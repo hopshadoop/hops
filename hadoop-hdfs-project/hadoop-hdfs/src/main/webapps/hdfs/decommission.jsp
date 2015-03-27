@@ -38,7 +38,8 @@
    * reported by each name node. 
    * It eleminates the data nodes who are not in decommission states.
    */
-  final ClusterJspHelper clusterhealthjsp  = new ClusterJspHelper();
+   final NameNode nn = NameNodeHttpServer.getNameNodeFromContext(application);
+   final ClusterJspHelper clusterhealthjsp  = new ClusterJspHelper(nn);
    DecommissionStatus dInfo = clusterhealthjsp.generateDecommissioningReport();
    XMLOutputter doc = new XMLOutputter(out, "UTF-8");
    dInfo.toXML(doc);

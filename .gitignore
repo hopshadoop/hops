@@ -9,3 +9,8 @@
 target
 hadoop-hdfs-project/hadoop-hdfs/downloads
 hadoop-hdfs-project/hadoop-hdfs-httpfs/downloads
+*.gv
+*.png
+*~
+/nbactions.xml
+sonar-project.properties

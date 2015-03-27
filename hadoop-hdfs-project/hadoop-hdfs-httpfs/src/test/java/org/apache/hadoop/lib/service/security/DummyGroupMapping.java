@@ -17,13 +17,13 @@
  */
 package org.apache.hadoop.lib.service.security;
 
+import org.apache.hadoop.security.GroupMappingServiceProvider;
+import org.apache.hadoop.test.HadoopUsersConfTestHelper;
+
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-
-import org.apache.hadoop.security.GroupMappingServiceProvider;
-import org.apache.hadoop.test.HadoopUsersConfTestHelper;
 
 public class DummyGroupMapping implements GroupMappingServiceProvider {
 
@@ -32,8 +32,7 @@ public class DummyGroupMapping implements GroupMappingServiceProvider {
   public List<String> getGroups(String user) throws IOException {
     if (user.equals("root")) {
       return Arrays.asList("admin");
-    }
-    else if (user.equals("nobody")) {
+    } else if (user.equals("nobody")) {
       return Arrays.asList("nobody");
     } else {
       String[] groups = HadoopUsersConfTestHelper.getHadoopUserGroups(user);

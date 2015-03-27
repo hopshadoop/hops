@@ -25,7 +25,7 @@ import org.apache.hadoop.hdfs.security.token.block.ExportedBlockKeys;
 import org.apache.hadoop.hdfs.server.common.Storage;
 import org.apache.hadoop.hdfs.server.common.StorageInfo;
 
-/** 
+/**
  * DatanodeRegistration class contains all information the name-node needs
  * to identify and verify a data-node when it contacts the name-node.
  * This information is sent by data-node with each communication request.
@@ -35,9 +35,9 @@ import org.apache.hadoop.hdfs.server.common.StorageInfo;
 public class DatanodeRegistration extends DatanodeID
     implements NodeRegistration {
 
-  private final StorageInfo storageInfo;
+  private StorageInfo storageInfo;
   private ExportedBlockKeys exportedKeys;
-  private final String softwareVersion;
+  private String softwareVersion;
 
   public DatanodeRegistration(DatanodeID dn, StorageInfo info,
       ExportedBlockKeys keys, String softwareVersion) {
@@ -80,19 +80,16 @@ public class DatanodeRegistration extends DatanodeID
 
   @Override
   public String toString() {
-    return getClass().getSimpleName()
-      + "(" + getIpAddr()
-      + ", datanodeUuid=" + getDatanodeUuid()
-      + ", infoPort=" + getInfoPort()
-      + ", ipcPort=" + getIpcPort()
-      + ", storageInfo=" + storageInfo
-      + ")";
+    return getClass().getSimpleName() + "(" + getIpAddr() + ", storageID=" +
+        getStorageID() + ", infoPort=" + getInfoPort() + ", ipcPort=" +
+        getIpcPort() + ", storageInfo=" + storageInfo + ")";
   }
 
   @Override
   public boolean equals(Object to) {
     return super.equals(to);
   }
+
   @Override
   public int hashCode() {
     return super.hashCode();

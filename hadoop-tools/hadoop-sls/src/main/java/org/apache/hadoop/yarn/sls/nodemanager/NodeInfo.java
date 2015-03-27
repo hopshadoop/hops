@@ -32,9 +32,11 @@ import org.apache.hadoop.yarn.api.records.NodeState;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.ResourceOption;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
+import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode
         .UpdatedContainerInfo;
+import io.hops.ha.common.TransactionState;
 
 public class NodeInfo {
   private static int NODE_ID = 0;
@@ -148,8 +150,9 @@ public class NodeInfo {
         list2.add(ContainerStatus.newInstance(cId, ContainerState.RUNNING, "", 
           ContainerExitStatus.SUCCESS));
       }
+      //TODO check is the value 0 is enough here or if we should find the true value of the id
       list.add(new UpdatedContainerInfo(new ArrayList<ContainerStatus>(), 
-        list2));
+        list2, 0));
       return list;
     }
 
@@ -163,6 +166,21 @@ public class NodeInfo {
     public void setResourceOption(ResourceOption resourceOption) {
       perNode = resourceOption;
     }
+
+        @Override
+        public void updateNodeHeartbeatResponseForCleanup(NodeHeartbeatResponse response, TransactionState ts) {
+            throw new UnsupportedOperationException("Not supported yet.");
+        }
+
+        @Override
+        public List<UpdatedContainerInfo> pullContainerUpdates(TransactionState ts) {
+            throw new UnsupportedOperationException("Not supported yet.");
+        }
+
+        @Override
+        public void recover(RMStateStore.RMState state) throws Exception {
+            throw new UnsupportedOperationException("Not supported yet.");
+        }
   }
   
   public static RMNode newNodeInfo(String rackName, String hostName,

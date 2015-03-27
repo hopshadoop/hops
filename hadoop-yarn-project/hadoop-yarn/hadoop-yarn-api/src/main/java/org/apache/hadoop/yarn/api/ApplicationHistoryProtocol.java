@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.yarn.api;
 
-import java.io.IOException;
-
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
@@ -50,9 +48,12 @@ import org.apache.hadoop.yarn.api.records.ContainerReport;
 import org.apache.hadoop.yarn.api.records.Token;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 
+import java.io.IOException;
+
 /**
  * <p>
- * The protocol between clients and the <code>ApplicationHistoryServer</code> to
+ * The protocol between clients and the <code>ApplicationHistoryServer</code>
+ * to
  * get the information of completed applications etc.
  * </p>
  */
@@ -65,23 +66,24 @@ public interface ApplicationHistoryProtocol {
    * The interface used by clients to get a report of an Application from the
    * <code>ResourceManager</code>.
    * </p>
-   * 
+   * <p/>
    * <p>
    * The client, via {@link GetApplicationReportRequest} provides the
    * {@link ApplicationId} of the application.
    * </p>
-   * 
+   * <p/>
    * <p>
-   * In secure mode,the <code>ApplicationHistoryServer</code> verifies access to
+   * In secure mode,the <code>ApplicationHistoryServer</code> verifies access
+   * to
    * the application, queue etc. before accepting the request.
    * </p>
-   * 
+   * <p/>
    * <p>
    * The <code>ApplicationHistoryServer</code> responds with a
    * {@link GetApplicationReportResponse} which includes the
    * {@link ApplicationReport} for the application.
    * </p>
-   * 
+   * <p/>
    * <p>
    * If the user does not have <code>VIEW_APP</code> access then the following
    * fields in the report will be set to stubbed values:
@@ -95,9 +97,9 @@ public interface ApplicationHistoryProtocol {
    * <li>resource usage report - all values are -1</li>
    * </ul>
    * </p>
-   * 
+   *
    * @param request
-   *          request for an application report
+   *     request for an application report
    * @return application report
    * @throws YarnException
    * @throws IOException
@@ -112,54 +114,54 @@ public interface ApplicationHistoryProtocol {
    * The interface used by clients to get a report of all Applications in the
    * cluster from the <code>ApplicationHistoryServer</code>.
    * </p>
-   * 
+   * <p/>
    * <p>
    * The <code>ApplicationHistoryServer</code> responds with a
    * {@link GetApplicationsResponse} which includes a list of
    * {@link ApplicationReport} for all the applications.
    * </p>
-   * 
+   * <p/>
    * <p>
    * If the user does not have <code>VIEW_APP</code> access for an application
    * then the corresponding report will be filtered as described in
    * {@link #getApplicationReport(GetApplicationReportRequest)}.
    * </p>
-   * 
+   *
    * @param request
-   *          request for reports on all the applications
+   *     request for reports on all the applications
    * @return report on applications matching the given application types defined
-   *         in the request
+   * in the request
    * @throws YarnException
    * @throws IOException
    */
   @Public
   @Unstable
-  public GetApplicationsResponse
-      getApplications(GetApplicationsRequest request) throws YarnException,
-          IOException;
+  public GetApplicationsResponse getApplications(GetApplicationsRequest request)
+      throws YarnException, IOException;
 
   /**
    * <p>
    * The interface used by clients to get a report of an Application Attempt
    * from the <code>ApplicationHistoryServer</code>.
    * </p>
-   * 
+   * <p/>
    * <p>
    * The client, via {@link GetApplicationAttemptReportRequest} provides the
    * {@link ApplicationAttemptId} of the application attempt.
    * </p>
-   * 
+   * <p/>
    * <p>
-   * In secure mode,the <code>ApplicationHistoryServer</code> verifies access to
+   * In secure mode,the <code>ApplicationHistoryServer</code> verifies access
+   * to
    * the method before accepting the request.
    * </p>
-   * 
+   * <p/>
    * <p>
    * The <code>ApplicationHistoryServer</code> responds with a
    * {@link GetApplicationAttemptReportResponse} which includes the
    * {@link ApplicationAttemptReport} for the application attempt.
    * </p>
-   * 
+   * <p/>
    * <p>
    * If the user does not have <code>VIEW_APP</code> access then the following
    * fields in the report will be set to stubbed values:
@@ -171,9 +173,9 @@ public interface ApplicationHistoryProtocol {
    * <li>tracking URL</li>
    * </ul>
    * </p>
-   * 
+   *
    * @param request
-   *          request for an application attempt report
+   *     request for an application attempt report
    * @return application attempt report
    * @throws YarnException
    * @throws IOException
@@ -181,30 +183,30 @@ public interface ApplicationHistoryProtocol {
   @Public
   @Unstable
   public GetApplicationAttemptReportResponse getApplicationAttemptReport(
-      GetApplicationAttemptReportRequest request) throws YarnException,
-      IOException;
+      GetApplicationAttemptReportRequest request)
+      throws YarnException, IOException;
 
   /**
    * <p>
    * The interface used by clients to get a report of all Application attempts
    * in the cluster from the <code>ApplicationHistoryServer</code>.
    * </p>
-   * 
+   * <p/>
    * <p>
    * The <code>ApplicationHistoryServer</code> responds with a
    * {@link GetApplicationAttemptsRequest} which includes the
    * {@link ApplicationAttemptReport} for all the applications attempts of a
    * specified application attempt.
    * </p>
-   * 
+   * <p/>
    * <p>
    * If the user does not have <code>VIEW_APP</code> access for an application
    * then the corresponding report will be filtered as described in
    * {@link #getApplicationAttemptReport(GetApplicationAttemptReportRequest)}.
    * </p>
-   * 
+   *
    * @param request
-   *          request for reports on all application attempts of an application
+   *     request for reports on all application attempts of an application
    * @return reports on all application attempts of an application
    * @throws YarnException
    * @throws IOException
@@ -219,25 +221,26 @@ public interface ApplicationHistoryProtocol {
    * The interface used by clients to get a report of an Container from the
    * <code>ApplicationHistoryServer</code>.
    * </p>
-   * 
+   * <p/>
    * <p>
    * The client, via {@link GetContainerReportRequest} provides the
    * {@link ContainerId} of the container.
    * </p>
-   * 
+   * <p/>
    * <p>
-   * In secure mode,the <code>ApplicationHistoryServer</code> verifies access to
+   * In secure mode,the <code>ApplicationHistoryServer</code> verifies access
+   * to
    * the method before accepting the request.
    * </p>
-   * 
+   * <p/>
    * <p>
    * The <code>ApplicationHistoryServer</code> responds with a
    * {@link GetContainerReportResponse} which includes the
    * {@link ContainerReport} for the container.
    * </p>
-   * 
+   *
    * @param request
-   *          request for a container report
+   *     request for a container report
    * @return container report
    * @throws YarnException
    * @throws IOException
@@ -252,26 +255,27 @@ public interface ApplicationHistoryProtocol {
    * The interface used by clients to get a report of Containers for an
    * application attempt from the <code>ApplciationHistoryServer</code>.
    * </p>
-   * 
+   * <p/>
    * <p>
    * The client, via {@link GetContainersRequest} provides the
    * {@link ApplicationAttemptId} of the application attempt.
    * </p>
-   * 
+   * <p/>
    * <p>
-   * In secure mode,the <code>ApplicationHistoryServer</code> verifies access to
+   * In secure mode,the <code>ApplicationHistoryServer</code> verifies access
+   * to
    * the method before accepting the request.
    * </p>
-   * 
+   * <p/>
    * <p>
    * The <code>ApplicationHistoryServer</code> responds with a
    * {@link GetContainersResponse} which includes a list of
    * {@link ContainerReport} for all the containers of a specific application
    * attempt.
    * </p>
-   * 
+   *
    * @param request
-   *          request for a list of container reports of an application attempt.
+   *     request for a list of container reports of an application attempt.
    * @return reports on all containers of an application attempt
    * @throws YarnException
    * @throws IOException
@@ -286,15 +290,15 @@ public interface ApplicationHistoryProtocol {
    * The interface used by clients to get delegation token, enabling the
    * containers to be able to talk to the service using those tokens.
    * </p>
-   * 
+   * <p/>
    * <p>
    * The <code>ApplicationHistoryServer</code> responds with the delegation
    * token {@link Token} that can be used by the client to speak to this
    * service.
    * </p>
-   * 
+   *
    * @param request
-   *          request to get a delegation token for the client.
+   *     request to get a delegation token for the client.
    * @return delegation token that can be used to talk to this service
    * @throws YarnException
    * @throws IOException
@@ -306,9 +310,9 @@ public interface ApplicationHistoryProtocol {
 
   /**
    * Renew an existing delegation token.
-   * 
+   *
    * @param request
-   *          the delegation token to be renewed.
+   *     the delegation token to be renewed.
    * @return the new expiry time for the delegation token.
    * @throws YarnException
    * @throws IOException
@@ -320,9 +324,9 @@ public interface ApplicationHistoryProtocol {
 
   /**
    * Cancel an existing delegation token.
-   * 
+   *
    * @param request
-   *          the delegation token to be cancelled.
+   *     the delegation token to be cancelled.
    * @return an empty response.
    * @throws YarnException
    * @throws IOException

@@ -17,18 +17,18 @@
  */
 package org.apache.hadoop.hdfs.server.datanode.fsdataset.impl;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.server.datanode.DataStorage;
 import org.apache.hadoop.util.DiskChecker;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * A node type that can be built into a tree reflecting the
@@ -51,7 +51,7 @@ class LDir {
         throw new IOException("Failed to mkdirs " + dir);
       }
     } else {
-      File[] files = FileUtil.listFiles(dir); 
+      File[] files = FileUtil.listFiles(dir);
       List<LDir> dirList = new ArrayList<LDir>();
       for (int idx = 0; idx < files.length; idx++) {
         if (files[idx].isDirectory()) {
@@ -65,58 +65,58 @@ class LDir {
       }
     }
   }
-      
+
   File addBlock(Block b, File src) throws IOException {
     //First try without creating subdirectories
-    File file = addBlock(b, src, false, false);          
+    File file = addBlock(b, src, false, false);
     return (file != null) ? file : addBlock(b, src, true, true);
   }
 
-  private File addBlock(Block b, File src, boolean createOk, boolean resetIdx
-      ) throws IOException {
+  private File addBlock(Block b, File src, boolean createOk, boolean resetIdx)
+      throws IOException {
     if (numBlocks < maxBlocksPerDir) {
       final File dest = FsDatasetImpl.moveBlockFiles(b, src, dir);
       numBlocks += 1;
       return dest;
     }
-          
+
     if (lastChildIdx < 0 && resetIdx) {
       //reset so that all children will be checked
-      lastChildIdx = DFSUtil.getRandom().nextInt(children.length);              
+      lastChildIdx = DFSUtil.getRandom().nextInt(children.length);
     }
-          
+
     if (lastChildIdx >= 0 && children != null) {
       //Check if any child-tree has room for a block.
-      for (int i=0; i < children.length; i++) {
-        int idx = (lastChildIdx + i)%children.length;
+      for (int i = 0; i < children.length; i++) {
+        int idx = (lastChildIdx + i) % children.length;
         File file = children[idx].addBlock(b, src, false, resetIdx);
         if (file != null) {
           lastChildIdx = idx;
-          return file; 
+          return file;
         }
       }
       lastChildIdx = -1;
     }
-          
+
     if (!createOk) {
       return null;
     }
-          
+
     if (children == null || children.length == 0) {
       children = new LDir[maxBlocksPerDir];
       for (int idx = 0; idx < maxBlocksPerDir; idx++) {
-        final File sub = new File(dir, DataStorage.BLOCK_SUBDIR_PREFIX+idx);
+        final File sub = new File(dir, DataStorage.BLOCK_SUBDIR_PREFIX + idx);
         children[idx] = new LDir(sub, maxBlocksPerDir);
       }
     }
-          
+
     //now pick a child randomly for creating a new set of subdirs.
     lastChildIdx = DFSUtil.getRandom().nextInt(children.length);
-    return children[ lastChildIdx ].addBlock(b, src, true, false); 
+    return children[lastChildIdx].addBlock(b, src, true, false);
   }
 
-  void getVolumeMap(String bpid, ReplicaMap volumeMap, FsVolumeImpl volume
-      ) throws IOException {
+  void getVolumeMap(String bpid, ReplicaMap volumeMap, FsVolumeImpl volume)
+      throws IOException {
     if (children != null) {
       for (int i = 0; i < children.length; i++) {
         children[i].getVolumeMap(bpid, volumeMap, volume);
@@ -126,7 +126,7 @@ class LDir {
     recoverTempUnlinkedBlock();
     volume.addToReplicasMap(bpid, volumeMap, dir, true);
   }
-      
+
   /**
    * Recover unlinked tmp files on datanode restart. If the original block
    * does not exist, then the tmp file is renamed to be the
@@ -154,51 +154,52 @@ class LDir {
   
   /**
    * check if a data diretory is healthy
+   *
    * @throws DiskErrorException
    */
   void checkDirTree() throws DiskErrorException {
     DiskChecker.checkDir(dir);
-          
+
     if (children != null) {
       for (int i = 0; i < children.length; i++) {
         children[i].checkDirTree();
       }
     }
   }
-      
+
   void clearPath(File f) {
     String root = dir.getAbsolutePath();
     String dir = f.getAbsolutePath();
     if (dir.startsWith(root)) {
       String[] dirNames = dir.substring(root.length()).
-        split(File.separator + DataStorage.BLOCK_SUBDIR_PREFIX);
-      if (clearPath(f, dirNames, 1))
+          split(File.separator + DataStorage.BLOCK_SUBDIR_PREFIX);
+      if (clearPath(f, dirNames, 1)) {
         return;
+      }
     }
     clearPath(f, null, -1);
   }
-      
+
   /**
    * dirNames is an array of string integers derived from
    * usual directory structure data/subdirN/subdirXY/subdirM ...
-   * If dirName array is non-null, we only check the child at 
+   * If dirName array is non-null, we only check the child at
    * the children[dirNames[idx]]. This avoids iterating over
-   * children in common case. If directory structure changes 
+   * children in common case. If directory structure changes
    * in later versions, we need to revisit this.
    */
   private boolean clearPath(File f, String[] dirNames, int idx) {
-    if ((dirNames == null || idx == dirNames.length) &&
-        dir.compareTo(f) == 0) {
+    if ((dirNames == null || idx == dirNames.length) && dir.compareTo(f) == 0) {
       numBlocks--;
       return true;
     }
-        
+
     if (dirNames != null) {
       //guess the child index from the directory name
       if (idx > (dirNames.length - 1) || children == null) {
         return false;
       }
-      int childIdx; 
+      int childIdx;
       try {
         childIdx = Integer.parseInt(dirNames[idx]);
       } catch (NumberFormatException ignored) {
@@ -206,13 +207,13 @@ class LDir {
         return false;
       }
       return (childIdx >= 0 && childIdx < children.length) ?
-        children[childIdx].clearPath(f, dirNames, idx+1) : false;
+          children[childIdx].clearPath(f, dirNames, idx + 1) : false;
     }
 
     //guesses failed. back to blind iteration.
     if (children != null) {
-      for(int i=0; i < children.length; i++) {
-        if (children[i].clearPath(f, null, -1)){
+      for (int i = 0; i < children.length; i++) {
+        if (children[i].clearPath(f, null, -1)) {
           return true;
         }
       }
@@ -222,7 +223,7 @@ class LDir {
 
   @Override
   public String toString() {
-    return "FSDir{dir=" + dir + ", children="
-        + (children == null ? null : Arrays.asList(children)) + "}";
+    return "FSDir{dir=" + dir + ", children=" +
+        (children == null ? null : Arrays.asList(children)) + "}";
   }
 }

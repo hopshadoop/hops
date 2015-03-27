@@ -17,16 +17,6 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
-import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
-import static org.apache.hadoop.test.MetricsAsserts.assertQuantileGauges;
-import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
-import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-
-import java.util.List;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -41,6 +31,16 @@ import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.junit.Test;
 
+import java.util.List;
+
+import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
+import static org.apache.hadoop.test.MetricsAsserts.assertQuantileGauges;
+import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
+import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+
 public class TestDataNodeMetrics {
 
   @Test
@@ -50,16 +50,18 @@ public class TestDataNodeMetrics {
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).build();
     try {
       FileSystem fs = cluster.getFileSystem();
-      final long LONG_FILE_LEN = Integer.MAX_VALUE+1L; 
-      DFSTestUtil.createFile(fs, new Path("/tmp.txt"),
-          LONG_FILE_LEN, (short)1, 1L);
+      final long LONG_FILE_LEN = Integer.MAX_VALUE + 1L;
+      DFSTestUtil
+          .createFile(fs, new Path("/tmp.txt"), LONG_FILE_LEN, (short) 1, 1L);
       List<DataNode> datanodes = cluster.getDataNodes();
       assertEquals(datanodes.size(), 1);
       DataNode datanode = datanodes.get(0);
       MetricsRecordBuilder rb = getMetrics(datanode.getMetrics().name());
       assertCounter("BytesWritten", LONG_FILE_LEN, rb);
     } finally {
-      if (cluster != null) {cluster.shutdown();}
+      if (cluster != null) {
+        cluster.shutdown();
+      }
     }
   }
 
@@ -67,14 +69,14 @@ public class TestDataNodeMetrics {
   public void testSendDataPacketMetrics() throws Exception {
     Configuration conf = new HdfsConfiguration();
     final int interval = 1;
-    conf.set(DFSConfigKeys.DFS_METRICS_PERCENTILES_INTERVALS_KEY, "" + interval);
+    conf.set(DFSConfigKeys.DFS_METRICS_PERCENTILES_INTERVALS_KEY,
+        "" + interval);
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).build();
     try {
       FileSystem fs = cluster.getFileSystem();
       // Create and read a 1 byte file
       Path tmpfile = new Path("/tmp.txt");
-      DFSTestUtil.createFile(fs, tmpfile,
-          (long)1, (short)1, 1L);
+      DFSTestUtil.createFile(fs, tmpfile, (long) 1, (short) 1, 1L);
       DFSTestUtil.readFile(fs, tmpfile);
       List<DataNode> datanodes = cluster.getDataNodes();
       assertEquals(datanodes.size(), 1);
@@ -82,8 +84,8 @@ public class TestDataNodeMetrics {
       MetricsRecordBuilder rb = getMetrics(datanode.getMetrics().name());
       // Expect 2 packets, 1 for the 1 byte read, 1 for the empty packet
       // signaling the end of the block
-      assertCounter("SendDataPacketTransferNanosNumOps", (long)2, rb);
-      assertCounter("SendDataPacketBlockedOnNetworkNanosNumOps", (long)2, rb);
+      assertCounter("SendDataPacketTransferNanosNumOps", (long) 2, rb);
+      assertCounter("SendDataPacketBlockedOnNetworkNanosNumOps", (long) 2, rb);
       // Wait for at least 1 rollover
       Thread.sleep((interval + 1) * 1000);
       // Check that the sendPacket percentiles rolled to non-zero values
@@ -91,7 +93,9 @@ public class TestDataNodeMetrics {
       assertQuantileGauges("SendDataPacketBlockedOnNetworkNanos" + sec, rb);
       assertQuantileGauges("SendDataPacketTransferNanos" + sec, rb);
     } finally {
-      if (cluster != null) {cluster.shutdown();}
+      if (cluster != null) {
+        cluster.shutdown();
+      }
     }
   }
 
@@ -99,11 +103,13 @@ public class TestDataNodeMetrics {
   public void testReceivePacketMetrics() throws Exception {
     Configuration conf = new HdfsConfiguration();
     final int interval = 1;
-    conf.set(DFSConfigKeys.DFS_METRICS_PERCENTILES_INTERVALS_KEY, "" + interval);
+    conf.set(DFSConfigKeys.DFS_METRICS_PERCENTILES_INTERVALS_KEY,
+        "" + interval);
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).build();
     try {
       cluster.waitActive();
-      DistributedFileSystem fs = (DistributedFileSystem) cluster.getFileSystem();
+      DistributedFileSystem fs =
+          (DistributedFileSystem) cluster.getFileSystem();
 
       Path testFile = new Path("/testFlushNanosMetric.txt");
       FSDataOutputStream fout = fs.create(testFile);
@@ -125,22 +131,25 @@ public class TestDataNodeMetrics {
       assertQuantileGauges("FlushNanos" + sec, dnMetrics);
       assertQuantileGauges("FsyncNanos" + sec, dnMetrics);
     } finally {
-      if (cluster != null) {cluster.shutdown();}
+      if (cluster != null) {
+        cluster.shutdown();
+      }
     }
   }
 
   /**
-   * Tests that round-trip acks in a datanode write pipeline are correctly 
-   * measured. 
+   * Tests that round-trip acks in a datanode write pipeline are correctly
+   * measured.
    */
   @Test
   public void testRoundTripAckMetric() throws Exception {
     final int datanodeCount = 2;
     final int interval = 1;
     Configuration conf = new HdfsConfiguration();
-    conf.set(DFSConfigKeys.DFS_METRICS_PERCENTILES_INTERVALS_KEY, "" + interval);
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(
-        datanodeCount).build();
+    conf.set(DFSConfigKeys.DFS_METRICS_PERCENTILES_INTERVALS_KEY,
+        "" + interval);
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(datanodeCount).build();
     try {
       cluster.waitActive();
       FileSystem fs = cluster.getFileSystem();
@@ -169,17 +178,16 @@ public class TestDataNodeMetrics {
           break;
         }
       }
-      assertNotNull("Could not find the head of the datanode write pipeline", 
+      assertNotNull("Could not find the head of the datanode write pipeline",
           headNode);
       // Close the file and wait for the metrics to rollover
       Thread.sleep((interval + 1) * 1000);
       // Check the ack was received
-      MetricsRecordBuilder dnMetrics = getMetrics(headNode.getMetrics()
-          .name());
-      assertTrue("Expected non-zero number of acks", 
+      MetricsRecordBuilder dnMetrics = getMetrics(headNode.getMetrics().name());
+      assertTrue("Expected non-zero number of acks",
           getLongCounter("PacketAckRoundTripTimeNanosNumOps", dnMetrics) > 0);
-      assertQuantileGauges("PacketAckRoundTripTimeNanos" + interval
-          + "s", dnMetrics);
+      assertQuantileGauges("PacketAckRoundTripTimeNanos" + interval + "s",
+          dnMetrics);
     } finally {
       if (cluster != null) {
         cluster.shutdown();

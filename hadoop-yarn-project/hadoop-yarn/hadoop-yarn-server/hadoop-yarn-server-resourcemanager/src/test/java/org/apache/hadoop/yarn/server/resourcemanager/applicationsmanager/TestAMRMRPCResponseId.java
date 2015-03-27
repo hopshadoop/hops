@@ -1,32 +1,34 @@
 /**
-* Licensed to the Apache Software Foundation (ASF) under one
-* or more contributor license agreements.  See the NOTICE file
-* distributed with this work for additional information
-* regarding copyright ownership.  The ASF licenses this file
-* to you under the Apache License, Version 2.0 (the
-* "License"); you may not use this file except in compliance
-* with the License.  You may obtain a copy of the License at
-*
-*     http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package org.apache.hadoop.yarn.server.resourcemanager.applicationsmanager;
 
-import java.security.PrivilegedExceptionAction;
-
+import io.hops.exception.StorageInitializtionException;
+import io.hops.metadata.util.RMStorageFactory;
+import io.hops.metadata.util.RMUtilities;
+import io.hops.metadata.util.YarnAPIStorageFactory;
 import junit.framework.Assert;
-
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.api.protocolrecords.AllocateRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.AllocateResponse;
 import org.apache.hadoop.yarn.api.records.AMCommand;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.security.AMRMTokenIdentifier;
 import org.apache.hadoop.yarn.server.resourcemanager.ApplicationMasterService;
 import org.apache.hadoop.yarn.server.resourcemanager.MockAM;
@@ -38,13 +40,20 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.io.IOException;
+import java.security.PrivilegedExceptionAction;
+
 public class TestAMRMRPCResponseId {
 
   private MockRM rm;
   ApplicationMasterService amService = null;
 
   @Before
-  public void setUp() {
+  public void setUp() throws StorageInitializtionException, IOException {
+    YarnConfiguration conf = new YarnConfiguration();
+    YarnAPIStorageFactory.setConfiguration(conf);
+    RMStorageFactory.setConfiguration(conf);
+    RMUtilities.InitializeDB();
     this.rm = new MockRM();
     rm.start();
     amService = rm.getApplicationMasterService();
@@ -63,7 +72,7 @@ public class TestAMRMRPCResponseId {
         UserGroupInformation.createRemoteUser(attemptId.toString());
     org.apache.hadoop.security.token.Token<AMRMTokenIdentifier> token =
         rm.getRMContext().getRMApps().get(attemptId.getApplicationId())
-          .getRMAppAttempt(attemptId).getAMRMToken();
+            .getRMAppAttempt(attemptId).getAMRMToken();
     ugi.addTokenIdentifier(token.decodeIdentifier());
     return ugi.doAs(new PrivilegedExceptionAction<AllocateResponse>() {
       @Override
@@ -95,9 +104,8 @@ public class TestAMRMRPCResponseId {
         allocate(attempt.getAppAttemptId(), allocateRequest);
     Assert.assertEquals(1, response.getResponseId());
     Assert.assertTrue(response.getAMCommand() == null);
-    allocateRequest =
-        AllocateRequest.newInstance(response.getResponseId(), 0F, null, null,
-          null);
+    allocateRequest = AllocateRequest
+        .newInstance(response.getResponseId(), 0F, null, null, null);
     
     response = allocate(attempt.getAppAttemptId(), allocateRequest);
     Assert.assertEquals(2, response.getResponseId());

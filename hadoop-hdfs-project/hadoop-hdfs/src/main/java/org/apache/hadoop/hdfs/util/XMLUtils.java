@@ -31,7 +31,6 @@ import java.util.TreeMap;
 
 /**
  * General xml utilities.
- *   
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
@@ -41,6 +40,7 @@ public class XMLUtils {
    */
   static public class InvalidXmlException extends RuntimeException {
     private static final long serialVersionUID = 1L;
+
     public InvalidXmlException(String s) {
       super(s);
     }
@@ -65,13 +65,14 @@ public class XMLUtils {
   /**
    * Given a code point, determine if it should be mangled before being
    * represented in an XML document.
-   * 
+   * <p/>
    * Any code point that isn't valid in XML must be mangled.
    * See http://en.wikipedia.org/wiki/Valid_characters_in_XML for a
    * quick reference, or the w3 standard for the authoritative reference.
-   * 
-   * @param cp      The code point
-   * @return        True if the code point should be mangled
+   *
+   * @param cp
+   *     The code point
+   * @return True if the code point should be mangled
    */
   private static boolean codePointMustBeMangled(int cp) {
     if (cp < 0x20) {
@@ -88,7 +89,7 @@ public class XMLUtils {
     return false;
   }
 
-  private static final int NUM_SLASH_POSITIONS = 4;
+  private static int NUM_SLASH_POSITIONS = 4;
 
   private static String mangleCodePoint(int cp) {
     return String.format("\\%0" + NUM_SLASH_POSITIONS + "x;", cp);
@@ -96,41 +97,41 @@ public class XMLUtils {
 
   /**
    * Mangle a string so that it can be represented in an XML document.
-   * 
+   * <p/>
    * There are three kinds of code points in XML:
    * - Those that can be represented normally,
-   * - Those that have to be escaped (for example, & must be represented 
-   *     as &amp;)
+   * - Those that have to be escaped (for example, & must be represented
+   * as &amp;)
    * - Those that cannot be represented at all in XML.
-   *
+   * <p/>
    * The built-in SAX functions will handle the first two types for us just
    * fine.  However, sometimes we come across a code point of the third type.
    * In this case, we have to mangle the string in order to represent it at
    * all.  We also mangle backslash to avoid confusing a backslash in the
    * string with part our escape sequence.
-   * 
+   * <p/>
    * The encoding used here is as follows: an illegal code point is
-   * represented as '\ABCD;', where ABCD is the hexadecimal value of 
+   * represented as '\ABCD;', where ABCD is the hexadecimal value of
    * the code point.
    *
-   * @param str     The input string.
-   *
-   * @return        The mangled string.
+   * @param str
+   *     The input string.
+   * @return The mangled string.
    */
   public static String mangleXmlString(String str) {
     final StringBuilder bld = new StringBuilder();
     final int length = str.length();
     for (int offset = 0; offset < length; ) {
-       final int cp = str.codePointAt(offset);
-       final int len = Character.charCount(cp);
-       if (codePointMustBeMangled(cp)) {
-         bld.append(mangleCodePoint(cp));
-       } else {
-         for (int i = 0; i < len; i++) {
-           bld.append(str.charAt(offset + i));
-         }
-       }
-       offset += len;
+      final int cp = str.codePointAt(offset);
+      final int len = Character.charCount(cp);
+      if (codePointMustBeMangled(cp)) {
+        bld.append(mangleCodePoint(cp));
+      } else {
+        for (int i = 0; i < len; i++) {
+          bld.append(str.charAt(offset + i));
+        }
+      }
+      offset += len;
     }
     return bld.toString();
   }
@@ -140,13 +141,13 @@ public class XMLUtils {
    * See {@link #mangleXmlString(String)} for a description of the mangling
    * format.
    *
-   * @param str    The string to be demangled.
-   * 
-   * @return       The unmangled string
-   * @throws       UnmanglingError if the input is malformed.
+   * @param str
+   *     The string to be demangled.
+   * @return The unmangled string
+   * @throws UnmanglingError
+   *     if the input is malformed.
    */
-  public static String unmangleXmlString(String str)
-        throws UnmanglingError {
+  public static String unmangleXmlString(String str) throws UnmanglingError {
     int slashPosition = -1;
     String escapedCp = "";
     StringBuilder bld = new StringBuilder();
@@ -183,12 +184,15 @@ public class XMLUtils {
   /**
    * Add a SAX tag with a string inside.
    *
-   * @param contentHandler     the SAX content handler
-   * @param tag                the element tag to use  
-   * @param value              the string to put inside the tag
+   * @param contentHandler
+   *     the SAX content handler
+   * @param tag
+   *     the element tag to use
+   * @param value
+   *     the string to put inside the tag
    */
-  public static void addSaxString(ContentHandler contentHandler,
-      String tag, String val) throws SAXException {
+  public static void addSaxString(ContentHandler contentHandler, String tag,
+      String val) throws SAXException {
     contentHandler.startElement("", "", tag, new AttributesImpl());
     char c[] = mangleXmlString(val).toCharArray();
     contentHandler.characters(c, 0, c.length);
@@ -200,13 +204,15 @@ public class XMLUtils {
    * file.
    */
   static public class Stanza {
-    private final TreeMap<String, LinkedList <Stanza > > subtrees;
+    private TreeMap<String, LinkedList<Stanza>> subtrees;
 
-    /** The unmangled value of this stanza. */
+    /**
+     * The unmangled value of this stanza.
+     */
     private String value;
     
     public Stanza() {
-      subtrees = new TreeMap<String, LinkedList <Stanza > >();
+      subtrees = new TreeMap<String, LinkedList<Stanza>>();
       value = "";
     }
     
@@ -218,70 +224,57 @@ public class XMLUtils {
       return this.value;
     }
     
-    /** 
+    /**
      * Discover if a stanza has a given entry.
      *
-     * @param name        entry to look for
-     * 
-     * @return            true if the entry was found
+     * @param name
+     *     entry to look for
+     * @return true if the entry was found
      */
     public boolean hasChildren(String name) {
       return subtrees.containsKey(name);
     }
     
-    /** 
+    /**
      * Pull an entry from a stanza.
      *
-     * @param name        entry to look for
-     * 
-     * @return            the entry
+     * @param name
+     *     entry to look for
+     * @return the entry
      */
     public List<Stanza> getChildren(String name) throws InvalidXmlException {
-      LinkedList <Stanza> children = subtrees.get(name);
+      LinkedList<Stanza> children = subtrees.get(name);
       if (children == null) {
         throw new InvalidXmlException("no entry found for " + name);
       }
       return children;
     }
     
-    /** 
+    /**
      * Pull a string entry from a stanza.
      *
-     * @param name        entry to look for
-     * 
-     * @return            the entry
+     * @param name
+     *     entry to look for
+     * @return the entry
      */
     public String getValue(String name) throws InvalidXmlException {
-      String ret = getValueOrNull(name);
-      if (ret == null) {
+      if (!subtrees.containsKey(name)) {
         throw new InvalidXmlException("no entry found for " + name);
       }
-      return ret;
-    }
-
-    /** 
-     * Pull a string entry from a stanza, or null.
-     *
-     * @param name        entry to look for
-     * 
-     * @return            the entry, or null if it was not found.
-     */
-    public String getValueOrNull(String name) throws InvalidXmlException {
-      if (!subtrees.containsKey(name)) {
-        return null;
-      }
-      LinkedList <Stanza> l = subtrees.get(name);
+      LinkedList<Stanza> l = subtrees.get(name);
       if (l.size() != 1) {
         throw new InvalidXmlException("More than one value found for " + name);
       }
       return l.get(0).getValue();
     }
     
-    /** 
+    /**
      * Add an entry to a stanza.
      *
-     * @param name        name of the entry to add
-     * @param child       the entry to add
+     * @param name
+     *     name of the entry to add
+     * @param child
+     *     the entry to add
      */
     public void addChild(String name, Stanza child) {
       LinkedList<Stanza> l;
@@ -294,7 +287,7 @@ public class XMLUtils {
       l.add(child);
     }
     
-    /** 
+    /**
      * Convert a stanza to a human-readable string.
      */
     @Override
@@ -305,10 +298,9 @@ public class XMLUtils {
         bld.append("\"").append(value).append("\"");
       }
       String prefix = "";
-      for (Map.Entry<String, LinkedList <Stanza > > entry :
-          subtrees.entrySet()) {
+      for (Map.Entry<String, LinkedList<Stanza>> entry : subtrees.entrySet()) {
         String key = entry.getKey();
-        LinkedList <Stanza > ll = entry.getValue();
+        LinkedList<Stanza> ll = entry.getValue();
         for (Stanza child : ll) {
           bld.append(prefix);
           bld.append("<").append(key).append(">");

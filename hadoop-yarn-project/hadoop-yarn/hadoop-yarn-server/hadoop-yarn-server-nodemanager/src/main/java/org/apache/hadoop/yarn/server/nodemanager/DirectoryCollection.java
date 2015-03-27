@@ -1,30 +1,22 @@
 /**
-* Licensed to the Apache Software Foundation (ASF) under one
-* or more contributor license agreements.  See the NOTICE file
-* distributed with this work for additional information
-* regarding copyright ownership.  The ASF licenses this file
-* to you under the Apache License, Version 2.0 (the
-* "License"); you may not use this file except in compliance
-* with the License.  You may obtain a copy of the License at
-*
-*     http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package org.apache.hadoop.yarn.server.nodemanager;
-
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -33,6 +25,14 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.util.DiskChecker;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Manages a list of local storage directories.
@@ -50,9 +50,9 @@ class DirectoryCollection {
 
   /**
    * Create collection for the directories specified. No check for free space.
-   * 
+   *
    * @param dirs
-   *          directories to be monitored
+   *     directories to be monitored
    */
   public DirectoryCollection(String[] dirs) {
     this(dirs, 100.0F, 0);
@@ -62,13 +62,12 @@ class DirectoryCollection {
    * Create collection for the directories specified. Users must specify the
    * maximum percentage of disk utilization allowed. Minimum amount of disk
    * space is not checked.
-   * 
+   *
    * @param dirs
-   *          directories to be monitored
+   *     directories to be monitored
    * @param utilizationPercentageCutOff
-   *          percentage of disk that can be used before the dir is taken out of
-   *          the good dirs list
-   * 
+   *     percentage of disk that can be used before the dir is taken out of
+   *     the good dirs list
    */
   public DirectoryCollection(String[] dirs, float utilizationPercentageCutOff) {
     this(dirs, utilizationPercentageCutOff, 0);
@@ -76,14 +75,14 @@ class DirectoryCollection {
 
   /**
    * Create collection for the directories specified. Users must specify the
-   * minimum amount of free space that must be available for the dir to be used.
-   * 
+   * minimum amount of free space that must be available for the dir to be
+   * used.
+   *
    * @param dirs
-   *          directories to be monitored
+   *     directories to be monitored
    * @param utilizationSpaceCutOff
-   *          minimum space, in MB, that must be available on the disk for the
-   *          dir to be marked as good
-   * 
+   *     minimum space, in MB, that must be available on the disk for the
+   *     dir to be marked as good
    */
   public DirectoryCollection(String[] dirs, long utilizationSpaceCutOff) {
     this(dirs, 100.0F, utilizationSpaceCutOff);
@@ -94,34 +93,32 @@ class DirectoryCollection {
    * maximum percentage of disk utilization allowed and the minimum amount of
    * free space that must be available for the dir to be used. If either check
    * fails the dir is removed from the good dirs list.
-   * 
+   *
    * @param dirs
-   *          directories to be monitored
+   *     directories to be monitored
    * @param utilizationPercentageCutOff
-   *          percentage of disk that can be used before the dir is taken out of
-   *          the good dirs list
+   *     percentage of disk that can be used before the dir is taken out of
+   *     the good dirs list
    * @param utilizationSpaceCutOff
-   *          minimum space, in MB, that must be available on the disk for the
-   *          dir to be marked as good
-   * 
+   *     minimum space, in MB, that must be available on the disk for the
+   *     dir to be marked as good
    */
-  public DirectoryCollection(String[] dirs, 
-      float utilizationPercentageCutOff,
+  public DirectoryCollection(String[] dirs, float utilizationPercentageCutOff,
       long utilizationSpaceCutOff) {
     localDirs = new CopyOnWriteArrayList<String>(dirs);
     failedDirs = new CopyOnWriteArrayList<String>();
     diskUtilizationPercentageCutoff = utilizationPercentageCutOff;
     diskUtilizationSpaceCutoff = utilizationSpaceCutOff;
     diskUtilizationPercentageCutoff =
-        utilizationPercentageCutOff < 0.0F ? 0.0F
-            : (utilizationPercentageCutOff > 100.0F ? 100.0F
-                : utilizationPercentageCutOff);
+        utilizationPercentageCutOff < 0.0F ? 0.0F :
+            (utilizationPercentageCutOff > 100.0F ? 100.0F :
+                utilizationPercentageCutOff);
     diskUtilizationSpaceCutoff =
         utilizationSpaceCutOff < 0 ? 0 : utilizationSpaceCutOff;
   }
 
   /**
-   * @return the current valid directories 
+   * @return the current valid directories
    */
   synchronized List<String> getGoodDirs() {
     return Collections.unmodifiableList(localDirs);
@@ -144,8 +141,11 @@ class DirectoryCollection {
   /**
    * Create any non-existent directories and parent directories, updating the
    * list of valid directories if necessary.
-   * @param localFs local file system to use
-   * @param perm absolute permissions to use for any directories created
+   *
+   * @param localFs
+   *     local file system to use
+   * @param perm
+   *     absolute permissions to use for any directories created
    * @return true if there were no errors, false if at least one error occurred
    */
   synchronized boolean createNonExistentDirs(FileContext localFs,
@@ -169,8 +169,9 @@ class DirectoryCollection {
   /**
    * Check the health of current set of local directories, updating the list
    * of valid directories if necessary.
+   *
    * @return <em>true</em> if there is a new disk-failure identified in
-   *         this checking. <em>false</em> otherwise.
+   * this checking. <em>false</em> otherwise.
    */
   synchronized boolean checkDirs() {
     int oldNumFailures = numFailures;
@@ -180,20 +181,20 @@ class DirectoryCollection {
         File testDir = new File(dir);
         DiskChecker.checkDir(testDir);
         if (isDiskUsageUnderPercentageLimit(testDir)) {
-          LOG.warn("Directory " + dir
-              + " error, used space above threshold of "
-              + diskUtilizationPercentageCutoff
-              + "%, removing from the list of valid directories.");
+          LOG.warn(
+              "Directory " + dir + " error, used space above threshold of " +
+                  diskUtilizationPercentageCutoff +
+                  "%, removing from the list of valid directories.");
           checkFailedDirs.add(dir);
         } else if (isDiskFreeSpaceWithinLimit(testDir)) {
-          LOG.warn("Directory " + dir + " error, free space below limit of "
-              + diskUtilizationSpaceCutoff
-              + "MB, removing from the list of valid directories.");
+          LOG.warn("Directory " + dir + " error, free space below limit of " +
+              diskUtilizationSpaceCutoff +
+              "MB, removing from the list of valid directories.");
           checkFailedDirs.add(dir);
         }
       } catch (DiskErrorException de) {
-        LOG.warn("Directory " + dir + " error " + de.getMessage()
-            + ", removing from the list of valid directories.");
+        LOG.warn("Directory " + dir + " error " + de.getMessage() +
+            ", removing from the list of valid directories.");
         checkFailedDirs.add(dir);
       }
     }
@@ -209,8 +210,8 @@ class DirectoryCollection {
     float freePercentage =
         100 * (dir.getUsableSpace() / (float) dir.getTotalSpace());
     float usedPercentage = 100.0F - freePercentage;
-    if (usedPercentage > diskUtilizationPercentageCutoff
-        || usedPercentage >= 100.0F) {
+    if (usedPercentage > diskUtilizationPercentageCutoff ||
+        usedPercentage >= 100.0F) {
       return true;
     }
     return false;
@@ -247,9 +248,9 @@ class DirectoryCollection {
   public void setDiskUtilizationPercentageCutoff(
       float diskUtilizationPercentageCutoff) {
     this.diskUtilizationPercentageCutoff =
-        diskUtilizationPercentageCutoff < 0.0F ? 0.0F
-            : (diskUtilizationPercentageCutoff > 100.0F ? 100.0F
-                : diskUtilizationPercentageCutoff);
+        diskUtilizationPercentageCutoff < 0.0F ? 0.0F :
+            (diskUtilizationPercentageCutoff > 100.0F ? 100.0F :
+                diskUtilizationPercentageCutoff);
   }
 
   public long getDiskUtilizationSpaceCutoff() {

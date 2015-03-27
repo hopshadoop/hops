@@ -18,20 +18,20 @@
 
 package org.apache.hadoop.yarn.api.records;
 
-import java.text.NumberFormat;
-
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Stable;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.util.Records;
 
+import java.text.NumberFormat;
+
 /**
- * <p><code>ApplicationId</code> represents the <em>globally unique</em> 
+ * <p><code>ApplicationId</code> represents the <em>globally unique</em>
  * identifier for an application.</p>
- * 
- * <p>The globally unique nature of the identifier is achieved by using the 
- * <em>cluster timestamp</em> i.e. start-time of the 
+ * <p/>
+ * <p>The globally unique nature of the identifier is achieved by using the
+ * <em>cluster timestamp</em> i.e. start-time of the
  * <code>ResourceManager</code> along with a monotonically increasing counter
  * for the application.</p>
  */
@@ -57,6 +57,7 @@ public abstract class ApplicationId implements Comparable<ApplicationId> {
    * Get the short integer identifier of the <code>ApplicationId</code>
    * which is unique for all applications started by a particular instance
    * of the <code>ResourceManager</code>.
+   *
    * @return short integer identifier of the <code>ApplicationId</code>
    */
   @Public
@@ -68,8 +69,9 @@ public abstract class ApplicationId implements Comparable<ApplicationId> {
   protected abstract void setId(int id);
   
   /**
-   * Get the <em>start time</em> of the <code>ResourceManager</code> which is 
+   * Get the <em>start time</em> of the <code>ResourceManager</code> which is
    * used to generate globally unique <code>ApplicationId</code>.
+   *
    * @return <em>start time</em> of the <code>ResourceManager</code>
    */
   @Public
@@ -83,30 +85,30 @@ public abstract class ApplicationId implements Comparable<ApplicationId> {
   protected abstract void build();
   
   static final ThreadLocal<NumberFormat> appIdFormat =
-    new ThreadLocal<NumberFormat>() {
-      @Override
-      public NumberFormat initialValue() {
-        NumberFormat fmt = NumberFormat.getInstance();
-        fmt.setGroupingUsed(false);
-        fmt.setMinimumIntegerDigits(4);
-        return fmt;
-      }
-    };
+      new ThreadLocal<NumberFormat>() {
+        @Override
+        public NumberFormat initialValue() {
+          NumberFormat fmt = NumberFormat.getInstance();
+          fmt.setGroupingUsed(false);
+          fmt.setMinimumIntegerDigits(4);
+          return fmt;
+        }
+      };
 
   @Override
   public int compareTo(ApplicationId other) {
     if (this.getClusterTimestamp() - other.getClusterTimestamp() == 0) {
       return this.getId() - other.getId();
     } else {
-      return this.getClusterTimestamp() > other.getClusterTimestamp() ? 1 : 
-        this.getClusterTimestamp() < other.getClusterTimestamp() ? -1 : 0;
+      return this.getClusterTimestamp() > other.getClusterTimestamp() ? 1 :
+          this.getClusterTimestamp() < other.getClusterTimestamp() ? -1 : 0;
     }
   }
 
   @Override
   public String toString() {
-    return appIdStrPrefix + this.getClusterTimestamp() + "_"
-        + appIdFormat.get().format(getId());
+    return appIdStrPrefix + this.getClusterTimestamp() + "_" +
+        appIdFormat.get().format(getId());
   }
 
   @Override
@@ -115,25 +117,30 @@ public abstract class ApplicationId implements Comparable<ApplicationId> {
     final int prime = 371237;
     int result = 6521;
     long clusterTimestamp = getClusterTimestamp();
-    result = prime * result
-        + (int) (clusterTimestamp ^ (clusterTimestamp >>> 32));
+    result =
+        prime * result + (int) (clusterTimestamp ^ (clusterTimestamp >>> 32));
     result = prime * result + getId();
     return result;
   }
 
   @Override
   public boolean equals(Object obj) {
-    if (this == obj)
+    if (this == obj) {
       return true;
-    if (obj == null)
+    }
+    if (obj == null) {
       return false;
-    if (getClass() != obj.getClass())
+    }
+    if (getClass() != obj.getClass()) {
       return false;
+    }
     ApplicationId other = (ApplicationId) obj;
-    if (this.getClusterTimestamp() != other.getClusterTimestamp())
+    if (this.getClusterTimestamp() != other.getClusterTimestamp()) {
       return false;
-    if (this.getId() != other.getId())
+    }
+    if (this.getId() != other.getId()) {
       return false;
+    }
     return true;
   }
 }

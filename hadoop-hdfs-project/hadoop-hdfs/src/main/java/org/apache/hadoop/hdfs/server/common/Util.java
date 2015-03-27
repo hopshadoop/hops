@@ -17,6 +17,10 @@
  */
 package org.apache.hadoop.hdfs.server.common;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience;
+
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -25,36 +29,33 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.classification.InterfaceAudience;
-
 @InterfaceAudience.Private
 public final class Util {
   private final static Log LOG = LogFactory.getLog(Util.class.getName());
 
   /**
-   * Interprets the passed string as a URI. In case of error it 
+   * Interprets the passed string as a URI. In case of error it
    * assumes the specified string is a file.
    *
-   * @param s the string to interpret
-   * @return the resulting URI 
-   * @throws IOException 
+   * @param s
+   *     the string to interpret
+   * @return the resulting URI
+   * @throws IOException
    */
   public static URI stringAsURI(String s) throws IOException {
     URI u = null;
     // try to make a URI
     try {
       u = new URI(s);
-    } catch (URISyntaxException e){
-      LOG.error("Syntax error in URI " + s
-          + ". Please check hdfs configuration.", e);
+    } catch (URISyntaxException e) {
+      LOG.error(
+          "Syntax error in URI " + s + ". Please check hdfs configuration.", e);
     }
 
     // if URI is null or scheme is undefined, then assume it's file://
-    if(u == null || u.getScheme() == null){
-      LOG.warn("Path " + s + " should be specified as a URI "
-          + "in configuration files. Please update hdfs configuration.");
+    if (u == null || u.getScheme() == null) {
+      LOG.warn("Path " + s + " should be specified as a URI " +
+          "in configuration files. Please update hdfs configuration.");
       u = fileAsURI(new File(s));
     }
     return u;
@@ -64,8 +65,9 @@ public final class Util {
    * Converts the passed File to a URI. This method trims the trailing slash if
    * one is appended because the underlying file is in fact a directory that
    * exists.
-   * 
-   * @param f the file to convert
+   *
+   * @param f
+   *     the file to convert
    * @return the resulting URI
    * @throws IOException
    */
@@ -87,13 +89,14 @@ public final class Util {
 
   /**
    * Converts a collection of strings into a collection of URIs.
-   * @param names collection of strings to convert to URIs
+   *
+   * @param names
+   *     collection of strings to convert to URIs
    * @return collection of URIs
    */
-  public static List<URI> stringCollectionAsURIs(
-                                  Collection<String> names) {
+  public static List<URI> stringCollectionAsURIs(Collection<String> names) {
     List<URI> uris = new ArrayList<URI>(names.size());
-    for(String name : names) {
+    for (String name : names) {
       try {
         uris.add(stringAsURI(name));
       } catch (IOException e) {

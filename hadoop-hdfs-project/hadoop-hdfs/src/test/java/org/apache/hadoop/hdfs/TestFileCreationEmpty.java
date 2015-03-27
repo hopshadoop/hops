@@ -16,14 +16,15 @@
  * limitations under the License.
  */
 package org.apache.hadoop.hdfs;
-import static org.junit.Assert.assertFalse;
-
-import java.util.ConcurrentModificationException;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.server.namenode.LeaseManager;
 import org.junit.Test;
+
+import java.util.ConcurrentModificationException;
+
+import static org.junit.Assert.assertFalse;
 
 /**
  * Test empty file creation.
@@ -33,36 +34,41 @@ public class TestFileCreationEmpty {
 
   /**
    * This test creates three empty files and lets their leases expire.
-   * This triggers release of the leases. 
-   * The empty files are supposed to be closed by that 
+   * This triggers release of the leases.
+   * The empty files are supposed to be closed by that
    * without causing ConcurrentModificationException.
    */
   @Test
   public void testLeaseExpireEmptyFiles() throws Exception {
-    final Thread.UncaughtExceptionHandler oldUEH = Thread.getDefaultUncaughtExceptionHandler();
-    Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
-      @Override
-      public void uncaughtException(Thread t, Throwable e) {
-        if (e instanceof ConcurrentModificationException) {
-          LeaseManager.LOG.error("t=" + t, e);
-          isConcurrentModificationException = true;
-        }
-      }
-    });
+    final Thread.UncaughtExceptionHandler oldUEH =
+        Thread.getDefaultUncaughtExceptionHandler();
+    Thread.setDefaultUncaughtExceptionHandler(
+        new Thread.UncaughtExceptionHandler() {
+          @Override
+          public void uncaughtException(Thread t, Throwable e) {
+            if (e instanceof ConcurrentModificationException) {
+              LeaseManager.LOG.error("t=" + t, e);
+              isConcurrentModificationException = true;
+            }
+          }
+        });
 
     System.out.println("testLeaseExpireEmptyFiles start");
     final long leasePeriod = 1000;
     final int DATANODE_NUM = 3;
 
     final Configuration conf = new HdfsConfiguration();
-    conf.setInt(DFSConfigKeys.DFS_NAMENODE_HEARTBEAT_RECHECK_INTERVAL_KEY, 1000);
+    conf.setInt(DFSConfigKeys.DFS_NAMENODE_HEARTBEAT_RECHECK_INTERVAL_KEY,
+        1000);
     conf.setInt(DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY, 1);
 
     // create cluster
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(DATANODE_NUM).build();
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(DATANODE_NUM).build();
     try {
       cluster.waitActive();
-      DistributedFileSystem dfs = (DistributedFileSystem)cluster.getFileSystem();
+      DistributedFileSystem dfs =
+          (DistributedFileSystem) cluster.getFileSystem();
 
       // create a new file.
       TestFileCreation.createFile(dfs, new Path("/foo"), DATANODE_NUM);
@@ -73,7 +79,10 @@ public class TestFileCreationEmpty {
       // namenode triggers lease recovery
       cluster.setLeasePeriod(leasePeriod, leasePeriod);
       // wait for the lease to expire
-      try {Thread.sleep(5 * leasePeriod);} catch (InterruptedException e) {}
+      try {
+        Thread.sleep(5 * leasePeriod);
+      } catch (InterruptedException e) {
+      }
 
       assertFalse(isConcurrentModificationException);
     } finally {

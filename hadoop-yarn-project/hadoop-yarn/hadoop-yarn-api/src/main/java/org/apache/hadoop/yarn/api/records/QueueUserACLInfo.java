@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.yarn.api.records;
 
-import java.util.List;
-
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Stable;
@@ -27,10 +25,12 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.ApplicationClientProtocol;
 import org.apache.hadoop.yarn.util.Records;
 
+import java.util.List;
+
 /**
  * <p><code>QueueUserACLInfo</code> provides information {@link QueueACL} for
  * the given user.</p>
- * 
+ *
  * @see QueueACL
  * @see ApplicationClientProtocol#getQueueUserAcls(org.apache.hadoop.yarn.api.protocolrecords.GetQueueUserAclsInfoRequest)
  */
@@ -50,6 +50,7 @@ public abstract class QueueUserACLInfo {
 
   /**
    * Get the <em>queue name</em> of the queue.
+   *
    * @return <em>queue name</em> of the queue
    */
   @Public
@@ -62,6 +63,7 @@ public abstract class QueueUserACLInfo {
 
   /**
    * Get the list of <code>QueueACL</code> for the given user.
+   *
    * @return list of <code>QueueACL</code> for the given user
    */
   @Public

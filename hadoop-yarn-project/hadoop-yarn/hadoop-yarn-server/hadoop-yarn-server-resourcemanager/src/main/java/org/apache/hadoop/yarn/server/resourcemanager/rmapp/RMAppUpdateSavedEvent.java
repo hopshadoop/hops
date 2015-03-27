@@ -18,14 +18,16 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.rmapp;
 
+import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 
 public class RMAppUpdateSavedEvent extends RMAppEvent {
 
   private final Exception updatedException;
 
-  public RMAppUpdateSavedEvent(ApplicationId appId, Exception updatedException) {
-    super(appId, RMAppEventType.APP_UPDATE_SAVED);
+  public RMAppUpdateSavedEvent(ApplicationId appId, Exception updatedException,
+      TransactionState transactionState) {
+    super(appId, RMAppEventType.APP_UPDATE_SAVED, transactionState);
     this.updatedException = updatedException;
   }
 

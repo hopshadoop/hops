@@ -21,8 +21,11 @@ import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.Iterator;
 
-abstract class EnumSetParam<E extends Enum<E>> extends Param<EnumSet<E>, EnumSetParam.Domain<E>> {
-  /** Convert an EnumSet to a string of comma separated values. */
+abstract class EnumSetParam<E extends Enum<E>>
+    extends Param<EnumSet<E>, EnumSetParam.Domain<E>> {
+  /**
+   * Convert an EnumSet to a string of comma separated values.
+   */
   static <E extends Enum<E>> String toString(EnumSet<E> set) {
     if (set == null || set.isEmpty()) {
       return "";
@@ -30,7 +33,7 @@ abstract class EnumSetParam<E extends Enum<E>> extends Param<EnumSet<E>, EnumSet
       final StringBuilder b = new StringBuilder();
       final Iterator<E> i = set.iterator();
       b.append(i.next());
-      for(; i.hasNext(); ) {
+      for (; i.hasNext(); ) {
         b.append(',').append(i.next());
       }
       return b.toString();
@@ -53,14 +56,19 @@ abstract class EnumSetParam<E extends Enum<E>> extends Param<EnumSet<E>, EnumSet
     return getName() + "=" + toString(value);
   }
 
-  /** @return the parameter value as a string */
+  /**
+   * @return the parameter value as a string
+   */
   @Override
   public String getValueString() {
     return toString(value);
   }
   
-  /** The domain of the parameter. */
-  static final class Domain<E extends Enum<E>> extends Param.Domain<EnumSet<E>> {
+  /**
+   * The domain of the parameter.
+   */
+  static final class Domain<E extends Enum<E>>
+      extends Param.Domain<EnumSet<E>> {
     private final Class<E> enumClass;
 
     Domain(String name, final Class<E> enumClass) {
@@ -73,15 +81,17 @@ abstract class EnumSetParam<E extends Enum<E>> extends Param<EnumSet<E>, EnumSet
       return Arrays.asList(enumClass.getEnumConstants()).toString();
     }
 
-    /** The string contains a comma separated values. */
+    /**
+     * The string contains a comma separated values.
+     */
     @Override
     final EnumSet<E> parse(final String str) {
       final EnumSet<E> set = EnumSet.noneOf(enumClass);
       if (!str.isEmpty()) {
-        for(int i, j = 0; j >= 0; ) {
+        for (int i, j = 0; j >= 0; ) {
           i = j;
-          j = str.indexOf(',', i+1);
-          final String sub = j >= 0? str.substring(i, j): str.substring(i);
+          j = str.indexOf(',', i + 1);
+          final String sub = j >= 0 ? str.substring(i, j) : str.substring(i);
           set.add(Enum.valueOf(enumClass, sub.trim().toUpperCase()));
         }
       }

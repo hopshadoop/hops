@@ -17,14 +17,14 @@
  */
 package org.apache.hadoop.hdfs.client;
 
-import java.io.IOException;
-import java.util.EnumSet;
-
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hdfs.DFSOutputStream;
+
+import java.io.IOException;
+import java.util.EnumSet;
 
 /**
  * The Hdfs implementation of {@link FSDataOutputStream}.
@@ -37,32 +37,33 @@ public class HdfsDataOutputStream extends FSDataOutputStream {
     super(out, stats, startPosition);
   }
 
-  public HdfsDataOutputStream(DFSOutputStream out, FileSystem.Statistics stats
-      ) throws IOException {
+  public HdfsDataOutputStream(DFSOutputStream out, FileSystem.Statistics stats)
+      throws IOException {
     this(out, stats, 0L);
   }
 
   /**
    * Get the actual number of replicas of the current block.
-   * 
+   * <p/>
    * This can be different from the designated replication factor of the file
-   * because the namenode does not maintain replication for the blocks which are
+   * because the namenode does not maintain replication for the blocks which
+   * are
    * currently being written to. Depending on the configuration, the client may
    * continue to write to a block even if a few datanodes in the write pipeline
    * have failed, or the client may add a new datanodes once a datanode has
    * failed.
-   * 
+   *
    * @return the number of valid replicas of the current block
    */
   public synchronized int getCurrentBlockReplication() throws IOException {
-    return ((DFSOutputStream)getWrappedStream()).getCurrentBlockReplication();
+    return ((DFSOutputStream) getWrappedStream()).getCurrentBlockReplication();
   }
   
   /**
    * Sync buffered data to DataNodes (flush to disk devices).
-   * 
+   *
    * @param syncFlags
-   *          Indicate the detailed semantic and actions of the hsync.
+   *     Indicate the detailed semantic and actions of the hsync.
    * @throws IOException
    * @see FSDataOutputStream#hsync()
    */

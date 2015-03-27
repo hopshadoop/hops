@@ -1,31 +1,25 @@
 /**
-* Licensed to the Apache Software Foundation (ASF) under one
-* or more contributor license agreements.  See the NOTICE file
-* distributed with this work for additional information
-* regarding copyright ownership.  The ASF licenses this file
-* to you under the Apache License, Version 2.0 (the
-* "License"); you may not use this file except in compliance
-* with the License.  You may obtain a copy of the License at
-*
-*     http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
-
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with this
+ * work for additional information regarding copyright ownership. The ASF
+ * licenses this file to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations under
+ * the License.
+ */
 package org.apache.hadoop.yarn.server.resourcemanager.security;
 
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
-
+import io.hops.exception.StorageException;
+import io.hops.exception.StorageInitializtionException;
+import io.hops.metadata.util.RMStorageFactory;
+import io.hops.metadata.util.YarnAPIStorageFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -52,12 +46,22 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.io.IOException;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 public class TestRMDelegationTokens {
 
   private YarnConfiguration conf;
 
   @Before
-  public void setup() {
+  public void setup()
+      throws StorageInitializtionException, StorageException, IOException {
     Logger rootLogger = LogManager.getRootLogger();
     rootLogger.setLevel(Level.DEBUG);
     ExitUtil.disableSystemExit();
@@ -65,6 +69,9 @@ public class TestRMDelegationTokens {
     UserGroupInformation.setConfiguration(conf);
     conf.set(YarnConfiguration.RM_STORE, MemoryRMStateStore.class.getName());
     conf.set(YarnConfiguration.RM_SCHEDULER, FairScheduler.class.getName());
+    YarnAPIStorageFactory.setConfiguration(conf);
+    RMStorageFactory.setConfiguration(conf);
+    RMStorageFactory.getConnector().formatStorage();
   }
 
   @Test(timeout = 15000)
@@ -109,7 +116,7 @@ public class TestRMDelegationTokens {
 
     // wait for the first rollMasterKey
     while (((TestRMDelegationTokenSecretManager) dtSecretManager).numUpdatedKeys
-      .get() < 1){
+        .get() < 1) {
       Thread.sleep(200);
     }
 
@@ -122,7 +129,7 @@ public class TestRMDelegationTokens {
     // wait for token to expire
     // rollMasterKey is called every 1 second.
     while (((TestRMDelegationTokenSecretManager) dtSecretManager).numUpdatedKeys
-      .get() < 6) {
+        .get() < 6) {
       Thread.sleep(200);
     }
 
@@ -157,8 +164,9 @@ public class TestRMDelegationTokens {
           allExpired = false;
         }
       }
-      if (allExpired)
+      if (allExpired) {
         break;
+      }
       Thread.sleep(500);
     }
   }
@@ -174,9 +182,8 @@ public class TestRMDelegationTokens {
       return new RMSecretManagerService(conf, rmContext) {
 
         @Override
-        protected RMDelegationTokenSecretManager
-        createRMDelegationTokenSecretManager(Configuration conf,
-                                             RMContext rmContext) {
+        protected RMDelegationTokenSecretManager createRMDelegationTokenSecretManager(
+            Configuration conf, RMContext rmContext) {
           // KeyUpdateInterval-> 1 seconds
           // TokenMaxLifetime-> 2 seconds.
           return new TestRMDelegationTokenSecretManager(1000, 1000, 2000, 1000,
@@ -187,16 +194,17 @@ public class TestRMDelegationTokens {
 
   }
 
-  public class TestRMDelegationTokenSecretManager extends
-      RMDelegationTokenSecretManager {
+  public class TestRMDelegationTokenSecretManager
+      extends RMDelegationTokenSecretManager {
+
     public AtomicInteger numUpdatedKeys = new AtomicInteger(0);
 
     public TestRMDelegationTokenSecretManager(long delegationKeyUpdateInterval,
         long delegationTokenMaxLifetime, long delegationTokenRenewInterval,
         long delegationTokenRemoverScanInterval, RMContext rmContext) {
       super(delegationKeyUpdateInterval, delegationTokenMaxLifetime,
-        delegationTokenRenewInterval, delegationTokenRemoverScanInterval,
-        rmContext);
+          delegationTokenRenewInterval, delegationTokenRemoverScanInterval,
+          rmContext);
     }
 
     @Override

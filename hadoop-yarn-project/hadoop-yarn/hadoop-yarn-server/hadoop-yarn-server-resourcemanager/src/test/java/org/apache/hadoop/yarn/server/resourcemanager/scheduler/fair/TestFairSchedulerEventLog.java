@@ -18,11 +18,10 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair;
 
-import java.io.File;
-import java.io.IOException;
-
+import io.hops.metadata.util.RMStorageFactory;
+import io.hops.metadata.util.RMUtilities;
+import io.hops.metadata.util.YarnAPIStorageFactory;
 import junit.framework.Assert;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.event.AsyncDispatcher;
@@ -31,6 +30,9 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+
+import java.io.File;
+import java.io.IOException;
 
 public class TestFairSchedulerEventLog {
   private File logFile;
@@ -50,8 +52,11 @@ public class TestFairSchedulerEventLog {
     conf.set(FairSchedulerConfiguration.ASSIGN_MULTIPLE, "false");
     resourceManager = new ResourceManager();
     resourceManager.init(conf);
-    ((AsyncDispatcher)resourceManager.getRMContext().getDispatcher()).start();
+    ((AsyncDispatcher) resourceManager.getRMContext().getDispatcher()).start();
     scheduler.reinitialize(conf, resourceManager.getRMContext());
+    YarnAPIStorageFactory.setConfiguration(conf);
+    RMStorageFactory.setConfiguration(conf);
+    RMUtilities.InitializeDB();
   }
 
   /**

@@ -19,22 +19,6 @@
 package org.apache.hadoop.security;
 
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.fail;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.net.URL;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -46,15 +30,32 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.fail;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 
 public class TestRefreshUserMappings {
   private MiniDFSCluster cluster;
   Configuration config;
-  private static final long groupRefreshTimeoutSec = 1;
+  private static long groupRefreshTimeoutSec = 1;
   private String tempResource = null;
   
-  public static class MockUnixGroupsMapping implements GroupMappingServiceProvider {
-    private int i=0;
+  public static class MockUnixGroupsMapping
+      implements GroupMappingServiceProvider {
+    private int i = 0;
     
     @Override
     public List<String> getGroups(String user) throws IOException {
@@ -72,7 +73,7 @@ public class TestRefreshUserMappings {
     public void cacheGroupsRefresh() throws IOException {
       System.out.println("Refreshing groups in MockUnixGroupsMapping");
     }
-  
+
     @Override
     public void cacheGroupsAdd(List<String> groups) throws IOException {
     }
@@ -94,24 +95,24 @@ public class TestRefreshUserMappings {
 
   @After
   public void tearDown() throws Exception {
-    if(cluster!=null) {
+    if (cluster != null) {
       cluster.shutdown();
     }
-    if(tempResource!=null) {
+    if (tempResource != null) {
       File f = new File(tempResource);
       f.delete();
     }
   }
-    
+
   @Test
   public void testGroupMappingRefresh() throws Exception {
     DFSAdmin admin = new DFSAdmin(config);
-    String [] args =  new String[]{"-refreshUserToGroupsMappings"};
+    String[] args = new String[]{"-refreshUserToGroupsMappings"};
     Groups groups = Groups.getUserToGroupsMappingService(config);
     String user = UserGroupInformation.getCurrentUser().getUserName();
     System.out.println("first attempt:");
     List<String> g1 = groups.getGroups(user);
-    String [] str_groups = new String [g1.size()];
+    String[] str_groups = new String[g1.size()];
     g1.toArray(str_groups);
     System.out.println(Arrays.toString(str_groups));
     
@@ -119,26 +120,28 @@ public class TestRefreshUserMappings {
     List<String> g2 = groups.getGroups(user);
     g2.toArray(str_groups);
     System.out.println(Arrays.toString(str_groups));
-    for(int i=0; i<g2.size(); i++) {
+    for (int i = 0; i < g2.size(); i++) {
       assertEquals("Should be same group ", g1.get(i), g2.get(i));
     }
     admin.run(args);
-    System.out.println("third attempt(after refresh command), should be different:");
+    System.out
+        .println("third attempt(after refresh command), should be different:");
     List<String> g3 = groups.getGroups(user);
     g3.toArray(str_groups);
     System.out.println(Arrays.toString(str_groups));
-    for(int i=0; i<g3.size(); i++) {
-      assertFalse("Should be different group: " + g1.get(i) + " and " + g3.get(i), 
+    for (int i = 0; i < g3.size(); i++) {
+      assertFalse(
+          "Should be different group: " + g1.get(i) + " and " + g3.get(i),
           g1.get(i).equals(g3.get(i)));
     }
     
     // test time out
-    Thread.sleep(groupRefreshTimeoutSec*1100);
+    Thread.sleep(groupRefreshTimeoutSec * 1100);
     System.out.println("fourth attempt(after timeout), should be different:");
     List<String> g4 = groups.getGroups(user);
     g4.toArray(str_groups);
     System.out.println(Arrays.toString(str_groups));
-    for(int i=0; i<g4.size(); i++) {
+    for (int i = 0; i < g4.size(); i++) {
       assertFalse("Should be different group ", g3.get(i).equals(g4.get(i)));
     }
   }
@@ -146,15 +149,16 @@ public class TestRefreshUserMappings {
   @Test
   public void testRefreshSuperUserGroupsConfiguration() throws Exception {
     final String SUPER_USER = "super_user";
-    final String [] GROUP_NAMES1 = new String [] {"gr1" , "gr2"};
-    final String [] GROUP_NAMES2 = new String [] {"gr3" , "gr4"};
+    final String[] GROUP_NAMES1 = new String[]{"gr1", "gr2"};
+    final String[] GROUP_NAMES2 = new String[]{"gr3", "gr4"};
     
     //keys in conf
     String userKeyGroups = ProxyUsers.getProxySuperuserGroupConfKey(SUPER_USER);
-    String userKeyHosts = ProxyUsers.getProxySuperuserIpConfKey (SUPER_USER);
+    String userKeyHosts = ProxyUsers.getProxySuperuserIpConfKey(SUPER_USER);
     
-    config.set(userKeyGroups, "gr3,gr4,gr5"); // superuser can proxy for this group
-    config.set(userKeyHosts,"127.0.0.1");
+    config.set(userKeyGroups,
+        "gr3,gr4,gr5"); // superuser can proxy for this group
+    config.set(userKeyHosts, "127.0.0.1");
     ProxyUsers.refreshSuperUserGroupsConfiguration(config);
     
     UserGroupInformation ugi1 = mock(UserGroupInformation.class);
@@ -164,18 +168,18 @@ public class TestRefreshUserMappings {
     when(ugi2.getRealUser()).thenReturn(suUgi);
 
     when(suUgi.getShortUserName()).thenReturn(SUPER_USER); // super user
-    when(suUgi.getUserName()).thenReturn(SUPER_USER+"L"); // super user
-     
+    when(suUgi.getUserName()).thenReturn(SUPER_USER + "L"); // super user
+
     when(ugi1.getShortUserName()).thenReturn("user1");
     when(ugi2.getShortUserName()).thenReturn("user2");
     
     when(ugi1.getUserName()).thenReturn("userL1");
     when(ugi2.getUserName()).thenReturn("userL2");
-   
+
     // set groups for users
     when(ugi1.getGroupNames()).thenReturn(GROUP_NAMES1);
     when(ugi2.getGroupNames()).thenReturn(GROUP_NAMES2);
-   
+
     
     // check before
     try {
@@ -190,17 +194,18 @@ public class TestRefreshUserMappings {
       System.err.println("auth for " + ugi2.getUserName() + " succeeded");
       // expected
     } catch (AuthorizationException e) {
-      fail("first auth for " + ugi2.getShortUserName() + " should've succeeded: " + e.getLocalizedMessage());
+      fail("first auth for " + ugi2.getShortUserName() +
+          " should've succeeded: " + e.getLocalizedMessage());
     }
     
     // refresh will look at configuration on the server side
     // add additional resource with the new value
     // so the server side will pick it up
     String rsrc = "testGroupMappingRefresh_rsrc.xml";
-    addNewConfigResource(rsrc, userKeyGroups, "gr2", userKeyHosts, "127.0.0.1");  
+    addNewConfigResource(rsrc, userKeyGroups, "gr2", userKeyHosts, "127.0.0.1");
     
     DFSAdmin admin = new DFSAdmin(config);
-    String [] args = new String[]{"-refreshSuperUserGroupsConfiguration"};
+    String[] args = new String[]{"-refreshSuperUserGroupsConfiguration"};
     admin.run(args);
     
     try {
@@ -215,14 +220,16 @@ public class TestRefreshUserMappings {
       System.err.println("auth for " + ugi1.getUserName() + " succeeded");
       // expected
     } catch (AuthorizationException e) {
-      fail("second auth for " + ugi1.getShortUserName() + " should've succeeded: " + e.getLocalizedMessage());
+      fail("second auth for " + ugi1.getShortUserName() +
+          " should've succeeded: " + e.getLocalizedMessage());
     }
     
     
   }
 
   private void addNewConfigResource(String rsrcName, String keyGroup,
-      String groups, String keyHosts, String hosts)  throws FileNotFoundException {
+      String groups, String keyHosts, String hosts)
+      throws FileNotFoundException {
     // location for temp resource should be in CLASSPATH
     Configuration conf = new Configuration();
     URL url = conf.getResource("hdfs-site.xml");
@@ -231,11 +238,12 @@ public class TestRefreshUserMappings {
     tempResource = dir.toString() + "/" + rsrcName;
     
     
-    String newResource =
-    "<configuration>"+
-    "<property><name>" + keyGroup + "</name><value>"+groups+"</value></property>" +
-    "<property><name>" + keyHosts + "</name><value>"+hosts+"</value></property>" +
-    "</configuration>";
+    String newResource = "<configuration>" +
+        "<property><name>" + keyGroup + "</name><value>" + groups +
+        "</value></property>" +
+        "<property><name>" + keyHosts + "</name><value>" + hosts +
+        "</value></property>" +
+        "</configuration>";
     PrintWriter writer = new PrintWriter(new FileOutputStream(tempResource));
     writer.println(newResource);
     writer.close();

@@ -27,12 +27,11 @@ import java.io.Flushable;
 
 /**
  * A simple log4j-appender for container's logs.
- *
  */
 @Public
 @Unstable
 public class ContainerRollingLogAppender extends RollingFileAppender
-  implements Flushable {
+    implements Flushable {
   private String containerLogDir;
 
   @Override

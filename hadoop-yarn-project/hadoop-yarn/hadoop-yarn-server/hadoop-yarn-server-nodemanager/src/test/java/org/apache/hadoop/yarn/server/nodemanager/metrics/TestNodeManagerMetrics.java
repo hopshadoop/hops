@@ -18,25 +18,28 @@
 package org.apache.hadoop.yarn.server.nodemanager.metrics;
 
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
-import static org.apache.hadoop.test.MetricsAsserts.*;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.util.Records;
-
 import org.junit.Test;
+
+import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
+import static org.apache.hadoop.test.MetricsAsserts.assertGauge;
+import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 
 public class TestNodeManagerMetrics {
   static final int GiB = 1024; // MiB
 
-  @Test public void testNames() {
+  @Test
+  public void testNames() {
     NodeManagerMetrics metrics = NodeManagerMetrics.create();
     Resource total = Records.newRecord(Resource.class);
-    total.setMemory(8*GiB);
+    total.setMemory(8 * GiB);
     Resource resource = Records.newRecord(Resource.class);
-    resource.setMemory(1*GiB);
+    resource.setMemory(1 * GiB);
 
     metrics.addResource(total);
 
-    for (int i = 5; i-- > 0;) {
+    for (int i = 5; i-- > 0; ) {
       metrics.launchedContainer();
       metrics.allocateContainer(resource);
     }
@@ -61,8 +64,8 @@ public class TestNodeManagerMetrics {
   }
 
   private void checkMetrics(int launched, int completed, int failed, int killed,
-                            int initing, int running, int allocatedGB,
-                            int allocatedContainers, int availableGB) {
+      int initing, int running, int allocatedGB, int allocatedContainers,
+      int availableGB) {
     MetricsRecordBuilder rb = getMetrics("NodeManagerMetrics");
     assertCounter("ContainersLaunched", launched, rb);
     assertCounter("ContainersCompleted", completed, rb);

@@ -18,11 +18,6 @@
 
 package org.apache.hadoop.hdfs.security.token.block;
 
-import java.io.DataInput;
-import java.io.DataOutput;
-import java.io.IOException;
-import java.util.EnumSet;
-
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenSecretManager.AccessMode;
 import org.apache.hadoop.io.Text;
@@ -30,6 +25,11 @@ import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
+
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.io.IOException;
+import java.util.EnumSet;
 
 @InterfaceAudience.Private
 public class BlockTokenIdentifier extends TokenIdentifier {
@@ -40,9 +40,9 @@ public class BlockTokenIdentifier extends TokenIdentifier {
   private String userId;
   private String blockPoolId;
   private long blockId;
-  private final EnumSet<AccessMode> modes;
+  private EnumSet<AccessMode> modes;
 
-  private byte [] cache;
+  private byte[] cache;
   
   public BlockTokenIdentifier() {
     this(null, null, 0, EnumSet.noneOf(AccessMode.class));
@@ -107,11 +107,10 @@ public class BlockTokenIdentifier extends TokenIdentifier {
 
   @Override
   public String toString() {
-    return "block_token_identifier (expiryDate=" + this.getExpiryDate()
-        + ", keyId=" + this.getKeyId() + ", userId=" + this.getUserId()
-        + ", blockPoolId=" + this.getBlockPoolId()
-        + ", blockId=" + this.getBlockId() + ", access modes="
-        + this.getAccessModes() + ")";
+    return "block_token_identifier (expiryDate=" + this.getExpiryDate() +
+        ", keyId=" + this.getKeyId() + ", userId=" + this.getUserId() +
+        ", blockPoolId=" + this.getBlockPoolId() + ", blockId=" +
+        this.getBlockId() + ", access modes=" + this.getAccessModes() + ")";
   }
 
   static boolean isEqual(Object a, Object b) {
@@ -125,20 +124,19 @@ public class BlockTokenIdentifier extends TokenIdentifier {
     }
     if (obj instanceof BlockTokenIdentifier) {
       BlockTokenIdentifier that = (BlockTokenIdentifier) obj;
-      return this.expiryDate == that.expiryDate && this.keyId == that.keyId
-          && isEqual(this.userId, that.userId) 
-          && isEqual(this.blockPoolId, that.blockPoolId)
-          && this.blockId == that.blockId
-          && isEqual(this.modes, that.modes);
+      return this.expiryDate == that.expiryDate && this.keyId == that.keyId &&
+          isEqual(this.userId, that.userId) &&
+          isEqual(this.blockPoolId, that.blockPoolId) &&
+          this.blockId == that.blockId && isEqual(this.modes, that.modes);
     }
     return false;
   }
 
   @Override
   public int hashCode() {
-    return (int) expiryDate ^ keyId ^ (int) blockId ^ modes.hashCode()
-        ^ (userId == null ? 0 : userId.hashCode())
-        ^ (blockPoolId == null ? 0 : blockPoolId.hashCode());
+    return (int) expiryDate ^ keyId ^ (int) blockId ^ modes.hashCode() ^
+        (userId == null ? 0 : userId.hashCode()) ^
+        (blockPoolId == null ? 0 : blockPoolId.hashCode());
   }
 
   @Override
@@ -149,8 +147,8 @@ public class BlockTokenIdentifier extends TokenIdentifier {
     userId = WritableUtils.readString(in);
     blockPoolId = WritableUtils.readString(in);
     blockId = WritableUtils.readVLong(in);
-    int length = WritableUtils.readVIntInRange(in, 0,
-        AccessMode.class.getEnumConstants().length);
+    int length = WritableUtils
+        .readVIntInRange(in, 0, AccessMode.class.getEnumConstants().length);
     for (int i = 0; i < length; i++) {
       modes.add(WritableUtils.readEnum(in, AccessMode.class));
     }
@@ -171,7 +169,9 @@ public class BlockTokenIdentifier extends TokenIdentifier {
   
   @Override
   public byte[] getBytes() {
-    if(cache == null) cache = super.getBytes();
+    if (cache == null) {
+      cache = super.getBytes();
+    }
     
     return cache;
   }

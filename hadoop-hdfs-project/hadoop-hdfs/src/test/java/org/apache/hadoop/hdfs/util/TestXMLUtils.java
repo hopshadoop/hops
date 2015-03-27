@@ -17,8 +17,8 @@
  */
 package org.apache.hadoop.hdfs.util;
 
+import junit.framework.Assert;
 import org.apache.hadoop.hdfs.util.XMLUtils.UnmanglingError;
-import org.junit.Assert;
 import org.junit.Test;
 
 public class TestXMLUtils {
@@ -43,7 +43,7 @@ public class TestXMLUtils {
   public void testMangleStringWithBackSlash() throws Exception {
     testRoundTrip("a\\bcdef", "a\\005c;bcdef");
     testRoundTrip("\\\\", "\\005c;\\005c;");
-  }  
+  }
 
   @Test
   public void testMangleStringWithForbiddenCodePoint() throws Exception {

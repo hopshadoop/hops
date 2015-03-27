@@ -17,14 +17,6 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assume.assumeTrue;
-
-import java.io.File;
-import java.io.IOException;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
@@ -37,6 +29,14 @@ import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeManager;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+
+import java.io.File;
+import java.io.IOException;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeTrue;
 
 /**
  * Test the ability of a DN to tolerate volume failures.
@@ -65,7 +65,8 @@ public class TestDataNodeVolumeFailureToleration {
      */
     conf.setInt(DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY, 1);
     conf.setInt(DFSConfigKeys.DFS_DF_INTERVAL_KEY, 1000);
-    conf.setInt(DFSConfigKeys.DFS_NAMENODE_HEARTBEAT_RECHECK_INTERVAL_KEY, 1000);
+    conf.setInt(DFSConfigKeys.DFS_NAMENODE_HEARTBEAT_RECHECK_INTERVAL_KEY,
+        1000);
     // Allow a single volume failure (there are two volumes)
     conf.setInt(DFSConfigKeys.DFS_DATANODE_FAILED_VOLUMES_TOLERATED_KEY, 1);
     cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
@@ -77,8 +78,8 @@ public class TestDataNodeVolumeFailureToleration {
   @After
   public void tearDown() throws Exception {
     for (int i = 0; i < 3; i++) {
-      FileUtil.setExecutable(new File(dataDir, "data"+(2*i+1)), true);
-      FileUtil.setExecutable(new File(dataDir, "data"+(2*i+2)), true);
+      new File(dataDir, "data" + (2 * i + 1)).setExecutable(true);
+      new File(dataDir, "data" + (2 * i + 2)).setExecutable(true);
     }
     cluster.shutdown();
   }
@@ -116,8 +117,7 @@ public class TestDataNodeVolumeFailureToleration {
     cluster.waitActive();
 
     try {
-      assertTrue("The DN should have started up fine.",
-          cluster.isDataNodeUp());
+      assertTrue("The DN should have started up fine.", cluster.isDataNodeUp());
       DataNode dn = cluster.getDataNodes().get(0);
       String si = DataNodeTestUtils.getFSDataset(dn).getStorageInfo();
       assertTrue("The DN should have started with this directory",
@@ -145,49 +145,54 @@ public class TestDataNodeVolumeFailureToleration {
     conf.setInt(DFSConfigKeys.DFS_DATANODE_FAILED_VOLUMES_TOLERATED_KEY, 0);
     cluster.startDataNodes(conf, 2, true, null, null);
     cluster.waitActive();
-    final DatanodeManager dm = cluster.getNamesystem().getBlockManager(
-        ).getDatanodeManager();
+    final DatanodeManager dm =
+        cluster.getNamesystem().getBlockManager().getDatanodeManager();
     long origCapacity = DFSTestUtil.getLiveDatanodeCapacity(dm);
     long dnCapacity = DFSTestUtil.getDatanodeCapacity(dm, 0);
 
     // Fail a volume on the 2nd DN
-    File dn2Vol1 = new File(dataDir, "data"+(2*1+1));
-    assertTrue("Couldn't chmod local vol", FileUtil.setExecutable(dn2Vol1, false));
+    File dn2Vol1 = new File(dataDir, "data" + (2 * 1 + 1));
+    assertTrue("Couldn't chmod local vol", dn2Vol1.setExecutable(false));
 
     // Should only get two replicas (the first DN and the 3rd)
     Path file1 = new Path("/test1");
-    DFSTestUtil.createFile(fs, file1, 1024, (short)3, 1L);
-    DFSTestUtil.waitReplication(fs, file1, (short)2);
+    DFSTestUtil.createFile(fs, file1, 1024, (short) 3, 1L);
+    DFSTestUtil.waitReplication(fs, file1, (short) 2);
 
     // Check that this single failure caused a DN to die.
-    DFSTestUtil.waitForDatanodeStatus(dm, 2, 1, 0, 
-        origCapacity - (1*dnCapacity), WAIT_FOR_HEARTBEATS);
+    DFSTestUtil
+        .waitForDatanodeStatus(dm, 2, 1, 0, origCapacity - (1 * dnCapacity),
+            WAIT_FOR_HEARTBEATS);
 
     // If we restore the volume we should still only be able to get
     // two replicas since the DN is still considered dead.
-    assertTrue("Couldn't chmod local vol", FileUtil.setExecutable(dn2Vol1, true));
+    assertTrue("Couldn't chmod local vol", dn2Vol1.setExecutable(true));
     Path file2 = new Path("/test2");
-    DFSTestUtil.createFile(fs, file2, 1024, (short)3, 1L);
-    DFSTestUtil.waitReplication(fs, file2, (short)2);
+    DFSTestUtil.createFile(fs, file2, 1024, (short) 3, 1L);
+    DFSTestUtil.waitReplication(fs, file2, (short) 2);
   }
 
-  /** 
+  /**
    * Restart the datanodes with a new volume tolerated value.
-   * @param volTolerated number of dfs data dir failures to tolerate
-   * @param manageDfsDirs whether the mini cluster should manage data dirs
+   *
+   * @param volTolerated
+   *     number of dfs data dir failures to tolerate
+   * @param manageDfsDirs
+   *     whether the mini cluster should manage data dirs
    * @throws IOException
    */
   private void restartDatanodes(int volTolerated, boolean manageDfsDirs)
       throws IOException {
     // Make sure no datanode is running
     cluster.shutdownDataNodes();
-    conf.setInt(DFSConfigKeys.DFS_DATANODE_FAILED_VOLUMES_TOLERATED_KEY, volTolerated);
+    conf.setInt(DFSConfigKeys.DFS_DATANODE_FAILED_VOLUMES_TOLERATED_KEY,
+        volTolerated);
     cluster.startDataNodes(conf, 1, manageDfsDirs, null, null);
     cluster.waitActive();
   }
 
   /**
-   * Test for different combination of volume configs and volumes tolerated 
+   * Test for different combination of volume configs and volumes tolerated
    * values.
    */
   @Test
@@ -221,9 +226,9 @@ public class TestDataNodeVolumeFailureToleration {
     final int dnIndex = 0;
     // Fail the current directory since invalid storage directory perms
     // get fixed up automatically on datanode startup.
-    File[] dirs = {
-        new File(cluster.getInstanceStorageDir(dnIndex, 0), "current"),
-        new File(cluster.getInstanceStorageDir(dnIndex, 1), "current") };
+    File[] dirs =
+        {new File(cluster.getInstanceStorageDir(dnIndex, 0), "current"),
+            new File(cluster.getInstanceStorageDir(dnIndex, 1), "current")};
 
     try {
       for (int i = 0; i < volumesFailed; i++) {
@@ -239,14 +244,15 @@ public class TestDataNodeVolumeFailureToleration {
     }
   }
 
-  /** 
+  /**
    * Prepare directories for a failure, set dir permission to 000
+   *
    * @param dir
    * @throws IOException
    * @throws InterruptedException
    */
-  private void prepareDirToFail(File dir) throws IOException,
-      InterruptedException {
+  private void prepareDirToFail(File dir)
+      throws IOException, InterruptedException {
     dir.mkdirs();
     assertEquals("Couldn't chmod local vol", 0,
         FileUtil.chmod(dir.toString(), "000"));
@@ -254,13 +260,13 @@ public class TestDataNodeVolumeFailureToleration {
 
   /**
    * Test that a volume that is considered failed on startup is seen as
-   *  a failed volume by the NN.
+   * a failed volume by the NN.
    */
   @Test
   public void testFailedVolumeOnStartupIsCounted() throws Exception {
     assumeTrue(!System.getProperty("os.name").startsWith("Windows"));
-    final DatanodeManager dm = cluster.getNamesystem().getBlockManager(
-    ).getDatanodeManager();
+    final DatanodeManager dm =
+        cluster.getNamesystem().getBlockManager().getDatanodeManager();
     long origCapacity = DFSTestUtil.getLiveDatanodeCapacity(dm);
     File dir = new File(cluster.getInstanceStorageDir(0, 0), "current");
 
@@ -271,8 +277,8 @@ public class TestDataNodeVolumeFailureToleration {
       assertEquals(true, cluster.getDataNodes().get(0)
           .isBPServiceAlive(cluster.getNamesystem().getBlockPoolId()));
       // but there has been a single volume failure
-      DFSTestUtil.waitForDatanodeStatus(dm, 1, 0, 1,
-          origCapacity / 2, WAIT_FOR_HEARTBEATS);
+      DFSTestUtil.waitForDatanodeStatus(dm, 1, 0, 1, origCapacity / 2,
+          WAIT_FOR_HEARTBEATS);
     } finally {
       FileUtil.chmod(dir.toString(), "755");
     }

@@ -17,21 +17,8 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-
-import java.io.DataOutputStream;
-import java.io.File;
-import java.net.InetSocketAddress;
-import java.net.Socket;
-import java.net.SocketException;
-import java.net.SocketTimeoutException;
-import java.nio.channels.ClosedChannelException;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
@@ -44,12 +31,19 @@ import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.protocol.datatransfer.BlockConstructionStage;
 import org.apache.hadoop.hdfs.protocol.datatransfer.Sender;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenSecretManager;
-import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsVolumeSpi;
 import org.apache.hadoop.hdfs.server.namenode.NameNodeAdapter;
 import org.apache.hadoop.util.DataChecksum;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+
+import java.io.DataOutputStream;
+import java.io.File;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Test that datanodes can correctly handle errors during block read/write.
@@ -104,16 +98,16 @@ public class TestDiskError {
 
       // create files and make sure that first datanode will be down
       DataNode dn = cluster.getDataNodes().get(dnIndex);
-      for (int i=0; dn.isDatanodeUp(); i++) {
-        Path fileName = new Path("/test.txt"+i);
-        DFSTestUtil.createFile(fs, fileName, 1024, (short)2, 1L);
-        DFSTestUtil.waitReplication(fs, fileName, (short)2);
+      for (int i = 0; dn.isDatanodeUp(); i++) {
+        Path fileName = new Path("/test.txt" + i);
+        DFSTestUtil.createFile(fs, fileName, 1024, (short) 2, 1L);
+        DFSTestUtil.waitReplication(fs, fileName, (short) 2);
         fs.delete(fileName, true);
       }
     } finally {
       // restore its old permission
-      FileUtil.setWritable(dir1, true);
-      FileUtil.setWritable(dir2, true);
+      dir1.setWritable(true);
+      dir2.setWritable(true);
     }
   }
 
@@ -126,12 +120,13 @@ public class TestDiskError {
     // create a file of replication factor of 1
     final Path fileName = new Path("/test.txt");
     final int fileLen = 1;
-    DFSTestUtil.createFile(fs, fileName, 1, (short)1, 1L);
-    DFSTestUtil.waitReplication(fs, fileName, (short)1);
+    DFSTestUtil.createFile(fs, fileName, 1, (short) 1, 1L);
+    DFSTestUtil.waitReplication(fs, fileName, (short) 1);
 
     // get the block belonged to the created file
-    LocatedBlocks blocks = NameNodeAdapter.getBlockLocations(
-        cluster.getNameNode(), fileName.toString(), 0, (long)fileLen);
+    LocatedBlocks blocks = NameNodeAdapter
+        .getBlockLocations(cluster.getNameNode(), fileName.toString(), 0,
+            (long) fileLen);
     assertEquals("Should only find 1 block", blocks.locatedBlockCount(), 1);
     LocatedBlock block = blocks.get(0);
 
@@ -147,13 +142,13 @@ public class TestDiskError {
     // write the header.
     DataOutputStream out = new DataOutputStream(s.getOutputStream());
 
-    DataChecksum checksum = DataChecksum.newDataChecksum(
-        DataChecksum.Type.CRC32, 512);
-    new Sender(out).writeBlock(block.getBlock(),
-        BlockTokenSecretManager.DUMMY_TOKEN, "",
-        new DatanodeInfo[0], null,
-        BlockConstructionStage.PIPELINE_SETUP_CREATE, 1, 0L, 0L, 0L,
-        checksum, CachingStrategy.newDefaultStrategy());
+    DataChecksum checksum =
+        DataChecksum.newDataChecksum(DataChecksum.Type.CRC32, 512);
+    new Sender(out)
+        .writeBlock(block.getBlock(), BlockTokenSecretManager.DUMMY_TOKEN, "",
+            new DatanodeInfo[0], null,
+            BlockConstructionStage.PIPELINE_SETUP_CREATE, 1, 0L, 0L, 0L,
+            checksum);
     out.flush();
 
     // close the connection before sending the content of the block
@@ -170,9 +165,9 @@ public class TestDiskError {
     }
 
     // then increase the file's replication factor
-    fs.setReplication(fileName, (short)2);
+    fs.setReplication(fileName, (short) 2);
     // replication should succeed
-    DFSTestUtil.waitReplication(fs, fileName, (short)1);
+    DFSTestUtil.waitReplication(fs, fileName, (short) 1);
 
     // clean up the file
     fs.delete(fileName, false);
@@ -184,32 +179,21 @@ public class TestDiskError {
   @Test
   public void testLocalDirs() throws Exception {
     Configuration conf = new Configuration();
-    final String permStr = conf.get(
-      DFSConfigKeys.DFS_DATANODE_DATA_DIR_PERMISSION_KEY);
+    final String permStr =
+        conf.get(DFSConfigKeys.DFS_DATANODE_DATA_DIR_PERMISSION_KEY);
     FsPermission expected = new FsPermission(permStr);
 
     // Check permissions on directories in 'dfs.datanode.data.dir'
     FileSystem localFS = FileSystem.getLocal(conf);
     for (DataNode dn : cluster.getDataNodes()) {
-      for (FsVolumeSpi v : dn.getFSDataset().getVolumes()) {
-        String dir = v.getBasePath();
+      String[] dataDirs =
+          dn.getConf().getStrings(DFSConfigKeys.DFS_DATANODE_DATA_DIR_KEY);
+      for (String dir : dataDirs) {
         Path dataDir = new Path(dir);
         FsPermission actual = localFS.getFileStatus(dataDir).getPermission();
-          assertEquals("Permission for dir: " + dataDir + ", is " + actual +
-              ", while expected is " + expected, expected, actual);
+        assertEquals("Permission for dir: " + dataDir + ", is " + actual +
+            ", while expected is " + expected, expected, actual);
       }
     }
-  }
-  
-  @Test
-  public void testNetworkErrorsIgnored() {
-    DataNode dn = cluster.getDataNodes().iterator().next();
-    
-    assertTrue(dn.isNetworkRelatedException(new SocketException()));
-    assertTrue(dn.isNetworkRelatedException(new SocketTimeoutException()));
-    assertTrue(dn.isNetworkRelatedException(new ClosedChannelException()));
-    assertTrue(dn.isNetworkRelatedException(new Exception("Broken pipe foo bar")));
-    assertFalse(dn.isNetworkRelatedException(new Exception()));
-    assertFalse(dn.isNetworkRelatedException(new Exception("random problem")));
   }
 }

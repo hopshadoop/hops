@@ -18,21 +18,6 @@
 
 package org.apache.hadoop.yarn.client;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyInt;
-import static org.mockito.Matchers.argThat;
-import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.never;
-
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.PrintStream;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ha.HAServiceProtocol;
 import org.apache.hadoop.ha.HAServiceStatus;
@@ -50,6 +35,21 @@ import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentMatcher;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.PrintStream;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyInt;
+import static org.mockito.Matchers.argThat;
+import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 public class TestRMAdminCLI {
 
   private ResourceManagerAdministrationProtocol admin;
@@ -62,8 +62,8 @@ public class TestRMAdminCLI {
     admin = mock(ResourceManagerAdministrationProtocol.class);
 
     haadmin = mock(HAServiceProtocol.class);
-    when(haadmin.getServiceStatus()).thenReturn(new HAServiceStatus(
-        HAServiceProtocol.HAServiceState.INITIALIZING));
+    when(haadmin.getServiceStatus()).thenReturn(
+        new HAServiceStatus(HAServiceProtocol.HAServiceState.INITIALIZING));
 
     final HAServiceTarget haServiceTarget = mock(HAServiceTarget.class);
     when(haServiceTarget.getProxy(any(Configuration.class), anyInt()))
@@ -99,59 +99,59 @@ public class TestRMAdminCLI {
     };
   }
   
-  @Test(timeout=500)
+  @Test(timeout = 500)
   public void testRefreshQueues() throws Exception {
-    String[] args = { "-refreshQueues" };
+    String[] args = {"-refreshQueues"};
     assertEquals(0, rmAdminCLI.run(args));
     verify(admin).refreshQueues(any(RefreshQueuesRequest.class));
   }
 
-  @Test(timeout=500)
+  @Test(timeout = 500)
   public void testRefreshUserToGroupsMappings() throws Exception {
-    String[] args = { "-refreshUserToGroupsMappings" };
+    String[] args = {"-refreshUserToGroupsMappings"};
     assertEquals(0, rmAdminCLI.run(args));
     verify(admin).refreshUserToGroupsMappings(
         any(RefreshUserToGroupsMappingsRequest.class));
   }
 
-  @Test(timeout=500)
+  @Test(timeout = 500)
   public void testRefreshSuperUserGroupsConfiguration() throws Exception {
-    String[] args = { "-refreshSuperUserGroupsConfiguration" };
+    String[] args = {"-refreshSuperUserGroupsConfiguration"};
     assertEquals(0, rmAdminCLI.run(args));
     verify(admin).refreshSuperUserGroupsConfiguration(
         any(RefreshSuperUserGroupsConfigurationRequest.class));
   }
 
-  @Test(timeout=500)
+  @Test(timeout = 500)
   public void testRefreshAdminAcls() throws Exception {
-    String[] args = { "-refreshAdminAcls" };
+    String[] args = {"-refreshAdminAcls"};
     assertEquals(0, rmAdminCLI.run(args));
     verify(admin).refreshAdminAcls(any(RefreshAdminAclsRequest.class));
   }
 
-  @Test(timeout=500)
+  @Test(timeout = 500)
   public void testRefreshServiceAcl() throws Exception {
-    String[] args = { "-refreshServiceAcl" };
+    String[] args = {"-refreshServiceAcl"};
     assertEquals(0, rmAdminCLI.run(args));
     verify(admin).refreshServiceAcls(any(RefreshServiceAclsRequest.class));
   }
 
-  @Test(timeout=500)
+  @Test(timeout = 500)
   public void testRefreshNodes() throws Exception {
-    String[] args = { "-refreshNodes" };
+    String[] args = {"-refreshNodes"};
     assertEquals(0, rmAdminCLI.run(args));
     verify(admin).refreshNodes(any(RefreshNodesRequest.class));
   }
   
-  @Test(timeout=500)
+  @Test(timeout = 500)
   public void testGetGroups() throws Exception {
-    when(admin.getGroupsForUser(eq("admin"))).thenReturn(
-        new String[] {"group1", "group2"});
+    when(admin.getGroupsForUser(eq("admin")))
+        .thenReturn(new String[]{"group1", "group2"});
     PrintStream origOut = System.out;
     PrintStream out = mock(PrintStream.class);
     System.setOut(out);
     try {
-      String[] args = { "-getGroups", "admin" };
+      String[] args = {"-getGroups", "admin"};
       assertEquals(0, rmAdminCLI.run(args));
       verify(admin).getGroupsForUser(eq("admin"));
       verify(out).println(argThat(new ArgumentMatcher<StringBuilder>() {
@@ -232,7 +232,7 @@ public class TestRMAdminCLI {
   /**
    * Test printing of help messages
    */
-  @Test(timeout=500)
+  @Test(timeout = 500)
   public void testHelp() throws Exception {
     PrintStream oldOutPrintStream = System.out;
     PrintStream oldErrPrintStream = System.err;
@@ -241,95 +241,74 @@ public class TestRMAdminCLI {
     System.setOut(new PrintStream(dataOut));
     System.setErr(new PrintStream(dataErr));
     try {
-      String[] args = { "-help" };
+      String[] args = {"-help"};
       assertEquals(0, rmAdminCLI.run(args));
       oldOutPrintStream.println(dataOut);
-      assertTrue(dataOut
-          .toString()
-          .contains(
-              "rmadmin is the command to execute YARN administrative commands."));
-      assertTrue(dataOut
-          .toString()
-          .contains(
-              "yarn rmadmin [-refreshQueues] [-refreshNodes] [-refreshSuper" +
+      assertTrue(dataOut.toString().contains(
+          "rmadmin is the command to execute YARN administrative commands."));
+      assertTrue(dataOut.toString().contains(
+          "yarn rmadmin [-refreshQueues] [-refreshNodes] [-refreshSuper" +
               "UserGroupsConfiguration] [-refreshUserToGroupsMappings] " +
               "[-refreshAdminAcls] [-refreshServiceAcl] [-getGroup" +
               " [username]] [-help [cmd]]"));
-      assertTrue(dataOut
-          .toString()
-          .contains(
-              "-refreshQueues: Reload the queues' acls, states and scheduler " +
+      assertTrue(dataOut.toString().contains(
+          "-refreshQueues: Reload the queues' acls, states and scheduler " +
               "specific properties."));
-      assertTrue(dataOut
-          .toString()
-          .contains(
-              "-refreshNodes: Refresh the hosts information at the " +
+      assertTrue(dataOut.toString().contains(
+          "-refreshNodes: Refresh the hosts information at the " +
               "ResourceManager."));
       assertTrue(dataOut.toString().contains(
           "-refreshUserToGroupsMappings: Refresh user-to-groups mappings"));
-      assertTrue(dataOut
-          .toString()
-          .contains(
-              "-refreshSuperUserGroupsConfiguration: Refresh superuser proxy" +
+      assertTrue(dataOut.toString().contains(
+          "-refreshSuperUserGroupsConfiguration: Refresh superuser proxy" +
               " groups mappings"));
-      assertTrue(dataOut
-          .toString()
-          .contains(
-              "-refreshAdminAcls: Refresh acls for administration of " +
+      assertTrue(dataOut.toString().contains(
+          "-refreshAdminAcls: Refresh acls for administration of " +
               "ResourceManager"));
-      assertTrue(dataOut
-          .toString()
-          .contains(
-              "-refreshServiceAcl: Reload the service-level authorization" +
+      assertTrue(dataOut.toString().contains(
+          "-refreshServiceAcl: Reload the service-level authorization" +
               " policy file"));
-      assertTrue(dataOut
-          .toString()
-          .contains(
-              "-help [cmd]: Displays help for the given command or all " +
+      assertTrue(dataOut.toString().contains(
+          "-help [cmd]: Displays help for the given command or all " +
               "commands if none"));
 
-      testError(new String[] { "-help", "-refreshQueues" },
+      testError(new String[]{"-help", "-refreshQueues"},
           "Usage: yarn rmadmin [-refreshQueues]", dataErr, 0);
-      testError(new String[] { "-help", "-refreshNodes" },
+      testError(new String[]{"-help", "-refreshNodes"},
           "Usage: yarn rmadmin [-refreshNodes]", dataErr, 0);
-      testError(new String[] { "-help", "-refreshUserToGroupsMappings" },
+      testError(new String[]{"-help", "-refreshUserToGroupsMappings"},
           "Usage: yarn rmadmin [-refreshUserToGroupsMappings]", dataErr, 0);
-      testError(
-          new String[] { "-help", "-refreshSuperUserGroupsConfiguration" },
-          "Usage: yarn rmadmin [-refreshSuperUserGroupsConfiguration]",
-          dataErr, 0);
-      testError(new String[] { "-help", "-refreshAdminAcls" },
+      testError(new String[]{"-help", "-refreshSuperUserGroupsConfiguration"},
+          "Usage: yarn rmadmin [-refreshSuperUserGroupsConfiguration]", dataErr,
+          0);
+      testError(new String[]{"-help", "-refreshAdminAcls"},
           "Usage: yarn rmadmin [-refreshAdminAcls]", dataErr, 0);
-      testError(new String[] { "-help", "-refreshServiceAcl" },
+      testError(new String[]{"-help", "-refreshServiceAcl"},
           "Usage: yarn rmadmin [-refreshServiceAcl]", dataErr, 0);
-      testError(new String[] { "-help", "-getGroups" },
+      testError(new String[]{"-help", "-getGroups"},
           "Usage: yarn rmadmin [-getGroups [username]]", dataErr, 0);
-      testError(new String[] { "-help", "-transitionToActive" },
+      testError(new String[]{"-help", "-transitionToActive"},
           "Usage: yarn rmadmin [-transitionToActive <serviceId>]", dataErr, 0);
-      testError(new String[] { "-help", "-transitionToStandby" },
+      testError(new String[]{"-help", "-transitionToStandby"},
           "Usage: yarn rmadmin [-transitionToStandby <serviceId>]", dataErr, 0);
-      testError(new String[] { "-help", "-getServiceState" },
+      testError(new String[]{"-help", "-getServiceState"},
           "Usage: yarn rmadmin [-getServiceState <serviceId>]", dataErr, 0);
-      testError(new String[] { "-help", "-checkHealth" },
+      testError(new String[]{"-help", "-checkHealth"},
           "Usage: yarn rmadmin [-checkHealth <serviceId>]", dataErr, 0);
-      testError(new String[] { "-help", "-failover" },
-          "Usage: yarn rmadmin " +
+      testError(new String[]{"-help", "-failover"}, "Usage: yarn rmadmin " +
               "[-failover [--forcefence] [--forceactive] " +
-              "<serviceId> <serviceId>]",
-          dataErr, 0);
+              "<serviceId> <serviceId>]", dataErr, 0);
 
-      testError(new String[] { "-help", "-badParameter" },
-          "Usage: yarn rmadmin", dataErr, 0);
-      testError(new String[] { "-badParameter" },
-          "badParameter: Unknown command", dataErr, -1);
+      testError(new String[]{"-help", "-badParameter"}, "Usage: yarn rmadmin",
+          dataErr, 0);
+      testError(new String[]{"-badParameter"}, "badParameter: Unknown command",
+          dataErr, -1);
 
       // Test -help when RM HA is enabled
       assertEquals(0, rmAdminCLIWithHAEnabled.run(args));
       oldOutPrintStream.println(dataOut);
-      assertTrue(dataOut
-          .toString()
-          .contains(
-              "yarn rmadmin [-refreshQueues] [-refreshNodes] [-refreshSuper" +
+      assertTrue(dataOut.toString().contains(
+          "yarn rmadmin [-refreshQueues] [-refreshNodes] [-refreshSuper" +
               "UserGroupsConfiguration] [-refreshUserToGroupsMappings] " +
               "[-refreshAdminAcls] [-refreshServiceAcl] [-getGroup" +
               " [username]] [-help [cmd]] [-transitionToActive <serviceId>]" +
@@ -342,7 +321,7 @@ public class TestRMAdminCLI {
     }
   }
 
-  @Test(timeout=500)
+  @Test(timeout = 500)
   public void testException() throws Exception {
     PrintStream oldErrPrintStream = System.err;
     ByteArrayOutputStream dataErr = new ByteArrayOutputStream();
@@ -350,7 +329,7 @@ public class TestRMAdminCLI {
     try {
       when(admin.refreshQueues(any(RefreshQueuesRequest.class)))
           .thenThrow(new IOException("test exception"));
-      String[] args = { "-refreshQueues" };
+      String[] args = {"-refreshQueues"};
 
       assertEquals(-1, rmAdminCLI.run(args));
       verify(admin).refreshQueues(any(RefreshQueuesRequest.class));

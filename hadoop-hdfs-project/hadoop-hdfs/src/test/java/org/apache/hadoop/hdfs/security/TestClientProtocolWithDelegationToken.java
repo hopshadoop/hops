@@ -18,12 +18,6 @@
 
 package org.apache.hadoop.hdfs.security;
 
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
-import static org.mockito.Mockito.mock;
-
-import java.net.InetSocketAddress;
-import java.security.PrivilegedExceptionAction;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.logging.impl.Log4JLogger;
@@ -47,14 +41,23 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.log4j.Level;
 import org.junit.Test;
 
-/** Unit tests for using Delegation Token over RPC. */
+import java.net.InetSocketAddress;
+import java.security.PrivilegedExceptionAction;
+
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
+import static org.mockito.Mockito.mock;
+
+/**
+ * Unit tests for using Delegation Token over RPC.
+ */
 public class TestClientProtocolWithDelegationToken {
   private static final String ADDRESS = "0.0.0.0";
 
-  public static final Log LOG = LogFactory
-      .getLog(TestClientProtocolWithDelegationToken.class);
+  public static final Log LOG =
+      LogFactory.getLog(TestClientProtocolWithDelegationToken.class);
 
-  private static final Configuration conf;
+  private static Configuration conf;
+
   static {
     conf = new Configuration();
     conf.set(HADOOP_SECURITY_AUTHENTICATION, "kerberos");
@@ -80,20 +83,21 @@ public class TestClientProtocolWithDelegationToken {
         DFSConfigKeys.DFS_NAMENODE_DELEGATION_TOKEN_MAX_LIFETIME_DEFAULT,
         3600000, mockNameSys);
     sm.startThreads();
-    final Server server = new RPC.Builder(conf)
-        .setProtocol(ClientProtocol.class).setInstance(mockNN)
-        .setBindAddress(ADDRESS).setPort(0).setNumHandlers(5).setVerbose(true)
-        .setSecretManager(sm).build();
-    
+    final Server server =
+        new RPC.Builder(conf).setProtocol(ClientProtocol.class)
+            .setInstance(mockNN).setBindAddress(ADDRESS).setPort(0)
+            .setNumHandlers(5).setVerbose(true).setSecretManager(sm).build();
+
     server.start();
 
     final UserGroupInformation current = UserGroupInformation.getCurrentUser();
     final InetSocketAddress addr = NetUtils.getConnectAddress(server);
     String user = current.getUserName();
     Text owner = new Text(user);
-    DelegationTokenIdentifier dtId = new DelegationTokenIdentifier(owner, owner, null);
-    Token<DelegationTokenIdentifier> token = new Token<DelegationTokenIdentifier>(
-        dtId, sm);
+    DelegationTokenIdentifier dtId =
+        new DelegationTokenIdentifier(owner, owner, null);
+    Token<DelegationTokenIdentifier> token =
+        new Token<DelegationTokenIdentifier>(dtId, sm);
     SecurityUtil.setTokenService(token, addr);
     LOG.info("Service for token is " + token.getService());
     current.addToken(token);
@@ -102,8 +106,9 @@ public class TestClientProtocolWithDelegationToken {
       public Object run() throws Exception {
         ClientProtocol proxy = null;
         try {
-          proxy = (ClientProtocol) RPC.getProxy(ClientProtocol.class,
-              ClientProtocol.versionID, addr, conf);
+          proxy = (ClientProtocol) RPC
+              .getProxy(ClientProtocol.class, ClientProtocol.versionID, addr,
+                  conf);
           proxy.getServerDefaults();
         } finally {
           server.stop();

@@ -19,9 +19,7 @@
 
 package org.apache.hadoop.hdfs.server.datanode;
 
-import java.io.File;
-import java.io.IOException;
-
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
@@ -34,15 +32,16 @@ import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.hdfs.server.protocol.InterDatanodeProtocol;
 import org.mockito.Mockito;
 
-import com.google.common.base.Preconditions;
+import java.io.File;
+import java.io.IOException;
 
 /**
- * Utility class for accessing package-private DataNode information during tests.
- *
+ * Utility class for accessing package-private DataNode information during
+ * tests.
  */
-public class DataNodeTestUtils {  
-  public static DatanodeRegistration 
-  getDNRegistrationForBP(DataNode dn, String bpid) throws IOException {
+public class DataNodeTestUtils {
+  public static DatanodeRegistration getDNRegistrationForBP(DataNode dn,
+      String bpid) throws IOException {
     return dn.getDNRegistrationForBP(bpid);
   }
 
@@ -85,8 +84,7 @@ public class DataNodeTestUtils {
         break;
       }
     }
-    Preconditions.checkArgument(bpos != null,
-        "No such bpid: %s", bpid);
+    Preconditions.checkArgument(bpos != null, "No such bpid: %s", bpid);
     
     BPServiceActor bpsa = null;
     for (BPServiceActor thisBpsa : bpos.getBPServiceActors()) {
@@ -95,8 +93,8 @@ public class DataNodeTestUtils {
         break;
       }
     }
-    Preconditions.checkArgument(bpsa != null,
-      "No service actor to NN at %s", nn.getServiceRpcAddress());
+    Preconditions.checkArgument(bpsa != null, "No service actor to NN at %s",
+        nn.getServiceRpcAddress());
 
     DatanodeProtocolClientSideTranslatorPB origNN = bpsa.getNameNodeProxy();
     DatanodeProtocolClientSideTranslatorPB spy = Mockito.spy(origNN);
@@ -115,22 +113,11 @@ public class DataNodeTestUtils {
   }
   
   public static void runBlockScannerForBlock(DataNode dn, ExtendedBlock b) {
-    BlockPoolSliceScanner bpScanner = getBlockPoolScanner(dn, b);
-    bpScanner.verifyBlock(b);
-  }
-
-  private static BlockPoolSliceScanner getBlockPoolScanner(DataNode dn,
-      ExtendedBlock b) {
     DataBlockScanner scanner = dn.getBlockScanner();
     BlockPoolSliceScanner bpScanner = scanner.getBPScanner(b.getBlockPoolId());
-    return bpScanner;
+    bpScanner.verifyBlock(b);
   }
-
-  public static long getLatestScanTime(DataNode dn, ExtendedBlock b) {
-    BlockPoolSliceScanner scanner = getBlockPoolScanner(dn, b);
-    return scanner.getLastScanTime(b.getLocalBlock());
-  }
-
+  
   public static void shutdownBlockScanner(DataNode dn) {
     if (dn.blockScanner != null) {
       dn.blockScanner.shutdown();
@@ -138,10 +125,10 @@ public class DataNodeTestUtils {
   }
 
   /**
-   * This method is used for testing. 
+   * This method is used for testing.
    * Examples are adding and deleting blocks directly.
    * The most common usage will be when the data node's storage is simulated.
-   * 
+   *
    * @return the fsdataset that stores the blocks
    */
   public static FsDatasetSpi<?> getFSDataset(DataNode dn) {
@@ -152,8 +139,8 @@ public class DataNodeTestUtils {
     return FsDatasetTestUtil.getFile(dn.getFSDataset(), bpid, bid);
   }
 
-  public static File getBlockFile(DataNode dn, String bpid, Block b
-      ) throws IOException {
+  public static File getBlockFile(DataNode dn, String bpid, Block b)
+      throws IOException {
     return FsDatasetTestUtil.getBlockFile(dn.getFSDataset(), bpid, b);
   }
 
@@ -162,8 +149,8 @@ public class DataNodeTestUtils {
     return FsDatasetTestUtil.getMetaFile(dn.getFSDataset(), bpid, b);
   }
   
-  public static boolean unlinkBlock(DataNode dn, ExtendedBlock bk, int numLinks
-      ) throws IOException {
+  public static boolean unlinkBlock(DataNode dn, ExtendedBlock bk, int numLinks)
+      throws IOException {
     return FsDatasetTestUtil.unlinkBlock(dn.getFSDataset(), bk, numLinks);
   }
 
@@ -173,9 +160,13 @@ public class DataNodeTestUtils {
 
   /**
    * Fetch a copy of ReplicaInfo from a datanode by block id
-   * @param dn datanode to retrieve a replicainfo object from
-   * @param bpid Block pool Id
-   * @param blkId id of the replica's block
+   *
+   * @param dn
+   *     datanode to retrieve a replicainfo object from
+   * @param bpid
+   *     Block pool Id
+   * @param blkId
+   *     id of the replica's block
    * @return copy of ReplicaInfo object @link{FSDataset#fetchReplicaInfo}
    */
   public static ReplicaInfo fetchReplicaInfo(final DataNode dn,

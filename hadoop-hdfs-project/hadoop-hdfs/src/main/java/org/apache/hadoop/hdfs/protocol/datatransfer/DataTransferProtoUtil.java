@@ -53,13 +53,14 @@ public abstract class DataTransferProtoUtil {
     ChecksumTypeProto type = PBHelper.convert(checksum.getChecksumType());
     // ChecksumType#valueOf never returns null
     return ChecksumProto.newBuilder()
-      .setBytesPerChecksum(checksum.getBytesPerChecksum())
-      .setType(type)
-      .build();
+        .setBytesPerChecksum(checksum.getBytesPerChecksum()).setType(type)
+        .build();
   }
 
   public static DataChecksum fromProto(ChecksumProto proto) {
-    if (proto == null) return null;
+    if (proto == null) {
+      return null;
+    }
 
     int bytesPerChecksum = proto.getBytesPerChecksum();
     DataChecksum.Type type = PBHelper.convert(proto.getType());
@@ -68,19 +69,15 @@ public abstract class DataTransferProtoUtil {
 
   static ClientOperationHeaderProto buildClientHeader(ExtendedBlock blk,
       String client, Token<BlockTokenIdentifier> blockToken) {
-    ClientOperationHeaderProto header =
-      ClientOperationHeaderProto.newBuilder()
-        .setBaseHeader(buildBaseHeader(blk, blockToken))
-        .setClientName(client)
+    ClientOperationHeaderProto header = ClientOperationHeaderProto.newBuilder()
+        .setBaseHeader(buildBaseHeader(blk, blockToken)).setClientName(client)
         .build();
     return header;
   }
 
   static BaseHeaderProto buildBaseHeader(ExtendedBlock blk,
       Token<BlockTokenIdentifier> blockToken) {
-    return BaseHeaderProto.newBuilder()
-      .setBlock(PBHelper.convert(blk))
-      .setToken(PBHelper.convert(blockToken))
-      .build();
+    return BaseHeaderProto.newBuilder().setBlock(PBHelper.convert(blk))
+        .setToken(PBHelper.convert(blockToken)).build();
   }
 }

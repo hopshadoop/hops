@@ -266,7 +266,7 @@ public abstract class AMSimulator extends TaskRunner.Task {
     UserGroupInformation ugi = UserGroupInformation.createRemoteUser(user);
     ugi.doAs(new PrivilegedExceptionAction<Object>() {
       @Override
-      public Object run() throws YarnException {
+      public Object run() throws YarnException, IOException {
         rm.getClientRMService().submitApplication(subAppRequest);
         return null;
       }

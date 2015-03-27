@@ -1,0 +1,95 @@
+#Contains command line args for different experiments. # is used for comments 
+
+
+-max_processes 5    -number_of_leaders_to_kill 50   -consider_stable_after 120000   -max_stabilization_wait_time 900000   -time_period 2000   -time_period_increment 50    -missed_hb_threshold  2   -process_join_wait_time -1     -ndb_jar hops-metadata-dal-impl-ndb-1.0-SNAPSHOT-jar-with-dependencies.jar
+
+
+-max_processes 10    -number_of_leaders_to_kill 50   -consider_stable_after 120000   -max_stabilization_wait_time 900000   -time_period 2000   -time_period_increment 50    -missed_hb_threshold  2   -process_join_wait_time -1     -ndb_jar hops-metadata-dal-impl-ndb-1.0-SNAPSHOT-jar-with-dependencies.jar
+
+
+-max_processes 25    -number_of_leaders_to_kill 50   -consider_stable_after 120000   -max_stabilization_wait_time 900000   -time_period 2000   -time_period_increment 50    -missed_hb_threshold  2   -process_join_wait_time -1     -ndb_jar hops-metadata-dal-impl-ndb-1.0-SNAPSHOT-jar-with-dependencies.jar
+
+
+-max_processes 50    -number_of_leaders_to_kill 50   -consider_stable_after 120000   -max_stabilization_wait_time 900000   -time_period 2000   -time_period_increment 50    -missed_hb_threshold  2   -process_join_wait_time -1     -ndb_jar hops-metadata-dal-impl-ndb-1.0-SNAPSHOT-jar-with-dependencies.jar
+
+
+-max_processes 75    -number_of_leaders_to_kill 50   -consider_stable_after 120000   -max_stabilization_wait_time 900000   -time_period 2000   -time_period_increment 50    -missed_hb_threshold  2   -process_join_wait_time -1     -ndb_jar hops-metadata-dal-impl-ndb-1.0-SNAPSHOT-jar-with-dependencies.jar
+
+
+-max_processes 100    -number_of_leaders_to_kill 50   -consider_stable_after 120000   -max_stabilization_wait_time 900000   -time_period 2000   -time_period_increment 50    -missed_hb_threshold  2   -process_join_wait_time -1     -ndb_jar hops-metadata-dal-impl-ndb-1.0-SNAPSHOT-jar-with-dependencies.jar
+
+
+
+-max_processes 150    -number_of_leaders_to_kill 50   -consider_stable_after 120000   -max_stabilization_wait_time 900000   -time_period 2000   -time_period_increment 50    -missed_hb_threshold  2   -process_join_wait_time -1     -ndb_jar hops-metadata-dal-impl-ndb-1.0-SNAPSHOT-jar-with-dependencies.jar
+
+
+
+-max_processes 200    -number_of_leaders_to_kill 50   -consider_stable_after 120000   -max_stabilization_wait_time 900000   -time_period 2000   -time_period_increment 50    -missed_hb_threshold  2   -process_join_wait_time -1     -ndb_jar hops-metadata-dal-impl-ndb-1.0-SNAPSHOT-jar-with-dependencies.jar
+
+
+
+
+-max_processes 250    -number_of_leaders_to_kill 50   -consider_stable_after 120000   -max_stabilization_wait_time 900000   -time_period 2000   -time_period_increment 50    -missed_hb_threshold  2   -process_join_wait_time -1     -ndb_jar hops-metadata-dal-impl-ndb-1.0-SNAPSHOT-jar-with-dependencies.jar
+
+
+
+
+-max_processes 300    -number_of_leaders_to_kill 50   -consider_stable_after 120000   -max_stabilization_wait_time 900000   -time_period 2000   -time_period_increment 50    -missed_hb_threshold  2   -process_join_wait_time -1     -ndb_jar hops-metadata-dal-impl-ndb-1.0-SNAPSHOT-jar-with-dependencies.jar
+
+
+
+-max_processes 350    -number_of_leaders_to_kill 50   -consider_stable_after 120000   -max_stabilization_wait_time 900000   -time_period 2000   -time_period_increment 50    -missed_hb_threshold  2   -process_join_wait_time -1     -ndb_jar hops-metadata-dal-impl-ndb-1.0-SNAPSHOT-jar-with-dependencies.jar
+
+
+
+
+-max_processes 400    -number_of_leaders_to_kill 50   -consider_stable_after 120000   -max_stabilization_wait_time 900000   -time_period 2000   -time_period_increment 50    -missed_hb_threshold  2   -process_join_wait_time -1     -ndb_jar hops-metadata-dal-impl-ndb-1.0-SNAPSHOT-jar-with-dependencies.jar
+
+
+
+
+-max_processes 450    -number_of_leaders_to_kill 50   -consider_stable_after 120000   -max_stabilization_wait_time 900000   -time_period 2000   -time_period_increment 50    -missed_hb_threshold  2   -process_join_wait_time -1     -ndb_jar hops-metadata-dal-impl-ndb-1.0-SNAPSHOT-jar-with-dependencies.jar
+
+
+
+-max_processes 500    -number_of_leaders_to_kill 50   -consider_stable_after 120000   -max_stabilization_wait_time 900000   -time_period 2000   -time_period_increment 50    -missed_hb_threshold  2   -process_join_wait_time -1     -ndb_jar hops-metadata-dal-impl-ndb-1.0-SNAPSHOT-jar-with-dependencies.jar
+
+
+-max_processes 550    -number_of_leaders_to_kill 50   -consider_stable_after 120000   -max_stabilization_wait_time 900000   -time_period 2000   -time_period_increment 50    -missed_hb_threshold  2   -process_join_wait_time -1     -ndb_jar hops-metadata-dal-impl-ndb-1.0-SNAPSHOT-jar-with-dependencies.jar
+
+
+
+
+-max_processes 600    -number_of_leaders_to_kill 50   -consider_stable_after 120000   -max_stabilization_wait_time 900000   -time_period 2000   -time_period_increment 50    -missed_hb_threshold  2   -process_join_wait_time -1     -ndb_jar hops-metadata-dal-impl-ndb-1.0-SNAPSHOT-jar-with-dependencies.jar
+
+
+
+
+-max_processes 650    -number_of_leaders_to_kill 50   -consider_stable_after 120000   -max_stabilization_wait_time 900000   -time_period 2000   -time_period_increment 50    -missed_hb_threshold  2   -process_join_wait_time -1     -ndb_jar hops-metadata-dal-impl-ndb-1.0-SNAPSHOT-jar-with-dependencies.jar
+
+
+
+
+-max_processes 700    -number_of_leaders_to_kill 50   -consider_stable_after 120000   -max_stabilization_wait_time 900000   -time_period 2000   -time_period_increment 50    -missed_hb_threshold  2   -process_join_wait_time -1     -ndb_jar hops-metadata-dal-impl-ndb-1.0-SNAPSHOT-jar-with-dependencies.jar
+
+
+
+-max_processes 750    -number_of_leaders_to_kill 50   -consider_stable_after 120000   -max_stabilization_wait_time 900000   -time_period 2000   -time_period_increment 50    -missed_hb_threshold  2   -process_join_wait_time -1     -ndb_jar hops-metadata-dal-impl-ndb-1.0-SNAPSHOT-jar-with-dependencies.jar
+
+
+
+-max_processes 800    -number_of_leaders_to_kill 50   -consider_stable_after 120000   -max_stabilization_wait_time 900000   -time_period 2000   -time_period_increment 50    -missed_hb_threshold  2   -process_join_wait_time -1     -ndb_jar hops-metadata-dal-impl-ndb-1.0-SNAPSHOT-jar-with-dependencies.jar
+
+
+-max_processes 850    -number_of_leaders_to_kill 50   -consider_stable_after 120000   -max_stabilization_wait_time 900000   -time_period 2000   -time_period_increment 50    -missed_hb_threshold  2   -process_join_wait_time -1     -ndb_jar hops-metadata-dal-impl-ndb-1.0-SNAPSHOT-jar-with-dependencies.jar
+
+
+-max_processes 900    -number_of_leaders_to_kill 50   -consider_stable_after 120000   -max_stabilization_wait_time 900000   -time_period 2000   -time_period_increment 50    -missed_hb_threshold  2   -process_join_wait_time -1     -ndb_jar hops-metadata-dal-impl-ndb-1.0-SNAPSHOT-jar-with-dependencies.jar
+
+
+-max_processes 950    -number_of_leaders_to_kill 50   -consider_stable_after 120000   -max_stabilization_wait_time 900000   -time_period 2000   -time_period_increment 50    -missed_hb_threshold  2   -process_join_wait_time -1     -ndb_jar hops-metadata-dal-impl-ndb-1.0-SNAPSHOT-jar-with-dependencies.jar
+
+
+-max_processes 1000    -number_of_leaders_to_kill 50   -consider_stable_after 120000   -max_stabilization_wait_time 900000   -time_period 2000   -time_period_increment 50    -missed_hb_threshold  2   -process_join_wait_time -1     -ndb_jar hops-metadata-dal-impl-ndb-1.0-SNAPSHOT-jar-with-dependencies.jar
+
+

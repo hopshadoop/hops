@@ -17,35 +17,30 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
+import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdfs.server.common.Storage.StorageDirectory;
+import org.apache.hadoop.hdfs.util.Canceler;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
-
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.hdfs.server.common.Storage.StorageDirectory;
-import org.apache.hadoop.hdfs.util.Canceler;
-
-import com.google.common.base.Preconditions;
 
 /**
  * Context for an ongoing SaveNamespace operation. This class
  * allows cancellation, and also is responsible for accumulating
  * failed storage directories.
  */
-@InterfaceAudience.Private
-public class SaveNamespaceContext {
+class SaveNamespaceContext {
   private final FSNamesystem sourceNamesystem;
   private final long txid;
   private final List<StorageDirectory> errorSDs =
-    Collections.synchronizedList(new ArrayList<StorageDirectory>());
+      Collections.synchronizedList(new ArrayList<StorageDirectory>());
   
   private final Canceler canceller;
-  private final CountDownLatch completionLatch = new CountDownLatch(1);
+  private CountDownLatch completionLatch = new CountDownLatch(1);
 
-  SaveNamespaceContext(
-      FSNamesystem sourceNamesystem,
-      long txid,
+  SaveNamespaceContext(FSNamesystem sourceNamesystem, long txid,
       Canceler canceller) {
     this.sourceNamesystem = sourceNamesystem;
     this.txid = txid;
@@ -74,7 +69,7 @@ public class SaveNamespaceContext {
     completionLatch.countDown();
   }
 
-  public void checkCancelled() throws SaveNamespaceCancelledException {
+  void checkCancelled() throws SaveNamespaceCancelledException {
     if (canceller.isCancelled()) {
       throw new SaveNamespaceCancelledException(
           canceller.getCancellationReason());

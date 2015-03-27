@@ -18,15 +18,6 @@
 
 package org.apache.hadoop.hdfs.server.datanode;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
-import java.io.IOException;
-import java.net.InetSocketAddress;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
@@ -38,12 +29,21 @@ import org.apache.hadoop.util.VersionInfo;
 import org.junit.Before;
 import org.junit.Test;
 
-public class TestDatanodeRegister { 
+import java.io.IOException;
+import java.net.InetSocketAddress;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+public class TestDatanodeRegister {
   public static final Log LOG = LogFactory.getLog(TestDatanodeRegister.class);
 
   // Invalid address
   private static final InetSocketAddress INVALID_ADDR =
-    new InetSocketAddress("127.0.0.1", 1);
+      new InetSocketAddress("127.0.0.1", 1);
   
   private BPServiceActor actor;
   NamespaceInfo fakeNsInfo;
@@ -52,7 +52,8 @@ public class TestDatanodeRegister {
   @Before
   public void setUp() throws IOException {
     mockDnConf = mock(DNConf.class);
-    doReturn(VersionInfo.getVersion()).when(mockDnConf).getMinimumNameNodeVersion();
+    doReturn(VersionInfo.getVersion()).when(mockDnConf)
+        .getMinimumNameNodeVersion();
     
     DataNode mockDN = mock(DataNode.class);
     doReturn(true).when(mockDN).shouldRun();
@@ -67,10 +68,9 @@ public class TestDatanodeRegister {
     // Return a a good software version.
     doReturn(VersionInfo.getVersion()).when(fakeNsInfo).getSoftwareVersion();
     // Return a good layout version for now.
-    doReturn(HdfsConstants.NAMENODE_LAYOUT_VERSION).when(fakeNsInfo)
-        .getLayoutVersion();
+    doReturn(HdfsConstants.LAYOUT_VERSION).when(fakeNsInfo).getLayoutVersion();
     
-    DatanodeProtocolClientSideTranslatorPB fakeDnProt = 
+    DatanodeProtocolClientSideTranslatorPB fakeDnProt =
         mock(DatanodeProtocolClientSideTranslatorPB.class);
     when(fakeDnProt.versionRequest()).thenReturn(fakeNsInfo);
     actor.setNameNode(fakeDnProt);
@@ -95,8 +95,9 @@ public class TestDatanodeRegister {
       actor.retrieveNamespaceInfo();
       fail("Should have thrown an exception for NN with too-low version");
     } catch (IncorrectVersionException ive) {
-      GenericTestUtils.assertExceptionContains(
-          "The reported NameNode version is too low", ive);
+      GenericTestUtils
+          .assertExceptionContains("The reported NameNode version is too low",
+              ive);
       LOG.info("Got expected exception", ive);
     }
   }
@@ -104,17 +105,21 @@ public class TestDatanodeRegister {
   @Test
   public void testDifferentLayoutVersions() throws Exception {
     // We expect no exceptions to be thrown when the layout versions match.
-    assertEquals(HdfsConstants.NAMENODE_LAYOUT_VERSION,
+    assertEquals(HdfsConstants.LAYOUT_VERSION,
         actor.retrieveNamespaceInfo().getLayoutVersion());
     
     // We expect an exception to be thrown when the NN reports a layout version
     // different from that of the DN.
-    doReturn(HdfsConstants.NAMENODE_LAYOUT_VERSION * 1000).when(fakeNsInfo)
+    doReturn(HdfsConstants.LAYOUT_VERSION * 1000).when(fakeNsInfo)
         .getLayoutVersion();
     try {
       actor.retrieveNamespaceInfo();
-    } catch (IOException e) {
-      fail("Should not fail to retrieve NS info from DN with different layout version");
+      fail(
+          "Should have failed to retrieve NS info from DN with bad layout version");
+    } catch (IncorrectVersionException ive) {
+      GenericTestUtils
+          .assertExceptionContains("Unexpected version of namenode", ive);
+      LOG.info("Got expected exception", ive);
     }
   }
 }

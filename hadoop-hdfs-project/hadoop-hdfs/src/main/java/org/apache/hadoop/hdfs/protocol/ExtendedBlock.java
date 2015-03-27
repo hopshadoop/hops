@@ -56,7 +56,9 @@ public class ExtendedBlock {
     return poolId;
   }
 
-  /** Returns the block file name for the block */
+  /**
+   * Returns the block file name for the block
+   */
   public String getBlockName() {
     return block.getBlockName();
   }
@@ -74,15 +76,15 @@ public class ExtendedBlock {
   }
 
   public void setBlockId(final long bid) {
-    block.setBlockId(bid);
+    block.setBlockIdNoPersistance(bid);
   }
   
   public void setGenerationStamp(final long genStamp) {
-    block.setGenerationStamp(genStamp);
+    block.setGenerationStampNoPersistance(genStamp);
   }
 
   public void setNumBytes(final long len) {
-    block.setNumBytes(len);
+    block.setNumBytesNoPersistance(len);
   }
   
   public void set(String poolId, Block blk) {
@@ -106,10 +108,10 @@ public class ExtendedBlock {
     if (!(o instanceof ExtendedBlock)) {
       return false;
     }
-    ExtendedBlock b = (ExtendedBlock)o;
+    ExtendedBlock b = (ExtendedBlock) o;
     return b.block.equals(block) && b.poolId.equals(poolId);
   }
-  
+
   @Override // Object
   public int hashCode() {
     return block.hashCode();

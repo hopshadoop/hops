@@ -17,15 +17,15 @@
  */
 package org.apache.hadoop.test;
 
-import java.io.File;
-import java.io.IOException;
-import java.text.MessageFormat;
-import java.util.concurrent.atomic.AtomicInteger;
-
 import org.junit.Test;
 import org.junit.rules.MethodRule;
 import org.junit.runners.model.FrameworkMethod;
 import org.junit.runners.model.Statement;
+
+import java.io.File;
+import java.io.IOException;
+import java.text.MessageFormat;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class TestDirHelper implements MethodRule {
 
@@ -42,8 +42,9 @@ public class TestDirHelper implements MethodRule {
 
   private static void delete(File file) throws IOException {
     if (file.getAbsolutePath().length() < 5) {
-      throw new IllegalArgumentException(
-        MessageFormat.format("Path [{0}] is too short, not deleting", file.getAbsolutePath()));
+      throw new IllegalArgumentException(MessageFormat
+          .format("Path [{0}] is too short, not deleting",
+              file.getAbsolutePath()));
     }
     if (file.exists()) {
       if (file.isDirectory()) {
@@ -55,21 +56,25 @@ public class TestDirHelper implements MethodRule {
         }
       }
       if (!file.delete()) {
-        throw new RuntimeException(MessageFormat.format("Could not delete path [{0}]", file.getAbsolutePath()));
+        throw new RuntimeException(MessageFormat
+            .format("Could not delete path [{0}]", file.getAbsolutePath()));
       }
     }
   }
 
   static {
     try {
-      TEST_DIR_ROOT = System.getProperty(TEST_DIR_PROP, new File("target").getAbsolutePath());
-      if (!new File(TEST_DIR_ROOT).isAbsolute()) {
-        System.err.println(MessageFormat.format("System property [{0}]=[{1}] must be set to an absolute path",
-                                                TEST_DIR_PROP, TEST_DIR_ROOT));
+      TEST_DIR_ROOT = System
+          .getProperty(TEST_DIR_PROP, new File("target").getAbsolutePath());
+      if (!TEST_DIR_ROOT.startsWith("/")) {
+        System.err.println(MessageFormat.format(
+            "System property [{0}]=[{1}] must be set to an absolute path",
+            TEST_DIR_PROP, TEST_DIR_ROOT));
         System.exit(-1);
       } else if (TEST_DIR_ROOT.length() < 4) {
-        System.err.println(MessageFormat.format("System property [{0}]=[{1}] must be at least 4 chars",
-                                                TEST_DIR_PROP, TEST_DIR_ROOT));
+        System.err.println(MessageFormat
+            .format("System property [{0}]=[{1}] must be at least 4 chars",
+                TEST_DIR_PROP, TEST_DIR_ROOT));
         System.exit(-1);
       }
 
@@ -79,25 +84,30 @@ public class TestDirHelper implements MethodRule {
       File dir = new File(TEST_DIR_ROOT);
       delete(dir);
       if (!dir.mkdirs()) {
-        System.err.println(MessageFormat.format("Could not create test dir [{0}]", TEST_DIR_ROOT));
+        System.err.println(MessageFormat
+            .format("Could not create test dir [{0}]", TEST_DIR_ROOT));
         System.exit(-1);
       }
 
-      System.out.println(">>> " + TEST_DIR_PROP + "        : " + System.getProperty(TEST_DIR_PROP));
+      System.out.println(">>> " + TEST_DIR_PROP + "        : " +
+          System.getProperty(TEST_DIR_PROP));
     } catch (IOException ex) {
       throw new RuntimeException(ex);
     }
   }
 
-  private static ThreadLocal<File> TEST_DIR_TL = new InheritableThreadLocal<File>();
+  private static ThreadLocal<File> TEST_DIR_TL =
+      new InheritableThreadLocal<File>();
 
   @Override
-  public Statement apply(final Statement statement, final FrameworkMethod frameworkMethod, final Object o) {
+  public Statement apply(final Statement statement,
+      final FrameworkMethod frameworkMethod, final Object o) {
     return new Statement() {
       @Override
       public void evaluate() throws Throwable {
         File testDir = null;
-        TestDir testDirAnnotation = frameworkMethod.getAnnotation(TestDir.class);
+        TestDir testDirAnnotation =
+            frameworkMethod.getAnnotation(TestDir.class);
         if (testDirAnnotation != null) {
           testDir = resetTestCaseDir(frameworkMethod.getName());
         }
@@ -112,11 +122,12 @@ public class TestDirHelper implements MethodRule {
   }
 
   /**
-   * Returns the local test directory for the current test, only available when the
+   * Returns the local test directory for the current test, only available when
+   * the
    * test method has been annotated with {@link TestDir}.
    *
    * @return the test directory for the current test. It is an full/absolute
-   *         <code>File</code>.
+   * <code>File</code>.
    */
   public static File getTestDir() {
     File testDir = TEST_DIR_TL.get();
@@ -135,11 +146,13 @@ public class TestDirHelper implements MethodRule {
     try {
       delete(dir);
     } catch (IOException ex) {
-      throw new RuntimeException(MessageFormat.format("Could not delete test dir[{0}], {1}",
-                                                      dir, ex.getMessage()), ex);
+      throw new RuntimeException(MessageFormat
+          .format("Could not delete test dir[{0}], {1}", dir, ex.getMessage()),
+          ex);
     }
     if (!dir.mkdirs()) {
-      throw new RuntimeException(MessageFormat.format("Could not create test dir[{0}]", dir));
+      throw new RuntimeException(
+          MessageFormat.format("Could not create test dir[{0}]", dir));
     }
     return dir;
   }

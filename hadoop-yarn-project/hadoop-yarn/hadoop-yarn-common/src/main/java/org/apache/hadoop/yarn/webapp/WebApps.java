@@ -1,25 +1,39 @@
 /**
-* Licensed to the Apache Software Foundation (ASF) under one
-* or more contributor license agreements.  See the NOTICE file
-* distributed with this work for additional information
-* regarding copyright ownership.  The ASF licenses this file
-* to you under the Apache License, Version 2.0 (the
-* "License"); you may not use this file except in compliance
-* with the License.  You may obtain a copy of the License at
-*
-*     http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package org.apache.hadoop.yarn.webapp;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import com.google.inject.AbstractModule;
+import com.google.inject.Guice;
+import com.google.inject.Injector;
+import com.google.inject.servlet.GuiceFilter;
+import org.apache.commons.lang.StringUtils;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.http.HttpConfig.Policy;
+import org.apache.hadoop.http.HttpServer2;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.yarn.security.AdminACLsManager;
+import org.apache.hadoop.yarn.webapp.util.WebAppUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import javax.servlet.http.HttpServlet;
 import java.io.IOException;
 import java.net.ConnectException;
 import java.net.URI;
@@ -30,33 +44,16 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
-import javax.servlet.http.HttpServlet;
-
-import org.apache.commons.lang.StringUtils;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.http.HttpConfig.Policy;
-import org.apache.hadoop.http.HttpConfig;
-import org.apache.hadoop.http.HttpServer2;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.yarn.conf.YarnConfiguration;
-import org.apache.hadoop.yarn.security.AdminACLsManager;
-import org.apache.hadoop.yarn.webapp.util.WebAppUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.google.inject.AbstractModule;
-import com.google.inject.Guice;
-import com.google.inject.Injector;
-import com.google.inject.servlet.GuiceFilter;
+import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * Helpers to create an embedded webapp.
- *
+ * <p/>
  * <h4>Quick start:</h4>
  * <pre>
  *   WebApp wa = WebApps.$for(myApp).start();</pre>
- * Starts a webapp with default routes binds to 0.0.0.0 (all network interfaces)
+ * Starts a webapp with default routes binds to 0.0.0.0 (all network
+ * interfaces)
  * on an ephemeral port, which can be obtained with:<pre>
  *   int port = wa.port();</pre>
  * <h4>With more options:</h4>
@@ -73,6 +70,7 @@ import com.google.inject.servlet.GuiceFilter;
 @InterfaceAudience.LimitedPrivate({"YARN", "MapReduce"})
 public class WebApps {
   static final Logger LOG = LoggerFactory.getLogger(WebApps.class);
+
   public static class Builder<T> {
     static class ServletStruct {
       public Class<? extends HttpServlet> clazz;
@@ -92,8 +90,10 @@ public class WebApps {
     boolean devMode = false;
     private String spnegoPrincipalKey;
     private String spnegoKeytabKey;
-    private final HashSet<ServletStruct> servlets = new HashSet<ServletStruct>();
-    private final HashMap<String, Object> attributes = new HashMap<String, Object>();
+    private final HashSet<ServletStruct> servlets =
+        new HashSet<ServletStruct>();
+    private final HashMap<String, Object> attributes =
+        new HashMap<String, Object>();
 
     Builder(String name, Class<T> api, T application, String wsName) {
       this.name = name;
@@ -131,7 +131,7 @@ public class WebApps {
       return this;
     }
     
-    public Builder<T> withServlet(String name, String pathSpec, 
+    public Builder<T> withServlet(String name, String pathSpec,
         Class<? extends HttpServlet> servlet) {
       ServletStruct struct = new ServletStruct();
       struct.clazz = servlet;
@@ -181,16 +181,16 @@ public class WebApps {
       String basePath = "/" + name;
       webapp.setRedirectPath(basePath);
       List<String> pathList = new ArrayList<String>();
-      if (basePath.equals("/")) { 
+      if (basePath.equals("/")) {
         webapp.addServePathSpec("/*");
         pathList.add("/*");
-      }  else {
+      } else {
         webapp.addServePathSpec(basePath);
         webapp.addServePathSpec(basePath + "/*");
         pathList.add(basePath + "/*");
       }
       if (wsName != null && !wsName.equals(basePath)) {
-        if (wsName.equals("/")) { 
+        if (wsName.equals("/")) {
           webapp.addServePathSpec("/*");
           pathList.add("/*");
         } else {
@@ -213,7 +213,7 @@ public class WebApps {
         if (devMode) {
           if (port > 0) {
             try {
-              new URL("http://localhost:"+ port +"/__stop").getContent();
+              new URL("http://localhost:" + port + "/__stop").getContent();
               LOG.info("stopping existing webapp instance");
               Thread.sleep(100);
             } catch (ConnectException e) {
@@ -232,20 +232,18 @@ public class WebApps {
           httpScheme = WebAppUtils.getHttpSchemePrefix(conf);
         } else {
           httpScheme =
-              (httpPolicy == Policy.HTTPS_ONLY) ? WebAppUtils.HTTPS_PREFIX
-                  : WebAppUtils.HTTP_PREFIX;
+              (httpPolicy == Policy.HTTPS_ONLY) ? WebAppUtils.HTTPS_PREFIX :
+                  WebAppUtils.HTTP_PREFIX;
         }
-        HttpServer2.Builder builder = new HttpServer2.Builder()
-            .setName(name)
-            .addEndpoint(
-                URI.create(httpScheme + bindAddress
-                    + ":" + port)).setConf(conf).setFindPort(findPort)
+        HttpServer2.Builder builder = new HttpServer2.Builder().setName(name)
+            .addEndpoint(URI.create(httpScheme + bindAddress + ":" + port))
+            .setConf(conf).setFindPort(findPort)
             .setACL(new AdminACLsManager(conf).getAdminAcl())
             .setPathSpec(pathList.toArray(new String[0]));
 
-        boolean hasSpnegoConf = spnegoPrincipalKey != null
-            && conf.get(spnegoPrincipalKey) != null && spnegoKeytabKey != null
-            && conf.get(spnegoKeytabKey) != null;
+        boolean hasSpnegoConf = spnegoPrincipalKey != null &&
+            conf.get(spnegoPrincipalKey) != null && spnegoKeytabKey != null &&
+            conf.get(spnegoKeytabKey) != null;
 
         if (hasSpnegoConf) {
           builder.setUsernameConfKey(spnegoPrincipalKey)
@@ -259,19 +257,20 @@ public class WebApps {
 
         HttpServer2 server = builder.build();
 
-        for(ServletStruct struct: servlets) {
+        for (ServletStruct struct : servlets) {
           server.addServlet(struct.name, struct.spec, struct.clazz);
         }
-        for(Map.Entry<String, Object> entry : attributes.entrySet()) {
+        for (Map.Entry<String, Object> entry : attributes.entrySet()) {
           server.setAttribute(entry.getKey(), entry.getValue());
         }
         HttpServer2.defineFilter(server.getWebAppContext(), "guice",
-          GuiceFilter.class.getName(), null, new String[] { "/*" });
+            GuiceFilter.class.getName(), null, new String[]{"/*"});
 
         webapp.setConf(conf);
         webapp.setHttpServer(server);
         server.start();
-        LOG.info("Web app /"+ name +" started at "+ server.getConnectorAddress(0).getPort());
+        LOG.info("Web app /" + name + " started at " +
+            server.getConnectorAddress(0).getPort());
       } catch (ClassNotFoundException e) {
         throw new WebAppException("Error starting http server", e);
       } catch (IOException e) {
@@ -303,7 +302,9 @@ public class WebApps {
       String thisClass = this.getClass().getName();
       Throwable t = new Throwable();
       for (StackTraceElement e : t.getStackTrace()) {
-        if (e.getClassName().equals(thisClass)) continue;
+        if (e.getClassName().equals(thisClass)) {
+          continue;
+        }
         return e.getClassName();
       }
       LOG.warn("could not infer host class from", t);
@@ -313,26 +314,38 @@ public class WebApps {
 
   /**
    * Create a new webapp builder.
-   * @see WebApps for a complete example
-   * @param <T> application (holding the embedded webapp) type
-   * @param prefix of the webapp
-   * @param api the api class for the application
-   * @param app the application instance
-   * @param wsPrefix the prefix for the webservice api for this app
+   *
+   * @param <T>
+   *     application (holding the embedded webapp) type
+   * @param prefix
+   *     of the webapp
+   * @param api
+   *     the api class for the application
+   * @param app
+   *     the application instance
+   * @param wsPrefix
+   *     the prefix for the webservice api for this app
    * @return a webapp builder
+   * @see WebApps for a complete example
    */
-  public static <T> Builder<T> $for(String prefix, Class<T> api, T app, String wsPrefix) {
+  public static <T> Builder<T> $for(String prefix, Class<T> api, T app,
+      String wsPrefix) {
     return new Builder<T>(prefix, api, app, wsPrefix);
   }
 
   /**
    * Create a new webapp builder.
-   * @see WebApps for a complete example
-   * @param <T> application (holding the embedded webapp) type
-   * @param prefix of the webapp
-   * @param api the api class for the application
-   * @param app the application instance
+   *
+   * @param <T>
+   *     application (holding the embedded webapp) type
+   * @param prefix
+   *     of the webapp
+   * @param api
+   *     the api class for the application
+   * @param app
+   *     the application instance
    * @return a webapp builder
+   * @see WebApps for a complete example
    */
   public static <T> Builder<T> $for(String prefix, Class<T> api, T app) {
     return new Builder<T>(prefix, api, app);
@@ -341,7 +354,7 @@ public class WebApps {
   // Short cut mostly for tests/demos
   @SuppressWarnings("unchecked")
   public static <T> Builder<T> $for(String prefix, T app) {
-    return $for(prefix, (Class<T>)app.getClass(), app);
+    return $for(prefix, (Class<T>) app.getClass(), app);
   }
 
   // Ditto

@@ -17,9 +17,9 @@
  */
 package org.apache.hadoop.hdfs.nfs.nfs3;
 
-import java.util.Comparator;
-
 import com.google.common.base.Preconditions;
+
+import java.util.Comparator;
 
 /**
  * OffsetRange is the range of read/write request. A single point (e.g.,[5,5])
@@ -27,18 +27,18 @@ import com.google.common.base.Preconditions;
  */
 public class OffsetRange {
   
-  public static final Comparator<OffsetRange> ReverseComparatorOnMin = 
+  public static final Comparator<OffsetRange> ReverseComparatorOnMin =
       new Comparator<OffsetRange>() {
-    @Override
-    public int compare(OffsetRange o1, OffsetRange o2) {
-      if (o1.getMin() == o2.getMin()) {
-        return o1.getMax() < o2.getMax() ? 
-            1 : (o1.getMax() > o2.getMax() ? -1 : 0);
-      } else {
-        return o1.getMin() < o2.getMin() ? 1 : -1;
-      }
-    }
-  };
+        @Override
+        public int compare(OffsetRange o1, OffsetRange o2) {
+          if (o1.getMin() == o2.getMin()) {
+            return o1.getMax() < o2.getMax() ? 1 :
+                (o1.getMax() > o2.getMax() ? -1 : 0);
+          } else {
+            return o1.getMin() < o2.getMin() ? 1 : -1;
+          }
+        }
+      };
   
   private final long min;
   private final long max;

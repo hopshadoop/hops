@@ -17,240 +17,213 @@
  */
 package org.apache.hadoop.hdfs.server.common;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.util.Map;
-import java.util.Properties;
-import java.util.SortedSet;
-
+import com.google.common.base.Joiner;
+import io.hops.exception.StorageException;
+import io.hops.metadata.HdfsVariables;
+import io.hops.metadata.common.entity.Variable;
+import io.hops.transaction.handler.HDFSOperationType;
+import io.hops.transaction.handler.HopsTransactionalRequestHandler;
+import io.hops.transaction.lock.LockFactory;
+import io.hops.transaction.lock.TransactionLockTypes;
+import io.hops.transaction.lock.TransactionLocks;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
+import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.LayoutVersion;
 import org.apache.hadoop.hdfs.protocol.LayoutVersion.Feature;
-import org.apache.hadoop.hdfs.protocol.LayoutVersion.LayoutFeature;
-import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.NodeType;
-import org.apache.hadoop.hdfs.server.common.Storage.StorageDirectory;
-import org.apache.hadoop.hdfs.server.datanode.DataNodeLayoutVersion;
-import org.apache.hadoop.hdfs.server.namenode.NameNodeLayoutVersion;
+import org.apache.hadoop.net.DNS;
+import org.apache.hadoop.util.Time;
 
-import com.google.common.base.Joiner;
+import java.io.IOException;
+import java.net.UnknownHostException;
+import java.util.UUID;
 
 /**
  * Common class for storage information.
- * 
+ * <p/>
  * TODO namespaceID should be long and computed as hash(address + port)
  */
 @InterfaceAudience.Private
 public class StorageInfo {
-  public int   layoutVersion;   // layout version of the storage data
-  public int   namespaceID;     // id of the file system
+
+  public static final Log LOG = LogFactory.getLog(StorageInfo.class);
+  public static final int DEFAULT_ROW_ID = 0;
+      // StorageInfo is stored as one row in the database.
+  protected String blockpoolID = "";
+      // id of the block pool. moved it from NNStorage.java to here. This is where it should have been
+  private static StorageInfo storageInfo = null;
+
+  public int layoutVersion;   // layout version of the storage data
+  public int namespaceID;     // id of the file system
   public String clusterID;      // id of the cluster
-  public long  cTime;           // creation time of the file system state
+  public long cTime;           // creation time of the file system state
 
-  protected final NodeType storageType; // Type of the node using this storage 
-
-  protected static final String STORAGE_FILE_VERSION    = "VERSION";
-  
-  public StorageInfo(NodeType type) {
-    this(0, 0, "", 0L, type);
+  public StorageInfo() {
+    this(0, 0, "", 0L, "");
   }
 
-  public StorageInfo(int layoutV, int nsID, String cid, long cT, NodeType type) {
+  public StorageInfo(int layoutV, int nsID, String cid, long cT, String bpid) {
     layoutVersion = layoutV;
     clusterID = cid;
     namespaceID = nsID;
     cTime = cT;
-    storageType = type;
+
+    blockpoolID = bpid;
+
   }
   
   public StorageInfo(StorageInfo from) {
-    this(from.layoutVersion, from.namespaceID, from.clusterID, from.cTime,
-        from.storageType);
+    setStorageInfo(from);
   }
 
   /**
    * Layout version of the storage data.
    */
-  public int    getLayoutVersion(){ return layoutVersion; }
+  public int getLayoutVersion() {
+    return layoutVersion;
+  }
 
   /**
    * Namespace id of the file system.<p>
    * Assigned to the file system at formatting and never changes after that.
    * Shared by all file system components.
    */
-  public int    getNamespaceID()  { return namespaceID; }
+  public int getNamespaceID() {
+    return namespaceID;
+  }
 
   /**
    * cluster id of the file system.<p>
    */
-  public String    getClusterID()  { return clusterID; }
+  public String getClusterID() {
+    return clusterID;
+  }
   
   /**
    * Creation time of the file system state.<p>
    * Modified during upgrades.
    */
-  public long   getCTime()        { return cTime; }
+  public long getCTime() {
+    return cTime;
+  }
   
-  public void   setStorageInfo(StorageInfo from) {
+  public void setStorageInfo(StorageInfo from) {
     layoutVersion = from.layoutVersion;
     clusterID = from.clusterID;
     namespaceID = from.namespaceID;
     cTime = from.cTime;
   }
 
-  public boolean versionSupportsFederation(
-      Map<Integer, SortedSet<LayoutFeature>> map) {
-    return LayoutVersion.supports(map, LayoutVersion.Feature.FEDERATION,
-        layoutVersion);
+  public boolean versionSupportsFederation() {
+    return LayoutVersion.supports(Feature.FEDERATION, layoutVersion);
   }
   
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append("lv=").append(layoutVersion).append(";cid=").append(clusterID)
-    .append(";nsid=").append(namespaceID).append(";c=").append(cTime);
+        .append(";nsid=").append(namespaceID).append(";c=").append(cTime);
     return sb.toString();
   }
   
   public String toColonSeparatedString() {
-    return Joiner.on(":").join(
-        layoutVersion, namespaceID, cTime, clusterID);
-  }
-
-  /**
-   * Get common storage fields.
-   * Should be overloaded if additional fields need to be get.
-   * 
-   * @param props
-   * @throws IOException
-   */
-  protected void setFieldsFromProperties(
-      Properties props, StorageDirectory sd) throws IOException {
-    setLayoutVersion(props, sd);
-    setNamespaceID(props, sd);
-    setcTime(props, sd);
-    setClusterId(props, layoutVersion, sd);
-    checkStorageType(props, sd);
-  }
-
-  /** Validate and set storage type from {@link Properties}*/
-  protected void checkStorageType(Properties props, StorageDirectory sd)
-      throws InconsistentFSStateException {
-    if (storageType == null) { //don't care about storage type
-      return;
-    }
-    NodeType type = NodeType.valueOf(getProperty(props, sd, "storageType"));
-    if (!storageType.equals(type)) {
-      throw new InconsistentFSStateException(sd.root,
-          "Incompatible node types: storageType=" + storageType
-          + " but StorageDirectory type=" + type);
-    }
+    return Joiner.on(":").join(layoutVersion, namespaceID, cTime, clusterID);
   }
   
-  /** Validate and set ctime from {@link Properties}*/
-  protected void setcTime(Properties props, StorageDirectory sd)
-      throws InconsistentFSStateException {
-    cTime = Long.parseLong(getProperty(props, sd, "cTime"));
+
+  public static StorageInfo getStorageInfoFromDB() throws IOException {
+    if (storageInfo == null) {
+      storageInfo = (StorageInfo) new HopsTransactionalRequestHandler(
+          HDFSOperationType.GET_STORAGE_INFO) {
+        @Override
+        public void acquireLock(TransactionLocks locks) throws IOException {
+          LockFactory lf = LockFactory.getInstance();
+          locks.add(lf.getVariableLock(Variable.Finder.StorageInfo,
+              TransactionLockTypes.LockType.READ));
+        }
+
+        @Override
+        public Object performTask() throws StorageException, IOException {
+          return HdfsVariables.getStorageInfo();
+        }
+      }.handle();
+    }
+    return storageInfo;
   }
 
-  /** Validate and set clusterId from {@link Properties}*/
-  protected void setClusterId(Properties props, int layoutVersion,
-      StorageDirectory sd) throws InconsistentFSStateException {
-    // Set cluster ID in version that supports federation
-    if (LayoutVersion.supports(getServiceLayoutFeatureMap(),
-        Feature.FEDERATION, layoutVersion)) {
-      String cid = getProperty(props, sd, "clusterID");
-      if (!(clusterID.equals("") || cid.equals("") || clusterID.equals(cid))) {
-        throw new InconsistentFSStateException(sd.getRoot(),
-            "cluster Id is incompatible with others.");
+  public static void storeStorageInfoToDB(final String clusterId) throws
+      IOException { // should only be called by the format function once during the life time of the cluster.
+    // FIXME [S] it can cause problems in the future when we try to run multiple NN
+    // Solution. call format on only one namenode or every one puts the same values.
+    
+    new HopsTransactionalRequestHandler(HDFSOperationType.ADD_STORAGE_INFO) {
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = LockFactory.getInstance();
+        locks.add(lf.getVariableLock(Variable.Finder.StorageInfo,
+            TransactionLockTypes.LockType.WRITE));
       }
-      clusterID = cid;
-    }
-  }
-  
-  /** Validate and set layout version from {@link Properties}*/
-  protected void setLayoutVersion(Properties props, StorageDirectory sd)
-      throws IncorrectVersionException, InconsistentFSStateException {
-    int lv = Integer.parseInt(getProperty(props, sd, "layoutVersion"));
-    if (lv < getServiceLayoutVersion()) { // future version
-      throw new IncorrectVersionException(getServiceLayoutVersion(), lv,
-          "storage directory " + sd.root.getAbsolutePath());
-    }
-    layoutVersion = lv;
-  }
-  
-  /** Validate and set namespaceID version from {@link Properties}*/
-  protected void setNamespaceID(Properties props, StorageDirectory sd)
-      throws InconsistentFSStateException {
-    int nsId = Integer.parseInt(getProperty(props, sd, "namespaceID"));
-    if (namespaceID != 0 && nsId != 0 && namespaceID != nsId) {
-      throw new InconsistentFSStateException(sd.root,
-          "namespaceID is incompatible with others.");
-    }
-    namespaceID = nsId;
-  }
 
-  public int getServiceLayoutVersion() {
-    return storageType == NodeType.DATA_NODE ? HdfsConstants.DATANODE_LAYOUT_VERSION
-        : HdfsConstants.NAMENODE_LAYOUT_VERSION;
-  }
-
-  public Map<Integer, SortedSet<LayoutFeature>> getServiceLayoutFeatureMap() {
-    return storageType == NodeType.DATA_NODE? DataNodeLayoutVersion.FEATURES
-        : NameNodeLayoutVersion.FEATURES;
-  }
-
-  protected static String getProperty(Properties props, StorageDirectory sd,
-      String name) throws InconsistentFSStateException {
-    String property = props.getProperty(name);
-    if (property == null) {
-      throw new InconsistentFSStateException(sd.root, "file "
-          + STORAGE_FILE_VERSION + " has " + name + " missing.");
-    }
-    return property;
+      @Override
+      public Object performTask() throws StorageException, IOException {
+        Configuration conf = new Configuration();
+        String bpid = newBlockPoolID();
+        storageInfo = new StorageInfo(HdfsConstants.LAYOUT_VERSION,
+            conf.getInt(DFSConfigKeys.DFS_NAME_SPACE_ID_KEY,
+                DFSConfigKeys.DFS_NAME_SPACE_ID_DEFAULT), clusterId, 0L, bpid);
+        HdfsVariables.setStorageInfo(storageInfo);
+        LOG.info("Added new entry to storage info. nsid:" +
+            DFSConfigKeys.DFS_NAME_SPACE_ID_KEY + " CID:" + clusterId +
+            " pbid:" + bpid);
+        return null;
+      }
+    }.handle();
   }
   
-  public static int getNsIdFromColonSeparatedString(String in) {
-    return Integer.parseInt(in.split(":")[1]);
+  public String getBlockPoolId() {
+    return blockpoolID;
   }
   
-  public static String getClusterIdFromColonSeparatedString(String in) {
-    return in.split(":")[3];
-  }
-  
-  /**
-   * Read properties from the VERSION file in the given storage directory.
-   */
-  public void readProperties(StorageDirectory sd) throws IOException {
-    Properties props = readPropertiesFile(sd.getVersionFile());
-    setFieldsFromProperties(props, sd);
-  }
-  
-  /**
-   * Read properties from the the previous/VERSION file in the given storage directory.
-   */
-  public void readPreviousVersionProperties(StorageDirectory sd)
-      throws IOException {
-    Properties props = readPropertiesFile(sd.getPreviousVersionFile());
-    setFieldsFromProperties(props, sd);
-  }
-
-  public static Properties readPropertiesFile(File from) throws IOException {
-    RandomAccessFile file = new RandomAccessFile(from, "rws");
-    FileInputStream in = null;
-    Properties props = new Properties();
+  static String newBlockPoolID() throws UnknownHostException {
+    String ip = "unknownIP";
     try {
-      in = new FileInputStream(file.getFD());
-      file.seek(0);
-      props.load(in);
-    } finally {
-      if (in != null) {
-        in.close();
-      }
-      file.close();
+      ip = DNS.getDefaultIP("default");
+    } catch (UnknownHostException e) {
+      System.out.println("Could not find ip address of \"default\" inteface.");
+      throw e;
     }
-    return props;
+
+    int rand = DFSUtil.getSecureRandom().nextInt(Integer.MAX_VALUE);
+    String bpid = "BP-" + rand + "-" + ip + "-" + Time.now();
+    return bpid;
   }
+  
+  /**
+   * Generate new clusterID.
+   * <p/>
+   * clusterID is a persistent attribute of the cluster.
+   * It is generated when the cluster is created and remains the same
+   * during the life cycle of the cluster.  When a new name node is formated,
+   * if
+   * this is a new cluster, a new clusterID is geneated and stored.  Subsequent
+   * name node must be given the same ClusterID during its format to be in the
+   * same cluster.
+   * When a datanode register it receive the clusterID and stick with it.
+   * If at any point, name node or data node tries to join another cluster, it
+   * will be rejected.
+   *
+   * @return new clusterID
+   */
+  public static String newClusterID() {
+    return "CID-" + UUID.randomUUID().toString();
+  }
+  
+  public int getDefaultRowId() {
+    return this.DEFAULT_ROW_ID;
+  }
+
 }

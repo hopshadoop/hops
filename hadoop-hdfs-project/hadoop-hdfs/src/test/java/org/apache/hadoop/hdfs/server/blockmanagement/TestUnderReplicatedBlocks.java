@@ -17,8 +17,14 @@
  */
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
-import static org.junit.Assert.assertEquals;
-
+import io.hops.common.INodeUtil;
+import io.hops.exception.StorageException;
+import io.hops.metadata.hdfs.entity.INodeIdentifier;
+import io.hops.transaction.handler.HDFSOperationType;
+import io.hops.transaction.handler.HopsTransactionalRequestHandler;
+import io.hops.transaction.lock.LockFactory;
+import io.hops.transaction.lock.TransactionLockTypes.INodeLockType;
+import io.hops.transaction.lock.TransactionLocks;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FsShell;
@@ -26,17 +32,25 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
+import org.apache.hadoop.hdfs.server.datanode.DataNodeTestUtils;
 import org.junit.Test;
 
+import java.io.IOException;
+
+import static org.junit.Assert.assertEquals;
+
 public class TestUnderReplicatedBlocks {
-  @Test(timeout=60000) // 1 min timeout
+  @Test(timeout = 300000) // 5 min timeout
   public void testSetrepIncWithUnderReplicatedBlocks() throws Exception {
     Configuration conf = new HdfsConfiguration();
     final short REPLICATION_FACTOR = 2;
     final String FILE_NAME = "/testFile";
     final Path FILE_PATH = new Path(FILE_NAME);
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(REPLICATION_FACTOR + 1).build();
+    final MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(REPLICATION_FACTOR + 1)
+            .build();
     try {
       // create a file with one block with a replication factor of 2
       final FileSystem fs = cluster.getFileSystem();
@@ -46,17 +60,83 @@ public class TestUnderReplicatedBlocks {
       // remove one replica from the blocksMap so block becomes under-replicated
       // but the block does not get put into the under-replicated blocks queue
       final BlockManager bm = cluster.getNamesystem().getBlockManager();
-      ExtendedBlock b = DFSTestUtil.getFirstBlock(fs, FILE_PATH);
-      DatanodeDescriptor dn = bm.blocksMap.getStorages(b.getLocalBlock())
-          .iterator().next().getDatanodeDescriptor();
-      bm.addToInvalidates(b.getLocalBlock(), dn);
-      Thread.sleep(5000);
-      bm.blocksMap.removeNode(b.getLocalBlock(), dn);
+      final ExtendedBlock b = DFSTestUtil.getFirstBlock(fs, FILE_PATH);
+
+      HopsTransactionalRequestHandler handler =
+          new HopsTransactionalRequestHandler(HDFSOperationType.TEST) {
+            INodeIdentifier inodeIdentifier;
+
+            @Override
+            public void setUp() throws StorageException {
+              Block blk = b.getLocalBlock();
+              inodeIdentifier = INodeUtil.resolveINodeFromBlock(blk);
+            }
+
+            @Override
+            public void acquireLock(TransactionLocks locks) throws IOException {
+              LockFactory lf = LockFactory.getInstance();
+              locks.add(lf.getIndividualINodeLock(INodeLockType.WRITE,
+                  inodeIdentifier)).add(
+                  lf.getIndividualBlockLock(b.getBlockId(), inodeIdentifier))
+                  .add(lf.getBlockRelated(LockFactory.BLK.RE,
+                      LockFactory.BLK.IV));
+            }
+
+            @Override
+            public Object performTask() throws StorageException, IOException {
+              DatanodeDescriptor dn =
+                  bm.blocksMap.nodeIterator(b.getLocalBlock()).next();
+              bm.addToInvalidates(b.getLocalBlock(), dn);
+
+              bm.blocksMap.removeNode(b.getLocalBlock(), dn);
+              return dn;
+            }
+          };
+      DatanodeDescriptor dn = (DatanodeDescriptor) handler.handle();
+      
+      //PATCH https://issues.apache.org/jira/browse/HDFS-4067
+      // Compute the invalidate work in NN, and trigger the heartbeat from DN
+      BlockManagerTestUtil.computeAllPendingWork(bm);
+      DataNodeTestUtils.triggerHeartbeat(cluster.getDataNode(dn.getIpcPort()));
+      // Wait to make sure the DataNode receives the deletion request 
+      Thread.sleep(1000);
+      
+
+      HopsTransactionalRequestHandler handler2 =
+          new HopsTransactionalRequestHandler(HDFSOperationType.TEST) {
+            INodeIdentifier inodeIdentifier;
+
+            @Override
+            public void setUp() throws StorageException {
+              Block blk = b.getLocalBlock();
+              inodeIdentifier = INodeUtil.resolveINodeFromBlock(blk);
+            }
+
+            @Override
+            public void acquireLock(TransactionLocks locks) throws IOException {
+              LockFactory lf = LockFactory.getInstance();
+              locks.add(lf.getIndividualINodeLock(INodeLockType.WRITE,
+                  inodeIdentifier)).add(
+                  lf.getIndividualBlockLock(b.getBlockId(), inodeIdentifier))
+                  .add(lf.getBlockRelated(LockFactory.BLK.RE,
+                      LockFactory.BLK.IV));
+            }
+
+            @Override
+            public Object performTask() throws StorageException, IOException {
+              DatanodeDescriptor dn = (DatanodeDescriptor) getParams()[0];
+              // Remove the record from blocksMap
+              bm.blocksMap.removeNode(b.getLocalBlock(), dn);
+              return null;
+            }
+          };
+      handler2.setParams(dn);
+      handler2.handle();
       
       // increment this file's replication factor
       FsShell shell = new FsShell(conf);
-      assertEquals(0, shell.run(new String[]{
-          "-setrep", "-w", Integer.toString(1+REPLICATION_FACTOR), FILE_NAME}));
+      assertEquals(0, shell.run(new String[]{"-setrep", "-w",
+          Integer.toString(1 + REPLICATION_FACTOR), FILE_NAME}));
     } finally {
       cluster.shutdown();
     }

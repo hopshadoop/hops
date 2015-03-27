@@ -17,6 +17,13 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.security.Groups;
+import org.apache.hadoop.util.ReflectionUtils;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -25,15 +32,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.security.Groups;
-import org.apache.hadoop.util.ReflectionUtils;
-import org.w3c.dom.Element;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
-
 public class QueuePlacementPolicy {
-  private static final Map<String, Class<? extends QueuePlacementRule>> ruleClasses;
+  private static final Map<String, Class<? extends QueuePlacementRule>>
+      ruleClasses;
+
   static {
     Map<String, Class<? extends QueuePlacementRule>> map =
         new HashMap<String, Class<? extends QueuePlacementRule>>();
@@ -54,13 +56,13 @@ public class QueuePlacementPolicy {
   public QueuePlacementPolicy(List<QueuePlacementRule> rules,
       Set<String> configuredQueues, Configuration conf)
       throws AllocationConfigurationException {
-    for (int i = 0; i < rules.size()-1; i++) {
+    for (int i = 0; i < rules.size() - 1; i++) {
       if (rules.get(i).isTerminal()) {
-        throw new AllocationConfigurationException("Rules after rule "
-            + i + " in queue placement policy can never be reached");
+        throw new AllocationConfigurationException("Rules after rule " + i +
+            " in queue placement policy can never be reached");
       }
     }
-    if (!rules.get(rules.size()-1).isTerminal()) {
+    if (!rules.get(rules.size() - 1).isTerminal()) {
       throw new AllocationConfigurationException(
           "Could get past last queue placement rule without assigning");
     }
@@ -72,25 +74,26 @@ public class QueuePlacementPolicy {
   /**
    * Builds a QueuePlacementPolicy from an xml element.
    */
-  public static QueuePlacementPolicy fromXml(Element el, Set<String> configuredQueues,
-      Configuration conf) throws AllocationConfigurationException {
+  public static QueuePlacementPolicy fromXml(Element el,
+      Set<String> configuredQueues, Configuration conf)
+      throws AllocationConfigurationException {
     List<QueuePlacementRule> rules = new ArrayList<QueuePlacementRule>();
     NodeList elements = el.getChildNodes();
     for (int i = 0; i < elements.getLength(); i++) {
       Node node = elements.item(i);
       if (node instanceof Element) {
-        Element element = (Element)node;
+        Element element = (Element) node;
 
         String ruleName = element.getAttribute("name");
         if ("".equals(ruleName)) {
-          throw new AllocationConfigurationException("No name provided for a " +
-            "rule element");
+          throw new AllocationConfigurationException(
+              "No name provided for a " + "rule element");
         }
 
         Class<? extends QueuePlacementRule> clazz = ruleClasses.get(ruleName);
         if (clazz == null) {
-          throw new AllocationConfigurationException("No rule class found for "
-              + ruleName);
+          throw new AllocationConfigurationException(
+              "No rule class found for " + ruleName);
         }
         QueuePlacementRule rule = ReflectionUtils.newInstance(clazz, null);
         rule.initializeFromXml(element);
@@ -106,12 +109,12 @@ public class QueuePlacementPolicy {
    */
   public static QueuePlacementPolicy fromConfiguration(Configuration conf,
       Set<String> configuredQueues) {
-    boolean create = conf.getBoolean(
-        FairSchedulerConfiguration.ALLOW_UNDECLARED_POOLS,
-        FairSchedulerConfiguration.DEFAULT_ALLOW_UNDECLARED_POOLS);
-    boolean userAsDefaultQueue = conf.getBoolean(
-        FairSchedulerConfiguration.USER_AS_DEFAULT_QUEUE,
-        FairSchedulerConfiguration.DEFAULT_USER_AS_DEFAULT_QUEUE);
+    boolean create =
+        conf.getBoolean(FairSchedulerConfiguration.ALLOW_UNDECLARED_POOLS,
+            FairSchedulerConfiguration.DEFAULT_ALLOW_UNDECLARED_POOLS);
+    boolean userAsDefaultQueue =
+        conf.getBoolean(FairSchedulerConfiguration.USER_AS_DEFAULT_QUEUE,
+            FairSchedulerConfiguration.DEFAULT_USER_AS_DEFAULT_QUEUE);
     List<QueuePlacementRule> rules = new ArrayList<QueuePlacementRule>();
     rules.add(new QueuePlacementRule.Specified().initialize(create, null));
     if (userAsDefaultQueue) {
@@ -124,35 +127,35 @@ public class QueuePlacementPolicy {
       return new QueuePlacementPolicy(rules, configuredQueues, conf);
     } catch (AllocationConfigurationException ex) {
       throw new RuntimeException("Should never hit exception when loading" +
-      		"placement policy from conf", ex);
+          "placement policy from conf", ex);
     }
   }
 
   /**
    * Applies this rule to an app with the given requested queue and user/group
    * information.
-   * 
+   *
    * @param requestedQueue
-   *    The queue specified in the ApplicationSubmissionContext
+   *     The queue specified in the ApplicationSubmissionContext
    * @param user
-   *    The user submitting the app
-   * @return
-   *    The name of the queue to assign the app to.  Or null if the app should
-   *    be rejected.
+   *     The user submitting the app
+   * @return The name of the queue to assign the app to.  Or null if the app
+   * should
+   * be rejected.
    * @throws IOException
-   *    If an exception is encountered while getting the user's groups
+   *     If an exception is encountered while getting the user's groups
    */
   public String assignAppToQueue(String requestedQueue, String user)
       throws IOException {
     for (QueuePlacementRule rule : rules) {
-      String queue = rule.assignAppToQueue(requestedQueue, user, groups,
-          configuredQueues);
+      String queue =
+          rule.assignAppToQueue(requestedQueue, user, groups, configuredQueues);
       if (queue == null || !queue.isEmpty()) {
         return queue;
       }
     }
-    throw new IllegalStateException("Should have applied a rule before " +
-    		"reaching here");
+    throw new IllegalStateException(
+        "Should have applied a rule before " + "reaching here");
   }
   
   public List<QueuePlacementRule> getRules() {

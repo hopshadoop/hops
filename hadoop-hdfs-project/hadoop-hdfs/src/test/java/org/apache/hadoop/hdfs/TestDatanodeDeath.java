@@ -17,11 +17,6 @@
  */
 package org.apache.hadoop.hdfs;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
-import java.io.IOException;
-
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.conf.Configuration;
@@ -40,19 +35,26 @@ import org.apache.hadoop.hdfs.server.protocol.InterDatanodeProtocol;
 import org.apache.log4j.Level;
 import org.junit.Test;
 
+import java.io.IOException;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
 /**
  * This class tests that a file need not be closed before its
  * data can be read by another client.
  */
 public class TestDatanodeDeath {
   {
-    ((Log4JLogger)NameNode.stateChangeLog).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger)NameNode.blockStateChangeLog).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger)LeaseManager.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger)LogFactory.getLog(FSNamesystem.class)).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger)DataNode.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger)DFSClient.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger)InterDatanodeProtocol.LOG).getLogger().setLevel(Level.ALL);
+    ((Log4JLogger) NameNode.stateChangeLog).getLogger().setLevel(Level.ALL);
+    ((Log4JLogger) NameNode.blockStateChangeLog).getLogger()
+        .setLevel(Level.ALL);
+    ((Log4JLogger) LeaseManager.LOG).getLogger().setLevel(Level.ALL);
+    ((Log4JLogger) LogFactory.getLog(FSNamesystem.class)).getLogger()
+        .setLevel(Level.ALL);
+    ((Log4JLogger) DataNode.LOG).getLogger().setLevel(Level.ALL);
+    ((Log4JLogger) DFSClient.LOG).getLogger().setLevel(Level.ALL);
+    ((Log4JLogger) InterDatanodeProtocol.LOG).getLogger().setLevel(Level.ALL);
   }
 
   static final int blockSize = 8192;
@@ -61,23 +63,23 @@ public class TestDatanodeDeath {
   static final int numDatanodes = 15;
   static final short replication = 3;
 
-  final int numberOfFiles = 3;
-  final int numThreads = 5;
+  int numberOfFiles = 3;
+  int numThreads = 5;
   Workload[] workload = null;
 
   //
   // an object that does a bunch of transactions
   //
   static class Workload extends Thread {
-    private final short replication;
-    private final int numberOfFiles;
-    private final int id;
-    private final FileSystem fs;
+    private short replication;
+    private int numberOfFiles;
+    private int id;
+    private FileSystem fs;
     private long stamp;
     private final long myseed;
 
-    Workload(long myseed, FileSystem fs, int threadIndex, int numberOfFiles, 
-             short replication, long stamp) {
+    Workload(long myseed, FileSystem fs, int threadIndex, int numberOfFiles,
+        short replication, long stamp) {
       this.myseed = myseed;
       id = threadIndex;
       this.fs = fs;
@@ -89,20 +91,19 @@ public class TestDatanodeDeath {
     // create a bunch of files. Write to them and then verify.
     @Override
     public void run() {
-      System.out.println("Workload starting ");
+      FSNamesystem.LOG.debug("Workload starting ");
       for (int i = 0; i < numberOfFiles; i++) {
         Path filename = new Path(id + "." + i);
         try {
-          System.out.println("Workload processing file " + filename);
+          FSNamesystem.LOG.debug("Workload processing file " + filename);
           FSDataOutputStream stm = createFile(fs, filename, replication);
-          DFSOutputStream dfstream = (DFSOutputStream)
-                                                 (stm.getWrappedStream());
+          DFSOutputStream dfstream = (DFSOutputStream) (stm.getWrappedStream());
           dfstream.setArtificialSlowdown(1000);
           writeFile(stm, myseed);
           stm.close();
           checkFile(fs, filename, replication, numBlocks, fileSize, myseed);
         } catch (Throwable e) {
-          System.out.println("Workload exception " + e);
+          FSNamesystem.LOG.debug("Workload exception " + e);
           assertTrue(e.toString(), false);
         }
 
@@ -125,22 +126,23 @@ public class TestDatanodeDeath {
   //
   // creates a file and returns a descriptor for writing to it.
   //
-  static private FSDataOutputStream createFile(FileSystem fileSys, Path name, short repl)
-    throws IOException {
+  static private FSDataOutputStream createFile(FileSystem fileSys, Path name,
+      short repl) throws IOException {
     // create and write a file that contains three blocks of data
     FSDataOutputStream stm = fileSys.create(name, true, fileSys.getConf()
-        .getInt(CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096), repl,
-        blockSize);
+            .getInt(CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096),
+        repl, blockSize);
     return stm;
   }
 
   //
   // writes to file
   //
-  static private void writeFile(FSDataOutputStream stm, long seed) throws IOException {
+  static private void writeFile(FSDataOutputStream stm, long seed)
+      throws IOException {
     byte[] buffer = AppendTestUtil.randomBytes(seed, fileSize);
 
-    int mid = fileSize/2;
+    int mid = fileSize / 2;
     stm.write(buffer, 0, mid);
     stm.write(buffer, mid, fileSize - mid);
   }
@@ -149,32 +151,31 @@ public class TestDatanodeDeath {
   // verify that the data written are sane
   // 
   static private void checkFile(FileSystem fileSys, Path name, int repl,
-                         int numblocks, int filesize, long seed)
-    throws IOException {
+      int numblocks, int filesize, long seed) throws IOException {
     boolean done = false;
     int attempt = 0;
 
     long len = fileSys.getFileStatus(name).getLen();
     assertTrue(name + " should be of size " + filesize +
-               " but found to be of size " + len, 
-               len == filesize);
+            " but found to be of size " + len, len == filesize);
 
     // wait till all full blocks are confirmed by the datanodes.
     while (!done) {
       attempt++;
       try {
         Thread.sleep(1000);
-      } catch (InterruptedException e) {}
+      } catch (InterruptedException e) {
+      }
       done = true;
-      BlockLocation[] locations = fileSys.getFileBlockLocations(
-          fileSys.getFileStatus(name), 0, filesize);
+      BlockLocation[] locations = fileSys
+          .getFileBlockLocations(fileSys.getFileStatus(name), 0, filesize);
 
       if (locations.length < numblocks) {
         if (attempt > 100) {
-          System.out.println("File " + name + " has only " +
-                             locations.length + " blocks, " +
-                             " but is expected to have " + numblocks +
-                             " blocks.");
+          FSNamesystem.LOG.debug("File " + name + " has only " +
+              locations.length + " blocks, " +
+              " but is expected to have " + numblocks +
+              " blocks.");
         }
         done = false;
         continue;
@@ -182,12 +183,11 @@ public class TestDatanodeDeath {
       for (int idx = 0; idx < locations.length; idx++) {
         if (locations[idx].getHosts().length < repl) {
           if (attempt > 100) {
-            System.out.println("File " + name + " has " +
-                               locations.length + " blocks: " +
-                               " The " + idx + " block has only " +
-                               locations[idx].getHosts().length + 
-                               " replicas but is expected to have " 
-                               + repl + " replicas.");
+            FSNamesystem.LOG.debug("File " + name + " has " +
+                locations.length + " blocks: " +
+                " The " + idx + " block has only " +
+                locations[idx].getHosts().length +
+                " replicas but is expected to have " + repl + " replicas.");
           }
           done = false;
           break;
@@ -203,26 +203,27 @@ public class TestDatanodeDeath {
     checkData(actual, 0, expected, "Read 1");
   }
 
-  private static void checkData(byte[] actual, int from, byte[] expected, String message) {
+  private static void checkData(byte[] actual, int from, byte[] expected,
+      String message) {
     for (int idx = 0; idx < actual.length; idx++) {
-      assertEquals(message+" byte "+(from+idx)+" differs. expected "+
-                        expected[from+idx]+" actual "+actual[idx],
-                        actual[idx], expected[from+idx]);
+      assertEquals(message + " byte " + (from + idx) + " differs. expected " +
+              expected[from + idx] + " actual " + actual[idx], actual[idx],
+          expected[from + idx]);
       actual[idx] = 0;
     }
   }
 
   /**
    * A class that kills one datanode and recreates a new one. It waits to
-   * ensure that that all workers have finished at least one file since the 
+   * ensure that that all workers have finished at least one file since the
    * last kill of a datanode. This guarantees that all three replicas of
    * a block do not get killed (otherwise the file will be corrupt and the
    * test will fail).
    */
   class Modify extends Thread {
     volatile boolean running;
-    final MiniDFSCluster cluster;
-    final Configuration conf;
+    MiniDFSCluster cluster;
+    Configuration conf;
 
     Modify(Configuration conf, MiniDFSCluster cluster) {
       running = true;
@@ -261,11 +262,11 @@ public class TestDatanodeDeath {
           // pick a random datanode to shutdown
           int victim = AppendTestUtil.nextInt(numDatanodes);
           try {
-            System.out.println("Stopping datanode " + victim);
+            FSNamesystem.LOG.debug("Stopping datanode " + victim);
             cluster.restartDataNode(victim);
             // cluster.startDataNodes(conf, 1, true, null, null);
           } catch (IOException e) {
-            System.out.println("TestDatanodeDeath Modify exception " + e);
+            FSNamesystem.LOG.debug("TestDatanodeDeath Modify exception " + e);
             assertTrue("TestDatanodeDeath Modify exception " + e, false);
             running = false;
           }
@@ -291,12 +292,14 @@ public class TestDatanodeDeath {
    */
   private void complexTest() throws IOException {
     Configuration conf = new HdfsConfiguration();
-    conf.setInt(DFSConfigKeys.DFS_NAMENODE_HEARTBEAT_RECHECK_INTERVAL_KEY, 2000);
+    conf.setInt(DFSConfigKeys.DFS_NAMENODE_HEARTBEAT_RECHECK_INTERVAL_KEY,
+        2000);
     conf.setInt(DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY, 2);
-    conf.setInt(DFSConfigKeys.DFS_NAMENODE_REPLICATION_PENDING_TIMEOUT_SEC_KEY, 2);
+    conf.setInt(DFSConfigKeys.DFS_NAMENODE_REPLICATION_PENDING_TIMEOUT_SEC_KEY,
+        2);
     conf.setInt(DFSConfigKeys.DFS_CLIENT_SOCKET_TIMEOUT_KEY, 5000);
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-                                               .numDataNodes(numDatanodes).build();
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(numDatanodes).build();
     cluster.waitActive();
     FileSystem fs = cluster.getFileSystem();
     Modify modThread = null;
@@ -306,7 +309,9 @@ public class TestDatanodeDeath {
       // Create threads and make them run workload concurrently.
       workload = new Workload[numThreads];
       for (int i = 0; i < numThreads; i++) {
-        workload[i] = new Workload(AppendTestUtil.nextLong(), fs, i, numberOfFiles, replication, 0);
+        workload[i] =
+            new Workload(AppendTestUtil.nextLong(), fs, i, numberOfFiles,
+                replication, 0);
         workload[i].start();
       }
 
@@ -317,14 +322,14 @@ public class TestDatanodeDeath {
       // wait for all transactions to get over
       for (int i = 0; i < numThreads; i++) {
         try {
-          System.out.println("Waiting for thread " + i + " to complete...");
+          FSNamesystem.LOG.debug("Waiting for thread " + i + " to complete...");
           workload[i].join();
 
           // if most of the threads are done, then stop restarting datanodes.
-          if (i >= numThreads/2) {
+          if (i >= numThreads / 2) {
             modThread.close();
           }
-         
+
         } catch (InterruptedException e) {
           i--;      // retry
         }
@@ -334,7 +339,8 @@ public class TestDatanodeDeath {
         modThread.close();
         try {
           modThread.join();
-        } catch (InterruptedException e) {}
+        } catch (InterruptedException e) {
+        }
       }
       fs.close();
       cluster.shutdown();
@@ -347,14 +353,18 @@ public class TestDatanodeDeath {
    */
   private void simpleTest(int datanodeToKill) throws IOException {
     Configuration conf = new HdfsConfiguration();
-    conf.setInt(DFSConfigKeys.DFS_NAMENODE_HEARTBEAT_RECHECK_INTERVAL_KEY, 2000);
+    conf.setInt(DFSConfigKeys.DFS_NAMENODE_HEARTBEAT_RECHECK_INTERVAL_KEY,
+        2000);
     conf.setInt(DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY, 1);
-    conf.setInt(DFSConfigKeys.DFS_NAMENODE_REPLICATION_PENDING_TIMEOUT_SEC_KEY, 2);
+    conf.setInt(DFSConfigKeys.DFS_NAMENODE_REPLICATION_PENDING_TIMEOUT_SEC_KEY,
+        2);
     conf.setInt(DFSConfigKeys.DFS_CLIENT_SOCKET_TIMEOUT_KEY, 5000);
     int myMaxNodes = 5;
-    System.out.println("SimpleTest starting with DataNode to Kill " + 
-                       datanodeToKill);
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(myMaxNodes).build();
+    FSNamesystem.LOG
+        .debug("SimpleTest starting with DataNode to Kill " + datanodeToKill);
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).format(true).numDataNodes(myMaxNodes)
+            .build();
     cluster.waitActive();
     FileSystem fs = cluster.getFileSystem();
     short repl = 3;
@@ -363,10 +373,9 @@ public class TestDatanodeDeath {
     try {
 
       // create a file and write one block of data
-      System.out.println("SimpleTest creating file " + filename);
+      FSNamesystem.LOG.debug("SimpleTest creating file " + filename);
       FSDataOutputStream stm = createFile(fs, filename, repl);
-      DFSOutputStream dfstream = (DFSOutputStream)
-                                             (stm.getWrappedStream());
+      DFSOutputStream dfstream = (DFSOutputStream) (stm.getWrappedStream());
 
       // these are test settings
       dfstream.setChunksPerPacket(5);
@@ -374,14 +383,15 @@ public class TestDatanodeDeath {
 
       final long myseed = AppendTestUtil.nextLong();
       byte[] buffer = AppendTestUtil.randomBytes(myseed, fileSize);
-      int mid = fileSize/4;
+      int mid = fileSize / 4;
       stm.write(buffer, 0, mid);
 
       DatanodeInfo[] targets = dfstream.getPipeline();
       int count = 5;
       while (count-- > 0 && targets == null) {
         try {
-          System.out.println("SimpleTest: Waiting for pipeline to be created.");
+          FSNamesystem.LOG
+              .debug("SimpleTest: Waiting for pipeline to be created.");
           Thread.sleep(1000);
         } catch (InterruptedException e) {
         }
@@ -390,14 +400,15 @@ public class TestDatanodeDeath {
 
       if (targets == null) {
         int victim = AppendTestUtil.nextInt(myMaxNodes);
-        System.out.println("SimpleTest stopping datanode random " + victim);
+        FSNamesystem.LOG.debug("SimpleTest stopping datanode random " + victim);
         cluster.stopDataNode(victim);
       } else {
         int victim = datanodeToKill;
-        System.out.println("SimpleTest stopping datanode " + targets[victim]);
+        FSNamesystem.LOG
+            .debug("SimpleTest stopping datanode " + targets[victim]);
         cluster.stopDataNode(targets[victim].getXferAddr());
       }
-      System.out.println("SimpleTest stopping datanode complete");
+      FSNamesystem.LOG.debug("SimpleTest stopping datanode complete");
 
       // write some more data to file, close and verify
       stm.write(buffer, mid, fileSize - mid);
@@ -405,7 +416,7 @@ public class TestDatanodeDeath {
 
       checkFile(fs, filename, repl, numBlocks, fileSize, myseed);
     } catch (Throwable e) {
-      System.out.println("Simple Workload exception " + e);
+      FSNamesystem.LOG.debug("Simple Workload exception " + e);
       e.printStackTrace();
       assertTrue(e.toString(), false);
     } finally {
@@ -415,14 +426,22 @@ public class TestDatanodeDeath {
   }
 
   @Test
-  public void testSimple0() throws IOException {simpleTest(0);}
+  public void testSimple0() throws IOException {
+    simpleTest(0);
+  }
 
   @Test
-  public void testSimple1() throws IOException {simpleTest(1);}
+  public void testSimple1() throws IOException {
+    simpleTest(1);
+  }
 
   @Test
-  public void testSimple2() throws IOException {simpleTest(2);}
+  public void testSimple2() throws IOException {
+    simpleTest(2);
+  }
 
   @Test
-  public void testComplex() throws IOException {complexTest();}
+  public void testComplex() throws IOException {
+    complexTest();
+  }
 }

@@ -17,19 +17,17 @@
  */
 package org.apache.hadoop.hdfs;
 
-import java.io.IOException;
-import java.util.EnumSet;
-
 import org.apache.hadoop.fs.ByteBufferReadable;
-import org.apache.hadoop.fs.ReadOption;
-import org.apache.hadoop.hdfs.client.ClientMmap;
+import org.apache.hadoop.hdfs.protocol.datatransfer.IOStreamPair;
+
+import java.io.IOException;
+import java.net.Socket;
 
 /**
  * A BlockReader is responsible for reading a single block
  * from a single datanode.
  */
 public interface BlockReader extends ByteBufferReadable {
-  
 
   /* same interface as inputStream java.io.InputStream#read()
    * used by DFSInputStream#read()
@@ -37,8 +35,6 @@ public interface BlockReader extends ByteBufferReadable {
    * "Read should not modify user buffer before successful read"
    * because it first reads the data to user buffer and then checks
    * the checksum.
-   * Note: this must return -1 on EOF, even in the case of a 0-byte read.
-   * See HDFS-5762 for details.
    */
   int read(byte[] buf, int off, int len) throws IOException;
 
@@ -47,18 +43,6 @@ public interface BlockReader extends ByteBufferReadable {
    */
   long skip(long n) throws IOException;
 
-  /**
-   * Returns an estimate of the number of bytes that can be read
-   * (or skipped over) from this input stream without performing
-   * network I/O.
-   */
-  int available() throws IOException;
-
-  /**
-   * Close the block reader.
-   *
-   * @throws IOException
-   */
   void close() throws IOException;
 
   /**
@@ -78,22 +62,18 @@ public interface BlockReader extends ByteBufferReadable {
   int readAll(byte[] buf, int offset, int len) throws IOException;
 
   /**
-   * @return              true only if this is a local read.
+   * Take the socket used to talk to the DN.
    */
-  boolean isLocal();
-  
-  /**
-   * @return              true only if this is a short-circuit read.
-   *                      All short-circuit reads are also local.
-   */
-  boolean isShortCircuit();
+  Socket takeSocket();
 
   /**
-   * Get a ClientMmap object for this BlockReader.
-   *
-   * @param opts          The read options to use.
-   * @return              The ClientMmap object, or null if mmap is not
-   *                      supported.
+   * Whether the BlockReader has reached the end of its input stream
+   * and successfully sent a status code back to the datanode.
    */
-  ClientMmap getClientMmap(EnumSet<ReadOption> opts);
+  boolean hasSentStatusCode();
+
+  /**
+   * @return a reference to the streams this block reader is using.
+   */
+  IOStreamPair getStreams();
 }

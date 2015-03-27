@@ -17,19 +17,25 @@
  */
 package org.apache.hadoop.fi;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
-/** Test Utilities */
+/**
+ * Test Utilities
+ */
 public class FiTestUtil {
-  /** Logging */
+  /**
+   * Logging
+   */
   public static final Log LOG = LogFactory.getLog(FiTestUtil.class);
 
-  /** Random source */
+  /**
+   * Random source
+   */
   public static final ThreadLocal<Random> RANDOM = new ThreadLocal<Random>() {
     protected Random initialValue() {
       final Random r = new Random();
@@ -48,7 +54,7 @@ public class FiTestUtil {
     if (d <= 0) {
       throw new IllegalArgumentException("d <= 0, min=" + min + ", max=" + max);
     }
-    return d == 1? min: min + RANDOM.get().nextInt(d);
+    return d == 1 ? min : min + RANDOM.get().nextInt(d);
   }
 
   /**
@@ -62,17 +68,20 @@ public class FiTestUtil {
       throw new IllegalArgumentException(
           "d <= 0 || d > Integer.MAX_VALUE, min=" + min + ", max=" + max);
     }
-    return d == 1? min: min + RANDOM.get().nextInt((int)d);
+    return d == 1 ? min : min + RANDOM.get().nextInt((int) d);
   }
 
-  /** Return the method name of the callee. */
+  /**
+   * Return the method name of the callee.
+   */
   public static String getMethodName() {
     final StackTraceElement[] s = Thread.currentThread().getStackTrace();
-    return s[s.length > 2? 2: s.length - 1].getMethodName();
+    return s[s.length > 2 ? 2 : s.length - 1].getMethodName();
   }
 
   /**
    * Sleep.
+   *
    * @return true if sleep exits normally; false if InterruptedException.
    */
   public static boolean sleep(long ms) {
@@ -92,28 +101,44 @@ public class FiTestUtil {
    */
   public static void sleep(final long min, final long max) {
     final long n = nextRandomLong(min, max);
-    LOG.info(Thread.currentThread().getName() + " sleeps for " + n  +"ms");
+    LOG.info(Thread.currentThread().getName() + " sleeps for " + n + "ms");
     if (n > 0) {
       sleep(n);
     }
   }
 
-  /** Action interface */
+  /**
+   * Action interface
+   */
   public static interface Action<T, E extends Exception> {
-    /** Run the action with the parameter. */
+    /**
+     * Run the action with the parameter.
+     */
     public void run(T parameter) throws E;
   }
 
-  /** An ActionContainer contains at most one action. */
+  /**
+   * An ActionContainer contains at most one action.
+   */
   public static class ActionContainer<T, E extends Exception> {
     private List<Action<T, E>> actionList = new ArrayList<Action<T, E>>();
-    /** Create an empty container. */
-    public ActionContainer() {}
 
-    /** Set action. */
-    public void set(Action<T, E> a) {actionList.add(a);}
+    /**
+     * Create an empty container.
+     */
+    public ActionContainer() {
+    }
 
-    /** Run the action if it exists. */
+    /**
+     * Set action.
+     */
+    public void set(Action<T, E> a) {
+      actionList.add(a);
+    }
+
+    /**
+     * Run the action if it exists.
+     */
     public void run(T obj) throws E {
       for (Action<T, E> action : actionList) {
         action.run(obj);
@@ -121,17 +146,25 @@ public class FiTestUtil {
     }
   }
 
-  /** Constraint interface */
+  /**
+   * Constraint interface
+   */
   public static interface Constraint {
-    /** Is this constraint satisfied? */
+    /**
+     * Is this constraint satisfied?
+     */
     public boolean isSatisfied();
   }
 
-  /** Counting down, the constraint is satisfied if the count is one. */
+  /**
+   * Counting down, the constraint is satisfied if the count is one.
+   */
   public static class CountdownConstraint implements Constraint {
     private int count;
 
-    /** Initialize the count. */
+    /**
+     * Initialize the count.
+     */
     public CountdownConstraint(int count) {
       if (count < 1) {
         throw new IllegalArgumentException(count + " = count < 1");
@@ -139,7 +172,9 @@ public class FiTestUtil {
       this.count = count;
     }
 
-    /** Counting down, the constraint is satisfied if the count is zero. */
+    /**
+     * Counting down, the constraint is satisfied if the count is zero.
+     */
     public boolean isSatisfied() {
       if (count > 1) {
         count--;
@@ -149,26 +184,30 @@ public class FiTestUtil {
     }
   }
   
-  /** An action is fired if all the constraints are satisfied. */
-  public static class ConstraintSatisfactionAction<T, E extends Exception> 
+  /**
+   * An action is fired if all the constraints are satisfied.
+   */
+  public static class ConstraintSatisfactionAction<T, E extends Exception>
       implements Action<T, E> {
     private final Action<T, E> action;
     private final Constraint[] constraints;
     
-    /** Constructor */
-    public ConstraintSatisfactionAction(
-        Action<T, E> action, Constraint... constraints) {
+    /**
+     * Constructor
+     */
+    public ConstraintSatisfactionAction(Action<T, E> action,
+        Constraint... constraints) {
       this.action = action;
       this.constraints = constraints;
     }
 
     /**
      * Fire the action if all the constraints are satisfied.
-     * Short-circuit-and is used. 
+     * Short-circuit-and is used.
      */
     @Override
     public final void run(T parameter) throws E {
-      for(Constraint c : constraints) {
+      for (Constraint c : constraints) {
         if (!c.isSatisfied()) {
           return;
         }
@@ -179,29 +218,39 @@ public class FiTestUtil {
     }
   }
 
-  /** A MarkerConstraint is satisfied if it is marked. */
+  /**
+   * A MarkerConstraint is satisfied if it is marked.
+   */
   public static class MarkerConstraint implements Constraint {
     private final String name;
     private boolean marked = false;
 
-    /** Construct an object. */
+    /**
+     * Construct an object.
+     */
     public MarkerConstraint(String name) {
       this.name = name;
     }
 
-    /** Set marker to be marked. */
+    /**
+     * Set marker to be marked.
+     */
     public void mark() {
       marked = true;
       LOG.info("Marking this " + this);
     }
 
-    /** Is the marker marked? */
+    /**
+     * Is the marker marked?
+     */
     @Override
     public boolean isSatisfied() {
       return marked;
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     */
     public String toString() {
       return getClass().getSimpleName() + "[" + name + ": " + marked + "]";
     }

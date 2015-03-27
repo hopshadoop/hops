@@ -17,20 +17,20 @@
  */
 package org.apache.hadoop.hdfs.util;
 
+import java.util.ArrayList;
 import java.util.ConcurrentModificationException;
 import java.util.Iterator;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
 
 /**
  * A low memory linked hash set implementation, which uses an array for storing
- * the elements and linked lists for collision resolution. In addition it stores
+ * the elements and linked lists for collision resolution. In addition it
+ * stores
  * elements in a linked list to ensure ordered traversal. This class does not
  * support null element.
- *
+ * <p/>
  * This class is not thread safe.
- *
  */
 public class LightWeightLinkedSet<T> extends LightWeightHashSet<T> {
   /**
@@ -58,11 +58,11 @@ public class LightWeightLinkedSet<T> extends LightWeightHashSet<T> {
 
   /**
    * @param initCapacity
-   *          Recommended size of the internal array.
+   *     Recommended size of the internal array.
    * @param maxLoadFactor
-   *          used to determine when to expand the internal array
+   *     used to determine when to expand the internal array
    * @param minLoadFactor
-   *          used to determine when to shrink the internal array
+   *     used to determine when to shrink the internal array
    */
   public LightWeightLinkedSet(int initCapacity, float maxLoadFactor,
       float minLoadFactor) {
@@ -116,14 +116,15 @@ public class LightWeightLinkedSet<T> extends LightWeightHashSet<T> {
   }
 
   /**
-   * Remove the element corresponding to the key, given key.hashCode() == index.
+   * Remove the element corresponding to the key, given key.hashCode() ==
+   * index.
    *
    * @return Return the entry with the element if exists. Otherwise return null.
    */
   @Override
   protected DoubleLinkedElement<T> removeElem(final T key) {
-    DoubleLinkedElement<T> found = (DoubleLinkedElement<T>) (super
-        .removeElem(key));
+    DoubleLinkedElement<T> found =
+        (DoubleLinkedElement<T>) (super.removeElem(key));
     if (found == null) {
       return null;
     }
@@ -160,7 +161,7 @@ public class LightWeightLinkedSet<T> extends LightWeightHashSet<T> {
 
   /**
    * Remove and return n elements from the hashtable.
-   * The order in which entries are removed is corresponds 
+   * The order in which entries are removed is corresponds
    * to the order in which they were inserted.
    *
    * @return first element
@@ -204,8 +205,8 @@ public class LightWeightLinkedSet<T> extends LightWeightHashSet<T> {
       throw new NullPointerException("Input array can not be null");
     }
     if (a.length < size) {
-      a = (U[]) java.lang.reflect.Array.newInstance(a.getClass()
-          .getComponentType(), size);
+      a = (U[]) java.lang.reflect.Array
+          .newInstance(a.getClass().getComponentType(), size);
     }
     int currentIndex = 0;
     DoubleLinkedElement<T> current = head;
@@ -223,9 +224,13 @@ public class LightWeightLinkedSet<T> extends LightWeightHashSet<T> {
   }
 
   private class LinkedSetIterator implements Iterator<T> {
-    /** The starting modification for fail-fast. */
+    /**
+     * The starting modification for fail-fast.
+     */
     private final int startModification = modification;
-    /** The next element to return. */
+    /**
+     * The next element to return.
+     */
     private DoubleLinkedElement<T> next = head;
 
     @Override
@@ -236,8 +241,9 @@ public class LightWeightLinkedSet<T> extends LightWeightHashSet<T> {
     @Override
     public T next() {
       if (modification != startModification) {
-        throw new ConcurrentModificationException("modification="
-            + modification + " != startModification = " + startModification);
+        throw new ConcurrentModificationException(
+            "modification=" + modification + " != startModification = " +
+                startModification);
       }
       if (next == null) {
         throw new NoSuchElementException();

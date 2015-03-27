@@ -17,11 +17,11 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
-import java.io.File;
-
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.ReplicaState;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsVolumeSpi;
+
+import java.io.File;
 
 /**
  * This class represents a replica that is waiting to be recovered.
@@ -37,11 +37,17 @@ public class ReplicaWaitingToBeRecovered extends ReplicaInfo {
 
   /**
    * Constructor
-   * @param blockId block id
-   * @param len replica length
-   * @param genStamp replica generation stamp
-   * @param vol volume where replica is located
-   * @param dir directory path where block and meta files are located
+   *
+   * @param blockId
+   *     block id
+   * @param len
+   *     replica length
+   * @param genStamp
+   *     replica generation stamp
+   * @param vol
+   *     volume where replica is located
+   * @param dir
+   *     directory path where block and meta files are located
    */
   public ReplicaWaitingToBeRecovered(long blockId, long len, long genStamp,
       FsVolumeSpi vol, File dir) {
@@ -50,9 +56,13 @@ public class ReplicaWaitingToBeRecovered extends ReplicaInfo {
   
   /**
    * Constructor
-   * @param block a block
-   * @param vol volume where replica is located
-   * @param dir directory path where block and meta files are located
+   *
+   * @param block
+   *     a block
+   * @param vol
+   *     volume where replica is located
+   * @param dir
+   *     directory path where block and meta files are located
    */
   public ReplicaWaitingToBeRecovered(Block block, FsVolumeSpi vol, File dir) {
     super(block, vol, dir);
@@ -60,6 +70,7 @@ public class ReplicaWaitingToBeRecovered extends ReplicaInfo {
   
   /**
    * Copy constructor.
+   *
    * @param from
    */
   public ReplicaWaitingToBeRecovered(ReplicaWaitingToBeRecovered from) {
@@ -104,7 +115,6 @@ public class ReplicaWaitingToBeRecovered extends ReplicaInfo {
 
   @Override
   public String toString() {
-    return super.toString()
-        + "\n  unlinked=" + unlinked;
+    return super.toString() + "\n  unlinked=" + unlinked;
   }
 }

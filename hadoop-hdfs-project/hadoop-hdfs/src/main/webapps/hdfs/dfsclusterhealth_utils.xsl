@@ -30,16 +30,30 @@
     <xsl:variable name="Tb" select="$Gb * 1024"/>
     <xsl:variable name="Pb" select="$Tb * 1024"/>
 
-     
-    <xsl:choose>
-      <xsl:when test="$number &lt; $kb"><xsl:value-of select="format-number($number, '#,###.##')"/> b</xsl:when>
-      <xsl:when test="$number &lt; $Mb"><xsl:value-of select="format-number($number div $kb, '#,###.00')"/> kb</xsl:when>
-      <xsl:when test="$number &lt; $Gb"><xsl:value-of select="format-number($number div $Mb, '#,###.00')"/> Mb</xsl:when>
-      <xsl:when test="$number &lt; $Tb"><xsl:value-of select="format-number($number div $Gb, '#,###.00')"/> Gb</xsl:when>
 
-      <xsl:when test="$number &lt; $Pb"><xsl:value-of select="format-number($number div $Tb, '#,###.00')"/> Tb</xsl:when>
-      <xsl:when test="$number &lt; ($Pb * 1024)"><xsl:value-of select="format-number($number div $Pb, '#,###.00')"/> Pb</xsl:when>
-      <xsl:otherwise><xsl:value-of select="format-number($number, '#,###.00')"/> b</xsl:otherwise>
+    <xsl:choose>
+      <xsl:when test="$number &lt; $kb">
+        <xsl:value-of select="format-number($number, '#,###.##')"/> b
+      </xsl:when>
+      <xsl:when test="$number &lt; $Mb">
+        <xsl:value-of select="format-number($number div $kb, '#,###.00')"/> kb
+      </xsl:when>
+      <xsl:when test="$number &lt; $Gb">
+        <xsl:value-of select="format-number($number div $Mb, '#,###.00')"/> Mb
+      </xsl:when>
+      <xsl:when test="$number &lt; $Tb">
+        <xsl:value-of select="format-number($number div $Gb, '#,###.00')"/> Gb
+      </xsl:when>
+
+      <xsl:when test="$number &lt; $Pb">
+        <xsl:value-of select="format-number($number div $Tb, '#,###.00')"/> Tb
+      </xsl:when>
+      <xsl:when test="$number &lt; ($Pb * 1024)">
+        <xsl:value-of select="format-number($number div $Pb, '#,###.00')"/> Pb
+      </xsl:when>
+      <xsl:otherwise>
+        <xsl:value-of select="format-number($number, '#,###.00')"/> b
+      </xsl:otherwise>
     </xsl:choose>
 
   </xsl:template>
@@ -76,10 +90,14 @@
         </xsl:call-template>
       </xsl:when>
       <xsl:when test="string-length($link) &gt; 0">
-        <a href="{$link}"><xsl:value-of select="$value"/></a>
+        <a href="{$link}">
+          <xsl:value-of select="$value"/>
+        </a>
 
       </xsl:when>
-      <xsl:otherwise><xsl:value-of select="$value"/></xsl:otherwise>
+      <xsl:otherwise>
+        <xsl:value-of select="$value"/>
+      </xsl:otherwise>
     </xsl:choose>
 
   </xsl:template>

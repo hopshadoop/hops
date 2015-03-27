@@ -17,38 +17,35 @@
  */
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.ReplicaState;
+
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
-
-import org.apache.hadoop.hdfs.protocol.Block;
-import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.ReplicaState;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 
 /**
  * In the Standby Node, we can receive messages about blocks
  * before they are actually available in the namespace, or while
  * they have an outdated state in the namespace. In those cases,
  * we queue those block-related messages in this structure.
- * */  
+ */
 class PendingDataNodeMessages {
   
-  final Map<Block, Queue<ReportedBlockInfo>> queueByBlockId =
-    Maps.newHashMap();
+  Map<Block, Queue<ReportedBlockInfo>> queueByBlockId = Maps.newHashMap();
   private int count = 0;
   
-    
+
   static class ReportedBlockInfo {
     private final Block block;
     private final DatanodeDescriptor dn;
-    private final String storageID;
     private final ReplicaState reportedState;
 
-    ReportedBlockInfo(DatanodeDescriptor dn, String storageID, Block block,
+    ReportedBlockInfo(DatanodeDescriptor dn, Block block,
         ReplicaState reportedState) {
       this.dn = dn;
-      this.storageID = storageID;
       this.block = block;
       this.reportedState = reportedState;
     }
@@ -60,10 +57,6 @@ class PendingDataNodeMessages {
     DatanodeDescriptor getNode() {
       return dn;
     }
-    
-    String getStorageID() {
-      return storageID;
-    }
 
     ReplicaState getReportedState() {
       return reportedState;
@@ -71,16 +64,15 @@ class PendingDataNodeMessages {
 
     @Override
     public String toString() {
-      return "ReportedBlockInfo [block=" + block + ", dn=" + dn
-          + ", reportedState=" + reportedState + "]";
+      return "ReportedBlockInfo [block=" + block + ", dn=" + dn +
+          ", reportedState=" + reportedState + "]";
     }
   }
   
-  void enqueueReportedBlock(DatanodeDescriptor dn, String storageID, Block block,
+  void enqueueReportedBlock(DatanodeDescriptor dn, Block block,
       ReplicaState reportedState) {
     block = new Block(block);
-    getBlockQueue(block).add(
-        new ReportedBlockInfo(dn, storageID, block, reportedState));
+    getBlockQueue(block).add(new ReportedBlockInfo(dn, block, reportedState));
     count++;
   }
   
@@ -107,14 +99,14 @@ class PendingDataNodeMessages {
   }
   
   public int count() {
-    return count ;
+    return count;
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    for (Map.Entry<Block, Queue<ReportedBlockInfo>> entry :
-      queueByBlockId.entrySet()) {
+    for (Map.Entry<Block, Queue<ReportedBlockInfo>> entry : queueByBlockId
+        .entrySet()) {
       sb.append("Block " + entry.getKey() + ":\n");
       for (ReportedBlockInfo rbi : entry.getValue()) {
         sb.append("  ").append(rbi).append("\n");
@@ -124,8 +116,7 @@ class PendingDataNodeMessages {
   }
 
   public Iterable<ReportedBlockInfo> takeAll() {
-    List<ReportedBlockInfo> rbis = Lists.newArrayListWithCapacity(
-        count);
+    List<ReportedBlockInfo> rbis = Lists.newArrayListWithCapacity(count);
     for (Queue<ReportedBlockInfo> q : queueByBlockId.values()) {
       rbis.addAll(q);
     }

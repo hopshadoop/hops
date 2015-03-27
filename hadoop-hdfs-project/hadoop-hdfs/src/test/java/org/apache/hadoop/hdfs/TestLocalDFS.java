@@ -17,17 +17,17 @@
  */
 package org.apache.hadoop.hdfs;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.junit.Test;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.junit.Test;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 /**
  * This class tests the DFS class via the FileSystem interface in a single node
@@ -44,8 +44,8 @@ public class TestLocalDFS {
   private void readFile(FileSystem fileSys, Path name) throws IOException {
     DataInputStream stm = fileSys.open(name);
     byte[] buffer = new byte[4];
-    int bytesRead = stm.read(buffer, 0 , 4);
-    assertEquals("oom", new String(buffer, 0 , bytesRead));
+    int bytesRead = stm.read(buffer, 0, 4);
+    assertEquals("oom", new String(buffer, 0, bytesRead));
     stm.close();
   }
   
@@ -55,9 +55,9 @@ public class TestLocalDFS {
     assertTrue(!fileSys.exists(name));
   }
 
-  static String getUserName(FileSystem fs) {
+  static String getUserName(FileSystem fs) throws IOException {
     if (fs instanceof DistributedFileSystem) {
-      return ((DistributedFileSystem)fs).dfs.ugi.getShortUserName();
+      return ((DistributedFileSystem) fs).dfs.ugi.getShortUserName();
     }
     return System.getProperty("user.name");
   }
@@ -85,12 +85,12 @@ public class TestLocalDFS {
       fileSys.setWorkingDirectory(subdir2);
       writeFile(fileSys, file1);
       readFile(fileSys, file1);
-      cleanupFile(fileSys, new Path(new Path(subdir1, subdir2.toString()),
-                                    file1.toString()));
+      cleanupFile(fileSys,
+          new Path(new Path(subdir1, subdir2.toString()), file1.toString()));
 
       // test home directory
-      Path home = 
-        fileSys.makeQualified(new Path("/user/" + getUserName(fileSys))); 
+      Path home =
+          fileSys.makeQualified(new Path("/user/" + getUserName(fileSys)));
       Path fsHome = fileSys.getHomeDirectory();
       assertEquals(home, fsHome);
 

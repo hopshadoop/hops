@@ -26,7 +26,7 @@ import org.apache.hadoop.yarn.api.ApplicationClientProtocol;
  * <p>
  * <code>QueueACL</code> enumerates the various ACLs for queues.
  * </p>
- * 
+ * <p/>
  * <p>
  * The ACL is one of:
  * <ul>
@@ -35,7 +35,7 @@ import org.apache.hadoop.yarn.api.ApplicationClientProtocol;
  * <li>{@link #ADMINISTER_QUEUE} - ACL to administer the queue.</li>
  * </ul>
  * </p>
- * 
+ *
  * @see QueueInfo
  * @see ApplicationClientProtocol#getQueueUserAcls(org.apache.hadoop.yarn.api.protocolrecords.GetQueueUserAclsInfoRequest)
  */

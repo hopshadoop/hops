@@ -18,31 +18,41 @@
 
 package org.apache.hadoop.fi;
 
-import java.io.IOException;
-
 import org.apache.hadoop.fi.FiTestUtil.ActionContainer;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 
-/** Helper methods and actions for hflush() fault injection tests */
+import java.io.IOException;
+
+/**
+ * Helper methods and actions for hflush() fault injection tests
+ */
 public class FiHFlushTestUtil extends DataTransferTestUtil {
 
-  /** {@inheritDoc} */
+  /**
+   * {@inheritDoc}
+   */
   public static PipelineTest initTest() {
     return thepipelinetest = new HFlushTest();
   }
   
-  /** Disk error action for fault injection tests */
+  /**
+   * Disk error action for fault injection tests
+   */
   public static class DerrAction extends DataTransferTestUtil.DataNodeAction {
     /**
-     * @param currentTest The name of the test
-     * @param index       The index of the datanode
+     * @param currentTest
+     *     The name of the test
+     * @param index
+     *     The index of the datanode
      */
     public DerrAction(String currentTest, int index) {
       super(currentTest, index);
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     */
     public void run(DatanodeID id) throws IOException {
       final Pipeline p = getPipelineTest().getPipelineForDatanode(id);
       if (p == null) {
@@ -56,11 +66,13 @@ public class FiHFlushTestUtil extends DataTransferTestUtil {
     }
   }
   
-  /** Class adds new type of action */
+  /**
+   * Class adds new type of action
+   */
   public static class HFlushTest extends DataTransferTest {
-    public final ActionContainer<DatanodeID, IOException> fiCallHFlush = 
-      new ActionContainer<DatanodeID, IOException>();
-    public final ActionContainer<Integer, RuntimeException> fiErrorOnCallHFlush = 
-      new ActionContainer<Integer, RuntimeException>();
+    public final ActionContainer<DatanodeID, IOException> fiCallHFlush =
+        new ActionContainer<DatanodeID, IOException>();
+    public final ActionContainer<Integer, RuntimeException>
+        fiErrorOnCallHFlush = new ActionContainer<Integer, RuntimeException>();
   }
 }

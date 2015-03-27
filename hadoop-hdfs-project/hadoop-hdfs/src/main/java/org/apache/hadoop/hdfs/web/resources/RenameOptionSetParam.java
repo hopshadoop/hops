@@ -19,19 +19,27 @@ package org.apache.hadoop.hdfs.web.resources;
 
 import org.apache.hadoop.fs.Options;
 
-/** Rename option set parameter. */
+/**
+ * Rename option set parameter.
+ */
 public class RenameOptionSetParam extends EnumSetParam<Options.Rename> {
-  /** Parameter name. */
+  /**
+   * Parameter name.
+   */
   public static final String NAME = "renameoptions";
-  /** Default parameter value. */
+  /**
+   * Default parameter value.
+   */
   public static final String DEFAULT = "";
 
-  private static final Domain<Options.Rename> DOMAIN = new Domain<Options.Rename>(
-      NAME, Options.Rename.class);
+  private static final Domain<Options.Rename> DOMAIN =
+      new Domain<Options.Rename>(NAME, Options.Rename.class);
 
   /**
    * Constructor.
-   * @param options rename options.
+   *
+   * @param options
+   *     rename options.
    */
   public RenameOptionSetParam(final Options.Rename... options) {
     super(DOMAIN, toEnumSet(Options.Rename.class, options));
@@ -39,7 +47,9 @@ public class RenameOptionSetParam extends EnumSetParam<Options.Rename> {
 
   /**
    * Constructor.
-   * @param str a string representation of the parameter value.
+   *
+   * @param str
+   *     a string representation of the parameter value.
    */
   public RenameOptionSetParam(final String str) {
     super(DOMAIN, DOMAIN.parse(str));

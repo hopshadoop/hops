@@ -17,10 +17,6 @@
  */
 package org.apache.hadoop.hdfs.web;
 
-import java.io.IOException;
-import java.net.URI;
-import java.security.PrivilegedExceptionAction;
-
 import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSMainOperationsBaseTest;
@@ -41,16 +37,20 @@ import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import java.io.IOException;
+import java.net.URI;
+import java.security.PrivilegedExceptionAction;
+
 public class TestFSMainOperationsWebHdfs extends FSMainOperationsBaseTest {
   {
-    ((Log4JLogger)ExceptionHandler.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger)DatanodeWebHdfsMethods.LOG).getLogger().setLevel(Level.ALL);
+    ((Log4JLogger) ExceptionHandler.LOG).getLogger().setLevel(Level.ALL);
+    ((Log4JLogger) DatanodeWebHdfsMethods.LOG).getLogger().setLevel(Level.ALL);
   }
 
   private static MiniDFSCluster cluster = null;
   private static Path defaultWorkingDirectory;
   private static FileSystem fileSystem;
-  
+
   public TestFSMainOperationsWebHdfs() {
     super();
   }
@@ -70,16 +70,18 @@ public class TestFSMainOperationsWebHdfs extends FSMainOperationsBaseTest {
       cluster.waitActive();
 
       //change root permission to 777
-      cluster.getFileSystem().setPermission(
-          new Path("/"), new FsPermission((short)0777));
+      cluster.getFileSystem()
+          .setPermission(new Path("/"), new FsPermission((short) 0777));
 
-      final String uri = WebHdfsFileSystem.SCHEME  + "://"
-          + conf.get(DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY);
+      final String uri = WebHdfsFileSystem.SCHEME + "://" +
+          conf.get(DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY);
 
       //get file system as a non-superuser
-      final UserGroupInformation current = UserGroupInformation.getCurrentUser();
-      final UserGroupInformation ugi = UserGroupInformation.createUserForTesting(
-          current.getShortUserName() + "x", new String[]{"user"});
+      final UserGroupInformation current =
+          UserGroupInformation.getCurrentUser();
+      final UserGroupInformation ugi = UserGroupInformation
+          .createUserForTesting(current.getShortUserName() + "x",
+              new String[]{"user"});
       fileSystem = ugi.doAs(new PrivilegedExceptionAction<FileSystem>() {
         @Override
         public FileSystem run() throws Exception {
@@ -108,9 +110,9 @@ public class TestFSMainOperationsWebHdfs extends FSMainOperationsBaseTest {
 
   @Test
   public void testConcat() throws Exception {
-    Path[] paths = {new Path("/test/hadoop/file1"),
-                    new Path("/test/hadoop/file2"),
-                    new Path("/test/hadoop/file3")};
+    Path[] paths =
+        {new Path("/test/hadoop/file1"), new Path("/test/hadoop/file2"),
+            new Path("/test/hadoop/file3")};
 
     DFSTestUtil.createFile(fSys, paths[0], 1024, (short) 3, 0);
     DFSTestUtil.createFile(fSys, paths[1], 1024, (short) 3, 0);
@@ -127,7 +129,7 @@ public class TestFSMainOperationsWebHdfs extends FSMainOperationsBaseTest {
     Assert.assertFalse(exists(fSys, paths[2]));
 
     FileStatus fileStatus = fSys.getFileStatus(catPath);
-    Assert.assertEquals(1024*4, fileStatus.getLen());
+    Assert.assertEquals(1024 * 4, fileStatus.getLen());
   }
 
   @Override
@@ -149,11 +151,12 @@ public class TestFSMainOperationsWebHdfs extends FSMainOperationsBaseTest {
     }
     try {
       Assert.assertFalse(exists(fSys, testSubDir));
-    } catch(AccessControlException e) {
+    } catch (AccessControlException e) {
       // also okay for HDFS.
     }
     
-    Path testDeepSubDir = getTestRootPath(fSys, "test/hadoop/file/deep/sub/dir");
+    Path testDeepSubDir =
+        getTestRootPath(fSys, "test/hadoop/file/deep/sub/dir");
     try {
       fSys.mkdirs(testDeepSubDir);
       Assert.fail("Should throw IOException.");
@@ -162,8 +165,8 @@ public class TestFSMainOperationsWebHdfs extends FSMainOperationsBaseTest {
     }
     try {
       Assert.assertFalse(exists(fSys, testDeepSubDir));
-    } catch(AccessControlException e) {
+    } catch (AccessControlException e) {
       // also okay for HDFS.
-    }    
+    }
   }
 }

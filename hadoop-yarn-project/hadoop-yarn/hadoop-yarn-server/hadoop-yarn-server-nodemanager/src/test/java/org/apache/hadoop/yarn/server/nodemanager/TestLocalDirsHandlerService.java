@@ -18,9 +18,6 @@
 
 package org.apache.hadoop.yarn.server.nodemanager;
 
-import java.io.File;
-import java.io.IOException;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.service.Service.STATE;
@@ -31,9 +28,13 @@ import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import java.io.File;
+import java.io.IOException;
+
 public class TestLocalDirsHandlerService {
-  private static final File testDir = new File("target",
-      TestDirectoryCollection.class.getName()).getAbsoluteFile();
+  private static final File testDir =
+      new File("target", TestDirectoryCollection.class.getName())
+          .getAbsoluteFile();
   private static final File testFile = new File(testDir, "testfile");
 
   @BeforeClass
@@ -73,8 +74,7 @@ public class TestLocalDirsHandlerService {
       Assert.fail("Service should have thrown an exception due to wrong URI");
     } catch (YarnRuntimeException e) {
     }
-    Assert.assertEquals("Service should not be inited",
-                        STATE.STOPPED,
-                        dirSvc.getServiceState());
+    Assert.assertEquals("Service should not be inited", STATE.STOPPED,
+        dirSvc.getServiceState());
   }
 }

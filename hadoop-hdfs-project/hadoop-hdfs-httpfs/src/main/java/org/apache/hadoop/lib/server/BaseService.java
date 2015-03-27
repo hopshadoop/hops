@@ -36,7 +36,8 @@ public abstract class BaseService implements Service {
   /**
    * Service constructor.
    *
-   * @param prefix service prefix.
+   * @param prefix
+   *     service prefix.
    */
   public BaseService(String prefix) {
     this.prefix = prefix;
@@ -52,20 +53,23 @@ public abstract class BaseService implements Service {
    * After collecting  the service properties it delegates to the
    * {@link #init()} method.
    *
-   * @param server the server initializing the service, give access to the
-   * server context.
-   *
-   * @throws ServiceException thrown if the service could not be initialized.
+   * @param server
+   *     the server initializing the service, give access to the
+   *     server context.
+   * @throws ServiceException
+   *     thrown if the service could not be initialized.
    */
   @Override
   public final void init(Server server) throws ServiceException {
     this.server = server;
     String servicePrefix = getPrefixedName("");
     serviceConfig = new Configuration(false);
-    for (Map.Entry<String, String> entry : ConfigurationUtils.resolve(server.getConfig())) {
+    for (Map.Entry<String, String> entry : ConfigurationUtils
+        .resolve(server.getConfig())) {
       String key = entry.getKey();
       if (key.startsWith(servicePrefix)) {
-        serviceConfig.set(key.substring(servicePrefix.length()), entry.getValue());
+        serviceConfig
+            .set(key.substring(servicePrefix.length()), entry.getValue());
       }
     }
     init();
@@ -78,8 +82,9 @@ public abstract class BaseService implements Service {
    * <p/>
    * This method does a NOP.
    *
-   * @throws ServiceException thrown if the service could not be
-   * post-initialized.
+   * @throws ServiceException
+   *     thrown if the service could not be
+   *     post-initialized.
    */
   @Override
   public void postInit() throws ServiceException {
@@ -113,13 +118,16 @@ public abstract class BaseService implements Service {
    * <p/>
    * This method returns an empty array (size 0)
    *
-   * @param oldStatus old server status.
-   * @param newStatus new server status.
-   *
-   * @throws ServiceException thrown if the service could not process the status change.
+   * @param oldStatus
+   *     old server status.
+   * @param newStatus
+   *     new server status.
+   * @throws ServiceException
+   *     thrown if the service could not process the status change.
    */
   @Override
-  public void serverStatusChange(Server.Status oldStatus, Server.Status newStatus) throws ServiceException {
+  public void serverStatusChange(Server.Status oldStatus,
+      Server.Status newStatus) throws ServiceException {
   }
 
   /**
@@ -143,8 +151,8 @@ public abstract class BaseService implements Service {
   /**
    * Returns the full prefixed name of a service property.
    *
-   * @param name of the property.
-   *
+   * @param name
+   *     of the property.
    * @return prefixed name of the property.
    */
   protected String getPrefixedName(String name) {
@@ -160,8 +168,8 @@ public abstract class BaseService implements Service {
    * in the server configuration.
    *
    * @return the service configuration properties with names
-   *         trimmed off from their <code>#SERVER#.#SERVICE#.</code>
-   *         prefix.
+   * trimmed off from their <code>#SERVER#.#SERVICE#.</code>
+   * prefix.
    */
   protected Configuration getServiceConfig() {
     return serviceConfig;
@@ -170,10 +178,12 @@ public abstract class BaseService implements Service {
   /**
    * Initializes the server.
    * <p/>
-   * This method is called by {@link #init(Server)} after all service properties
+   * This method is called by {@link #init(Server)} after all service
+   * properties
    * (properties prefixed with
    *
-   * @throws ServiceException thrown if the service could not be initialized.
+   * @throws ServiceException
+   *     thrown if the service could not be initialized.
    */
   protected abstract void init() throws ServiceException;
 

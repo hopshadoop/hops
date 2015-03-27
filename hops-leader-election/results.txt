@@ -1,0 +1,16 @@
+
+
+==========================================================================
+Params [-max_processes, 5, -number_of_leaders_to_kill, 10, -consider_stable_after, 120000, -max_stabilization_wait_time, 300000, -time_period, 2000, -time_period_increment, 200, -missed_hb_threshold, 2, -process_join_wait_time, -1, -output_file_path, results.txt, -ndb_jar, /home/salman/NetbeanProjects/hop/hops-metadata-dal-impl-ndb/target/hops-metadata-dal-impl-ndb-1.0-SNAPSHOT-jar-with-dependencies.jar]
+--------------------------------------------------------------------------
+After join the system stabilized in 120001 ms. Time period is 2000
+New Leader Elected. Old Leader Id 1 new Leader Id 2 New leader elected in 3234 ms.
+New Leader Elected. Old Leader Id 2 new Leader Id 3 New leader elected in 5115 ms.
+New Leader Elected. Old Leader Id 3 new Leader Id 4 New leader elected in 4211 ms.
+New Leader Elected. Old Leader Id 4 new Leader Id 5 New leader elected in 4113 ms.
+New Leader Elected. Old Leader Id 5 new Leader Id 6 New leader elected in 5313 ms.
+New Leader Elected. Old Leader Id 6 new Leader Id 7 New leader elected in 5237 ms.
+New Leader Elected. Old Leader Id 7 new Leader Id 8 New leader elected in 5114 ms.
+New Leader Elected. Old Leader Id 8 new Leader Id 9 New leader elected in 4205 ms.
+New Leader Elected. Old Leader Id 9 new Leader Id 10 New leader elected in 4115 ms.
+Experiment Finished Sucessfully. Min: 3234 Max: 5313 Avg: 4517.444444444444

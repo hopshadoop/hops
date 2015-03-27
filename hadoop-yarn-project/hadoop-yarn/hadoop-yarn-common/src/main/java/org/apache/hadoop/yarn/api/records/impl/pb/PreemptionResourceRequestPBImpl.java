@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.yarn.api.records.impl.pb;
 
+import com.google.protobuf.TextFormat;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.records.PreemptionResourceRequest;
@@ -25,14 +26,12 @@ import org.apache.hadoop.yarn.proto.YarnProtos.PreemptionResourceRequestProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.PreemptionResourceRequestProtoOrBuilder;
 import org.apache.hadoop.yarn.proto.YarnProtos.ResourceRequestProto;
 
-import com.google.protobuf.TextFormat;
-
 @Private
 @Unstable
 public class PreemptionResourceRequestPBImpl extends PreemptionResourceRequest {
 
   PreemptionResourceRequestProto proto =
-    PreemptionResourceRequestProto.getDefaultInstance();
+      PreemptionResourceRequestProto.getDefaultInstance();
   PreemptionResourceRequestProto.Builder builder = null;
 
   boolean viaProto = false;
@@ -61,8 +60,9 @@ public class PreemptionResourceRequestPBImpl extends PreemptionResourceRequest {
 
   @Override
   public boolean equals(Object other) {
-    if (other == null)
+    if (other == null) {
       return false;
+    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -75,8 +75,9 @@ public class PreemptionResourceRequestPBImpl extends PreemptionResourceRequest {
   }
 
   private void mergeLocalToProto() {
-    if (viaProto)
+    if (viaProto) {
       maybeInitBuilder();
+    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
@@ -122,7 +123,7 @@ public class PreemptionResourceRequestPBImpl extends PreemptionResourceRequest {
   }
 
   private ResourceRequestProto convertToProtoFormat(ResourceRequest t) {
-    return ((ResourceRequestPBImpl)t).getProto();
+    return ((ResourceRequestPBImpl) t).getProto();
   }
 
 }

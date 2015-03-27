@@ -1,24 +1,34 @@
 /**
-* Licensed to the Apache Software Foundation (ASF) under one
-* or more contributor license agreements.  See the NOTICE file
-* distributed with this work for additional information
-* regarding copyright ownership.  The ASF licenses this file
-* to you under the Apache License, Version 2.0 (the
-* "License"); you may not use this file except in compliance
-* with the License.  You may obtain a copy of the License at
-*
-*     http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package org.apache.hadoop.yarn.server.nodemanager;
 
-import static java.util.concurrent.TimeUnit.SECONDS;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience.Private;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileContext;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.UnsupportedFileSystemException;
+import org.apache.hadoop.service.AbstractService;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -31,18 +41,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.classification.InterfaceAudience.Private;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileContext;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.UnsupportedFileSystemException;
-import org.apache.hadoop.service.AbstractService;
-import org.apache.hadoop.yarn.conf.YarnConfiguration;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import static java.util.concurrent.TimeUnit.SECONDS;
 
 public class DeletionService extends AbstractService {
   static final Log LOG = LogFactory.getLog(DeletionService.class);
@@ -66,23 +65,26 @@ public class DeletionService extends AbstractService {
   }
   
   /**
-   * 
-  /**
+   * /**
    * Delete the path(s) as this user.
-   * @param user The user to delete as, or the JVM user if null
-   * @param subDir the sub directory name
-   * @param baseDirs the base directories which contains the subDir's
+   *
+   * @param user
+   *     The user to delete as, or the JVM user if null
+   * @param subDir
+   *     the sub directory name
+   * @param baseDirs
+   *     the base directories which contains the subDir's
    */
   public void delete(String user, Path subDir, Path... baseDirs) {
     // TODO if parent owned by NM, rename within parent inline
     if (debugDelay != -1) {
       if (baseDirs == null || baseDirs.length == 0) {
         sched.schedule(new FileDeletionTask(this, user, subDir, null),
-          debugDelay, TimeUnit.SECONDS);
+            debugDelay, TimeUnit.SECONDS);
       } else {
         sched.schedule(
-          new FileDeletionTask(this, user, subDir, Arrays.asList(baseDirs)),
-          debugDelay, TimeUnit.SECONDS);
+            new FileDeletionTask(this, user, subDir, Arrays.asList(baseDirs)),
+            debugDelay, TimeUnit.SECONDS);
       }
     }
   }
@@ -95,17 +97,16 @@ public class DeletionService extends AbstractService {
   
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
-    ThreadFactory tf = new ThreadFactoryBuilder()
-      .setNameFormat("DeletionService #%d")
-      .build();
+    ThreadFactory tf =
+        new ThreadFactoryBuilder().setNameFormat("DeletionService #%d").build();
     if (conf != null) {
       sched = new ScheduledThreadPoolExecutor(
-          conf.getInt(YarnConfiguration.NM_DELETE_THREAD_COUNT, YarnConfiguration.DEFAULT_NM_DELETE_THREAD_COUNT),
-          tf);
+          conf.getInt(YarnConfiguration.NM_DELETE_THREAD_COUNT,
+              YarnConfiguration.DEFAULT_NM_DELETE_THREAD_COUNT), tf);
       debugDelay = conf.getInt(YarnConfiguration.DEBUG_NM_DELETE_DELAY_SEC, 0);
     } else {
-      sched = new ScheduledThreadPoolExecutor(YarnConfiguration.DEFAULT_NM_DELETE_THREAD_COUNT,
-          tf);
+      sched = new ScheduledThreadPoolExecutor(
+          YarnConfiguration.DEFAULT_NM_DELETE_THREAD_COUNT, tf);
     }
     sched.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
     sched.setKeepAliveTime(60L, SECONDS);
@@ -131,6 +132,7 @@ public class DeletionService extends AbstractService {
   /**
    * Determine if the service has completely stopped.
    * Used only by unit tests
+   *
    * @return true if service has completely stopped
    */
   @Private
@@ -215,7 +217,7 @@ public class DeletionService extends AbstractService {
           }
         } else {
           for (Path baseDir : baseDirs) {
-            Path del = subDir == null? baseDir : new Path(baseDir, subDir);
+            Path del = subDir == null ? baseDir : new Path(baseDir, subDir);
             LOG.debug("NM deleting path : " + del);
             try {
               lfs.delete(del, true);
@@ -229,10 +231,10 @@ public class DeletionService extends AbstractService {
         try {
           LOG.debug("Deleting path: [" + subDir + "] as user: [" + user + "]");
           if (baseDirs == null || baseDirs.size() == 0) {
-            delService.exec.deleteAsUser(user, subDir, (Path[])null);
+            delService.exec.deleteAsUser(user, subDir, (Path[]) null);
           } else {
-            delService.exec.deleteAsUser(user, subDir,
-              baseDirs.toArray(new Path[0]));
+            delService.exec
+                .deleteAsUser(user, subDir, baseDirs.toArray(new Path[0]));
           }
         } catch (IOException e) {
           error = true;
@@ -243,7 +245,7 @@ public class DeletionService extends AbstractService {
         }
       }
       if (error) {
-        setSuccess(!error);        
+        setSuccess(!error);
       }
       fileDeletionTaskFinished();
     }
@@ -252,8 +254,8 @@ public class DeletionService extends AbstractService {
     public String toString() {
       StringBuffer sb = new StringBuffer("\nFileDeletionTask : ");
       sb.append("  user : ").append(this.user);
-      sb.append("  subDir : ").append(
-        subDir == null ? "null" : subDir.toString());
+      sb.append("  subDir : ")
+          .append(subDir == null ? "null" : subDir.toString());
       sb.append("  baseDir : ");
       if (baseDirs == null || baseDirs.size() == 0) {
         sb.append("null");
@@ -270,6 +272,7 @@ public class DeletionService extends AbstractService {
      * task2 and task3 can be started only after task1 then we should define
      * task2 and task3 as successor tasks for task1.
      * Note:- Task dependency should be defined prior to
+     *
      * @param successorTask
      */
     public synchronized void addFileDeletionTaskDependency(
@@ -308,11 +311,15 @@ public class DeletionService extends AbstractService {
   /**
    * Helper method to create file deletion task. To be used only if we need
    * a way to define dependencies between deletion tasks.
-   * @param user user on whose behalf this task is suppose to run
-   * @param subDir sub directory as required in 
-   * {@link DeletionService#delete(String, Path, Path...)}
-   * @param baseDirs base directories as required in
-   * {@link DeletionService#delete(String, Path, Path...)}
+   *
+   * @param user
+   *     user on whose behalf this task is suppose to run
+   * @param subDir
+   *     sub directory as required in
+   *     {@link DeletionService#delete(String, Path, Path...)}
+   * @param baseDirs
+   *     base directories as required in
+   *     {@link DeletionService#delete(String, Path, Path...)}
    */
   public FileDeletionTask createFileDeletionTask(String user, Path subDir,
       Path[] baseDirs) {

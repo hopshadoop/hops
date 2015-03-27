@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
-import java.io.IOException;
-
 import org.apache.hadoop.fi.DataTransferTestUtil;
 import org.apache.hadoop.fi.DataTransferTestUtil.DataNodeAction;
 import org.apache.hadoop.fi.DataTransferTestUtil.DataTransferTest;
@@ -33,13 +31,17 @@ import org.apache.hadoop.fi.FiTestUtil.MarkerConstraint;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.junit.Test;
 
-/** Test DataTransferProtocol with fault injection. */
+import java.io.IOException;
+
+/**
+ * Test DataTransferProtocol with fault injection.
+ */
 public class TestFiPipelineClose {
   private static void runPipelineCloseTest(String methodName,
       Action<DatanodeID, IOException> a) throws IOException {
     FiTestUtil.LOG.info("Running " + methodName + " ...");
-    final DataTransferTest t = (DataTransferTest) DataTransferTestUtil
-        .initTest();
+    final DataTransferTest t =
+        (DataTransferTest) DataTransferTestUtil.initTest();
     t.fiPipelineClose.set(a);
     TestFiDataTransferProtocol.write1byte(methodName);
   }
@@ -81,13 +83,15 @@ public class TestFiPipelineClose {
     runPipelineCloseTest(name, new SleepAction(name, i, 3000));
   }
 
-  private static void runPipelineCloseAck(String name, int i, DataNodeAction a
-      ) throws IOException {
+  private static void runPipelineCloseAck(String name, int i, DataNodeAction a)
+      throws IOException {
     FiTestUtil.LOG.info("Running " + name + " ...");
-    final DataTransferTest t = (DataTransferTest)DataTransferTestUtil.initTest();
+    final DataTransferTest t =
+        (DataTransferTest) DataTransferTestUtil.initTest();
     final MarkerConstraint marker = new MarkerConstraint(name);
     t.fiPipelineClose.set(new DatanodeMarkingAction(name, i, marker));
-    t.fiPipelineAck.set(new ConstraintSatisfactionAction<DatanodeID, IOException>(a, marker));
+    t.fiPipelineAck.set(
+        new ConstraintSatisfactionAction<DatanodeID, IOException>(a, marker));
     TestFiDataTransferProtocol.write1byte(name);
   }
 
@@ -207,8 +211,8 @@ public class TestFiPipelineClose {
   private static void runBlockFileCloseTest(String methodName,
       Action<DatanodeID, IOException> a) throws IOException {
     FiTestUtil.LOG.info("Running " + methodName + " ...");
-    final DataTransferTest t = (DataTransferTest) DataTransferTestUtil
-        .initTest();
+    final DataTransferTest t =
+        (DataTransferTest) DataTransferTestUtil.initTest();
     t.fiBlockFileClose.set(a);
     TestFiDataTransferProtocol.write1byte(methodName);
   }

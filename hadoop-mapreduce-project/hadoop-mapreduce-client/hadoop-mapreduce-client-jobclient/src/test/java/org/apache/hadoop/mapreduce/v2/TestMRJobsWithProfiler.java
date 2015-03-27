@@ -41,6 +41,7 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppState;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 public class TestMRJobsWithProfiler {
@@ -104,6 +105,7 @@ public class TestMRJobsWithProfiler {
   }
 
 
+  @Ignore("HOPS fails on vanilla")
   @Test (timeout = 120000)
   public void testProfiler() throws IOException, InterruptedException,
       ClassNotFoundException {

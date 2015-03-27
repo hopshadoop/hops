@@ -42,6 +42,7 @@ public abstract class CancelDelegationTokenRequest {
 
   /**
    * Get the delegation token requested to be cancelled.
+   *
    * @return the delegation token requested to be cancelled.
    */
   @Private

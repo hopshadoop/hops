@@ -18,11 +18,11 @@
                       http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <artifactId>hadoop-mapreduce-client</artifactId>
-    <groupId>org.apache.hadoop</groupId>
+    <groupId>io.hops</groupId>
     <version>2.4.0</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
-  <groupId>org.apache.hadoop</groupId>
+  <groupId>io.hops</groupId>
   <artifactId>hadoop-mapreduce-client-common</artifactId>
   <version>2.4.0</version>
   <name>hadoop-mapreduce-client-common</name>
@@ -34,19 +34,19 @@
 
   <dependencies>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-yarn-common</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-yarn-client</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-mapreduce-client-core</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-yarn-server-common</artifactId>
     </dependency>
   </dependencies>
@@ -54,7 +54,7 @@
   <build>
     <plugins>
       <plugin>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-maven-plugins</artifactId>
         <executions>
           <execution>

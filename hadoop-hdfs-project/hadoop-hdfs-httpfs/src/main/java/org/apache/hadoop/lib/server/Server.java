@@ -115,9 +115,11 @@ public class Server {
     /**
      * Status constructor.
      *
-     * @param settable indicates if the status is settable.
-     * @param operational indicates if the server is operational
-     * when in this status.
+     * @param settable
+     *     indicates if the status is settable.
+     * @param operational
+     *     indicates if the server is operational
+     *     when in this status.
      */
     private Status(boolean settable, boolean operational) {
       this.settable = settable;
@@ -139,7 +141,8 @@ public class Server {
    * classpath if the <code>#SERVER#-log4j.properties</code> is not defined
    * in the server configuration directory.
    */
-  public static final String DEFAULT_LOG4J_PROPERTIES = "default-log4j.properties";
+  public static final String DEFAULT_LOG4J_PROPERTIES =
+      "default-log4j.properties";
 
   private Status status;
   private String name;
@@ -153,10 +156,13 @@ public class Server {
   /**
    * Creates a server instance.
    * <p/>
-   * The config, log and temp directories are all under the specified home directory.
+   * The config, log and temp directories are all under the specified home
+   * directory.
    *
-   * @param name server name.
-   * @param homeDir server home directory.
+   * @param name
+   *     server name.
+   * @param homeDir
+   *     server home directory.
    */
   public Server(String name, String homeDir) {
     this(name, homeDir, null);
@@ -165,29 +171,40 @@ public class Server {
   /**
    * Creates a server instance.
    *
-   * @param name server name.
-   * @param homeDir server home directory.
-   * @param configDir config directory.
-   * @param logDir log directory.
-   * @param tempDir temp directory.
+   * @param name
+   *     server name.
+   * @param homeDir
+   *     server home directory.
+   * @param configDir
+   *     config directory.
+   * @param logDir
+   *     log directory.
+   * @param tempDir
+   *     temp directory.
    */
-  public Server(String name, String homeDir, String configDir, String logDir, String tempDir) {
+  public Server(String name, String homeDir, String configDir, String logDir,
+      String tempDir) {
     this(name, homeDir, configDir, logDir, tempDir, null);
   }
 
   /**
    * Creates a server instance.
    * <p/>
-   * The config, log and temp directories are all under the specified home directory.
+   * The config, log and temp directories are all under the specified home
+   * directory.
    * <p/>
    * It uses the provided configuration instead loading it from the config dir.
    *
-   * @param name server name.
-   * @param homeDir server home directory.
-   * @param config server configuration.
+   * @param name
+   *     server name.
+   * @param homeDir
+   *     server home directory.
+   * @param config
+   *     server configuration.
    */
   public Server(String name, String homeDir, Configuration config) {
-    this(name, homeDir, homeDir + "/conf", homeDir + "/log", homeDir + "/temp", config);
+    this(name, homeDir, homeDir + "/conf", homeDir + "/log", homeDir + "/temp",
+        config);
   }
 
   /**
@@ -195,14 +212,21 @@ public class Server {
    * <p/>
    * It uses the provided configuration instead loading it from the config dir.
    *
-   * @param name server name.
-   * @param homeDir server home directory.
-   * @param configDir config directory.
-   * @param logDir log directory.
-   * @param tempDir temp directory.
-   * @param config server configuration.
+   * @param name
+   *     server name.
+   * @param homeDir
+   *     server home directory.
+   * @param configDir
+   *     config directory.
+   * @param logDir
+   *     log directory.
+   * @param tempDir
+   *     temp directory.
+   * @param config
+   *     server configuration.
    */
-  public Server(String name, String homeDir, String configDir, String logDir, String tempDir, Configuration config) {
+  public Server(String name, String homeDir, String configDir, String logDir,
+      String tempDir, Configuration config) {
     this.name = Check.notEmpty(name, "name").trim().toLowerCase();
     this.homeDir = Check.notEmpty(homeDir, "homeDir");
     this.configDir = Check.notEmpty(configDir, "configDir");
@@ -222,19 +246,20 @@ public class Server {
   /**
    * Validates that the specified value is an absolute path (starts with '/').
    *
-   * @param value value to verify it is an absolute path.
-   * @param name name to use in the exception if the value is not an absolute
-   * path.
-   *
+   * @param value
+   *     value to verify it is an absolute path.
+   * @param name
+   *     name to use in the exception if the value is not an absolute
+   *     path.
    * @return the value.
-   *
-   * @throws IllegalArgumentException thrown if the value is not an absolute
-   * path.
+   * @throws IllegalArgumentException
+   *     thrown if the value is not an absolute
+   *     path.
    */
   private String checkAbsolutePath(String value, String name) {
-    if (!new File(value).isAbsolute()) {
-      throw new IllegalArgumentException(
-        MessageFormat.format("[{0}] must be an absolute path [{1}]", name, value));
+    if (!value.startsWith("/")) {
+      throw new IllegalArgumentException(MessageFormat
+          .format("[{0}] must be an absolute path [{1}]", name, value));
     }
     return value;
   }
@@ -254,13 +279,15 @@ public class Server {
    * The status must be settable.
    * <p/>
    * All services will be notified o the status change via the
-   * {@link Service#serverStatusChange(Server.Status, Server.Status)} method. If a service
+   * {@link Service#serverStatusChange(Server.Status, Server.Status)} method. If
+   * a service
    * throws an exception during the notification, the server will be destroyed.
    *
-   * @param status status to set.
-   *
-   * @throws ServerException thrown if the service has been destroy because of
-   * a failed notification to a service.
+   * @param status
+   *     status to set.
+   * @throws ServerException
+   *     thrown if the service has been destroy because of
+   *     a failed notification to a service.
    */
   public void setStatus(Status status) throws ServerException {
     Check.notNull(status, "status");
@@ -272,23 +299,28 @@ public class Server {
           try {
             service.serverStatusChange(oldStatus, status);
           } catch (Exception ex) {
-            log.error("Service [{}] exception during status change to [{}] -server shutting down-,  {}",
-                      new Object[]{service.getInterface().getSimpleName(), status, ex.getMessage(), ex});
+            log.error(
+                "Service [{}] exception during status change to [{}] -server shutting down-,  {}",
+                new Object[]{service.getInterface().getSimpleName(), status,
+                    ex.getMessage(), ex});
             destroy();
-            throw new ServerException(ServerException.ERROR.S11, service.getInterface().getSimpleName(),
-                                      status, ex.getMessage(), ex);
+            throw new ServerException(ServerException.ERROR.S11,
+                service.getInterface().getSimpleName(), status, ex.getMessage(),
+                ex);
           }
         }
       }
     } else {
-      throw new IllegalArgumentException("Status [" + status + " is not settable");
+      throw new IllegalArgumentException(
+          "Status [" + status + " is not settable");
     }
   }
 
   /**
    * Verifies the server is operational.
    *
-   * @throws IllegalStateException thrown if the server is not operational.
+   * @throws IllegalStateException
+   *     thrown if the server is not operational.
    */
   protected void ensureOperational() {
     if (!getStatus().isOperational()) {
@@ -303,10 +335,10 @@ public class Server {
    * It first attempts to use the Thread's context classloader and if not
    * set it uses the <code>ClassUtils</code> classloader.
    *
-   * @param name resource to retrieve.
-   *
+   * @param name
+   *     resource to retrieve.
    * @return inputstream with the resource, NULL if the resource does not
-   *         exist.
+   * exist.
    */
   static InputStream getResource(String name) {
     Check.notEmpty(name, "name");
@@ -336,7 +368,8 @@ public class Server {
    * <li>Post-initializes the services</li>
    * <li>Sets the server startup status</li>
    *
-   * @throws ServerException thrown if the server could not be initialized.
+   * @throws ServerException
+   *     thrown if the server could not be initialized.
    */
   public void init() throws ServerException {
     if (status != Status.UNDEF) {
@@ -351,17 +384,23 @@ public class Server {
       serverInfo.load(is);
       is.close();
     } catch (IOException ex) {
-      throw new RuntimeException("Could not load server information file: " + name + ".properties");
+      throw new RuntimeException(
+          "Could not load server information file: " + name + ".properties");
     }
     initLog();
     log.info("++++++++++++++++++++++++++++++++++++++++++++++++++++++");
     log.info("Server [{}] starting", name);
     log.info("  Built information:");
-    log.info("    Version           : {}", serverInfo.getProperty(name + ".version", "undef"));
-    log.info("    Source Repository : {}", serverInfo.getProperty(name + ".source.repository", "undef"));
-    log.info("    Source Revision   : {}", serverInfo.getProperty(name + ".source.revision", "undef"));
-    log.info("    Built by          : {}", serverInfo.getProperty(name + ".build.username", "undef"));
-    log.info("    Built timestamp   : {}", serverInfo.getProperty(name + ".build.timestamp", "undef"));
+    log.info("    Version           : {}",
+        serverInfo.getProperty(name + ".version", "undef"));
+    log.info("    Source Repository : {}",
+        serverInfo.getProperty(name + ".source.repository", "undef"));
+    log.info("    Source Revision   : {}",
+        serverInfo.getProperty(name + ".source.revision", "undef"));
+    log.info("    Built by          : {}",
+        serverInfo.getProperty(name + ".build.username", "undef"));
+    log.info("    Built timestamp   : {}",
+        serverInfo.getProperty(name + ".build.timestamp", "undef"));
     log.info("  Runtime information:");
     log.info("    Home   dir: {}", homeDir);
     log.info("    Config dir: {}", (config == null) ? configDir : "-");
@@ -375,11 +414,13 @@ public class Server {
       initServices(list);
       log.info("Services initialized");
     } catch (ServerException ex) {
-      log.error("Services initialization failure, destroying initialized services");
+      log.error(
+          "Services initialization failure, destroying initialized services");
       destroyServices();
       throw ex;
     }
-    Status status = Status.valueOf(getConfig().get(getPrefixedName(CONF_STARTUP_STATUS), Status.NORMAL.toString()));
+    Status status = Status.valueOf(getConfig()
+        .get(getPrefixedName(CONF_STARTUP_STATUS), Status.NORMAL.toString()));
     setStatus(status);
     log.info("Server [{}] started!, status [{}]", name, status);
   }
@@ -387,10 +428,11 @@ public class Server {
   /**
    * Verifies the specified directory exists.
    *
-   * @param dir directory to verify it exists.
-   *
-   * @throws ServerException thrown if the directory does not exist or it the
-   * path it is not a directory.
+   * @param dir
+   *     directory to verify it exists.
+   * @throws ServerException
+   *     thrown if the directory does not exist or it the
+   *     path it is not a directory.
    */
   private void verifyDir(String dir) throws ServerException {
     File file = new File(dir);
@@ -405,37 +447,39 @@ public class Server {
   /**
    * Initializes Log4j logging.
    *
-   * @throws ServerException thrown if Log4j could not be initialized.
+   * @throws ServerException
+   *     thrown if Log4j could not be initialized.
    */
   protected void initLog() throws ServerException {
     verifyDir(logDir);
     LogManager.resetConfiguration();
     File log4jFile = new File(configDir, name + "-log4j.properties");
     if (log4jFile.exists()) {
-      PropertyConfigurator.configureAndWatch(log4jFile.toString(), 10 * 1000); //every 10 secs
+      PropertyConfigurator
+          .configureAndWatch(log4jFile.toString(), 10 * 1000); //every 10 secs
       log = LoggerFactory.getLogger(Server.class);
     } else {
       Properties props = new Properties();
       try {
         InputStream is = getResource(DEFAULT_LOG4J_PROPERTIES);
-        try {
-          props.load(is);
-        } finally {
-          is.close();
-        }
+        props.load(is);
       } catch (IOException ex) {
-        throw new ServerException(ServerException.ERROR.S03, DEFAULT_LOG4J_PROPERTIES, ex.getMessage(), ex);
+        throw new ServerException(ServerException.ERROR.S03,
+            DEFAULT_LOG4J_PROPERTIES, ex.getMessage(), ex);
       }
       PropertyConfigurator.configure(props);
       log = LoggerFactory.getLogger(Server.class);
-      log.warn("Log4j [{}] configuration file not found, using default configuration from classpath", log4jFile);
+      log.warn(
+          "Log4j [{}] configuration file not found, using default configuration from classpath",
+          log4jFile);
     }
   }
 
   /**
    * Loads and inializes the server configuration.
    *
-   * @throws ServerException thrown if the configuration could not be loaded/initialized.
+   * @throws ServerException
+   *     thrown if the configuration could not be loaded/initialized.
    */
   protected void initConfig() throws ServerException {
     verifyDir(configDir);
@@ -445,14 +489,16 @@ public class Server {
     ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
     InputStream inputStream = classLoader.getResourceAsStream(defaultConfig);
     if (inputStream == null) {
-      log.warn("Default configuration file not available in classpath [{}]", defaultConfig);
+      log.warn("Default configuration file not available in classpath [{}]",
+          defaultConfig);
       defaultConf = new Configuration(false);
     } else {
       try {
         defaultConf = new Configuration(false);
         ConfigurationUtils.load(defaultConf, inputStream);
       } catch (Exception ex) {
-        throw new ServerException(ServerException.ERROR.S03, defaultConfig, ex.getMessage(), ex);
+        throw new ServerException(ServerException.ERROR.S03, defaultConfig,
+            ex.getMessage(), ex);
       }
     }
 
@@ -460,11 +506,13 @@ public class Server {
       Configuration siteConf;
       File siteFile = new File(file, name + "-site.xml");
       if (!siteFile.exists()) {
-        log.warn("Site configuration file [{}] not found in config directory", siteFile);
+        log.warn("Site configuration file [{}] not found in config directory",
+            siteFile);
         siteConf = new Configuration(false);
       } else {
         if (!siteFile.isFile()) {
-          throw new ServerException(ServerException.ERROR.S05, siteFile.getAbsolutePath());
+          throw new ServerException(ServerException.ERROR.S05,
+              siteFile.getAbsolutePath());
         }
         try {
           log.debug("Loading site configuration from [{}]", siteFile);
@@ -472,7 +520,8 @@ public class Server {
           siteConf = new Configuration(false);
           ConfigurationUtils.load(siteConf, inputStream);
         } catch (IOException ex) {
-          throw new ServerException(ServerException.ERROR.S06, siteFile, ex.getMessage(), ex);
+          throw new ServerException(ServerException.ERROR.S06, siteFile,
+              ex.getMessage(), ex);
         }
       }
 
@@ -509,26 +558,31 @@ public class Server {
   /**
    * Loads the specified services.
    *
-   * @param classes services classes to load.
-   * @param list list of loaded service in order of appearance in the
-   * configuration.
-   *
-   * @throws ServerException thrown if a service class could not be loaded.
+   * @param classes
+   *     services classes to load.
+   * @param list
+   *     list of loaded service in order of appearance in the
+   *     configuration.
+   * @throws ServerException
+   *     thrown if a service class could not be loaded.
    */
-  private void loadServices(Class[] classes, List<Service> list) throws ServerException {
+  private void loadServices(Class[] classes, List<Service> list)
+      throws ServerException {
     for (Class klass : classes) {
       try {
         Service service = (Service) klass.newInstance();
-        log.debug("Loading service [{}] implementation [{}]", service.getInterface(),
-                  service.getClass());
+        log.debug("Loading service [{}] implementation [{}]",
+            service.getInterface(), service.getClass());
         if (!service.getInterface().isInstance(service)) {
-          throw new ServerException(ServerException.ERROR.S04, klass, service.getInterface().getName());
+          throw new ServerException(ServerException.ERROR.S04, klass,
+              service.getInterface().getName());
         }
         list.add(service);
       } catch (ServerException ex) {
         throw ex;
       } catch (Exception ex) {
-        throw new ServerException(ServerException.ERROR.S07, klass, ex.getMessage(), ex);
+        throw new ServerException(ServerException.ERROR.S07, klass,
+            ex.getMessage(), ex);
       }
     }
   }
@@ -538,14 +592,15 @@ public class Server {
    * <code>services.ext</code> and de-dups them.
    *
    * @return List of final services to initialize.
-   *
-   * @throws ServerException throw if the services could not be loaded.
+   * @throws ServerException
+   *     throw if the services could not be loaded.
    */
   protected List<Service> loadServices() throws ServerException {
     try {
       Map<Class, Service> map = new LinkedHashMap<Class, Service>();
       Class[] classes = getConfig().getClasses(getPrefixedName(CONF_SERVICES));
-      Class[] classesExt = getConfig().getClasses(getPrefixedName(CONF_SERVICES_EXT));
+      Class[] classesExt =
+          getConfig().getClasses(getPrefixedName(CONF_SERVICES_EXT));
       List<Service> list = new ArrayList<Service>();
       loadServices(classes, list);
       loadServices(classesExt, list);
@@ -553,8 +608,8 @@ public class Server {
       //removing duplicate services, strategy: last one wins
       for (Service service : list) {
         if (map.containsKey(service.getInterface())) {
-          log.debug("Replacing service [{}] implementation [{}]", service.getInterface(),
-                    service.getClass());
+          log.debug("Replacing service [{}] implementation [{}]",
+              service.getInterface(), service.getClass());
         }
         map.put(service.getInterface(), service);
       }
@@ -571,10 +626,11 @@ public class Server {
   /**
    * Initializes the list of services.
    *
-   * @param services services to initialized, it must be a de-dupped list of
-   * services.
-   *
-   * @throws ServerException thrown if the services could not be initialized.
+   * @param services
+   *     services to initialized, it must be a de-dupped list of
+   *     services.
+   * @throws ServerException
+   *     thrown if the services could not be initialized.
    */
   protected void initServices(List<Service> services) throws ServerException {
     for (Service service : services) {
@@ -591,15 +647,18 @@ public class Server {
   /**
    * Checks if all service dependencies of a service are available.
    *
-   * @param service service to check if all its dependencies are available.
-   *
-   * @throws ServerException thrown if a service dependency is missing.
+   * @param service
+   *     service to check if all its dependencies are available.
+   * @throws ServerException
+   *     thrown if a service dependency is missing.
    */
-  protected void checkServiceDependencies(Service service) throws ServerException {
+  protected void checkServiceDependencies(Service service)
+      throws ServerException {
     if (service.getServiceDependencies() != null) {
       for (Class dependency : service.getServiceDependencies()) {
         if (services.get(dependency) == null) {
-          throw new ServerException(ServerException.ERROR.S10, service.getClass(), dependency);
+          throw new ServerException(ServerException.ERROR.S10,
+              service.getClass(), dependency);
         }
       }
     }
@@ -617,7 +676,7 @@ public class Server {
         service.destroy();
       } catch (Throwable ex) {
         log.error("Could not destroy service [{}], {}",
-                  new Object[]{service.getInterface(), ex.getMessage(), ex});
+            new Object[]{service.getInterface(), ex.getMessage(), ex});
       }
     }
     log.info("Services destroyed");
@@ -663,8 +722,8 @@ public class Server {
   /**
    * Returns the prefixed name of a server property.
    *
-   * @param name of the property.
-   *
+   * @param name
+   *     of the property.
    * @return prefixed name of the property.
    */
   public String getPrefixedName(String name) {
@@ -720,8 +779,8 @@ public class Server {
   /**
    * Returns the {@link Service} associated to the specified interface.
    *
-   * @param serviceKlass service interface.
-   *
+   * @param serviceKlass
+   *     service interface.
    * @return the service implementation.
    */
   @SuppressWarnings("unchecked")
@@ -739,12 +798,14 @@ public class Server {
    * <p/>
    * If an exception is thrown the server is destroyed.
    *
-   * @param klass service class to add.
-   *
-   * @throws ServerException throw if the service could not initialized/added
-   * to the server.
+   * @param klass
+   *     service class to add.
+   * @throws ServerException
+   *     throw if the service could not initialized/added
+   *     to the server.
    */
-  public void setService(Class<? extends Service> klass) throws ServerException {
+  public void setService(Class<? extends Service> klass)
+      throws ServerException {
     ensureOperational();
     Check.notNull(klass, "serviceKlass");
     if (getStatus() == Status.SHUTTING_DOWN) {
@@ -758,15 +819,18 @@ public class Server {
           oldService.destroy();
         } catch (Throwable ex) {
           log.error("Could not destroy service [{}], {}",
-                    new Object[]{oldService.getInterface(), ex.getMessage(), ex});
+              new Object[]{oldService.getInterface(), ex.getMessage(), ex});
         }
       }
       newService.init(this);
       services.put(newService.getInterface(), newService);
     } catch (Exception ex) {
-      log.error("Could not set service [{}] programmatically -server shutting down-, {}", klass, ex);
+      log.error(
+          "Could not set service [{}] programmatically -server shutting down-, {}",
+          klass, ex);
       destroy();
-      throw new ServerException(ServerException.ERROR.S09, klass, ex.getMessage(), ex);
+      throw new ServerException(ServerException.ERROR.S09, klass,
+          ex.getMessage(), ex);
     }
   }
 

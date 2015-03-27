@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.rmcontainer;
 
+import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
 
@@ -26,8 +27,9 @@ public class RMContainerFinishedEvent extends RMContainerEvent {
   private final ContainerStatus remoteContainerStatus;
 
   public RMContainerFinishedEvent(ContainerId containerId,
-      ContainerStatus containerStatus, RMContainerEventType event) {
-    super(containerId, event);
+      ContainerStatus containerStatus, RMContainerEventType event,
+      TransactionState transactionState) {
+    super(containerId, event, transactionState);
     this.remoteContainerStatus = containerStatus;
   }
 

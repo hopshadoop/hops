@@ -17,16 +17,15 @@
  */
 package org.apache.hadoop.hdfs.util;
 
+import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.classification.InterfaceAudience;
+
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
-
-import org.apache.hadoop.classification.InterfaceAudience;
-
-import com.google.common.annotations.VisibleForTesting;
 
 /**
  * A simple class for pooling direct ByteBuffers. This is necessary
@@ -35,7 +34,7 @@ import com.google.common.annotations.VisibleForTesting;
  * native memory, and thus can cause high memory usage if not pooled.
  * The pooled instances are referred to only via weak references, allowing
  * them to be collected when a GC does run.
- *
+ * <p/>
  * This class only does effective pooling when many buffers will be
  * allocated at the same size. There is no attempt to reuse larger
  * buffers to satisfy smaller allocations.
@@ -44,9 +43,9 @@ import com.google.common.annotations.VisibleForTesting;
 public class DirectBufferPool {
 
   // Essentially implement a multimap with weak values.
-  final ConcurrentMap<Integer, Queue<WeakReference<ByteBuffer>>> buffersBySize =
-    new ConcurrentHashMap<Integer, Queue<WeakReference<ByteBuffer>>>();
- 
+  ConcurrentMap<Integer, Queue<WeakReference<ByteBuffer>>> buffersBySize =
+      new ConcurrentHashMap<Integer, Queue<WeakReference<ByteBuffer>>>();
+
   /**
    * Allocate a direct buffer of the specified size, in bytes.
    * If a pooled buffer is available, returns that. Otherwise
@@ -74,7 +73,9 @@ public class DirectBufferPool {
    * Return a buffer into the pool. After being returned,
    * the buffer may be recycled, so the user must not
    * continue to use it in any way.
-   * @param buf the buffer to return
+   *
+   * @param buf
+   *     the buffer to return
    */
   public void returnBuffer(ByteBuffer buf) {
     buf.clear(); // reset mark, limit, etc
@@ -82,7 +83,8 @@ public class DirectBufferPool {
     Queue<WeakReference<ByteBuffer>> list = buffersBySize.get(size);
     if (list == null) {
       list = new ConcurrentLinkedQueue<WeakReference<ByteBuffer>>();
-      Queue<WeakReference<ByteBuffer>> prev = buffersBySize.putIfAbsent(size, list);
+      Queue<WeakReference<ByteBuffer>> prev =
+          buffersBySize.putIfAbsent(size, list);
       // someone else put a queue in the map before we did
       if (prev != null) {
         list = prev;

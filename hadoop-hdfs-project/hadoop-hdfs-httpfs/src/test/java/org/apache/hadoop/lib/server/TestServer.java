@@ -18,12 +18,15 @@
 
 package org.apache.hadoop.lib.server;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.lib.lang.XException;
+import org.apache.hadoop.test.HTestCase;
+import org.apache.hadoop.test.TestDir;
+import org.apache.hadoop.test.TestDirHelper;
+import org.apache.hadoop.test.TestException;
+import org.apache.hadoop.util.StringUtils;
+import org.junit.Test;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -35,47 +38,43 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.lib.lang.XException;
-import org.apache.hadoop.test.HTestCase;
-import org.apache.hadoop.test.TestDir;
-import org.apache.hadoop.test.TestDirHelper;
-import org.apache.hadoop.test.TestException;
-import org.apache.hadoop.util.Shell;
-import org.apache.hadoop.util.StringUtils;
-import org.junit.Test;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 public class TestServer extends HTestCase {
 
   @Test
   @TestDir
   public void constructorsGetters() throws Exception {
-    Server server = new Server("server", getAbsolutePath("/a"),
-      getAbsolutePath("/b"), getAbsolutePath("/c"), getAbsolutePath("/d"),
-      new Configuration(false));
-    assertEquals(server.getHomeDir(), getAbsolutePath("/a"));
-    assertEquals(server.getConfigDir(), getAbsolutePath("/b"));
-    assertEquals(server.getLogDir(), getAbsolutePath("/c"));
-    assertEquals(server.getTempDir(), getAbsolutePath("/d"));
+    Server server =
+        new Server("server", "/a", "/b", "/c", "/d", new Configuration(false));
+    assertEquals(server.getHomeDir(), "/a");
+    assertEquals(server.getConfigDir(), "/b");
+    assertEquals(server.getLogDir(), "/c");
+    assertEquals(server.getTempDir(), "/d");
     assertEquals(server.getName(), "server");
     assertEquals(server.getPrefix(), "server");
     assertEquals(server.getPrefixedName("name"), "server.name");
     assertNotNull(server.getConfig());
 
-    server = new Server("server", getAbsolutePath("/a"), getAbsolutePath("/b"),
-      getAbsolutePath("/c"), getAbsolutePath("/d"));
-    assertEquals(server.getHomeDir(), getAbsolutePath("/a"));
-    assertEquals(server.getConfigDir(), getAbsolutePath("/b"));
-    assertEquals(server.getLogDir(), getAbsolutePath("/c"));
-    assertEquals(server.getTempDir(), getAbsolutePath("/d"));
+    server = new Server("server", "/a", "/b", "/c", "/d");
+    assertEquals(server.getHomeDir(), "/a");
+    assertEquals(server.getConfigDir(), "/b");
+    assertEquals(server.getLogDir(), "/c");
+    assertEquals(server.getTempDir(), "/d");
     assertEquals(server.getName(), "server");
     assertEquals(server.getPrefix(), "server");
     assertEquals(server.getPrefixedName("name"), "server.name");
     assertNull(server.getConfig());
 
-    server = new Server("server", TestDirHelper.getTestDir().getAbsolutePath(), new Configuration(false));
-    assertEquals(server.getHomeDir(), TestDirHelper.getTestDir().getAbsolutePath());
+    server = new Server("server", TestDirHelper.getTestDir().getAbsolutePath(),
+        new Configuration(false));
+    assertEquals(server.getHomeDir(),
+        TestDirHelper.getTestDir().getAbsolutePath());
     assertEquals(server.getConfigDir(), TestDirHelper.getTestDir() + "/conf");
     assertEquals(server.getLogDir(), TestDirHelper.getTestDir() + "/log");
     assertEquals(server.getTempDir(), TestDirHelper.getTestDir() + "/temp");
@@ -85,7 +84,8 @@ public class TestServer extends HTestCase {
     assertNotNull(server.getConfig());
 
     server = new Server("server", TestDirHelper.getTestDir().getAbsolutePath());
-    assertEquals(server.getHomeDir(), TestDirHelper.getTestDir().getAbsolutePath());
+    assertEquals(server.getHomeDir(),
+        TestDirHelper.getTestDir().getAbsolutePath());
     assertEquals(server.getConfigDir(), TestDirHelper.getTestDir() + "/conf");
     assertEquals(server.getLogDir(), TestDirHelper.getTestDir() + "/log");
     assertEquals(server.getTempDir(), TestDirHelper.getTestDir() + "/temp");
@@ -221,15 +221,17 @@ public class TestServer extends HTestCase {
 
   private Server createServer(Configuration conf) {
     return new Server("server", TestDirHelper.getTestDir().getAbsolutePath(),
-                      TestDirHelper.getTestDir().getAbsolutePath(),
-                      TestDirHelper.getTestDir().getAbsolutePath(), TestDirHelper.getTestDir().getAbsolutePath(), conf);
+        TestDirHelper.getTestDir().getAbsolutePath(),
+        TestDirHelper.getTestDir().getAbsolutePath(),
+        TestDirHelper.getTestDir().getAbsolutePath(), conf);
   }
 
   @Test
   @TestDir
   public void log4jFile() throws Exception {
     InputStream is = Server.getResource("default-log4j.properties");
-    OutputStream os = new FileOutputStream(new File(TestDirHelper.getTestDir(), "server-log4j.properties"));
+    OutputStream os = new FileOutputStream(
+        new File(TestDirHelper.getTestDir(), "server-log4j.properties"));
     IOUtils.copyBytes(is, os, 1024, true);
     Configuration conf = new Configuration(false);
     Server server = createServer(conf);
@@ -322,7 +324,8 @@ public class TestServer extends HTestCase {
     }
 
     @Override
-    public void serverStatusChange(Server.Status oldStatus, Server.Status newStatus) throws ServiceException {
+    public void serverStatusChange(Server.Status oldStatus,
+        Server.Status newStatus) throws ServiceException {
       LIFECYCLE.add("serverStatusChange");
     }
   }
@@ -330,7 +333,8 @@ public class TestServer extends HTestCase {
   public static class TestServiceExceptionOnStatusChange extends TestService {
 
     @Override
-    public void serverStatusChange(Server.Status oldStatus, Server.Status newStatus) throws ServiceException {
+    public void serverStatusChange(Server.Status oldStatus,
+        Server.Status newStatus) throws ServiceException {
       throw new RuntimeException();
     }
   }
@@ -353,7 +357,8 @@ public class TestServer extends HTestCase {
   public void changeStatusServiceException() throws Exception {
     TestService.LIFECYCLE.clear();
     Configuration conf = new Configuration(false);
-    conf.set("server.services", TestServiceExceptionOnStatusChange.class.getName());
+    conf.set("server.services",
+        TestServiceExceptionOnStatusChange.class.getName());
     Server server = createServer(conf);
     server.init();
   }
@@ -380,7 +385,8 @@ public class TestServer extends HTestCase {
     server.init();
     assertNotNull(server.get(TestService.class));
     server.destroy();
-    assertEquals(TestService.LIFECYCLE, Arrays.asList("init", "postInit", "serverStatusChange", "destroy"));
+    assertEquals(TestService.LIFECYCLE,
+        Arrays.asList("init", "postInit", "serverStatusChange", "destroy"));
   }
 
   @Test
@@ -398,7 +404,8 @@ public class TestServer extends HTestCase {
     String dir = TestDirHelper.getTestDir().getAbsolutePath();
     File configFile = new File(dir, "testserver-site.xml");
     Writer w = new FileWriter(configFile);
-    w.write("<configuration><property><name>testserver.a</name><value>site</value></property></configuration>");
+    w.write(
+        "<configuration><property><name>testserver.a</name><value>site</value></property></configuration>");
     w.close();
     Server server = new Server("testserver", dir, dir, dir, dir);
     server.init();
@@ -413,7 +420,8 @@ public class TestServer extends HTestCase {
       String dir = TestDirHelper.getTestDir().getAbsolutePath();
       File configFile = new File(dir, "testserver-site.xml");
       Writer w = new FileWriter(configFile);
-      w.write("<configuration><property><name>testserver.a</name><value>site</value></property></configuration>");
+      w.write(
+          "<configuration><property><name>testserver.a</name><value>site</value></property></configuration>");
       w.close();
       Server server = new Server("testserver", dir, dir, dir, dir);
       server.init();
@@ -426,21 +434,27 @@ public class TestServer extends HTestCase {
   @Test(expected = IllegalStateException.class)
   @TestDir
   public void illegalState1() throws Exception {
-    Server server = new Server("server", TestDirHelper.getTestDir().getAbsolutePath(), new Configuration(false));
+    Server server =
+        new Server("server", TestDirHelper.getTestDir().getAbsolutePath(),
+            new Configuration(false));
     server.destroy();
   }
 
   @Test(expected = IllegalStateException.class)
   @TestDir
   public void illegalState2() throws Exception {
-    Server server = new Server("server", TestDirHelper.getTestDir().getAbsolutePath(), new Configuration(false));
+    Server server =
+        new Server("server", TestDirHelper.getTestDir().getAbsolutePath(),
+            new Configuration(false));
     server.get(Object.class);
   }
 
   @Test(expected = IllegalStateException.class)
   @TestDir
   public void illegalState3() throws Exception {
-    Server server = new Server("server", TestDirHelper.getTestDir().getAbsolutePath(), new Configuration(false));
+    Server server =
+        new Server("server", TestDirHelper.getTestDir().getAbsolutePath(),
+            new Configuration(false));
     server.setService(null);
   }
 
@@ -448,7 +462,8 @@ public class TestServer extends HTestCase {
   @TestDir
   public void illegalState4() throws Exception {
     String dir = TestDirHelper.getTestDir().getAbsolutePath();
-    Server server = new Server("server", dir, dir, dir, dir, new Configuration(false));
+    Server server =
+        new Server("server", dir, dir, dir, dir, new Configuration(false));
     server.init();
     server.init();
   }
@@ -462,8 +477,8 @@ public class TestServer extends HTestCase {
     private boolean failOnInit;
     private boolean failOnDestroy;
 
-    protected MyService(String id, Class serviceInterface, Class[] dependencies, boolean failOnInit,
-                        boolean failOnDestroy) {
+    protected MyService(String id, Class serviceInterface, Class[] dependencies,
+        boolean failOnInit, boolean failOnDestroy) {
       this.id = id;
       this.serviceInterface = serviceInterface;
       this.dependencies = dependencies;
@@ -509,7 +524,8 @@ public class TestServer extends HTestCase {
     }
 
     @Override
-    public void serverStatusChange(Server.Status oldStatus, Server.Status newStatus) throws ServiceException {
+    public void serverStatusChange(Server.Status oldStatus,
+        Server.Status newStatus) throws ServiceException {
     }
   }
 
@@ -519,8 +535,8 @@ public class TestServer extends HTestCase {
       super("s1", MyService1.class, null, false, false);
     }
 
-    protected MyService1(String id, Class serviceInterface, Class[] dependencies, boolean failOnInit,
-                         boolean failOnDestroy) {
+    protected MyService1(String id, Class serviceInterface,
+        Class[] dependencies, boolean failOnInit, boolean failOnDestroy) {
       super(id, serviceInterface, dependencies, failOnInit, failOnDestroy);
     }
   }
@@ -557,8 +573,8 @@ public class TestServer extends HTestCase {
       super("s5", MyService5.class, null, false, true);
     }
 
-    protected MyService5(String id, Class serviceInterface, Class[] dependencies, boolean failOnInit,
-                         boolean failOnDestroy) {
+    protected MyService5(String id, Class serviceInterface,
+        Class[] dependencies, boolean failOnInit, boolean failOnDestroy) {
       super(id, serviceInterface, dependencies, failOnInit, failOnDestroy);
     }
   }
@@ -573,7 +589,8 @@ public class TestServer extends HTestCase {
   public static class MyService6 extends MyService {
 
     public MyService6() {
-      super("s6", MyService6.class, new Class[]{MyService1.class}, false, false);
+      super("s6", MyService6.class, new Class[]{MyService1.class}, false,
+          false);
     }
   }
 
@@ -581,7 +598,8 @@ public class TestServer extends HTestCase {
 
     @SuppressWarnings({"UnusedParameters"})
     public MyService7(String foo) {
-      super("s6", MyService7.class, new Class[]{MyService1.class}, false, false);
+      super("s6", MyService7.class, new Class[]{MyService1.class}, false,
+          false);
     }
   }
 
@@ -624,8 +642,8 @@ public class TestServer extends HTestCase {
   public void serviceWithMissingDependency() throws Exception {
     String dir = TestDirHelper.getTestDir().getAbsolutePath();
     Configuration conf = new Configuration(false);
-    String services = StringUtils.join(",", Arrays.asList(MyService3.class.getName(), MyService6.class.getName())
-    );
+    String services = StringUtils.join(",",
+        Arrays.asList(MyService3.class.getName(), MyService6.class.getName()));
     conf.set("server.services", services);
     Server server = new Server("server", dir, dir, dir, dir, conf);
     server.init();
@@ -647,8 +665,8 @@ public class TestServer extends HTestCase {
 
     // 2 services init/destroy
     ORDER.clear();
-    String services = StringUtils.join(",", Arrays.asList(MyService1.class.getName(), MyService3.class.getName())
-    );
+    String services = StringUtils.join(",",
+        Arrays.asList(MyService1.class.getName(), MyService3.class.getName()));
     conf = new Configuration(false);
     conf.set("server.services", services);
     server = new Server("server", dir, dir, dir, dir, conf);
@@ -667,8 +685,9 @@ public class TestServer extends HTestCase {
 
     // 3 services, 2nd one fails on init
     ORDER.clear();
-    services = StringUtils.join(",", Arrays.asList(MyService1.class.getName(), MyService2.class.getName(),
-                                                   MyService3.class.getName()));
+    services = StringUtils.join(",", Arrays
+        .asList(MyService1.class.getName(), MyService2.class.getName(),
+            MyService3.class.getName()));
     conf = new Configuration(false);
     conf.set("server.services", services);
 
@@ -688,7 +707,8 @@ public class TestServer extends HTestCase {
 
     // 2 services one fails on destroy
     ORDER.clear();
-    services = StringUtils.join(",", Arrays.asList(MyService1.class.getName(), MyService5.class.getName()));
+    services = StringUtils.join(",",
+        Arrays.asList(MyService1.class.getName(), MyService5.class.getName()));
     conf = new Configuration(false);
     conf.set("server.services", services);
     server = new Server("server", dir, dir, dir, dir, conf);
@@ -706,8 +726,10 @@ public class TestServer extends HTestCase {
 
     // service override via ext
     ORDER.clear();
-    services = StringUtils.join(",", Arrays.asList(MyService1.class.getName(), MyService3.class.getName()));
-    String servicesExt = StringUtils.join(",", Arrays.asList(MyService1a.class.getName()));
+    services = StringUtils.join(",",
+        Arrays.asList(MyService1.class.getName(), MyService3.class.getName()));
+    String servicesExt =
+        StringUtils.join(",", Arrays.asList(MyService1a.class.getName()));
 
     conf = new Configuration(false);
     conf.set("server.services", services);
@@ -728,7 +750,8 @@ public class TestServer extends HTestCase {
 
     // service override via setService
     ORDER.clear();
-    services = StringUtils.join(",", Arrays.asList(MyService1.class.getName(), MyService3.class.getName()));
+    services = StringUtils.join(",",
+        Arrays.asList(MyService1.class.getName(), MyService3.class.getName()));
     conf = new Configuration(false);
     conf.set("server.services", services);
     server = new Server("server", dir, dir, dir, dir, conf);
@@ -748,7 +771,8 @@ public class TestServer extends HTestCase {
 
     // service add via setService
     ORDER.clear();
-    services = StringUtils.join(",", Arrays.asList(MyService1.class.getName(), MyService3.class.getName()));
+    services = StringUtils.join(",",
+        Arrays.asList(MyService1.class.getName(), MyService3.class.getName()));
     conf = new Configuration(false);
     conf.set("server.services", services);
     server = new Server("server", dir, dir, dir, dir, conf);
@@ -768,7 +792,8 @@ public class TestServer extends HTestCase {
 
     // service add via setService exception
     ORDER.clear();
-    services = StringUtils.join(",", Arrays.asList(MyService1.class.getName(), MyService3.class.getName()));
+    services = StringUtils.join(",",
+        Arrays.asList(MyService1.class.getName(), MyService3.class.getName()));
     conf = new Configuration(false);
     conf.set("server.services", services);
     server = new Server("server", dir, dir, dir, dir, conf);
@@ -787,7 +812,8 @@ public class TestServer extends HTestCase {
 
     // service with dependency
     ORDER.clear();
-    services = StringUtils.join(",", Arrays.asList(MyService1.class.getName(), MyService6.class.getName()));
+    services = StringUtils.join(",",
+        Arrays.asList(MyService1.class.getName(), MyService6.class.getName()));
     conf = new Configuration(false);
     conf.set("server.services", services);
     server = new Server("server", dir, dir, dir, dir, conf);
@@ -797,14 +823,4 @@ public class TestServer extends HTestCase {
     server.destroy();
   }
 
-  /**
-   * Creates an absolute path by appending the given relative path to the test
-   * root.
-   * 
-   * @param relativePath String relative path
-   * @return String absolute path formed by appending relative path to test root
-   */
-  private static String getAbsolutePath(String relativePath) {
-    return new File(TestDirHelper.getTestDir(), relativePath).getAbsolutePath();
-  }
 }

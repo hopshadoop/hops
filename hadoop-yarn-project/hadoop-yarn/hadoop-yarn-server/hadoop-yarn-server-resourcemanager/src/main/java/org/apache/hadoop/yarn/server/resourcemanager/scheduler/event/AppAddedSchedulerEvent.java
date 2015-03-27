@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.event;
 
+import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 
 public class AppAddedSchedulerEvent extends SchedulerEvent {
@@ -26,9 +27,9 @@ public class AppAddedSchedulerEvent extends SchedulerEvent {
   private final String queue;
   private final String user;
 
-  public AppAddedSchedulerEvent(
-      ApplicationId applicationId, String queue, String user) {
-    super(SchedulerEventType.APP_ADDED);
+  public AppAddedSchedulerEvent(ApplicationId applicationId, String queue,
+      String user, TransactionState transactionState) {
+    super(SchedulerEventType.APP_ADDED, transactionState);
     this.applicationId = applicationId;
     this.queue = queue;
     this.user = user;

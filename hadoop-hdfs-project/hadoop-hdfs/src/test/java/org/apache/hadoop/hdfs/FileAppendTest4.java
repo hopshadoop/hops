@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.hdfs;
 
-import java.io.IOException;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -29,7 +27,10 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-/** This is a comprehensive append test that tries
+import java.io.IOException;
+
+/**
+ * This is a comprehensive append test that tries
  * all combinations of file length and number of appended bytes
  * In each iteration, it creates a file of len1. Then reopen
  * the file for append. It first append len2 bytes, calls hflush,
@@ -37,14 +38,13 @@ import org.junit.Test;
  * the file is validated.
  * Len1 ranges from [0, 2*BLOCK_SIZE+1], len2 ranges from [0, BLOCK_SIZE+1],
  * and len3 ranges from [0, BLOCK_SIZE+1].
- *
  */
 public class FileAppendTest4 {
   public static final Log LOG = LogFactory.getLog(FileAppendTest4.class);
   
   private static final int BYTES_PER_CHECKSUM = 4;
   private static final int PACKET_SIZE = BYTES_PER_CHECKSUM;
-  private static final int BLOCK_SIZE = 2*PACKET_SIZE;
+  private static final int BLOCK_SIZE = 2 * PACKET_SIZE;
   private static final short REPLICATION = 3;
   private static final int DATANODE_NUM = 5;
   private static Configuration conf;
@@ -58,11 +58,12 @@ public class FileAppendTest4 {
   }
   
   @BeforeClass
-  public static void startUp () throws IOException {
+  public static void startUp() throws IOException {
     conf = new HdfsConfiguration();
     init(conf);
-    cluster = new MiniDFSCluster.Builder(conf).numDataNodes(DATANODE_NUM).build();
-    fs = (DistributedFileSystem)cluster.getFileSystem();
+    cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(DATANODE_NUM).build();
+    fs = (DistributedFileSystem) cluster.getFileSystem();
   }
 
   @AfterClass
@@ -71,28 +72,30 @@ public class FileAppendTest4 {
   }
   
   /**
-   * Comprehensive test for append 
-   * @throws IOException an exception might be thrown
+   * Comprehensive test for append
+   *
+   * @throws IOException
+   *     an exception might be thrown
    */
   @Test
   public void testAppend() throws IOException {
-    final int maxOldFileLen = 2*BLOCK_SIZE+1;
+    final int maxOldFileLen = 2 * BLOCK_SIZE + 1;
     final int maxFlushedBytes = BLOCK_SIZE;
-    byte[] contents = AppendTestUtil.initBuffer(
-        maxOldFileLen+2*maxFlushedBytes);
-    for (int oldFileLen =0; oldFileLen <=maxOldFileLen; oldFileLen++) {
-      for (int flushedBytes1=0; flushedBytes1<=maxFlushedBytes; 
-                                flushedBytes1++) {
-        for (int flushedBytes2=0; flushedBytes2 <=maxFlushedBytes; 
-                                  flushedBytes2++) {
+    byte[] contents =
+        AppendTestUtil.initBuffer(maxOldFileLen + 2 * maxFlushedBytes);
+    for (int oldFileLen = 0; oldFileLen <= maxOldFileLen; oldFileLen++) {
+      for (int flushedBytes1 = 0; flushedBytes1 <= maxFlushedBytes;
+           flushedBytes1++) {
+        for (int flushedBytes2 = 0; flushedBytes2 <= maxFlushedBytes;
+             flushedBytes2++) {
           final int fileLen = oldFileLen + flushedBytes1 + flushedBytes2;
           // create the initial file of oldFileLen
-          final Path p = 
-            new Path("foo"+ oldFileLen +"_"+ flushedBytes1 +"_"+ flushedBytes2);
+          final Path p = new Path(
+              "foo" + oldFileLen + "_" + flushedBytes1 + "_" + flushedBytes2);
           LOG.info("Creating file " + p);
-          FSDataOutputStream out = fs.create(p, false, 
-              conf.getInt(CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096), 
-              REPLICATION, BLOCK_SIZE);
+          FSDataOutputStream out = fs.create(p, false,
+              conf.getInt(CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY,
+                  4096), REPLICATION, BLOCK_SIZE);
           out.write(contents, 0, oldFileLen);
           out.close();
 

@@ -17,22 +17,21 @@
  */
 package org.apache.hadoop.hdfs.protocol;
 
-import java.util.Comparator;
-import java.util.Map;
-import java.util.SortedSet;
-import java.util.TreeSet;
-
 import org.apache.hadoop.classification.InterfaceAudience;
+
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * This class tracks changes in the layout version of HDFS.
- * 
+ * <p/>
  * Layout version is changed for following reasons:
  * <ol>
- * <li>The layout of how namenode or datanode stores information 
+ * <li>The layout of how namenode or datanode stores information
  * on disk changes.</li>
  * <li>A new operation code is added to the editlog.</li>
- * <li>Modification such as format of a record, content of a record 
+ * <li>Modification such as format of a record, content of a record
  * in editlog or fsimage.</li>
  * </ol>
  * <br>
@@ -44,6 +43,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
  */
 @InterfaceAudience.Private
 public class LayoutVersion {
+
   /**
    * Version in which HDFS-2991 was fixed. This bug caused OP_ADD to
    * sometimes be skipped for append() calls. If we see such a case when
@@ -54,27 +54,20 @@ public class LayoutVersion {
   public static final int BUGFIX_HDFS_2991_VERSION = -40;
 
   /**
-   * The interface to be implemented by NameNode and DataNode layout features 
-   */
-  public interface LayoutFeature {
-    public FeatureInfo getInfo();
-  }
-
-  /**
-   * Enums for features that change the layout version before rolling
-   * upgrade is supported.
+   * Enums for features that change the layout version.
    * <br><br>
    * To add a new layout version:
    * <ul>
-   * <li>Define a new enum constant with a short enum name, the new layout version 
+   * <li>Define a new enum constant with a short enum name, the new layout
+   * version
    * and description of the added feature.</li>
    * <li>When adding a layout version with an ancestor that is not same as
-   * its immediate predecessor, use the constructor where a specific ancestor
+   * its immediate predecessor, use the constructor where a spacific ancestor
    * can be passed.
    * </li>
    * </ul>
    */
-  public static enum Feature implements LayoutFeature {
+  public static enum Feature {
     NAMESPACE_QUOTA(-16, "Support for namespace quotas"),
     FILE_ACCESS_TIME(-17, "Support for access time on files"),
     DISKSPACE_QUOTA(-18, "Support for disk space quotas"),
@@ -86,210 +79,164 @@ public class LayoutVersion {
     DELEGATION_TOKEN(-24, "Support for delegation tokens for security"),
     FSIMAGE_COMPRESSION(-25, "Support for fsimage compression"),
     FSIMAGE_CHECKSUM(-26, "Support checksum for fsimage"),
-    REMOVE_REL13_DISK_LAYOUT_SUPPORT(-27, "Remove support for 0.13 disk layout"),
+    REMOVE_REL13_DISK_LAYOUT_SUPPORT(-27,
+        "Remove support for 0.13 disk layout"),
     EDITS_CHESKUM(-28, "Support checksum for editlog"),
     UNUSED(-29, "Skipped version"),
     FSIMAGE_NAME_OPTIMIZATION(-30, "Store only last part of path in fsimage"),
-    RESERVED_REL20_203(-31, -19, "Reserved for release 0.20.203", true,
-        DELEGATION_TOKEN),
-    RESERVED_REL20_204(-32, -31, "Reserved for release 0.20.204", true),
-    RESERVED_REL22(-33, -27, "Reserved for release 0.22", true),
-    RESERVED_REL23(-34, -30, "Reserved for release 0.23", true),
+    RESERVED_REL20_203(-31, -19, "Reserved for release 0.20.203"),
+    RESERVED_REL20_204(-32, "Reserved for release 0.20.204"),
+    RESERVED_REL22(-33, -27, "Reserved for release 0.22"),
+    RESERVED_REL23(-34, -30, "Reserved for release 0.23"),
     FEDERATION(-35, "Support for namenode federation"),
     LEASE_REASSIGNMENT(-36, "Support for persisting lease holder reassignment"),
-    STORED_TXIDS(-37, "Transaction IDs are stored in edits log and image files"),
-    TXID_BASED_LAYOUT(-38, "File names in NN Storage are based on transaction IDs"), 
+    STORED_TXIDS(-37,
+        "Transaction IDs are stored in edits log and image files"),
+    TXID_BASED_LAYOUT(-38,
+        "File names in NN Storage are based on transaction IDs"),
     EDITLOG_OP_OPTIMIZATION(-39,
         "Use LongWritable and ShortWritable directly instead of ArrayWritable of UTF8"),
     OPTIMIZE_PERSIST_BLOCKS(-40,
         "Serialize block lists with delta-encoded variable length ints, " +
-        "add OP_UPDATE_BLOCKS"),
-    RESERVED_REL1_2_0(-41, -32, "Reserved for release 1.2.0", true, CONCAT),
-    ADD_INODE_ID(-42, -40, "Assign a unique inode id for each inode", false),
-    SNAPSHOT(-43, "Support for snapshot feature"),
-    RESERVED_REL1_3_0(-44, -41,
-        "Reserved for release 1.3.0", true, ADD_INODE_ID, SNAPSHOT),
-    OPTIMIZE_SNAPSHOT_INODES(-45, -43,
-        "Reduce snapshot inode memory footprint", false),
-    SEQUENTIAL_BLOCK_ID(-46, "Allocate block IDs sequentially and store " +
-        "block IDs in the edits log and image files"),
-    EDITLOG_SUPPORT_RETRYCACHE(-47, "Record ClientId and CallId in editlog to " 
-        + "enable rebuilding retry cache in case of HA failover"),
-    EDITLOG_ADD_BLOCK(-48, "Add new editlog that only records allocation of "
-        + "the new block instead of the entire block list"),
-    ADD_DATANODE_AND_STORAGE_UUIDS(-49, "Replace StorageID with DatanodeUuid."
-        + " Use distinct StorageUuid per storage directory."),
-    ADD_LAYOUT_FLAGS(-50, "Add support for layout flags."),
-    CACHING(-51, "Support for cache pools and path-based caching"),
-    // Hadoop 2.4.0
-    PROTOBUF_FORMAT(-52, "Use protobuf to serialize FSImage"),
-    EXTENDED_ACL(-53, "Extended ACL"),
-    RESERVED_REL2_4_0(-54, -51, "Reserved for release 2.4.0", true,
-        PROTOBUF_FORMAT, EXTENDED_ACL);
-
-    private final FeatureInfo info;
-
+            "add OP_UPDATE_BLOCKS");
+    
+    final int lv;
+    final int ancestorLV;
+    final String description;
+    
     /**
-     * Feature that is added at layout version {@code lv} - 1. 
-     * @param lv new layout version with the addition of this feature
-     * @param description description of the feature
+     * Feature that is added at {@code currentLV}.
+     *
+     * @param lv
+     *     new layout version with the addition of this feature
+     * @param description
+     *     description of the feature
      */
     Feature(final int lv, final String description) {
-      this(lv, lv + 1, description, false);
+      this(lv, lv + 1, description);
     }
 
     /**
-     * Feature that is added at layout version {@code ancestoryLV}.
-     * @param lv new layout version with the addition of this feature
-     * @param ancestorLV layout version from which the new lv is derived from.
-     * @param description description of the feature
-     * @param reserved true when this is a layout version reserved for previous
-     *        version
-     * @param features set of features that are to be enabled for this version
+     * Feature that is added at {@code currentLV}.
+     *
+     * @param lv
+     *     new layout version with the addition of this feature
+     * @param ancestorLV
+     *     layout version from which the new lv is derived
+     *     from.
+     * @param description
+     *     description of the feature
      */
-    Feature(final int lv, final int ancestorLV, final String description,
-        boolean reserved, Feature... features) {
-      info = new FeatureInfo(lv, ancestorLV, description, reserved, features);
-    }
-    
-    @Override
-    public FeatureInfo getInfo() {
-      return info;
-    }
-  }
-  
-  /** Feature information. */
-  public static class FeatureInfo {
-    private final int lv;
-    private final int ancestorLV;
-    private final String description;
-    private final boolean reserved;
-    private final LayoutFeature[] specialFeatures;
-
-    public FeatureInfo(final int lv, final int ancestorLV, final String description,
-        boolean reserved, LayoutFeature... specialFeatures) {
+    Feature(final int lv, final int ancestorLV, final String description) {
       this.lv = lv;
       this.ancestorLV = ancestorLV;
       this.description = description;
-      this.reserved = reserved;
-      this.specialFeatures = specialFeatures;
     }
     
-    /** 
-     * Accessor method for feature layout version 
+    /**
+     * Accessor method for feature layout version
+     *
      * @return int lv value
      */
     public int getLayoutVersion() {
       return lv;
     }
 
-    /** 
-     * Accessor method for feature ancestor layout version 
+    /**
+     * Accessor method for feature ancestor layout version
+     *
      * @return int ancestor LV value
      */
     public int getAncestorLayoutVersion() {
       return ancestorLV;
     }
 
-    /** 
-     * Accessor method for feature description 
-     * @return String feature description 
+    /**
+     * Accessor method for feature description
+     *
+     * @return String feature description
      */
     public String getDescription() {
       return description;
     }
-    
-    public boolean isReservedForOldRelease() {
-      return reserved;
-    }
-    
-    public LayoutFeature[] getSpecialFeatures() {
-      return specialFeatures;
-    }
   }
-
-  static class LayoutFeatureComparator implements Comparator<LayoutFeature> {
-    @Override
-    public int compare(LayoutFeature arg0, LayoutFeature arg1) {
-      return arg0.getInfo().getLayoutVersion()
-          - arg1.getInfo().getLayoutVersion();
-    }
+  
+  // Build layout version and corresponding feature matrix
+  static final Map<Integer, EnumSet<Feature>> map =
+      new HashMap<Integer, EnumSet<Feature>>();
+  
+  // Static initialization 
+  static {
+    initMap();
   }
- 
-  public static void updateMap(Map<Integer, SortedSet<LayoutFeature>> map,
-      LayoutFeature[] features) {
+  
+  /**
+   * Initialize the map of a layout version and EnumSet of {@link Feature}s
+   * supported.
+   */
+  private static void initMap() {
     // Go through all the enum constants and build a map of
-    // LayoutVersion <-> Set of all supported features in that LayoutVersion
-    for (LayoutFeature f : features) {
-      final FeatureInfo info = f.getInfo();
-      SortedSet<LayoutFeature> ancestorSet = map.get(info.getAncestorLayoutVersion());
+    // LayoutVersion <-> EnumSet of all supported features in that LayoutVersion
+    for (Feature f : Feature.values()) {
+      EnumSet<Feature> ancestorSet = map.get(f.ancestorLV);
       if (ancestorSet == null) {
-        // Empty set
-        ancestorSet = new TreeSet<LayoutFeature>(new LayoutFeatureComparator());
-        map.put(info.getAncestorLayoutVersion(), ancestorSet);
+        ancestorSet = EnumSet.noneOf(Feature.class); // Empty enum set
+        map.put(f.ancestorLV, ancestorSet);
       }
-      SortedSet<LayoutFeature> featureSet = new TreeSet<LayoutFeature>(ancestorSet);
-      if (info.getSpecialFeatures() != null) {
-        for (LayoutFeature specialFeature : info.getSpecialFeatures()) {
-          featureSet.add(specialFeature);
-        }
-      }
+      EnumSet<Feature> featureSet = EnumSet.copyOf(ancestorSet);
       featureSet.add(f);
-      map.put(info.getLayoutVersion(), featureSet);
+      map.put(f.lv, featureSet);
     }
+    
+    // Special initialization for 0.20.203 and 0.20.204
+    // to add Feature#DELEGATION_TOKEN
+    specialInit(Feature.RESERVED_REL20_203.lv, Feature.DELEGATION_TOKEN);
+    specialInit(Feature.RESERVED_REL20_204.lv, Feature.DELEGATION_TOKEN);
+  }
+  
+  private static void specialInit(int lv, Feature f) {
+    EnumSet<Feature> set = map.get(lv);
+    set.add(f);
   }
   
   /**
    * Gets formatted string that describes {@link LayoutVersion} information.
    */
-  public String getString(Map<Integer, SortedSet<LayoutFeature>> map,
-      LayoutFeature[] values) {
+  public static String getString() {
     final StringBuilder buf = new StringBuilder();
     buf.append("Feature List:\n");
-    for (LayoutFeature f : values) {
-      final FeatureInfo info = f.getInfo();
-      buf.append(f).append(" introduced in layout version ")
-          .append(info.getLayoutVersion()).append(" (")
-          .append(info.getDescription()).append(")\n");
+    for (Feature f : Feature.values()) {
+      buf.append(f).append(" introduced in layout version ").append(f.lv)
+          .append(" (").
+          append(f.description).append(")\n");
     }
-
+    
     buf.append("\n\nLayoutVersion and supported features:\n");
-    for (LayoutFeature f : values) {
-      final FeatureInfo info = f.getInfo();
-      buf.append(info.getLayoutVersion()).append(": ")
-          .append(map.get(info.getLayoutVersion())).append("\n");
+    for (Feature f : Feature.values()) {
+      buf.append(f.lv).append(": ").append(map.get(f.lv)).append("\n");
     }
     return buf.toString();
   }
   
   /**
    * Returns true if a given feature is supported in the given layout version
-   * @param map layout feature map
-   * @param f Feature
-   * @param lv LayoutVersion
+   *
+   * @param f
+   *     Feature
+   * @param lv
+   *     LayoutVersion
    * @return true if {@code f} is supported in layout version {@code lv}
    */
-  public static boolean supports(Map<Integer, SortedSet<LayoutFeature>> map,
-      final LayoutFeature f, final int lv) {
-    final SortedSet<LayoutFeature> set =  map.get(lv);
+  public static boolean supports(final Feature f, final int lv) {
+    final EnumSet<Feature> set = map.get(lv);
     return set != null && set.contains(f);
   }
   
   /**
    * Get the current layout version
    */
-  public static int getCurrentLayoutVersion(LayoutFeature[] features) {
-    return getLastNonReservedFeature(features).getInfo().getLayoutVersion();
-  }
-
-  static LayoutFeature getLastNonReservedFeature(LayoutFeature[] features) {
-    for (int i = features.length -1; i >= 0; i--) {
-      final FeatureInfo info = features[i].getInfo();
-      if (!info.isReservedForOldRelease()) {
-        return features[i];
-      }
-    }
-    throw new AssertionError("All layout versions are reserved.");
+  public static int getCurrentLayoutVersion() {
+    Feature[] values = Feature.values();
+    return values[values.length - 1].lv;
   }
 }
-

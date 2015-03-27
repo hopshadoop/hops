@@ -17,13 +17,13 @@
  */
 package org.apache.hadoop.hdfs;
 
-import java.io.OutputStream;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IOUtils;
 import org.junit.Test;
+
+import java.io.OutputStream;
 
 /**
  * Regression test for HDFS-1542, a deadlock between the main thread
@@ -31,12 +31,13 @@ import org.junit.Test;
  * Configuration.writeXML holds a lock on itself while writing to DFS.
  */
 public class TestWriteConfigurationToDFS {
-  @Test(timeout=60000)
+  @Test(timeout = 60000)
   public void testWriteConf() throws Exception {
     Configuration conf = new HdfsConfiguration();
     conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, 4096);
     System.out.println("Setting conf in: " + System.identityHashCode(conf));
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
     FileSystem fs = null;
     OutputStream os = null;
     try {
@@ -44,7 +45,7 @@ public class TestWriteConfigurationToDFS {
       Path filePath = new Path("/testWriteConf.xml");
       os = fs.create(filePath);
       StringBuilder longString = new StringBuilder();
-      for (int i = 0; i < 100000; i++) {
+      for (int i = 0; i < 10000; i++) { //HOP: default value is 100000
         longString.append("hello");
       } // 500KB
       conf.set("foobar", longString.toString());

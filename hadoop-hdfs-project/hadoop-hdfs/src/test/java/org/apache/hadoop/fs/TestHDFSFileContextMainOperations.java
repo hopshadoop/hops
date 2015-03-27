@@ -18,16 +18,8 @@
 
 package org.apache.hadoop.fs;
 
-import static org.apache.hadoop.fs.FileContextTestHelper.exists;
-import static org.junit.Assert.fail;
-
-import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
-
-import javax.security.auth.login.LoginException;
-
 import org.apache.hadoop.fs.Options.Rename;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
@@ -41,26 +33,46 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-public class TestHDFSFileContextMainOperations extends
-    FileContextMainOperationsBaseTest {
+import javax.security.auth.login.LoginException;
+import java.io.IOException;
+import java.net.URISyntaxException;
+
+import static org.apache.hadoop.fs.FileContextTestHelper.exists;
+
+public class TestHDFSFileContextMainOperations
+    extends FileContextMainOperationsBaseTest {
   private static MiniDFSCluster cluster;
   private static Path defaultWorkingDirectory;
-  private static final HdfsConfiguration CONF = new HdfsConfiguration();
-  
+  private static HdfsConfiguration CONF = new HdfsConfiguration();
+  private static int NNPORT = 5555;
+  private static int QUOTA_UPDATE_INTERVAL = 1;
+
   @Override
   protected FileContextTestHelper createFileContextHelper() {
-    return new FileContextTestHelper();
+    return new FileContextTestHelper("/tmp/TestHDFSFileContextMainOperations");
+  }
+
+  @Override
+  protected boolean listCorruptedBlocksSupported() {
+    return true;
+  }
+
+  private Path getTestRootPath(FileContext fc, String path) {
+    return fileContextTestHelper.getTestRootPath(fc, path);
   }
 
   @BeforeClass
-  public static void clusterSetupAtBegining() throws IOException,
-      LoginException, URISyntaxException {
-    cluster = new MiniDFSCluster.Builder(CONF).numDataNodes(2).build();
+  public static void clusterSetupAtBegining()
+      throws IOException, LoginException, URISyntaxException {
+    CONF.setInt(DFSConfigKeys.DFS_NAMENODE_QUOTA_UPDATE_INTERVAL_KEY,
+        QUOTA_UPDATE_INTERVAL);
+    cluster =
+        new MiniDFSCluster.Builder(CONF).numDataNodes(2).nameNodePort(NNPORT)
+            .build();
     cluster.waitClusterUp();
-    URI uri0 = cluster.getURI(0);
-    fc = FileContext.getFileContext(uri0, CONF);
-    defaultWorkingDirectory = fc.makeQualified( new Path("/user/" + 
-        UserGroupInformation.getCurrentUser().getShortUserName()));
+    fc = FileContext.getFileContext(cluster.getURI(0), CONF);
+    defaultWorkingDirectory = fc.makeQualified(new Path(
+        "/user/" + UserGroupInformation.getCurrentUser().getShortUserName()));
     fc.mkdir(defaultWorkingDirectory, FileContext.DEFAULT_PERM, true);
   }
 
@@ -69,21 +81,19 @@ public class TestHDFSFileContextMainOperations extends
       cluster.shutdown();
       cluster = null;
     }
-    cluster = new MiniDFSCluster.Builder(CONF).numDataNodes(1)
-                                              .format(false).build();
+    cluster =
+        new MiniDFSCluster.Builder(CONF).numDataNodes(1).nameNodePort(NNPORT)
+            .format(false).build();
     cluster.waitClusterUp();
     fc = FileContext.getFileContext(cluster.getURI(0), CONF);
-    defaultWorkingDirectory = fc.makeQualified( new Path("/user/" + 
-        UserGroupInformation.getCurrentUser().getShortUserName()));
+    defaultWorkingDirectory = fc.makeQualified(new Path(
+        "/user/" + UserGroupInformation.getCurrentUser().getShortUserName()));
     fc.mkdir(defaultWorkingDirectory, FileContext.DEFAULT_PERM, true);
   }
-      
+
   @AfterClass
   public static void ClusterShutdownAtEnd() throws Exception {
-    if (cluster != null) {
-      cluster.shutdown();
-      cluster = null;
-    }    
+    cluster.shutdown();
   }
   
   @Override
@@ -101,23 +111,19 @@ public class TestHDFSFileContextMainOperations extends
   @Override
   protected Path getDefaultWorkingDirectory() {
     return defaultWorkingDirectory;
-  } 
+  }
   
   @Override
-   protected IOException unwrapException(IOException e) {
+  protected IOException unwrapException(IOException e) {
     if (e instanceof RemoteException) {
       return ((RemoteException) e).unwrapRemoteException();
     }
     return e;
   }
   
-  private Path getTestRootPath(FileContext fc, String path) {
-    return fileContextTestHelper.getTestRootPath(fc, path);
-  }
-  
   @Test
   public void testOldRenameWithQuota() throws Exception {
-    DistributedFileSystem fs = cluster.getFileSystem();
+    DistributedFileSystem fs = (DistributedFileSystem) cluster.getFileSystem();
     Path src1 = getTestRootPath(fc, "test/testOldRenameWithQuota/srcdir/src1");
     Path src2 = getTestRootPath(fc, "test/testOldRenameWithQuota/srcdir/src2");
     Path dst1 = getTestRootPath(fc, "test/testOldRenameWithQuota/dstdir/dst1");
@@ -135,6 +141,8 @@ public class TestHDFSFileContextMainOperations extends
      */
     oldRename(src1, dst1, true, false);
 
+    // HOP - Wait for asynchronous quota updates to be applied
+    Thread.sleep(5000);
     /*
      * Test2: src does not exceed quota and dst has *no* quota to accommodate 
      * rename. 
@@ -152,7 +160,7 @@ public class TestHDFSFileContextMainOperations extends
   
   @Test
   public void testRenameWithQuota() throws Exception {
-    DistributedFileSystem fs = cluster.getFileSystem();
+    DistributedFileSystem fs = (DistributedFileSystem) cluster.getFileSystem();
     Path src1 = getTestRootPath(fc, "test/testRenameWithQuota/srcdir/src1");
     Path src2 = getTestRootPath(fc, "test/testRenameWithQuota/srcdir/src2");
     Path dst1 = getTestRootPath(fc, "test/testRenameWithQuota/dstdir/dst1");
@@ -178,6 +186,8 @@ public class TestHDFSFileContextMainOperations extends
      * rename. 
      */
     // dstDir quota = 1 and dst1 already uses it
+    // HOP - Wait for asynchronous quota updates to be applied
+    Thread.sleep(5000);
     createFile(src2);
     rename(src2, dst2, false, false, true, Rename.NONE);
 
@@ -216,23 +226,29 @@ public class TestHDFSFileContextMainOperations extends
    */
   @Test
   public void testEditsLogOldRename() throws Exception {
-    DistributedFileSystem fs = cluster.getFileSystem();
+    DistributedFileSystem fs = (DistributedFileSystem) cluster.getFileSystem();
     Path src1 = getTestRootPath(fc, "testEditsLogOldRename/srcdir/src1");
     Path dst1 = getTestRootPath(fc, "testEditsLogOldRename/dstdir/dst1");
     createFile(src1);
     fs.mkdirs(dst1.getParent());
     createFile(dst1);
-    
+
     // Set quota so that dst1 parent cannot allow under it new files/directories 
     fs.setQuota(dst1.getParent(), 2, HdfsConstants.QUOTA_DONT_SET);
     // Free up quota for a subsequent rename
+    System.out.println("quota set");
+    Thread.sleep(60000);
     fs.delete(dst1, true);
+    System.out.println("delete");
+    // HOP - Wait for asynchronous quota updates to be applied
+    Thread.sleep(dst1.depth() * QUOTA_UPDATE_INTERVAL * 1000 + 2000);
+    System.out.println("start rename");
     oldRename(src1, dst1, true, false);
     
     // Restart the cluster and ensure the above operations can be
     // loaded from the edits log
     restartCluster();
-    fs = cluster.getFileSystem();
+    fs = (DistributedFileSystem) cluster.getFileSystem();
     src1 = getTestRootPath(fc, "testEditsLogOldRename/srcdir/src1");
     dst1 = getTestRootPath(fc, "testEditsLogOldRename/dstdir/dst1");
     Assert.assertFalse(fs.exists(src1));   // ensure src1 is already renamed
@@ -245,7 +261,7 @@ public class TestHDFSFileContextMainOperations extends
    */
   @Test
   public void testEditsLogRename() throws Exception {
-    DistributedFileSystem fs = cluster.getFileSystem();
+    DistributedFileSystem fs = (DistributedFileSystem) cluster.getFileSystem();
     Path src1 = getTestRootPath(fc, "testEditsLogRename/srcdir/src1");
     Path dst1 = getTestRootPath(fc, "testEditsLogRename/dstdir/dst1");
     createFile(src1);
@@ -254,42 +270,33 @@ public class TestHDFSFileContextMainOperations extends
     
     // Set quota so that dst1 parent cannot allow under it new files/directories 
     fs.setQuota(dst1.getParent(), 2, HdfsConstants.QUOTA_DONT_SET);
+    System.out.println("quota set");
+    Thread.sleep(60000);
     // Free up quota for a subsequent rename
     fs.delete(dst1, true);
+    System.out.println("delete");
+    // HOP - Wait for asynchronous quota updates to be applied
+    Thread.sleep(dst1.depth() * QUOTA_UPDATE_INTERVAL + 2000);
+    System.out.println("start rename");
     rename(src1, dst1, true, true, false, Rename.OVERWRITE);
     
     // Restart the cluster and ensure the above operations can be
     // loaded from the edits log
     restartCluster();
-    fs = cluster.getFileSystem();
+    fs = (DistributedFileSystem) cluster.getFileSystem();
     src1 = getTestRootPath(fc, "testEditsLogRename/srcdir/src1");
     dst1 = getTestRootPath(fc, "testEditsLogRename/dstdir/dst1");
     Assert.assertFalse(fs.exists(src1));   // ensure src1 is already renamed
     Assert.assertTrue(fs.exists(dst1));    // ensure rename dst exists
   }
-
-  @Test
-  public void testIsValidNameInvalidNames() {
-    String[] invalidNames = {
-      "/foo/../bar",
-      "/foo/./bar",
-      "/foo/:/bar",
-      "/foo:bar"
-    };
-
-    for (String invalidName: invalidNames) {
-      Assert.assertFalse(invalidName + " is not valid",
-        fc.getDefaultFileSystem().isValidName(invalidName));
-    }
-  }
-
+  
   private void oldRename(Path src, Path dst, boolean renameSucceeds,
       boolean exception) throws Exception {
-    DistributedFileSystem fs = cluster.getFileSystem();
+    DistributedFileSystem fs = (DistributedFileSystem) cluster.getFileSystem();
     try {
       Assert.assertEquals(renameSucceeds, fs.rename(src, dst));
     } catch (Exception ex) {
-      Assert.assertTrue(exception);
+      Assert.assertTrue(ex.getMessage(), exception);
     }
     Assert.assertEquals(renameSucceeds, !exists(fc, src));
     Assert.assertEquals(renameSucceeds, exists(fc, dst));
@@ -302,28 +309,9 @@ public class TestHDFSFileContextMainOperations extends
       fc.rename(src, dst, options);
       Assert.assertTrue(renameSucceeds);
     } catch (Exception ex) {
-      Assert.assertTrue(exception);
+      Assert.assertTrue(ex.getMessage(), exception);
     }
     Assert.assertEquals(renameSucceeds, !exists(fc, src));
-    Assert.assertEquals((dstExists||renameSucceeds), exists(fc, dst));
+    Assert.assertEquals((dstExists || renameSucceeds), exists(fc, dst));
   }
-  
-  @Override
-  protected boolean listCorruptedBlocksSupported() {
-    return true;
-  }
-  
-  @Test
-  public void testCrossFileSystemRename() throws IOException {
-    try {
-      fc.rename(
-        new Path("hdfs://127.0.0.1/aaa/bbb/Foo"), 
-        new Path("file://aaa/bbb/Moo"), 
-        Options.Rename.OVERWRITE);
-      fail("IOexception expected.");
-    } catch (IOException ioe) {
-      // okay
-    }
-  }
-  
 }

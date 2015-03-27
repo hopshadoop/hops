@@ -17,29 +17,21 @@
  */
 package org.apache.hadoop.hdfs.server.datanode.fsdataset;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.junit.Assert;
 import org.junit.Test;
 import org.mockito.Mockito;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
 public class TestRoundRobinVolumeChoosingPolicy {
 
   // Test the Round-Robin block-volume choosing algorithm.
   @Test
   public void testRR() throws Exception {
-    @SuppressWarnings("unchecked")
-    final RoundRobinVolumeChoosingPolicy<FsVolumeSpi> policy = 
-        ReflectionUtils.newInstance(RoundRobinVolumeChoosingPolicy.class, null);
-    testRR(policy);
-  }
-  
-  public static void testRR(VolumeChoosingPolicy<FsVolumeSpi> policy)
-      throws Exception {
     final List<FsVolumeSpi> volumes = new ArrayList<FsVolumeSpi>();
 
     // First volume, with 100 bytes of space.
@@ -49,6 +41,10 @@ public class TestRoundRobinVolumeChoosingPolicy {
     // Second volume, with 200 bytes of space.
     volumes.add(Mockito.mock(FsVolumeSpi.class));
     Mockito.when(volumes.get(1).getAvailable()).thenReturn(200L);
+
+    @SuppressWarnings("unchecked")
+    final RoundRobinVolumeChoosingPolicy<FsVolumeSpi> policy =
+        ReflectionUtils.newInstance(RoundRobinVolumeChoosingPolicy.class, null);
     
     // Test two rounds of round-robin choosing
     Assert.assertEquals(volumes.get(0), policy.chooseVolume(volumes, 0));
@@ -73,13 +69,6 @@ public class TestRoundRobinVolumeChoosingPolicy {
   // with volume and block sizes in exception message.
   @Test
   public void testRRPolicyExceptionMessage() throws Exception {
-    final RoundRobinVolumeChoosingPolicy<FsVolumeSpi> policy
-        = new RoundRobinVolumeChoosingPolicy<FsVolumeSpi>();
-    testRRPolicyExceptionMessage(policy);
-  }
-  
-  public static void testRRPolicyExceptionMessage(
-      VolumeChoosingPolicy<FsVolumeSpi> policy) throws Exception {
     final List<FsVolumeSpi> volumes = new ArrayList<FsVolumeSpi>();
 
     // First volume, with 500 bytes of space.
@@ -90,14 +79,16 @@ public class TestRoundRobinVolumeChoosingPolicy {
     volumes.add(Mockito.mock(FsVolumeSpi.class));
     Mockito.when(volumes.get(1).getAvailable()).thenReturn(600L);
 
+    final RoundRobinVolumeChoosingPolicy<FsVolumeSpi> policy =
+        new RoundRobinVolumeChoosingPolicy<FsVolumeSpi>();
     int blockSize = 700;
     try {
       policy.chooseVolume(volumes, blockSize);
       Assert.fail("expected to throw DiskOutOfSpaceException");
-    } catch(DiskOutOfSpaceException e) {
+    } catch (DiskOutOfSpaceException e) {
       Assert.assertEquals("Not returnig the expected message",
-          "Out of space: The volume with the most available space (=" + 600
-              + " B) is less than the block size (=" + blockSize + " B).",
+          "Out of space: The volume with the most available space (=" + 600 +
+              " B) is less than the block size (=" + blockSize + " B).",
           e.getMessage());
     }
   }

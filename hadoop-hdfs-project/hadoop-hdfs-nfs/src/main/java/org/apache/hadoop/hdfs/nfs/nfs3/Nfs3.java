@@ -17,14 +17,13 @@
  */
 package org.apache.hadoop.hdfs.nfs.nfs3;
 
-import java.io.IOException;
-
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.nfs.mount.Mountd;
 import org.apache.hadoop.nfs.nfs3.Nfs3Base;
 import org.apache.hadoop.util.StringUtils;
 
-import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
 
 /**
  * Nfs server. Supports NFS v3 using {@link RpcProgramNfs3}.
@@ -55,7 +54,7 @@ public class Nfs3 extends Nfs3Base {
   }
   
   public static void main(String[] args) throws IOException {
-    StringUtils.startupShutdownMessage(Nfs3.class, args, LOG);    
+    StringUtils.startupShutdownMessage(Nfs3.class, args, LOG);
     final Nfs3 nfsServer = new Nfs3(new Configuration());
     nfsServer.startServiceInternal(true);
   }

@@ -16,7 +16,7 @@
 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <groupId>org.apache.hadoop</groupId>
+  <groupId>io.hops</groupId>
   <artifactId>hadoop-main</artifactId>
   <version>2.4.0</version>
   <description>Apache Hadoop Main</description>
@@ -52,6 +52,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
   </distributionManagement>
 
   <repositories>
+    <repository>
+      <id>sics-release</id>
+      <name>SICS Release Repository</name>
+      <url>http://kompics.sics.se/maven/repository</url>
+    </repository>
     <repository>
       <id>${distMgmtSnapshotsId}</id>
       <name>${distMgmtSnapshotsName}</name>
@@ -97,10 +102,12 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <module>hadoop-assemblies</module>
     <module>hadoop-maven-plugins</module>
     <module>hadoop-common-project</module>
+    <module>hops-leader-election</module>
     <module>hadoop-hdfs-project</module>
     <module>hadoop-yarn-project</module>
     <module>hadoop-mapreduce-project</module>
     <module>hadoop-tools</module>
+    <module>hops-erasure-coding</module>
     <module>hadoop-dist</module>
     <module>hadoop-client</module>
     <module>hadoop-minicluster</module>
@@ -283,7 +290,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
               <doclet>org.apache.hadoop.classification.tools.IncludePublicAnnotationsStandardDoclet</doclet>
               <docletArtifacts>
                 <docletArtifact>
-                  <groupId>org.apache.hadoop</groupId>
+                  <groupId>io.hops</groupId>
                   <artifactId>hadoop-annotations</artifactId>
                   <version>${project.version}</version>
                 </docletArtifact>
@@ -492,6 +499,46 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                 <goals>
                   <goal>clover</goal>
                 </goals>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>ndb</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <dependencies>
+        <dependency>
+          <groupId>io.hops.metadata</groupId>
+          <artifactId>hops-metadata-dal-impl-ndb</artifactId>
+          <version>1.0-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+          <groupId>com.mysql.ndb</groupId>
+          <artifactId>clusterj-platform</artifactId>
+          <version>7.4.4</version>
+          <classifier>natives-linux</classifier>
+        </dependency>
+      </dependencies>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>com.googlecode.mavennatives</groupId>
+            <artifactId>maven-nativedependencies-plugin</artifactId>
+            <version>0.0.7</version>
+            <executions>
+              <execution>
+                <id>unpacknatives</id>
+                <goals>
+                  <goal>copy</goal>
+                </goals>
+                <configuration>
+                  <nativesTargetDir>${session.executionRootDirectory}/target/lib</nativesTargetDir>
+                  <separateDirs>false</separateDirs>
+                </configuration>
               </execution>
             </executions>
           </plugin>

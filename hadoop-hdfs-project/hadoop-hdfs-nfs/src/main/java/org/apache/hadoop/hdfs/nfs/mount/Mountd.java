@@ -17,10 +17,10 @@
  */
 package org.apache.hadoop.hdfs.nfs.mount;
 
-import java.io.IOException;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mount.MountdBase;
+
+import java.io.IOException;
 
 /**
  * Main class for starting mountd daemon. This daemon implements the NFS

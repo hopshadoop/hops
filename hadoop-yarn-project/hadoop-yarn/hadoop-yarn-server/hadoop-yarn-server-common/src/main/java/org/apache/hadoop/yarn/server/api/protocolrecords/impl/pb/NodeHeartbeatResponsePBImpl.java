@@ -18,10 +18,6 @@
 
 package org.apache.hadoop.yarn.server.api.protocolrecords.impl.pb;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Iterator;
-
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.impl.pb.ApplicationIdPBImpl;
@@ -38,10 +34,16 @@ import org.apache.hadoop.yarn.server.api.records.MasterKey;
 import org.apache.hadoop.yarn.server.api.records.NodeAction;
 import org.apache.hadoop.yarn.server.api.records.impl.pb.MasterKeyPBImpl;
 
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 
-    
-public class NodeHeartbeatResponsePBImpl extends ProtoBase<NodeHeartbeatResponseProto> implements NodeHeartbeatResponse {
-  NodeHeartbeatResponseProto proto = NodeHeartbeatResponseProto.getDefaultInstance();
+
+public class NodeHeartbeatResponsePBImpl
+    extends ProtoBase<NodeHeartbeatResponseProto>
+    implements NodeHeartbeatResponse {
+  NodeHeartbeatResponseProto proto =
+      NodeHeartbeatResponseProto.getDefaultInstance();
   NodeHeartbeatResponseProto.Builder builder = null;
   boolean viaProto = false;
   
@@ -60,7 +62,7 @@ public class NodeHeartbeatResponsePBImpl extends ProtoBase<NodeHeartbeatResponse
   }
   
   public NodeHeartbeatResponseProto getProto() {
-      mergeLocalToProto();
+    mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
     viaProto = true;
     return proto;
@@ -78,14 +80,14 @@ public class NodeHeartbeatResponsePBImpl extends ProtoBase<NodeHeartbeatResponse
           convertToProtoFormat(this.containerTokenMasterKey));
     }
     if (this.nmTokenMasterKey != null) {
-      builder.setNmTokenMasterKey(
-          convertToProtoFormat(this.nmTokenMasterKey));
+      builder.setNmTokenMasterKey(convertToProtoFormat(this.nmTokenMasterKey));
     }
   }
 
   private void mergeLocalToProto() {
-    if (viaProto) 
+    if (viaProto) {
       maybeInitBuilder();
+    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
@@ -97,7 +99,7 @@ public class NodeHeartbeatResponsePBImpl extends ProtoBase<NodeHeartbeatResponse
     }
     viaProto = false;
   }
-    
+
   
   @Override
   public int getResponseId() {
@@ -128,8 +130,9 @@ public class NodeHeartbeatResponsePBImpl extends ProtoBase<NodeHeartbeatResponse
   @Override
   public void setContainerTokenMasterKey(MasterKey masterKey) {
     maybeInitBuilder();
-    if (masterKey == null)
+    if (masterKey == null) {
       builder.clearContainerTokenMasterKey();
+    }
     this.containerTokenMasterKey = masterKey;
   }
 
@@ -142,16 +145,16 @@ public class NodeHeartbeatResponsePBImpl extends ProtoBase<NodeHeartbeatResponse
     if (!p.hasNmTokenMasterKey()) {
       return null;
     }
-    this.nmTokenMasterKey =
-        convertFromProtoFormat(p.getNmTokenMasterKey());
+    this.nmTokenMasterKey = convertFromProtoFormat(p.getNmTokenMasterKey());
     return this.nmTokenMasterKey;
   }
 
   @Override
   public void setNMTokenMasterKey(MasterKey masterKey) {
     maybeInitBuilder();
-    if (masterKey == null)
+    if (masterKey == null) {
       builder.clearNmTokenMasterKey();
+    }
     this.nmTokenMasterKey = masterKey;
   }
 
@@ -215,8 +218,9 @@ public class NodeHeartbeatResponsePBImpl extends ProtoBase<NodeHeartbeatResponse
   @Override
   public void addAllContainersToCleanup(
       final List<ContainerId> containersToCleanup) {
-    if (containersToCleanup == null)
+    if (containersToCleanup == null) {
       return;
+    }
     initContainersToCleanup();
     this.containersToCleanup.addAll(containersToCleanup);
   }
@@ -224,8 +228,9 @@ public class NodeHeartbeatResponsePBImpl extends ProtoBase<NodeHeartbeatResponse
   private void addContainersToCleanupToProto() {
     maybeInitBuilder();
     builder.clearContainersToCleanup();
-    if (containersToCleanup == null)
+    if (containersToCleanup == null) {
       return;
+    }
     Iterable<ContainerIdProto> iterable = new Iterable<ContainerIdProto>() {
 
       @Override
@@ -278,8 +283,9 @@ public class NodeHeartbeatResponsePBImpl extends ProtoBase<NodeHeartbeatResponse
   @Override
   public void addAllApplicationsToCleanup(
       final List<ApplicationId> applicationsToCleanup) {
-    if (applicationsToCleanup == null)
+    if (applicationsToCleanup == null) {
       return;
+    }
     initApplicationsToCleanup();
     this.applicationsToCleanup.addAll(applicationsToCleanup);
   }
@@ -287,8 +293,9 @@ public class NodeHeartbeatResponsePBImpl extends ProtoBase<NodeHeartbeatResponse
   private void addApplicationsToCleanupToProto() {
     maybeInitBuilder();
     builder.clearApplicationsToCleanup();
-    if (applicationsToCleanup == null)
+    if (applicationsToCleanup == null) {
       return;
+    }
     Iterable<ApplicationIdProto> iterable = new Iterable<ApplicationIdProto>() {
 
       @Override
@@ -329,6 +336,18 @@ public class NodeHeartbeatResponsePBImpl extends ProtoBase<NodeHeartbeatResponse
   public void setNextHeartBeatInterval(long nextHeartBeatInterval) {
     maybeInitBuilder();
     builder.setNextHeartBeatInterval(nextHeartBeatInterval);
+  }
+  
+  @Override
+  public boolean getNextheartbeat() {
+    NodeHeartbeatResponseProtoOrBuilder p = viaProto ? proto : builder;
+    return (p.getNextheartbeat());
+  }
+  
+  @Override
+  public void setNextheartbeat(boolean nextHeartbeat) {
+    maybeInitBuilder();
+    builder.setNextheartbeat(nextHeartbeat);
   }
 
   private ContainerIdPBImpl convertFromProtoFormat(ContainerIdProto p) {

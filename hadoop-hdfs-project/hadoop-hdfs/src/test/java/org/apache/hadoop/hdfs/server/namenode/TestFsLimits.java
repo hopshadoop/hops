@@ -18,30 +18,33 @@
 
 package org.apache.hadoop.hdfs.server.namenode;
 
-import static org.apache.hadoop.hdfs.server.common.Util.fileAsURI;
-import static org.apache.hadoop.util.Time.now;
+import io.hops.exception.StorageException;
+import io.hops.exception.TransactionContextException;
+import io.hops.leader_election.node.SortedActiveNodeListPBImpl;
+import io.hops.metadata.HdfsStorageFactory;
+import io.hops.transaction.handler.HDFSOperationType;
+import io.hops.transaction.handler.HopsTransactionalRequestHandler;
+import io.hops.transaction.lock.LockFactory;
+import io.hops.transaction.lock.TransactionLockTypes;
+import io.hops.transaction.lock.TransactionLocks;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.fs.permission.PermissionStatus;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
+import org.apache.hadoop.hdfs.protocol.FSLimitException;
+import org.apache.hadoop.hdfs.protocol.FSLimitException.MaxDirectoryItemsExceededException;
+import org.apache.hadoop.hdfs.protocol.FSLimitException.PathComponentTooLongException;
+import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
+import org.junit.Before;
+import org.junit.Test;
+
+import java.io.IOException;
+import java.util.Collections;
+
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Matchers.anyObject;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-
-import java.io.File;
-import java.io.IOException;
-
-import org.apache.hadoop.HadoopIllegalArgumentException;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.Options.Rename;
-import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.fs.permission.PermissionStatus;
-import org.apache.hadoop.hdfs.DFSConfigKeys;
-import org.apache.hadoop.hdfs.MiniDFSCluster;
-import org.apache.hadoop.hdfs.protocol.FSLimitException.MaxDirectoryItemsExceededException;
-import org.apache.hadoop.hdfs.protocol.FSLimitException.PathComponentTooLongException;
-import org.apache.hadoop.hdfs.protocol.HdfsConstants;
-import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.NamenodeRole;
-import org.apache.hadoop.test.GenericTestUtils;
-import org.junit.Before;
-import org.junit.Test;
 
 public class TestFsLimits {
   static Configuration conf;
@@ -49,122 +52,94 @@ public class TestFsLimits {
   static FSDirectory fs;
   static boolean fsIsReady;
   
-  static final PermissionStatus perms
-    = new PermissionStatus("admin", "admin", FsPermission.getDefault());
+  static PermissionStatus perms =
+      new PermissionStatus("admin", "admin", FsPermission.getDefault());
 
-  static private FSImage getMockFSImage() {
-    FSEditLog editLog = mock(FSEditLog.class);
-    FSImage fsImage = mock(FSImage.class);
-    when(fsImage.getEditLog()).thenReturn(editLog);
-    return fsImage;
-  }
-
+  static INodeDirectoryWithQuota rootInode;
+  
   static private FSNamesystem getMockNamesystem() {
     FSNamesystem fsn = mock(FSNamesystem.class);
-    when(
-        fsn.createFsOwnerPermissions((FsPermission)anyObject())
-    ).thenReturn(
-         new PermissionStatus("root", "wheel", FsPermission.getDefault())
-    );
+    when(fsn.createFsOwnerPermissions((FsPermission) anyObject())).thenReturn(
+        new PermissionStatus("root", "wheel", FsPermission.getDefault()));
+    NameNode nn = mock(NameNode.class);
+    when(nn.getActiveNameNodes())
+        .thenReturn(new SortedActiveNodeListPBImpl(Collections.EMPTY_LIST));
+    when(fsn.getNameNode()).thenReturn(nn);
     return fsn;
   }
   
-  private static class MockFSDirectory extends FSDirectory {
-    public MockFSDirectory() throws IOException {
-      super(getMockFSImage(), getMockNamesystem(), conf);
+  private void initFS() throws StorageException, IOException {
+    HdfsStorageFactory.setConfiguration(conf);
+    assert (HdfsStorageFactory.formatStorage());
+    rootInode = FSDirectory.createRootInode(perms, true);
+    inodes = new INode[]{rootInode, null};
+    fs = null;
+    fsIsReady = true;
+  }
+
+  private static class TestFSDirectory extends FSDirectory {
+    public TestFSDirectory() throws IOException {
+      super(getMockNamesystem(), conf);
       setReady(fsIsReady);
-      NameNode.initMetrics(conf, NamenodeRole.NAMENODE);
+    }
+    
+    @Override
+    public <T extends INode> void verifyFsLimits(INode[] pathComponents,
+        int pos, T child)
+        throws FSLimitException, StorageException, TransactionContextException {
+      super.verifyFsLimits(pathComponents, pos, child);
     }
   }
 
   @Before
   public void setUp() throws IOException {
     conf = new Configuration();
-    conf.set(DFSConfigKeys.DFS_NAMENODE_NAME_DIR_KEY,
-             fileAsURI(new File(MiniDFSCluster.getBaseDirectory(),
-                                "namenode")).toString());
+    initFS();
+  }
 
-    fs = null;
-    fsIsReady = true;
+  @Test
+  public void testDefaultMaxComponentLength() {
+    int maxComponentLength =
+        conf.getInt(DFSConfigKeys.DFS_NAMENODE_MAX_COMPONENT_LENGTH_KEY,
+            DFSConfigKeys.DFS_NAMENODE_MAX_COMPONENT_LENGTH_DEFAULT);
+    assertEquals(0, maxComponentLength);
+  }
+  
+  @Test
+  public void testDefaultMaxDirItems() {
+    int maxDirItems =
+        conf.getInt(DFSConfigKeys.DFS_NAMENODE_MAX_DIRECTORY_ITEMS_KEY,
+            DFSConfigKeys.DFS_NAMENODE_MAX_DIRECTORY_ITEMS_DEFAULT);
+    assertEquals(0, maxDirItems);
   }
 
   @Test
   public void testNoLimits() throws Exception {
-    mkdirs("/1", null);
-    mkdirs("/22", null);
-    mkdirs("/333", null);
-    mkdirs("/4444", null);
-    mkdirs("/55555", null);
-    mkdirs("/1/" + HdfsConstants.DOT_SNAPSHOT_DIR,
-        HadoopIllegalArgumentException.class);
+    addChildWithName("1", null);
+    addChildWithName("22", null);
+    addChildWithName("333", null);
+    addChildWithName("4444", null);
+    addChildWithName("55555", null);
   }
 
   @Test
   public void testMaxComponentLength() throws Exception {
     conf.setInt(DFSConfigKeys.DFS_NAMENODE_MAX_COMPONENT_LENGTH_KEY, 2);
     
-    mkdirs("/1", null);
-    mkdirs("/22", null);
-    mkdirs("/333", PathComponentTooLongException.class);
-    mkdirs("/4444", PathComponentTooLongException.class);
-  }
-
-  @Test
-  public void testMaxComponentLengthRename() throws Exception {
-    conf.setInt(DFSConfigKeys.DFS_NAMENODE_MAX_COMPONENT_LENGTH_KEY, 2);
-
-    mkdirs("/5", null);
-    rename("/5", "/555", PathComponentTooLongException.class);
-    rename("/5", "/55", null);
-
-    mkdirs("/6", null);
-    deprecatedRename("/6", "/666", PathComponentTooLongException.class);
-    deprecatedRename("/6", "/66", null);
+    addChildWithName("1", null);
+    addChildWithName("22", null);
+    addChildWithName("333", PathComponentTooLongException.class);
+    addChildWithName("4444", PathComponentTooLongException.class);
   }
 
   @Test
   public void testMaxDirItems() throws Exception {
     conf.setInt(DFSConfigKeys.DFS_NAMENODE_MAX_DIRECTORY_ITEMS_KEY, 2);
     
-    mkdirs("/1", null);
-    mkdirs("/22", null);
-    mkdirs("/333", MaxDirectoryItemsExceededException.class);
-    mkdirs("/4444", MaxDirectoryItemsExceededException.class);
-  }
-
-  @Test
-  public void testMaxDirItemsRename() throws Exception {
-    conf.setInt(DFSConfigKeys.DFS_NAMENODE_MAX_DIRECTORY_ITEMS_KEY, 2);
-    
-    mkdirs("/1", null);
-    mkdirs("/2", null);
-
-    mkdirs("/2/A", null);
-    rename("/2/A", "/A", MaxDirectoryItemsExceededException.class);
-    rename("/2/A", "/1/A", null);
-
-    mkdirs("/2/B", null);
-    deprecatedRename("/2/B", "/B", MaxDirectoryItemsExceededException.class);
-    deprecatedRename("/2/B", "/1/B", null);
-
-    rename("/1", "/3", null);
-    deprecatedRename("/2", "/4", null);
-  }
-
-  @Test
-  public void testMaxDirItemsLimits() throws Exception {
-    conf.setInt(DFSConfigKeys.DFS_NAMENODE_MAX_DIRECTORY_ITEMS_KEY, 0);
-    try {
-      mkdirs("1", null);
-    } catch (IllegalArgumentException e) {
-      GenericTestUtils.assertExceptionContains("Cannot set dfs", e);
-    }
-    conf.setInt(DFSConfigKeys.DFS_NAMENODE_MAX_DIRECTORY_ITEMS_KEY, 64*100*1024);
-    try {
-      mkdirs("1", null);
-    } catch (IllegalArgumentException e) {
-      GenericTestUtils.assertExceptionContains("Cannot set dfs", e);
-    }
+    addChildWithName("1", null);
+    addChildWithName("22", null);
+    addChildWithName("333", MaxDirectoryItemsExceededException.class);
+    addChildWithName("4444", MaxDirectoryItemsExceededException.class);
   }
 
   @Test
@@ -172,10 +147,10 @@ public class TestFsLimits {
     conf.setInt(DFSConfigKeys.DFS_NAMENODE_MAX_COMPONENT_LENGTH_KEY, 3);
     conf.setInt(DFSConfigKeys.DFS_NAMENODE_MAX_DIRECTORY_ITEMS_KEY, 2);
     
-    mkdirs("/1", null);
-    mkdirs("/22", null);
-    mkdirs("/333", MaxDirectoryItemsExceededException.class);
-    mkdirs("/4444", PathComponentTooLongException.class);
+    addChildWithName("1", null);
+    addChildWithName("22", null);
+    addChildWithName("333", MaxDirectoryItemsExceededException.class);
+    addChildWithName("4444", PathComponentTooLongException.class);
   }
 
   @Test
@@ -184,55 +159,52 @@ public class TestFsLimits {
     conf.setInt(DFSConfigKeys.DFS_NAMENODE_MAX_DIRECTORY_ITEMS_KEY, 2);
     fsIsReady = false;
     
-    mkdirs("/1", null);
-    mkdirs("/22", null);
-    mkdirs("/333", null);
-    mkdirs("/4444", null);
-    mkdirs("/1/" + HdfsConstants.DOT_SNAPSHOT_DIR,
-        HadoopIllegalArgumentException.class);
+    addChildWithName("1", null);
+    addChildWithName("22", null);
+    addChildWithName("333", null);
+    addChildWithName("4444", null);
   }
 
-  private void mkdirs(String name, Class<?> expected)
-  throws Exception {
-    lazyInitFSDirectory();
-    Class<?> generated = null;
-    try {
-      fs.mkdirs(name, perms, false, now());
-    } catch (Throwable e) {
-      generated = e.getClass();
-    }
-    assertEquals(expected, generated);
-  }
+  private static int id = 1 + INodeDirectory.ROOT_ID;
 
-  private void rename(String src, String dst, Class<?> expected)
+  private void addChildWithName(final String name, final Class<?> expected)
       throws Exception {
-    lazyInitFSDirectory();
-    Class<?> generated = null;
-    try {
-      fs.renameTo(src, dst, false, new Rename[] { });
-    } catch (Throwable e) {
-      generated = e.getClass();
-    }
-    assertEquals(expected, generated);
-  }
+    HopsTransactionalRequestHandler handler =
+        new HopsTransactionalRequestHandler(HDFSOperationType.TEST) {
 
-  @SuppressWarnings("deprecation")
-  private void deprecatedRename(String src, String dst, Class<?> expected)
-      throws Exception {
-    lazyInitFSDirectory();
-    Class<?> generated = null;
-    try {
-      fs.renameTo(src, dst, false);
-    } catch (Throwable e) {
-      generated = e.getClass();
-    }
-    assertEquals(expected, generated);
-  }
+          @Override
+          public void acquireLock(TransactionLocks locks) throws IOException {
+            LockFactory lf = LockFactory.getInstance();
+            locks.add(lf.getINodeLock(getMockNamesystem().getNameNode(),
+                TransactionLockTypes.INodeLockType.WRITE_ON_TARGET_AND_PARENT,
+                TransactionLockTypes.INodeResolveType.PATH_AND_ALL_CHILDREN_RECURSIVELY,
+                "/", "/" + name));
+          }
 
-  private static void lazyInitFSDirectory() throws IOException {
-    // have to create after the caller has had a chance to set conf values
-    if (fs == null) {
-      fs = new MockFSDirectory();
-    }
+          @Override
+          public Object performTask() throws StorageException, IOException {
+            // have to create after the caller has had a chance to set conf values
+            if (fs == null) {
+              fs = new TestFSDirectory();
+            }
+
+            INode child = new INodeDirectory(name, perms);
+            child.setIdNoPersistance(id++);
+            child.setLocalName(name);
+
+            Class<?> generated = null;
+            try {
+              fs.verifyFsLimits(inodes, 1, child);
+              INodeDirectoryWithQuota.getRootDir().addChild(child, false);
+            } catch (QuotaExceededException e) {
+              generated = e.getClass();
+            }
+            assertEquals(expected, generated);
+            return null;
+          }
+        };
+
+    handler.handle();
+    
   }
 }

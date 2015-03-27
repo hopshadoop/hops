@@ -18,9 +18,8 @@
 
 package org.apache.hadoop.yarn.server.applicationhistoryservice.webapp;
 
-import org.apache.hadoop.yarn.webapp.Controller;
-
 import com.google.inject.Inject;
+import org.apache.hadoop.yarn.webapp.Controller;
 
 public class AHSController extends Controller {
 

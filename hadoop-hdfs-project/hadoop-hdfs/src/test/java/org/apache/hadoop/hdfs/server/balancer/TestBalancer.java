@@ -17,21 +17,8 @@
  */
 package org.apache.hadoop.hdfs.server.balancer;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
-
-import java.io.IOException;
-import java.net.URI;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.List;
-import java.util.Random;
-import java.util.concurrent.TimeoutException;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -51,19 +38,27 @@ import org.apache.hadoop.hdfs.server.balancer.Balancer.Cli;
 import org.apache.hadoop.hdfs.server.datanode.SimulatedFSDataset;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.Tool;
-import org.apache.log4j.Level;
 import org.junit.Test;
+
+import java.io.IOException;
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
+import java.util.Random;
+import java.util.concurrent.TimeoutException;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 
 /**
  * This class tests if a balancer schedules tasks correctly.
  */
 public class TestBalancer {
-  private static final Log LOG = LogFactory.getLog(
-  "org.apache.hadoop.hdfs.TestBalancer");
-  static {
-    ((Log4JLogger)Balancer.LOG).getLogger().setLevel(Level.ALL);
-  }
-
+  private static final Log LOG =
+      LogFactory.getLog("org.apache.hadoop.hdfs.TestBalancer");
+  
   final static long CAPACITY = 500L;
   final static String RACK0 = "/rack0";
   final static String RACK1 = "/rack1";
@@ -74,14 +69,14 @@ public class TestBalancer {
 
   ClientProtocol client;
 
-  static final long TIMEOUT = 40000L; //msec
+  static final long TIMEOUT = 20000L; //msec
   static final double CAPACITY_ALLOWED_VARIANCE = 0.005;  // 0.5%
   static final double BALANCE_ALLOWED_VARIANCE = 0.11;    // 10%+delta
   static final int DEFAULT_BLOCK_SIZE = 10;
   private static final Random r = new Random();
 
   static {
-    Balancer.setBlockMoveWaitTime(1000L) ;
+    Balancer.setBlockMoveWaitTime(1000L);
   }
 
   static void initConf(Configuration conf) {
@@ -95,10 +90,10 @@ public class TestBalancer {
   /* create a file with a length of <code>fileLen</code> */
   static void createFile(MiniDFSCluster cluster, Path filePath, long fileLen,
       short replicationFactor, int nnIndex)
-  throws IOException, InterruptedException, TimeoutException {
+      throws IOException, InterruptedException, TimeoutException {
     FileSystem fs = cluster.getFileSystem(nnIndex);
-    DFSTestUtil.createFile(fs, filePath, fileLen, 
-        replicationFactor, r.nextLong());
+    DFSTestUtil
+        .createFile(fs, filePath, fileLen, replicationFactor, r.nextLong());
     DFSTestUtil.waitReplication(fs, filePath, replicationFactor);
   }
 
@@ -106,26 +101,28 @@ public class TestBalancer {
    * whose used space to be <code>size</code>
    */
   private ExtendedBlock[] generateBlocks(Configuration conf, long size,
-      short numNodes) throws IOException, InterruptedException, TimeoutException {
+      short numNodes)
+      throws IOException, InterruptedException, TimeoutException {
     cluster = new MiniDFSCluster.Builder(conf).numDataNodes(numNodes).build();
     try {
       cluster.waitActive();
-      client = NameNodeProxies.createProxy(conf, cluster.getFileSystem(0).getUri(),
-          ClientProtocol.class).getProxy();
+      client = NameNodeProxies
+          .createProxy(conf, cluster.getFileSystem(0).getUri(),
+              ClientProtocol.class).getProxy();
 
-      short replicationFactor = (short)(numNodes-1);
-      long fileLen = size/replicationFactor;
-      createFile(cluster , filePath, fileLen, replicationFactor, 0);
+      short replicationFactor = (short) (numNodes - 1);
+      long fileLen = size / replicationFactor;
+      createFile(cluster, filePath, fileLen, replicationFactor, 0);
 
       List<LocatedBlock> locatedBlocks = client.
-      getBlockLocations(fileName, 0, fileLen).getLocatedBlocks();
+          getBlockLocations(fileName, 0, fileLen).getLocatedBlocks();
 
       int numOfBlocks = locatedBlocks.size();
       ExtendedBlock[] blocks = new ExtendedBlock[numOfBlocks];
-      for(int i=0; i<numOfBlocks; i++) {
+      for (int i = 0; i < numOfBlocks; i++) {
         ExtendedBlock b = locatedBlocks.get(i).getBlock();
-        blocks[i] = new ExtendedBlock(b.getBlockPoolId(), b.getBlockId(), b
-            .getNumBytes(), b.getGenerationStamp());
+        blocks[i] = new ExtendedBlock(b.getBlockPoolId(), b.getBlockId(),
+            b.getNumBytes(), b.getGenerationStamp());
       }
 
       return blocks;
@@ -141,18 +138,18 @@ public class TestBalancer {
     long[] usedSpace = new long[distribution.length];
     System.arraycopy(distribution, 0, usedSpace, 0, distribution.length);
 
-    List<List<Block>> blockReports = 
-      new ArrayList<List<Block>>(usedSpace.length);
+    List<List<Block>> blockReports =
+        new ArrayList<List<Block>>(usedSpace.length);
     Block[][] results = new Block[usedSpace.length][];
-    for(int i=0; i<usedSpace.length; i++) {
+    for (int i = 0; i < usedSpace.length; i++) {
       blockReports.add(new ArrayList<Block>());
     }
-    for(int i=0; i<blocks.length; i++) {
-      for(int j=0; j<replicationFactor; j++) {
+    for (int i = 0; i < blocks.length; i++) {
+      for (int j = 0; j < replicationFactor; j++) {
         boolean notChosen = true;
-        while(notChosen) {
+        while (notChosen) {
           int chosenIndex = r.nextInt(usedSpace.length);
-          if( usedSpace[chosenIndex]>0 ) {
+          if (usedSpace[chosenIndex] > 0) {
             notChosen = false;
             blockReports.get(chosenIndex).add(blocks[i].getLocalBlock());
             usedSpace[chosenIndex] -= blocks[i].getNumBytes();
@@ -160,7 +157,7 @@ public class TestBalancer {
         }
       }
     }
-    for(int i=0; i<usedSpace.length; i++) {
+    for (int i = 0; i < usedSpace.length; i++) {
       List<Block> nodeBlockList = blockReports.get(i);
       results[i] = nodeBlockList.toArray(new Block[nodeBlockList.size()]);
     }
@@ -169,7 +166,7 @@ public class TestBalancer {
 
   static long sum(long[] x) {
     long s = 0L;
-    for(long a : x) {
+    for (long a : x) {
       s += a;
     }
     return s;
@@ -179,8 +176,8 @@ public class TestBalancer {
    * then redistribute blocks according the required distribution.
    * Afterwards a balancer is running to balance the cluster.
    */
-  private void testUnevenDistribution(Configuration conf,
-      long distribution[], long capacities[], String[] racks) throws Exception {
+  private void testUnevenDistribution(Configuration conf, long distribution[],
+      long capacities[], String[] racks) throws Exception {
     int numDatanodes = distribution.length;
     if (capacities.length != numDatanodes || racks.length != numDatanodes) {
       throw new IllegalArgumentException("Array length is not the same");
@@ -190,26 +187,25 @@ public class TestBalancer {
     final long totalUsedSpace = sum(distribution);
 
     // fill the cluster
-    ExtendedBlock[] blocks = generateBlocks(conf, totalUsedSpace,
-        (short) numDatanodes);
+    ExtendedBlock[] blocks =
+        generateBlocks(conf, totalUsedSpace, (short) numDatanodes);
 
     // redistribute blocks
-    Block[][] blocksDN = distributeBlocks(
-        blocks, (short)(numDatanodes-1), distribution);
+    Block[][] blocksDN =
+        distributeBlocks(blocks, (short) (numDatanodes - 1), distribution);
 
     // restart the cluster: do NOT format the cluster
-    conf.set(DFSConfigKeys.DFS_NAMENODE_SAFEMODE_THRESHOLD_PCT_KEY, "0.0f"); 
+    conf.set(DFSConfigKeys.DFS_NAMENODE_SAFEMODE_THRESHOLD_PCT_KEY, "0.0f");
     cluster = new MiniDFSCluster.Builder(conf).numDataNodes(numDatanodes)
-                                              .format(false)
-                                              .racks(racks)
-                                              .simulatedCapacities(capacities)
-                                              .build();
+        .format(false).racks(racks).simulatedCapacities(capacities).build();
     cluster.waitActive();
-    client = NameNodeProxies.createProxy(conf, cluster.getFileSystem(0).getUri(),
-        ClientProtocol.class).getProxy();
+    client = NameNodeProxies
+        .createProxy(conf, cluster.getFileSystem(0).getUri(),
+            ClientProtocol.class).getProxy();
 
-    for(int i = 0; i < blocksDN.length; i++)
-      cluster.injectBlocks(i, Arrays.asList(blocksDN[i]), null);
+    for (int i = 0; i < blocksDN.length; i++) {
+      cluster.injectBlocks(i, Arrays.asList(blocksDN[i]));
+    }
 
     final long totalCapacity = sum(capacities);
     runBalancer(conf, totalUsedSpace, totalCapacity);
@@ -217,75 +213,80 @@ public class TestBalancer {
   }
 
   /**
-   * Wait until heartbeat gives expected results, within CAPACITY_ALLOWED_VARIANCE, 
+   * Wait until heartbeat gives expected results, within
+   * CAPACITY_ALLOWED_VARIANCE,
    * summed over all nodes.  Times out after TIMEOUT msec.
+   *
    * @param expectedUsedSpace
    * @param expectedTotalSpace
-   * @throws IOException - if getStats() fails
+   * @throws IOException
+   *     - if getStats() fails
    * @throws TimeoutException
    */
-  static void waitForHeartBeat(long expectedUsedSpace,
-      long expectedTotalSpace, ClientProtocol client, MiniDFSCluster cluster)
-  throws IOException, TimeoutException {
+  static void waitForHeartBeat(long expectedUsedSpace, long expectedTotalSpace,
+      ClientProtocol client, MiniDFSCluster cluster)
+      throws IOException, TimeoutException {
     long timeout = TIMEOUT;
-    long failtime = (timeout <= 0L) ? Long.MAX_VALUE
-             : Time.now() + timeout;
+    long failtime = (timeout <= 0L) ? Long.MAX_VALUE : Time.now() + timeout;
     
     while (true) {
       long[] status = client.getStats();
-      double totalSpaceVariance = Math.abs((double)status[0] - expectedTotalSpace) 
-          / expectedTotalSpace;
-      double usedSpaceVariance = Math.abs((double)status[1] - expectedUsedSpace) 
-          / expectedUsedSpace;
-      if (totalSpaceVariance < CAPACITY_ALLOWED_VARIANCE 
-          && usedSpaceVariance < CAPACITY_ALLOWED_VARIANCE)
+      double totalSpaceVariance =
+          Math.abs((double) status[0] - expectedTotalSpace) /
+              expectedTotalSpace;
+      double usedSpaceVariance =
+          Math.abs((double) status[1] - expectedUsedSpace) / expectedUsedSpace;
+      if (totalSpaceVariance < CAPACITY_ALLOWED_VARIANCE &&
+          usedSpaceVariance < CAPACITY_ALLOWED_VARIANCE) {
         break; //done
+      }
 
       if (Time.now() > failtime) {
-        throw new TimeoutException("Cluster failed to reached expected values of "
-            + "totalSpace (current: " + status[0] 
-            + ", expected: " + expectedTotalSpace 
-            + "), or usedSpace (current: " + status[1] 
-            + ", expected: " + expectedUsedSpace
-            + "), in more than " + timeout + " msec.");
+        throw new TimeoutException(
+            "Cluster failed to reached expected values of " +
+                "totalSpace (current: " + status[0] + ", expected: " +
+                expectedTotalSpace + "), or usedSpace (current: " + status[1] +
+                ", expected: " + expectedUsedSpace + "), in more than " +
+                timeout + " msec.");
       }
       try {
         Thread.sleep(100L);
-      } catch(InterruptedException ignored) {
+      } catch (InterruptedException ignored) {
       }
     }
   }
   
   /**
-   * Wait until balanced: each datanode gives utilization within 
+   * Wait until balanced: each datanode gives utilization within
    * BALANCE_ALLOWED_VARIANCE of average
+   *
    * @throws IOException
    * @throws TimeoutException
    */
   static void waitForBalancer(long totalUsedSpace, long totalCapacity,
       ClientProtocol client, MiniDFSCluster cluster)
-  throws IOException, TimeoutException {
+      throws IOException, TimeoutException {
     long timeout = TIMEOUT;
-    long failtime = (timeout <= 0L) ? Long.MAX_VALUE
-        : Time.now() + timeout;
-    final double avgUtilization = ((double)totalUsedSpace) / totalCapacity;
+    long failtime = (timeout <= 0L) ? Long.MAX_VALUE : Time.now() + timeout;
+    final double avgUtilization = ((double) totalUsedSpace) / totalCapacity;
     boolean balanced;
     do {
-      DatanodeInfo[] datanodeReport = 
+      DatanodeInfo[] datanodeReport =
           client.getDatanodeReport(DatanodeReportType.ALL);
       assertEquals(datanodeReport.length, cluster.getDataNodes().size());
       balanced = true;
       for (DatanodeInfo datanode : datanodeReport) {
-        double nodeUtilization = ((double)datanode.getDfsUsed())
-            / datanode.getCapacity();
-        if (Math.abs(avgUtilization - nodeUtilization) > BALANCE_ALLOWED_VARIANCE) {
+        double nodeUtilization =
+            ((double) datanode.getDfsUsed()) / datanode.getCapacity();
+        if (Math.abs(avgUtilization - nodeUtilization) >
+            BALANCE_ALLOWED_VARIANCE) {
           balanced = false;
           if (Time.now() > failtime) {
             throw new TimeoutException(
-                "Rebalancing expected avg utilization to become "
-                + avgUtilization + ", but on datanode " + datanode
-                + " it remains at " + nodeUtilization
-                + " after more than " + TIMEOUT + " msec.");
+                "Rebalancing expected avg utilization to become " +
+                    avgUtilization + ", but on datanode " + datanode +
+                    " it remains at " + nodeUtilization + " after more than " +
+                    TIMEOUT + " msec.");
           }
           try {
             Thread.sleep(100);
@@ -297,58 +298,48 @@ public class TestBalancer {
     } while (!balanced);
   }
 
-  String long2String(long[] array) {
-    if (array.length == 0) {
-      return "<empty>";
-    }
-    StringBuilder b = new StringBuilder("[").append(array[0]);
-    for(int i = 1; i < array.length; i++) {
-      b.append(", ").append(array[i]);
-    }
-    return b.append("]").toString();
-  }
-  /** This test start a cluster with specified number of nodes, 
+  /**
+   * This test start a cluster with specified number of nodes,
    * and fills it to be 30% full (with a single file replicated identically
    * to all datanodes);
    * It then adds one new empty node and starts balancing.
-   * 
-   * @param conf - configuration
-   * @param capacities - array of capacities of original nodes in cluster
-   * @param racks - array of racks for original nodes in cluster
-   * @param newCapacity - new node's capacity
-   * @param newRack - new node's rack
-   * @param useTool - if true run test via Cli with command-line argument 
-   *   parsing, etc.   Otherwise invoke balancer API directly.
+   *
+   * @param conf
+   *     - configuration
+   * @param capacities
+   *     - array of capacities of original nodes in cluster
+   * @param racks
+   *     - array of racks for original nodes in cluster
+   * @param newCapacity
+   *     - new node's capacity
+   * @param newRack
+   *     - new node's rack
+   * @param useTool
+   *     - if true run test via Cli with command-line argument
+   *     parsing, etc.   Otherwise invoke balancer API directly.
    * @throws Exception
    */
-  private void doTest(Configuration conf, long[] capacities, String[] racks, 
+  private void doTest(Configuration conf, long[] capacities, String[] racks,
       long newCapacity, String newRack, boolean useTool) throws Exception {
-    LOG.info("capacities = " +  long2String(capacities)); 
-    LOG.info("racks      = " +  Arrays.asList(racks)); 
-    LOG.info("newCapacity= " +  newCapacity); 
-    LOG.info("newRack    = " +  newRack); 
-    LOG.info("useTool    = " +  useTool); 
     assertEquals(capacities.length, racks.length);
     int numOfDatanodes = capacities.length;
-    cluster = new MiniDFSCluster.Builder(conf)
-                                .numDataNodes(capacities.length)
-                                .racks(racks)
-                                .simulatedCapacities(capacities)
-                                .build();
+    cluster = new MiniDFSCluster.Builder(conf).numDataNodes(capacities.length)
+        .racks(racks).simulatedCapacities(capacities).build();
     try {
       cluster.waitActive();
-      client = NameNodeProxies.createProxy(conf, cluster.getFileSystem(0).getUri(),
-          ClientProtocol.class).getProxy();
+      client = NameNodeProxies
+          .createProxy(conf, cluster.getFileSystem(0).getUri(),
+              ClientProtocol.class).getProxy();
 
       long totalCapacity = sum(capacities);
       
       // fill up the cluster to be 30% full
-      long totalUsedSpace = totalCapacity*3/10;
+      long totalUsedSpace = totalCapacity * 3 / 10;
       createFile(cluster, filePath, totalUsedSpace / numOfDatanodes,
           (short) numOfDatanodes, 0);
       // start up an empty node with the same capacity and on the same rack
-      cluster.startDataNodes(conf, 1, true, null,
-          new String[]{newRack}, new long[]{newCapacity});
+      cluster.startDataNodes(conf, 1, true, null, new String[]{newRack},
+          new long[]{newCapacity});
 
       totalCapacity += newCapacity;
 
@@ -363,8 +354,8 @@ public class TestBalancer {
     }
   }
 
-  private void runBalancer(Configuration conf,
-      long totalUsedSpace, long totalCapacity) throws Exception {
+  private void runBalancer(Configuration conf, long totalUsedSpace,
+      long totalCapacity) throws Exception {
     waitForHeartBeat(totalUsedSpace, totalCapacity, client, cluster);
 
     // start rebalancing
@@ -377,12 +368,12 @@ public class TestBalancer {
     waitForBalancer(totalUsedSpace, totalCapacity, client, cluster);
   }
   
-  private void runBalancerCli(Configuration conf,
-      long totalUsedSpace, long totalCapacity) throws Exception {
+  private void runBalancerCli(Configuration conf, long totalUsedSpace,
+      long totalCapacity) throws Exception {
     waitForHeartBeat(totalUsedSpace, totalCapacity, client, cluster);
 
-    final String[] args = { "-policy", "datanode" };
-    final Tool tool = new Cli();    
+    final String[] args = {"-policy", "datanode"};
+    final Tool tool = new Cli();
     tool.setConf(conf);
     final int r = tool.run(args); // start rebalancing
     
@@ -392,20 +383,27 @@ public class TestBalancer {
     waitForBalancer(totalUsedSpace, totalCapacity, client, cluster);
   }
   
-  /** one-node cluster test*/
-  private void oneNodeTest(Configuration conf, boolean useTool) throws Exception {
+  /**
+   * one-node cluster test
+   */
+  private void oneNodeTest(Configuration conf, boolean useTool)
+      throws Exception {
     // add an empty node with half of the CAPACITY & the same rack
-    doTest(conf, new long[]{CAPACITY}, new String[]{RACK0}, CAPACITY/2, 
-            RACK0, useTool);
+    doTest(conf, new long[]{CAPACITY}, new String[]{RACK0}, CAPACITY / 2, RACK0,
+        useTool);
   }
   
-  /** two-node cluster test */
+  /**
+   * two-node cluster test
+   */
   private void twoNodeTest(Configuration conf) throws Exception {
     doTest(conf, new long[]{CAPACITY, CAPACITY}, new String[]{RACK0, RACK1},
         CAPACITY, RACK2, false);
   }
   
-  /** test using a user-supplied conf */
+  /**
+   * test using a user-supplied conf
+   */
   public void integrationTest(Configuration conf) throws Exception {
     initConf(conf);
     oneNodeTest(conf, false);
@@ -415,18 +413,19 @@ public class TestBalancer {
    * Test parse method in Balancer#Cli class with threshold value out of
    * boundaries.
    */
-  @Test(timeout=100000)
+  @Test(timeout = 100000)
   public void testBalancerCliParseWithThresholdOutOfBoundaries() {
-    String parameters[] = new String[] { "-threshold", "0" };
-    String reason = "IllegalArgumentException is expected when threshold value"
-        + " is out of boundary.";
+    String parameters[] = new String[]{"-threshold", "0"};
+    String reason =
+        "IllegalArgumentException is expected when threshold value" +
+            " is out of boundary.";
     try {
       Balancer.Cli.parse(parameters);
       fail(reason);
     } catch (IllegalArgumentException e) {
       assertEquals("Number out of range: threshold = 0.0", e.getMessage());
     }
-    parameters = new String[] { "-threshold", "101" };
+    parameters = new String[]{"-threshold", "101"};
     try {
       Balancer.Cli.parse(parameters);
       fail(reason);
@@ -435,9 +434,11 @@ public class TestBalancer {
     }
   }
   
-  /** Test a cluster with even distribution, 
-   * then a new empty node is added to the cluster*/
-  @Test(timeout=100000)
+  /**
+   * Test a cluster with even distribution,
+   * then a new empty node is added to the cluster
+   */
+  @Test(timeout = 100000)
   public void testBalancer0() throws Exception {
     testBalancer0Internal(new HdfsConfiguration());
   }
@@ -448,8 +449,10 @@ public class TestBalancer {
     twoNodeTest(conf);
   }
 
-  /** Test unevenly distributed cluster */
-  @Test(timeout=100000)
+  /**
+   * Test unevenly distributed cluster
+   */
+  @Test(timeout = 100000)
   public void testBalancer1() throws Exception {
     testBalancer1Internal(new HdfsConfiguration());
   }
@@ -457,20 +460,19 @@ public class TestBalancer {
   void testBalancer1Internal(Configuration conf) throws Exception {
     initConf(conf);
     testUnevenDistribution(conf,
-        new long[] {50*CAPACITY/100, 10*CAPACITY/100},
-        new long[]{CAPACITY, CAPACITY},
-        new String[] {RACK0, RACK1});
+        new long[]{50 * CAPACITY / 100, 10 * CAPACITY / 100},
+        new long[]{CAPACITY, CAPACITY}, new String[]{RACK0, RACK1});
   }
   
-  @Test(timeout=100000)
+  @Test(timeout = 100000)
   public void testBalancer2() throws Exception {
     testBalancer2Internal(new HdfsConfiguration());
   }
   
   void testBalancer2Internal(Configuration conf) throws Exception {
     initConf(conf);
-    testBalancerDefaultConstructor(conf, new long[] { CAPACITY, CAPACITY },
-        new String[] { RACK0, RACK1 }, CAPACITY, RACK2);
+    testBalancerDefaultConstructor(conf, new long[]{CAPACITY, CAPACITY},
+        new String[]{RACK0, RACK1}, CAPACITY, RACK2);
   }
 
   private void testBalancerDefaultConstructor(Configuration conf,
@@ -478,15 +480,13 @@ public class TestBalancer {
       throws Exception {
     int numOfDatanodes = capacities.length;
     assertEquals(numOfDatanodes, racks.length);
-    cluster = new MiniDFSCluster.Builder(conf)
-                                .numDataNodes(capacities.length)
-                                .racks(racks)
-                                .simulatedCapacities(capacities)
-                                .build();
+    cluster = new MiniDFSCluster.Builder(conf).numDataNodes(capacities.length)
+        .racks(racks).simulatedCapacities(capacities).build();
     try {
       cluster.waitActive();
-      client = NameNodeProxies.createProxy(conf, cluster.getFileSystem(0).getUri(),
-          ClientProtocol.class).getProxy();
+      client = NameNodeProxies
+          .createProxy(conf, cluster.getFileSystem(0).getUri(),
+              ClientProtocol.class).getProxy();
 
       long totalCapacity = sum(capacities);
 
@@ -495,8 +495,8 @@ public class TestBalancer {
       createFile(cluster, filePath, totalUsedSpace / numOfDatanodes,
           (short) numOfDatanodes, 0);
       // start up an empty node with the same capacity and on the same rack
-      cluster.startDataNodes(conf, 1, true, null, new String[] { newRack },
-          new long[] { newCapacity });
+      cluster.startDataNodes(conf, 1, true, null, new String[]{newRack},
+          new long[]{newCapacity});
 
       totalCapacity += newCapacity;
 
@@ -510,7 +510,7 @@ public class TestBalancer {
   /**
    * Verify balancer exits 0 on success.
    */
-  @Test(timeout=100000)
+  @Test(timeout = 100000)
   public void testExitZeroOnSuccess() throws Exception {
     final Configuration conf = new HdfsConfiguration();
     

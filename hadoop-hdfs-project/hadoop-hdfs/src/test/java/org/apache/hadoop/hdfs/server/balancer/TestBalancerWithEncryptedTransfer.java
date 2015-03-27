@@ -25,7 +25,7 @@ import org.junit.Test;
 
 public class TestBalancerWithEncryptedTransfer {
   
-  private final Configuration conf = new HdfsConfiguration();
+  private Configuration conf = new HdfsConfiguration();
   
   @Before
   public void setUpConf() {
@@ -33,17 +33,17 @@ public class TestBalancerWithEncryptedTransfer {
     conf.setBoolean(DFSConfigKeys.DFS_BLOCK_ACCESS_TOKEN_ENABLE_KEY, true);
   }
   
-  @Test(timeout=60000)
+  @Test(timeout = 300000)
   public void testEncryptedBalancer0() throws Exception {
     new TestBalancer().testBalancer0Internal(conf);
   }
   
-  @Test(timeout=60000)
+  @Test(timeout = 300000)
   public void testEncryptedBalancer1() throws Exception {
     new TestBalancer().testBalancer1Internal(conf);
   }
   
-  @Test(timeout=60000)
+  @Test(timeout = 300000)
   public void testEncryptedBalancer2() throws Exception {
     new TestBalancer().testBalancer2Internal(conf);
   }

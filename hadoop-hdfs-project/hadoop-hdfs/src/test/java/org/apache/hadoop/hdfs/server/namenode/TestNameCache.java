@@ -17,12 +17,12 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
+import org.junit.Test;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
-
-import org.junit.Test;
 
 /**
  * Test for {@link NameCache} class
@@ -31,8 +31,7 @@ public class TestNameCache {
   @Test
   public void testDictionary() throws Exception {
     // Create dictionary with useThreshold 2
-    NameCache<String> cache = 
-      new NameCache<String>(2);
+    NameCache<String> cache = new NameCache<String>(2);
     String[] matching = {"part1", "part10000000", "fileabc", "abc", "filepart"};
     String[] notMatching = {"spart1", "apart", "abcd", "def"};
 
@@ -71,7 +70,8 @@ public class TestNameCache {
     }
   }
 
-  private void verifyNameReuse(NameCache<String> cache, String s, boolean reused) {
+  private void verifyNameReuse(NameCache<String> cache, String s,
+      boolean reused) {
     cache.put(s);
     int lookupCount = cache.getLookupCount();
     if (reused) {

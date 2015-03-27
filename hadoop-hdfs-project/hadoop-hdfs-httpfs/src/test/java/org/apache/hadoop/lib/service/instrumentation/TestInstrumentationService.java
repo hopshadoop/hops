@@ -18,16 +18,6 @@
 
 package org.apache.hadoop.lib.service.instrumentation;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
-import java.io.StringWriter;
-import java.util.Arrays;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.lib.server.Server;
 import org.apache.hadoop.lib.service.Instrumentation;
@@ -40,6 +30,16 @@ import org.apache.hadoop.util.Time;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.junit.Test;
+
+import java.io.StringWriter;
+import java.util.Arrays;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 public class TestInstrumentationService extends HTestCase {
 
@@ -139,7 +139,8 @@ public class TestInstrumentationService extends HTestCase {
 
     timer.addCron(cron);
     long[] values = timer.getValues();
-    assertEquals(values[InstrumentationService.Timer.LAST_TOTAL], totalDelta, 20);
+    assertEquals(values[InstrumentationService.Timer.LAST_TOTAL], totalDelta,
+        20);
     assertEquals(values[InstrumentationService.Timer.LAST_OWN], ownDelta, 20);
     assertEquals(values[InstrumentationService.Timer.AVG_TOTAL], avgTotal, 20);
     assertEquals(values[InstrumentationService.Timer.AVG_OWN], avgOwn, 20);
@@ -172,7 +173,8 @@ public class TestInstrumentationService extends HTestCase {
 
     timer.addCron(cron);
     values = timer.getValues();
-    assertEquals(values[InstrumentationService.Timer.LAST_TOTAL], totalDelta, 20);
+    assertEquals(values[InstrumentationService.Timer.LAST_TOTAL], totalDelta,
+        20);
     assertEquals(values[InstrumentationService.Timer.LAST_OWN], ownDelta, 20);
     assertEquals(values[InstrumentationService.Timer.AVG_TOTAL], avgTotal, 20);
     assertEquals(values[InstrumentationService.Timer.AVG_OWN], avgOwn, 20);
@@ -209,27 +211,36 @@ public class TestInstrumentationService extends HTestCase {
     cron.stop();
     timer.addCron(cron);
     values = timer.getValues();
-    assertEquals(values[InstrumentationService.Timer.LAST_TOTAL], totalDelta, 20);
+    assertEquals(values[InstrumentationService.Timer.LAST_TOTAL], totalDelta,
+        20);
     assertEquals(values[InstrumentationService.Timer.LAST_OWN], ownDelta, 20);
     assertEquals(values[InstrumentationService.Timer.AVG_TOTAL], avgTotal, 20);
     assertEquals(values[InstrumentationService.Timer.AVG_OWN], avgOwn, 20);
 
     JSONObject json = (JSONObject) new JSONParser().parse(timer.toJSONString());
     assertEquals(json.size(), 4);
-    assertEquals(json.get("lastTotal"), values[InstrumentationService.Timer.LAST_TOTAL]);
-    assertEquals(json.get("lastOwn"), values[InstrumentationService.Timer.LAST_OWN]);
-    assertEquals(json.get("avgTotal"), values[InstrumentationService.Timer.AVG_TOTAL]);
-    assertEquals(json.get("avgOwn"), values[InstrumentationService.Timer.AVG_OWN]);
+    assertEquals(json.get("lastTotal"),
+        values[InstrumentationService.Timer.LAST_TOTAL]);
+    assertEquals(json.get("lastOwn"),
+        values[InstrumentationService.Timer.LAST_OWN]);
+    assertEquals(json.get("avgTotal"),
+        values[InstrumentationService.Timer.AVG_TOTAL]);
+    assertEquals(json.get("avgOwn"),
+        values[InstrumentationService.Timer.AVG_OWN]);
 
     StringWriter writer = new StringWriter();
     timer.writeJSONString(writer);
     writer.close();
     json = (JSONObject) new JSONParser().parse(writer.toString());
     assertEquals(json.size(), 4);
-    assertEquals(json.get("lastTotal"), values[InstrumentationService.Timer.LAST_TOTAL]);
-    assertEquals(json.get("lastOwn"), values[InstrumentationService.Timer.LAST_OWN]);
-    assertEquals(json.get("avgTotal"), values[InstrumentationService.Timer.AVG_TOTAL]);
-    assertEquals(json.get("avgOwn"), values[InstrumentationService.Timer.AVG_OWN]);
+    assertEquals(json.get("lastTotal"),
+        values[InstrumentationService.Timer.LAST_TOTAL]);
+    assertEquals(json.get("lastOwn"),
+        values[InstrumentationService.Timer.LAST_OWN]);
+    assertEquals(json.get("avgTotal"),
+        values[InstrumentationService.Timer.AVG_TOTAL]);
+    assertEquals(json.get("avgOwn"),
+        values[InstrumentationService.Timer.AVG_OWN]);
   }
 
   @Test
@@ -242,7 +253,8 @@ public class TestInstrumentationService extends HTestCase {
       }
     };
 
-    InstrumentationService.Sampler sampler = new InstrumentationService.Sampler();
+    InstrumentationService.Sampler sampler =
+        new InstrumentationService.Sampler();
     sampler.init(4, var);
     assertEquals(sampler.getRate(), 0f, 0.0001);
     sampler.sample();
@@ -260,7 +272,8 @@ public class TestInstrumentationService extends HTestCase {
     sampler.sample();
     assertEquals(sampler.getRate(), (4d + 1 + 2 + 3) / 4, 0.0001);
 
-    JSONObject json = (JSONObject) new JSONParser().parse(sampler.toJSONString());
+    JSONObject json =
+        (JSONObject) new JSONParser().parse(sampler.toJSONString());
     assertEquals(json.size(), 2);
     assertEquals(json.get("sampler"), sampler.getRate());
     assertEquals(json.get("size"), 4L);
@@ -277,7 +290,7 @@ public class TestInstrumentationService extends HTestCase {
   @Test
   public void variableHolder() throws Exception {
     InstrumentationService.VariableHolder<String> variableHolder =
-      new InstrumentationService.VariableHolder<String>();
+        new InstrumentationService.VariableHolder<String>();
 
     variableHolder.var = new Instrumentation.Variable<String>() {
       @Override
@@ -286,7 +299,8 @@ public class TestInstrumentationService extends HTestCase {
       }
     };
 
-    JSONObject json = (JSONObject) new JSONParser().parse(variableHolder.toJSONString());
+    JSONObject json =
+        (JSONObject) new JSONParser().parse(variableHolder.toJSONString());
     assertEquals(json.size(), 1);
     assertEquals(json.get("value"), "foo");
 
@@ -303,7 +317,8 @@ public class TestInstrumentationService extends HTestCase {
   @SuppressWarnings("unchecked")
   public void service() throws Exception {
     String dir = TestDirHelper.getTestDir().getAbsolutePath();
-    String services = StringUtils.join(",", Arrays.asList(InstrumentationService.class.getName()));
+    String services = StringUtils
+        .join(",", Arrays.asList(InstrumentationService.class.getName()));
     Configuration conf = new Configuration(false);
     conf.set("server.services", services);
     Server server = new Server("server", dir, dir, dir, dir, conf);
@@ -326,20 +341,22 @@ public class TestInstrumentationService extends HTestCase {
     cron.stop();
     instrumentation.addCron("g", "t", cron);
 
-    Instrumentation.Variable<String> var = new Instrumentation.Variable<String>() {
-      @Override
-      public String getValue() {
-        return "foo";
-      }
-    };
+    Instrumentation.Variable<String> var =
+        new Instrumentation.Variable<String>() {
+          @Override
+          public String getValue() {
+            return "foo";
+          }
+        };
     instrumentation.addVariable("g", "v", var);
 
-    Instrumentation.Variable<Long> varToSample = new Instrumentation.Variable<Long>() {
-      @Override
-      public Long getValue() {
-        return 1L;
-      }
-    };
+    Instrumentation.Variable<Long> varToSample =
+        new Instrumentation.Variable<Long>() {
+          @Override
+          public Long getValue() {
+            return 1L;
+          }
+        };
     instrumentation.addSampler("g", "s", 10, varToSample);
 
     Map<String, ?> snapshot = instrumentation.getSnapshot();
@@ -351,19 +368,34 @@ public class TestInstrumentationService extends HTestCase {
     assertNotNull(snapshot.get("variables"));
     assertNotNull(snapshot.get("samplers"));
     assertNotNull(((Map<String, String>) snapshot.get("os-env")).get("PATH"));
-    assertNotNull(((Map<String, String>) snapshot.get("sys-props")).get("java.version"));
+    assertNotNull(
+        ((Map<String, String>) snapshot.get("sys-props")).get("java.version"));
     assertNotNull(((Map<String, ?>) snapshot.get("jvm")).get("free.memory"));
     assertNotNull(((Map<String, ?>) snapshot.get("jvm")).get("max.memory"));
     assertNotNull(((Map<String, ?>) snapshot.get("jvm")).get("total.memory"));
-    assertNotNull(((Map<String, Map<String, Object>>) snapshot.get("counters")).get("g"));
-    assertNotNull(((Map<String, Map<String, Object>>) snapshot.get("timers")).get("g"));
-    assertNotNull(((Map<String, Map<String, Object>>) snapshot.get("variables")).get("g"));
-    assertNotNull(((Map<String, Map<String, Object>>) snapshot.get("samplers")).get("g"));
-    assertNotNull(((Map<String, Map<String, Object>>) snapshot.get("counters")).get("g").get("c"));
-    assertNotNull(((Map<String, Map<String, Object>>) snapshot.get("counters")).get("g").get("c1"));
-    assertNotNull(((Map<String, Map<String, Object>>) snapshot.get("timers")).get("g").get("t"));
-    assertNotNull(((Map<String, Map<String, Object>>) snapshot.get("variables")).get("g").get("v"));
-    assertNotNull(((Map<String, Map<String, Object>>) snapshot.get("samplers")).get("g").get("s"));
+    assertNotNull(
+        ((Map<String, Map<String, Object>>) snapshot.get("counters")).get("g"));
+    assertNotNull(
+        ((Map<String, Map<String, Object>>) snapshot.get("timers")).get("g"));
+    assertNotNull(((Map<String, Map<String, Object>>) snapshot.get("variables"))
+        .get("g"));
+    assertNotNull(
+        ((Map<String, Map<String, Object>>) snapshot.get("samplers")).get("g"));
+    assertNotNull(
+        ((Map<String, Map<String, Object>>) snapshot.get("counters")).get("g")
+            .get("c"));
+    assertNotNull(
+        ((Map<String, Map<String, Object>>) snapshot.get("counters")).get("g")
+            .get("c1"));
+    assertNotNull(
+        ((Map<String, Map<String, Object>>) snapshot.get("timers")).get("g")
+            .get("t"));
+    assertNotNull(
+        ((Map<String, Map<String, Object>>) snapshot.get("variables")).get("g")
+            .get("v"));
+    assertNotNull(
+        ((Map<String, Map<String, Object>>) snapshot.get("samplers")).get("g")
+            .get("s"));
 
     StringWriter writer = new StringWriter();
     JSONObject.writeJSONString(snapshot, writer);
@@ -376,8 +408,9 @@ public class TestInstrumentationService extends HTestCase {
   @SuppressWarnings("unchecked")
   public void sampling() throws Exception {
     String dir = TestDirHelper.getTestDir().getAbsolutePath();
-    String services = StringUtils.join(",", Arrays.asList(InstrumentationService.class.getName(),
-                                                          SchedulerService.class.getName()));
+    String services = StringUtils.join(",", Arrays
+        .asList(InstrumentationService.class.getName(),
+            SchedulerService.class.getName()));
     Configuration conf = new Configuration(false);
     conf.set("server.services", services);
     Server server = new Server("server", dir, dir, dir, dir, conf);
@@ -386,12 +419,13 @@ public class TestInstrumentationService extends HTestCase {
 
     final AtomicInteger count = new AtomicInteger();
 
-    Instrumentation.Variable<Long> varToSample = new Instrumentation.Variable<Long>() {
-      @Override
-      public Long getValue() {
-        return (long) count.incrementAndGet();
-      }
-    };
+    Instrumentation.Variable<Long> varToSample =
+        new Instrumentation.Variable<Long>() {
+          @Override
+          public Long getValue() {
+            return (long) count.incrementAndGet();
+          }
+        };
     instrumentation.addSampler("g", "s", 10, varToSample);
 
     sleep(2000);
@@ -399,8 +433,10 @@ public class TestInstrumentationService extends HTestCase {
     assertTrue(i > 0);
 
     Map<String, Map<String, ?>> snapshot = instrumentation.getSnapshot();
-    Map<String, Map<String, Object>> samplers = (Map<String, Map<String, Object>>) snapshot.get("samplers");
-    InstrumentationService.Sampler sampler = (InstrumentationService.Sampler) samplers.get("g").get("s");
+    Map<String, Map<String, Object>> samplers =
+        (Map<String, Map<String, Object>>) snapshot.get("samplers");
+    InstrumentationService.Sampler sampler =
+        (InstrumentationService.Sampler) samplers.get("g").get("s");
     assertTrue(sampler.getRate() > 0);
 
     server.destroy();

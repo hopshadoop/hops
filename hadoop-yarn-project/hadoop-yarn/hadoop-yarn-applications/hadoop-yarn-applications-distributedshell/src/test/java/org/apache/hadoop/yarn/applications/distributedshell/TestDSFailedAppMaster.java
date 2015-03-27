@@ -18,11 +18,11 @@
 
 package org.apache.hadoop.yarn.applications.distributedshell;
 
-import java.io.IOException;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.yarn.exceptions.YarnException;
+
+import java.io.IOException;
 
 public class TestDSFailedAppMaster extends ApplicationMaster {
 
@@ -37,11 +37,11 @@ public class TestDSFailedAppMaster extends ApplicationMaster {
       // should reuse the earlier running container, so numAllocatedContainers
       // should be set to 1. And should ask no more containers, so
       // numRequestedContainers should be set to 0.
-      if (numAllocatedContainers.get() != 1
-          || numRequestedContainers.get() != 0) {
-        LOG.info("NumAllocatedContainers is " + numAllocatedContainers.get()
-            + " and NumRequestedContainers is " + numAllocatedContainers.get()
-            + ".Application Master failed. exiting");
+      if (numAllocatedContainers.get() != 1 ||
+          numRequestedContainers.get() != 0) {
+        LOG.info("NumAllocatedContainers is " + numAllocatedContainers.get() +
+            " and NumRequestedContainers is " + numAllocatedContainers.get() +
+            ".Application Master failed. exiting");
         System.exit(200);
       }
     }
@@ -60,7 +60,8 @@ public class TestDSFailedAppMaster extends ApplicationMaster {
         try {
           // sleep some time, wait for the AM to launch a container.
           Thread.sleep(3000);
-        } catch (InterruptedException e) {}
+        } catch (InterruptedException e) {
+        }
         // fail the first am.
         System.exit(100);
       }

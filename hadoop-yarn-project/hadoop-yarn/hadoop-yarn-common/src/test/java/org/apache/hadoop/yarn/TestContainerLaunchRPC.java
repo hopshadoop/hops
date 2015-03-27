@@ -18,14 +18,7 @@
 
 package org.apache.hadoop.yarn;
 
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.SocketTimeoutException;
-import java.util.ArrayList;
-import java.util.List;
-
 import junit.framework.Assert;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -57,6 +50,12 @@ import org.apache.hadoop.yarn.ipc.YarnRPC;
 import org.apache.hadoop.yarn.security.ContainerTokenIdentifier;
 import org.junit.Test;
 
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.SocketTimeoutException;
+import java.util.ArrayList;
+import java.util.List;
+
 /*
  * Test that the container launcher rpc times out properly. This is used
  * by both RM to launch an AM as well as an AM to launch containers.
@@ -65,8 +64,8 @@ public class TestContainerLaunchRPC {
 
   static final Log LOG = LogFactory.getLog(TestContainerLaunchRPC.class);
 
-  private static final RecordFactory recordFactory = RecordFactoryProvider
-      .getRecordFactory(null);
+  private static final RecordFactory recordFactory =
+      RecordFactoryProvider.getRecordFactory(null);
 
   @Test
   public void testHadoopProtoRPCTimeout() throws Exception {
@@ -87,11 +86,11 @@ public class TestContainerLaunchRPC {
     server.start();
     try {
 
-      ContainerManagementProtocol proxy = (ContainerManagementProtocol) rpc.getProxy(
-          ContainerManagementProtocol.class,
-          server.getListenerAddress(), conf);
-      ContainerLaunchContext containerLaunchContext = recordFactory
-          .newRecordInstance(ContainerLaunchContext.class);
+      ContainerManagementProtocol proxy = (ContainerManagementProtocol) rpc
+          .getProxy(ContainerManagementProtocol.class,
+              server.getListenerAddress(), conf);
+      ContainerLaunchContext containerLaunchContext =
+          recordFactory.newRecordInstance(ContainerLaunchContext.class);
 
       ApplicationId applicationId = ApplicationId.newInstance(0, 0);
       ApplicationAttemptId applicationAttemptId =
@@ -102,14 +101,13 @@ public class TestContainerLaunchRPC {
       Resource resource = Resource.newInstance(1234, 2);
       ContainerTokenIdentifier containerTokenIdentifier =
           new ContainerTokenIdentifier(containerId, "localhost", "user",
-            resource, System.currentTimeMillis() + 10000, 42, 42);
-      Token containerToken =
-          TestRPC.newContainerToken(nodeId, "password".getBytes(),
-            containerTokenIdentifier);
+              resource, System.currentTimeMillis() + 10000, 42, 42);
+      Token containerToken = TestRPC
+          .newContainerToken(nodeId, "password".getBytes(),
+              containerTokenIdentifier);
 
-      StartContainerRequest scRequest =
-          StartContainerRequest.newInstance(containerLaunchContext,
-            containerToken);
+      StartContainerRequest scRequest = StartContainerRequest
+          .newInstance(containerLaunchContext, containerToken);
       List<StartContainerRequest> list = new ArrayList<StartContainerRequest>();
       list.add(scRequest);
       StartContainersRequest allRequests =
@@ -118,8 +116,8 @@ public class TestContainerLaunchRPC {
         proxy.startContainers(allRequests);
       } catch (Exception e) {
         LOG.info(StringUtils.stringifyException(e));
-        Assert.assertEquals("Error, exception is not: "
-            + SocketTimeoutException.class.getName(),
+        Assert.assertEquals("Error, exception is not: " +
+                SocketTimeoutException.class.getName(),
             SocketTimeoutException.class.getName(), e.getClass().getName());
         return;
       }
@@ -148,11 +146,10 @@ public class TestContainerLaunchRPC {
     }
 
     @Override
-    public StopContainersResponse
-        stopContainers(StopContainersRequest requests) throws YarnException,
-            IOException {
-      Exception e = new Exception("Dummy function", new Exception(
-          "Dummy function cause"));
+    public StopContainersResponse stopContainers(StopContainersRequest requests)
+        throws YarnException, IOException {
+      Exception e = new Exception("Dummy function",
+          new Exception("Dummy function cause"));
       throw new YarnException(e);
     }
 

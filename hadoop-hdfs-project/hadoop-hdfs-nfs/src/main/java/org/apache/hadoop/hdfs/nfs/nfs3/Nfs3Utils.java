@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.hdfs.nfs.nfs3;
 
-import java.io.IOException;
-
 import org.apache.hadoop.hdfs.DFSClient;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.nfs.NfsFileType;
@@ -33,6 +31,8 @@ import org.apache.hadoop.oncrpc.XDR;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.channel.Channel;
 
+import java.io.IOException;
+
 /**
  * Utility/helper methods related to NFS
  */
@@ -40,10 +40,10 @@ public class Nfs3Utils {
   public final static String INODEID_PATH_PREFIX = "/.reserved/.inodes/";
 
   
-  public final static String READ_RPC_START =  "READ_RPC_CALL_START____";
-  public final static String READ_RPC_END =    "READ_RPC_CALL_END______";
+  public final static String READ_RPC_START = "READ_RPC_CALL_START____";
+  public final static String READ_RPC_END = "READ_RPC_CALL_END______";
   public final static String WRITE_RPC_START = "WRITE_RPC_CALL_START____";
-  public final static String WRITE_RPC_END =   "WRITE_RPC_CALL_END______";
+  public final static String WRITE_RPC_END = "WRITE_RPC_CALL_END______";
   
   public static String getFileIdPath(FileHandle handle) {
     return getFileIdPath(handle.getFileId());
@@ -53,8 +53,8 @@ public class Nfs3Utils {
     return INODEID_PATH_PREFIX + fileId;
   }
 
-  public static HdfsFileStatus getFileStatus(DFSClient client, String fileIdPath)
-      throws IOException {
+  public static HdfsFileStatus getFileStatus(DFSClient client,
+      String fileIdPath) throws IOException {
     return client.getFileLinkInfo(fileIdPath);
   }
 
@@ -68,8 +68,8 @@ public class Nfs3Utils {
     NfsFileType fileType = fs.isDir() ? NfsFileType.NFSDIR : NfsFileType.NFSREG;
     fileType = fs.isSymlink() ? NfsFileType.NFSLNK : fileType;
     
-    return new Nfs3FileAttributes(fileType, fs.getChildrenNum(), fs
-        .getPermission().toShort(), iug.getUidAllowingUnknown(fs.getOwner()),
+    return new Nfs3FileAttributes(fileType, fs.getChildrenNum(),
+        fs.getPermission().toShort(), iug.getUidAllowingUnknown(fs.getOwner()),
         iug.getGidAllowingUnknown(fs.getGroup()), fs.getLen(), 0 /* fsid */,
         fs.getFileId(), fs.getModificationTime(), fs.getAccessTime());
   }
@@ -87,15 +87,16 @@ public class Nfs3Utils {
       return null;
     }
 
-    long size = fstat.isDir() ? Nfs3FileAttributes.getDirSize(fstat
-        .getChildrenNum()) : fstat.getLen();
+    long size =
+        fstat.isDir() ? Nfs3FileAttributes.getDirSize(fstat.getChildrenNum()) :
+            fstat.getLen();
     return new WccAttr(size, new NfsTime(fstat.getModificationTime()),
         new NfsTime(fstat.getModificationTime()));
   }
 
   public static WccAttr getWccAttr(Nfs3FileAttributes attr) {
-    return attr == null ? new WccAttr() : new WccAttr(attr.getSize(),
-        attr.getMtime(), attr.getCtime());
+    return attr == null ? new WccAttr() :
+        new WccAttr(attr.getSize(), attr.getMtime(), attr.getCtime());
   }
 
   // TODO: maybe not efficient

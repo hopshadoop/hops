@@ -1,55 +1,23 @@
 /**
-* Licensed to the Apache Software Foundation (ASF) under one
-* or more contributor license agreements.  See the NOTICE file
-* distributed with this work for additional information
-* regarding copyright ownership.  The ASF licenses this file
-* to you under the Apache License, Version 2.0 (the
-* "License"); you may not use this file except in compliance
-* with the License.  You may obtain a copy of the License at
-*
-*     http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.container;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.argThat;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.reset;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
-import java.io.IOException;
-import java.net.URISyntaxException;
-import java.nio.ByteBuffer;
-import java.util.AbstractMap.SimpleEntry;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Random;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
-
 import junit.framework.Assert;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -92,6 +60,37 @@ import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.junit.Test;
 import org.mockito.ArgumentMatcher;
 
+import java.io.IOException;
+import java.net.URISyntaxException;
+import java.nio.ByteBuffer;
+import java.util.AbstractMap.SimpleEntry;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Random;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.argThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 public class TestContainer {
 
   final NodeManagerMetrics metrics = NodeManagerMetrics.create();
@@ -111,17 +110,17 @@ public class TestContainer {
 
       // Verify request for public/private resources to localizer
       ResourcesRequestedMatcher matchesReq =
-          new ResourcesRequestedMatcher(wc.localResources, EnumSet.of(
-              LocalResourceVisibility.PUBLIC, LocalResourceVisibility.PRIVATE,
-              LocalResourceVisibility.APPLICATION));
+          new ResourcesRequestedMatcher(wc.localResources, EnumSet
+              .of(LocalResourceVisibility.PUBLIC,
+                  LocalResourceVisibility.PRIVATE,
+                  LocalResourceVisibility.APPLICATION));
       verify(wc.localizerBus).handle(argThat(matchesReq));
       assertEquals(ContainerState.LOCALIZING, wc.c.getContainerState());
-    }
-    finally {
+    } finally {
       if (wc != null) {
         wc.finished();
       }
-    } 
+    }
   }
 
   /**
@@ -148,13 +147,13 @@ public class TestContainer {
       final WrappedContainer wcf = wc;
       // verify container launch
       ArgumentMatcher<ContainersLauncherEvent> matchesContainerLaunch =
-        new ArgumentMatcher<ContainersLauncherEvent>() {
-          @Override
-          public boolean matches(Object o) {
-            ContainersLauncherEvent launchEvent = (ContainersLauncherEvent) o;
-            return wcf.c == launchEvent.getContainer();
-          }
-        };
+          new ArgumentMatcher<ContainersLauncherEvent>() {
+            @Override
+            public boolean matches(Object o) {
+              ContainersLauncherEvent launchEvent = (ContainersLauncherEvent) o;
+              return wcf.c == launchEvent.getContainer();
+            }
+          };
       verify(wc.launcherBus).handle(argThat(matchesContainerLaunch));
     } finally {
       if (wc != null) {
@@ -174,12 +173,11 @@ public class TestContainer {
       wc.launchContainer();
       reset(wc.localizerBus);
       wc.containerKilledOnRequest();
-      assertEquals(ContainerState.EXITED_WITH_FAILURE, 
+      assertEquals(ContainerState.EXITED_WITH_FAILURE,
           wc.c.getContainerState());
       assertNull(wc.c.getLocalizedResources());
       verifyCleanupCall(wc);
-    }
-    finally {
+    } finally {
       if (wc != null) {
         wc.finished();
       }
@@ -197,16 +195,15 @@ public class TestContainer {
       wc.launchContainer();
       reset(wc.localizerBus);
       wc.containerFailed(ExitCode.FORCE_KILLED.getExitCode());
-      assertEquals(ContainerState.EXITED_WITH_FAILURE, 
+      assertEquals(ContainerState.EXITED_WITH_FAILURE,
           wc.c.getContainerState());
       assertNull(wc.c.getLocalizedResources());
       verifyCleanupCall(wc);
-    }
-    finally {
+    } finally {
       if (wc != null) {
         wc.finished();
       }
-    } 
+    }
   }
   
   @Test
@@ -224,8 +221,7 @@ public class TestContainer {
           wc.c.getContainerState());
       assertNull(wc.c.getLocalizedResources());
       verifyCleanupCall(wc);
-    }
-    finally {
+    } finally {
       if (wc != null) {
         wc.finished();
       }
@@ -252,8 +248,7 @@ public class TestContainer {
       assertEquals(ContainerState.DONE, wc.c.getContainerState());
       assertNull(wc.c.getLocalizedResources());
       verifyCleanupCall(wc);
-    }
-    finally {
+    } finally {
       if (wc != null) {
         wc.finished();
       }
@@ -318,10 +313,12 @@ public class TestContainer {
       wc = new WrappedContainer(15, 314159265358979L, 4344, "yak");
       wc.initContainer();
       wc.failLocalizeResources(wc.getLocalResourceCount());
-      assertEquals(ContainerState.LOCALIZATION_FAILED, wc.c.getContainerState());
+      assertEquals(ContainerState.LOCALIZATION_FAILED,
+          wc.c.getContainerState());
       assertNull(wc.c.getLocalizedResources());
       wc.killContainer();
-      assertEquals(ContainerState.LOCALIZATION_FAILED, wc.c.getContainerState());
+      assertEquals(ContainerState.LOCALIZATION_FAILED,
+          wc.c.getContainerState());
       assertNull(wc.c.getLocalizedResources());
       verifyCleanupCall(wc);
     } finally {
@@ -389,15 +386,17 @@ public class TestContainer {
     try {
       wc = new WrappedContainer(16, 314159265358979L, 4344, "yak");
       wc.initContainer();
-      int failCount = wc.getLocalResourceCount()/2;
+      int failCount = wc.getLocalResourceCount() / 2;
       if (failCount == 0) {
         failCount = 1;
       }
       wc.failLocalizeResources(failCount);
-      assertEquals(ContainerState.LOCALIZATION_FAILED, wc.c.getContainerState());
+      assertEquals(ContainerState.LOCALIZATION_FAILED,
+          wc.c.getContainerState());
       assertNull(wc.c.getLocalizedResources());
       wc.localizeResourcesFromInvalidState(failCount);
-      assertEquals(ContainerState.LOCALIZATION_FAILED, wc.c.getContainerState());
+      assertEquals(ContainerState.LOCALIZATION_FAILED,
+          wc.c.getContainerState());
       assertNull(wc.c.getLocalizedResources());
       verifyCleanupCall(wc);
       Assert.assertTrue(wc.getDiagnostics().contains(FAKE_LOCALIZATION_ERROR));
@@ -419,10 +418,12 @@ public class TestContainer {
       String key1 = lRsrcKeys.next();
       String key2 = lRsrcKeys.next();
       wc.failLocalizeSpecificResource(key1);
-      assertEquals(ContainerState.LOCALIZATION_FAILED, wc.c.getContainerState());
+      assertEquals(ContainerState.LOCALIZATION_FAILED,
+          wc.c.getContainerState());
       assertNull(wc.c.getLocalizedResources());
       wc.failLocalizeSpecificResource(key2);
-      assertEquals(ContainerState.LOCALIZATION_FAILED, wc.c.getContainerState());
+      assertEquals(ContainerState.LOCALIZATION_FAILED,
+          wc.c.getContainerState());
       assertNull(wc.c.getLocalizedResources());
       verifyCleanupCall(wc);
     } finally {
@@ -466,30 +467,31 @@ public class TestContainer {
       assertEquals(ContainerState.NEW, wc.c.getContainerState());
       wc.initContainer();
       
-      for (final Map.Entry<String,ByteBuffer> e : wc.serviceData.entrySet()) {
+      for (final Map.Entry<String, ByteBuffer> e : wc.serviceData.entrySet()) {
         ArgumentMatcher<AuxServicesEvent> matchesServiceReq =
-          new ArgumentMatcher<AuxServicesEvent>() {
-            @Override
-            public boolean matches(Object o) {
-              AuxServicesEvent evt = (AuxServicesEvent) o;
-              return e.getKey().equals(evt.getServiceID())
-                && 0 == e.getValue().compareTo(evt.getServiceData());
-            }
-          };
+            new ArgumentMatcher<AuxServicesEvent>() {
+              @Override
+              public boolean matches(Object o) {
+                AuxServicesEvent evt = (AuxServicesEvent) o;
+                return e.getKey().equals(evt.getServiceID()) &&
+                    0 == e.getValue().compareTo(evt.getServiceData());
+              }
+            };
         verify(wc.auxBus).handle(argThat(matchesServiceReq));
       }
 
       final WrappedContainer wcf = wc;
       // verify launch on empty resource request
       ArgumentMatcher<ContainersLauncherEvent> matchesLaunchReq =
-        new ArgumentMatcher<ContainersLauncherEvent>() {
-          @Override
-          public boolean matches(Object o) {
-            ContainersLauncherEvent evt = (ContainersLauncherEvent) o;
-            return evt.getType() == ContainersLauncherEventType.LAUNCH_CONTAINER
-              && wcf.cId == evt.getContainer().getContainerId();
-          }
-        };
+          new ArgumentMatcher<ContainersLauncherEvent>() {
+            @Override
+            public boolean matches(Object o) {
+              ContainersLauncherEvent evt = (ContainersLauncherEvent) o;
+              return evt.getType() ==
+                  ContainersLauncherEventType.LAUNCH_CONTAINER &&
+                  wcf.cId == evt.getContainer().getContainerId();
+            }
+          };
       verify(wc.launcherBus).handle(argThat(matchesLaunchReq));
     } finally {
       if (wc != null) {
@@ -522,14 +524,14 @@ public class TestContainer {
   
   private void verifyCleanupCall(WrappedContainer wc) throws Exception {
     ResourcesReleasedMatcher matchesReq =
-        new ResourcesReleasedMatcher(wc.localResources, EnumSet.of(
-            LocalResourceVisibility.PUBLIC, LocalResourceVisibility.PRIVATE,
-            LocalResourceVisibility.APPLICATION));
+        new ResourcesReleasedMatcher(wc.localResources, EnumSet
+            .of(LocalResourceVisibility.PUBLIC, LocalResourceVisibility.PRIVATE,
+                LocalResourceVisibility.APPLICATION));
     verify(wc.localizerBus).handle(argThat(matchesReq));
   }
 
-  private static class ResourcesReleasedMatcher extends
-      ArgumentMatcher<LocalizationEvent> {
+  private static class ResourcesReleasedMatcher
+      extends ArgumentMatcher<LocalizationEvent> {
     final HashSet<LocalResourceRequest> resources =
         new HashSet<LocalResourceRequest>();
 
@@ -563,8 +565,8 @@ public class TestContainer {
   }
 
   // Accept iff the resource payload matches.
-  private static class ResourcesRequestedMatcher extends
-      ArgumentMatcher<LocalizationEvent> {
+  private static class ResourcesRequestedMatcher
+      extends ArgumentMatcher<LocalizationEvent> {
     final HashSet<LocalResourceRequest> resources =
         new HashSet<LocalResourceRequest>();
 
@@ -599,36 +601,35 @@ public class TestContainer {
       LocalResourceVisibility vis) {
     String name = Long.toHexString(r.nextLong());
     URL url = BuilderUtils.newURL("file", null, 0, "/local" + vis + "/" + name);
-    LocalResource rsrc =
-        BuilderUtils.newLocalResource(url, LocalResourceType.FILE, vis,
+    LocalResource rsrc = BuilderUtils
+        .newLocalResource(url, LocalResourceType.FILE, vis,
             r.nextInt(1024) + 1024L, r.nextInt(1024) + 2048L);
     return new SimpleEntry<String, LocalResource>(name, rsrc);
   }
 
-  private static Map<String,LocalResource> createLocalResources(Random r) {
-    Map<String,LocalResource> localResources =
-      new HashMap<String,LocalResource>();
+  private static Map<String, LocalResource> createLocalResources(Random r) {
+    Map<String, LocalResource> localResources =
+        new HashMap<String, LocalResource>();
     for (int i = r.nextInt(5) + 5; i >= 0; --i) {
-      Entry<String,LocalResource> rsrc =
-        getMockRsrc(r, LocalResourceVisibility.PUBLIC);
+      Entry<String, LocalResource> rsrc =
+          getMockRsrc(r, LocalResourceVisibility.PUBLIC);
       localResources.put(rsrc.getKey(), rsrc.getValue());
     }
     for (int i = r.nextInt(5) + 5; i >= 0; --i) {
-      Entry<String,LocalResource> rsrc =
-        getMockRsrc(r, LocalResourceVisibility.PRIVATE);
+      Entry<String, LocalResource> rsrc =
+          getMockRsrc(r, LocalResourceVisibility.PRIVATE);
       localResources.put(rsrc.getKey(), rsrc.getValue());
     }
     for (int i = r.nextInt(2) + 2; i >= 0; --i) {
-      Entry<String,LocalResource> rsrc =
-        getMockRsrc(r, LocalResourceVisibility.APPLICATION);
+      Entry<String, LocalResource> rsrc =
+          getMockRsrc(r, LocalResourceVisibility.APPLICATION);
       localResources.put(rsrc.getKey(), rsrc.getValue());
     }
     return localResources;
   }
 
-  private static Map<String,ByteBuffer> createServiceData(Random r) {
-    Map<String,ByteBuffer> serviceData =
-      new HashMap<String,ByteBuffer>();
+  private static Map<String, ByteBuffer> createServiceData(Random r) {
+    Map<String, ByteBuffer> serviceData = new HashMap<String, ByteBuffer>();
     for (int i = r.nextInt(5) + 5; i >= 0; --i) {
       String service = Long.toHexString(r.nextLong());
       byte[] b = new byte[r.nextInt(1024) + 1024];
@@ -680,8 +681,8 @@ public class TestContainer {
       dispatcher.register(LogHandlerEventType.class, LogBus);
 
       Context context = mock(Context.class);
-      when(context.getApplications()).thenReturn(
-          new ConcurrentHashMap<ApplicationId, Application>());
+      when(context.getApplications())
+          .thenReturn(new ConcurrentHashMap<ApplicationId, Application>());
       ContainerExecutor executor = mock(ContainerExecutor.class);
       launcher =
           new ContainersLauncher(context, dispatcher, executor, null, null);
@@ -689,8 +690,8 @@ public class TestContainer {
       // ContainerLaunch at all.
       launcher.containerLauncher = mock(ExecutorService.class);
       Future future = mock(Future.class);
-      when(launcher.containerLauncher.submit
-          (any(Callable.class))).thenReturn(future);
+      when(launcher.containerLauncher.submit(any(Callable.class)))
+          .thenReturn(future);
       when(future.isDone()).thenReturn(false);
       when(future.cancel(false)).thenReturn(true);
       launcher.init(new Configuration());
@@ -710,10 +711,10 @@ public class TestContainer {
       long currentTime = System.currentTimeMillis();
       ContainerTokenIdentifier identifier =
           new ContainerTokenIdentifier(cId, "127.0.0.1", user, resource,
-            currentTime + 10000L, 123, currentTime);
-      Token token =
-          BuilderUtils.newContainerToken(BuilderUtils.newNodeId(host, port),
-            "password".getBytes(), identifier);
+              currentTime + 10000L, 123, currentTime);
+      Token token = BuilderUtils
+          .newContainerToken(BuilderUtils.newNodeId(host, port),
+              "password".getBytes(), identifier);
       when(mockContainer.getContainerToken()).thenReturn(token);
       if (withLocalRes) {
         Random r = new Random();
@@ -722,7 +723,7 @@ public class TestContainer {
         System.out.println("WrappedContainerLocalResource seed: " + seed);
         localResources = createLocalResources(r);
       } else {
-        localResources = Collections.<String, LocalResource> emptyMap();
+        localResources = Collections.<String, LocalResource>emptyMap();
       }
       when(ctxt.getLocalResources()).thenReturn(localResources);
 
@@ -733,7 +734,7 @@ public class TestContainer {
         System.out.println("ServiceData seed: " + seed);
         serviceData = createServiceData(r);
       } else {
-        serviceData = Collections.<String, ByteBuffer> emptyMap();
+        serviceData = Collections.<String, ByteBuffer>emptyMap();
       }
       when(ctxt.getServiceData()).thenReturn(serviceData);
 
@@ -742,9 +743,9 @@ public class TestContainer {
           new EventHandler<ContainerEvent>() {
             @Override
             public void handle(ContainerEvent event) {
-                c.handle(event);
+              c.handle(event);
             }
-      });
+          });
       dispatcher.start();
     }
 
@@ -772,8 +773,7 @@ public class TestContainer {
         boolean checkLocalizingState, int skipRsrcCount)
         throws URISyntaxException {
       Path cache = new Path("file:///cache");
-      Map<Path, List<String>> localPaths =
-          new HashMap<Path, List<String>>();
+      Map<Path, List<String>> localPaths = new HashMap<Path, List<String>>();
       int counter = 0;
       for (Entry<String, LocalResource> rsrc : localResources.entrySet()) {
         if (counter++ < skipRsrcCount) {
@@ -786,8 +786,8 @@ public class TestContainer {
         Path p = new Path(cache, rsrc.getKey());
         localPaths.put(p, Arrays.asList(rsrc.getKey()));
         // rsrc copied to p
-        c.handle(new ContainerResourceLocalizedEvent(c.getContainerId(),
-                 req, p));
+        c.handle(
+            new ContainerResourceLocalizedEvent(c.getContainerId(), req, p));
       }
       drainDispatcherEvents();
       return localPaths;
@@ -809,8 +809,8 @@ public class TestContainer {
       LocalResource rsrc = localResources.get(rsrcKey);
       LocalResourceRequest req = new LocalResourceRequest(rsrc);
       Exception e = new Exception(FAKE_LOCALIZATION_ERROR);
-      c.handle(new ContainerResourceFailedEvent(c.getContainerId(), req, e
-        .getMessage()));
+      c.handle(new ContainerResourceFailedEvent(c.getContainerId(), req,
+          e.getMessage()));
       drainDispatcherEvents();
     }
 
@@ -825,10 +825,10 @@ public class TestContainer {
         ++counter;
         LocalResourceRequest req = new LocalResourceRequest(rsrc.getValue());
         Exception e = new Exception(FAKE_LOCALIZATION_ERROR);
-        c.handle(new ContainerResourceFailedEvent(c.getContainerId(),
-                 req, e.getMessage()));
+        c.handle(new ContainerResourceFailedEvent(c.getContainerId(), req,
+            e.getMessage()));
       }
-      drainDispatcherEvents();     
+      drainDispatcherEvents();
     }
 
     public void launchContainer() {
@@ -841,6 +841,7 @@ public class TestContainer {
           ContainerEventType.CONTAINER_EXITED_WITH_SUCCESS));
       drainDispatcherEvents();
     }
+
     public void containerResourcesCleanup() {
       c.handle(new ContainerEvent(cId,
           ContainerEventType.CONTAINER_RESOURCES_CLEANEDUP));
@@ -871,7 +872,7 @@ public class TestContainer {
           diagnosticMsg));
       ContainerStatus containerStatus = c.cloneAndGetContainerStatus();
       assert containerStatus.getDiagnostics().contains(diagnosticMsg);
-      assert containerStatus.getExitStatus() == exitCode; 
+      assert containerStatus.getExitStatus() == exitCode;
       drainDispatcherEvents();
     }
     

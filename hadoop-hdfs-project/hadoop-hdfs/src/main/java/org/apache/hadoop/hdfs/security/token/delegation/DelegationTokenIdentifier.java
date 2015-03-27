@@ -18,22 +18,23 @@
 
 package org.apache.hadoop.hdfs.security.token.delegation;
 
-import java.io.ByteArrayInputStream;
-import java.io.DataInputStream;
-import java.io.IOException;
-
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.delegation.AbstractDelegationTokenIdentifier;
 
+import java.io.ByteArrayInputStream;
+import java.io.DataInputStream;
+import java.io.IOException;
+
 /**
  * A delegation token identifier that is specific to HDFS.
  */
 @InterfaceAudience.Private
-public class DelegationTokenIdentifier 
+public class DelegationTokenIdentifier
     extends AbstractDelegationTokenIdentifier {
-  public static final Text HDFS_DELEGATION_KIND = new Text("HDFS_DELEGATION_TOKEN");
+  public static final Text HDFS_DELEGATION_KIND =
+      new Text("HDFS_DELEGATION_TOKEN");
 
   /**
    * Create an empty delegation token identifier for reading into.
@@ -43,9 +44,13 @@ public class DelegationTokenIdentifier
 
   /**
    * Create a new delegation token identifier
-   * @param owner the effective username of the token owner
-   * @param renewer the username of the renewer
-   * @param realUser the real username of the token owner
+   *
+   * @param owner
+   *     the effective username of the token owner
+   * @param renewer
+   *     the username of the renewer
+   * @param realUser
+   *     the real username of the token owner
    */
   public DelegationTokenIdentifier(Text owner, Text renewer, Text realUser) {
     super(owner, renewer, realUser);
@@ -58,15 +63,17 @@ public class DelegationTokenIdentifier
 
   @Override
   public String toString() {
-    return getKind() + " token " + getSequenceNumber()
-        + " for " + getUser().getShortUserName();
+    return getKind() + " token " + getSequenceNumber() + " for " +
+        getUser().getShortUserName();
   }
 
-  /** @return a string representation of the token */
+  /**
+   * @return a string representation of the token
+   */
   public static String stringifyToken(final Token<?> token) throws IOException {
     DelegationTokenIdentifier ident = new DelegationTokenIdentifier();
     ByteArrayInputStream buf = new ByteArrayInputStream(token.getIdentifier());
-    DataInputStream in = new DataInputStream(buf);  
+    DataInputStream in = new DataInputStream(buf);
     ident.readFields(in);
 
     if (token.getService().getLength() > 0) {

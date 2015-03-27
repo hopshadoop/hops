@@ -17,25 +17,25 @@
  */
 package org.apache.hadoop.hdfs.util;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.io.IOUtils;
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FilterOutputStream;
 import java.io.IOException;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.io.IOUtils;
-
 /**
  * A FileOutputStream that has the property that it will only show
  * up at its destination once it has been entirely written and flushed
  * to disk. While being written, it will use a .tmp suffix.
- * 
+ * <p/>
  * When the output stream is closed, it is flushed, fsynced, and
  * will be moved into place, overwriting any file that already
  * exists at that location.
- * 
+ * <p/>
  * <b>NOTE</b>: on Windows platforms, it will not atomically
  * replace the target file - instead the target file is deleted
  * before this one is moved into place.
@@ -44,8 +44,8 @@ public class AtomicFileOutputStream extends FilterOutputStream {
 
   private static final String TMP_EXTENSION = ".tmp";
   
-  private final static Log LOG = LogFactory.getLog(
-      AtomicFileOutputStream.class);
+  private final static Log LOG =
+      LogFactory.getLog(AtomicFileOutputStream.class);
   
   private final File origFile;
   private final File tmpFile;
@@ -53,9 +53,11 @@ public class AtomicFileOutputStream extends FilterOutputStream {
   public AtomicFileOutputStream(File f) throws FileNotFoundException {
     // Code unfortunately must be duplicated below since we can't assign anything
     // before calling super
-    super(new FileOutputStream(new File(f.getParentFile(), f.getName() + TMP_EXTENSION)));
+    super(new FileOutputStream(
+        new File(f.getParentFile(), f.getName() + TMP_EXTENSION)));
     origFile = f.getAbsoluteFile();
-    tmpFile = new File(f.getParentFile(), f.getName() + TMP_EXTENSION).getAbsoluteFile();
+    tmpFile = new File(f.getParentFile(), f.getName() + TMP_EXTENSION)
+        .getAbsoluteFile();
   }
 
   @Override
@@ -63,7 +65,7 @@ public class AtomicFileOutputStream extends FilterOutputStream {
     boolean triedToClose = false, success = false;
     try {
       flush();
-      ((FileOutputStream)out).getChannel().force(true);
+      ((FileOutputStream) out).getChannel().force(true);
 
       triedToClose = true;
       super.close();

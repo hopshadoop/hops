@@ -18,12 +18,13 @@
 
 package org.apache.hadoop.yarn.client.api.impl;
 
-import java.io.IOException;
-import java.net.URI;
-import java.util.Arrays;
-
-import javax.ws.rs.core.MediaType;
-
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Joiner;
+import com.sun.jersey.api.client.Client;
+import com.sun.jersey.api.client.ClientResponse;
+import com.sun.jersey.api.client.WebResource;
+import com.sun.jersey.api.client.config.ClientConfig;
+import com.sun.jersey.api.client.config.DefaultClientConfig;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -37,13 +38,10 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.webapp.YarnJacksonJaxbJsonProvider;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Joiner;
-import com.sun.jersey.api.client.Client;
-import com.sun.jersey.api.client.ClientResponse;
-import com.sun.jersey.api.client.WebResource;
-import com.sun.jersey.api.client.config.ClientConfig;
-import com.sun.jersey.api.client.config.DefaultClientConfig;
+import javax.ws.rs.core.MediaType;
+import java.io.IOException;
+import java.net.URI;
+import java.util.Arrays;
 
 @Private
 @Unstable
@@ -65,22 +63,20 @@ public class TimelineClientImpl extends TimelineClient {
   }
 
   protected void serviceInit(Configuration conf) throws Exception {
-    isEnabled = conf.getBoolean(
-        YarnConfiguration.TIMELINE_SERVICE_ENABLED,
+    isEnabled = conf.getBoolean(YarnConfiguration.TIMELINE_SERVICE_ENABLED,
         YarnConfiguration.DEFAULT_TIMELINE_SERVICE_ENABLED);
     if (!isEnabled) {
       LOG.info("Timeline service is not enabled");
     } else {
       if (YarnConfiguration.useHttps(conf)) {
-        resURI = URI
-            .create(JOINER.join("https://", conf.get(
-                YarnConfiguration.TIMELINE_SERVICE_WEBAPP_HTTPS_ADDRESS,
+        resURI = URI.create(JOINER.join("https://",
+            conf.get(YarnConfiguration.TIMELINE_SERVICE_WEBAPP_HTTPS_ADDRESS,
                 YarnConfiguration.DEFAULT_TIMELINE_SERVICE_WEBAPP_HTTPS_ADDRESS),
-                RESOURCE_URI_STR));
+            RESOURCE_URI_STR));
       } else {
-        resURI = URI.create(JOINER.join("http://", conf.get(
-            YarnConfiguration.TIMELINE_SERVICE_WEBAPP_ADDRESS,
-            YarnConfiguration.DEFAULT_TIMELINE_SERVICE_WEBAPP_ADDRESS),
+        resURI = URI.create(JOINER.join("http://",
+            conf.get(YarnConfiguration.TIMELINE_SERVICE_WEBAPP_ADDRESS,
+                YarnConfiguration.DEFAULT_TIMELINE_SERVICE_WEBAPP_ADDRESS),
             RESOURCE_URI_STR));
       }
       LOG.info("Timeline service address: " + resURI);
@@ -89,11 +85,12 @@ public class TimelineClientImpl extends TimelineClient {
   }
 
   @Override
-  public TimelinePutResponse putEntities(
-      TimelineEntity... entities) throws IOException, YarnException {
+  public TimelinePutResponse putEntities(TimelineEntity... entities)
+      throws IOException, YarnException {
     if (!isEnabled) {
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Nothing will be put because timeline service is not enabled");
+        LOG.debug(
+            "Nothing will be put because timeline service is not enabled");
       }
       return new TimelinePutResponse();
     }
@@ -104,20 +101,19 @@ public class TimelineClientImpl extends TimelineClient {
       resp = doPostingEntities(entitiesContainer);
     } catch (RuntimeException re) {
       // runtime exception is expected if the client cannot connect the server
-      String msg =
-          "Failed to get the response from the timeline server.";
+      String msg = "Failed to get the response from the timeline server.";
       LOG.error(msg, re);
       throw re;
     }
     if (resp == null ||
         resp.getClientResponseStatus() != ClientResponse.Status.OK) {
-      String msg =
-          "Failed to get the response from the timeline server.";
+      String msg = "Failed to get the response from the timeline server.";
       LOG.error(msg);
       if (LOG.isDebugEnabled() && resp != null) {
         String output = resp.getEntity(String.class);
-        LOG.debug("HTTP error code: " + resp.getStatus()
-            + " Server response : \n" + output);
+        LOG.debug(
+            "HTTP error code: " + resp.getStatus() + " Server response : \n" +
+                output);
       }
       throw new YarnException(msg);
     }
@@ -129,8 +125,7 @@ public class TimelineClientImpl extends TimelineClient {
   public ClientResponse doPostingEntities(TimelineEntities entities) {
     WebResource webResource = client.resource(resURI);
     return webResource.accept(MediaType.APPLICATION_JSON)
-        .type(MediaType.APPLICATION_JSON)
-        .post(ClientResponse.class, entities);
+        .type(MediaType.APPLICATION_JSON).post(ClientResponse.class, entities);
   }
 
 }

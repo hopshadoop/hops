@@ -17,13 +17,11 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler;
 
-import static org.junit.Assert.assertEquals;
-import static org.mockito.Mockito.*;
-
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
-
+import io.hops.exception.StorageInitializtionException;
+import io.hops.ha.common.TransactionState;
+import io.hops.ha.common.TransactionStateImpl;
+import io.hops.metadata.util.RMStorageFactory;
+import io.hops.metadata.util.YarnAPIStorageFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
@@ -34,9 +32,20 @@ import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.ResourceRequest;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
+
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+
+import static org.junit.Assert.assertEquals;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 public class TestSchedulerApplicationAttempt {
 
@@ -44,6 +53,13 @@ public class TestSchedulerApplicationAttempt {
 
   private Configuration conf = new Configuration();
   
+  @Before
+  public void setup() throws StorageInitializtionException, IOException {
+    conf = new YarnConfiguration();
+    YarnAPIStorageFactory.setConfiguration(conf);
+    RMStorageFactory.setConfiguration(conf);
+  }
+
   @After
   public void tearDown() {
     QueueMetrics.clearQueueMetrics();
@@ -61,29 +77,34 @@ public class TestSchedulerApplicationAttempt {
     QueueMetrics newMetrics = newQueue.getMetrics();
 
     ApplicationAttemptId appAttId = createAppAttemptId(0, 0);
-    SchedulerApplicationAttempt app = new SchedulerApplicationAttempt(appAttId,
-        user, oldQueue, oldQueue.getActiveUsersManager(), null);
+    SchedulerApplicationAttempt app =
+        new SchedulerApplicationAttempt(appAttId, user, oldQueue,
+            oldQueue.getActiveUsersManager(), null);
     oldMetrics.submitApp(user);
     
     // Resource request
     Resource requestedResource = Resource.newInstance(1536, 2);
     Priority requestedPriority = Priority.newInstance(2);
-    ResourceRequest request = ResourceRequest.newInstance(requestedPriority,
-        ResourceRequest.ANY, requestedResource, 3);
-    app.updateResourceRequests(Arrays.asList(request));
+    ResourceRequest request = ResourceRequest
+        .newInstance(requestedPriority, ResourceRequest.ANY, requestedResource,
+            3);
+    app.updateResourceRequests(Arrays.asList(request),
+        new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
 
     // Allocated container
     RMContainer container1 = createRMContainer(appAttId, 1, requestedResource);
     app.liveContainers.put(container1.getContainerId(), container1);
     SchedulerNode node = createNode();
-    app.appSchedulingInfo.allocate(NodeType.OFF_SWITCH, node, requestedPriority,
-        request, container1.getContainer());
+    app.appSchedulingInfo
+        .allocate(NodeType.OFF_SWITCH, node, requestedPriority, request,
+            container1.getContainer(), null);
     
     // Reserved container
     Priority prio1 = Priority.newInstance(1);
     Resource reservedResource = Resource.newInstance(2048, 3);
-    RMContainer container2 = createReservedRMContainer(appAttId, 1, reservedResource,
-        node.getNodeID(), prio1);
+    RMContainer container2 =
+        createReservedRMContainer(appAttId, 1, reservedResource,
+            node.getNodeID(), prio1);
     Map<NodeId, RMContainer> reservations = new HashMap<NodeId, RMContainer>();
     reservations.put(node.getNodeID(), container2);
     app.reservedContainers.put(prio1, reservations);

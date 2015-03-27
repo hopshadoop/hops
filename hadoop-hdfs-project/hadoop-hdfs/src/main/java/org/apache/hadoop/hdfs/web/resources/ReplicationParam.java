@@ -17,31 +17,41 @@
  */
 package org.apache.hadoop.hdfs.web.resources;
 
+import org.apache.hadoop.conf.Configuration;
+
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_REPLICATION_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_REPLICATION_KEY;
 
-import org.apache.hadoop.conf.Configuration;
-
-/** Replication parameter. */
+/**
+ * Replication parameter.
+ */
 public class ReplicationParam extends ShortParam {
-  /** Parameter name. */
+  /**
+   * Parameter name.
+   */
   public static final String NAME = "replication";
-  /** Default parameter value. */
+  /**
+   * Default parameter value.
+   */
   public static final String DEFAULT = NULL;
 
   private static final Domain DOMAIN = new Domain(NAME);
 
   /**
    * Constructor.
-   * @param value the parameter value.
+   *
+   * @param value
+   *     the parameter value.
    */
   public ReplicationParam(final Short value) {
-    super(DOMAIN, value, (short)1, null);
+    super(DOMAIN, value, (short) 1, null);
   }
 
   /**
    * Constructor.
-   * @param str a string representation of the parameter value.
+   *
+   * @param str
+   *     a string representation of the parameter value.
    */
   public ReplicationParam(final String str) {
     this(DOMAIN.parse(str));
@@ -52,9 +62,11 @@ public class ReplicationParam extends ShortParam {
     return NAME;
   }
 
-  /** @return the value or, if it is null, return the default from conf. */
+  /**
+   * @return the value or, if it is null, return the default from conf.
+   */
   public short getValue(final Configuration conf) {
-    return getValue() != null? getValue()
-        : (short)conf.getInt(DFS_REPLICATION_KEY, DFS_REPLICATION_DEFAULT);
+    return getValue() != null ? getValue() :
+        (short) conf.getInt(DFS_REPLICATION_KEY, DFS_REPLICATION_DEFAULT);
   }
 }

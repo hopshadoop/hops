@@ -25,10 +25,16 @@
     <name>hadoop.security.authentication</name>
     <value>simple</value>
   </property>
-  <!-- Disable min block size since most tests use tiny blocks -->
+
+  <!-- for testing only set the hops-metadata-dal-impl-ndb jarfile !-->
   <property>
-    <name>dfs.namenode.fs-limits.min-block-size</name>
-    <value>0</value>
+    <name>dfs.storage.driver.jarFile</name>
+    <value></value>
   </property>
 
+  <!-- Enable erasure coding to test all code paths -->
+  <property>
+    <name>dfs.erasure_coding.enabled</name>
+    <value>true</value>
+  </property>
 </configuration>

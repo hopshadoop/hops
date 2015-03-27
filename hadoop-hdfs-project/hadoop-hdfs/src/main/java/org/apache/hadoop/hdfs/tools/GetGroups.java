@@ -17,10 +17,6 @@
  */
 package org.apache.hadoop.hdfs.tools;
 
-import java.io.IOException;
-import java.io.PrintStream;
-import java.net.InetSocketAddress;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -36,6 +32,10 @@ import org.apache.hadoop.tools.GetGroupsBase;
 import org.apache.hadoop.tools.GetUserMappingsProtocol;
 import org.apache.hadoop.util.ToolRunner;
 
+import java.io.IOException;
+import java.io.PrintStream;
+import java.net.InetSocketAddress;
+
 /**
  * HDFS implementation of a tool for getting the groups which a given user
  * belongs to.
@@ -47,7 +47,7 @@ public class GetGroups extends GetGroupsBase {
   
   static final String USAGE = "Usage: hdfs groups [username ...]";
 
-  static{
+  static {
     HdfsConfiguration.init();
   }
 
@@ -69,8 +69,8 @@ public class GetGroups extends GetGroupsBase {
   @Override
   public void setConf(Configuration conf) {
     conf = new HdfsConfiguration(conf);
-    String nameNodePrincipal = conf.get(
-        DFSConfigKeys.DFS_NAMENODE_USER_NAME_KEY, "");
+    String nameNodePrincipal =
+        conf.get(DFSConfigKeys.DFS_NAMENODE_USER_NAME_KEY, "");
     
     if (LOG.isDebugEnabled()) {
       LOG.debug("Using NN principal: " + nameNodePrincipal);
@@ -84,8 +84,9 @@ public class GetGroups extends GetGroupsBase {
   
   @Override
   protected GetUserMappingsProtocol getUgmProtocol() throws IOException {
-    return NameNodeProxies.createProxy(getConf(), FileSystem.getDefaultUri(getConf()),
-        GetUserMappingsProtocol.class).getProxy();
+    return NameNodeProxies
+        .createProxy(getConf(), FileSystem.getDefaultUri(getConf()),
+            GetUserMappingsProtocol.class).getProxy();
   }
 
   public static void main(String[] argv) throws Exception {

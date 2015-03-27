@@ -18,14 +18,14 @@
 
 package org.apache.hadoop.hdfs.protocol;
 
-import java.io.IOException;
-
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
-import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.UnresolvedLinkException;
 
-/** 
+import java.io.IOException;
+
+/**
  * Thrown when a symbolic link is encountered in a path.
  */
 @InterfaceAudience.Private
@@ -64,9 +64,8 @@ public final class UnresolvedPathException extends UnresolvedLinkException {
     if (target.isUriPathAbsolute()) {
       return noRemainder ? target : new Path(target, remainder);
     } else {
-      return noRemainder
-        ? new Path(preceding, target)
-        : new Path(new Path(preceding, linkTarget), remainder);
+      return noRemainder ? new Path(preceding, target) :
+          new Path(new Path(preceding, linkTarget), remainder);
     }
   }
 

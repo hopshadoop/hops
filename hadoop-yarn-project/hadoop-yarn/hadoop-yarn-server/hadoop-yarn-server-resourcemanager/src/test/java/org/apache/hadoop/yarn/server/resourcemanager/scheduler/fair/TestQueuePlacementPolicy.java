@@ -17,13 +17,7 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair;
 
-import static org.junit.Assert.assertEquals;
-
-import java.util.Set;
-
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-
+import com.google.common.collect.Sets;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
@@ -33,11 +27,16 @@ import org.junit.Test;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
-import com.google.common.collect.Sets;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import java.util.Set;
+
+import static org.junit.Assert.assertEquals;
 
 public class TestQueuePlacementPolicy {
   private final static Configuration conf = new Configuration();
-  private final static Set<String> configuredQueues = Sets.newHashSet("root.someuser");
+  private final static Set<String> configuredQueues =
+      Sets.newHashSet("root.someuser");
   
   @BeforeClass
   public static void setup() {
@@ -53,9 +52,12 @@ public class TestQueuePlacementPolicy {
     sb.append("  <rule name='user' />");
     sb.append("</queuePlacementPolicy>");
     QueuePlacementPolicy policy = parse(sb.toString());
-    assertEquals("root.specifiedq",policy.assignAppToQueue("specifiedq", "someuser"));
-    assertEquals("root.someuser", policy.assignAppToQueue("default", "someuser"));
-    assertEquals("root.otheruser", policy.assignAppToQueue("default", "otheruser"));
+    assertEquals("root.specifiedq",
+        policy.assignAppToQueue("specifiedq", "someuser"));
+    assertEquals("root.someuser",
+        policy.assignAppToQueue("default", "someuser"));
+    assertEquals("root.otheruser",
+        policy.assignAppToQueue("default", "otheruser"));
   }
   
   @Test
@@ -67,10 +69,14 @@ public class TestQueuePlacementPolicy {
     sb.append("  <rule name='default' />");
     sb.append("</queuePlacementPolicy>");
     QueuePlacementPolicy policy = parse(sb.toString());
-    assertEquals("root.specifiedq", policy.assignAppToQueue("specifiedq", "someuser"));
-    assertEquals("root.someuser", policy.assignAppToQueue("default", "someuser"));
-    assertEquals("root.specifiedq", policy.assignAppToQueue("specifiedq", "otheruser"));
-    assertEquals("root.default", policy.assignAppToQueue("default", "otheruser"));
+    assertEquals("root.specifiedq",
+        policy.assignAppToQueue("specifiedq", "someuser"));
+    assertEquals("root.someuser",
+        policy.assignAppToQueue("default", "someuser"));
+    assertEquals("root.specifiedq",
+        policy.assignAppToQueue("specifiedq", "otheruser"));
+    assertEquals("root.default",
+        policy.assignAppToQueue("default", "otheruser"));
   }
   
   @Test
@@ -81,11 +87,12 @@ public class TestQueuePlacementPolicy {
     sb.append("  <rule name='reject' />");
     sb.append("</queuePlacementPolicy>");
     QueuePlacementPolicy policy = parse(sb.toString());
-    assertEquals("root.specifiedq", policy.assignAppToQueue("specifiedq", "someuser"));
+    assertEquals("root.specifiedq",
+        policy.assignAppToQueue("specifiedq", "someuser"));
     assertEquals(null, policy.assignAppToQueue("default", "someuser"));
   }
   
-  @Test (expected = AllocationConfigurationException.class)
+  @Test(expected = AllocationConfigurationException.class)
   public void testOmittedTerminalRule() throws Exception {
     StringBuffer sb = new StringBuffer();
     sb.append("<queuePlacementPolicy>");
@@ -95,7 +102,7 @@ public class TestQueuePlacementPolicy {
     parse(sb.toString());
   }
   
-  @Test (expected = AllocationConfigurationException.class)
+  @Test(expected = AllocationConfigurationException.class)
   public void testTerminalRuleInMiddle() throws Exception {
     StringBuffer sb = new StringBuffer();
     sb.append("<queuePlacementPolicy>");
@@ -109,7 +116,7 @@ public class TestQueuePlacementPolicy {
   private QueuePlacementPolicy parse(String str) throws Exception {
     // Read and parse the allocations file.
     DocumentBuilderFactory docBuilderFactory =
-      DocumentBuilderFactory.newInstance();
+        DocumentBuilderFactory.newInstance();
     docBuilderFactory.setIgnoringComments(true);
     DocumentBuilder builder = docBuilderFactory.newDocumentBuilder();
     Document doc = builder.parse(IOUtils.toInputStream(str));

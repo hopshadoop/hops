@@ -18,27 +18,8 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.webapp;
 
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentMap;
-
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.ws.rs.GET;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
-import javax.ws.rs.core.Context;
-import javax.ws.rs.core.MediaType;
-
+import com.google.inject.Inject;
+import com.google.inject.Singleton;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -66,7 +47,6 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CSQueue;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FairScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fifo.FifoScheduler;
-import org.apache.hadoop.yarn.server.resourcemanager.security.QueueACLsManager;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.AppAttemptInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.AppAttemptsInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.AppInfo;
@@ -82,14 +62,30 @@ import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.NodesInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.SchedulerInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.SchedulerTypeInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.StatisticsItemInfo;
-import org.apache.hadoop.yarn.server.security.ApplicationACLsManager;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.hadoop.yarn.webapp.BadRequestException;
 import org.apache.hadoop.yarn.webapp.NotFoundException;
 import org.apache.hadoop.yarn.webapp.util.WebAppUtils;
 
-import com.google.inject.Inject;
-import com.google.inject.Singleton;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.MediaType;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentMap;
 
 @Singleton
 @Path("/ws/v1/cluster")
@@ -99,10 +95,12 @@ public class RMWebServices {
   private static final String EMPTY = "";
   private static final String ANY = "*";
   private final ResourceManager rm;
-  private static RecordFactory recordFactory = RecordFactoryProvider
-      .getRecordFactory(null);
+  private static RecordFactory recordFactory =
+      RecordFactoryProvider.getRecordFactory(null);
   private final Configuration conf;
-  private @Context HttpServletResponse response;
+  private
+  @Context
+  HttpServletResponse response;
 
   @Inject
   public RMWebServices(final ResourceManager rm, Configuration conf) {
@@ -117,12 +115,10 @@ public class RMWebServices {
     if (remoteUser != null) {
       callerUGI = UserGroupInformation.createRemoteUser(remoteUser);
     }
-    if (callerUGI != null
-        && !(this.rm.getApplicationACLsManager().checkAccess(callerUGI,
-              ApplicationAccessType.VIEW_APP, app.getUser(),
-              app.getApplicationId()) ||
-            this.rm.getQueueACLsManager().checkAccess(callerUGI,
-              QueueACL.ADMINISTER_QUEUE, app.getQueue()))) {
+    if (callerUGI != null && !(this.rm.getApplicationACLsManager()
+        .checkAccess(callerUGI, ApplicationAccessType.VIEW_APP, app.getUser(),
+            app.getApplicationId()) || this.rm.getQueueACLsManager()
+        .checkAccess(callerUGI, QueueACL.ADMINISTER_QUEUE, app.getQueue()))) {
       return false;
     }
     return true;
@@ -134,14 +130,14 @@ public class RMWebServices {
   }
 
   @GET
-  @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
+  @Produces({MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML})
   public ClusterInfo get() {
     return getClusterInfo();
   }
 
   @GET
   @Path("/info")
-  @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
+  @Produces({MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML})
   public ClusterInfo getClusterInfo() {
     init();
     return new ClusterInfo(this.rm);
@@ -149,7 +145,7 @@ public class RMWebServices {
 
   @GET
   @Path("/metrics")
-  @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
+  @Produces({MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML})
   public ClusterMetricsInfo getClusterMetricsInfo() {
     init();
     return new ClusterMetricsInfo(this.rm, this.rm.getRMContext());
@@ -157,7 +153,7 @@ public class RMWebServices {
 
   @GET
   @Path("/scheduler")
-  @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
+  @Produces({MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML})
   public SchedulerTypeInfo getSchedulerInfo() {
     init();
     ResourceScheduler rs = rm.getResourceScheduler();
@@ -183,8 +179,10 @@ public class RMWebServices {
    */
   @GET
   @Path("/nodes")
-  @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-  public NodesInfo getNodes(@QueryParam("states") String states) {
+  @Produces({MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML})
+  public NodesInfo getNodes(
+      @QueryParam("states")
+      String states) {
     init();
     ResourceScheduler sched = this.rm.getResourceScheduler();
     if (sched == null) {
@@ -201,12 +199,13 @@ public class RMWebServices {
       }
     }
     
-    Collection<RMNode> rmNodes = RMServerUtils.queryRMNodes(this.rm.getRMContext(),
-        acceptedStates);
+    Collection<RMNode> rmNodes =
+        RMServerUtils.queryRMNodes(this.rm.getRMContext(), acceptedStates);
     NodesInfo nodesInfo = new NodesInfo();
     for (RMNode rmNode : rmNodes) {
       NodeInfo nodeInfo = new NodeInfo(rmNode, sched);
-      if (EnumSet.of(NodeState.LOST, NodeState.DECOMMISSIONED, NodeState.REBOOTED)
+      if (EnumSet
+          .of(NodeState.LOST, NodeState.DECOMMISSIONED, NodeState.REBOOTED)
           .contains(rmNode.getState())) {
         nodeInfo.setNodeHTTPAddress(EMPTY);
       }
@@ -218,8 +217,10 @@ public class RMWebServices {
 
   @GET
   @Path("/nodes/{nodeId}")
-  @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-  public NodeInfo getNode(@PathParam("nodeId") String nodeId) {
+  @Produces({MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML})
+  public NodeInfo getNode(
+      @PathParam("nodeId")
+      String nodeId) {
     init();
     if (nodeId == null || nodeId.isEmpty()) {
       throw new NotFoundException("nodeId, " + nodeId + ", is empty or null");
@@ -229,7 +230,7 @@ public class RMWebServices {
       throw new NotFoundException("Null ResourceScheduler instance");
     }
     NodeId nid = ConverterUtils.toNodeId(nodeId);
-    RMNode ni = this.rm.getRMContext().getRMNodes().get(nid);
+    RMNode ni = this.rm.getRMContext().getActiveRMNodes().get(nid);
     boolean isInactive = false;
     if (ni == null) {
       ni = this.rm.getRMContext().getInactiveRMNodes().get(nid.getHost());
@@ -247,20 +248,34 @@ public class RMWebServices {
 
   @GET
   @Path("/apps")
-  @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-  public AppsInfo getApps(@Context HttpServletRequest hsr,
-      @QueryParam("state") String stateQuery,
-      @QueryParam("states") Set<String> statesQuery,
-      @QueryParam("finalStatus") String finalStatusQuery,
-      @QueryParam("user") String userQuery,
-      @QueryParam("queue") String queueQuery,
-      @QueryParam("limit") String count,
-      @QueryParam("startedTimeBegin") String startedBegin,
-      @QueryParam("startedTimeEnd") String startedEnd,
-      @QueryParam("finishedTimeBegin") String finishBegin,
-      @QueryParam("finishedTimeEnd") String finishEnd,
-      @QueryParam("applicationTypes") Set<String> applicationTypes,
-      @QueryParam("applicationTags") Set<String> applicationTags) {
+  @Produces({MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML})
+  public AppsInfo getApps(
+      @Context
+      HttpServletRequest hsr,
+      @QueryParam("state")
+      String stateQuery,
+      @QueryParam("states")
+      Set<String> statesQuery,
+      @QueryParam("finalStatus")
+      String finalStatusQuery,
+      @QueryParam("user")
+      String userQuery,
+      @QueryParam("queue")
+      String queueQuery,
+      @QueryParam("limit")
+      String count,
+      @QueryParam("startedTimeBegin")
+      String startedBegin,
+      @QueryParam("startedTimeEnd")
+      String startedEnd,
+      @QueryParam("finishedTimeBegin")
+      String finishBegin,
+      @QueryParam("finishedTimeEnd")
+      String finishEnd,
+      @QueryParam("applicationTypes")
+      Set<String> applicationTypes,
+      @QueryParam("applicationTags")
+      Set<String> applicationTags) {
     boolean checkCount = false;
     boolean checkStart = false;
     boolean checkEnd = false;
@@ -288,7 +303,8 @@ public class RMWebServices {
       checkStart = true;
       sBegin = Long.parseLong(startedBegin);
       if (sBegin < 0) {
-        throw new BadRequestException("startedTimeBegin must be greater than 0");
+        throw new BadRequestException(
+            "startedTimeBegin must be greater than 0");
       }
     }
     if (startedEnd != null && !startedEnd.isEmpty()) {
@@ -391,8 +407,8 @@ public class RMWebServices {
 
     List<ApplicationReport> appReports = null;
     try {
-      appReports = rm.getClientRMService()
-          .getApplications(request, false).getApplicationList();
+      appReports = rm.getClientRMService().getApplications(request, false)
+          .getApplicationList();
     } catch (YarnException e) {
       LOG.error("Unable to retrieve apps from ClientRMService", e);
       throw new YarnRuntimeException(
@@ -422,11 +438,14 @@ public class RMWebServices {
 
   @GET
   @Path("/appstatistics")
-  @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
+  @Produces({MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML})
   public ApplicationStatisticsInfo getAppStatistics(
-      @Context HttpServletRequest hsr,
-      @QueryParam("states") Set<String> stateQueries,
-      @QueryParam("applicationTypes") Set<String> typeQueries) {
+      @Context
+      HttpServletRequest hsr,
+      @QueryParam("states")
+      Set<String> stateQueries,
+      @QueryParam("applicationTypes")
+      Set<String> typeQueries) {
     init();
 
     // parse the params and build the scoreboard
@@ -437,8 +456,8 @@ public class RMWebServices {
     if (types.size() == 0) {
       types.add(ANY);
     } else if (types.size() != 1) {
-      throw new BadRequestException("# of applicationTypes = " + types.size()
-          + ", we temporarily support at most one applicationType");
+      throw new BadRequestException("# of applicationTypes = " + types.size() +
+          ", we temporarily support at most one applicationType");
     }
     // if no states, returns the counts of all RMAppStates
     if (states.size() == 0) {
@@ -467,20 +486,21 @@ public class RMWebServices {
 
     // fill the response object
     ApplicationStatisticsInfo appStatInfo = new ApplicationStatisticsInfo();
-    for (Map.Entry<YarnApplicationState, Map<String, Long>> partScoreboard
-        : scoreboard.entrySet()) {
-      for (Map.Entry<String, Long> statEntry
-          : partScoreboard.getValue().entrySet()) {
-        StatisticsItemInfo statItem = new StatisticsItemInfo(
-            partScoreboard.getKey(), statEntry.getKey(), statEntry.getValue());
+    for (Map.Entry<YarnApplicationState, Map<String, Long>> partScoreboard : scoreboard
+        .entrySet()) {
+      for (Map.Entry<String, Long> statEntry : partScoreboard.getValue()
+          .entrySet()) {
+        StatisticsItemInfo statItem =
+            new StatisticsItemInfo(partScoreboard.getKey(), statEntry.getKey(),
+                statEntry.getValue());
         appStatInfo.add(statItem);
       }
     }
     return appStatInfo;
   }
 
-  private static Set<String> parseQueries(
-      Set<String> queries, boolean isState) {
+  private static Set<String> parseQueries(Set<String> queries,
+      boolean isState) {
     Set<String> params = new HashSet<String>();
     if (!queries.isEmpty()) {
       for (String query : queries) {
@@ -497,8 +517,8 @@ public class RMWebServices {
                       YarnApplicationState.values();
                   String allAppStates = Arrays.toString(stateArray);
                   throw new BadRequestException(
-                      "Invalid application-state " + paramStr.trim()
-                      + " specified. It should be one of " + allAppStates);
+                      "Invalid application-state " + paramStr.trim() +
+                          " specified. It should be one of " + allAppStates);
                 }
               }
               params.add(paramStr.trim().toLowerCase());
@@ -511,15 +531,15 @@ public class RMWebServices {
   }
 
   private static Map<YarnApplicationState, Map<String, Long>> buildScoreboard(
-     Set<String> states, Set<String> types) {
-    Map<YarnApplicationState, Map<String, Long>> scoreboard
-        = new HashMap<YarnApplicationState, Map<String, Long>>();
+      Set<String> states, Set<String> types) {
+    Map<YarnApplicationState, Map<String, Long>> scoreboard =
+        new HashMap<YarnApplicationState, Map<String, Long>>();
     // default states will result in enumerating all YarnApplicationStates
     assert !states.isEmpty();
     for (String state : states) {
       Map<String, Long> partScoreboard = new HashMap<String, Long>();
-      scoreboard.put(
-          YarnApplicationState.valueOf(state.toUpperCase()), partScoreboard);
+      scoreboard.put(YarnApplicationState.valueOf(state.toUpperCase()),
+          partScoreboard);
       // types is verified no to be empty
       for (String type : types) {
         partScoreboard.put(type, 0L);
@@ -538,9 +558,12 @@ public class RMWebServices {
 
   @GET
   @Path("/apps/{appid}")
-  @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-  public AppInfo getApp(@Context HttpServletRequest hsr,
-      @PathParam("appid") String appId) {
+  @Produces({MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML})
+  public AppInfo getApp(
+      @Context
+      HttpServletRequest hsr,
+      @PathParam("appid")
+      String appId) {
     init();
     if (appId == null || appId.isEmpty()) {
       throw new NotFoundException("appId, " + appId + ", is empty or null");
@@ -559,8 +582,10 @@ public class RMWebServices {
 
   @GET
   @Path("/apps/{appid}/appattempts")
-  @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-  public AppAttemptsInfo getAppAttempts(@PathParam("appid") String appId) {
+  @Produces({MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML})
+  public AppAttemptsInfo getAppAttempts(
+      @PathParam("appid")
+      String appId) {
 
     init();
     if (appId == null || appId.isEmpty()) {

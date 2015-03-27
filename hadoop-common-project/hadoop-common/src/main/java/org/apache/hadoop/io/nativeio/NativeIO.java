@@ -299,9 +299,9 @@ public class NativeIO {
      * Locks the provided direct ByteBuffer into memory, preventing it from
      * swapping out. After a buffer is locked, future accesses will not incur
      * a page fault.
-     * 
+     *
      * See the mlock(2) man page for more information.
-     * 
+     *
      * @throws NativeIOException
      */
     static void mlock(ByteBuffer buffer, long len)
@@ -316,9 +316,9 @@ public class NativeIO {
     /**
      * Unlocks a locked direct ByteBuffer, allowing it to swap out of memory.
      * This is a no-op if the ByteBuffer was not previously locked.
-     * 
+     *
      * See the munlock(2) man page for more information.
-     * 
+     *
      * @throws NativeIOException
      */
     public static void munlock(ByteBuffer buffer, long len)
@@ -426,7 +426,7 @@ public class NativeIO {
     public static Stat getFstat(FileDescriptor fd) throws IOException {
       Stat stat = null;
       if (!Shell.WINDOWS) {
-        stat = fstat(fd); 
+        stat = fstat(fd);
         stat.owner = getName(IdCache.USER, stat.ownerId);
         stat.group = getName(IdCache.GROUP, stat.groupId);
       } else {
@@ -488,9 +488,9 @@ public class NativeIO {
 
     private enum IdCache { USER, GROUP }
 
-    public final static int MMAP_PROT_READ = 0x1; 
-    public final static int MMAP_PROT_WRITE = 0x2; 
-    public final static int MMAP_PROT_EXEC = 0x4; 
+    public final static int MMAP_PROT_READ = 0x1;
+    public final static int MMAP_PROT_WRITE = 0x2;
+    public final static int MMAP_PROT_EXEC = 0x4;
 
     public static native long mmap(FileDescriptor fd, int prot,
         boolean shared, long length) throws IOException;
@@ -556,7 +556,7 @@ public class NativeIO {
     /**
      * Checks whether the current process has desired access rights on
      * the given path.
-     * 
+     *
      * Longer term this native function can be substituted with JDK7
      * function Files#isReadable, isWritable, isExecutable.
      *
@@ -814,7 +814,7 @@ public class NativeIO {
    *
    * @param src                  The source path
    * @param dst                  The destination path
-   * 
+   *
    * @throws NativeIOException   On failure.
    */
   public static void renameTo(File src, File dst)
@@ -834,7 +834,7 @@ public class NativeIO {
    *
    * @param src                  The source path
    * @param dst                  The destination path
-   * 
+   *
    * @throws NativeIOException   On failure.
    */
   private static native void renameTo0(String src, String dst)

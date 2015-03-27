@@ -17,13 +17,6 @@
  */
 package org.apache.hadoop.hdfs;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.util.Random;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.ChecksumFileSystem;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -32,9 +25,16 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IOUtils;
 import org.junit.Test;
 
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.util.Random;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
 /**
  * This class tests the presence of seek bug as described
- * in HADOOP-508 
+ * in HADOOP-508
  */
 public class TestSeekBug {
   static final long seed = 0xDEADBEEFL;
@@ -50,11 +50,12 @@ public class TestSeekBug {
     stm.close();
   }
   
-  private void checkAndEraseData(byte[] actual, int from, byte[] expected, String message) {
+  private void checkAndEraseData(byte[] actual, int from, byte[] expected,
+      String message) {
     for (int idx = 0; idx < actual.length; idx++) {
-      assertEquals(message+" byte "+(from+idx)+" differs. expected "+
-                        expected[from+idx]+" actual "+actual[idx],
-                        actual[idx], expected[from+idx]);
+      assertEquals(message + " byte " + (from + idx) + " differs. expected " +
+              expected[from + idx] + " actual " + actual[idx], actual[idx],
+          expected[from + idx]);
       actual[idx] = 0;
     }
   }
@@ -86,7 +87,7 @@ public class TestSeekBug {
    */
   private void smallReadSeek(FileSystem fileSys, Path name) throws IOException {
     if (fileSys instanceof ChecksumFileSystem) {
-      fileSys = ((ChecksumFileSystem)fileSys).getRawFileSystem();
+      fileSys = ((ChecksumFileSystem) fileSys).getRawFileSystem();
     }
     // Make the buffer size small to trigger code for HADOOP-922
     FSDataInputStream stmRaw = fileSys.open(name, 1);
@@ -142,23 +143,20 @@ public class TestSeekBug {
     }
   }
 
- /**
-  * Test (expected to throw IOE) for negative
-  * <code>FSDataInpuStream#seek</code> argument
-  */
-  @Test (expected=IOException.class)
+  /**
+   * Test (expected to throw IOE) for negative
+   * <code>FSDataInpuStream#seek</code> argument
+   */
+  @Test(expected = IOException.class)
   public void testNegativeSeek() throws IOException {
     Configuration conf = new HdfsConfiguration();
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).build();
     FileSystem fs = cluster.getFileSystem();
     try {
       Path seekFile = new Path("seekboundaries.dat");
-      DFSTestUtil.createFile(
-        fs,
-        seekFile,
-        ONEMB,
-        fs.getDefaultReplication(seekFile),
-        seed);
+      DFSTestUtil
+          .createFile(fs, seekFile, ONEMB, fs.getDefaultReplication(seekFile),
+              seed);
       FSDataInputStream stream = fs.open(seekFile);
       // Perform "safe seek" (expected to pass)
       stream.seek(65536);
@@ -171,23 +169,20 @@ public class TestSeekBug {
     }
   }
 
- /**
-  * Test (expected to throw IOE) for <code>FSDataInpuStream#seek</code>
-  * when the position argument is larger than the file size.
-  */
-  @Test (expected=IOException.class)
+  /**
+   * Test (expected to throw IOE) for <code>FSDataInpuStream#seek</code>
+   * when the position argument is larger than the file size.
+   */
+  @Test(expected = IOException.class)
   public void testSeekPastFileSize() throws IOException {
     Configuration conf = new HdfsConfiguration();
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).build();
     FileSystem fs = cluster.getFileSystem();
     try {
       Path seekFile = new Path("seekboundaries.dat");
-      DFSTestUtil.createFile(
-        fs,
-        seekFile,
-        ONEMB,
-        fs.getDefaultReplication(seekFile),
-        seed);
+      DFSTestUtil
+          .createFile(fs, seekFile, ONEMB, fs.getDefaultReplication(seekFile),
+              seed);
       FSDataInputStream stream = fs.open(seekFile);
       // Perform "safe seek" (expected to pass)
       stream.seek(65536);
@@ -199,7 +194,7 @@ public class TestSeekBug {
       cluster.shutdown();
     }
   }
- 
+
   /**
    * Tests if the seek bug exists in FSDataInputStream in LocalFS.
    */

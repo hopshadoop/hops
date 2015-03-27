@@ -18,13 +18,7 @@
 package org.apache.hadoop.fs.viewfs;
 
 
-import java.io.IOException;
-import java.net.URISyntaxException;
-
-import javax.security.auth.login.LoginException;
-
 import org.apache.hadoop.fs.FileContext;
-import org.apache.hadoop.fs.FileContextTestHelper;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
@@ -34,37 +28,35 @@ import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 
+import javax.security.auth.login.LoginException;
+import java.io.IOException;
+import java.net.URISyntaxException;
+
 public class TestViewFsHdfs extends ViewFsBaseTest {
 
   private static MiniDFSCluster cluster;
-  private static final HdfsConfiguration CONF = new HdfsConfiguration();
+  private static HdfsConfiguration CONF = new HdfsConfiguration();
   private static FileContext fc;
   
-  @Override
-  protected FileContextTestHelper createFileContextHelper() {
-    return new FileContextTestHelper();
-  }
-
-
   @BeforeClass
-  public static void clusterSetupAtBegining() throws IOException,
-      LoginException, URISyntaxException {
+  public static void clusterSetupAtBegining()
+      throws IOException, LoginException, URISyntaxException {
     SupportsBlocks = true;
-    CONF.setBoolean(
-        DFSConfigKeys.DFS_NAMENODE_DELEGATION_TOKEN_ALWAYS_USE_KEY, true);
+    CONF.setBoolean(DFSConfigKeys.DFS_NAMENODE_DELEGATION_TOKEN_ALWAYS_USE_KEY,
+        true);
 
     cluster = new MiniDFSCluster.Builder(CONF).numDataNodes(2).build();
     cluster.waitClusterUp();
     fc = FileContext.getFileContext(cluster.getURI(0), CONF);
-    Path defaultWorkingDirectory = fc.makeQualified( new Path("/user/" + 
-        UserGroupInformation.getCurrentUser().getShortUserName()));
+    Path defaultWorkingDirectory = fc.makeQualified(new Path(
+        "/user/" + UserGroupInformation.getCurrentUser().getShortUserName()));
     fc.mkdir(defaultWorkingDirectory, FileContext.DEFAULT_PERM, true);
   }
 
-      
+
   @AfterClass
   public static void ClusterShutdownAtEnd() throws Exception {
-    cluster.shutdown();   
+    cluster.shutdown();
   }
 
   @Override
@@ -83,5 +75,5 @@ public class TestViewFsHdfs extends ViewFsBaseTest {
   int getExpectedDelegationTokenCount() {
     return 8;
   }
- 
+
 }

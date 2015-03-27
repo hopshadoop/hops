@@ -13,16 +13,16 @@
   limitations under the License. See accompanying LICENSE file.
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
                       http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <groupId>org.apache.hadoop</groupId>
+    <groupId>io.hops</groupId>
     <artifactId>hadoop-main</artifactId>
     <version>2.4.0</version>
   </parent>
-  <groupId>org.apache.hadoop</groupId>
+  <groupId>io.hops</groupId>
   <artifactId>hadoop-project</artifactId>
   <version>2.4.0</version>
   <description>Apache Hadoop Project POM</description>
@@ -75,238 +75,244 @@
         <version>${jdiff.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-assemblies</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-annotations</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-common</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-common</artifactId>
         <version>${project.version}</version>
         <type>test-jar</type>
       </dependency>
       <dependency>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-auth</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-nfs</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-hdfs</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-hdfs</artifactId>
         <version>${project.version}</version>
         <type>test-jar</type>
       </dependency>
       <dependency>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-mapreduce-client-app</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-mapreduce-client-app</artifactId>
         <version>${project.version}</version>
         <type>test-jar</type>
       </dependency>
       <dependency>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-mapreduce-client-common</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-yarn-api</artifactId>
         <version>${project.version}</version>
       </dependency>
 
       <dependency>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-yarn-client</artifactId>
         <version>${project.version}</version>
       </dependency>
 
       <dependency>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-mapreduce-client-core</artifactId>
         <version>${project.version}</version>
       </dependency>
 
       <dependency>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-mapreduce-client-jobclient</artifactId>
         <version>${project.version}</version>
       </dependency>
 
       <dependency>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-mapreduce-client-shuffle</artifactId>
         <version>${project.version}</version>
       </dependency>
 
       <dependency>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-yarn</artifactId>
         <version>${project.version}</version>
         <type>pom</type>
       </dependency>
 
       <dependency>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-yarn-server</artifactId>
         <version>${project.version}</version>
       </dependency>
 
       <dependency>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-yarn-server-web-proxy</artifactId>
         <version>${project.version}</version>
       </dependency>
 
       <dependency>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-yarn-server-common</artifactId>
         <version>${project.version}</version>
       </dependency>
 
       <dependency>
-        <groupId>org.apache.hadoop</groupId>
-         <artifactId>hadoop-yarn-server-tests</artifactId>
+        <groupId>io.hops</groupId>
+        <artifactId>hadoop-yarn-server-tests</artifactId>
         <version>${project.version}</version>
         <type>test-jar</type>
       </dependency>
 
       <dependency>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-yarn-common</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-yarn-common</artifactId>
         <version>${project.version}</version>
         <type>test-jar</type>
       </dependency>
 
       <dependency>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-yarn-server-nodemanager</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-yarn-server-resourcemanager</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-yarn-server-resourcemanager</artifactId>
         <version>${project.version}</version>
         <type>test-jar</type>
       </dependency>
 
-     <dependency>
-        <groupId>org.apache.hadoop</groupId>
+      <dependency>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-yarn-applications-distributedshell</artifactId>
         <version>${project.version}</version>
       </dependency>
 
       <dependency>
-        <groupId>org.apache.hadoop</groupId>
-         <artifactId>hadoop-mapreduce-client-jobclient</artifactId>
+        <groupId>io.hops</groupId>
+        <artifactId>hadoop-mapreduce-client-jobclient</artifactId>
         <version>${project.version}</version>
         <type>test-jar</type>
       </dependency>
 
       <dependency>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-mapreduce-client-hs</artifactId>
         <version>${project.version}</version>
       </dependency>
 
       <dependency>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-mapreduce-examples</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-gridmix</artifactId>
         <version>${project.version}</version>
       </dependency>
 
       <dependency>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-streaming</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-archives</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-distcp</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-datajoin</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-rumen</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-extras</artifactId>
         <version>${project.version}</version>
       </dependency>
 
       <dependency>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-client</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-minicluster</artifactId>
         <version>${project.version}</version>
       </dependency>
 
       <dependency>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-minikdc</artifactId>
         <version>${project.version}</version>
       </dependency>
 
       <dependency>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-openstack</artifactId>
         <version>${project.version}</version>
       </dependency>
 
+      <dependency>
+        <groupId>io.hops</groupId>
+        <artifactId>hops-leader-election</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+          
       <dependency>
         <groupId>com.google.guava</groupId>
         <artifactId>guava</artifactId>
@@ -742,7 +748,7 @@
         <version>3.0.0</version>
       </dependency>
       <dependency>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-sls</artifactId>
         <version>${project.version}</version>
       </dependency>
@@ -816,7 +822,7 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-surefire-plugin</artifactId>
-          <version>2.16</version>
+          <version>2.17</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
@@ -894,7 +900,7 @@
           <version>1.1</version>
         </plugin>
         <plugin>
-          <groupId>org.apache.hadoop</groupId>
+          <groupId>io.hops</groupId>
           <artifactId>hadoop-maven-plugins</artifactId>
           <version>${project.version}</version>
         </plugin>
@@ -907,8 +913,8 @@
         <artifactId>findbugs-maven-plugin</artifactId>
       </plugin>
       
-       <plugin>
-         <groupId>org.apache.maven.plugins</groupId>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-antrun-plugin</artifactId>
         <executions>
           <execution>
@@ -969,12 +975,12 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
           <reuseForks>false</reuseForks>
-          <forkedProcessTimeoutInSeconds>900</forkedProcessTimeoutInSeconds>
-          <argLine>-Xmx1024m -XX:+HeapDumpOnOutOfMemoryError</argLine>
+          <forkedProcessTimeoutInSeconds>3600</forkedProcessTimeoutInSeconds>
+          <argLine>-Xmx4096m -XX:+HeapDumpOnOutOfMemoryError</argLine>
           <environmentVariables>
             <!-- HADOOP_HOME required for tests on Windows to find winutils -->
             <HADOOP_HOME>${hadoop.common.build.dir}</HADOOP_HOME>
-            <LD_LIBRARY_PATH>${env.LD_LIBRARY_PATH}:${project.build.directory}/native/target/usr/local/lib:${hadoop.common.build.dir}/native/target/usr/local/lib</LD_LIBRARY_PATH>
+            <LD_LIBRARY_PATH>${env.LD_LIBRARY_PATH}:${project.build.directory}/native/target/usr/local/lib:${hadoop.common.build.dir}/native/target/usr/local/lib:${session.executionRootDirectory}/target/lib</LD_LIBRARY_PATH>
             <MALLOC_ARENA_MAX>4</MALLOC_ARENA_MAX>
           </environmentVariables>
           <systemPropertyVariables>
@@ -1155,7 +1161,7 @@
                 <id>dist-enforce</id>
                 <phase>package</phase>
                 <goals>
-                 <goal>enforce</goal>
+                  <goal>enforce</goal>
                 </goals>
               </execution>
             </executions>

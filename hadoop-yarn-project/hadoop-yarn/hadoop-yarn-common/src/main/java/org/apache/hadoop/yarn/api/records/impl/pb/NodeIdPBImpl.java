@@ -19,16 +19,31 @@
 package org.apache.hadoop.yarn.api.records.impl.pb;
 
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.proto.YarnProtos.NodeIdProto;
 
-import com.google.common.base.Preconditions;
-
 @Private
 @Unstable
 public class NodeIdPBImpl extends NodeId {
+
+
+  private int id = Integer.MIN_VALUE;
+
+
+  @Override
+  public int getId() {
+    return this.id;
+  }
+
+  @Override
+  public void setId(int id) {
+    this.id = id;
+  }
+
+
   NodeIdProto proto = null;
   NodeIdProto.Builder builder = null;
   

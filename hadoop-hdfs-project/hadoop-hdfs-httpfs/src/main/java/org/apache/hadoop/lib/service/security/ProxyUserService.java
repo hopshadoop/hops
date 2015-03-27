@@ -64,8 +64,10 @@ public class ProxyUserService extends BaseService implements ProxyUser {
   private static final String GROUPS = ".groups";
   private static final String HOSTS = ".hosts";
 
-  private Map<String, Set<String>> proxyUserHosts = new HashMap<String, Set<String>>();
-  private Map<String, Set<String>> proxyUserGroups = new HashMap<String, Set<String>>();
+  private Map<String, Set<String>> proxyUserHosts =
+      new HashMap<String, Set<String>>();
+  private Map<String, Set<String>> proxyUserGroups =
+      new HashMap<String, Set<String>>();
 
   public ProxyUserService() {
     super(PREFIX);
@@ -88,7 +90,8 @@ public class ProxyUserService extends BaseService implements ProxyUser {
       if (key.endsWith(GROUPS)) {
         String proxyUser = key.substring(0, key.lastIndexOf(GROUPS));
         if (getServiceConfig().get(proxyUser + HOSTS) == null) {
-          throw new ServiceException(ERROR.PRXU02, getPrefixedName(proxyUser + HOSTS));
+          throw new ServiceException(ERROR.PRXU02,
+              getPrefixedName(proxyUser + HOSTS));
         }
         String value = entry.getValue().trim();
         LOG.info("Loading proxyuser settings [{}]=[{}]", key, value);
@@ -101,7 +104,8 @@ public class ProxyUserService extends BaseService implements ProxyUser {
       if (key.endsWith(HOSTS)) {
         String proxyUser = key.substring(0, key.lastIndexOf(HOSTS));
         if (getServiceConfig().get(proxyUser + GROUPS) == null) {
-          throw new ServiceException(ERROR.PRXU02, getPrefixedName(proxyUser + GROUPS));
+          throw new ServiceException(ERROR.PRXU02,
+              getPrefixedName(proxyUser + GROUPS));
         }
         String value = entry.getValue().trim();
         LOG.info("Loading proxyuser settings [{}]=[{}]", key, value);
@@ -113,9 +117,11 @@ public class ProxyUserService extends BaseService implements ProxyUser {
             try {
               hosts[i] = normalizeHostname(originalName);
             } catch (Exception ex) {
-              throw new ServiceException(ERROR.PRXU01, originalName, ex.getMessage(), ex);
+              throw new ServiceException(ERROR.PRXU01, originalName,
+                  ex.getMessage(), ex);
             }
-            LOG.info("  Hostname, original [{}], normalized [{}]", originalName, hosts[i]);
+            LOG.info("  Hostname, original [{}], normalized [{}]", originalName,
+                hosts[i]);
           }
           values = new HashSet<String>(Arrays.asList(hosts));
         }
@@ -125,34 +131,38 @@ public class ProxyUserService extends BaseService implements ProxyUser {
   }
 
   @Override
-  public void validate(String proxyUser, String proxyHost, String doAsUser) throws IOException,
-    AccessControlException {
+  public void validate(String proxyUser, String proxyHost, String doAsUser)
+      throws IOException, AccessControlException {
     Check.notEmpty(proxyUser, "proxyUser");
     Check.notEmpty(proxyHost, "proxyHost");
     Check.notEmpty(doAsUser, "doAsUser");
     LOG.debug("Authorization check proxyuser [{}] host [{}] doAs [{}]",
-              new Object[]{proxyUser, proxyHost, doAsUser});
+        new Object[]{proxyUser, proxyHost, doAsUser});
     if (proxyUserHosts.containsKey(proxyUser)) {
       proxyHost = normalizeHostname(proxyHost);
-      validateRequestorHost(proxyUser, proxyHost, proxyUserHosts.get(proxyUser));
+      validateRequestorHost(proxyUser, proxyHost,
+          proxyUserHosts.get(proxyUser));
       validateGroup(proxyUser, doAsUser, proxyUserGroups.get(proxyUser));
     } else {
-      throw new AccessControlException(MessageFormat.format("User [{0}] not defined as proxyuser", proxyUser));
+      throw new AccessControlException(MessageFormat
+          .format("User [{0}] not defined as proxyuser", proxyUser));
     }
   }
 
-  private void validateRequestorHost(String proxyUser, String hostname, Set<String> validHosts)
-    throws IOException, AccessControlException {
+  private void validateRequestorHost(String proxyUser, String hostname,
+      Set<String> validHosts) throws IOException, AccessControlException {
     if (validHosts != null) {
-      if (!validHosts.contains(hostname) && !validHosts.contains(normalizeHostname(hostname))) {
-        throw new AccessControlException(MessageFormat.format("Unauthorized host [{0}] for proxyuser [{1}]",
-                                                              hostname, proxyUser));
+      if (!validHosts.contains(hostname) &&
+          !validHosts.contains(normalizeHostname(hostname))) {
+        throw new AccessControlException(MessageFormat
+            .format("Unauthorized host [{0}] for proxyuser [{1}]", hostname,
+                proxyUser));
       }
     }
   }
 
-  private void validateGroup(String proxyUser, String user, Set<String> validGroups) throws IOException,
-    AccessControlException {
+  private void validateGroup(String proxyUser, String user,
+      Set<String> validGroups) throws IOException, AccessControlException {
     if (validGroups != null) {
       List<String> userGroups = getServer().get(Groups.class).getGroups(user);
       for (String g : validGroups) {
@@ -160,9 +170,9 @@ public class ProxyUserService extends BaseService implements ProxyUser {
           return;
         }
       }
-      throw new AccessControlException(
-        MessageFormat.format("Unauthorized proxyuser [{0}] for user [{1}], not in proxyuser groups",
-                             proxyUser, user));
+      throw new AccessControlException(MessageFormat.format(
+          "Unauthorized proxyuser [{0}] for user [{1}], not in proxyuser groups",
+          proxyUser, user));
     }
   }
 
@@ -171,8 +181,8 @@ public class ProxyUserService extends BaseService implements ProxyUser {
       InetAddress address = InetAddress.getByName(name);
       return address.getCanonicalHostName();
     } catch (IOException ex) {
-      throw new AccessControlException(MessageFormat.format("Could not resolve host [{0}], {1}", name,
-                                                            ex.getMessage()));
+      throw new AccessControlException(MessageFormat
+          .format("Could not resolve host [{0}], {1}", name, ex.getMessage()));
     }
   }
 

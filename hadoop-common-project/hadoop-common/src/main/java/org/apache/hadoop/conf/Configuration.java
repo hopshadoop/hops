@@ -950,6 +950,7 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
    * @param value property value.
    */
   public void set(String name, String value) {
+    LOG.debug("conf set " + name + " value " + value);
     set(name, value, null);
   }
   
@@ -1765,6 +1766,10 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
     return NetUtils.createSocketAddr(address, defaultPort, name);
   }
 
+  public int getPort(
+      String name, int defaultPort) {
+    return getInt(name, defaultPort);
+  }
   /**
    * Set the socket address for the <code>name</code> property as
    * a <code>host:port</code>.

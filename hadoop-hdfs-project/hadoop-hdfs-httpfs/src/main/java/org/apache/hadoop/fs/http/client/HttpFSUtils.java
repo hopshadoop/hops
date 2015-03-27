@@ -50,35 +50,32 @@ public class HttpFSUtils {
    * HttpFSServer file system operations.
    * <p/>
    *
-   * @param path the file path.
-   * @param params the query string parameters.
-   *
+   * @param path
+   *     the file path.
+   * @param params
+   *     the query string parameters.
    * @return a <code>URL</code> for the HttpFSServer server,
-   *
-   * @throws IOException thrown if an IO error occurs.
+   * @throws IOException
+   *     thrown if an IO error occurrs.
    */
-  static URL createURL(Path path, Map<String, String> params)
-    throws IOException {
+  static URL createHttpURL(Path path, Map<String, String> params)
+      throws IOException {
     URI uri = path.toUri();
     String realScheme;
     if (uri.getScheme().equalsIgnoreCase(HttpFSFileSystem.SCHEME)) {
       realScheme = "http";
-    } else if (uri.getScheme().equalsIgnoreCase(HttpsFSFileSystem.SCHEME)) {
-      realScheme = "https";
-
     } else {
-      throw new IllegalArgumentException(MessageFormat.format(
-        "Invalid scheme [{0}] it should be '" + HttpFSFileSystem.SCHEME + "' " +
-            "or '" + HttpsFSFileSystem.SCHEME + "'", uri));
+      throw new IllegalArgumentException(MessageFormat
+          .format("Invalid scheme [{0}] it should be 'webhdfs'", uri));
     }
     StringBuilder sb = new StringBuilder();
     sb.append(realScheme).append("://").append(uri.getAuthority()).
-      append(SERVICE_PATH).append(uri.getPath());
+        append(SERVICE_PATH).append(uri.getPath());
 
     String separator = "?";
     for (Map.Entry<String, String> entry : params.entrySet()) {
       sb.append(separator).append(entry.getKey()).append("=").
-        append(URLEncoder.encode(entry.getValue(), "UTF8"));
+          append(URLEncoder.encode(entry.getValue(), "UTF8"));
       separator = "&";
     }
     return new URL(sb.toString());
@@ -90,25 +87,27 @@ public class HttpFSUtils {
    * one it throws an exception with a detail message using Server side error
    * messages if available.
    *
-   * @param conn the <code>HttpURLConnection</code>.
-   * @param expected the expected HTTP status code.
-   *
-   * @throws IOException thrown if the current status code does not match the
-   * expected one.
+   * @param conn
+   *     the <code>HttpURLConnection</code>.
+   * @param expected
+   *     the expected HTTP status code.
+   * @throws IOException
+   *     thrown if the current status code does not match the
+   *     expected one.
    */
   @SuppressWarnings({"unchecked", "deprecation"})
   static void validateResponse(HttpURLConnection conn, int expected)
-    throws IOException {
+      throws IOException {
     int status = conn.getResponseCode();
     if (status != expected) {
       try {
         JSONObject json = (JSONObject) HttpFSUtils.jsonParse(conn);
         json = (JSONObject) json.get(HttpFSFileSystem.ERROR_JSON);
         String message = (String) json.get(HttpFSFileSystem.ERROR_MESSAGE_JSON);
-        String exception = (String)
-          json.get(HttpFSFileSystem.ERROR_EXCEPTION_JSON);
-        String className = (String)
-          json.get(HttpFSFileSystem.ERROR_CLASSNAME_JSON);
+        String exception =
+            (String) json.get(HttpFSFileSystem.ERROR_EXCEPTION_JSON);
+        String className =
+            (String) json.get(HttpFSFileSystem.ERROR_CLASSNAME_JSON);
 
         try {
           ClassLoader cl = HttpFSFileSystem.class.getClassLoader();
@@ -118,16 +117,16 @@ public class HttpFSUtils {
         } catch (IOException ex) {
           throw ex;
         } catch (Exception ex) {
-          throw new IOException(MessageFormat.format("{0} - {1}", exception,
-                                                     message));
+          throw new IOException(
+              MessageFormat.format("{0} - {1}", exception, message));
         }
       } catch (IOException ex) {
         if (ex.getCause() instanceof IOException) {
           throw (IOException) ex.getCause();
         }
-        throw new IOException(
-          MessageFormat.format("HTTP status [{0}], {1}",
-                               status, conn.getResponseMessage()));
+        throw new IOException(MessageFormat
+            .format("HTTP status [{0}], {1}", status,
+                conn.getResponseMessage()));
       }
     }
   }
@@ -136,12 +135,12 @@ public class HttpFSUtils {
    * Convenience method that JSON Parses the <code>InputStream</code> of a
    * <code>HttpURLConnection</code>.
    *
-   * @param conn the <code>HttpURLConnection</code>.
-   *
+   * @param conn
+   *     the <code>HttpURLConnection</code>.
    * @return the parsed JSON object.
-   *
-   * @throws IOException thrown if the <code>InputStream</code> could not be
-   * JSON parsed.
+   * @throws IOException
+   *     thrown if the <code>InputStream</code> could not be
+   *     JSON parsed.
    */
   static Object jsonParse(HttpURLConnection conn) throws IOException {
     try {

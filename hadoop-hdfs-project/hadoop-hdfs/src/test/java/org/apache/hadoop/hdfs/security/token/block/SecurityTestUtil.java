@@ -18,11 +18,13 @@
 
 package org.apache.hadoop.hdfs.security.token.block;
 
-import java.io.IOException;
-
 import org.apache.hadoop.security.token.Token;
 
-/** Utilities for security tests */
+import java.io.IOException;
+
+/**
+ * Utilities for security tests
+ */
 public class SecurityTestUtil {
 
   /**

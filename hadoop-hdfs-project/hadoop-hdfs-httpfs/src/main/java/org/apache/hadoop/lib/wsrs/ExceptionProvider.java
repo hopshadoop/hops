@@ -35,15 +35,19 @@ public class ExceptionProvider implements ExceptionMapper<Throwable> {
 
   private static final String ENTER = System.getProperty("line.separator");
 
-  protected Response createResponse(Response.Status status, Throwable throwable) {
+  protected Response createResponse(Response.Status status,
+      Throwable throwable) {
     Map<String, Object> json = new LinkedHashMap<String, Object>();
     json.put(HttpFSFileSystem.ERROR_MESSAGE_JSON, getOneLineMessage(throwable));
-    json.put(HttpFSFileSystem.ERROR_EXCEPTION_JSON, throwable.getClass().getSimpleName());
-    json.put(HttpFSFileSystem.ERROR_CLASSNAME_JSON, throwable.getClass().getName());
+    json.put(HttpFSFileSystem.ERROR_EXCEPTION_JSON,
+        throwable.getClass().getSimpleName());
+    json.put(HttpFSFileSystem.ERROR_CLASSNAME_JSON,
+        throwable.getClass().getName());
     Map<String, Object> response = new LinkedHashMap<String, Object>();
     response.put(HttpFSFileSystem.ERROR_JSON, json);
     log(status, throwable);
-    return Response.status(status).type(MediaType.APPLICATION_JSON).entity(response).build();
+    return Response.status(status).type(MediaType.APPLICATION_JSON)
+        .entity(response).build();
   }
 
   protected String getOneLineMessage(Throwable throwable) {

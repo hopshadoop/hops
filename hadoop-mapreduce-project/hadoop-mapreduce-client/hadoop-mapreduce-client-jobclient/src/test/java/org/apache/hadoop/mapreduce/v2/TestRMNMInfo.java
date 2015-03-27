@@ -139,7 +139,7 @@ public class TestRMNMInfo {
     ConcurrentMap<NodeId, RMNode> map = new ConcurrentHashMap<NodeId, RMNode>();
     RMNode node = MockNodes.newNodeInfo(1, MockNodes.newResource(4 * 1024));
     map.put(node.getNodeID(), node);
-    when(rmc.getRMNodes()).thenReturn(map);
+    when(rmc.getActiveRMNodes()).thenReturn(map);
     
     RMNMInfo rmInfo = new RMNMInfo(rmc,rms);
     String liveNMs = rmInfo.getLiveNodeManagers();

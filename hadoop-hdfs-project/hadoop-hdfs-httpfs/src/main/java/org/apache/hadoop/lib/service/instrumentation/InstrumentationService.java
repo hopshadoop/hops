@@ -41,7 +41,8 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 @InterfaceAudience.Private
-public class InstrumentationService extends BaseService implements Instrumentation {
+public class InstrumentationService extends BaseService
+    implements Instrumentation {
   public static final String PREFIX = "instrumentation";
   public static final String CONF_TIMERS_SIZE = "timers.size";
 
@@ -69,7 +70,8 @@ public class InstrumentationService extends BaseService implements Instrumentati
     timerLock = new ReentrantLock();
     variableLock = new ReentrantLock();
     samplerLock = new ReentrantLock();
-    Map<String, VariableHolder> jvmVariables = new ConcurrentHashMap<String, VariableHolder>();
+    Map<String, VariableHolder> jvmVariables =
+        new ConcurrentHashMap<String, VariableHolder>();
     counters = new ConcurrentHashMap<String, Map<String, AtomicLong>>();
     timers = new ConcurrentHashMap<String, Map<String, Timer>>();
     variables = new ConcurrentHashMap<String, Map<String, VariableHolder>>();
@@ -84,24 +86,27 @@ public class InstrumentationService extends BaseService implements Instrumentati
     all.put("variables", (Map) variables);
     all.put("samplers", (Map) samplers);
 
-    jvmVariables.put("free.memory", new VariableHolder<Long>(new Instrumentation.Variable<Long>() {
-      @Override
-      public Long getValue() {
-        return Runtime.getRuntime().freeMemory();
-      }
-    }));
-    jvmVariables.put("max.memory", new VariableHolder<Long>(new Instrumentation.Variable<Long>() {
-      @Override
-      public Long getValue() {
-        return Runtime.getRuntime().maxMemory();
-      }
-    }));
-    jvmVariables.put("total.memory", new VariableHolder<Long>(new Instrumentation.Variable<Long>() {
-      @Override
-      public Long getValue() {
-        return Runtime.getRuntime().totalMemory();
-      }
-    }));
+    jvmVariables.put("free.memory",
+        new VariableHolder<Long>(new Instrumentation.Variable<Long>() {
+          @Override
+          public Long getValue() {
+            return Runtime.getRuntime().freeMemory();
+          }
+        }));
+    jvmVariables.put("max.memory",
+        new VariableHolder<Long>(new Instrumentation.Variable<Long>() {
+          @Override
+          public Long getValue() {
+            return Runtime.getRuntime().maxMemory();
+          }
+        }));
+    jvmVariables.put("total.memory",
+        new VariableHolder<Long>(new Instrumentation.Variable<Long>() {
+          @Override
+          public Long getValue() {
+            return Runtime.getRuntime().totalMemory();
+          }
+        }));
   }
 
   @Override
@@ -118,7 +123,8 @@ public class InstrumentationService extends BaseService implements Instrumentati
   }
 
   @SuppressWarnings("unchecked")
-  private <T> T getToAdd(String group, String name, Class<T> klass, Lock lock, Map<String, Map<String, T>> map) {
+  private <T> T getToAdd(String group, String name, Class<T> klass, Lock lock,
+      Map<String, Map<String, T>> map) {
     boolean locked = false;
     try {
       Map<String, T> groupMap = map.get(group);
@@ -284,7 +290,8 @@ public class InstrumentationService extends BaseService implements Instrumentati
 
   @Override
   public void incr(String group, String name, long count) {
-    AtomicLong counter = getToAdd(group, name, AtomicLong.class, counterLock, counters);
+    AtomicLong counter =
+        getToAdd(group, name, AtomicLong.class, counterLock, counters);
     counter.addAndGet(count);
   }
 
@@ -325,7 +332,8 @@ public class InstrumentationService extends BaseService implements Instrumentati
 
   @Override
   public void addVariable(String group, String name, Variable<?> variable) {
-    VariableHolder holder = getToAdd(group, name, VariableHolder.class, variableLock, variables);
+    VariableHolder holder =
+        getToAdd(group, name, VariableHolder.class, variableLock, variables);
     holder.var = variable;
   }
 
@@ -353,7 +361,8 @@ public class InstrumentationService extends BaseService implements Instrumentati
     }
 
     double getRate() {
-      return ((double) sum.get()) / ((full) ? values.length : ((last == 0) ? 1 : last));
+      return ((double) sum.get()) /
+          ((full) ? values.length : ((last == 0) ? 1 : last));
     }
 
     @SuppressWarnings("unchecked")
@@ -376,8 +385,10 @@ public class InstrumentationService extends BaseService implements Instrumentati
   }
 
   @Override
-  public void addSampler(String group, String name, int samplingSize, Variable<Long> variable) {
-    Sampler sampler = getToAdd(group, name, Sampler.class, samplerLock, samplers);
+  public void addSampler(String group, String name, int samplingSize,
+      Variable<Long> variable) {
+    Sampler sampler =
+        getToAdd(group, name, Sampler.class, samplerLock, samplers);
     samplerLock.lock();
     try {
       sampler.init(samplingSize, variable);

@@ -46,7 +46,8 @@ public interface Instrumentation {
   public void addVariable(String group, String name, Variable<?> variable);
 
   //sampling happens once a second
-  public void addSampler(String group, String name, int samplingSize, Variable<Long> variable);
+  public void addSampler(String group, String name, int samplingSize,
+      Variable<Long> variable);
 
   public Map<String, Map<String, ?>> getSnapshot();
 

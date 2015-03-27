@@ -18,12 +18,8 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair;
 
-import static org.junit.Assert.assertTrue;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
-import java.io.IOException;
-
+import io.hops.metadata.util.RMStorageFactory;
+import io.hops.metadata.util.YarnAPIStorageFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
@@ -34,6 +30,12 @@ import org.apache.hadoop.yarn.util.resource.Resources;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
+
+import java.io.IOException;
+
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 public class TestFSLeafQueue {
   private FSLeafQueue schedulable = null;
@@ -47,13 +49,16 @@ public class TestFSLeafQueue {
     conf.set(FairSchedulerConfiguration.ASSIGN_MULTIPLE, "false");
     ResourceManager resourceManager = new ResourceManager();
     resourceManager.init(conf);
-    ((AsyncDispatcher)resourceManager.getRMContext().getDispatcher()).start();
+    ((AsyncDispatcher) resourceManager.getRMContext().getDispatcher()).start();
     scheduler.reinitialize(conf, resourceManager.getRMContext());
-    
+    YarnAPIStorageFactory.setConfiguration(conf);
+    RMStorageFactory.setConfiguration(conf);
     String queueName = "root.queue1";
     scheduler.allocConf = mock(AllocationConfiguration.class);
-    when(scheduler.allocConf.getMaxResources(queueName)).thenReturn(maxResource);
-    when(scheduler.allocConf.getMinResources(queueName)).thenReturn(Resources.none());
+    when(scheduler.allocConf.getMaxResources(queueName))
+        .thenReturn(maxResource);
+    when(scheduler.allocConf.getMinResources(queueName))
+        .thenReturn(Resources.none());
 
     schedulable = new FSLeafQueue(queueName, scheduler, null);
   }

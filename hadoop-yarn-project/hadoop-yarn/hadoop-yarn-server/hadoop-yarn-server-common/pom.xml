@@ -13,16 +13,16 @@
   limitations under the License. See accompanying LICENSE file.
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
                       http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <artifactId>hadoop-yarn-server</artifactId>
-    <groupId>org.apache.hadoop</groupId>
+    <groupId>io.hops</groupId>
     <version>2.4.0</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
-  <groupId>org.apache.hadoop</groupId>
+  <groupId>io.hops</groupId>
   <artifactId>hadoop-yarn-server-common</artifactId>
   <version>2.4.0</version>
   <name>hadoop-yarn-server-common</name>
@@ -35,7 +35,7 @@
   <dependencies>
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-common</artifactId>
       <scope>provided</scope>
       <exclusions>
@@ -59,7 +59,7 @@
     </dependency>
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-common</artifactId>
       <type>test-jar</type>
       <scope>test</scope>
@@ -67,12 +67,12 @@
 
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-yarn-api</artifactId>
     </dependency>
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-yarn-common</artifactId>
     </dependency>
 
@@ -87,7 +87,7 @@
 
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-annotations</artifactId>
     </dependency>
     <dependency>
@@ -98,10 +98,6 @@
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
       <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.zookeeper</groupId>
-      <artifactId>zookeeper</artifactId>
     </dependency>
   </dependencies>
 
@@ -117,7 +113,8 @@
             </goals>
             <configuration>
               <tasks>
-                <copy file="src/main/xsl/configuration.xsl" todir="src/site/resources"/>
+                <copy file="src/main/xsl/configuration.xsl"
+                      todir="src/site/resources"/>
               </tasks>
             </configuration>
           </execution>
@@ -125,7 +122,7 @@
       </plugin>
 
       <plugin>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-maven-plugins</artifactId>
         <executions>
           <execution>
@@ -138,7 +135,9 @@
               <protocVersion>${protobuf.version}</protocVersion>
               <protocCommand>${protoc.path}</protocCommand>
               <imports>
-                <param>${basedir}/../../../../hadoop-common-project/hadoop-common/src/main/proto</param>
+                <param>
+                  ${basedir}/../../../../hadoop-common-project/hadoop-common/src/main/proto
+                </param>
                 <param>${basedir}/../../hadoop-yarn-api/src/main/proto</param>
                 <param>${basedir}/src/main/proto</param>
               </imports>

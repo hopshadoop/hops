@@ -19,7 +19,6 @@
 package org.apache.hadoop.yarn.api;
 
 import junit.framework.Assert;
-
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.junit.Test;
 

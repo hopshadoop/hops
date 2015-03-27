@@ -86,6 +86,7 @@ import com.codahale.metrics.Histogram;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.SlidingWindowReservoir;
 import com.codahale.metrics.Timer;
+import io.hops.ha.common.TransactionState;
 
 public class ResourceSchedulerWrapper implements ResourceScheduler,
         Configurable {
@@ -190,13 +191,13 @@ public class ResourceSchedulerWrapper implements ResourceScheduler,
   public Allocation allocate(ApplicationAttemptId attemptId,
                              List<ResourceRequest> resourceRequests,
                              List<ContainerId> containerIds,
-                             List<String> strings, List<String> strings2) {
+                             List<String> strings, List<String> strings2, TransactionState transactionState) {
     if (metricsON) {
       final Timer.Context context = schedulerAllocateTimer.time();
       Allocation allocation = null;
       try {
         allocation = scheduler.allocate(attemptId, resourceRequests,
-                containerIds, strings, strings2);
+                containerIds, strings, strings2, transactionState);
         return allocation;
       } finally {
         context.stop();
@@ -210,7 +211,7 @@ public class ResourceSchedulerWrapper implements ResourceScheduler,
       }
     } else {
       return scheduler.allocate(attemptId,
-              resourceRequests, containerIds, strings, strings2);
+              resourceRequests, containerIds, strings, strings2, transactionState);
     }
   }
 

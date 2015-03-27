@@ -18,12 +18,6 @@
 
 package org.apache.hadoop.lib.service.hadoop;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.util.Arrays;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
@@ -44,6 +38,12 @@ import org.apache.hadoop.util.StringUtils;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.Arrays;
 
 public class TestFileSystemAccessService extends HFSTestCase {
 
@@ -66,10 +66,10 @@ public class TestFileSystemAccessService extends HFSTestCase {
   @TestDir
   public void simpleSecurity() throws Exception {
     String dir = TestDirHelper.getTestDir().getAbsolutePath();
-    String services = StringUtils.join(",",
-      Arrays.asList(InstrumentationService.class.getName(),
-                    SchedulerService.class.getName(),
-                    FileSystemAccessService.class.getName()));
+    String services = StringUtils.join(",", Arrays
+            .asList(InstrumentationService.class.getName(),
+                SchedulerService.class.getName(),
+                FileSystemAccessService.class.getName()));
     Configuration conf = new Configuration(false);
     conf.set("server.services", services);
     Server server = new Server("server", dir, dir, dir, dir, conf);
@@ -83,10 +83,10 @@ public class TestFileSystemAccessService extends HFSTestCase {
   @TestDir
   public void noKerberosKeytabProperty() throws Exception {
     String dir = TestDirHelper.getTestDir().getAbsolutePath();
-    String services = StringUtils.join(",",
-    Arrays.asList(InstrumentationService.class.getName(),
-                  SchedulerService.class.getName(),
-                  FileSystemAccessService.class.getName()));
+    String services = StringUtils.join(",", Arrays
+            .asList(InstrumentationService.class.getName(),
+                SchedulerService.class.getName(),
+                FileSystemAccessService.class.getName()));
     Configuration conf = new Configuration(false);
     conf.set("server.services", services);
     conf.set("server.hadoop.authentication.type", "kerberos");
@@ -100,10 +100,10 @@ public class TestFileSystemAccessService extends HFSTestCase {
   @TestDir
   public void noKerberosPrincipalProperty() throws Exception {
     String dir = TestDirHelper.getTestDir().getAbsolutePath();
-    String services = StringUtils.join(",",
-      Arrays.asList(InstrumentationService.class.getName(),
-                    SchedulerService.class.getName(),
-                    FileSystemAccessService.class.getName()));
+    String services = StringUtils.join(",", Arrays
+            .asList(InstrumentationService.class.getName(),
+                SchedulerService.class.getName(),
+                FileSystemAccessService.class.getName()));
     Configuration conf = new Configuration(false);
     conf.set("server.services", services);
     conf.set("server.hadoop.authentication.type", "kerberos");
@@ -118,10 +118,10 @@ public class TestFileSystemAccessService extends HFSTestCase {
   @TestDir
   public void kerberosInitializationFailure() throws Exception {
     String dir = TestDirHelper.getTestDir().getAbsolutePath();
-    String services = StringUtils.join(",",
-      Arrays.asList(InstrumentationService.class.getName(),
-                    SchedulerService.class.getName(),
-                    FileSystemAccessService.class.getName()));
+    String services = StringUtils.join(",", Arrays
+            .asList(InstrumentationService.class.getName(),
+                SchedulerService.class.getName(),
+                FileSystemAccessService.class.getName()));
     Configuration conf = new Configuration(false);
     conf.set("server.services", services);
     conf.set("server.hadoop.authentication.type", "kerberos");
@@ -136,10 +136,10 @@ public class TestFileSystemAccessService extends HFSTestCase {
   @TestDir
   public void invalidSecurity() throws Exception {
     String dir = TestDirHelper.getTestDir().getAbsolutePath();
-    String services = StringUtils.join(",",
-      Arrays.asList(InstrumentationService.class.getName(),
-                    SchedulerService.class.getName(),
-                    FileSystemAccessService.class.getName()));
+    String services = StringUtils.join(",", Arrays
+            .asList(InstrumentationService.class.getName(),
+                SchedulerService.class.getName(),
+                FileSystemAccessService.class.getName()));
     Configuration conf = new Configuration(false);
     conf.set("server.services", services);
     conf.set("server.hadoop.authentication.type", "foo");
@@ -151,16 +151,17 @@ public class TestFileSystemAccessService extends HFSTestCase {
   @TestDir
   public void serviceHadoopConf() throws Exception {
     String dir = TestDirHelper.getTestDir().getAbsolutePath();
-    String services = StringUtils.join(",",
-      Arrays.asList(InstrumentationService.class.getName(),
-                    SchedulerService.class.getName(),
-                    FileSystemAccessService.class.getName()));
+    String services = StringUtils.join(",", Arrays
+            .asList(InstrumentationService.class.getName(),
+                SchedulerService.class.getName(),
+                FileSystemAccessService.class.getName()));
     Configuration conf = new Configuration(false);
     conf.set("server.services", services);
 
     Server server = new Server("server", dir, dir, dir, dir, conf);
     server.init();
-    FileSystemAccessService fsAccess = (FileSystemAccessService) server.get(FileSystemAccess.class);
+    FileSystemAccessService fsAccess =
+        (FileSystemAccessService) server.get(FileSystemAccess.class);
     Assert.assertEquals(fsAccess.serviceHadoopConf.get("foo"), "FOO");
     server.destroy();
   }
@@ -171,10 +172,10 @@ public class TestFileSystemAccessService extends HFSTestCase {
     String dir = TestDirHelper.getTestDir().getAbsolutePath();
     String hadoopConfDir = new File(dir, "confx").getAbsolutePath();
     new File(hadoopConfDir).mkdirs();
-    String services = StringUtils.join(",",
-      Arrays.asList(InstrumentationService.class.getName(),
-                    SchedulerService.class.getName(),
-                    FileSystemAccessService.class.getName()));
+    String services = StringUtils.join(",", Arrays
+            .asList(InstrumentationService.class.getName(),
+                SchedulerService.class.getName(),
+                FileSystemAccessService.class.getName()));
     Configuration conf = new Configuration(false);
     conf.set("server.services", services);
     conf.set("server.hadoop.config.dir", hadoopConfDir);
@@ -188,7 +189,8 @@ public class TestFileSystemAccessService extends HFSTestCase {
 
     Server server = new Server("server", dir, dir, dir, dir, conf);
     server.init();
-    FileSystemAccessService fsAccess = (FileSystemAccessService) server.get(FileSystemAccess.class);
+    FileSystemAccessService fsAccess =
+        (FileSystemAccessService) server.get(FileSystemAccess.class);
     Assert.assertEquals(fsAccess.serviceHadoopConf.get("foo"), "BAR");
     server.destroy();
   }
@@ -197,15 +199,16 @@ public class TestFileSystemAccessService extends HFSTestCase {
   @TestDir
   public void inWhitelists() throws Exception {
     String dir = TestDirHelper.getTestDir().getAbsolutePath();
-    String services = StringUtils.join(",",
-      Arrays.asList(InstrumentationService.class.getName(),
-                    SchedulerService.class.getName(),
-                    FileSystemAccessService.class.getName()));
+    String services = StringUtils.join(",", Arrays
+            .asList(InstrumentationService.class.getName(),
+                SchedulerService.class.getName(),
+                FileSystemAccessService.class.getName()));
     Configuration conf = new Configuration(false);
     conf.set("server.services", services);
     Server server = new Server("server", dir, dir, dir, dir, conf);
     server.init();
-    FileSystemAccessService fsAccess = (FileSystemAccessService) server.get(FileSystemAccess.class);
+    FileSystemAccessService fsAccess =
+        (FileSystemAccessService) server.get(FileSystemAccess.class);
     fsAccess.validateNamenode("NN");
     server.destroy();
 
@@ -229,20 +232,22 @@ public class TestFileSystemAccessService extends HFSTestCase {
   }
 
   @Test
-  @TestException(exception = FileSystemAccessException.class, msgRegExp = "H05.*")
+  @TestException(exception = FileSystemAccessException.class,
+      msgRegExp = "H05.*")
   @TestDir
   public void NameNodeNotinWhitelists() throws Exception {
     String dir = TestDirHelper.getTestDir().getAbsolutePath();
-    String services = StringUtils.join(",",
-      Arrays.asList(InstrumentationService.class.getName(),
-                    SchedulerService.class.getName(),
-                    FileSystemAccessService.class.getName()));
+    String services = StringUtils.join(",", Arrays
+            .asList(InstrumentationService.class.getName(),
+                SchedulerService.class.getName(),
+                FileSystemAccessService.class.getName()));
     Configuration conf = new Configuration(false);
     conf.set("server.services", services);
     conf.set("server.hadoop.name.node.whitelist", "NN");
     Server server = new Server("server", dir, dir, dir, dir, conf);
     server.init();
-    FileSystemAccessService fsAccess = (FileSystemAccessService) server.get(FileSystemAccess.class);
+    FileSystemAccessService fsAccess =
+        (FileSystemAccessService) server.get(FileSystemAccess.class);
     fsAccess.validateNamenode("NNx");
   }
 
@@ -251,13 +256,15 @@ public class TestFileSystemAccessService extends HFSTestCase {
   @TestHdfs
   public void createFileSystem() throws Exception {
     String dir = TestDirHelper.getTestDir().getAbsolutePath();
-    String services = StringUtils.join(",",
-      Arrays.asList(InstrumentationService.class.getName(),
-                    SchedulerService.class.getName(),
-                    FileSystemAccessService.class.getName()));
+    String services = StringUtils.join(",", Arrays
+            .asList(InstrumentationService.class.getName(),
+                SchedulerService.class.getName(),
+                FileSystemAccessService.class.getName()));
 
     Configuration hadoopConf = new Configuration(false);
-    hadoopConf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, TestHdfsHelper.getHdfsConf().get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY));
+    hadoopConf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY,
+        TestHdfsHelper.getHdfsConf()
+            .get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY));
     createHadoopConf(hadoopConf);
 
     Configuration conf = new Configuration(false);
@@ -266,7 +273,8 @@ public class TestFileSystemAccessService extends HFSTestCase {
     Server server = new Server("server", dir, dir, dir, dir, conf);
     server.init();
     FileSystemAccess hadoop = server.get(FileSystemAccess.class);
-    FileSystem fs = hadoop.createFileSystem("u", hadoop.getFileSystemConfiguration());
+    FileSystem fs =
+        hadoop.createFileSystem("u", hadoop.getFileSystemConfiguration());
     Assert.assertNotNull(fs);
     fs.mkdirs(new Path("/tmp/foo"));
     hadoop.releaseFileSystem(fs);
@@ -285,13 +293,15 @@ public class TestFileSystemAccessService extends HFSTestCase {
   @TestHdfs
   public void fileSystemExecutor() throws Exception {
     String dir = TestDirHelper.getTestDir().getAbsolutePath();
-    String services = StringUtils.join(",",
-      Arrays.asList(InstrumentationService.class.getName(),
-                    SchedulerService.class.getName(),
-                    FileSystemAccessService.class.getName()));
+    String services = StringUtils.join(",", Arrays
+            .asList(InstrumentationService.class.getName(),
+                SchedulerService.class.getName(),
+                FileSystemAccessService.class.getName()));
 
     Configuration hadoopConf = new Configuration(false);
-    hadoopConf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, TestHdfsHelper.getHdfsConf().get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY));
+    hadoopConf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY,
+        TestHdfsHelper.getHdfsConf()
+            .get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY));
     createHadoopConf(hadoopConf);
 
     Configuration conf = new Configuration(false);
@@ -303,14 +313,15 @@ public class TestFileSystemAccessService extends HFSTestCase {
 
     final FileSystem fsa[] = new FileSystem[1];
 
-    hadoop.execute("u", hadoop.getFileSystemConfiguration(), new FileSystemAccess.FileSystemExecutor<Void>() {
-      @Override
-      public Void execute(FileSystem fs) throws IOException {
-        fs.mkdirs(new Path("/tmp/foo"));
-        fsa[0] = fs;
-        return null;
-      }
-    });
+    hadoop.execute("u", hadoop.getFileSystemConfiguration(),
+        new FileSystemAccess.FileSystemExecutor<Void>() {
+          @Override
+          public Void execute(FileSystem fs) throws IOException {
+            fs.mkdirs(new Path("/tmp/foo"));
+            fsa[0] = fs;
+            return null;
+          }
+        });
     try {
       fsa[0].mkdirs(new Path("/tmp/foo"));
       Assert.fail();
@@ -322,17 +333,20 @@ public class TestFileSystemAccessService extends HFSTestCase {
   }
 
   @Test
-  @TestException(exception = FileSystemAccessException.class, msgRegExp = "H06.*")
+  @TestException(exception = FileSystemAccessException.class,
+      msgRegExp = "H06.*")
   @TestDir
   @TestHdfs
   public void fileSystemExecutorNoNameNode() throws Exception {
     String dir = TestDirHelper.getTestDir().getAbsolutePath();
-    String services = StringUtils.join(",",
-      Arrays.asList(InstrumentationService.class.getName(),
-                    SchedulerService.class.getName(),
-                    FileSystemAccessService.class.getName()));
+    String services = StringUtils.join(",", Arrays
+            .asList(InstrumentationService.class.getName(),
+                SchedulerService.class.getName(),
+                FileSystemAccessService.class.getName()));
     Configuration hadoopConf = new Configuration(false);
-    hadoopConf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, TestHdfsHelper.getHdfsConf().get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY));
+    hadoopConf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY,
+        TestHdfsHelper.getHdfsConf()
+            .get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY));
     createHadoopConf(hadoopConf);
 
     Configuration conf = new Configuration(false);
@@ -343,12 +357,13 @@ public class TestFileSystemAccessService extends HFSTestCase {
 
     Configuration hdfsConf = fsAccess.getFileSystemConfiguration();
     hdfsConf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, "");
-    fsAccess.execute("u", hdfsConf, new FileSystemAccess.FileSystemExecutor<Void>() {
-      @Override
-      public Void execute(FileSystem fs) throws IOException {
-        return null;
-      }
-    });
+    fsAccess.execute("u", hdfsConf,
+        new FileSystemAccess.FileSystemExecutor<Void>() {
+          @Override
+          public Void execute(FileSystem fs) throws IOException {
+            return null;
+          }
+        });
   }
 
   @Test
@@ -356,13 +371,15 @@ public class TestFileSystemAccessService extends HFSTestCase {
   @TestHdfs
   public void fileSystemExecutorException() throws Exception {
     String dir = TestDirHelper.getTestDir().getAbsolutePath();
-    String services = StringUtils.join(",",
-      Arrays.asList(InstrumentationService.class.getName(),
-                    SchedulerService.class.getName(),
-                    FileSystemAccessService.class.getName()));
+    String services = StringUtils.join(",", Arrays
+            .asList(InstrumentationService.class.getName(),
+                SchedulerService.class.getName(),
+                FileSystemAccessService.class.getName()));
 
     Configuration hadoopConf = new Configuration(false);
-    hadoopConf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, TestHdfsHelper.getHdfsConf().get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY));
+    hadoopConf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY,
+        TestHdfsHelper.getHdfsConf()
+            .get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY));
     createHadoopConf(hadoopConf);
 
     Configuration conf = new Configuration(false);
@@ -374,13 +391,14 @@ public class TestFileSystemAccessService extends HFSTestCase {
 
     final FileSystem fsa[] = new FileSystem[1];
     try {
-      hadoop.execute("u", hadoop.getFileSystemConfiguration(), new FileSystemAccess.FileSystemExecutor<Void>() {
-        @Override
-        public Void execute(FileSystem fs) throws IOException {
-          fsa[0] = fs;
-          throw new IOException();
-        }
-      });
+      hadoop.execute("u", hadoop.getFileSystemConfiguration(),
+          new FileSystemAccess.FileSystemExecutor<Void>() {
+            @Override
+            public Void execute(FileSystem fs) throws IOException {
+              fsa[0] = fs;
+              throw new IOException();
+            }
+          });
       Assert.fail();
     } catch (FileSystemAccessException ex) {
       Assert.assertEquals(ex.getError(), FileSystemAccessException.ERROR.H03);
@@ -403,14 +421,15 @@ public class TestFileSystemAccessService extends HFSTestCase {
   @TestHdfs
   public void fileSystemCache() throws Exception {
     String dir = TestDirHelper.getTestDir().getAbsolutePath();
-    String services = StringUtils.join(",",
-      Arrays.asList(InstrumentationService.class.getName(),
-                    SchedulerService.class.getName(),
-                    FileSystemAccessService.class.getName()));
+    String services = StringUtils.join(",", Arrays
+            .asList(InstrumentationService.class.getName(),
+                SchedulerService.class.getName(),
+                FileSystemAccessService.class.getName()));
 
     Configuration hadoopConf = new Configuration(false);
     hadoopConf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY,
-      TestHdfsHelper.getHdfsConf().get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY));
+        TestHdfsHelper.getHdfsConf()
+            .get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY));
     createHadoopConf(hadoopConf);
 
     Configuration conf = new Configuration(false);
@@ -423,7 +442,7 @@ public class TestFileSystemAccessService extends HFSTestCase {
       FileSystemAccess hadoop = server.get(FileSystemAccess.class);
 
       FileSystem fs1 =
-        hadoop.createFileSystem("u", hadoop.getFileSystemConfiguration());
+          hadoop.createFileSystem("u", hadoop.getFileSystemConfiguration());
       Assert.assertNotNull(fs1);
       fs1.mkdirs(new Path("/tmp/foo1"));
       hadoop.releaseFileSystem(fs1);
@@ -432,7 +451,7 @@ public class TestFileSystemAccessService extends HFSTestCase {
       fs1.mkdirs(new Path("/tmp/foo2"));
 
       FileSystem fs2 =
-        hadoop.createFileSystem("u", hadoop.getFileSystemConfiguration());
+          hadoop.createFileSystem("u", hadoop.getFileSystemConfiguration());
 
       //should be same instance because of caching
       Assert.assertEquals(fs1, fs2);

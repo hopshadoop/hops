@@ -35,9 +35,9 @@ public interface TimelineWriter {
   /**
    * Stores entity information to the timeline store. Any errors occurring for
    * individual put request objects will be reported in the response.
-   * 
+   *
    * @param data
-   *          An {@link TimelineEntities} object.
+   *     An {@link TimelineEntities} object.
    * @return An {@link TimelinePutResponse} object.
    * @throws IOException
    */

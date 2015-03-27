@@ -36,7 +36,8 @@ public abstract class SerializedException {
   }
 
   /**
-   * Constructs a new <code>SerializedException</code> with the specified detail
+   * Constructs a new <code>SerializedException</code> with the specified
+   * detail
    * message and cause.
    */
   @Private
@@ -44,7 +45,8 @@ public abstract class SerializedException {
   public abstract void init(String message, Throwable cause);
 
   /**
-   * Constructs a new <code>SerializedException</code> with the specified detail
+   * Constructs a new <code>SerializedException</code> with the specified
+   * detail
    * message.
    */
   @Private
@@ -52,7 +54,8 @@ public abstract class SerializedException {
   public abstract void init(String message);
 
   /**
-   * Constructs a new <code>SerializedException</code> with the specified cause.
+   * Constructs a new <code>SerializedException</code> with the specified
+   * cause.
    */
   @Private
   @Unstable
@@ -60,6 +63,7 @@ public abstract class SerializedException {
 
   /**
    * Get the detail message string of this exception.
+   *
    * @return the detail message string of this exception.
    */
   @Private
@@ -67,7 +71,8 @@ public abstract class SerializedException {
   public abstract String getMessage();
 
   /**
-   * Get the backtrace of this exception. 
+   * Get the backtrace of this exception.
+   *
    * @return the backtrace of this exception.
    */
   @Private
@@ -77,6 +82,7 @@ public abstract class SerializedException {
   /**
    * Get the cause of this exception or null if the cause is nonexistent or
    * unknown.
+   *
    * @return the cause of this exception.
    */
   @Private
@@ -84,7 +90,8 @@ public abstract class SerializedException {
   public abstract SerializedException getCause();
 
   /**
-   * Deserialize the exception to a new Throwable. 
+   * Deserialize the exception to a new Throwable.
+   *
    * @return the Throwable form of this serialized exception.
    */
   @Private

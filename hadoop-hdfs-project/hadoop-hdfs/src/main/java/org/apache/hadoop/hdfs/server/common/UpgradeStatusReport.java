@@ -22,14 +22,14 @@ import org.apache.hadoop.classification.InterfaceAudience;
 /**
  * Base upgrade upgradeStatus class.
  * Overload this class if specific status fields need to be reported.
- * 
+ * <p/>
  * Describes status of current upgrade.
  */
 @InterfaceAudience.Private
 public class UpgradeStatusReport {
-  protected final int version;
-  protected final short upgradeStatus;
-  protected final boolean finalized;
+  protected int version;
+  protected short upgradeStatus;
+  protected boolean finalized;
 
   public UpgradeStatusReport(int version, short status, boolean isFinalized) {
     this.version = version;
@@ -39,6 +39,7 @@ public class UpgradeStatusReport {
 
   /**
    * Get the layout version of the currently running upgrade.
+   *
    * @return layout version
    */
   public int getVersion() {
@@ -47,15 +48,16 @@ public class UpgradeStatusReport {
 
   /**
    * Get upgrade upgradeStatus as a percentage of the total upgrade done.
-   * 
-   * @see Upgradeable#getUpgradeStatus() 
-   */ 
+   *
+   * @see Upgradeable#getUpgradeStatus()
+   */
   public short getUpgradeStatus() {
     return upgradeStatus;
   }
 
   /**
    * Is current upgrade finalized.
+   *
    * @return true if finalized or false otherwise.
    */
   public boolean isFinalized() {
@@ -65,18 +67,17 @@ public class UpgradeStatusReport {
   /**
    * Get upgradeStatus data as a text for reporting.
    * Should be overloaded for a particular upgrade specific upgradeStatus data.
-   * 
-   * @param details true if upgradeStatus details need to be included, 
-   *                false otherwise
+   *
+   * @param details
+   *     true if upgradeStatus details need to be included,
+   *     false otherwise
    * @return text
    */
   public String getStatusText(boolean details) {
-    return "Upgrade for version " + getVersion() 
-            + (upgradeStatus<100 ? 
-              " is in progress. Status = " + upgradeStatus + "%" : 
-              " has been completed."
-              + "\nUpgrade is " + (finalized ? "" : "not ")
-              + "finalized.");
+    return "Upgrade for version " + getVersion() + (upgradeStatus < 100 ?
+        " is in progress. Status = " + upgradeStatus + "%" :
+        " has been completed." + "\nUpgrade is " + (finalized ? "" : "not ") +
+            "finalized.");
   }
 
   /**

@@ -23,40 +23,52 @@
  */
 
 option java_package = "org.apache.hadoop.yarn.proto";
+
 option java_outer_classname = "YarnServerResourceManagerServiceProtos";
+
 option java_generic_services = true;
+
 option java_generate_equals_and_hash = true;
+
 package hadoop.yarn;
 
 import "yarn_protos.proto";
 
+import "yarn_service_protos.proto";
+
 message RefreshQueuesRequestProto {
 }
+
 message RefreshQueuesResponseProto {
 }
 
 message RefreshNodesRequestProto {
 }
+
 message RefreshNodesResponseProto {
 }
 
 message RefreshSuperUserGroupsConfigurationRequestProto {
 }
+
 message RefreshSuperUserGroupsConfigurationResponseProto {
 }
 
 message RefreshUserToGroupsMappingsRequestProto {
 }
+
 message RefreshUserToGroupsMappingsResponseProto {
 }
 
 message RefreshAdminAclsRequestProto {
 }
+
 message RefreshAdminAclsResponseProto {
 }
 
 message RefreshServiceAclsRequestProto {
 }
+
 message RefreshServiceAclsResponseProto {
 }
 
@@ -106,6 +118,7 @@ enum RMAppStateProto {
   RMAPP_FINISHED = 8;
   RMAPP_FAILED = 9;
   RMAPP_KILLED = 10;
+  RMAPP_KILLING = 11;
 }
 
 message ApplicationStateDataProto {
@@ -116,6 +129,8 @@ message ApplicationStateDataProto {
   optional RMAppStateProto application_state = 5;
   optional string diagnostics = 6 [default = "N/A"];
   optional int64 finish_time = 7;
+  optional RMAppStateProto application_state_before_killing = 8;
+  repeated NodeIdProto updated_nodes_id = 9;
 }
 
 message ApplicationAttemptStateDataProto {
@@ -127,6 +142,12 @@ message ApplicationAttemptStateDataProto {
   optional string diagnostics = 6 [default = "N/A"];
   optional int64 start_time = 7;
   optional FinalApplicationStatusProto final_application_status = 8;
+  optional float progress = 9;
+  optional string host = 10;
+  optional int32 rpc_port = 11;
+  repeated NodeIdProto ran_nodes = 12;
+  repeated ContainerStatusProto just_finished_fontainers = 13;
+  optional AllocateResponseProto allocate_response = 14;
 }
 
 message RMStateVersionProto {

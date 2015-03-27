@@ -18,12 +18,7 @@
 
 package org.apache.hadoop.yarn.logaggregation;
 
-import java.io.DataInputStream;
-import java.io.EOFException;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.PrintStream;
-
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configurable;
@@ -38,7 +33,11 @@ import org.apache.hadoop.yarn.logaggregation.AggregatedLogFormat.LogKey;
 import org.apache.hadoop.yarn.logaggregation.AggregatedLogFormat.LogReader;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 
-import com.google.common.annotations.VisibleForTesting;
+import java.io.DataInputStream;
+import java.io.EOFException;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.PrintStream;
 
 public class LogCLIHelpers implements Configurable {
 
@@ -48,13 +47,14 @@ public class LogCLIHelpers implements Configurable {
   @VisibleForTesting
   public int dumpAContainersLogs(String appId, String containerId,
       String nodeId, String jobOwner) throws IOException {
-    Path remoteRootLogDir = new Path(getConf().get(
-        YarnConfiguration.NM_REMOTE_APP_LOG_DIR,
-        YarnConfiguration.DEFAULT_NM_REMOTE_APP_LOG_DIR));
+    Path remoteRootLogDir = new Path(getConf()
+        .get(YarnConfiguration.NM_REMOTE_APP_LOG_DIR,
+            YarnConfiguration.DEFAULT_NM_REMOTE_APP_LOG_DIR));
     String suffix = LogAggregationUtils.getRemoteNodeLogDirSuffix(getConf());
-    Path logPath = LogAggregationUtils.getRemoteNodeLogFileForApp(
-        remoteRootLogDir, ConverterUtils.toApplicationId(appId), jobOwner,
-        ConverterUtils.toNodeId(nodeId), suffix);
+    Path logPath = LogAggregationUtils
+        .getRemoteNodeLogFileForApp(remoteRootLogDir,
+            ConverterUtils.toApplicationId(appId), jobOwner,
+            ConverterUtils.toNodeId(nodeId), suffix);
     AggregatedLogFormat.LogReader reader;
     try {
       reader = new AggregatedLogFormat.LogReader(getConf(), logPath);
@@ -69,7 +69,8 @@ public class LogCLIHelpers implements Configurable {
 
   @Private
   public int dumpAContainerLogs(String containerIdStr,
-      AggregatedLogFormat.LogReader reader, PrintStream out) throws IOException {
+      AggregatedLogFormat.LogReader reader, PrintStream out)
+      throws IOException {
     DataInputStream valueStream;
     LogKey key = new LogKey();
     valueStream = reader.next(key);
@@ -81,8 +82,8 @@ public class LogCLIHelpers implements Configurable {
     }
 
     if (valueStream == null) {
-      System.out.println("Logs for container " + containerIdStr
-          + " are not present in this log-file.");
+      System.out.println("Logs for container " + containerIdStr +
+          " are not present in this log-file.");
       return -1;
     }
 
@@ -99,14 +100,15 @@ public class LogCLIHelpers implements Configurable {
   @Private
   public int dumpAllContainersLogs(ApplicationId appId, String appOwner,
       PrintStream out) throws IOException {
-    Path remoteRootLogDir = new Path(getConf().get(
-        YarnConfiguration.NM_REMOTE_APP_LOG_DIR,
-        YarnConfiguration.DEFAULT_NM_REMOTE_APP_LOG_DIR));
+    Path remoteRootLogDir = new Path(getConf()
+        .get(YarnConfiguration.NM_REMOTE_APP_LOG_DIR,
+            YarnConfiguration.DEFAULT_NM_REMOTE_APP_LOG_DIR));
     String user = appOwner;
-    String logDirSuffix = LogAggregationUtils.getRemoteNodeLogDirSuffix(getConf());
+    String logDirSuffix =
+        LogAggregationUtils.getRemoteNodeLogDirSuffix(getConf());
     // TODO Change this to get a list of files from the LAS.
-    Path remoteAppLogDir = LogAggregationUtils.getRemoteAppLogDir(
-        remoteRootLogDir, appId, user, logDirSuffix);
+    Path remoteAppLogDir = LogAggregationUtils
+        .getRemoteAppLogDir(remoteRootLogDir, appId, user, logDirSuffix);
     RemoteIterator<FileStatus> nodeFiles;
     try {
       nodeFiles = FileContext.getFileContext().listStatus(remoteAppLogDir);
@@ -118,8 +120,9 @@ public class LogCLIHelpers implements Configurable {
     }
     while (nodeFiles.hasNext()) {
       FileStatus thisNodeFile = nodeFiles.next();
-      AggregatedLogFormat.LogReader reader = new AggregatedLogFormat.LogReader(
-          getConf(), new Path(remoteAppLogDir, thisNodeFile.getPath().getName()));
+      AggregatedLogFormat.LogReader reader =
+          new AggregatedLogFormat.LogReader(getConf(),
+              new Path(remoteAppLogDir, thisNodeFile.getPath().getName()));
       try {
 
         DataInputStream valueStream;
@@ -127,8 +130,8 @@ public class LogCLIHelpers implements Configurable {
         valueStream = reader.next(key);
 
         while (valueStream != null) {
-          String containerString = "\n\nContainer: " + key + " on "
-              + thisNodeFile.getPath().getName();
+          String containerString = "\n\nContainer: " + key + " on " +
+              thisNodeFile.getPath().getName();
           out.println(containerString);
           out.println(StringUtils.repeat("=", containerString.length()));
           while (true) {

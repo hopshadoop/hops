@@ -32,11 +32,13 @@ public class NumberReplicas {
     initialize(0, 0, 0, 0, 0);
   }
 
-  NumberReplicas(int live, int decommissioned, int corrupt, int excess, int stale) {
+  NumberReplicas(int live, int decommissioned, int corrupt, int excess,
+      int stale) {
     initialize(live, decommissioned, corrupt, excess, stale);
   }
 
-  void initialize(int live, int decommissioned, int corrupt, int excess, int stale) {
+  void initialize(int live, int decommissioned, int corrupt, int excess,
+      int stale) {
     liveReplicas = live;
     decommissionedReplicas = decommissioned;
     corruptReplicas = corrupt;
@@ -47,12 +49,15 @@ public class NumberReplicas {
   public int liveReplicas() {
     return liveReplicas;
   }
+
   public int decommissionedReplicas() {
     return decommissionedReplicas;
   }
+
   public int corruptReplicas() {
     return corruptReplicas;
   }
+
   public int excessReplicas() {
     return excessReplicas;
   }

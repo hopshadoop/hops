@@ -18,25 +18,22 @@
 
 package org.apache.hadoop.yarn;
 
-import java.io.File;
-import java.io.Flushable;
-import java.util.LinkedList;
-import java.util.Queue;
-
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.log4j.FileAppender;
 import org.apache.log4j.spi.LoggingEvent;
 
+import java.io.File;
+import java.io.Flushable;
+import java.util.LinkedList;
+import java.util.Queue;
+
 /**
  * A simple log4j-appender for container's logs.
- * 
  */
 @Public
 @Unstable
-public class ContainerLogAppender extends FileAppender
-  implements Flushable
-{
+public class ContainerLogAppender extends FileAppender implements Flushable {
   private String containerLogDir;
   //so that log4j can configure it from the configuration(log4j.properties). 
   private int maxEvents;
@@ -78,7 +75,7 @@ public class ContainerLogAppender extends FileAppender
   @Override
   public synchronized void close() {
     if (tail != null) {
-      for(LoggingEvent event: tail) {
+      for (LoggingEvent event : tail) {
         super.append(event);
       }
     }

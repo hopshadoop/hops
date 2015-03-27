@@ -17,11 +17,8 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.applicationsmanager;
 
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
+import com.google.common.collect.Lists;
+import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.yarn.MockApps;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
@@ -40,7 +37,10 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 import org.apache.hadoop.yarn.util.Records;
 
-import com.google.common.collect.Lists;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @InterfaceAudience.Private
 public abstract class MockAsm extends MockApps {
@@ -80,47 +80,58 @@ public abstract class MockAsm extends MockApps {
     public long getFinishTime() {
       throw new UnsupportedOperationException("Not supported yet.");
     }
+
     @Override
     public StringBuilder getDiagnostics() {
       throw new UnsupportedOperationException("Not supported yet.");
     }
+
     @Override
     public ApplicationId getApplicationId() {
       throw new UnsupportedOperationException("Not supported yet.");
     }
+
     @Override
     public RMAppAttempt getCurrentAppAttempt() {
       throw new UnsupportedOperationException("Not supported yet.");
     }
+
     @Override
     public Map<ApplicationAttemptId, RMAppAttempt> getAppAttempts() {
       throw new UnsupportedOperationException("Not supported yet.");
     }
+
     @Override
     public float getProgress() {
       throw new UnsupportedOperationException("Not supported yet.");
     }
+
     @Override
     public RMAppAttempt getRMAppAttempt(ApplicationAttemptId appAttemptId) {
       throw new UnsupportedOperationException("Not supported yet.");
     }
+
     @Override
     public RMAppState getState() {
       throw new UnsupportedOperationException("Not supported yet.");
     }
+
     @Override
     public String getTrackingUrl() {
       throw new UnsupportedOperationException("Not supported yet.");
     }
+
     @Override
     public int getMaxAppAttempts() {
       throw new UnsupportedOperationException("Not supported yet.");
     }
+
     @Override
     public ApplicationReport createAndGetApplicationReport(
-        String clientUserName,boolean allowAccess) {
+        String clientUserName, boolean allowAccess) {
       throw new UnsupportedOperationException("Not supported yet.");
     }
+
     @Override
     public void handle(RMAppEvent event) {
       throw new UnsupportedOperationException("Not supported yet.");
@@ -130,8 +141,10 @@ public abstract class MockAsm extends MockApps {
     public FinalApplicationStatus getFinalApplicationStatus() {
       throw new UnsupportedOperationException("Not supported yet.");
     }
+
     @Override
-    public int pullRMNodeUpdates(Collection<RMNode> updatedNodes) {
+    public int pullRMNodeUpdates(Collection<RMNode> updatedNodes,
+        TransactionState ts) {
       throw new UnsupportedOperationException("Not supported yet.");
     }
 
@@ -182,6 +195,7 @@ public abstract class MockAsm extends MockApps {
       public ApplicationId getApplicationId() {
         return appAttemptId.getApplicationId();
       }
+
       @Override
       public String getUser() {
         return user;
@@ -211,22 +225,27 @@ public abstract class MockAsm extends MockApps {
       public long getFinishTime() {
         return finish;
       }
+
       @Override
       public String getTrackingUrl() {
         return null;
       }
+
       @Override
       public YarnApplicationState createApplicationState() {
         return state;
       }
+
       @Override
       public StringBuilder getDiagnostics() {
         return new StringBuilder();
       }
+
       @Override
       public float getProgress() {
-        return (float)Math.random();
+        return (float) Math.random();
       }
+
       @Override
       public FinalApplicationStatus getFinalApplicationStatus() {
         return FinalApplicationStatus.UNDEFINED;

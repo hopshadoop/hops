@@ -18,12 +18,12 @@
                       http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <groupId>org.apache.hadoop</groupId>
+    <groupId>io.hops</groupId>
     <artifactId>hadoop-project</artifactId>
     <version>2.4.0</version>
     <relativePath>../../hadoop-project</relativePath>
   </parent>
-  <groupId>org.apache.hadoop</groupId>
+  <groupId>io.hops</groupId>
   <artifactId>hadoop-mapreduce-examples</artifactId>
   <version>2.4.0</version>
   <description>Apache Hadoop MapReduce Examples</description>
@@ -44,52 +44,52 @@
       <artifactId>commons-logging</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-mapreduce-client-jobclient</artifactId>
       <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-mapreduce-client-jobclient</artifactId>
       <scope>test</scope>
       <type>test-jar</type>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-common</artifactId>
       <scope>provided</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-common</artifactId>
       <scope>test</scope>
       <type>test-jar</type>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-hdfs</artifactId>
       <scope>runtime</scope>
     </dependency>
     <dependency>
-       <groupId>org.apache.hadoop</groupId>
+       <groupId>io.hops</groupId>
        <artifactId>hadoop-hdfs</artifactId>
        <scope>test</scope>
        <type>test-jar</type>
      </dependency>
      <dependency>
-       <groupId>org.apache.hadoop</groupId>
+       <groupId>io.hops</groupId>
        <artifactId>hadoop-yarn-server-tests</artifactId>
        <scope>test</scope>
        <type>test-jar</type>
      </dependency>
      <dependency>
-       <groupId>org.apache.hadoop</groupId>
+       <groupId>io.hops</groupId>
        <artifactId>hadoop-mapreduce-client-app</artifactId>
        <scope>provided</scope>
      </dependency>
      <dependency>
-       <groupId>org.apache.hadoop</groupId>
+       <groupId>io.hops</groupId>
        <artifactId>hadoop-mapreduce-client-app</artifactId>
        <type>test-jar</type>
        <scope>test</scope>
@@ -100,7 +100,7 @@
       <scope>test</scope>
     </dependency>
      <dependency>
-       <groupId>org.apache.hadoop</groupId>
+       <groupId>io.hops</groupId>
        <artifactId>hadoop-mapreduce-client-hs</artifactId>
        <scope>test</scope>
      </dependency>

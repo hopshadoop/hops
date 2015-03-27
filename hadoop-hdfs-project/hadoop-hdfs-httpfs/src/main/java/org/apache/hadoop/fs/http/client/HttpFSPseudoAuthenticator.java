@@ -26,7 +26,8 @@ import java.io.IOException;
 
 /**
  * A <code>PseudoAuthenticator</code> subclass that uses FileSystemAccess's
- * <code>UserGroupInformation</code> to obtain the client user name (the UGI's login user).
+ * <code>UserGroupInformation</code> to obtain the client user name (the UGI's
+ * login user).
  */
 @InterfaceAudience.Private
 public class HttpFSPseudoAuthenticator extends PseudoAuthenticator {
@@ -41,7 +42,8 @@ public class HttpFSPseudoAuthenticator extends PseudoAuthenticator {
     try {
       return UserGroupInformation.getLoginUser().getUserName();
     } catch (IOException ex) {
-      throw new SecurityException("Could not obtain current user, " + ex.getMessage(), ex);
+      throw new SecurityException(
+          "Could not obtain current user, " + ex.getMessage(), ex);
     }
   }
 }

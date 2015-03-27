@@ -18,9 +18,6 @@
 
 package org.apache.hadoop.yarn.server.api;
 
-import java.io.IOException;
-import java.util.Map;
-
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
@@ -30,15 +27,18 @@ import org.apache.hadoop.yarn.api.records.ApplicationReport;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerReport;
 
+import java.io.IOException;
+import java.util.Map;
+
 @Public
 @Unstable
 public interface ApplicationContext {
   /**
-   * This method returns Application {@link ApplicationReport} for the specified
+   * This method returns Application {@link ApplicationReport} for the
+   * specified
    * {@link ApplicationId}.
-   * 
+   *
    * @param appId
-   * 
    * @return {@link ApplicationReport} for the ApplicationId.
    * @throws IOException
    */
@@ -48,7 +48,7 @@ public interface ApplicationContext {
 
   /**
    * This method returns all Application {@link ApplicationReport}s
-   * 
+   *
    * @return map of {@link ApplicationId} to {@link ApplicationReport}s.
    * @throws IOException
    */
@@ -60,9 +60,8 @@ public interface ApplicationContext {
    * Application can have multiple application attempts
    * {@link ApplicationAttemptReport}. This method returns the all
    * {@link ApplicationAttemptReport}s for the Application.
-   * 
+   *
    * @param appId
-   * 
    * @return all {@link ApplicationAttemptReport}s for the Application.
    * @throws IOException
    */
@@ -74,9 +73,9 @@ public interface ApplicationContext {
   /**
    * This method returns {@link ApplicationAttemptReport} for specified
    * {@link ApplicationId}.
-   * 
+   *
    * @param appAttemptId
-   *          {@link ApplicationAttemptId}
+   *     {@link ApplicationAttemptId}
    * @return {@link ApplicationAttemptReport} for ApplicationAttemptId
    * @throws IOException
    */
@@ -88,9 +87,9 @@ public interface ApplicationContext {
   /**
    * This method returns {@link ContainerReport} for specified
    * {@link ContainerId}.
-   * 
+   *
    * @param containerId
-   *          {@link ContainerId}
+   *     {@link ContainerId}
    * @return {@link ContainerReport} for ContainerId
    * @throws IOException
    */
@@ -101,9 +100,9 @@ public interface ApplicationContext {
   /**
    * This method returns {@link ContainerReport} for specified
    * {@link ApplicationAttemptId}.
-   * 
+   *
    * @param appAttemptId
-   *          {@link ApplicationAttemptId}
+   *     {@link ApplicationAttemptId}
    * @return {@link ContainerReport} for ApplicationAttemptId
    * @throws IOException
    */
@@ -115,11 +114,11 @@ public interface ApplicationContext {
   /**
    * This method returns Map of {@link ContainerId} to {@link ContainerReport}
    * for specified {@link ApplicationAttemptId}.
-   * 
+   *
    * @param appAttemptId
-   *          {@link ApplicationAttemptId}
+   *     {@link ApplicationAttemptId}
    * @return Map of {@link ContainerId} to {@link ContainerReport} for
-   *         ApplicationAttemptId
+   * ApplicationAttemptId
    * @throws IOException
    */
   @Public

@@ -19,7 +19,6 @@
 package org.apache.hadoop.yarn;
 
 import junit.framework.Assert;
-
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factories.impl.pb.RecordFactoryPBImpl;
@@ -33,7 +32,8 @@ public class TestYSCRecordFactory {
   public void testPbRecordFactory() {
     RecordFactory pbRecordFactory = RecordFactoryPBImpl.get();
     try {
-      NodeHeartbeatRequest request = pbRecordFactory.newRecordInstance(NodeHeartbeatRequest.class);
+      NodeHeartbeatRequest request =
+          pbRecordFactory.newRecordInstance(NodeHeartbeatRequest.class);
       Assert.assertEquals(NodeHeartbeatRequestPBImpl.class, request.getClass());
     } catch (YarnRuntimeException e) {
       e.printStackTrace();

@@ -24,6 +24,5 @@ import org.apache.hadoop.service.Service;
 
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
-public interface TimelineStore extends
-    Service, TimelineReader, TimelineWriter {
+public interface TimelineStore extends Service, TimelineReader, TimelineWriter {
 }

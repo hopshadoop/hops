@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.api.protocolrecords.impl.pb;
 
+import com.google.protobuf.TextFormat;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.protocolrecords.GetApplicationAttemptReportRequest;
@@ -27,12 +28,10 @@ import org.apache.hadoop.yarn.proto.YarnProtos.ApplicationAttemptIdProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetApplicationAttemptReportRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetApplicationAttemptReportRequestProtoOrBuilder;
 
-import com.google.protobuf.TextFormat;
-
 @Private
 @Unstable
-public class GetApplicationAttemptReportRequestPBImpl extends
-    GetApplicationAttemptReportRequest {
+public class GetApplicationAttemptReportRequestPBImpl
+    extends GetApplicationAttemptReportRequest {
 
   GetApplicationAttemptReportRequestProto proto =
       GetApplicationAttemptReportRequestProto.getDefaultInstance();
@@ -81,8 +80,8 @@ public class GetApplicationAttemptReportRequestPBImpl extends
 
   private void mergeLocalToBuilder() {
     if (applicationAttemptId != null) {
-      builder
-        .setApplicationAttemptId(convertToProtoFormat(this.applicationAttemptId));
+      builder.setApplicationAttemptId(
+          convertToProtoFormat(this.applicationAttemptId));
     }
   }
 
@@ -118,8 +117,8 @@ public class GetApplicationAttemptReportRequestPBImpl extends
   }
 
   @Override
-  public void
-      setApplicationAttemptId(ApplicationAttemptId applicationAttemptId) {
+  public void setApplicationAttemptId(
+      ApplicationAttemptId applicationAttemptId) {
     maybeInitBuilder();
     if (applicationAttemptId == null) {
       builder.clearApplicationAttemptId();
@@ -132,8 +131,8 @@ public class GetApplicationAttemptReportRequestPBImpl extends
     return new ApplicationAttemptIdPBImpl(p);
   }
 
-  private ApplicationAttemptIdProto
-      convertToProtoFormat(ApplicationAttemptId t) {
+  private ApplicationAttemptIdProto convertToProtoFormat(
+      ApplicationAttemptId t) {
     return ((ApplicationAttemptIdPBImpl) t).getProto();
   }
 

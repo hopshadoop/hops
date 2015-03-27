@@ -18,13 +18,7 @@
 
 package org.apache.hadoop.fs;
 
-import java.io.IOException;
-import java.net.URISyntaxException;
-
-import javax.security.auth.login.LoginException;
-
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -33,20 +27,23 @@ import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 
-public class TestFcHdfsPermission extends FileContextPermissionBase {
-  
-  private static final FileContextTestHelper fileContextTestHelper =
-      new FileContextTestHelper();
-  private static FileContext fc;
+import javax.security.auth.login.LoginException;
+import java.io.IOException;
+import java.net.URISyntaxException;
 
+public class TestFcHdfsPermission extends FileContextPermissionBase {
+
+  private static final FileContextTestHelper fileContextTestHelper =
+      new FileContextTestHelper("/tmp/TestFcHdfsPermission");
+  private static FileContext fc;
   private static MiniDFSCluster cluster;
   private static Path defaultWorkingDirectory;
-  
+
   @Override
   protected FileContextTestHelper getFileContextHelper() {
     return fileContextTestHelper;
   }
-  
+
   @Override
   protected FileContext getFileContext() {
     return fc;
@@ -54,19 +51,19 @@ public class TestFcHdfsPermission extends FileContextPermissionBase {
   
   @BeforeClass
   public static void clusterSetupAtBegining()
-                                    throws IOException, LoginException, URISyntaxException  {
+      throws IOException, LoginException, URISyntaxException {
     Configuration conf = new HdfsConfiguration();
     cluster = new MiniDFSCluster.Builder(conf).numDataNodes(2).build();
     fc = FileContext.getFileContext(cluster.getURI(0), conf);
-    defaultWorkingDirectory = fc.makeQualified( new Path("/user/" + 
-        UserGroupInformation.getCurrentUser().getShortUserName()));
+    defaultWorkingDirectory = fc.makeQualified(new Path(
+        "/user/" + UserGroupInformation.getCurrentUser().getShortUserName()));
     fc.mkdir(defaultWorkingDirectory, FileContext.DEFAULT_PERM, true);
   }
 
-      
+
   @AfterClass
   public static void ClusterShutdownAtEnd() throws Exception {
-    cluster.shutdown();   
+    cluster.shutdown();
   }
   
   @Override

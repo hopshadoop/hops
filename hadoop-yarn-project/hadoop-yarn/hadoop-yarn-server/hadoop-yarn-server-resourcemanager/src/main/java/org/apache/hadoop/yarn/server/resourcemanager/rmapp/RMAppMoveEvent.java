@@ -18,17 +18,17 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.rmapp;
 
-import org.apache.hadoop.yarn.api.records.ApplicationId;
-
 import com.google.common.util.concurrent.SettableFuture;
+import io.hops.ha.common.TransactionState;
+import org.apache.hadoop.yarn.api.records.ApplicationId;
 
 public class RMAppMoveEvent extends RMAppEvent {
   private String targetQueue;
   private SettableFuture<Object> result;
   
   public RMAppMoveEvent(ApplicationId id, String newQueue,
-      SettableFuture<Object> resultFuture) {
-    super(id, RMAppEventType.MOVE);
+      SettableFuture<Object> resultFuture, TransactionState transactionState) {
+    super(id, RMAppEventType.MOVE, transactionState);
     this.targetQueue = newQueue;
     this.result = resultFuture;
   }

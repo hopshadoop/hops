@@ -17,9 +17,6 @@
  */
 package org.apache.hadoop.hdfs.client;
 
-import java.io.IOException;
-import java.util.List;
-
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -27,6 +24,9 @@ import org.apache.hadoop.hdfs.DFSInputStream;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
+
+import java.io.IOException;
+import java.util.List;
 
 /**
  * The Hdfs implementation of {@link FSDataInputStream}.
@@ -62,20 +62,10 @@ public class HdfsDataInputStream extends FSDataInputStream {
   /**
    * Get the visible length of the file. It will include the length of the last
    * block even if that is in UnderConstruction state.
-   * 
+   *
    * @return The visible length of the file.
    */
   public long getVisibleLength() throws IOException {
     return ((DFSInputStream) in).getFileLength();
-  }
-
-  /**
-   * Get statistics about the reads which this DFSInputStream has done.
-   * Note that because HdfsDataInputStream is buffered, these stats may
-   * be higher than you would expect just by adding up the number of
-   * bytes read through HdfsDataInputStream.
-   */
-  public synchronized DFSInputStream.ReadStatistics getReadStatistics() {
-    return ((DFSInputStream) in).getReadStatistics();
   }
 }

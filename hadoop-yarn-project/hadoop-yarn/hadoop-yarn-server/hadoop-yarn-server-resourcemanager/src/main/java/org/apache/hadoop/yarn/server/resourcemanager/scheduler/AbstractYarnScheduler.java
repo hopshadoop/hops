@@ -18,11 +18,6 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.Container;
@@ -33,14 +28,21 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 import org.apache.hadoop.yarn.util.resource.Resources;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+
 public abstract class AbstractYarnScheduler implements ResourceScheduler {
 
   protected RMContext rmContext;
   protected Map<ApplicationId, SchedulerApplication> applications;
+      //recovered in FIFO scheduler
   protected final static List<Container> EMPTY_CONTAINER_LIST =
-      new ArrayList<Container>();
-  protected static final Allocation EMPTY_ALLOCATION = new Allocation(
-    EMPTY_CONTAINER_LIST, Resources.createResource(0), null, null, null);
+      new ArrayList<Container>();//recovered
+  protected static final Allocation EMPTY_ALLOCATION =
+      new Allocation(EMPTY_CONTAINER_LIST, Resources.createResource(0), null,
+          null, null);//recovered
 
   public synchronized List<Container> getTransferredContainers(
       ApplicationAttemptId currentAttempt) {
@@ -55,7 +57,7 @@ public abstract class AbstractYarnScheduler implements ResourceScheduler {
         app.getCurrentAppAttempt().getLiveContainers();
     ContainerId amContainerId =
         rmContext.getRMApps().get(appId).getCurrentAppAttempt()
-          .getMasterContainer().getId();
+            .getMasterContainer().getId();
     for (RMContainer rmContainer : liveContainers) {
       if (!rmContainer.getContainerId().equals(amContainerId)) {
         containerList.add(rmContainer.getContainer());
@@ -64,6 +66,7 @@ public abstract class AbstractYarnScheduler implements ResourceScheduler {
     return containerList;
   }
 
+  //for testing
   public Map<ApplicationId, SchedulerApplication> getSchedulerApplications() {
     return applications;
   }
@@ -71,7 +74,7 @@ public abstract class AbstractYarnScheduler implements ResourceScheduler {
   @Override
   public String moveApplication(ApplicationId appId, String newQueue)
       throws YarnException {
-    throw new YarnException(getClass().getSimpleName()
-        + " does not support moving apps between queues");
+    throw new YarnException(getClass().getSimpleName() +
+        " does not support moving apps between queues");
   }
 }

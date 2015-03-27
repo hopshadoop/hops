@@ -18,11 +18,7 @@
 
 package org.apache.hadoop.yarn.server.applicationhistoryservice;
 
-import java.io.IOException;
-import java.util.List;
-
 import junit.framework.Assert;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.protocolrecords.GetApplicationAttemptReportRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetApplicationAttemptReportResponse;
@@ -49,8 +45,11 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-public class TestApplicationHistoryClientService extends
-    ApplicationHistoryStoreTestUtils {
+import java.io.IOException;
+import java.util.List;
+
+public class TestApplicationHistoryClientService
+    extends ApplicationHistoryStoreTestUtils {
 
   ApplicationHistoryServer historyServer = null;
   String expectedLogUrl = null;
@@ -64,12 +63,12 @@ public class TestApplicationHistoryClientService extends
         "/applicationhistory/logs/localhost:0/container_0_0001_01_000001/" +
         "container_0_0001_01_000001/test user";
     config.setClass(YarnConfiguration.APPLICATION_HISTORY_STORE,
-      MemoryApplicationHistoryStore.class, ApplicationHistoryStore.class);
+        MemoryApplicationHistoryStore.class, ApplicationHistoryStore.class);
     historyServer.init(config);
     historyServer.start();
     store =
         ((ApplicationHistoryManagerImpl) historyServer.getApplicationHistory())
-          .getHistoryStore();
+            .getHistoryStore();
   }
 
   @After
@@ -87,11 +86,11 @@ public class TestApplicationHistoryClientService extends
         GetApplicationReportRequest.newInstance(appId);
     GetApplicationReportResponse response =
         historyServer.getClientService().getClientHandler()
-          .getApplicationReport(request);
+            .getApplicationReport(request);
     ApplicationReport appReport = response.getApplicationReport();
     Assert.assertNotNull(appReport);
-    Assert.assertEquals("application_0_0001", appReport.getApplicationId()
-      .toString());
+    Assert.assertEquals("application_0_0001",
+        appReport.getApplicationId().toString());
     Assert.assertEquals("test type", appReport.getApplicationType().toString());
     Assert.assertEquals("test queue", appReport.getQueue().toString());
   }
@@ -108,7 +107,7 @@ public class TestApplicationHistoryClientService extends
     GetApplicationsRequest request = GetApplicationsRequest.newInstance();
     GetApplicationsResponse response =
         historyServer.getClientService().getClientHandler()
-          .getApplications(request);
+            .getApplications(request);
     List<ApplicationReport> appReport = response.getApplicationList();
     Assert.assertNotNull(appReport);
     Assert.assertEquals(appId, appReport.get(0).getApplicationId());
@@ -126,12 +125,12 @@ public class TestApplicationHistoryClientService extends
         GetApplicationAttemptReportRequest.newInstance(appAttemptId);
     GetApplicationAttemptReportResponse response =
         historyServer.getClientService().getClientHandler()
-          .getApplicationAttemptReport(request);
+            .getApplicationAttemptReport(request);
     ApplicationAttemptReport attemptReport =
         response.getApplicationAttemptReport();
     Assert.assertNotNull(attemptReport);
-    Assert.assertEquals("appattempt_0_0001_000001", attemptReport
-      .getApplicationAttemptId().toString());
+    Assert.assertEquals("appattempt_0_0001_000001",
+        attemptReport.getApplicationAttemptId().toString());
   }
 
   @Test
@@ -149,14 +148,14 @@ public class TestApplicationHistoryClientService extends
         GetApplicationAttemptsRequest.newInstance(appId);
     GetApplicationAttemptsResponse response =
         historyServer.getClientService().getClientHandler()
-          .getApplicationAttempts(request);
+            .getApplicationAttempts(request);
     List<ApplicationAttemptReport> attemptReports =
         response.getApplicationAttemptList();
     Assert.assertNotNull(attemptReports);
-    Assert.assertEquals(appAttemptId, attemptReports.get(0)
-      .getApplicationAttemptId());
-    Assert.assertEquals(appAttemptId1, attemptReports.get(1)
-      .getApplicationAttemptId());
+    Assert.assertEquals(appAttemptId,
+        attemptReports.get(0).getApplicationAttemptId());
+    Assert.assertEquals(appAttemptId1,
+        attemptReports.get(1).getApplicationAttemptId());
   }
 
   @Test
@@ -173,7 +172,7 @@ public class TestApplicationHistoryClientService extends
         GetContainerReportRequest.newInstance(containerId);
     GetContainerReportResponse response =
         historyServer.getClientService().getClientHandler()
-          .getContainerReport(request);
+            .getContainerReport(request);
     ContainerReport container = response.getContainerReport();
     Assert.assertNotNull(container);
     Assert.assertEquals(containerId, container.getContainerId());
@@ -197,7 +196,7 @@ public class TestApplicationHistoryClientService extends
         GetContainersRequest.newInstance(appAttemptId);
     GetContainersResponse response =
         historyServer.getClientService().getClientHandler()
-          .getContainers(request);
+            .getContainers(request);
     List<ContainerReport> containers = response.getContainerList();
     Assert.assertNotNull(containers);
     Assert.assertEquals(containerId, containers.get(1).getContainerId());

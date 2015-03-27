@@ -18,12 +18,11 @@
 
 package org.apache.hadoop.yarn.api.records.impl.pb;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.ResourceOption;
-import org.apache.hadoop.yarn.proto.YarnProtos.ResourceProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.ResourceOptionProto;
-
-import com.google.common.base.Preconditions;
+import org.apache.hadoop.yarn.proto.YarnProtos.ResourceProto;
 
 public class ResourceOptionPBImpl extends ResourceOption {
 
@@ -70,13 +69,11 @@ public class ResourceOptionPBImpl extends ResourceOption {
     builder.setOverCommitTimeout(overCommitTimeout);
   }
   
-  private ResourceProto convertToProtoFormat(
-      Resource resource) {
-    return ((ResourcePBImpl)resource).getProto();
+  private ResourceProto convertToProtoFormat(Resource resource) {
+    return ((ResourcePBImpl) resource).getProto();
   }
   
-  private ResourcePBImpl convertFromProtoFormat(
-      ResourceProto p) {
+  private ResourcePBImpl convertFromProtoFormat(ResourceProto p) {
     return new ResourcePBImpl(p);
   }
   

@@ -21,7 +21,8 @@ Skin configuration file. This file contains details of your project,
 which will be used to configure the chosen Forrest skin.
 -->
 
-<!DOCTYPE skinconfig PUBLIC "-//APACHE//DTD Skin Configuration V0.6-3//EN" "http://forrest.apache.org/dtd/skinconfig-v06-3.dtd">
+<!DOCTYPE skinconfig PUBLIC "-//APACHE//DTD Skin Configuration V0.6-3//EN"
+    "http://forrest.apache.org/dtd/skinconfig-v06-3.dtd">
 <skinconfig>
   <!-- To enable lucene search add provider="lucene" (default is google).
     Add box-location="alt" to move the search box to an alternate location
@@ -34,7 +35,7 @@ which will be used to configure the chosen Forrest skin.
   <search name="Lucene" domain="hadoop.apache.org" provider="google"/>
 
   <!-- Disable the print link? If enabled, invalid HTML 4.0.1 -->
-  <disable-print-link>true</disable-print-link>  
+  <disable-print-link>true</disable-print-link>
   <!-- Disable the PDF link? -->
   <disable-pdf-link>false</disable-pdf-link>
   <!-- Disable the POD link? -->
@@ -115,7 +116,7 @@ which will be used to configure the chosen Forrest skin.
 
   <!-- Heading types can be clean|underlined|boxed  -->
   <headings type="clean"/>
-  
+
   <!-- The optional feedback element will be used to construct a
     feedback link in the footer with the page pathname appended:
     <a href="@href">{@to}</a>
@@ -137,168 +138,170 @@ which will be used to configure the chosen Forrest skin.
         e.g. <p class="quote"/>
     -->
     p.quote {
-      margin-left: 2em;
-      padding: .5em;
-      background-color: #f0f0f0;
-      font-family: monospace;
+    margin-left: 2em;
+    padding: .5em;
+    background-color: #f0f0f0;
+    font-family: monospace;
     }
-    
+
     <!--Headers -->
-	#content h1 {
-	  margin-bottom: .5em;
-	  font-size: 185%; color: black;
-	  font-family: arial;
-	}  
+    #content h1 {
+    margin-bottom: .5em;
+    font-size: 185%; color: black;
+    font-family: arial;
+    }
     h2, .h3 { font-size: 175%; color: black; font-family: arial; }
-	h3, .h4 { font-size: 135%; color: black; font-family: arial; margin-bottom: 0.5em; }
-	h4, .h5 { font-size: 125%; color: black;  font-style: italic; font-weight: bold; font-family: arial; }
-	h5, h6 { font-size: 110%; color: #363636; font-weight: bold; }    
-   
-   <!--Code Background -->
+    h3, .h4 { font-size: 135%; color: black; font-family: arial; margin-bottom:
+    0.5em; }
+    h4, .h5 { font-size: 125%; color: black; font-style: italic; font-weight:
+    bold; font-family: arial; }
+    h5, h6 { font-size: 110%; color: #363636; font-weight: bold; }
+
+    <!--Code Background -->
     pre.code {
-      margin-left: 0em;
-      padding: 0.5em;
-      background-color: rgb(241,239,231);
-      font-family: monospace;
-    }   
-    
+    margin-left: 0em;
+    padding: 0.5em;
+    background-color: rgb(241,239,231);
+    font-family: monospace;
+    }
+
   </extra-css>
 
   <colors>
-  <!-- These values are used for the generated CSS files. -->
+    <!-- These values are used for the generated CSS files. -->
 
-  <!-- Krysalis -->
-<!--
-    <color name="header"    value="#FFFFFF"/>
+    <!-- Krysalis -->
+    <!--
+        <color name="header"    value="#FFFFFF"/>
 
-    <color name="tab-selected" value="#a5b6c6" link="#000000" vlink="#000000" hlink="#000000"/>
-    <color name="tab-unselected" value="#F7F7F7"  link="#000000" vlink="#000000" hlink="#000000"/>
-    <color name="subtab-selected" value="#a5b6c6"  link="#000000" vlink="#000000" hlink="#000000"/>
-    <color name="subtab-unselected" value="#a5b6c6"  link="#000000" vlink="#000000" hlink="#000000"/>
+        <color name="tab-selected" value="#a5b6c6" link="#000000" vlink="#000000" hlink="#000000"/>
+        <color name="tab-unselected" value="#F7F7F7"  link="#000000" vlink="#000000" hlink="#000000"/>
+        <color name="subtab-selected" value="#a5b6c6"  link="#000000" vlink="#000000" hlink="#000000"/>
+        <color name="subtab-unselected" value="#a5b6c6"  link="#000000" vlink="#000000" hlink="#000000"/>
 
-    <color name="heading" value="#a5b6c6"/>
-    <color name="subheading" value="#CFDCED"/>
-        
-    <color name="navstrip" value="#CFDCED" font="#000000" link="#000000" vlink="#000000" hlink="#000000"/>
-    <color name="toolbox" value="#a5b6c6"/>
-    <color name="border" value="#a5b6c6"/>
-        
-    <color name="menu" value="#F7F7F7" link="#000000" vlink="#000000" hlink="#000000"/>    
-    <color name="dialog" value="#F7F7F7"/>
-            
-    <color name="body"    value="#ffffff" link="#0F3660" vlink="#009999" hlink="#000066"/>
-    
-    <color name="table" value="#a5b6c6"/>    
-    <color name="table-cell" value="#ffffff"/>    
-    <color name="highlight" value="#ffff00"/>
-    <color name="fixme" value="#cc6600"/>
-    <color name="note" value="#006699"/>
-    <color name="warning" value="#990000"/>
-    <color name="code" value="#a5b6c6"/>
-        
-    <color name="footer" value="#a5b6c6"/>
--->
-  
-  <!-- Forrest -->
-<!--
-    <color name="header"    value="#294563"/>
+        <color name="heading" value="#a5b6c6"/>
+        <color name="subheading" value="#CFDCED"/>
 
-    <color name="tab-selected" value="#4a6d8c" link="#0F3660" vlink="#0F3660" hlink="#000066"/>
-    <color name="tab-unselected" value="#b5c7e7" link="#0F3660" vlink="#0F3660" hlink="#000066"/>
-    <color name="subtab-selected" value="#4a6d8c" link="#0F3660" vlink="#0F3660" hlink="#000066"/>
-    <color name="subtab-unselected" value="#4a6d8c" link="#0F3660" vlink="#0F3660" hlink="#000066"/>
+        <color name="navstrip" value="#CFDCED" font="#000000" link="#000000" vlink="#000000" hlink="#000000"/>
+        <color name="toolbox" value="#a5b6c6"/>
+        <color name="border" value="#a5b6c6"/>
 
-    <color name="heading" value="#294563"/>
-    <color name="subheading" value="#4a6d8c"/>
-        
-    <color name="navstrip" value="#cedfef" font="#0F3660" link="#0F3660" vlink="#0F3660" hlink="#000066"/>
-    <color name="toolbox" value="#4a6d8c"/>
-    <color name="border" value="#294563"/>
-    
-    <color name="menu" value="#4a6d8c" font="#cedfef" link="#ffffff" vlink="#ffffff" hlink="#ffcf00"/>    
-    <color name="dialog" value="#4a6d8c"/>
-            
-    <color name="body" value="#ffffff"  link="#0F3660" vlink="#009999" hlink="#000066"/>
-    
-    <color name="table" value="#7099C5"/>    
-    <color name="table-cell" value="#f0f0ff"/>    
-    <color name="highlight" value="#ffff00"/>
-    <color name="fixme" value="#cc6600"/>
-    <color name="note" value="#006699"/>
-    <color name="warning" value="#990000"/>
-    <color name="code" value="#CFDCED"/>
-        
-    <color name="footer" value="#cedfef"/>
--->
+        <color name="menu" value="#F7F7F7" link="#000000" vlink="#000000" hlink="#000000"/>
+        <color name="dialog" value="#F7F7F7"/>
 
-  <!-- Collabnet --> 
-<!--
-    <color name="header"    value="#003366"/>
+        <color name="body"    value="#ffffff" link="#0F3660" vlink="#009999" hlink="#000066"/>
 
-    <color name="tab-selected" value="#dddddd" link="#555555" vlink="#555555" hlink="#555555"/>
-    <color name="tab-unselected" value="#999999" link="#ffffff" vlink="#ffffff" hlink="#ffffff"/>
-    <color name="subtab-selected" value="#cccccc" link="#000000" vlink="#000000" hlink="#000000"/>
-    <color name="subtab-unselected" value="#cccccc" link="#555555" vlink="#555555" hlink="#555555"/>
+        <color name="table" value="#a5b6c6"/>
+        <color name="table-cell" value="#ffffff"/>
+        <color name="highlight" value="#ffff00"/>
+        <color name="fixme" value="#cc6600"/>
+        <color name="note" value="#006699"/>
+        <color name="warning" value="#990000"/>
+        <color name="code" value="#a5b6c6"/>
 
-    <color name="heading" value="#003366"/>
-    <color name="subheading" value="#888888"/>
-    
-    <color name="navstrip" value="#dddddd" font="#555555"/>
-    <color name="toolbox" value="#dddddd" font="#555555"/>
-    <color name="border" value="#999999"/>
-    
-    <color name="menu" value="#ffffff"/>    
-    <color name="dialog" value="#eeeeee"/>
-            
-    <color name="body"      value="#ffffff"/>
-    
-    <color name="table" value="#ccc"/>    
-    <color name="table-cell" value="#ffffff"/>   
-    <color name="highlight" value="#ffff00"/>
-    <color name="fixme" value="#cc6600"/>
-    <color name="note" value="#006699"/>
-    <color name="warning" value="#990000"/>
-    <color name="code" value="#003366"/>
-        
-    <color name="footer" value="#ffffff"/>
--->
- <!-- Lenya using pelt-->
-<!--
-    <color name="header" value="#ffffff"/>
+        <color name="footer" value="#a5b6c6"/>
+    -->
 
-    <color name="tab-selected" value="#4C6C8F" link="#ffffff" vlink="#ffffff" hlink="#ffffff"/>
-    <color name="tab-unselected" value="#E5E4D9" link="#000000" vlink="#000000" hlink="#000000"/>
-    <color name="subtab-selected" value="#000000" link="#000000" vlink="#000000" hlink="#000000"/>
-    <color name="subtab-unselected" value="#E5E4D9" link="#000000" vlink="#000000" hlink="#000000"/>
+    <!-- Forrest -->
+    <!--
+        <color name="header"    value="#294563"/>
 
-    <color name="heading" value="#E5E4D9"/>
-    <color name="subheading" value="#000000"/>
-    <color name="published" value="#4C6C8F" font="#FFFFFF"/>
-    <color name="feedback" value="#4C6C8F" font="#FFFFFF" align="center"/>
-    <color name="navstrip" value="#E5E4D9" font="#000000"/>
+        <color name="tab-selected" value="#4a6d8c" link="#0F3660" vlink="#0F3660" hlink="#000066"/>
+        <color name="tab-unselected" value="#b5c7e7" link="#0F3660" vlink="#0F3660" hlink="#000066"/>
+        <color name="subtab-selected" value="#4a6d8c" link="#0F3660" vlink="#0F3660" hlink="#000066"/>
+        <color name="subtab-unselected" value="#4a6d8c" link="#0F3660" vlink="#0F3660" hlink="#000066"/>
 
-    <color name="toolbox" value="#CFDCED" font="#000000"/>
+        <color name="heading" value="#294563"/>
+        <color name="subheading" value="#4a6d8c"/>
 
-    <color name="border" value="#999999"/>
-    <color name="menu" value="#4C6C8F" font="#ffffff" link="#ffffff" vlink="#ffffff" hlink="#ffffff" current="#FFCC33" />    
-    <color name="menuheading" value="#cfdced" font="#000000" />
-    <color name="searchbox" value="#E5E4D9" font="#000000"/>
-    
-    <color name="dialog" value="#CFDCED"/>
-    <color name="body" value="#ffffff" />            
-    
-    <color name="table" value="#ccc"/>    
-    <color name="table-cell" value="#ffffff"/>   
-    <color name="highlight" value="#ffff00"/>
-    <color name="fixme" value="#cc6600"/>
-    <color name="note" value="#006699"/>
-    <color name="warning" value="#990000"/>
-    <color name="code" value="#003366"/>
-        
-    <color name="footer" value="#E5E4D9"/>
--->
+        <color name="navstrip" value="#cedfef" font="#0F3660" link="#0F3660" vlink="#0F3660" hlink="#000066"/>
+        <color name="toolbox" value="#4a6d8c"/>
+        <color name="border" value="#294563"/>
+
+        <color name="menu" value="#4a6d8c" font="#cedfef" link="#ffffff" vlink="#ffffff" hlink="#ffcf00"/>
+        <color name="dialog" value="#4a6d8c"/>
+
+        <color name="body" value="#ffffff"  link="#0F3660" vlink="#009999" hlink="#000066"/>
+
+        <color name="table" value="#7099C5"/>
+        <color name="table-cell" value="#f0f0ff"/>
+        <color name="highlight" value="#ffff00"/>
+        <color name="fixme" value="#cc6600"/>
+        <color name="note" value="#006699"/>
+        <color name="warning" value="#990000"/>
+        <color name="code" value="#CFDCED"/>
+
+        <color name="footer" value="#cedfef"/>
+    -->
+
+    <!-- Collabnet -->
+    <!--
+        <color name="header"    value="#003366"/>
+
+        <color name="tab-selected" value="#dddddd" link="#555555" vlink="#555555" hlink="#555555"/>
+        <color name="tab-unselected" value="#999999" link="#ffffff" vlink="#ffffff" hlink="#ffffff"/>
+        <color name="subtab-selected" value="#cccccc" link="#000000" vlink="#000000" hlink="#000000"/>
+        <color name="subtab-unselected" value="#cccccc" link="#555555" vlink="#555555" hlink="#555555"/>
+
+        <color name="heading" value="#003366"/>
+        <color name="subheading" value="#888888"/>
+
+        <color name="navstrip" value="#dddddd" font="#555555"/>
+        <color name="toolbox" value="#dddddd" font="#555555"/>
+        <color name="border" value="#999999"/>
+
+        <color name="menu" value="#ffffff"/>
+        <color name="dialog" value="#eeeeee"/>
+
+        <color name="body"      value="#ffffff"/>
+
+        <color name="table" value="#ccc"/>
+        <color name="table-cell" value="#ffffff"/>
+        <color name="highlight" value="#ffff00"/>
+        <color name="fixme" value="#cc6600"/>
+        <color name="note" value="#006699"/>
+        <color name="warning" value="#990000"/>
+        <color name="code" value="#003366"/>
+
+        <color name="footer" value="#ffffff"/>
+    -->
+    <!-- Lenya using pelt-->
+    <!--
+        <color name="header" value="#ffffff"/>
+
+        <color name="tab-selected" value="#4C6C8F" link="#ffffff" vlink="#ffffff" hlink="#ffffff"/>
+        <color name="tab-unselected" value="#E5E4D9" link="#000000" vlink="#000000" hlink="#000000"/>
+        <color name="subtab-selected" value="#000000" link="#000000" vlink="#000000" hlink="#000000"/>
+        <color name="subtab-unselected" value="#E5E4D9" link="#000000" vlink="#000000" hlink="#000000"/>
+
+        <color name="heading" value="#E5E4D9"/>
+        <color name="subheading" value="#000000"/>
+        <color name="published" value="#4C6C8F" font="#FFFFFF"/>
+        <color name="feedback" value="#4C6C8F" font="#FFFFFF" align="center"/>
+        <color name="navstrip" value="#E5E4D9" font="#000000"/>
+
+        <color name="toolbox" value="#CFDCED" font="#000000"/>
+
+        <color name="border" value="#999999"/>
+        <color name="menu" value="#4C6C8F" font="#ffffff" link="#ffffff" vlink="#ffffff" hlink="#ffffff" current="#FFCC33" />
+        <color name="menuheading" value="#cfdced" font="#000000" />
+        <color name="searchbox" value="#E5E4D9" font="#000000"/>
+
+        <color name="dialog" value="#CFDCED"/>
+        <color name="body" value="#ffffff" />
+
+        <color name="table" value="#ccc"/>
+        <color name="table-cell" value="#ffffff"/>
+        <color name="highlight" value="#ffff00"/>
+        <color name="fixme" value="#cc6600"/>
+        <color name="note" value="#006699"/>
+        <color name="warning" value="#990000"/>
+        <color name="code" value="#003366"/>
+
+        <color name="footer" value="#E5E4D9"/>
+    -->
   </colors>
- 
+
   <!-- Settings specific to PDF output. -->
   <pdf>
     <!-- 

@@ -16,9 +16,6 @@
  * limitations under the License.
  */
 package org.apache.hadoop.hdfs;
-import static org.junit.Assert.assertTrue;
-
-import java.io.IOException;
 
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.logging.impl.Log4JLogger;
@@ -32,11 +29,16 @@ import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.log4j.Level;
 import org.junit.Test;
 
+import java.io.IOException;
+
+import static org.junit.Assert.assertTrue;
+
 public class TestFileCreationDelete {
   {
-    ((Log4JLogger)NameNode.stateChangeLog).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger)LeaseManager.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger)LogFactory.getLog(FSNamesystem.class)).getLogger().setLevel(Level.ALL);
+    ((Log4JLogger) NameNode.stateChangeLog).getLogger().setLevel(Level.ALL);
+    ((Log4JLogger) LeaseManager.LOG).getLogger().setLevel(Level.ALL);
+    ((Log4JLogger) LogFactory.getLog(FSNamesystem.class)).getLogger()
+        .setLevel(Level.ALL);
   }
 
   @Test
@@ -44,7 +46,8 @@ public class TestFileCreationDelete {
     Configuration conf = new HdfsConfiguration();
     final int MAX_IDLE_TIME = 2000; // 2s
     conf.setInt("ipc.client.connection.maxidletime", MAX_IDLE_TIME);
-    conf.setInt(DFSConfigKeys.DFS_NAMENODE_HEARTBEAT_RECHECK_INTERVAL_KEY, 1000);
+    conf.setInt(DFSConfigKeys.DFS_NAMENODE_HEARTBEAT_RECHECK_INTERVAL_KEY,
+        1000);
     conf.setInt(DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY, 1);
 
     // create cluster
@@ -59,16 +62,16 @@ public class TestFileCreationDelete {
       Path dir = new Path("/foo");
       Path file1 = new Path(dir, "file1");
       FSDataOutputStream stm1 = TestFileCreation.createFile(fs, file1, 1);
-      System.out.println("testFileCreationDeleteParent: "
-          + "Created file " + file1);
+      System.out
+          .println("testFileCreationDeleteParent: " + "Created file " + file1);
       TestFileCreation.writeFile(stm1, 1000);
       stm1.hflush();
 
       // create file2.
       Path file2 = new Path("/file2");
       FSDataOutputStream stm2 = TestFileCreation.createFile(fs, file2, 1);
-      System.out.println("testFileCreationDeleteParent: "
-          + "Created file " + file2);
+      System.out
+          .println("testFileCreationDeleteParent: " + "Created file " + file2);
       TestFileCreation.writeFile(stm2, 1000);
       stm2.hflush();
 
@@ -78,19 +81,25 @@ public class TestFileCreationDelete {
       // restart cluster with the same namenode port as before.
       // This ensures that leases are persisted in fsimage.
       cluster.shutdown();
-      try {Thread.sleep(2*MAX_IDLE_TIME);} catch (InterruptedException e) {}
-      cluster = new MiniDFSCluster.Builder(conf).nameNodePort(nnport)
-                                                .format(false)
-                                                .build();
+      try {
+        Thread.sleep(2 * MAX_IDLE_TIME);
+      } catch (InterruptedException e) {
+      }
+      cluster =
+          new MiniDFSCluster.Builder(conf).nameNodePort(nnport).format(false)
+              .build();
       cluster.waitActive();
 
       // restart cluster yet again. This triggers the code to read in
       // persistent leases from fsimage.
       cluster.shutdown();
-      try {Thread.sleep(5000);} catch (InterruptedException e) {}
-      cluster = new MiniDFSCluster.Builder(conf).nameNodePort(nnport)
-                                                .format(false)
-                                                .build();
+      try {
+        Thread.sleep(5000);
+      } catch (InterruptedException e) {
+      }
+      cluster =
+          new MiniDFSCluster.Builder(conf).nameNodePort(nnport).format(false)
+              .build();
       cluster.waitActive();
       fs = cluster.getFileSystem();
 

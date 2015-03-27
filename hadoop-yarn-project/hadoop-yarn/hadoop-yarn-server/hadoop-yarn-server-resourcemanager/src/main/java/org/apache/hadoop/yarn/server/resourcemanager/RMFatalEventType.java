@@ -24,7 +24,9 @@ import org.apache.hadoop.classification.InterfaceAudience;
 public enum RMFatalEventType {
   // Source <- Store
   STATE_STORE_FENCED,
+  //gautier done
   STATE_STORE_OP_FAILED,
+  //gautier done
 
   // Source <- Embedded Elector
   EMBEDDED_ELECTOR_FAILED

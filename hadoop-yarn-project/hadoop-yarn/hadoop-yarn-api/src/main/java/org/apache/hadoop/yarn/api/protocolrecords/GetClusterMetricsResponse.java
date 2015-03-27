@@ -29,7 +29,7 @@ import org.apache.hadoop.yarn.util.Records;
 /**
  * <p>The response sent by the <code>ResourceManager</code> to a client
  * requesting cluster metrics.<p>
- * 
+ *
  * @see YarnClusterMetrics
  * @see ApplicationClientProtocol#getClusterMetrics(GetClusterMetricsRequest)
  */
@@ -39,8 +39,8 @@ public abstract class GetClusterMetricsResponse {
 
   @Private
   @Unstable
-  public static GetClusterMetricsResponse
-      newInstance(YarnClusterMetrics metrics) {
+  public static GetClusterMetricsResponse newInstance(
+      YarnClusterMetrics metrics) {
     GetClusterMetricsResponse response =
         Records.newRecord(GetClusterMetricsResponse.class);
     response.setClusterMetrics(metrics);
@@ -49,6 +49,7 @@ public abstract class GetClusterMetricsResponse {
 
   /**
    * Get the <code>YarnClusterMetrics</code> for the cluster.
+   *
    * @return <code>YarnClusterMetrics</code> for the cluster
    */
   @Public

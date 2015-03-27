@@ -17,14 +17,14 @@
  */
 package org.apache.hadoop.hdfs.server.datanode.fsdataset.impl;
 
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.fail;
-
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.server.datanode.FinalizedReplica;
 import org.junit.Before;
 import org.junit.Test;
+
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.fail;
 
 /**
  * Unit test for ReplicasMap class
@@ -32,7 +32,7 @@ import org.junit.Test;
 public class TestReplicaMap {
   private final ReplicaMap map = new ReplicaMap(TestReplicaMap.class);
   private final String bpid = "BP-TEST";
-  private final  Block block = new Block(1234, 1234, 1234);
+  private final Block block = new Block(1234, 1234, 1234);
   
   @Before
   public void setup() {
@@ -48,19 +48,20 @@ public class TestReplicaMap {
     try {
       map.get(bpid, null);
       fail("Expected exception not thrown");
-    } catch (IllegalArgumentException expected) { }
+    } catch (IllegalArgumentException expected) {
+    }
     
     // Test 2: successful lookup based on block
     assertNotNull(map.get(bpid, block));
     
     // Test 3: Lookup failure - generation stamp mismatch 
     Block b = new Block(block);
-    b.setGenerationStamp(0);
+    b.setGenerationStampNoPersistance(0);
     assertNull(map.get(bpid, b));
     
     // Test 4: Lookup failure - blockID mismatch
-    b.setGenerationStamp(block.getGenerationStamp());
-    b.setBlockId(0);
+    b.setGenerationStampNoPersistance(block.getGenerationStamp());
+    b.setBlockIdNoPersistance(0);
     assertNull(map.get(bpid, b));
     
     // Test 5: successful lookup based on block ID
@@ -76,7 +77,8 @@ public class TestReplicaMap {
     try {
       map.add(bpid, null);
       fail("Expected exception not thrown");
-    } catch (IllegalArgumentException expected) { }
+    } catch (IllegalArgumentException expected) {
+    }
   }
   
   @Test
@@ -85,16 +87,17 @@ public class TestReplicaMap {
     try {
       map.remove(bpid, null);
       fail("Expected exception not thrown");
-    } catch (IllegalArgumentException expected) { }
+    } catch (IllegalArgumentException expected) {
+    }
     
     // Test 2: remove failure - generation stamp mismatch 
     Block b = new Block(block);
-    b.setGenerationStamp(0);
+    b.setGenerationStampNoPersistance(0);
     assertNull(map.remove(bpid, b));
     
     // Test 3: remove failure - blockID mismatch
-    b.setGenerationStamp(block.getGenerationStamp());
-    b.setBlockId(0);
+    b.setGenerationStampNoPersistance(block.getGenerationStamp());
+    b.setBlockIdNoPersistance(0);
     assertNull(map.remove(bpid, b));
     
     // Test 4: remove success

@@ -1,4 +1,4 @@
-/**                                                                                                                               
+/**
  * Licensed to the Apache Software Foundation (ASF) under one                                                                     
  * or more contributor license agreements.  See the NOTICE file                                                                   
  * distributed with this work for additional information                                                                          
@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the                                                                              
  * "License"); you may not use this file except in compliance                                                                     
  * with the License.  You may obtain a copy of the License at                                                                     
- *                                                                                                                                
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0                                                                                 
- *                                                                                                                                
+ *
  * Unless required by applicable law or agreed to in writing, software                                                            
  * distributed under the License is distributed on an "AS IS" BASIS,                                                              
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.                                                       
@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.hdfs;
 
-import java.io.IOException;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.Path;
@@ -26,7 +24,11 @@ import org.apache.hadoop.hdfs.client.HdfsDataInputStream;
 import org.junit.Assert;
 import org.junit.Test;
 
-/** Test the fileLength on cluster restarts */
+import java.io.IOException;
+
+/**
+ * Test the fileLength on cluster restarts
+ */
 public class TestFileLengthOnClusterRestart {
   /**
    * Tests the fileLength when we sync the file and restart the cluster and
@@ -39,13 +41,13 @@ public class TestFileLengthOnClusterRestart {
     // create cluster
     conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, 512);
 
-    final MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-        .numDataNodes(2).build();
+    final MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(2).build();
     HdfsDataInputStream in = null;
     try {
       Path path = new Path("/tmp/TestFileLengthOnClusterRestart", "test");
-      DistributedFileSystem dfs = (DistributedFileSystem) cluster
-          .getFileSystem();
+      DistributedFileSystem dfs =
+          (DistributedFileSystem) cluster.getFileSystem();
       FSDataOutputStream out = dfs.create(path);
       int fileLength = 1030;
       out.write(new byte[fileLength]);
@@ -65,8 +67,8 @@ public class TestFileLengthOnClusterRestart {
         in = (HdfsDataInputStream) dfs.open(path);
         Assert.fail("Expected IOException");
       } catch (IOException e) {
-        Assert.assertTrue(e.getLocalizedMessage().indexOf(
-            "Name node is in safe mode") >= 0);
+        Assert.assertTrue(
+            e.getLocalizedMessage().indexOf("Name node is in safe mode") >= 0);
       }
     } finally {
       if (null != in) {

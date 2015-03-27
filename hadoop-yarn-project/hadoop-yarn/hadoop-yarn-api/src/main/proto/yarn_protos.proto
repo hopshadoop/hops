@@ -23,9 +23,13 @@
  */
 
 option java_package = "org.apache.hadoop.yarn.proto";
+
 option java_outer_classname = "YarnProtos";
+
 option java_generic_services = true;
+
 option java_generate_equals_and_hash = true;
+
 package hadoop.yarn;
 
 import "Security.proto";
@@ -203,10 +207,10 @@ message ApplicationAttemptReportProto {
 }
 
 enum NodeStateProto {
-  NS_NEW = 1; 
-  NS_RUNNING = 2; 
+  NS_NEW = 1;
+  NS_RUNNING = 2;
   NS_UNHEALTHY = 3;
-  NS_DECOMMISSIONED = 4; 
+  NS_DECOMMISSIONED = 4;
   NS_LOST = 5;
   NS_REBOOTED = 6;
 }
@@ -268,8 +272,8 @@ message PreemptionResourceRequestProto {
 }
 
 message ResourceBlacklistRequestProto {
-  repeated string blacklist_additions = 1; 
-  repeated string blacklist_removals = 2; 
+  repeated string blacklist_additions = 1;
+  repeated string blacklist_removals = 2;
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -359,7 +363,7 @@ enum ContainerExitStatusProto {
 message ContainerResourceIncreaseRequestProto {
   optional ContainerIdProto container_id = 1;
   optional ResourceProto capability = 2;
-} 
+}
 
 message ContainerResourceIncreaseProto {
   optional ContainerIdProto container_id = 1;

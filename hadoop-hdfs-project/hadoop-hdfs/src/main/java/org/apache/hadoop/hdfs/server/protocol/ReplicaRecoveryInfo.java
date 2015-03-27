@@ -29,10 +29,11 @@ import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.ReplicaState;
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class ReplicaRecoveryInfo extends Block {
-  private final ReplicaState originalState;
+  private ReplicaState originalState;
 
-  public ReplicaRecoveryInfo(long blockId, long diskLen, long gs, ReplicaState rState) {
-    set(blockId, diskLen, gs);
+  public ReplicaRecoveryInfo(long blockId, long diskLen, long gs,
+      ReplicaState rState) {
+    setNoPersistance(blockId, diskLen, gs);
     originalState = rState;
   }
 

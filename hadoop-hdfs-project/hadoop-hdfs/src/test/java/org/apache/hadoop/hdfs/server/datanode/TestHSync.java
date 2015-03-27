@@ -17,12 +17,6 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
-import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
-import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
-
-import java.util.EnumSet;
-import java.util.Random;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -39,16 +33,27 @@ import org.apache.hadoop.io.SequenceFile.Writer;
 import org.apache.hadoop.io.compress.DefaultCodec;
 import org.junit.Test;
 
+import java.util.EnumSet;
+import java.util.Random;
+
+import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
+import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
+
 public class TestHSync {
   
   private void checkSyncMetric(MiniDFSCluster cluster, int dn, long value) {
     DataNode datanode = cluster.getDataNodes().get(dn);
-    assertCounter("FsyncCount", value, getMetrics(datanode.getMetrics().name()));    
+    assertCounter("FsyncCount", value,
+        getMetrics(datanode.getMetrics().name()));
   }
+
   private void checkSyncMetric(MiniDFSCluster cluster, long value) {
     checkSyncMetric(cluster, 0, value);
   }
-  /** Test basic hsync cases */
+
+  /**
+   * Test basic hsync cases
+   */
   @Test
   public void testHSync() throws Exception {
     Configuration conf = new HdfsConfiguration();
@@ -57,8 +62,8 @@ public class TestHSync {
 
     final Path p = new Path("/testHSync/foo");
     final int len = 1 << 16;
-    FSDataOutputStream out = fs.create(p, FsPermission.getDefault(),
-        EnumSet.of(CreateFlag.CREATE, CreateFlag.OVERWRITE, CreateFlag.SYNC_BLOCK),
+    FSDataOutputStream out = fs.create(p, FsPermission.getDefault(), EnumSet
+        .of(CreateFlag.CREATE, CreateFlag.OVERWRITE, CreateFlag.SYNC_BLOCK),
         4096, (short) 1, len, null);
     out.hflush();
     // hflush does not sync
@@ -82,8 +87,8 @@ public class TestHSync {
 
     // same with a file created with out SYNC_BLOCK
     out = fs.create(p, FsPermission.getDefault(),
-        EnumSet.of(CreateFlag.CREATE, CreateFlag.OVERWRITE),
-        4096, (short) 1, len, null);
+        EnumSet.of(CreateFlag.CREATE, CreateFlag.OVERWRITE), 4096, (short) 1,
+        len, null);
     out.hsync();
     checkSyncMetric(cluster, 3);
     out.write(1);
@@ -99,7 +104,9 @@ public class TestHSync {
     cluster.shutdown();
   }
 
-  /** Test hsync on an exact block boundary */
+  /**
+   * Test hsync on an exact block boundary
+   */
   @Test
   public void testHSyncBlockBoundary() throws Exception {
     Configuration conf = new HdfsConfiguration();
@@ -109,8 +116,8 @@ public class TestHSync {
     final Path p = new Path("/testHSyncBlockBoundary/foo");
     final int len = 1 << 16;
     final byte[] fileContents = AppendTestUtil.initBuffer(len);
-    FSDataOutputStream out = fs.create(p, FsPermission.getDefault(),
-        EnumSet.of(CreateFlag.CREATE, CreateFlag.OVERWRITE, CreateFlag.SYNC_BLOCK),
+    FSDataOutputStream out = fs.create(p, FsPermission.getDefault(), EnumSet
+        .of(CreateFlag.CREATE, CreateFlag.OVERWRITE, CreateFlag.SYNC_BLOCK),
         4096, (short) 1, len, null);
     // fill exactly one block (tests the SYNC_BLOCK case) and flush
     out.write(fileContents, 0, len);
@@ -129,7 +136,9 @@ public class TestHSync {
     cluster.shutdown();
   }
 
-  /** Test hsync via SequenceFiles */
+  /**
+   * Test hsync via SequenceFiles
+   */
   @Test
   public void testSequenceFileSync() throws Exception {
     Configuration conf = new HdfsConfiguration();
@@ -138,14 +147,14 @@ public class TestHSync {
     final FileSystem fs = cluster.getFileSystem();
     final Path p = new Path("/testSequenceFileSync/foo");
     final int len = 1 << 16;
-    FSDataOutputStream out = fs.create(p, FsPermission.getDefault(),
-        EnumSet.of(CreateFlag.CREATE, CreateFlag.OVERWRITE, CreateFlag.SYNC_BLOCK),
+    FSDataOutputStream out = fs.create(p, FsPermission.getDefault(), EnumSet
+        .of(CreateFlag.CREATE, CreateFlag.OVERWRITE, CreateFlag.SYNC_BLOCK),
         4096, (short) 1, len, null);
-    Writer w = SequenceFile.createWriter(new Configuration(),
-        Writer.stream(out),
-        Writer.keyClass(RandomDatum.class),
-        Writer.valueClass(RandomDatum.class),
-        Writer.compression(CompressionType.NONE, new DefaultCodec()));
+    Writer w = SequenceFile
+        .createWriter(new Configuration(), Writer.stream(out),
+            Writer.keyClass(RandomDatum.class),
+            Writer.valueClass(RandomDatum.class),
+            Writer.compression(CompressionType.NONE, new DefaultCodec()));
     w.hflush();
     checkSyncMetric(cluster, 0);
     w.hsync();
@@ -163,17 +172,20 @@ public class TestHSync {
     cluster.shutdown();
   }
 
-  /** Test that syncBlock is correctly performed at replicas */
+  /**
+   * Test that syncBlock is correctly performed at replicas
+   */
   @Test
   public void testHSyncWithReplication() throws Exception {
     Configuration conf = new HdfsConfiguration();
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(3).build();
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(3).build();
     final FileSystem fs = cluster.getFileSystem();
 
     final Path p = new Path("/testHSyncWithReplication/foo");
     final int len = 1 << 16;
-    FSDataOutputStream out = fs.create(p, FsPermission.getDefault(),
-        EnumSet.of(CreateFlag.CREATE, CreateFlag.OVERWRITE, CreateFlag.SYNC_BLOCK),
+    FSDataOutputStream out = fs.create(p, FsPermission.getDefault(), EnumSet
+        .of(CreateFlag.CREATE, CreateFlag.OVERWRITE, CreateFlag.SYNC_BLOCK),
         4096, (short) 3, len, null);
     out.write(1);
     out.hflush();

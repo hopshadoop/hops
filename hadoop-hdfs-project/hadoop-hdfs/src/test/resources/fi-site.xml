@@ -26,8 +26,8 @@
     <name>fi.*</name>
     <value>0.00</value>
     <description>
-    	Default probability level for all injected faults specified 
-    	as a floating number between 0 and 1.00
+      Default probability level for all injected faults specified
+      as a floating number between 0 and 1.00
     </description>
   </property>
 </configuration>

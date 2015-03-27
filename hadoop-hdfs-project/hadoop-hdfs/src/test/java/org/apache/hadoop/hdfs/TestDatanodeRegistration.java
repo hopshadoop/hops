@@ -36,7 +36,9 @@ import org.junit.Test;
 import java.net.InetSocketAddress;
 import java.security.Permission;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 
@@ -46,12 +48,16 @@ import static org.mockito.Mockito.mock;
  */
 public class TestDatanodeRegistration {
   
-  public static final Log LOG = LogFactory.getLog(TestDatanodeRegistration.class);
+  public static final Log LOG =
+      LogFactory.getLog(TestDatanodeRegistration.class);
 
   private static class MonitorDNS extends SecurityManager {
     int lookups = 0;
+
     @Override
-    public void checkPermission(Permission perm) {}    
+    public void checkPermission(Permission perm) {
+    }
+
     @Override
     public void checkConnect(String host, int port) {
       if (port == -1) {
@@ -63,6 +69,7 @@ public class TestDatanodeRegistration {
   /**
    * Ensure the datanode manager does not do host lookup after registration,
    * especially for node reports.
+   *
    * @throws Exception
    */
   @Test
@@ -117,9 +124,8 @@ public class TestDatanodeRegistration {
     MiniDFSCluster cluster = null;
     try {
       cluster = new MiniDFSCluster.Builder(conf).build();
-      InetSocketAddress addr = new InetSocketAddress(
-        "localhost",
-        cluster.getNameNodePort());
+      InetSocketAddress addr =
+          new InetSocketAddress("localhost", cluster.getNameNodePort());
       DFSClient client = new DFSClient(addr, conf);
 
       // Restart datanodes
@@ -132,8 +138,9 @@ public class TestDatanodeRegistration {
       boolean gotHeartbeat = false;
       for (int i = 0; i < 10 && !gotHeartbeat; i++) {
         try {
-          Thread.sleep(i*1000);
-        } catch (InterruptedException ie) {}
+          Thread.sleep(i * 1000);
+        } catch (InterruptedException ie) {
+        }
 
         report = client.datanodeReport(DatanodeReportType.ALL);
         gotHeartbeat = (report[0].getLastUpdate() > firstUpdateAfterRestart);
@@ -158,48 +165,43 @@ public class TestDatanodeRegistration {
     final String DN_HOSTNAME = "localhost";
     final int DN_XFER_PORT = 12345;
     final int DN_INFO_PORT = 12346;
-    final int DN_INFO_SECURE_PORT = 12347;
-    final int DN_IPC_PORT = 12348;
+    final int DN_IPC_PORT = 12347;
     Configuration conf = new HdfsConfiguration();
     MiniDFSCluster cluster = null;
     try {
-      cluster = new MiniDFSCluster.Builder(conf)
-          .numDataNodes(0)
-          .build();
-      InetSocketAddress addr = new InetSocketAddress(
-        "localhost",
-        cluster.getNameNodePort());
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(0).build();
+      InetSocketAddress addr =
+          new InetSocketAddress("localhost", cluster.getNameNodePort());
       DFSClient client = new DFSClient(addr, conf);
       NamenodeProtocols rpcServer = cluster.getNameNodeRpc();
 
       // register a datanode
-      DatanodeID dnId = new DatanodeID(DN_IP_ADDR, DN_HOSTNAME,
-          "fake-datanode-id", DN_XFER_PORT, DN_INFO_PORT, DN_INFO_SECURE_PORT,
-          DN_IPC_PORT);
-      long nnCTime = cluster.getNamesystem().getFSImage().getStorage()
-          .getCTime();
+      DatanodeID dnId =
+          new DatanodeID(DN_IP_ADDR, DN_HOSTNAME, "fake-storage-id",
+              DN_XFER_PORT, DN_INFO_PORT, DN_IPC_PORT);
+      long nnCTime = StorageInfo.getStorageInfoFromDB().getCTime();
       StorageInfo mockStorageInfo = mock(StorageInfo.class);
       doReturn(nnCTime).when(mockStorageInfo).getCTime();
-      doReturn(HdfsConstants.DATANODE_LAYOUT_VERSION).when(mockStorageInfo)
+      doReturn(HdfsConstants.LAYOUT_VERSION).when(mockStorageInfo)
           .getLayoutVersion();
-      DatanodeRegistration dnReg = new DatanodeRegistration(dnId,
-          mockStorageInfo, null, VersionInfo.getVersion());
+      DatanodeRegistration dnReg =
+          new DatanodeRegistration(dnId, mockStorageInfo, null,
+              VersionInfo.getVersion());
       rpcServer.registerDatanode(dnReg);
 
       DatanodeInfo[] report = client.datanodeReport(DatanodeReportType.ALL);
       assertEquals("Expected a registered datanode", 1, report.length);
 
       // register the same datanode again with a different storage ID
-      dnId = new DatanodeID(DN_IP_ADDR, DN_HOSTNAME,
-          "changed-fake-datanode-id", DN_XFER_PORT, DN_INFO_PORT,
-          DN_INFO_SECURE_PORT, DN_IPC_PORT);
-      dnReg = new DatanodeRegistration(dnId,
-          mockStorageInfo, null, VersionInfo.getVersion());
+      dnId = new DatanodeID(DN_IP_ADDR, DN_HOSTNAME, "changed-fake-storage-id",
+          DN_XFER_PORT, DN_INFO_PORT, DN_IPC_PORT);
+      dnReg = new DatanodeRegistration(dnId, mockStorageInfo, null,
+          VersionInfo.getVersion());
       rpcServer.registerDatanode(dnReg);
 
       report = client.datanodeReport(DatanodeReportType.ALL);
-      assertEquals("Datanode with changed storage ID not recognized",
-          1, report.length);
+      assertEquals("Datanode with changed storage ID not recognized", 1,
+          report.length);
     } finally {
       if (cluster != null) {
         cluster.shutdown();
@@ -210,24 +212,23 @@ public class TestDatanodeRegistration {
   @Test
   public void testRegistrationWithDifferentSoftwareVersions() throws Exception {
     Configuration conf = new HdfsConfiguration();
-    conf.set(DFSConfigKeys.DFS_DATANODE_MIN_SUPPORTED_NAMENODE_VERSION_KEY, "3.0.0");
-    conf.set(DFSConfigKeys.DFS_NAMENODE_MIN_SUPPORTED_DATANODE_VERSION_KEY, "3.0.0");
+    conf.set(DFSConfigKeys.DFS_DATANODE_MIN_SUPPORTED_NAMENODE_VERSION_KEY,
+        "3.0.0");
+    conf.set(DFSConfigKeys.DFS_NAMENODE_MIN_SUPPORTED_DATANODE_VERSION_KEY,
+        "3.0.0");
     MiniDFSCluster cluster = null;
     try {
-      cluster = new MiniDFSCluster.Builder(conf)
-          .numDataNodes(0)
-          .build();
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(0).build();
       
       NamenodeProtocols rpcServer = cluster.getNameNodeRpc();
       
-      long nnCTime = cluster.getNamesystem().getFSImage().getStorage().getCTime();
+      long nnCTime = StorageInfo.getStorageInfoFromDB().getCTime();
       StorageInfo mockStorageInfo = mock(StorageInfo.class);
       doReturn(nnCTime).when(mockStorageInfo).getCTime();
       
       DatanodeRegistration mockDnReg = mock(DatanodeRegistration.class);
-      doReturn(HdfsConstants.DATANODE_LAYOUT_VERSION).when(mockDnReg).getVersion();
-      doReturn(123).when(mockDnReg).getXferPort();
-      doReturn("fake-storage-id").when(mockDnReg).getDatanodeUuid();
+      doReturn(HdfsConstants.LAYOUT_VERSION).when(mockDnReg).getVersion();
+      doReturn("fake-storage-id").when(mockDnReg).getStorageID();
       doReturn(mockStorageInfo).when(mockDnReg).getStorageInfo();
       
       // Should succeed when software versions are the same.
@@ -244,8 +245,9 @@ public class TestDatanodeRegistration {
         rpcServer.registerDatanode(mockDnReg);
         fail("Should not have been able to register DN with too-low version.");
       } catch (IncorrectVersionException ive) {
-        GenericTestUtils.assertExceptionContains(
-            "The reported DataNode version is too low", ive);
+        GenericTestUtils
+            .assertExceptionContains("The reported DataNode version is too low",
+                ive);
         LOG.info("Got expected exception", ive);
       }
     } finally {
@@ -259,28 +261,26 @@ public class TestDatanodeRegistration {
   public void testRegistrationWithDifferentSoftwareVersionsDuringUpgrade()
       throws Exception {
     Configuration conf = new HdfsConfiguration();
-    conf.set(DFSConfigKeys.DFS_DATANODE_MIN_SUPPORTED_NAMENODE_VERSION_KEY, "1.0.0");
+    conf.set(DFSConfigKeys.DFS_DATANODE_MIN_SUPPORTED_NAMENODE_VERSION_KEY,
+        "1.0.0");
     MiniDFSCluster cluster = null;
     try {
-      cluster = new MiniDFSCluster.Builder(conf)
-          .numDataNodes(0)
-          .build();
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(0).build();
       
       NamenodeProtocols rpcServer = cluster.getNameNodeRpc();
       
-      long nnCTime = cluster.getNamesystem().getFSImage().getStorage().getCTime();
+      long nnCTime = StorageInfo.getStorageInfoFromDB().getCTime();
       StorageInfo mockStorageInfo = mock(StorageInfo.class);
       doReturn(nnCTime).when(mockStorageInfo).getCTime();
       
       DatanodeRegistration mockDnReg = mock(DatanodeRegistration.class);
-      doReturn(HdfsConstants.DATANODE_LAYOUT_VERSION).when(mockDnReg).getVersion();
-      doReturn("fake-storage-id").when(mockDnReg).getDatanodeUuid();
+      doReturn(HdfsConstants.LAYOUT_VERSION).when(mockDnReg).getVersion();
+      doReturn("fake-storage-id").when(mockDnReg).getStorageID();
       doReturn(mockStorageInfo).when(mockDnReg).getStorageInfo();
       
       // Should succeed when software versions are the same and CTimes are the
       // same.
       doReturn(VersionInfo.getVersion()).when(mockDnReg).getSoftwareVersion();
-      doReturn(123).when(mockDnReg).getXferPort();
       rpcServer.registerDatanode(mockDnReg);
       
       // Should succeed when software versions are the same and CTimes are
@@ -290,14 +290,16 @@ public class TestDatanodeRegistration {
       
       // Should fail when software version of DN is different from NN and CTimes
       // are different.
-      doReturn(VersionInfo.getVersion() + ".1").when(mockDnReg).getSoftwareVersion();
+      doReturn(VersionInfo.getVersion() + ".1").when(mockDnReg)
+          .getSoftwareVersion();
       try {
         rpcServer.registerDatanode(mockDnReg);
-        fail("Should not have been able to register DN with different software" +
-            " versions and CTimes");
+        fail(
+            "Should not have been able to register DN with different software" +
+                " versions and CTimes");
       } catch (IncorrectVersionException ive) {
-        GenericTestUtils.assertExceptionContains(
-            "does not match CTime of NN", ive);
+        GenericTestUtils
+            .assertExceptionContains("does not match CTime of NN", ive);
         LOG.info("Got expected exception", ive);
       }
     } finally {

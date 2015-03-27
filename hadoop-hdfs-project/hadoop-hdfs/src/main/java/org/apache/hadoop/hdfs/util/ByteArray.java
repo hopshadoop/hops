@@ -17,11 +17,11 @@
  */
 package org.apache.hadoop.hdfs.util;
 
-import java.util.Arrays;
-
 import org.apache.hadoop.classification.InterfaceAudience;
 
-/** 
+import java.util.Arrays;
+
+/**
  * Wrapper for byte[] to use byte[] as key in HashMap
  */
 @InterfaceAudience.Private
@@ -50,6 +50,6 @@ public class ByteArray {
     if (!(o instanceof ByteArray)) {
       return false;
     }
-    return Arrays.equals(bytes, ((ByteArray)o).bytes);
+    return Arrays.equals(bytes, ((ByteArray) o).bytes);
   }
 }

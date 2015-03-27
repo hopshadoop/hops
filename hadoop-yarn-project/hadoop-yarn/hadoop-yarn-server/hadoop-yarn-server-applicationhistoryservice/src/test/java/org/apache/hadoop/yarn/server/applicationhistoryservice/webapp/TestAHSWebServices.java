@@ -18,13 +18,18 @@
 
 package org.apache.hadoop.yarn.server.applicationhistoryservice.webapp;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
-
-import javax.ws.rs.core.MediaType;
-
+import com.google.inject.Guice;
+import com.google.inject.Injector;
+import com.google.inject.servlet.GuiceServletContextListener;
+import com.google.inject.servlet.ServletModule;
+import com.sun.jersey.api.client.ClientResponse;
+import com.sun.jersey.api.client.ClientResponse.Status;
+import com.sun.jersey.api.client.UniformInterfaceException;
+import com.sun.jersey.api.client.WebResource;
+import com.sun.jersey.guice.spi.container.servlet.GuiceContainer;
+import com.sun.jersey.test.framework.JerseyTest;
+import com.sun.jersey.test.framework.WebAppDescriptor;
 import junit.framework.Assert;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -49,17 +54,10 @@ import org.codehaus.jettison.json.JSONObject;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.google.inject.Guice;
-import com.google.inject.Injector;
-import com.google.inject.servlet.GuiceServletContextListener;
-import com.google.inject.servlet.ServletModule;
-import com.sun.jersey.api.client.ClientResponse;
-import com.sun.jersey.api.client.ClientResponse.Status;
-import com.sun.jersey.api.client.UniformInterfaceException;
-import com.sun.jersey.api.client.WebResource;
-import com.sun.jersey.guice.spi.container.servlet.GuiceContainer;
-import com.sun.jersey.test.framework.JerseyTest;
-import com.sun.jersey.test.framework.WebAppDescriptor;
+import javax.ws.rs.core.MediaType;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 
 public class TestAHSWebServices extends JerseyTest {
 
@@ -102,10 +100,10 @@ public class TestAHSWebServices extends JerseyTest {
 
   public TestAHSWebServices() {
     super(new WebAppDescriptor.Builder(
-      "org.apache.hadoop.yarn.server.applicationhistoryservice.webapp")
-      .contextListenerClass(GuiceServletConfig.class)
-      .filterClass(com.google.inject.servlet.GuiceFilter.class)
-      .contextPath("jersey-guice-filter").servletPath("/").build());
+        "org.apache.hadoop.yarn.server.applicationhistoryservice.webapp")
+        .contextListenerClass(GuiceServletConfig.class)
+        .filterClass(com.google.inject.servlet.GuiceFilter.class)
+        .contextPath("jersey-guice-filter").servletPath("/").build());
   }
 
   @Before
@@ -121,14 +119,15 @@ public class TestAHSWebServices extends JerseyTest {
     try {
       responseStr =
           r.path("ws").path("v1").path("applicationhistory").path("bogus")
-            .accept(MediaType.APPLICATION_JSON).get(String.class);
+              .accept(MediaType.APPLICATION_JSON).get(String.class);
       fail("should have thrown exception on invalid uri");
     } catch (UniformInterfaceException ue) {
       ClientResponse response = ue.getResponse();
       assertEquals(Status.NOT_FOUND, response.getClientResponseStatus());
 
-      WebServicesTestUtils.checkStringMatch(
-        "error string exists and shouldn't", "", responseStr);
+      WebServicesTestUtils
+          .checkStringMatch("error string exists and shouldn't", "",
+              responseStr);
     }
   }
 
@@ -142,8 +141,9 @@ public class TestAHSWebServices extends JerseyTest {
     } catch (UniformInterfaceException ue) {
       ClientResponse response = ue.getResponse();
       assertEquals(Status.NOT_FOUND, response.getClientResponseStatus());
-      WebServicesTestUtils.checkStringMatch(
-        "error string exists and shouldn't", "", responseStr);
+      WebServicesTestUtils
+          .checkStringMatch("error string exists and shouldn't", "",
+              responseStr);
     }
   }
 
@@ -152,16 +152,16 @@ public class TestAHSWebServices extends JerseyTest {
     WebResource r = resource();
     String responseStr = "";
     try {
-      responseStr =
-          r.path("ws").path("v1").path("applicationhistory")
-            .accept(MediaType.TEXT_PLAIN).get(String.class);
+      responseStr = r.path("ws").path("v1").path("applicationhistory")
+          .accept(MediaType.TEXT_PLAIN).get(String.class);
       fail("should have thrown exception on invalid uri");
     } catch (UniformInterfaceException ue) {
       ClientResponse response = ue.getResponse();
       assertEquals(Status.INTERNAL_SERVER_ERROR,
-        response.getClientResponseStatus());
-      WebServicesTestUtils.checkStringMatch(
-        "error string exists and shouldn't", "", responseStr);
+          response.getClientResponseStatus());
+      WebServicesTestUtils
+          .checkStringMatch("error string exists and shouldn't", "",
+              responseStr);
     }
   }
 
@@ -170,8 +170,8 @@ public class TestAHSWebServices extends JerseyTest {
     WebResource r = resource();
     ClientResponse response =
         r.path("ws").path("v1").path("applicationhistory").path("apps")
-          .queryParam("state", YarnApplicationState.FINISHED.toString())
-          .accept(MediaType.APPLICATION_JSON).get(ClientResponse.class);
+            .queryParam("state", YarnApplicationState.FINISHED.toString())
+            .accept(MediaType.APPLICATION_JSON).get(ClientResponse.class);
     assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
     JSONObject json = response.getEntity(JSONObject.class);
     assertEquals("incorrect number of elements", 1, json.length());
@@ -187,8 +187,8 @@ public class TestAHSWebServices extends JerseyTest {
     WebResource r = resource();
     ClientResponse response =
         r.path("ws").path("v1").path("applicationhistory").path("apps")
-          .path(appId.toString()).accept(MediaType.APPLICATION_JSON)
-          .get(ClientResponse.class);
+            .path(appId.toString()).accept(MediaType.APPLICATION_JSON)
+            .get(ClientResponse.class);
     assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
     JSONObject json = response.getEntity(JSONObject.class);
     assertEquals("incorrect number of elements", 1, json.length());
@@ -200,7 +200,7 @@ public class TestAHSWebServices extends JerseyTest {
     assertEquals("test user", app.get("user"));
     assertEquals("test type", app.get("type"));
     assertEquals(FinalApplicationStatus.UNDEFINED.toString(),
-      app.get("finalAppStatus"));
+        app.get("finalAppStatus"));
     assertEquals(YarnApplicationState.FINISHED.toString(), app.get("appState"));
   }
 
@@ -210,8 +210,8 @@ public class TestAHSWebServices extends JerseyTest {
     WebResource r = resource();
     ClientResponse response =
         r.path("ws").path("v1").path("applicationhistory").path("apps")
-          .path(appId.toString()).path("appattempts")
-          .accept(MediaType.APPLICATION_JSON).get(ClientResponse.class);
+            .path(appId.toString()).path("appattempts")
+            .accept(MediaType.APPLICATION_JSON).get(ClientResponse.class);
     assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
     JSONObject json = response.getEntity(JSONObject.class);
     assertEquals("incorrect number of elements", 1, json.length());
@@ -229,9 +229,9 @@ public class TestAHSWebServices extends JerseyTest {
     WebResource r = resource();
     ClientResponse response =
         r.path("ws").path("v1").path("applicationhistory").path("apps")
-          .path(appId.toString()).path("appattempts")
-          .path(appAttemptId.toString()).accept(MediaType.APPLICATION_JSON)
-          .get(ClientResponse.class);
+            .path(appId.toString()).path("appattempts")
+            .path(appAttemptId.toString()).accept(MediaType.APPLICATION_JSON)
+            .get(ClientResponse.class);
     assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
     JSONObject json = response.getEntity(JSONObject.class);
     assertEquals("incorrect number of elements", 1, json.length());
@@ -239,10 +239,10 @@ public class TestAHSWebServices extends JerseyTest {
     assertEquals(appAttemptId.toString(), appAttempt.getString("appAttemptId"));
     assertEquals(appAttemptId.toString(), appAttempt.getString("host"));
     assertEquals(appAttemptId.toString(),
-      appAttempt.getString("diagnosticsInfo"));
+        appAttempt.getString("diagnosticsInfo"));
     assertEquals("test tracking url", appAttempt.getString("trackingUrl"));
     assertEquals(YarnApplicationAttemptState.FINISHED.toString(),
-      appAttempt.get("appAttemptState"));
+        appAttempt.get("appAttemptState"));
   }
 
   @Test
@@ -253,9 +253,9 @@ public class TestAHSWebServices extends JerseyTest {
     WebResource r = resource();
     ClientResponse response =
         r.path("ws").path("v1").path("applicationhistory").path("apps")
-          .path(appId.toString()).path("appattempts")
-          .path(appAttemptId.toString()).path("containers")
-          .accept(MediaType.APPLICATION_JSON).get(ClientResponse.class);
+            .path(appId.toString()).path("appattempts")
+            .path(appAttemptId.toString()).path("containers")
+            .accept(MediaType.APPLICATION_JSON).get(ClientResponse.class);
     assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
     JSONObject json = response.getEntity(JSONObject.class);
     assertEquals("incorrect number of elements", 1, json.length());
@@ -274,30 +274,31 @@ public class TestAHSWebServices extends JerseyTest {
     WebResource r = resource();
     ClientResponse response =
         r.path("ws").path("v1").path("applicationhistory").path("apps")
-          .path(appId.toString()).path("appattempts")
-          .path(appAttemptId.toString()).path("containers")
-          .path(containerId.toString()).accept(MediaType.APPLICATION_JSON)
-          .get(ClientResponse.class);
+            .path(appId.toString()).path("appattempts")
+            .path(appAttemptId.toString()).path("containers")
+            .path(containerId.toString()).accept(MediaType.APPLICATION_JSON)
+            .get(ClientResponse.class);
     assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
     JSONObject json = response.getEntity(JSONObject.class);
     assertEquals("incorrect number of elements", 1, json.length());
     JSONObject container = json.getJSONObject("container");
     assertEquals(containerId.toString(), container.getString("containerId"));
-    assertEquals(containerId.toString(), container.getString("diagnosticsInfo"));
+    assertEquals(containerId.toString(),
+        container.getString("diagnosticsInfo"));
     assertEquals("0", container.getString("allocatedMB"));
     assertEquals("0", container.getString("allocatedVCores"));
     assertEquals(NodeId.newInstance("localhost", 0).toString(),
-      container.getString("assignedNodeId"));
+        container.getString("assignedNodeId"));
     assertEquals(Priority.newInstance(containerId.getId()).toString(),
-      container.getString("priority"));
+        container.getString("priority"));
     Configuration conf = new YarnConfiguration();
     assertEquals(WebAppUtils.getHttpSchemePrefix(conf) +
-        WebAppUtils.getAHSWebAppURLWithoutScheme(conf) +
-        "/applicationhistory/logs/localhost:0/container_0_0001_01_000001/" +
-        "container_0_0001_01_000001/test user",
+            WebAppUtils.getAHSWebAppURLWithoutScheme(conf) +
+            "/applicationhistory/logs/localhost:0/container_0_0001_01_000001/" +
+            "container_0_0001_01_000001/test user",
         container.getString("logUrl"));
     assertEquals(ContainerState.COMPLETE.toString(),
-      container.getString("containerState"));
+        container.getString("containerState"));
   }
 
 }

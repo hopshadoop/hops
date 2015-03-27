@@ -17,13 +17,6 @@
  */
 package org.apache.hadoop.security;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-
-import java.io.IOException;
-import java.util.Random;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -41,7 +34,16 @@ import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.util.StringUtils;
 import org.junit.Test;
 
-/** Unit tests for permission */
+import java.io.IOException;
+import java.util.Random;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
+/**
+ * Unit tests for permission
+ */
 public class TestPermission {
   public static final Log LOG = LogFactory.getLog(TestPermission.class);
 
@@ -56,11 +58,12 @@ public class TestPermission {
   final private static String USER_NAME = "user" + RAN.nextInt();
   final private static String[] GROUP_NAMES = {"group1", "group2"};
 
-  static FsPermission checkPermission(FileSystem fs,
-      String path, FsPermission expected) throws IOException {
+  static FsPermission checkPermission(FileSystem fs, String path,
+      FsPermission expected) throws IOException {
     FileStatus s = fs.getFileStatus(new Path(path));
-    LOG.info(s.getPath() + ": " + s.isDirectory() + " " + s.getPermission()
-        + ":" + s.getOwner() + ":" + s.getGroup());
+    LOG.info(
+        s.getPath() + ": " + s.isDirectory() + " " + s.getPermission() + ":" +
+            s.getOwner() + ":" + s.getGroup());
     if (expected != null) {
       assertEquals(expected, s.getPermission());
       assertEquals(expected.toShort(), s.getPermission().toShort());
@@ -78,14 +81,14 @@ public class TestPermission {
     // Test 1 - old configuration key with decimal 
     // umask value should be handled when set using 
     // FSPermission.setUMask() API
-    FsPermission perm = new FsPermission((short)18);
+    FsPermission perm = new FsPermission((short) 18);
     Configuration conf = new Configuration();
     FsPermission.setUMask(conf, perm);
     assertEquals(18, FsPermission.getUMask(conf).toShort());
     
     // Test 2 - old configuration key set with decimal 
     // umask value should be handled
-    perm = new FsPermission((short)18);
+    perm = new FsPermission((short) 18);
     conf = new Configuration();
     conf.set(FsPermission.DEPRECATED_UMASK_LABEL, "18");
     assertEquals(18, FsPermission.getUMask(conf).toShort());
@@ -115,27 +118,27 @@ public class TestPermission {
       cluster.waitActive();
       fs = FileSystem.get(conf);
       FsPermission rootPerm = checkPermission(fs, "/", null);
-      FsPermission inheritPerm = FsPermission.createImmutable(
-          (short)(rootPerm.toShort() | 0300));
+      FsPermission inheritPerm =
+          FsPermission.createImmutable((short) (rootPerm.toShort() | 0300));
 
-      FsPermission dirPerm = new FsPermission((short)0777);
+      FsPermission dirPerm = new FsPermission((short) 0777);
       fs.mkdirs(new Path("/a1/a2/a3"), dirPerm);
       checkPermission(fs, "/a1", dirPerm);
       checkPermission(fs, "/a1/a2", dirPerm);
       checkPermission(fs, "/a1/a2/a3", dirPerm);
 
-      dirPerm = new FsPermission((short)0123);
-      FsPermission permission = FsPermission.createImmutable(
-        (short)(dirPerm.toShort() | 0300));
+      dirPerm = new FsPermission((short) 0123);
+      FsPermission permission =
+          FsPermission.createImmutable((short) (dirPerm.toShort() | 0300));
       fs.mkdirs(new Path("/aa/1/aa/2/aa/3"), dirPerm);
       checkPermission(fs, "/aa/1", permission);
       checkPermission(fs, "/aa/1/aa/2", permission);
       checkPermission(fs, "/aa/1/aa/2/aa/3", dirPerm);
 
-      FsPermission filePerm = new FsPermission((short)0444);
+      FsPermission filePerm = new FsPermission((short) 0444);
       Path p = new Path("/b1/b2/b3.txt");
-      FSDataOutputStream out = fs.create(p, filePerm,
-          true, conf.getInt(CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096),
+      FSDataOutputStream out = fs.create(p, filePerm, true,
+          conf.getInt(CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096),
           fs.getDefaultReplication(p), fs.getDefaultBlockSize(p), null);
       out.write(123);
       out.close();
@@ -144,22 +147,25 @@ public class TestPermission {
       checkPermission(fs, "/b1/b2/b3.txt", filePerm);
       
       conf.set(FsPermission.UMASK_LABEL, "022");
-      permission = 
-        FsPermission.createImmutable((short)0666);
+      permission = FsPermission.createImmutable((short) 0666);
       FileSystem.mkdirs(fs, new Path("/c1"), new FsPermission(permission));
-      FileSystem.create(fs, new Path("/c1/c2.txt"),
-          new FsPermission(permission));
+      FileSystem
+          .create(fs, new Path("/c1/c2.txt"), new FsPermission(permission));
       checkPermission(fs, "/c1", permission);
       checkPermission(fs, "/c1/c2.txt", permission);
     } finally {
       try {
-        if(fs != null) fs.close();
-      } catch(Exception e) {
+        if (fs != null) {
+          fs.close();
+        }
+      } catch (Exception e) {
         LOG.error(StringUtils.stringifyException(e));
       }
       try {
-        if(cluster != null) cluster.shutdown();
-      } catch(Exception e) {
+        if (cluster != null) {
+          cluster.shutdown();
+        }
+      } catch (Exception e) {
         LOG.error(StringUtils.stringifyException(e));
       }
     }
@@ -169,7 +175,8 @@ public class TestPermission {
   public void testFilePermision() throws Exception {
     final Configuration conf = new HdfsConfiguration();
     conf.setBoolean(DFSConfigKeys.DFS_PERMISSIONS_ENABLED_KEY, true);
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(3).build();
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(3).build();
     cluster.waitActive();
 
     try {
@@ -179,27 +186,26 @@ public class TestPermission {
       try {
         nnfs.setOwner(CHILD_FILE1, "foo", "bar");
         assertTrue(false);
-      }
-      catch(java.io.FileNotFoundException e) {
+      } catch (java.io.FileNotFoundException e) {
         LOG.info("GOOD: got " + e);
       }
       try {
-        nnfs.setPermission(CHILD_FILE1, new FsPermission((short)0777));
+        nnfs.setPermission(CHILD_FILE1, new FsPermission((short) 0777));
         assertTrue(false);
-      }
-      catch(java.io.FileNotFoundException e) {
+      } catch (java.io.FileNotFoundException e) {
         LOG.info("GOOD: got " + e);
       }
-      
+
       // make sure nn can take user specified permission (with default fs
       // permission umask applied)
-      FSDataOutputStream out = nnfs.create(CHILD_FILE1, new FsPermission(
-          (short) 0777), true, 1024, (short) 1, 1024, null);
+      FSDataOutputStream out =
+          nnfs.create(CHILD_FILE1, new FsPermission((short) 0777), true, 1024,
+              (short) 1, 1024, null);
       FileStatus status = nnfs.getFileStatus(CHILD_FILE1);
       // FS_PERMISSIONS_UMASK_DEFAULT is 0022
       assertTrue(status.getPermission().toString().equals("rwxr-xr-x"));
       nnfs.delete(CHILD_FILE1, false);
-      
+
       // following dir/file creations are legal
       nnfs.mkdirs(CHILD_DIR1);
       out = nnfs.create(CHILD_FILE1);
@@ -218,7 +224,7 @@ public class TestPermission {
       FSDataInputStream fin = nnfs.open(CHILD_FILE1);
       int bytesRead = fin.read(dataIn);
       assertTrue(bytesRead == FILE_LEN);
-      for(int i=0; i<FILE_LEN; i++) {
+      for (int i = 0; i < FILE_LEN; i++) {
         assertEquals(data[i], dataIn[i]);
       }
 
@@ -230,11 +236,11 @@ public class TestPermission {
       status = nnfs.getFileStatus(CHILD_FILE1);
       assertTrue(status.getPermission().toString().equals("rwxr--r--"));
       nnfs.setPermission(CHILD_FILE1, new FsPermission("700"));
-      
+
       ////////////////////////////////////////////////////////////////
       // test illegal file/dir creation
-      UserGroupInformation userGroupInfo = 
-        UserGroupInformation.createUserForTesting(USER_NAME, GROUP_NAMES );
+      UserGroupInformation userGroupInfo =
+          UserGroupInformation.createUserForTesting(USER_NAME, GROUP_NAMES);
       
       FileSystem userfs = DFSTestUtil.getFileSystemAs(userGroupInfo, conf);
 
@@ -251,9 +257,9 @@ public class TestPermission {
       // illegal file open
       assertTrue(!canOpen(userfs, CHILD_FILE1));
 
-      nnfs.setPermission(ROOT_PATH, new FsPermission((short)0755));
+      nnfs.setPermission(ROOT_PATH, new FsPermission((short) 0755));
       nnfs.setPermission(CHILD_DIR1, new FsPermission("777"));
-      nnfs.setPermission(new Path("/"), new FsPermission((short)0777));
+      nnfs.setPermission(new Path("/"), new FsPermission((short) 0777));
       final Path RENAME_PATH = new Path("/foo/bar");
       userfs.mkdirs(RENAME_PATH);
       assertTrue(canRename(userfs, RENAME_PATH, CHILD_DIR1));
@@ -266,7 +272,7 @@ public class TestPermission {
     try {
       fs.mkdirs(p);
       return true;
-    } catch(AccessControlException e) {
+    } catch (AccessControlException e) {
       return false;
     }
   }
@@ -275,7 +281,7 @@ public class TestPermission {
     try {
       fs.create(p);
       return true;
-    } catch(AccessControlException e) {
+    } catch (AccessControlException e) {
       return false;
     }
   }
@@ -284,17 +290,17 @@ public class TestPermission {
     try {
       fs.open(p);
       return true;
-    } catch(AccessControlException e) {
+    } catch (AccessControlException e) {
       return false;
     }
   }
 
-  static boolean canRename(FileSystem fs, Path src, Path dst
-      ) throws IOException {
+  static boolean canRename(FileSystem fs, Path src, Path dst)
+      throws IOException {
     try {
       fs.rename(src, dst);
       return true;
-    } catch(AccessControlException e) {
+    } catch (AccessControlException e) {
       return false;
     }
   }

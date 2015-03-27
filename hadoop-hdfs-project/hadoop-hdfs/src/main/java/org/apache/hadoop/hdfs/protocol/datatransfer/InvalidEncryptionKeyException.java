@@ -17,10 +17,10 @@
  */
 package org.apache.hadoop.hdfs.protocol.datatransfer;
 
-import java.io.IOException;
-
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+
+import java.io.IOException;
 
 /**
  * Encryption key verification failed.

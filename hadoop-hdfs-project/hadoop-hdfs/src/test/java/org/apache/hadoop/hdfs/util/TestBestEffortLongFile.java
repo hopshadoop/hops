@@ -17,16 +17,17 @@
  */
 package org.apache.hadoop.hdfs.util;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.Random;
-
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.io.IOUtils;
 import org.junit.Before;
 import org.junit.Test;
 
-import static org.junit.Assert.*;
+import java.io.File;
+import java.io.IOException;
+import java.util.Random;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 public class TestBestEffortLongFile {
 
@@ -50,7 +51,7 @@ public class TestBestEffortLongFile {
       
       // And first access should open it.
       assertTrue(FILE.exists());
-  
+
       Random r = new Random();
       for (int i = 0; i < 100; i++) {
         long newVal = r.nextLong();

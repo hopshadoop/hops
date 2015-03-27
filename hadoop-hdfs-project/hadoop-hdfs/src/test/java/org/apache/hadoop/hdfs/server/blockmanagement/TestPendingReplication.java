@@ -17,12 +17,17 @@
  */
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
-import java.util.ArrayList;
-
+import io.hops.common.INodeUtil;
+import io.hops.exception.StorageException;
+import io.hops.metadata.HdfsStorageFactory;
+import io.hops.metadata.hdfs.entity.INodeIdentifier;
+import io.hops.transaction.EntityManager;
+import io.hops.transaction.handler.HDFSOperationType;
+import io.hops.transaction.handler.HopsTransactionalRequestHandler;
+import io.hops.transaction.lock.LockFactory;
+import io.hops.transaction.lock.TransactionLocks;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSTestUtil;
@@ -30,18 +35,18 @@ import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.protocol.Block;
-import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.datanode.DataNodeTestUtils;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
-import org.apache.hadoop.hdfs.server.namenode.INodeFile;
 import org.apache.hadoop.hdfs.server.namenode.NameNodeAdapter;
-import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
-import org.apache.hadoop.hdfs.server.protocol.ReceivedDeletedBlockInfo;
-import org.apache.hadoop.hdfs.server.protocol.ReceivedDeletedBlockInfo.BlockStatus;
-import org.apache.hadoop.hdfs.server.protocol.StorageReceivedDeletedBlocks;
 import org.junit.Test;
+
+import java.io.IOException;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 /**
  * This class tests the internals of PendingReplicationBlocks.java,
@@ -54,42 +59,39 @@ public class TestPendingReplication {
   private static final int DATANODE_COUNT = 5;
 
   @Test
-  public void testPendingReplication() {
-    PendingReplicationBlocks pendingReplications;
-    pendingReplications = new PendingReplicationBlocks(TIMEOUT * 1000);
+  public void testPendingReplication() throws IOException, StorageException {
+    HdfsStorageFactory.setConfiguration(new HdfsConfiguration());
+    HdfsStorageFactory.formatStorage();
+
+    PendingReplicationBlocks pendingReplications =
+        new PendingReplicationBlocks(TIMEOUT * 1000);
     pendingReplications.start();
 
     //
     // Add 10 blocks to pendingReplications.
     //
-    DatanodeStorageInfo[] storages = DFSTestUtil.createDatanodeStorageInfos(10);
-    for (int i = 0; i < storages.length; i++) {
-      Block block = new Block(i, i, 0);
-      DatanodeStorageInfo[] targets = new DatanodeStorageInfo[i];
-      System.arraycopy(storages, 0, targets, 0, i);
-      pendingReplications.increment(block,
-          DatanodeStorageInfo.toDatanodeDescriptors(targets));
+    for (int i = 0; i < 10; i++) {
+      BlockInfo block = newBlockInfo(new Block(i, i, 0), i);
+      increment(pendingReplications, block, i);
     }
-    assertEquals("Size of pendingReplications ",
-                 10, pendingReplications.size());
+    
+    assertEquals("Size of pendingReplications ", 10,
+        pendingReplications.size());
 
 
     //
     // remove one item and reinsert it
     //
-    Block blk = new Block(8, 8, 0);
-    pendingReplications.decrement(blk, storages[7].getDatanodeDescriptor()); // removes one replica
-    assertEquals("pendingReplications.getNumReplicas ",
-                 7, pendingReplications.getNumReplicas(blk));
+    BlockInfo blk = newBlockInfo(new Block(8, 8, 0), 8);
+    decrement(pendingReplications, blk);             // removes one replica
+    assertEquals("pendingReplications.getNumReplicas ", 7,
+        getNumReplicas(pendingReplications, blk));
 
     for (int i = 0; i < 7; i++) {
-      // removes all replicas
-      pendingReplications.decrement(blk, storages[i].getDatanodeDescriptor());
+      decrement(pendingReplications, blk);           // removes all replicas
     }
     assertTrue(pendingReplications.size() == 9);
-    pendingReplications.increment(blk,
-        DatanodeStorageInfo.toDatanodeDescriptors(
-            DFSTestUtil.createDatanodeStorageInfos(8)));
+    increment(pendingReplications, blk, 8);
     assertTrue(pendingReplications.size() == 10);
 
     //
@@ -97,8 +99,8 @@ public class TestPendingReplication {
     // are sane.
     //
     for (int i = 0; i < 10; i++) {
-      Block block = new Block(i, i, 0);
-      int numReplicas = pendingReplications.getNumReplicas(block);
+      BlockInfo block = newBlockInfo(new Block(i, i, 0), i);
+      int numReplicas = getNumReplicas(pendingReplications, block);
       assertTrue(numReplicas == i);
     }
 
@@ -116,10 +118,8 @@ public class TestPendingReplication {
     }
 
     for (int i = 10; i < 15; i++) {
-      Block block = new Block(i, i, 0);
-      pendingReplications.increment(block,
-          DatanodeStorageInfo.toDatanodeDescriptors(
-              DFSTestUtil.createDatanodeStorageInfos(i)));
+      BlockInfo block = newBlockInfo(new Block(i, i, 0), i);
+      increment(pendingReplications, block, i);
     }
     assertTrue(pendingReplications.size() == 15);
 
@@ -135,120 +135,42 @@ public class TestPendingReplication {
       loop++;
     }
     System.out.println("Had to wait for " + loop +
-                       " seconds for the lot to timeout");
+        " seconds for the lot to timeout");
 
     //
     // Verify that everything has timed out.
     //
-    assertEquals("Size of pendingReplications ",
-                 0, pendingReplications.size());
-    Block[] timedOut = pendingReplications.getTimedOutBlocks();
+    assertEquals("Size of pendingReplications ", 0, pendingReplications.size());
+    long[] timedOut = pendingReplications.getTimedOutBlocks();
     assertTrue(timedOut != null && timedOut.length == 15);
     for (int i = 0; i < timedOut.length; i++) {
-      assertTrue(timedOut[i].getBlockId() < 15);
+      assertTrue(timedOut[i] < 15);
     }
-    pendingReplications.stop();
-  }
-  
-  /**
-   * Test if DatanodeProtocol#blockReceivedAndDeleted can correctly update the
-   * pending replications. Also make sure the blockReceivedAndDeleted call is
-   * idempotent to the pending replications. 
-   */
-  @Test
-  public void testBlockReceived() throws Exception {
-    final Configuration conf = new HdfsConfiguration();
-    conf.setLong(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, 1024);
-    MiniDFSCluster cluster = null;
-    try {
-      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(
-          DATANODE_COUNT).build();
-      cluster.waitActive();
-
-      DistributedFileSystem hdfs = cluster.getFileSystem();
-      FSNamesystem fsn = cluster.getNamesystem();
-      BlockManager blkManager = fsn.getBlockManager();
     
-      final String file = "/tmp.txt";
-      final Path filePath = new Path(file);
-      short replFactor = 1;
-      DFSTestUtil.createFile(hdfs, filePath, 1024L, replFactor, 0);
-
-      // temporarily stop the heartbeat
-      ArrayList<DataNode> datanodes = cluster.getDataNodes();
-      for (int i = 0; i < DATANODE_COUNT; i++) {
-        DataNodeTestUtils.setHeartbeatsDisabledForTests(datanodes.get(i), true);
-      }
-
-      hdfs.setReplication(filePath, (short) DATANODE_COUNT);
-      BlockManagerTestUtil.computeAllPendingWork(blkManager);
-
-      assertEquals(1, blkManager.pendingReplications.size());
-      INodeFile fileNode = fsn.getFSDirectory().getINode4Write(file).asFile();
-      Block[] blocks = fileNode.getBlocks();
-      assertEquals(DATANODE_COUNT - 1,
-          blkManager.pendingReplications.getNumReplicas(blocks[0]));
-
-      LocatedBlock locatedBlock = hdfs.getClient().getLocatedBlocks(file, 0)
-          .get(0);
-      DatanodeInfo existingDn = (locatedBlock.getLocations())[0];
-      int reportDnNum = 0;
-      String poolId = cluster.getNamesystem().getBlockPoolId();
-      // let two datanodes (other than the one that already has the data) to
-      // report to NN
-      for (int i = 0; i < DATANODE_COUNT && reportDnNum < 2; i++) {
-        if (!datanodes.get(i).getDatanodeId().equals(existingDn)) {
-          DatanodeRegistration dnR = datanodes.get(i).getDNRegistrationForBP(
-              poolId);
-          StorageReceivedDeletedBlocks[] report = { 
-              new StorageReceivedDeletedBlocks("Fake-storage-ID-Ignored",
-              new ReceivedDeletedBlockInfo[] { new ReceivedDeletedBlockInfo(
-                  blocks[0], BlockStatus.RECEIVED_BLOCK, "") }) };
-          cluster.getNameNodeRpc().blockReceivedAndDeleted(dnR, poolId, report);
-          reportDnNum++;
-        }
-      }
-
-      assertEquals(DATANODE_COUNT - 3,
-          blkManager.pendingReplications.getNumReplicas(blocks[0]));
-
-      // let the same datanodes report again
-      for (int i = 0; i < DATANODE_COUNT && reportDnNum < 2; i++) {
-        if (!datanodes.get(i).getDatanodeId().equals(existingDn)) {
-          DatanodeRegistration dnR = datanodes.get(i).getDNRegistrationForBP(
-              poolId);
-          StorageReceivedDeletedBlocks[] report = 
-            { new StorageReceivedDeletedBlocks("Fake-storage-ID-Ignored",
-              new ReceivedDeletedBlockInfo[] { new ReceivedDeletedBlockInfo(
-                  blocks[0], BlockStatus.RECEIVED_BLOCK, "") }) };
-          cluster.getNameNodeRpc().blockReceivedAndDeleted(dnR, poolId, report);
-          reportDnNum++;
-        }
-      }
-
-      assertEquals(DATANODE_COUNT - 3,
-          blkManager.pendingReplications.getNumReplicas(blocks[0]));
-
-      // re-enable heartbeat for the datanode that has data
-      for (int i = 0; i < DATANODE_COUNT; i++) {
-        DataNodeTestUtils
-            .setHeartbeatsDisabledForTests(datanodes.get(i), false);
-        DataNodeTestUtils.triggerHeartbeat(datanodes.get(i));
-      }
-
-      Thread.sleep(5000);
-      assertEquals(0, blkManager.pendingReplications.size());
-    } finally {
-      if (cluster != null) {
-        cluster.shutdown();
-      }
+    //
+    // Verify that the blocks have not been removed from the pending database
+    //
+    timedOut = pendingReplications.getTimedOutBlocks();
+    assertTrue(timedOut != null && timedOut.length == 15);
+    for (int i = 0; i < timedOut.length; i++) {
+      assertTrue(timedOut[i] < 15);
     }
+    //
+    // Verify that the blocks have not been removed from the pending database
+    //
+    timedOut = pendingReplications.getTimedOutBlocks();
+    assertTrue(timedOut != null && timedOut.length == 15);
+    for (int i = 0; i < timedOut.length; i++) {
+      assertTrue(timedOut[i] < 15);
+    }
+    
+    pendingReplications.stop();
   }
   
   /**
    * Test if BlockManager can correctly remove corresponding pending records
    * when a file is deleted
-   * 
+   *
    * @throws Exception
    */
   @Test
@@ -257,10 +179,10 @@ public class TestPendingReplication {
     CONF.setLong(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, 1024);
     CONF.setLong(DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY,
         DFS_REPLICATION_INTERVAL);
-    CONF.setInt(DFSConfigKeys.DFS_NAMENODE_REPLICATION_INTERVAL_KEY, 
+    CONF.setInt(DFSConfigKeys.DFS_NAMENODE_REPLICATION_INTERVAL_KEY,
         DFS_REPLICATION_INTERVAL);
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(CONF).numDataNodes(
-        DATANODE_COUNT).build();
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(CONF).numDataNodes(DATANODE_COUNT).build();
     cluster.waitActive();
     
     FSNamesystem namesystem = cluster.getNamesystem();
@@ -277,28 +199,24 @@ public class TestPendingReplication {
       }
       
       // 3. mark a couple of blocks as corrupt
-      LocatedBlock block = NameNodeAdapter.getBlockLocations(
-          cluster.getNameNode(), filePath.toString(), 0, 1).get(0);
-      cluster.getNamesystem().writeLock();
-      try {
-        bm.findAndMarkBlockAsCorrupt(block.getBlock(), block.getLocations()[0],
-            "STORAGE_ID", "TEST");
-        bm.findAndMarkBlockAsCorrupt(block.getBlock(), block.getLocations()[1],
-            "STORAGE_ID", "TEST");
-      } finally {
-        cluster.getNamesystem().writeUnlock();
-      }
+      LocatedBlock block = NameNodeAdapter
+          .getBlockLocations(cluster.getNameNode(), filePath.toString(), 0, 1)
+          .get(0);
+      bm.findAndMarkBlockAsCorrupt(block.getBlock(), block.getLocations()[0],
+          "TEST");
+      bm.findAndMarkBlockAsCorrupt(block.getBlock(), block.getLocations()[1],
+          "TEST");
       BlockManagerTestUtil.computeAllPendingWork(bm);
       BlockManagerTestUtil.updateState(bm);
       assertEquals(bm.getPendingReplicationBlocksCount(), 1L);
-      assertEquals(bm.pendingReplications.getNumReplicas(block.getBlock()
-          .getLocalBlock()), 2);
+      assertEquals(getNumReplicas(bm.pendingReplications,
+          (BlockInfo) block.getBlock().getLocalBlock()), 2);
       
       // 4. delete the file
       fs.delete(filePath, true);
       // retry at most 10 times, each time sleep for 1s. Note that 10s is much
       // less than the default pending record timeout (5~10min)
-      int retries = 10; 
+      int retries = 10;
       long pendingNum = bm.getPendingReplicationBlocksCount();
       while (pendingNum != 0 && retries-- > 0) {
         Thread.sleep(1000);  // let NN do the deletion
@@ -309,5 +227,187 @@ public class TestPendingReplication {
     } finally {
       cluster.shutdown();
     }
+  }
+  
+  
+  private void increment(final PendingReplicationBlocks pendingReplications,
+      final Block block, final int numReplicas) throws IOException {
+    incrementOrDecrementPendingReplications(pendingReplications, block, true,
+        numReplicas);
+  }
+
+  private void decrement(final PendingReplicationBlocks pendingReplications,
+      final Block block) throws IOException {
+    incrementOrDecrementPendingReplications(pendingReplications, block, false,
+        -1);
+  }
+
+  private void incrementOrDecrementPendingReplications(
+      final PendingReplicationBlocks pendingReplications, final Block block,
+      final boolean inc, final int numReplicas) throws IOException {
+    new HopsTransactionalRequestHandler(
+        HDFSOperationType.TEST_PENDING_REPLICATION) {
+      INodeIdentifier inodeIdentifier;
+
+      @Override
+      public void setUp() throws StorageException, IOException {
+        inodeIdentifier = INodeUtil.resolveINodeFromBlock(block);
+      }
+
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = LockFactory.getInstance();
+        locks
+            .add(lf.getIndividualBlockLock(block.getBlockId(), inodeIdentifier))
+            .add(lf.getBlockRelated(LockFactory.BLK.PE));
+      }
+
+      @Override
+      public Object performTask() throws StorageException, IOException {
+        BlockInfo blockInfo = EntityManager
+            .find(BlockInfo.Finder.ByBlockIdAndINodeId, block.getBlockId());
+        if (inc) {
+          pendingReplications.increment(blockInfo, numReplicas);
+        } else {
+          pendingReplications.decrement(blockInfo);
+        }
+        return null;
+      }
+    }.handle();
+  }
+
+  private int getNumReplicas(final PendingReplicationBlocks pendingReplications,
+      final Block block) throws IOException {
+    return (Integer) new HopsTransactionalRequestHandler(
+        HDFSOperationType.TEST_PENDING_REPLICATION) {
+      INodeIdentifier inodeIdentifier;
+
+      @Override
+      public void setUp() throws StorageException, IOException {
+        inodeIdentifier = INodeUtil.resolveINodeFromBlock(block);
+      }
+
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = LockFactory.getInstance();
+        locks
+            .add(lf.getIndividualBlockLock(block.getBlockId(), inodeIdentifier))
+            .add(lf.getBlockRelated(LockFactory.BLK.PE));
+      }
+
+      @Override
+      public Object performTask() throws StorageException, IOException {
+        BlockInfo blockInfo = EntityManager
+            .find(BlockInfo.Finder.ByBlockIdAndINodeId, block.getBlockId());
+        return pendingReplications.getNumReplicas(blockInfo);
+      }
+    }.handle();
+  }
+  
+  
+  /**
+   * Test processPendingReplications
+   *
+   * @throws Exception
+   */
+  @Test
+  public void testProcessPendingReplications() throws Exception {
+    final short REPLICATION_FACTOR = (short) 1;
+    
+    // start a mini dfs cluster of 2 nodes
+    final Configuration conf = new HdfsConfiguration();
+    //we do not want the nameNode to run processPendingReplications before 
+    //we do it ourself 
+    conf.setInt(DFSConfigKeys.DFS_NAMENODE_REPLICATION_INTERVAL_KEY, 100);
+    conf.setInt(DFSConfigKeys.DFS_NAMENODE_REPLICATION_PENDING_TIMEOUT_SEC_KEY,
+        10);
+    final MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(REPLICATION_FACTOR)
+            .build();
+    try {
+      final FSNamesystem namesystem = cluster.getNamesystem();
+      final BlockManager bm = namesystem.getBlockManager();
+      final FileSystem fs = cluster.getFileSystem();
+
+      PendingReplicationBlocks pendingReplications = bm.pendingReplications;
+
+      //
+      // populate the cluster with 10 one block file
+      //
+      for (int i = 0; i < 10; i++) {
+        final Path FILE_PATH = new Path("/testfile_" + i);
+        DFSTestUtil.createFile(fs, FILE_PATH, 1L, REPLICATION_FACTOR, 1L);
+        DFSTestUtil.waitReplication(fs, FILE_PATH, REPLICATION_FACTOR);
+        //increase the block replication so that they are under replicated
+        fs.setReplication(FILE_PATH, (short) 2);
+        final ExtendedBlock block = DFSTestUtil.getFirstBlock(fs, FILE_PATH);
+        increment(pendingReplications, block.getLocalBlock(), i);
+      }
+
+      int test = pendingReplications.size();
+
+      assertEquals("Size of pendingReplications " + test, 10,
+          pendingReplications.size());
+
+
+      //
+      // Wait for everything to timeout.
+      //
+      int loop = 0;
+      while (pendingReplications.size() > 0) {
+        try {
+          Thread.sleep(1000);
+        } catch (Exception e) {
+        }
+        loop++;
+      }
+      System.out.println("Had to wait for " + loop +
+          " seconds for the lot to timeout");
+
+      //
+      // Verify that everything has timed out.
+      //
+      assertEquals("Size of pendingReplications ", 0,
+          pendingReplications.size());
+      long[] timedOut = pendingReplications.getTimedOutBlocks();
+      assertTrue(timedOut != null && timedOut.length == 10);
+
+      // run processPendingReplications
+      bm.processPendingReplications();
+
+      //
+      // Verify that the blocks have been removed from the pendingreplication
+      // database
+      //
+      timedOut = pendingReplications.getTimedOutBlocks();
+      assertTrue("blocks removed from pending", timedOut == null);
+
+      //
+      // Verify that the blocks have been added to the underReplicated database
+      //
+      UnderReplicatedBlocks queues = new UnderReplicatedBlocks();
+      assertEquals("Size of underReplications ", 10, queues.size());
+
+
+    } finally {
+      cluster.shutdown();
+    }
+  }
+
+  private BlockInfo newBlockInfo(final Block block, final int inodeId)
+      throws IOException {
+    final BlockInfo blockInfo = new BlockInfo(block, inodeId);
+    new HopsTransactionalRequestHandler(HDFSOperationType.TEST) {
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+      }
+
+      @Override
+      public Object performTask() throws StorageException, IOException {
+        EntityManager.add(blockInfo);
+        return null;
+      }
+    }.handle();
+    return blockInfo;
   }
 }

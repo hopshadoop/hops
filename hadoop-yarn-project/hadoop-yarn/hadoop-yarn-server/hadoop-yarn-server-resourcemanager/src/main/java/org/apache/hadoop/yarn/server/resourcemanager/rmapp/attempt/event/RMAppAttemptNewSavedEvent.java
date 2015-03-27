@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.event;
 
+import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptEventType;
@@ -27,8 +28,9 @@ public class RMAppAttemptNewSavedEvent extends RMAppAttemptEvent {
   final Exception storedException;
   
   public RMAppAttemptNewSavedEvent(ApplicationAttemptId appAttemptId,
-                                 Exception storedException) {
-    super(appAttemptId, RMAppAttemptEventType.ATTEMPT_NEW_SAVED);
+      Exception storedException, TransactionState transactionState) {
+    super(appAttemptId, RMAppAttemptEventType.ATTEMPT_NEW_SAVED,
+        transactionState);
     this.storedException = storedException;
   }
   

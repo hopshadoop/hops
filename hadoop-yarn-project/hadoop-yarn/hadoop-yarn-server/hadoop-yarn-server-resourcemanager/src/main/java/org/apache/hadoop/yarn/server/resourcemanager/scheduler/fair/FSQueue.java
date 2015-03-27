@@ -18,10 +18,6 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -36,6 +32,10 @@ import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
 import org.apache.hadoop.yarn.server.resourcemanager.resource.ResourceWeights;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.Queue;
 import org.apache.hadoop.yarn.util.resource.Resources;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 
 @Private
 @Unstable
@@ -53,7 +53,8 @@ public abstract class FSQueue extends Schedulable implements Queue {
   public FSQueue(String name, FairScheduler scheduler, FSParentQueue parent) {
     this.name = name;
     this.scheduler = scheduler;
-    this.metrics = FSQueueMetrics.forQueue(getName(), parent, true, scheduler.getConf());
+    this.metrics =
+        FSQueueMetrics.forQueue(getName(), parent, true, scheduler.getConf());
     metrics.setMinShare(getMinShare());
     metrics.setMaxShare(getMaxShare());
     this.parent = parent;
@@ -78,8 +79,8 @@ public abstract class FSQueue extends Schedulable implements Queue {
 
   protected void throwPolicyDoesnotApplyException(SchedulingPolicy policy)
       throws AllocationConfigurationException {
-    throw new AllocationConfigurationException("SchedulingPolicy " + policy
-        + " does not apply to queue " + getName());
+    throw new AllocationConfigurationException(
+        "SchedulingPolicy " + policy + " does not apply to queue " + getName());
   }
 
   public abstract void setPolicy(SchedulingPolicy policy)
@@ -162,8 +163,11 @@ public abstract class FSQueue extends Schedulable implements Queue {
   public abstract List<FSQueue> getChildQueues();
   
   /**
-   * Adds all applications in the queue and its subqueues to the given collection.
-   * @param apps the collection to add the applications to
+   * Adds all applications in the queue and its subqueues to the given
+   * collection.
+   *
+   * @param apps
+   *     the collection to add the applications to
    */
   public abstract void collectSchedulerApplications(
       Collection<ApplicationAttemptId> apps);
@@ -176,13 +180,13 @@ public abstract class FSQueue extends Schedulable implements Queue {
   
   /**
    * Helper method to check if the queue should attempt assigning resources
-   * 
+   *
    * @return true if check passes (can assign) or false otherwise
    */
   protected boolean assignContainerPreCheck(FSSchedulerNode node) {
     if (!Resources.fitsIn(getResourceUsage(),
-        scheduler.getAllocationConfiguration().getMaxResources(getName()))
-        || node.getReservedContainer() != null) {
+        scheduler.getAllocationConfiguration().getMaxResources(getName())) ||
+        node.getReservedContainer() != null) {
       return false;
     }
     return true;

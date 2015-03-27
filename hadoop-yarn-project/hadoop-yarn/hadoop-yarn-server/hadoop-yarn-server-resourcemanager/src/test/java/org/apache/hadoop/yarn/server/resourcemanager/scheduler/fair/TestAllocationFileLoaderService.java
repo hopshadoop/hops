@@ -1,29 +1,21 @@
 /**
-* Licensed to the Apache Software Foundation (ASF) under one
-* or more contributor license agreements.  See the NOTICE file
-* distributed with this work for additional information
-* regarding copyright ownership.  The ASF licenses this file
-* to you under the Apache License, Version 2.0 (the
-* "License"); you may not use this file except in compliance
-* with the License.  You may obtain a copy of the License at
-*
-*     http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair;
-
-import static junit.framework.Assert.*;
-import static org.junit.Assert.assertEquals;
-
-import java.io.File;
-import java.io.FileWriter;
-import java.io.PrintWriter;
-import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.records.QueueACL;
@@ -34,16 +26,25 @@ import org.apache.hadoop.yarn.util.Clock;
 import org.apache.hadoop.yarn.util.resource.Resources;
 import org.junit.Test;
 
+import java.io.File;
+import java.io.FileWriter;
+import java.io.PrintWriter;
+import java.util.List;
+
+import static junit.framework.Assert.assertTrue;
+import static org.junit.Assert.assertEquals;
+
 public class TestAllocationFileLoaderService {
   
-  final static String TEST_DIR = new File(System.getProperty("test.build.data",
-      "/tmp")).getAbsolutePath();
+  final static String TEST_DIR =
+      new File(System.getProperty("test.build.data", "/tmp")).getAbsolutePath();
 
-  final static String ALLOC_FILE = new File(TEST_DIR,
-      "test-queues").getAbsolutePath();
+  final static String ALLOC_FILE =
+      new File(TEST_DIR, "test-queues").getAbsolutePath();
   
   private class MockClock implements Clock {
     private long time = 0;
+
     @Override
     public long getTime() {
       return time;
@@ -65,7 +66,7 @@ public class TestAllocationFileLoaderService {
     assertTrue(allocationFile.exists());
   }
   
-  @Test (timeout = 10000)
+  @Test(timeout = 10000)
   public void testReload() throws Exception {
     PrintWriter out = new PrintWriter(new FileWriter(ALLOC_FILE));
     out.println("<?xml version=\"1.0\"?>");
@@ -84,8 +85,8 @@ public class TestAllocationFileLoaderService {
     Configuration conf = new Configuration();
     conf.set(FairSchedulerConfiguration.ALLOCATION_FILE, ALLOC_FILE);
 
-    AllocationFileLoaderService allocLoader = new AllocationFileLoaderService(
-        clock);
+    AllocationFileLoaderService allocLoader =
+        new AllocationFileLoaderService(clock);
     allocLoader.reloadIntervalMs = 5;
     allocLoader.init(conf);
     ReloadListener confHolder = new ReloadListener();
@@ -119,8 +120,8 @@ public class TestAllocationFileLoaderService {
     out.println("</allocations>");
     out.close();
     
-    clock.tick(System.currentTimeMillis()
-        + AllocationFileLoaderService.ALLOC_RELOAD_WAIT_MS + 10000);
+    clock.tick(System.currentTimeMillis() +
+        AllocationFileLoaderService.ALLOC_RELOAD_WAIT_MS + 10000);
     allocLoader.start();
     
     while (confHolder.allocConf == null) {
@@ -179,12 +180,13 @@ public class TestAllocationFileLoaderService {
     out.println("<maxRunningApps>10</maxRunningApps>");
     out.println("</user>");
     // Set default min share preemption timeout to 2 minutes
-    out.println("<defaultMinSharePreemptionTimeout>120"
-        + "</defaultMinSharePreemptionTimeout>");
+    out.println("<defaultMinSharePreemptionTimeout>120" +
+        "</defaultMinSharePreemptionTimeout>");
     // Set fair share preemption timeout to 5 minutes
     out.println("<fairSharePreemptionTimeout>300</fairSharePreemptionTimeout>");
     // Set default scheduling policy to DRF
-    out.println("<defaultQueueSchedulingPolicy>drf</defaultQueueSchedulingPolicy>");
+    out.println(
+        "<defaultQueueSchedulingPolicy>drf</defaultQueueSchedulingPolicy>");
     out.println("</allocations>");
     out.close();
     
@@ -195,10 +197,10 @@ public class TestAllocationFileLoaderService {
     AllocationConfiguration queueConf = confHolder.allocConf;
     
     assertEquals(5, queueConf.getQueueNames().size());
-    assertEquals(Resources.createResource(0),
-        queueConf.getMinResources("root." + YarnConfiguration.DEFAULT_QUEUE_NAME));
-    assertEquals(Resources.createResource(0),
-        queueConf.getMinResources("root." + YarnConfiguration.DEFAULT_QUEUE_NAME));
+    assertEquals(Resources.createResource(0), queueConf
+        .getMinResources("root." + YarnConfiguration.DEFAULT_QUEUE_NAME));
+    assertEquals(Resources.createResource(0), queueConf
+        .getMinResources("root." + YarnConfiguration.DEFAULT_QUEUE_NAME));
 
     assertEquals(Resources.createResource(1024, 0),
         queueConf.getMinResources("root.queueA"));
@@ -211,7 +213,8 @@ public class TestAllocationFileLoaderService {
     assertEquals(Resources.createResource(0),
         queueConf.getMinResources("root.queueE"));
 
-    assertEquals(15, queueConf.getQueueMaxApps("root." + YarnConfiguration.DEFAULT_QUEUE_NAME));
+    assertEquals(15, queueConf
+        .getQueueMaxApps("root." + YarnConfiguration.DEFAULT_QUEUE_NAME));
     assertEquals(15, queueConf.getQueueMaxApps("root.queueA"));
     assertEquals(15, queueConf.getQueueMaxApps("root.queueB"));
     assertEquals(15, queueConf.getQueueMaxApps("root.queueC"));
@@ -221,27 +224,32 @@ public class TestAllocationFileLoaderService {
     assertEquals(5, queueConf.getUserMaxApps("user2"));
 
     // Root should get * ACL
-    assertEquals("*", queueConf.getQueueAcl("root",
-        QueueACL.ADMINISTER_QUEUE).getAclString());
-    assertEquals("*", queueConf.getQueueAcl("root",
-        QueueACL.SUBMIT_APPLICATIONS).getAclString());
+    assertEquals("*", queueConf.getQueueAcl("root", QueueACL.ADMINISTER_QUEUE)
+        .getAclString());
+    assertEquals("*",
+        queueConf.getQueueAcl("root", QueueACL.SUBMIT_APPLICATIONS)
+            .getAclString());
 
     // Unspecified queues should get default ACL
-    assertEquals(" ", queueConf.getQueueAcl("root.queueA",
-        QueueACL.ADMINISTER_QUEUE).getAclString());
-    assertEquals(" ", queueConf.getQueueAcl("root.queueA",
-        QueueACL.SUBMIT_APPLICATIONS).getAclString());
+    assertEquals(" ",
+        queueConf.getQueueAcl("root.queueA", QueueACL.ADMINISTER_QUEUE)
+            .getAclString());
+    assertEquals(" ",
+        queueConf.getQueueAcl("root.queueA", QueueACL.SUBMIT_APPLICATIONS)
+            .getAclString());
 
     // Queue B ACL
-    assertEquals("alice,bob admins", queueConf.getQueueAcl("root.queueB",
-        QueueACL.ADMINISTER_QUEUE).getAclString());
+    assertEquals("alice,bob admins",
+        queueConf.getQueueAcl("root.queueB", QueueACL.ADMINISTER_QUEUE)
+            .getAclString());
 
     // Queue C ACL
-    assertEquals("alice,bob admins", queueConf.getQueueAcl("root.queueC",
-        QueueACL.SUBMIT_APPLICATIONS).getAclString());
+    assertEquals("alice,bob admins",
+        queueConf.getQueueAcl("root.queueC", QueueACL.SUBMIT_APPLICATIONS)
+            .getAclString());
 
-    assertEquals(120000, queueConf.getMinSharePreemptionTimeout("root." + 
-        YarnConfiguration.DEFAULT_QUEUE_NAME));
+    assertEquals(120000, queueConf.getMinSharePreemptionTimeout(
+        "root." + YarnConfiguration.DEFAULT_QUEUE_NAME));
     assertEquals(120000, queueConf.getMinSharePreemptionTimeout("root.queueA"));
     assertEquals(120000, queueConf.getMinSharePreemptionTimeout("root.queueB"));
     assertEquals(120000, queueConf.getMinSharePreemptionTimeout("root.queueC"));
@@ -302,8 +310,8 @@ public class TestAllocationFileLoaderService {
     out.println("<maxRunningApps>10</maxRunningApps>");
     out.println("</user>");
     // Set default min share preemption timeout to 2 minutes
-    out.println("<defaultMinSharePreemptionTimeout>120"
-        + "</defaultMinSharePreemptionTimeout>");
+    out.println("<defaultMinSharePreemptionTimeout>120" +
+        "</defaultMinSharePreemptionTimeout>");
     // Set fair share preemption timeout to 5 minutes
     out.println("<fairSharePreemptionTimeout>300</fairSharePreemptionTimeout>");
     out.println("</allocations>");
@@ -316,10 +324,10 @@ public class TestAllocationFileLoaderService {
     AllocationConfiguration queueConf = confHolder.allocConf;
 
     assertEquals(5, queueConf.getQueueNames().size());
-    assertEquals(Resources.createResource(0),
-        queueConf.getMinResources("root." + YarnConfiguration.DEFAULT_QUEUE_NAME));
-    assertEquals(Resources.createResource(0),
-        queueConf.getMinResources("root." + YarnConfiguration.DEFAULT_QUEUE_NAME));
+    assertEquals(Resources.createResource(0), queueConf
+        .getMinResources("root." + YarnConfiguration.DEFAULT_QUEUE_NAME));
+    assertEquals(Resources.createResource(0), queueConf
+        .getMinResources("root." + YarnConfiguration.DEFAULT_QUEUE_NAME));
 
     assertEquals(Resources.createResource(1024, 0),
         queueConf.getMinResources("root.queueA"));
@@ -332,7 +340,8 @@ public class TestAllocationFileLoaderService {
     assertEquals(Resources.createResource(0),
         queueConf.getMinResources("root.queueE"));
 
-    assertEquals(15, queueConf.getQueueMaxApps("root." + YarnConfiguration.DEFAULT_QUEUE_NAME));
+    assertEquals(15, queueConf
+        .getQueueMaxApps("root." + YarnConfiguration.DEFAULT_QUEUE_NAME));
     assertEquals(15, queueConf.getQueueMaxApps("root.queueA"));
     assertEquals(15, queueConf.getQueueMaxApps("root.queueB"));
     assertEquals(15, queueConf.getQueueMaxApps("root.queueC"));
@@ -342,22 +351,26 @@ public class TestAllocationFileLoaderService {
     assertEquals(5, queueConf.getUserMaxApps("user2"));
 
     // Unspecified queues should get default ACL
-    assertEquals(" ", queueConf.getQueueAcl("root.queueA",
-        QueueACL.ADMINISTER_QUEUE).getAclString());
-    assertEquals(" ", queueConf.getQueueAcl("root.queueA",
-        QueueACL.SUBMIT_APPLICATIONS).getAclString());
+    assertEquals(" ",
+        queueConf.getQueueAcl("root.queueA", QueueACL.ADMINISTER_QUEUE)
+            .getAclString());
+    assertEquals(" ",
+        queueConf.getQueueAcl("root.queueA", QueueACL.SUBMIT_APPLICATIONS)
+            .getAclString());
 
     // Queue B ACL
-    assertEquals("alice,bob admins", queueConf.getQueueAcl("root.queueB",
-        QueueACL.ADMINISTER_QUEUE).getAclString());
+    assertEquals("alice,bob admins",
+        queueConf.getQueueAcl("root.queueB", QueueACL.ADMINISTER_QUEUE)
+            .getAclString());
 
     // Queue C ACL
-    assertEquals("alice,bob admins", queueConf.getQueueAcl("root.queueC",
-        QueueACL.SUBMIT_APPLICATIONS).getAclString());
+    assertEquals("alice,bob admins",
+        queueConf.getQueueAcl("root.queueC", QueueACL.SUBMIT_APPLICATIONS)
+            .getAclString());
 
 
-    assertEquals(120000, queueConf.getMinSharePreemptionTimeout("root." +
-        YarnConfiguration.DEFAULT_QUEUE_NAME));
+    assertEquals(120000, queueConf.getMinSharePreemptionTimeout(
+        "root." + YarnConfiguration.DEFAULT_QUEUE_NAME));
     assertEquals(120000, queueConf.getMinSharePreemptionTimeout("root.queueA"));
     assertEquals(120000, queueConf.getMinSharePreemptionTimeout("root.queueB"));
     assertEquals(120000, queueConf.getMinSharePreemptionTimeout("root.queueC"));
@@ -399,7 +412,7 @@ public class TestAllocationFileLoaderService {
    * Verify that you can't place queues at the same level as the root queue in
    * the allocations file.
    */
-  @Test (expected = AllocationConfigurationException.class)
+  @Test(expected = AllocationConfigurationException.class)
   public void testQueueAlongsideRoot() throws Exception {
     Configuration conf = new Configuration();
     conf.set(FairSchedulerConfiguration.ALLOCATION_FILE, ALLOC_FILE);

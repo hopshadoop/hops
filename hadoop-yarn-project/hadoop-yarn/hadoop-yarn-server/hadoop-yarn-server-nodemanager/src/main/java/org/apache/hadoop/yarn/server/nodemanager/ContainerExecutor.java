@@ -1,22 +1,36 @@
 /**
-* Licensed to the Apache Software Foundation (ASF) under one
-* or more contributor license agreements.  See the NOTICE file
-* distributed with this work for additional information
-* regarding copyright ownership.  The ASF licenses this file
-* to you under the Apache License, Version 2.0 (the
-* "License"); you may not use this file except in compliance
-* with the License.  You may obtain a copy of the License at
-*
-*     http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package org.apache.hadoop.yarn.server.nodemanager;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configurable;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.util.Shell;
+import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.yarn.api.records.ContainerId;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Container;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.ContainerDiagnosticsUpdateEvent;
+import org.apache.hadoop.yarn.server.nodemanager.util.ProcessIdFileReader;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -29,26 +43,11 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.conf.Configurable;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.util.Shell.ShellCommandExecutor;
-import org.apache.hadoop.yarn.api.records.ContainerId;
-import org.apache.hadoop.yarn.conf.YarnConfiguration;
-import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Container;
-import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.ContainerDiagnosticsUpdateEvent;
-import org.apache.hadoop.yarn.server.nodemanager.util.ProcessIdFileReader;
-import org.apache.hadoop.util.Shell;
-import org.apache.hadoop.util.StringUtils;
-
 public abstract class ContainerExecutor implements Configurable {
 
   private static final Log LOG = LogFactory.getLog(ContainerExecutor.class);
   final public static FsPermission TASK_LAUNCH_SCRIPT_PERMISSION =
-    FsPermission.createImmutable((short) 0700);
+      FsPermission.createImmutable((short) 0700);
 
   private Configuration conf;
 
@@ -70,8 +69,9 @@ public abstract class ContainerExecutor implements Configurable {
   }
 
   /**
-   * Run the executor initialization steps. 
+   * Run the executor initialization steps.
    * Verify that the necessary configs, permissions are in place.
+   *
    * @throws IOException
    */
   public abstract void init() throws IOException;
@@ -79,49 +79,66 @@ public abstract class ContainerExecutor implements Configurable {
   /**
    * Prepare the environment for containers in this application to execute.
    * For $x in local.dirs
-   *   create $x/$user/$appId
+   * create $x/$user/$appId
    * Copy $nmLocal/appTokens -> $N/$user/$appId
    * For $rsrc in private resources
-   *   Copy $rsrc -> $N/$user/filecache/[idef]
+   * Copy $rsrc -> $N/$user/filecache/[idef]
    * For $rsrc in job resources
-   *   Copy $rsrc -> $N/$user/$appId/filecache/idef
-   * @param user user name of application owner
-   * @param appId id of the application
-   * @param nmPrivateContainerTokens path to localized credentials, rsrc by NM
-   * @param nmAddr RPC address to contact NM
-   * @param localDirs nm-local-dirs
-   * @param logDirs nm-log-dirs
-   * @throws IOException For most application init failures
-   * @throws InterruptedException If application init thread is halted by NM
+   * Copy $rsrc -> $N/$user/$appId/filecache/idef
+   *
+   * @param user
+   *     user name of application owner
+   * @param appId
+   *     id of the application
+   * @param nmPrivateContainerTokens
+   *     path to localized credentials, rsrc by NM
+   * @param nmAddr
+   *     RPC address to contact NM
+   * @param localDirs
+   *     nm-local-dirs
+   * @param logDirs
+   *     nm-log-dirs
+   * @throws IOException
+   *     For most application init failures
+   * @throws InterruptedException
+   *     If application init thread is halted by NM
    */
   public abstract void startLocalizer(Path nmPrivateContainerTokens,
       InetSocketAddress nmAddr, String user, String appId, String locId,
       List<String> localDirs, List<String> logDirs)
-    throws IOException, InterruptedException;
+      throws IOException, InterruptedException;
 
 
   /**
    * Launch the container on the node. This is a blocking call and returns only
    * when the container exits.
-   * @param container the container to be launched
-   * @param nmPrivateContainerScriptPath the path for launch script
-   * @param nmPrivateTokensPath the path for tokens for the container
-   * @param user the user of the container
-   * @param appId the appId of the container
-   * @param containerWorkDir the work dir for the container
-   * @param localDirs nm-local-dirs to be used for this container
-   * @param logDirs nm-log-dirs to be used for this container
+   *
+   * @param container
+   *     the container to be launched
+   * @param nmPrivateContainerScriptPath
+   *     the path for launch script
+   * @param nmPrivateTokensPath
+   *     the path for tokens for the container
+   * @param user
+   *     the user of the container
+   * @param appId
+   *     the appId of the container
+   * @param containerWorkDir
+   *     the work dir for the container
+   * @param localDirs
+   *     nm-local-dirs to be used for this container
+   * @param logDirs
+   *     nm-log-dirs to be used for this container
    * @return the return status of the launch
    * @throws IOException
    */
   public abstract int launchContainer(Container container,
-      Path nmPrivateContainerScriptPath, Path nmPrivateTokensPath,
-      String user, String appId, Path containerWorkDir, List<String> localDirs,
+      Path nmPrivateContainerScriptPath, Path nmPrivateTokensPath, String user,
+      String appId, Path containerWorkDir, List<String> localDirs,
       List<String> logDirs) throws IOException;
 
   public abstract boolean signalContainer(String user, String pid,
-      Signal signal)
-      throws IOException;
+      Signal signal) throws IOException;
 
   public abstract void deleteAsUser(String user, Path subDir, Path... basedirs)
       throws IOException, InterruptedException;
@@ -149,17 +166,22 @@ public abstract class ContainerExecutor implements Configurable {
    * The constants for the signals.
    */
   public enum Signal {
-    NULL(0, "NULL"), QUIT(3, "SIGQUIT"), 
-    KILL(9, "SIGKILL"), TERM(15, "SIGTERM");
+    NULL(0, "NULL"),
+    QUIT(3, "SIGQUIT"),
+    KILL(9, "SIGKILL"),
+    TERM(15, "SIGTERM");
     private final int value;
     private final String str;
+
     private Signal(int value, String str) {
       this.str = str;
       this.value = value;
     }
+
     public int getValue() {
       return value;
     }
+
     @Override
     public String toString() {
       return str;
@@ -177,6 +199,7 @@ public abstract class ContainerExecutor implements Configurable {
 
   /**
    * Get the pidFile of the container.
+   *
    * @param containerId
    * @return the path of the pid-file for the given containerId.
    */
@@ -189,25 +212,26 @@ public abstract class ContainerExecutor implements Configurable {
     }
   }
   
-  /** 
+  /**
    * Return a command to execute the given command in OS shell.
    * On Windows, the passed in groupId can be used to launch
    * and associate the given groupId in a process group. On
    * non-Windows, groupId is ignored.
    */
   protected static String[] getRunCommand(String command, String groupId,
-                                          Configuration conf) {
-    int containerSchedPriorityAdjustment = 
+      Configuration conf) {
+    int containerSchedPriorityAdjustment =
         YarnConfiguration.DEFAULT_NM_CONTAINER_EXECUTOR_SCHED_PRIORITY;
     if (conf.get(YarnConfiguration.NM_CONTAINER_EXECUTOR_SCHED_PRIORITY) !=
         null) {
-      containerSchedPriorityAdjustment = conf
-          .getInt(YarnConfiguration.NM_CONTAINER_EXECUTOR_SCHED_PRIORITY, 0);
+      containerSchedPriorityAdjustment =
+          conf.getInt(YarnConfiguration.NM_CONTAINER_EXECUTOR_SCHED_PRIORITY,
+              0);
     }
     
     if (Shell.WINDOWS) {
-      return new String[] { Shell.WINUTILS, "task", "create", groupId,
-          "cmd /c " + command };
+      return new String[]{Shell.WINUTILS, "task", "create", groupId,
+          "cmd /c " + command};
     } else {
       List<String> retCommand = new ArrayList<String>();
       retCommand.addAll(Arrays.asList("nice", "-n",
@@ -215,10 +239,11 @@ public abstract class ContainerExecutor implements Configurable {
       retCommand.addAll(Arrays.asList("bash", command));
       return retCommand.toArray(new String[retCommand.size()]);
     }
-  }   
+  }
 
   /**
    * Is the container still active?
+   *
    * @param containerId
    * @return true if the container is active else false.
    */
@@ -233,12 +258,12 @@ public abstract class ContainerExecutor implements Configurable {
 
   /**
    * Mark the container as active
-   * 
+   *
    * @param containerId
-   *          the ContainerId
+   *     the ContainerId
    * @param pidFilePath
-   *          Path where the executor should write the pid of the launched
-   *          process
+   *     Path where the executor should write the pid of the launched
+   *     process
    */
   public void activateContainer(ContainerId containerId, Path pidFilePath) {
     try {
@@ -265,10 +290,10 @@ public abstract class ContainerExecutor implements Configurable {
 
   /**
    * Get the process-identifier for the container
-   * 
+   *
    * @param containerID
    * @return the processid of the container if it has already launched,
-   *         otherwise return null
+   * otherwise return null
    */
   public String getProcessId(ContainerId containerID) {
     String pid = null;
@@ -304,6 +329,7 @@ public abstract class ContainerExecutor implements Configurable {
       setName("Task killer for " + pid);
       setDaemon(false);
     }
+
     @Override
     public void run() {
       try {
@@ -312,11 +338,14 @@ public abstract class ContainerExecutor implements Configurable {
       } catch (InterruptedException e) {
         return;
       } catch (IOException e) {
-        String message = "Exception when user " + user + " killing task " + pid
-            + " in DelayedProcessKiller: " + StringUtils.stringifyException(e);
+        String message =
+            "Exception when user " + user + " killing task " + pid +
+                " in DelayedProcessKiller: " +
+                StringUtils.stringifyException(e);
         LOG.warn(message);
-        container.handle(new ContainerDiagnosticsUpdateEvent(container
-          .getContainerId(), message));
+        container.handle(
+            new ContainerDiagnosticsUpdateEvent(container.getContainerId(),
+                message));
       }
     }
   }

@@ -17,13 +17,6 @@
  */
 package org.apache.hadoop.yarn.server.applicationhistoryservice.timeline;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -39,6 +32,13 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.io.File;
+import java.io.IOException;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
 import static org.apache.hadoop.yarn.server.applicationhistoryservice.timeline.GenericObjectMapper.writeReverseOrderedLong;
 import static org.junit.Assert.assertEquals;
 
@@ -52,8 +52,8 @@ public class TestLeveldbTimelineStore extends TimelineStoreTestUtils {
   public void setup() throws Exception {
     fsContext = FileContext.getLocalFSFileContext();
     Configuration conf = new Configuration();
-    fsPath = new File("target", this.getClass().getSimpleName() +
-        "-tmpDir").getAbsoluteFile();
+    fsPath = new File("target", this.getClass().getSimpleName() + "-tmpDir")
+        .getAbsoluteFile();
     fsContext.delete(new Path(fsPath.getAbsolutePath()), true);
     conf.set(YarnConfiguration.TIMELINE_SERVICE_LEVELDB_PATH,
         fsPath.getAbsolutePath());
@@ -74,7 +74,7 @@ public class TestLeveldbTimelineStore extends TimelineStoreTestUtils {
   @Test
   public void testGetSingleEntity() throws IOException {
     super.testGetSingleEntity();
-    ((LeveldbTimelineStore)store).clearStartTimeCache();
+    ((LeveldbTimelineStore) store).clearStartTimeCache();
     super.testGetSingleEntity();
     loadTestData();
   }
@@ -130,10 +130,10 @@ public class TestLeveldbTimelineStore extends TimelineStoreTestUtils {
     DBIterator iterator = null;
     DBIterator pfIterator = null;
     try {
-      iterator = ((LeveldbTimelineStore)store).getDbIterator(false);
-      pfIterator = ((LeveldbTimelineStore)store).getDbIterator(false);
-      return ((LeveldbTimelineStore)store).deleteNextEntity(entityType, ts,
-          iterator, pfIterator, false);
+      iterator = ((LeveldbTimelineStore) store).getDbIterator(false);
+      pfIterator = ((LeveldbTimelineStore) store).getDbIterator(false);
+      return ((LeveldbTimelineStore) store)
+          .deleteNextEntity(entityType, ts, iterator, pfIterator, false);
     } finally {
       IOUtils.cleanup(null, iterator, pfIterator);
     }
@@ -141,7 +141,7 @@ public class TestLeveldbTimelineStore extends TimelineStoreTestUtils {
 
   @Test
   public void testGetEntityTypes() throws IOException {
-    List<String> entityTypes = ((LeveldbTimelineStore)store).getEntityTypes();
+    List<String> entityTypes = ((LeveldbTimelineStore) store).getEntityTypes();
     assertEquals(4, entityTypes.size());
     assertEquals(entityType1, entityTypes.get(0));
     assertEquals(entityType2, entityTypes.get(1));
@@ -154,51 +154,50 @@ public class TestLeveldbTimelineStore extends TimelineStoreTestUtils {
     assertEquals(2, getEntities("type_1").size());
     assertEquals(1, getEntities("type_2").size());
 
-    assertEquals(false, deleteNextEntity(entityType1,
-        writeReverseOrderedLong(122l)));
+    assertEquals(false,
+        deleteNextEntity(entityType1, writeReverseOrderedLong(122l)));
     assertEquals(2, getEntities("type_1").size());
     assertEquals(1, getEntities("type_2").size());
 
-    assertEquals(true, deleteNextEntity(entityType1,
-        writeReverseOrderedLong(123l)));
+    assertEquals(true,
+        deleteNextEntity(entityType1, writeReverseOrderedLong(123l)));
     List<TimelineEntity> entities = getEntities("type_2");
     assertEquals(1, entities.size());
-    verifyEntityInfo(entityId2, entityType2, events2, Collections.singletonMap(
-        entityType1, Collections.singleton(entityId1b)), EMPTY_PRIMARY_FILTERS,
-        EMPTY_MAP, entities.get(0));
+    verifyEntityInfo(entityId2, entityType2, events2, Collections
+            .singletonMap(entityType1, Collections.singleton(entityId1b)),
+        EMPTY_PRIMARY_FILTERS, EMPTY_MAP, entities.get(0));
     entities = getEntitiesWithPrimaryFilter("type_1", userFilter);
     assertEquals(1, entities.size());
     verifyEntityInfo(entityId1b, entityType1, events1, EMPTY_REL_ENTITIES,
         primaryFilters, otherInfo, entities.get(0));
 
-    ((LeveldbTimelineStore)store).discardOldEntities(-123l);
+    ((LeveldbTimelineStore) store).discardOldEntities(-123l);
     assertEquals(1, getEntities("type_1").size());
     assertEquals(0, getEntities("type_2").size());
-    assertEquals(3, ((LeveldbTimelineStore)store).getEntityTypes().size());
+    assertEquals(3, ((LeveldbTimelineStore) store).getEntityTypes().size());
 
-    ((LeveldbTimelineStore)store).discardOldEntities(123l);
+    ((LeveldbTimelineStore) store).discardOldEntities(123l);
     assertEquals(0, getEntities("type_1").size());
     assertEquals(0, getEntities("type_2").size());
-    assertEquals(0, ((LeveldbTimelineStore)store).getEntityTypes().size());
+    assertEquals(0, ((LeveldbTimelineStore) store).getEntityTypes().size());
     assertEquals(0, getEntitiesWithPrimaryFilter("type_1", userFilter).size());
   }
 
   @Test
   public void testDeleteEntitiesPrimaryFilters()
       throws IOException, InterruptedException {
-    Map<String, Set<Object>> primaryFilter =
-        Collections.singletonMap("user", Collections.singleton(
-            (Object) "otheruser"));
+    Map<String, Set<Object>> primaryFilter = Collections
+        .singletonMap("user", Collections.singleton((Object) "otheruser"));
     TimelineEntities atsEntities = new TimelineEntities();
-    atsEntities.setEntities(Collections.singletonList(createEntity(entityId1b,
-        entityType1, 789l, Collections.singletonList(ev2), null, primaryFilter,
-        null)));
+    atsEntities.setEntities(Collections.singletonList(
+        createEntity(entityId1b, entityType1, 789l,
+            Collections.singletonList(ev2), null, primaryFilter, null)));
     TimelinePutResponse response = store.put(atsEntities);
     assertEquals(0, response.getErrors().size());
 
     NameValuePair pfPair = new NameValuePair("user", "otheruser");
-    List<TimelineEntity> entities = getEntitiesWithPrimaryFilter("type_1",
-        pfPair);
+    List<TimelineEntity> entities =
+        getEntitiesWithPrimaryFilter("type_1", pfPair);
     assertEquals(1, entities.size());
     verifyEntityInfo(entityId1b, entityType1, Collections.singletonList(ev2),
         EMPTY_REL_ENTITIES, primaryFilter, EMPTY_MAP, entities.get(0));
@@ -210,14 +209,14 @@ public class TestLeveldbTimelineStore extends TimelineStoreTestUtils {
     verifyEntityInfo(entityId1b, entityType1, events1, EMPTY_REL_ENTITIES,
         primaryFilters, otherInfo, entities.get(1));
 
-    ((LeveldbTimelineStore)store).discardOldEntities(-123l);
+    ((LeveldbTimelineStore) store).discardOldEntities(-123l);
     assertEquals(1, getEntitiesWithPrimaryFilter("type_1", pfPair).size());
     assertEquals(2, getEntitiesWithPrimaryFilter("type_1", userFilter).size());
 
-    ((LeveldbTimelineStore)store).discardOldEntities(123l);
+    ((LeveldbTimelineStore) store).discardOldEntities(123l);
     assertEquals(0, getEntities("type_1").size());
     assertEquals(0, getEntities("type_2").size());
-    assertEquals(0, ((LeveldbTimelineStore)store).getEntityTypes().size());
+    assertEquals(0, ((LeveldbTimelineStore) store).getEntityTypes().size());
 
     assertEquals(0, getEntitiesWithPrimaryFilter("type_1", pfPair).size());
     assertEquals(0, getEntitiesWithPrimaryFilter("type_1", userFilter).size());
@@ -229,22 +228,22 @@ public class TestLeveldbTimelineStore extends TimelineStoreTestUtils {
     long l = System.currentTimeMillis();
     assertEquals(2, getEntitiesFromTs("type_1", l).size());
     assertEquals(1, getEntitiesFromTs("type_2", l).size());
-    assertEquals(2, getEntitiesFromTsWithPrimaryFilter("type_1", userFilter,
-        l).size());
-    ((LeveldbTimelineStore)store).discardOldEntities(123l);
+    assertEquals(2,
+        getEntitiesFromTsWithPrimaryFilter("type_1", userFilter, l).size());
+    ((LeveldbTimelineStore) store).discardOldEntities(123l);
     assertEquals(0, getEntitiesFromTs("type_1", l).size());
     assertEquals(0, getEntitiesFromTs("type_2", l).size());
-    assertEquals(0, getEntitiesFromTsWithPrimaryFilter("type_1", userFilter,
-        l).size());
+    assertEquals(0,
+        getEntitiesFromTsWithPrimaryFilter("type_1", userFilter, l).size());
     assertEquals(0, getEntities("type_1").size());
     assertEquals(0, getEntities("type_2").size());
-    assertEquals(0, getEntitiesFromTsWithPrimaryFilter("type_1", userFilter,
-        l).size());
+    assertEquals(0,
+        getEntitiesFromTsWithPrimaryFilter("type_1", userFilter, l).size());
     loadTestData();
     assertEquals(0, getEntitiesFromTs("type_1", l).size());
     assertEquals(0, getEntitiesFromTs("type_2", l).size());
-    assertEquals(0, getEntitiesFromTsWithPrimaryFilter("type_1", userFilter,
-        l).size());
+    assertEquals(0,
+        getEntitiesFromTsWithPrimaryFilter("type_1", userFilter, l).size());
     assertEquals(2, getEntities("type_1").size());
     assertEquals(1, getEntities("type_2").size());
     assertEquals(2, getEntitiesWithPrimaryFilter("type_1", userFilter).size());

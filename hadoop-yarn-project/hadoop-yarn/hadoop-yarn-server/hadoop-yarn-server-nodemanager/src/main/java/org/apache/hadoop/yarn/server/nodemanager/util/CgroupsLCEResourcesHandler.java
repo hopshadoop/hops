@@ -18,6 +18,18 @@
 
 package org.apache.hadoop.yarn.server.nodemanager.util;
 
+import com.google.common.annotations.VisibleForTesting;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.yarn.api.records.ContainerId;
+import org.apache.hadoop.yarn.api.records.Resource;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import org.apache.hadoop.yarn.server.nodemanager.LinuxContainerExecutor;
+import org.apache.hadoop.yarn.util.Clock;
+import org.apache.hadoop.yarn.util.SystemClock;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -32,22 +44,9 @@ import java.util.Map.Entry;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import com.google.common.annotations.VisibleForTesting;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.yarn.api.records.ContainerId;
-import org.apache.hadoop.yarn.api.records.Resource;
-import org.apache.hadoop.yarn.conf.YarnConfiguration;
-import org.apache.hadoop.yarn.server.nodemanager.LinuxContainerExecutor;
-import org.apache.hadoop.yarn.util.Clock;
-import org.apache.hadoop.yarn.util.SystemClock;
-
 public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
 
-  final static Log LOG = LogFactory
-      .getLog(CgroupsLCEResourcesHandler.class);
+  final static Log LOG = LogFactory.getLog(CgroupsLCEResourcesHandler.class);
 
   private Configuration conf;
   private String cgroupPrefix;
@@ -85,11 +84,11 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
   void initConfig() throws IOException {
 
     this.cgroupPrefix = conf.get(YarnConfiguration.
-            NM_LINUX_CONTAINER_CGROUPS_HIERARCHY, "/hadoop-yarn");
+        NM_LINUX_CONTAINER_CGROUPS_HIERARCHY, "/hadoop-yarn");
     this.cgroupMount = conf.getBoolean(YarnConfiguration.
-            NM_LINUX_CONTAINER_CGROUPS_MOUNT, false);
+        NM_LINUX_CONTAINER_CGROUPS_MOUNT, false);
     this.cgroupMountPath = conf.get(YarnConfiguration.
-            NM_LINUX_CONTAINER_CGROUPS_MOUNT_PATH, null);
+        NM_LINUX_CONTAINER_CGROUPS_MOUNT_PATH, null);
 
     this.deleteCgroupTimeout = conf.getLong(
         YarnConfiguration.NM_LINUX_CONTAINER_CGROUPS_DELETE_TIMEOUT,
@@ -112,7 +111,7 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
     if (cgroupMount && cgroupMountPath != null) {
       ArrayList<String> cgroupKVs = new ArrayList<String>();
       cgroupKVs.add(CONTROLLER_CPU + "=" + cgroupMountPath + "/" +
-                    CONTROLLER_CPU);
+          CONTROLLER_CPU);
       lce.mountCgroups(cgroupKVs, cgroupPrefix);
     }
 
@@ -134,20 +133,20 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
   }
 
   private void createCgroup(String controller, String groupName)
-        throws IOException {
+      throws IOException {
     String path = pathForCgroup(controller, groupName);
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("createCgroup: " + path);
     }
 
-    if (! new File(path).mkdir()) {
+    if (!new File(path).mkdir()) {
       throw new IOException("Failed to create cgroup at " + path);
     }
   }
 
   private void updateCgroup(String controller, String groupName, String param,
-                            String value) throws IOException {
+      String value) throws IOException {
     FileWriter f = null;
     String path = pathForCgroup(controller, groupName);
     param = controller + "." + param;
@@ -167,8 +166,7 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
         try {
           f.close();
         } catch (IOException e) {
-          LOG.warn("Unable to close cgroup file: " +
-              path, e);
+          LOG.warn("Unable to close cgroup file: " + path, e);
         }
       }
     }
@@ -206,8 +204,8 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
    * Next three functions operate on all the resources we are enforcing.
    */
 
-  private void setupLimits(ContainerId containerId,
-                           Resource containerResource) throws IOException {
+  private void setupLimits(ContainerId containerId, Resource containerResource)
+      throws IOException {
     String containerName = containerId.toString();
 
     if (isCpuWeightEnabled()) {
@@ -229,7 +227,7 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
    */
 
   public void preExecute(ContainerId containerId, Resource containerResource)
-              throws IOException {
+      throws IOException {
     setupLimits(containerId, containerResource);
   }
 
@@ -276,8 +274,7 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
     try {
       in = new BufferedReader(new FileReader(new File(MTAB_FILE)));
 
-      for (String str = in.readLine(); str != null;
-          str = in.readLine()) {
+      for (String str = in.readLine(); str != null; str = in.readLine()) {
         Matcher m = MTAB_FILE_FORMAT.matcher(str);
         boolean mat = m.find();
         if (mat) {
@@ -306,10 +303,11 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
   }
 
   private String findControllerInMtab(String controller,
-                                      Map<String, List<String>> entries) {
+      Map<String, List<String>> entries) {
     for (Entry<String, List<String>> e : entries.entrySet()) {
-      if (e.getValue().contains(controller))
+      if (e.getValue().contains(controller)) {
         return e.getKey();
+      }
     }
 
     return null;
@@ -329,12 +327,12 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
       if (FileUtil.canWrite(f)) {
         controllerPaths.put(CONTROLLER_CPU, controllerPath);
       } else {
-        throw new IOException("Not able to enforce cpu weights; cannot write "
-            + "to cgroup at: " + controllerPath);
+        throw new IOException("Not able to enforce cpu weights; cannot write " +
+            "to cgroup at: " + controllerPath);
       }
     } else {
-      throw new IOException("Not able to enforce cpu weights; cannot find "
-          + "cgroup for cpu controller in " + MTAB_FILE);
+      throw new IOException("Not able to enforce cpu weights; cannot find " +
+          "cgroup for cpu controller in " + MTAB_FILE);
     }
   }
 }

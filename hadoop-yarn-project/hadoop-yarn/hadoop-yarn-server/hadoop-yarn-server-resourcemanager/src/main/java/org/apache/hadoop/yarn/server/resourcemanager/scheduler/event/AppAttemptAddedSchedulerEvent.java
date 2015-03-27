@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.event;
 
+import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 
 public class AppAttemptAddedSchedulerEvent extends SchedulerEvent {
@@ -27,8 +28,9 @@ public class AppAttemptAddedSchedulerEvent extends SchedulerEvent {
 
   public AppAttemptAddedSchedulerEvent(
       ApplicationAttemptId applicationAttemptId,
-      boolean transferStateFromPreviousAttempt) {
-    super(SchedulerEventType.APP_ATTEMPT_ADDED);
+      boolean transferStateFromPreviousAttempt,
+      TransactionState transactionState) {
+    super(SchedulerEventType.APP_ATTEMPT_ADDED, transactionState);
     this.applicationAttemptId = applicationAttemptId;
     this.transferStateFromPreviousAttempt = transferStateFromPreviousAttempt;
   }

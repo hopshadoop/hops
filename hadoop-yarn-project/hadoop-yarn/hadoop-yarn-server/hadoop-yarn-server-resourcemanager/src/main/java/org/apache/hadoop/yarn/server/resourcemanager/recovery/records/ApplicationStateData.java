@@ -24,10 +24,13 @@ import org.apache.hadoop.classification.InterfaceStability.Stable;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ApplicationSubmissionContext;
+import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppState;
 
+import java.util.List;
+
 /**
- * Contains all the state data that needs to be stored persistently 
+ * Contains all the state data that needs to be stored persistently
  * for an Application
  */
 @Public
@@ -36,6 +39,7 @@ public interface ApplicationStateData {
   
   /**
    * The time at which the application was received by the Resource Manager
+   *
    * @return submitTime
    */
   @Public
@@ -48,6 +52,7 @@ public interface ApplicationStateData {
 
   /**
    * Get the <em>start time</em> of the application.
+   *
    * @return <em>start time</em> of the application
    */
   @Public
@@ -72,6 +77,7 @@ public interface ApplicationStateData {
   /**
    * The {@link ApplicationSubmissionContext} for the application
    * {@link ApplicationId} can be obtained from the this
+   *
    * @return ApplicationSubmissionContext
    */
   @Public
@@ -85,14 +91,20 @@ public interface ApplicationStateData {
 
   /**
    * Get the final state of the application.
+   *
    * @return the final state of the application.
    */
   public RMAppState getState();
 
   public void setState(RMAppState state);
 
+  public RMAppState getStateBeforeKilling();
+
+  public void setStateBeforeKilling(RMAppState state);
+
   /**
    * Get the diagnostics information for the application master.
+   *
    * @return the diagnostics information for the application master.
    */
   public String getDiagnostics();
@@ -101,9 +113,14 @@ public interface ApplicationStateData {
 
   /**
    * The finish time of the application.
+   *
    * @return the finish time of the application.,
    */
   public long getFinishTime();
 
   public void setFinishTime(long finishTime);
+  
+  public List<NodeId> getUpdatedNodesId();
+  
+  public void setUpdatedNodesId(List<NodeId> updatedNodesId);
 }

@@ -18,11 +18,10 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica;
 
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-
+import io.hops.ha.common.TransactionState;
+import io.hops.ha.common.TransactionStateImpl;
+import io.hops.metadata.yarn.entity.AppSchedulingInfo;
+import io.hops.metadata.yarn.entity.Resource;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -33,11 +32,11 @@ import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.Priority;
-import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.ResourceRequest;
 import org.apache.hadoop.yarn.server.resourcemanager.RMAuditLogger;
 import org.apache.hadoop.yarn.server.resourcemanager.RMAuditLogger.AuditConstants;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
+import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerEventType;
@@ -48,8 +47,13 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.Allocation;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.NodeType;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.Queue;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicationAttempt;
-import org.apache.hadoop.yarn.util.resource.Resources;
 import org.apache.hadoop.yarn.util.resource.ResourceCalculator;
+import org.apache.hadoop.yarn.util.resource.Resources;
+
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Represents an application attempt from the viewpoint of the FIFO or Capacity
@@ -62,53 +66,69 @@ public class FiCaSchedulerApp extends SchedulerApplicationAttempt {
   private static final Log LOG = LogFactory.getLog(FiCaSchedulerApp.class);
 
   private final Set<ContainerId> containersToPreempt =
-    new HashSet<ContainerId>();
+      new HashSet<ContainerId>();
+      //TORECOVER but don't seem to be used presently (capacity)
 
-  public FiCaSchedulerApp(ApplicationAttemptId applicationAttemptId, 
+  public FiCaSchedulerApp(ApplicationAttemptId applicationAttemptId,
       String user, Queue queue, ActiveUsersManager activeUsersManager,
       RMContext rmContext) {
     super(applicationAttemptId, user, queue, activeUsersManager, rmContext);
   }
 
+  public void recover(AppSchedulingInfo hopInfo, RMStateStore.RMState state) {
+    super.recover(hopInfo, state);
+  }
+
   synchronized public boolean containerCompleted(RMContainer rmContainer,
-      ContainerStatus containerStatus, RMContainerEventType event) {
+      ContainerStatus containerStatus, RMContainerEventType event,
+      TransactionState transactionState) {
 
     // Remove from the list of containers
     if (null == liveContainers.remove(rmContainer.getContainerId())) {
       return false;
     }
-
+    if (transactionState != null) {
+      ((TransactionStateImpl) transactionState).getSchedulerApplicationInfo()
+          .getFiCaSchedulerAppInfo(
+              this.appSchedulingInfo.getApplicationAttemptId())
+          .setLiveContainersToRemove(rmContainer);
+    }
     Container container = rmContainer.getContainer();
     ContainerId containerId = container.getId();
 
     // Inform the container
     rmContainer.handle(
-        new RMContainerFinishedEvent(
-            containerId,
-            containerStatus, 
-            event)
-        );
-    LOG.info("Completed container: " + rmContainer.getContainerId() + 
+        new RMContainerFinishedEvent(containerId, containerStatus, event,
+            transactionState));
+    LOG.info("Completed container: " + rmContainer.getContainerId() +
         " in state: " + rmContainer.getState() + " event:" + event);
 
     containersToPreempt.remove(rmContainer.getContainerId());
 
-    RMAuditLogger.logSuccess(getUser(), 
-        AuditConstants.RELEASE_CONTAINER, "SchedulerApp", 
-        getApplicationId(), containerId);
+    RMAuditLogger
+        .logSuccess(getUser(), AuditConstants.RELEASE_CONTAINER, "SchedulerApp",
+            getApplicationId(), containerId);
     
     // Update usage metrics 
-    Resource containerResource = rmContainer.getContainer().getResource();
-    queue.getMetrics().releaseResources(getUser(), 1, containerResource);
+    org.apache.hadoop.yarn.api.records.Resource containerResource =
+        rmContainer.getContainer().getResource();
+    queue.getMetrics()
+        .releaseResources(getUser(), 1, containerResource); //TORECOVER
     Resources.subtractFrom(currentConsumption, containerResource);
-
+    //HOP : Update Resources
+    if (transactionState != null) {
+      ((TransactionStateImpl) transactionState).getSchedulerApplicationInfo()
+          .getFiCaSchedulerAppInfo(
+              this.appSchedulingInfo.getApplicationAttemptId())
+          .toUpdateResource(Resource.CURRENTCONSUMPTION, currentConsumption);
+    }
     return true;
   }
 
-  synchronized public RMContainer allocate(NodeType type, FiCaSchedulerNode node,
-      Priority priority, ResourceRequest request, 
-      Container container) {
-
+  synchronized public RMContainer allocate(NodeType type,
+      FiCaSchedulerNode node, Priority priority, ResourceRequest request,
+      Container container, TransactionState transactionState) {
+    LOG.debug("HOP :: FiCaSchedulerApp.allocate -START");
     if (isStopped) {
       return null;
     }
@@ -120,47 +140,80 @@ public class FiCaSchedulerApp extends SchedulerApplicationAttempt {
     }
     
     // Create RMContainer
-    RMContainer rmContainer = new RMContainerImpl(container, this
-        .getApplicationAttemptId(), node.getNodeID(),
-        appSchedulingInfo.getUser(), this.rmContext);
+    RMContainer rmContainer =
+        new RMContainerImpl(container, this.getApplicationAttemptId(),
+            node.getNodeID(), appSchedulingInfo.getUser(), this.rmContext,
+            transactionState);
 
     // Add it to allContainers list.
     newlyAllocatedContainers.add(rmContainer);
-    liveContainers.put(container.getId(), rmContainer);    
+    
+    LOG.debug("HOP :: AttemptId is " +
+        this.appSchedulingInfo.getApplicationAttemptId().toString());
+    LOG.debug("HOP :: Size is " + newlyAllocatedContainers.size());
+    
+    liveContainers.put(container.getId(), rmContainer);
+    
+    if (transactionState != null) {
+      ((TransactionStateImpl) transactionState).getSchedulerApplicationInfo()
+          .getFiCaSchedulerAppInfo(
+              this.appSchedulingInfo.getApplicationAttemptId())
+          .setNewlyAllocatedContainersToAdd(rmContainer);
+      ((TransactionStateImpl) transactionState).getSchedulerApplicationInfo()
+          .getFiCaSchedulerAppInfo(
+              this.appSchedulingInfo.getApplicationAttemptId())
+          .setLiveContainersToAdd(container.getId(), rmContainer);
+    }
+    
 
     // Update consumption and track allocations
-    appSchedulingInfo.allocate(type, node, priority, request, container);
+    appSchedulingInfo
+        .allocate(type, node, priority, request, container, transactionState);
     Resources.addTo(currentConsumption, container.getResource());
-
+    //HOP : Update Resources
+    if (transactionState != null) {
+      ((TransactionStateImpl) transactionState).getSchedulerApplicationInfo().
+          getFiCaSchedulerAppInfo(
+              this.appSchedulingInfo.getApplicationAttemptId()).
+          toUpdateResource(Resource.CURRENTCONSUMPTION, currentConsumption);
+      ((TransactionStateImpl) transactionState).getSchedulerApplicationInfo().
+          getFiCaSchedulerAppInfo(
+              this.appSchedulingInfo.getApplicationAttemptId()).
+          updateAppInfo(this);
+    }
     // Inform the container
+    LOG.debug("HOP :: RMContainerEventType.START");
     rmContainer.handle(
-        new RMContainerEvent(container.getId(), RMContainerEventType.START));
+        new RMContainerEvent(container.getId(), RMContainerEventType.START,
+            transactionState));
 
     if (LOG.isDebugEnabled()) {
-      LOG.debug("allocate: applicationAttemptId=" 
-          + container.getId().getApplicationAttemptId() 
-          + " container=" + container.getId() + " host="
-          + container.getNodeId().getHost() + " type=" + type);
+      LOG.debug("allocate: applicationAttemptId=" +
+          container.getId().getApplicationAttemptId() + " container=" +
+          container.getId() + " host=" + container.getNodeId().getHost() +
+          " type=" + type);
     }
-    RMAuditLogger.logSuccess(getUser(), 
-        AuditConstants.ALLOC_CONTAINER, "SchedulerApp", 
-        getApplicationId(), container.getId());
+    RMAuditLogger
+        .logSuccess(getUser(), AuditConstants.ALLOC_CONTAINER, "SchedulerApp",
+            getApplicationId(), container.getId());
     
     return rmContainer;
   }
 
-  public synchronized boolean unreserve(FiCaSchedulerNode node, Priority priority) {
+  public synchronized boolean unreserve(FiCaSchedulerNode node,
+      Priority priority, TransactionState transactionState) {
     Map<NodeId, RMContainer> reservedContainers =
-      this.reservedContainers.get(priority);
+        this.reservedContainers.get(priority);
 
     if (reservedContainers != null) {
-      RMContainer reservedContainer = reservedContainers.remove(node.getNodeID());
+      RMContainer reservedContainer =
+          reservedContainers.remove(node.getNodeID());
 
       // unreserve is now triggered in new scenarios (preemption)
       // as a consequence reservedcontainer might be null, adding NP-checks
-      if (reservedContainer != null
-          && reservedContainer.getContainer() != null
-          && reservedContainer.getContainer().getResource() != null) {
+      if (reservedContainer != null &&
+          reservedContainer.getContainer() != null &&
+          reservedContainer.getContainer().getResource() != null) {
 
         if (reservedContainers.isEmpty()) {
           this.reservedContainers.remove(priority);
@@ -168,35 +221,45 @@ public class FiCaSchedulerApp extends SchedulerApplicationAttempt {
         // Reset the re-reservation count
         resetReReservations(priority);
 
-        Resource resource = reservedContainer.getContainer().getResource();
+        org.apache.hadoop.yarn.api.records.Resource resource =
+            reservedContainer.getContainer().getResource();
         Resources.subtractFrom(currentReservation, resource);
 
-        LOG.info("Application " + getApplicationId() + " unreserved "
-            + " on node " + node + ", currently has " + reservedContainers.size()
-            + " at priority " + priority + "; currentReservation "
-            + currentReservation);
+        //HOP : Update Resources
+        ((TransactionStateImpl) transactionState).getSchedulerApplicationInfo()
+            .getFiCaSchedulerAppInfo(
+                this.appSchedulingInfo.getApplicationAttemptId())
+            .toUpdateResource(Resource.CURRENTRESERVATION, currentReservation);
+
+
+        LOG.info(
+            "Application " + getApplicationId() + " unreserved " + " on node " +
+                node + ", currently has " + reservedContainers.size() +
+                " at priority " + priority + "; currentReservation " +
+                currentReservation);
         return true;
       }
     }
     return false;
   }
 
-  public synchronized float getLocalityWaitFactor(
-      Priority priority, int clusterNodes) {
+  public synchronized float getLocalityWaitFactor(Priority priority,
+      int clusterNodes) {
     // Estimate: Required unique resources (i.e. hosts + racks)
-    int requiredResources = 
+    int requiredResources =
         Math.max(this.getResourceRequests(priority).size() - 1, 0);
     
     // waitFactor can't be more than '1' 
     // i.e. no point skipping more than clustersize opportunities
-    return Math.min(((float)requiredResources / clusterNodes), 1.0f);
+    return Math.min(((float) requiredResources / clusterNodes), 1.0f);
   }
 
-  public synchronized Resource getTotalPendingRequests() {
-    Resource ret = Resource.newInstance(0, 0);
+  public synchronized org.apache.hadoop.yarn.api.records.Resource getTotalPendingRequests() {
+    org.apache.hadoop.yarn.api.records.Resource ret =
+        org.apache.hadoop.yarn.api.records.Resource.newInstance(0, 0);
     for (ResourceRequest rr : appSchedulingInfo.getAllResourceRequests()) {
       // to avoid double counting we count only "ANY" resource requests
-      if (ResourceRequest.isAnyLocation(rr.getResourceName())){
+      if (ResourceRequest.isAnyLocation(rr.getResourceName())) {
         Resources.addTo(ret,
             Resources.multiply(rr.getCapability(), rr.getNumContainers()));
       }
@@ -204,7 +267,8 @@ public class FiCaSchedulerApp extends SchedulerApplicationAttempt {
     return ret;
   }
 
-  public synchronized void addPreemptContainer(ContainerId cont){
+  public synchronized void addPreemptContainer(ContainerId cont,
+      TransactionState transactionState) {
     // ignore already completed containers
     if (liveContainers.containsKey(cont)) {
       containersToPreempt.add(cont);
@@ -222,26 +286,28 @@ public class FiCaSchedulerApp extends SchedulerApplicationAttempt {
    * @return an allocation
    */
   public synchronized Allocation getAllocation(ResourceCalculator rc,
-      Resource clusterResource, Resource minimumAllocation) {
+      org.apache.hadoop.yarn.api.records.Resource clusterResource,
+      org.apache.hadoop.yarn.api.records.Resource minimumAllocation,
+      TransactionState transactionState) {
 
-    Set<ContainerId> currentContPreemption = Collections.unmodifiableSet(
-        new HashSet<ContainerId>(containersToPreempt));
+    Set<ContainerId> currentContPreemption = Collections
+        .unmodifiableSet(new HashSet<ContainerId>(containersToPreempt));
     containersToPreempt.clear();
-    Resource tot = Resource.newInstance(0, 0);
-    for(ContainerId c : currentContPreemption){
-      Resources.addTo(tot,
-          liveContainers.get(c).getContainer().getResource());
+    org.apache.hadoop.yarn.api.records.Resource tot =
+        org.apache.hadoop.yarn.api.records.Resource.newInstance(0, 0);
+    for (ContainerId c : currentContPreemption) {
+      Resources.addTo(tot, liveContainers.get(c).getContainer().getResource());
     }
-    int numCont = (int) Math.ceil(
-        Resources.divide(rc, clusterResource, tot, minimumAllocation));
-    ResourceRequest rr = ResourceRequest.newInstance(
-        Priority.UNDEFINED, ResourceRequest.ANY,
-        minimumAllocation, numCont);
+    int numCont = (int) Math
+        .ceil(Resources.divide(rc, clusterResource, tot, minimumAllocation));
+    ResourceRequest rr = ResourceRequest
+        .newInstance(Priority.UNDEFINED, ResourceRequest.ANY, minimumAllocation,
+            numCont);
     ContainersAndNMTokensAllocation allocation =
-        pullNewlyAllocatedContainersAndNMTokens();
+        pullNewlyAllocatedContainersAndNMTokens(transactionState);
     return new Allocation(allocation.getContainerList(), getHeadroom(), null,
-      currentContPreemption, Collections.singletonList(rr),
-      allocation.getNMTokenList());
+        currentContPreemption, Collections.singletonList(rr),
+        allocation.getNMTokenList());
   }
 
 }

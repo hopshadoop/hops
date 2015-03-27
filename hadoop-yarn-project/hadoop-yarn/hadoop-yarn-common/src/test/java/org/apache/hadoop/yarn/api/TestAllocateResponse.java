@@ -18,11 +18,7 @@
 
 package org.apache.hadoop.yarn.api;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import junit.framework.Assert;
-
 import org.apache.hadoop.yarn.api.protocolrecords.AllocateResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.AllocateResponsePBImpl;
 import org.apache.hadoop.yarn.api.records.AMCommand;
@@ -36,6 +32,9 @@ import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.AllocateResponseProto;
 import org.junit.Test;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements. See the NOTICE file distributed with this
@@ -43,13 +42,14 @@ import org.junit.Test;
  * licenses this file to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ * <p/>
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ * <p/>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
+ * License for the specific language governing permissions and limitations
+ * under
  * the License.
  */
 
@@ -61,16 +61,16 @@ public class TestAllocateResponse {
     List<ContainerResourceDecrease> decContainers =
         new ArrayList<ContainerResourceDecrease>();
     for (int i = 0; i < 3; i++) {
-      incContainers.add(ContainerResourceIncrease.newInstance(null,
-          Resource.newInstance(1024, i), null));
+      incContainers.add(ContainerResourceIncrease
+          .newInstance(null, Resource.newInstance(1024, i), null));
     }
     for (int i = 0; i < 5; i++) {
-      decContainers.add(ContainerResourceDecrease.newInstance(null,
-          Resource.newInstance(1024, i)));
+      decContainers.add(ContainerResourceDecrease
+          .newInstance(null, Resource.newInstance(1024, i)));
     }
 
-    AllocateResponse r =
-        AllocateResponse.newInstance(3, new ArrayList<ContainerStatus>(),
+    AllocateResponse r = AllocateResponse
+        .newInstance(3, new ArrayList<ContainerStatus>(),
             new ArrayList<Container>(), new ArrayList<NodeReport>(), null,
             AMCommand.AM_RESYNC, 3, null, new ArrayList<NMToken>(),
             incContainers, decContainers);
@@ -86,20 +86,20 @@ public class TestAllocateResponse {
         .assertEquals(decContainers.size(), r.getDecreasedContainers().size());
 
     for (int i = 0; i < incContainers.size(); i++) {
-      Assert.assertEquals(i, r.getIncreasedContainers().get(i).getCapability()
-          .getVirtualCores());
+      Assert.assertEquals(i,
+          r.getIncreasedContainers().get(i).getCapability().getVirtualCores());
     }
 
     for (int i = 0; i < decContainers.size(); i++) {
-      Assert.assertEquals(i, r.getDecreasedContainers().get(i).getCapability()
-          .getVirtualCores());
+      Assert.assertEquals(i,
+          r.getDecreasedContainers().get(i).getCapability().getVirtualCores());
     }
   }
 
   @Test
   public void testAllocateResponseWithoutIncDecContainers() {
-    AllocateResponse r =
-        AllocateResponse.newInstance(3, new ArrayList<ContainerStatus>(),
+    AllocateResponse r = AllocateResponse
+        .newInstance(3, new ArrayList<ContainerStatus>(),
             new ArrayList<Container>(), new ArrayList<NodeReport>(), null,
             AMCommand.AM_RESYNC, 3, null, new ArrayList<NMToken>(), null, null);
 

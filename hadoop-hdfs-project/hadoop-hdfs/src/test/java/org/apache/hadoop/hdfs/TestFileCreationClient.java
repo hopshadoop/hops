@@ -16,7 +16,6 @@
  * limitations under the License.
  */
 package org.apache.hadoop.hdfs;
-import static org.junit.Assert.assertEquals;
 
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.logging.impl.Log4JLogger;
@@ -33,40 +32,47 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.log4j.Level;
 import org.junit.Test;
 
+import static org.junit.Assert.assertEquals;
+
 /**
  * This class tests that a file need not be closed before its
  * data can be read by another client.
  */
 public class TestFileCreationClient {
-  static final String DIR = "/" + TestFileCreationClient.class.getSimpleName() + "/";
+  static final String DIR =
+      "/" + TestFileCreationClient.class.getSimpleName() + "/";
 
   {
-    ((Log4JLogger)DataNode.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger)LeaseManager.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger)LogFactory.getLog(FSNamesystem.class)).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger)InterDatanodeProtocol.LOG).getLogger().setLevel(Level.ALL);
+    ((Log4JLogger) DataNode.LOG).getLogger().setLevel(Level.ALL);
+    ((Log4JLogger) LeaseManager.LOG).getLogger().setLevel(Level.ALL);
+    ((Log4JLogger) LogFactory.getLog(FSNamesystem.class)).getLogger()
+        .setLevel(Level.ALL);
+    ((Log4JLogger) InterDatanodeProtocol.LOG).getLogger().setLevel(Level.ALL);
   }
 
-  /** Test lease recovery Triggered by DFSClient. */
+  /**
+   * Test lease recovery Triggered by DFSClient.
+   */
   @Test
   public void testClientTriggeredLeaseRecovery() throws Exception {
     final int REPLICATION = 3;
     Configuration conf = new HdfsConfiguration();
     conf.setInt(DFSConfigKeys.DFS_DATANODE_HANDLER_COUNT_KEY, 1);
     conf.setInt(DFSConfigKeys.DFS_REPLICATION_KEY, REPLICATION);
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(REPLICATION).build();
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(REPLICATION).build();
 
     try {
       final FileSystem fs = cluster.getFileSystem();
       final Path dir = new Path("/wrwelkj");
       
       SlowWriter[] slowwriters = new SlowWriter[10];
-      for(int i = 0; i < slowwriters.length; i++) {
+      for (int i = 0; i < slowwriters.length; i++) {
         slowwriters[i] = new SlowWriter(fs, new Path(dir, "file" + i));
       }
 
       try {
-        for(int i = 0; i < slowwriters.length; i++) {
+        for (int i = 0; i < slowwriters.length; i++) {
           slowwriters[i].start();
         }
 
@@ -78,15 +84,14 @@ public class TestFileCreationClient {
         //let the slow writer writes a few more seconds
         System.out.println("Wait a few seconds");
         Thread.sleep(5000);
-      }
-      finally {
-        for(int i = 0; i < slowwriters.length; i++) {
+      } finally {
+        for (int i = 0; i < slowwriters.length; i++) {
           if (slowwriters[i] != null) {
             slowwriters[i].running = false;
             slowwriters[i].interrupt();
           }
         }
-        for(int i = 0; i < slowwriters.length; i++) {
+        for (int i = 0; i < slowwriters.length; i++) {
           if (slowwriters[i] != null) {
             slowwriters[i].join();
           }
@@ -95,22 +100,23 @@ public class TestFileCreationClient {
 
       //Verify the file
       System.out.println("Verify the file");
-      for(int i = 0; i < slowwriters.length; i++) {
-        System.out.println(slowwriters[i].filepath + ": length="
-            + fs.getFileStatus(slowwriters[i].filepath).getLen());
+      for (int i = 0; i < slowwriters.length; i++) {
+        System.out.println(slowwriters[i].filepath + ": length=" +
+            fs.getFileStatus(slowwriters[i].filepath).getLen());
         FSDataInputStream in = null;
         try {
           in = fs.open(slowwriters[i].filepath);
-          for(int j = 0, x; (x = in.read()) != -1; j++) {
+          for (int j = 0, x; (x = in.read()) != -1; j++) {
             assertEquals(j, x);
           }
-        }
-        finally {
+        } finally {
           IOUtils.closeStream(in);
         }
       }
     } finally {
-      if (cluster != null) {cluster.shutdown();}
+      if (cluster != null) {
+        cluster.shutdown();
+      }
     }
   }
 
@@ -131,20 +137,18 @@ public class TestFileCreationClient {
       int i = 0;
       try {
         out = fs.create(filepath);
-        for(; running; i++) {
+        for (; running; i++) {
           System.out.println(getName() + " writes " + i);
           out.write(i);
           out.hflush();
           sleep(100);
         }
-      }
-      catch(Exception e) {
+      } catch (Exception e) {
         System.out.println(getName() + " dies: e=" + e);
-      }
-      finally {
+      } finally {
         System.out.println(getName() + ": i=" + i);
         IOUtils.closeStream(out);
       }
-    }        
+    }
   }
 }

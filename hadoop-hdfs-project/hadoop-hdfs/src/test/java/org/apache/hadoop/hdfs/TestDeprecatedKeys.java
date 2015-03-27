@@ -18,23 +18,25 @@
 
 package org.apache.hadoop.hdfs;
 
-import static org.junit.Assert.assertTrue;
-
 import org.apache.hadoop.conf.Configuration;
 import org.junit.Test;
 
+import static org.junit.Assert.assertTrue;
+
 public class TestDeprecatedKeys {
- 
+
   //Tests a deprecated key
   @Test
   public void testDeprecatedKeys() throws Exception {
     Configuration conf = new HdfsConfiguration();
     conf.set("topology.script.file.name", "xyz");
-    String scriptFile = conf.get(DFSConfigKeys.NET_TOPOLOGY_SCRIPT_FILE_NAME_KEY);
-    assertTrue(scriptFile.equals("xyz")) ;
+    String scriptFile =
+        conf.get(DFSConfigKeys.NET_TOPOLOGY_SCRIPT_FILE_NAME_KEY);
+    assertTrue(scriptFile.equals("xyz"));
     conf.setInt("dfs.replication.interval", 1);
     String alpha = DFSConfigKeys.DFS_NAMENODE_REPLICATION_INTERVAL_KEY;
-    int repInterval = conf.getInt(DFSConfigKeys.DFS_NAMENODE_REPLICATION_INTERVAL_KEY, 3) ;
-    assertTrue(repInterval == 1) ;
+    int repInterval =
+        conf.getInt(DFSConfigKeys.DFS_NAMENODE_REPLICATION_INTERVAL_KEY, 3);
+    assertTrue(repInterval == 1);
   }
 }

@@ -24,7 +24,8 @@ import org.apache.hadoop.lib.util.Check;
 import java.util.concurrent.Callable;
 
 /**
- * Adapter class that allows <code>Runnable</code>s and <code>Callable</code>s to
+ * Adapter class that allows <code>Runnable</code>s and <code>Callable</code>s
+ * to
  * be treated as the other.
  */
 @InterfaceAudience.Private
@@ -35,7 +36,8 @@ public class RunnableCallable implements Callable<Void>, Runnable {
   /**
    * Constructor that takes a runnable.
    *
-   * @param runnable runnable.
+   * @param runnable
+   *     runnable.
    */
   public RunnableCallable(Runnable runnable) {
     this.runnable = Check.notNull(runnable, "runnable");
@@ -44,7 +46,8 @@ public class RunnableCallable implements Callable<Void>, Runnable {
   /**
    * Constructor that takes a callable.
    *
-   * @param callable callable.
+   * @param callable
+   *     callable.
    */
   public RunnableCallable(Callable<?> callable) {
     this.callable = Check.notNull(callable, "callable");
@@ -54,8 +57,8 @@ public class RunnableCallable implements Callable<Void>, Runnable {
    * Invokes the wrapped callable/runnable as a callable.
    *
    * @return void
-   *
-   * @throws Exception thrown by the wrapped callable/runnable invocation.
+   * @throws Exception
+   *     thrown by the wrapped callable/runnable invocation.
    */
   @Override
   public Void call() throws Exception {
@@ -70,7 +73,8 @@ public class RunnableCallable implements Callable<Void>, Runnable {
   /**
    * Invokes the wrapped callable/runnable as a runnable.
    *
-   * @throws RuntimeException thrown by the wrapped callable/runnable invocation.
+   * @throws RuntimeException
+   *     thrown by the wrapped callable/runnable invocation.
    */
   @Override
   public void run() {
@@ -92,6 +96,7 @@ public class RunnableCallable implements Callable<Void>, Runnable {
    */
   @Override
   public String toString() {
-    return (runnable != null) ? runnable.getClass().getSimpleName() : callable.getClass().getSimpleName();
+    return (runnable != null) ? runnable.getClass().getSimpleName() :
+        callable.getClass().getSimpleName();
   }
 }

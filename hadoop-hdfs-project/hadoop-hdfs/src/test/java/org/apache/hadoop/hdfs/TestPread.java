@@ -17,19 +17,6 @@
  */
 package org.apache.hadoop.hdfs;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Random;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-
 import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -39,9 +26,13 @@ import org.apache.hadoop.hdfs.protocol.datatransfer.DataTransferProtocol;
 import org.apache.hadoop.hdfs.server.datanode.SimulatedFSDataset;
 import org.apache.log4j.Level;
 import org.junit.Test;
-import org.mockito.Mockito;
-import org.mockito.invocation.InvocationOnMock;
-import org.mockito.stubbing.Answer;
+
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.util.Random;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 /**
  * This class tests the DFS positional read functionality in a single node
@@ -53,10 +44,9 @@ public class TestPread {
   boolean simulatedStorage = false;
 
   private void writeFile(FileSystem fileSys, Path name) throws IOException {
-    int replication = 3;// We need > 1 blocks to test out the hedged reads.
     // create and write a file that contains three blocks of data
-    DataOutputStream stm = fileSys.create(name, true, 4096,
-      (short)replication, blockSize);
+    DataOutputStream stm =
+        fileSys.create(name, true, 4096, (short) 1, blockSize);
     // test empty file open and read
     stm.close();
     FSDataInputStream in = fileSys.open(name);
@@ -71,31 +61,34 @@ public class TestPread {
     }
     assertTrue("Error reading beyond file boundary.", res != null);
     in.close();
-    if (!fileSys.delete(name, true))
+    if (!fileSys.delete(name, true)) {
       assertTrue("Cannot delete file", false);
+    }
     
     // now create the real file
-    stm = fileSys.create(name, true, 4096, (short)1, blockSize);
+    stm = fileSys.create(name, true, 4096, (short) 1, blockSize);
     Random rand = new Random(seed);
     rand.nextBytes(buffer);
     stm.write(buffer);
     stm.close();
   }
   
-  private void checkAndEraseData(byte[] actual, int from, byte[] expected, String message) {
+  private void checkAndEraseData(byte[] actual, int from, byte[] expected,
+      String message) {
     for (int idx = 0; idx < actual.length; idx++) {
-      assertEquals(message+" byte "+(from+idx)+" differs. expected "+
-                        expected[from+idx]+" actual "+actual[idx],
-                        actual[idx], expected[from+idx]);
+      assertEquals(message + " byte " + (from + idx) + " differs. expected " +
+              expected[from + idx] + " actual " + actual[idx], actual[idx],
+          expected[from + idx]);
       actual[idx] = 0;
     }
   }
   
   private void doPread(FSDataInputStream stm, long position, byte[] buffer,
-                       int offset, int length) throws IOException {
+      int offset, int length) throws IOException {
     int nread = 0;
     while (nread < length) {
-      int nbytes = stm.read(position+nread, buffer, offset+nread, length-nread);
+      int nbytes =
+          stm.read(position + nread, buffer, offset + nread, length - nread);
       assertTrue("Error in pread", nbytes > 0);
       nread += nbytes;
     }
@@ -105,7 +98,7 @@ public class TestPread {
     FSDataInputStream stm = fileSys.open(name);
     byte[] expected = new byte[12 * blockSize];
     if (simulatedStorage) {
-      for (int i= 0; i < expected.length; i++) {  
+      for (int i = 0; i < expected.length; i++) {
         expected[i] = SimulatedFSDataset.DEFAULT_DATABYTE;
       }
     } else {
@@ -137,7 +130,8 @@ public class TestPread {
     // read blockSize + 4K bytes from 10*blockSize - 2K offset
     actual = new byte[blockSize + 4096];
     stm.readFully(10 * blockSize - 2048, actual);
-    checkAndEraseData(actual, (10 * blockSize - 2048), expected, "Pread Test 5");
+    checkAndEraseData(actual, (10 * blockSize - 2048), expected,
+        "Pread Test 5");
     // now check that even after all these preads, we can still read
     // bytes 8K-12K
     actual = new byte[4096];
@@ -148,19 +142,19 @@ public class TestPread {
     // check block location caching
     stm = fileSys.open(name);
     stm.readFully(1, actual, 0, 4096);
-    stm.readFully(4*blockSize, actual, 0, 4096);
-    stm.readFully(7*blockSize, actual, 0, 4096);
-    actual = new byte[3*4096];
-    stm.readFully(0*blockSize, actual, 0, 3*4096);
+    stm.readFully(4 * blockSize, actual, 0, 4096);
+    stm.readFully(7 * blockSize, actual, 0, 4096);
+    actual = new byte[3 * 4096];
+    stm.readFully(0 * blockSize, actual, 0, 3 * 4096);
     checkAndEraseData(actual, 0, expected, "Pread Test 7");
-    actual = new byte[8*4096];
-    stm.readFully(3*blockSize, actual, 0, 8*4096);
-    checkAndEraseData(actual, 3*blockSize, expected, "Pread Test 8");
+    actual = new byte[8 * 4096];
+    stm.readFully(3 * blockSize, actual, 0, 8 * 4096);
+    checkAndEraseData(actual, 3 * blockSize, expected, "Pread Test 8");
     // read the tail
-    stm.readFully(11*blockSize+blockSize/2, actual, 0, blockSize/2);
+    stm.readFully(11 * blockSize + blockSize / 2, actual, 0, blockSize / 2);
     IOException res = null;
     try { // read beyond the end of the file
-      stm.readFully(11*blockSize+blockSize/2, actual, 0, blockSize);
+      stm.readFully(11 * blockSize + blockSize / 2, actual, 0, blockSize);
     } catch (IOException e) {
       // should throw an exception
       res = e;
@@ -169,7 +163,7 @@ public class TestPread {
     
     stm.close();
   }
-    
+
   // test pread can survive datanode restarts
   private void datanodeRestartTest(MiniDFSCluster cluster, FileSystem fileSys,
       Path name) throws IOException {
@@ -179,7 +173,8 @@ public class TestPread {
       return;
     }
     int numBlocks = 1;
-    assertTrue(numBlocks <= DFSConfigKeys.DFS_CLIENT_MAX_BLOCK_ACQUIRE_FAILURES_DEFAULT);
+    assertTrue(numBlocks <=
+        DFSConfigKeys.DFS_CLIENT_MAX_BLOCK_ACQUIRE_FAILURES_DEFAULT);
     byte[] expected = new byte[numBlocks * blockSize];
     Random rand = new Random(seed);
     rand.nextBytes(expected);
@@ -206,128 +201,26 @@ public class TestPread {
     assertTrue(fileSys.delete(name, true));
     assertTrue(!fileSys.exists(name));
   }
-
-  private Callable<Void> getPReadFileCallable(final FileSystem fileSys,
-      final Path file) {
-    return new Callable<Void>() {
-      public Void call() throws IOException {
-        pReadFile(fileSys, file);
-        return null;
-      }
-    };
-  }
-
+  
   /**
    * Tests positional read in DFS.
    */
   @Test
   public void testPreadDFS() throws IOException {
-    Configuration conf = new Configuration();
-    dfsPreadTest(conf, false, true); // normal pread
-    dfsPreadTest(conf, true, true); // trigger read code path without
-                                    // transferTo.
+    dfsPreadTest(false, true); //normal pread
+    dfsPreadTest(true, true); //trigger read code path without transferTo.
   }
   
   @Test
   public void testPreadDFSNoChecksum() throws IOException {
-    Configuration conf = new Configuration();
-    ((Log4JLogger)DataTransferProtocol.LOG).getLogger().setLevel(Level.ALL);
-    dfsPreadTest(conf, false, false);
-    dfsPreadTest(conf, true, false);
+    ((Log4JLogger) DataTransferProtocol.LOG).getLogger().setLevel(Level.ALL);
+    dfsPreadTest(false, false);
+    dfsPreadTest(true, false);
   }
   
-  /**
-   * Tests positional read in DFS, with hedged reads enabled.
-   */
-  @Test
-  public void testHedgedPreadDFSBasic() throws IOException {
-    Configuration conf = new Configuration();
-    conf.setInt(DFSConfigKeys.DFS_DFSCLIENT_HEDGED_READ_THREADPOOL_SIZE, 5);
-    conf.setLong(DFSConfigKeys.DFS_DFSCLIENT_HEDGED_READ_THRESHOLD_MILLIS, 100);
-    dfsPreadTest(conf, false, true); // normal pread
-    dfsPreadTest(conf, true, true); // trigger read code path without
-                                    // transferTo.
-  }
-
-  @Test
-  public void testMaxOutHedgedReadPool() throws IOException,
-      InterruptedException, ExecutionException {
-    Configuration conf = new Configuration();
-    int numHedgedReadPoolThreads = 5;
-    final int initialHedgedReadTimeoutMillis = 50000;
-    final int fixedSleepIntervalMillis = 50;
-    conf.setInt(DFSConfigKeys.DFS_DFSCLIENT_HEDGED_READ_THREADPOOL_SIZE,
-        numHedgedReadPoolThreads);
-    conf.setLong(DFSConfigKeys.DFS_DFSCLIENT_HEDGED_READ_THRESHOLD_MILLIS,
-        initialHedgedReadTimeoutMillis);
-
-    // Set up the InjectionHandler
-    DFSClientFaultInjector.instance = Mockito
-        .mock(DFSClientFaultInjector.class);
-    DFSClientFaultInjector injector = DFSClientFaultInjector.instance;
-    // make preads sleep for 50ms
-    Mockito.doAnswer(new Answer<Void>() {
-      @Override
-      public Void answer(InvocationOnMock invocation) throws Throwable {
-        Thread.sleep(fixedSleepIntervalMillis);
-        return null;
-      }
-    }).when(injector).startFetchFromDatanode();
-
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(3)
-        .format(true).build();
-    DistributedFileSystem fileSys = cluster.getFileSystem();
-    DFSClient dfsClient = fileSys.getClient();
-    DFSHedgedReadMetrics metrics = dfsClient.getHedgedReadMetrics();
-
-    try {
-      Path file1 = new Path("hedgedReadMaxOut.dat");
-      writeFile(fileSys, file1);
-      // Basic test. Reads complete within timeout. Assert that there were no
-      // hedged reads.
-      pReadFile(fileSys, file1);
-      // assert that there were no hedged reads. 50ms + delta < 500ms
-      assertTrue(metrics.getHedgedReadOps() == 0);
-      assertTrue(metrics.getHedgedReadOpsInCurThread() == 0);
-      /*
-       * Reads take longer than timeout. But, only one thread reading. Assert
-       * that there were hedged reads. But, none of the reads had to run in the
-       * current thread.
-       */
-      dfsClient.setHedgedReadTimeout(50); // 50ms
-      pReadFile(fileSys, file1);
-      // assert that there were hedged reads
-      assertTrue(metrics.getHedgedReadOps() > 0);
-      assertTrue(metrics.getHedgedReadOpsInCurThread() == 0);
-      /*
-       * Multiple threads reading. Reads take longer than timeout. Assert that
-       * there were hedged reads. And that reads had to run in the current
-       * thread.
-       */
-      int factor = 10;
-      int numHedgedReads = numHedgedReadPoolThreads * factor;
-      long initialReadOpsValue = metrics.getHedgedReadOps();
-      ExecutorService executor = Executors.newFixedThreadPool(numHedgedReads);
-      ArrayList<Future<Void>> futures = new ArrayList<Future<Void>>();
-      for (int i = 0; i < numHedgedReads; i++) {
-        futures.add(executor.submit(getPReadFileCallable(fileSys, file1)));
-      }
-      for (int i = 0; i < numHedgedReads; i++) {
-        futures.get(i).get();
-      }
-      assertTrue(metrics.getHedgedReadOps() > initialReadOpsValue);
-      assertTrue(metrics.getHedgedReadOpsInCurThread() > 0);
-      cleanupFile(fileSys, file1);
-      executor.shutdown();
-    } finally {
-      fileSys.close();
-      cluster.shutdown();
-      Mockito.reset(injector);
-    }
-  }
-
-  private void dfsPreadTest(Configuration conf, boolean disableTransferTo, boolean verifyChecksum)
+  private void dfsPreadTest(boolean disableTransferTo, boolean verifyChecksum)
       throws IOException {
+    Configuration conf = new HdfsConfiguration();
     conf.setLong(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, 4096);
     conf.setLong(DFSConfigKeys.DFS_CLIENT_READ_PREFETCH_SIZE_KEY, 4096);
     if (simulatedStorage) {
@@ -336,7 +229,8 @@ public class TestPread {
     if (disableTransferTo) {
       conf.setBoolean("dfs.datanode.transferTo.allowed", false);
     }
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(3).build();
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(3).build();
     FileSystem fileSys = cluster.getFileSystem();
     fileSys.setVerifyChecksum(verifyChecksum);
     try {

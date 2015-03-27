@@ -1,27 +1,24 @@
 /**
-* Licensed to the Apache Software Foundation (ASF) under one
-* or more contributor license agreements.  See the NOTICE file
-* distributed with this work for additional information
-* regarding copyright ownership.  The ASF licenses this file
-* to you under the Apache License, Version 2.0 (the
-* "License"); you may not use this file except in compliance
-* with the License.  You may obtain a copy of the License at
-*
-*     http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package org.apache.hadoop.yarn.server.api.impl.pb.client;
 
-import java.io.Closeable;
-import java.io.IOException;
-import java.net.InetSocketAddress;
-
+import com.google.protobuf.ServiceException;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ipc.ProtobufHelper;
@@ -69,19 +66,23 @@ import org.apache.hadoop.yarn.server.api.protocolrecords.impl.pb.RefreshUserToGr
 import org.apache.hadoop.yarn.server.api.protocolrecords.impl.pb.UpdateNodeResourceRequestPBImpl;
 import org.apache.hadoop.yarn.server.api.protocolrecords.impl.pb.UpdateNodeResourceResponsePBImpl;
 
-import com.google.protobuf.ServiceException;
+import java.io.Closeable;
+import java.io.IOException;
+import java.net.InetSocketAddress;
 
 @Private
-public class ResourceManagerAdministrationProtocolPBClientImpl implements ResourceManagerAdministrationProtocol, Closeable {
+public class ResourceManagerAdministrationProtocolPBClientImpl
+    implements ResourceManagerAdministrationProtocol, Closeable {
 
   private ResourceManagerAdministrationProtocolPB proxy;
   
-  public ResourceManagerAdministrationProtocolPBClientImpl(long clientVersion, InetSocketAddress addr, 
-      Configuration conf) throws IOException {
-    RPC.setProtocolEngine(conf, ResourceManagerAdministrationProtocolPB.class, 
+  public ResourceManagerAdministrationProtocolPBClientImpl(long clientVersion,
+      InetSocketAddress addr, Configuration conf) throws IOException {
+    RPC.setProtocolEngine(conf, ResourceManagerAdministrationProtocolPB.class,
         ProtobufRpcEngine.class);
-    proxy = (ResourceManagerAdministrationProtocolPB)RPC.getProxy(
-        ResourceManagerAdministrationProtocolPB.class, clientVersion, addr, conf);
+    proxy = (ResourceManagerAdministrationProtocolPB) RPC
+        .getProxy(ResourceManagerAdministrationProtocolPB.class, clientVersion,
+            addr, conf);
   }
 
   @Override
@@ -94,8 +95,8 @@ public class ResourceManagerAdministrationProtocolPBClientImpl implements Resour
   @Override
   public RefreshQueuesResponse refreshQueues(RefreshQueuesRequest request)
       throws YarnException, IOException {
-    RefreshQueuesRequestProto requestProto = 
-      ((RefreshQueuesRequestPBImpl)request).getProto();
+    RefreshQueuesRequestProto requestProto =
+        ((RefreshQueuesRequestPBImpl) request).getProto();
     try {
       return new RefreshQueuesResponsePBImpl(
           proxy.refreshQueues(null, requestProto));
@@ -107,9 +108,9 @@ public class ResourceManagerAdministrationProtocolPBClientImpl implements Resour
 
   @Override
   public RefreshNodesResponse refreshNodes(RefreshNodesRequest request)
-  throws YarnException, IOException {
-    RefreshNodesRequestProto requestProto = 
-      ((RefreshNodesRequestPBImpl)request).getProto();
+      throws YarnException, IOException {
+    RefreshNodesRequestProto requestProto =
+        ((RefreshNodesRequestPBImpl) request).getProto();
     try {
       return new RefreshNodesResponsePBImpl(
           proxy.refreshNodes(null, requestProto));
@@ -123,8 +124,8 @@ public class ResourceManagerAdministrationProtocolPBClientImpl implements Resour
   public RefreshSuperUserGroupsConfigurationResponse refreshSuperUserGroupsConfiguration(
       RefreshSuperUserGroupsConfigurationRequest request)
       throws YarnException, IOException {
-    RefreshSuperUserGroupsConfigurationRequestProto requestProto = 
-      ((RefreshSuperUserGroupsConfigurationRequestPBImpl)request).getProto();
+    RefreshSuperUserGroupsConfigurationRequestProto requestProto =
+        ((RefreshSuperUserGroupsConfigurationRequestPBImpl) request).getProto();
     try {
       return new RefreshSuperUserGroupsConfigurationResponsePBImpl(
           proxy.refreshSuperUserGroupsConfiguration(null, requestProto));
@@ -136,10 +137,10 @@ public class ResourceManagerAdministrationProtocolPBClientImpl implements Resour
 
   @Override
   public RefreshUserToGroupsMappingsResponse refreshUserToGroupsMappings(
-      RefreshUserToGroupsMappingsRequest request) throws YarnException,
-      IOException {
-    RefreshUserToGroupsMappingsRequestProto requestProto = 
-      ((RefreshUserToGroupsMappingsRequestPBImpl)request).getProto();
+      RefreshUserToGroupsMappingsRequest request)
+      throws YarnException, IOException {
+    RefreshUserToGroupsMappingsRequestProto requestProto =
+        ((RefreshUserToGroupsMappingsRequestPBImpl) request).getProto();
     try {
       return new RefreshUserToGroupsMappingsResponsePBImpl(
           proxy.refreshUserToGroupsMappings(null, requestProto));
@@ -152,8 +153,8 @@ public class ResourceManagerAdministrationProtocolPBClientImpl implements Resour
   @Override
   public RefreshAdminAclsResponse refreshAdminAcls(
       RefreshAdminAclsRequest request) throws YarnException, IOException {
-    RefreshAdminAclsRequestProto requestProto = 
-      ((RefreshAdminAclsRequestPBImpl)request).getProto();
+    RefreshAdminAclsRequestProto requestProto =
+        ((RefreshAdminAclsRequestPBImpl) request).getProto();
     try {
       return new RefreshAdminAclsResponsePBImpl(
           proxy.refreshAdminAcls(null, requestProto));
@@ -165,13 +166,12 @@ public class ResourceManagerAdministrationProtocolPBClientImpl implements Resour
 
   @Override
   public RefreshServiceAclsResponse refreshServiceAcls(
-      RefreshServiceAclsRequest request) throws YarnException,
-      IOException {
-    RefreshServiceAclsRequestProto requestProto = 
-        ((RefreshServiceAclsRequestPBImpl)request).getProto();
+      RefreshServiceAclsRequest request) throws YarnException, IOException {
+    RefreshServiceAclsRequestProto requestProto =
+        ((RefreshServiceAclsRequestPBImpl) request).getProto();
     try {
-      return new RefreshServiceAclsResponsePBImpl(proxy.refreshServiceAcls(
-          null, requestProto));
+      return new RefreshServiceAclsResponsePBImpl(
+          proxy.refreshServiceAcls(null, requestProto));
     } catch (ServiceException e) {
       RPCUtil.unwrapAndThrowException(e);
       return null;
@@ -180,13 +180,13 @@ public class ResourceManagerAdministrationProtocolPBClientImpl implements Resour
 
   @Override
   public String[] getGroupsForUser(String user) throws IOException {
-    GetGroupsForUserRequestProto requestProto = 
+    GetGroupsForUserRequestProto requestProto =
         GetGroupsForUserRequestProto.newBuilder().setUser(user).build();
     try {
       GetGroupsForUserResponseProto responseProto =
           proxy.getGroupsForUser(null, requestProto);
-      return (String[]) responseProto.getGroupsList().toArray(
-          new String[responseProto.getGroupsCount()]);
+      return (String[]) responseProto.getGroupsList()
+          .toArray(new String[responseProto.getGroupsCount()]);
     } catch (ServiceException e) {
       throw ProtobufHelper.getRemoteException(e);
     }
@@ -198,8 +198,8 @@ public class ResourceManagerAdministrationProtocolPBClientImpl implements Resour
     UpdateNodeResourceRequestProto requestProto =
         ((UpdateNodeResourceRequestPBImpl) request).getProto();
     try {
-      return new UpdateNodeResourceResponsePBImpl(proxy.updateNodeResource(null,
-          requestProto));
+      return new UpdateNodeResourceResponsePBImpl(
+          proxy.updateNodeResource(null, requestProto));
     } catch (ServiceException e) {
       RPCUtil.unwrapAndThrowException(e);
       return null;

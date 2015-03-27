@@ -17,14 +17,6 @@
  */
 package org.apache.hadoop.hdfs;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-
-import java.io.IOException;
-import java.util.EnumSet;
-import java.util.Random;
-
 import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CreateFlag;
@@ -42,12 +34,20 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import java.io.IOException;
+import java.util.EnumSet;
+import java.util.Random;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
 /**
  * This class tests the FileStatus API.
  */
 public class TestListFilesInFileContext {
   {
-    ((Log4JLogger)FileSystem.LOG).getLogger().setLevel(Level.ALL);
+    ((Log4JLogger) FileSystem.LOG).getLogger().setLevel(Level.ALL);
   }
 
   static final long seed = 0xDEADBEEFL;
@@ -70,7 +70,7 @@ public class TestListFilesInFileContext {
   }
   
   private static void writeFile(FileContext fc, Path name, int fileSize)
-  throws IOException {
+      throws IOException {
     // Create and write a file that contains three blocks of data
     FSDataOutputStream stm = fc.create(name, EnumSet.of(CreateFlag.CREATE),
         Options.CreateOpts.createParent());
@@ -86,14 +86,15 @@ public class TestListFilesInFileContext {
     cluster.shutdown();
   }
 
-  /** Test when input path is a file */
+  /**
+   * Test when input path is a file
+   */
   @Test
   public void testFile() throws IOException {
     fc.mkdir(TEST_DIR, FsPermission.getDefault(), true);
     writeFile(fc, FILE1, FILE_LEN);
 
-    RemoteIterator<LocatedFileStatus> itor = fc.util().listFiles(
-        FILE1, true);
+    RemoteIterator<LocatedFileStatus> itor = fc.util().listFiles(FILE1, true);
     LocatedFileStatus stat = itor.next();
     assertFalse(itor.hasNext());
     assertTrue(stat.isFile());
@@ -115,14 +116,15 @@ public class TestListFilesInFileContext {
     fc.delete(TEST_DIR, true);
   }
 
-  /** Test when input path is a directory */
+  /**
+   * Test when input path is a directory
+   */
   @Test
   public void testDirectory() throws IOException {
     fc.mkdir(DIR1, FsPermission.getDefault(), true);
 
     // test empty directory
-    RemoteIterator<LocatedFileStatus> itor = fc.util().listFiles(
-        DIR1, true);
+    RemoteIterator<LocatedFileStatus> itor = fc.util().listFiles(DIR1, true);
     assertFalse(itor.hasNext());
     itor = fc.util().listFiles(DIR1, false);
     assertFalse(itor.hasNext());
@@ -169,7 +171,9 @@ public class TestListFilesInFileContext {
     assertFalse(itor.hasNext());
   }
 
-  /** Test when input patch has a symbolic links as its children */
+  /**
+   * Test when input patch has a symbolic links as its children
+   */
   @Test
   public void testSymbolicLinks() throws IOException {
     writeFile(fc, FILE1, FILE_LEN);

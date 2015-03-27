@@ -17,14 +17,14 @@
  */
 package org.apache.hadoop.test;
 
-import static org.junit.Assert.fail;
-
-import java.util.regex.Pattern;
-
 import org.junit.Test;
 import org.junit.rules.MethodRule;
 import org.junit.runners.model.FrameworkMethod;
 import org.junit.runners.model.Statement;
+
+import java.util.regex.Pattern;
+
+import static org.junit.Assert.fail;
 
 public class TestExceptionHelper implements MethodRule {
 
@@ -33,28 +33,34 @@ public class TestExceptionHelper implements MethodRule {
   }
 
   @Override
-  public Statement apply(final Statement statement, final FrameworkMethod frameworkMethod, final Object o) {
+  public Statement apply(final Statement statement,
+      final FrameworkMethod frameworkMethod, final Object o) {
     return new Statement() {
       @Override
       public void evaluate() throws Throwable {
-        TestException testExceptionAnnotation = frameworkMethod.getAnnotation(TestException.class);
+        TestException testExceptionAnnotation =
+            frameworkMethod.getAnnotation(TestException.class);
         try {
           statement.evaluate();
           if (testExceptionAnnotation != null) {
-            Class<? extends Throwable> klass = testExceptionAnnotation.exception();
+            Class<? extends Throwable> klass =
+                testExceptionAnnotation.exception();
             fail("Expected Exception: " + klass.getSimpleName());
           }
         } catch (Throwable ex) {
           if (testExceptionAnnotation != null) {
-            Class<? extends Throwable> klass = testExceptionAnnotation.exception();
+            Class<? extends Throwable> klass =
+                testExceptionAnnotation.exception();
             if (klass.isInstance(ex)) {
               String regExp = testExceptionAnnotation.msgRegExp();
               Pattern pattern = Pattern.compile(regExp);
               if (!pattern.matcher(ex.getMessage()).find()) {
-                fail("Expected Exception Message pattern: " + regExp + " got message: " + ex.getMessage());
+                fail("Expected Exception Message pattern: " + regExp +
+                    " got message: " + ex.getMessage());
               }
             } else {
-              fail("Expected Exception: " + klass.getSimpleName() + " got: " + ex.getClass().getSimpleName());
+              fail("Expected Exception: " + klass.getSimpleName() + " got: " +
+                  ex.getClass().getSimpleName());
             }
           } else {
             throw ex;

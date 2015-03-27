@@ -20,12 +20,15 @@ package org.apache.hadoop.hdfs.protocol.datatransfer;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
-/** Block Construction Stage */
+/**
+ * Block Construction Stage
+ */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public enum BlockConstructionStage {
-  /** The enumerates are always listed as regular stage followed by the
-   * recovery stage. 
+  /**
+   * The enumerates are always listed as regular stage followed by the
+   * recovery stage.
    * Changing this order will make getRecoveryStage not working.
    */
   // pipeline set up for block append
@@ -45,18 +48,20 @@ public enum BlockConstructionStage {
   // transfer RBW for adding datanodes
   TRANSFER_RBW,
   // transfer Finalized for adding datanodes
-  TRANSFER_FINALIZED;
+  TRANSFER_FINALIZED,
+  // pipeline set up for single block sending
+  PIPELINE_SETUP_SINGLE_BLOCK;
   
-  final static private byte RECOVERY_BIT = (byte)1;
+  final static private byte RECOVERY_BIT = (byte) 1;
   
   /**
    * get the recovery stage of this stage
    */
   public BlockConstructionStage getRecoveryStage() {
     if (this == PIPELINE_SETUP_CREATE) {
-      throw new IllegalArgumentException( "Unexpected blockStage " + this);
+      throw new IllegalArgumentException("Unexpected blockStage " + this);
     } else {
-      return values()[ordinal()|RECOVERY_BIT];
+      return values()[ordinal() | RECOVERY_BIT];
     }
   }
 }    

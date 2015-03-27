@@ -45,9 +45,9 @@ public class TestClientRMProxy {
     conf.setBoolean(YarnConfiguration.RM_HA_ENABLED, true);
     conf.set(YarnConfiguration.RM_HA_IDS, "rm1,rm2");
     conf.set(HAUtil.addSuffix(YarnConfiguration.RM_HOSTNAME, "rm1"),
-        "0.0.0.0");
+        "127.0.0.1");
     conf.set(HAUtil.addSuffix(YarnConfiguration.RM_HOSTNAME, "rm2"),
-        "0.0.0.0");
+        "127.0.0.1");
     tokenService = ClientRMProxy.getRMDelegationTokenService(conf);
     services = tokenService.toString().split(",");
     assertEquals(2, services.length);

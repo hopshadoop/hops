@@ -18,26 +18,7 @@
 
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.launcher;
 
-import static org.junit.Assert.assertEquals;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.FileReader;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 import junit.framework.Assert;
-
 import org.apache.commons.codec.binary.Base64;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileUtil;
@@ -86,6 +67,24 @@ import org.apache.hadoop.yarn.util.ResourceCalculatorPlugin;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import static org.junit.Assert.assertEquals;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 public class TestContainerLaunch extends BaseContainerManagerTest {
 
   public TestContainerLaunch() throws UnsupportedFileSystemException {
@@ -94,33 +93,31 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
 
   @Before
   public void setup() throws IOException {
-    conf.setClass(
-        YarnConfiguration.NM_CONTAINER_MON_RESOURCE_CALCULATOR,
+    conf.setClass(YarnConfiguration.NM_CONTAINER_MON_RESOURCE_CALCULATOR,
         LinuxResourceCalculatorPlugin.class, ResourceCalculatorPlugin.class);
     super.setup();
   }
 
   @Test
-  public void testSpecialCharSymlinks() throws IOException  {
+  public void testSpecialCharSymlinks() throws IOException {
 
     File shellFile = null;
     File tempFile = null;
-    String badSymlink = Shell.WINDOWS ? "foo@zz_#!-+bar.cmd" :
-      "foo@zz%_#*&!-+= bar()";
+    String badSymlink =
+        Shell.WINDOWS ? "foo@zz_#!-+bar.cmd" : "foo@zz%_#*&!-+= bar()";
     File symLinkFile = null;
 
     try {
       shellFile = Shell.appendScriptExtension(tmpDir, "hello");
       tempFile = Shell.appendScriptExtension(tmpDir, "temp");
-      String timeoutCommand = Shell.WINDOWS ? "@echo \"hello\"" :
-        "echo \"hello\"";
+      String timeoutCommand =
+          Shell.WINDOWS ? "@echo \"hello\"" : "echo \"hello\"";
       PrintWriter writer = new PrintWriter(new FileOutputStream(shellFile));
       FileUtil.setExecutable(shellFile, true);
       writer.println(timeoutCommand);
       writer.close();
 
-      Map<Path, List<String>> resources =
-          new HashMap<Path, List<String>>();
+      Map<Path, List<String>> resources = new HashMap<Path, List<String>>();
       Path path = new Path(shellFile.getAbsolutePath());
       resources.put(path, Arrays.asList(badSymlink));
 
@@ -141,56 +138,50 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
       fos.close();
       FileUtil.setExecutable(tempFile, true);
 
-      Shell.ShellCommandExecutor shexc 
-      = new Shell.ShellCommandExecutor(new String[]{tempFile.getAbsolutePath()}, tmpDir);
+      Shell.ShellCommandExecutor shexc = new Shell.ShellCommandExecutor(
+          new String[]{tempFile.getAbsolutePath()}, tmpDir);
 
       shexc.execute();
       assertEquals(shexc.getExitCode(), 0);
-      assert(shexc.getOutput().contains("hello"));
+      assert (shexc.getOutput().contains("hello"));
 
       symLinkFile = new File(tmpDir, badSymlink);
-    }
-    finally {
+    } finally {
       // cleanup
-      if (shellFile != null
-          && shellFile.exists()) {
+      if (shellFile != null && shellFile.exists()) {
         shellFile.delete();
       }
-      if (tempFile != null 
-          && tempFile.exists()) {
+      if (tempFile != null && tempFile.exists()) {
         tempFile.delete();
       }
-      if (symLinkFile != null
-          && symLinkFile.exists()) {
+      if (symLinkFile != null && symLinkFile.exists()) {
         symLinkFile.delete();
-      } 
+      }
     }
   }
 
   // test the diagnostics are generated
-  @Test (timeout = 20000)
-  public void testInvalidSymlinkDiagnostics() throws IOException  {
+  @Test(timeout = 20000)
+  public void testInvalidSymlinkDiagnostics() throws IOException {
 
     File shellFile = null;
     File tempFile = null;
-    String symLink = Shell.WINDOWS ? "test.cmd" :
-      "test";
+    String symLink = Shell.WINDOWS ? "test.cmd" : "test";
     File symLinkFile = null;
 
     try {
       shellFile = Shell.appendScriptExtension(tmpDir, "hello");
       tempFile = Shell.appendScriptExtension(tmpDir, "temp");
-      String timeoutCommand = Shell.WINDOWS ? "@echo \"hello\"" :
-        "echo \"hello\"";
+      String timeoutCommand =
+          Shell.WINDOWS ? "@echo \"hello\"" : "echo \"hello\"";
       PrintWriter writer = new PrintWriter(new FileOutputStream(shellFile));
       FileUtil.setExecutable(shellFile, true);
       writer.println(timeoutCommand);
       writer.close();
 
-      Map<Path, List<String>> resources =
-          new HashMap<Path, List<String>>();
+      Map<Path, List<String>> resources = new HashMap<Path, List<String>>();
       //This is an invalid path and should throw exception because of No such file.
-      Path invalidPath = new Path(shellFile.getAbsolutePath()+"randomPath");
+      Path invalidPath = new Path(shellFile.getAbsolutePath() + "randomPath");
       resources.put(invalidPath, Arrays.asList(symLink));
       FileOutputStream fos = new FileOutputStream(tempFile);
 
@@ -208,53 +199,48 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
       fos.close();
       FileUtil.setExecutable(tempFile, true);
 
-      Shell.ShellCommandExecutor shexc
-      = new Shell.ShellCommandExecutor(new String[]{tempFile.getAbsolutePath()}, tmpDir);
+      Shell.ShellCommandExecutor shexc = new Shell.ShellCommandExecutor(
+          new String[]{tempFile.getAbsolutePath()}, tmpDir);
       String diagnostics = null;
       try {
         shexc.execute();
         Assert.fail("Should catch exception");
-      } catch(ExitCodeException e){
+      } catch (ExitCodeException e) {
         diagnostics = e.getMessage();
       }
       Assert.assertNotNull(diagnostics);
       Assert.assertTrue(shexc.getExitCode() != 0);
       symLinkFile = new File(tmpDir, symLink);
-    }
-    finally {
+    } finally {
       // cleanup
-      if (shellFile != null
-          && shellFile.exists()) {
+      if (shellFile != null && shellFile.exists()) {
         shellFile.delete();
       }
-      if (tempFile != null
-          && tempFile.exists()) {
+      if (tempFile != null && tempFile.exists()) {
         tempFile.delete();
       }
-      if (symLinkFile != null
-          && symLinkFile.exists()) {
+      if (symLinkFile != null && symLinkFile.exists()) {
         symLinkFile.delete();
       }
     }
   }
 
-  @Test (timeout = 20000)
-  public void testInvalidEnvSyntaxDiagnostics() throws IOException  {
+  @Test(timeout = 20000)
+  public void testInvalidEnvSyntaxDiagnostics() throws IOException {
 
     File shellFile = null;
     try {
       shellFile = Shell.appendScriptExtension(tmpDir, "hello");
-      Map<Path, List<String>> resources =
-          new HashMap<Path, List<String>>();
+      Map<Path, List<String>> resources = new HashMap<Path, List<String>>();
       FileOutputStream fos = new FileOutputStream(shellFile);
       FileUtil.setExecutable(shellFile, true);
 
       Map<String, String> env = new HashMap<String, String>();
       // invalid env
-      env.put(
-          "APPLICATION_WORKFLOW_CONTEXT", "{\"workflowId\":\"609f91c5cd83\"," +
-          "\"workflowName\":\"\n\ninsert table " +
-          "\npartition (cd_education_status)\nselect cd_demo_sk, cd_gender, " );
+      env.put("APPLICATION_WORKFLOW_CONTEXT",
+          "{\"workflowId\":\"609f91c5cd83\"," +
+              "\"workflowName\":\"\n\ninsert table " +
+              "\npartition (cd_education_status)\nselect cd_demo_sk, cd_gender, ");
       List<String> commands = new ArrayList<String>();
       ContainerLaunch.writeLaunchEnv(fos, env, resources, commands);
       fos.flush();
@@ -263,25 +249,22 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
       // It is supposed that LANG is set as C.
       Map<String, String> cmdEnv = new HashMap<String, String>();
       cmdEnv.put("LANG", "C");
-      Shell.ShellCommandExecutor shexc
-      = new Shell.ShellCommandExecutor(new String[]{shellFile.getAbsolutePath()},
-        tmpDir, cmdEnv);
+      Shell.ShellCommandExecutor shexc = new Shell.ShellCommandExecutor(
+          new String[]{shellFile.getAbsolutePath()}, tmpDir, cmdEnv);
       String diagnostics = null;
       try {
         shexc.execute();
         Assert.fail("Should catch exception");
-      } catch(ExitCodeException e){
+      } catch (ExitCodeException e) {
         diagnostics = e.getMessage();
       }
       Assert.assertTrue(diagnostics.contains(Shell.WINDOWS ?
           "is not recognized as an internal or external command" :
           "command not found"));
       Assert.assertTrue(shexc.getExitCode() != 0);
-    }
-    finally {
+    } finally {
       // cleanup
-      if (shellFile != null
-          && shellFile.exists()) {
+      if (shellFile != null && shellFile.exists()) {
         shellFile.delete();
       }
     }
@@ -291,43 +274,44 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
   public void testEnvExpansion() throws IOException {
     Path logPath = new Path("/nm/container/logs");
     String input =
-        Apps.crossPlatformify("HADOOP_HOME") + "/share/hadoop/common/*"
-            + ApplicationConstants.CLASS_PATH_SEPARATOR
-            + Apps.crossPlatformify("HADOOP_HOME") + "/share/hadoop/common/lib/*"
-            + ApplicationConstants.CLASS_PATH_SEPARATOR
-            + Apps.crossPlatformify("HADOOP_LOG_HOME")
-            + ApplicationConstants.LOG_DIR_EXPANSION_VAR;
+        Apps.crossPlatformify("HADOOP_HOME") + "/share/hadoop/common/*" +
+            ApplicationConstants.CLASS_PATH_SEPARATOR +
+            Apps.crossPlatformify("HADOOP_HOME") +
+            "/share/hadoop/common/lib/*" +
+            ApplicationConstants.CLASS_PATH_SEPARATOR +
+            Apps.crossPlatformify("HADOOP_LOG_HOME") +
+            ApplicationConstants.LOG_DIR_EXPANSION_VAR;
 
     String res = ContainerLaunch.expandEnvironment(input, logPath);
 
     if (Shell.WINDOWS) {
-      Assert.assertEquals("%HADOOP_HOME%/share/hadoop/common/*;"
-          + "%HADOOP_HOME%/share/hadoop/common/lib/*;"
-          + "%HADOOP_LOG_HOME%/nm/container/logs", res);
+      Assert.assertEquals("%HADOOP_HOME%/share/hadoop/common/*;" +
+          "%HADOOP_HOME%/share/hadoop/common/lib/*;" +
+          "%HADOOP_LOG_HOME%/nm/container/logs", res);
     } else {
-      Assert.assertEquals("$HADOOP_HOME/share/hadoop/common/*:"
-          + "$HADOOP_HOME/share/hadoop/common/lib/*:"
-          + "$HADOOP_LOG_HOME/nm/container/logs", res);
+      Assert.assertEquals("$HADOOP_HOME/share/hadoop/common/*:" +
+          "$HADOOP_HOME/share/hadoop/common/lib/*:" +
+          "$HADOOP_LOG_HOME/nm/container/logs", res);
     }
     System.out.println(res);
   }
 
-  @Test (timeout = 20000)
-  public void testContainerLaunchStdoutAndStderrDiagnostics() throws IOException {
+  @Test(timeout = 20000)
+  public void testContainerLaunchStdoutAndStderrDiagnostics()
+      throws IOException {
 
     File shellFile = null;
     try {
       shellFile = Shell.appendScriptExtension(tmpDir, "hello");
       // echo "hello" to stdout and "error" to stderr and exit code with 2;
-      String command = Shell.WINDOWS ?
-          "@echo \"hello\" & @echo \"error\" 1>&2 & exit /b 2" :
-          "echo \"hello\"; echo \"error\" 1>&2; exit 2;";
+      String command =
+          Shell.WINDOWS ? "@echo \"hello\" & @echo \"error\" 1>&2 & exit /b 2" :
+              "echo \"hello\"; echo \"error\" 1>&2; exit 2;";
       PrintWriter writer = new PrintWriter(new FileOutputStream(shellFile));
       FileUtil.setExecutable(shellFile, true);
       writer.println(command);
       writer.close();
-      Map<Path, List<String>> resources =
-          new HashMap<Path, List<String>>();
+      Map<Path, List<String>> resources = new HashMap<Path, List<String>>();
       FileOutputStream fos = new FileOutputStream(shellFile, true);
 
       Map<String, String> env = new HashMap<String, String>();
@@ -337,13 +321,13 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
       fos.flush();
       fos.close();
 
-      Shell.ShellCommandExecutor shexc
-      = new Shell.ShellCommandExecutor(new String[]{shellFile.getAbsolutePath()}, tmpDir);
+      Shell.ShellCommandExecutor shexc = new Shell.ShellCommandExecutor(
+          new String[]{shellFile.getAbsolutePath()}, tmpDir);
       String diagnostics = null;
       try {
         shexc.execute();
         Assert.fail("Should catch exception");
-      } catch(ExitCodeException e){
+      } catch (ExitCodeException e) {
         diagnostics = e.getMessage();
       }
       // test stderr
@@ -351,11 +335,9 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
       // test stdout
       Assert.assertTrue(shexc.getOutput().contains("hello"));
       Assert.assertTrue(shexc.getExitCode() == 2);
-    }
-    finally {
+    } finally {
       // cleanup
-      if (shellFile != null
-          && shellFile.exists()) {
+      if (shellFile != null && shellFile.exists()) {
         shellFile.delete();
       }
     }
@@ -363,9 +345,10 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
 
   /**
    * See if environment variable is forwarded using sanitizeEnv.
+   *
    * @throws Exception
    */
-  @Test (timeout = 60000)
+  @Test(timeout = 60000)
   public void testContainerEnvVariables() throws Exception {
     containerManager.start();
 
@@ -384,8 +367,8 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
     userSetEnv.put(Environment.NM_PORT.name(), "user_set_NM_PORT");
     userSetEnv.put(Environment.NM_HTTP_PORT.name(), "user_set_NM_HTTP_PORT");
     userSetEnv.put(Environment.LOCAL_DIRS.name(), "user_set_LOCAL_DIR");
-    userSetEnv.put(Environment.USER.key(), "user_set_" +
-    	Environment.USER.key());
+    userSetEnv
+        .put(Environment.USER.key(), "user_set_" + Environment.USER.key());
     userSetEnv.put(Environment.LOGNAME.name(), "user_set_LOGNAME");
     userSetEnv.put(Environment.PWD.name(), "user_set_PWD");
     userSetEnv.put(Environment.HOME.name(), "user_set_HOME");
@@ -393,60 +376,60 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
 
     File scriptFile = Shell.appendScriptExtension(tmpDir, "scriptFile");
     PrintWriter fileWriter = new PrintWriter(scriptFile);
-    File processStartFile =
-        new File(tmpDir, "env_vars.txt").getAbsoluteFile();
+    File processStartFile = new File(tmpDir, "env_vars.txt").getAbsoluteFile();
     if (Shell.WINDOWS) {
-      fileWriter.println("@echo " + Environment.CONTAINER_ID.$() + "> "
-          + processStartFile);
-      fileWriter.println("@echo " + Environment.NM_HOST.$() + ">> "
-          + processStartFile);
-      fileWriter.println("@echo " + Environment.NM_PORT.$() + ">> "
-          + processStartFile);
-      fileWriter.println("@echo " + Environment.NM_HTTP_PORT.$() + ">> "
-          + processStartFile);
-      fileWriter.println("@echo " + Environment.LOCAL_DIRS.$() + ">> "
-          + processStartFile);
-      fileWriter.println("@echo " + Environment.USER.$() + ">> "
-    	  + processStartFile);
-      fileWriter.println("@echo " + Environment.LOGNAME.$() + ">> "
-          + processStartFile);
-      fileWriter.println("@echo " + Environment.PWD.$() + ">> "
-    	  + processStartFile);
-      fileWriter.println("@echo " + Environment.HOME.$() + ">> "
-          + processStartFile);
+      fileWriter.println(
+          "@echo " + Environment.CONTAINER_ID.$() + "> " + processStartFile);
+      fileWriter.println(
+          "@echo " + Environment.NM_HOST.$() + ">> " + processStartFile);
+      fileWriter.println(
+          "@echo " + Environment.NM_PORT.$() + ">> " + processStartFile);
+      fileWriter.println(
+          "@echo " + Environment.NM_HTTP_PORT.$() + ">> " + processStartFile);
+      fileWriter.println(
+          "@echo " + Environment.LOCAL_DIRS.$() + ">> " + processStartFile);
+      fileWriter
+          .println("@echo " + Environment.USER.$() + ">> " + processStartFile);
+      fileWriter.println(
+          "@echo " + Environment.LOGNAME.$() + ">> " + processStartFile);
+      fileWriter
+          .println("@echo " + Environment.PWD.$() + ">> " + processStartFile);
+      fileWriter
+          .println("@echo " + Environment.HOME.$() + ">> " + processStartFile);
       for (String serviceName : containerManager.getAuxServiceMetaData()
           .keySet()) {
-        fileWriter.println("@echo %" + AuxiliaryServiceHelper.NM_AUX_SERVICE
-            + serviceName + "%>> "
-            + processStartFile);
+        fileWriter.println(
+            "@echo %" + AuxiliaryServiceHelper.NM_AUX_SERVICE + serviceName +
+                "%>> " + processStartFile);
       }
       fileWriter.println("@echo " + cId + ">> " + processStartFile);
       fileWriter.println("@ping -n 100 127.0.0.1 >nul");
     } else {
-      fileWriter.write("\numask 0"); // So that start file is readable by the test
-      fileWriter.write("\necho $" + Environment.CONTAINER_ID.name() + " > "
-          + processStartFile);
-      fileWriter.write("\necho $" + Environment.NM_HOST.name() + " >> "
-          + processStartFile);
-      fileWriter.write("\necho $" + Environment.NM_PORT.name() + " >> "
-          + processStartFile);
-      fileWriter.write("\necho $" + Environment.NM_HTTP_PORT.name() + " >> "
-          + processStartFile);
-      fileWriter.write("\necho $" + Environment.LOCAL_DIRS.name() + " >> "
-          + processStartFile);
-      fileWriter.write("\necho $" + Environment.USER.name() + " >> "
-          + processStartFile);
-      fileWriter.write("\necho $" + Environment.LOGNAME.name() + " >> "
-          + processStartFile);
-      fileWriter.write("\necho $" + Environment.PWD.name() + " >> "
-          + processStartFile);
-      fileWriter.write("\necho $" + Environment.HOME.name() + " >> "
-          + processStartFile);
+      fileWriter
+          .write("\numask 0"); // So that start file is readable by the test
+      fileWriter.write("\necho $" + Environment.CONTAINER_ID.name() + " > " +
+          processStartFile);
+      fileWriter.write(
+          "\necho $" + Environment.NM_HOST.name() + " >> " + processStartFile);
+      fileWriter.write(
+          "\necho $" + Environment.NM_PORT.name() + " >> " + processStartFile);
+      fileWriter.write("\necho $" + Environment.NM_HTTP_PORT.name() + " >> " +
+          processStartFile);
+      fileWriter.write("\necho $" + Environment.LOCAL_DIRS.name() + " >> " +
+          processStartFile);
+      fileWriter.write(
+          "\necho $" + Environment.USER.name() + " >> " + processStartFile);
+      fileWriter.write(
+          "\necho $" + Environment.LOGNAME.name() + " >> " + processStartFile);
+      fileWriter.write(
+          "\necho $" + Environment.PWD.name() + " >> " + processStartFile);
+      fileWriter.write(
+          "\necho $" + Environment.HOME.name() + " >> " + processStartFile);
       for (String serviceName : containerManager.getAuxServiceMetaData()
           .keySet()) {
-        fileWriter.write("\necho $" + AuxiliaryServiceHelper.NM_AUX_SERVICE
-            + serviceName + " >> "
-            + processStartFile);
+        fileWriter.write(
+            "\necho $" + AuxiliaryServiceHelper.NM_AUX_SERVICE + serviceName +
+                " >> " + processStartFile);
       }
       fileWriter.write("\necho $$ >> " + processStartFile);
       fileWriter.write("\nexec sleep 100");
@@ -454,9 +437,8 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
     fileWriter.close();
 
     // upload the script file so that the container can run it
-    URL resource_alpha =
-        ConverterUtils.getYarnUrlFromPath(localFS
-            .makeQualified(new Path(scriptFile.getAbsolutePath())));
+    URL resource_alpha = ConverterUtils.getYarnUrlFromPath(
+        localFS.makeQualified(new Path(scriptFile.getAbsolutePath())));
     LocalResource rsrc_alpha =
         recordFactory.newRecordInstance(LocalResource.class);
     rsrc_alpha.setResource(resource_alpha);
@@ -465,17 +447,17 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
     rsrc_alpha.setType(LocalResourceType.FILE);
     rsrc_alpha.setTimestamp(scriptFile.lastModified());
     String destinationFile = "dest_file";
-    Map<String, LocalResource> localResources = 
+    Map<String, LocalResource> localResources =
         new HashMap<String, LocalResource>();
     localResources.put(destinationFile, rsrc_alpha);
     containerLaunchContext.setLocalResources(localResources);
 
     // set up the rest of the container
-    List<String> commands = Arrays.asList(Shell.getRunScriptCommand(scriptFile));
+    List<String> commands =
+        Arrays.asList(Shell.getRunScriptCommand(scriptFile));
     containerLaunchContext.setCommands(commands);
-    StartContainerRequest scRequest =
-        StartContainerRequest.newInstance(containerLaunchContext,
-          createContainerToken(cId));
+    StartContainerRequest scRequest = StartContainerRequest
+        .newInstance(containerLaunchContext, createContainerToken(cId));
     List<StartContainerRequest> list = new ArrayList<StartContainerRequest>();
     list.add(scRequest);
     StartContainersRequest allRequests =
@@ -504,7 +486,7 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
     List<String> containerLogDirs = new ArrayList<String>();
     String relativeContainerLogDir = ContainerLaunch
         .getRelativeContainerLogDir(appId.toString(), cId.toString());
-    for(String logDir : logDirs){
+    for (String logDir : logDirs) {
       containerLogDirs.add(logDir + Path.SEPARATOR + relativeContainerLogDir);
     }
     BufferedReader reader =
@@ -512,7 +494,7 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
     Assert.assertEquals(cId.toString(), reader.readLine());
     Assert.assertEquals(context.getNodeId().getHost(), reader.readLine());
     Assert.assertEquals(String.valueOf(context.getNodeId().getPort()),
-      reader.readLine());
+        reader.readLine());
     Assert.assertEquals(String.valueOf(HTTP_PORT), reader.readLine());
     Assert.assertEquals(StringUtils.join(",", appDirs), reader.readLine());
     Assert.assertEquals(user, reader.readLine());
@@ -526,34 +508,37 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
       }
     }
     Assert.assertTrue("Wrong local-dir found : " + obtainedPWD, found);
-    Assert.assertEquals(
-        conf.get(
-              YarnConfiguration.NM_USER_HOME_DIR, 
-              YarnConfiguration.DEFAULT_NM_USER_HOME_DIR),
-        reader.readLine());
+    Assert.assertEquals(conf.get(YarnConfiguration.NM_USER_HOME_DIR,
+            YarnConfiguration.DEFAULT_NM_USER_HOME_DIR), reader.readLine());
 
-    for (String serviceName : containerManager.getAuxServiceMetaData().keySet()) {
+    for (String serviceName : containerManager.getAuxServiceMetaData()
+        .keySet()) {
       Assert.assertEquals(
           containerManager.getAuxServiceMetaData().get(serviceName),
           ByteBuffer.wrap(Base64.decodeBase64(reader.readLine().getBytes())));
     }
 
-    Assert.assertEquals(cId.toString(), containerLaunchContext
-        .getEnvironment().get(Environment.CONTAINER_ID.name()));
-    Assert.assertEquals(context.getNodeId().getHost(), containerLaunchContext
-      .getEnvironment().get(Environment.NM_HOST.name()));
+    Assert.assertEquals(cId.toString(), containerLaunchContext.getEnvironment()
+        .get(Environment.CONTAINER_ID.name()));
+    Assert.assertEquals(context.getNodeId().getHost(),
+        containerLaunchContext.getEnvironment()
+            .get(Environment.NM_HOST.name()));
     Assert.assertEquals(String.valueOf(context.getNodeId().getPort()),
-      containerLaunchContext.getEnvironment().get(Environment.NM_PORT.name()));
-    Assert.assertEquals(String.valueOf(HTTP_PORT), containerLaunchContext
-      .getEnvironment().get(Environment.NM_HTTP_PORT.name()));
-    Assert.assertEquals(StringUtils.join(",", appDirs), containerLaunchContext
-        .getEnvironment().get(Environment.LOCAL_DIRS.name()));
+        containerLaunchContext.getEnvironment()
+            .get(Environment.NM_PORT.name()));
+    Assert.assertEquals(String.valueOf(HTTP_PORT),
+        containerLaunchContext.getEnvironment()
+            .get(Environment.NM_HTTP_PORT.name()));
+    Assert.assertEquals(StringUtils.join(",", appDirs),
+        containerLaunchContext.getEnvironment()
+            .get(Environment.LOCAL_DIRS.name()));
     Assert.assertEquals(StringUtils.join(",", containerLogDirs),
-      containerLaunchContext.getEnvironment().get(Environment.LOG_DIRS.name()));
+        containerLaunchContext.getEnvironment()
+            .get(Environment.LOG_DIRS.name()));
+    Assert.assertEquals(user,
+        containerLaunchContext.getEnvironment().get(Environment.USER.name()));
     Assert.assertEquals(user, containerLaunchContext.getEnvironment()
-    	.get(Environment.USER.name()));
-    Assert.assertEquals(user, containerLaunchContext.getEnvironment()
-    	.get(Environment.LOGNAME.name()));
+        .get(Environment.LOGNAME.name()));
     found = false;
     obtainedPWD =
         containerLaunchContext.getEnvironment().get(Environment.PWD.name());
@@ -564,12 +549,9 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
       }
     }
     Assert.assertTrue("Wrong local-dir found : " + obtainedPWD, found);
-    Assert.assertEquals(
-        conf.get(
-    	        YarnConfiguration.NM_USER_HOME_DIR, 
-    	        YarnConfiguration.DEFAULT_NM_USER_HOME_DIR),
-    	containerLaunchContext.getEnvironment()
-    		.get(Environment.HOME.name()));
+    Assert.assertEquals(conf.get(YarnConfiguration.NM_USER_HOME_DIR,
+            YarnConfiguration.DEFAULT_NM_USER_HOME_DIR),
+        containerLaunchContext.getEnvironment().get(Environment.HOME.name()));
 
     // Get the pid of the process
     String pid = reader.readLine().trim();
@@ -580,10 +562,10 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
 
     // Assert that the process is alive
     Assert.assertTrue("Process is not alive!",
-      DefaultContainerExecutor.containerIsAlive(pid));
+        DefaultContainerExecutor.containerIsAlive(pid));
     // Once more
     Assert.assertTrue("Process is not alive!",
-      DefaultContainerExecutor.containerIsAlive(pid));
+        DefaultContainerExecutor.containerIsAlive(pid));
 
     // Now test the stop functionality.
     List<ContainerId> containerIds = new ArrayList<ContainerId>();
@@ -592,23 +574,24 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
         StopContainersRequest.newInstance(containerIds);
     containerManager.stopContainers(stopRequest);
 
-    BaseContainerManagerTest.waitForContainerState(containerManager, cId,
-        ContainerState.COMPLETE);
+    BaseContainerManagerTest
+        .waitForContainerState(containerManager, cId, ContainerState.COMPLETE);
 
     GetContainerStatusesRequest gcsRequest =
         GetContainerStatusesRequest.newInstance(containerIds);
-    ContainerStatus containerStatus = 
-        containerManager.getContainerStatuses(gcsRequest).getContainerStatuses().get(0);
+    ContainerStatus containerStatus =
+        containerManager.getContainerStatuses(gcsRequest).getContainerStatuses()
+            .get(0);
     int expectedExitCode = Shell.WINDOWS ? ExitCode.FORCE_KILLED.getExitCode() :
-      ExitCode.TERMINATED.getExitCode();
+        ExitCode.TERMINATED.getExitCode();
     Assert.assertEquals(expectedExitCode, containerStatus.getExitStatus());
 
     // Assert that the process is not alive anymore
     Assert.assertFalse("Process is still alive!",
-      DefaultContainerExecutor.containerIsAlive(pid));
+        DefaultContainerExecutor.containerIsAlive(pid));
   }
 
-  @Test (timeout = 5000)
+  @Test(timeout = 5000)
   public void testAuxiliaryServiceHelper() throws Exception {
     Map<String, String> env = new HashMap<String, String>();
     String serviceName = "testAuxiliaryService";
@@ -620,7 +603,7 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
 
   private void internalKillTest(boolean delayed) throws Exception {
     conf.setLong(YarnConfiguration.NM_SLEEP_DELAY_BEFORE_SIGKILL_MS,
-      delayed ? 1000 : 0);
+        delayed ? 1000 : 0);
     containerManager.start();
 
     // ////// Construct the Container-id
@@ -628,8 +611,7 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
     ApplicationAttemptId appAttemptId =
         ApplicationAttemptId.newInstance(appId, 1);
     ContainerId cId = ContainerId.newInstance(appAttemptId, 0);
-    File processStartFile =
-        new File(tmpDir, "pid.txt").getAbsoluteFile();
+    File processStartFile = new File(tmpDir, "pid.txt").getAbsoluteFile();
 
     // setup a script that can handle sigterm gracefully
     File scriptFile = Shell.appendScriptExtension(tmpDir, "testscript");
@@ -644,7 +626,8 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
       writer.println("echo \"Running testscript for delayed kill\"");
       writer.println("hello=\"Got SIGTERM\"");
       writer.println("umask 0");
-      writer.println("trap \"echo $hello >> " + processStartFile + "\" SIGTERM");
+      writer
+          .println("trap \"echo $hello >> " + processStartFile + "\" SIGTERM");
       writer.println("echo \"Writing pid to start file\"");
       writer.println("echo $$ >> " + processStartFile);
       writer.println("while true; do\nsleep 1s;\ndone");
@@ -652,13 +635,12 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
     writer.close();
     FileUtil.setExecutable(scriptFile, true);
 
-    ContainerLaunchContext containerLaunchContext = 
+    ContainerLaunchContext containerLaunchContext =
         recordFactory.newRecordInstance(ContainerLaunchContext.class);
 
     // upload the script file so that the container can run it
-    URL resource_alpha =
-        ConverterUtils.getYarnUrlFromPath(localFS
-            .makeQualified(new Path(scriptFile.getAbsolutePath())));
+    URL resource_alpha = ConverterUtils.getYarnUrlFromPath(
+        localFS.makeQualified(new Path(scriptFile.getAbsolutePath())));
     LocalResource rsrc_alpha =
         recordFactory.newRecordInstance(LocalResource.class);
     rsrc_alpha.setResource(resource_alpha);
@@ -667,19 +649,19 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
     rsrc_alpha.setType(LocalResourceType.FILE);
     rsrc_alpha.setTimestamp(scriptFile.lastModified());
     String destinationFile = "dest_file.sh";
-    Map<String, LocalResource> localResources = 
+    Map<String, LocalResource> localResources =
         new HashMap<String, LocalResource>();
     localResources.put(destinationFile, rsrc_alpha);
     containerLaunchContext.setLocalResources(localResources);
 
     // set up the rest of the container
-    List<String> commands = Arrays.asList(Shell.getRunScriptCommand(scriptFile));
+    List<String> commands =
+        Arrays.asList(Shell.getRunScriptCommand(scriptFile));
     containerLaunchContext.setCommands(commands);
     Token containerToken = createContainerToken(cId);
 
-    StartContainerRequest scRequest =
-        StartContainerRequest.newInstance(containerLaunchContext,
-          containerToken);
+    StartContainerRequest scRequest = StartContainerRequest
+        .newInstance(containerLaunchContext, containerToken);
     List<StartContainerRequest> list = new ArrayList<StartContainerRequest>();
     list.add(scRequest);
     StartContainersRequest allRequests =
@@ -701,17 +683,17 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
         StopContainersRequest.newInstance(containerIds);
     containerManager.stopContainers(stopRequest);
 
-    BaseContainerManagerTest.waitForContainerState(containerManager, cId,
-        ContainerState.COMPLETE);
+    BaseContainerManagerTest
+        .waitForContainerState(containerManager, cId, ContainerState.COMPLETE);
 
     // if delayed container stop sends a sigterm followed by a sigkill
     // otherwise sigkill is sent immediately 
     GetContainerStatusesRequest gcsRequest =
         GetContainerStatusesRequest.newInstance(containerIds);
     
-    ContainerStatus containerStatus = 
-        containerManager.getContainerStatuses(gcsRequest)
-          .getContainerStatuses().get(0);
+    ContainerStatus containerStatus =
+        containerManager.getContainerStatuses(gcsRequest).getContainerStatuses()
+            .get(0);
     Assert.assertEquals(ExitCode.FORCE_KILLED.getExitCode(),
         containerStatus.getExitStatus());
 
@@ -722,7 +704,7 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
     // verify that the job object with ID matching container ID no longer exists.
     if (Shell.WINDOWS || !delayed) {
       Assert.assertFalse("Process is still alive!",
-        DefaultContainerExecutor.containerIsAlive(cId.toString()));
+          DefaultContainerExecutor.containerIsAlive(cId.toString()));
     } else {
       BufferedReader reader =
           new BufferedReader(new FileReader(processStartFile));
@@ -758,8 +740,8 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
   public void testCallFailureWithNullLocalizedResources() {
     Container container = mock(Container.class);
     when(container.getContainerId()).thenReturn(ContainerId.newInstance(
-        ApplicationAttemptId.newInstance(ApplicationId.newInstance(
-            System.currentTimeMillis(), 1), 1), 1));
+        ApplicationAttemptId.newInstance(
+            ApplicationId.newInstance(System.currentTimeMillis(), 1), 1), 1));
     ContainerLaunchContext clc = mock(ContainerLaunchContext.class);
     when(clc.getCommands()).thenReturn(Collections.<String>emptyList());
     when(container.getLaunchContext()).thenReturn(clc);
@@ -774,8 +756,9 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
       }
     };
     when(dispatcher.getEventHandler()).thenReturn(eventHandler);
-    ContainerLaunch launch = new ContainerLaunch(context, new Configuration(),
-        dispatcher, exec, null, container, dirsHandler, containerManager);
+    ContainerLaunch launch =
+        new ContainerLaunch(context, new Configuration(), dispatcher, exec,
+            null, container, dirsHandler, containerManager);
     launch.call();
   }
 
@@ -783,12 +766,11 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
     Resource r = BuilderUtils.newResource(1024, 1);
     ContainerTokenIdentifier containerTokenIdentifier =
         new ContainerTokenIdentifier(cId, context.getNodeId().toString(), user,
-          r, System.currentTimeMillis() + 10000L, 123, DUMMY_RM_IDENTIFIER);
-    Token containerToken =
-        BuilderUtils.newContainerToken(
-          context.getNodeId(),
-          context.getContainerTokenSecretManager().retrievePassword(
-            containerTokenIdentifier), containerTokenIdentifier);
+            r, System.currentTimeMillis() + 10000L, 123, DUMMY_RM_IDENTIFIER);
+    Token containerToken = BuilderUtils.newContainerToken(context.getNodeId(),
+        context.getContainerTokenSecretManager()
+            .retrievePassword(containerTokenIdentifier),
+        containerTokenIdentifier);
     return containerToken;
   }
 

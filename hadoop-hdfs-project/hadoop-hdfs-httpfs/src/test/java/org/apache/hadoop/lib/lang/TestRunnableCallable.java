@@ -19,13 +19,13 @@
 package org.apache.hadoop.lib.lang;
 
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import org.apache.hadoop.test.HTestCase;
+import org.junit.Test;
 
 import java.util.concurrent.Callable;
 
-import org.apache.hadoop.test.HTestCase;
-import org.junit.Test;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 public class TestRunnableCallable extends HTestCase {
 

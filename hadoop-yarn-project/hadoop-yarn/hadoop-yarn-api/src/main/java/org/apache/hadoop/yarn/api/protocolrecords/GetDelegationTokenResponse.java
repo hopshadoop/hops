@@ -28,10 +28,9 @@ import org.apache.hadoop.yarn.util.Records;
 
 
 /**
- * Response to a {@link GetDelegationTokenRequest} request 
- * from the client. The response contains the token that 
+ * Response to a {@link GetDelegationTokenRequest} request
+ * from the client. The response contains the token that
  * can be used by the containers to talk to  ClientRMService.
- *
  */
 @Public
 @Stable
@@ -49,7 +48,6 @@ public abstract class GetDelegationTokenResponse {
   /**
    * The Delegation tokens have a identifier which maps to
    * {@link AbstractDelegationTokenIdentifier}.
-   *
    */
   @Public
   @Stable

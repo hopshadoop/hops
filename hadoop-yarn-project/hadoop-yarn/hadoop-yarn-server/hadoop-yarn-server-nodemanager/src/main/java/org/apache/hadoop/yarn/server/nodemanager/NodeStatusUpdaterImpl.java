@@ -1,37 +1,24 @@
 /**
-* Licensed to the Apache Software Foundation (ASF) under one
-* or more contributor license agreements.  See the NOTICE file
-* distributed with this work for additional information
-* regarding copyright ownership.  The ASF licenses this file
-* to you under the Apache License, Version 2.0 (the
-* "License"); you may not use this file except in compliance
-* with the License.  You may obtain a copy of the License at
-*
-*     http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package org.apache.hadoop.yarn.server.nodemanager;
 
-import java.io.IOException;
-import java.net.ConnectException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Random;
-import java.util.Set;
-
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -66,12 +53,25 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Cont
 import org.apache.hadoop.yarn.server.nodemanager.metrics.NodeManagerMetrics;
 import org.apache.hadoop.yarn.util.YarnVersionInfo;
 
-import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
+import java.net.ConnectException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Random;
+import java.util.Set;
 
-public class NodeStatusUpdaterImpl extends AbstractService implements
-    NodeStatusUpdater {
+public class NodeStatusUpdaterImpl extends AbstractService
+    implements NodeStatusUpdater {
 
-  public static final String YARN_NODEMANAGER_DURATION_TO_TRACK_STOPPED_CONTAINERS =
+  public static final String
+      YARN_NODEMANAGER_DURATION_TO_TRACK_STOPPED_CONTAINERS =
       YarnConfiguration.NM_PREFIX + "duration-to-track-stopped-containers";
 
   private static final Log LOG = LogFactory.getLog(NodeStatusUpdaterImpl.class);
@@ -91,7 +91,9 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
   private volatile boolean isStopped;
   private boolean tokenKeepAliveEnabled;
   private long tokenRemovalDelayMs;
-  /** Keeps track of when the next keep alive request should be sent for an app*/
+  /**
+   * Keeps track of when the next keep alive request should be sent for an app
+   */
   private Map<ApplicationId, Long> appTokenKeepAliveMap =
       new HashMap<ApplicationId, Long>();
   private Random keepAliveDelayRandom = new Random();
@@ -112,7 +114,7 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
   private final NodeManagerMetrics metrics;
 
   private Runnable statusUpdaterRunnable;
-  private Thread  statusUpdater;
+  private Thread statusUpdater;
   private long rmIdentifier = ResourceManagerConstants.RM_INVALID_IDENTIFIER;
 
   public NodeStatusUpdaterImpl(Context context, Dispatcher dispatcher,
@@ -122,25 +124,20 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
     this.context = context;
     this.dispatcher = dispatcher;
     this.metrics = metrics;
-    this.recentlyStoppedContainers =
-        new LinkedHashMap<ContainerId, Long>();
+    this.recentlyStoppedContainers = new LinkedHashMap<ContainerId, Long>();
     this.previousCompletedContainers = new HashSet<ContainerId>();
   }
 
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
-    int memoryMb = 
-        conf.getInt(
-            YarnConfiguration.NM_PMEM_MB, YarnConfiguration.DEFAULT_NM_PMEM_MB);
-    float vMemToPMem =             
-        conf.getFloat(
-            YarnConfiguration.NM_VMEM_PMEM_RATIO, 
-            YarnConfiguration.DEFAULT_NM_VMEM_PMEM_RATIO); 
-    int virtualMemoryMb = (int)Math.ceil(memoryMb * vMemToPMem);
+    int memoryMb = conf.getInt(YarnConfiguration.NM_PMEM_MB,
+        YarnConfiguration.DEFAULT_NM_PMEM_MB);
+    float vMemToPMem = conf.getFloat(YarnConfiguration.NM_VMEM_PMEM_RATIO,
+        YarnConfiguration.DEFAULT_NM_VMEM_PMEM_RATIO);
+    int virtualMemoryMb = (int) Math.ceil(memoryMb * vMemToPMem);
     
-    int virtualCores =
-        conf.getInt(
-            YarnConfiguration.NM_VCORES, YarnConfiguration.DEFAULT_NM_VCORES);
+    int virtualCores = conf.getInt(YarnConfiguration.NM_VCORES,
+        YarnConfiguration.DEFAULT_NM_VCORES);
 
     this.totalResource = Resource.newInstance(memoryMb, virtualCores);
     metrics.addResource(totalResource);
@@ -149,26 +146,26 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
         conf.getInt(YarnConfiguration.RM_NM_EXPIRY_INTERVAL_MS,
             YarnConfiguration.DEFAULT_RM_NM_EXPIRY_INTERVAL_MS);
 
-    this.minimumResourceManagerVersion = conf.get(
-        YarnConfiguration.NM_RESOURCEMANAGER_MINIMUM_VERSION,
-        YarnConfiguration.DEFAULT_NM_RESOURCEMANAGER_MINIMUM_VERSION);
+    this.minimumResourceManagerVersion =
+        conf.get(YarnConfiguration.NM_RESOURCEMANAGER_MINIMUM_VERSION,
+            YarnConfiguration.DEFAULT_NM_RESOURCEMANAGER_MINIMUM_VERSION);
     
     // Default duration to track stopped containers on nodemanager is 10Min.
     // This should not be assigned very large value as it will remember all the
     // containers stopped during that time.
     durationToTrackStoppedContainers =
         conf.getLong(YARN_NODEMANAGER_DURATION_TO_TRACK_STOPPED_CONTAINERS,
-          600000);
+            600000);
     if (durationToTrackStoppedContainers < 0) {
-      String message = "Invalid configuration for "
-        + YARN_NODEMANAGER_DURATION_TO_TRACK_STOPPED_CONTAINERS + " default "
-          + "value is 10Min(600000).";
+      String message = "Invalid configuration for " +
+          YARN_NODEMANAGER_DURATION_TO_TRACK_STOPPED_CONTAINERS + " default " +
+          "value is 10Min(600000).";
       LOG.error(message);
       throw new YarnException(message);
     }
     if (LOG.isDebugEnabled()) {
-      LOG.debug(YARN_NODEMANAGER_DURATION_TO_TRACK_STOPPED_CONTAINERS + " :"
-        + durationToTrackStoppedContainers);
+      LOG.debug(YARN_NODEMANAGER_DURATION_TO_TRACK_STOPPED_CONTAINERS + " :" +
+          durationToTrackStoppedContainers);
     }
     super.serviceInit(conf);
     LOG.info("Initialized nodemanager for " + nodeId + ":" +
@@ -225,7 +222,7 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
 
   @VisibleForTesting
   protected void stopRMProxy() {
-    if(this.resourceTracker != null) {
+    if (this.resourceTracker != null) {
       RPC.stopProxy(this.resourceTracker);
     }
   }
@@ -233,58 +230,60 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
   @Private
   protected boolean isTokenKeepAliveEnabled(Configuration conf) {
     return conf.getBoolean(YarnConfiguration.LOG_AGGREGATION_ENABLED,
-        YarnConfiguration.DEFAULT_LOG_AGGREGATION_ENABLED)
-        && UserGroupInformation.isSecurityEnabled();
+        YarnConfiguration.DEFAULT_LOG_AGGREGATION_ENABLED) &&
+        UserGroupInformation.isSecurityEnabled();
   }
 
   @VisibleForTesting
   protected ResourceTracker getRMClient() throws IOException {
     Configuration conf = getConfig();
-    return ServerRMProxy.createRMProxy(conf, ResourceTracker.class);
+    return ServerRMProxy.createRMProxy(conf, ResourceTracker.class,
+        conf.getBoolean(YarnConfiguration.DISTRIBUTED_RM,
+            YarnConfiguration.DEFAULT_DISTRIBUTED_RM));
   }
 
   @VisibleForTesting
-  protected void registerWithRM()
-      throws YarnException, IOException {
+  protected void registerWithRM() throws YarnException, IOException {
     List<ContainerStatus> containerStatuses = getContainerStatuses();
-    RegisterNodeManagerRequest request =
-        RegisterNodeManagerRequest.newInstance(nodeId, httpPort, totalResource,
-          nodeManagerVersionId, containerStatuses);
+    RegisterNodeManagerRequest request = RegisterNodeManagerRequest
+        .newInstance(nodeId, httpPort, totalResource, nodeManagerVersionId,
+            containerStatuses);
     if (containerStatuses != null) {
-      LOG.info("Registering with RM using finished containers :"
-          + containerStatuses);
+      LOG.info("Registering with RM using finished containers :" +
+          containerStatuses);
     }
     RegisterNodeManagerResponse regNMResponse =
         resourceTracker.registerNodeManager(request);
     this.rmIdentifier = regNMResponse.getRMIdentifier();
     // if the Resourcemanager instructs NM to shutdown.
     if (NodeAction.SHUTDOWN.equals(regNMResponse.getNodeAction())) {
-      String message =
-          "Message from ResourceManager: "
-              + regNMResponse.getDiagnosticsMessage();
+      String message = "Message from ResourceManager: " +
+          regNMResponse.getDiagnosticsMessage();
       throw new YarnRuntimeException(
-        "Recieved SHUTDOWN signal from Resourcemanager ,Registration of NodeManager failed, "
-            + message);
+          "Recieved SHUTDOWN signal from Resourcemanager ,Registration of NodeManager failed, " +
+              message);
     }
 
     // if ResourceManager version is too old then shutdown
-    if (!minimumResourceManagerVersion.equals("NONE")){
-      if (minimumResourceManagerVersion.equals("EqualToNM")){
+    if (!minimumResourceManagerVersion.equals("NONE")) {
+      if (minimumResourceManagerVersion.equals("EqualToNM")) {
         minimumResourceManagerVersion = nodeManagerVersionId;
       }
       String rmVersion = regNMResponse.getRMVersion();
       if (rmVersion == null) {
-        String message = "The Resource Manager's did not return a version. "
-            + "Valid version cannot be checked.";
-        throw new YarnRuntimeException("Shutting down the Node Manager. "
-            + message);
+        String message = "The Resource Manager's did not return a version. " +
+            "Valid version cannot be checked.";
+        throw new YarnRuntimeException(
+            "Shutting down the Node Manager. " + message);
       }
-      if (VersionUtil.compareVersions(rmVersion,minimumResourceManagerVersion) < 0) {
-        String message = "The Resource Manager's version ("
-            + rmVersion +") is less than the minimum "
-            + "allowed version " + minimumResourceManagerVersion;
-        throw new YarnRuntimeException("Shutting down the Node Manager on RM "
-            + "version error, " + message);
+      if (VersionUtil
+          .compareVersions(rmVersion, minimumResourceManagerVersion) < 0) {
+        String message = "The Resource Manager's version (" + rmVersion +
+            ") is less than the minimum " + "allowed version " +
+            minimumResourceManagerVersion;
+        throw new YarnRuntimeException(
+            "Shutting down the Node Manager on RM " + "version error, " +
+                message);
       }
     }
     MasterKey masterKey = regNMResponse.getContainerTokenMasterKey();
@@ -301,11 +300,11 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
       this.context.getNMTokenSecretManager().setMasterKey(masterKey);
     }
 
-    LOG.info("Registered with ResourceManager as " + this.nodeId
-        + " with total resource of " + this.totalResource);
+    LOG.info("Registered with ResourceManager as " + this.nodeId +
+        " with total resource of " + this.totalResource);
     LOG.info("Notifying ContainerManager to unblock new container-requests");
     ((ContainerManagerImpl) this.context.getContainerManager())
-      .setBlockNewContainerRequests(false);
+        .setBlockNewContainerRequests(false);
   }
 
   private List<ApplicationId> createKeepAliveApplicationList() {
@@ -315,7 +314,7 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
 
     List<ApplicationId> appList = new ArrayList<ApplicationId>();
     for (Iterator<Entry<ApplicationId, Long>> i =
-        this.appTokenKeepAliveMap.entrySet().iterator(); i.hasNext();) {
+             this.appTokenKeepAliveMap.entrySet().iterator(); i.hasNext(); ) {
       Entry<ApplicationId, Long> e = i.next();
       ApplicationId appId = e.getKey();
       Long nextKeepAlive = e.getValue();
@@ -336,20 +335,22 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
     NodeHealthStatus nodeHealthStatus = this.context.getNodeHealthStatus();
     nodeHealthStatus.setHealthReport(healthChecker.getHealthReport());
     nodeHealthStatus.setIsNodeHealthy(healthChecker.isHealthy());
-    nodeHealthStatus.setLastHealthReportTime(healthChecker
-      .getLastHealthReportTime());
+    nodeHealthStatus
+        .setLastHealthReportTime(healthChecker.getLastHealthReportTime());
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Node's health-status : " + nodeHealthStatus.getIsNodeHealthy()
-          + ", " + nodeHealthStatus.getHealthReport());
+      LOG.debug(
+          "Node's health-status : " + nodeHealthStatus.getIsNodeHealthy() +
+              ", " + nodeHealthStatus.getHealthReport());
     }
     List<ContainerStatus> containersStatuses = getContainerStatuses();
     if (LOG.isDebugEnabled()) {
-      LOG.debug(this.nodeId + " sending out status for "
-          + containersStatuses.size() + " containers");
+      LOG.debug(
+          this.nodeId + " sending out status for " + containersStatuses.size() +
+              " containers");
     }
-    NodeStatus nodeStatus =
-        NodeStatus.newInstance(nodeId, responseId, containersStatuses,
-          createKeepAliveApplicationList(), nodeHealthStatus);
+    NodeStatus nodeStatus = NodeStatus
+        .newInstance(nodeId, responseId, containersStatuses,
+            createKeepAliveApplicationList(), nodeHealthStatus);
 
     return nodeStatus;
   }
@@ -390,8 +391,8 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
         for (ContainerId containerId : previousCompletedContainers) {
           this.context.getContainers().remove(containerId);
         }
-        LOG.info("Removed completed containers from NM context: "
-            + previousCompletedContainers);
+        LOG.info("Removed completed containers from NM context: " +
+            previousCompletedContainers);
         previousCompletedContainers.clear();
       }
     }
@@ -408,9 +409,10 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
   private void trackAppForKeepAlive(ApplicationId appId) {
     // Next keepAlive request for app between 0.7 & 0.9 of when the token will
     // likely expire.
-    long nextTime = System.currentTimeMillis()
-    + (long) (0.7 * tokenRemovalDelayMs + (0.2 * tokenRemovalDelayMs
-        * keepAliveDelayRandom.nextInt(100))/100);
+    long nextTime = System.currentTimeMillis() +
+        (long) (0.7 * tokenRemovalDelayMs +
+            (0.2 * tokenRemovalDelayMs * keepAliveDelayRandom.nextInt(100)) /
+                100);
     appTokenKeepAliveMap.put(appId, nextTime);
   }
 
@@ -421,6 +423,7 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
     }
   }
 
+  @Override
   public boolean isContainerRecentlyStopped(ContainerId containerId) {
     synchronized (recentlyStoppedContainers) {
       return recentlyStoppedContainers.containsKey(containerId);
@@ -433,7 +436,7 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
     synchronized (recentlyStoppedContainers) {
       removeVeryOldStoppedContainersFromCache();
       recentlyStoppedContainers.put(containerId,
-        System.currentTimeMillis() + durationToTrackStoppedContainers);
+          System.currentTimeMillis() + durationToTrackStoppedContainers);
     }
   }
   
@@ -449,8 +452,7 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
   public void removeVeryOldStoppedContainersFromCache() {
     synchronized (recentlyStoppedContainers) {
       long currentTime = System.currentTimeMillis();
-      Iterator<ContainerId> i =
-          recentlyStoppedContainers.keySet().iterator();
+      Iterator<ContainerId> i = recentlyStoppedContainers.keySet().iterator();
       while (i.hasNext()) {
         if (recentlyStoppedContainers.get(i.next()) < currentTime) {
           i.remove();
@@ -479,37 +481,36 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
             NodeHeartbeatResponse response = null;
             NodeStatus nodeStatus = getNodeStatus(lastHeartBeatID);
             
-            NodeHeartbeatRequest request =
-                NodeHeartbeatRequest.newInstance(nodeStatus,
-                  NodeStatusUpdaterImpl.this.context
-                    .getContainerTokenSecretManager().getCurrentKey(),
-                  NodeStatusUpdaterImpl.this.context.getNMTokenSecretManager()
-                    .getCurrentKey());
+            NodeHeartbeatRequest request = NodeHeartbeatRequest
+                .newInstance(nodeStatus, NodeStatusUpdaterImpl.this.context
+                        .getContainerTokenSecretManager().getCurrentKey(),
+                    NodeStatusUpdaterImpl.this.context.getNMTokenSecretManager()
+                        .getCurrentKey());
             response = resourceTracker.nodeHeartbeat(request);
             //get next heartbeat interval from response
             nextHeartBeatInterval = response.getNextHeartBeatInterval();
             updateMasterKeys(response);
 
             if (response.getNodeAction() == NodeAction.SHUTDOWN) {
-              LOG
-                .warn("Recieved SHUTDOWN signal from Resourcemanager as part of heartbeat,"
-                    + " hence shutting down.");
-              LOG.warn("Message from ResourceManager: "
-                  + response.getDiagnosticsMessage());
-              dispatcher.getEventHandler().handle(
-                  new NodeManagerEvent(NodeManagerEventType.SHUTDOWN));
+              LOG.warn(
+                  "Recieved SHUTDOWN signal from Resourcemanager as part of heartbeat," +
+                      " hence shutting down.");
+              LOG.warn("Message from ResourceManager: " +
+                  response.getDiagnosticsMessage());
+              dispatcher.getEventHandler()
+                  .handle(new NodeManagerEvent(NodeManagerEventType.SHUTDOWN));
               break;
             }
             if (response.getNodeAction() == NodeAction.RESYNC) {
-              LOG.warn("Node is out of sync with ResourceManager,"
-                  + " hence resyncing.");
-              LOG.warn("Message from ResourceManager: "
-                  + response.getDiagnosticsMessage());
+              LOG.warn("Node is out of sync with ResourceManager," +
+                  " hence resyncing.");
+              LOG.warn("Message from ResourceManager: " +
+                  response.getDiagnosticsMessage());
               // Invalidate the RMIdentifier while resync
               NodeStatusUpdaterImpl.this.rmIdentifier =
                   ResourceManagerConstants.RM_INVALID_IDENTIFIER;
-              dispatcher.getEventHandler().handle(
-                  new NodeManagerEvent(NodeManagerEventType.RESYNC));
+              dispatcher.getEventHandler()
+                  .handle(new NodeManagerEvent(NodeManagerEventType.RESYNC));
               break;
             }
 
@@ -520,12 +521,12 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
             removeCompletedContainersFromContext();
 
             lastHeartBeatID = response.getResponseId();
-            List<ContainerId> containersToCleanup = response
-                .getContainersToCleanup();
+            List<ContainerId> containersToCleanup =
+                response.getContainersToCleanup();
             if (!containersToCleanup.isEmpty()) {
               dispatcher.getEventHandler().handle(
                   new CMgrCompletedContainersEvent(containersToCleanup,
-                    CMgrCompletedContainersEvent.Reason.BY_RESOURCEMANAGER));
+                      CMgrCompletedContainersEvent.Reason.BY_RESOURCEMANAGER));
             }
             List<ApplicationId> appsToCleanup =
                 response.getApplicationsToCleanup();
@@ -538,8 +539,8 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
             }
           } catch (ConnectException e) {
             //catch and throw the exception if tried MAX wait time to connect RM
-            dispatcher.getEventHandler().handle(
-                new NodeManagerEvent(NodeManagerEventType.SHUTDOWN));
+            dispatcher.getEventHandler()
+                .handle(new NodeManagerEvent(NodeManagerEventType.SHUTDOWN));
             throw new YarnRuntimeException(e);
           } catch (Throwable e) {
 
@@ -550,7 +551,7 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
             synchronized (heartbeatMonitor) {
               nextHeartBeatInterval = nextHeartBeatInterval <= 0 ?
                   YarnConfiguration.DEFAULT_RM_NM_HEARTBEAT_INTERVAL_MS :
-                    nextHeartBeatInterval;
+                  nextHeartBeatInterval;
               try {
                 heartbeatMonitor.wait(nextHeartBeatInterval);
               } catch (InterruptedException e) {
@@ -566,7 +567,8 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
         MasterKey updatedMasterKey = response.getContainerTokenMasterKey();
         if (updatedMasterKey != null) {
           // Will be non-null only on roll-over on RM side
-          context.getContainerTokenSecretManager().setMasterKey(updatedMasterKey);
+          context.getContainerTokenSecretManager()
+              .setMasterKey(updatedMasterKey);
         }
         
         updatedMasterKey = response.getNMTokenMasterKey();
@@ -575,8 +577,7 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
         }
       }
     };
-    statusUpdater =
-        new Thread(statusUpdaterRunnable, "Node Status Updater");
+    statusUpdater = new Thread(statusUpdaterRunnable, "Node Status Updater");
     statusUpdater.start();
   }
   

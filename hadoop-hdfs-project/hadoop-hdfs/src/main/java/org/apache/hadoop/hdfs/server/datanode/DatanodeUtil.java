@@ -17,27 +17,32 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
-import java.io.File;
-import java.io.IOException;
-
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hdfs.protocol.Block;
 
-/** Provide utility methods for Datanode. */
+import java.io.File;
+import java.io.IOException;
+
+/**
+ * Provide utility methods for Datanode.
+ */
 @InterfaceAudience.Private
 public class DatanodeUtil {
   public static final String UNLINK_BLOCK_SUFFIX = ".unlinked";
 
   public static final String DISK_ERROR = "Possible disk error: ";
 
-  /** Get the cause of an I/O exception if caused by a possible disk error
-   * @param ioe an I/O exception
+  /**
+   * Get the cause of an I/O exception if caused by a possible disk error
+   *
+   * @param ioe
+   *     an I/O exception
    * @return cause if the I/O exception is caused by a possible disk error;
-   *         null otherwise.
-   */ 
+   * null otherwise.
+   */
   static IOException getCauseIfDiskError(IOException ioe) {
-    if (ioe.getMessage()!=null && ioe.getMessage().startsWith(DISK_ERROR)) {
-      return (IOException)ioe.getCause();
+    if (ioe.getMessage() != null && ioe.getMessage().startsWith(DISK_ERROR)) {
+      return (IOException) ioe.getCause();
     } else {
       return null;
     }
@@ -45,13 +50,15 @@ public class DatanodeUtil {
 
   /**
    * Create a new file.
-   * @throws IOException 
-   * if the file already exists or if the file cannot be created.
+   *
+   * @throws IOException
+   *     if the file already exists or if the file cannot be created.
    */
   public static File createTmpFile(Block b, File f) throws IOException {
     if (f.exists()) {
-      throw new IOException("Failed to create temporary file for " + b
-          + ".  File " + f + " should not be present, but is.");
+      throw new IOException(
+          "Failed to create temporary file for " + b + ".  File " + f +
+              " should not be present, but is.");
     }
     // Create the zero-length temp file
     final boolean fileCreated;
@@ -61,8 +68,9 @@ public class DatanodeUtil {
       throw new IOException(DISK_ERROR + "Failed to create " + f, ioe);
     }
     if (!fileCreated) {
-      throw new IOException("Failed to create temporary file for " + b
-          + ".  File " + f + " should be creatable, but is already present.");
+      throw new IOException(
+          "Failed to create temporary file for " + b + ".  File " + f +
+              " should be creatable, but is already present.");
     }
     return f;
   }
@@ -71,11 +79,13 @@ public class DatanodeUtil {
    * @return the meta name given the block name and generation stamp.
    */
   public static String getMetaName(String blockName, long generationStamp) {
-    return blockName + "_" + generationStamp + Block.METADATA_EXTENSION; 
+    return blockName + "_" + generationStamp + Block.METADATA_EXTENSION;
   }
 
-  /** @return the unlink file. */
+  /**
+   * @return the unlink file.
+   */
   public static File getUnlinkTmpFile(File f) {
-    return new File(f.getParentFile(), f.getName()+UNLINK_BLOCK_SUFFIX);
+    return new File(f.getParentFile(), f.getName() + UNLINK_BLOCK_SUFFIX);
   }
 }

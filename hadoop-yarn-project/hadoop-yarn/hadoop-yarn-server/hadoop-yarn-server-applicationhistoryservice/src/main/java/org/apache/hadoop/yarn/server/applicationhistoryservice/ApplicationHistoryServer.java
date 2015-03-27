@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.server.applicationhistoryservice;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -33,14 +34,12 @@ import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.yarn.YarnUncaughtExceptionHandler;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
-import org.apache.hadoop.yarn.server.applicationhistoryservice.timeline.TimelineStore;
 import org.apache.hadoop.yarn.server.applicationhistoryservice.timeline.LeveldbTimelineStore;
+import org.apache.hadoop.yarn.server.applicationhistoryservice.timeline.TimelineStore;
 import org.apache.hadoop.yarn.server.applicationhistoryservice.webapp.AHSWebApp;
 import org.apache.hadoop.yarn.webapp.WebApp;
 import org.apache.hadoop.yarn.webapp.WebApps;
 import org.apache.hadoop.yarn.webapp.util.WebAppUtils;
-
-import com.google.common.annotations.VisibleForTesting;
 
 /**
  * History server that keeps track of all types of history in the cluster.
@@ -49,8 +48,8 @@ import com.google.common.annotations.VisibleForTesting;
 public class ApplicationHistoryServer extends CompositeService {
 
   public static final int SHUTDOWN_HOOK_PRIORITY = 30;
-  private static final Log LOG = LogFactory
-    .getLog(ApplicationHistoryServer.class);
+  private static final Log LOG =
+      LogFactory.getLog(ApplicationHistoryServer.class);
 
   ApplicationHistoryClientService ahsClientService;
   ApplicationHistoryManager historyManager;
@@ -97,9 +96,8 @@ public class ApplicationHistoryServer extends CompositeService {
     return this.ahsClientService;
   }
 
-  protected ApplicationHistoryClientService
-      createApplicationHistoryClientService(
-          ApplicationHistoryManager historyManager) {
+  protected ApplicationHistoryClientService createApplicationHistoryClientService(
+      ApplicationHistoryManager historyManager) {
     return new ApplicationHistoryClientService(historyManager);
   }
 
@@ -113,15 +111,15 @@ public class ApplicationHistoryServer extends CompositeService {
 
   static ApplicationHistoryServer launchAppHistoryServer(String[] args) {
     Thread
-      .setDefaultUncaughtExceptionHandler(new YarnUncaughtExceptionHandler());
-    StringUtils.startupShutdownMessage(ApplicationHistoryServer.class, args,
-      LOG);
+        .setDefaultUncaughtExceptionHandler(new YarnUncaughtExceptionHandler());
+    StringUtils
+        .startupShutdownMessage(ApplicationHistoryServer.class, args, LOG);
     ApplicationHistoryServer appHistoryServer = null;
     try {
       appHistoryServer = new ApplicationHistoryServer();
-      ShutdownHookManager.get().addShutdownHook(
-        new CompositeServiceShutdownHook(appHistoryServer),
-        SHUTDOWN_HOOK_PRIORITY);
+      ShutdownHookManager.get()
+          .addShutdownHook(new CompositeServiceShutdownHook(appHistoryServer),
+              SHUTDOWN_HOOK_PRIORITY);
       YarnConfiguration conf = new YarnConfiguration();
       appHistoryServer.init(conf);
       appHistoryServer.start();
@@ -141,34 +139,31 @@ public class ApplicationHistoryServer extends CompositeService {
     return new ApplicationHistoryManagerImpl();
   }
 
-  protected TimelineStore createTimelineStore(
-      Configuration conf) {
-    return ReflectionUtils.newInstance(conf.getClass(
-        YarnConfiguration.TIMELINE_SERVICE_STORE, LeveldbTimelineStore.class,
-        TimelineStore.class), conf);
+  protected TimelineStore createTimelineStore(Configuration conf) {
+    return ReflectionUtils.newInstance(
+        conf.getClass(YarnConfiguration.TIMELINE_SERVICE_STORE,
+            LeveldbTimelineStore.class, TimelineStore.class), conf);
   }
 
   protected void startWebApp() {
     String bindAddress = WebAppUtils.getAHSWebAppURLWithoutScheme(getConfig());
     LOG.info("Instantiating AHSWebApp at " + bindAddress);
     try {
-      webApp =
-          WebApps
-            .$for("applicationhistory", ApplicationHistoryClientService.class,
-              ahsClientService, "ws")
-            .with(getConfig())
-            .withHttpSpnegoPrincipalKey(
+      webApp = WebApps
+          .$for("applicationhistory", ApplicationHistoryClientService.class,
+              ahsClientService, "ws").with(getConfig())
+          .withHttpSpnegoPrincipalKey(
               YarnConfiguration.TIMELINE_SERVICE_WEBAPP_SPNEGO_USER_NAME_KEY)
-            .withHttpSpnegoKeytabKey(
+          .withHttpSpnegoKeytabKey(
               YarnConfiguration.TIMELINE_SERVICE_WEBAPP_SPNEGO_KEYTAB_FILE_KEY)
-            .at(bindAddress)
-            .start(new AHSWebApp(historyManager, timelineStore));
+          .at(bindAddress).start(new AHSWebApp(historyManager, timelineStore));
     } catch (Exception e) {
       String msg = "AHSWebApp failed to start.";
       LOG.error(msg, e);
       throw new YarnRuntimeException(msg, e);
     }
   }
+
   /**
    * @return ApplicationTimelineStore
    */

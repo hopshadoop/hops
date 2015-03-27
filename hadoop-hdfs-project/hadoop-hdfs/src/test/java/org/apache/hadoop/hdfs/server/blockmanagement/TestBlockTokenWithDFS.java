@@ -17,18 +17,6 @@
  */
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.Socket;
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Random;
-
 import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
@@ -38,17 +26,10 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.BlockReader;
 import org.apache.hadoop.hdfs.BlockReaderFactory;
-import org.apache.hadoop.hdfs.ClientContext;
 import org.apache.hadoop.hdfs.DFSClient;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
-import org.apache.hadoop.hdfs.DFSClient.Conf;
-import org.apache.hadoop.hdfs.RemotePeerFactory;
-import org.apache.hadoop.hdfs.client.ShortCircuitCache;
-import org.apache.hadoop.hdfs.client.ShortCircuitReplica;
-import org.apache.hadoop.hdfs.net.Peer;
-import org.apache.hadoop.hdfs.net.TcpPeerServer;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
@@ -58,17 +39,25 @@ import org.apache.hadoop.hdfs.security.token.block.InvalidBlockTokenException;
 import org.apache.hadoop.hdfs.security.token.block.SecurityTestUtil;
 import org.apache.hadoop.hdfs.server.balancer.TestBalancer;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
-import org.apache.hadoop.hdfs.server.datanode.CachingStrategy;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocols;
-import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.log4j.Level;
-import org.junit.Assert;
 import org.junit.Test;
+
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Random;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 public class TestBlockTokenWithDFS {
 
@@ -97,7 +86,8 @@ public class TestBlockTokenWithDFS {
     int totalRead = 0;
     int nRead = 0;
     try {
-      while ((nRead = in.read(toRead, totalRead, toRead.length - totalRead)) > 0) {
+      while ((nRead = in.read(toRead, totalRead, toRead.length - totalRead)) >
+          0) {
         totalRead += nRead;
       }
     } catch (IOException e) {
@@ -111,8 +101,8 @@ public class TestBlockTokenWithDFS {
   private boolean checkFile2(FSDataInputStream in) {
     byte[] toRead = new byte[FILE_SIZE];
     try {
-      assertEquals("Cannot read file", toRead.length, in.read(0, toRead, 0,
-          toRead.length));
+      assertEquals("Cannot read file", toRead.length,
+          in.read(0, toRead, 0, toRead.length));
     } catch (IOException e) {
       return false;
     }
@@ -135,75 +125,54 @@ public class TestBlockTokenWithDFS {
   private static FSDataOutputStream writeFile(FileSystem fileSys, Path name,
       short repl, long blockSize) throws IOException {
     FSDataOutputStream stm = fileSys.create(name, true, fileSys.getConf()
-        .getInt(CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096), repl, blockSize);
+        .getInt(CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096), repl,
+        blockSize);
     return stm;
   }
 
   // try reading a block using a BlockReader directly
-  private static void tryRead(final Configuration conf, LocatedBlock lblock,
+  private static void tryRead(Configuration conf, LocatedBlock lblock,
       boolean shouldSucceed) {
     InetSocketAddress targetAddr = null;
-    IOException ioe = null;
+    Socket s = null;
     BlockReader blockReader = null;
     ExtendedBlock block = lblock.getBlock();
     try {
       DatanodeInfo[] nodes = lblock.getLocations();
       targetAddr = NetUtils.createSocketAddr(nodes[0].getXferAddr());
+      s = NetUtils.getDefaultSocketFactory(conf).createSocket();
+      s.connect(targetAddr, HdfsServerConstants.READ_TIMEOUT);
+      s.setSoTimeout(HdfsServerConstants.READ_TIMEOUT);
 
-      blockReader = new BlockReaderFactory(new DFSClient.Conf(conf)).
-          setFileName(BlockReaderFactory.getFileName(targetAddr, 
-                        "test-blockpoolid", block.getBlockId())).
-          setBlock(block).
-          setBlockToken(lblock.getBlockToken()).
-          setInetSocketAddress(targetAddr).
-          setStartOffset(0).
-          setLength(-1).
-          setVerifyChecksum(true).
-          setClientName("TestBlockTokenWithDFS").
-          setDatanodeInfo(nodes[0]).
-          setCachingStrategy(CachingStrategy.newDefaultStrategy()).
-          setClientCacheContext(ClientContext.getFromConf(conf)).
-          setConfiguration(conf).
-          setRemotePeerFactory(new RemotePeerFactory() {
-            @Override
-            public Peer newConnectedPeer(InetSocketAddress addr)
-                throws IOException {
-              Peer peer = null;
-              Socket sock = NetUtils.getDefaultSocketFactory(conf).createSocket();
-              try {
-                sock.connect(addr, HdfsServerConstants.READ_TIMEOUT);
-                sock.setSoTimeout(HdfsServerConstants.READ_TIMEOUT);
-                peer = TcpPeerServer.peerFromSocket(sock);
-              } finally {
-                if (peer == null) {
-                  IOUtils.closeSocket(sock);
-                }
-              }
-              return peer;
-            }
-          }).
-          build();
+      String file = BlockReaderFactory
+          .getFileName(targetAddr, "test-blockpoolid", block.getBlockId());
+      blockReader = BlockReaderFactory
+          .newBlockReader(conf, s, file, block, lblock.getBlockToken(), 0, -1,
+              null);
+
     } catch (IOException ex) {
-      ioe = ex;
+      if (ex instanceof InvalidBlockTokenException) {
+        assertFalse("OP_READ_BLOCK: access token is invalid, " +
+            "when it is expected to be valid", shouldSucceed);
+        return;
+      }
+      fail("OP_READ_BLOCK failed due to reasons other than access token: " +
+          StringUtils.stringifyException(ex));
     } finally {
-      if (blockReader != null) {
+      if (s != null) {
         try {
-          blockReader.close();
-        } catch (IOException e) {
-          throw new RuntimeException(e);
+          s.close();
+        } catch (IOException iex) {
+        } finally {
+          s = null;
         }
       }
     }
-    if (shouldSucceed) {
-      Assert.assertNotNull("OP_READ_BLOCK: access token is invalid, "
-            + "when it is expected to be valid", blockReader);
-    } else {
-      Assert.assertNotNull("OP_READ_BLOCK: access token is valid, "
-          + "when it is expected to be invalid", ioe);
-      Assert.assertTrue(
-          "OP_READ_BLOCK failed due to reasons other than access token: ",
-          ioe instanceof InvalidBlockTokenException);
+    if (blockReader == null) {
+      fail("OP_READ_BLOCK failed due to reasons other than access token");
     }
+    assertTrue("OP_READ_BLOCK: access token is valid, " +
+        "when it is expected to be invalid", shouldSucceed);
   }
 
   // get a conf for testing
@@ -229,7 +198,8 @@ public class TestBlockTokenWithDFS {
     Configuration conf = getConf(numDataNodes);
 
     try {
-      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(numDataNodes).build();
+      cluster =
+          new MiniDFSCluster.Builder(conf).numDataNodes(numDataNodes).build();
       cluster.waitActive();
       assertEquals(numDataNodes, cluster.getDataNodes().size());
 
@@ -243,8 +213,8 @@ public class TestBlockTokenWithDFS {
       FileSystem fs = cluster.getFileSystem();
 
       // write a one-byte file
-      FSDataOutputStream stm = writeFile(fs, fileToAppend,
-          (short) numDataNodes, BLOCK_SIZE);
+      FSDataOutputStream stm =
+          writeFile(fs, fileToAppend, (short) numDataNodes, BLOCK_SIZE);
       stm.write(rawData, 0, 1);
       stm.close();
       // open the file again for append
@@ -290,7 +260,8 @@ public class TestBlockTokenWithDFS {
     Configuration conf = getConf(numDataNodes);
 
     try {
-      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(numDataNodes).build();
+      cluster =
+          new MiniDFSCluster.Builder(conf).numDataNodes(numDataNodes).build();
       cluster.waitActive();
       assertEquals(numDataNodes, cluster.getDataNodes().size());
 
@@ -303,8 +274,8 @@ public class TestBlockTokenWithDFS {
       Path fileToWrite = new Path(FILE_TO_WRITE);
       FileSystem fs = cluster.getFileSystem();
 
-      FSDataOutputStream stm = writeFile(fs, fileToWrite, (short) numDataNodes,
-          BLOCK_SIZE);
+      FSDataOutputStream stm =
+          writeFile(fs, fileToWrite, (short) numDataNodes, BLOCK_SIZE);
       // write a partial block
       int mid = rawData.length - 1;
       stm.write(rawData, 0, mid);
@@ -343,7 +314,8 @@ public class TestBlockTokenWithDFS {
     Configuration conf = getConf(numDataNodes);
 
     try {
-      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(numDataNodes).build();
+      cluster =
+          new MiniDFSCluster.Builder(conf).numDataNodes(numDataNodes).build();
       cluster.waitActive();
       assertEquals(numDataNodes, cluster.getDataNodes().size());
 
@@ -376,15 +348,12 @@ public class TestBlockTokenWithDFS {
       /*
        * testing READ interface on DN using a BlockReader
        */
-      DFSClient client = null;
-      try {
-        client = new DFSClient(new InetSocketAddress("localhost",
-          cluster.getNameNodePort()), conf);
-      } finally {
-        if (client != null) client.close();
-      }
-      List<LocatedBlock> locatedBlocks = nnProto.getBlockLocations(
-          FILE_TO_READ, 0, FILE_SIZE).getLocatedBlocks();
+
+      new DFSClient(
+          new InetSocketAddress("localhost", cluster.getNameNodePort()), conf);
+      List<LocatedBlock> locatedBlocks =
+          nnProto.getBlockLocations(FILE_TO_READ, 0, FILE_SIZE)
+              .getLocatedBlocks();
       LocatedBlock lblock = locatedBlocks.get(0); // first block
       Token<BlockTokenIdentifier> myToken = lblock.getBlockToken();
       // verify token is not expired
@@ -413,21 +382,22 @@ public class TestBlockTokenWithDFS {
       tryRead(conf, lblock, false);
       // use a valid new token
       lblock.setBlockToken(sm.generateToken(lblock.getBlock(),
-              EnumSet.of(BlockTokenSecretManager.AccessMode.READ)));
+          EnumSet.of(BlockTokenSecretManager.AccessMode.READ)));
       // read should succeed
       tryRead(conf, lblock, true);
       // use a token with wrong blockID
-      ExtendedBlock wrongBlock = new ExtendedBlock(lblock.getBlock()
-          .getBlockPoolId(), lblock.getBlock().getBlockId() + 1);
+      ExtendedBlock wrongBlock =
+          new ExtendedBlock(lblock.getBlock().getBlockPoolId(),
+              lblock.getBlock().getBlockId() + 1);
       lblock.setBlockToken(sm.generateToken(wrongBlock,
           EnumSet.of(BlockTokenSecretManager.AccessMode.READ)));
       // read should fail
       tryRead(conf, lblock, false);
       // use a token with wrong access modes
-      lblock.setBlockToken(sm.generateToken(lblock.getBlock(),
-          EnumSet.of(BlockTokenSecretManager.AccessMode.WRITE,
-                     BlockTokenSecretManager.AccessMode.COPY,
-                     BlockTokenSecretManager.AccessMode.REPLACE)));
+      lblock.setBlockToken(sm.generateToken(lblock.getBlock(), EnumSet
+              .of(BlockTokenSecretManager.AccessMode.WRITE,
+                  BlockTokenSecretManager.AccessMode.COPY,
+                  BlockTokenSecretManager.AccessMode.REPLACE)));
       // read should fail
       tryRead(conf, lblock, false);
 
@@ -583,7 +553,7 @@ public class TestBlockTokenWithDFS {
       }
     }
   }
-
+  
   /**
    * Integration testing of access token, involving NN, DN, and Balancer
    */

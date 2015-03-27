@@ -18,10 +18,7 @@
 
 package org.apache.hadoop.yarn.client.api.async;
 
-import java.nio.ByteBuffer;
-import java.util.Map;
-import java.util.concurrent.ConcurrentMap;
-
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Stable;
@@ -31,24 +28,25 @@ import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.NodeId;
-import org.apache.hadoop.yarn.api.records.Token;
 import org.apache.hadoop.yarn.client.api.NMClient;
 import org.apache.hadoop.yarn.client.api.async.impl.NMClientAsyncImpl;
 import org.apache.hadoop.yarn.client.api.impl.NMClientImpl;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 
-import com.google.common.annotations.VisibleForTesting;
+import java.nio.ByteBuffer;
+import java.util.Map;
 
 /**
  * <code>NMClientAsync</code> handles communication with all the NodeManagers
  * and provides asynchronous updates on getting responses from them. It
  * maintains a thread pool to communicate with individual NMs where a number of
- * worker threads process requests to NMs by using {@link NMClientImpl}. The max
+ * worker threads process requests to NMs by using {@link NMClientImpl}. The
+ * max
  * size of the thread pool is configurable through
  * {@link YarnConfiguration#NM_CLIENT_ASYNC_THREAD_POOL_MAX_SIZE}.
- *
+ * <p/>
  * It should be used in conjunction with a CallbackHandler. For example
- *
+ * <p/>
  * <pre>
  * {@code
  * class MyCallbackHandler implements NMClientAsync.CallbackHandler {
@@ -83,12 +81,12 @@ import com.google.common.annotations.VisibleForTesting;
  * }
  * }
  * </pre>
- *
+ * <p/>
  * The client's life-cycle should be managed like the following:
- *
+ * <p/>
  * <pre>
  * {@code
- * NMClientAsync asyncClient = 
+ * NMClientAsync asyncClient =
  *     NMClientAsync.createNMClientAsync(new MyCallbackhandler());
  * asyncClient.init(conf);
  * asyncClient.start();
@@ -117,11 +115,11 @@ public abstract class NMClientAsync extends AbstractService {
   }
   
   protected NMClientAsync(CallbackHandler callbackHandler) {
-    this (NMClientAsync.class.getName(), callbackHandler);
+    this(NMClientAsync.class.getName(), callbackHandler);
   }
 
   protected NMClientAsync(String name, CallbackHandler callbackHandler) {
-    this (name, new NMClientImpl(), callbackHandler);
+    this(name, new NMClientImpl(), callbackHandler);
   }
 
   @Private
@@ -133,14 +131,14 @@ public abstract class NMClientAsync extends AbstractService {
     this.setCallbackHandler(callbackHandler);
   }
 
-  public abstract void startContainerAsync(
-      Container container, ContainerLaunchContext containerLaunchContext);
+  public abstract void startContainerAsync(Container container,
+      ContainerLaunchContext containerLaunchContext);
 
-  public abstract void stopContainerAsync(
-      ContainerId containerId, NodeId nodeId);
+  public abstract void stopContainerAsync(ContainerId containerId,
+      NodeId nodeId);
 
-  public abstract void getContainerStatusAsync(
-      ContainerId containerId, NodeId nodeId);
+  public abstract void getContainerStatusAsync(ContainerId containerId,
+      NodeId nodeId);
   
   public NMClient getClient() {
     return client;
@@ -161,17 +159,18 @@ public abstract class NMClientAsync extends AbstractService {
   /**
    * <p>
    * The callback interface needs to be implemented by {@link NMClientAsync}
-   * users. The APIs are called when responses from <code>NodeManager</code> are
+   * users. The APIs are called when responses from <code>NodeManager</code>
+   * are
    * available.
    * </p>
-   *
+   * <p/>
    * <p>
    * Once a callback happens, the users can chose to act on it in blocking or
    * non-blocking manner. If the action on callback is done in a blocking
    * manner, some of the threads performing requests on NodeManagers may get
    * blocked depending on how many threads in the pool are busy.
    * </p>
-   *
+   * <p/>
    * <p>
    * The implementation of the callback function should not throw the
    * unexpected exception. Otherwise, {@link NMClientAsync} will just
@@ -182,9 +181,12 @@ public abstract class NMClientAsync extends AbstractService {
     /**
      * The API is called when <code>NodeManager</code> responds to indicate its
      * acceptance of the starting container request
-     * @param containerId the Id of the container
-     * @param allServiceResponse a Map between the auxiliary service names and
-     *                           their outputs
+     *
+     * @param containerId
+     *     the Id of the container
+     * @param allServiceResponse
+     *     a Map between the auxiliary service names and
+     *     their outputs
      */
     void onContainerStarted(ContainerId containerId,
         Map<String, ByteBuffer> allServiceResponse);
@@ -192,8 +194,11 @@ public abstract class NMClientAsync extends AbstractService {
     /**
      * The API is called when <code>NodeManager</code> responds with the status
      * of the container
-     * @param containerId the Id of the container
-     * @param containerStatus the status of the container
+     *
+     * @param containerId
+     *     the Id of the container
+     * @param containerStatus
+     *     the status of the container
      */
     void onContainerStatusReceived(ContainerId containerId,
         ContainerStatus containerStatus);
@@ -201,7 +206,9 @@ public abstract class NMClientAsync extends AbstractService {
     /**
      * The API is called when <code>NodeManager</code> responds to indicate the
      * container is stopped.
-     * @param containerId the Id of the container
+     *
+     * @param containerId
+     *     the Id of the container
      */
     void onContainerStopped(ContainerId containerId);
 
@@ -209,8 +216,10 @@ public abstract class NMClientAsync extends AbstractService {
      * The API is called when an exception is raised in the process of
      * starting a container
      *
-     * @param containerId the Id of the container
-     * @param t the raised exception
+     * @param containerId
+     *     the Id of the container
+     * @param t
+     *     the raised exception
      */
     void onStartContainerError(ContainerId containerId, Throwable t);
 
@@ -218,8 +227,10 @@ public abstract class NMClientAsync extends AbstractService {
      * The API is called when an exception is raised in the process of
      * querying the status of a container
      *
-     * @param containerId the Id of the container
-     * @param t the raised exception
+     * @param containerId
+     *     the Id of the container
+     * @param t
+     *     the raised exception
      */
     void onGetContainerStatusError(ContainerId containerId, Throwable t);
 
@@ -227,8 +238,10 @@ public abstract class NMClientAsync extends AbstractService {
      * The API is called when an exception is raised in the process of
      * stopping a container
      *
-     * @param containerId the Id of the container
-     * @param t the raised exception
+     * @param containerId
+     *     the Id of the container
+     * @param t
+     *     the raised exception
      */
     void onStopContainerError(ContainerId containerId, Throwable t);
 

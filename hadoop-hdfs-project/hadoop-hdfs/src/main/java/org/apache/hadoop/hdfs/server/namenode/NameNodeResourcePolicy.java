@@ -17,9 +17,9 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
-import java.util.Collection;
-
 import org.apache.hadoop.classification.InterfaceAudience;
+
+import java.util.Collection;
 
 /**
  * Given a set of checkable resources, this class is capable of determining
@@ -31,12 +31,14 @@ final class NameNodeResourcePolicy {
   /**
    * Return true if and only if there are sufficient NN
    * resources to continue logging edits.
-   * 
-   * @param resources the collection of resources to check.
-   * @param minimumRedundantResources the minimum number of redundant resources
-   *        required to continue operation.
+   *
+   * @param resources
+   *     the collection of resources to check.
+   * @param minimumRedundantResources
+   *     the minimum number of redundant resources
+   *     required to continue operation.
    * @return true if and only if there are sufficient NN resources to
-   *         continue logging edits.
+   * continue logging edits.
    */
   static boolean areResourcesAvailable(
       Collection<? extends CheckableNameNodeResource> resources,

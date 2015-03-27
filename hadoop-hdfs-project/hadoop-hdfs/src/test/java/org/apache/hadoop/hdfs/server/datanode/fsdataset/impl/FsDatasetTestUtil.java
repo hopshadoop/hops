@@ -17,49 +17,49 @@
  */
 package org.apache.hadoop.hdfs.server.datanode.fsdataset.impl;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.Collection;
-
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.server.datanode.ReplicaInfo;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsDatasetSpi;
 
+import java.io.File;
+import java.io.IOException;
+import java.util.Collection;
+
 public class FsDatasetTestUtil {
 
   public static File getFile(FsDatasetSpi<?> fsd, String bpid, long bid) {
-    return ((FsDatasetImpl)fsd).getFile(bpid, bid);
+    return ((FsDatasetImpl) fsd).getFile(bpid, bid);
   }
 
-  public static File getBlockFile(FsDatasetSpi<?> fsd, String bpid, Block b
-      ) throws IOException {
-    return ((FsDatasetImpl)fsd).getBlockFile(bpid, b);
+  public static File getBlockFile(FsDatasetSpi<?> fsd, String bpid, Block b)
+      throws IOException {
+    return ((FsDatasetImpl) fsd).getBlockFile(bpid, b);
   }
 
   public static File getMetaFile(FsDatasetSpi<?> fsd, String bpid, Block b)
       throws IOException {
-    return FsDatasetUtil.getMetaFile(getBlockFile(fsd, bpid, b), b
-        .getGenerationStamp());
+    return FsDatasetUtil
+        .getMetaFile(getBlockFile(fsd, bpid, b), b.getGenerationStamp());
   }
   
-  public static boolean unlinkBlock(FsDatasetSpi<?> fsd,
-      ExtendedBlock block, int numLinks) throws IOException {
-    final ReplicaInfo info = ((FsDatasetImpl)fsd).getReplicaInfo(block);
+  public static boolean unlinkBlock(FsDatasetSpi<?> fsd, ExtendedBlock block,
+      int numLinks) throws IOException {
+    final ReplicaInfo info = ((FsDatasetImpl) fsd).getReplicaInfo(block);
     return info.unlinkBlock(numLinks);
   }
 
-  public static ReplicaInfo fetchReplicaInfo (final FsDatasetSpi<?> fsd,
+  public static ReplicaInfo fetchReplicaInfo(final FsDatasetSpi<?> fsd,
       final String bpid, final long blockId) {
-    return ((FsDatasetImpl)fsd).fetchReplicaInfo(bpid, blockId);
+    return ((FsDatasetImpl) fsd).fetchReplicaInfo(bpid, blockId);
   }
 
   public static long getPendingAsyncDeletions(FsDatasetSpi<?> fsd) {
-    return ((FsDatasetImpl)fsd).asyncDiskService.countPendingDeletions();
+    return ((FsDatasetImpl) fsd).asyncDiskService.countPendingDeletions();
   }
   
   public static Collection<ReplicaInfo> getReplicas(FsDatasetSpi<?> fsd,
       String bpid) {
-    return ((FsDatasetImpl)fsd).volumeMap.replicas(bpid);
+    return ((FsDatasetImpl) fsd).volumeMap.replicas(bpid);
   }
 }

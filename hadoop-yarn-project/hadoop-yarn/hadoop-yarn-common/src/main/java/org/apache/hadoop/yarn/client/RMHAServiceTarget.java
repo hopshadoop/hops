@@ -31,13 +31,12 @@ public class RMHAServiceTarget extends HAServiceTarget {
   private final boolean autoFailoverEnabled;
   private final InetSocketAddress haAdminServiceAddress;
 
-  public RMHAServiceTarget(YarnConfiguration conf)
-      throws IOException {
+  public RMHAServiceTarget(YarnConfiguration conf) throws IOException {
     autoFailoverEnabled = HAUtil.isAutomaticFailoverEnabled(conf);
-    haAdminServiceAddress = conf.getSocketAddr(
-        YarnConfiguration.RM_ADMIN_ADDRESS,
-        YarnConfiguration.DEFAULT_RM_ADMIN_ADDRESS,
-        YarnConfiguration.DEFAULT_RM_ADMIN_PORT);
+    haAdminServiceAddress =
+        conf.getSocketAddr(YarnConfiguration.RM_ADMIN_ADDRESS,
+            YarnConfiguration.DEFAULT_RM_ADMIN_ADDRESS,
+            YarnConfiguration.DEFAULT_RM_ADMIN_PORT);
   }
 
   @Override
@@ -48,8 +47,8 @@ public class RMHAServiceTarget extends HAServiceTarget {
   @Override
   public InetSocketAddress getZKFCAddress() {
     // TODO (YARN-1177): ZKFC implementation
-    throw new UnsupportedOperationException("RMHAServiceTarget doesn't have " +
-        "a corresponding ZKFC address");
+    throw new UnsupportedOperationException(
+        "RMHAServiceTarget doesn't have " + "a corresponding ZKFC address");
   }
 
   @Override

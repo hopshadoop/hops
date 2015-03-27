@@ -26,13 +26,13 @@ import org.apache.hadoop.yarn.util.Records;
 /**
  * <p><code>LocalResource</code> represents a local resource required to
  * run a container.</p>
- * 
- * <p>The <code>NodeManager</code> is responsible for localizing the resource 
+ * <p/>
+ * <p>The <code>NodeManager</code> is responsible for localizing the resource
  * prior to launching the container.</p>
- * 
- * <p>Applications can specify {@link LocalResourceType} and 
+ * <p/>
+ * <p>Applications can specify {@link LocalResourceType} and
  * {@link LocalResourceVisibility}.</p>
- * 
+ *
  * @see LocalResourceType
  * @see LocalResourceVisibility
  * @see ContainerLaunchContext
@@ -67,6 +67,7 @@ public abstract class LocalResource {
 
   /**
    * Get the <em>location</em> of the resource to be localized.
+   *
    * @return <em>location</em> of the resource to be localized
    */
   @Public
@@ -75,7 +76,9 @@ public abstract class LocalResource {
   
   /**
    * Set <em>location</em> of the resource to be localized.
-   * @param resource <em>location</em> of the resource to be localized
+   *
+   * @param resource
+   *     <em>location</em> of the resource to be localized
    */
   @Public
   @Stable
@@ -83,6 +86,7 @@ public abstract class LocalResource {
   
   /**
    * Get the <em>size</em> of the resource to be localized.
+   *
    * @return <em>size</em> of the resource to be localized
    */
   @Public
@@ -91,7 +95,9 @@ public abstract class LocalResource {
   
   /**
    * Set the <em>size</em> of the resource to be localized.
-   * @param size <em>size</em> of the resource to be localized
+   *
+   * @param size
+   *     <em>size</em> of the resource to be localized
    */
   @Public
   @Stable
@@ -100,6 +106,7 @@ public abstract class LocalResource {
   /**
    * Get the original <em>timestamp</em> of the resource to be localized, used
    * for verification.
+   *
    * @return <em>timestamp</em> of the resource to be localized
    */
   @Public
@@ -109,7 +116,9 @@ public abstract class LocalResource {
   /**
    * Set the <em>timestamp</em> of the resource to be localized, used
    * for verification.
-   * @param timestamp <em>timestamp</em> of the resource to be localized
+   *
+   * @param timestamp
+   *     <em>timestamp</em> of the resource to be localized
    */
   @Public
   @Stable
@@ -117,6 +126,7 @@ public abstract class LocalResource {
   
   /**
    * Get the <code>LocalResourceType</code> of the resource to be localized.
+   *
    * @return <code>LocalResourceType</code> of the resource to be localized
    */
   @Public
@@ -125,27 +135,32 @@ public abstract class LocalResource {
   
   /**
    * Set the <code>LocalResourceType</code> of the resource to be localized.
-   * @param type <code>LocalResourceType</code> of the resource to be localized
+   *
+   * @param type
+   *     <code>LocalResourceType</code> of the resource to be localized
    */
   @Public
   @Stable
   public abstract void setType(LocalResourceType type);
   
   /**
-   * Get the <code>LocalResourceVisibility</code> of the resource to be 
+   * Get the <code>LocalResourceVisibility</code> of the resource to be
    * localized.
-   * @return <code>LocalResourceVisibility</code> of the resource to be 
-   *         localized
+   *
+   * @return <code>LocalResourceVisibility</code> of the resource to be
+   * localized
    */
   @Public
   @Stable
   public abstract LocalResourceVisibility getVisibility();
   
   /**
-   * Set the <code>LocalResourceVisibility</code> of the resource to be 
+   * Set the <code>LocalResourceVisibility</code> of the resource to be
    * localized.
-   * @param visibility <code>LocalResourceVisibility</code> of the resource to be 
-   *                   localized
+   *
+   * @param visibility
+   *     <code>LocalResourceVisibility</code> of the resource to be
+   *     localized
    */
   @Public
   @Stable
@@ -154,8 +169,9 @@ public abstract class LocalResource {
   /**
    * Get the <em>pattern</em> that should be used to extract entries from the
    * archive (only used when type is <code>PATTERN</code>).
-   * @return <em>pattern</em> that should be used to extract entries from the 
-   * archive. 
+   *
+   * @return <em>pattern</em> that should be used to extract entries from the
+   * archive.
    */
   @Public
   @Stable
@@ -164,8 +180,10 @@ public abstract class LocalResource {
   /**
    * Set the <em>pattern</em> that should be used to extract entries from the
    * archive (only used when type is <code>PATTERN</code>).
-   * @param pattern <em>pattern</em> that should be used to extract entries 
-   * from the archive.
+   *
+   * @param pattern
+   *     <em>pattern</em> that should be used to extract entries
+   *     from the archive.
    */
   @Public
   @Stable

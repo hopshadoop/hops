@@ -30,37 +30,47 @@ import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public enum ReplaceDatanodeOnFailure {
-  /** The feature is disabled in the entire site. */
+  /**
+   * The feature is disabled in the entire site.
+   */
   DISABLE,
-  /** Never add a new datanode. */
+  /**
+   * Never add a new datanode.
+   */
   NEVER,
   /**
    * DEFAULT policy:
-   *   Let r be the replication number.
-   *   Let n be the number of existing datanodes.
-   *   Add a new datanode only if r >= 3 and either
-   *   (1) floor(r/2) >= n; or
-   *   (2) r > n and the block is hflushed/appended.
+   * Let r be the replication number.
+   * Let n be the number of existing datanodes.
+   * Add a new datanode only if r >= 3 and either
+   * (1) floor(r/2) >= n; or
+   * (2) r > n and the block is hflushed/appended.
    */
   DEFAULT,
-  /** Always add a new datanode when an existing datanode is removed. */
+  /**
+   * Always add a new datanode when an existing datanode is removed.
+   */
   ALWAYS;
 
-  /** Check if the feature is enabled. */
+  /**
+   * Check if the feature is enabled.
+   */
   public void checkEnabled() {
     if (this == DISABLE) {
       throw new UnsupportedOperationException(
-          "This feature is disabled.  Please refer to "
-          + DFSConfigKeys.DFS_CLIENT_WRITE_REPLACE_DATANODE_ON_FAILURE_ENABLE_KEY
-          + " configuration property.");
+          "This feature is disabled.  Please refer to " +
+              DFSConfigKeys.DFS_CLIENT_WRITE_REPLACE_DATANODE_ON_FAILURE_ENABLE_KEY +
+              " configuration property.");
     }
   }
 
-  /** Is the policy satisfied? */
-  public boolean satisfy(
-      final short replication, final DatanodeInfo[] existings,
-      final boolean isAppend, final boolean isHflushed) {
-    final int n = existings == null? 0: existings.length;
+  /**
+   * Is the policy satisfied?
+   */
+  public boolean satisfy(final short replication,
+      final DatanodeInfo[] existings, final boolean isAppend,
+      final boolean isHflushed) {
+    final int n = existings == null ? 0 : existings.length;
     if (n == 0 || n >= replication) {
       //don't need to add datanode for any policy.
       return false;
@@ -73,7 +83,7 @@ public enum ReplaceDatanodeOnFailure {
       if (replication < 3) {
         return false;
       } else {
-        if (n <= (replication/2)) {
+        if (n <= (replication / 2)) {
           return true;
         } else {
           return isAppend || isHflushed;
@@ -82,7 +92,9 @@ public enum ReplaceDatanodeOnFailure {
     }
   }
 
-  /** Get the setting from configuration. */
+  /**
+   * Get the setting from configuration.
+   */
   public static ReplaceDatanodeOnFailure get(final Configuration conf) {
     final boolean enabled = conf.getBoolean(
         DFSConfigKeys.DFS_CLIENT_WRITE_REPLACE_DATANODE_ON_FAILURE_ENABLE_KEY,
@@ -94,18 +106,21 @@ public enum ReplaceDatanodeOnFailure {
     final String policy = conf.get(
         DFSConfigKeys.DFS_CLIENT_WRITE_REPLACE_DATANODE_ON_FAILURE_POLICY_KEY,
         DFSConfigKeys.DFS_CLIENT_WRITE_REPLACE_DATANODE_ON_FAILURE_POLICY_DEFAULT);
-    for(int i = 1; i < values().length; i++) {
+    for (int i = 1; i < values().length; i++) {
       final ReplaceDatanodeOnFailure rdof = values()[i];
       if (rdof.name().equalsIgnoreCase(policy)) {
         return rdof;
       }
     }
-    throw new HadoopIllegalArgumentException("Illegal configuration value for "
-        + DFSConfigKeys.DFS_CLIENT_WRITE_REPLACE_DATANODE_ON_FAILURE_POLICY_KEY
-        + ": " + policy);
+    throw new HadoopIllegalArgumentException(
+        "Illegal configuration value for " +
+            DFSConfigKeys.DFS_CLIENT_WRITE_REPLACE_DATANODE_ON_FAILURE_POLICY_KEY +
+            ": " + policy);
   }
 
-  /** Write the setting to configuration. */
+  /**
+   * Write the setting to configuration.
+   */
   public void write(final Configuration conf) {
     conf.setBoolean(
         DFSConfigKeys.DFS_CLIENT_WRITE_REPLACE_DATANODE_ON_FAILURE_ENABLE_KEY,

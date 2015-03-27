@@ -63,15 +63,18 @@ public abstract class RMStateVersion {
 
   @Override
   public boolean equals(Object obj) {
-    if (this == obj)
+    if (this == obj) {
       return true;
-    if (obj == null)
+    }
+    if (obj == null) {
       return false;
-    if (getClass() != obj.getClass())
+    }
+    if (getClass() != obj.getClass()) {
       return false;
+    }
     RMStateVersion other = (RMStateVersion) obj;
-    if (this.getMajorVersion() == other.getMajorVersion()
-        && this.getMinorVersion() == other.getMinorVersion()) {
+    if (this.getMajorVersion() == other.getMajorVersion() &&
+        this.getMinorVersion() == other.getMinorVersion()) {
       return true;
     } else {
       return false;

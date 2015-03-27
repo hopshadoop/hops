@@ -17,28 +17,29 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
-import java.util.HashMap;
-import java.util.Map;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Caches frequently used names to facilitate reuse.
  * (example: byte[] representation of the file name in {@link INode}).
- * 
+ * <p/>
  * This class is used by initially adding all the file names. Cache
- * tracks the number of times a name is used in a transient map. It promotes 
+ * tracks the number of times a name is used in a transient map. It promotes
  * a name used more than {@code useThreshold} to the cache.
- * 
+ * <p/>
  * One all the names are added, {@link #initialized()} should be called to
  * finish initialization. The transient map where use count is tracked is
  * discarded and cache is ready for use.
- * 
- * <p>
+ * <p/>
+ * <p/>
  * This class must be synchronized externally.
- * 
- * @param <K> name to be added to the cache
+ *
+ * @param <K>
+ *     name to be added to the cache
  */
 class NameCache<K> {
   /**
@@ -64,25 +65,37 @@ class NameCache<K> {
 
   static final Log LOG = LogFactory.getLog(NameCache.class.getName());
 
-  /** indicates initialization is in progress */
+  /**
+   * indicates initialization is in progress
+   */
   private boolean initialized = false;
 
-  /** names used more than {@code useThreshold} is added to the cache */
+  /**
+   * names used more than {@code useThreshold} is added to the cache
+   */
   private final int useThreshold;
 
-  /** of times a cache look up was successful */
+  /**
+   * of times a cache look up was successful
+   */
   private int lookups = 0;
 
-  /** Cached names */
+  /**
+   * Cached names
+   */
   final HashMap<K, K> cache = new HashMap<K, K>();
 
-  /** Names and with number of occurrences tracked during initialization */
+  /**
+   * Names and with number of occurrences tracked during initialization
+   */
   Map<K, UseCount> transientMap = new HashMap<K, UseCount>();
 
   /**
    * Constructor
-   * @param useThreshold names occurring more than this is promoted to the
-   *          cache
+   *
+   * @param useThreshold
+   *     names occurring more than this is promoted to the
+   *     cache
    */
   NameCache(int useThreshold) {
     this.useThreshold = useThreshold;
@@ -91,8 +104,9 @@ class NameCache<K> {
   /**
    * Add a given name to the cache or track use count.
    * exist. If the name already exists, then the internal value is returned.
-   * 
-   * @param name name to be looked up
+   *
+   * @param name
+   *     name to be looked up
    * @return internal value for the name if found; otherwise null
    */
   K put(final K name) {
@@ -120,6 +134,7 @@ class NameCache<K> {
   
   /**
    * Lookup count when a lookup for a name returned cached object
+   *
    * @return number of successful lookups
    */
   int getLookupCount() {
@@ -128,6 +143,7 @@ class NameCache<K> {
 
   /**
    * Size of the cache
+   *
    * @return Number of names stored in the cache
    */
   int size() {
@@ -146,7 +162,9 @@ class NameCache<K> {
     transientMap = null;
   }
   
-  /** Promote a frequently used name to the cache */
+  /**
+   * Promote a frequently used name to the cache
+   */
   private void promote(final K name) {
     transientMap.remove(name);
     cache.put(name, name);

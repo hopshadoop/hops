@@ -17,28 +17,32 @@
  */
 package org.apache.hadoop.fi;
 
+import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
-import org.apache.hadoop.hdfs.protocol.DatanodeID;
 
-import java.util.List;
 import java.util.ArrayList;
+import java.util.List;
 
 public class Pipeline {
   private final List<String> datanodes = new ArrayList<String>();
 
   Pipeline(LocatedBlock lb) {
-    for(DatanodeInfo d : lb.getLocations()) {
+    for (DatanodeInfo d : lb.getLocations()) {
       datanodes.add(d.getName());
     }
   }
 
-  /** Does the pipeline contains d? */
+  /**
+   * Does the pipeline contains d?
+   */
   public boolean contains(DatanodeID d) {
     return datanodes.contains(d.getName());
   }
 
-  /** Does the pipeline contains d at the n th position? */
+  /**
+   * Does the pipeline contains d at the n th position?
+   */
   public boolean contains(int n, DatanodeID d) {
     return d.getName().equals(datanodes.get(n));
   }

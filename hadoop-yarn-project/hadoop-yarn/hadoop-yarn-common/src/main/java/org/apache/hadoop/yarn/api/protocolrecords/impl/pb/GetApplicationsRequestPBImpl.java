@@ -18,12 +18,7 @@
 
 package org.apache.hadoop.yarn.api.protocolrecords.impl.pb;
 
-import java.util.EnumSet;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Set;
-
+import com.google.protobuf.TextFormat;
 import org.apache.commons.lang.math.LongRange;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
@@ -35,12 +30,17 @@ import org.apache.hadoop.yarn.proto.YarnProtos.YarnApplicationStateProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetApplicationsRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetApplicationsRequestProtoOrBuilder;
 
-import com.google.protobuf.TextFormat;
+import java.util.EnumSet;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Set;
 
 @Private
 @Unstable
 public class GetApplicationsRequestPBImpl extends GetApplicationsRequest {
-  GetApplicationsRequestProto proto = GetApplicationsRequestProto.getDefaultInstance();
+  GetApplicationsRequestProto proto =
+      GetApplicationsRequestProto.getDefaultInstance();
   GetApplicationsRequestProto.Builder builder = null;
   boolean viaProto = false;
 
@@ -70,8 +70,9 @@ public class GetApplicationsRequestPBImpl extends GetApplicationsRequest {
   }
 
   private void mergeLocalToProto() {
-    if (viaProto)
+    if (viaProto) {
       maybeInitBuilder();
+    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
@@ -91,8 +92,8 @@ public class GetApplicationsRequestPBImpl extends GetApplicationsRequest {
             public Iterator<YarnApplicationStateProto> iterator() {
               return new Iterator<YarnApplicationStateProto>() {
 
-                Iterator<YarnApplicationState> iter = applicationStates
-                    .iterator();
+                Iterator<YarnApplicationState> iter =
+                    applicationStates.iterator();
 
                 @Override
                 public boolean hasNext() {
@@ -126,8 +127,9 @@ public class GetApplicationsRequestPBImpl extends GetApplicationsRequest {
   private void addLocalApplicationTypesToProto() {
     maybeInitBuilder();
     builder.clearApplicationTypes();
-    if (this.applicationTypes == null)
+    if (this.applicationTypes == null) {
       return;
+    }
     builder.addAllApplicationTypes(applicationTypes);
   }
 
@@ -191,8 +193,9 @@ public class GetApplicationsRequestPBImpl extends GetApplicationsRequest {
   @Override
   public void setApplicationTypes(Set<String> applicationTypes) {
     maybeInitBuilder();
-    if (applicationTypes == null)
+    if (applicationTypes == null) {
       builder.clearApplicationTypes();
+    }
     this.applicationTypes = applicationTypes;
   }
 
@@ -255,7 +258,8 @@ public class GetApplicationsRequestPBImpl extends GetApplicationsRequest {
   }
 
   @Override
-  public void setApplicationStates(EnumSet<YarnApplicationState> applicationStates) {
+  public void setApplicationStates(
+      EnumSet<YarnApplicationState> applicationStates) {
     maybeInitBuilder();
     if (applicationStates == null) {
       builder.clearApplicationStates();
@@ -325,7 +329,7 @@ public class GetApplicationsRequestPBImpl extends GetApplicationsRequest {
   @Override
   public LongRange getStartRange() {
     if (this.start == null) {
-      GetApplicationsRequestProtoOrBuilder p = viaProto ? proto: builder;
+      GetApplicationsRequestProtoOrBuilder p = viaProto ? proto : builder;
       if (p.hasStartBegin() || p.hasFinishBegin()) {
         long begin = p.hasStartBegin() ? p.getStartBegin() : 0L;
         long end = p.hasStartEnd() ? p.getStartEnd() : Long.MAX_VALUE;
@@ -348,7 +352,7 @@ public class GetApplicationsRequestPBImpl extends GetApplicationsRequest {
   @Override
   public LongRange getFinishRange() {
     if (this.finish == null) {
-      GetApplicationsRequestProtoOrBuilder p = viaProto ? proto: builder;
+      GetApplicationsRequestProtoOrBuilder p = viaProto ? proto : builder;
       if (p.hasFinishBegin() || p.hasFinishEnd()) {
         long begin = p.hasFinishBegin() ? p.getFinishBegin() : 0L;
         long end = p.hasFinishEnd() ? p.getFinishEnd() : Long.MAX_VALUE;
@@ -374,8 +378,9 @@ public class GetApplicationsRequestPBImpl extends GetApplicationsRequest {
 
   @Override
   public boolean equals(Object other) {
-    if (other == null)
+    if (other == null) {
       return false;
+    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }

@@ -26,12 +26,12 @@ import org.apache.hadoop.yarn.api.records.ApplicationReport;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * <p>The request sent by a client to the <code>ResourceManager</code> to 
+ * <p>The request sent by a client to the <code>ResourceManager</code> to
  * get an {@link ApplicationReport} for an application.</p>
- * 
- * <p>The request should include the {@link ApplicationId} of the 
+ * <p/>
+ * <p>The request should include the {@link ApplicationId} of the
  * application.</p>
- * 
+ *
  * @see ApplicationClientProtocol#getApplicationReport(GetApplicationReportRequest)
  * @see ApplicationReport
  */
@@ -51,6 +51,7 @@ public abstract class GetApplicationReportRequest {
 
   /**
    * Get the <code>ApplicationId</code> of the application.
+   *
    * @return <code>ApplicationId</code> of the application
    */
   @Public
@@ -59,7 +60,9 @@ public abstract class GetApplicationReportRequest {
   
   /**
    * Set the <code>ApplicationId</code> of the application
-   * @param applicationId <code>ApplicationId</code> of the application
+   *
+   * @param applicationId
+   *     <code>ApplicationId</code> of the application
    */
   @Public
   @Stable

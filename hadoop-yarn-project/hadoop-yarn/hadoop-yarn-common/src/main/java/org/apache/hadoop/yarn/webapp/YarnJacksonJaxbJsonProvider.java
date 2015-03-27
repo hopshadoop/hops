@@ -18,9 +18,7 @@
 
 package org.apache.hadoop.yarn.webapp;
 
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.ext.Provider;
-
+import com.google.inject.Singleton;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.codehaus.jackson.jaxrs.JacksonJaxbJsonProvider;
@@ -29,7 +27,8 @@ import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.map.annotate.JsonSerialize.Inclusion;
 import org.codehaus.jackson.xc.JaxbAnnotationIntrospector;
 
-import com.google.inject.Singleton;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.ext.Provider;
 
 /**
  * YARN's implementation of JAX-RS abstractions based on

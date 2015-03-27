@@ -18,6 +18,13 @@
 
 package org.apache.hadoop.yarn.util;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Splitter;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience.Public;
+import org.apache.hadoop.classification.InterfaceStability.Unstable;
+
 import java.io.File;
 import java.io.FilenameFilter;
 import java.net.MalformedURLException;
@@ -25,14 +32,6 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.List;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Unstable;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Splitter;
 
 /**
  * A {@link URLClassLoader} for YARN application isolation. Classes from
@@ -43,15 +42,15 @@ import com.google.common.base.Splitter;
 public class ApplicationClassLoader extends URLClassLoader {
 
   private static final Log LOG =
-    LogFactory.getLog(ApplicationClassLoader.class.getName());
+      LogFactory.getLog(ApplicationClassLoader.class.getName());
   
   private static final FilenameFilter JAR_FILENAME_FILTER =
-    new FilenameFilter() {
-      @Override
-      public boolean accept(File dir, String name) {
-        return name.endsWith(".jar") || name.endsWith(".JAR");
-      }
-  };
+      new FilenameFilter() {
+        @Override
+        public boolean accept(File dir, String name) {
+          return name.endsWith(".jar") || name.endsWith(".JAR");
+        }
+      };
   
   private ClassLoader parent;
   private List<String> systemClasses;
@@ -99,22 +98,22 @@ public class ApplicationClassLoader extends URLClassLoader {
     URL url = null;
     
     if (!isSystemClass(name, systemClasses)) {
-      url= findResource(name);
+      url = findResource(name);
       if (url == null && name.startsWith("/")) {
         if (LOG.isDebugEnabled()) {
           LOG.debug("Remove leading / off " + name);
         }
-        url= findResource(name.substring(1));
+        url = findResource(name.substring(1));
       }
     }
 
     if (url == null) {
-      url= parent.getResource(name);
+      url = parent.getResource(name);
     }
 
     if (url != null) {
       if (LOG.isDebugEnabled()) {
-        LOG.debug("getResource("+name+")=" + url);
+        LOG.debug("getResource(" + name + ")=" + url);
       }
     }
     
@@ -177,7 +176,7 @@ public class ApplicationClassLoader extends URLClassLoader {
     if (systemClasses != null) {
       String canonicalName = name.replace('/', '.');
       while (canonicalName.startsWith(".")) {
-        canonicalName=canonicalName.substring(1);
+        canonicalName = canonicalName.substring(1);
       }
       for (String c : systemClasses) {
         boolean result = true;

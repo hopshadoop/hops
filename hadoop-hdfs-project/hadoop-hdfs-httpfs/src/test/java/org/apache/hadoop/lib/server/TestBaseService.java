@@ -18,14 +18,14 @@
 
 package org.apache.hadoop.lib.server;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.test.HTestCase;
 import org.junit.Test;
 import org.mockito.Mockito;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 public class TestBaseService extends HTestCase {
 
@@ -59,8 +59,10 @@ public class TestBaseService extends HTestCase {
     conf.set("server.myservice.foo", "FOO");
     conf.set("server.myservice1.bar", "BAR");
     Mockito.when(server.getConfig()).thenReturn(conf);
-    Mockito.when(server.getPrefixedName("myservice.foo")).thenReturn("server.myservice.foo");
-    Mockito.when(server.getPrefixedName("myservice.")).thenReturn("server.myservice.");
+    Mockito.when(server.getPrefixedName("myservice.foo"))
+        .thenReturn("server.myservice.foo");
+    Mockito.when(server.getPrefixedName("myservice."))
+        .thenReturn("server.myservice.");
 
     service.init(server);
     assertEquals(service.getPrefixedName("foo"), "server.myservice.foo");

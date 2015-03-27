@@ -1,36 +1,23 @@
 /**
-* Licensed to the Apache Software Foundation (ASF) under one
-* or more contributor license agreements.  See the NOTICE file
-* distributed with this work for additional information
-* regarding copyright ownership.  The ASF licenses this file
-* to you under the Apache License, Version 2.0 (the
-* "License"); you may not use this file except in compliance
-* with the License.  You may obtain a copy of the License at
-*
-*     http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair;
 
-import java.io.File;
-import java.io.IOException;
-import java.net.URL;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
-
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
@@ -51,16 +38,29 @@ import org.w3c.dom.NodeList;
 import org.w3c.dom.Text;
 import org.xml.sax.SAXException;
 
-import com.google.common.annotations.VisibleForTesting;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import java.io.File;
+import java.io.IOException;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Public
 @Unstable
 public class AllocationFileLoaderService extends AbstractService {
   
-  public static final Log LOG = LogFactory.getLog(
-      AllocationFileLoaderService.class.getName());
+  public static final Log LOG =
+      LogFactory.getLog(AllocationFileLoaderService.class.getName());
   
-  /** Time to wait between checks of the allocation file */
+  /**
+   * Time to wait between checks of the allocation file
+   */
   public static final long ALLOC_RELOAD_INTERVAL_MS = 10 * 1000;
 
   /**
@@ -71,7 +71,8 @@ public class AllocationFileLoaderService extends AbstractService {
   
   private final Clock clock;
 
-  private long lastSuccessfulReload; // Last time we successfully reloaded queues
+  private long lastSuccessfulReload;
+      // Last time we successfully reloaded queues
   private boolean lastReloadAttemptFailed = false;
   
   // Path to XML file containing allocations. 
@@ -125,7 +126,8 @@ public class AllocationFileLoaderService extends AbstractService {
           } else if (lastModified == 0l) {
             if (!lastReloadAttemptFailed) {
               LOG.warn("Failed to reload fair scheduler config file because" +
-                  " last modified returned 0. File exists: " + allocFile.exists());
+                  " last modified returned 0. File exists: " +
+                  allocFile.exists());
             }
             lastReloadAttemptFailed = true;
           }
@@ -166,8 +168,8 @@ public class AllocationFileLoaderService extends AbstractService {
         LOG.warn(allocFilePath + " not found on the classpath.");
         allocFile = null;
       } else if (!url.getProtocol().equalsIgnoreCase("file")) {
-        throw new RuntimeException("Allocation file " + url
-            + " found on the classpath is not on the local filesystem.");
+        throw new RuntimeException("Allocation file " + url +
+            " found on the classpath is not on the local filesystem.");
       } else {
         allocFile = new File(url.getPath());
       }
@@ -183,13 +185,18 @@ public class AllocationFileLoaderService extends AbstractService {
    * Updates the allocation list from the allocation config file. This file is
    * expected to be in the XML format specified in the design doc.
    *
-   * @throws IOException if the config file cannot be read.
-   * @throws AllocationConfigurationException if allocations are invalid.
-   * @throws ParserConfigurationException if XML parser is misconfigured.
-   * @throws SAXException if config file is malformed.
+   * @throws IOException
+   *     if the config file cannot be read.
+   * @throws AllocationConfigurationException
+   *     if allocations are invalid.
+   * @throws ParserConfigurationException
+   *     if XML parser is misconfigured.
+   * @throws SAXException
+   *     if config file is malformed.
    */
-  public synchronized void reloadAllocations() throws IOException,
-      ParserConfigurationException, SAXException, AllocationConfigurationException {
+  public synchronized void reloadAllocations()
+      throws IOException, ParserConfigurationException, SAXException,
+      AllocationConfigurationException {
     if (allocFile == null) {
       return;
     }
@@ -200,8 +207,10 @@ public class AllocationFileLoaderService extends AbstractService {
     Map<String, Resource> maxQueueResources = new HashMap<String, Resource>();
     Map<String, Integer> queueMaxApps = new HashMap<String, Integer>();
     Map<String, Integer> userMaxApps = new HashMap<String, Integer>();
-    Map<String, ResourceWeights> queueWeights = new HashMap<String, ResourceWeights>();
-    Map<String, SchedulingPolicy> queuePolicies = new HashMap<String, SchedulingPolicy>();
+    Map<String, ResourceWeights> queueWeights =
+        new HashMap<String, ResourceWeights>();
+    Map<String, SchedulingPolicy> queuePolicies =
+        new HashMap<String, SchedulingPolicy>();
     Map<String, Long> minSharePreemptionTimeouts = new HashMap<String, Long>();
     Map<String, Map<QueueACL, AccessControlList>> queueAcls =
         new HashMap<String, Map<QueueACL, AccessControlList>>();
@@ -218,57 +227,61 @@ public class AllocationFileLoaderService extends AbstractService {
 
     // Read and parse the allocations file.
     DocumentBuilderFactory docBuilderFactory =
-      DocumentBuilderFactory.newInstance();
+        DocumentBuilderFactory.newInstance();
     docBuilderFactory.setIgnoringComments(true);
     DocumentBuilder builder = docBuilderFactory.newDocumentBuilder();
     Document doc = builder.parse(allocFile);
     Element root = doc.getDocumentElement();
-    if (!"allocations".equals(root.getTagName()))
+    if (!"allocations".equals(root.getTagName())) {
       throw new AllocationConfigurationException("Bad fair scheduler config " +
           "file: top-level element not <allocations>");
+    }
     NodeList elements = root.getChildNodes();
     List<Element> queueElements = new ArrayList<Element>();
     Element placementPolicyElement = null;
     for (int i = 0; i < elements.getLength(); i++) {
       Node node = elements.item(i);
       if (node instanceof Element) {
-        Element element = (Element)node;
+        Element element = (Element) node;
         if ("queue".equals(element.getTagName()) ||
-          "pool".equals(element.getTagName())) {
+            "pool".equals(element.getTagName())) {
           queueElements.add(element);
         } else if ("user".equals(element.getTagName())) {
           String userName = element.getAttribute("name");
           NodeList fields = element.getChildNodes();
           for (int j = 0; j < fields.getLength(); j++) {
             Node fieldNode = fields.item(j);
-            if (!(fieldNode instanceof Element))
+            if (!(fieldNode instanceof Element)) {
               continue;
+            }
             Element field = (Element) fieldNode;
             if ("maxRunningApps".equals(field.getTagName())) {
-              String text = ((Text)field.getFirstChild()).getData().trim();
+              String text = ((Text) field.getFirstChild()).getData().trim();
               int val = Integer.parseInt(text);
               userMaxApps.put(userName, val);
             }
           }
         } else if ("userMaxAppsDefault".equals(element.getTagName())) {
-          String text = ((Text)element.getFirstChild()).getData().trim();
+          String text = ((Text) element.getFirstChild()).getData().trim();
           int val = Integer.parseInt(text);
           userMaxAppsDefault = val;
         } else if ("fairSharePreemptionTimeout".equals(element.getTagName())) {
-          String text = ((Text)element.getFirstChild()).getData().trim();
+          String text = ((Text) element.getFirstChild()).getData().trim();
           long val = Long.parseLong(text) * 1000L;
           fairSharePreemptionTimeout = val;
-        } else if ("defaultMinSharePreemptionTimeout".equals(element.getTagName())) {
-          String text = ((Text)element.getFirstChild()).getData().trim();
+        } else if ("defaultMinSharePreemptionTimeout"
+            .equals(element.getTagName())) {
+          String text = ((Text) element.getFirstChild()).getData().trim();
           long val = Long.parseLong(text) * 1000L;
           defaultMinSharePreemptionTimeout = val;
         } else if ("queueMaxAppsDefault".equals(element.getTagName())) {
-          String text = ((Text)element.getFirstChild()).getData().trim();
+          String text = ((Text) element.getFirstChild()).getData().trim();
           int val = Integer.parseInt(text);
           queueMaxAppsDefault = val;
-        } else if ("defaultQueueSchedulingPolicy".equals(element.getTagName())
-            || "defaultQueueSchedulingMode".equals(element.getTagName())) {
-          String text = ((Text)element.getFirstChild()).getData().trim();
+        } else if (
+            "defaultQueueSchedulingPolicy".equals(element.getTagName()) ||
+                "defaultQueueSchedulingMode".equals(element.getTagName())) {
+          String text = ((Text) element.getFirstChild()).getData().trim();
           defaultSchedPolicy = SchedulingPolicy.parse(text);
         } else if ("queuePlacementPolicy".equals(element.getTagName())) {
           placementPolicyElement = element;
@@ -284,31 +297,34 @@ public class AllocationFileLoaderService extends AbstractService {
       String parent = "root";
       if (element.getAttribute("name").equalsIgnoreCase("root")) {
         if (queueElements.size() > 1) {
-          throw new AllocationConfigurationException("If configuring root queue,"
-              + " no other queues can be placed alongside it.");
+          throw new AllocationConfigurationException(
+              "If configuring root queue," +
+                  " no other queues can be placed alongside it.");
         }
         parent = null;
       }
-      loadQueue(parent, element, minQueueResources, maxQueueResources, queueMaxApps,
-          userMaxApps, queueWeights, queuePolicies, minSharePreemptionTimeouts,
-          queueAcls, queueNamesInAllocFile);
+      loadQueue(parent, element, minQueueResources, maxQueueResources,
+          queueMaxApps, userMaxApps, queueWeights, queuePolicies,
+          minSharePreemptionTimeouts, queueAcls, queueNamesInAllocFile);
     }
     
     // Load placement policy and pass it configured queues
     Configuration conf = getConfig();
     if (placementPolicyElement != null) {
-      newPlacementPolicy = QueuePlacementPolicy.fromXml(placementPolicyElement,
-          queueNamesInAllocFile, conf);
+      newPlacementPolicy = QueuePlacementPolicy
+          .fromXml(placementPolicyElement, queueNamesInAllocFile, conf);
     } else {
-      newPlacementPolicy = QueuePlacementPolicy.fromConfiguration(conf,
-          queueNamesInAllocFile);
+      newPlacementPolicy =
+          QueuePlacementPolicy.fromConfiguration(conf, queueNamesInAllocFile);
     }
     
-    AllocationConfiguration info = new AllocationConfiguration(minQueueResources, maxQueueResources,
-        queueMaxApps, userMaxApps, queueWeights, userMaxAppsDefault,
-        queueMaxAppsDefault, queuePolicies, defaultSchedPolicy, minSharePreemptionTimeouts,
-        queueAcls, fairSharePreemptionTimeout, defaultMinSharePreemptionTimeout,
-        newPlacementPolicy, queueNamesInAllocFile);
+    AllocationConfiguration info =
+        new AllocationConfiguration(minQueueResources, maxQueueResources,
+            queueMaxApps, userMaxApps, queueWeights, userMaxAppsDefault,
+            queueMaxAppsDefault, queuePolicies, defaultSchedPolicy,
+            minSharePreemptionTimeouts, queueAcls, fairSharePreemptionTimeout,
+            defaultMinSharePreemptionTimeout, newPlacementPolicy,
+            queueNamesInAllocFile);
     
     lastSuccessfulReload = clock.getTime();
     lastReloadAttemptFailed = false;
@@ -319,12 +335,15 @@ public class AllocationFileLoaderService extends AbstractService {
   /**
    * Loads a queue from a queue element in the configuration file
    */
-  private void loadQueue(String parentName, Element element, Map<String, Resource> minQueueResources,
-      Map<String, Resource> maxQueueResources, Map<String, Integer> queueMaxApps,
-      Map<String, Integer> userMaxApps, Map<String, ResourceWeights> queueWeights,
+  private void loadQueue(String parentName, Element element,
+      Map<String, Resource> minQueueResources,
+      Map<String, Resource> maxQueueResources,
+      Map<String, Integer> queueMaxApps, Map<String, Integer> userMaxApps,
+      Map<String, ResourceWeights> queueWeights,
       Map<String, SchedulingPolicy> queuePolicies,
       Map<String, Long> minSharePreemptionTimeouts,
-      Map<String, Map<QueueACL, AccessControlList>> queueAcls, Set<String> queueNamesInAllocFile) 
+      Map<String, Map<QueueACL, AccessControlList>> queueAcls,
+      Set<String> queueNamesInAllocFile)
       throws AllocationConfigurationException {
     String queueName = element.getAttribute("name");
     if (parentName != null) {
@@ -337,46 +356,48 @@ public class AllocationFileLoaderService extends AbstractService {
 
     for (int j = 0; j < fields.getLength(); j++) {
       Node fieldNode = fields.item(j);
-      if (!(fieldNode instanceof Element))
+      if (!(fieldNode instanceof Element)) {
         continue;
+      }
       Element field = (Element) fieldNode;
       if ("minResources".equals(field.getTagName())) {
-        String text = ((Text)field.getFirstChild()).getData().trim();
-        Resource val = FairSchedulerConfiguration.parseResourceConfigValue(text);
+        String text = ((Text) field.getFirstChild()).getData().trim();
+        Resource val =
+            FairSchedulerConfiguration.parseResourceConfigValue(text);
         minQueueResources.put(queueName, val);
       } else if ("maxResources".equals(field.getTagName())) {
-        String text = ((Text)field.getFirstChild()).getData().trim();
-        Resource val = FairSchedulerConfiguration.parseResourceConfigValue(text);
+        String text = ((Text) field.getFirstChild()).getData().trim();
+        Resource val =
+            FairSchedulerConfiguration.parseResourceConfigValue(text);
         maxQueueResources.put(queueName, val);
       } else if ("maxRunningApps".equals(field.getTagName())) {
-        String text = ((Text)field.getFirstChild()).getData().trim();
+        String text = ((Text) field.getFirstChild()).getData().trim();
         int val = Integer.parseInt(text);
         queueMaxApps.put(queueName, val);
       } else if ("weight".equals(field.getTagName())) {
-        String text = ((Text)field.getFirstChild()).getData().trim();
+        String text = ((Text) field.getFirstChild()).getData().trim();
         double val = Double.parseDouble(text);
-        queueWeights.put(queueName, new ResourceWeights((float)val));
+        queueWeights.put(queueName, new ResourceWeights((float) val));
       } else if ("minSharePreemptionTimeout".equals(field.getTagName())) {
-        String text = ((Text)field.getFirstChild()).getData().trim();
+        String text = ((Text) field.getFirstChild()).getData().trim();
         long val = Long.parseLong(text) * 1000L;
         minSharePreemptionTimeouts.put(queueName, val);
-      } else if ("schedulingPolicy".equals(field.getTagName())
-          || "schedulingMode".equals(field.getTagName())) {
-        String text = ((Text)field.getFirstChild()).getData().trim();
+      } else if ("schedulingPolicy".equals(field.getTagName()) ||
+          "schedulingMode".equals(field.getTagName())) {
+        String text = ((Text) field.getFirstChild()).getData().trim();
         SchedulingPolicy policy = SchedulingPolicy.parse(text);
         queuePolicies.put(queueName, policy);
       } else if ("aclSubmitApps".equals(field.getTagName())) {
-        String text = ((Text)field.getFirstChild()).getData();
+        String text = ((Text) field.getFirstChild()).getData();
         acls.put(QueueACL.SUBMIT_APPLICATIONS, new AccessControlList(text));
       } else if ("aclAdministerApps".equals(field.getTagName())) {
-        String text = ((Text)field.getFirstChild()).getData();
+        String text = ((Text) field.getFirstChild()).getData();
         acls.put(QueueACL.ADMINISTER_QUEUE, new AccessControlList(text));
-      } else if ("queue".endsWith(field.getTagName()) || 
+      } else if ("queue".endsWith(field.getTagName()) ||
           "pool".equals(field.getTagName())) {
         loadQueue(queueName, field, minQueueResources, maxQueueResources,
             queueMaxApps, userMaxApps, queueWeights, queuePolicies,
-            minSharePreemptionTimeouts,
-            queueAcls, queueNamesInAllocFile);
+            minSharePreemptionTimeouts, queueAcls, queueNamesInAllocFile);
         isLeaf = false;
       }
     }
@@ -384,11 +405,14 @@ public class AllocationFileLoaderService extends AbstractService {
       queueNamesInAllocFile.add(queueName);
     }
     queueAcls.put(queueName, acls);
-    if (maxQueueResources.containsKey(queueName) && minQueueResources.containsKey(queueName)
-        && !Resources.fitsIn(minQueueResources.get(queueName),
+    if (maxQueueResources.containsKey(queueName) &&
+        minQueueResources.containsKey(queueName) && !Resources
+        .fitsIn(minQueueResources.get(queueName),
             maxQueueResources.get(queueName))) {
-      LOG.warn(String.format("Queue %s has max resources %s less than min resources %s",
-          queueName, maxQueueResources.get(queueName), minQueueResources.get(queueName)));
+      LOG.warn(String
+          .format("Queue %s has max resources %s less than min resources %s",
+              queueName, maxQueueResources.get(queueName),
+              minQueueResources.get(queueName)));
     }
   }
   

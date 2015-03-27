@@ -30,49 +30,59 @@ public interface DelegationTokenManager {
   /**
    * Creates a delegation token.
    *
-   * @param ugi UGI creating the token.
-   * @param renewer token renewer.
+   * @param ugi
+   *     UGI creating the token.
+   * @param renewer
+   *     token renewer.
    * @return new delegation token.
-   * @throws DelegationTokenManagerException thrown if the token could not be
-   * created.
+   * @throws DelegationTokenManagerException
+   *     thrown if the token could not be
+   *     created.
    */
   public Token<DelegationTokenIdentifier> createToken(UserGroupInformation ugi,
-                                                      String renewer)
-    throws DelegationTokenManagerException;
+      String renewer) throws DelegationTokenManagerException;
 
   /**
    * Renews a delegation token.
    *
-   * @param token delegation token to renew.
-   * @param renewer token renewer.
+   * @param token
+   *     delegation token to renew.
+   * @param renewer
+   *     token renewer.
    * @return epoc expiration time.
-   * @throws DelegationTokenManagerException thrown if the token could not be
-   * renewed.
+   * @throws DelegationTokenManagerException
+   *     thrown if the token could not be
+   *     renewed.
    */
   public long renewToken(Token<DelegationTokenIdentifier> token, String renewer)
-    throws DelegationTokenManagerException;
+      throws DelegationTokenManagerException;
 
   /**
    * Cancels a delegation token.
    *
-   * @param token delegation token to cancel.
-   * @param canceler token canceler.
-   * @throws DelegationTokenManagerException thrown if the token could not be
-   * canceled.
+   * @param token
+   *     delegation token to cancel.
+   * @param canceler
+   *     token canceler.
+   * @throws DelegationTokenManagerException
+   *     thrown if the token could not be
+   *     canceled.
    */
   public void cancelToken(Token<DelegationTokenIdentifier> token,
-                          String canceler)
-    throws DelegationTokenManagerException;
+      String canceler) throws DelegationTokenManagerException;
 
   /**
    * Verifies a delegation token.
    *
-   * @param token delegation token to verify.
+   * @param token
+   *     delegation token to verify.
    * @return the UGI for the token.
-   * @throws DelegationTokenManagerException thrown if the token could not be
-   * verified.
+   * @throws DelegationTokenManagerException
+   *     thrown if the token could not be
+   *     verified.
    */
-  public UserGroupInformation verifyToken(Token<DelegationTokenIdentifier> token)
-    throws DelegationTokenManagerException;
+  public UserGroupInformation verifyToken(
+      Token<DelegationTokenIdentifier> token)
+      throws DelegationTokenManagerException;
 
 }

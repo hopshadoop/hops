@@ -17,9 +17,13 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair;
 
-import static org.junit.Assert.assertEquals;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import io.hops.metadata.util.RMStorageFactory;
+import io.hops.metadata.util.YarnAPIStorageFactory;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
+import org.apache.hadoop.yarn.api.records.ApplicationId;
+import org.junit.Before;
+import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -27,11 +31,9 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
-import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.junit.Before;
-import org.junit.Test;
+import static org.junit.Assert.assertEquals;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 public class TestMaxRunningAppsEnforcer {
   private QueueManager queueManager;
@@ -46,11 +48,9 @@ public class TestMaxRunningAppsEnforcer {
     Configuration conf = new Configuration();
     clock = new TestFairScheduler.MockClock();
     FairScheduler scheduler = mock(FairScheduler.class);
-    when(scheduler.getConf()).thenReturn(
-        new FairSchedulerConfiguration(conf));
+    when(scheduler.getConf()).thenReturn(new FairSchedulerConfiguration(conf));
     when(scheduler.getClock()).thenReturn(clock);
-    AllocationConfiguration allocConf = new AllocationConfiguration(
-        conf);
+    AllocationConfiguration allocConf = new AllocationConfiguration(conf);
     when(scheduler.getAllocationConfiguration()).thenReturn(allocConf);
     
     queueManager = new QueueManager(scheduler);
@@ -59,6 +59,9 @@ public class TestMaxRunningAppsEnforcer {
     userMaxApps = allocConf.userMaxApps;
     maxAppsEnforcer = new MaxRunningAppsEnforcer(scheduler);
     appNum = 0;
+    
+    YarnAPIStorageFactory.setConfiguration(conf);
+    RMStorageFactory.setConfiguration(conf);
   }
   
   private FSSchedulerApp addApp(FSLeafQueue queue, String user) {
@@ -102,8 +105,10 @@ public class TestMaxRunningAppsEnforcer {
   
   @Test
   public void testRemoveEnablesAppOnCousinQueue() {
-    FSLeafQueue leaf1 = queueManager.getLeafQueue("root.queue1.subqueue1.leaf1", true);
-    FSLeafQueue leaf2 = queueManager.getLeafQueue("root.queue1.subqueue2.leaf2", true);
+    FSLeafQueue leaf1 =
+        queueManager.getLeafQueue("root.queue1.subqueue1.leaf1", true);
+    FSLeafQueue leaf2 =
+        queueManager.getLeafQueue("root.queue1.subqueue2.leaf2", true);
     queueMaxApps.put("root.queue1", 2);
     FSSchedulerApp app1 = addApp(leaf1, "user");
     addApp(leaf2, "user");
@@ -139,8 +144,10 @@ public class TestMaxRunningAppsEnforcer {
   
   @Test
   public void testRemoveEnablingOrderedByStartTime() {
-    FSLeafQueue leaf1 = queueManager.getLeafQueue("root.queue1.subqueue1.leaf1", true);
-    FSLeafQueue leaf2 = queueManager.getLeafQueue("root.queue1.subqueue2.leaf2", true);
+    FSLeafQueue leaf1 =
+        queueManager.getLeafQueue("root.queue1.subqueue1.leaf1", true);
+    FSLeafQueue leaf2 =
+        queueManager.getLeafQueue("root.queue1.subqueue2.leaf2", true);
     queueMaxApps.put("root.queue1", 2);
     FSSchedulerApp app1 = addApp(leaf1, "user");
     addApp(leaf2, "user");
@@ -159,8 +166,10 @@ public class TestMaxRunningAppsEnforcer {
   
   @Test
   public void testMultipleAppsWaitingOnCousinQueue() {
-    FSLeafQueue leaf1 = queueManager.getLeafQueue("root.queue1.subqueue1.leaf1", true);
-    FSLeafQueue leaf2 = queueManager.getLeafQueue("root.queue1.subqueue2.leaf2", true);
+    FSLeafQueue leaf1 =
+        queueManager.getLeafQueue("root.queue1.subqueue1.leaf1", true);
+    FSLeafQueue leaf2 =
+        queueManager.getLeafQueue("root.queue1.subqueue2.leaf2", true);
     queueMaxApps.put("root.queue1", 2);
     FSSchedulerApp app1 = addApp(leaf1, "user");
     addApp(leaf2, "user");

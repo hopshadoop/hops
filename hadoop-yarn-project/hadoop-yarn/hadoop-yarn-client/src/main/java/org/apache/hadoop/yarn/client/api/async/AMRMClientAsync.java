@@ -1,28 +1,24 @@
 /**
-* Licensed to the Apache Software Foundation (ASF) under one
-* or more contributor license agreements.  See the NOTICE file
-* distributed with this work for additional information
-* regarding copyright ownership.  The ASF licenses this file
-* to you under the Apache License, Version 2.0 (the
-* "License"); you may not use this file except in compliance
-* with the License.  You may obtain a copy of the License at
-*
-*     http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package org.apache.hadoop.yarn.client.api.async;
 
-import java.io.IOException;
-import java.util.Collection;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
-
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Stable;
@@ -41,14 +37,18 @@ import org.apache.hadoop.yarn.client.api.async.impl.AMRMClientAsyncImpl;
 import org.apache.hadoop.yarn.client.api.impl.AMRMClientImpl;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 
-import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
+import java.util.Collection;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * <code>AMRMClientAsync</code> handles communication with the ResourceManager
- * and provides asynchronous updates on events such as container allocations and
+ * and provides asynchronous updates on events such as container allocations
+ * and
  * completions.  It contains a thread that sends periodic heartbeats to the
  * ResourceManager.
- * 
+ * <p/>
  * It should be used by implementing a CallbackHandler:
  * <pre>
  * {@code
@@ -56,23 +56,23 @@ import com.google.common.annotations.VisibleForTesting;
  *   public void onContainersAllocated(List<Container> containers) {
  *     [run tasks on the containers]
  *   }
- *   
+ *
  *   public void onContainersCompleted(List<ContainerStatus> statuses) {
  *     [update progress, check whether app is done]
  *   }
- *   
+ *
  *   public void onNodesUpdated(List<NodeReport> updated) {}
- *   
+ *
  *   public void onReboot() {}
  * }
  * }
  * </pre>
- * 
+ * <p/>
  * The client's lifecycle should be managed similarly to the following:
- * 
+ * <p/>
  * <pre>
  * {@code
- * AMRMClientAsync asyncClient = 
+ * AMRMClientAsync asyncClient =
  *     createAMRMClientAsync(appAttId, 1000, new MyCallbackhandler());
  * asyncClient.init(conf);
  * asyncClient.start();
@@ -88,21 +88,20 @@ import com.google.common.annotations.VisibleForTesting;
  */
 @Public
 @Stable
-public abstract class AMRMClientAsync<T extends ContainerRequest> 
-extends AbstractService {
+public abstract class AMRMClientAsync<T extends ContainerRequest>
+    extends AbstractService {
   
   protected final AMRMClient<T> client;
   protected final CallbackHandler handler;
   protected final AtomicInteger heartbeatIntervalMs = new AtomicInteger();
 
-  public static <T extends ContainerRequest> AMRMClientAsync<T>
-      createAMRMClientAsync(int intervalMs, CallbackHandler callbackHandler) {
+  public static <T extends ContainerRequest> AMRMClientAsync<T> createAMRMClientAsync(
+      int intervalMs, CallbackHandler callbackHandler) {
     return new AMRMClientAsyncImpl<T>(intervalMs, callbackHandler);
   }
   
-  public static <T extends ContainerRequest> AMRMClientAsync<T>
-      createAMRMClientAsync(AMRMClient<T> client, int intervalMs,
-          CallbackHandler callbackHandler) {
+  public static <T extends ContainerRequest> AMRMClientAsync<T> createAMRMClientAsync(
+      AMRMClient<T> client, int intervalMs, CallbackHandler callbackHandler) {
     return new AMRMClientAsyncImpl<T>(client, intervalMs, callbackHandler);
   }
   
@@ -119,19 +118,18 @@ extends AbstractService {
     this.heartbeatIntervalMs.set(intervalMs);
     this.handler = callbackHandler;
   }
-    
+
   public void setHeartbeatInterval(int interval) {
     heartbeatIntervalMs.set(interval);
   }
   
   public abstract List<? extends Collection<T>> getMatchingRequests(
-                                                   Priority priority, 
-                                                   String resourceName, 
-                                                   Resource capability);
+      Priority priority, String resourceName, Resource capability);
   
   /**
    * Registers this application master with the resource manager. On successful
    * registration, starts the heartbeating thread.
+   *
    * @throws YarnException
    * @throws IOException
    */
@@ -141,28 +139,36 @@ extends AbstractService {
 
   /**
    * Unregister the application master. This must be called in the end.
-   * @param appStatus Success/Failure status of the master
-   * @param appMessage Diagnostics message on failure
-   * @param appTrackingUrl New URL to get master info
+   *
+   * @param appStatus
+   *     Success/Failure status of the master
+   * @param appMessage
+   *     Diagnostics message on failure
+   * @param appTrackingUrl
+   *     New URL to get master info
    * @throws YarnException
    * @throws IOException
    */
   public abstract void unregisterApplicationMaster(
-      FinalApplicationStatus appStatus, String appMessage, String appTrackingUrl) 
-  throws YarnException, IOException;
+      FinalApplicationStatus appStatus, String appMessage,
+      String appTrackingUrl) throws YarnException, IOException;
 
   /**
    * Request containers for resources before calling <code>allocate</code>
-   * @param req Resource request
+   *
+   * @param req
+   *     Resource request
    */
   public abstract void addContainerRequest(T req);
 
   /**
-   * Remove previous container request. The previous container request may have 
-   * already been sent to the ResourceManager. So even after the remove request 
-   * the app must be prepared to receive an allocation for the previous request 
+   * Remove previous container request. The previous container request may have
+   * already been sent to the ResourceManager. So even after the remove request
+   * the app must be prepared to receive an allocation for the previous request
    * even after the remove request
-   * @param req Resource request
+   *
+   * @param req
+   *     Resource request
    */
   public abstract void removeContainerRequest(T req);
 
@@ -171,6 +177,7 @@ extends AbstractService {
    * the container or wants to give up the container then it can release them.
    * The app needs to make new requests for the released resource capability if
    * it still needs it. eg. it released non-local resources
+   *
    * @param containerId
    */
   public abstract void releaseAssignedContainer(ContainerId containerId);
@@ -178,6 +185,7 @@ extends AbstractService {
   /**
    * Get the currently available resources in the cluster.
    * A valid value is available after a call to allocate has been made
+   *
    * @return Currently available resources
    */
   public abstract Resource getAvailableResources();
@@ -185,6 +193,7 @@ extends AbstractService {
   /**
    * Get the current number of nodes in the cluster.
    * A valid values is available after a call to allocate has been made
+   *
    * @return Current number of nodes in the cluster
    */
   public abstract int getClusterNodeCount();

@@ -17,19 +17,18 @@
  */
 package org.apache.hadoop.hdfs.server.datanode.web.resources;
 
-import java.io.IOException;
-import java.io.OutputStream;
-import java.lang.annotation.Annotation;
-import java.lang.reflect.Type;
+import org.apache.hadoop.hdfs.DFSClient;
+import org.apache.hadoop.hdfs.client.HdfsDataInputStream;
+import org.apache.hadoop.io.IOUtils;
 
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.ext.MessageBodyWriter;
 import javax.ws.rs.ext.Provider;
-
-import org.apache.hadoop.hdfs.DFSClient;
-import org.apache.hadoop.hdfs.client.HdfsDataInputStream;
-import org.apache.hadoop.io.IOUtils;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Type;
 
 /**
  * A response entity for a HdfsDataInputStream.
@@ -55,8 +54,8 @@ public class OpenEntity {
     @Override
     public boolean isWriteable(Class<?> clazz, Type genericType,
         Annotation[] annotations, MediaType mediaType) {
-      return clazz == OpenEntity.class
-          && MediaType.APPLICATION_OCTET_STREAM_TYPE.isCompatible(mediaType);
+      return clazz == OpenEntity.class &&
+          MediaType.APPLICATION_OCTET_STREAM_TYPE.isCompatible(mediaType);
     }
 
     @Override
@@ -68,8 +67,8 @@ public class OpenEntity {
     @Override
     public void writeTo(OpenEntity e, Class<?> type, Type genericType,
         Annotation[] annotations, MediaType mediaType,
-        MultivaluedMap<String, Object> httpHeaders, OutputStream out
-        ) throws IOException {
+        MultivaluedMap<String, Object> httpHeaders, OutputStream out)
+        throws IOException {
       try {
         IOUtils.copyBytes(e.in, out, e.length, false);
       } finally {

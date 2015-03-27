@@ -24,22 +24,22 @@ import org.apache.hadoop.classification.InterfaceStability;
  * Base class for a server command.
  * Issued by the name-node to notify other servers what should be done.
  * Commands are defined by actions defined in respective protocols.
- * 
+ *
  * @see DatanodeProtocol
  * @see NamenodeProtocol
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public abstract class ServerCommand {
-  private final int action;
+  private int action;
 
   /**
    * Create a command for the specified action.
    * Actions are protocol specific.
-   * 
+   *
+   * @param action
    * @see DatanodeProtocol
    * @see NamenodeProtocol
-   * @param action
    */
   public ServerCommand(int action) {
     this.action = action;
@@ -47,6 +47,7 @@ public abstract class ServerCommand {
 
   /**
    * Get server command action.
+   *
    * @return action code.
    */
   public int getAction() {

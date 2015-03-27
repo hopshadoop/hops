@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager;
 
-import java.util.concurrent.ConcurrentMap;
-
 import org.apache.hadoop.ha.HAServiceProtocol.HAServiceState;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.NodeId;
@@ -27,6 +25,7 @@ import org.apache.hadoop.yarn.conf.ConfigurationProvider;
 import org.apache.hadoop.yarn.event.Dispatcher;
 import org.apache.hadoop.yarn.server.resourcemanager.ahs.RMApplicationHistoryWriter;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
+import org.apache.hadoop.yarn.server.resourcemanager.recovery.Recoverable;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.AMLivelinessMonitor;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.ContainerAllocationExpirer;
@@ -39,10 +38,13 @@ import org.apache.hadoop.yarn.server.resourcemanager.security.NMTokenSecretManag
 import org.apache.hadoop.yarn.server.resourcemanager.security.RMContainerTokenSecretManager;
 import org.apache.hadoop.yarn.server.resourcemanager.security.RMDelegationTokenSecretManager;
 
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ConcurrentSkipListSet;
+
 /**
  * Context of the ResourceManager.
  */
-public interface RMContext {
+public interface RMContext extends Recoverable {
 
   Dispatcher getDispatcher();
 
@@ -56,8 +58,10 @@ public interface RMContext {
   
   ConcurrentMap<String, RMNode> getInactiveRMNodes();
 
-  ConcurrentMap<NodeId, RMNode> getRMNodes();
+  ConcurrentMap<NodeId, RMNode> getActiveRMNodes();
 
+  ConcurrentSkipListSet<NodeId> getRMNodesToResyncAfterRolback();
+  
   AMLivelinessMonitor getAMLivelinessMonitor();
 
   AMLivelinessMonitor getAMFinishingMonitor();
@@ -80,6 +84,8 @@ public interface RMContext {
 
   AdminService getRMAdminService();
 
+  GroupMembershipService getRMGroupMembershipService();
+  
   ClientRMService getClientRMService();
 
   ApplicationMasterService getApplicationMasterService();

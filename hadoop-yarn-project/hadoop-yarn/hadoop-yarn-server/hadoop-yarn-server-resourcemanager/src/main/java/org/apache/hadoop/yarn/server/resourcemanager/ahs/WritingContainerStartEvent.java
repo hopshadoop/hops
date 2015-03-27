@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.ahs;
 
+import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.server.applicationhistoryservice.records.ContainerStartData;
 
@@ -27,8 +28,8 @@ public class WritingContainerStartEvent extends WritingApplicationHistoryEvent {
   private ContainerStartData containerStart;
 
   public WritingContainerStartEvent(ContainerId containerId,
-      ContainerStartData containerStart) {
-    super(WritingHistoryEventType.CONTAINER_START);
+      ContainerStartData containerStart, TransactionState transactionState) {
+    super(WritingHistoryEventType.CONTAINER_START, transactionState);
     this.containerId = containerId;
     this.containerStart = containerStart;
   }

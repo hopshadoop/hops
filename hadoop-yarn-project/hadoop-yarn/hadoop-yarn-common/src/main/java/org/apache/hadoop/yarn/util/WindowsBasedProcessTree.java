@@ -18,10 +18,6 @@
 
 package org.apache.hadoop.yarn.util;
 
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -29,11 +25,14 @@ import org.apache.hadoop.util.Shell;
 import org.apache.hadoop.util.Shell.ShellCommandExecutor;
 import org.apache.hadoop.util.StringUtils;
 
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+
 @Private
 public class WindowsBasedProcessTree extends ResourceCalculatorProcessTree {
 
-  static final Log LOG = LogFactory
-      .getLog(WindowsBasedProcessTree.class);
+  static final Log LOG = LogFactory.getLog(WindowsBasedProcessTree.class);
   
   static class ProcessInfo {
     String pid; // process pid
@@ -46,21 +45,21 @@ public class WindowsBasedProcessTree extends ResourceCalculatorProcessTree {
   
   private String taskProcessId = null;
   private long cpuTimeMs = 0;
-  private Map<String, ProcessInfo> processTree = 
+  private Map<String, ProcessInfo> processTree =
       new HashMap<String, ProcessInfo>();
-    
+
   public static boolean isAvailable() {
     if (Shell.WINDOWS) {
-      ShellCommandExecutor shellExecutor = new ShellCommandExecutor(
-          new String[] { Shell.WINUTILS, "help" });
+      ShellCommandExecutor shellExecutor =
+          new ShellCommandExecutor(new String[]{Shell.WINUTILS, "help"});
       try {
         shellExecutor.execute();
       } catch (IOException e) {
         LOG.error(StringUtils.stringifyException(e));
       } finally {
         String output = shellExecutor.getOutput();
-        if (output != null &&
-            output.contains("Prints to stdout a list of processes in the task")) {
+        if (output != null && output
+            .contains("Prints to stdout a list of processes in the task")) {
           return true;
         }
       }
@@ -76,7 +75,7 @@ public class WindowsBasedProcessTree extends ResourceCalculatorProcessTree {
   // helper method to override while testing
   String getAllProcessInfoFromShell() {
     ShellCommandExecutor shellExecutor = new ShellCommandExecutor(
-        new String[] { Shell.WINUTILS, "task", "processList", taskProcessId });
+        new String[]{Shell.WINUTILS, "task", "processList", taskProcessId});
     try {
       shellExecutor.execute();
       return shellExecutor.getOutput();
@@ -88,6 +87,7 @@ public class WindowsBasedProcessTree extends ResourceCalculatorProcessTree {
 
   /**
    * Parses string of process info lines into ProcessInfo objects
+   *
    * @param processesInfoStr
    * @return Map of pid string to ProcessInfo objects
    */
@@ -110,8 +110,9 @@ public class WindowsBasedProcessTree extends ResourceCalculatorProcessTree {
             LOG.debug("Error parsing procInfo." + nfe);
           }
         } else {
-          LOG.debug("Expected split length of proc info to be "
-              + procInfoSplitCount + ". Got " + procInfo.length);
+          LOG.debug(
+              "Expected split length of proc info to be " + procInfoSplitCount +
+                  ". Got " + procInfo.length);
         }
       }
     }
@@ -120,11 +121,12 @@ public class WindowsBasedProcessTree extends ResourceCalculatorProcessTree {
   
   @Override
   public void updateProcessTree() {
-    if(taskProcessId != null) {
+    if (taskProcessId != null) {
       // taskProcessId can be null in some tests
       String processesInfoStr = getAllProcessInfoFromShell();
       if (processesInfoStr != null && processesInfoStr.length() > 0) {
-        Map<String, ProcessInfo> allProcessInfo = createProcessInfo(processesInfoStr);
+        Map<String, ProcessInfo> allProcessInfo =
+            createProcessInfo(processesInfoStr);
 
         for (Map.Entry<String, ProcessInfo> entry : allProcessInfo.entrySet()) {
           String pid = entry.getKey();
@@ -161,12 +163,13 @@ public class WindowsBasedProcessTree extends ResourceCalculatorProcessTree {
   public String getProcessTreeDump() {
     StringBuilder ret = new StringBuilder();
     // The header.
-    ret.append(String.format("\t|- PID " + "CPU_TIME(MILLIS) "
-        + "VMEM(BYTES) WORKING_SET(BYTES)\n"));
+    ret.append(String.format("\t|- PID " + "CPU_TIME(MILLIS) " +
+        "VMEM(BYTES) WORKING_SET(BYTES)\n"));
     for (ProcessInfo p : processTree.values()) {
       if (p != null) {
-        ret.append(String.format("\t|- %s %d %d %d\n", p.pid,
-            p.cpuTimeMs, p.vmem, p.workingSet));
+        ret.append(String
+            .format("\t|- %s %d %d %d\n", p.pid, p.cpuTimeMs, p.vmem,
+                p.workingSet));
       }
     }
     return ret.toString();

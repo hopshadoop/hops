@@ -42,46 +42,47 @@ import java.util.Map;
 public class HttpFSParametersProvider extends ParametersProvider {
 
   private static final Map<Enum, Class<Param<?>>[]> PARAMS_DEF =
-    new HashMap<Enum, Class<Param<?>>[]>();
+      new HashMap<Enum, Class<Param<?>>[]>();
 
   static {
     PARAMS_DEF.put(Operation.OPEN,
-      new Class[]{DoAsParam.class, OffsetParam.class, LenParam.class});
+        new Class[]{DoAsParam.class, OffsetParam.class, LenParam.class});
     PARAMS_DEF.put(Operation.GETFILESTATUS, new Class[]{DoAsParam.class});
     PARAMS_DEF.put(Operation.LISTSTATUS,
-      new Class[]{DoAsParam.class, FilterParam.class});
+        new Class[]{DoAsParam.class, FilterParam.class});
     PARAMS_DEF.put(Operation.GETHOMEDIRECTORY, new Class[]{DoAsParam.class});
     PARAMS_DEF.put(Operation.GETCONTENTSUMMARY, new Class[]{DoAsParam.class});
     PARAMS_DEF.put(Operation.GETFILECHECKSUM, new Class[]{DoAsParam.class});
-    PARAMS_DEF.put(Operation.GETFILEBLOCKLOCATIONS,
-      new Class[]{DoAsParam.class});
+    PARAMS_DEF
+        .put(Operation.GETFILEBLOCKLOCATIONS, new Class[]{DoAsParam.class});
     PARAMS_DEF.put(Operation.INSTRUMENTATION, new Class[]{DoAsParam.class});
-    PARAMS_DEF.put(Operation.APPEND,
-      new Class[]{DoAsParam.class, DataParam.class});
+    PARAMS_DEF
+        .put(Operation.APPEND, new Class[]{DoAsParam.class, DataParam.class});
     PARAMS_DEF.put(Operation.CONCAT, new Class[]{SourcesParam.class});
     PARAMS_DEF.put(Operation.CREATE,
-      new Class[]{DoAsParam.class, PermissionParam.class, OverwriteParam.class,
-                  ReplicationParam.class, BlockSizeParam.class, DataParam.class});
+        new Class[]{DoAsParam.class, PermissionParam.class,
+            OverwriteParam.class, ReplicationParam.class, BlockSizeParam.class,
+            DataParam.class});
     PARAMS_DEF.put(Operation.MKDIRS,
-      new Class[]{DoAsParam.class, PermissionParam.class});
+        new Class[]{DoAsParam.class, PermissionParam.class});
     PARAMS_DEF.put(Operation.RENAME,
-      new Class[]{DoAsParam.class, DestinationParam.class});
+        new Class[]{DoAsParam.class, DestinationParam.class});
     PARAMS_DEF.put(Operation.SETOWNER,
-      new Class[]{DoAsParam.class, OwnerParam.class, GroupParam.class});
+        new Class[]{DoAsParam.class, OwnerParam.class, GroupParam.class});
     PARAMS_DEF.put(Operation.SETPERMISSION,
-      new Class[]{DoAsParam.class, PermissionParam.class});
+        new Class[]{DoAsParam.class, PermissionParam.class});
     PARAMS_DEF.put(Operation.SETREPLICATION,
-      new Class[]{DoAsParam.class, ReplicationParam.class});
+        new Class[]{DoAsParam.class, ReplicationParam.class});
     PARAMS_DEF.put(Operation.SETTIMES,
-      new Class[]{DoAsParam.class, ModifiedTimeParam.class,
-                  AccessTimeParam.class});
+        new Class[]{DoAsParam.class, ModifiedTimeParam.class,
+            AccessTimeParam.class});
     PARAMS_DEF.put(Operation.DELETE,
-      new Class[]{DoAsParam.class, RecursiveParam.class});
+        new Class[]{DoAsParam.class, RecursiveParam.class});
   }
 
   public HttpFSParametersProvider() {
     super(HttpFSFileSystem.OP_PARAM, HttpFSFileSystem.Operation.class,
-          PARAMS_DEF);
+        PARAMS_DEF);
   }
 
   /**
@@ -94,6 +95,7 @@ public class HttpFSParametersProvider extends ParametersProvider {
      * Parameter name.
      */
     public static final String NAME = HttpFSFileSystem.ACCESS_TIME_PARAM;
+
     /**
      * Constructor.
      */
@@ -144,18 +146,20 @@ public class HttpFSParametersProvider extends ParametersProvider {
    * Class for operation parameter.
    */
   @InterfaceAudience.Private
-  public static class OperationParam extends EnumParam<HttpFSFileSystem.Operation> {
+  public static class OperationParam
+      extends EnumParam<HttpFSFileSystem.Operation> {
 
     /**
      * Parameter name.
      */
     public static final String NAME = HttpFSFileSystem.OP_PARAM;
+
     /**
      * Constructor.
      */
     public OperationParam(String operation) {
       super(NAME, HttpFSFileSystem.Operation.class,
-            HttpFSFileSystem.Operation.valueOf(operation.toUpperCase()));
+          HttpFSFileSystem.Operation.valueOf(operation.toUpperCase()));
     }
   }
 
@@ -193,16 +197,15 @@ public class HttpFSParametersProvider extends ParametersProvider {
      * Constructor.
      */
     public DoAsParam() {
-      super(NAME, null, UserProvider.getUserPattern());
+      super(NAME, null, UserProvider.USER_PATTERN);
     }
 
     /**
      * Delegates to parent and then adds do-as user to
      * MDC context for logging purposes.
      *
-     *
-     * @param str parameter value.
-     *
+     * @param str
+     *     parameter value.
      * @return parsed parameter
      */
     @Override
@@ -248,7 +251,7 @@ public class HttpFSParametersProvider extends ParametersProvider {
      * Constructor.
      */
     public GroupParam() {
-      super(NAME, null, UserProvider.getUserPattern());
+      super(NAME, null, UserProvider.USER_PATTERN);
     }
 
   }
@@ -344,7 +347,7 @@ public class HttpFSParametersProvider extends ParametersProvider {
      * Constructor.
      */
     public OwnerParam() {
-      super(NAME, null, UserProvider.getUserPattern());
+      super(NAME, null, UserProvider.USER_PATTERN);
     }
 
   }

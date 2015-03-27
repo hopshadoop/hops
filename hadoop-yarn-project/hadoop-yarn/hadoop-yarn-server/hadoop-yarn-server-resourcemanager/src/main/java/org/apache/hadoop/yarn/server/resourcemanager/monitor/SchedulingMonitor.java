@@ -17,12 +17,12 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.monitor;
 
+import com.google.common.annotations.VisibleForTesting;
+import io.hops.ha.common.TransactionState;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.service.AbstractService;
-
-import com.google.common.annotations.VisibleForTesting;
 
 public class SchedulingMonitor extends AbstractService {
 
@@ -68,8 +68,8 @@ public class SchedulingMonitor extends AbstractService {
   }
 
   @VisibleForTesting
-  public void invokePolicy(){
-    scheduleEditPolicy.editSchedule();
+  public void invokePolicy(TransactionState transactionState) {
+    scheduleEditPolicy.editSchedule(transactionState);
   }
 
   private class PreemptionChecker implements Runnable {
@@ -79,7 +79,7 @@ public class SchedulingMonitor extends AbstractService {
         //invoke the preemption policy at a regular pace
         //the policy will generate preemption or kill events
         //managed by the dispatcher
-        invokePolicy();
+        invokePolicy(null);
         try {
           Thread.sleep(monitorInterval);
         } catch (InterruptedException e) {

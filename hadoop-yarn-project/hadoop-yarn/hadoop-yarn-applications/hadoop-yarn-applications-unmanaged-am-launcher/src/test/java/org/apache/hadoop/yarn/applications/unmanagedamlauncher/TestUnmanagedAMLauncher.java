@@ -18,18 +18,7 @@
 
 package org.apache.hadoop.yarn.applications.unmanagedamlauncher;
 
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.net.URL;
-
 import junit.framework.Assert;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -49,9 +38,19 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.net.URL;
+
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 public class TestUnmanagedAMLauncher {
-  private static final Log LOG = LogFactory
-      .getLog(TestUnmanagedAMLauncher.class);
+  private static final Log LOG =
+      LogFactory.getLog(TestUnmanagedAMLauncher.class);
 
   protected static MiniYARNCluster yarnCluster = null;
   protected static Configuration conf = new Configuration();
@@ -61,20 +60,22 @@ public class TestUnmanagedAMLauncher {
     LOG.info("Starting up YARN cluster");
     conf.setInt(YarnConfiguration.RM_SCHEDULER_MINIMUM_ALLOCATION_MB, 128);
     if (yarnCluster == null) {
-      yarnCluster = new MiniYARNCluster(
-          TestUnmanagedAMLauncher.class.getSimpleName(), 1, 1, 1);
+      yarnCluster =
+          new MiniYARNCluster(TestUnmanagedAMLauncher.class.getSimpleName(), 1,
+              1, 1);
       yarnCluster.init(conf);
       yarnCluster.start();
       //get the address
       Configuration yarnClusterConfig = yarnCluster.getConfig();
       LOG.info("MiniYARN ResourceManager published address: " +
-               yarnClusterConfig.get(YarnConfiguration.RM_ADDRESS));
+          yarnClusterConfig.get(YarnConfiguration.RM_ADDRESS));
       LOG.info("MiniYARN ResourceManager published web address: " +
-               yarnClusterConfig.get(YarnConfiguration.RM_WEBAPP_ADDRESS));
-      String webapp = yarnClusterConfig.get(YarnConfiguration.RM_WEBAPP_ADDRESS);
+          yarnClusterConfig.get(YarnConfiguration.RM_WEBAPP_ADDRESS));
+      String webapp =
+          yarnClusterConfig.get(YarnConfiguration.RM_WEBAPP_ADDRESS);
       assertTrue("Web app address still unbound to a host at " + webapp,
-        !webapp.startsWith("0.0.0.0"));
-      LOG.info("Yarn webapp is at "+ webapp);
+          !webapp.startsWith("0.0.0.0"));
+      LOG.info("Yarn webapp is at " + webapp);
       URL url = Thread.currentThread().getContextClassLoader()
           .getResource("yarn-site.xml");
       if (url == null) {
@@ -110,21 +111,22 @@ public class TestUnmanagedAMLauncher {
   }
 
   private static String getTestRuntimeClasspath() {
-    LOG.info("Trying to generate classpath for app master from current thread's classpath");
+    LOG.info(
+        "Trying to generate classpath for app master from current thread's classpath");
     String envClassPath = "";
     String cp = System.getProperty("java.class.path");
     if (cp != null) {
       envClassPath += cp.trim() + File.pathSeparator;
     }
     // yarn-site.xml at this location contains proper config for mini cluster
-    ClassLoader thisClassLoader = Thread.currentThread()
-      .getContextClassLoader();
+    ClassLoader thisClassLoader =
+        Thread.currentThread().getContextClassLoader();
     URL url = thisClassLoader.getResource("yarn-site.xml");
     envClassPath += new File(url.getFile()).getParent();
     return envClassPath;
   }
 
-  @Test(timeout=30000)
+  @Test(timeout = 30000)
   public void testUMALauncher() throws Exception {
     String classpath = getTestRuntimeClasspath();
     String javaHome = System.getenv("JAVA_HOME");
@@ -132,16 +134,9 @@ public class TestUnmanagedAMLauncher {
       LOG.fatal("JAVA_HOME not defined. Test not running.");
       return;
     }
-    String[] args = {
-        "--classpath",
-        classpath,
-        "--queue",
-        "default",
-        "--cmd",
-        javaHome
-            + "/bin/java -Xmx512m "
-            + TestUnmanagedAMLauncher.class.getCanonicalName()
-            + " success" };
+    String[] args = {"--classpath", classpath, "--queue", "default", "--cmd",
+        javaHome + "/bin/java -Xmx512m " +
+            TestUnmanagedAMLauncher.class.getCanonicalName() + " success"};
 
     LOG.info("Initializing Launcher");
     UnmanagedAMLauncher launcher =
@@ -150,9 +145,9 @@ public class TestUnmanagedAMLauncher {
               throws IOException, YarnException {
             YarnApplicationAttemptState attemptState =
                 rmClient.getApplicationAttemptReport(attemptId)
-                  .getYarnApplicationAttemptState();
-            Assert.assertTrue(attemptState
-              .equals(YarnApplicationAttemptState.LAUNCHED));
+                    .getYarnApplicationAttemptState();
+            Assert.assertTrue(
+                attemptState.equals(YarnApplicationAttemptState.LAUNCHED));
             super.launchAM(attemptId);
           }
         };
@@ -166,7 +161,7 @@ public class TestUnmanagedAMLauncher {
 
   }
 
-  @Test(timeout=30000)
+  @Test(timeout = 30000)
   public void testUMALauncherError() throws Exception {
     String classpath = getTestRuntimeClasspath();
     String javaHome = System.getenv("JAVA_HOME");
@@ -174,20 +169,13 @@ public class TestUnmanagedAMLauncher {
       LOG.fatal("JAVA_HOME not defined. Test not running.");
       return;
     }
-    String[] args = {
-        "--classpath",
-        classpath,
-        "--queue",
-        "default",
-        "--cmd",
-        javaHome
-            + "/bin/java -Xmx512m "
-            + TestUnmanagedAMLauncher.class.getCanonicalName()
-            + " failure" };
+    String[] args = {"--classpath", classpath, "--queue", "default", "--cmd",
+        javaHome + "/bin/java -Xmx512m " +
+            TestUnmanagedAMLauncher.class.getCanonicalName() + " failure"};
 
     LOG.info("Initializing Launcher");
-    UnmanagedAMLauncher launcher = new UnmanagedAMLauncher(new Configuration(
-        yarnCluster.getConfig()));
+    UnmanagedAMLauncher launcher =
+        new UnmanagedAMLauncher(new Configuration(yarnCluster.getConfig()));
     boolean initSuccess = launcher.init(args);
     Assert.assertTrue(initSuccess);
     LOG.info("Running Launcher");
@@ -203,14 +191,14 @@ public class TestUnmanagedAMLauncher {
   // provide main method so this class can act as AM
   public static void main(String[] args) throws Exception {
     if (args[0].equals("success")) {
-      ApplicationMasterProtocol client = ClientRMProxy.createRMProxy(conf,
-          ApplicationMasterProtocol.class);
+      ApplicationMasterProtocol client =
+          ClientRMProxy.createRMProxy(conf, ApplicationMasterProtocol.class);
       client.registerApplicationMaster(RegisterApplicationMasterRequest
           .newInstance(NetUtils.getHostname(), -1, ""));
       Thread.sleep(1000);
-      FinishApplicationMasterResponse resp =
-          client.finishApplicationMaster(FinishApplicationMasterRequest
-            .newInstance(FinalApplicationStatus.SUCCEEDED, "success", null));
+      FinishApplicationMasterResponse resp = client.finishApplicationMaster(
+          FinishApplicationMasterRequest
+              .newInstance(FinalApplicationStatus.SUCCEEDED, "success", null));
       assertTrue(resp.getIsUnregistered());
       System.exit(0);
     } else {

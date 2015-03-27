@@ -1,43 +1,22 @@
 /**
-* Licensed to the Apache Software Foundation (ASF) under one
-* or more contributor license agreements.  See the NOTICE file
-* distributed with this work for additional information
-* regarding copyright ownership.  The ASF licenses this file
-* to you under the Apache License, Version 2.0 (the
-* "License"); you may not use this file except in compliance
-* with the License.  You may obtain a copy of the License at
-*
-*     http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package org.apache.hadoop.yarn.logaggregation;
-
-import java.io.DataInput;
-import java.io.DataInputStream;
-import java.io.DataOutput;
-import java.io.DataOutputStream;
-import java.io.EOFException;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintStream;
-import java.io.Writer;
-import java.security.PrivilegedExceptionAction;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
 
 import org.apache.commons.io.input.BoundedInputStream;
 import org.apache.commons.logging.Log;
@@ -64,13 +43,36 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 
+import java.io.DataInput;
+import java.io.DataInputStream;
+import java.io.DataOutput;
+import java.io.DataOutputStream;
+import java.io.EOFException;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintStream;
+import java.io.Writer;
+import java.security.PrivilegedExceptionAction;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+
 @Public
 @Evolving
 public class AggregatedLogFormat {
 
   private static final Log LOG = LogFactory.getLog(AggregatedLogFormat.class);
-  private static final LogKey APPLICATION_ACL_KEY = new LogKey("APPLICATION_ACL");
-  private static final LogKey APPLICATION_OWNER_KEY = new LogKey("APPLICATION_OWNER");
+  private static final LogKey APPLICATION_ACL_KEY =
+      new LogKey("APPLICATION_ACL");
+  private static final LogKey APPLICATION_OWNER_KEY =
+      new LogKey("APPLICATION_OWNER");
   private static final LogKey VERSION_KEY = new LogKey("VERSION");
   private static final Map<String, LogKey> RESERVED_KEYS;
   //Maybe write out the retention policy.
@@ -80,8 +82,8 @@ public class AggregatedLogFormat {
   /**
    * Umask for the log file.
    */
-  private static final FsPermission APP_LOG_FILE_UMASK = FsPermission
-      .createImmutable((short) (0640 ^ 0777));
+  private static final FsPermission APP_LOG_FILE_UMASK =
+      FsPermission.createImmutable((short) (0640 ^ 0777));
 
 
   static {
@@ -164,12 +166,9 @@ public class AggregatedLogFormat {
 
     public void write(DataOutputStream out) throws IOException {
       for (String rootLogDir : this.rootLogDirs) {
-        File appLogDir =
-            new File(rootLogDir, 
-                ConverterUtils.toString(
-                    this.containerId.getApplicationAttemptId().
-                        getApplicationId())
-                );
+        File appLogDir = new File(rootLogDir,
+            ConverterUtils.toString(this.containerId.getApplicationAttemptId().
+                    getApplicationId()));
         File containerLogDir =
             new File(appLogDir, ConverterUtils.toString(this.containerId));
 
@@ -201,22 +200,22 @@ public class AggregatedLogFormat {
               //If buffer contents within fileLength, write
               if (len < bytesLeft) {
                 out.write(buf, 0, len);
-                bytesLeft-=len;
+                bytesLeft -= len;
               }
               //else only write contents within fileLength, then exit early
               else {
-                out.write(buf, 0, (int)bytesLeft);
+                out.write(buf, 0, (int) bytesLeft);
                 break;
               }
             }
             long newLength = logFile.length();
-            if(fileLength < newLength) {
-              LOG.warn("Aggregated logs truncated by approximately "+
-                  (newLength-fileLength) +" bytes.");
+            if (fileLength < newLength) {
+              LOG.warn("Aggregated logs truncated by approximately " +
+                  (newLength - fileLength) + " bytes.");
             }
           } catch (IOException e) {
-            String message = "Error aggregating log file. Log file : "
-                + logFile.getAbsolutePath() + e.getMessage(); 
+            String message = "Error aggregating log file. Log file : " +
+                logFile.getAbsolutePath() + e.getMessage();
             LOG.error(message, e);
             out.write(message.getBytes());
           } finally {
@@ -252,10 +251,9 @@ public class AggregatedLogFormat {
               public FSDataOutputStream run() throws Exception {
                 FileContext fc = FileContext.getFileContext(conf);
                 fc.setUMask(APP_LOG_FILE_UMASK);
-                return fc.create(
-                    remoteAppLogFile,
+                return fc.create(remoteAppLogFile,
                     EnumSet.of(CreateFlag.CREATE, CreateFlag.OVERWRITE),
-                    new Options.CreateOpts[] {});
+                    new Options.CreateOpts[]{});
               }
             });
       } catch (InterruptedException e) {
@@ -264,10 +262,10 @@ public class AggregatedLogFormat {
 
       // Keys are not sorted: null arg
       // 256KB minBlockSize : Expected log size for each container too
-      this.writer =
-          new TFile.Writer(this.fsDataOStream, 256 * 1024, conf.get(
-              YarnConfiguration.NM_LOG_AGG_COMPRESSION_TYPE,
-              YarnConfiguration.DEFAULT_NM_LOG_AGG_COMPRESSION_TYPE), null, conf);
+      this.writer = new TFile.Writer(this.fsDataOStream, 256 * 1024,
+          conf.get(YarnConfiguration.NM_LOG_AGG_COMPRESSION_TYPE,
+              YarnConfiguration.DEFAULT_NM_LOG_AGG_COMPRESSION_TYPE), null,
+          conf);
       //Write the version string
       writeVersion();
     }
@@ -338,9 +336,8 @@ public class AggregatedLogFormat {
         throws IOException {
       FileContext fileContext = FileContext.getFileContext(conf);
       this.fsDataIStream = fileContext.open(remoteAppLogFile);
-      reader =
-          new TFile.Reader(this.fsDataIStream, fileContext.getFileStatus(
-              remoteAppLogFile).getLen(), conf);
+      reader = new TFile.Reader(this.fsDataIStream,
+          fileContext.getFileStatus(remoteAppLogFile).getLen(), conf);
       this.scanner = reader.createScanner();
     }
 
@@ -348,7 +345,7 @@ public class AggregatedLogFormat {
 
     /**
      * Returns the owner of the application.
-     * 
+     *
      * @return the application owner.
      * @throws IOException
      */
@@ -368,9 +365,10 @@ public class AggregatedLogFormat {
     }
 
     /**
-     * Returns ACLs for the application. An empty map is returned if no ACLs are
+     * Returns ACLs for the application. An empty map is returned if no ACLs
+     * are
      * found.
-     * 
+     *
      * @return a map of the Application ACLs.
      * @throws IOException
      */
@@ -411,7 +409,7 @@ public class AggregatedLogFormat {
     
     /**
      * Read the next key and return the value-stream.
-     * 
+     *
      * @param key
      * @return the valueStream if there are more keys or null otherwise.
      * @throws IOException
@@ -441,12 +439,12 @@ public class AggregatedLogFormat {
      *
      * @param containerId
      * @return object to read the container's logs or null if the
-     *         logs could not be found
+     * logs could not be found
      * @throws IOException
      */
     @Private
-    public ContainerLogsReader getContainerLogsReader(
-        ContainerId containerId) throws IOException {
+    public ContainerLogsReader getContainerLogsReader(ContainerId containerId)
+        throws IOException {
       ContainerLogsReader logReader = null;
 
       final LogKey containerKey = new LogKey(containerId);
@@ -465,49 +463,50 @@ public class AggregatedLogFormat {
 
     //TODO  Change Log format and interfaces to be containerId specific.
     // Avoid returning completeValueStreams.
-//    public List<String> getTypesForContainer(DataInputStream valueStream){}
-//    
-//    /**
-//     * @param valueStream
-//     *          The Log stream for the container.
-//     * @param fileType
-//     *          the log type required.
-//     * @return An InputStreamReader for the required log type or null if the
-//     *         type is not found.
-//     * @throws IOException
-//     */
-//    public InputStreamReader getLogStreamForType(DataInputStream valueStream,
-//        String fileType) throws IOException {
-//      valueStream.reset();
-//      try {
-//        while (true) {
-//          String ft = valueStream.readUTF();
-//          String fileLengthStr = valueStream.readUTF();
-//          long fileLength = Long.parseLong(fileLengthStr);
-//          if (ft.equals(fileType)) {
-//            BoundedInputStream bis =
-//                new BoundedInputStream(valueStream, fileLength);
-//            return new InputStreamReader(bis);
-//          } else {
-//            long totalSkipped = 0;
-//            long currSkipped = 0;
-//            while (currSkipped != -1 && totalSkipped < fileLength) {
-//              currSkipped = valueStream.skip(fileLength - totalSkipped);
-//              totalSkipped += currSkipped;
-//            }
-//            // TODO Verify skip behaviour.
-//            if (currSkipped == -1) {
-//              return null;
-//            }
-//          }
-//        }
-//      } catch (EOFException e) {
-//        return null;
-//      }
-//    }
+    //    public List<String> getTypesForContainer(DataInputStream valueStream){}
+    //
+    //    /**
+    //     * @param valueStream
+    //     *          The Log stream for the container.
+    //     * @param fileType
+    //     *          the log type required.
+    //     * @return An InputStreamReader for the required log type or null if the
+    //     *         type is not found.
+    //     * @throws IOException
+    //     */
+    //    public InputStreamReader getLogStreamForType(DataInputStream valueStream,
+    //        String fileType) throws IOException {
+    //      valueStream.reset();
+    //      try {
+    //        while (true) {
+    //          String ft = valueStream.readUTF();
+    //          String fileLengthStr = valueStream.readUTF();
+    //          long fileLength = Long.parseLong(fileLengthStr);
+    //          if (ft.equals(fileType)) {
+    //            BoundedInputStream bis =
+    //                new BoundedInputStream(valueStream, fileLength);
+    //            return new InputStreamReader(bis);
+    //          } else {
+    //            long totalSkipped = 0;
+    //            long currSkipped = 0;
+    //            while (currSkipped != -1 && totalSkipped < fileLength) {
+    //              currSkipped = valueStream.skip(fileLength - totalSkipped);
+    //              totalSkipped += currSkipped;
+    //            }
+    //            // TODO Verify skip behaviour.
+    //            if (currSkipped == -1) {
+    //              return null;
+    //            }
+    //          }
+    //        }
+    //      } catch (EOFException e) {
+    //        return null;
+    //      }
+    //    }
 
     /**
      * Writes all logs for a single container to the provided writer.
+     *
      * @param valueStream
      * @param writer
      * @throws IOException
@@ -548,16 +547,16 @@ public class AggregatedLogFormat {
     }
 
     /**
-     * Keep calling this till you get a {@link EOFException} for getting logs of
+     * Keep calling this till you get a {@link EOFException} for getting logs
+     * of
      * all types for a single container.
-     * 
+     *
      * @param valueStream
      * @param out
      * @throws IOException
      */
     public static void readAContainerLogsForALogType(
-        DataInputStream valueStream, PrintStream out)
-          throws IOException {
+        DataInputStream valueStream, PrintStream out) throws IOException {
 
       byte[] buf = new byte[65535];
 
@@ -572,16 +571,14 @@ public class AggregatedLogFormat {
 
       long curRead = 0;
       long pendingRead = fileLength - curRead;
-      int toRead =
-                pendingRead > buf.length ? buf.length : (int) pendingRead;
+      int toRead = pendingRead > buf.length ? buf.length : (int) pendingRead;
       int len = valueStream.read(buf, 0, toRead);
       while (len != -1 && curRead < fileLength) {
         out.write(buf, 0, len);
         curRead += len;
 
         pendingRead = fileLength - curRead;
-        toRead =
-                  pendingRead > buf.length ? buf.length : (int) pendingRead;
+        toRead = pendingRead > buf.length ? buf.length : (int) pendingRead;
         len = valueStream.read(buf, 0, toRead);
       }
       out.println("");
@@ -624,8 +621,7 @@ public class AggregatedLogFormat {
         String logType = valueStream.readUTF();
         String logLengthStr = valueStream.readUTF();
         currentLogLength = Long.parseLong(logLengthStr);
-        currentLogData =
-            new BoundedInputStream(valueStream, currentLogLength);
+        currentLogData = new BoundedInputStream(valueStream, currentLogLength);
         currentLogData.setPropagateClose(false);
         currentLogISR = new InputStreamReader(currentLogData);
         currentLogType = logType;

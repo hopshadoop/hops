@@ -18,10 +18,7 @@
 
 package org.apache.hadoop.yarn.api.records.impl.pb;
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-
+import com.google.protobuf.TextFormat;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.records.ApplicationReport;
@@ -32,7 +29,9 @@ import org.apache.hadoop.yarn.proto.YarnProtos.QueueInfoProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.QueueInfoProtoOrBuilder;
 import org.apache.hadoop.yarn.proto.YarnProtos.QueueStateProto;
 
-import com.google.protobuf.TextFormat;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 
 @Private
 @Unstable
@@ -167,8 +166,9 @@ public class QueueInfoPBImpl extends QueueInfo {
 
   @Override
   public boolean equals(Object other) {
-    if (other == null)
+    if (other == null) {
       return false;
+    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -196,34 +196,36 @@ public class QueueInfoPBImpl extends QueueInfo {
   private void addApplicationsToProto() {
     maybeInitBuilder();
     builder.clearApplications();
-    if (applicationsList == null)
+    if (applicationsList == null) {
       return;
-    Iterable<ApplicationReportProto> iterable = new Iterable<ApplicationReportProto>() {
-      @Override
-      public Iterator<ApplicationReportProto> iterator() {
-        return new Iterator<ApplicationReportProto>() {
-  
-          Iterator<ApplicationReport> iter = applicationsList.iterator();
-  
+    }
+    Iterable<ApplicationReportProto> iterable =
+        new Iterable<ApplicationReportProto>() {
           @Override
-          public boolean hasNext() {
-            return iter.hasNext();
-          }
-  
-          @Override
-          public ApplicationReportProto next() {
-            return convertToProtoFormat(iter.next());
-          }
-  
-          @Override
-          public void remove() {
-            throw new UnsupportedOperationException();
-  
+          public Iterator<ApplicationReportProto> iterator() {
+            return new Iterator<ApplicationReportProto>() {
+
+              Iterator<ApplicationReport> iter = applicationsList.iterator();
+
+              @Override
+              public boolean hasNext() {
+                return iter.hasNext();
+              }
+
+              @Override
+              public ApplicationReportProto next() {
+                return convertToProtoFormat(iter.next());
+              }
+
+              @Override
+              public void remove() {
+                throw new UnsupportedOperationException();
+
+              }
+            };
+
           }
         };
-  
-      }
-    };
     builder.addAllApplications(iterable);
   }
 
@@ -243,32 +245,33 @@ public class QueueInfoPBImpl extends QueueInfo {
   private void addChildQueuesInfoToProto() {
     maybeInitBuilder();
     builder.clearChildQueues();
-    if (childQueuesList == null)
+    if (childQueuesList == null) {
       return;
+    }
     Iterable<QueueInfoProto> iterable = new Iterable<QueueInfoProto>() {
       @Override
       public Iterator<QueueInfoProto> iterator() {
         return new Iterator<QueueInfoProto>() {
-  
+
           Iterator<QueueInfo> iter = childQueuesList.iterator();
-  
+
           @Override
           public boolean hasNext() {
             return iter.hasNext();
           }
-  
+
           @Override
           public QueueInfoProto next() {
             return convertToProtoFormat(iter.next());
           }
-  
+
           @Override
           public void remove() {
             throw new UnsupportedOperationException();
-  
+
           }
         };
-  
+
       }
     };
     builder.addAllChildQueues(iterable);
@@ -284,8 +287,9 @@ public class QueueInfoPBImpl extends QueueInfo {
   }
 
   private void mergeLocalToProto() {
-    if (viaProto) 
+    if (viaProto) {
       maybeInitBuilder();
+    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
@@ -299,12 +303,13 @@ public class QueueInfoPBImpl extends QueueInfo {
   }
 
 
-  private ApplicationReportPBImpl convertFromProtoFormat(ApplicationReportProto a) {
+  private ApplicationReportPBImpl convertFromProtoFormat(
+      ApplicationReportProto a) {
     return new ApplicationReportPBImpl(a);
   }
 
   private ApplicationReportProto convertToProtoFormat(ApplicationReport t) {
-    return ((ApplicationReportPBImpl)t).getProto();
+    return ((ApplicationReportPBImpl) t).getProto();
   }
 
   private QueueInfoPBImpl convertFromProtoFormat(QueueInfoProto a) {
@@ -312,7 +317,7 @@ public class QueueInfoPBImpl extends QueueInfo {
   }
   
   private QueueInfoProto convertToProtoFormat(QueueInfo q) {
-    return ((QueueInfoPBImpl)q).getProto();
+    return ((QueueInfoPBImpl) q).getProto();
   }
 
   private QueueState convertFromProtoFormat(QueueStateProto q) {

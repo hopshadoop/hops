@@ -18,22 +18,22 @@
 
 package org.apache.hadoop.yarn.api.records.impl.pb;
 
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
-
 import org.apache.hadoop.yarn.api.records.SerializedException;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.proto.YarnProtos.SerializedExceptionProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.SerializedExceptionProtoOrBuilder;
 
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+
 public class SerializedExceptionPBImpl extends SerializedException {
 
-  SerializedExceptionProto proto = SerializedExceptionProto
-      .getDefaultInstance();
+  SerializedExceptionProto proto =
+      SerializedExceptionProto.getDefaultInstance();
   SerializedExceptionProto.Builder builder = null;
   boolean viaProto = false;
 
@@ -68,17 +68,20 @@ public class SerializedExceptionPBImpl extends SerializedException {
     PrintWriter pw = new PrintWriter(sw);
     t.printStackTrace(pw);
     pw.close();
-    if (sw.toString() != null)
+    if (sw.toString() != null) {
       builder.setTrace(sw.toString());
-    if (t.getMessage() != null)
+    }
+    if (t.getMessage() != null) {
       builder.setMessage(t.getMessage());
+    }
     builder.setClassName(t.getClass().getCanonicalName());
   }
 
   public void init(String message, Throwable t) {
     init(t);
-    if (message != null)
+    if (message != null) {
       builder.setMessage(message);
+    }
   }
 
   @SuppressWarnings("unchecked")
@@ -104,7 +107,7 @@ public class SerializedExceptionPBImpl extends SerializedException {
       classType = Exception.class;
     }
     return instantiateException(realClass.asSubclass(classType), getMessage(),
-      cause == null ? null : cause.deSerialize());
+        cause == null ? null : cause.deSerialize());
   }
 
   @Override

@@ -18,10 +18,6 @@
 
 package org.apache.hadoop.yarn.security;
 
-import java.io.DataInput;
-import java.io.DataOutput;
-import java.io.IOException;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
@@ -32,6 +28,10 @@ import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.NodeId;
+
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.io.IOException;
 
 @Public
 @Evolving
@@ -90,9 +90,8 @@ public class NMTokenIdentifier extends TokenIdentifier {
 
   @Override
   public void readFields(DataInput in) throws IOException {
-    appAttemptId =
-        ApplicationAttemptId.newInstance(
-            ApplicationId.newInstance(in.readLong(), in.readInt()),
+    appAttemptId = ApplicationAttemptId
+        .newInstance(ApplicationId.newInstance(in.readLong(), in.readInt()),
             in.readInt());
     String[] hostAddr = in.readUTF().split(":");
     nodeId = NodeId.newInstance(hostAddr[0], Integer.parseInt(hostAddr[1]));

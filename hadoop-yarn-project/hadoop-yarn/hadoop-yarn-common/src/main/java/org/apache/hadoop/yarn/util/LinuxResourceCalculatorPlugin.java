@@ -18,17 +18,17 @@
 
 package org.apache.hadoop.yarn.util;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
+
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 
 /**
  * Plugin to calculate resource information on Linux systems.
@@ -69,9 +69,8 @@ public class LinuxResourceCalculatorPlugin extends ResourceCalculatorPlugin {
    * Pattern for parsing /proc/stat
    */
   private static final String PROCFS_STAT = "/proc/stat";
-  private static final Pattern CPU_TIME_FORMAT =
-    Pattern.compile("^cpu[ \t]*([0-9]*)" +
-    		            "[ \t]*([0-9]*)[ \t]*([0-9]*)[ \t].*");
+  private static final Pattern CPU_TIME_FORMAT = Pattern
+      .compile("^cpu[ \t]*([0-9]*)" + "[ \t]*([0-9]*)[ \t]*([0-9]*)[ \t].*");
 
   private String procfsMemFile;
   private String procfsCpuFile;
@@ -97,6 +96,7 @@ public class LinuxResourceCalculatorPlugin extends ResourceCalculatorPlugin {
 
   /**
    * Get current time
+   *
    * @return Unix time stamp in millisecond
    */
   long getCurrentTime() {
@@ -113,15 +113,18 @@ public class LinuxResourceCalculatorPlugin extends ResourceCalculatorPlugin {
   /**
    * Constructor which allows assigning the /proc/ directories. This will be
    * used only in unit tests
-   * @param procfsMemFile fake file for /proc/meminfo
-   * @param procfsCpuFile fake file for /proc/cpuinfo
-   * @param procfsStatFile fake file for /proc/stat
-   * @param jiffyLengthInMillis fake jiffy length value
+   *
+   * @param procfsMemFile
+   *     fake file for /proc/meminfo
+   * @param procfsCpuFile
+   *     fake file for /proc/cpuinfo
+   * @param procfsStatFile
+   *     fake file for /proc/stat
+   * @param jiffyLengthInMillis
+   *     fake jiffy length value
    */
   public LinuxResourceCalculatorPlugin(String procfsMemFile,
-                                       String procfsCpuFile,
-                                       String procfsStatFile,
-                                       long jiffyLengthInMillis) {
+      String procfsCpuFile, String procfsStatFile, long jiffyLengthInMillis) {
     this.procfsMemFile = procfsMemFile;
     this.procfsCpuFile = procfsCpuFile;
     this.procfsStatFile = procfsStatFile;
@@ -137,7 +140,9 @@ public class LinuxResourceCalculatorPlugin extends ResourceCalculatorPlugin {
 
   /**
    * Read /proc/meminfo, parse and compute memory information
-   * @param readAgain if false, read only on the first time
+   *
+   * @param readAgain
+   *     if false, read only on the first time
    */
   private void readProcMemInfoFile(boolean readAgain) {
 
@@ -225,7 +230,8 @@ public class LinuxResourceCalculatorPlugin extends ResourceCalculatorPlugin {
         }
         mat = FREQUENCY_FORMAT.matcher(str);
         if (mat.find()) {
-          cpuFrequency = (long)(Double.parseDouble(mat.group(1)) * 1000); // kHz
+          cpuFrequency =
+              (long) (Double.parseDouble(mat.group(1)) * 1000); // kHz
         }
         str = in.readLine();
       }
@@ -294,62 +300,77 @@ public class LinuxResourceCalculatorPlugin extends ResourceCalculatorPlugin {
     }
   }
 
-  /** {@inheritDoc} */
+  /**
+   * {@inheritDoc}
+   */
   @Override
   public long getPhysicalMemorySize() {
     readProcMemInfoFile();
     return ramSize * 1024;
   }
 
-  /** {@inheritDoc} */
+  /**
+   * {@inheritDoc}
+   */
   @Override
   public long getVirtualMemorySize() {
     readProcMemInfoFile();
     return (ramSize + swapSize) * 1024;
   }
 
-  /** {@inheritDoc} */
+  /**
+   * {@inheritDoc}
+   */
   @Override
   public long getAvailablePhysicalMemorySize() {
     readProcMemInfoFile(true);
     return (ramSizeFree + inactiveSize) * 1024;
   }
 
-  /** {@inheritDoc} */
+  /**
+   * {@inheritDoc}
+   */
   @Override
   public long getAvailableVirtualMemorySize() {
     readProcMemInfoFile(true);
     return (ramSizeFree + swapSizeFree + inactiveSize) * 1024;
   }
 
-  /** {@inheritDoc} */
+  /**
+   * {@inheritDoc}
+   */
   @Override
   public int getNumProcessors() {
     readProcCpuInfoFile();
     return numProcessors;
   }
 
-  /** {@inheritDoc} */
+  /**
+   * {@inheritDoc}
+   */
   @Override
   public long getCpuFrequency() {
     readProcCpuInfoFile();
     return cpuFrequency;
   }
 
-  /** {@inheritDoc} */
+  /**
+   * {@inheritDoc}
+   */
   @Override
   public long getCumulativeCpuTime() {
     readProcStatFile();
     return cumulativeCpuTime;
   }
 
-  /** {@inheritDoc} */
+  /**
+   * {@inheritDoc}
+   */
   @Override
   public float getCpuUsage() {
     readProcStatFile();
     sampleTime = getCurrentTime();
-    if (lastSampleTime == UNAVAILABLE ||
-        lastSampleTime > sampleTime) {
+    if (lastSampleTime == UNAVAILABLE || lastSampleTime > sampleTime) {
       // lastSampleTime > sampleTime may happen when the system time is changed
       lastSampleTime = sampleTime;
       lastCumulativeCpuTime = cumulativeCpuTime;
@@ -360,9 +381,9 @@ public class LinuxResourceCalculatorPlugin extends ResourceCalculatorPlugin {
     // use of the next calculation.
     final long MINIMUM_UPDATE_INTERVAL = 10 * jiffyLengthInMillis;
     if (sampleTime > lastSampleTime + MINIMUM_UPDATE_INTERVAL) {
-	    cpuUsage = (float)(cumulativeCpuTime - lastCumulativeCpuTime) * 100F /
-	               ((float)(sampleTime - lastSampleTime) * getNumProcessors());
-	    lastSampleTime = sampleTime;
+      cpuUsage = (float) (cumulativeCpuTime - lastCumulativeCpuTime) * 100F /
+          ((float) (sampleTime - lastSampleTime) * getNumProcessors());
+      lastSampleTime = sampleTime;
       lastCumulativeCpuTime = cumulativeCpuTime;
     }
     return cpuUsage;
@@ -375,18 +396,18 @@ public class LinuxResourceCalculatorPlugin extends ResourceCalculatorPlugin {
    */
   public static void main(String[] args) {
     LinuxResourceCalculatorPlugin plugin = new LinuxResourceCalculatorPlugin();
-    System.out.println("Physical memory Size (bytes) : "
-        + plugin.getPhysicalMemorySize());
-    System.out.println("Total Virtual memory Size (bytes) : "
-        + plugin.getVirtualMemorySize());
-    System.out.println("Available Physical memory Size (bytes) : "
-        + plugin.getAvailablePhysicalMemorySize());
-    System.out.println("Total Available Virtual memory Size (bytes) : "
-        + plugin.getAvailableVirtualMemorySize());
+    System.out.println(
+        "Physical memory Size (bytes) : " + plugin.getPhysicalMemorySize());
+    System.out.println(
+        "Total Virtual memory Size (bytes) : " + plugin.getVirtualMemorySize());
+    System.out.println("Available Physical memory Size (bytes) : " +
+        plugin.getAvailablePhysicalMemorySize());
+    System.out.println("Total Available Virtual memory Size (bytes) : " +
+        plugin.getAvailableVirtualMemorySize());
     System.out.println("Number of Processors : " + plugin.getNumProcessors());
     System.out.println("CPU frequency (kHz) : " + plugin.getCpuFrequency());
-    System.out.println("Cumulative CPU time (ms) : " +
-            plugin.getCumulativeCpuTime());
+    System.out
+        .println("Cumulative CPU time (ms) : " + plugin.getCumulativeCpuTime());
     try {
       // Sleep so we can compute the CPU usage
       Thread.sleep(500L);

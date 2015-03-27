@@ -19,9 +19,13 @@ package org.apache.hadoop.hdfs.web.resources;
 
 import java.net.HttpURLConnection;
 
-/** Http GET operation parameter. */
+/**
+ * Http GET operation parameter.
+ */
 public class GetOpParam extends HttpOpParam<GetOpParam.Op> {
-  /** Get operations. */
+  /**
+   * Get operations.
+   */
   public static enum Op implements HttpOpParam.Op {
     OPEN(true, HttpURLConnection.HTTP_OK),
 
@@ -31,37 +35,26 @@ public class GetOpParam extends HttpOpParam<GetOpParam.Op> {
     GETFILECHECKSUM(true, HttpURLConnection.HTTP_OK),
 
     GETHOMEDIRECTORY(false, HttpURLConnection.HTTP_OK),
-    GETDELEGATIONTOKEN(false, HttpURLConnection.HTTP_OK, true),
+    GETDELEGATIONTOKEN(false, HttpURLConnection.HTTP_OK),
 
-    /** GET_BLOCK_LOCATIONS is a private unstable op. */
+    /**
+     * GET_BLOCK_LOCATIONS is a private unstable op.
+     */
     GET_BLOCK_LOCATIONS(false, HttpURLConnection.HTTP_OK),
-    GETACLSTATUS(false, HttpURLConnection.HTTP_OK),
 
     NULL(false, HttpURLConnection.HTTP_NOT_IMPLEMENTED);
 
     final boolean redirect;
     final int expectedHttpResponseCode;
-    final boolean requireAuth;
 
     Op(final boolean redirect, final int expectedHttpResponseCode) {
-      this(redirect, expectedHttpResponseCode, false);
-    }
-    
-    Op(final boolean redirect, final int expectedHttpResponseCode,
-       final boolean requireAuth) {
       this.redirect = redirect;
       this.expectedHttpResponseCode = expectedHttpResponseCode;
-      this.requireAuth = requireAuth;
     }
 
     @Override
     public HttpOpParam.Type getType() {
       return HttpOpParam.Type.GET;
-    }
-    
-    @Override
-    public boolean getRequireAuth() {
-      return requireAuth;
     }
 
     @Override
@@ -89,7 +82,9 @@ public class GetOpParam extends HttpOpParam<GetOpParam.Op> {
 
   /**
    * Constructor.
-   * @param str a string representation of the parameter value.
+   *
+   * @param str
+   *     a string representation of the parameter value.
    */
   public GetOpParam(final String str) {
     super(DOMAIN, DOMAIN.parse(str));

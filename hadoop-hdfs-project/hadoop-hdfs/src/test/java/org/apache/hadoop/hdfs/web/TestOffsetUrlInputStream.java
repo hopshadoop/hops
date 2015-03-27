@@ -17,24 +17,26 @@
  */
 package org.apache.hadoop.hdfs.web;
 
-import static org.junit.Assert.assertEquals;
+import org.junit.Test;
 
 import java.io.IOException;
 import java.net.URL;
 
-import org.junit.Test;
+import static org.junit.Assert.assertEquals;
 
 public class TestOffsetUrlInputStream {
   @Test
   public void testRemoveOffset() throws IOException {
     { //no offset
       String s = "http://test/Abc?Length=99";
-      assertEquals(s, WebHdfsFileSystem.removeOffsetParam(new URL(s)).toString());
+      assertEquals(s,
+          WebHdfsFileSystem.removeOffsetParam(new URL(s)).toString());
     }
 
     { //no parameters
       String s = "http://test/Abc";
-      assertEquals(s, WebHdfsFileSystem.removeOffsetParam(new URL(s)).toString());
+      assertEquals(s,
+          WebHdfsFileSystem.removeOffsetParam(new URL(s)).toString());
     }
 
     { //offset as first parameter

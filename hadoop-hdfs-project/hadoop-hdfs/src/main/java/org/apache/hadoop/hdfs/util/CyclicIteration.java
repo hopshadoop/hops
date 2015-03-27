@@ -17,15 +17,16 @@
  */
 package org.apache.hadoop.hdfs.util;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
+
 import java.util.Iterator;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.NoSuchElementException;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
-
-/** Provide an cyclic {@link Iterator} for a {@link NavigableMap}.
+/**
+ * Provide an cyclic {@link Iterator} for a {@link NavigableMap}.
  * The {@link Iterator} navigates the entries of the map
  * according to the map's ordering.
  * If the {@link Iterator} hits the last entry of the map,
@@ -37,8 +38,9 @@ public class CyclicIteration<K, V> implements Iterable<Map.Entry<K, V>> {
   private final NavigableMap<K, V> navigablemap;
   private final NavigableMap<K, V> tailmap;
 
-  /** Construct an {@link Iterable} object,
-   * so that an {@link Iterator} can be created  
+  /**
+   * Construct an {@link Iterable} object,
+   * so that an {@link Iterator} can be created
    * for iterating the given {@link NavigableMap}.
    * The iteration begins from the starting key exclusively.
    */
@@ -46,10 +48,9 @@ public class CyclicIteration<K, V> implements Iterable<Map.Entry<K, V>> {
     if (navigablemap == null || navigablemap.isEmpty()) {
       this.navigablemap = null;
       this.tailmap = null;
-    }
-    else {
+    } else {
       this.navigablemap = navigablemap;
-      this.tailmap = navigablemap.tailMap(startingkey, false); 
+      this.tailmap = navigablemap.tailMap(startingkey, false);
     }
   }
 
@@ -58,13 +59,19 @@ public class CyclicIteration<K, V> implements Iterable<Map.Entry<K, V>> {
     return new CyclicIterator();
   }
 
-  /** An {@link Iterator} for {@link CyclicIteration}. */
+  /**
+   * An {@link Iterator} for {@link CyclicIteration}.
+   */
   private class CyclicIterator implements Iterator<Map.Entry<K, V>> {
     private boolean hasnext;
     private Iterator<Map.Entry<K, V>> i;
-    /** The first entry to begin. */
+    /**
+     * The first entry to begin.
+     */
     private final Map.Entry<K, V> first;
-    /** The next entry. */
+    /**
+     * The next entry.
+     */
     private Map.Entry<K, V> next;
     
     private CyclicIterator() {
@@ -73,8 +80,7 @@ public class CyclicIteration<K, V> implements Iterable<Map.Entry<K, V>> {
         i = tailmap.entrySet().iterator();
         first = nextEntry();
         next = first;
-      }
-      else {
+      } else {
         i = null;
         first = null;
         next = null;
@@ -105,7 +111,9 @@ public class CyclicIteration<K, V> implements Iterable<Map.Entry<K, V>> {
       return curr;
     }
 
-    /** Not supported */
+    /**
+     * Not supported
+     */
     @Override
     public void remove() {
       throw new UnsupportedOperationException("Not supported");

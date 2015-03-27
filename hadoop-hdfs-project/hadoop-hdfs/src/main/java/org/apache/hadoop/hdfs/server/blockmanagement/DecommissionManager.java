@@ -17,13 +17,13 @@
  */
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
-import java.util.Map;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.hdfs.server.namenode.Namesystem;
+
+import java.util.Map;
 
 /**
  * Manage node decommissioning.
@@ -42,15 +42,22 @@ class DecommissionManager {
     this.blockmanager = blockmanager;
   }
 
-  /** Periodically check decommission status. */
+  /**
+   * Periodically check decommission status.
+   */
   class Monitor implements Runnable {
-    /** recheckInterval is how often namenode checks
-     *  if a node has finished decommission
+    /**
+     * recheckInterval is how often namenode checks
+     * if a node has finished decommission
      */
     private final long recheckInterval;
-    /** The number of decommission nodes to check for each interval */
+    /**
+     * The number of decommission nodes to check for each interval
+     */
     private final int numNodesPerCheck;
-    /** firstkey can be initialized to anything. */
+    /**
+     * firstkey can be initialized to anything.
+     */
     private String firstkey = "";
 
     Monitor(int recheckIntervalInSecond, int numNodesPerCheck) {
@@ -64,14 +71,8 @@ class DecommissionManager {
      */
     @Override
     public void run() {
-      for(; namesystem.isRunning(); ) {
-        namesystem.writeLock();
-        try {
-          check();
-        } finally {
-          namesystem.writeUnlock();
-        }
-  
+      for (; namesystem.isRunning(); ) {
+        check();
         try {
           Thread.sleep(recheckInterval);
         } catch (InterruptedException ie) {
@@ -83,15 +84,15 @@ class DecommissionManager {
     private void check() {
       final DatanodeManager dm = blockmanager.getDatanodeManager();
       int count = 0;
-      for(Map.Entry<String, DatanodeDescriptor> entry
-          : dm.getDatanodeCyclicIteration(firstkey)) {
+      for (Map.Entry<String, DatanodeDescriptor> entry : dm
+          .getDatanodeCyclicIteration(firstkey)) {
         final DatanodeDescriptor d = entry.getValue();
         firstkey = entry.getKey();
 
         if (d.isDecommissionInProgress()) {
           try {
             dm.checkDecommissionState(d);
-          } catch(Exception e) {
+          } catch (Exception e) {
             LOG.warn("entry=" + entry, e);
           }
           if (++count == numNodesPerCheck) {

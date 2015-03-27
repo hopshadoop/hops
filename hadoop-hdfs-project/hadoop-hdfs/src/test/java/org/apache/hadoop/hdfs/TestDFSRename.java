@@ -16,12 +16,6 @@
  * limitations under the License.
  */
 package org.apache.hadoop.hdfs;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-
-import java.io.DataOutputStream;
-import java.io.IOException;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
@@ -30,16 +24,24 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.server.namenode.NameNodeAdapter;
 import org.junit.Test;
 
+import java.io.DataOutputStream;
+import java.io.IOException;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
 public class TestDFSRename {
-  static int countLease(MiniDFSCluster cluster) {
-    return NameNodeAdapter.getLeaseManager(cluster.getNamesystem()).countLease();
+  static int countLease(MiniDFSCluster cluster) throws IOException {
+    return NameNodeAdapter.getLeaseManager(cluster.getNamesystem())
+        .countLease();
   }
   
   final Path dir = new Path("/test/rename/");
 
   void list(FileSystem fs, String name) throws IOException {
     FileSystem.LOG.info("\n\n" + name);
-    for(FileStatus s : fs.listStatus(dir)) {
+    for (FileStatus s : fs.listStatus(dir)) {
       FileSystem.LOG.info("" + s.getPath());
     }
   }
@@ -53,7 +55,8 @@ public class TestDFSRename {
   @Test
   public void testRename() throws Exception {
     Configuration conf = new HdfsConfiguration();
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(2).build();
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(2).build();
     try {
       FileSystem fs = cluster.getFileSystem();
       assertTrue(fs.mkdirs(dir));
@@ -62,24 +65,24 @@ public class TestDFSRename {
         Path a = new Path(dir, "a");
         Path aa = new Path(dir, "aa");
         Path b = new Path(dir, "b");
-  
+
         createFile(fs, a);
         
         //should not have any lease
-        assertEquals(0, countLease(cluster)); 
-  
+        assertEquals(0, countLease(cluster));
+
         DataOutputStream aa_out = fs.create(aa);
         aa_out.writeBytes("something");
-  
+
         //should have 1 lease
-        assertEquals(1, countLease(cluster)); 
+        assertEquals(1, countLease(cluster));
         list(fs, "rename0");
         fs.rename(a, b);
         list(fs, "rename1");
         aa_out.writeBytes(" more");
         aa_out.close();
         list(fs, "rename2");
-  
+
         //should not have any lease
         assertEquals(0, countLease(cluster));
       }
@@ -98,10 +101,10 @@ public class TestDFSRename {
         createFile(fs, new Path(src, "foo"));
         
         // dst cannot be a file under src
-        assertFalse(fs.rename(src, dst)); 
+        assertFalse(fs.rename(src, dst));
         
         // dst cannot be a directory under src
-        assertFalse(fs.rename(src.getParent(), dst.getParent())); 
+        assertFalse(fs.rename(src.getParent(), dst.getParent()));
       }
       
       { // dst can start with src, if it is not a directory or file under src
@@ -122,7 +125,9 @@ public class TestDFSRename {
       }
       fs.delete(dir, true);
     } finally {
-      if (cluster != null) {cluster.shutdown();}
+      if (cluster != null) {
+        cluster.shutdown();
+      }
     }
   }
 }

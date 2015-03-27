@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager;
 
-import java.net.InetAddress;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.ipc.Server;
@@ -26,16 +24,28 @@ import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 
-/** 
- * Manages ResourceManager audit logs. 
- *
+import java.net.InetAddress;
+
+/**
+ * Manages ResourceManager audit logs.
+ * <p/>
  * Audit log format is written as key=value pairs. Tab separated.
  */
 public class RMAuditLogger {
   private static final Log LOG = LogFactory.getLog(RMAuditLogger.class);
 
-  static enum Keys {USER, OPERATION, TARGET, RESULT, IP, PERMISSIONS,
-                    DESCRIPTION, APPID, APPATTEMPTID, CONTAINERID}
+  static enum Keys {
+    USER,
+    OPERATION,
+    TARGET,
+    RESULT,
+    IP,
+    PERMISSIONS,
+    DESCRIPTION,
+    APPID,
+    APPATTEMPTID,
+    CONTAINERID
+  }
 
   public static class AuditConstants {
     static final String SUCCESS = "SUCCESS";
@@ -44,11 +54,15 @@ public class RMAuditLogger {
     static final char PAIR_SEPARATOR = '\t';
 
     public static final String KILL_APP_REQUEST = "Kill Application Request";
-    public static final String SUBMIT_APP_REQUEST = "Submit Application Request";
+    public static final String SUBMIT_APP_REQUEST =
+        "Submit Application Request";
     public static final String MOVE_APP_REQUEST = "Move Application Request";
-    public static final String FINISH_SUCCESS_APP = "Application Finished - Succeeded";
-    public static final String FINISH_FAILED_APP = "Application Finished - Failed";
-    public static final String FINISH_KILLED_APP = "Application Finished - Killed";
+    public static final String FINISH_SUCCESS_APP =
+        "Application Finished - Succeeded";
+    public static final String FINISH_FAILED_APP =
+        "Application Finished - Failed";
+    public static final String FINISH_KILLED_APP =
+        "Application Finished - Killed";
     public static final String REGISTER_AM = "Register App Master";
     public static final String UNREGISTER_AM = "Unregister App Master";
     public static final String ALLOC_CONTAINER = "AM Allocated Container";
@@ -62,12 +76,13 @@ public class RMAuditLogger {
    * A helper api for creating an audit log for a successful event.
    */
   static String createSuccessLog(String user, String operation, String target,
-      ApplicationId appId, ApplicationAttemptId attemptId, ContainerId containerId) {
+      ApplicationId appId, ApplicationAttemptId attemptId,
+      ContainerId containerId) {
     StringBuilder b = new StringBuilder();
     start(Keys.USER, user, b);
     addRemoteIP(b);
     add(Keys.OPERATION, operation, b);
-    add(Keys.TARGET, target ,b);
+    add(Keys.TARGET, target, b);
     add(Keys.RESULT, AuditConstants.SUCCESS, b);
     if (appId != null) {
       add(Keys.APPID, appId.toString(), b);
@@ -84,42 +99,54 @@ public class RMAuditLogger {
   /**
    * Create a readable and parseable audit log string for a successful event.
    *
-   * @param user User who made the service request to the ResourceManager
-   * @param operation Operation requested by the user.
-   * @param target The target on which the operation is being performed. 
-   * @param appId Application Id in which operation was performed.
-   * @param containerId Container Id in which operation was performed.
-   *
-   * <br><br>
-   * Note that the {@link RMAuditLogger} uses tabs ('\t') as a key-val delimiter
-   * and hence the value fields should not contains tabs ('\t').
+   * @param user
+   *     User who made the service request to the ResourceManager
+   * @param operation
+   *     Operation requested by the user.
+   * @param target
+   *     The target on which the operation is being performed.
+   * @param appId
+   *     Application Id in which operation was performed.
+   * @param containerId
+   *     Container Id in which operation was performed.
+   *     <p/>
+   *     <br><br>
+   *     Note that the {@link RMAuditLogger} uses tabs ('\t') as a key-val
+   *     delimiter
+   *     and hence the value fields should not contains tabs ('\t').
    */
-  public static void logSuccess(String user, String operation, String target, 
+  public static void logSuccess(String user, String operation, String target,
       ApplicationId appId, ContainerId containerId) {
     if (LOG.isInfoEnabled()) {
-      LOG.info(createSuccessLog(user, operation, target, appId, null, 
-          containerId));
+      LOG.info(
+          createSuccessLog(user, operation, target, appId, null, containerId));
     }
   }
 
   /**
    * Create a readable and parseable audit log string for a successful event.
    *
-   * @param user User who made the service request to the ResourceManager.
-   * @param operation Operation requested by the user.
-   * @param target The target on which the operation is being performed. 
-   * @param appId Application Id in which operation was performed.
-   * @param attemptId Application Attempt Id in which operation was performed.
-   *
-   * <br><br>
-   * Note that the {@link RMAuditLogger} uses tabs ('\t') as a key-val delimiter
-   * and hence the value fields should not contains tabs ('\t').
+   * @param user
+   *     User who made the service request to the ResourceManager.
+   * @param operation
+   *     Operation requested by the user.
+   * @param target
+   *     The target on which the operation is being performed.
+   * @param appId
+   *     Application Id in which operation was performed.
+   * @param attemptId
+   *     Application Attempt Id in which operation was performed.
+   *     <p/>
+   *     <br><br>
+   *     Note that the {@link RMAuditLogger} uses tabs ('\t') as a key-val
+   *     delimiter
+   *     and hence the value fields should not contains tabs ('\t').
    */
-  public static void logSuccess(String user, String operation, String target, 
+  public static void logSuccess(String user, String operation, String target,
       ApplicationId appId, ApplicationAttemptId attemptId) {
     if (LOG.isInfoEnabled()) {
-      LOG.info(createSuccessLog(user, operation, target, appId, attemptId,
-          null));
+      LOG.info(
+          createSuccessLog(user, operation, target, appId, attemptId, null));
     }
   }
 
@@ -127,14 +154,19 @@ public class RMAuditLogger {
   /**
    * Create a readable and parseable audit log string for a successful event.
    *
-   * @param user User who made the service request to the ResourceManager.
-   * @param operation Operation requested by the user.
-   * @param target The target on which the operation is being performed. 
-   * @param appId Application Id in which operation was performed.
-   *
-   * <br><br>
-   * Note that the {@link RMAuditLogger} uses tabs ('\t') as a key-val delimiter
-   * and hence the value fields should not contains tabs ('\t').
+   * @param user
+   *     User who made the service request to the ResourceManager.
+   * @param operation
+   *     Operation requested by the user.
+   * @param target
+   *     The target on which the operation is being performed.
+   * @param appId
+   *     Application Id in which operation was performed.
+   *     <p/>
+   *     <br><br>
+   *     Note that the {@link RMAuditLogger} uses tabs ('\t') as a key-val
+   *     delimiter
+   *     and hence the value fields should not contains tabs ('\t').
    */
   public static void logSuccess(String user, String operation, String target,
       ApplicationId appId) {
@@ -146,13 +178,17 @@ public class RMAuditLogger {
   /**
    * Create a readable and parseable audit log string for a successful event.
    *
-   * @param user User who made the service request. 
-   * @param operation Operation requested by the user.
-   * @param target The target on which the operation is being performed. 
-   *
-   * <br><br>
-   * Note that the {@link RMAuditLogger} uses tabs ('\t') as a key-val delimiter
-   * and hence the value fields should not contains tabs ('\t').
+   * @param user
+   *     User who made the service request.
+   * @param operation
+   *     Operation requested by the user.
+   * @param target
+   *     The target on which the operation is being performed.
+   *     <p/>
+   *     <br><br>
+   *     Note that the {@link RMAuditLogger} uses tabs ('\t') as a key-val
+   *     delimiter
+   *     and hence the value fields should not contains tabs ('\t').
    */
   public static void logSuccess(String user, String operation, String target) {
     if (LOG.isInfoEnabled()) {
@@ -170,7 +206,7 @@ public class RMAuditLogger {
     start(Keys.USER, user, b);
     addRemoteIP(b);
     add(Keys.OPERATION, operation, b);
-    add(Keys.TARGET, target ,b);
+    add(Keys.TARGET, target, b);
     add(Keys.RESULT, AuditConstants.FAILURE, b);
     add(Keys.DESCRIPTION, description, b);
     add(Keys.PERMISSIONS, perm, b);
@@ -189,49 +225,66 @@ public class RMAuditLogger {
   /**
    * Create a readable and parseable audit log string for a failed event.
    *
-   * @param user User who made the service request. 
-   * @param operation Operation requested by the user.
-   * @param perm Target permissions. 
-   * @param target The target on which the operation is being performed. 
-   * @param description Some additional information as to why the operation
-   *                    failed.
-   * @param appId Application Id in which operation was performed.
-   * @param containerId Container Id in which operation was performed.
-   *
-   * <br><br>
-   * Note that the {@link RMAuditLogger} uses tabs ('\t') as a key-val delimiter
-   * and hence the value fields should not contains tabs ('\t').
+   * @param user
+   *     User who made the service request.
+   * @param operation
+   *     Operation requested by the user.
+   * @param perm
+   *     Target permissions.
+   * @param target
+   *     The target on which the operation is being performed.
+   * @param description
+   *     Some additional information as to why the operation
+   *     failed.
+   * @param appId
+   *     Application Id in which operation was performed.
+   * @param containerId
+   *     Container Id in which operation was performed.
+   *     <p/>
+   *     <br><br>
+   *     Note that the {@link RMAuditLogger} uses tabs ('\t') as a key-val
+   *     delimiter
+   *     and hence the value fields should not contains tabs ('\t').
    */
   public static void logFailure(String user, String operation, String perm,
-      String target, String description, ApplicationId appId, 
+      String target, String description, ApplicationId appId,
       ContainerId containerId) {
     if (LOG.isWarnEnabled()) {
-      LOG.warn(createFailureLog(user, operation, perm, target, description,
-          appId, null, containerId));
+      LOG.warn(
+          createFailureLog(user, operation, perm, target, description, appId,
+              null, containerId));
     }
   }
 
   /**
    * Create a readable and parseable audit log string for a failed event.
    *
-   * @param user User who made the service request. 
-   * @param operation Operation requested by the user.
-   * @param perm Target permissions.
-   * @param target The target on which the operation is being performed. 
-   * @param description Some additional information as to why the operation
-   *                    failed.
-   * @param appId ApplicationId in which operation was performed.
-   *
-   * <br><br>
-   * Note that the {@link RMAuditLogger} uses tabs ('\t') as a key-val delimiter
-   * and hence the value fields should not contains tabs ('\t').
+   * @param user
+   *     User who made the service request.
+   * @param operation
+   *     Operation requested by the user.
+   * @param perm
+   *     Target permissions.
+   * @param target
+   *     The target on which the operation is being performed.
+   * @param description
+   *     Some additional information as to why the operation
+   *     failed.
+   * @param appId
+   *     ApplicationId in which operation was performed.
+   *     <p/>
+   *     <br><br>
+   *     Note that the {@link RMAuditLogger} uses tabs ('\t') as a key-val
+   *     delimiter
+   *     and hence the value fields should not contains tabs ('\t').
    */
   public static void logFailure(String user, String operation, String perm,
-      String target, String description, ApplicationId appId, 
+      String target, String description, ApplicationId appId,
       ApplicationAttemptId attemptId) {
     if (LOG.isWarnEnabled()) {
-      LOG.warn(createFailureLog(user, operation, perm, target, description,
-          appId, attemptId, null));
+      LOG.warn(
+          createFailureLog(user, operation, perm, target, description, appId,
+              attemptId, null));
     }
   }
 
@@ -239,45 +292,60 @@ public class RMAuditLogger {
   /**
    * Create a readable and parseable audit log string for a failed event.
    *
-   * @param user User who made the service request. 
-   * @param operation Operation requested by the user.
-   * @param perm Target permissions.
-   * @param target The target on which the operation is being performed. 
-   * @param description Some additional information as to why the operation
-   *                    failed.
-   * @param appId ApplicationId in which operation was performed.
-   *
-   * <br><br>
-   * Note that the {@link RMAuditLogger} uses tabs ('\t') as a key-val delimiter
-   * and hence the value fields should not contains tabs ('\t').
+   * @param user
+   *     User who made the service request.
+   * @param operation
+   *     Operation requested by the user.
+   * @param perm
+   *     Target permissions.
+   * @param target
+   *     The target on which the operation is being performed.
+   * @param description
+   *     Some additional information as to why the operation
+   *     failed.
+   * @param appId
+   *     ApplicationId in which operation was performed.
+   *     <p/>
+   *     <br><br>
+   *     Note that the {@link RMAuditLogger} uses tabs ('\t') as a key-val
+   *     delimiter
+   *     and hence the value fields should not contains tabs ('\t').
    */
   public static void logFailure(String user, String operation, String perm,
       String target, String description, ApplicationId appId) {
     if (LOG.isWarnEnabled()) {
-      LOG.warn(createFailureLog(user, operation, perm, target, description,
-          appId, null, null));
+      LOG.warn(
+          createFailureLog(user, operation, perm, target, description, appId,
+              null, null));
     }
   }
 
   /**
    * Create a readable and parseable audit log string for a failed event.
    *
-   * @param user User who made the service request.
-   * @param operation Operation requested by the user.
-   * @param perm Target permissions. 
-   * @param target The target on which the operation is being performed. 
-   * @param description Some additional information as to why the operation
-   *                    failed.
-   *
-   * <br><br>
-   * Note that the {@link RMAuditLogger} uses tabs ('\t') as a key-val delimiter
-   * and hence the value fields should not contains tabs ('\t').
+   * @param user
+   *     User who made the service request.
+   * @param operation
+   *     Operation requested by the user.
+   * @param perm
+   *     Target permissions.
+   * @param target
+   *     The target on which the operation is being performed.
+   * @param description
+   *     Some additional information as to why the operation
+   *     failed.
+   *     <p/>
+   *     <br><br>
+   *     Note that the {@link RMAuditLogger} uses tabs ('\t') as a key-val
+   *     delimiter
+   *     and hence the value fields should not contains tabs ('\t').
    */
   public static void logFailure(String user, String operation, String perm,
       String target, String description) {
     if (LOG.isWarnEnabled()) {
-      LOG.warn(createFailureLog(user, operation, perm, target, description,
-          null, null, null));
+      LOG.warn(
+          createFailureLog(user, operation, perm, target, description, null,
+              null, null));
     }
   }
 
@@ -306,6 +374,6 @@ public class RMAuditLogger {
    */
   static void add(Keys key, String value, StringBuilder b) {
     b.append(AuditConstants.PAIR_SEPARATOR).append(key.name())
-     .append(AuditConstants.KEY_VAL_SEPARATOR).append(value);
+        .append(AuditConstants.KEY_VAL_SEPARATOR).append(value);
   }
 }

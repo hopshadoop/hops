@@ -17,10 +17,10 @@
  */
 package org.apache.hadoop.hdfs.protocol;
 
+import org.junit.Test;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-
-import org.junit.Test;
 
 
 public class TestExtendedBlock {
@@ -33,25 +33,20 @@ public class TestExtendedBlock {
   @Test
   public void testEquals() {
     // Same block -> equal
-    assertEquals(
-        new ExtendedBlock(POOL_A, BLOCK_1_GS1),
+    assertEquals(new ExtendedBlock(POOL_A, BLOCK_1_GS1),
         new ExtendedBlock(POOL_A, BLOCK_1_GS1));
     // Different pools, same block id -> not equal
-    assertNotEquals(
-        new ExtendedBlock(POOL_A, BLOCK_1_GS1),
+    assertNotEquals(new ExtendedBlock(POOL_A, BLOCK_1_GS1),
         new ExtendedBlock(POOL_B, BLOCK_1_GS1));
     // Same pool, different block id -> not equal
-    assertNotEquals(
-        new ExtendedBlock(POOL_A, BLOCK_1_GS1),
+    assertNotEquals(new ExtendedBlock(POOL_A, BLOCK_1_GS1),
         new ExtendedBlock(POOL_A, BLOCK_2_GS1));
     // Same block, different genstamps -> equal
-    assertEquals(
-        new ExtendedBlock(POOL_A, BLOCK_1_GS1),
+    assertEquals(new ExtendedBlock(POOL_A, BLOCK_1_GS1),
         new ExtendedBlock(POOL_A, BLOCK_1_GS2));
   }
 
   private static void assertNotEquals(Object a, Object b) {
-    assertFalse("expected not equal: '" + a + "' and '" + b + "'",
-        a.equals(b));
+    assertFalse("expected not equal: '" + a + "' and '" + b + "'", a.equals(b));
   }
 }

@@ -18,12 +18,12 @@
                       http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <groupId>org.apache.hadoop</groupId>
+    <groupId>io.hops</groupId>
     <artifactId>hadoop-project-dist</artifactId>
     <version>2.4.0</version>
     <relativePath>../../hadoop-project-dist</relativePath>
   </parent>
-  <groupId>org.apache.hadoop</groupId>
+  <groupId>io.hops</groupId>
   <artifactId>hadoop-tools-dist</artifactId>
   <version>2.4.0</version>
   <description>Apache Hadoop Tools Dist</description>
@@ -36,55 +36,55 @@
 
   <dependencies>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-streaming</artifactId>
       <scope>compile</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-distcp</artifactId>
       <scope>compile</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-archives</artifactId>
       <scope>compile</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-rumen</artifactId>
       <scope>compile</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-datajoin</artifactId>
       <scope>compile</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-extras</artifactId>
       <scope>compile</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-gridmix</artifactId>
       <scope>compile</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-pipes</artifactId>
       <scope>compile</scope>
       <type>pom</type>
       <version>${project.version}</version>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-openstack</artifactId>
       <scope>compile</scope>
       <version>${project.version}</version>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-sls</artifactId>
       <scope>compile</scope>
     </dependency>
@@ -120,7 +120,7 @@
             <artifactId>maven-assembly-plugin</artifactId>
             <dependencies>
               <dependency>
-                <groupId>org.apache.hadoop</groupId>
+                <groupId>io.hops</groupId>
                 <artifactId>hadoop-assemblies</artifactId>
                 <version>${project.version}</version>
               </dependency>

@@ -19,7 +19,6 @@
 package org.apache.hadoop.yarn;
 
 import junit.framework.Assert;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
@@ -61,7 +60,8 @@ public class TestRpcFactoryProvider {
     
     conf = new Configuration();
     conf.set(YarnConfiguration.IPC_CLIENT_FACTORY_CLASS, "NonExistantClass");
-    conf.set(YarnConfiguration.IPC_SERVER_FACTORY_CLASS, RpcServerFactoryPBImpl.class.getName());
+    conf.set(YarnConfiguration.IPC_SERVER_FACTORY_CLASS,
+        RpcServerFactoryPBImpl.class.getName());
     
     try {
       clientFactory = RpcFactoryProvider.getClientFactory(conf);
@@ -71,7 +71,8 @@ public class TestRpcFactoryProvider {
     try {
       serverFactory = RpcFactoryProvider.getServerFactory(conf);
     } catch (YarnRuntimeException e) {
-      Assert.fail("Error while loading factory using reflection: [" + RpcServerFactoryPBImpl.class.getName() + "]");
+      Assert.fail("Error while loading factory using reflection: [" +
+          RpcServerFactoryPBImpl.class.getName() + "]");
     }
   }
 }

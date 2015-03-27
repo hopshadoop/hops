@@ -21,7 +21,6 @@
 
 #include <jni.h> /* for jboolean */
 
-struct hdfsBuilder;
 struct NativeMiniDfsCluster; 
 
 /**
@@ -29,24 +28,17 @@ struct NativeMiniDfsCluster;
  */
 struct NativeMiniDfsConf {
     /**
-     * Nonzero if the cluster should be formatted prior to startup.
+     * Nonzero if the cluster should be formatted prior to startup
      */
     jboolean doFormat;
-
     /**
      * Whether or not to enable webhdfs in MiniDfsCluster
      */
     jboolean webhdfsEnabled;
-
     /**
      * The http port of the namenode in MiniDfsCluster
      */
     jint namenodeHttpPort;
-
-    /**
-     * Nonzero if we should configure short circuit.
-     */
-    jboolean configureShortCircuit;
 };
 
 /**
@@ -92,7 +84,7 @@ void nmdFree(struct NativeMiniDfsCluster* cl);
  *
  * @return          the port, or a negative error code
  */
-int nmdGetNameNodePort(const struct NativeMiniDfsCluster *cl); 
+int nmdGetNameNodePort(const struct NativeMiniDfsCluster *cl);
 
 /**
  * Get the http address that's in use by the given (non-HA) nativeMiniDfs
@@ -108,15 +100,5 @@ int nmdGetNameNodePort(const struct NativeMiniDfsCluster *cl);
  */
 int nmdGetNameNodeHttpAddress(const struct NativeMiniDfsCluster *cl,
                                int *port, const char **hostName);
-
-/**
- * Configure the HDFS builder appropriately to connect to this cluster.
- *
- * @param bld       The hdfs builder
- *
- * @return          the port, or a negative error code
- */
-int nmdConfigureHdfsBuilder(struct NativeMiniDfsCluster *cl,
-                            struct hdfsBuilder *bld);
 
 #endif

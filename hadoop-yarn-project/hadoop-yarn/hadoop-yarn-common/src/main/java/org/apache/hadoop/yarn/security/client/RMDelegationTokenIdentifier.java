@@ -19,9 +19,6 @@
 package org.apache.hadoop.yarn.security.client;
 
 
-import java.io.IOException;
-import java.net.InetSocketAddress;
-
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
@@ -29,7 +26,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenRenewer;
 import org.apache.hadoop.security.token.delegation.AbstractDelegationTokenIdentifier;
@@ -38,17 +34,20 @@ import org.apache.hadoop.yarn.api.ApplicationClientProtocol;
 import org.apache.hadoop.yarn.api.protocolrecords.CancelDelegationTokenRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.RenewDelegationTokenRequest;
 import org.apache.hadoop.yarn.client.ClientRMProxy;
-import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.util.Records;
 
+import java.io.IOException;
+import java.net.InetSocketAddress;
+
 /**
- * Delegation Token Identifier that identifies the delegation tokens from the 
- * Resource Manager. 
+ * Delegation Token Identifier that identifies the delegation tokens from the
+ * Resource Manager.
  */
 @Public
 @Evolving
-public class RMDelegationTokenIdentifier extends AbstractDelegationTokenIdentifier {
+public class RMDelegationTokenIdentifier
+    extends AbstractDelegationTokenIdentifier {
 
   public static final Text KIND_NAME = new Text("RM_DELEGATION_TOKEN");
   
@@ -57,9 +56,13 @@ public class RMDelegationTokenIdentifier extends AbstractDelegationTokenIdentifi
   
   /**
    * Create a new delegation token identifier
-   * @param owner the effective username of the token owner
-   * @param renewer the username of the renewer
-   * @param realUser the real username of the token owner
+   *
+   * @param owner
+   *     the effective username of the token owner
+   * @param renewer
+   *     the username of the renewer
+   * @param realUser
+   *     the real username of the token owner
    */
   public RMDelegationTokenIdentifier(Text owner, Text renewer, Text realUser) {
     super(owner, renewer, realUser);
@@ -82,8 +85,8 @@ public class RMDelegationTokenIdentifier extends AbstractDelegationTokenIdentifi
       return true;
     }
 
-    private static
-    AbstractDelegationTokenSecretManager<RMDelegationTokenIdentifier> localSecretManager;
+    private static AbstractDelegationTokenSecretManager<RMDelegationTokenIdentifier>
+        localSecretManager;
     private static InetSocketAddress localServiceAddress;
     
     @Private
@@ -96,8 +99,8 @@ public class RMDelegationTokenIdentifier extends AbstractDelegationTokenIdentifi
     
     @SuppressWarnings("unchecked")
     @Override
-    public long renew(Token<?> token, Configuration conf) throws IOException,
-        InterruptedException {
+    public long renew(Token<?> token, Configuration conf)
+        throws IOException, InterruptedException {
       final ApplicationClientProtocol rmClient = getRmClient(token, conf);
       if (rmClient != null) {
         try {
@@ -111,15 +114,16 @@ public class RMDelegationTokenIdentifier extends AbstractDelegationTokenIdentifi
           RPC.stopProxy(rmClient);
         }
       } else {
-        return localSecretManager.renewToken(
-            (Token<RMDelegationTokenIdentifier>)token, getRenewer(token));
+        return localSecretManager
+            .renewToken((Token<RMDelegationTokenIdentifier>) token,
+                getRenewer(token));
       }
     }
 
     @SuppressWarnings("unchecked")
     @Override
-    public void cancel(Token<?> token, Configuration conf) throws IOException,
-        InterruptedException {
+    public void cancel(Token<?> token, Configuration conf)
+        throws IOException, InterruptedException {
       final ApplicationClientProtocol rmClient = getRmClient(token, conf);
       if (rmClient != null) {
         try {
@@ -133,8 +137,9 @@ public class RMDelegationTokenIdentifier extends AbstractDelegationTokenIdentifi
           RPC.stopProxy(rmClient);
         }
       } else {
-        localSecretManager.cancelToken(
-            (Token<RMDelegationTokenIdentifier>)token, getRenewer(token));
+        localSecretManager
+            .cancelToken((Token<RMDelegationTokenIdentifier>) token,
+                getRenewer(token));
       }
     }
     
@@ -161,15 +166,15 @@ public class RMDelegationTokenIdentifier extends AbstractDelegationTokenIdentifi
     // get renewer so we can always renew our own tokens
     @SuppressWarnings("unchecked")
     private static String getRenewer(Token<?> token) throws IOException {
-      return ((Token<RMDelegationTokenIdentifier>)token).decodeIdentifier()
+      return ((Token<RMDelegationTokenIdentifier>) token).decodeIdentifier()
           .getRenewer().toString();
     }
     
-    private static org.apache.hadoop.yarn.api.records.Token
-        convertToProtoToken(Token<?> token) {
-      return org.apache.hadoop.yarn.api.records.Token.newInstance(
-        token.getIdentifier(), token.getKind().toString(), token.getPassword(),
-        token.getService().toString());
+    private static org.apache.hadoop.yarn.api.records.Token convertToProtoToken(
+        Token<?> token) {
+      return org.apache.hadoop.yarn.api.records.Token
+          .newInstance(token.getIdentifier(), token.getKind().toString(),
+              token.getPassword(), token.getService().toString());
     }
   }
 }

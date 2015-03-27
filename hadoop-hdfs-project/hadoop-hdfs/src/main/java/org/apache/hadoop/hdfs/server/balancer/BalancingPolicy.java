@@ -38,35 +38,45 @@ abstract class BalancingPolicy {
     avgUtilization = 0.0;
   }
 
-  /** Get the policy name. */
+  /**
+   * Get the policy name.
+   */
   abstract String getName();
 
-  /** Accumulate used space and capacity. */
+  /**
+   * Accumulate used space and capacity.
+   */
   abstract void accumulateSpaces(DatanodeInfo d);
 
   void initAvgUtilization() {
-    this.avgUtilization = totalUsedSpace*100.0/totalCapacity;
+    this.avgUtilization = totalUsedSpace * 100.0 / totalCapacity;
   }
+
   double getAvgUtilization() {
     return avgUtilization;
   }
 
-  /** Return the utilization of a datanode */
+  /**
+   * Return the utilization of a datanode
+   */
   abstract double getUtilization(DatanodeInfo d);
   
   @Override
   public String toString() {
-    return BalancingPolicy.class.getSimpleName()
-        + "." + getClass().getSimpleName();
+    return BalancingPolicy.class.getSimpleName() + "." +
+        getClass().getSimpleName();
   }
 
-  /** Get all {@link BalancingPolicy} instances*/
+  /**
+   * Get all {@link BalancingPolicy} instances
+   */
   static BalancingPolicy parse(String s) {
-    final BalancingPolicy [] all = {BalancingPolicy.Node.INSTANCE,
-                                    BalancingPolicy.Pool.INSTANCE};
-    for(BalancingPolicy p : all) {
-      if (p.getName().equalsIgnoreCase(s))
+    final BalancingPolicy[] all =
+        {BalancingPolicy.Node.INSTANCE, BalancingPolicy.Pool.INSTANCE};
+    for (BalancingPolicy p : all) {
+      if (p.getName().equalsIgnoreCase(s)) {
         return p;
+      }
     }
     throw new IllegalArgumentException("Cannot parse string \"" + s + "\"");
   }
@@ -75,8 +85,10 @@ abstract class BalancingPolicy {
    * Cluster is balanced if each node is balanced.
    */
   static class Node extends BalancingPolicy {
-    static final Node INSTANCE = new Node();
-    private Node() {}
+    static Node INSTANCE = new Node();
+
+    private Node() {
+    }
 
     @Override
     String getName() {
@@ -86,12 +98,12 @@ abstract class BalancingPolicy {
     @Override
     void accumulateSpaces(DatanodeInfo d) {
       totalCapacity += d.getCapacity();
-      totalUsedSpace += d.getDfsUsed();  
+      totalUsedSpace += d.getDfsUsed();
     }
     
     @Override
     double getUtilization(DatanodeInfo d) {
-      return d.getDfsUsed()*100.0/d.getCapacity();
+      return d.getDfsUsed() * 100.0 / d.getCapacity();
     }
   }
 
@@ -99,8 +111,10 @@ abstract class BalancingPolicy {
    * Cluster is balanced if each pool in each node is balanced.
    */
   static class Pool extends BalancingPolicy {
-    static final Pool INSTANCE = new Pool();
-    private Pool() {}
+    static Pool INSTANCE = new Pool();
+
+    private Pool() {
+    }
 
     @Override
     String getName() {
@@ -110,12 +124,12 @@ abstract class BalancingPolicy {
     @Override
     void accumulateSpaces(DatanodeInfo d) {
       totalCapacity += d.getCapacity();
-      totalUsedSpace += d.getBlockPoolUsed();  
+      totalUsedSpace += d.getBlockPoolUsed();
     }
 
     @Override
     double getUtilization(DatanodeInfo d) {
-      return d.getBlockPoolUsed()*100.0/d.getCapacity();
+      return d.getBlockPoolUsed() * 100.0 / d.getCapacity();
     }
   }
 }

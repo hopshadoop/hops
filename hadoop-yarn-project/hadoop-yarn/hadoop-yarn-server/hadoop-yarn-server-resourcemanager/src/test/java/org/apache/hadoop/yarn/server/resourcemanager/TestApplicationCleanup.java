@@ -1,30 +1,26 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with this
+ * work for additional information regarding copyright ownership. The ASF
+ * licenses this file to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations under
+ * the License.
  */
-
 package org.apache.hadoop.yarn.server.resourcemanager;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
+import io.hops.exception.StorageInitializtionException;
+import io.hops.metadata.util.RMStorageFactory;
+import io.hops.metadata.util.RMUtilities;
+import io.hops.metadata.util.YarnAPIStorageFactory;
 import junit.framework.Assert;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -33,6 +29,7 @@ import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerState;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.ResourceRequest;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.event.Dispatcher;
 import org.apache.hadoop.yarn.event.DrainDispatcher;
 import org.apache.hadoop.yarn.event.EventHandler;
@@ -45,17 +42,33 @@ import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
+import org.junit.Before;
 import org.junit.Test;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class TestApplicationCleanup {
 
-  private static final Log LOG = LogFactory
-    .getLog(TestApplicationCleanup.class);
+  private static final Log LOG =
+      LogFactory.getLog(TestApplicationCleanup.class);
+
+  @Before
+  public void setup() throws StorageInitializtionException, IOException {
+    YarnConfiguration conf = new YarnConfiguration();
+    YarnAPIStorageFactory.setConfiguration(conf);
+    RMStorageFactory.setConfiguration(conf);
+    RMUtilities.InitializeDB();
+  }
 
   @Test
   public void testAppCleanup() throws Exception {
     Logger rootLogger = LogManager.getRootLogger();
     rootLogger.setLevel(Level.DEBUG);
+    rootLogger.debug("start testAppCleanup");
     MockRM rm = new MockRM();
     rm.start();
 
@@ -69,12 +82,11 @@ public class TestApplicationCleanup {
     RMAppAttempt attempt = app.getCurrentAppAttempt();
     MockAM am = rm.sendAMLaunched(attempt.getAppAttemptId());
     am.registerAppAttempt();
-    
+
     //request for containers
     int request = 2;
-    am.allocate("127.0.0.1" , 1000, request, 
-        new ArrayList<ContainerId>());
-    
+    am.allocate("127.0.0.1", 1000, request, new ArrayList<ContainerId>());
+
     //kick the scheduler
     nm1.nodeHeartbeat(true);
     List<Container> conts = am.allocate(new ArrayList<ResourceRequest>(),
@@ -82,8 +94,8 @@ public class TestApplicationCleanup {
     int contReceived = conts.size();
     int waitCount = 0;
     while (contReceived < request && waitCount++ < 200) {
-      LOG.info("Got " + contReceived + " containers. Waiting to get "
-               + request);
+      LOG.info(
+          "Got " + contReceived + " containers. Waiting to get " + request);
       Thread.sleep(100);
       conts = am.allocate(new ArrayList<ResourceRequest>(),
           new ArrayList<ContainerId>()).getAllocatedContainers();
@@ -91,7 +103,7 @@ public class TestApplicationCleanup {
       nm1.nodeHeartbeat(true);
     }
     Assert.assertEquals(request, contReceived);
-    
+
     am.unregisterAppAttempt();
     NodeHeartbeatResponse resp = nm1.nodeHeartbeat(attempt.getAppAttemptId(), 1,
         ContainerState.COMPLETE);
@@ -105,10 +117,10 @@ public class TestApplicationCleanup {
     int numCleanedContainers = containersToCleanup.size();
     int numCleanedApps = appsToCleanup.size();
     waitCount = 0;
-    while ((numCleanedContainers < 2 || numCleanedApps < 1)
-        && waitCount++ < 200) {
-      LOG.info("Waiting to get cleanup events.. cleanedConts: "
-          + numCleanedContainers + " cleanedApps: " + numCleanedApps);
+    while ((numCleanedContainers < 2 || numCleanedApps < 1) &&
+        waitCount++ < 200) {
+      LOG.info("Waiting to get cleanup events.. cleanedConts: " +
+          numCleanedContainers + " cleanedApps: " + numCleanedApps);
       Thread.sleep(100);
       resp = nm1.nodeHeartbeat(true);
       List<ContainerId> deltaContainersToCleanup =
@@ -121,7 +133,7 @@ public class TestApplicationCleanup {
       numCleanedContainers = containersToCleanup.size();
       numCleanedApps = appsToCleanup.size();
     }
-    
+
     Assert.assertEquals(1, appsToCleanup.size());
     Assert.assertEquals(app.getApplicationId(), appsToCleanup.get(0));
     Assert.assertEquals(1, numCleanedApps);
@@ -135,6 +147,7 @@ public class TestApplicationCleanup {
 
     Logger rootLogger = LogManager.getRootLogger();
     rootLogger.setLevel(Level.DEBUG);
+    rootLogger.debug("start testContainerCleanup");
     final DrainDispatcher dispatcher = new DrainDispatcher();
     MockRM rm = new MockRM() {
       @Override
@@ -164,13 +177,12 @@ public class TestApplicationCleanup {
     RMAppAttempt attempt = app.getCurrentAppAttempt();
     MockAM am = rm.sendAMLaunched(attempt.getAppAttemptId());
     am.registerAppAttempt();
-    
+
     //request for containers
     int request = 2;
-    am.allocate("127.0.0.1" , 1000, request, 
-        new ArrayList<ContainerId>());
+    am.allocate("127.0.0.1", 1000, request, new ArrayList<ContainerId>());
     dispatcher.await();
-    
+
     //kick the scheduler
     nm1.nodeHeartbeat(true);
     List<Container> conts = am.allocate(new ArrayList<ResourceRequest>(),
@@ -178,8 +190,8 @@ public class TestApplicationCleanup {
     int contReceived = conts.size();
     int waitCount = 0;
     while (contReceived < request && waitCount++ < 200) {
-      LOG.info("Got " + contReceived + " containers. Waiting to get "
-               + request);
+      LOG.info(
+          "Got " + contReceived + " containers. Waiting to get " + request);
       Thread.sleep(100);
       conts = am.allocate(new ArrayList<ResourceRequest>(),
           new ArrayList<ContainerId>()).getAllocatedContainers();
@@ -202,8 +214,9 @@ public class TestApplicationCleanup {
         new HashMap<ApplicationId, List<ContainerStatus>>();
     ArrayList<ContainerStatus> containerStatusList =
         new ArrayList<ContainerStatus>();
-    containerStatusList.add(BuilderUtils.newContainerStatus(conts.get(0)
-      .getId(), ContainerState.RUNNING, "nothing", 0));
+    containerStatusList.add(BuilderUtils
+        .newContainerStatus(conts.get(0).getId(), ContainerState.RUNNING,
+            "nothing", 0));
     containerStatuses.put(app.getApplicationId(), containerStatusList);
 
     NodeHeartbeatResponse resp = nm1.nodeHeartbeat(containerStatuses, true);
@@ -224,12 +237,13 @@ public class TestApplicationCleanup {
 
     // Now to test the case when RM already gave cleanup, and NM suddenly
     // realizes that the container is running.
-    LOG.info("Testing container launch much after release and "
-        + "NM getting cleanup");
+    LOG.info("Testing container launch much after release and " +
+        "NM getting cleanup");
     containerStatuses.clear();
     containerStatusList.clear();
-    containerStatusList.add(BuilderUtils.newContainerStatus(conts.get(0)
-      .getId(), ContainerState.RUNNING, "nothing", 0));
+    containerStatusList.add(BuilderUtils
+        .newContainerStatus(conts.get(0).getId(), ContainerState.RUNNING,
+            "nothing", 0));
     containerStatuses.put(app.getApplicationId(), containerStatusList);
 
     resp = nm1.nodeHeartbeat(containerStatuses, true);

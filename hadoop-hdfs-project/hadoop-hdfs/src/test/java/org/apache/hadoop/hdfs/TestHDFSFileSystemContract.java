@@ -18,13 +18,13 @@
 
 package org.apache.hadoop.hdfs;
 
-import java.io.IOException;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.FileSystemContractBaseTest;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.UserGroupInformation;
+
+import java.io.IOException;
 
 public class TestHDFSFileSystemContract extends FileSystemContractBaseTest {
   
@@ -38,15 +38,14 @@ public class TestHDFSFileSystemContract extends FileSystemContractBaseTest {
         FileSystemContractBaseTest.TEST_UMASK);
     cluster = new MiniDFSCluster.Builder(conf).numDataNodes(2).build();
     fs = cluster.getFileSystem();
-    defaultWorkingDirectory = "/user/" + 
-           UserGroupInformation.getCurrentUser().getShortUserName();
+    defaultWorkingDirectory =
+        "/user/" + UserGroupInformation.getCurrentUser().getShortUserName();
   }
   
   @Override
   protected void tearDown() throws Exception {
     super.tearDown();
     cluster.shutdown();
-    cluster = null;
   }
 
   @Override

@@ -19,8 +19,6 @@ package org.apache.hadoop.lib.service.security;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.http.server.HttpFSServerWebApp;
-import org.apache.hadoop.hdfs.web.SWebHdfsFileSystem;
-import org.apache.hadoop.hdfs.web.WebHdfsFileSystem;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.lib.server.BaseService;
 import org.apache.hadoop.lib.server.ServerException;
@@ -42,7 +40,7 @@ import java.io.IOException;
  */
 @InterfaceAudience.Private
 public class DelegationTokenManagerService extends BaseService
-  implements DelegationTokenManager {
+    implements DelegationTokenManager {
 
   private static final String PREFIX = "delegation.token.manager";
 
@@ -57,8 +55,6 @@ public class DelegationTokenManagerService extends BaseService
 
   DelegationTokenSecretManager secretManager = null;
 
-  private Text tokenKind;
-
   public DelegationTokenManagerService() {
     super(PREFIX);
   }
@@ -66,7 +62,8 @@ public class DelegationTokenManagerService extends BaseService
   /**
    * Initializes the service.
    *
-   * @throws ServiceException thrown if the service could not be initialized.
+   * @throws ServiceException
+   *     thrown if the service could not be initialized.
    */
   @Override
   protected void init() throws ServiceException {
@@ -74,17 +71,14 @@ public class DelegationTokenManagerService extends BaseService
     long updateInterval = getServiceConfig().getLong(UPDATE_INTERVAL, DAY);
     long maxLifetime = getServiceConfig().getLong(MAX_LIFETIME, 7 * DAY);
     long renewInterval = getServiceConfig().getLong(RENEW_INTERVAL, DAY);
-    tokenKind = (HttpFSServerWebApp.get().isSslEnabled())
-                ? SWebHdfsFileSystem.TOKEN_KIND : WebHdfsFileSystem.TOKEN_KIND;
-    secretManager = new DelegationTokenSecretManager(tokenKind, updateInterval,
-                                                     maxLifetime,
-                                                     renewInterval, HOUR);
+    secretManager =
+        new DelegationTokenSecretManager(updateInterval, maxLifetime,
+            renewInterval, HOUR);
     try {
       secretManager.startThreads();
     } catch (IOException ex) {
       throw new ServiceException(ServiceException.ERROR.S12,
-                                 DelegationTokenManager.class.getSimpleName(),
-                                 ex.toString(), ex);
+          DelegationTokenManager.class.getSimpleName(), ex.toString(), ex);
     }
   }
 
@@ -110,16 +104,18 @@ public class DelegationTokenManagerService extends BaseService
   /**
    * Creates a delegation token.
    *
-   * @param ugi UGI creating the token.
-   * @param renewer token renewer.
+   * @param ugi
+   *     UGI creating the token.
+   * @param renewer
+   *     token renewer.
    * @return new delegation token.
-   * @throws DelegationTokenManagerException thrown if the token could not be
-   * created.
+   * @throws DelegationTokenManagerException
+   *     thrown if the token could not be
+   *     created.
    */
   @Override
   public Token<DelegationTokenIdentifier> createToken(UserGroupInformation ugi,
-                                                      String renewer)
-    throws DelegationTokenManagerException {
+      String renewer) throws DelegationTokenManagerException {
     renewer = (renewer == null) ? ugi.getShortUserName() : renewer;
     String user = ugi.getUserName();
     Text owner = new Text(user);
@@ -128,15 +124,15 @@ public class DelegationTokenManagerService extends BaseService
       realUser = new Text(ugi.getRealUser().getUserName());
     }
     DelegationTokenIdentifier tokenIdentifier =
-      new DelegationTokenIdentifier(tokenKind, owner, new Text(renewer), realUser);
+        new DelegationTokenIdentifier(owner, new Text(renewer), realUser);
     Token<DelegationTokenIdentifier> token =
-      new Token<DelegationTokenIdentifier>(tokenIdentifier, secretManager);
+        new Token<DelegationTokenIdentifier>(tokenIdentifier, secretManager);
     try {
-      SecurityUtil.setTokenService(token,
-                                   HttpFSServerWebApp.get().getAuthority());
+      SecurityUtil
+          .setTokenService(token, HttpFSServerWebApp.get().getAuthority());
     } catch (ServerException ex) {
       throw new DelegationTokenManagerException(
-        DelegationTokenManagerException.ERROR.DT04, ex.toString(), ex);
+          DelegationTokenManagerException.ERROR.DT04, ex.toString(), ex);
     }
     return token;
   }
@@ -144,97 +140,105 @@ public class DelegationTokenManagerService extends BaseService
   /**
    * Renews a delegation token.
    *
-   * @param token delegation token to renew.
-   * @param renewer token renewer.
+   * @param token
+   *     delegation token to renew.
+   * @param renewer
+   *     token renewer.
    * @return epoc expiration time.
-   * @throws DelegationTokenManagerException thrown if the token could not be
-   * renewed.
+   * @throws DelegationTokenManagerException
+   *     thrown if the token could not be
+   *     renewed.
    */
   @Override
   public long renewToken(Token<DelegationTokenIdentifier> token, String renewer)
-    throws DelegationTokenManagerException {
+      throws DelegationTokenManagerException {
     try {
       return secretManager.renewToken(token, renewer);
     } catch (IOException ex) {
       throw new DelegationTokenManagerException(
-        DelegationTokenManagerException.ERROR.DT02, ex.toString(), ex);
+          DelegationTokenManagerException.ERROR.DT02, ex.toString(), ex);
     }
   }
 
   /**
    * Cancels a delegation token.
    *
-   * @param token delegation token to cancel.
-   * @param canceler token canceler.
-   * @throws DelegationTokenManagerException thrown if the token could not be
-   * canceled.
+   * @param token
+   *     delegation token to cancel.
+   * @param canceler
+   *     token canceler.
+   * @throws DelegationTokenManagerException
+   *     thrown if the token could not be
+   *     canceled.
    */
   @Override
   public void cancelToken(Token<DelegationTokenIdentifier> token,
-                          String canceler)
-    throws DelegationTokenManagerException {
+      String canceler) throws DelegationTokenManagerException {
     try {
       secretManager.cancelToken(token, canceler);
     } catch (IOException ex) {
       throw new DelegationTokenManagerException(
-        DelegationTokenManagerException.ERROR.DT03, ex.toString(), ex);
+          DelegationTokenManagerException.ERROR.DT03, ex.toString(), ex);
     }
   }
 
   /**
    * Verifies a delegation token.
    *
-   * @param token delegation token to verify.
+   * @param token
+   *     delegation token to verify.
    * @return the UGI for the token.
-   * @throws DelegationTokenManagerException thrown if the token could not be
-   * verified.
+   * @throws DelegationTokenManagerException
+   *     thrown if the token could not be
+   *     verified.
    */
   @Override
-  public UserGroupInformation verifyToken(Token<DelegationTokenIdentifier> token)
-    throws DelegationTokenManagerException {
+  public UserGroupInformation verifyToken(
+      Token<DelegationTokenIdentifier> token)
+      throws DelegationTokenManagerException {
     ByteArrayInputStream buf = new ByteArrayInputStream(token.getIdentifier());
     DataInputStream dis = new DataInputStream(buf);
-    DelegationTokenIdentifier id = new DelegationTokenIdentifier(tokenKind);
+    DelegationTokenIdentifier id = new DelegationTokenIdentifier();
     try {
       id.readFields(dis);
       dis.close();
       secretManager.verifyToken(id, token.getPassword());
     } catch (Exception ex) {
       throw new DelegationTokenManagerException(
-        DelegationTokenManagerException.ERROR.DT01, ex.toString(), ex);
+          DelegationTokenManagerException.ERROR.DT01, ex.toString(), ex);
     }
     return id.getUser();
   }
 
   private static class DelegationTokenSecretManager
-    extends AbstractDelegationTokenSecretManager<DelegationTokenIdentifier> {
-
-    private Text tokenKind;
+      extends AbstractDelegationTokenSecretManager<DelegationTokenIdentifier> {
 
     /**
      * Create a secret manager
      *
-     * @param delegationKeyUpdateInterval the number of seconds for rolling new
-     * secret keys.
-     * @param delegationTokenMaxLifetime the maximum lifetime of the delegation
-     * tokens
-     * @param delegationTokenRenewInterval how often the tokens must be renewed
-     * @param delegationTokenRemoverScanInterval how often the tokens are
-     * scanned
-     * for expired tokens
+     * @param delegationKeyUpdateInterval
+     *     the number of seconds for rolling new
+     *     secret keys.
+     * @param delegationTokenMaxLifetime
+     *     the maximum lifetime of the delegation
+     *     tokens
+     * @param delegationTokenRenewInterval
+     *     how often the tokens must be renewed
+     * @param delegationTokenRemoverScanInterval
+     *     how often the tokens are
+     *     scanned
+     *     for expired tokens
      */
-    public DelegationTokenSecretManager(Text tokenKind, long delegationKeyUpdateInterval,
-                                        long delegationTokenMaxLifetime,
-                                        long delegationTokenRenewInterval,
-                                        long delegationTokenRemoverScanInterval) {
+    public DelegationTokenSecretManager(long delegationKeyUpdateInterval,
+        long delegationTokenMaxLifetime, long delegationTokenRenewInterval,
+        long delegationTokenRemoverScanInterval) {
       super(delegationKeyUpdateInterval, delegationTokenMaxLifetime,
-            delegationTokenRenewInterval, delegationTokenRemoverScanInterval);
-      this.tokenKind = tokenKind;
+          delegationTokenRenewInterval, delegationTokenRemoverScanInterval);
     }
 
     @Override
     public DelegationTokenIdentifier createIdentifier() {
-      return new DelegationTokenIdentifier(tokenKind);
+      return new DelegationTokenIdentifier();
     }
 
   }

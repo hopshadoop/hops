@@ -21,7 +21,7 @@ import javax.servlet.ServletException;
 import java.util.Properties;
 
 public class HttpFSKerberosAuthenticationHandlerForTesting
-  extends HttpFSKerberosAuthenticationHandler {
+    extends HttpFSKerberosAuthenticationHandler {
 
   @Override
   public void init(Properties config) throws ServletException {

@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.rmcontainer;
 
+import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.Priority;
@@ -25,7 +26,7 @@ import org.apache.hadoop.yarn.api.records.Resource;
 
 /**
  * The event signifying that a container has been reserved.
- * 
+ * <p/>
  * The event encapsulates information on the amount of reservation
  * and the node on which the reservation is in effect.
  */
@@ -36,9 +37,9 @@ public class RMContainerReservedEvent extends RMContainerEvent {
   private final Priority reservedPriority;
   
   public RMContainerReservedEvent(ContainerId containerId,
-      Resource reservedResource, NodeId reservedNode, 
-      Priority reservedPriority) {
-    super(containerId, RMContainerEventType.RESERVED);
+      Resource reservedResource, NodeId reservedNode, Priority reservedPriority,
+      TransactionState transactionState) {
+    super(containerId, RMContainerEventType.RESERVED, transactionState);
     this.reservedResource = reservedResource;
     this.reservedNode = reservedNode;
     this.reservedPriority = reservedPriority;

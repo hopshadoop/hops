@@ -17,12 +17,6 @@
  */
 package org.apache.hadoop.hdfs;
 
-import static org.junit.Assert.assertEquals;
-
-import java.io.IOException;
-import java.io.OutputStream;
-import java.util.Random;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -34,19 +28,29 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.UserGroupInformation;
 
-/** Utilities for append-related tests */ 
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.Random;
+
+import static org.junit.Assert.assertEquals;
+
+/**
+ * Utilities for append-related tests
+ */
 public class AppendTestUtil {
-  /** For specifying the random number generator seed,
-   *  change the following value:
+  /**
+   * For specifying the random number generator seed,
+   * change the following value:
    */
   static final Long RANDOM_NUMBER_GENERATOR_SEED = null;
 
   static final Log LOG = LogFactory.getLog(AppendTestUtil.class);
 
   private static final Random SEED = new Random();
+
   static {
-    final long seed = RANDOM_NUMBER_GENERATOR_SEED == null?
-        SEED.nextLong(): RANDOM_NUMBER_GENERATOR_SEED;
+    final long seed = RANDOM_NUMBER_GENERATOR_SEED == null ? SEED.nextLong() :
+        RANDOM_NUMBER_GENERATOR_SEED;
     LOG.info("seed=" + seed);
     SEED.setSeed(seed);
   }
@@ -54,8 +58,8 @@ public class AppendTestUtil {
   private static final ThreadLocal<Random> RANDOM = new ThreadLocal<Random>() {
     @Override
     protected Random initialValue() {
-      final Random r =  new Random();
-      synchronized(SEED) { 
+      final Random r = new Random();
+      synchronized (SEED) {
         final long seed = SEED.nextLong();
         r.setSeed(seed);
         LOG.info(Thread.currentThread().getName() + ": seed=" + seed);
@@ -68,9 +72,17 @@ public class AppendTestUtil {
   static final int FILE_SIZE = NUM_BLOCKS * BLOCK_SIZE + 1;
   static long seed = -1;
 
-  static int nextInt() {return RANDOM.get().nextInt();}
-  static int nextInt(int n) {return RANDOM.get().nextInt(n);}
-  static int nextLong() {return RANDOM.get().nextInt();}
+  static int nextInt() {
+    return RANDOM.get().nextInt();
+  }
+
+  public static int nextInt(int n) {
+    return RANDOM.get().nextInt(n);
+  }
+
+  static int nextLong() {
+    return RANDOM.get().nextInt();
+  }
 
   static byte[] randomBytes(long seed, int size) {
     LOG.info("seed=" + seed + ", size=" + size);
@@ -89,81 +101,91 @@ public class AppendTestUtil {
   }
   
   /**
-   * Returns the reference to a new instance of FileSystem created 
+   * Returns the reference to a new instance of FileSystem created
    * with different user name
-   * @param conf current Configuration
+   *
+   * @param conf
+   *     current Configuration
    * @return FileSystem instance
    * @throws IOException
-   * @throws InterruptedException 
+   * @throws InterruptedException
    */
-  public static FileSystem createHdfsWithDifferentUsername(final Configuration conf
-      ) throws IOException, InterruptedException {
-    String username = UserGroupInformation.getCurrentUser().getShortUserName()+"_XXX";
-    UserGroupInformation ugi = 
-      UserGroupInformation.createUserForTesting(username, new String[]{"supergroup"});
+  public static FileSystem createHdfsWithDifferentUsername(
+      final Configuration conf) throws IOException, InterruptedException {
+    String username =
+        UserGroupInformation.getCurrentUser().getShortUserName() + "_XXX";
+    UserGroupInformation ugi = UserGroupInformation
+        .createUserForTesting(username, new String[]{"supergroup"});
     
     return DFSTestUtil.getFileSystemAs(ugi, conf);
   }
 
-  public static void write(OutputStream out, int offset, int length) throws IOException {
+  public static void write(OutputStream out, int offset, int length)
+      throws IOException {
     final byte[] bytes = new byte[length];
-    for(int i = 0; i < length; i++) {
-      bytes[i] = (byte)(offset + i);
+    for (int i = 0; i < length; i++) {
+      bytes[i] = (byte) (offset + i);
     }
     out.write(bytes);
   }
   
-  public static void check(FileSystem fs, Path p, long length) throws IOException {
+  public static void check(FileSystem fs, Path p, long length)
+      throws IOException {
     int i = -1;
     try {
       final FileStatus status = fs.getFileStatus(p);
       FSDataInputStream in = fs.open(p);
       if (in.getWrappedStream() instanceof DFSInputStream) {
-        long len = ((DFSInputStream)in.getWrappedStream()).getFileLength();
+        long len = ((DFSInputStream) in.getWrappedStream()).getFileLength();
         assertEquals(length, len);
       } else {
         assertEquals(length, status.getLen());
       }
       
-      for(i++; i < length; i++) {
-        assertEquals((byte)i, (byte)in.read());  
+      for (i++; i < length; i++) {
+        assertEquals((byte) i, (byte) in.read());
       }
-      i = -(int)length;
+      i = -(int) length;
       assertEquals(-1, in.read()); //EOF  
       in.close();
-    } catch(IOException ioe) {
+    } catch (IOException ioe) {
       throw new IOException("p=" + p + ", length=" + length + ", i=" + i, ioe);
     }
   }
 
   /**
-   *  create a buffer that contains the entire test file data.
+   * create a buffer that contains the entire test file data.
    */
   public static byte[] initBuffer(int size) {
-    if (seed == -1)
+    if (seed == -1) {
       seed = nextLong();
+    }
     return randomBytes(seed, size);
   }
 
   /**
-   *  Creates a file but does not close it
-   *  Make sure to call close() on the returned stream
-   *  @throws IOException an exception might be thrown
+   * Creates a file but does not close it
+   * Make sure to call close() on the returned stream
+   *
+   * @throws IOException
+   *     an exception might be thrown
    */
-  public static FSDataOutputStream createFile(FileSystem fileSys, Path name, int repl)
-      throws IOException {
-    return fileSys.create(name, true,
-        fileSys.getConf().getInt(CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096),
+  public static FSDataOutputStream createFile(FileSystem fileSys, Path name,
+      int repl) throws IOException {
+    return fileSys.create(name, true, fileSys.getConf()
+        .getInt(CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096),
         (short) repl, BLOCK_SIZE);
   }
 
   /**
-   *  Compare the content of a file created from FileSystem and Path with
-   *  the specified byte[] buffer's content
-   *  @throws IOException an exception might be thrown
+   * Compare the content of a file created from FileSystem and Path with
+   * the specified byte[] buffer's content
+   *
+   * @throws IOException
+   *     an exception might be thrown
    */
   public static void checkFullFile(FileSystem fs, Path name, int len,
-                            final byte[] compareContent, String message) throws IOException {
+      final byte[] compareContent, String message) throws IOException {
     FSDataInputStream stm = fs.open(name);
     byte[] actual = new byte[len];
     stm.readFully(0, actual);
@@ -172,11 +194,11 @@ public class AppendTestUtil {
   }
 
   private static void checkData(final byte[] actual, int from,
-                                final byte[] expected, String message) {
+      final byte[] expected, String message) {
     for (int idx = 0; idx < actual.length; idx++) {
-      assertEquals(message+" byte "+(from+idx)+" differs. expected "+
-                   expected[from+idx]+" actual "+actual[idx],
-                   expected[from+idx], actual[idx]);
+      assertEquals(message + " byte " + (from + idx) + " differs. expected " +
+              expected[from + idx] + " actual " + actual[idx],
+          expected[from + idx], actual[idx]);
       actual[idx] = 0;
     }
   }
@@ -185,18 +207,18 @@ public class AppendTestUtil {
     final byte[] bytes = new byte[1000];
 
     { //create file
-      final FSDataOutputStream out = fs.create(p, (short)1);
+      final FSDataOutputStream out = fs.create(p, (short) 1);
       out.write(bytes);
       out.close();
       assertEquals(bytes.length, fs.getFileStatus(p).getLen());
     }
 
-    for(int i = 2; i < 500; i++) {
+    for (int i = 2; i < 500; i++) {
       //append
       final FSDataOutputStream out = fs.append(p);
       out.write(bytes);
       out.close();
-      assertEquals(i*bytes.length, fs.getFileStatus(p).getLen());
+      assertEquals(i * bytes.length, fs.getFileStatus(p).getLen());
     }
   }
 }

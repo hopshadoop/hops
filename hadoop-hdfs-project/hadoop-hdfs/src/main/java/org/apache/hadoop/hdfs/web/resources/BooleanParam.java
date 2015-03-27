@@ -17,12 +17,16 @@
  */
 package org.apache.hadoop.hdfs.web.resources;
 
-/** Boolean parameter. */
+/**
+ * Boolean parameter.
+ */
 abstract class BooleanParam extends Param<Boolean, BooleanParam.Domain> {
   static final String TRUE = "true";
   static final String FALSE = "false";
 
-  /** @return the parameter value as a string */
+  /**
+   * @return the parameter value as a string
+   */
   @Override
   public String getValueString() {
     return value.toString();
@@ -32,7 +36,9 @@ abstract class BooleanParam extends Param<Boolean, BooleanParam.Domain> {
     super(domain, value);
   }
 
-  /** The domain of the parameter. */
+  /**
+   * The domain of the parameter.
+   */
   static final class Domain extends Param.Domain<Boolean> {
     Domain(final String paramName) {
       super(paramName);
@@ -50,8 +56,8 @@ abstract class BooleanParam extends Param<Boolean, BooleanParam.Domain> {
       } else if (FALSE.equalsIgnoreCase(str)) {
         return false;
       }
-      throw new IllegalArgumentException("Failed to parse \"" + str
-          + "\" to Boolean.");
+      throw new IllegalArgumentException(
+          "Failed to parse \"" + str + "\" to Boolean.");
     }
   }
 }

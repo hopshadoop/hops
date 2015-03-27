@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.test;
 
+import org.apache.hadoop.MultipleSleepJob;
 import org.apache.hadoop.io.TestSequenceFile;
 import org.apache.hadoop.mapred.BigMapOutput;
 import org.apache.hadoop.mapred.GenericMRLoadGenerator;
@@ -85,6 +86,8 @@ public class MapredTestDriver {
       pgd.addClass("fail", FailJob.class, "a job that always fails");
       pgd.addClass("sleep", SleepJob.class, 
                    "A job that sleeps at each map and reduce task.");
+      pgd.addClass("multipleSleep", MultipleSleepJob.class,
+              "Several job that sleeps at each map and reduce task.");
       pgd.addClass("nnbench", NNBench.class, 
           "A benchmark that stresses the namenode.");
       pgd.addClass("testfilesystem", TestFileSystem.class, 

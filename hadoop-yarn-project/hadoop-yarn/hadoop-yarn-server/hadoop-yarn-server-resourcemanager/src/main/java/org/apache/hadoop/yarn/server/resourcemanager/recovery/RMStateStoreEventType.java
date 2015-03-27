@@ -20,8 +20,12 @@ package org.apache.hadoop.yarn.server.resourcemanager.recovery;
 
 public enum RMStateStoreEventType {
   STORE_APP_ATTEMPT,
+  //gautier done
   STORE_APP,
+  //done gautier
   UPDATE_APP,
+  //gautier done
   UPDATE_APP_ATTEMPT,
-  REMOVE_APP
+  //done gautier
+  REMOVE_APP //done gautier
 }

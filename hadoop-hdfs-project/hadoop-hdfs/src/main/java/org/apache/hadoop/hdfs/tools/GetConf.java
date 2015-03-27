@@ -17,6 +17,15 @@
  */
 package org.apache.hadoop.hdfs.tools;
 
+import org.apache.hadoop.HadoopIllegalArgumentException;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.hdfs.DFSUtil;
+import org.apache.hadoop.hdfs.HdfsConfiguration;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.Tool;
+import org.apache.hadoop.util.ToolRunner;
+
 import java.io.IOException;
 import java.io.PrintStream;
 import java.net.InetSocketAddress;
@@ -26,69 +35,51 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.hadoop.HadoopIllegalArgumentException;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.conf.Configured;
-import org.apache.hadoop.hdfs.DFSConfigKeys;
-import org.apache.hadoop.hdfs.DFSUtil;
-import org.apache.hadoop.hdfs.HdfsConfiguration;
-import org.apache.hadoop.hdfs.DFSUtil.ConfiguredNNAddress;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.util.Tool;
-import org.apache.hadoop.util.ToolRunner;
-
 /**
  * Tool for getting configuration information from a configuration file.
- * 
+ * <p/>
  * Adding more options:
  * <ul>
  * <li>
- * If adding a simple option to get a value corresponding to a key in the 
- * configuration, use regular {@link GetConf.CommandHandler}. 
+ * If adding a simple option to get a value corresponding to a key in the
+ * configuration, use regular {@link GetConf.CommandHandler}.
  * See {@link GetConf.Command#EXCLUDE_FILE} example.
  * </li>
  * <li>
  * If adding an option that is does not return a value for a key, add
- * a subclass of {@link GetConf.CommandHandler} and set it up in 
+ * a subclass of {@link GetConf.CommandHandler} and set it up in
  * {@link GetConf.Command}.
- * 
+ * <p/>
  * See {@link GetConf.Command#NAMENODE} for example.
- * 
+ * <p/>
  * Add for the new option added, a map entry with the corresponding
  * {@link GetConf.CommandHandler}.
  * </ul>
  */
 public class GetConf extends Configured implements Tool {
-  private static final String DESCRIPTION = "hdfs getconf is utility for "
-      + "getting configuration information from the config file.\n";
+  private static final String DESCRIPTION = "hdfs getconf is utility for " +
+      "getting configuration information from the config file.\n";
 
   enum Command {
     NAMENODE("-namenodes", "gets list of namenodes in the cluster."),
-    SECONDARY("-secondaryNameNodes", 
-        "gets list of secondary namenodes in the cluster."),
-    BACKUP("-backupNodes", "gets list of backup nodes in the cluster."),
     INCLUDE_FILE("-includeFile",
         "gets the include file path that defines the datanodes " +
-        "that can join the cluster."),
+            "that can join the cluster."),
     EXCLUDE_FILE("-excludeFile",
         "gets the exclude file path that defines the datanodes " +
-        "that need to decommissioned."),
+            "that need to decommissioned."),
     NNRPCADDRESSES("-nnRpcAddresses", "gets the namenode rpc addresses"),
     CONFKEY("-confKey [key]", "gets a specific key from the configuration");
 
-    private static final Map<String, CommandHandler> map;
-    static  {
+    private static Map<String, CommandHandler> map;
+
+    static {
       map = new HashMap<String, CommandHandler>();
-      map.put(NAMENODE.getName().toLowerCase(), 
-          new NameNodesCommandHandler());
-      map.put(SECONDARY.getName().toLowerCase(),
-          new SecondaryNameNodesCommandHandler());
-      map.put(BACKUP.getName().toLowerCase(), 
-          new BackupNodesCommandHandler());
-      map.put(INCLUDE_FILE.getName().toLowerCase(), 
-          new CommandHandler(DFSConfigKeys.DFS_HOSTS));
+      map.put(NAMENODE.getName().toLowerCase(), new NameNodesCommandHandler());
+      map.put(INCLUDE_FILE.getName().toLowerCase(),
+          new CommandHandler("DFSConfigKeys.DFS_HOSTS"));
       map.put(EXCLUDE_FILE.getName().toLowerCase(),
-          new CommandHandler(DFSConfigKeys.DFS_HOSTS_EXCLUDE));
+          new CommandHandler("DFSConfigKeys.DFS_HOSTS_EXCLUDE"));
       map.put(NNRPCADDRESSES.getName().toLowerCase(),
           new NNRpcAddressesCommandHandler());
       map.put(CONFKEY.getName().toLowerCase(),
@@ -121,6 +112,7 @@ public class GetConf extends Configured implements Tool {
   }
   
   static final String USAGE;
+
   static {
     HdfsConfiguration.init();
     
@@ -128,13 +120,13 @@ public class GetConf extends Configured implements Tool {
     StringBuilder usage = new StringBuilder(DESCRIPTION);
     usage.append("\nhadoop getconf \n");
     for (Command cmd : Command.values()) {
-      usage.append("\t[" + cmd.getUsage() + "]\t\t\t" + cmd.getDescription()
-          + "\n");
+      usage.append(
+          "\t[" + cmd.getUsage() + "]\t\t\t" + cmd.getDescription() + "\n");
     }
     USAGE = usage.toString();
   }
   
-  /** 
+  /**
    * Handler to return value for key corresponding to the {@link Command}
    */
   static class CommandHandler {
@@ -167,8 +159,11 @@ public class GetConf extends Configured implements Tool {
     }
 
     
-    /** Method to be overridden by sub classes for specific behavior 
-     * @param args */
+    /**
+     * Method to be overridden by sub classes for specific behavior
+     *
+     * @param args
+     */
     int doWorkInternal(GetConf tool, String[] args) throws Exception {
 
       String value = tool.getConf().getTrimmed(key);
@@ -186,49 +181,25 @@ public class GetConf extends Configured implements Tool {
    */
   static class NameNodesCommandHandler extends CommandHandler {
     @Override
-    int doWorkInternal(GetConf tool, String []args) throws IOException {
-      tool.printMap(DFSUtil.getNNServiceRpcAddresses(tool.getConf()));
-      return 0;
-    }
-  }
-  
-  /**
-   * Handler for {@link Command#BACKUP}
-   */
-  static class BackupNodesCommandHandler extends CommandHandler {
-    @Override
-    public int doWorkInternal(GetConf tool, String []args) throws IOException {
-      tool.printMap(DFSUtil.getBackupNodeAddresses(tool.getConf()));
-      return 0;
-    }
-  }
-  
-  /**
-   * Handler for {@link Command#SECONDARY}
-   */
-  static class SecondaryNameNodesCommandHandler extends CommandHandler {
-    @Override
-    public int doWorkInternal(GetConf tool, String []args) throws IOException {
-      tool.printMap(DFSUtil.getSecondaryNameNodeAddresses(tool.getConf()));
+    int doWorkInternal(GetConf tool, String[] args) throws IOException {
+      tool.printList(DFSUtil.getNameNodesServiceRpcAddresses(tool.getConf()));
       return 0;
     }
   }
   
   /**
    * Handler for {@link Command#NNRPCADDRESSES}
-   * If rpc addresses are defined in configuration, we return them. Otherwise, 
+   * If rpc addresses are defined in configuration, we return them. Otherwise,
    * return empty string.
    */
   static class NNRpcAddressesCommandHandler extends CommandHandler {
     @Override
-    public int doWorkInternal(GetConf tool, String []args) throws IOException {
-      Configuration config = tool.getConf();
-      List<ConfiguredNNAddress> cnnlist = DFSUtil.flattenAddressMap(
-          DFSUtil.getNNServiceRpcAddresses(config));
-      if (!cnnlist.isEmpty()) {
-        for (ConfiguredNNAddress cnn : cnnlist) {
-          InetSocketAddress rpc = cnn.getAddress();
-          tool.printOut(rpc.getHostName()+":"+rpc.getPort());
+    public int doWorkInternal(GetConf tool, String[] args) throws IOException {
+      List<InetSocketAddress> addresses =
+          DFSUtil.getNameNodesServiceRpcAddresses(tool.getConf());
+      if (!addresses.isEmpty()) {
+        for (InetSocketAddress rpc : addresses) {
+          tool.printOut(rpc.getHostName() + ":" + rpc.getPort());
         }
         return 0;
       }
@@ -274,12 +245,10 @@ public class GetConf extends Configured implements Tool {
     out.println(message);
   }
   
-  void printMap(Map<String, Map<String, InetSocketAddress>> map) {
+  void printList(List<InetSocketAddress> list) {
     StringBuilder buffer = new StringBuilder();
 
-    List<ConfiguredNNAddress> cnns = DFSUtil.flattenAddressMap(map);
-    for (ConfiguredNNAddress cnn : cnns) {
-      InetSocketAddress address = cnn.getAddress();
+    for (InetSocketAddress address : list) {
       if (buffer.length() > 0) {
         buffer.append(" ");
       }
@@ -294,15 +263,16 @@ public class GetConf extends Configured implements Tool {
 
   /**
    * Main method that runs the tool for given arguments.
-   * @param args arguments
+   *
+   * @param args
+   *     arguments
    * @return return status of the command
    */
   private int doWork(String[] args) {
     if (args.length >= 1) {
       CommandHandler handler = Command.getHandler(args[0]);
       if (handler != null) {
-        return handler.doWork(this,
-            Arrays.copyOfRange(args, 1, args.length));
+        return handler.doWork(this, Arrays.copyOfRange(args, 1, args.length));
       }
     }
     printUsage();
@@ -312,13 +282,13 @@ public class GetConf extends Configured implements Tool {
   @Override
   public int run(final String[] args) throws Exception {
     try {
-      return UserGroupInformation.getCurrentUser().doAs(
-          new PrivilegedExceptionAction<Integer>() {
-            @Override
-            public Integer run() throws Exception {
-              return doWork(args);
-            }
-          });
+      return UserGroupInformation.getCurrentUser()
+          .doAs(new PrivilegedExceptionAction<Integer>() {
+                @Override
+                public Integer run() throws Exception {
+                  return doWork(args);
+                }
+              });
     } catch (InterruptedException e) {
       throw new IOException(e);
     }

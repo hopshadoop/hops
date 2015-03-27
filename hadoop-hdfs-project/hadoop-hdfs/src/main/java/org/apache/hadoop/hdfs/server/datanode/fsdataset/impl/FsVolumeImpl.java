@@ -17,80 +17,47 @@
  */
 package org.apache.hadoop.hdfs.server.datanode.fsdataset.impl;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executor;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.DF;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
-import org.apache.hadoop.hdfs.StorageType;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.server.datanode.DataStorage;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsVolumeSpi;
-import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.io.File;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
 
 /**
  * The underlying volume used to store replica.
- * 
+ * <p/>
  * It uses the {@link FsDatasetImpl} object for synchronization.
  */
 @InterfaceAudience.Private
 class FsVolumeImpl implements FsVolumeSpi {
   private final FsDatasetImpl dataset;
   private final String storageID;
-  private final StorageType storageType;
-  private final Map<String, BlockPoolSlice> bpSlices
-      = new ConcurrentHashMap<String, BlockPoolSlice>();
+  private final Map<String, BlockPoolSlice> bpSlices =
+      new HashMap<String, BlockPoolSlice>();
   private final File currentDir;    // <StorageDirectory>/current
-  private final DF usage;           
+  private final DF usage;
   private final long reserved;
-  /**
-   * Per-volume worker pool that processes new blocks to cache.
-   * The maximum number of workers per volume is bounded (configurable via
-   * dfs.datanode.fsdatasetcache.max.threads.per.volume) to limit resource
-   * contention.
-   */
-  private final ThreadPoolExecutor cacheExecutor;
   
   FsVolumeImpl(FsDatasetImpl dataset, String storageID, File currentDir,
-      Configuration conf, StorageType storageType) throws IOException {
+      Configuration conf) throws IOException {
     this.dataset = dataset;
     this.storageID = storageID;
-    this.reserved = conf.getLong(
-        DFSConfigKeys.DFS_DATANODE_DU_RESERVED_KEY,
+    this.reserved = conf.getLong(DFSConfigKeys.DFS_DATANODE_DU_RESERVED_KEY,
         DFSConfigKeys.DFS_DATANODE_DU_RESERVED_DEFAULT);
-    this.currentDir = currentDir; 
+    this.currentDir = currentDir;
     File parent = currentDir.getParentFile();
     this.usage = new DF(parent, conf);
-    this.storageType = storageType;
-    final int maxNumThreads = dataset.datanode.getConf().getInt(
-        DFSConfigKeys.DFS_DATANODE_FSDATASETCACHE_MAX_THREADS_PER_VOLUME_KEY,
-        DFSConfigKeys.DFS_DATANODE_FSDATASETCACHE_MAX_THREADS_PER_VOLUME_DEFAULT
-        );
-    ThreadFactory workerFactory = new ThreadFactoryBuilder()
-        .setDaemon(true)
-        .setNameFormat("FsVolumeImplWorker-" + parent.toString() + "-%d")
-        .build();
-    cacheExecutor = new ThreadPoolExecutor(
-        1, maxNumThreads,
-        60, TimeUnit.SECONDS,
-        new LinkedBlockingQueue<Runnable>(),
-        workerFactory);
-    cacheExecutor.allowCoreThreadTimeOut(true);
   }
   
   File getCurrentDir() {
@@ -102,7 +69,7 @@ class FsVolumeImpl implements FsVolumeSpi {
   }
   
   void decDfsUsed(String bpid, long value) {
-    synchronized(dataset) {
+    synchronized (dataset) {
       BlockPoolSlice bp = bpSlices.get(bpid);
       if (bp != null) {
         bp.decDfsUsed(value);
@@ -112,8 +79,8 @@ class FsVolumeImpl implements FsVolumeSpi {
   
   long getDfsUsed() throws IOException {
     long dfsUsed = 0;
-    synchronized(dataset) {
-      for(BlockPoolSlice s : bpSlices.values()) {
+    synchronized (dataset) {
+      for (BlockPoolSlice s : bpSlices.values()) {
         dfsUsed += s.getDfsUsed();
       }
     }
@@ -127,7 +94,9 @@ class FsVolumeImpl implements FsVolumeSpi {
   /**
    * Calculate the capacity of the filesystem, after removing any
    * reserved capacity.
-   * @return the unreserved number of bytes left in this filesystem. May be zero.
+   *
+   * @return the unreserved number of bytes left in this filesystem. May be
+   * zero.
    */
   long getCapacity() {
     long remaining = usage.getCapacity() - reserved;
@@ -136,15 +105,15 @@ class FsVolumeImpl implements FsVolumeSpi {
 
   @Override
   public long getAvailable() throws IOException {
-    long remaining = getCapacity()-getDfsUsed();
+    long remaining = getCapacity() - getDfsUsed();
     long available = usage.getAvailable();
     if (remaining > available) {
       remaining = available;
     }
     return (remaining > 0) ? remaining : 0;
   }
-    
-  long getReserved(){
+
+  long getReserved() {
     return reserved;
   }
 
@@ -156,11 +125,6 @@ class FsVolumeImpl implements FsVolumeSpi {
     return bp;
   }
 
-  @Override
-  public String getBasePath() {
-    return currentDir.getParent();
-  }
-  
   @Override
   public String getPath(String bpid) throws IOException {
     return getBlockPoolSlice(bpid).getDirectory().getAbsolutePath();
@@ -176,9 +140,9 @@ class FsVolumeImpl implements FsVolumeSpi {
    */
   @Override
   public String[] getBlockPoolList() {
-    return bpSlices.keySet().toArray(new String[bpSlices.keySet().size()]);   
+    return bpSlices.keySet().toArray(new String[bpSlices.keySet().size()]);
   }
-    
+
   /**
    * Temporary files. They get moved to the finalized block directory when
    * the block is finalized.
@@ -199,19 +163,15 @@ class FsVolumeImpl implements FsVolumeSpi {
     return getBlockPoolSlice(bpid).addBlock(b, f);
   }
 
-  Executor getCacheExecutor() {
-    return cacheExecutor;
-  }
-
   void checkDirs() throws DiskErrorException {
     // TODO:FEDERATION valid synchronization
-    for(BlockPoolSlice s : bpSlices.values()) {
+    for (BlockPoolSlice s : bpSlices.values()) {
       s.checkDirs();
     }
   }
-    
+
   void getVolumeMap(ReplicaMap volumeMap) throws IOException {
-    for(BlockPoolSlice s : bpSlices.values()) {
+    for (BlockPoolSlice s : bpSlices.values()) {
       s.getVolumeMap(volumeMap);
     }
   }
@@ -222,14 +182,18 @@ class FsVolumeImpl implements FsVolumeSpi {
   
   /**
    * Add replicas under the given directory to the volume map
-   * @param volumeMap the replicas map
-   * @param dir an input directory
-   * @param isFinalized true if the directory has finalized replicas;
-   *                    false if the directory has rbw replicas
-   * @throws IOException 
+   *
+   * @param volumeMap
+   *     the replicas map
+   * @param dir
+   *     an input directory
+   * @param isFinalized
+   *     true if the directory has finalized replicas;
+   *     false if the directory has rbw replicas
+   * @throws IOException
    */
-  void addToReplicasMap(String bpid, ReplicaMap volumeMap, 
-      File dir, boolean isFinalized) throws IOException {
+  void addToReplicasMap(String bpid, ReplicaMap volumeMap, File dir,
+      boolean isFinalized) throws IOException {
     BlockPoolSlice bp = getBlockPoolSlice(bpid);
     // TODO move this up
     // dfsUsage.incDfsUsed(b.getNumBytes()+metaFile.length());
@@ -246,7 +210,6 @@ class FsVolumeImpl implements FsVolumeSpi {
   }
 
   void shutdown() {
-    cacheExecutor.shutdown();
     Set<Entry<String, BlockPoolSlice>> set = bpSlices.entrySet();
     for (Entry<String, BlockPoolSlice> entry : set) {
       entry.getValue().shutdown();
@@ -271,8 +234,8 @@ class FsVolumeImpl implements FsVolumeSpi {
     File volumeCurrentDir = this.getCurrentDir();
     File bpDir = new File(volumeCurrentDir, bpid);
     File bpCurrentDir = new File(bpDir, DataStorage.STORAGE_DIR_CURRENT);
-    File finalizedDir = new File(bpCurrentDir,
-        DataStorage.STORAGE_DIR_FINALIZED);
+    File finalizedDir =
+        new File(bpCurrentDir, DataStorage.STORAGE_DIR_FINALIZED);
     File rbwDir = new File(bpCurrentDir, DataStorage.STORAGE_DIR_RBW);
     if (finalizedDir.exists() && FileUtil.list(finalizedDir).length != 0) {
       return false;
@@ -290,10 +253,10 @@ class FsVolumeImpl implements FsVolumeSpi {
       // nothing to be deleted
       return;
     }
-    File tmpDir = new File(bpDir, DataStorage.STORAGE_DIR_TMP); 
+    File tmpDir = new File(bpDir, DataStorage.STORAGE_DIR_TMP);
     File bpCurrentDir = new File(bpDir, DataStorage.STORAGE_DIR_CURRENT);
-    File finalizedDir = new File(bpCurrentDir,
-        DataStorage.STORAGE_DIR_FINALIZED);
+    File finalizedDir =
+        new File(bpCurrentDir, DataStorage.STORAGE_DIR_FINALIZED);
     File rbwDir = new File(bpCurrentDir, DataStorage.STORAGE_DIR_RBW);
     if (force) {
       FileUtil.fullyDelete(bpDir);
@@ -324,19 +287,7 @@ class FsVolumeImpl implements FsVolumeSpi {
     }
   }
 
-  @Override
-  public String getStorageID() {
+  String getStorageID() {
     return storageID;
   }
-  
-  @Override
-  public StorageType getStorageType() {
-    return storageType;
-  }
-  
-  DatanodeStorage toDatanodeStorage() {
-    return new DatanodeStorage(storageID, DatanodeStorage.State.NORMAL, storageType);
-  }
-
 }
-

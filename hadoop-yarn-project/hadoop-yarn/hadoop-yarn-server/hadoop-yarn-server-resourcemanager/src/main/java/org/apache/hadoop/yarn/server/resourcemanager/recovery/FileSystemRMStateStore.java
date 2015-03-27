@@ -1,13 +1,13 @@
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
+ * or more contributor license agreements. See the NOTICE file
  * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
+ * regarding copyright ownership. The ASF licenses this file
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * with the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,17 +15,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.apache.hadoop.yarn.server.resourcemanager.recovery;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -47,13 +39,22 @@ import org.apache.hadoop.yarn.proto.YarnServerResourceManagerServiceProtos.Appli
 import org.apache.hadoop.yarn.proto.YarnServerResourceManagerServiceProtos.ApplicationStateDataProto;
 import org.apache.hadoop.yarn.proto.YarnServerResourceManagerServiceProtos.RMStateVersionProto;
 import org.apache.hadoop.yarn.security.client.RMDelegationTokenIdentifier;
+import org.apache.hadoop.yarn.server.api.records.MasterKey;
+import org.apache.hadoop.yarn.server.api.records.impl.pb.MasterKeyPBImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.RMStateVersion;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.impl.pb.ApplicationAttemptStateDataPBImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.impl.pb.ApplicationStateDataPBImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.impl.pb.RMStateVersionPBImpl;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 
-import com.google.common.annotations.VisibleForTesting;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 
 @Private
 @Unstable
@@ -62,14 +63,13 @@ import com.google.common.annotations.VisibleForTesting;
  * FileSystem interface. Does not use directories so that simple key-value
  * stores can be used. The retry policy for the real filesystem client must be
  * configured separately to enable retry of filesystem operations when needed.
- */
-public class FileSystemRMStateStore extends RMStateStore {
+ */ public class FileSystemRMStateStore extends RMStateStore {
 
   public static final Log LOG = LogFactory.getLog(FileSystemRMStateStore.class);
 
   protected static final String ROOT_DIR_NAME = "FSRMStateRoot";
-  protected static final RMStateVersion CURRENT_VERSION_INFO = RMStateVersion
-    .newInstance(1, 0);
+  protected static final RMStateVersion CURRENT_VERSION_INFO =
+      RMStateVersion.newInstance(1, 0);
 
   protected FileSystem fs;
 
@@ -77,6 +77,9 @@ public class FileSystemRMStateStore extends RMStateStore {
   @Private
   @VisibleForTesting
   Path rmDTSecretManagerRoot;
+  @Private
+  @VisibleForTesting
+  Path rmTokenSecretManagerMasterKeyRoot;
   private Path rmAppRoot;
   private Path dtSequenceNumberPath = null;
 
@@ -84,11 +87,12 @@ public class FileSystemRMStateStore extends RMStateStore {
   Path fsWorkingPath;
 
   @Override
-  public synchronized void initInternal(Configuration conf)
-      throws Exception{
+  public synchronized void initInternal(Configuration conf) throws Exception {
     fsWorkingPath = new Path(conf.get(YarnConfiguration.FS_RM_STATE_STORE_URI));
     rootDirPath = new Path(fsWorkingPath, ROOT_DIR_NAME);
     rmDTSecretManagerRoot = new Path(rootDirPath, RM_DT_SECRET_MANAGER_ROOT);
+    rmTokenSecretManagerMasterKeyRoot =
+        new Path(rootDirPath, RM_TOKEN_SECRET_ROOT);
     rmAppRoot = new Path(rootDirPath, RM_APP_ROOT);
   }
 
@@ -101,11 +105,12 @@ public class FileSystemRMStateStore extends RMStateStore {
     conf.setBoolean("dfs.client.retry.policy.enabled", true);
     String retryPolicy =
         conf.get(YarnConfiguration.FS_RM_STATE_STORE_RETRY_POLICY_SPEC,
-          YarnConfiguration.DEFAULT_FS_RM_STATE_STORE_RETRY_POLICY_SPEC);
+            YarnConfiguration.DEFAULT_FS_RM_STATE_STORE_RETRY_POLICY_SPEC);
     conf.set("dfs.client.retry.policy.spec", retryPolicy);
 
     fs = fsWorkingPath.getFileSystem(conf);
     fs.mkdirs(rmDTSecretManagerRoot);
+    fs.mkdirs(rmTokenSecretManagerMasterKeyRoot);
     fs.mkdirs(rmAppRoot);
   }
 
@@ -125,8 +130,8 @@ public class FileSystemRMStateStore extends RMStateStore {
     if (fs.exists(versionNodePath)) {
       FileStatus status = fs.getFileStatus(versionNodePath);
       byte[] data = readFile(versionNodePath, status.getLen());
-      RMStateVersion version =
-          new RMStateVersionPBImpl(RMStateVersionProto.parseFrom(data));
+      RMStateVersion version = new RMStateVersionPBImpl(RMStateVersionProto.
+          parseFrom(data));
       return version;
     }
     return null;
@@ -135,8 +140,8 @@ public class FileSystemRMStateStore extends RMStateStore {
   @Override
   protected synchronized void storeVersion() throws Exception {
     Path versionNodePath = getNodePath(rootDirPath, VERSION_NODE);
-    byte[] data =
-        ((RMStateVersionPBImpl) CURRENT_VERSION_INFO).getProto().toByteArray();
+    byte[] data = ((RMStateVersionPBImpl) CURRENT_VERSION_INFO).getProto().
+        toByteArray();
     if (fs.exists(versionNodePath)) {
       updateFile(versionNodePath, data);
     } else {
@@ -149,6 +154,7 @@ public class FileSystemRMStateStore extends RMStateStore {
     RMState rmState = new RMState();
     // recover DelegationTokenSecretManager
     loadRMDTSecretManagerState(rmState);
+    loadRMTokenSecretManagerMasterKeyState(rmState);
     // recover RM applications
     loadRMAppState(rmState);
     return rmState;
@@ -177,29 +183,30 @@ public class FileSystemRMStateStore extends RMStateStore {
             ApplicationId appId = ConverterUtils.toApplicationId(childNodeName);
             ApplicationStateDataPBImpl appStateData =
                 new ApplicationStateDataPBImpl(
-                  ApplicationStateDataProto.parseFrom(childData));
-            ApplicationState appState =
-                new ApplicationState(appStateData.getSubmitTime(),
-                  appStateData.getStartTime(),
-                  appStateData.getApplicationSubmissionContext(),
-                  appStateData.getUser(),
-                  appStateData.getState(),
-                  appStateData.getDiagnostics(), appStateData.getFinishTime());
+                    ApplicationStateDataProto.parseFrom(childData));
+            ApplicationState appState = new ApplicationState(appStateData.
+                getSubmitTime(), appStateData.getStartTime(),
+                appStateData.getApplicationSubmissionContext(),
+                appStateData.getUser(), appStateData.getState(),
+                appStateData.getDiagnostics(), appStateData.getFinishTime(),
+                appStateData.getStateBeforeKilling(),
+                appStateData.getUpdatedNodesId());
             // assert child node name is same as actual applicationId
             assert appId.equals(appState.context.getApplicationId());
             rmState.appState.put(appId, appState);
           } else if (childNodeName
-            .startsWith(ApplicationAttemptId.appAttemptIdStrPrefix)) {
+              .startsWith(ApplicationAttemptId.appAttemptIdStrPrefix)) {
             // attempt
             if (LOG.isDebugEnabled()) {
-              LOG.debug("Loading application attempt from node: "
-                  + childNodeName);
+              LOG.debug(
+                  "Loading application attempt from node: " + childNodeName);
             }
-            ApplicationAttemptId attemptId =
-                ConverterUtils.toApplicationAttemptId(childNodeName);
+            ApplicationAttemptId attemptId = ConverterUtils.
+                toApplicationAttemptId(childNodeName);
             ApplicationAttemptStateDataPBImpl attemptStateData =
                 new ApplicationAttemptStateDataPBImpl(
-                  ApplicationAttemptStateDataProto.parseFrom(childData));
+                    ApplicationAttemptStateDataProto.
+                        parseFrom(childData));
             Credentials credentials = null;
             if (attemptStateData.getAppAttemptTokens() != null) {
               credentials = new Credentials();
@@ -209,12 +216,16 @@ public class FileSystemRMStateStore extends RMStateStore {
             }
             ApplicationAttemptState attemptState =
                 new ApplicationAttemptState(attemptId,
-                  attemptStateData.getMasterContainer(), credentials,
-                  attemptStateData.getStartTime(),
-                  attemptStateData.getState(),
-                  attemptStateData.getFinalTrackingUrl(),
-                  attemptStateData.getDiagnostics(),
-                  attemptStateData.getFinalApplicationStatus());
+                    attemptStateData.getMasterContainer(), credentials,
+                    attemptStateData.getStartTime(),
+                    attemptStateData.getState(),
+                    attemptStateData.getFinalTrackingUrl(),
+                    attemptStateData.getDiagnostics(),
+                    attemptStateData.getFinalApplicationStatus(),
+                    attemptStateData.getProgress(), attemptStateData.getHost(),
+                    attemptStateData.getRpcPort(),
+                    attemptStateData.getRanNodes(),
+                    attemptStateData.getJustFinishedContainers());
 
             // assert child node name is same as application attempt id
             assert attemptId.equals(attemptState.getAttemptId());
@@ -246,8 +257,7 @@ public class FileSystemRMStateStore extends RMStateStore {
     // during saving state into state store. The file will be deleted as a
     // part of this call
     if (record.getName().endsWith(".tmp")) {
-      LOG.error("incomplete rm state store entry found :"
-          + record);
+      LOG.error("incomplete rm state store entry found :" + record);
       fs.delete(record, false);
       return true;
     }
@@ -258,34 +268,34 @@ public class FileSystemRMStateStore extends RMStateStore {
     // Before loading the state information, check whether .new file exists.
     // If it does, the prior updateFile is failed on half way. We need to
     // complete replacing the old file first.
-    FileStatus[] newChildNodes =
-        fs.listStatus(path, new PathFilter() {
+    FileStatus[] newChildNodes = fs.listStatus(path, new PathFilter() {
       @Override
       public boolean accept(Path path) {
         return path.getName().endsWith(".new");
       }
     });
-    for(FileStatus newChildNodeStatus : newChildNodes) {
+    for (FileStatus newChildNodeStatus : newChildNodes) {
       assert newChildNodeStatus.isFile();
       String newChildNodeName = newChildNodeStatus.getPath().getName();
-      String childNodeName = newChildNodeName.substring(
-          0, newChildNodeName.length() - ".new".length());
+      String childNodeName = newChildNodeName
+          .substring(0, newChildNodeName.length() - ".new".length());
       Path childNodePath =
           new Path(newChildNodeStatus.getPath().getParent(), childNodeName);
       replaceFile(newChildNodeStatus.getPath(), childNodePath);
     }
   }
+
   private void loadRMDTSecretManagerState(RMState rmState) throws Exception {
     checkAndResumeUpdateOperation(rmDTSecretManagerRoot);
     FileStatus[] childNodes = fs.listStatus(rmDTSecretManagerRoot);
 
-    for(FileStatus childNodeStatus : childNodes) {
+    for (FileStatus childNodeStatus : childNodes) {
       assert childNodeStatus.isFile();
       String childNodeName = childNodeStatus.getPath().getName();
       if (checkAndRemovePartialRecord(childNodeStatus.getPath())) {
         continue;
       }
-      if(childNodeName.startsWith(DELEGATION_TOKEN_SEQUENCE_NUMBER_PREFIX)) {
+      if (childNodeName.startsWith(DELEGATION_TOKEN_SEQUENCE_NUMBER_PREFIX)) {
         rmState.rmSecretManagerState.dtSequenceNumber =
             Integer.parseInt(childNodeName.split("_")[1]);
         continue;
@@ -295,16 +305,17 @@ public class FileSystemRMStateStore extends RMStateStore {
       byte[] childData = readFile(childNodePath, childNodeStatus.getLen());
       ByteArrayInputStream is = new ByteArrayInputStream(childData);
       DataInputStream fsIn = new DataInputStream(is);
-      if(childNodeName.startsWith(DELEGATION_KEY_PREFIX)){
+      if (childNodeName.startsWith(DELEGATION_KEY_PREFIX)) {
         DelegationKey key = new DelegationKey();
         key.readFields(fsIn);
         rmState.rmSecretManagerState.masterKeyState.add(key);
       } else if (childNodeName.startsWith(DELEGATION_TOKEN_PREFIX)) {
-        RMDelegationTokenIdentifier identifier = new RMDelegationTokenIdentifier();
+        RMDelegationTokenIdentifier identifier =
+            new RMDelegationTokenIdentifier();
         identifier.readFields(fsIn);
         long renewDate = fsIn.readLong();
-        rmState.rmSecretManagerState.delegationTokenState.put(identifier,
-          renewDate);
+        rmState.rmSecretManagerState.delegationTokenState
+            .put(identifier, renewDate);
       } else {
         LOG.warn("Unknown file for recovering RMDelegationTokenSecretManager");
       }
@@ -354,13 +365,12 @@ public class FileSystemRMStateStore extends RMStateStore {
   @Override
   public synchronized void storeApplicationAttemptStateInternal(
       ApplicationAttemptId appAttemptId,
-      ApplicationAttemptStateDataPBImpl attemptStateDataPB)
-      throws Exception {
-    Path appDirPath =
-        getAppDir(rmAppRoot, appAttemptId.getApplicationId().toString());
+      ApplicationAttemptStateDataPBImpl attemptStateDataPB) throws Exception {
+    Path appDirPath = getAppDir(rmAppRoot, appAttemptId.getApplicationId().
+        toString());
     Path nodeCreatePath = getNodePath(appDirPath, appAttemptId.toString());
-    LOG.info("Storing info for attempt: " + appAttemptId + " at: "
-        + nodeCreatePath);
+    LOG.info(
+        "Storing info for attempt: " + appAttemptId + " at: " + nodeCreatePath);
     byte[] attemptStateData = attemptStateDataPB.getProto().toByteArray();
     try {
       // currently throw all exceptions. May need to respond differently for HA
@@ -375,13 +385,12 @@ public class FileSystemRMStateStore extends RMStateStore {
   @Override
   public synchronized void updateApplicationAttemptStateInternal(
       ApplicationAttemptId appAttemptId,
-      ApplicationAttemptStateDataPBImpl attemptStateDataPB)
-      throws Exception {
-    Path appDirPath =
-        getAppDir(rmAppRoot, appAttemptId.getApplicationId().toString());
+      ApplicationAttemptStateDataPBImpl attemptStateDataPB) throws Exception {
+    Path appDirPath = getAppDir(rmAppRoot, appAttemptId.getApplicationId().
+        toString());
     Path nodeCreatePath = getNodePath(appDirPath, appAttemptId.toString());
-    LOG.info("Updating info for attempt: " + appAttemptId + " at: "
-        + nodeCreatePath);
+    LOG.info("Updating info for attempt: " + appAttemptId + " at: " +
+        nodeCreatePath);
     byte[] attemptStateData = attemptStateDataPB.getProto().toByteArray();
     try {
       // currently throw all exceptions. May need to respond differently for HA
@@ -394,8 +403,8 @@ public class FileSystemRMStateStore extends RMStateStore {
   }
 
   @Override
-  public synchronized void removeApplicationStateInternal(ApplicationState appState)
-      throws Exception {
+  public synchronized void removeApplicationStateInternal(
+      ApplicationState appState) throws Exception {
     String appId = appState.getAppId().toString();
     Path nodeRemovePath = getAppDir(rmAppRoot, appId);
     LOG.info("Removing info for app: " + appId + " at: " + nodeRemovePath);
@@ -406,15 +415,15 @@ public class FileSystemRMStateStore extends RMStateStore {
   public synchronized void storeRMDelegationTokenAndSequenceNumberState(
       RMDelegationTokenIdentifier identifier, Long renewDate,
       int latestSequenceNumber) throws Exception {
-    storeOrUpdateRMDelegationTokenAndSequenceNumberState(
-        identifier, renewDate,latestSequenceNumber, false);
+    storeOrUpdateRMDelegationTokenAndSequenceNumberState(identifier, renewDate,
+        latestSequenceNumber, false);
   }
 
   @Override
   public synchronized void removeRMDelegationTokenState(
       RMDelegationTokenIdentifier identifier) throws Exception {
     Path nodeCreatePath = getNodePath(rmDTSecretManagerRoot,
-      DELEGATION_TOKEN_PREFIX + identifier.getSequenceNumber());
+        DELEGATION_TOKEN_PREFIX + identifier.getSequenceNumber());
     LOG.info("Removing RMDelegationToken_" + identifier.getSequenceNumber());
     deleteFile(nodeCreatePath);
   }
@@ -423,16 +432,15 @@ public class FileSystemRMStateStore extends RMStateStore {
   protected void updateRMDelegationTokenAndSequenceNumberInternal(
       RMDelegationTokenIdentifier rmDTIdentifier, Long renewDate,
       int latestSequenceNumber) throws Exception {
-    storeOrUpdateRMDelegationTokenAndSequenceNumberState(
-        rmDTIdentifier, renewDate,latestSequenceNumber, true);
+    storeOrUpdateRMDelegationTokenAndSequenceNumberState(rmDTIdentifier,
+        renewDate, latestSequenceNumber, true);
   }
 
   private void storeOrUpdateRMDelegationTokenAndSequenceNumberState(
       RMDelegationTokenIdentifier identifier, Long renewDate,
       int latestSequenceNumber, boolean isUpdate) throws Exception {
-    Path nodeCreatePath =
-        getNodePath(rmDTSecretManagerRoot,
-          DELEGATION_TOKEN_PREFIX + identifier.getSequenceNumber());
+    Path nodeCreatePath = getNodePath(rmDTSecretManagerRoot,
+        DELEGATION_TOKEN_PREFIX + identifier.getSequenceNumber());
     ByteArrayOutputStream os = new ByteArrayOutputStream();
     DataOutputStream fsOut = new DataOutputStream(os);
     identifier.write(fsOut);
@@ -448,9 +456,9 @@ public class FileSystemRMStateStore extends RMStateStore {
 
     // store sequence number
     Path latestSequenceNumberPath = getNodePath(rmDTSecretManagerRoot,
-          DELEGATION_TOKEN_SEQUENCE_NUMBER_PREFIX + latestSequenceNumber);
-    LOG.info("Storing " + DELEGATION_TOKEN_SEQUENCE_NUMBER_PREFIX
-        + latestSequenceNumber);
+        DELEGATION_TOKEN_SEQUENCE_NUMBER_PREFIX + latestSequenceNumber);
+    LOG.info("Storing " + DELEGATION_TOKEN_SEQUENCE_NUMBER_PREFIX +
+        latestSequenceNumber);
     if (dtSequenceNumberPath == null) {
       if (!createFile(latestSequenceNumberPath)) {
         throw new Exception("Failed to create " + latestSequenceNumberPath);
@@ -467,7 +475,7 @@ public class FileSystemRMStateStore extends RMStateStore {
   public synchronized void storeRMDTMasterKeyState(DelegationKey masterKey)
       throws Exception {
     Path nodeCreatePath = getNodePath(rmDTSecretManagerRoot,
-          DELEGATION_KEY_PREFIX + masterKey.getKeyId());
+        DELEGATION_KEY_PREFIX + masterKey.getKeyId());
     ByteArrayOutputStream os = new ByteArrayOutputStream();
     DataOutputStream fsOut = new DataOutputStream(os);
     LOG.info("Storing RMDelegationKey_" + masterKey.getKeyId());
@@ -477,11 +485,11 @@ public class FileSystemRMStateStore extends RMStateStore {
   }
 
   @Override
-  public synchronized void
-      removeRMDTMasterKeyState(DelegationKey masterKey) throws Exception {
+  public synchronized void removeRMDTMasterKeyState(DelegationKey masterKey)
+      throws Exception {
     Path nodeCreatePath = getNodePath(rmDTSecretManagerRoot,
-          DELEGATION_KEY_PREFIX + masterKey.getKeyId());
-    LOG.info("Removing RMDelegationKey_"+ masterKey.getKeyId());
+        DELEGATION_KEY_PREFIX + masterKey.getKeyId());
+    LOG.info("Removing RMDelegationKey_" + masterKey.getKeyId());
     deleteFile(nodeCreatePath);
   }
 
@@ -490,9 +498,8 @@ public class FileSystemRMStateStore extends RMStateStore {
   }
 
   // FileSystem related code
-
   private void deleteFile(Path deletePath) throws Exception {
-    if(!fs.delete(deletePath, true)) {
+    if (!fs.delete(deletePath, true)) {
       throw new Exception("Failed to delete " + deletePath);
     }
   }
@@ -500,7 +507,7 @@ public class FileSystemRMStateStore extends RMStateStore {
   private byte[] readFile(Path inputPath, long len) throws Exception {
     FSDataInputStream fsIn = fs.open(inputPath);
     // state data will not be that "long"
-    byte[] data = new byte[(int)len];
+    byte[] data = new byte[(int) len];
     fsIn.readFully(data);
     fsIn.close();
     return data;
@@ -514,6 +521,7 @@ public class FileSystemRMStateStore extends RMStateStore {
   private void writeFile(Path outputPath, byte[] data) throws Exception {
     Path tempPath =
         new Path(outputPath.getParent(), outputPath.getName() + ".tmp");
+    LOG.debug("HOP:: tempPath=" + tempPath);
     FSDataOutputStream fsOut = null;
     // This file will be overwritten when app/attempt finishes for saving the
     // final status.
@@ -529,7 +537,8 @@ public class FileSystemRMStateStore extends RMStateStore {
    * atomic for underlying file system.
    */
   protected void updateFile(Path outputPath, byte[] data) throws Exception {
-    Path newPath = new Path(outputPath.getParent(), outputPath.getName() + ".new");
+    Path newPath =
+        new Path(outputPath.getParent(), outputPath.getName() + ".new");
     // use writeFile to make sure .new file is created atomically
     writeFile(newPath, data);
     replaceFile(newPath, outputPath);
@@ -558,4 +567,53 @@ public class FileSystemRMStateStore extends RMStateStore {
     return new Path(root, nodeName);
   }
 
+  //TODO laod stored key on recover
+  @Override
+  protected void storeRMTokenSecretManagerMasterKeyState(MasterKey key,
+      KeyType keyType) throws Exception {
+    Path nodeCreatePath = getNodePath(rmTokenSecretManagerMasterKeyRoot,
+        RM_TOKEN_SECRET_PREFIX + keyType.toString());
+    ByteArrayOutputStream os = new ByteArrayOutputStream();
+    DataOutputStream fsOut = new DataOutputStream(os);
+    LOG.info("Storing RMTokenSecretManagerMasterKey_" + keyType.toString());
+    key.write(fsOut);
+    writeFile(nodeCreatePath, os.toByteArray());
+    fsOut.close();
+  }
+
+  @Override
+  protected void removeRMTokenSecretManagerMasterKeyState(KeyType keyType)
+      throws Exception {
+    Path nodeCreatePath = getNodePath(rmTokenSecretManagerMasterKeyRoot,
+        RM_TOKEN_SECRET_PREFIX + keyType.toString());
+    LOG.info("Removing RMTokenSecretManagerMasterKey_" + keyType.toString());
+    deleteFile(nodeCreatePath);
+  }
+
+  private void loadRMTokenSecretManagerMasterKeyState(RMState rmState)
+      throws Exception {
+    checkAndResumeUpdateOperation(rmTokenSecretManagerMasterKeyRoot);
+    FileStatus[] childNodes = fs.listStatus(rmTokenSecretManagerMasterKeyRoot);
+
+    rmState.secretMamagerKeys = new HashMap<KeyType, MasterKey>();
+    for (FileStatus childNodeStatus : childNodes) {
+      assert childNodeStatus.isFile();
+      String childNodeName = childNodeStatus.getPath().getName();
+      if (checkAndRemovePartialRecord(childNodeStatus.getPath())) {
+        continue;
+      }
+      if (childNodeName.startsWith(RM_TOKEN_SECRET_PREFIX)) {
+        KeyType keyType = KeyType.valueOf(childNodeName.split("_")[1]);
+        Path childNodePath =
+            getNodePath(rmTokenSecretManagerMasterKeyRoot, childNodeName);
+        byte[] childData = readFile(childNodePath, childNodeStatus.getLen());
+        ByteArrayInputStream is = new ByteArrayInputStream(childData);
+        DataInputStream fsIn = new DataInputStream(is);
+        MasterKey key = new MasterKeyPBImpl();
+        key.readFields(fsIn);
+        rmState.secretMamagerKeys.put(keyType, key);
+        fsIn.close();
+      }
+    }
+  }
 }

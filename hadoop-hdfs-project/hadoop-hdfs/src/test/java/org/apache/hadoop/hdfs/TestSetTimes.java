@@ -17,18 +17,6 @@
  */
 package org.apache.hadoop.hdfs;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.Random;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -37,15 +25,22 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
-import org.apache.hadoop.hdfs.server.namenode.NameNodeAdapter;
-import org.apache.hadoop.test.MockitoUtil;
 import org.apache.hadoop.util.Time;
 import org.junit.Test;
-import org.mockito.Mockito;
+
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Random;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /**
  * This class tests the access time on files.
- *
  */
 public class TestSetTimes {
   static final long seed = 0xDEADBEEFL;
@@ -53,16 +48,17 @@ public class TestSetTimes {
   static final int fileSize = 16384;
   static final int numDatanodes = 1;
 
-  static final SimpleDateFormat dateForm = new SimpleDateFormat("yyyy-MM-dd HH:mm");
+  static final SimpleDateFormat dateForm =
+      new SimpleDateFormat("yyyy-MM-dd HH:mm");
 
   Random myrand = new Random();
   Path hostsFile;
   Path excludeFile;
 
   private FSDataOutputStream writeFile(FileSystem fileSys, Path name, int repl)
-    throws IOException {
+      throws IOException {
     FSDataOutputStream stm = fileSys.create(name, true, fileSys.getConf()
-        .getInt(CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096),
+            .getInt(CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096),
         (short) repl, blockSize);
     byte[] buffer = new byte[fileSize];
     Random rand = new Random(seed);
@@ -93,17 +89,17 @@ public class TestSetTimes {
     Configuration conf = new HdfsConfiguration();
     final int MAX_IDLE_TIME = 2000; // 2s
     conf.setInt("ipc.client.connection.maxidletime", MAX_IDLE_TIME);
-    conf.setInt(DFSConfigKeys.DFS_NAMENODE_HEARTBEAT_RECHECK_INTERVAL_KEY, 1000);
+    conf.setInt(DFSConfigKeys.DFS_NAMENODE_HEARTBEAT_RECHECK_INTERVAL_KEY,
+        1000);
     conf.setInt(DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY, 1);
 
 
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-                                               .numDataNodes(numDatanodes)
-                                               .build();
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(numDatanodes).build();
     cluster.waitActive();
     final int nnport = cluster.getNameNodePort();
-    InetSocketAddress addr = new InetSocketAddress("localhost", 
-                                                   cluster.getNameNodePort());
+    InetSocketAddress addr =
+        new InetSocketAddress("localhost", cluster.getNameNodePort());
     DFSClient client = new DFSClient(addr, conf);
     DatanodeInfo[] info = client.datanodeReport(DatanodeReportType.LIVE);
     assertEquals("Number of Datanodes ", numDatanodes, info.length);
@@ -122,8 +118,8 @@ public class TestSetTimes {
       FileStatus stat = fileSys.getFileStatus(file1);
       long atimeBeforeClose = stat.getAccessTime();
       String adate = dateForm.format(new Date(atimeBeforeClose));
-      System.out.println("atime on " + file1 + " before close is " + 
-                         adate + " (" + atimeBeforeClose + ")");
+      System.out.println("atime on " + file1 + " before close is " +
+          adate + " (" + atimeBeforeClose + ")");
       assertTrue(atimeBeforeClose != 0);
       stm.close();
 
@@ -132,10 +128,10 @@ public class TestSetTimes {
       long mtime1 = stat.getModificationTime();
       adate = dateForm.format(new Date(atime1));
       String mdate = dateForm.format(new Date(mtime1));
-      System.out.println("atime on " + file1 + " is " + adate + 
-                         " (" + atime1 + ")");
-      System.out.println("mtime on " + file1 + " is " + mdate + 
-                         " (" + mtime1 + ")");
+      System.out.println("atime on " + file1 + " is " + adate +
+          " (" + atime1 + ")");
+      System.out.println("mtime on " + file1 + " is " + mdate +
+          " (" + mtime1 + ")");
       assertTrue(atime1 != 0);
 
       //
@@ -153,8 +149,8 @@ public class TestSetTimes {
       stat = fileSys.getFileStatus(file1);
       long atime3 = stat.getAccessTime();
       String adate3 = dateForm.format(new Date(atime3));
-      System.out.println("new atime on " + file1 + " is " + 
-                         adate3 + " (" + atime3 + ")");
+      System.out.println("new atime on " + file1 + " is " +
+          adate3 + " (" + atime3 + ")");
       assertTrue(atime2 == atime3);
       assertTrue(mtime1 == stat.getModificationTime());
 
@@ -166,8 +162,8 @@ public class TestSetTimes {
       stat = fileSys.getFileStatus(file1);
       long mtime3 = stat.getModificationTime();
       String mdate3 = dateForm.format(new Date(mtime3));
-      System.out.println("new mtime on " + file1 + " is " + 
-                         mdate3 + " (" + mtime3 + ")");
+      System.out.println("new mtime on " + file1 + " is " +
+          mdate3 + " (" + mtime3 + ")");
       assertTrue(atime2 == stat.getAccessTime());
       assertTrue(mtime2 == mtime3);
 
@@ -176,10 +172,10 @@ public class TestSetTimes {
       fileSys.setTimes(dir1, mtime4, atime4);
       // check new modification time on file
       stat = fileSys.getFileStatus(dir1);
-      assertTrue("Not matching the modification times", mtime4 == stat
-          .getModificationTime());
-      assertTrue("Not matching the access times", atime4 == stat
-          .getAccessTime());
+      assertTrue("Not matching the modification times",
+          mtime4 == stat.getModificationTime());
+      assertTrue("Not matching the access times",
+          atime4 == stat.getAccessTime());
 
       Path nonExistingDir = new Path(dir1, "/nonExistingDir/");
       try {
@@ -187,14 +183,18 @@ public class TestSetTimes {
         fail("Expecting FileNotFoundException");
       } catch (FileNotFoundException e) {
         assertTrue(e.getMessage().contains(
-            "File/Directory " + nonExistingDir.toString() + " does not exist."));
+            "File/Directory " + nonExistingDir.toString() +
+                " does not exist."));
       }
       // shutdown cluster and restart
       cluster.shutdown();
-      try {Thread.sleep(2*MAX_IDLE_TIME);} catch (InterruptedException e) {}
-      cluster = new MiniDFSCluster.Builder(conf).nameNodePort(nnport)
-                                                .format(false)
-                                                .build();
+      try {
+        Thread.sleep(2 * MAX_IDLE_TIME);
+      } catch (InterruptedException e) {
+      }
+      cluster =
+          new MiniDFSCluster.Builder(conf).nameNodePort(nnport).format(false)
+              .build();
       cluster.waitActive();
       fileSys = cluster.getFileSystem();
 
@@ -204,7 +204,7 @@ public class TestSetTimes {
       stat = fileSys.getFileStatus(file1);
       assertTrue(atime2 == stat.getAccessTime());
       assertTrue(mtime3 == stat.getModificationTime());
-    
+
       cleanupFile(fileSys, file1);
       cleanupFile(fileSys, dir1);
     } catch (IOException e) {
@@ -228,15 +228,15 @@ public class TestSetTimes {
 
     // parameter initialization
     conf.setInt("ipc.client.connection.maxidletime", MAX_IDLE_TIME);
-    conf.setInt(DFSConfigKeys.DFS_NAMENODE_HEARTBEAT_RECHECK_INTERVAL_KEY, 1000);
+    conf.setInt(DFSConfigKeys.DFS_NAMENODE_HEARTBEAT_RECHECK_INTERVAL_KEY,
+        1000);
     conf.setInt(DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY, 1);
     conf.setInt(DFSConfigKeys.DFS_DATANODE_HANDLER_COUNT_KEY, 50);
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-                                               .numDataNodes(numDatanodes)
-                                               .build();
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(numDatanodes).build();
     cluster.waitActive();
-    InetSocketAddress addr = new InetSocketAddress("localhost",
-                                                     cluster.getNameNodePort());
+    InetSocketAddress addr =
+        new InetSocketAddress("localhost", cluster.getNameNodePort());
     DFSClient client = new DFSClient(addr, conf);
     DatanodeInfo[] info = client.datanodeReport(DatanodeReportType.LIVE);
     assertEquals("Number of Datanodes ", numDatanodes, info.length);
@@ -250,10 +250,10 @@ public class TestSetTimes {
       System.out.println("Created and wrote file simple.dat");
       FileStatus statBeforeClose = fileSys.getFileStatus(file1);
       long mtimeBeforeClose = statBeforeClose.getModificationTime();
-      String mdateBeforeClose = dateForm.format(new Date(
-                                                     mtimeBeforeClose));
-      System.out.println("mtime on " + file1 + " before close is "
-                  + mdateBeforeClose + " (" + mtimeBeforeClose + ")");
+      String mdateBeforeClose = dateForm.format(new Date(mtimeBeforeClose));
+      System.out.println(
+          "mtime on " + file1 + " before close is " + mdateBeforeClose + " (" +
+              mtimeBeforeClose + ")");
       assertTrue(mtimeBeforeClose != 0);
 
       //close file after writing
@@ -262,8 +262,9 @@ public class TestSetTimes {
       FileStatus statAfterClose = fileSys.getFileStatus(file1);
       long mtimeAfterClose = statAfterClose.getModificationTime();
       String mdateAfterClose = dateForm.format(new Date(mtimeAfterClose));
-      System.out.println("mtime on " + file1 + " after close is "
-                  + mdateAfterClose + " (" + mtimeAfterClose + ")");
+      System.out.println(
+          "mtime on " + file1 + " after close is " + mdateAfterClose + " (" +
+              mtimeAfterClose + ")");
       assertTrue(mtimeAfterClose != 0);
       assertTrue(mtimeBeforeClose != mtimeAfterClose);
 
@@ -274,37 +275,6 @@ public class TestSetTimes {
       throw e;
     } finally {
       fileSys.close();
-      cluster.shutdown();
-    }
-  }
-  
-  /**
-   * Test that when access time updates are not needed, the FSNamesystem
-   * write lock is not taken by getBlockLocations.
-   * Regression test for HDFS-3981.
-   */
-  @Test(timeout=60000)
-  public void testGetBlockLocationsOnlyUsesReadLock() throws IOException {
-    Configuration conf = new HdfsConfiguration();
-    conf.setInt(DFSConfigKeys.DFS_NAMENODE_ACCESSTIME_PRECISION_KEY, 100*1000);
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-      .numDataNodes(0)
-      .build();
-    ReentrantReadWriteLock spyLock = NameNodeAdapter.spyOnFsLock(cluster.getNamesystem());
-    try {
-      // Create empty file in the FSN.
-      Path p = new Path("/empty-file");
-      DFSTestUtil.createFile(cluster.getFileSystem(), p, 0, (short)1, 0L);
-      
-      // getBlockLocations() should not need the write lock, since we just created
-      // the file (and thus its access time is already within the 100-second
-      // accesstime precision configured above). 
-      MockitoUtil.doThrowWhenCallStackMatches(
-          new AssertionError("Should not need write lock"),
-          ".*getBlockLocations.*")
-          .when(spyLock).writeLock();
-      cluster.getFileSystem().getFileBlockLocations(p, 0, 100);
-    } finally {
       cluster.shutdown();
     }
   }

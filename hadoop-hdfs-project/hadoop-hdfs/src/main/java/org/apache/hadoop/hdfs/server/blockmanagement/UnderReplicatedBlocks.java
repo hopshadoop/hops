@@ -17,139 +17,182 @@
  */
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
+import io.hops.exception.StorageException;
+import io.hops.exception.TransactionContextException;
+import io.hops.metadata.HdfsStorageFactory;
+import io.hops.metadata.HdfsVariables;
+import io.hops.metadata.common.entity.Variable;
+import io.hops.metadata.hdfs.dal.BlockInfoDataAccess;
+import io.hops.metadata.hdfs.dal.UnderReplicatedBlockDataAccess;
+import io.hops.metadata.hdfs.entity.UnderReplicatedBlock;
+import io.hops.transaction.EntityManager;
+import io.hops.transaction.handler.HDFSOperationType;
+import io.hops.transaction.handler.HopsTransactionalRequestHandler;
+import io.hops.transaction.handler.LightWeightRequestHandler;
+import io.hops.transaction.lock.LockFactory;
+import io.hops.transaction.lock.TransactionLockTypes;
+import io.hops.transaction.lock.TransactionLocks;
+import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.server.namenode.NameNode;
+
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 
-import java.util.Map;
-
-import org.apache.hadoop.hdfs.protocol.Block;
-import org.apache.hadoop.hdfs.util.LightWeightLinkedSet;
-import org.apache.hadoop.hdfs.server.namenode.NameNode;
-
 /**
  * Keep prioritized queues of under replicated blocks.
- * Blocks have replication priority, with priority {@link #QUEUE_HIGHEST_PRIORITY}
+ * Blocks have replication priority, with priority {@link
+ * #QUEUE_HIGHEST_PRIORITY}
  * indicating the highest priority.
  * </p>
  * Having a prioritised queue allows the {@link BlockManager} to select
  * which blocks to replicate first -it tries to give priority to data
  * that is most at risk or considered most valuable.
- *
+ * <p/>
  * <p/>
  * The policy for choosing which priority to give added blocks
  * is implemented in {@link #getPriority(Block, int, int, int)}.
  * </p>
  * <p>The queue order is as follows:</p>
  * <ol>
- *   <li>{@link #QUEUE_HIGHEST_PRIORITY}: the blocks that must be replicated
- *   first. That is blocks with only one copy, or blocks with zero live
- *   copies but a copy in a node being decommissioned. These blocks
- *   are at risk of loss if the disk or server on which they
- *   remain fails.</li>
- *   <li>{@link #QUEUE_VERY_UNDER_REPLICATED}: blocks that are very
- *   under-replicated compared to their expected values. Currently
- *   that means the ratio of the ratio of actual:expected means that
- *   there is <i>less than</i> 1:3.</li>. These blocks may not be at risk,
- *   but they are clearly considered "important".
- *   <li>{@link #QUEUE_UNDER_REPLICATED}: blocks that are also under
- *   replicated, and the ratio of actual:expected is good enough that
- *   they do not need to go into the {@link #QUEUE_VERY_UNDER_REPLICATED}
- *   queue.</li>
- *   <li>{@link #QUEUE_REPLICAS_BADLY_DISTRIBUTED}: there are as least as
- *   many copies of a block as required, but the blocks are not adequately
- *   distributed. Loss of a rack/switch could take all copies off-line.</li>
- *   <li>{@link #QUEUE_WITH_CORRUPT_BLOCKS} This is for blocks that are corrupt
- *   and for which there are no-non-corrupt copies (currently) available.
- *   The policy here is to keep those corrupt blocks replicated, but give
- *   blocks that are not corrupt higher priority.</li>
+ * <li>{@link #QUEUE_HIGHEST_PRIORITY}: the blocks that must be replicated
+ * first. That is blocks with only one copy, or blocks with zero live
+ * copies but a copy in a node being decommissioned. These blocks
+ * are at risk of loss if the disk or server on which they
+ * remain fails.</li>
+ * <li>{@link #QUEUE_VERY_UNDER_REPLICATED}: blocks that are very
+ * under-replicated compared to their expected values. Currently
+ * that means the ratio of the ratio of actual:expected means that
+ * there is <i>less than</i> 1:3.</li>. These blocks may not be at risk,
+ * but they are clearly considered "important".
+ * <li>{@link #QUEUE_UNDER_REPLICATED}: blocks that are also under
+ * replicated, and the ratio of actual:expected is good enough that
+ * they do not need to go into the {@link #QUEUE_VERY_UNDER_REPLICATED}
+ * queue.</li>
+ * <li>{@link #QUEUE_REPLICAS_BADLY_DISTRIBUTED}: there are as least as
+ * many copies of a block as required, but the blocks are not adequately
+ * distributed. Loss of a rack/switch could take all copies off-line.</li>
+ * <li>{@link #QUEUE_WITH_CORRUPT_BLOCKS} This is for blocks that are corrupt
+ * and for which there are no-non-corrupt copies (currently) available.
+ * The policy here is to keep those corrupt blocks replicated, but give
+ * blocks that are not corrupt higher priority.</li>
  * </ol>
  */
 class UnderReplicatedBlocks implements Iterable<Block> {
-  /** The total number of queues : {@value} */
+  /**
+   * The total number of queues : {@value}
+   */
   static final int LEVEL = 5;
-  /** The queue with the highest priority: {@value} */
+  /**
+   * The queue with the highest priority: {@value}
+   */
   static final int QUEUE_HIGHEST_PRIORITY = 0;
-  /** The queue for blocks that are way below their expected value : {@value} */
+  /**
+   * The queue for blocks that are way below their expected value : {@value}
+   */
   static final int QUEUE_VERY_UNDER_REPLICATED = 1;
-  /** The queue for "normally" under-replicated blocks: {@value} */
+  /**
+   * The queue for "normally" under-replicated blocks: {@value}
+   */
   static final int QUEUE_UNDER_REPLICATED = 2;
-  /** The queue for blocks that have the right number of replicas,
+  /**
+   * The queue for blocks that have the right number of replicas,
    * but which the block manager felt were badly distributed: {@value}
    */
   static final int QUEUE_REPLICAS_BADLY_DISTRIBUTED = 3;
-  /** The queue for corrupt blocks: {@value} */
+  /**
+   * The queue for corrupt blocks: {@value}
+   */
   static final int QUEUE_WITH_CORRUPT_BLOCKS = 4;
-  /** the queues themselves */
-  private final List<LightWeightLinkedSet<Block>> priorityQueues
-      = new ArrayList<LightWeightLinkedSet<Block>>();
-
-  /** Stores the replication index for each priority */
-  private Map<Integer, Integer> priorityToReplIdx = new HashMap<Integer, Integer>(LEVEL);
   
-  /** Create an object. */
+  /**
+   * Create an object.
+   */
   UnderReplicatedBlocks() {
-    for (int i = 0; i < LEVEL; i++) {
-      priorityQueues.add(new LightWeightLinkedSet<Block>());
-      priorityToReplIdx.put(i, 0);
-    }
   }
 
   /**
    * Empty the queues.
    */
-  void clear() {
-    for (int i = 0; i < LEVEL; i++) {
-      priorityQueues.get(i).clear();
-    }
-  }
-
-  /** Return the total number of under replication blocks */
-  synchronized int size() {
-    int size = 0;
-    for (int i = 0; i < LEVEL; i++) {
-      size += priorityQueues.get(i).size();
-    }
-    return size;
-  }
-
-  /** Return the number of under replication blocks excluding corrupt blocks */
-  synchronized int getUnderReplicatedBlockCount() {
-    int size = 0;
-    for (int i = 0; i < LEVEL; i++) {
-      if (i != QUEUE_WITH_CORRUPT_BLOCKS) {
-        size += priorityQueues.get(i).size();
+  void clear() throws IOException {
+    new LightWeightRequestHandler(
+        HDFSOperationType.DEL_ALL_UNDER_REPLICATED_BLKS) {
+      @Override
+      public Object performTask() throws StorageException, IOException {
+        UnderReplicatedBlockDataAccess da =
+            (UnderReplicatedBlockDataAccess) HdfsStorageFactory
+                .getDataAccess(UnderReplicatedBlockDataAccess.class);
+        da.removeAll();
+        return null;
       }
-    }
-    return size;
+    }.handle();
   }
 
-  /** Return the number of corrupt blocks */
-  synchronized int getCorruptBlockSize() {
-    return priorityQueues.get(QUEUE_WITH_CORRUPT_BLOCKS).size();
-  }
+  /**
+   * Return the total number of under replication blocks
+   */
+  int size() throws IOException {
+    return (Integer) new LightWeightRequestHandler(
+        HDFSOperationType.COUNT_ALL_UNDER_REPLICATED_BLKS) {
 
-  /** Check if a block is in the neededReplication queue */
-  synchronized boolean contains(Block block) {
-    for(LightWeightLinkedSet<Block> set : priorityQueues) {
-      if (set.contains(block)) {
-        return true;
+      @Override
+      public Object performTask() throws StorageException, IOException {
+        UnderReplicatedBlockDataAccess da =
+            (UnderReplicatedBlockDataAccess) HdfsStorageFactory
+                .getDataAccess(UnderReplicatedBlockDataAccess.class);
+        return da.countAll();
       }
-    }
-    return false;
+    }.handle();
   }
 
-  /** Return the priority of a block
-   * @param block a under replicated block
-   * @param curReplicas current number of replicas of the block
-   * @param expectedReplicas expected number of replicas of the block
+  /**
+   * Return the number of under replication blocks excluding corrupt blocks
+   */
+  int getUnderReplicatedBlockCount() throws IOException {
+    return (Integer) new LightWeightRequestHandler(
+        HDFSOperationType.COUNT_UNDER_REPLICATED_BLKS_LESS_THAN_LVL4) {
+      @Override
+      public Object performTask() throws StorageException, IOException {
+        UnderReplicatedBlockDataAccess da =
+            (UnderReplicatedBlockDataAccess) HdfsStorageFactory
+                .getDataAccess(UnderReplicatedBlockDataAccess.class);
+        return da.countLessThanALevel(QUEUE_WITH_CORRUPT_BLOCKS);
+      }
+    }.handle();
+  }
+
+  /**
+   * Return the number of corrupt blocks
+   */
+  int getCorruptBlockSize() throws IOException {
+    return count(QUEUE_WITH_CORRUPT_BLOCKS);
+  }
+
+  /**
+   * Check if a block is in the neededReplication queue
+   */
+  boolean contains(BlockInfo block)
+      throws StorageException, TransactionContextException {
+    return getUnderReplicatedBlock(block) != null;
+  }
+
+  /**
+   * Return the priority of a block
+   *
+   * @param block
+   *     a under replicated block
+   * @param curReplicas
+   *     current number of replicas of the block
+   * @param expectedReplicas
+   *     expected number of replicas of the block
    * @return the priority for the blocks, between 0 and ({@link #LEVEL}-1)
    */
-  private int getPriority(Block block,
-                          int curReplicas, 
-                          int decommissionedReplicas,
-                          int expectedReplicas) {
+  private int getPriority(Block block, int curReplicas,
+      int decommissionedReplicas, int expectedReplicas) {
     assert curReplicas >= 0 : "Negative replicas!";
     if (curReplicas >= expectedReplicas) {
       // Block has enough copies, but not enough racks
@@ -176,135 +219,137 @@ class UnderReplicatedBlocks implements Iterable<Block> {
     }
   }
 
-  /** add a block to a under replication queue according to its priority
-   * @param block a under replication block
-   * @param curReplicas current number of replicas of the block
-   * @param decomissionedReplicas the number of decommissioned replicas
-   * @param expectedReplicas expected number of replicas of the block
+  /**
+   * add a block to a under replication queue according to its priority
+   *
+   * @param block
+   *     a under replication block
+   * @param curReplicas
+   *     current number of replicas of the block
+   * @param decomissionedReplicas
+   *     the number of decommissioned replicas
+   * @param expectedReplicas
+   *     expected number of replicas of the block
    * @return true if the block was added to a queue.
    */
-  synchronized boolean add(Block block,
-                           int curReplicas, 
-                           int decomissionedReplicas,
-                           int expectedReplicas) {
+  boolean add(BlockInfo block, int curReplicas, int decomissionedReplicas,
+      int expectedReplicas)
+      throws StorageException, TransactionContextException {
     assert curReplicas >= 0 : "Negative replicas!";
     int priLevel = getPriority(block, curReplicas, decomissionedReplicas,
-                               expectedReplicas);
-    if(priLevel != LEVEL && priorityQueues.get(priLevel).add(block)) {
-      if(NameNode.blockStateChangeLog.isDebugEnabled()) {
+        expectedReplicas);
+    if (priLevel != LEVEL && add(block, priLevel)) {
+      if (NameNode.blockStateChangeLog.isDebugEnabled()) {
         NameNode.blockStateChangeLog.debug(
-          "BLOCK* NameSystem.UnderReplicationBlock.add:"
-          + block
-          + " has only " + curReplicas
-          + " replicas and need " + expectedReplicas
-          + " replicas so is added to neededReplications"
-          + " at priority level " + priLevel);
+            "BLOCK* NameSystem.UnderReplicationBlock.add:" + block +
+                " has only " + curReplicas + " replicas and need " +
+                expectedReplicas +
+                " replicas so is added to neededReplications" +
+                " at priority level " + priLevel);
       }
       return true;
     }
     return false;
   }
 
-  /** remove a block from a under replication queue */
-  synchronized boolean remove(Block block, 
-                              int oldReplicas, 
-                              int decommissionedReplicas,
-                              int oldExpectedReplicas) {
-    int priLevel = getPriority(block, oldReplicas, 
-                               decommissionedReplicas,
-                               oldExpectedReplicas);
+  /**
+   * remove a block from a under replication queue
+   */
+  boolean remove(BlockInfo block, int oldReplicas, int decommissionedReplicas,
+      int oldExpectedReplicas)
+      throws StorageException, TransactionContextException {
+    int priLevel = getPriority(block, oldReplicas, decommissionedReplicas,
+        oldExpectedReplicas);
     return remove(block, priLevel);
   }
 
   /**
    * Remove a block from the under replication queues.
-   *
+   * <p/>
    * The priLevel parameter is a hint of which queue to query
    * first: if negative or &gt;= {@link #LEVEL} this shortcutting
    * is not attmpted.
-   *
+   * <p/>
    * If the block is not found in the nominated queue, an attempt is made to
    * remove it from all queues.
-   *
+   * <p/>
    * <i>Warning:</i> This is not a synchronized method.
-   * @param block block to remove
-   * @param priLevel expected privilege level
-   * @return true if the block was found and removed from one of the priority queues
+   *
+   * @param block
+   *     block to remove
+   * @param priLevel
+   *     expected privilege level
+   * @return true if the block was found and removed from one of the priority
+   * queues
    */
-  boolean remove(Block block, int priLevel) {
-    if(priLevel >= 0 && priLevel < LEVEL 
-        && priorityQueues.get(priLevel).remove(block)) {
-      if(NameNode.blockStateChangeLog.isDebugEnabled()) {
+  boolean remove(BlockInfo block, int priLevel)
+      throws StorageException, TransactionContextException {
+    UnderReplicatedBlock urb = getUnderReplicatedBlock(block);
+    if (priLevel >= 0 && priLevel < LEVEL && remove(urb)) {
+      if (NameNode.blockStateChangeLog.isDebugEnabled()) {
         NameNode.blockStateChangeLog.debug(
-          "BLOCK* NameSystem.UnderReplicationBlock.remove: "
-          + "Removing block " + block
-          + " from priority queue "+ priLevel);
+            "BLOCK* NameSystem.UnderReplicationBlock.remove: " +
+                "Removing block " + block + " from priority queue " +
+                urb.getLevel());
       }
       return true;
-    } else {
-      // Try to remove the block from all queues if the block was
-      // not found in the queue for the given priority level.
-      for (int i = 0; i < LEVEL; i++) {
-        if (priorityQueues.get(i).remove(block)) {
-          if(NameNode.blockStateChangeLog.isDebugEnabled()) {
-            NameNode.blockStateChangeLog.debug(
-              "BLOCK* NameSystem.UnderReplicationBlock.remove: "
-              + "Removing block " + block
-              + " from priority queue "+ i);
-          }
-          return true;
-        }
-      }
     }
     return false;
   }
 
   /**
    * Recalculate and potentially update the priority level of a block.
-   *
+   * <p/>
    * If the block priority has changed from before an attempt is made to
    * remove it from the block queue. Regardless of whether or not the block
    * is in the block queue of (recalculate) priority, an attempt is made
    * to add it to that queue. This ensures that the block will be
    * in its expected priority queue (and only that queue) by the end of the
    * method call.
-   * @param block a under replicated block
-   * @param curReplicas current number of replicas of the block
-   * @param decommissionedReplicas  the number of decommissioned replicas
-   * @param curExpectedReplicas expected number of replicas of the block
-   * @param curReplicasDelta the change in the replicate count from before
-   * @param expectedReplicasDelta the change in the expected replica count from before
+   *
+   * @param block
+   *     a under replicated block
+   * @param curReplicas
+   *     current number of replicas of the block
+   * @param decommissionedReplicas
+   *     the number of decommissioned replicas
+   * @param curExpectedReplicas
+   *     expected number of replicas of the block
+   * @param curReplicasDelta
+   *     the change in the replicate count from before
+   * @param expectedReplicasDelta
+   *     the change in the expected replica count from before
    */
-  synchronized void update(Block block, int curReplicas,
-                           int decommissionedReplicas,
-                           int curExpectedReplicas,
-                           int curReplicasDelta, int expectedReplicasDelta) {
-    int oldReplicas = curReplicas-curReplicasDelta;
-    int oldExpectedReplicas = curExpectedReplicas-expectedReplicasDelta;
-    int curPri = getPriority(block, curReplicas, decommissionedReplicas, curExpectedReplicas);
-    int oldPri = getPriority(block, oldReplicas, decommissionedReplicas, oldExpectedReplicas);
-    if(NameNode.stateChangeLog.isDebugEnabled()) {
-      NameNode.stateChangeLog.debug("UnderReplicationBlocks.update " + 
-        block +
-        " curReplicas " + curReplicas +
-        " curExpectedReplicas " + curExpectedReplicas +
-        " oldReplicas " + oldReplicas +
-        " oldExpectedReplicas  " + oldExpectedReplicas +
-        " curPri  " + curPri +
-        " oldPri  " + oldPri);
+  void update(BlockInfo block, int curReplicas, int decommissionedReplicas,
+      int curExpectedReplicas, int curReplicasDelta, int expectedReplicasDelta)
+      throws StorageException, TransactionContextException {
+    int oldReplicas = curReplicas - curReplicasDelta;
+    int oldExpectedReplicas = curExpectedReplicas - expectedReplicasDelta;
+    int curPri = getPriority(block, curReplicas, decommissionedReplicas,
+        curExpectedReplicas);
+    int oldPri = getPriority(block, oldReplicas, decommissionedReplicas,
+        oldExpectedReplicas);
+    if (NameNode.stateChangeLog.isDebugEnabled()) {
+      NameNode.stateChangeLog.debug("UnderReplicationBlocks.update " +
+          block +
+          " curReplicas " + curReplicas +
+          " curExpectedReplicas " + curExpectedReplicas +
+          " oldReplicas " + oldReplicas +
+          " oldExpectedReplicas  " + oldExpectedReplicas +
+          " curPri  " + curPri +
+          " oldPri  " + oldPri);
     }
-    if(oldPri != LEVEL && oldPri != curPri) {
+    if (oldPri != LEVEL && oldPri != curPri) {
       remove(block, oldPri);
     }
-    if(curPri != LEVEL && priorityQueues.get(curPri).add(block)) {
-      if(NameNode.blockStateChangeLog.isDebugEnabled()) {
+    if (curPri != LEVEL && add(block, curPri)) {
+      if (NameNode.blockStateChangeLog.isDebugEnabled()) {
         NameNode.blockStateChangeLog.debug(
-          "BLOCK* NameSystem.UnderReplicationBlock.update:"
-          + block
-          + " has only "+ curReplicas
-          + " replicas and needs " + curExpectedReplicas
-          + " replicas so is added to neededReplications"
-          + " at priority level " + curPri);
+            "BLOCK* NameSystem.UnderReplicationBlock.update:" + block +
+                " has only " + curReplicas + " replicas and needs " +
+                curExpectedReplicas +
+                " replicas so is added to neededReplications" +
+                " at priority level " + curPri);
       }
     }
   }
@@ -316,72 +361,106 @@ class UnderReplicatedBlocks implements Iterable<Block> {
    * all priority lists and find the elements after replication index. Once the
    * last priority lists reaches to end, all replication indexes will be set to
    * 0 and start from 1st priority list to fulfill the blockToProces count.
-   * 
-   * @param blocksToProcess - number of blocks to fetch from underReplicated blocks.
+   *
+   * @param blocksToProcess
+   *     - number of blocks to fetch from underReplicated blocks.
    * @return Return a list of block lists to be replicated. The block list index
-   *         represents its replication priority.
+   * represents its replication priority.
    */
-  public synchronized List<List<Block>> chooseUnderReplicatedBlocks(
-      int blocksToProcess) {
+  private List<List<Block>> chooseUnderReplicatedBlocksInt(int blocksToProcess)
+      throws IOException {
     // initialize data structure for the return value
     List<List<Block>> blocksToReplicate = new ArrayList<List<Block>>(LEVEL);
     for (int i = 0; i < LEVEL; i++) {
       blocksToReplicate.add(new ArrayList<Block>());
     }
-
     if (size() == 0) { // There are no blocks to collect.
       return blocksToReplicate;
     }
     
+    List<Integer> priorityToReplIdx = getReplicationIndex();
+    List<List<Block>> priorityQueuestmp = createPrioriryQueue();
+    
     int blockCount = 0;
-    for (int priority = 0; priority < LEVEL; priority++) { 
+    blocksToProcess = Math.min(blocksToProcess, size());
+    
+    for (int priority = 0; priority < LEVEL; priority++) {
       // Go through all blocks that need replications with current priority.
-      BlockIterator neededReplicationsIterator = iterator(priority);
       Integer replIndex = priorityToReplIdx.get(priority);
-      
-      // skip to the first unprocessed block, which is at replIndex
-      for (int i = 0; i < replIndex && neededReplicationsIterator.hasNext(); i++) {
-        neededReplicationsIterator.next();
-      }
-
-      blocksToProcess = Math.min(blocksToProcess, size());
       
       if (blockCount == blocksToProcess) {
         break;  // break if already expected blocks are obtained
       }
       
-      // Loop through all remaining blocks in the list.
-      while (blockCount < blocksToProcess
-          && neededReplicationsIterator.hasNext()) {
-        Block block = neededReplicationsIterator.next();
-        blocksToReplicate.get(priority).add(block);
-        replIndex++;
-        blockCount++;
-      }
+      int remainingblksToProcess = blocksToProcess - blockCount;
+      List<UnderReplicatedBlock> urbs =
+          getUnderReplicatedBlocks(priority, replIndex, remainingblksToProcess);
+      addBlocksInPriorityQueues(urbs, priorityQueuestmp);
       
-      if (!neededReplicationsIterator.hasNext()
-          && neededReplicationsIterator.getPriority() == LEVEL - 1) {
+      List<Block> blks = priorityQueuestmp.get(priority);
+      blocksToReplicate.get(priority).addAll(blks);
+      blockCount += blks.size();
+      replIndex += blks.size();
+      
+      if (count(priority) <= remainingblksToProcess && priority == LEVEL - 1) {
         // reset all priorities replication index to 0 because there is no
         // recently added blocks in any list.
         for (int i = 0; i < LEVEL; i++) {
-          priorityToReplIdx.put(i, 0);
+          priorityToReplIdx.set(i, 0);
         }
         break;
       }
-      priorityToReplIdx.put(priority, replIndex); 
+      priorityToReplIdx.set(priority, replIndex);
     }
+    setReplicationIndex(priorityToReplIdx);
     return blocksToReplicate;
   }
 
-  /** returns an iterator of all blocks in a given priority queue */
-  synchronized BlockIterator iterator(int level) {
-    return new BlockIterator(level);
+  /**
+   * returns an iterator of all blocks in a given priority queue
+   */
+  BlockIterator iterator(final int level) {
+    try {
+      return (BlockIterator) new HopsTransactionalRequestHandler(
+          HDFSOperationType.UNDER_REPLICATED_BLKS_ITERATOR) {
+        @Override
+        public void acquireLock(TransactionLocks locks) throws IOException {
+        }
+
+        @Override
+        public Object performTask() throws StorageException, IOException {
+          return new BlockIterator(fillPriorityQueues(level), level);
+        }
+      }.handle();
+    } catch (IOException ex) {
+      BlockManager.LOG
+          .error("Error while filling the priorityQueues from db", ex);
+      return null;
+    }
   }
 
-  /** return an iterator of all the under replication blocks */
+  /**
+   * return an iterator of all the under replication blocks
+   */
   @Override
-  public synchronized BlockIterator iterator() {
-    return new BlockIterator();
+  public BlockIterator iterator() {
+    try {
+      return (BlockIterator) new HopsTransactionalRequestHandler(
+          HDFSOperationType.UNDER_REPLICATED_BLKS_ITERATOR) {
+        @Override
+        public void acquireLock(TransactionLocks locks) throws IOException {
+        }
+        
+        @Override
+        public Object performTask() throws StorageException, IOException {
+          return new BlockIterator(fillPriorityQueues());
+        }
+      }.handle();
+    } catch (IOException ex) {
+      BlockManager.LOG
+          .error("Error while filling the priorityQueues from db", ex);
+      return null;
+    }
   }
 
   /**
@@ -390,61 +469,82 @@ class UnderReplicatedBlocks implements Iterable<Block> {
   class BlockIterator implements Iterator<Block> {
     private int level;
     private boolean isIteratorForLevel = false;
-    private final List<Iterator<Block>> iterators = new ArrayList<Iterator<Block>>();
-
+    private final List<Iterator<Block>> iterators =
+        new ArrayList<Iterator<Block>>();
+    
     /**
      * Construct an iterator over all queues.
      */
-    private BlockIterator() {
-      level=0;
-      for(int i=0; i<LEVEL; i++) {
-        iterators.add(priorityQueues.get(i).iterator());
+    private BlockIterator(List<List<Block>> priorityQueuestmp) {
+      level = 0;
+      synchronized (iterators) {
+        for (int i = 0; i < LEVEL; i++) {
+          iterators.add(priorityQueuestmp.get(i).iterator());
+        }
       }
     }
 
     /**
      * Constrict an iterator for a single queue level
-     * @param l the priority level to iterate over
+     *
+     * @param l
+     *     the priority level to iterate over
      */
-    private BlockIterator(int l) {
+    private BlockIterator(List<List<Block>> priorityQueuestmp, int l) {
       level = l;
       isIteratorForLevel = true;
-      iterators.add(priorityQueues.get(level).iterator());
+      synchronized (iterators) {
+        iterators.add(priorityQueuestmp.get(level).iterator());
+      }
     }
 
     private void update() {
       if (isIteratorForLevel) {
         return;
       }
-      while(level< LEVEL-1 && !iterators.get(level).hasNext()) {
-        level++;
+      synchronized (iterators) {
+        while (level < LEVEL - 1 && !iterators.get(level).hasNext()) {
+          level++;
+        }
       }
     }
 
     @Override
     public Block next() {
       if (isIteratorForLevel) {
-        return iterators.get(0).next();
+        synchronized (iterators) {
+          return iterators.get(0).next();
+        }
       }
       update();
-      return iterators.get(level).next();
+      synchronized (iterators) {
+        return iterators.get(level).next();
+      }
     }
 
     @Override
     public boolean hasNext() {
       if (isIteratorForLevel) {
-        return iterators.get(0).hasNext();
+        synchronized (iterators) {
+          return iterators.get(0).hasNext();
+        }
       }
       update();
-      return iterators.get(level).hasNext();
+      synchronized (iterators) {
+        return iterators.get(level).hasNext();
+      }
     }
 
     @Override
     public void remove() {
       if (isIteratorForLevel) {
-        iterators.get(0).remove();
+        synchronized (iterators) {
+          iterators.get(0).remove();
+        }
       } else {
-        iterators.get(level).remove();
+        synchronized (iterators) {
+          iterators.get(level).remove();
+        }
       }
     }
 
@@ -455,11 +555,196 @@ class UnderReplicatedBlocks implements Iterable<Block> {
 
   /**
    * This method is to decrement the replication index for the given priority
-   * 
-   * @param priority  - int priority level
+   *
+   * @param priority
+   *     - int priority level
    */
-  public void decrementReplicationIndex(int priority) {
+  public void decrementReplicationIndex(int priority)
+      throws StorageException, TransactionContextException {
+    List<Integer> priorityToReplIdx = getReplicationIndex();
     Integer replIdx = priorityToReplIdx.get(priority);
-    priorityToReplIdx.put(priority, --replIdx); 
+    replIdx = replIdx <= 0 ? 0 : (replIdx - 1);
+    priorityToReplIdx.set(priority, replIdx);
+    setReplicationIndex(priorityToReplIdx);
   }
+
+  public List<List<Block>> chooseUnderReplicatedBlocks(
+      final int blocksToProcess) throws IOException {
+    return (List<List<Block>>) new HopsTransactionalRequestHandler(
+        HDFSOperationType.CHOOSE_UNDER_REPLICATED_BLKS) {
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = LockFactory.getInstance();
+        locks.add(lf.getVariableLock(Variable.Finder.ReplicationIndex,
+            TransactionLockTypes.LockType.WRITE));
+      }
+
+      @Override
+      public Object performTask() throws StorageException, IOException {
+        return chooseUnderReplicatedBlocksInt(blocksToProcess);
+      }
+    }.handle();
+  }
+  
+  private boolean remove(UnderReplicatedBlock urb)
+      throws StorageException, TransactionContextException {
+    if (urb != null) {
+      removeUnderReplicatedBlock(urb);
+      return true;
+    }
+    return false;
+  }
+
+  // return true if it does not exist other wise return false
+  private boolean add(BlockInfo block, int priLevel)
+      throws StorageException, TransactionContextException {
+    UnderReplicatedBlock urb = getUnderReplicatedBlock(block);
+    if (urb == null) {
+      addUnderReplicatedBlock(
+          new UnderReplicatedBlock(priLevel, block.getBlockId(),
+              block.getInodeId()));
+      return true;
+    }
+    return false;
+  }
+  
+  private List<List<Block>> fillPriorityQueues() throws IOException {
+    return fillPriorityQueues(-1);
+  }
+  
+  private List<List<Block>> fillPriorityQueues(int level) throws IOException {
+    List<List<Block>> priorityQueuestmp = createPrioriryQueue();
+    List<UnderReplicatedBlock> allUrb = getUnderReplicatedBlocks(level);
+    if (!allUrb.isEmpty()) {
+      addBlocksInPriorityQueues(allUrb, priorityQueuestmp);
+    }
+    return priorityQueuestmp;
+  }
+  
+  private List<List<Block>> createPrioriryQueue() {
+    List<List<Block>> priorityQueuestmp = new ArrayList<List<Block>>();
+    for (int i = 0; i < LEVEL; i++) {
+      priorityQueuestmp.add(new ArrayList<Block>());
+    }
+    return priorityQueuestmp;
+  }
+  
+
+  private List<UnderReplicatedBlock> getUnderReplicatedBlocks(final int level)
+      throws IOException {
+    return (List<UnderReplicatedBlock>) new LightWeightRequestHandler(
+        HDFSOperationType.GET_ALL_UNDER_REPLICATED_BLKS) {
+      @Override
+      public Object performTask() throws StorageException, IOException {
+        UnderReplicatedBlockDataAccess da =
+            (UnderReplicatedBlockDataAccess) HdfsStorageFactory
+                .getDataAccess(UnderReplicatedBlockDataAccess.class);
+        if (level == -1) {
+          return da.findAll();
+        } else {
+          return da.findByLevel(level);
+        }
+        
+      }
+    }.handle();
+  }
+  
+  private List<UnderReplicatedBlock> getUnderReplicatedBlocks(final int level,
+      final int offset, final int count) throws IOException {
+    return (List<UnderReplicatedBlock>) new LightWeightRequestHandler(
+        HDFSOperationType.GET_UNDER_REPLICATED_BLKS_By_LEVEL_LIMITED) {
+      @Override
+      public Object performTask() throws StorageException, IOException {
+        UnderReplicatedBlockDataAccess da =
+            (UnderReplicatedBlockDataAccess) HdfsStorageFactory
+                .getDataAccess(UnderReplicatedBlockDataAccess.class);
+        return da.findByLevel(level, offset, count);
+
+      }
+    }.handle();
+  }
+
+  private void addBlocksInPriorityQueues(
+      final List<UnderReplicatedBlock> allUrb,
+      final List<List<Block>> priorityQueuestmp) throws IOException {
+    final long[] blockIds = new long[allUrb.size()];
+    final int[] inodeIds = new int[allUrb.size()];
+    final HashMap<Long, UnderReplicatedBlock> allUrbHashMap =
+        new HashMap<Long, UnderReplicatedBlock>();
+    for (int i = 0; i < allUrb.size(); i++) {
+      UnderReplicatedBlock b = allUrb.get(i);
+      blockIds[i] = b.getBlockId();
+      inodeIds[i] = b.getInodeId();
+      allUrbHashMap.put(b.getBlockId(), b);
+    }
+
+    // use lightweight transaction handler here and it should work
+
+    new LightWeightRequestHandler(HDFSOperationType.GET_BLOCKS) {
+      
+      @Override
+      public Object performTask() throws StorageException, IOException {
+        BlockInfoDataAccess bda = (BlockInfoDataAccess) HdfsStorageFactory
+            .getDataAccess(BlockInfoDataAccess.class);
+        List<BlockInfo> blks = bda.findByIds(blockIds, inodeIds);
+        for (BlockInfo blk : blks) {
+          UnderReplicatedBlock urb = allUrbHashMap.remove(blk.getBlockId());
+          assert urb.getInodeId() == blk.getInodeId();
+          priorityQueuestmp.get(urb.getLevel()).add(blk);
+        }
+        
+        //HOP[M]: allUrb should contains the list of underreplicatedblocks that doesn't have any block attached to 
+        // so it's safe to delete these blocks without taking anylocks
+        Collection<UnderReplicatedBlock> toRemove = allUrbHashMap.values();
+        if (!toRemove.isEmpty()) {
+          UnderReplicatedBlockDataAccess uda =
+              (UnderReplicatedBlockDataAccess) HdfsStorageFactory
+                  .getDataAccess(UnderReplicatedBlockDataAccess.class);
+          uda.prepare(toRemove, Collections.EMPTY_LIST, Collections.EMPTY_LIST);
+        }
+        return null;
+      }
+    }.handle();
+  }
+  
+  int count(final int level) throws IOException {
+    return (Integer) new LightWeightRequestHandler(
+        HDFSOperationType.COUNT_UNDER_REPLICATED_BLKS_AT_LVL) {
+      @Override
+      public Object performTask() throws StorageException, IOException {
+        UnderReplicatedBlockDataAccess da =
+            (UnderReplicatedBlockDataAccess) HdfsStorageFactory
+                .getDataAccess(UnderReplicatedBlockDataAccess.class);
+        return da.countByLevel(level);
+      }
+    }.handle();
+  }
+  
+  private UnderReplicatedBlock getUnderReplicatedBlock(BlockInfo blk)
+      throws StorageException, TransactionContextException {
+    return EntityManager
+        .find(UnderReplicatedBlock.Finder.ByBlockIdAndINodeId, blk.getBlockId(),
+            blk.getInodeId());
+  }
+
+  private void addUnderReplicatedBlock(UnderReplicatedBlock urb)
+      throws StorageException, TransactionContextException {
+    EntityManager.add(urb);
+  }
+
+  private void removeUnderReplicatedBlock(UnderReplicatedBlock urb)
+      throws StorageException, TransactionContextException {
+    EntityManager.remove(urb);
+  }
+
+  private List<Integer> getReplicationIndex()
+      throws StorageException, TransactionContextException {
+    return HdfsVariables.getReplicationIndex();
+  }
+
+  private void setReplicationIndex(List<Integer> replicationIndex)
+      throws StorageException, TransactionContextException {
+    HdfsVariables.setReplicationIndex(replicationIndex);
+  }
+  
 }

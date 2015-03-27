@@ -1,25 +1,22 @@
 /**
-* Licensed to the Apache Software Foundation (ASF) under one
-* or more contributor license agreements.  See the NOTICE file
-* distributed with this work for additional information
-* regarding copyright ownership.  The ASF licenses this file
-* to you under the Apache License, Version 2.0 (the
-* "License"); you may not use this file except in compliance
-* with the License.  You may obtain a copy of the License at
-*
-*     http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package org.apache.hadoop.yarn.server.resourcemanager.security;
-
-import java.util.Timer;
-import java.util.TimerTask;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -32,35 +29,43 @@ import org.apache.hadoop.yarn.api.records.Token;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.security.ContainerTokenIdentifier;
 import org.apache.hadoop.yarn.server.api.records.MasterKey;
+import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
+import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
 import org.apache.hadoop.yarn.server.security.BaseContainerTokenSecretManager;
-import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.apache.hadoop.yarn.server.security.MasterKeyData;
+import org.apache.hadoop.yarn.server.utils.BuilderUtils;
+
+import java.util.Timer;
+import java.util.TimerTask;
 
 /**
  * SecretManager for ContainerTokens. This is RM-specific and rolls the
  * master-keys every so often.
- * 
  */
-public class RMContainerTokenSecretManager extends
-    BaseContainerTokenSecretManager {
+public class RMContainerTokenSecretManager
+    extends BaseContainerTokenSecretManager {
 
-  private static Log LOG = LogFactory
-      .getLog(RMContainerTokenSecretManager.class);
+  private static final Log LOG =
+      LogFactory.getLog(RMContainerTokenSecretManager.class);
 
   private MasterKeyData nextMasterKey;
 
   private final Timer timer;
   private final long rollingInterval;
   private final long activationDelay;
-
-  public RMContainerTokenSecretManager(Configuration conf) {
+  private boolean stoped = true;
+  private final RMContext rmContext;
+  
+  public RMContainerTokenSecretManager(Configuration conf,
+      RMContext rmContext) {
     super(conf);
-
+    this.rmContext = rmContext;
     this.timer = new Timer();
     this.rollingInterval = conf.getLong(
-            YarnConfiguration.RM_CONTAINER_TOKEN_MASTER_KEY_ROLLING_INTERVAL_SECS,
-            YarnConfiguration.DEFAULT_RM_CONTAINER_TOKEN_MASTER_KEY_ROLLING_INTERVAL_SECS) * 1000;
+        YarnConfiguration.RM_CONTAINER_TOKEN_MASTER_KEY_ROLLING_INTERVAL_SECS,
+        YarnConfiguration.DEFAULT_RM_CONTAINER_TOKEN_MASTER_KEY_ROLLING_INTERVAL_SECS) *
+        1000;
     // Add an activation delay. This is to address the following race: RM may
     // roll over master-key, scheduling may happen at some point of time, a
     // container created with a password generated off new master key, but NM
@@ -69,17 +74,17 @@ public class RMContainerTokenSecretManager extends
     // secret yet.
     // Adding delay = 1.5 * expiry interval makes sure that all active NMs get
     // the updated shared-key.
-    this.activationDelay =
-        (long) (conf.getLong(YarnConfiguration.RM_NM_EXPIRY_INTERVAL_MS,
+    this.activationDelay = (long) (
+        conf.getLong(YarnConfiguration.RM_NM_EXPIRY_INTERVAL_MS,
             YarnConfiguration.DEFAULT_RM_NM_EXPIRY_INTERVAL_MS) * 1.5);
-    LOG.info("ContainerTokenKeyRollingInterval: " + this.rollingInterval
-        + "ms and ContainerTokenKeyActivationDelay: " + this.activationDelay
-        + "ms");
+    LOG.info("ContainerTokenKeyRollingInterval: " + this.rollingInterval +
+        "ms and ContainerTokenKeyActivationDelay: " + this.activationDelay +
+        "ms");
     if (rollingInterval <= activationDelay * 2) {
       throw new IllegalArgumentException(
-          YarnConfiguration.RM_CONTAINER_TOKEN_MASTER_KEY_ROLLING_INTERVAL_SECS
-              + " should be more than 2 X "
-              + YarnConfiguration.RM_CONTAINER_TOKEN_MASTER_KEY_ROLLING_INTERVAL_SECS);
+          YarnConfiguration.RM_CONTAINER_TOKEN_MASTER_KEY_ROLLING_INTERVAL_SECS +
+              " should be more than 2 X " +
+              YarnConfiguration.RM_CONTAINER_TOKEN_MASTER_KEY_ROLLING_INTERVAL_SECS);
     }
   }
 
@@ -87,10 +92,12 @@ public class RMContainerTokenSecretManager extends
     rollMasterKey();
     this.timer.scheduleAtFixedRate(new MasterKeyRoller(), rollingInterval,
         rollingInterval);
+    stoped = false;
   }
 
   public void stop() {
     this.timer.cancel();
+    stoped = true;
   }
 
   /**
@@ -103,13 +110,21 @@ public class RMContainerTokenSecretManager extends
       LOG.info("Rolling master-key for container-tokens");
       if (this.currentMasterKey == null) { // Setting up for the first time.
         this.currentMasterKey = createNewMasterKey();
+        rmContext.getStateStore()
+            .storeRMTokenSecretManagerMasterKey(currentMasterKey.getMasterKey(),
+                RMStateStore.KeyType.CURRENTCONTAINERTOKENMASTERKEY);
       } else {
         this.nextMasterKey = createNewMasterKey();
-        LOG.info("Going to activate master-key with key-id "
-            + this.nextMasterKey.getMasterKey().getKeyId() + " in "
-            + this.activationDelay + "ms");
+        rmContext.getStateStore()
+            .storeRMTokenSecretManagerMasterKey(nextMasterKey.getMasterKey(),
+                RMStateStore.KeyType.NEXTCONTAINERTOKENMASTERKEY);
+        LOG.info("Going to activate master-key with key-id " +
+            this.nextMasterKey.getMasterKey().getKeyId() + " in " +
+            this.activationDelay + "ms");
         this.timer.schedule(new NextKeyActivator(), this.activationDelay);
       }
+    } catch (Exception ex) {
+      LOG.error(ex, ex);
     } finally {
       super.writeLock.unlock();
     }
@@ -136,10 +151,17 @@ public class RMContainerTokenSecretManager extends
   public void activateNextMasterKey() {
     super.writeLock.lock();
     try {
-      LOG.info("Activating next master key with id: "
-          + this.nextMasterKey.getMasterKey().getKeyId());
+      LOG.info("Activating next master key with id: " +
+          this.nextMasterKey.getMasterKey().getKeyId());
       this.currentMasterKey = this.nextMasterKey;
+      rmContext.getStateStore()
+          .storeRMTokenSecretManagerMasterKey(currentMasterKey.getMasterKey(),
+              RMStateStore.KeyType.CURRENTCONTAINERTOKENMASTERKEY);
       this.nextMasterKey = null;
+      rmContext.getStateStore().removeRMTokenSecretManagerMasterKey(
+          RMStateStore.KeyType.NEXTCONTAINERTOKENMASTERKEY);
+    } catch (Exception ex) {
+      LOG.error(ex);
     } finally {
       super.writeLock.unlock();
     }
@@ -164,16 +186,15 @@ public class RMContainerTokenSecretManager extends
 
   /**
    * Helper function for creating ContainerTokens
-   * 
+   *
    * @param containerId
    * @param nodeId
    * @param appSubmitter
    * @param capability
    * @return the container-token
    */
-  public Token
-      createContainerToken(ContainerId containerId, NodeId nodeId,
-          String appSubmitter, Resource capability) {
+  public Token createContainerToken(ContainerId containerId, NodeId nodeId,
+      String appSubmitter, Resource capability) {
     byte[] password;
     ContainerTokenIdentifier tokenIdentifier;
     long expiryTimeStamp =
@@ -184,8 +205,9 @@ public class RMContainerTokenSecretManager extends
     try {
       tokenIdentifier =
           new ContainerTokenIdentifier(containerId, nodeId.toString(),
-            appSubmitter, capability, expiryTimeStamp, this.currentMasterKey
-              .getMasterKey().getKeyId(), ResourceManager.getClusterTimeStamp());
+              appSubmitter, capability, expiryTimeStamp,
+              this.currentMasterKey.getMasterKey().getKeyId(),
+              ResourceManager.getClusterTimeStamp());
       password = this.createPassword(tokenIdentifier);
 
     } finally {
@@ -193,5 +215,24 @@ public class RMContainerTokenSecretManager extends
     }
 
     return BuilderUtils.newContainerToken(nodeId, password, tokenIdentifier);
+  }
+
+  public boolean isStoped() {
+    return stoped;
+  }
+
+  public void recover(RMStateStore.RMState state) {
+    MasterKey recoverKey = state.getSecretTokenMamagerKey(
+        RMStateStore.KeyType.CURRENTCONTAINERTOKENMASTERKEY);
+    if (recoverKey != null) {
+      this.currentMasterKey = new MasterKeyData(recoverKey,
+          createSecretKey(recoverKey.getBytes().array()));
+    }
+    recoverKey = state.getSecretTokenMamagerKey(
+        RMStateStore.KeyType.NEXTCONTAINERTOKENMASTERKEY);
+    if (recoverKey != null) {
+      this.nextMasterKey = new MasterKeyData(recoverKey,
+          createSecretKey(recoverKey.getBytes().array()));
+    }
   }
 }

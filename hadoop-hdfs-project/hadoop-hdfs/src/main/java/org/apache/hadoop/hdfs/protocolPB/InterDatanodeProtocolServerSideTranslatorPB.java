@@ -17,8 +17,8 @@
  */
 package org.apache.hadoop.hdfs.protocolPB;
 
-import java.io.IOException;
-
+import com.google.protobuf.RpcController;
+import com.google.protobuf.ServiceException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hdfs.protocol.proto.InterDatanodeProtocolProtos.InitReplicaRecoveryRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.InterDatanodeProtocolProtos.InitReplicaRecoveryResponseProto;
@@ -28,8 +28,7 @@ import org.apache.hadoop.hdfs.server.protocol.BlockRecoveryCommand.RecoveringBlo
 import org.apache.hadoop.hdfs.server.protocol.InterDatanodeProtocol;
 import org.apache.hadoop.hdfs.server.protocol.ReplicaRecoveryInfo;
 
-import com.google.protobuf.RpcController;
-import com.google.protobuf.ServiceException;
+import java.io.IOException;
 
 /**
  * Implementation for protobuf service that forwards requests
@@ -37,11 +36,12 @@ import com.google.protobuf.ServiceException;
  * {@link InterDatanodeProtocol} server implementation.
  */
 @InterfaceAudience.Private
-public class InterDatanodeProtocolServerSideTranslatorPB implements
-    InterDatanodeProtocolPB {
+public class InterDatanodeProtocolServerSideTranslatorPB
+    implements InterDatanodeProtocolPB {
   private final InterDatanodeProtocol impl;
 
-  public InterDatanodeProtocolServerSideTranslatorPB(InterDatanodeProtocol impl) {
+  public InterDatanodeProtocolServerSideTranslatorPB(
+      InterDatanodeProtocol impl) {
     this.impl = impl;
   }
 
@@ -59,11 +59,9 @@ public class InterDatanodeProtocolServerSideTranslatorPB implements
     
     if (r == null) {
       return InitReplicaRecoveryResponseProto.newBuilder()
-          .setReplicaFound(false)
-          .build();
+          .setReplicaFound(false).build();
     } else {
-      return InitReplicaRecoveryResponseProto.newBuilder()
-          .setReplicaFound(true)
+      return InitReplicaRecoveryResponseProto.newBuilder().setReplicaFound(true)
           .setBlock(PBHelper.convert(r))
           .setState(PBHelper.convert(r.getOriginalReplicaState())).build();
     }
@@ -75,13 +73,13 @@ public class InterDatanodeProtocolServerSideTranslatorPB implements
       throws ServiceException {
     final String storageID;
     try {
-      storageID = impl.updateReplicaUnderRecovery(
-          PBHelper.convert(request.getBlock()),
-          request.getRecoveryId(), request.getNewLength());
+      storageID =
+          impl.updateReplicaUnderRecovery(PBHelper.convert(request.getBlock()),
+              request.getRecoveryId(), request.getNewLength());
     } catch (IOException e) {
       throw new ServiceException(e);
     }
     return UpdateReplicaUnderRecoveryResponseProto.newBuilder()
-        .setStorageUuid(storageID).build();
+        .setStorageID(storageID).build();
   }
 }

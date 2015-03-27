@@ -18,24 +18,22 @@
 
 package org.apache.hadoop.hdfs.server.namenode;
 
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_AUDIT_LOGGERS_KEY;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
-import java.io.IOException;
-import java.net.InetAddress;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
-import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.ipc.RemoteException;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.Test;
+
+import java.io.IOException;
+import java.net.InetAddress;
+
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_AUDIT_LOGGERS_KEY;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /**
  * Tests for the {@link AuditLogger} custom audit logging interface.
@@ -48,8 +46,7 @@ public class TestAuditLogger {
   @Test
   public void testAuditLogger() throws IOException {
     Configuration conf = new HdfsConfiguration();
-    conf.set(DFS_NAMENODE_AUDIT_LOGGERS_KEY,
-        DummyAuditLogger.class.getName());
+    conf.set(DFS_NAMENODE_AUDIT_LOGGERS_KEY, DummyAuditLogger.class.getName());
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).build();
 
     try {
@@ -71,8 +68,7 @@ public class TestAuditLogger {
   @Test
   public void testBrokenLogger() throws IOException {
     Configuration conf = new HdfsConfiguration();
-    conf.set(DFS_NAMENODE_AUDIT_LOGGERS_KEY,
-        BrokenAuditLogger.class.getName());
+    conf.set(DFS_NAMENODE_AUDIT_LOGGERS_KEY, BrokenAuditLogger.class.getName());
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).build();
 
     try {
@@ -99,8 +95,7 @@ public class TestAuditLogger {
     }
 
     public void logAuditEvent(boolean succeeded, String userName,
-        InetAddress addr, String cmd, String src, String dst,
-        FileStatus stat) {
+        InetAddress addr, String cmd, String src, String dst, FileStatus stat) {
       logCount++;
     }
 
@@ -113,8 +108,7 @@ public class TestAuditLogger {
     }
 
     public void logAuditEvent(boolean succeeded, String userName,
-        InetAddress addr, String cmd, String src, String dst,
-        FileStatus stat) {
+        InetAddress addr, String cmd, String src, String dst, FileStatus stat) {
       throw new RuntimeException("uh oh");
     }
 

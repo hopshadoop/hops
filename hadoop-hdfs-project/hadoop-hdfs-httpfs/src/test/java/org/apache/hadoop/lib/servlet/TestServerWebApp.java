@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.lib.servlet;
 
-import static org.junit.Assert.assertEquals;
-
 import org.apache.hadoop.lib.server.Server;
 import org.apache.hadoop.test.HTestCase;
 import org.apache.hadoop.test.TestDir;
@@ -28,6 +26,8 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import java.net.InetSocketAddress;
+
+import static org.junit.Assert.assertEquals;
 
 public class TestServerWebApp extends HTestCase {
 
@@ -40,9 +40,13 @@ public class TestServerWebApp extends HTestCase {
   public void getHomeDir() {
     System.setProperty("TestServerWebApp0.home.dir", "/tmp");
     assertEquals(ServerWebApp.getHomeDir("TestServerWebApp0"), "/tmp");
-    assertEquals(ServerWebApp.getDir("TestServerWebApp0", ".log.dir", "/tmp/log"), "/tmp/log");
+    assertEquals(
+        ServerWebApp.getDir("TestServerWebApp0", ".log.dir", "/tmp/log"),
+        "/tmp/log");
     System.setProperty("TestServerWebApp0.log.dir", "/tmplog");
-    assertEquals(ServerWebApp.getDir("TestServerWebApp0", ".log.dir", "/tmp/log"), "/tmplog");
+    assertEquals(
+        ServerWebApp.getDir("TestServerWebApp0", ".log.dir", "/tmp/log"),
+        "/tmplog");
   }
 
   @Test

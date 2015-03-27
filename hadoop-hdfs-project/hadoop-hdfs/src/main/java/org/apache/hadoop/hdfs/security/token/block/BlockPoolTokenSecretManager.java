@@ -17,32 +17,36 @@
  */
 package org.apache.hadoop.hdfs.security.token.block;
 
-import java.io.IOException;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.Map;
-
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenSecretManager.AccessMode;
 import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.Token;
 
-import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
- * Manages a {@link BlockTokenSecretManager} per block pool. Routes the requests
+ * Manages a {@link BlockTokenSecretManager} per block pool. Routes the
+ * requests
  * given a block pool Id to corresponding {@link BlockTokenSecretManager}
  */
-public class BlockPoolTokenSecretManager extends
-    SecretManager<BlockTokenIdentifier> {
+public class BlockPoolTokenSecretManager
+    extends SecretManager<BlockTokenIdentifier> {
   
-  private final Map<String, BlockTokenSecretManager> map = 
-    new HashMap<String, BlockTokenSecretManager>();
+  private final Map<String, BlockTokenSecretManager> map =
+      new HashMap<String, BlockTokenSecretManager>();
 
   /**
-   * Add a block pool Id and corresponding {@link BlockTokenSecretManager} to map
-   * @param bpid block pool Id
-   * @param secretMgr {@link BlockTokenSecretManager}
+   * Add a block pool Id and corresponding {@link BlockTokenSecretManager} to
+   * map
+   *
+   * @param bpid
+   *     block pool Id
+   * @param secretMgr
+   *     {@link BlockTokenSecretManager}
    */
   public synchronized void addBlockPool(String bpid,
       BlockTokenSecretManager secretMgr) {
@@ -52,8 +56,8 @@ public class BlockPoolTokenSecretManager extends
   synchronized BlockTokenSecretManager get(String bpid) {
     BlockTokenSecretManager secretMgr = map.get(bpid);
     if (secretMgr == null) {
-      throw new IllegalArgumentException("Block pool " + bpid
-          + " is not found");
+      throw new IllegalArgumentException(
+          "Block pool " + bpid + " is not found");
     }
     return secretMgr;
   }
@@ -62,7 +66,9 @@ public class BlockPoolTokenSecretManager extends
     return map.containsKey(bpid);
   }
 
-  /** Return an empty BlockTokenIdentifer */
+  /**
+   * Return an empty BlockTokenIdentifer
+   */
   @Override
   public BlockTokenIdentifier createIdentifier() {
     return new BlockTokenIdentifier();
@@ -80,8 +86,8 @@ public class BlockPoolTokenSecretManager extends
   }
 
   /**
-   * See {@link BlockTokenSecretManager#checkAccess(BlockTokenIdentifier, 
-   *                String, ExtendedBlock, AccessMode)}
+   * See {@link BlockTokenSecretManager#checkAccess(BlockTokenIdentifier,
+   * String, ExtendedBlock, AccessMode)}
    */
   public void checkAccess(BlockTokenIdentifier id, String userId,
       ExtendedBlock block, AccessMode mode) throws InvalidToken {
@@ -89,11 +95,11 @@ public class BlockPoolTokenSecretManager extends
   }
 
   /**
-   * See {@link BlockTokenSecretManager#checkAccess(Token, String, 
-   *                ExtendedBlock, AccessMode)}
+   * See {@link BlockTokenSecretManager#checkAccess(Token, String,
+   * ExtendedBlock, AccessMode)}
    */
-  public void checkAccess(Token<BlockTokenIdentifier> token,
-      String userId, ExtendedBlock block, AccessMode mode) throws InvalidToken {
+  public void checkAccess(Token<BlockTokenIdentifier> token, String userId,
+      ExtendedBlock block, AccessMode mode) throws InvalidToken {
     get(block.getBlockPoolId()).checkAccess(token, userId, block, mode);
   }
 
@@ -120,7 +126,8 @@ public class BlockPoolTokenSecretManager extends
     }
   }
 
-  public DataEncryptionKey generateDataEncryptionKey(String blockPoolId) {
+  public DataEncryptionKey generateDataEncryptionKey(String blockPoolId)
+      throws IOException {
     return get(blockPoolId).generateDataEncryptionKey();
   }
   

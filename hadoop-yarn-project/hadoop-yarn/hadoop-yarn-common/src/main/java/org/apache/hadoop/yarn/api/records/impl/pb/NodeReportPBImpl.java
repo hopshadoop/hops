@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.api.records.impl.pb;
 
+import com.google.protobuf.TextFormat;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.records.NodeId;
@@ -28,8 +29,6 @@ import org.apache.hadoop.yarn.proto.YarnProtos.NodeIdProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.NodeReportProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.NodeReportProtoOrBuilder;
 import org.apache.hadoop.yarn.proto.YarnProtos.ResourceProto;
-
-import com.google.protobuf.TextFormat;
 
 @Private
 @Unstable
@@ -142,8 +141,9 @@ public class NodeReportPBImpl extends NodeReport {
   @Override
   public void setNodeId(NodeId nodeId) {
     maybeInitBuilder();
-    if (nodeId == null)
+    if (nodeId == null) {
       builder.clearNodeId();
+    }
     this.nodeId = nodeId;
   }
   
@@ -169,8 +169,9 @@ public class NodeReportPBImpl extends NodeReport {
   @Override
   public void setCapability(Resource capability) {
     maybeInitBuilder();
-    if (capability == null)
+    if (capability == null) {
       builder.clearCapability();
+    }
     this.capability = capability;
   }
 
@@ -207,8 +208,9 @@ public class NodeReportPBImpl extends NodeReport {
   @Override
   public void setUsed(Resource used) {
     maybeInitBuilder();
-    if (used == null)
+    if (used == null) {
       builder.clearUsed();
+    }
     this.used = used;
   }
 
@@ -226,8 +228,9 @@ public class NodeReportPBImpl extends NodeReport {
 
   @Override
   public boolean equals(Object other) {
-    if (other == null)
+    if (other == null) {
       return false;
+    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -240,26 +243,25 @@ public class NodeReportPBImpl extends NodeReport {
   }
 
   private void mergeLocalToBuilder() {
-    if (this.nodeId != null
-        && !((NodeIdPBImpl) this.nodeId).getProto().equals(
-            builder.getNodeId())) {
+    if (this.nodeId != null &&
+        !((NodeIdPBImpl) this.nodeId).getProto().equals(builder.getNodeId())) {
       builder.setNodeId(convertToProtoFormat(this.nodeId));
     }
-    if (this.used != null
-        && !((ResourcePBImpl) this.used).getProto().equals(
-            builder.getUsed())) {
+    if (this.used != null &&
+        !((ResourcePBImpl) this.used).getProto().equals(builder.getUsed())) {
       builder.setUsed(convertToProtoFormat(this.used));
     }
-    if (this.capability != null
-        && !((ResourcePBImpl) this.capability).getProto().equals(
-            builder.getCapability())) {
+    if (this.capability != null &&
+        !((ResourcePBImpl) this.capability).getProto()
+            .equals(builder.getCapability())) {
       builder.setCapability(convertToProtoFormat(this.capability));
     }
   }
 
   private void mergeLocalToProto() {
-    if (viaProto)
+    if (viaProto) {
       maybeInitBuilder();
+    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;

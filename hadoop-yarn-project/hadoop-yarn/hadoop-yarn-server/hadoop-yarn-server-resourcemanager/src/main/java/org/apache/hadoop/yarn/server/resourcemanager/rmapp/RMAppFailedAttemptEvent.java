@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.rmapp;
 
+import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 
 public class RMAppFailedAttemptEvent extends RMAppEvent {
@@ -25,9 +26,10 @@ public class RMAppFailedAttemptEvent extends RMAppEvent {
   private final String diagnostics;
   private final boolean transferStateFromPreviousAttempt;
 
-  public RMAppFailedAttemptEvent(ApplicationId appId, RMAppEventType event, 
-      String diagnostics, boolean transferStateFromPreviousAttempt) {
-    super(appId, event);
+  public RMAppFailedAttemptEvent(ApplicationId appId, RMAppEventType event,
+      String diagnostics, boolean transferStateFromPreviousAttempt,
+      TransactionState transactionState) {
+    super(appId, event, transactionState);
     this.diagnostics = diagnostics;
     this.transferStateFromPreviousAttempt = transferStateFromPreviousAttempt;
   }

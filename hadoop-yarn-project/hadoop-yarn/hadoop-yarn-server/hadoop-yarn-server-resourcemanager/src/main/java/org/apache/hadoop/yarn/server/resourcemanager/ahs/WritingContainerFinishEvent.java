@@ -18,17 +18,19 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.ahs;
 
+import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.server.applicationhistoryservice.records.ContainerFinishData;
 
-public class WritingContainerFinishEvent extends WritingApplicationHistoryEvent {
+public class WritingContainerFinishEvent
+    extends WritingApplicationHistoryEvent {
 
   private ContainerId containerId;
   private ContainerFinishData containerFinish;
 
   public WritingContainerFinishEvent(ContainerId containerId,
-      ContainerFinishData containerFinish) {
-    super(WritingHistoryEventType.CONTAINER_FINISH);
+      ContainerFinishData containerFinish, TransactionState transactionState) {
+    super(WritingHistoryEventType.CONTAINER_FINISH, transactionState);
     this.containerId = containerId;
     this.containerFinish = containerFinish;
   }

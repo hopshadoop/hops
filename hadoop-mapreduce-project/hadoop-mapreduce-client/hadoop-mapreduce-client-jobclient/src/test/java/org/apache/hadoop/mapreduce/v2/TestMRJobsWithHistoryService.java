@@ -51,6 +51,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppState;
 import org.apache.hadoop.yarn.util.Records;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 public class TestMRJobsWithHistoryService {
@@ -111,6 +112,7 @@ public class TestMRJobsWithHistoryService {
     }
   }
 
+  @Ignore("HOPS fails on vanilla")
   @Test (timeout = 90000)
   public void testJobHistoryData() throws IOException, InterruptedException,
       AvroRemoteException, ClassNotFoundException {

@@ -17,71 +17,86 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.RandomAccessFile;
-
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.ReplicaState;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsVolumeSpi;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.ReplicaOutputStreams;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.util.DataChecksum;
-import org.apache.hadoop.util.StringUtils;
 
-/** 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.RandomAccessFile;
+
+/**
  * This class defines a replica in a pipeline, which
  * includes a persistent replica being written to by a dfs client or
  * a temporary replica being replicated by a source datanode or
  * being copied for the balancing purpose.
- * 
+ * <p/>
  * The base class implements a temporary replica
  */
 public class ReplicaInPipeline extends ReplicaInfo
-                        implements ReplicaInPipelineInterface {
+    implements ReplicaInPipelineInterface {
   private long bytesAcked;
   private long bytesOnDisk;
-  private byte[] lastChecksum;  
+  private byte[] lastChecksum;
   private Thread writer;
   
   /**
    * Constructor for a zero length replica
-   * @param blockId block id
-   * @param genStamp replica generation stamp
-   * @param vol volume where replica is located
-   * @param dir directory path where block and meta files are located
+   *
+   * @param blockId
+   *     block id
+   * @param genStamp
+   *     replica generation stamp
+   * @param vol
+   *     volume where replica is located
+   * @param dir
+   *     directory path where block and meta files are located
    */
-  public ReplicaInPipeline(long blockId, long genStamp, 
-        FsVolumeSpi vol, File dir) {
-    this( blockId, 0L, genStamp, vol, dir, Thread.currentThread());
+  public ReplicaInPipeline(long blockId, long genStamp, FsVolumeSpi vol,
+      File dir) {
+    this(blockId, 0L, genStamp, vol, dir, Thread.currentThread());
   }
 
   /**
    * Constructor
-   * @param block a block
-   * @param vol volume where replica is located
-   * @param dir directory path where block and meta files are located
-   * @param writer a thread that is writing to this replica
+   *
+   * @param block
+   *     a block
+   * @param vol
+   *     volume where replica is located
+   * @param dir
+   *     directory path where block and meta files are located
+   * @param writer
+   *     a thread that is writing to this replica
    */
-  ReplicaInPipeline(Block block, 
-      FsVolumeSpi vol, File dir, Thread writer) {
-    this( block.getBlockId(), block.getNumBytes(), block.getGenerationStamp(),
+  ReplicaInPipeline(Block block, FsVolumeSpi vol, File dir, Thread writer) {
+    this(block.getBlockId(), block.getNumBytes(), block.getGenerationStamp(),
         vol, dir, writer);
   }
 
   /**
    * Constructor
-   * @param blockId block id
-   * @param len replica length
-   * @param genStamp replica generation stamp
-   * @param vol volume where replica is located
-   * @param dir directory path where block and meta files are located
-   * @param writer a thread that is writing to this replica
+   *
+   * @param blockId
+   *     block id
+   * @param len
+   *     replica length
+   * @param genStamp
+   *     replica generation stamp
+   * @param vol
+   *     volume where replica is located
+   * @param dir
+   *     directory path where block and meta files are located
+   * @param writer
+   *     a thread that is writing to this replica
    */
-  ReplicaInPipeline(long blockId, long len, long genStamp,
-      FsVolumeSpi vol, File dir, Thread writer ) {
-    super( blockId, len, genStamp, vol, dir);
+  ReplicaInPipeline(long blockId, long len, long genStamp, FsVolumeSpi vol,
+      File dir, Thread writer) {
+    super(blockId, len, genStamp, vol, dir);
     this.bytesAcked = len;
     this.bytesOnDisk = len;
     this.writer = writer;
@@ -89,6 +104,7 @@ public class ReplicaInPipeline extends ReplicaInfo
 
   /**
    * Copy constructor.
+   *
    * @param from
    */
   public ReplicaInPipeline(ReplicaInPipeline from) {
@@ -124,7 +140,8 @@ public class ReplicaInPipeline extends ReplicaInfo
   }
   
   @Override // ReplicaInPipelineInterface
-  public synchronized void setLastChecksumAndDataLen(long dataLength, byte[] lastChecksum) {
+  public synchronized void setLastChecksumAndDataLen(long dataLength,
+      byte[] lastChecksum) {
     this.bytesOnDisk = dataLength;
     this.lastChecksum = lastChecksum;
   }
@@ -136,7 +153,9 @@ public class ReplicaInPipeline extends ReplicaInfo
 
   /**
    * Set the thread that is writing to this replica
-   * @param writer a thread writing to this replica
+   *
+   * @param writer
+   *     a thread writing to this replica
    */
   public void setWriter(Thread writer) {
     this.writer = writer;
@@ -149,18 +168,16 @@ public class ReplicaInPipeline extends ReplicaInfo
   
   /**
    * Interrupt the writing thread and wait until it dies
-   * @throws IOException the waiting is interrupted
+   *
+   * @throws IOException
+   *     the waiting is interrupted
    */
-  public void stopWriter(long xceiverStopTimeout) throws IOException {
-    if (writer != null && writer != Thread.currentThread() && writer.isAlive()) {
+  public void stopWriter() throws IOException {
+    if (writer != null && writer != Thread.currentThread() &&
+        writer.isAlive()) {
       writer.interrupt();
       try {
-        writer.join(xceiverStopTimeout);
-        if (writer.isAlive()) {
-          final String msg = "Join on writer thread " + writer + " timed out";
-          DataNode.LOG.warn(msg + "\n" + StringUtils.getStackTrace(writer));
-          throw new IOException(msg);
-        }
+        writer.join();
       } catch (InterruptedException e) {
         throw new IOException("Waiting for writer thread is interrupted.");
       }
@@ -173,15 +190,15 @@ public class ReplicaInPipeline extends ReplicaInfo
   }
   
   @Override // ReplicaInPipelineInterface
-  public ReplicaOutputStreams createStreams(boolean isCreate, 
+  public ReplicaOutputStreams createStreams(boolean isCreate,
       DataChecksum requestedChecksum) throws IOException {
     File blockFile = getBlockFile();
     File metaFile = getMetaFile();
     if (DataNode.LOG.isDebugEnabled()) {
       DataNode.LOG.debug("writeTo blockfile is " + blockFile +
-                         " of size " + blockFile.length());
+          " of size " + blockFile.length());
       DataNode.LOG.debug("writeTo metafile is " + metaFile +
-                         " of size " + metaFile.length());
+          " of size " + metaFile.length());
     }
     long blockDiskSize = 0L;
     long crcDiskSize = 0L;
@@ -212,9 +229,9 @@ public class ReplicaInPipeline extends ReplicaInfo
         
         blockDiskSize = bytesOnDisk;
         crcDiskSize = BlockMetadataHeader.getHeaderSize() +
-          (blockDiskSize+bytesPerChunk-1)/bytesPerChunk*checksumSize;
-        if (blockDiskSize>0 && 
-            (blockDiskSize>blockFile.length() || crcDiskSize>metaFile.length())) {
+            (blockDiskSize + bytesPerChunk - 1) / bytesPerChunk * checksumSize;
+        if (blockDiskSize > 0 && (blockDiskSize > blockFile.length() ||
+            crcDiskSize > metaFile.length())) {
           throw new IOException("Corrupted block: " + this);
         }
         checkedMeta = true;
@@ -232,9 +249,9 @@ public class ReplicaInPipeline extends ReplicaInfo
     FileOutputStream blockOut = null;
     FileOutputStream crcOut = null;
     try {
-      blockOut = new FileOutputStream(
-          new RandomAccessFile( blockFile, "rw" ).getFD() );
-      crcOut = new FileOutputStream(metaRAF.getFD() );
+      blockOut =
+          new FileOutputStream(new RandomAccessFile(blockFile, "rw").getFD());
+      crcOut = new FileOutputStream(metaRAF.getFD());
       if (!isCreate) {
         blockOut.getChannel().position(blockDiskSize);
         crcOut.getChannel().position(crcDiskSize);
@@ -249,8 +266,7 @@ public class ReplicaInPipeline extends ReplicaInfo
   
   @Override
   public String toString() {
-    return super.toString()
-        + "\n  bytesAcked=" + bytesAcked
-        + "\n  bytesOnDisk=" + bytesOnDisk;
+    return super.toString() + "\n  bytesAcked=" + bytesAcked +
+        "\n  bytesOnDisk=" + bytesOnDisk;
   }
 }

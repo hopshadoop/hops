@@ -20,6 +20,8 @@ package org.apache.hadoop.lib.servlet;
 
 
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
@@ -30,8 +32,6 @@ import javax.servlet.ServletResponse;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Filter that resolves the requester hostname.
@@ -39,16 +39,18 @@ import org.slf4j.LoggerFactory;
 @InterfaceAudience.Private
 public class HostnameFilter implements Filter {
   static final ThreadLocal<String> HOSTNAME_TL = new ThreadLocal<String>();
-  private static final Logger log = LoggerFactory.getLogger(HostnameFilter.class);
+  private static final Logger log =
+      LoggerFactory.getLogger(HostnameFilter.class);
 
   /**
    * Initializes the filter.
    * <p/>
    * This implementation is a NOP.
    *
-   * @param config filter configuration.
-   *
-   * @throws ServletException thrown if the filter could not be initialized.
+   * @param config
+   *     filter configuration.
+   * @throws ServletException
+   *     thrown if the filter could not be initialized.
    */
   @Override
   public void init(FilterConfig config) throws ServletException {
@@ -59,16 +61,20 @@ public class HostnameFilter implements Filter {
    * <p/>
    * The requester hostname is available via the {@link #get} method.
    *
-   * @param request servlet request.
-   * @param response servlet response.
-   * @param chain filter chain.
-   *
-   * @throws IOException thrown if an IO error occurrs.
-   * @throws ServletException thrown if a servet error occurrs.
+   * @param request
+   *     servlet request.
+   * @param response
+   *     servlet response.
+   * @param chain
+   *     filter chain.
+   * @throws IOException
+   *     thrown if an IO error occurrs.
+   * @throws ServletException
+   *     thrown if a servet error occurrs.
    */
   @Override
-  public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
-    throws IOException, ServletException {
+  public void doFilter(ServletRequest request, ServletResponse response,
+      FilterChain chain) throws IOException, ServletException {
     try {
       String hostname;
       try {
@@ -80,7 +86,8 @@ public class HostnameFilter implements Filter {
           hostname = "???";
         }
       } catch (UnknownHostException ex) {
-        log.warn("Request remote address could not be resolved, {0}", ex.toString(), ex);
+        log.warn("Request remote address could not be resolved, {0}",
+            ex.toString(), ex);
         hostname = "???";
       }
       HOSTNAME_TL.set(hostname);

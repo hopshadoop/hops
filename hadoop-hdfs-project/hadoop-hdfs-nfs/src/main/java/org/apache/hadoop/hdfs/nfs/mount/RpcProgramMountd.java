@@ -16,16 +16,8 @@
  * limitations under the License.
  */
 package org.apache.hadoop.hdfs.nfs.mount;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NFS_KEYTAB_FILE_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NFS_USER_NAME_KEY;
 
-import java.io.IOException;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -54,7 +46,15 @@ import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.buffer.ChannelBuffers;
 import org.jboss.netty.channel.ChannelHandlerContext;
 
-import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NFS_KEYTAB_FILE_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NFS_USER_NAME_KEY;
 
 /**
  * RPC program corresponding to mountd daemon. See {@link Mountd}.
@@ -70,10 +70,14 @@ public class RpcProgramMountd extends RpcProgram implements MountInterface {
   // Need DFSClient for branch-1 to get ExtendedHdfsFileStatus
   private final DFSClient dfsClient;
   
-  /** Synchronized list */
+  /**
+   * Synchronized list
+   */
   private final List<MountEntry> mounts;
   
-  /** List that is unmodifiable */
+  /**
+   * List that is unmodifiable
+   */
   private final List<String> exports;
   
   private final NfsExports hostsMatcher;
@@ -83,13 +87,12 @@ public class RpcProgramMountd extends RpcProgram implements MountInterface {
     super("mountd", "localhost", config.getInt("nfs3.mountd.port", PORT),
         PROGRAM, VERSION_1, VERSION_3);
     exports = new ArrayList<String>();
-    exports.add(config.get(Nfs3Constant.EXPORT_POINT,
-        Nfs3Constant.EXPORT_POINT_DEFAULT));
+    exports.add(config
+        .get(Nfs3Constant.EXPORT_POINT, Nfs3Constant.EXPORT_POINT_DEFAULT));
     this.hostsMatcher = NfsExports.getInstance(config);
     this.mounts = Collections.synchronizedList(new ArrayList<MountEntry>());
     UserGroupInformation.setConfiguration(config);
-    SecurityUtil.login(config, DFS_NFS_KEYTAB_FILE_KEY,
-            DFS_NFS_USER_NAME_KEY);
+    SecurityUtil.login(config, DFS_NFS_KEYTAB_FILE_KEY, DFS_NFS_USER_NAME_KEY);
     this.dfsClient = new DFSClient(NameNode.getAddress(config), config);
   }
   
@@ -98,16 +101,16 @@ public class RpcProgramMountd extends RpcProgram implements MountInterface {
     if (LOG.isDebugEnabled()) {
       LOG.debug("MOUNT NULLOP : " + " client: " + client);
     }
-    return RpcAcceptedReply.getAcceptInstance(xid, new VerifierNone()).write(
-        out);
+    return RpcAcceptedReply.getAcceptInstance(xid, new VerifierNone())
+        .write(out);
   }
 
   @Override
   public XDR mnt(XDR xdr, XDR out, int xid, InetAddress client) {
     AccessPrivilege accessPrivilege = hostsMatcher.getAccessPrivilege(client);
     if (accessPrivilege == AccessPrivilege.NONE) {
-      return MountResponse.writeMNTResponse(Nfs3Status.NFS3ERR_ACCES, out, xid,
-          null);
+      return MountResponse
+          .writeMNTResponse(Nfs3Status.NFS3ERR_ACCES, out, xid, null);
     }
 
     String path = xdr.readString();
@@ -137,12 +140,12 @@ public class RpcProgramMountd extends RpcProgram implements MountInterface {
     }
 
     assert (handle != null);
-    LOG.info("Giving handle (fileId:" + handle.getFileId()
-        + ") to client for export " + path);
+    LOG.info("Giving handle (fileId:" + handle.getFileId() +
+        ") to client for export " + path);
     mounts.add(new MountEntry(host, path));
 
-    MountResponse.writeMNTResponse(Nfs3Status.NFS3_OK, out, xid,
-        handle.getContent());
+    MountResponse
+        .writeMNTResponse(Nfs3Status.NFS3_OK, out, xid, handle.getContent());
     return out;
   }
 
@@ -176,8 +179,8 @@ public class RpcProgramMountd extends RpcProgram implements MountInterface {
       LOG.debug("MOUNT UMNTALL : " + " client: " + client);
     }
     mounts.clear();
-    return RpcAcceptedReply.getAcceptInstance(xid, new VerifierNone()).write(
-        out);
+    return RpcAcceptedReply.getAcceptInstance(xid, new VerifierNone())
+        .write(out);
   }
 
   @Override
@@ -189,7 +192,8 @@ public class RpcProgramMountd extends RpcProgram implements MountInterface {
     info.data().readBytes(data);
     XDR xdr = new XDR(data);
     XDR out = new XDR();
-    InetAddress client = ((InetSocketAddress) info.remoteAddress()).getAddress();
+    InetAddress client =
+        ((InetSocketAddress) info.remoteAddress()).getAddress();
 
     if (mntproc == MNTPROC.NULL) {
       out = nullOp(out, xid, client);
@@ -197,7 +201,7 @@ public class RpcProgramMountd extends RpcProgram implements MountInterface {
       out = mnt(xdr, out, xid, client);
     } else if (mntproc == MNTPROC.DUMP) {
       out = dump(out, xid, client);
-    } else if (mntproc == MNTPROC.UMNT) {      
+    } else if (mntproc == MNTPROC.UMNT) {
       out = umnt(xdr, out, xid, client);
     } else if (mntproc == MNTPROC.UMNTALL) {
       umntall(out, xid, client);
@@ -208,11 +212,12 @@ public class RpcProgramMountd extends RpcProgram implements MountInterface {
       out = MountResponse.writeExportList(out, xid, exports, hostsMatchers);
     } else {
       // Invalid procedure
-      RpcAcceptedReply.getInstance(xid,
-          RpcAcceptedReply.AcceptState.PROC_UNAVAIL, new VerifierNone()).write(
-          out);
-    }  
-    ChannelBuffer buf = ChannelBuffers.wrappedBuffer(out.asReadOnlyWrap().buffer());
+      RpcAcceptedReply
+          .getInstance(xid, RpcAcceptedReply.AcceptState.PROC_UNAVAIL,
+              new VerifierNone()).write(out);
+    }
+    ChannelBuffer buf =
+        ChannelBuffers.wrappedBuffer(out.asReadOnlyWrap().buffer());
     RpcResponse rsp = new RpcResponse(buf, info.remoteAddress());
     RpcUtil.sendRpcResponse(ctx, rsp);
   }

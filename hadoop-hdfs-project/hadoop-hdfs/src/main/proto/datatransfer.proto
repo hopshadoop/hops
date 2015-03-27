@@ -16,21 +16,19 @@
  * limitations under the License.
  */
 
-/**
- * These .proto interfaces are private and stable.
- * Please see http://wiki.apache.org/hadoop/Compatibility
- * for what changes are allowed for a *stable* .proto interface.
- */
-
 // This file contains protocol buffers that are used to transfer data
 // to and from the datanode, as well as between datanodes.
 
 option java_package = "org.apache.hadoop.hdfs.protocol.proto";
+
 option java_outer_classname = "DataTransferProtos";
+
 option java_generate_equals_and_hash = true;
+
 package hadoop.hdfs;
 
 import "Security.proto";
+
 import "hdfs.proto";
 
 message DataTransferEncryptorMessageProto {
@@ -54,17 +52,11 @@ message ClientOperationHeaderProto {
   required string clientName = 2;
 }
 
-message CachingStrategyProto {
-  optional bool dropBehind = 1;
-  optional int64 readahead = 2;
-}
-
 message OpReadBlockProto {
   required ClientOperationHeaderProto header = 1;
   required uint64 offset = 2;
   required uint64 len = 3;
   optional bool sendChecksums = 4 [default = true];
-  optional CachingStrategyProto cachingStrategy = 5;
 }
 
 
@@ -72,7 +64,7 @@ message ChecksumProto {
   required ChecksumTypeProto type = 1;
   required uint32 bytesPerChecksum = 2;
 }
-  
+
 message OpWriteBlockProto {
   required ClientOperationHeaderProto header = 1;
   repeated DatanodeInfoProto targets = 2;
@@ -106,9 +98,8 @@ message OpWriteBlockProto {
    * The requested checksum mechanism for this block write.
    */
   required ChecksumProto requestedChecksum = 9;
-  optional CachingStrategyProto cachingStrategy = 10;
 }
-  
+
 message OpTransferBlockProto {
   required ClientOperationHeaderProto header = 1;
   repeated DatanodeInfoProto targets = 2;
@@ -124,62 +115,10 @@ message OpCopyBlockProto {
   required BaseHeaderProto header = 1;
 }
 
-message OpBlockChecksumProto { 
+message OpBlockChecksumProto {
   required BaseHeaderProto header = 1;
 }
 
-/**
- * An ID uniquely identifying a shared memory segment.
- */
-message ShortCircuitShmIdProto { 
-  required int64 hi = 1;
-  required int64 lo = 2;
-}
-
-/**
- * An ID uniquely identifying a slot within a shared memory segment.
- */
-message ShortCircuitShmSlotProto {
-  required ShortCircuitShmIdProto shmId = 1;
-  required int32 slotIdx = 2; 
-}
-
-message OpRequestShortCircuitAccessProto { 
-  required BaseHeaderProto header = 1;
-
-  /** In order to get short-circuit access to block data, clients must set this
-   * to the highest version of the block data that they can understand.
-   * Currently 1 is the only version, but more versions may exist in the future
-   * if the on-disk format changes.
-   */
-  required uint32 maxVersion = 2;
-
-  /**
-   * The shared memory slot to use, if we are using one.
-   */
-  optional ShortCircuitShmSlotProto slotId = 3;
-}
-
-message ReleaseShortCircuitAccessRequestProto {
-  required ShortCircuitShmSlotProto slotId = 1;
-}
-
-message ReleaseShortCircuitAccessResponseProto {
-  required Status status = 1;
-  optional string error = 2;
-}
-
-message ShortCircuitShmRequestProto { 
-  // The name of the client requesting the shared memory segment.  This is
-  // purely for logging / debugging purposes.
-  required string clientName = 1;
-}
-
-message ShortCircuitShmResponseProto { 
-  required Status status = 1;
-  optional string error = 2;
-  optional ShortCircuitShmIdProto id = 3;
-}
 
 message PacketHeaderProto {
   // All fields must be fixed-length!
@@ -198,11 +137,6 @@ enum Status {
   ERROR_EXISTS = 4;
   ERROR_ACCESS_TOKEN = 5;
   CHECKSUM_OK = 6;
-  ERROR_UNSUPPORTED = 7;
-  OOB_RESTART = 8;            // Quick restart
-  OOB_RESERVED1 = 9;          // Reserved
-  OOB_RESERVED2 = 10;         // Reserved
-  OOB_RESERVED3 = 11;         // Reserved
 }
 
 message PipelineAckProto {
@@ -235,16 +169,6 @@ message BlockOpResponseProto {
 
   /** explanatory text which may be useful to log on the client side */
   optional string message = 5;
-
-  /** If the server chooses to agree to the request of a client for
-   * short-circuit access, it will send a response message with the relevant
-   * file descriptors attached.
-   *
-   * In the body of the message, this version number will be set to the
-   * specific version number of the block data that the client is about to
-   * read.
-   */
-  optional uint32 shortCircuitAccessVersion = 6;
 }
 
 /**

@@ -29,20 +29,21 @@ public class LengthInputStream extends FilterInputStream {
 
   /**
    * Create an stream.
-   * @param in the underlying input stream.
-   * @param length the length of the stream.
+   *
+   * @param in
+   *     the underlying input stream.
+   * @param length
+   *     the length of the stream.
    */
   public LengthInputStream(InputStream in, long length) {
     super(in);
     this.length = length;
   }
 
-  /** @return the length. */
+  /**
+   * @return the length.
+   */
   public long getLength() {
     return length;
-  }
-  
-  public InputStream getWrappedStream() {
-    return in;
   }
 }

@@ -16,23 +16,24 @@
 -->
 <FindBugsFilter>
   <Match>
-    <Class name="org.apache.hadoop.lib.service.instrumentation.InstrumentationService" />
-    <Method name="getToAdd" />
-    <Bug pattern="UL_UNRELEASED_LOCK" />
+    <Class
+        name="org.apache.hadoop.lib.service.instrumentation.InstrumentationService"/>
+    <Method name="getToAdd"/>
+    <Bug pattern="UL_UNRELEASED_LOCK"/>
   </Match>
   <Match>
-    <Class name="org.apache.hadoop.fs.http.server.HttpFSServerWebApp" />
-    <Method name="destroy" />
-    <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD" />
+    <Class name="org.apache.hadoop.fs.http.server.HttpFSServerWebApp"/>
+    <Method name="destroy"/>
+    <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD"/>
   </Match>
   <Match>
-    <Class name="org.apache.hadoop.lib.servlet.ServerWebApp" />
-    <Field name="authority" />
-    <Bug pattern="IS2_INCONSISTENT_SYNC" />
+    <Class name="org.apache.hadoop.lib.servlet.ServerWebApp"/>
+    <Field name="authority"/>
+    <Bug pattern="IS2_INCONSISTENT_SYNC"/>
   </Match>
   <Match>
-    <Class name="org.apache.hadoop.lib.service.hadoop.FileSystemAccessService" />
-    <Method name="closeFileSystem" />
-    <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE" />
+    <Class name="org.apache.hadoop.lib.service.hadoop.FileSystemAccessService"/>
+    <Method name="closeFileSystem"/>
+    <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"/>
   </Match>
 </FindBugsFilter>

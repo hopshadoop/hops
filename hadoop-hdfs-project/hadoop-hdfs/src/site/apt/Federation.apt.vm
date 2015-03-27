@@ -19,6 +19,8 @@
 
 HDFS Federation
 
+  \[ {{{./index.html}Go Back}} \]
+
 %{toc|section=1|fromDepth=0}
 
   This guide provides an overview of the HDFS Federation feature and
@@ -26,7 +28,7 @@ HDFS Federation
 
 * {Background}
 
-[./images/federation-background.gif] HDFS Layers
+[./federation-background.gif] HDFS Layers
 
   HDFS has two main layers:
 
@@ -70,10 +72,7 @@ HDFS Federation
   send periodic heartbeats and block reports and handles commands from the 
   Namenodes.
 
-  Users may use {{{./ViewFs.html}ViewFs}} to create personalized namespace views,
-  where ViewFs is analogous to client side mount tables in some Unix/Linux systems.
-
-[./images/federation.gif] HDFS Federation Architecture
+[./federation.gif] HDFS Federation Architecture
 
 
   <<Block Pool>>
@@ -217,11 +216,13 @@ HDFS Federation
   cluster_id in step 1. If they are different, the additional Namenodes 
   will not be part of the federated cluster.
 
-** Upgrading from an older release and configuring federation
+** Upgrading from older release to 0.23 and configuring federation
 
-  Older releases supported a single Namenode. 
-  Upgrade the cluster to newer release to enable federation
-  During upgrade you can provide a ClusterID as follows:
+  Older releases supported a single Namenode. Here are the steps enable 
+  federation:
+
+  Step 1: Upgrade the cluster to newer release. During upgrade you can 
+  provide a ClusterID as follows:
 
 ----
 > $HADOOP_PREFIX_HOME/bin/hdfs start namenode --config $HADOOP_CONF_DIR  -upgrade -clusterId <cluster_ID>

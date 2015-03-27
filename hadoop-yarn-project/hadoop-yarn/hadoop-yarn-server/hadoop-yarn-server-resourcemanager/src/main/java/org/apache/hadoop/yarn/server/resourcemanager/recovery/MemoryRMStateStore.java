@@ -15,13 +15,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.apache.hadoop.yarn.server.resourcemanager.recovery;
 
-import java.io.IOException;
-import java.util.Map;
-import java.util.Set;
-
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
@@ -32,17 +28,21 @@ import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.security.client.RMDelegationTokenIdentifier;
+import org.apache.hadoop.yarn.server.api.records.MasterKey;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.RMStateVersion;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.impl.pb.ApplicationAttemptStateDataPBImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.impl.pb.ApplicationStateDataPBImpl;
 
-import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
+import java.util.Map;
+import java.util.Set;
 
 @Private
 @Unstable
 public class MemoryRMStateStore extends RMStateStore {
-  
+
   RMState state = new RMState();
+
   @VisibleForTesting
   public RMState getState() {
     return state;
@@ -58,14 +58,14 @@ public class MemoryRMStateStore extends RMStateStore {
     RMState returnState = new RMState();
     returnState.appState.putAll(state.appState);
     returnState.rmSecretManagerState.getMasterKeyState()
-      .addAll(state.rmSecretManagerState.getMasterKeyState());
-    returnState.rmSecretManagerState.getTokenState().putAll(
-      state.rmSecretManagerState.getTokenState());
+        .addAll(state.rmSecretManagerState.getMasterKeyState());
+    returnState.rmSecretManagerState.getTokenState()
+        .putAll(state.rmSecretManagerState.getTokenState());
     returnState.rmSecretManagerState.dtSequenceNumber =
         state.rmSecretManagerState.dtSequenceNumber;
     return returnState;
   }
-  
+
   @Override
   public synchronized void initInternal(Configuration conf) {
   }
@@ -80,31 +80,27 @@ public class MemoryRMStateStore extends RMStateStore {
 
   @Override
   public void storeApplicationStateInternal(ApplicationId appId,
-                                     ApplicationStateDataPBImpl appStateData)
-      throws Exception {
-    ApplicationState appState =
-        new ApplicationState(appStateData.getSubmitTime(),
-          appStateData.getStartTime(),
-          appStateData.getApplicationSubmissionContext(),
-          appStateData.getUser());
+      ApplicationStateDataPBImpl appStateData) throws Exception {
+    ApplicationState appState = new ApplicationState(appStateData.
+        getSubmitTime(), appStateData.getStartTime(),
+        appStateData.getApplicationSubmissionContext(), appStateData.getUser());
     state.appState.put(appId, appState);
   }
 
   @Override
   public void updateApplicationStateInternal(ApplicationId appId,
       ApplicationStateDataPBImpl appStateData) throws Exception {
-    ApplicationState updatedAppState =
-        new ApplicationState(appStateData.getSubmitTime(),
-          appStateData.getStartTime(),
-          appStateData.getApplicationSubmissionContext(),
-          appStateData.getUser(), appStateData.getState(),
-          appStateData.getDiagnostics(), appStateData.getFinishTime());
-    LOG.info("Updating final state " + appStateData.getState() + " for app: "
-        + appId);
+    ApplicationState updatedAppState = new ApplicationState(appStateData.
+        getSubmitTime(), appStateData.getStartTime(),
+        appStateData.getApplicationSubmissionContext(), appStateData.getUser(),
+        appStateData.getState(), appStateData.getDiagnostics(),
+        appStateData.getFinishTime(), appStateData.getStateBeforeKilling(),
+        appStateData.getUpdatedNodesId());
+    LOG.info("Updating final state " + appStateData.getState() + " for app: " +
+        appId);
     if (state.appState.get(appId) != null) {
       // add the earlier attempts back
-      updatedAppState.attempts
-        .putAll(state.appState.get(appId).attempts);
+      updatedAppState.attempts.putAll(state.appState.get(appId).attempts);
     }
     state.appState.put(appId, updatedAppState);
   }
@@ -112,10 +108,9 @@ public class MemoryRMStateStore extends RMStateStore {
   @Override
   public synchronized void storeApplicationAttemptStateInternal(
       ApplicationAttemptId appAttemptId,
-      ApplicationAttemptStateDataPBImpl attemptStateData)
-      throws Exception {
+      ApplicationAttemptStateDataPBImpl attemptStateData) throws Exception {
     Credentials credentials = null;
-    if(attemptStateData.getAppAttemptTokens() != null){
+    if (attemptStateData.getAppAttemptTokens() != null) {
       DataInputByteBuffer dibb = new DataInputByteBuffer();
       credentials = new Credentials();
       dibb.reset(attemptStateData.getAppAttemptTokens());
@@ -123,11 +118,11 @@ public class MemoryRMStateStore extends RMStateStore {
     }
     ApplicationAttemptState attemptState =
         new ApplicationAttemptState(appAttemptId,
-          attemptStateData.getMasterContainer(), credentials,
-          attemptStateData.getStartTime());
+            attemptStateData.getMasterContainer(), credentials,
+            attemptStateData.getStartTime());
 
-    ApplicationState appState = state.getApplicationState().get(
-        attemptState.getAttemptId().getApplicationId());
+    ApplicationState appState = state.getApplicationState()
+        .get(attemptState.getAttemptId().getApplicationId());
     if (appState == null) {
       throw new YarnRuntimeException("Application doesn't exist");
     }
@@ -137,8 +132,7 @@ public class MemoryRMStateStore extends RMStateStore {
   @Override
   public synchronized void updateApplicationAttemptStateInternal(
       ApplicationAttemptId appAttemptId,
-      ApplicationAttemptStateDataPBImpl attemptStateData)
-      throws Exception {
+      ApplicationAttemptStateDataPBImpl attemptStateData) throws Exception {
     Credentials credentials = null;
     if (attemptStateData.getAppAttemptTokens() != null) {
       DataInputByteBuffer dibb = new DataInputByteBuffer();
@@ -148,22 +142,24 @@ public class MemoryRMStateStore extends RMStateStore {
     }
     ApplicationAttemptState updatedAttemptState =
         new ApplicationAttemptState(appAttemptId,
-          attemptStateData.getMasterContainer(), credentials,
-          attemptStateData.getStartTime(), attemptStateData.getState(),
-          attemptStateData.getFinalTrackingUrl(),
-          attemptStateData.getDiagnostics(),
-          attemptStateData.getFinalApplicationStatus());
+            attemptStateData.getMasterContainer(), credentials,
+            attemptStateData.getStartTime(), attemptStateData.getState(),
+            attemptStateData.getFinalTrackingUrl(),
+            attemptStateData.getDiagnostics(),
+            attemptStateData.getFinalApplicationStatus(),
+            attemptStateData.getProgress(), attemptStateData.getHost(),
+            attemptStateData.getRpcPort(), attemptStateData.getRanNodes(),
+            attemptStateData.getJustFinishedContainers());
 
-    ApplicationState appState =
-        state.getApplicationState().get(
-          updatedAttemptState.getAttemptId().getApplicationId());
+    ApplicationState appState = state.getApplicationState()
+        .get(updatedAttemptState.getAttemptId().getApplicationId());
     if (appState == null) {
       throw new YarnRuntimeException("Application doesn't exist");
     }
-    LOG.info("Updating final state " + updatedAttemptState.getState()
-        + " for attempt: " + updatedAttemptState.getAttemptId());
-    appState.attempts.put(updatedAttemptState.getAttemptId(),
-      updatedAttemptState);
+    LOG.info("Updating final state " + updatedAttemptState.getState() +
+        " for attempt: " + updatedAttemptState.getAttemptId());
+    appState.attempts
+        .put(updatedAttemptState.getAttemptId(), updatedAttemptState);
   }
 
   @Override
@@ -172,7 +168,8 @@ public class MemoryRMStateStore extends RMStateStore {
     ApplicationId appId = appState.getAppId();
     ApplicationState removed = state.appState.remove(appId);
     if (removed == null) {
-      throw new YarnRuntimeException("Removing non-exsisting application state");
+      throw new YarnRuntimeException(
+          "Removing non-exsisting application state");
     }
   }
 
@@ -183,9 +180,10 @@ public class MemoryRMStateStore extends RMStateStore {
     Map<RMDelegationTokenIdentifier, Long> rmDTState =
         state.rmSecretManagerState.getTokenState();
     if (rmDTState.containsKey(rmDTIdentifier)) {
-      IOException e = new IOException("RMDelegationToken: " + rmDTIdentifier
-              + "is already stored.");
-      LOG.info("Error storing info for RMDelegationToken: " + rmDTIdentifier, e);
+      IOException e = new IOException(
+          "RMDelegationToken: " + rmDTIdentifier + "is already stored.");
+      LOG.info("Error storing info for RMDelegationToken: " + rmDTIdentifier,
+          e);
       throw e;
     }
     rmDTState.put(rmDTIdentifier, renewDate);
@@ -194,7 +192,7 @@ public class MemoryRMStateStore extends RMStateStore {
 
   @Override
   public synchronized void removeRMDelegationTokenState(
-      RMDelegationTokenIdentifier rmDTIdentifier) throws Exception{
+      RMDelegationTokenIdentifier rmDTIdentifier) throws Exception {
     Map<RMDelegationTokenIdentifier, Long> rmDTState =
         state.rmSecretManagerState.getTokenState();
     rmDTState.remove(rmDTIdentifier);
@@ -205,21 +203,22 @@ public class MemoryRMStateStore extends RMStateStore {
       RMDelegationTokenIdentifier rmDTIdentifier, Long renewDate,
       int latestSequenceNumber) throws Exception {
     removeRMDelegationTokenState(rmDTIdentifier);
-    storeRMDelegationTokenAndSequenceNumberState(
-        rmDTIdentifier, renewDate, latestSequenceNumber);
+    storeRMDelegationTokenAndSequenceNumberState(rmDTIdentifier, renewDate,
+        latestSequenceNumber);
   }
 
   @Override
   public synchronized void storeRMDTMasterKeyState(DelegationKey delegationKey)
       throws Exception {
-    Set<DelegationKey> rmDTMasterKeyState =
-        state.rmSecretManagerState.getMasterKeyState();
+    Set<DelegationKey> rmDTMasterKeyState = state.rmSecretManagerState.
+        getMasterKeyState();
 
     if (rmDTMasterKeyState.contains(delegationKey)) {
-      IOException e = new IOException("RMDTMasterKey with keyID: "
-              + delegationKey.getKeyId() + " is already stored");
-      LOG.info("Error storing info for RMDTMasterKey with keyID: "
-          + delegationKey.getKeyId(), e);
+      IOException e = new IOException(
+          "RMDTMasterKey with keyID: " + delegationKey.getKeyId() +
+              " is already stored");
+      LOG.info("Error storing info for RMDTMasterKey with keyID: " +
+          delegationKey.getKeyId(), e);
       throw e;
     }
     state.getRMDTSecretManagerState().getMasterKeyState().add(delegationKey);
@@ -229,8 +228,8 @@ public class MemoryRMStateStore extends RMStateStore {
   @Override
   public synchronized void removeRMDTMasterKeyState(DelegationKey delegationKey)
       throws Exception {
-    Set<DelegationKey> rmDTMasterKeyState =
-        state.rmSecretManagerState.getMasterKeyState();
+    Set<DelegationKey> rmDTMasterKeyState = state.rmSecretManagerState.
+        getMasterKeyState();
     rmDTMasterKeyState.remove(delegationKey);
   }
 
@@ -246,6 +245,18 @@ public class MemoryRMStateStore extends RMStateStore {
   @Override
   protected RMStateVersion getCurrentVersion() {
     return null;
+  }
+
+  @Override
+  protected void storeRMTokenSecretManagerMasterKeyState(MasterKey key,
+      KeyType keyType) throws IOException {
+    state.getSecretTokenMamagerKey().put(keyType, key);
+  }
+
+  @Override
+  protected void removeRMTokenSecretManagerMasterKeyState(KeyType keyType)
+      throws IOException {
+    state.getSecretTokenMamagerKey().remove(keyType);
   }
 
 }

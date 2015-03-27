@@ -1,38 +1,24 @@
 /**
-* Licensed to the Apache Software Foundation (ASF) under one
-* or more contributor license agreements.  See the NOTICE file
-* distributed with this work for additional information
-* regarding copyright ownership.  The ASF licenses this file
-* to you under the Apache License, Version 2.0 (the
-* "License"); you may not use this file except in compliance
-* with the License.  You may obtain a copy of the License at
-*
-*     http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package org.apache.hadoop.yarn.server.nodemanager.containermanager;
 
-import static org.apache.hadoop.service.Service.STATE.INITED;
-import static org.apache.hadoop.service.Service.STATE.STARTED;
-import static org.apache.hadoop.service.Service.STATE.STOPPED;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Map;
-
 import junit.framework.Assert;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -48,17 +34,27 @@ import org.apache.hadoop.yarn.server.api.ApplicationTerminationContext;
 import org.apache.hadoop.yarn.server.api.AuxiliaryService;
 import org.apache.hadoop.yarn.server.api.ContainerInitializationContext;
 import org.apache.hadoop.yarn.server.api.ContainerTerminationContext;
-import org.apache.hadoop.yarn.server.nodemanager.containermanager.container
-    .Container;
-import org.apache.hadoop.yarn.server.nodemanager.containermanager.container
-    .ContainerImpl;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Container;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.ContainerImpl;
 import org.junit.Test;
+
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Map;
+
+import static org.apache.hadoop.service.Service.STATE.INITED;
+import static org.apache.hadoop.service.Service.STATE.STARTED;
+import static org.apache.hadoop.service.Service.STATE.STOPPED;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 public class TestAuxServices {
   private static final Log LOG = LogFactory.getLog(TestAuxServices.class);
 
-  static class LightService extends AuxiliaryService implements Service
-       {
+  static class LightService extends AuxiliaryService implements Service {
     private final char idef;
     private final int expected_appId;
     private int remaining_init;
@@ -68,9 +64,10 @@ public class TestAuxServices {
     private ContainerId containerId;
     private Resource resource;
 
-         LightService(String name, char idef, int expected_appId) {
+    LightService(String name, char idef, int expected_appId) {
       this(name, idef, expected_appId, null);
-    } 
+    }
+
     LightService(String name, char idef, int expected_appId, ByteBuffer meta) {
       super(name);
       this.idef = idef;
@@ -80,32 +77,37 @@ public class TestAuxServices {
     }
 
     public ArrayList<Integer> getAppIdsStopped() {
-      return (ArrayList<Integer>)this.stoppedApps.clone();
+      return (ArrayList<Integer>) this.stoppedApps.clone();
     }
 
-    @Override 
+    @Override
     protected void serviceInit(Configuration conf) throws Exception {
       remaining_init = conf.getInt(idef + ".expected.init", 0);
       remaining_stop = conf.getInt(idef + ".expected.stop", 0);
       super.serviceInit(conf);
     }
+
     @Override
     protected void serviceStop() throws Exception {
       assertEquals(0, remaining_init);
       assertEquals(0, remaining_stop);
       super.serviceStop();
     }
+
     @Override
-    public void initializeApplication(ApplicationInitializationContext context) {
+    public void initializeApplication(
+        ApplicationInitializationContext context) {
       ByteBuffer data = context.getApplicationDataForService();
       assertEquals(idef, data.getChar());
       assertEquals(expected_appId, data.getInt());
       assertEquals(expected_appId, context.getApplicationId().getId());
     }
+
     @Override
     public void stopApplication(ApplicationTerminationContext context) {
       stoppedApps.add(context.getApplicationId().getId());
     }
+
     @Override
     public ByteBuffer getMetaData() {
       return meta;
@@ -125,16 +127,16 @@ public class TestAuxServices {
       resource = stopContainerContext.getResource();
     }
 
- }
+  }
 
   static class ServiceA extends LightService {
-    public ServiceA() { 
+    public ServiceA() {
       super("A", 'A', 65, ByteBuffer.wrap("A".getBytes()));
     }
   }
 
   static class ServiceB extends LightService {
-    public ServiceB() { 
+    public ServiceB() {
       super("B", 'B', 66, ByteBuffer.wrap("B".getBytes()));
     }
   }
@@ -142,7 +144,8 @@ public class TestAuxServices {
   @Test
   public void testAuxEventDispatch() {
     Configuration conf = new Configuration();
-    conf.setStrings(YarnConfiguration.NM_AUX_SERVICES, new String[] { "Asrv", "Bsrv" });
+    conf.setStrings(YarnConfiguration.NM_AUX_SERVICES,
+        new String[]{"Asrv", "Bsrv"});
     conf.setClass(String.format(YarnConfiguration.NM_AUX_SERVICE_FMT, "Asrv"),
         ServiceA.class, Service.class);
     conf.setClass(String.format(YarnConfiguration.NM_AUX_SERVICE_FMT, "Bsrv"),
@@ -158,19 +161,20 @@ public class TestAuxServices {
     buf.putChar('A');
     buf.putInt(65);
     buf.flip();
-    AuxServicesEvent event = new AuxServicesEvent(
-        AuxServicesEventType.APPLICATION_INIT, "user0", appId1, "Asrv", buf);
+    AuxServicesEvent event =
+        new AuxServicesEvent(AuxServicesEventType.APPLICATION_INIT, "user0",
+            appId1, "Asrv", buf);
     aux.handle(event);
     ApplicationId appId2 = ApplicationId.newInstance(0, 66);
-    event = new AuxServicesEvent(
-        AuxServicesEventType.APPLICATION_STOP, "user0", appId2, "Bsrv", null);
+    event = new AuxServicesEvent(AuxServicesEventType.APPLICATION_STOP, "user0",
+        appId2, "Bsrv", null);
     // verify all services got the stop event 
     aux.handle(event);
     Collection<AuxiliaryService> servs = aux.getServices();
-    for (AuxiliaryService serv: servs) {
-      ArrayList<Integer> appIds = ((LightService)serv).getAppIdsStopped();
+    for (AuxiliaryService serv : servs) {
+      ArrayList<Integer> appIds = ((LightService) serv).getAppIdsStopped();
       assertEquals("app not properly stopped", 1, appIds.size());
-      assertTrue("wrong app stopped", appIds.contains((Integer)66));
+      assertTrue("wrong app stopped", appIds.contains((Integer) 66));
     }
 
     for (AuxiliaryService serv : servs) {
@@ -179,14 +183,16 @@ public class TestAuxServices {
     }
 
 
-    ApplicationAttemptId attemptId = ApplicationAttemptId.newInstance(appId1, 1);
-    ContainerTokenIdentifier cti = new ContainerTokenIdentifier(
-        ContainerId.newInstance(attemptId, 1), "", "",
-        Resource.newInstance(1, 1), 0,0,0);
+    ApplicationAttemptId attemptId =
+        ApplicationAttemptId.newInstance(appId1, 1);
+    ContainerTokenIdentifier cti =
+        new ContainerTokenIdentifier(ContainerId.newInstance(attemptId, 1), "",
+            "", Resource.newInstance(1, 1), 0, 0, 0);
     Container container = new ContainerImpl(null, null, null, null, null, cti);
     ContainerId containerId = container.getContainerId();
     Resource resource = container.getResource();
-    event = new AuxServicesEvent(AuxServicesEventType.CONTAINER_INIT,container);
+    event =
+        new AuxServicesEvent(AuxServicesEventType.CONTAINER_INIT, container);
     aux.handle(event);
     for (AuxiliaryService serv : servs) {
       assertEquals(containerId, ((LightService) serv).containerId);
@@ -195,7 +201,8 @@ public class TestAuxServices {
       ((LightService) serv).resource = null;
     }
 
-    event = new AuxServicesEvent(AuxServicesEventType.CONTAINER_STOP, container);
+    event =
+        new AuxServicesEvent(AuxServicesEventType.CONTAINER_STOP, container);
     aux.handle(event);
     for (AuxiliaryService serv : servs) {
       assertEquals(containerId, ((LightService) serv).containerId);
@@ -206,7 +213,8 @@ public class TestAuxServices {
   @Test
   public void testAuxServices() {
     Configuration conf = new Configuration();
-    conf.setStrings(YarnConfiguration.NM_AUX_SERVICES, new String[] { "Asrv", "Bsrv" });
+    conf.setStrings(YarnConfiguration.NM_AUX_SERVICES,
+        new String[]{"Asrv", "Bsrv"});
     conf.setClass(String.format(YarnConfiguration.NM_AUX_SERVICE_FMT, "Asrv"),
         ServiceA.class, Service.class);
     conf.setClass(String.format(YarnConfiguration.NM_AUX_SERVICE_FMT, "Bsrv"),
@@ -217,9 +225,13 @@ public class TestAuxServices {
     int latch = 1;
     for (Service s : aux.getServices()) {
       assertEquals(INITED, s.getServiceState());
-      if (s instanceof ServiceA) { latch *= 2; }
-      else if (s instanceof ServiceB) { latch *= 3; }
-      else fail("Unexpected service type " + s.getClass());
+      if (s instanceof ServiceA) {
+        latch *= 2;
+      } else if (s instanceof ServiceB) {
+        latch *= 3;
+      } else {
+        fail("Unexpected service type " + s.getClass());
+      }
     }
     assertEquals("Invalid mix of services", 6, latch);
     aux.start();
@@ -237,7 +249,8 @@ public class TestAuxServices {
   @Test
   public void testAuxServicesMeta() {
     Configuration conf = new Configuration();
-    conf.setStrings(YarnConfiguration.NM_AUX_SERVICES, new String[] { "Asrv", "Bsrv" });
+    conf.setStrings(YarnConfiguration.NM_AUX_SERVICES,
+        new String[]{"Asrv", "Bsrv"});
     conf.setClass(String.format(YarnConfiguration.NM_AUX_SERVICE_FMT, "Asrv"),
         ServiceA.class, Service.class);
     conf.setClass(String.format(YarnConfiguration.NM_AUX_SERVICE_FMT, "Bsrv"),
@@ -248,9 +261,13 @@ public class TestAuxServices {
     int latch = 1;
     for (Service s : aux.getServices()) {
       assertEquals(INITED, s.getServiceState());
-      if (s instanceof ServiceA) { latch *= 2; }
-      else if (s instanceof ServiceB) { latch *= 3; }
-      else fail("Unexpected service type " + s.getClass());
+      if (s instanceof ServiceA) {
+        latch *= 2;
+      } else if (s instanceof ServiceB) {
+        latch *= 3;
+      } else {
+        fail("Unexpected service type " + s.getClass());
+      }
     }
     assertEquals("Invalid mix of services", 6, latch);
     aux.start();
@@ -270,11 +287,11 @@ public class TestAuxServices {
   }
 
 
-
   @Test
   public void testAuxUnexpectedStop() {
     Configuration conf = new Configuration();
-    conf.setStrings(YarnConfiguration.NM_AUX_SERVICES, new String[] { "Asrv", "Bsrv" });
+    conf.setStrings(YarnConfiguration.NM_AUX_SERVICES,
+        new String[]{"Asrv", "Bsrv"});
     conf.setClass(String.format(YarnConfiguration.NM_AUX_SERVICE_FMT, "Asrv"),
         ServiceA.class, Service.class);
     conf.setClass(String.format(YarnConfiguration.NM_AUX_SERVICE_FMT, "Bsrv"),
@@ -294,7 +311,8 @@ public class TestAuxServices {
   public void testValidAuxServiceName() {
     final AuxServices aux = new AuxServices();
     Configuration conf = new Configuration();
-    conf.setStrings(YarnConfiguration.NM_AUX_SERVICES, new String[] {"Asrv1", "Bsrv_2"});
+    conf.setStrings(YarnConfiguration.NM_AUX_SERVICES,
+        new String[]{"Asrv1", "Bsrv_2"});
     conf.setClass(String.format(YarnConfiguration.NM_AUX_SERVICE_FMT, "Asrv1"),
         ServiceA.class, Service.class);
     conf.setClass(String.format(YarnConfiguration.NM_AUX_SERVICE_FMT, "Bsrv_2"),
@@ -307,7 +325,7 @@ public class TestAuxServices {
 
     //Test bad auxService Name
     final AuxServices aux1 = new AuxServices();
-    conf.setStrings(YarnConfiguration.NM_AUX_SERVICES, new String[] {"1Asrv1"});
+    conf.setStrings(YarnConfiguration.NM_AUX_SERVICES, new String[]{"1Asrv1"});
     conf.setClass(String.format(YarnConfiguration.NM_AUX_SERVICE_FMT, "1Asrv1"),
         ServiceA.class, Service.class);
     try {

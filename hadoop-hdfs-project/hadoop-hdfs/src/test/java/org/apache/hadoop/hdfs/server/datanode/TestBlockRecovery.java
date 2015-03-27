@@ -18,29 +18,8 @@
 
 package org.apache.hadoop.hdfs.server.datanode;
 
-import static org.junit.Assert.fail;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyBoolean;
-import static org.mockito.Matchers.anyListOf;
-import static org.mockito.Matchers.anyLong;
-import static org.mockito.Matchers.anyObject;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
-import java.io.File;
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.URISyntaxException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
-
+import io.hops.leader_election.node.ActiveNode;
+import io.hops.leader_election.node.SortedActiveNodeList;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.logging.impl.Log4JLogger;
@@ -50,7 +29,6 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.ha.HAServiceProtocol.HAServiceState;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
@@ -73,7 +51,6 @@ import org.apache.hadoop.hdfs.server.protocol.DatanodeProtocol;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.hdfs.server.protocol.HeartbeatResponse;
 import org.apache.hadoop.hdfs.server.protocol.InterDatanodeProtocol;
-import org.apache.hadoop.hdfs.server.protocol.NNHAStatusHeartbeat;
 import org.apache.hadoop.hdfs.server.protocol.NamespaceInfo;
 import org.apache.hadoop.hdfs.server.protocol.ReplicaRecoveryInfo;
 import org.apache.hadoop.hdfs.server.protocol.StorageReport;
@@ -89,39 +66,63 @@ import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
+import java.io.File;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import static org.junit.Assert.fail;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyBoolean;
+import static org.mockito.Matchers.anyListOf;
+import static org.mockito.Matchers.anyLong;
+import static org.mockito.Matchers.anyObject;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 /**
  * This tests if sync all replicas in block recovery works correctly
  */
 public class TestBlockRecovery {
   private static final Log LOG = LogFactory.getLog(TestBlockRecovery.class);
   private static final String DATA_DIR =
-    MiniDFSCluster.getBaseDirectory() + "data";
+      MiniDFSCluster.getBaseDirectory() + "data";
   private DataNode dn;
   private Configuration conf;
   private final static long RECOVERY_ID = 3000L;
   private final static String CLUSTER_ID = "testClusterID";
   private final static String POOL_ID = "BP-TEST";
-  private final static InetSocketAddress NN_ADDR = new InetSocketAddress(
-      "localhost", 5020);
+  private final static InetSocketAddress NN_ADDR =
+      new InetSocketAddress("localhost", 5020);
   private final static long BLOCK_ID = 1000L;
   private final static long GEN_STAMP = 2000L;
   private final static long BLOCK_LEN = 3000L;
   private final static long REPLICA_LEN1 = 6000L;
   private final static long REPLICA_LEN2 = 5000L;
-  private final static ExtendedBlock block = new ExtendedBlock(POOL_ID,
-      BLOCK_ID, BLOCK_LEN, GEN_STAMP);
+  private final static ExtendedBlock block =
+      new ExtendedBlock(POOL_ID, BLOCK_ID, BLOCK_LEN, GEN_STAMP);
   
   static {
-    ((Log4JLogger)LogFactory.getLog(FSNamesystem.class)).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger)LOG).getLogger().setLevel(Level.ALL);
+    ((Log4JLogger) LogFactory.getLog(FSNamesystem.class)).getLogger()
+        .setLevel(Level.ALL);
+    ((Log4JLogger) LOG).getLogger().setLevel(Level.ALL);
   }
 
   /**
    * Starts an instance of DataNode
+   *
    * @throws IOException
    */
   @Before
-  public void startUp() throws IOException, URISyntaxException {
+  public void startUp() throws IOException {
     conf = new HdfsConfiguration();
     conf.set(DFSConfigKeys.DFS_DATANODE_DATA_DIR_KEY, DATA_DIR);
     conf.set(DFSConfigKeys.DFS_DATANODE_ADDRESS_KEY, "0.0.0.0:0");
@@ -130,14 +131,13 @@ public class TestBlockRecovery {
     conf.setInt(CommonConfigurationKeys.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY, 0);
     FileSystem.setDefaultUri(conf,
         "hdfs://" + NN_ADDR.getHostName() + ":" + NN_ADDR.getPort());
-    ArrayList<StorageLocation> locations = new ArrayList<StorageLocation>();
+    ArrayList<File> dirs = new ArrayList<File>();
     File dataDir = new File(DATA_DIR);
     FileUtil.fullyDelete(dataDir);
     dataDir.mkdirs();
-    StorageLocation location = StorageLocation.parse(dataDir.getPath());
-    locations.add(location);
+    dirs.add(dataDir);
     final DatanodeProtocolClientSideTranslatorPB namenode =
-      mock(DatanodeProtocolClientSideTranslatorPB.class);
+        mock(DatanodeProtocolClientSideTranslatorPB.class);
 
     Mockito.doAnswer(new Answer<DatanodeRegistration>() {
       @Override
@@ -145,79 +145,120 @@ public class TestBlockRecovery {
           throws Throwable {
         return (DatanodeRegistration) invocation.getArguments()[0];
       }
-    }).when(namenode).registerDatanode(
-        Mockito.any(DatanodeRegistration.class));
+    }).when(namenode).registerDatanode(Mockito.any(DatanodeRegistration.class));
 
-    when(namenode.versionRequest()).thenReturn(new NamespaceInfo
-        (1, CLUSTER_ID, POOL_ID, 1L));
+    when(namenode.versionRequest())
+        .thenReturn(new NamespaceInfo(1, CLUSTER_ID, POOL_ID, 1L));
 
-    when(namenode.sendHeartbeat(
-            Mockito.any(DatanodeRegistration.class),
-            Mockito.any(StorageReport[].class),
-            Mockito.anyLong(),
-            Mockito.anyLong(),
-            Mockito.anyInt(),
-            Mockito.anyInt(),
-            Mockito.anyInt()))
-        .thenReturn(new HeartbeatResponse(
-            new DatanodeCommand[0],
-            new NNHAStatusHeartbeat(HAServiceState.ACTIVE, 1),
-            null));
+    when(namenode.sendHeartbeat(Mockito.any(DatanodeRegistration.class),
+        Mockito.any(StorageReport[].class), Mockito.anyInt(), Mockito.anyInt(),
+        Mockito.anyInt()))
+        .thenReturn(new HeartbeatResponse(new DatanodeCommand[0]));
 
-    dn = new DataNode(conf, locations, null) {
+    when(namenode.getActiveNamenodes()).thenReturn(new SortedActiveNodeList() {
+      @Override
+      public boolean isEmpty() {
+        return true;
+      }
+
+      @Override
+      public int size() {
+        return 0;
+      }
+
+      @Override
+      public List<ActiveNode> getActiveNodes() {
+        return new ArrayList<ActiveNode>();
+      }
+
+      @Override
+      public List<ActiveNode> getSortedActiveNodes() {
+        return null;
+      }
+
+      @Override
+      public ActiveNode getActiveNode(InetSocketAddress address) {
+        return null;
+      }
+
+      @Override
+      public ActiveNode getLeader() {
+        return null;
+      }
+    });
+
+    dn = new DataNode(conf, dirs, null) {
       @Override
       DatanodeProtocolClientSideTranslatorPB connectToNN(
           InetSocketAddress nnAddr) throws IOException {
         Assert.assertEquals(NN_ADDR, nnAddr);
         return namenode;
       }
+
+      @Override
+      public DatanodeProtocolClientSideTranslatorPB getActiveNamenodeForBP(
+          String bpid) throws IOException {
+        return namenode;
+      }
     };
+
+    BPOfferService bpos = dn.getAllBpOs()[0];
+    BPServiceActor bpsa = bpos.getBPServiceActors().get(0);
+    bpsa.bpNamenode = namenode;
+    NamespaceInfo nsInfo = bpsa.retrieveNamespaceInfo();
+    bpos.verifyAndSetNamespaceInfo(nsInfo);
+    bpos.bpRegistration = bpos.createRegistration();
+
     // Trigger a heartbeat so that it acknowledges the NN as active.
     dn.getAllBpOs()[0].triggerHeartbeatForTests();
   }
 
   /**
    * Cleans the resources and closes the instance of datanode
-   * @throws IOException if an error occurred
+   *
+   * @throws IOException
+   *     if an error occurred
    */
   @After
   public void tearDown() throws IOException {
     if (dn != null) {
       try {
         dn.shutdown();
-      } catch(Exception e) {
+      } catch (Exception e) {
         LOG.error("Cannot close: ", e);
       } finally {
         File dir = new File(DATA_DIR);
-        if (dir.exists())
-          Assert.assertTrue(
-              "Cannot delete data-node dirs", FileUtil.fullyDelete(dir));
+        if (dir.exists()) {
+          Assert.assertTrue("Cannot delete data-node dirs",
+              FileUtil.fullyDelete(dir));
+        }
       }
     }
   }
 
-  /** Sync two replicas */
-  private void testSyncReplicas(ReplicaRecoveryInfo replica1, 
-      ReplicaRecoveryInfo replica2,
-      InterDatanodeProtocol dn1,
-      InterDatanodeProtocol dn2,
-      long expectLen) throws IOException {
+  /**
+   * Sync two replicas
+   */
+  private void testSyncReplicas(ReplicaRecoveryInfo replica1,
+      ReplicaRecoveryInfo replica2, InterDatanodeProtocol dn1,
+      InterDatanodeProtocol dn2, long expectLen) throws IOException {
     
-    DatanodeInfo[] locs = new DatanodeInfo[]{
-        mock(DatanodeInfo.class), mock(DatanodeInfo.class)};
-    RecoveringBlock rBlock = new RecoveringBlock(block, 
-        locs, RECOVERY_ID);
+    DatanodeInfo[] locs =
+        new DatanodeInfo[]{mock(DatanodeInfo.class), mock(DatanodeInfo.class)};
+    RecoveringBlock rBlock = new RecoveringBlock(block, locs, RECOVERY_ID);
     ArrayList<BlockRecord> syncList = new ArrayList<BlockRecord>(2);
-    BlockRecord record1 = new BlockRecord(
-        DFSTestUtil.getDatanodeInfo("1.2.3.4", "bogus", 1234), dn1, replica1);
-    BlockRecord record2 = new BlockRecord(
-        DFSTestUtil.getDatanodeInfo("1.2.3.4", "bogus", 1234), dn2, replica2);
+    BlockRecord record1 =
+        new BlockRecord(DFSTestUtil.getDatanodeInfo("1.2.3.4", "bogus", 1234),
+            dn1, replica1);
+    BlockRecord record2 =
+        new BlockRecord(DFSTestUtil.getDatanodeInfo("1.2.3.4", "bogus", 1234),
+            dn2, replica2);
     syncList.add(record1);
     syncList.add(record2);
     
-    when(dn1.updateReplicaUnderRecovery((ExtendedBlock)anyObject(), anyLong(), 
+    when(dn1.updateReplicaUnderRecovery((ExtendedBlock) anyObject(), anyLong(),
         anyLong())).thenReturn("storage1");
-    when(dn2.updateReplicaUnderRecovery((ExtendedBlock)anyObject(), anyLong(), 
+    when(dn2.updateReplicaUnderRecovery((ExtendedBlock) anyObject(), anyLong(),
         anyLong())).thenReturn("storage2");
     dn.syncBlock(rBlock, syncList);
   }
@@ -225,56 +266,65 @@ public class TestBlockRecovery {
   /**
    * BlockRecovery_02.8.
    * Two replicas are in Finalized state
-   * @throws IOException in case of an error
+   *
+   * @throws IOException
+   *     in case of an error
    */
   @Test
-  public void testFinalizedReplicas () throws IOException {
-    if(LOG.isDebugEnabled()) {
+  public void testFinalizedReplicas() throws IOException {
+    if (LOG.isDebugEnabled()) {
       LOG.debug("Running " + GenericTestUtils.getMethodName());
     }
-    ReplicaRecoveryInfo replica1 = new ReplicaRecoveryInfo(BLOCK_ID, 
-        REPLICA_LEN1, GEN_STAMP-1, ReplicaState.FINALIZED);
-    ReplicaRecoveryInfo replica2 = new ReplicaRecoveryInfo(BLOCK_ID, 
-        REPLICA_LEN1, GEN_STAMP-2, ReplicaState.FINALIZED);
+    ReplicaRecoveryInfo replica1 =
+        new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN1, GEN_STAMP - 1,
+            ReplicaState.FINALIZED);
+    ReplicaRecoveryInfo replica2 =
+        new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN1, GEN_STAMP - 2,
+            ReplicaState.FINALIZED);
 
     InterDatanodeProtocol dn1 = mock(InterDatanodeProtocol.class);
     InterDatanodeProtocol dn2 = mock(InterDatanodeProtocol.class);
 
     testSyncReplicas(replica1, replica2, dn1, dn2, REPLICA_LEN1);
     verify(dn1).updateReplicaUnderRecovery(block, RECOVERY_ID, REPLICA_LEN1);
-    verify(dn2).updateReplicaUnderRecovery(block, RECOVERY_ID, REPLICA_LEN1);    
+    verify(dn2).updateReplicaUnderRecovery(block, RECOVERY_ID, REPLICA_LEN1);
 
     // two finalized replicas have different length
-    replica1 = new ReplicaRecoveryInfo(BLOCK_ID, 
-        REPLICA_LEN1, GEN_STAMP-1, ReplicaState.FINALIZED);
-    replica2 = new ReplicaRecoveryInfo(BLOCK_ID, 
-        REPLICA_LEN2, GEN_STAMP-2, ReplicaState.FINALIZED);
+    replica1 = new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN1, GEN_STAMP - 1,
+        ReplicaState.FINALIZED);
+    replica2 = new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN2, GEN_STAMP - 2,
+        ReplicaState.FINALIZED);
 
     try {
       testSyncReplicas(replica1, replica2, dn1, dn2, REPLICA_LEN1);
       Assert.fail("Two finalized replicas should not have different lengthes!");
     } catch (IOException e) {
-      Assert.assertTrue(e.getMessage().startsWith(
-          "Inconsistent size of finalized replicas. "));
+      e.printStackTrace();
+      Assert.assertTrue(e.getMessage()
+          .startsWith("Inconsistent size of finalized replicas. "));
     }
   }
   
   /**
    * BlockRecovery_02.9.
-   * One replica is Finalized and another is RBW. 
-   * @throws IOException in case of an error
+   * One replica is Finalized and another is RBW.
+   *
+   * @throws IOException
+   *     in case of an error
    */
   @Test
   public void testFinalizedRbwReplicas() throws IOException {
-    if(LOG.isDebugEnabled()) {
+    if (LOG.isDebugEnabled()) {
       LOG.debug("Running " + GenericTestUtils.getMethodName());
     }
     
     // rbw and finalized replicas have the same length
-    ReplicaRecoveryInfo replica1 = new ReplicaRecoveryInfo(BLOCK_ID, 
-        REPLICA_LEN1, GEN_STAMP-1, ReplicaState.FINALIZED);
-    ReplicaRecoveryInfo replica2 = new ReplicaRecoveryInfo(BLOCK_ID, 
-        REPLICA_LEN1, GEN_STAMP-2, ReplicaState.RBW);
+    ReplicaRecoveryInfo replica1 =
+        new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN1, GEN_STAMP - 1,
+            ReplicaState.FINALIZED);
+    ReplicaRecoveryInfo replica2 =
+        new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN1, GEN_STAMP - 2,
+            ReplicaState.RBW);
 
     InterDatanodeProtocol dn1 = mock(InterDatanodeProtocol.class);
     InterDatanodeProtocol dn2 = mock(InterDatanodeProtocol.class);
@@ -284,74 +334,82 @@ public class TestBlockRecovery {
     verify(dn2).updateReplicaUnderRecovery(block, RECOVERY_ID, REPLICA_LEN1);
     
     // rbw replica has a different length from the finalized one
-    replica1 = new ReplicaRecoveryInfo(BLOCK_ID, 
-        REPLICA_LEN1, GEN_STAMP-1, ReplicaState.FINALIZED);
-    replica2 = new ReplicaRecoveryInfo(BLOCK_ID, 
-        REPLICA_LEN2, GEN_STAMP-2, ReplicaState.RBW);
+    replica1 = new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN1, GEN_STAMP - 1,
+        ReplicaState.FINALIZED);
+    replica2 = new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN2, GEN_STAMP - 2,
+        ReplicaState.RBW);
 
     dn1 = mock(InterDatanodeProtocol.class);
     dn2 = mock(InterDatanodeProtocol.class);
 
     testSyncReplicas(replica1, replica2, dn1, dn2, REPLICA_LEN1);
     verify(dn1).updateReplicaUnderRecovery(block, RECOVERY_ID, REPLICA_LEN1);
-    verify(dn2, never()).updateReplicaUnderRecovery(
-        block, RECOVERY_ID, REPLICA_LEN1);
+    verify(dn2, never())
+        .updateReplicaUnderRecovery(block, RECOVERY_ID, REPLICA_LEN1);
   }
   
   /**
    * BlockRecovery_02.10.
-   * One replica is Finalized and another is RWR. 
-   * @throws IOException in case of an error
+   * One replica is Finalized and another is RWR.
+   *
+   * @throws IOException
+   *     in case of an error
    */
   @Test
   public void testFinalizedRwrReplicas() throws IOException {
-    if(LOG.isDebugEnabled()) {
+    if (LOG.isDebugEnabled()) {
       LOG.debug("Running " + GenericTestUtils.getMethodName());
     }
     
     // rbw and finalized replicas have the same length
-    ReplicaRecoveryInfo replica1 = new ReplicaRecoveryInfo(BLOCK_ID, 
-        REPLICA_LEN1, GEN_STAMP-1, ReplicaState.FINALIZED);
-    ReplicaRecoveryInfo replica2 = new ReplicaRecoveryInfo(BLOCK_ID, 
-        REPLICA_LEN1, GEN_STAMP-2, ReplicaState.RWR);
+    ReplicaRecoveryInfo replica1 =
+        new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN1, GEN_STAMP - 1,
+            ReplicaState.FINALIZED);
+    ReplicaRecoveryInfo replica2 =
+        new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN1, GEN_STAMP - 2,
+            ReplicaState.RWR);
 
     InterDatanodeProtocol dn1 = mock(InterDatanodeProtocol.class);
     InterDatanodeProtocol dn2 = mock(InterDatanodeProtocol.class);
 
     testSyncReplicas(replica1, replica2, dn1, dn2, REPLICA_LEN1);
     verify(dn1).updateReplicaUnderRecovery(block, RECOVERY_ID, REPLICA_LEN1);
-    verify(dn2, never()).updateReplicaUnderRecovery(
-        block, RECOVERY_ID, REPLICA_LEN1);
+    verify(dn2, never())
+        .updateReplicaUnderRecovery(block, RECOVERY_ID, REPLICA_LEN1);
     
     // rbw replica has a different length from the finalized one
-    replica1 = new ReplicaRecoveryInfo(BLOCK_ID, 
-        REPLICA_LEN1, GEN_STAMP-1, ReplicaState.FINALIZED);
-    replica2 = new ReplicaRecoveryInfo(BLOCK_ID, 
-        REPLICA_LEN2, GEN_STAMP-2, ReplicaState.RBW);
+    replica1 = new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN1, GEN_STAMP - 1,
+        ReplicaState.FINALIZED);
+    replica2 = new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN2, GEN_STAMP - 2,
+        ReplicaState.RBW);
 
     dn1 = mock(InterDatanodeProtocol.class);
     dn2 = mock(InterDatanodeProtocol.class);
 
     testSyncReplicas(replica1, replica2, dn1, dn2, REPLICA_LEN1);
     verify(dn1).updateReplicaUnderRecovery(block, RECOVERY_ID, REPLICA_LEN1);
-    verify(dn2, never()).updateReplicaUnderRecovery(
-        block, RECOVERY_ID, REPLICA_LEN1);
+    verify(dn2, never())
+        .updateReplicaUnderRecovery(block, RECOVERY_ID, REPLICA_LEN1);
   }
   
   /**
    * BlockRecovery_02.11.
    * Two replicas are RBW.
-   * @throws IOException in case of an error
+   *
+   * @throws IOException
+   *     in case of an error
    */
   @Test
   public void testRBWReplicas() throws IOException {
-    if(LOG.isDebugEnabled()) {
+    if (LOG.isDebugEnabled()) {
       LOG.debug("Running " + GenericTestUtils.getMethodName());
     }
-    ReplicaRecoveryInfo replica1 = new ReplicaRecoveryInfo(BLOCK_ID, 
-        REPLICA_LEN1, GEN_STAMP-1, ReplicaState.RBW);
-    ReplicaRecoveryInfo replica2 = new ReplicaRecoveryInfo(BLOCK_ID, 
-        REPLICA_LEN2, GEN_STAMP-2, ReplicaState.RBW);
+    ReplicaRecoveryInfo replica1 =
+        new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN1, GEN_STAMP - 1,
+            ReplicaState.RBW);
+    ReplicaRecoveryInfo replica2 =
+        new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN2, GEN_STAMP - 2,
+            ReplicaState.RBW);
 
     InterDatanodeProtocol dn1 = mock(InterDatanodeProtocol.class);
     InterDatanodeProtocol dn2 = mock(InterDatanodeProtocol.class);
@@ -359,47 +417,55 @@ public class TestBlockRecovery {
     long minLen = Math.min(REPLICA_LEN1, REPLICA_LEN2);
     testSyncReplicas(replica1, replica2, dn1, dn2, minLen);
     verify(dn1).updateReplicaUnderRecovery(block, RECOVERY_ID, minLen);
-    verify(dn2).updateReplicaUnderRecovery(block, RECOVERY_ID, minLen);    
+    verify(dn2).updateReplicaUnderRecovery(block, RECOVERY_ID, minLen);
   }
   
   /**
    * BlockRecovery_02.12.
-   * One replica is RBW and another is RWR. 
-   * @throws IOException in case of an error
+   * One replica is RBW and another is RWR.
+   *
+   * @throws IOException
+   *     in case of an error
    */
   @Test
   public void testRBW_RWRReplicas() throws IOException {
-    if(LOG.isDebugEnabled()) {
+    if (LOG.isDebugEnabled()) {
       LOG.debug("Running " + GenericTestUtils.getMethodName());
     }
-    ReplicaRecoveryInfo replica1 = new ReplicaRecoveryInfo(BLOCK_ID, 
-        REPLICA_LEN1, GEN_STAMP-1, ReplicaState.RBW);
-    ReplicaRecoveryInfo replica2 = new ReplicaRecoveryInfo(BLOCK_ID, 
-        REPLICA_LEN1, GEN_STAMP-2, ReplicaState.RWR);
+    ReplicaRecoveryInfo replica1 =
+        new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN1, GEN_STAMP - 1,
+            ReplicaState.RBW);
+    ReplicaRecoveryInfo replica2 =
+        new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN1, GEN_STAMP - 2,
+            ReplicaState.RWR);
 
     InterDatanodeProtocol dn1 = mock(InterDatanodeProtocol.class);
     InterDatanodeProtocol dn2 = mock(InterDatanodeProtocol.class);
 
     testSyncReplicas(replica1, replica2, dn1, dn2, REPLICA_LEN1);
     verify(dn1).updateReplicaUnderRecovery(block, RECOVERY_ID, REPLICA_LEN1);
-    verify(dn2, never()).updateReplicaUnderRecovery(
-        block, RECOVERY_ID, REPLICA_LEN1);    
+    verify(dn2, never())
+        .updateReplicaUnderRecovery(block, RECOVERY_ID, REPLICA_LEN1);
   }
   
   /**
-   * BlockRecovery_02.13. 
+   * BlockRecovery_02.13.
    * Two replicas are RWR.
-   * @throws IOException in case of an error
+   *
+   * @throws IOException
+   *     in case of an error
    */
   @Test
   public void testRWRReplicas() throws IOException {
-    if(LOG.isDebugEnabled()) {
+    if (LOG.isDebugEnabled()) {
       LOG.debug("Running " + GenericTestUtils.getMethodName());
     }
-    ReplicaRecoveryInfo replica1 = new ReplicaRecoveryInfo(BLOCK_ID, 
-        REPLICA_LEN1, GEN_STAMP-1, ReplicaState.RWR);
-    ReplicaRecoveryInfo replica2 = new ReplicaRecoveryInfo(BLOCK_ID, 
-        REPLICA_LEN2, GEN_STAMP-2, ReplicaState.RWR);
+    ReplicaRecoveryInfo replica1 =
+        new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN1, GEN_STAMP - 1,
+            ReplicaState.RWR);
+    ReplicaRecoveryInfo replica2 =
+        new ReplicaRecoveryInfo(BLOCK_ID, REPLICA_LEN2, GEN_STAMP - 2,
+            ReplicaState.RWR);
 
     InterDatanodeProtocol dn1 = mock(InterDatanodeProtocol.class);
     InterDatanodeProtocol dn2 = mock(InterDatanodeProtocol.class);
@@ -408,68 +474,77 @@ public class TestBlockRecovery {
     testSyncReplicas(replica1, replica2, dn1, dn2, minLen);
     
     verify(dn1).updateReplicaUnderRecovery(block, RECOVERY_ID, minLen);
-    verify(dn2).updateReplicaUnderRecovery(block, RECOVERY_ID, minLen);    
-  }  
+    verify(dn2).updateReplicaUnderRecovery(block, RECOVERY_ID, minLen);
+  }
 
-  private Collection<RecoveringBlock> initRecoveringBlocks() throws IOException {
+  private Collection<RecoveringBlock> initRecoveringBlocks()
+      throws IOException {
     Collection<RecoveringBlock> blocks = new ArrayList<RecoveringBlock>(1);
     DatanodeInfo mockOtherDN = DFSTestUtil.getLocalDatanodeInfo();
-    DatanodeInfo[] locs = new DatanodeInfo[] {
+    DatanodeInfo[] locs = new DatanodeInfo[]{
         new DatanodeInfo(dn.getDNRegistrationForBP(block.getBlockPoolId())),
-        mockOtherDN };
+        mockOtherDN};
     RecoveringBlock rBlock = new RecoveringBlock(block, locs, RECOVERY_ID);
     blocks.add(rBlock);
     return blocks;
   }
+
   /**
    * BlockRecoveryFI_05. One DN throws RecoveryInProgressException.
    *
    * @throws IOException
-   *           in case of an error
+   *     in case of an error
    */
   @Test
   public void testRecoveryInProgressException()
-    throws IOException, InterruptedException {
-    if(LOG.isDebugEnabled()) {
+      throws IOException, InterruptedException {
+    if (LOG.isDebugEnabled()) {
       LOG.debug("Running " + GenericTestUtils.getMethodName());
     }
-    DataNode spyDN = spy(dn);
-    doThrow(new RecoveryInProgressException("Replica recovery is in progress")).
-       when(spyDN).initReplicaRecovery(any(RecoveringBlock.class));
-    Daemon d = spyDN.recoverBlocks("fake NN", initRecoveringBlocks());
-    d.join();
-    verify(spyDN, never()).syncBlock(
-        any(RecoveringBlock.class), anyListOf(BlockRecord.class));
+    try {
+      DataNode spyDN = spy(dn);
+      doThrow(
+          new RecoveryInProgressException("Replica recovery is in progress")).
+          when(spyDN).initReplicaRecovery(any(RecoveringBlock.class));
+      Daemon d = spyDN.recoverBlocks("fake NN", initRecoveringBlocks());
+      d.join();
+      verify(spyDN, never())
+          .syncBlock(any(RecoveringBlock.class), anyListOf(BlockRecord.class));
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+
   }
 
   /**
    * BlockRecoveryFI_06. all datanodes throws an exception.
    *
    * @throws IOException
-   *           in case of an error
+   *     in case of an error
    */
   @Test
   public void testErrorReplicas() throws IOException, InterruptedException {
-    if(LOG.isDebugEnabled()) {
+    if (LOG.isDebugEnabled()) {
       LOG.debug("Running " + GenericTestUtils.getMethodName());
     }
     DataNode spyDN = spy(dn);
     doThrow(new IOException()).
-       when(spyDN).initReplicaRecovery(any(RecoveringBlock.class));
+        when(spyDN).initReplicaRecovery(any(RecoveringBlock.class));
     Daemon d = spyDN.recoverBlocks("fake NN", initRecoveringBlocks());
     d.join();
-    verify(spyDN, never()).syncBlock(
-        any(RecoveringBlock.class), anyListOf(BlockRecord.class));
+    verify(spyDN, never())
+        .syncBlock(any(RecoveringBlock.class), anyListOf(BlockRecord.class));
   }
 
   /**
    * BlockRecoveryFI_07. max replica length from all DNs is zero.
    *
-   * @throws IOException in case of an error
+   * @throws IOException
+   *     in case of an error
    */
   @Test
   public void testZeroLenReplicas() throws IOException, InterruptedException {
-    if(LOG.isDebugEnabled()) {
+    if (LOG.isDebugEnabled()) {
       LOG.debug("Running " + GenericTestUtils.getMethodName());
     }
     DataNode spyDN = spy(dn);
@@ -479,15 +554,16 @@ public class TestBlockRecovery {
     Daemon d = spyDN.recoverBlocks("fake NN", initRecoveringBlocks());
     d.join();
     DatanodeProtocol dnP = dn.getActiveNamenodeForBP(POOL_ID);
-    verify(dnP).commitBlockSynchronization(
-        block, RECOVERY_ID, 0, true, true, DatanodeID.EMPTY_ARRAY, null);
+    verify(dnP).commitBlockSynchronization(block, RECOVERY_ID, 0, true, true,
+        DatanodeID.EMPTY_ARRAY, null);
   }
 
-  private List<BlockRecord> initBlockRecords(DataNode spyDN) throws IOException {
+  private List<BlockRecord> initBlockRecords(DataNode spyDN)
+      throws IOException {
     List<BlockRecord> blocks = new ArrayList<BlockRecord>(1);
-    DatanodeRegistration dnR = dn.getDNRegistrationForBP(block.getBlockPoolId());
-    BlockRecord blockRecord = new BlockRecord(
-        new DatanodeID(dnR), spyDN,
+    DatanodeRegistration dnR =
+        dn.getDNRegistrationForBP(block.getBlockPoolId());
+    BlockRecord blockRecord = new BlockRecord(new DatanodeID(dnR), spyDN,
         new ReplicaRecoveryInfo(block.getBlockId(), block.getNumBytes(),
             block.getGenerationStamp(), ReplicaState.FINALIZED));
     blocks.add(blockRecord);
@@ -495,21 +571,22 @@ public class TestBlockRecovery {
   }
 
   private final static RecoveringBlock rBlock =
-    new RecoveringBlock(block, null, RECOVERY_ID);
+      new RecoveringBlock(block, null, RECOVERY_ID);
 
   /**
    * BlockRecoveryFI_09. some/all DNs failed to update replicas.
    *
-   * @throws IOException in case of an error
+   * @throws IOException
+   *     in case of an error
    */
   @Test
   public void testFailedReplicaUpdate() throws IOException {
-    if(LOG.isDebugEnabled()) {
+    if (LOG.isDebugEnabled()) {
       LOG.debug("Running " + GenericTestUtils.getMethodName());
     }
     DataNode spyDN = spy(dn);
-    doThrow(new IOException()).when(spyDN).updateReplicaUnderRecovery(
-        block, RECOVERY_ID, block.getNumBytes());
+    doThrow(new IOException()).when(spyDN)
+        .updateReplicaUnderRecovery(block, RECOVERY_ID, block.getNumBytes());
     try {
       spyDN.syncBlock(rBlock, initBlockRecords(spyDN));
       fail("Sync should fail");
@@ -521,11 +598,12 @@ public class TestBlockRecovery {
   /**
    * BlockRecoveryFI_10. DN has no ReplicaUnderRecovery.
    *
-   * @throws IOException in case of an error
+   * @throws IOException
+   *     in case of an error
    */
   @Test
   public void testNoReplicaUnderRecovery() throws IOException {
-    if(LOG.isDebugEnabled()) {
+    if (LOG.isDebugEnabled()) {
       LOG.debug("Running " + GenericTestUtils.getMethodName());
     }
     dn.data.createRbw(block);
@@ -536,19 +614,21 @@ public class TestBlockRecovery {
       e.getMessage().startsWith("Cannot recover ");
     }
     DatanodeProtocol namenode = dn.getActiveNamenodeForBP(POOL_ID);
-    verify(namenode, never()).commitBlockSynchronization(
-        any(ExtendedBlock.class), anyLong(), anyLong(), anyBoolean(),
-        anyBoolean(), any(DatanodeID[].class), any(String[].class));
+    verify(namenode, never())
+        .commitBlockSynchronization(any(ExtendedBlock.class), anyLong(),
+            anyLong(), anyBoolean(), anyBoolean(), any(DatanodeID[].class),
+            any(String[].class));
   }
 
   /**
    * BlockRecoveryFI_11. a replica's recovery id does not match new GS.
    *
-   * @throws IOException in case of an error
+   * @throws IOException
+   *     in case of an error
    */
   @Test
   public void testNotMatchedReplicaID() throws IOException {
-    if(LOG.isDebugEnabled()) {
+    if (LOG.isDebugEnabled()) {
       LOG.debug("Running " + GenericTestUtils.getMethodName());
     }
     ReplicaInPipelineInterface replicaInfo = dn.data.createRbw(block);
@@ -557,7 +637,8 @@ public class TestBlockRecovery {
       streams = replicaInfo.createStreams(true,
           DataChecksum.newDataChecksum(DataChecksum.Type.CRC32, 512));
       streams.getChecksumOut().write('a');
-      dn.data.initReplicaRecovery(new RecoveringBlock(block, null, RECOVERY_ID+1));
+      dn.data.initReplicaRecovery(
+          new RecoveringBlock(block, null, RECOVERY_ID + 1));
       try {
         dn.syncBlock(rBlock, initBlockRecords(dn));
         fail("Sync should fail");
@@ -565,9 +646,10 @@ public class TestBlockRecovery {
         e.getMessage().startsWith("Cannot recover ");
       }
       DatanodeProtocol namenode = dn.getActiveNamenodeForBP(POOL_ID);
-      verify(namenode, never()).commitBlockSynchronization(
-          any(ExtendedBlock.class), anyLong(), anyLong(), anyBoolean(),
-          anyBoolean(), any(DatanodeID[].class), any(String[].class));
+      verify(namenode, never())
+          .commitBlockSynchronization(any(ExtendedBlock.class), anyLong(),
+              anyLong(), anyBoolean(), anyBoolean(), any(DatanodeID[].class),
+              any(String[].class));
     } finally {
       streams.close();
     }
@@ -575,15 +657,15 @@ public class TestBlockRecovery {
   
   /**
    * Test to verify the race between finalizeBlock and Lease recovery
-   * 
+   *
    * @throws Exception
    */
   @Test(timeout = 20000)
-  public void testRaceBetweenReplicaRecoveryAndFinalizeBlock() throws Exception {
+  public void testRaceBetweenReplicaRecoveryAndFinalizeBlock()
+      throws Exception {
     tearDown();// Stop the Mocked DN started in startup()
 
     Configuration conf = new HdfsConfiguration();
-    conf.set(DFSConfigKeys.DFS_DATANODE_XCEIVER_STOP_TIMEOUT_MILLIS_KEY, "1000");
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
         .nnTopology(MiniDFSNNTopology.simpleSingleNN(8020, 50070))
         .numDataNodes(1).build();
@@ -605,9 +687,9 @@ public class TestBlockRecovery {
         public void run() {
           try {
             DatanodeInfo[] locations = block.getLocations();
-            final RecoveringBlock recoveringBlock = new RecoveringBlock(
-                block.getBlock(), locations, block.getBlock()
-                    .getGenerationStamp() + 1);
+            final RecoveringBlock recoveringBlock =
+                new RecoveringBlock(block.getBlock(), locations,
+                    block.getBlock().getGenerationStamp() + 1);
             synchronized (dataNode.data) {
               Thread.sleep(2000);
               dataNode.initReplicaRecovery(recoveringBlock);
@@ -629,8 +711,8 @@ public class TestBlockRecovery {
       Assert.assertTrue("Recovery should be initiated successfully",
           recoveryInitResult.get());
       
-      dataNode.updateReplicaUnderRecovery(block.getBlock(), block.getBlock()
-          .getGenerationStamp() + 1, block.getBlockSize());
+      dataNode.updateReplicaUnderRecovery(block.getBlock(),
+          block.getBlock().getGenerationStamp() + 1, block.getBlockSize());
     } finally {
       if (null != cluster) {
         cluster.shutdown();

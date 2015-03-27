@@ -18,13 +18,15 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.ahs;
 
-import org.apache.hadoop.yarn.event.AbstractEvent;
+import io.hops.ha.common.TransactionState;
+import org.apache.hadoop.yarn.event.AbstractEventTransaction;
 
-public class WritingApplicationHistoryEvent extends
-    AbstractEvent<WritingHistoryEventType> {
+public class WritingApplicationHistoryEvent
+    extends AbstractEventTransaction<WritingHistoryEventType> {
 
-  public WritingApplicationHistoryEvent(WritingHistoryEventType type) {
-    super(type);
+  public WritingApplicationHistoryEvent(WritingHistoryEventType type,
+      TransactionState transactionState) {
+    super(type, transactionState);
   }
 
 }

@@ -18,17 +18,16 @@
 
 package org.apache.hadoop.yarn.security;
 
-import java.io.IOException;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.security.authorize.AccessControlList;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.authorize.AccessControlList;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
+
+import java.io.IOException;
 
 @Private
 public class AdminACLsManager {
@@ -59,17 +58,18 @@ public class AdminACLsManager {
   /**
    * Constructs and initializes this AdminACLsManager
    *
-   * @param conf configuration for this object to use
+   * @param conf
+   *     configuration for this object to use
    */
   public AdminACLsManager(Configuration conf) {
 
-    this.adminAcl = new AccessControlList(conf.get(
-          YarnConfiguration.YARN_ADMIN_ACL,
-          YarnConfiguration.DEFAULT_YARN_ADMIN_ACL));
+    this.adminAcl = new AccessControlList(
+        conf.get(YarnConfiguration.YARN_ADMIN_ACL,
+            YarnConfiguration.DEFAULT_YARN_ADMIN_ACL));
     try {
       owner = UserGroupInformation.getCurrentUser();
       adminAcl.addUser(owner.getShortUserName());
-    } catch (IOException e){
+    } catch (IOException e) {
       LOG.warn("Could not add current user to admin:" + e);
       throw new YarnRuntimeException(e);
     }
@@ -90,9 +90,9 @@ public class AdminACLsManager {
   /**
    * Returns whether ACLs are enabled
    *
+   * @return <tt>true</tt> if ACLs are enabled
    * @see YarnConfiguration#YARN_ACL_ENABLE
    * @see YarnConfiguration#DEFAULT_YARN_ACL_ENABLE
-   * @return <tt>true</tt> if ACLs are enabled
    */
   public boolean areACLsEnabled() {
     return aclsEnabled;
@@ -110,9 +110,10 @@ public class AdminACLsManager {
   /**
    * Returns whether the specified user/group is an administrator
    *
-   * @param callerUGI user/group to to check
+   * @param callerUGI
+   *     user/group to to check
    * @return <tt>true</tt> if the UserGroupInformation specified
-   *         is a member of the access control list for administrators
+   * is a member of the access control list for administrators
    */
   public boolean isAdmin(UserGroupInformation callerUGI) {
     return adminAcl.isUserAllowed(callerUGI);
@@ -121,11 +122,11 @@ public class AdminACLsManager {
   /**
    * Returns whether the specified user/group has administrator access
    *
-   * @param callerUGI user/group to to check
+   * @param callerUGI
+   *     user/group to to check
    * @return <tt>true</tt> if the UserGroupInformation specified
-   *         is a member of the access control list for administrators
-   *         and ACLs are enabled for this cluster
-   *
+   * is a member of the access control list for administrators
+   * and ACLs are enabled for this cluster
    * @see #getAdminAcl
    * @see #areACLsEnabled
    */

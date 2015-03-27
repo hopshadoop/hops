@@ -18,18 +18,18 @@
 
 package org.apache.hadoop.lib.wsrs;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
+import org.junit.Test;
 
 import java.util.regex.Pattern;
 
-import org.junit.Test;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 
 public class TestParam {
 
-  private <T> void test(Param<T> param, String name,
-                   String domain, T defaultValue, T validValue,
-                   String invalidStrValue, String outOfRangeValue) throws Exception {
+  private <T> void test(Param<T> param, String name, String domain,
+      T defaultValue, T validValue, String invalidStrValue,
+      String outOfRangeValue) throws Exception {
 
     assertEquals(name, param.getName());
     assertEquals(domain, param.getDomain());
@@ -57,7 +57,7 @@ public class TestParam {
         fail();
       }
     }
-   }
+  }
 
   @Test
   public void testBoolean() throws Exception {
@@ -78,19 +78,20 @@ public class TestParam {
     Param<Short> param = new ShortParam("S", (short) 1) {
     };
     test(param, "S", "a short", (short) 1, (short) 2, "x",
-         "" + ((int)Short.MAX_VALUE + 1));
+        "" + ((int) Short.MAX_VALUE + 1));
 
     param = new ShortParam("S", (short) 1, 8) {
     };
 
-    assertEquals(new Short((short)01777), param.parse("01777"));
+    assertEquals(new Short((short) 01777), param.parse("01777"));
   }
 
   @Test
   public void testInteger() throws Exception {
     Param<Integer> param = new IntegerParam("I", 1) {
     };
-    test(param, "I", "an integer", 1, 2, "x", "" + ((long)Integer.MAX_VALUE + 1));
+    test(param, "I", "an integer", 1, 2, "x",
+        "" + ((long) Integer.MAX_VALUE + 1));
   }
 
   @Test
@@ -101,7 +102,8 @@ public class TestParam {
   }
 
   public static enum ENUM {
-    FOO, BAR
+    FOO,
+    BAR
   }
 
   @Test

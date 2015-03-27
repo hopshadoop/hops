@@ -17,10 +17,10 @@
  */
 package org.apache.hadoop.fs;
 
-import java.io.IOException;
-
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+
+import java.io.IOException;
 
 /**
  * Wrapper for {@link BlockLocation} that also adds {@link VolumeId} volume
@@ -35,14 +35,14 @@ public class BlockStorageLocation extends BlockLocation {
   public BlockStorageLocation(BlockLocation loc, VolumeId[] volumeIds)
       throws IOException {
     // Initialize with data from passed in BlockLocation
-    super(loc.getNames(), loc.getHosts(), loc.getTopologyPaths(), loc
-        .getOffset(), loc.getLength(), loc.isCorrupt());
+    super(loc.getNames(), loc.getHosts(), loc.getTopologyPaths(),
+        loc.getOffset(), loc.getLength(), loc.isCorrupt());
     this.volumeIds = volumeIds;
   }
 
   /**
    * Gets the list of {@link VolumeId} corresponding to the block's replicas.
-   * 
+   *
    * @return volumeIds list of VolumeId for the block's replicas
    */
   public VolumeId[] getVolumeIds() {

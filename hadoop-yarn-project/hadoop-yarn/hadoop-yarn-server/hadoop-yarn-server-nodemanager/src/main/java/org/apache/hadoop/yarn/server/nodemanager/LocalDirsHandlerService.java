@@ -18,13 +18,6 @@
 
 package org.apache.hadoop.yarn.server.nodemanager;
 
-import java.io.IOException;
-import java.net.URI;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Timer;
-import java.util.TimerTask;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -37,6 +30,13 @@ import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 
+import java.io.IOException;
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
+
 /**
  * The class which provides functionality of checking the health of the local
  * directories of a node. This specifically manages nodemanager-local-dirs and
@@ -46,7 +46,9 @@ public class LocalDirsHandlerService extends AbstractService {
 
   private static Log LOG = LogFactory.getLog(LocalDirsHandlerService.class);
 
-  /** Timer used to schedule disk health monitoring code execution */
+  /**
+   * Timer used to schedule disk health monitoring code execution
+   */
   private Timer dirsHandlerScheduler;
   private long diskHealthCheckInterval;
   private boolean isDiskHealthCheckerEnabled;
@@ -58,26 +60,32 @@ public class LocalDirsHandlerService extends AbstractService {
 
   private MonitoringTimerTask monitoringTimerTask;
 
-  /** Local dirs to store localized files in */
+  /**
+   * Local dirs to store localized files in
+   */
   private DirectoryCollection localDirs = null;
 
-  /** storage for container logs*/
+  /**
+   * storage for container logs
+   */
   private DirectoryCollection logDirs = null;
 
   /**
    * Everybody should go through this LocalDirAllocator object for read/write
    * of any local path corresponding to {@link YarnConfiguration#NM_LOCAL_DIRS}
    * instead of creating his/her own LocalDirAllocator objects
-   */ 
+   */
   private LocalDirAllocator localDirsAllocator;
   /**
    * Everybody should go through this LocalDirAllocator object for read/write
    * of any local path corresponding to {@link YarnConfiguration#NM_LOG_DIRS}
    * instead of creating his/her own LocalDirAllocator objects
-   */ 
+   */
   private LocalDirAllocator logDirsAllocator;
 
-  /** when disk health checking code was last run */
+  /**
+   * when disk health checking code was last run
+   */
   private long lastDisksCheckTime;
   
   private static String FILE_SCHEME = "file";
@@ -89,24 +97,20 @@ public class LocalDirsHandlerService extends AbstractService {
   private final class MonitoringTimerTask extends TimerTask {
 
     public MonitoringTimerTask(Configuration conf) throws YarnRuntimeException {
-      float maxUsableSpacePercentagePerDisk =
-          conf.getFloat(
-            YarnConfiguration.NM_MAX_PER_DISK_UTILIZATION_PERCENTAGE,
-            YarnConfiguration.DEFAULT_NM_MAX_PER_DISK_UTILIZATION_PERCENTAGE);
+      float maxUsableSpacePercentagePerDisk = conf.getFloat(
+          YarnConfiguration.NM_MAX_PER_DISK_UTILIZATION_PERCENTAGE,
+          YarnConfiguration.DEFAULT_NM_MAX_PER_DISK_UTILIZATION_PERCENTAGE);
       long minFreeSpacePerDiskMB =
           conf.getLong(YarnConfiguration.NM_MIN_PER_DISK_FREE_SPACE_MB,
-            YarnConfiguration.DEFAULT_NM_MIN_PER_DISK_FREE_SPACE_MB);
-      localDirs =
-          new DirectoryCollection(
-            validatePaths(conf
-              .getTrimmedStrings(YarnConfiguration.NM_LOCAL_DIRS)),
-            maxUsableSpacePercentagePerDisk, minFreeSpacePerDiskMB);
-      logDirs =
-          new DirectoryCollection(
-            validatePaths(conf.getTrimmedStrings(YarnConfiguration.NM_LOG_DIRS)),
-            maxUsableSpacePercentagePerDisk, minFreeSpacePerDiskMB);
-      localDirsAllocator = new LocalDirAllocator(
-          YarnConfiguration.NM_LOCAL_DIRS);
+              YarnConfiguration.DEFAULT_NM_MIN_PER_DISK_FREE_SPACE_MB);
+      localDirs = new DirectoryCollection(validatePaths(
+          conf.getTrimmedStrings(YarnConfiguration.NM_LOCAL_DIRS)),
+          maxUsableSpacePercentagePerDisk, minFreeSpacePerDiskMB);
+      logDirs = new DirectoryCollection(
+          validatePaths(conf.getTrimmedStrings(YarnConfiguration.NM_LOG_DIRS)),
+          maxUsableSpacePercentagePerDisk, minFreeSpacePerDiskMB);
+      localDirsAllocator =
+          new LocalDirAllocator(YarnConfiguration.NM_LOCAL_DIRS);
       logDirsAllocator = new LocalDirAllocator(YarnConfiguration.NM_LOG_DIRS);
     }
 
@@ -122,21 +126,20 @@ public class LocalDirsHandlerService extends AbstractService {
 
   /**
    * Method which initializes the timertask and its interval time.
-   * 
    */
   @Override
   protected void serviceInit(Configuration config) throws Exception {
     // Clone the configuration as we may do modifications to dirs-list
     Configuration conf = new Configuration(config);
-    diskHealthCheckInterval = conf.getLong(
-        YarnConfiguration.NM_DISK_HEALTH_CHECK_INTERVAL_MS,
-        YarnConfiguration.DEFAULT_NM_DISK_HEALTH_CHECK_INTERVAL_MS);
+    diskHealthCheckInterval =
+        conf.getLong(YarnConfiguration.NM_DISK_HEALTH_CHECK_INTERVAL_MS,
+            YarnConfiguration.DEFAULT_NM_DISK_HEALTH_CHECK_INTERVAL_MS);
     monitoringTimerTask = new MonitoringTimerTask(conf);
-    isDiskHealthCheckerEnabled = conf.getBoolean(
-        YarnConfiguration.NM_DISK_HEALTH_CHECK_ENABLE, true);
-    minNeededHealthyDisksFactor = conf.getFloat(
-        YarnConfiguration.NM_MIN_HEALTHY_DISKS_FRACTION,
-        YarnConfiguration.DEFAULT_NM_MIN_HEALTHY_DISKS_FRACTION);
+    isDiskHealthCheckerEnabled =
+        conf.getBoolean(YarnConfiguration.NM_DISK_HEALTH_CHECK_ENABLE, true);
+    minNeededHealthyDisksFactor =
+        conf.getFloat(YarnConfiguration.NM_MIN_HEALTHY_DISKS_FRACTION,
+            YarnConfiguration.DEFAULT_NM_MIN_HEALTHY_DISKS_FRACTION);
     lastDisksCheckTime = System.currentTimeMillis();
     super.serviceInit(conf);
 
@@ -146,7 +149,7 @@ public class LocalDirsHandlerService extends AbstractService {
     } catch (IOException e) {
       throw new YarnRuntimeException("Unable to get the local filesystem", e);
     }
-    FsPermission perm = new FsPermission((short)0755);
+    FsPermission perm = new FsPermission((short) 0755);
     boolean createSucceeded = localDirs.createNonExistentDirs(localFs, perm);
     createSucceeded &= logDirs.createNonExistentDirs(localFs, perm);
     if (!createSucceeded) {
@@ -165,8 +168,9 @@ public class LocalDirsHandlerService extends AbstractService {
   protected void serviceStart() throws Exception {
     if (isDiskHealthCheckerEnabled) {
       dirsHandlerScheduler = new Timer("DiskHealthMonitor-Timer", true);
-      dirsHandlerScheduler.scheduleAtFixedRate(monitoringTimerTask,
-          diskHealthCheckInterval, diskHealthCheckInterval);
+      dirsHandlerScheduler
+          .scheduleAtFixedRate(monitoringTimerTask, diskHealthCheckInterval,
+              diskHealthCheckInterval);
     }
     super.serviceStart();
   }
@@ -207,18 +211,17 @@ public class LocalDirsHandlerService extends AbstractService {
     StringBuilder report = new StringBuilder();
     List<String> failedLocalDirsList = localDirs.getFailedDirs();
     List<String> failedLogDirsList = logDirs.getFailedDirs();
-    int numLocalDirs = localDirs.getGoodDirs().size()
-        + failedLocalDirsList.size();
+    int numLocalDirs =
+        localDirs.getGoodDirs().size() + failedLocalDirsList.size();
     int numLogDirs = logDirs.getGoodDirs().size() + failedLogDirsList.size();
     if (!failedLocalDirsList.isEmpty()) {
-      report.append(failedLocalDirsList.size() + "/" + numLocalDirs
-          + " local-dirs turned bad: "
-          + StringUtils.join(",", failedLocalDirsList) + ";");
+      report.append(failedLocalDirsList.size() + "/" + numLocalDirs +
+          " local-dirs turned bad: " +
+          StringUtils.join(",", failedLocalDirsList) + ";");
     }
     if (!failedLogDirsList.isEmpty()) {
-      report.append(failedLogDirsList.size() + "/" + numLogDirs
-          + " log-dirs turned bad: "
-          + StringUtils.join(",", failedLogDirsList));
+      report.append(failedLogDirsList.size() + "/" + numLogDirs +
+          " log-dirs turned bad: " + StringUtils.join(",", failedLogDirsList));
     }
     return report.toString();
   }
@@ -228,6 +231,7 @@ public class LocalDirsHandlerService extends AbstractService {
    * be considered healthy in terms of disks is configured using
    * {@link YarnConfiguration#NM_MIN_HEALTHY_DISKS_FRACTION}, with a default
    * value of {@link YarnConfiguration#DEFAULT_NM_MIN_HEALTHY_DISKS_FRACTION}.
+   *
    * @return <em>false</em> if either (a) more than the allowed percentage of
    * nm-local-dirs failed or (b) more than the allowed percentage of
    * nm-log-dirs failed.
@@ -240,14 +244,14 @@ public class LocalDirsHandlerService extends AbstractService {
     int goodDirs = getLocalDirs().size();
     int failedDirs = localDirs.getFailedDirs().size();
     int totalConfiguredDirs = goodDirs + failedDirs;
-    if (goodDirs/(float)totalConfiguredDirs < minNeededHealthyDisksFactor) {
+    if (goodDirs / (float) totalConfiguredDirs < minNeededHealthyDisksFactor) {
       return false; // Not enough healthy local-dirs
     }
 
     goodDirs = getLogDirs().size();
     failedDirs = logDirs.getFailedDirs().size();
     totalConfiguredDirs = goodDirs + failedDirs;
-    if (goodDirs/(float)totalConfiguredDirs < minNeededHealthyDisksFactor) {
+    if (goodDirs / (float) totalConfiguredDirs < minNeededHealthyDisksFactor) {
       return false; // Not enough healthy log-dirs
     }
 
@@ -267,10 +271,10 @@ public class LocalDirsHandlerService extends AbstractService {
     Configuration conf = getConfig();
     List<String> localDirs = getLocalDirs();
     conf.setStrings(YarnConfiguration.NM_LOCAL_DIRS,
-                    localDirs.toArray(new String[localDirs.size()]));
+        localDirs.toArray(new String[localDirs.size()]));
     List<String> logDirs = getLogDirs();
     conf.setStrings(YarnConfiguration.NM_LOG_DIRS,
-                      logDirs.toArray(new String[logDirs.size()]));
+        logDirs.toArray(new String[logDirs.size()]));
     if (!areDisksHealthy()) {
       // Just log.
       LOG.error("Most of the disks failed. " + getDisksHealthReport());
@@ -278,18 +282,18 @@ public class LocalDirsHandlerService extends AbstractService {
   }
 
   private void checkDirs() {
-      boolean newFailure = false;
-      if (localDirs.checkDirs()) {
-        newFailure = true;
-      }
-      if (logDirs.checkDirs()) {
-        newFailure = true;
-      }
+    boolean newFailure = false;
+    if (localDirs.checkDirs()) {
+      newFailure = true;
+    }
+    if (logDirs.checkDirs()) {
+      newFailure = true;
+    }
 
-      if (newFailure) {
-        updateDirsAfterFailure();
-      }
-      lastDisksCheckTime = System.currentTimeMillis();
+    if (newFailure) {
+      updateDirsAfterFailure();
+    }
+    lastDisksCheckTime = System.currentTimeMillis();
   }
 
   public Path getLocalPathForWrite(String pathStr) throws IOException {
@@ -298,14 +302,15 @@ public class LocalDirsHandlerService extends AbstractService {
 
   public Path getLocalPathForWrite(String pathStr, long size,
       boolean checkWrite) throws IOException {
-    return localDirsAllocator.getLocalPathForWrite(pathStr, size, getConfig(),
-                                                   checkWrite);
+    return localDirsAllocator
+        .getLocalPathForWrite(pathStr, size, getConfig(), checkWrite);
   }
 
   public Path getLogPathForWrite(String pathStr, boolean checkWrite)
       throws IOException {
-    return logDirsAllocator.getLocalPathForWrite(pathStr,
-        LocalDirAllocator.SIZE_UNKNOWN, getConfig(), checkWrite);
+    return logDirsAllocator
+        .getLocalPathForWrite(pathStr, LocalDirAllocator.SIZE_UNKNOWN,
+            getConfig(), checkWrite);
   }
 
   public Path getLogPathToRead(String pathStr) throws IOException {
@@ -317,21 +322,21 @@ public class LocalDirsHandlerService extends AbstractService {
     for (int i = 0; i < paths.length; ++i) {
       try {
         URI uriPath = (new Path(paths[i])).toUri();
-        if (uriPath.getScheme() == null
-            || uriPath.getScheme().equals(FILE_SCHEME)) {
+        if (uriPath.getScheme() == null ||
+            uriPath.getScheme().equals(FILE_SCHEME)) {
           validPaths.add(new Path(uriPath.getPath()).toString());
         } else {
-          LOG.warn(paths[i] + " is not a valid path. Path should be with "
-              + FILE_SCHEME + " scheme or without scheme");
-          throw new YarnRuntimeException(paths[i]
-              + " is not a valid path. Path should be with " + FILE_SCHEME
-              + " scheme or without scheme");
+          LOG.warn(paths[i] + " is not a valid path. Path should be with " +
+              FILE_SCHEME + " scheme or without scheme");
+          throw new YarnRuntimeException(
+              paths[i] + " is not a valid path. Path should be with " +
+                  FILE_SCHEME + " scheme or without scheme");
         }
       } catch (IllegalArgumentException e) {
         LOG.warn(e.getMessage());
-        throw new YarnRuntimeException(paths[i]
-            + " is not a valid path. Path should be with " + FILE_SCHEME
-            + " scheme or without scheme");
+        throw new YarnRuntimeException(
+            paths[i] + " is not a valid path. Path should be with " +
+                FILE_SCHEME + " scheme or without scheme");
       }
     }
     String[] arrValidPaths = new String[validPaths.size()];

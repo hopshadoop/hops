@@ -62,6 +62,8 @@ import org.apache.hadoop.yarn.sls.utils.SLSUtils;
 import org.apache.log4j.Logger;
 import org.codehaus.jackson.JsonFactory;
 import org.codehaus.jackson.map.ObjectMapper;
+import io.hops.metadata.util.RMStorageFactory;
+import io.hops.metadata.util.YarnAPIStorageFactory;
 
 public class SLSRunner {
   // RM, Runner
@@ -154,6 +156,8 @@ public class SLSRunner {
   
   private void startRM() throws IOException, ClassNotFoundException {
     Configuration rmConf = new YarnConfiguration();
+    YarnAPIStorageFactory.setConfiguration(conf);
+    RMStorageFactory.setConfiguration(conf);
     String schedulerClass = rmConf.get(YarnConfiguration.RM_SCHEDULER);
     rmConf.set(SLSConfiguration.RM_SCHEDULER, schedulerClass);
     rmConf.set(YarnConfiguration.RM_SCHEDULER,
@@ -209,7 +213,7 @@ public class SLSRunner {
     long startTimeMS = System.currentTimeMillis();
     while (true) {
       int numRunningNodes = 0;
-      for (RMNode node : rm.getRMContext().getRMNodes().values()) {
+      for (RMNode node : rm.getRMContext().getActiveRMNodes().values()) {
         if (node.getState() == NodeState.RUNNING) {
           numRunningNodes ++;
         }

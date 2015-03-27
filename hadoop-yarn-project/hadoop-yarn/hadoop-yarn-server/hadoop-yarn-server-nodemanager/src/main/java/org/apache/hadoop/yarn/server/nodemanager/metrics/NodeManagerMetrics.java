@@ -26,20 +26,26 @@ import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
 import org.apache.hadoop.metrics2.source.JvmMetrics;
 import org.apache.hadoop.yarn.api.records.Resource;
 
-@Metrics(about="Metrics for node manager", context="yarn")
+@Metrics(about = "Metrics for node manager", context = "yarn")
 public class NodeManagerMetrics {
-  @Metric MutableCounterInt containersLaunched;
-  @Metric MutableCounterInt containersCompleted;
-  @Metric MutableCounterInt containersFailed;
-  @Metric MutableCounterInt containersKilled;
+  @Metric
+  MutableCounterInt containersLaunched;
+  @Metric
+  MutableCounterInt containersCompleted;
+  @Metric
+  MutableCounterInt containersFailed;
+  @Metric
+  MutableCounterInt containersKilled;
   @Metric("# of initializing containers")
-      MutableGaugeInt containersIniting;
-  @Metric MutableGaugeInt containersRunning;
+  MutableGaugeInt containersIniting;
+  @Metric
+  MutableGaugeInt containersRunning;
   @Metric("Current allocated memory in GB")
-      MutableGaugeInt allocatedGB;
+  MutableGaugeInt allocatedGB;
   @Metric("Current # of allocated containers")
-      MutableGaugeInt allocatedContainers;
-  @Metric MutableGaugeInt availableGB;
+  MutableGaugeInt allocatedContainers;
+  @Metric
+  MutableGaugeInt availableGB;
 
   public static NodeManagerMetrics create() {
     return create(DefaultMetricsSystem.instance());

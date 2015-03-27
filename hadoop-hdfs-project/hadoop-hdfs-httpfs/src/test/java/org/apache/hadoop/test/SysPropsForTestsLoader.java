@@ -30,11 +30,15 @@ public class SysPropsForTestsLoader {
 
   static {
     try {
-      String testFileName = System.getProperty(TEST_PROPERTIES_PROP, "test.properties");
-      File currentDir = new File(testFileName).getAbsoluteFile().getParentFile();
+      String testFileName =
+          System.getProperty(TEST_PROPERTIES_PROP, "test.properties");
+      File currentDir =
+          new File(testFileName).getAbsoluteFile().getParentFile();
       File testFile = new File(currentDir, testFileName);
       while (currentDir != null && !testFile.exists()) {
-        testFile = new File(testFile.getAbsoluteFile().getParentFile().getParentFile(), testFileName);
+        testFile =
+            new File(testFile.getAbsoluteFile().getParentFile().getParentFile(),
+                testFileName);
         currentDir = currentDir.getParentFile();
         if (currentDir != null) {
           testFile = new File(currentDir, testFileName);
@@ -43,17 +47,20 @@ public class SysPropsForTestsLoader {
 
       if (testFile.exists()) {
         System.out.println();
-        System.out.println(">>> " + TEST_PROPERTIES_PROP + " : " + testFile.getAbsolutePath());
+        System.out.println(
+            ">>> " + TEST_PROPERTIES_PROP + " : " + testFile.getAbsolutePath());
         Properties testProperties = new Properties();
         testProperties.load(new FileReader(testFile));
         for (Map.Entry entry : testProperties.entrySet()) {
           if (!System.getProperties().containsKey(entry.getKey())) {
-            System.setProperty((String) entry.getKey(), (String) entry.getValue());
+            System.setProperty((String) entry.getKey(),
+                (String) entry.getValue());
           }
         }
       } else if (System.getProperty(TEST_PROPERTIES_PROP) != null) {
-        System.err.println(MessageFormat.format("Specified 'test.properties' file does not exist [{0}]",
-                                                System.getProperty(TEST_PROPERTIES_PROP)));
+        System.err.println(MessageFormat
+            .format("Specified 'test.properties' file does not exist [{0}]",
+                System.getProperty(TEST_PROPERTIES_PROP)));
         System.exit(-1);
 
       } else {

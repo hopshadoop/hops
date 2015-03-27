@@ -17,29 +17,26 @@
  */
 package org.apache.hadoop.hdfs.util;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-
+import com.google.common.base.Charsets;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.io.IOUtils;
 
-import com.google.common.base.Charsets;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
 
 /**
  * Class that represents a file on disk which persistently stores
  * a single <code>long</code> value. The file is updated atomically
- * and durably (i.e fsynced). 
+ * and durably (i.e fsynced).
  */
 @InterfaceAudience.Private
 public class PersistentLongFile {
-  private static final Log LOG = LogFactory.getLog(
-      PersistentLongFile.class);
+  private static final Log LOG = LogFactory.getLog(PersistentLongFile.class);
 
   private final File file;
   private final long defaultVal;
@@ -71,9 +68,12 @@ public class PersistentLongFile {
   /**
    * Atomically write the given value to the given file, including fsyncing.
    *
-   * @param file destination file
-   * @param val value to write
-   * @throws IOException if the file cannot be written
+   * @param file
+   *     destination file
+   * @param val
+   *     value to write
+   * @throws IOException
+   *     if the file cannot be written
    */
   public static void writeFile(File file, long val) throws IOException {
     AtomicFileOutputStream fos = new AtomicFileOutputStream(file);
@@ -84,7 +84,7 @@ public class PersistentLongFile {
       fos = null;
     } finally {
       if (fos != null) {
-        fos.abort();        
+        fos.abort();
       }
     }
   }
@@ -92,9 +92,8 @@ public class PersistentLongFile {
   public static long readFile(File file, long defaultVal) throws IOException {
     long val = defaultVal;
     if (file.exists()) {
-      BufferedReader br = 
-          new BufferedReader(new InputStreamReader(new FileInputStream(
-              file), Charsets.UTF_8));
+      BufferedReader br = new BufferedReader(
+          new InputStreamReader(new FileInputStream(file), Charsets.UTF_8));
       try {
         val = Long.valueOf(br.readLine());
         br.close();

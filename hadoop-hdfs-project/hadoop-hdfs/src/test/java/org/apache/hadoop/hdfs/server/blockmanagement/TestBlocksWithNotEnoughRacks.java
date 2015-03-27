@@ -18,11 +18,6 @@
 
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
-import java.util.ArrayList;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.logging.impl.Log4JLogger;
@@ -42,11 +37,19 @@ import org.apache.hadoop.hdfs.server.namenode.NameNodeAdapter;
 import org.apache.log4j.Level;
 import org.junit.Test;
 
+import java.util.ArrayList;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
 public class TestBlocksWithNotEnoughRacks {
-  public static final Log LOG = LogFactory.getLog(TestBlocksWithNotEnoughRacks.class);
+  public static final Log LOG =
+      LogFactory.getLog(TestBlocksWithNotEnoughRacks.class);
+
   static {
-    ((Log4JLogger)LogFactory.getLog(FSNamesystem.class)).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger)LOG).getLogger().setLevel(Level.ALL);
+    ((Log4JLogger) LogFactory.getLog(FSNamesystem.class)).getLogger()
+        .setLevel(Level.ALL);
+    ((Log4JLogger) LOG).getLogger().setLevel(Level.ALL);
   }
 
   /*
@@ -67,7 +70,8 @@ public class TestBlocksWithNotEnoughRacks {
 
     // Have the NN check for pending replications every second so it
     // quickly schedules additional replicas as they are identified.
-    conf.setInt(DFSConfigKeys.DFS_NAMENODE_REPLICATION_PENDING_TIMEOUT_SEC_KEY, 1);
+    conf.setInt(DFSConfigKeys.DFS_NAMENODE_REPLICATION_PENDING_TIMEOUT_SEC_KEY,
+        1);
 
     // The DNs report blocks every second.
     conf.setLong(DFSConfigKeys.DFS_BLOCKREPORT_INTERVAL_MSEC_KEY, 1000L);
@@ -89,8 +93,9 @@ public class TestBlocksWithNotEnoughRacks {
     final Path filePath = new Path("/testFile");
     // All datanodes are on the same rack
     String racks[] = {"/rack1", "/rack1", "/rack1"};
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-      .numDataNodes(racks.length).racks(racks).build();
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(racks.length).racks(racks)
+            .build();
 
     try {
       // Create a file with one block with a replication factor of 3
@@ -122,8 +127,9 @@ public class TestBlocksWithNotEnoughRacks {
     final Path filePath = new Path("/testFile");
 
     String racks[] = {"/rack1", "/rack1", "/rack1", "/rack2"};
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-      .numDataNodes(racks.length).racks(racks).build();
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(racks.length).racks(racks)
+            .build();
     final FSNamesystem ns = cluster.getNameNode().getNamesystem();
 
     try {
@@ -156,8 +162,9 @@ public class TestBlocksWithNotEnoughRacks {
     final Path filePath = new Path("/testFile");
     // All datanodes are on the same rack
     String racks[] = {"/rack1", "/rack1", "/rack1", "/rack1", "/rack1"};
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-      .numDataNodes(racks.length).racks(racks).build();
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(racks.length).racks(racks)
+            .build();
     final FSNamesystem ns = cluster.getNameNode().getNamesystem();
 
     try {
@@ -193,8 +200,9 @@ public class TestBlocksWithNotEnoughRacks {
     final Path filePath = new Path("/testFile");
     // Datanodes are spread across two racks
     String racks[] = {"/rack1", "/rack1", "/rack2", "/rack2"};
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-      .numDataNodes(racks.length).racks(racks).build();
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(racks.length).racks(racks)
+            .build();
     final FSNamesystem ns = cluster.getNameNode().getNamesystem();
 
     try {
@@ -244,8 +252,9 @@ public class TestBlocksWithNotEnoughRacks {
     short REPLICATION_FACTOR = 3;
     final Path filePath = new Path("/testFile");
     String racks[] = {"/rack1", "/rack1", "/rack2", "/rack2"};
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-      .numDataNodes(racks.length).racks(racks).build();
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(racks.length).racks(racks)
+            .build();
     final FSNamesystem ns = cluster.getNameNode().getNamesystem();
 
     try {
@@ -259,7 +268,7 @@ public class TestBlocksWithNotEnoughRacks {
       // was not the one that lived on the rack with only one replica,
       // ie we should still have 2 racks after reducing the repl factor.
       REPLICATION_FACTOR = 2;
-      NameNodeAdapter.setReplication(ns, "/testFile", REPLICATION_FACTOR); 
+      NameNodeAdapter.setReplication(ns, "/testFile", REPLICATION_FACTOR);
 
       DFSTestUtil.waitForReplication(cluster, b, 2, REPLICATION_FACTOR, 0);
     } finally {
@@ -278,8 +287,9 @@ public class TestBlocksWithNotEnoughRacks {
     final Path filePath = new Path("/testFile");
     // Last datanode is on a different rack
     String racks[] = {"/rack1", "/rack1", "/rack1", "/rack2", "/rack2"};
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-      .numDataNodes(racks.length).racks(racks).build();
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(racks.length).racks(racks)
+            .build();
     final FSNamesystem ns = cluster.getNameNode().getNamesystem();
     final DatanodeManager dm = ns.getBlockManager().getDatanodeManager();
 
@@ -326,15 +336,16 @@ public class TestBlocksWithNotEnoughRacks {
    * a node re-joining the cluster the rack policy is not violated.
    */
   @Test
-  public void testReduceReplFactorDueToRejoinRespectsRackPolicy() 
+  public void testReduceReplFactorDueToRejoinRespectsRackPolicy()
       throws Exception {
     Configuration conf = getConf();
     short REPLICATION_FACTOR = 2;
     final Path filePath = new Path("/testFile");
     // Last datanode is on a different rack
     String racks[] = {"/rack1", "/rack1", "/rack2"};
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-      .numDataNodes(racks.length).racks(racks).build();
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(racks.length).racks(racks)
+            .build();
     final FSNamesystem ns = cluster.getNameNode().getNamesystem();
     final DatanodeManager dm = ns.getBlockManager().getDatanodeManager();
 
@@ -365,7 +376,7 @@ public class TestBlocksWithNotEnoughRacks {
       // not on the restarted datanode as that would violate the rack policy.
       String rack2[] = {"/rack2"};
       cluster.startDataNodes(conf, 1, true, null, rack2);
-      cluster.waitActive();      
+      cluster.waitActive();
       
       // The block now has sufficient # replicas, across racks
       DFSTestUtil.waitForReplication(cluster, b, 2, REPLICATION_FACTOR, 0);
@@ -398,8 +409,9 @@ public class TestBlocksWithNotEnoughRacks {
 
     // Two blocks and four racks
     String racks[] = {"/rack1", "/rack1", "/rack2", "/rack2"};
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-      .numDataNodes(racks.length).racks(racks).build();
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(racks.length).racks(racks)
+            .build();
     final FSNamesystem ns = cluster.getNameNode().getNamesystem();
 
     try {
@@ -412,8 +424,9 @@ public class TestBlocksWithNotEnoughRacks {
       // Decommission one of the hosts with the block, this should cause 
       // the block to get replicated to another host on the same rack,
       // otherwise the rack policy is violated.
-      BlockLocation locs[] = fs.getFileBlockLocations(
-          fs.getFileStatus(filePath), 0, Long.MAX_VALUE);
+      BlockLocation locs[] =
+          fs.getFileBlockLocations(fs.getFileStatus(filePath), 0,
+              Long.MAX_VALUE);
       String name = locs[0].getNames()[0];
       DFSTestUtil.writeFile(localFileSys, excludeFile, name);
       ns.getBlockManager().getDatanodeManager().refreshNodes(conf);
@@ -431,7 +444,7 @@ public class TestBlocksWithNotEnoughRacks {
    * due to node decommissioning, when the blocks are over-replicated.
    */
   @Test
-  public void testNodeDecomissionWithOverreplicationRespectsRackPolicy() 
+  public void testNodeDecomissionWithOverreplicationRespectsRackPolicy()
       throws Exception {
     Configuration conf = getConf();
     short REPLICATION_FACTOR = 5;
@@ -451,8 +464,9 @@ public class TestBlocksWithNotEnoughRacks {
 
     // All hosts are on two racks, only one host on /rack2
     String racks[] = {"/rack1", "/rack2", "/rack1", "/rack1", "/rack1"};
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-      .numDataNodes(racks.length).racks(racks).build();
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(racks.length).racks(racks)
+            .build();
     final FSNamesystem ns = cluster.getNameNode().getNamesystem();
 
     try {
@@ -468,11 +482,12 @@ public class TestBlocksWithNotEnoughRacks {
       // Decommission one of the hosts with the block that is not on
       // the lone host on rack2 (if we decomission that host it would
       // be impossible to respect the rack policy).
-      BlockLocation locs[] = fs.getFileBlockLocations(
-          fs.getFileStatus(filePath), 0, Long.MAX_VALUE);
+      BlockLocation locs[] =
+          fs.getFileBlockLocations(fs.getFileStatus(filePath), 0,
+              Long.MAX_VALUE);
       for (String top : locs[0].getTopologyPaths()) {
         if (!top.startsWith("/rack2")) {
-          String name = top.substring("/rack1".length()+1);
+          String name = top.substring("/rack1".length() + 1);
           DFSTestUtil.writeFile(localFileSys, excludeFile, name);
           ns.getBlockManager().getDatanodeManager().refreshNodes(conf);
           DFSTestUtil.waitForDecommission(fs, name);

@@ -51,9 +51,10 @@ public class MDCFilter implements Filter {
    * <p/>
    * This implementation is a NOP.
    *
-   * @param config filter configuration.
-   *
-   * @throws ServletException thrown if the filter could not be initialized.
+   * @param config
+   *     filter configuration.
+   * @throws ServletException
+   *     thrown if the filter could not be initialized.
    */
   @Override
   public void init(FilterConfig config) throws ServletException {
@@ -62,16 +63,20 @@ public class MDCFilter implements Filter {
   /**
    * Sets the slf4j <code>MDC</code> and delegates the request to the chain.
    *
-   * @param request servlet request.
-   * @param response servlet response.
-   * @param chain filter chain.
-   *
-   * @throws IOException thrown if an IO error occurrs.
-   * @throws ServletException thrown if a servet error occurrs.
+   * @param request
+   *     servlet request.
+   * @param response
+   *     servlet response.
+   * @param chain
+   *     filter chain.
+   * @throws IOException
+   *     thrown if an IO error occurrs.
+   * @throws ServletException
+   *     thrown if a servet error occurrs.
    */
   @Override
-  public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
-    throws IOException, ServletException {
+  public void doFilter(ServletRequest request, ServletResponse response,
+      FilterChain chain) throws IOException, ServletException {
     try {
       MDC.clear();
       String hostname = HostnameFilter.get();

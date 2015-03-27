@@ -17,12 +17,6 @@
  */
 package org.apache.hadoop.hdfs;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
-import java.io.IOException;
-import java.util.Random;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
@@ -32,6 +26,12 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.server.datanode.SimulatedFSDataset;
 import org.junit.Test;
+
+import java.io.IOException;
+import java.util.Random;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 /**
  * This class tests the creation of files with block-size
@@ -46,7 +46,7 @@ public class TestSmallBlock {
   private void writeFile(FileSystem fileSys, Path name) throws IOException {
     // create and write a file that contains three blocks of data
     FSDataOutputStream stm = fileSys.create(name, true, fileSys.getConf()
-        .getInt(CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096),
+            .getInt(CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096),
         (short) 1, blockSize);
     byte[] buffer = new byte[fileSize];
     Random rand = new Random(seed);
@@ -55,23 +55,24 @@ public class TestSmallBlock {
     stm.close();
   }
   
-  private void checkAndEraseData(byte[] actual, int from, byte[] expected, String message) {
+  private void checkAndEraseData(byte[] actual, int from, byte[] expected,
+      String message) {
     for (int idx = 0; idx < actual.length; idx++) {
-      assertEquals(message+" byte "+(from+idx)+" differs. expected "+
-                        expected[from+idx]+" actual "+actual[idx],
-                        actual[idx], expected[from+idx]);
+      assertEquals(message + " byte " + (from + idx) + " differs. expected " +
+              expected[from + idx] + " actual " + actual[idx], actual[idx],
+          expected[from + idx]);
       actual[idx] = 0;
     }
   }
   
   private void checkFile(FileSystem fileSys, Path name) throws IOException {
-    BlockLocation[] locations = fileSys.getFileBlockLocations(
-        fileSys.getFileStatus(name), 0, fileSize);
+    BlockLocation[] locations =
+        fileSys.getFileBlockLocations(fileSys.getFileStatus(name), 0, fileSize);
     assertEquals("Number of blocks", fileSize, locations.length);
     FSDataInputStream stm = fileSys.open(name);
     byte[] expected = new byte[fileSize];
     if (simulatedStorage) {
-      for (int i = 0; i < expected.length; ++i) {  
+      for (int i = 0; i < expected.length; ++i) {
         expected[i] = SimulatedFSDataset.DEFAULT_DATABYTE;
       }
     } else {
@@ -113,6 +114,7 @@ public class TestSmallBlock {
       cluster.shutdown();
     }
   }
+
   @Test
   public void testSmallBlockSimulatedStorage() throws IOException {
     simulatedStorage = true;

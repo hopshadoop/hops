@@ -26,18 +26,18 @@ import org.apache.hadoop.yarn.api.ApplicationClientProtocol;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * <p><code>NodeReport</code> is a summary of runtime information of a 
+ * <p><code>NodeReport</code> is a summary of runtime information of a
  * node in the cluster.</p>
- * 
+ * <p/>
  * <p>It includes details such as:
- *   <ul>
- *     <li>{@link NodeId} of the node.</li>
- *     <li>HTTP Tracking URL of the node.</li>
- *     <li>Rack name for the node.</li>
- *     <li>Used {@link Resource} on the node.</li>
- *     <li>Total available {@link Resource} of the node.</li>
- *     <li>Number of running containers on the node.</li>
- *   </ul>
+ * <ul>
+ * <li>{@link NodeId} of the node.</li>
+ * <li>HTTP Tracking URL of the node.</li>
+ * <li>Rack name for the node.</li>
+ * <li>Used {@link Resource} on the node.</li>
+ * <li>Total available {@link Resource} of the node.</li>
+ * <li>Number of running containers on the node.</li>
+ * </ul>
  * </p>
  *
  * @see ApplicationClientProtocol#getClusterNodes(org.apache.hadoop.yarn.api.protocolrecords.GetClusterNodesRequest)
@@ -66,6 +66,7 @@ public abstract class NodeReport {
 
   /**
    * Get the <code>NodeId</code> of the node.
+   *
    * @return <code>NodeId</code> of the node
    */
   @Public
@@ -78,6 +79,7 @@ public abstract class NodeReport {
   
   /**
    * Get the <code>NodeState</code> of the node.
+   *
    * @return <code>NodeState</code> of the node
    */
   @Public
@@ -90,6 +92,7 @@ public abstract class NodeReport {
   
   /**
    * Get the <em>http address</em> of the node.
+   *
    * @return <em>http address</em> of the node
    */
   @Public
@@ -102,6 +105,7 @@ public abstract class NodeReport {
   
   /**
    * Get the <em>rack name</em> for the node.
+   *
    * @return <em>rack name</em> for the node
    */
   @Public
@@ -114,6 +118,7 @@ public abstract class NodeReport {
   
   /**
    * Get <em>used</em> <code>Resource</code> on the node.
+   *
    * @return <em>used</em> <code>Resource</code> on the node
    */
   @Public
@@ -126,6 +131,7 @@ public abstract class NodeReport {
   
   /**
    * Get the <em>total</em> <code>Resource</code> on the node.
+   *
    * @return <em>total</em> <code>Resource</code> on the node
    */
   @Public
@@ -138,6 +144,7 @@ public abstract class NodeReport {
   
   /**
    * Get the <em>number of allocated containers</em> on the node.
+   *
    * @return <em>number of allocated containers</em> on the node
    */
   @Private
@@ -149,8 +156,9 @@ public abstract class NodeReport {
   public abstract void setNumContainers(int numContainers);
   
 
-  /** 
+  /**
    * Get the <em>diagnostic health report</em> of the node.
+   *
    * @return <em>diagnostic health report</em> of the node
    */
   @Public
@@ -163,6 +171,7 @@ public abstract class NodeReport {
 
   /**
    * Get the <em>last timestamp</em> at which the health report was received.
+   *
    * @return <em>last timestamp</em> at which the health report was received
    */
   @Public

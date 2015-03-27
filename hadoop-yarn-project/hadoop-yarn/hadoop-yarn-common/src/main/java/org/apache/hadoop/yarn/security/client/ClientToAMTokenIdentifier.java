@@ -18,10 +18,6 @@
 
 package org.apache.hadoop.yarn.security.client;
 
-import java.io.DataInput;
-import java.io.DataOutput;
-import java.io.IOException;
-
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
@@ -31,6 +27,10 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
+
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.io.IOException;
 
 @Public
 @Evolving
@@ -63,8 +63,8 @@ public class ClientToAMTokenIdentifier extends TokenIdentifier {
 
   @Override
   public void write(DataOutput out) throws IOException {
-    out.writeLong(this.applicationAttemptId.getApplicationId()
-      .getClusterTimestamp());
+    out.writeLong(
+        this.applicationAttemptId.getApplicationId().getClusterTimestamp());
     out.writeInt(this.applicationAttemptId.getApplicationId().getId());
     out.writeInt(this.applicationAttemptId.getAttemptId());
     this.clientName.write(out);
@@ -72,9 +72,9 @@ public class ClientToAMTokenIdentifier extends TokenIdentifier {
 
   @Override
   public void readFields(DataInput in) throws IOException {
-    this.applicationAttemptId =
-        ApplicationAttemptId.newInstance(
-          ApplicationId.newInstance(in.readLong(), in.readInt()), in.readInt());
+    this.applicationAttemptId = ApplicationAttemptId
+        .newInstance(ApplicationId.newInstance(in.readLong(), in.readInt()),
+            in.readInt());
     this.clientName.readFields(in);
   }
 

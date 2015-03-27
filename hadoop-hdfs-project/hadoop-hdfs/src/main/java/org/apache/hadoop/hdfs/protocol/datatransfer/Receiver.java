@@ -17,180 +17,143 @@
  */
 package org.apache.hadoop.hdfs.protocol.datatransfer;
 
-import static org.apache.hadoop.hdfs.protocolPB.PBHelper.vintPrefixed;
-import static org.apache.hadoop.hdfs.protocol.datatransfer.DataTransferProtoUtil.fromProto;
-
-import java.io.DataInputStream;
-import java.io.IOException;
-
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
-import org.apache.hadoop.hdfs.ShortCircuitShm.SlotId;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.OpBlockChecksumProto;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.OpCopyBlockProto;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.OpReadBlockProto;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.OpReplaceBlockProto;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.OpTransferBlockProto;
-import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.OpRequestShortCircuitAccessProto;
-import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.CachingStrategyProto;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.OpWriteBlockProto;
-import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.ReleaseShortCircuitAccessRequestProto;
-import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.ShortCircuitShmRequestProto;
 import org.apache.hadoop.hdfs.protocolPB.PBHelper;
-import org.apache.hadoop.hdfs.server.datanode.CachingStrategy;
 
-/** Receiver */
+import java.io.DataInputStream;
+import java.io.IOException;
+
+import static org.apache.hadoop.hdfs.protocol.datatransfer.DataTransferProtoUtil.fromProto;
+import static org.apache.hadoop.hdfs.protocolPB.PBHelper.vintPrefixed;
+
+/**
+ * Receiver
+ */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public abstract class Receiver implements DataTransferProtocol {
   protected DataInputStream in;
   
-  /** Initialize a receiver for DataTransferProtocol with a socket. */
+  /**
+   * Initialize a receiver for DataTransferProtocol with a socket.
+   */
   protected void initialize(final DataInputStream in) {
     this.in = in;
   }
 
-  /** Read an Op.  It also checks protocol version. */
+  /**
+   * Read an Op.  It also checks protocol version.
+   */
   protected final Op readOp() throws IOException {
     final short version = in.readShort();
     if (version != DataTransferProtocol.DATA_TRANSFER_VERSION) {
-      throw new IOException( "Version Mismatch (Expected: " +
-          DataTransferProtocol.DATA_TRANSFER_VERSION  +
-          ", Received: " +  version + " )");
+      throw new IOException("Version Mismatch (Expected: " +
+          DataTransferProtocol.DATA_TRANSFER_VERSION +
+          ", Received: " + version + " )");
     }
     return Op.read(in);
   }
 
-  /** Process op by the corresponding method. */
+  /**
+   * Process op by the corresponding method.
+   */
   protected final void processOp(Op op) throws IOException {
-    switch(op) {
-    case READ_BLOCK:
-      opReadBlock();
-      break;
-    case WRITE_BLOCK:
-      opWriteBlock(in);
-      break;
-    case REPLACE_BLOCK:
-      opReplaceBlock(in);
-      break;
-    case COPY_BLOCK:
-      opCopyBlock(in);
-      break;
-    case BLOCK_CHECKSUM:
-      opBlockChecksum(in);
-      break;
-    case TRANSFER_BLOCK:
-      opTransferBlock(in);
-      break;
-    case REQUEST_SHORT_CIRCUIT_FDS:
-      opRequestShortCircuitFds(in);
-      break;
-    case RELEASE_SHORT_CIRCUIT_FDS:
-      opReleaseShortCircuitFds(in);
-      break;
-    case REQUEST_SHORT_CIRCUIT_SHM:
-      opRequestShortCircuitShm(in);
-      break;
-    default:
-      throw new IOException("Unknown op " + op + " in data stream");
+    switch (op) {
+      case READ_BLOCK:
+        opReadBlock();
+        break;
+      case WRITE_BLOCK:
+        opWriteBlock(in);
+        break;
+      case REPLACE_BLOCK:
+        opReplaceBlock(in);
+        break;
+      case COPY_BLOCK:
+        opCopyBlock(in);
+        break;
+      case BLOCK_CHECKSUM:
+        opBlockChecksum(in);
+        break;
+      case TRANSFER_BLOCK:
+        opTransferBlock(in);
+        break;
+      default:
+        throw new IOException("Unknown op " + op + " in data stream");
     }
   }
 
-  static private CachingStrategy getCachingStrategy(CachingStrategyProto strategy) {
-    Boolean dropBehind = strategy.hasDropBehind() ?
-        strategy.getDropBehind() : null;
-    Long readahead = strategy.hasReadahead() ?
-        strategy.getReadahead() : null;
-    return new CachingStrategy(dropBehind, readahead);
-  }
-
-  /** Receive OP_READ_BLOCK */
+  /**
+   * Receive OP_READ_BLOCK
+   */
   private void opReadBlock() throws IOException {
     OpReadBlockProto proto = OpReadBlockProto.parseFrom(vintPrefixed(in));
     readBlock(PBHelper.convert(proto.getHeader().getBaseHeader().getBlock()),
         PBHelper.convert(proto.getHeader().getBaseHeader().getToken()),
-        proto.getHeader().getClientName(),
-        proto.getOffset(),
-        proto.getLen(),
-        proto.getSendChecksums(),
-        (proto.hasCachingStrategy() ?
-            getCachingStrategy(proto.getCachingStrategy()) :
-          CachingStrategy.newDefaultStrategy()));
+        proto.getHeader().getClientName(), proto.getOffset(), proto.getLen(),
+        proto.getSendChecksums());
   }
   
-  /** Receive OP_WRITE_BLOCK */
+  /**
+   * Receive OP_WRITE_BLOCK
+   */
   private void opWriteBlock(DataInputStream in) throws IOException {
-    final OpWriteBlockProto proto = OpWriteBlockProto.parseFrom(vintPrefixed(in));
+    final OpWriteBlockProto proto =
+        OpWriteBlockProto.parseFrom(vintPrefixed(in));
     writeBlock(PBHelper.convert(proto.getHeader().getBaseHeader().getBlock()),
         PBHelper.convert(proto.getHeader().getBaseHeader().getToken()),
         proto.getHeader().getClientName(),
         PBHelper.convert(proto.getTargetsList()),
-        PBHelper.convert(proto.getSource()),
-        fromProto(proto.getStage()),
-        proto.getPipelineSize(),
-        proto.getMinBytesRcvd(), proto.getMaxBytesRcvd(),
-        proto.getLatestGenerationStamp(),
-        fromProto(proto.getRequestedChecksum()),
-        (proto.hasCachingStrategy() ?
-            getCachingStrategy(proto.getCachingStrategy()) :
-          CachingStrategy.newDefaultStrategy()));
+        PBHelper.convert(proto.getSource()), fromProto(proto.getStage()),
+        proto.getPipelineSize(), proto.getMinBytesRcvd(),
+        proto.getMaxBytesRcvd(), proto.getLatestGenerationStamp(),
+        fromProto(proto.getRequestedChecksum()));
   }
 
-  /** Receive {@link Op#TRANSFER_BLOCK} */
+  /**
+   * Receive {@link Op#TRANSFER_BLOCK}
+   */
   private void opTransferBlock(DataInputStream in) throws IOException {
     final OpTransferBlockProto proto =
-      OpTransferBlockProto.parseFrom(vintPrefixed(in));
-    transferBlock(PBHelper.convert(proto.getHeader().getBaseHeader().getBlock()),
+        OpTransferBlockProto.parseFrom(vintPrefixed(in));
+    transferBlock(
+        PBHelper.convert(proto.getHeader().getBaseHeader().getBlock()),
         PBHelper.convert(proto.getHeader().getBaseHeader().getToken()),
         proto.getHeader().getClientName(),
         PBHelper.convert(proto.getTargetsList()));
   }
 
-  /** Receive {@link Op#REQUEST_SHORT_CIRCUIT_FDS} */
-  private void opRequestShortCircuitFds(DataInputStream in) throws IOException {
-    final OpRequestShortCircuitAccessProto proto =
-      OpRequestShortCircuitAccessProto.parseFrom(vintPrefixed(in));
-    SlotId slotId = (proto.hasSlotId()) ? 
-        PBHelper.convert(proto.getSlotId()) : null;
-    requestShortCircuitFds(PBHelper.convert(proto.getHeader().getBlock()),
-        PBHelper.convert(proto.getHeader().getToken()),
-        slotId, proto.getMaxVersion());
-  }
-
-  /** Receive {@link Op#RELEASE_SHORT_CIRCUIT_FDS} */
-  private void opReleaseShortCircuitFds(DataInputStream in)
-      throws IOException {
-    final ReleaseShortCircuitAccessRequestProto proto =
-      ReleaseShortCircuitAccessRequestProto.parseFrom(vintPrefixed(in));
-    releaseShortCircuitFds(PBHelper.convert(proto.getSlotId()));
-  }
-
-  /** Receive {@link Op#REQUEST_SHORT_CIRCUIT_SHM} */
-  private void opRequestShortCircuitShm(DataInputStream in) throws IOException {
-    final ShortCircuitShmRequestProto proto =
-        ShortCircuitShmRequestProto.parseFrom(vintPrefixed(in));
-    requestShortCircuitShm(proto.getClientName());
-  }
-
-  /** Receive OP_REPLACE_BLOCK */
+  /**
+   * Receive OP_REPLACE_BLOCK
+   */
   private void opReplaceBlock(DataInputStream in) throws IOException {
     OpReplaceBlockProto proto = OpReplaceBlockProto.parseFrom(vintPrefixed(in));
     replaceBlock(PBHelper.convert(proto.getHeader().getBlock()),
-        PBHelper.convert(proto.getHeader().getToken()),
-        proto.getDelHint(),
+        PBHelper.convert(proto.getHeader().getToken()), proto.getDelHint(),
         PBHelper.convert(proto.getSource()));
   }
 
-  /** Receive OP_COPY_BLOCK */
+  /**
+   * Receive OP_COPY_BLOCK
+   */
   private void opCopyBlock(DataInputStream in) throws IOException {
     OpCopyBlockProto proto = OpCopyBlockProto.parseFrom(vintPrefixed(in));
     copyBlock(PBHelper.convert(proto.getHeader().getBlock()),
         PBHelper.convert(proto.getHeader().getToken()));
   }
 
-  /** Receive OP_BLOCK_CHECKSUM */
+  /**
+   * Receive OP_BLOCK_CHECKSUM
+   */
   private void opBlockChecksum(DataInputStream in) throws IOException {
-    OpBlockChecksumProto proto = OpBlockChecksumProto.parseFrom(vintPrefixed(in));
+    OpBlockChecksumProto proto =
+        OpBlockChecksumProto.parseFrom(vintPrefixed(in));
     
     blockChecksum(PBHelper.convert(proto.getHeader().getBlock()),
         PBHelper.convert(proto.getHeader().getToken()));

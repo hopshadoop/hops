@@ -17,19 +17,16 @@
  */
 package org.apache.hadoop.hdfs.nfs.nfs3;
 
-import org.apache.commons.logging.LogFactory;
-
-import java.io.IOException;
-import java.security.PrivilegedExceptionAction;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map.Entry;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
+import com.google.common.cache.RemovalListener;
+import com.google.common.cache.RemovalNotification;
 import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.hdfs.DFSClient;
@@ -39,13 +36,14 @@ import org.apache.hadoop.io.MultipleIOException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.ShutdownHookManager;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Objects;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
-import com.google.common.cache.RemovalListener;
-import com.google.common.cache.RemovalNotification;
+import java.io.IOException;
+import java.security.PrivilegedExceptionAction;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 /**
  * A cache saves DFSClient objects for different users
@@ -105,10 +103,8 @@ class DFSClientCache {
   
   DFSClientCache(Configuration config, int clientCache) {
     this.config = config;
-    this.clientCache = CacheBuilder.newBuilder()
-        .maximumSize(clientCache)
-        .removalListener(clientRemovalListener())
-        .build(clientLoader());
+    this.clientCache = CacheBuilder.newBuilder().maximumSize(clientCache)
+        .removalListener(clientRemovalListener()).build(clientLoader());
 
     this.inputstreamCache = CacheBuilder.newBuilder()
         .maximumSize(DEFAULT_DFS_INPUTSTREAM_CACHE_SIZE)
@@ -116,8 +112,8 @@ class DFSClientCache {
         .removalListener(inputStreamRemovalListener())
         .build(inputStreamLoader());
     
-    ShutdownHookManager.get().addShutdownHook(new CacheFinalizer(),
-        SHUTDOWN_HOOK_PRIORITY);
+    ShutdownHookManager.get()
+        .addShutdownHook(new CacheFinalizer(), SHUTDOWN_HOOK_PRIORITY);
   }
 
   /**
@@ -138,7 +134,9 @@ class DFSClientCache {
   
   /**
    * Close all DFSClient instances in the Cache.
-   * @param onlyAutomatic only close those that are marked for automatic closing
+   *
+   * @param onlyAutomatic
+   *     only close those that are marked for automatic closing
    */
   synchronized void closeAll(boolean onlyAutomatic) throws IOException {
     List<IOException> exceptions = new ArrayList<IOException>();
@@ -165,9 +163,8 @@ class DFSClientCache {
     return new CacheLoader<String, DFSClient>() {
       @Override
       public DFSClient load(String userName) throws Exception {
-        UserGroupInformation ugi = getUserGroupInformation(
-                userName,
-                UserGroupInformation.getCurrentUser());
+        UserGroupInformation ugi = getUserGroupInformation(userName,
+            UserGroupInformation.getCurrentUser());
 
         // Guava requires CacheLoader never returns null.
         return ugi.doAs(new PrivilegedExceptionAction<DFSClient>() {
@@ -182,24 +179,26 @@ class DFSClientCache {
 
   /**
    * This method uses the currentUser, and real user to create a proxy
-   * @param effectiveUser The user who is being proxied by the real user
-   * @param realUser The actual user who does the command
+   *
+   * @param effectiveUser
+   *     The user who is being proxied by the real user
+   * @param realUser
+   *     The actual user who does the command
    * @return Proxy UserGroupInformation
-   * @throws IOException If proxying fails
+   * @throws IOException
+   *     If proxying fails
    */
-  UserGroupInformation getUserGroupInformation(
-          String effectiveUser,
-          UserGroupInformation realUser)
-          throws IOException {
+  UserGroupInformation getUserGroupInformation(String effectiveUser,
+      UserGroupInformation realUser) throws IOException {
     Preconditions.checkNotNull(effectiveUser);
     Preconditions.checkNotNull(realUser);
     realUser.checkTGTAndReloginFromKeytab();
 
     UserGroupInformation ugi =
-            UserGroupInformation.createProxyUser(effectiveUser, realUser);
-    if (LOG.isDebugEnabled()){
-      LOG.debug(String.format("Created ugi:" +
-              " %s for username: %s", ugi, effectiveUser));
+        UserGroupInformation.createProxyUser(effectiveUser, realUser);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(String
+          .format("Created ugi:" + " %s for username: %s", ugi, effectiveUser));
     }
     return ugi;
   }
@@ -207,14 +206,15 @@ class DFSClientCache {
   private RemovalListener<String, DFSClient> clientRemovalListener() {
     return new RemovalListener<String, DFSClient>() {
       @Override
-      public void onRemoval(RemovalNotification<String, DFSClient> notification) {
+      public void onRemoval(
+          RemovalNotification<String, DFSClient> notification) {
         DFSClient client = notification.getValue();
         try {
           client.close();
         } catch (IOException e) {
-          LOG.warn(String.format(
-              "IOException when closing the DFSClient(%s), cause: %s", client,
-              e));
+          LOG.warn(String
+              .format("IOException when closing the DFSClient(%s), cause: %s",
+                  client, e));
         }
       }
     };
@@ -238,7 +238,8 @@ class DFSClientCache {
     return new CacheLoader<DFSInputStreamCaheKey, FSDataInputStream>() {
 
       @Override
-      public FSDataInputStream load(DFSInputStreamCaheKey key) throws Exception {
+      public FSDataInputStream load(DFSInputStreamCaheKey key)
+          throws Exception {
         DFSClient client = getDfsClient(key.userId);
         DFSInputStream dis = client.open(key.inodePath);
         return new FSDataInputStream(dis);
@@ -251,8 +252,8 @@ class DFSClientCache {
     try {
       client = clientCache.get(userName);
     } catch (ExecutionException e) {
-      LOG.error("Failed to create DFSClient for user:" + userName + " Cause:"
-          + e);
+      LOG.error(
+          "Failed to create DFSClient for user:" + userName + " Cause:" + e);
     }
     return client;
   }
@@ -263,8 +264,9 @@ class DFSClientCache {
     try {
       s = inputstreamCache.get(k);
     } catch (ExecutionException e) {
-      LOG.warn("Failed to create DFSInputStream for user:" + userName
-          + " Cause:" + e);
+      LOG.warn(
+          "Failed to create DFSInputStream for user:" + userName + " Cause:" +
+              e);
     }
     return s;
   }

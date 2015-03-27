@@ -1,37 +1,24 @@
 /**
-* Licensed to the Apache Software Foundation (ASF) under one
-* or more contributor license agreements.  See the NOTICE file
-* distributed with this work for additional information
-* regarding copyright ownership.  The ASF licenses this file
-* to you under the Apache License, Version 2.0 (the
-* "License"); you may not use this file except in compliance
-* with the License.  You may obtain a copy of the License at
-*
-*     http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package org.apache.hadoop.yarn.server.nodemanager.webapp;
 
-import static org.apache.hadoop.yarn.util.StringHelper.join;
-import static org.apache.hadoop.yarn.webapp.YarnWebParams.CONTAINER_ID;
-import static org.apache.hadoop.yarn.webapp.view.JQueryUI.ACCORDION;
-import static org.apache.hadoop.yarn.webapp.view.JQueryUI.ACCORDION_ID;
-import static org.apache.hadoop.yarn.webapp.view.JQueryUI.initID;
-
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-
+import com.google.inject.Inject;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.exceptions.YarnException;
@@ -44,13 +31,26 @@ import org.apache.hadoop.yarn.webapp.hamlet.Hamlet;
 import org.apache.hadoop.yarn.webapp.hamlet.Hamlet.PRE;
 import org.apache.hadoop.yarn.webapp.view.HtmlBlock;
 
-import com.google.inject.Inject;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+import static org.apache.hadoop.yarn.util.StringHelper.join;
+import static org.apache.hadoop.yarn.webapp.YarnWebParams.CONTAINER_ID;
+import static org.apache.hadoop.yarn.webapp.view.JQueryUI.ACCORDION;
+import static org.apache.hadoop.yarn.webapp.view.JQueryUI.ACCORDION_ID;
+import static org.apache.hadoop.yarn.webapp.view.JQueryUI.initID;
 
 public class ContainerLogsPage extends NMView {
   
   public static final String REDIRECT_URL = "redirect.url";
   
-  @Override protected void preHead(Page.HTML<_> html) {
+  @Override
+  protected void preHead(Page.HTML<_> html) {
     String redirectUrl = $(REDIRECT_URL);
     if (redirectUrl == null || redirectUrl.isEmpty()) {
       set(TITLE, join("Logs for ", $(CONTAINER_ID)));
@@ -73,8 +73,8 @@ public class ContainerLogsPage extends NMView {
     return ContainersLogsBlock.class;
   }
 
-  public static class ContainersLogsBlock extends HtmlBlock implements
-      YarnWebParams {    
+  public static class ContainersLogsBlock extends HtmlBlock
+      implements YarnWebParams {
     private final Context nmContext;
 
     @Inject
@@ -86,9 +86,9 @@ public class ContainerLogsPage extends NMView {
     protected void render(Block html) {
 
       String redirectUrl = $(REDIRECT_URL);
-      if (redirectUrl !=null && redirectUrl.equals("false")) {
+      if (redirectUrl != null && redirectUrl.equals("false")) {
         html.h1("Failed while trying to construct the redirect url to the log" +
-        		" server. Log Server url may not be configured");
+            " server. Log Server url may not be configured");
         //Intentional fallthrough.
       }
 
@@ -102,12 +102,14 @@ public class ContainerLogsPage extends NMView {
 
       try {
         if ($(CONTAINER_LOG_TYPE).isEmpty()) {
-          List<File> logFiles = ContainerLogsUtils.getContainerLogDirs(containerId,
-              request().getRemoteUser(), nmContext);
+          List<File> logFiles = ContainerLogsUtils
+              .getContainerLogDirs(containerId, request().getRemoteUser(),
+                  nmContext);
           printLogFileDirectory(html, logFiles);
         } else {
-          File logFile = ContainerLogsUtils.getContainerLogFile(containerId,
-              $(CONTAINER_LOG_TYPE), request().getRemoteUser(), nmContext);
+          File logFile = ContainerLogsUtils
+              .getContainerLogFile(containerId, $(CONTAINER_LOG_TYPE),
+                  request().getRemoteUser(), nmContext);
           printLogFile(html, logFile);
         }
       } catch (YarnException ex) {
@@ -127,15 +129,16 @@ public class ContainerLogsPage extends NMView {
       end = end < 0 ? logFile.length() + end : end;
       end = end < 0 ? logFile.length() : end;
       if (start > end) {
-        html.h1("Invalid start and end values. Start: [" + start + "]"
-            + ", end[" + end + "]");
+        html.h1(
+            "Invalid start and end values. Start: [" + start + "]" + ", end[" +
+                end + "]");
         return;
       } else {
         FileInputStream logByteStream = null;
 
         try {
-          logByteStream = ContainerLogsUtils.openLogFileForRead($(CONTAINER_ID),
-              logFile, nmContext);
+          logByteStream = ContainerLogsUtils
+              .openLogFileForRead($(CONTAINER_ID), logFile, nmContext);
         } catch (IOException ex) {
           html.h1(ex.getMessage());
           return;
@@ -145,9 +148,9 @@ public class ContainerLogsPage extends NMView {
           long toRead = end - start;
           if (toRead < logFile.length()) {
             html.p()._("Showing " + toRead + " bytes. Click ")
-                .a(url("containerlogs", $(CONTAINER_ID), $(APP_OWNER), 
+                .a(url("containerlogs", $(CONTAINER_ID), $(APP_OWNER),
                     logFile.getName(), "?start=0"), "here").
-                    _(" for full log")._();
+                _(" for full log")._();
           }
           
           IOUtils.skipFully(logByteStream, start);
@@ -159,8 +162,8 @@ public class ContainerLogsPage extends NMView {
           int currentToRead = toRead > bufferSize ? bufferSize : (int) toRead;
           PRE<Hamlet> pre = html.pre();
 
-          while ((len = reader.read(cbuf, 0, currentToRead)) > 0
-              && toRead > 0) {
+          while ((len = reader.read(cbuf, 0, currentToRead)) > 0 &&
+              toRead > 0) {
             pre._(new String(cbuf, 0, len));
             toRead = toRead - len;
             currentToRead = toRead > bufferSize ? bufferSize : (int) toRead;
@@ -170,10 +173,10 @@ public class ContainerLogsPage extends NMView {
           reader.close();
 
         } catch (IOException e) {
-          LOG.error(
-              "Exception reading log file " + logFile.getAbsolutePath(), e);
-          html.h1("Exception reading log file. It might be because log "
-                + "file was aggregated : " + logFile.getName());
+          LOG.error("Exception reading log file " + logFile.getAbsolutePath(),
+              e);
+          html.h1("Exception reading log file. It might be because log " +
+              "file was aggregated : " + logFile.getName());
         } finally {
           if (logByteStream != null) {
             try {
@@ -186,7 +189,8 @@ public class ContainerLogsPage extends NMView {
       }
     }
     
-    private void printLogFileDirectory(Block html, List<File> containerLogsDirs) {
+    private void printLogFileDirectory(Block html,
+        List<File> containerLogsDirs) {
       // Print out log types in lexical order
       Collections.sort(containerLogsDirs);
       boolean foundLogFile = false;
@@ -196,11 +200,10 @@ public class ContainerLogsPage extends NMView {
           Arrays.sort(logFiles);
           for (File logFile : logFiles) {
             foundLogFile = true;
-            html.p()
-                .a(url("containerlogs", $(CONTAINER_ID), $(APP_OWNER),
+            html.p().a(url("containerlogs", $(CONTAINER_ID), $(APP_OWNER),
                     logFile.getName(), "?start=-4096"),
-                    logFile.getName() + " : Total file length is "
-                        + logFile.length() + " bytes.")._();
+                logFile.getName() + " : Total file length is " +
+                    logFile.length() + " bytes.")._();
           }
         }
       }

@@ -17,11 +17,15 @@
  */
 package org.apache.hadoop.hdfs.tools;
 
-import java.lang.management.ManagementFactory;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Set;
-import java.util.TreeSet;
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.CommandLineParser;
+import org.apache.commons.cli.GnuParser;
+import org.apache.commons.cli.HelpFormatter;
+import org.apache.commons.cli.Option;
+import org.apache.commons.cli.OptionBuilder;
+import org.apache.commons.cli.Options;
+import org.apache.commons.cli.ParseException;
+import org.apache.hadoop.classification.InterfaceAudience;
 
 import javax.management.AttributeNotFoundException;
 import javax.management.MBeanAttributeInfo;
@@ -32,18 +36,11 @@ import javax.management.ReflectionException;
 import javax.management.remote.JMXConnector;
 import javax.management.remote.JMXConnectorFactory;
 import javax.management.remote.JMXServiceURL;
-
-import org.apache.commons.cli.CommandLine;
-import org.apache.commons.cli.CommandLineParser;
-import org.apache.commons.cli.GnuParser;
-import org.apache.commons.cli.HelpFormatter;
-import org.apache.commons.cli.Option;
-import org.apache.commons.cli.OptionBuilder;
-import org.apache.commons.cli.Options;
-import org.apache.commons.cli.ParseException;
-
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.util.ExitUtil;
+import java.lang.management.ManagementFactory;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * tool to get data from NameNode or DataNode using MBeans currently the
@@ -56,9 +53,10 @@ import org.apache.hadoop.util.ExitUtil;
  * (static)
  * hadoop:service=DataNode,name=DataNodeActivity-UndefinedStorageId-520845215
  * (dynamic)
- * 
- * 
- * implementation note: all logging is sent to System.err (since it is a command
+ * <p/>
+ * <p/>
+ * implementation note: all logging is sent to System.err (since it is a
+ * command
  * line tool)
  */
 @InterfaceAudience.Private
@@ -104,7 +102,8 @@ public class JMXGet {
 
       for (MBeanAttributeInfo mb : mbinfos) {
         val = mbsc.getAttribute(oname, mb.getName());
-        System.out.format(format, mb.getName(), (val==null)?"":val.toString());
+        System.out
+            .format(format, mb.getName(), (val == null) ? "" : val.toString());
       }
     }
   }
@@ -137,12 +136,12 @@ public class JMXGet {
 
   /**
    * @throws Exception
-   *           initializes MBeanServer
+   *     initializes MBeanServer
    */
   public void init() throws Exception {
 
-    err("init: server=" + server + ";port=" + port + ";service=" + service
-        + ";localVMUrl=" + localVMUrl);
+    err("init: server=" + server + ";port=" + port + ";service=" + service +
+        ";localVMUrl=" + localVMUrl);
 
     String url_string = null;
     // build connection url
@@ -155,8 +154,8 @@ public class JMXGet {
 
     } else if (!port.isEmpty() && !server.isEmpty()) {
       // using server and port
-      url_string = "service:jmx:rmi:///jndi/rmi://" + server + ":" + port
-      + "/jmxrmi";
+      url_string =
+          "service:jmx:rmi:///jndi/rmi://" + server + ":" + port + "/jmxrmi";
     } // else url stays null
 
     // Create an RMI connector client and
@@ -198,8 +197,8 @@ public class JMXGet {
     ObjectName query = new ObjectName("Hadoop:service=" + service + ",*");
     hadoopObjectNames = new ArrayList<ObjectName>(5);
     err("\nQuery MBeanServer MBeans:");
-    Set<ObjectName> names = new TreeSet<ObjectName>(mbsc
-        .queryNames(query, null));
+    Set<ObjectName> names =
+        new TreeSet<ObjectName>(mbsc.queryNames(query, null));
 
     for (ObjectName name : names) {
       hadoopObjectNames.add(name);
@@ -227,7 +226,7 @@ public class JMXGet {
    * parse args
    */
   private static CommandLine parseArgs(Options opts, String... args)
-  throws IllegalArgumentException {
+      throws IllegalArgumentException {
 
     OptionBuilder.withArgName("NameNode|DataNode");
     OptionBuilder.hasArg();
@@ -237,7 +236,7 @@ public class JMXGet {
     OptionBuilder.withArgName("mbean server");
     OptionBuilder.hasArg();
     OptionBuilder
-    .withDescription("specify mbean server (localhost by default)");
+        .withDescription("specify mbean server (localhost by default)");
     Option jmx_server = OptionBuilder.create("server");
 
     OptionBuilder.withDescription("print help");
@@ -245,16 +244,16 @@ public class JMXGet {
 
     OptionBuilder.withArgName("mbean server port");
     OptionBuilder.hasArg();
-    OptionBuilder.withDescription("specify mbean server port, "
-        + "if missing - it will try to connect to MBean Server in the same VM");
+    OptionBuilder.withDescription("specify mbean server port, " +
+        "if missing - it will try to connect to MBean Server in the same VM");
     Option jmx_port = OptionBuilder.create("port");
 
     OptionBuilder.withArgName("VM's connector url");
     OptionBuilder.hasArg();
-    OptionBuilder.withDescription("connect to the VM on the same machine;"
-        + "\n use:\n jstat -J-Djstat.showUnsupported=true -snap <vmpid> | "
-        + "grep sun.management.JMXConnectorServer.address\n "
-        + "to find the url");
+    OptionBuilder.withDescription("connect to the VM on the same machine;" +
+        "\n use:\n jstat -J-Djstat.showUnsupported=true -snap <vmpid> | " +
+        "grep sun.management.JMXConnectorServer.address\n " +
+        "to find the url");
     Option jmx_localVM = OptionBuilder.create("localVM");
 
     opts.addOption(jmx_server);
@@ -276,7 +275,7 @@ public class JMXGet {
 
   /**
    * main
-   * 
+   *
    * @param args
    */
   public static void main(String[] args) {
@@ -296,7 +295,7 @@ public class JMXGet {
       // invalid arguments
       err("Invalid args");
       printUsage(opts);
-      ExitUtil.terminate(-1);      
+      System.exit(-1);
     }
 
     JMXGet jm = new JMXGet();
@@ -318,7 +317,7 @@ public class JMXGet {
 
     if (commandLine.hasOption("help")) {
       printUsage(opts);
-      ExitUtil.terminate(0);
+      System.exit(0);
     }
 
     // rest of args
@@ -333,8 +332,9 @@ public class JMXGet {
         for (String key : args) {
           err("key = " + key);
           String val = jm.getValue(key);
-          if (val != null)
+          if (val != null) {
             System.out.format(JMXGet.format, key, val);
+          }
         }
       }
       res = 0;
@@ -343,6 +343,6 @@ public class JMXGet {
       res = -1;
     }
 
-    ExitUtil.terminate(res);
+    System.exit(res);
   }
 }

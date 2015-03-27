@@ -17,17 +17,6 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
-import java.io.IOException;
-import java.io.OutputStream;
-import java.io.PrintWriter;
-import java.util.Enumeration;
-import java.util.List;
-
-import javax.servlet.ServletContext;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSInputStream;
@@ -41,9 +30,21 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.ServletUtil;
 import org.mortbay.jetty.InclusiveByteRange;
 
+import javax.servlet.ServletContext;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.PrintWriter;
+import java.util.Enumeration;
+import java.util.List;
+
 @InterfaceAudience.Private
 public class StreamFile extends DfsServlet {
-  /** for java.io.Serializable */
+  /**
+   * for java.io.Serializable
+   */
   private static final long serialVersionUID = 1L;
 
   public static final String CONTENT_LENGTH = "Content-Length";
@@ -51,8 +52,8 @@ public class StreamFile extends DfsServlet {
   /* Return a DFS client to use to make the given HTTP request */
   protected DFSClient getDFSClient(HttpServletRequest request)
       throws IOException, InterruptedException {
-    final Configuration conf =
-      (Configuration) getServletContext().getAttribute(JspHelper.CURRENT_CONF);
+    final Configuration conf = (Configuration) getServletContext()
+        .getAttribute(JspHelper.CURRENT_CONF);
     UserGroupInformation ugi = getUGI(request, conf);
     final ServletContext context = getServletContext();
     final DataNode datanode = (DataNode) context.getAttribute("datanode");
@@ -62,7 +63,7 @@ public class StreamFile extends DfsServlet {
   @Override
   @SuppressWarnings("unchecked")
   public void doGet(HttpServletRequest request, HttpServletResponse response)
-    throws ServletException, IOException {
+      throws ServletException, IOException {
     final String path = ServletUtil.getDecodedPath(request, "/streamFile");
     final String rawPath = ServletUtil.getRawPath(request, "/streamFile");
     final String filename = JspHelper.validatePath(path);
@@ -95,13 +96,13 @@ public class StreamFile extends DfsServlet {
       out = response.getOutputStream();
       final long fileLen = in.getFileLength();
       if (reqRanges != null) {
-        List<InclusiveByteRange> ranges = 
-          InclusiveByteRange.satisfiableRanges(reqRanges, fileLen);
+        List<InclusiveByteRange> ranges =
+            InclusiveByteRange.satisfiableRanges(reqRanges, fileLen);
         StreamFile.sendPartialData(in, out, response, fileLen, ranges);
       } else {
         // No ranges, so send entire file
-        response.setHeader("Content-Disposition", "attachment; filename=\"" + 
-                           rawFilename + "\"");
+        response.setHeader("Content-Disposition", "attachment; filename=\"" +
+            rawFilename + "\"");
         response.setContentType("application/octet-stream");
         response.setHeader(CONTENT_LENGTH, "" + fileLen);
         StreamFile.copyFromOffset(in, out, 0L, fileLen);
@@ -129,33 +130,36 @@ public class StreamFile extends DfsServlet {
    * no satisfiable ranges, or if multiple ranges are requested, which
    * is unsupported, respond with range not satisfiable.
    *
-   * @param in stream to read from
-   * @param out stream to write to
-   * @param response http response to use
-   * @param contentLength for the response header
-   * @param ranges to write to respond with
-   * @throws IOException on error sending the response
+   * @param in
+   *     stream to read from
+   * @param out
+   *     stream to write to
+   * @param response
+   *     http response to use
+   * @param contentLength
+   *     for the response header
+   * @param ranges
+   *     to write to respond with
+   * @throws IOException
+   *     on error sending the response
    */
-  static void sendPartialData(FSInputStream in,
-                              OutputStream out,
-                              HttpServletResponse response,
-                              long contentLength,
-                              List<InclusiveByteRange> ranges)
-      throws IOException {
+  static void sendPartialData(FSInputStream in, OutputStream out,
+      HttpServletResponse response, long contentLength,
+      List<InclusiveByteRange> ranges) throws IOException {
     if (ranges == null || ranges.size() != 1) {
       response.setContentLength(0);
-      response.setStatus(HttpServletResponse.SC_REQUESTED_RANGE_NOT_SATISFIABLE);
+      response
+          .setStatus(HttpServletResponse.SC_REQUESTED_RANGE_NOT_SATISFIABLE);
       response.setHeader("Content-Range",
-                InclusiveByteRange.to416HeaderRangeString(contentLength));
+          InclusiveByteRange.to416HeaderRangeString(contentLength));
     } else {
       InclusiveByteRange singleSatisfiableRange = ranges.get(0);
       long singleLength = singleSatisfiableRange.getSize(contentLength);
       response.setStatus(HttpServletResponse.SC_PARTIAL_CONTENT);
-      response.setHeader("Content-Range", 
-        singleSatisfiableRange.toHeaderRangeString(contentLength));
-      copyFromOffset(in, out,
-                     singleSatisfiableRange.getFirst(contentLength),
-                     singleLength);
+      response.setHeader("Content-Range",
+          singleSatisfiableRange.toHeaderRangeString(contentLength));
+      copyFromOffset(in, out, singleSatisfiableRange.getFirst(contentLength),
+          singleLength);
     }
   }
 

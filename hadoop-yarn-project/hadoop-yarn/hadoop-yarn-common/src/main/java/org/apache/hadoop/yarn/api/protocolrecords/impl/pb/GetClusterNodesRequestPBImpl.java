@@ -18,10 +18,7 @@
 
 package org.apache.hadoop.yarn.api.protocolrecords.impl.pb;
 
-import java.util.EnumSet;
-import java.util.Iterator;
-import java.util.List;
-
+import com.google.protobuf.TextFormat;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.protocolrecords.GetClusterNodesRequest;
@@ -31,13 +28,16 @@ import org.apache.hadoop.yarn.proto.YarnProtos.NodeStateProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetClusterNodesRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetClusterNodesRequestProtoOrBuilder;
 
-import com.google.protobuf.TextFormat;
+import java.util.EnumSet;
+import java.util.Iterator;
+import java.util.List;
 
 @Private
 @Unstable
 public class GetClusterNodesRequestPBImpl extends GetClusterNodesRequest {
 
-  GetClusterNodesRequestProto proto = GetClusterNodesRequestProto.getDefaultInstance();
+  GetClusterNodesRequestProto proto =
+      GetClusterNodesRequestProto.getDefaultInstance();
   GetClusterNodesRequestProto.Builder builder = null;
   boolean viaProto = false;
 
@@ -145,8 +145,9 @@ public class GetClusterNodesRequestPBImpl extends GetClusterNodesRequest {
 
   @Override
   public boolean equals(Object other) {
-    if (other == null)
+    if (other == null) {
       return false;
+    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }

@@ -39,7 +39,8 @@ import java.io.IOException;
 @InterfaceAudience.Private
 public class HttpFSExceptionProvider extends ExceptionProvider {
   private static Logger AUDIT_LOG = LoggerFactory.getLogger("httpfsaudit");
-  private static Logger LOG = LoggerFactory.getLogger(HttpFSExceptionProvider.class);
+  private static Logger LOG =
+      LoggerFactory.getLogger(HttpFSExceptionProvider.class);
 
   /**
    * Maps different exceptions thrown by HttpFSServer to HTTP status codes.
@@ -52,8 +53,8 @@ public class HttpFSExceptionProvider extends ExceptionProvider {
    * <li>all other exceptions : HTTP INTERNAL_SERVER_ERROR </li>
    * </ul>
    *
-   * @param throwable exception thrown.
-   *
+   * @param throwable
+   *     exception thrown.
    * @return mapped HTTP status code
    */
   @Override
@@ -84,16 +85,20 @@ public class HttpFSExceptionProvider extends ExceptionProvider {
   /**
    * Logs the HTTP status code and exception in HttpFSServer's log.
    *
-   * @param status HTTP status code.
-   * @param throwable exception thrown.
+   * @param status
+   *     HTTP status code.
+   * @param throwable
+   *     exception thrown.
    */
   @Override
   protected void log(Response.Status status, Throwable throwable) {
     String method = MDC.get("method");
     String path = MDC.get("path");
     String message = getOneLineMessage(throwable);
-    AUDIT_LOG.warn("FAILED [{}:{}] response [{}] {}", new Object[]{method, path, status, message});
-    LOG.warn("[{}:{}] response [{}] {}", new Object[]{method, path, status, message}, throwable);
+    AUDIT_LOG.warn("FAILED [{}:{}] response [{}] {}",
+        new Object[]{method, path, status, message});
+    LOG.warn("[{}:{}] response [{}] {}",
+        new Object[]{method, path, status, message}, throwable);
   }
 
 }

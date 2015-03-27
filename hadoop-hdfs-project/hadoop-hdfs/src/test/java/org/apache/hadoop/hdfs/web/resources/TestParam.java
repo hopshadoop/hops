@@ -17,29 +17,23 @@
  */
 package org.apache.hadoop.hdfs.web.resources;
 
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-
-import java.util.Arrays;
-import java.util.List;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
-import org.apache.hadoop.util.StringUtils;
 import org.junit.Assert;
 import org.junit.Test;
+
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 
 public class TestParam {
   public static final Log LOG = LogFactory.getLog(TestParam.class);
 
   final Configuration conf = new Configuration();
- 
+
   @Test
   public void testAccessTimeParam() {
     final AccessTimeParam p = new AccessTimeParam(AccessTimeParam.DEFAULT);
@@ -50,7 +44,7 @@ public class TestParam {
     try {
       new AccessTimeParam(-2L);
       Assert.fail();
-    } catch(IllegalArgumentException e) {
+    } catch (IllegalArgumentException e) {
       LOG.info("EXPECTED: " + e);
     }
   }
@@ -59,17 +53,15 @@ public class TestParam {
   public void testBlockSizeParam() {
     final BlockSizeParam p = new BlockSizeParam(BlockSizeParam.DEFAULT);
     Assert.assertEquals(null, p.getValue());
-    Assert.assertEquals(
-        conf.getLongBytes(DFSConfigKeys.DFS_BLOCK_SIZE_KEY,
-            DFSConfigKeys.DFS_BLOCK_SIZE_DEFAULT),
-        p.getValue(conf));
+    Assert.assertEquals(conf.getLongBytes(DFSConfigKeys.DFS_BLOCK_SIZE_KEY,
+            DFSConfigKeys.DFS_BLOCK_SIZE_DEFAULT), p.getValue(conf));
 
     new BlockSizeParam(1L);
 
     try {
       new BlockSizeParam(0L);
       Assert.fail();
-    } catch(IllegalArgumentException e) {
+    } catch (IllegalArgumentException e) {
       LOG.info("EXPECTED: " + e);
     }
   }
@@ -88,7 +80,7 @@ public class TestParam {
     try {
       new BufferSizeParam(0);
       Assert.fail();
-    } catch(IllegalArgumentException e) {
+    } catch (IllegalArgumentException e) {
       LOG.info("EXPECTED: " + e);
     }
   }
@@ -109,7 +101,7 @@ public class TestParam {
     try {
       new DestinationParam("abc");
       Assert.fail();
-    } catch(IllegalArgumentException e) {
+    } catch (IllegalArgumentException e) {
       LOG.info("EXPECTED: " + e);
     }
   }
@@ -122,7 +114,8 @@ public class TestParam {
 
   @Test
   public void testModificationTimeParam() {
-    final ModificationTimeParam p = new ModificationTimeParam(ModificationTimeParam.DEFAULT);
+    final ModificationTimeParam p =
+        new ModificationTimeParam(ModificationTimeParam.DEFAULT);
     Assert.assertEquals(-1L, p.getValue().longValue());
 
     new ModificationTimeParam(-1L);
@@ -130,7 +123,7 @@ public class TestParam {
     try {
       new ModificationTimeParam(-2L);
       Assert.fail();
-    } catch(IllegalArgumentException e) {
+    } catch (IllegalArgumentException e) {
       LOG.info("EXPECTED: " + e);
     }
   }
@@ -145,7 +138,7 @@ public class TestParam {
     try {
       new OverwriteParam("abc");
       Assert.fail();
-    } catch(IllegalArgumentException e) {
+    } catch (IllegalArgumentException e) {
       LOG.info("EXPECTED: " + e);
     }
   }
@@ -159,14 +152,14 @@ public class TestParam {
   @Test
   public void testPermissionParam() {
     final PermissionParam p = new PermissionParam(PermissionParam.DEFAULT);
-    Assert.assertEquals(new FsPermission((short)0755), p.getFsPermission());
+    Assert.assertEquals(new FsPermission((short) 0755), p.getFsPermission());
 
     new PermissionParam("0");
 
     try {
       new PermissionParam("-1");
       Assert.fail();
-    } catch(IllegalArgumentException e) {
+    } catch (IllegalArgumentException e) {
       LOG.info("EXPECTED: " + e);
     }
 
@@ -175,21 +168,21 @@ public class TestParam {
     try {
       new PermissionParam("2000");
       Assert.fail();
-    } catch(IllegalArgumentException e) {
+    } catch (IllegalArgumentException e) {
       LOG.info("EXPECTED: " + e);
     }
 
     try {
       new PermissionParam("8");
       Assert.fail();
-    } catch(IllegalArgumentException e) {
+    } catch (IllegalArgumentException e) {
       LOG.info("EXPECTED: " + e);
     }
 
     try {
       new PermissionParam("abc");
       Assert.fail();
-    } catch(IllegalArgumentException e) {
+    } catch (IllegalArgumentException e) {
       LOG.info("EXPECTED: " + e);
     }
   }
@@ -204,7 +197,7 @@ public class TestParam {
     try {
       new RecursiveParam("abc");
       Assert.fail();
-    } catch(IllegalArgumentException e) {
+    } catch (IllegalArgumentException e) {
       LOG.info("EXPECTED: " + e);
     }
   }
@@ -219,17 +212,15 @@ public class TestParam {
   public void testReplicationParam() {
     final ReplicationParam p = new ReplicationParam(ReplicationParam.DEFAULT);
     Assert.assertEquals(null, p.getValue());
-    Assert.assertEquals(
-        (short)conf.getInt(DFSConfigKeys.DFS_REPLICATION_KEY,
-            DFSConfigKeys.DFS_REPLICATION_DEFAULT),
-        p.getValue(conf));
+    Assert.assertEquals((short) conf.getInt(DFSConfigKeys.DFS_REPLICATION_KEY,
+            DFSConfigKeys.DFS_REPLICATION_DEFAULT), p.getValue(conf));
 
-    new ReplicationParam((short)1);
+    new ReplicationParam((short) 1);
 
     try {
-      new ReplicationParam((short)0);
+      new ReplicationParam((short) 0);
       Assert.fail();
-    } catch(IllegalArgumentException e) {
+    } catch (IllegalArgumentException e) {
       LOG.info("EXPECTED: " + e);
     }
   }
@@ -271,79 +262,4 @@ public class TestParam {
     UserParam userParam = new UserParam("a$");
     assertNotNull(userParam.getValue());
   }
-  
-  @Test
-  public void testConcatSourcesParam() {
-    final String[] strings = {"/", "/foo", "/bar"};
-    for(int n = 0; n < strings.length; n++) {
-      final String[] sub = new String[n]; 
-      final Path[] paths = new Path[n];
-      for(int i = 0; i < paths.length; i++) {
-        paths[i] = new Path(sub[i] = strings[i]);
-      }
-
-      final String expected = StringUtils.join(",", Arrays.asList(sub));
-      final ConcatSourcesParam computed = new ConcatSourcesParam(paths);
-      Assert.assertEquals(expected, computed.getValue());
-    }
-  }
-
-  @Test
-  public void testUserNameOkAfterResettingPattern() {
-    UserParam.Domain oldDomain = UserParam.getUserPatternDomain();
-
-    String newPattern = "^[A-Za-z0-9_][A-Za-z0-9._-]*[$]?$";
-    UserParam.setUserPattern(newPattern);
-
-    UserParam userParam = new UserParam("1x");
-    assertNotNull(userParam.getValue());
-    userParam = new UserParam("123");
-    assertNotNull(userParam.getValue());
-
-    UserParam.setUserPatternDomain(oldDomain);
-  }
-
-  @Test
-  public void testAclPermissionParam() {
-    final AclPermissionParam p =
-        new AclPermissionParam("user::rwx,group::r--,other::rwx,user:user1:rwx");
-    List<AclEntry> setAclList =
-        AclEntry.parseAclSpec("user::rwx,group::r--,other::rwx,user:user1:rwx",
-            true);
-    Assert.assertEquals(setAclList.toString(), p.getAclPermission(true)
-        .toString());
-
-    new AclPermissionParam("user::rw-,group::rwx,other::rw-,user:user1:rwx");
-    try {
-      new AclPermissionParam("user::rw--,group::rwx-,other::rw-");
-      Assert.fail();
-    } catch (IllegalArgumentException e) {
-      LOG.info("EXPECTED: " + e);
-    }
-
-    new AclPermissionParam(
-        "user::rw-,group::rwx,other::rw-,user:user1:rwx,group:group1:rwx,other::rwx,mask::rwx,default:user:user1:rwx");
-
-    try {
-      new AclPermissionParam("user:r-,group:rwx,other:rw-");
-      Assert.fail();
-    } catch (IllegalArgumentException e) {
-      LOG.info("EXPECTED: " + e);
-    }
-
-    try {
-      new AclPermissionParam("default:::r-,default:group::rwx,other::rw-");
-      Assert.fail();
-    } catch (IllegalArgumentException e) {
-      LOG.info("EXPECTED: " + e);
-    }
-
-    try {
-      new AclPermissionParam("user:r-,group::rwx,other:rw-,mask:rw-,temp::rwx");
-      Assert.fail();
-    } catch (IllegalArgumentException e) {
-      LOG.info("EXPECTED: " + e);
-    }
-  }
- 
 }

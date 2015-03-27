@@ -18,21 +18,6 @@
 
 package org.apache.hadoop.hdfs;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-
-import java.io.File;
-import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.net.InetSocketAddress;
-import java.net.URL;
-import java.util.Random;
-import java.util.concurrent.TimeoutException;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.logging.impl.Log4JLogger;
@@ -44,73 +29,90 @@ import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.datanode.DataNodeTestUtils;
-import org.apache.hadoop.hdfs.server.datanode.ReplicaInfo;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.log4j.Level;
 import org.junit.Test;
 
+import java.io.File;
+import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.net.InetSocketAddress;
+import java.net.URL;
+import java.util.Random;
+import java.util.concurrent.TimeoutException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
 /**
  * This test verifies that block verification occurs on the datanode
  */
 public class TestDatanodeBlockScanner {
   
-  private static final Log LOG = 
-                 LogFactory.getLog(TestDatanodeBlockScanner.class);
+  private static final Log LOG =
+      LogFactory.getLog(TestDatanodeBlockScanner.class);
   
   private static final long TIMEOUT = 20000; // 20 sec.
   
-  private static final Pattern pattern =
-             Pattern.compile(".*?(blk_[-]*\\d+).*?scan time\\s*:\\s*(\\d+)");
+  private static Pattern pattern =
+      Pattern.compile(".*?(blk_[-]*\\d+).*?scan time\\s*:\\s*(\\d+)");
   
-  private static final Pattern pattern_blockVerify =
-             Pattern.compile(".*?(SCAN_PERIOD)\\s*:\\s*(\\d+.*?)");
+  private static Pattern pattern_blockVerify =
+      Pattern.compile(".*?(SCAN_PERIOD)\\s*:\\s*(\\d+.*?)");
   
   static {
-    ((Log4JLogger)FSNamesystem.auditLog).getLogger().setLevel(Level.WARN);
+    ((Log4JLogger) FSNamesystem.auditLog).getLogger().setLevel(Level.WARN);
   }
+
   /**
    * This connects to datanode and fetches block verification data.
    * It repeats this until the given block has a verification time > newTime.
-   * @param newTime - validation timestamps before newTime are "old", the
-   *            result of previous validations.  This method waits until a "new"
-   *            validation timestamp is obtained.  If no validator runs soon
-   *            enough, the method will time out.
+   *
+   * @param newTime
+   *     - validation timestamps before newTime are "old", the
+   *     result of previous validations.  This method waits until a "new"
+   *     validation timestamp is obtained.  If no validator runs soon
+   *     enough, the method will time out.
    * @return - the new validation timestamp
    * @throws IOException
    * @throws TimeoutException
    */
-  private static long waitForVerification(int infoPort, FileSystem fs, 
-                          Path file, int blocksValidated, 
-                          long newTime, long timeout) 
-  throws IOException, TimeoutException {
+  private static long waitForVerification(int infoPort, FileSystem fs,
+      Path file, int blocksValidated, long newTime, long timeout)
+      throws IOException, TimeoutException {
     URL url = new URL("http://localhost:" + infoPort +
-                      "/blockScannerReport?listblocks");
+        "/blockScannerReport?listblocks");
     long lastWarnTime = Time.now();
-    if (newTime <= 0) newTime = 1L;
+    if (newTime <= 0) {
+      newTime = 1L;
+    }
     long verificationTime = 0;
     
     String block = DFSTestUtil.getFirstBlock(fs, file).getBlockName();
-    long failtime = (timeout <= 0) ? Long.MAX_VALUE 
-        : Time.now() + timeout;
+    long failtime = (timeout <= 0) ? Long.MAX_VALUE : Time.now() + timeout;
     while (verificationTime < newTime) {
       if (failtime < Time.now()) {
-        throw new TimeoutException("failed to achieve block verification after "
-            + timeout + " msec.  Current verification timestamp = "
-            + verificationTime + ", requested verification time > " 
-            + newTime);
+        throw new TimeoutException(
+            "failed to achieve block verification after " + timeout +
+                " msec.  Current verification timestamp = " + verificationTime +
+                ", requested verification time > " + newTime);
       }
       String response = DFSTestUtil.urlGet(url);
-      if(blocksValidated >= 0) {
-        for(Matcher matcher = pattern_blockVerify.matcher(response); matcher.find();) {
+      if (blocksValidated >= 0) {
+        for (Matcher matcher = pattern_blockVerify.matcher(response);
+             matcher.find(); ) {
           if (block.equals(matcher.group(1))) {
             assertEquals(1, blocksValidated);
             break;
           }
         }
       }
-      for(Matcher matcher = pattern.matcher(response); matcher.find();) {
+      for (Matcher matcher = pattern.matcher(response); matcher.find(); ) {
         if (block.equals(matcher.group(1))) {
           verificationTime = Long.parseLong(matcher.group(2));
           break;
@@ -119,13 +121,14 @@ public class TestDatanodeBlockScanner {
       
       if (verificationTime < newTime) {
         long now = Time.now();
-        if ((now - lastWarnTime) >= 5*1000) {
+        if ((now - lastWarnTime) >= 5 * 1000) {
           LOG.info("Waiting for verification of " + block);
-          lastWarnTime = now; 
+          lastWarnTime = now;
         }
         try {
           Thread.sleep(500);
-        } catch (InterruptedException ignored) {}
+        } catch (InterruptedException ignored) {
+        }
       }
     }
     
@@ -147,16 +150,15 @@ public class TestDatanodeBlockScanner {
     /*
      * Write the first file and restart the cluster.
      */
-    DFSTestUtil.createFile(fs, file1, 10, (short)1, 0);
+    DFSTestUtil.createFile(fs, file1, 10, (short) 1, 0);
     cluster.shutdown();
 
-    cluster = new MiniDFSCluster.Builder(conf)
-                                .numDataNodes(1)
-                                .format(false).build();
+    cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(1).format(false).build();
     cluster.waitActive();
     
-    DFSClient dfsClient =  new DFSClient(new InetSocketAddress("localhost", 
-                                         cluster.getNameNodePort()), conf);
+    DFSClient dfsClient = new DFSClient(
+        new InetSocketAddress("localhost", cluster.getNameNodePort()), conf);
     fs = cluster.getFileSystem();
     DatanodeInfo dn = dfsClient.datanodeReport(DatanodeReportType.LIVE)[0];
     
@@ -170,16 +172,17 @@ public class TestDatanodeBlockScanner {
      * Create a new file and read the block. The block should be marked 
      * verified since the client reads the block and verifies checksum. 
      */
-    DFSTestUtil.createFile(fs, file2, 10, (short)1, 0);
-    IOUtils.copyBytes(fs.open(file2), new IOUtils.NullOutputStream(), 
-                      conf, true); 
+    DFSTestUtil.createFile(fs, file2, 10, (short) 1, 0);
+    IOUtils
+        .copyBytes(fs.open(file2), new IOUtils.NullOutputStream(), conf, true);
     assertTrue(waitForVerification(dn.getInfoPort(), fs, file2, 2, startTime,
         TIMEOUT) >= startTime);
     
     cluster.shutdown();
   }
 
-  public static boolean corruptReplica(ExtendedBlock blk, int replica) throws IOException {
+  public static boolean corruptReplica(ExtendedBlock blk, int replica)
+      throws IOException {
     return MiniDFSCluster.corruptReplica(replica, blk);
   }
 
@@ -191,14 +194,15 @@ public class TestDatanodeBlockScanner {
     FileSystem fs = null;
     int rand = random.nextInt(3);
 
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(3).build();
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(3).build();
     cluster.waitActive();
     fs = cluster.getFileSystem();
     Path file1 = new Path("/tmp/testBlockVerification/file1");
-    DFSTestUtil.createFile(fs, file1, 1024, (short)3, 0);
+    DFSTestUtil.createFile(fs, file1, 1024, (short) 3, 0);
     ExtendedBlock block = DFSTestUtil.getFirstBlock(fs, file1);
     
-    DFSTestUtil.waitReplication(fs, file1, (short)3);
+    DFSTestUtil.waitReplication(fs, file1, (short) 3);
     assertFalse(DFSTestUtil.allBlockReplicasCorrupt(cluster, file1, 0));
 
     // Corrupt random replica of block 
@@ -208,9 +212,9 @@ public class TestDatanodeBlockScanner {
     cluster.restartDataNode(rand);
 
     // We have 2 good replicas and block is not corrupt
-    DFSTestUtil.waitReplication(fs, file1, (short)2);
+    DFSTestUtil.waitReplication(fs, file1, (short) 2);
     assertFalse(DFSTestUtil.allBlockReplicasCorrupt(cluster, file1, 0));
-  
+
     // Corrupt all replicas. Now, block should be marked as corrupt
     // and we should get all the replicas 
     assertTrue(MiniDFSCluster.corruptReplica(0, block));
@@ -227,7 +231,7 @@ public class TestDatanodeBlockScanner {
 
     // We now have the blocks to be marked as corrupt and we get back all
     // its replicas
-    DFSTestUtil.waitReplication(fs, file1, (short)3);
+    DFSTestUtil.waitReplication(fs, file1, (short) 3);
     assertTrue(DFSTestUtil.allBlockReplicasCorrupt(cluster, file1, 0));
     cluster.shutdown();
   }
@@ -238,42 +242,43 @@ public class TestDatanodeBlockScanner {
    * then for two. The test invokes blockCorruptionRecoveryPolicy which
    * 1. Creates a block with desired number of replicas
    * 2. Corrupts the desired number of replicas and restarts the datanodes
-   *    containing the corrupt replica. Additionaly we also read the block
-   *    in case restarting does not report corrupt replicas.
-   *    Restarting or reading from the datanode would trigger reportBadBlocks 
-   *    to namenode.
-   *    NameNode adds it to corruptReplicasMap and neededReplication
+   * containing the corrupt replica. Additionaly we also read the block
+   * in case restarting does not report corrupt replicas.
+   * Restarting or reading from the datanode would trigger reportBadBlocks
+   * to namenode.
+   * NameNode adds it to corruptReplicasMap and neededReplication
    * 3. Test waits until all corrupt replicas are reported, meanwhile
-   *    Re-replciation brings the block back to healthy state
+   * Re-replciation brings the block back to healthy state
    * 4. Test again waits until the block is reported with expected number
-   *    of good replicas.
+   * of good replicas.
    */
   @Test
   public void testBlockCorruptionRecoveryPolicy1() throws Exception {
     // Test recovery of 1 corrupt replica
     LOG.info("Testing corrupt replica recovery for one corrupt replica");
-    blockCorruptionRecoveryPolicy(4, (short)3, 1);
+    blockCorruptionRecoveryPolicy(4, (short) 3, 1);
   }
 
   @Test
   public void testBlockCorruptionRecoveryPolicy2() throws Exception {
     // Test recovery of 2 corrupt replicas
     LOG.info("Testing corrupt replica recovery for two corrupt replicas");
-    blockCorruptionRecoveryPolicy(5, (short)3, 2);
+    blockCorruptionRecoveryPolicy(5, (short) 3, 2);
   }
   
-  private void blockCorruptionRecoveryPolicy(int numDataNodes, 
-                                             short numReplicas,
-                                             int numCorruptReplicas) 
-                                             throws Exception {
+  private void blockCorruptionRecoveryPolicy(int numDataNodes,
+      short numReplicas, int numCorruptReplicas) throws Exception {
     Configuration conf = new HdfsConfiguration();
     conf.setLong(DFSConfigKeys.DFS_BLOCKREPORT_INTERVAL_MSEC_KEY, 30L);
     conf.setLong(DFSConfigKeys.DFS_NAMENODE_REPLICATION_INTERVAL_KEY, 3);
     conf.setLong(DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY, 3L);
-    conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_REPLICATION_CONSIDERLOAD_KEY, false);
-    conf.setLong(DFSConfigKeys.DFS_NAMENODE_REPLICATION_PENDING_TIMEOUT_SEC_KEY, 5L);
+    conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_REPLICATION_CONSIDERLOAD_KEY,
+        false);
+    conf.setLong(DFSConfigKeys.DFS_NAMENODE_REPLICATION_PENDING_TIMEOUT_SEC_KEY,
+        5L);
 
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(numDataNodes).build();
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(numDataNodes).build();
     cluster.waitActive();
     FileSystem fs = cluster.getFileSystem();
     Path file1 = new Path("/tmp/testBlockCorruptRecovery/file");
@@ -287,11 +292,13 @@ public class TestDatanodeBlockScanner {
     for (int k = 0; ; k++) {
       // Corrupt numCorruptReplicas replicas of block 
       int[] corruptReplicasDNIDs = new int[numCorruptReplicas];
-      for (int i=0, j=0; (j != numCorruptReplicas) && (i < numDataNodes); i++) {
+      for (int i = 0, j = 0; (j != numCorruptReplicas) && (i < numDataNodes);
+           i++) {
         if (corruptReplica(block, i)) {
           corruptReplicasDNIDs[j++] = i;
-          LOG.info("successfully corrupted block " + block + " on node " 
-                   + i + " " + cluster.getDataNodes().get(i).getDisplayName());
+          LOG.info(
+              "successfully corrupted block " + block + " on node " + i + " " +
+                  cluster.getDataNodes().get(i).getDisplayName());
         }
       }
       
@@ -300,22 +307,27 @@ public class TestDatanodeBlockScanner {
       // They MUST be restarted in reverse order from highest to lowest index,
       // because the act of restarting them removes them from the ArrayList
       // and causes the indexes of all nodes above them in the list to change.
-      for (int i = numCorruptReplicas - 1; i >= 0 ; i--) {
-        LOG.info("restarting node with corrupt replica: position " 
-            + i + " node " + corruptReplicasDNIDs[i] + " " 
-            + cluster.getDataNodes().get(corruptReplicasDNIDs[i]).getDisplayName());
+      for (int i = numCorruptReplicas - 1; i >= 0; i--) {
+        LOG.info(
+            "restarting node with corrupt replica: position " + i + " node " +
+                corruptReplicasDNIDs[i] + " " +
+                cluster.getDataNodes().get(corruptReplicasDNIDs[i])
+                    .getDisplayName());
         cluster.restartDataNode(corruptReplicasDNIDs[i]);
       }
 
       // Loop until all corrupt replicas are reported
       try {
-        DFSTestUtil.waitCorruptReplicas(fs, cluster.getNamesystem(), file1, 
-                                        block, numCorruptReplicas);
-      } catch(TimeoutException e) {
+        DFSTestUtil
+            .waitCorruptReplicas(fs, cluster.getNamesystem(), file1, block,
+                numCorruptReplicas);
+      } catch (TimeoutException e) {
         if (k > ITERATIONS) {
           throw e;
         }
-        LOG.info("Timed out waiting for corrupt replicas, trying again, iteration " + k);
+        LOG.info(
+            "Timed out waiting for corrupt replicas, trying again, iteration " +
+                k);
         continue;
       }
       break;
@@ -327,27 +339,30 @@ public class TestDatanodeBlockScanner {
 
     // Make sure the corrupt replica is invalidated and removed from
     // corruptReplicasMap
-    DFSTestUtil.waitCorruptReplicas(fs, cluster.getNamesystem(), file1, 
-        block, 0);
+    DFSTestUtil
+        .waitCorruptReplicas(fs, cluster.getNamesystem(), file1, block, 0);
     cluster.shutdown();
   }
   
-  /** Test if NameNode handles truncated blocks in block report */
+  /**
+   * Test if NameNode handles truncated blocks in block report
+   */
   @Test
   public void testTruncatedBlockReport() throws Exception {
     final Configuration conf = new HdfsConfiguration();
-    final short REPLICATION_FACTOR = (short)2;
+    final short REPLICATION_FACTOR = (short) 2;
     final Path fileName = new Path("/file1");
 
     conf.setLong(DFSConfigKeys.DFS_BLOCKREPORT_INTERVAL_MSEC_KEY, 3L);
     conf.setLong(DFSConfigKeys.DFS_NAMENODE_REPLICATION_INTERVAL_KEY, 3);
     conf.setLong(DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY, 3L);
-    conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_REPLICATION_CONSIDERLOAD_KEY, false);
+    conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_REPLICATION_CONSIDERLOAD_KEY,
+        false);
 
     long startTime = Time.now();
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-                                               .numDataNodes(REPLICATION_FACTOR)
-                                               .build();
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(REPLICATION_FACTOR)
+            .build();
     cluster.waitActive();
     
     ExtendedBlock block;
@@ -362,45 +377,43 @@ public class TestDatanodeBlockScanner {
 
     // Restart cluster and confirm block is verified on datanode 0,
     // then truncate it on datanode 0.
-    cluster = new MiniDFSCluster.Builder(conf)
-                                .numDataNodes(REPLICATION_FACTOR)
-                                .format(false)
-                                .build();
+    cluster = new MiniDFSCluster.Builder(conf).numDataNodes(REPLICATION_FACTOR)
+        .format(false).build();
     cluster.waitActive();
     try {
       FileSystem fs = cluster.getFileSystem();
       int infoPort = cluster.getDataNodes().get(0).getInfoPort();
-      assertTrue(waitForVerification(infoPort, fs, fileName, 1, startTime, TIMEOUT) >= startTime);
+      assertTrue(
+          waitForVerification(infoPort, fs, fileName, 1, startTime, TIMEOUT) >=
+              startTime);
       
       // Truncate replica of block
       if (!changeReplicaLength(block, 0, -1)) {
         throw new IOException(
-            "failed to find or change length of replica on node 0 "
-            + cluster.getDataNodes().get(0).getDisplayName());
-      }      
+            "failed to find or change length of replica on node 0 " +
+                cluster.getDataNodes().get(0).getDisplayName());
+      }
     } finally {
       cluster.shutdown();
     }
 
     // Restart the cluster, add a node, and check that the truncated block is 
     // handled correctly
-    cluster = new MiniDFSCluster.Builder(conf)
-                                .numDataNodes(REPLICATION_FACTOR)
-                                .format(false)
-                                .build();
+    cluster = new MiniDFSCluster.Builder(conf).numDataNodes(REPLICATION_FACTOR)
+        .format(false).build();
     cluster.startDataNodes(conf, 1, true, null, null);
     cluster.waitActive();  // now we have 3 datanodes
 
     // Assure the cluster has left safe mode.
     cluster.waitClusterUp();
-    assertFalse("failed to leave safe mode", 
+    assertFalse("failed to leave safe mode",
         cluster.getNameNode().isInSafeMode());
 
     try {
       // wait for truncated block be detected by block scanner,
       // and the block to be replicated
-      DFSTestUtil.waitReplication(
-          cluster.getFileSystem(), fileName, REPLICATION_FACTOR);
+      DFSTestUtil.waitReplication(cluster.getFileSystem(), fileName,
+          REPLICATION_FACTOR);
       
       // Make sure that truncated block will be deleted
       waitForBlockDeleted(block, 0, TIMEOUT);
@@ -417,7 +430,7 @@ public class TestDatanodeBlockScanner {
     File blockFile = MiniDFSCluster.getBlockFile(dnIndex, blk);
     if (blockFile != null && blockFile.exists()) {
       RandomAccessFile raFile = new RandomAccessFile(blockFile, "rw");
-      raFile.setLength(raFile.length()+lenDelta);
+      raFile.setLength(raFile.length() + lenDelta);
       raFile.close();
       return true;
     }
@@ -428,74 +441,15 @@ public class TestDatanodeBlockScanner {
   private static void waitForBlockDeleted(ExtendedBlock blk, int dnIndex,
       long timeout) throws TimeoutException, InterruptedException {
     File blockFile = MiniDFSCluster.getBlockFile(dnIndex, blk);
-    long failtime = Time.now() 
-                    + ((timeout > 0) ? timeout : Long.MAX_VALUE);
+    long failtime = Time.now() + ((timeout > 0) ? timeout : Long.MAX_VALUE);
     while (blockFile != null && blockFile.exists()) {
       if (failtime < Time.now()) {
-        throw new TimeoutException("waited too long for blocks to be deleted: "
-            + blockFile.getPath() + (blockFile.exists() ? " still exists; " : " is absent; "));
+        throw new TimeoutException(
+            "waited too long for blocks to be deleted: " + blockFile.getPath() +
+                (blockFile.exists() ? " still exists; " : " is absent; "));
       }
       Thread.sleep(100);
       blockFile = MiniDFSCluster.getBlockFile(dnIndex, blk);
-    }
-  }
-  
-  private static final String BASE_PATH = (new File("/data/current/finalized"))
-      .getAbsolutePath();
-  
-  @Test
-  public void testReplicaInfoParsing() throws Exception {
-    testReplicaInfoParsingSingle(BASE_PATH, new int[0]);
-    testReplicaInfoParsingSingle(BASE_PATH + "/subdir1", new int[]{1});
-    testReplicaInfoParsingSingle(BASE_PATH + "/subdir43", new int[]{43});
-    testReplicaInfoParsingSingle(BASE_PATH + "/subdir1/subdir2/subdir3", new int[]{1, 2, 3});
-    testReplicaInfoParsingSingle(BASE_PATH + "/subdir1/subdir2/subdir43", new int[]{1, 2, 43});
-    testReplicaInfoParsingSingle(BASE_PATH + "/subdir1/subdir23/subdir3", new int[]{1, 23, 3});
-    testReplicaInfoParsingSingle(BASE_PATH + "/subdir13/subdir2/subdir3", new int[]{13, 2, 3});
-  }
-  
-  private static void testReplicaInfoParsingSingle(String subDirPath, int[] expectedSubDirs) {
-    File testFile = new File(subDirPath);
-    assertArrayEquals(expectedSubDirs, ReplicaInfo.parseSubDirs(testFile).subDirs);
-    assertEquals(BASE_PATH, ReplicaInfo.parseSubDirs(testFile).baseDirPath);
-  }
-
-  @Test
-  public void testDuplicateScans() throws Exception {
-    long startTime = Time.now();
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(new Configuration())
-        .numDataNodes(1).build();
-    FileSystem fs = null;
-    try {
-      fs = cluster.getFileSystem();
-      DataNode dataNode = cluster.getDataNodes().get(0);
-      int infoPort = dataNode.getInfoPort();
-      long scanTimeBefore = 0, scanTimeAfter = 0;
-      for (int i = 1; i < 10; i++) {
-        Path fileName = new Path("/test" + i);
-        DFSTestUtil.createFile(fs, fileName, 1024, (short) 1, 1000L);
-        waitForVerification(infoPort, fs, fileName, i, startTime, TIMEOUT);
-        if (i > 1) {
-          scanTimeAfter = DataNodeTestUtils.getLatestScanTime(dataNode,
-              DFSTestUtil.getFirstBlock(fs, new Path("/test" + (i - 1))));
-          assertFalse("scan time shoud not be 0", scanTimeAfter == 0);
-          assertEquals("There should not be duplicate scan", scanTimeBefore,
-              scanTimeAfter);
-        }
-
-        scanTimeBefore = DataNodeTestUtils.getLatestScanTime(dataNode,
-            DFSTestUtil.getFirstBlock(fs, new Path("/test" + i)));
-      }
-      cluster.restartDataNode(0);
-      Thread.sleep(10000);
-      dataNode = cluster.getDataNodes().get(0);
-      scanTimeAfter = DataNodeTestUtils.getLatestScanTime(dataNode,
-          DFSTestUtil.getFirstBlock(fs, new Path("/test" + (9))));
-      assertEquals("There should not be duplicate scan", scanTimeBefore,
-          scanTimeAfter);
-    } finally {
-      IOUtils.closeStream(fs);
-      cluster.shutdown();
     }
   }
 }

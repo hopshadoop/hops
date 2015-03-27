@@ -20,8 +20,11 @@ package org.apache.hadoop.fi;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 
-/** A pipeline contains a list of datanodes. */
+/**
+ * A pipeline contains a list of datanodes.
+ */
 public interface PipelineTest {
   public Pipeline initPipeline(LocatedBlock lb);
+
   public Pipeline getPipelineForDatanode(DatanodeID id);
 }

@@ -17,18 +17,26 @@
  */
 package org.apache.hadoop.hdfs.web.resources;
 
-/** Overwrite parameter. */
+/**
+ * Overwrite parameter.
+ */
 public class OverwriteParam extends BooleanParam {
-  /** Parameter name. */
+  /**
+   * Parameter name.
+   */
   public static final String NAME = "overwrite";
-  /** Default parameter value. */
+  /**
+   * Default parameter value.
+   */
   public static final String DEFAULT = FALSE;
 
   private static final Domain DOMAIN = new Domain(NAME);
 
   /**
    * Constructor.
-   * @param value the parameter value.
+   *
+   * @param value
+   *     the parameter value.
    */
   public OverwriteParam(final Boolean value) {
     super(DOMAIN, value);
@@ -36,7 +44,9 @@ public class OverwriteParam extends BooleanParam {
 
   /**
    * Constructor.
-   * @param str a string representation of the parameter value.
+   *
+   * @param str
+   *     a string representation of the parameter value.
    */
   public OverwriteParam(final String str) {
     this(DOMAIN.parse(str));

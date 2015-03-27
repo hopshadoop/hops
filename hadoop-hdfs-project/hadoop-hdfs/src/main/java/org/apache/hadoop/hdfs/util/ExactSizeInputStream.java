@@ -17,15 +17,14 @@
  */
 package org.apache.hadoop.hdfs.util;
 
+import com.google.common.base.Preconditions;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
+
 import java.io.EOFException;
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
-
-import com.google.common.base.Preconditions;
 
 /**
  * An InputStream implementations which reads from some other InputStream
@@ -42,17 +41,19 @@ public class ExactSizeInputStream extends FilterInputStream {
   /**
    * Construct an input stream that will read no more than
    * 'numBytes' bytes.
-   * 
+   * <p/>
    * If an EOF occurs on the underlying stream before numBytes
    * bytes have been read, an EOFException will be thrown.
-   * 
-   * @param in the inputstream to wrap
-   * @param numBytes the number of bytes to read
+   *
+   * @param in
+   *     the inputstream to wrap
+   * @param numBytes
+   *     the number of bytes to read
    */
   public ExactSizeInputStream(InputStream in, int numBytes) {
     super(in);
-    Preconditions.checkArgument(numBytes >= 0,
-        "Negative expected bytes: ", numBytes);
+    Preconditions
+        .checkArgument(numBytes >= 0, "Negative expected bytes: ", numBytes);
     this.remaining = numBytes;
   }
 
@@ -80,8 +81,7 @@ public class ExactSizeInputStream extends FilterInputStream {
   }
 
   @Override
-  public int read(final byte[] b, final int off, int len)
-                  throws IOException {
+  public int read(final byte[] b, final int off, int len) throws IOException {
     if (remaining <= 0) {
       return -1;
     }

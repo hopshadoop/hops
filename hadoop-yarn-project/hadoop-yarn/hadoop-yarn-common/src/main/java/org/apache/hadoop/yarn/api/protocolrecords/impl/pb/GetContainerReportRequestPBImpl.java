@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.api.protocolrecords.impl.pb;
 
+import com.google.protobuf.TextFormat;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.protocolrecords.GetContainerReportRequest;
@@ -27,13 +28,11 @@ import org.apache.hadoop.yarn.proto.YarnProtos.ContainerIdProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetContainerReportRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetContainerReportRequestProtoOrBuilder;
 
-import com.google.protobuf.TextFormat;
-
 @Private
 @Unstable
 public class GetContainerReportRequestPBImpl extends GetContainerReportRequest {
-  GetContainerReportRequestProto proto = GetContainerReportRequestProto
-    .getDefaultInstance();
+  GetContainerReportRequestProto proto =
+      GetContainerReportRequestProto.getDefaultInstance();
   GetContainerReportRequestProto.Builder builder = null;
   boolean viaProto = false;
 
@@ -62,8 +61,9 @@ public class GetContainerReportRequestPBImpl extends GetContainerReportRequest {
 
   @Override
   public boolean equals(Object other) {
-    if (other == null)
+    if (other == null) {
       return false;
+    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -82,8 +82,9 @@ public class GetContainerReportRequestPBImpl extends GetContainerReportRequest {
   }
 
   private void mergeLocalToProto() {
-    if (viaProto)
+    if (viaProto) {
       maybeInitBuilder();
+    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;

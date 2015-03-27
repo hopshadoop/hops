@@ -18,19 +18,17 @@
 
 package org.apache.hadoop.yarn.server.nodemanager.webapp;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
-import java.io.File;
-import java.io.IOException;
-import java.io.StringReader;
-import java.util.HashMap;
-
-import javax.ws.rs.core.MediaType;
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-
+import com.google.inject.Guice;
+import com.google.inject.Injector;
+import com.google.inject.servlet.GuiceServletContextListener;
+import com.google.inject.servlet.ServletModule;
+import com.sun.jersey.api.client.ClientResponse;
+import com.sun.jersey.api.client.ClientResponse.Status;
+import com.sun.jersey.api.client.UniformInterfaceException;
+import com.sun.jersey.api.client.WebResource;
+import com.sun.jersey.guice.spi.container.servlet.GuiceContainer;
+import com.sun.jersey.test.framework.JerseyTest;
+import com.sun.jersey.test.framework.WebAppDescriptor;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
@@ -64,17 +62,17 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.InputSource;
 
-import com.google.inject.Guice;
-import com.google.inject.Injector;
-import com.google.inject.servlet.GuiceServletContextListener;
-import com.google.inject.servlet.ServletModule;
-import com.sun.jersey.api.client.ClientResponse;
-import com.sun.jersey.api.client.ClientResponse.Status;
-import com.sun.jersey.api.client.UniformInterfaceException;
-import com.sun.jersey.api.client.WebResource;
-import com.sun.jersey.guice.spi.container.servlet.GuiceContainer;
-import com.sun.jersey.test.framework.JerseyTest;
-import com.sun.jersey.test.framework.WebAppDescriptor;
+import javax.ws.rs.core.MediaType;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import java.io.File;
+import java.io.IOException;
+import java.io.StringReader;
+import java.util.HashMap;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 public class TestNMWebServicesApps extends JerseyTest {
 
@@ -85,8 +83,8 @@ public class TestNMWebServicesApps extends JerseyTest {
   private static WebApp nmWebApp;
   private static Configuration conf = new Configuration();
 
-  private static final File testRootDir = new File("target",
-      TestNMWebServicesApps.class.getSimpleName());
+  private static final File testRootDir =
+      new File("target", TestNMWebServicesApps.class.getSimpleName());
   private static File testLogDir = new File("target",
       TestNMWebServicesApps.class.getSimpleName() + "LogDir");
 
@@ -99,9 +97,10 @@ public class TestNMWebServicesApps extends JerseyTest {
       healthChecker.init(conf);
       dirsHandler = healthChecker.getDiskHandler();
       aclsManager = new ApplicationACLsManager(conf);
-      nmContext = new NodeManager.NMContext(null, null, dirsHandler, aclsManager);
+      nmContext =
+          new NodeManager.NMContext(null, null, dirsHandler, aclsManager);
       NodeId nodeId = NodeId.newInstance("testhost.foo.com", 9999);
-      ((NodeManager.NMContext)nmContext).setNodeId(nodeId);
+      ((NodeManager.NMContext) nmContext).setNodeId(nodeId);
       resourceView = new ResourceView() {
         @Override
         public long getVmemAllocatedForContainers() {
@@ -179,27 +178,27 @@ public class TestNMWebServicesApps extends JerseyTest {
     assertEquals("apps isn't NULL", JSONObject.NULL, json.get("apps"));
   }
 
-  private HashMap<String, String> addAppContainers(Application app) 
+  private HashMap<String, String> addAppContainers(Application app)
       throws IOException {
     Dispatcher dispatcher = new AsyncDispatcher();
-    ApplicationAttemptId appAttemptId = BuilderUtils.newApplicationAttemptId(
-        app.getAppId(), 1);
-    Container container1 = new MockContainer(appAttemptId, dispatcher, conf,
-        app.getUser(), app.getAppId(), 1);
-    Container container2 = new MockContainer(appAttemptId, dispatcher, conf,
-        app.getUser(), app.getAppId(), 2);
-    nmContext.getContainers()
-        .put(container1.getContainerId(), container1);
-    nmContext.getContainers()
-        .put(container2.getContainerId(), container2);
+    ApplicationAttemptId appAttemptId =
+        BuilderUtils.newApplicationAttemptId(app.getAppId(), 1);
+    Container container1 =
+        new MockContainer(appAttemptId, dispatcher, conf, app.getUser(),
+            app.getAppId(), 1);
+    Container container2 =
+        new MockContainer(appAttemptId, dispatcher, conf, app.getUser(),
+            app.getAppId(), 2);
+    nmContext.getContainers().put(container1.getContainerId(), container1);
+    nmContext.getContainers().put(container2.getContainerId(), container2);
 
     app.getContainers().put(container1.getContainerId(), container1);
     app.getContainers().put(container2.getContainerId(), container2);
     HashMap<String, String> hash = new HashMap<String, String>();
-    hash.put(container1.getContainerId().toString(), container1
-        .getContainerId().toString());
-    hash.put(container2.getContainerId().toString(), container2
-        .getContainerId().toString());
+    hash.put(container1.getContainerId().toString(),
+        container1.getContainerId().toString());
+    hash.put(container2.getContainerId().toString(),
+        container2.getContainerId().toString());
     return hash;
   }
 
@@ -220,8 +219,8 @@ public class TestNMWebServicesApps extends JerseyTest {
 
   }
 
-  public void testNodeHelper(String path, String media) throws JSONException,
-      Exception {
+  public void testNodeHelper(String path, String media)
+      throws JSONException, Exception {
     WebResource r = resource();
     Application app = new MockApp(1);
     nmContext.getApplications().put(app.getAppId(), app);
@@ -230,8 +229,9 @@ public class TestNMWebServicesApps extends JerseyTest {
     nmContext.getApplications().put(app2.getAppId(), app2);
     HashMap<String, String> hash2 = addAppContainers(app2);
 
-    ClientResponse response = r.path("ws").path("v1").path("node").path(path)
-        .accept(media).get(ClientResponse.class);
+    ClientResponse response =
+        r.path("ws").path("v1").path("node").path(path).accept(media)
+            .get(ClientResponse.class);
     assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
     JSONObject json = response.getEntity(JSONObject.class);
     JSONObject info = json.getJSONObject("apps");
@@ -314,13 +314,11 @@ public class TestNMWebServicesApps extends JerseyTest {
       String message = exception.getString("message");
       String type = exception.getString("exception");
       String classname = exception.getString("javaClassName");
+      WebServicesTestUtils.checkStringMatch("exception message",
+          "java.lang.Exception: Error: You must specify a non-empty string for the user",
+          message);
       WebServicesTestUtils
-          .checkStringMatch(
-              "exception message",
-              "java.lang.Exception: Error: You must specify a non-empty string for the user",
-              message);
-      WebServicesTestUtils.checkStringMatch("exception type",
-          "BadRequestException", type);
+          .checkStringMatch("exception type", "BadRequestException", type);
       WebServicesTestUtils.checkStringMatch("exception classname",
           "org.apache.hadoop.yarn.webapp.BadRequestException", classname);
     }
@@ -403,7 +401,8 @@ public class TestNMWebServicesApps extends JerseyTest {
 
   // verify the exception object default format is JSON
   @Test
-  public void testNodeAppsStateInvalidDefault() throws JSONException, Exception {
+  public void testNodeAppsStateInvalidDefault()
+      throws JSONException, Exception {
     WebResource r = resource();
     Application app = new MockApp(1);
     nmContext.getApplications().put(app.getAppId(), app);
@@ -463,21 +462,19 @@ public class TestNMWebServicesApps extends JerseyTest {
       Element element = (Element) nodes.item(0);
       String message = WebServicesTestUtils.getXmlString(element, "message");
       String type = WebServicesTestUtils.getXmlString(element, "exception");
-      String classname = WebServicesTestUtils.getXmlString(element,
-          "javaClassName");
+      String classname =
+          WebServicesTestUtils.getXmlString(element, "javaClassName");
       verifyStateInvalidException(message, type, classname);
     }
   }
 
   private void verifyStateInvalidException(String message, String type,
       String classname) {
+    WebServicesTestUtils.checkStringContains("exception message",
+        "org.apache.hadoop.yarn.server.nodemanager.containermanager.application.ApplicationState.FOO_STATE",
+        message);
     WebServicesTestUtils
-        .checkStringContains(
-            "exception message",
-            "org.apache.hadoop.yarn.server.nodemanager.containermanager.application.ApplicationState.FOO_STATE",
-            message);
-    WebServicesTestUtils.checkStringMatch("exception type",
-        "IllegalArgumentException", type);
+        .checkStringMatch("exception type", "IllegalArgumentException", type);
     WebServicesTestUtils.checkStringMatch("exception classname",
         "java.lang.IllegalArgumentException", classname);
   }
@@ -493,8 +490,8 @@ public class TestNMWebServicesApps extends JerseyTest {
     testNodeSingleAppHelper("");
   }
 
-  public void testNodeSingleAppHelper(String media) throws JSONException,
-      Exception {
+  public void testNodeSingleAppHelper(String media)
+      throws JSONException, Exception {
     WebResource r = resource();
     Application app = new MockApp(1);
     nmContext.getApplications().put(app.getAppId(), app);
@@ -553,10 +550,11 @@ public class TestNMWebServicesApps extends JerseyTest {
       String message = exception.getString("message");
       String type = exception.getString("exception");
       String classname = exception.getString("javaClassName");
-      WebServicesTestUtils.checkStringMatch("exception message",
-          "For input string: \"foo\"", message);
-      WebServicesTestUtils.checkStringMatch("exception type",
-          "NumberFormatException", type);
+      WebServicesTestUtils
+          .checkStringMatch("exception message", "For input string: \"foo\"",
+              message);
+      WebServicesTestUtils
+          .checkStringMatch("exception type", "NumberFormatException", type);
       WebServicesTestUtils.checkStringMatch("exception classname",
           "java.lang.NumberFormatException", classname);
     }
@@ -590,8 +588,8 @@ public class TestNMWebServicesApps extends JerseyTest {
       WebServicesTestUtils.checkStringMatch("exception message",
           "java.lang.Exception: app with id application_1234_0009 not found",
           message);
-      WebServicesTestUtils.checkStringMatch("exception type",
-          "NotFoundException", type);
+      WebServicesTestUtils
+          .checkStringMatch("exception type", "NotFoundException", type);
       WebServicesTestUtils.checkStringMatch("exception classname",
           "org.apache.hadoop.yarn.webapp.NotFoundException", classname);
     }
@@ -631,8 +629,8 @@ public class TestNMWebServicesApps extends JerseyTest {
     addAppContainers(app2);
 
     ClientResponse response = r.path("ws").path("v1").path("node").path("apps")
-        .path(app.getAppId().toString() + "/")
-        .accept(MediaType.APPLICATION_XML).get(ClientResponse.class);
+        .path(app.getAppId().toString() + "/").accept(MediaType.APPLICATION_XML)
+        .get(ClientResponse.class);
     assertEquals(MediaType.APPLICATION_XML_TYPE, response.getType());
     String xml = response.getEntity(String.class);
     DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
@@ -670,8 +668,8 @@ public class TestNMWebServicesApps extends JerseyTest {
       HashMap<String, String> hash) throws JSONException, Exception {
     assertEquals("incorrect number of elements", 4, info.length());
 
-    verifyNodeAppInfoGeneric(app, info.getString("id"),
-        info.getString("state"), info.getString("user"));
+    verifyNodeAppInfoGeneric(app, info.getString("id"), info.getString("state"),
+        info.getString("user"));
 
     JSONArray containerids = info.getJSONArray("containerids");
     for (int i = 0; i < containerids.length(); i++) {
@@ -681,13 +679,13 @@ public class TestNMWebServicesApps extends JerseyTest {
     assertTrue("missing containerids", hash.isEmpty());
   }
 
-  public void verifyNodeAppInfoGeneric(Application app, String id,
-      String state, String user) throws JSONException, Exception {
+  public void verifyNodeAppInfoGeneric(Application app, String id, String state,
+      String user) throws JSONException, Exception {
     WebServicesTestUtils.checkStringMatch("id", app.getAppId().toString(), id);
-    WebServicesTestUtils.checkStringMatch("state", app.getApplicationState()
-        .toString(), state);
-    WebServicesTestUtils.checkStringMatch("user", app.getUser().toString(),
-        user);
+    WebServicesTestUtils
+        .checkStringMatch("state", app.getApplicationState().toString(), state);
+    WebServicesTestUtils
+        .checkStringMatch("user", app.getUser().toString(), user);
   }
 
 }

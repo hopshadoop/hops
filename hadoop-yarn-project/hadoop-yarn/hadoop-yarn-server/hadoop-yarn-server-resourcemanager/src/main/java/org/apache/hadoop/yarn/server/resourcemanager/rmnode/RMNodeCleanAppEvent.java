@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.rmnode;
 
+import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.NodeId;
 
@@ -25,8 +26,9 @@ public class RMNodeCleanAppEvent extends RMNodeEvent {
 
   private ApplicationId appId;
 
-  public RMNodeCleanAppEvent(NodeId nodeId, ApplicationId appId) {
-    super(nodeId, RMNodeEventType.CLEANUP_APP);
+  public RMNodeCleanAppEvent(NodeId nodeId, ApplicationId appId,
+      TransactionState transactionState) {
+    super(nodeId, RMNodeEventType.CLEANUP_APP, transactionState);
     this.appId = appId;
   }
 

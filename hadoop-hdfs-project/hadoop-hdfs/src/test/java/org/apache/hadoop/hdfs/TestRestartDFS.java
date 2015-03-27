@@ -18,20 +18,21 @@
 
 package org.apache.hadoop.hdfs;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.junit.Test;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
 /**
  * A JUnit test for checking if restarting DFS preserves integrity.
  */
 public class TestRestartDFS {
-  public void runTests(Configuration conf, boolean serviceTest) throws Exception {
+  public void runTests(Configuration conf, boolean serviceTest)
+      throws Exception {
     MiniDFSCluster cluster = null;
     DFSTestUtil files = new DFSTestUtil.Builder().setName("TestRestartDFS").
         setNumFiles(20).build();
@@ -47,7 +48,7 @@ public class TestRestartDFS {
     try {
       if (serviceTest) {
         conf.set(DFSConfigKeys.DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY,
-                 "localhost:0");
+            "localhost:0");
       }
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(4).build();
       FileSystem fs = cluster.getFileSystem();
@@ -60,18 +61,21 @@ public class TestRestartDFS {
       fs.setOwner(rootpath, rootstatus.getOwner() + "_XXX", null);
       fs.setOwner(dirpath, null, dirstatus.getGroup() + "_XXX");
     } finally {
-      if (cluster != null) { cluster.shutdown(); }
+      if (cluster != null) {
+        cluster.shutdown();
+      }
     }
     try {
       if (serviceTest) {
         conf.set(DFSConfigKeys.DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY,
-                 "localhost:0");
+            "localhost:0");
       }
       // Here we restart the MiniDFScluster without formatting namenode
-      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(4).format(false).build(); 
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(4).format(false)
+          .build();
       FileSystem fs = cluster.getFileSystem();
       assertTrue("Filesystem corrupted after restart.",
-                 files.checkFiles(fs, dir));
+          files.checkFiles(fs, dir));
 
       final FileStatus newrootstatus = fs.getFileStatus(rootpath);
       assertEquals(rootmtime, newrootstatus.getModificationTime());
@@ -83,19 +87,22 @@ public class TestRestartDFS {
       assertEquals(dirstatus.getGroup() + "_XXX", newdirstatus.getGroup());
       rootmtime = fs.getFileStatus(rootpath).getModificationTime();
     } finally {
-      if (cluster != null) { cluster.shutdown(); }
+      if (cluster != null) {
+        cluster.shutdown();
+      }
     }
     try {
       if (serviceTest) {
         conf.set(DFSConfigKeys.DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY,
-                 "localhost:0");
+            "localhost:0");
       }
       // This is a second restart to check that after the first restart
       // the image written in parallel to both places did not get corrupted
-      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(4).format(false).build();
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(4).format(false)
+          .build();
       FileSystem fs = cluster.getFileSystem();
       assertTrue("Filesystem corrupted after restart.",
-                 files.checkFiles(fs, dir));
+          files.checkFiles(fs, dir));
 
       final FileStatus newrootstatus = fs.getFileStatus(rootpath);
       assertEquals(rootmtime, newrootstatus.getModificationTime());
@@ -108,22 +115,28 @@ public class TestRestartDFS {
 
       files.cleanup(fs, dir);
     } finally {
-      if (cluster != null) { cluster.shutdown(); }
+      if (cluster != null) {
+        cluster.shutdown();
+      }
     }
   }
-  /** check if DFS remains in proper condition after a restart */
+
+  /**
+   * check if DFS remains in proper condition after a restart
+   */
   @Test
   public void testRestartDFS() throws Exception {
     final Configuration conf = new HdfsConfiguration();
     runTests(conf, false);
   }
   
-  /** check if DFS remains in proper condition after a restart 
+  /**
+   * check if DFS remains in proper condition after a restart
    * this rerun is with 2 ports enabled for RPC in the namenode
    */
   @Test
-   public void testRestartDualPortDFS() throws Exception {
-     final Configuration conf = new HdfsConfiguration();
-     runTests(conf, true);
-   }
+  public void testRestartDualPortDFS() throws Exception {
+    final Configuration conf = new HdfsConfiguration();
+    runTests(conf, true);
+  }
 }

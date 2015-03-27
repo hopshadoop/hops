@@ -19,9 +19,13 @@ package org.apache.hadoop.hdfs.web.resources;
 
 import java.net.HttpURLConnection;
 
-/** Http DELETE operation parameter. */
+/**
+ * Http DELETE operation parameter.
+ */
 public class DeleteOpParam extends HttpOpParam<DeleteOpParam.Op> {
-  /** Delete operations. */
+  /**
+   * Delete operations.
+   */
   public static enum Op implements HttpOpParam.Op {
     DELETE(HttpURLConnection.HTTP_OK),
 
@@ -36,11 +40,6 @@ public class DeleteOpParam extends HttpOpParam<DeleteOpParam.Op> {
     @Override
     public HttpOpParam.Type getType() {
       return HttpOpParam.Type.DELETE;
-    }
-
-    @Override
-    public boolean getRequireAuth() {
-      return false;
     }
 
     @Override
@@ -68,7 +67,9 @@ public class DeleteOpParam extends HttpOpParam<DeleteOpParam.Op> {
 
   /**
    * Constructor.
-   * @param str a string representation of the parameter value.
+   *
+   * @param str
+   *     a string representation of the parameter value.
    */
   public DeleteOpParam(final String str) {
     super(DOMAIN, DOMAIN.parse(str));

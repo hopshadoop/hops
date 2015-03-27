@@ -36,32 +36,18 @@ import java.util.regex.Pattern;
 
 @Provider
 @InterfaceAudience.Private
-public class UserProvider extends AbstractHttpContextInjectable<Principal> implements
-  InjectableProvider<Context, Type> {
+public class UserProvider extends AbstractHttpContextInjectable<Principal>
+    implements InjectableProvider<Context, Type> {
 
   public static final String USER_NAME_PARAM = "user.name";
 
-
-  public static final String USER_PATTERN_KEY 
-    = "httpfs.user.provider.user.pattern";
-
-  public static final String USER_PATTERN_DEFAULT 
-    = "^[A-Za-z_][A-Za-z0-9._-]*[$]?$";
-
-  private static Pattern userPattern = Pattern.compile(USER_PATTERN_DEFAULT);
-
-  public static void setUserPattern(String pattern) {
-    userPattern = Pattern.compile(pattern);
-  }
-
-  public static Pattern getUserPattern() {
-    return userPattern;
-  }
+  public static final Pattern USER_PATTERN =
+      Pattern.compile("^[A-Za-z_][A-Za-z0-9._-]*[$]?$");
 
   static class UserParam extends StringParam {
 
     public UserParam(String user) {
-      super(USER_NAME_PARAM, user, getUserPattern());
+      super(USER_NAME_PARAM, user, USER_PATTERN);
     }
 
     @Override
@@ -69,8 +55,9 @@ public class UserProvider extends AbstractHttpContextInjectable<Principal> imple
       if (str != null) {
         int len = str.length();
         if (len < 1) {
-          throw new IllegalArgumentException(MessageFormat.format(
-            "Parameter [{0}], it's length must be at least 1", getName()));
+          throw new IllegalArgumentException(MessageFormat
+              .format("Parameter [{0}], it's length must be at least 1",
+                  getName()));
         }
       }
       return super.parseParam(str);
@@ -81,7 +68,8 @@ public class UserProvider extends AbstractHttpContextInjectable<Principal> imple
   public Principal getValue(HttpContext httpContext) {
     Principal principal = httpContext.getRequest().getUserPrincipal();
     if (principal == null) {
-      final String user = httpContext.getRequest().getQueryParameters().getFirst(USER_NAME_PARAM);
+      final String user = httpContext.getRequest().getQueryParameters()
+          .getFirst(USER_NAME_PARAM);
       if (user != null) {
         principal = new Principal() {
           @Override
@@ -103,7 +91,8 @@ public class UserProvider extends AbstractHttpContextInjectable<Principal> imple
   }
 
   @Override
-  public Injectable getInjectable(ComponentContext componentContext, Context context, Type type) {
+  public Injectable getInjectable(ComponentContext componentContext,
+      Context context, Type type) {
     return (type.equals(Principal.class)) ? this : null;
   }
 }

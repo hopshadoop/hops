@@ -18,15 +18,15 @@
 
 package org.apache.hadoop.lib.util;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
+import org.apache.hadoop.conf.Configuration;
+import org.junit.Test;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
-import org.apache.hadoop.conf.Configuration;
-import org.junit.Test;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 
 public class TestConfigurationUtils {
 
@@ -35,7 +35,9 @@ public class TestConfigurationUtils {
     Configuration conf = new Configuration(false);
     assertEquals(conf.size(), 0);
 
-    byte[] bytes = "<configuration><property><name>a</name><value>A</value></property></configuration>".getBytes();
+    byte[] bytes =
+        "<configuration><property><name>a</name><value>A</value></property></configuration>"
+            .getBytes();
     InputStream is = new ByteArrayInputStream(bytes);
     conf = new Configuration(false);
     ConfigurationUtils.load(conf, is);
@@ -46,7 +48,8 @@ public class TestConfigurationUtils {
 
   @Test(expected = IOException.class)
   public void constructorsFail3() throws Exception {
-    InputStream is = new ByteArrayInputStream("<xonfiguration></xonfiguration>".getBytes());
+    InputStream is =
+        new ByteArrayInputStream("<xonfiguration></xonfiguration>".getBytes());
     Configuration conf = new Configuration(false);
     ConfigurationUtils.load(conf, is);
   }

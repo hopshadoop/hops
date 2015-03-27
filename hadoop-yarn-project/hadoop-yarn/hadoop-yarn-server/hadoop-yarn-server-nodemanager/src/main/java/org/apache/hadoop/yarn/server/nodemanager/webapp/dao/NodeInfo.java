@@ -18,14 +18,14 @@
 
 package org.apache.hadoop.yarn.server.nodemanager.webapp.dao;
 
-import javax.xml.bind.annotation.XmlAccessType;
-import javax.xml.bind.annotation.XmlAccessorType;
-import javax.xml.bind.annotation.XmlRootElement;
-
 import org.apache.hadoop.util.VersionInfo;
 import org.apache.hadoop.yarn.server.nodemanager.Context;
 import org.apache.hadoop.yarn.server.nodemanager.ResourceView;
 import org.apache.hadoop.yarn.util.YarnVersionInfo;
+
+import javax.xml.bind.annotation.XmlAccessType;
+import javax.xml.bind.annotation.XmlAccessorType;
+import javax.xml.bind.annotation.XmlRootElement;
 
 @XmlRootElement
 @XmlAccessorType(XmlAccessType.FIELD)
@@ -56,15 +56,15 @@ public class NodeInfo {
 
     this.id = context.getNodeId().toString();
     this.nodeHostName = context.getNodeId().getHost();
-    this.totalVmemAllocatedContainersMB = resourceView
-        .getVmemAllocatedForContainers() / BYTES_IN_MB;
+    this.totalVmemAllocatedContainersMB =
+        resourceView.getVmemAllocatedForContainers() / BYTES_IN_MB;
     this.vmemCheckEnabled = resourceView.isVmemCheckEnabled();
-    this.totalPmemAllocatedContainersMB = resourceView
-        .getPmemAllocatedForContainers() / BYTES_IN_MB;
+    this.totalPmemAllocatedContainersMB =
+        resourceView.getPmemAllocatedForContainers() / BYTES_IN_MB;
     this.pmemCheckEnabled = resourceView.isPmemCheckEnabled();
     this.nodeHealthy = context.getNodeHealthStatus().getIsNodeHealthy();
-    this.lastNodeUpdateTime = context.getNodeHealthStatus()
-        .getLastHealthReportTime();
+    this.lastNodeUpdateTime =
+        context.getNodeHealthStatus().getLastHealthReportTime();
 
     this.healthReport = context.getNodeHealthStatus().getHealthReport();
 

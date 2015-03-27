@@ -24,7 +24,6 @@ import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.lib.server.ServerException;
 import org.apache.hadoop.lib.service.FileSystemAccess;
 import org.apache.hadoop.lib.servlet.ServerWebApp;
-import org.apache.hadoop.lib.wsrs.UserProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,7 +43,7 @@ import java.io.IOException;
 @InterfaceAudience.Private
 public class HttpFSServerWebApp extends ServerWebApp {
   private static final Logger LOG =
-    LoggerFactory.getLogger(HttpFSServerWebApp.class);
+      LoggerFactory.getLogger(HttpFSServerWebApp.class);
 
   /**
    * Server name and prefix for all configuration properties.
@@ -63,8 +62,9 @@ public class HttpFSServerWebApp extends ServerWebApp {
   /**
    * Default constructor.
    *
-   * @throws IOException thrown if the home/conf/log/temp directory paths
-   * could not be resolved.
+   * @throws IOException
+   *     thrown if the home/conf/log/temp directory paths
+   *     could not be resolved.
    */
   public HttpFSServerWebApp() throws IOException {
     super(NAME);
@@ -74,7 +74,7 @@ public class HttpFSServerWebApp extends ServerWebApp {
    * Constructor used for testing purposes.
    */
   public HttpFSServerWebApp(String homeDir, String configDir, String logDir,
-                               String tempDir, Configuration config) {
+      String tempDir, Configuration config) {
     super(NAME, homeDir, configDir, logDir, tempDir, config);
   }
 
@@ -89,23 +89,21 @@ public class HttpFSServerWebApp extends ServerWebApp {
    * Initializes the HttpFSServer server, loads configuration and required
    * services.
    *
-   * @throws ServerException thrown if HttpFSServer server could not be
-   * initialized.
+   * @throws ServerException
+   *     thrown if HttpFSServer server could not be
+   *     initialized.
    */
   @Override
   public void init() throws ServerException {
+    super.init();
     if (SERVER != null) {
       throw new RuntimeException("HttpFSServer server already initialized");
     }
     SERVER = this;
-    super.init();
     adminGroup = getConfig().get(getPrefixedName(CONF_ADMIN_GROUP), "admin");
     LOG.info("Connects to Namenode [{}]",
-             get().get(FileSystemAccess.class).getFileSystemConfiguration().
-               get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY));
-    String userPattern = getConfig().get(UserProvider.USER_PATTERN_KEY, 
-      UserProvider.USER_PATTERN_DEFAULT);
-    UserProvider.setUserPattern(userPattern);
+        get().get(FileSystemAccess.class).getFileSystemConfiguration().
+            get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY));
   }
 
   /**

@@ -24,7 +24,7 @@ import org.junit.runners.Parameterized;
 
 @RunWith(value = Parameterized.class)
 public class TestHttpFSFWithWebhdfsFileSystem
-  extends TestHttpFSWithHttpFSFileSystem {
+    extends TestHttpFSWithHttpFSFileSystem {
 
   public TestHttpFSFWithWebhdfsFileSystem(Operation operation) {
     super(operation);

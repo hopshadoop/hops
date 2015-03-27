@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair;
 
+import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.server.resourcemanager.resource.ResourceWeights;
@@ -55,20 +56,24 @@ public class FakeSchedulable extends Schedulable {
     this(minShare, maxShare, memoryWeight, 0, 0, 0);
   }
   
-  public FakeSchedulable(int minShare, int maxShare, double weight, int fairShare, int usage,
-      long startTime) {
-    this(Resources.createResource(minShare, 0), Resources.createResource(maxShare, 0),
-        new ResourceWeights((float)weight), Resources.createResource(fairShare, 0),
+  public FakeSchedulable(int minShare, int maxShare, double weight,
+      int fairShare, int usage, long startTime) {
+    this(Resources.createResource(minShare, 0),
+        Resources.createResource(maxShare, 0),
+        new ResourceWeights((float) weight),
+        Resources.createResource(fairShare, 0),
         Resources.createResource(usage, 0), startTime);
   }
   
   public FakeSchedulable(Resource minShare, ResourceWeights weights) {
-    this(minShare, Resources.createResource(Integer.MAX_VALUE, Integer.MAX_VALUE),
-        weights, Resources.createResource(0, 0), Resources.createResource(0, 0), 0);
+    this(minShare,
+        Resources.createResource(Integer.MAX_VALUE, Integer.MAX_VALUE), weights,
+        Resources.createResource(0, 0), Resources.createResource(0, 0), 0);
   }
   
   public FakeSchedulable(Resource minShare, Resource maxShare,
-      ResourceWeights weight, Resource fairShare, Resource usage, long startTime) {
+      ResourceWeights weight, Resource fairShare, Resource usage,
+      long startTime) {
     this.minShare = minShare;
     this.maxShare = maxShare;
     this.weights = weight;
@@ -79,7 +84,8 @@ public class FakeSchedulable extends Schedulable {
   }
   
   @Override
-  public Resource assignContainer(FSSchedulerNode node) {
+  public Resource assignContainer(FSSchedulerNode node,
+      TransactionState transactionState) {
     return null;
   }
 
@@ -124,5 +130,6 @@ public class FakeSchedulable extends Schedulable {
   }
 
   @Override
-  public void updateDemand() {}
+  public void updateDemand() {
+  }
 }

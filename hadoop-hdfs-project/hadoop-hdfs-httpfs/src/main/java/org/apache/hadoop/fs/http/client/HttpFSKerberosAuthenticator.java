@@ -61,6 +61,7 @@ public class HttpFSKerberosAuthenticator extends KerberosAuthenticator {
   public static final String DELEGATION_PARAM = "delegation";
   public static final String TOKEN_PARAM = "token";
   public static final String RENEWER_PARAM = "renewer";
+  public static final String TOKEN_KIND = "HTTPFS_DELEGATION_TOKEN";
   public static final String DELEGATION_TOKEN_JSON = "Token";
   public static final String DELEGATION_TOKEN_URL_STRING_JSON = "urlString";
   public static final String RENEW_DELEGATION_TOKEN_JSON = "long";
@@ -78,7 +79,7 @@ public class HttpFSKerberosAuthenticator extends KerberosAuthenticator {
     private boolean requiresKerberosCredentials;
 
     private DelegationTokenOperation(String httpMethod,
-                                     boolean requiresKerberosCredentials) {
+        boolean requiresKerberosCredentials) {
       this.httpMethod = httpMethod;
       this.requiresKerberosCredentials = requiresKerberosCredentials;
     }
@@ -94,8 +95,7 @@ public class HttpFSKerberosAuthenticator extends KerberosAuthenticator {
   }
 
   public static void injectDelegationToken(Map<String, String> params,
-                                          Token<?> dtToken)
-    throws IOException {
+      Token<?> dtToken) throws IOException {
     if (dtToken != null) {
       params.put(DELEGATION_PARAM, dtToken.encodeToUrlString());
     }
@@ -107,7 +107,7 @@ public class HttpFSKerberosAuthenticator extends KerberosAuthenticator {
 
   @Override
   public void authenticate(URL url, AuthenticatedURL.Token token)
-    throws IOException, AuthenticationException {
+      throws IOException, AuthenticationException {
     if (!hasDelegationToken(url)) {
       super.authenticate(url, token);
     }
@@ -116,26 +116,24 @@ public class HttpFSKerberosAuthenticator extends KerberosAuthenticator {
   public static final String OP_PARAM = "op";
 
   public static Token<?> getDelegationToken(URI fsURI,
-    InetSocketAddress httpFSAddr, AuthenticatedURL.Token token,
-    String renewer) throws IOException {
-    DelegationTokenOperation op = 
-      DelegationTokenOperation.GETDELEGATIONTOKEN;
+      InetSocketAddress httpFSAddr, AuthenticatedURL.Token token,
+      String renewer) throws IOException {
+    DelegationTokenOperation op = DelegationTokenOperation.GETDELEGATIONTOKEN;
     Map<String, String> params = new HashMap<String, String>();
     params.put(OP_PARAM, op.toString());
-    params.put(RENEWER_PARAM,renewer);
-    URL url = HttpFSUtils.createURL(new Path(fsURI), params);
+    params.put(RENEWER_PARAM, renewer);
+    URL url = HttpFSUtils.createHttpURL(new Path(fsURI), params);
     AuthenticatedURL aUrl =
-      new AuthenticatedURL(new HttpFSKerberosAuthenticator());
+        new AuthenticatedURL(new HttpFSKerberosAuthenticator());
     try {
       HttpURLConnection conn = aUrl.openConnection(url, token);
       conn.setRequestMethod(op.getHttpMethod());
       HttpFSUtils.validateResponse(conn, HttpURLConnection.HTTP_OK);
-      JSONObject json = (JSONObject) ((JSONObject)
-        HttpFSUtils.jsonParse(conn)).get(DELEGATION_TOKEN_JSON);
-      String tokenStr = (String)
-        json.get(DELEGATION_TOKEN_URL_STRING_JSON);
+      JSONObject json = (JSONObject) ((JSONObject) HttpFSUtils.jsonParse(conn))
+          .get(DELEGATION_TOKEN_JSON);
+      String tokenStr = (String) json.get(DELEGATION_TOKEN_URL_STRING_JSON);
       Token<AbstractDelegationTokenIdentifier> dToken =
-        new Token<AbstractDelegationTokenIdentifier>();
+          new Token<AbstractDelegationTokenIdentifier>();
       dToken.decodeFromUrlString(tokenStr);
       SecurityUtil.setTokenService(dToken, httpFSAddr);
       return dToken;
@@ -145,40 +143,40 @@ public class HttpFSKerberosAuthenticator extends KerberosAuthenticator {
   }
 
   public static long renewDelegationToken(URI fsURI,
-    AuthenticatedURL.Token token, Token<?> dToken) throws IOException {
+      AuthenticatedURL.Token token, Token<?> dToken) throws IOException {
     Map<String, String> params = new HashMap<String, String>();
     params.put(OP_PARAM,
-               DelegationTokenOperation.RENEWDELEGATIONTOKEN.toString());
+        DelegationTokenOperation.RENEWDELEGATIONTOKEN.toString());
     params.put(TOKEN_PARAM, dToken.encodeToUrlString());
-    URL url = HttpFSUtils.createURL(new Path(fsURI), params);
+    URL url = HttpFSUtils.createHttpURL(new Path(fsURI), params);
     AuthenticatedURL aUrl =
-      new AuthenticatedURL(new HttpFSKerberosAuthenticator());
+        new AuthenticatedURL(new HttpFSKerberosAuthenticator());
     try {
       HttpURLConnection conn = aUrl.openConnection(url, token);
       conn.setRequestMethod(
-        DelegationTokenOperation.RENEWDELEGATIONTOKEN.getHttpMethod());
+          DelegationTokenOperation.RENEWDELEGATIONTOKEN.getHttpMethod());
       HttpFSUtils.validateResponse(conn, HttpURLConnection.HTTP_OK);
-      JSONObject json = (JSONObject) ((JSONObject)
-        HttpFSUtils.jsonParse(conn)).get(DELEGATION_TOKEN_JSON);
-      return (Long)(json.get(RENEW_DELEGATION_TOKEN_JSON));
+      JSONObject json = (JSONObject) ((JSONObject) HttpFSUtils.jsonParse(conn))
+          .get(DELEGATION_TOKEN_JSON);
+      return (Long) (json.get(RENEW_DELEGATION_TOKEN_JSON));
     } catch (AuthenticationException ex) {
       throw new IOException(ex.toString(), ex);
     }
   }
 
   public static void cancelDelegationToken(URI fsURI,
-    AuthenticatedURL.Token token, Token<?> dToken) throws IOException {
+      AuthenticatedURL.Token token, Token<?> dToken) throws IOException {
     Map<String, String> params = new HashMap<String, String>();
     params.put(OP_PARAM,
-               DelegationTokenOperation.CANCELDELEGATIONTOKEN.toString());
+        DelegationTokenOperation.CANCELDELEGATIONTOKEN.toString());
     params.put(TOKEN_PARAM, dToken.encodeToUrlString());
-    URL url = HttpFSUtils.createURL(new Path(fsURI), params);
+    URL url = HttpFSUtils.createHttpURL(new Path(fsURI), params);
     AuthenticatedURL aUrl =
-      new AuthenticatedURL(new HttpFSKerberosAuthenticator());
+        new AuthenticatedURL(new HttpFSKerberosAuthenticator());
     try {
       HttpURLConnection conn = aUrl.openConnection(url, token);
       conn.setRequestMethod(
-        DelegationTokenOperation.CANCELDELEGATIONTOKEN.getHttpMethod());
+          DelegationTokenOperation.CANCELDELEGATIONTOKEN.getHttpMethod());
       HttpFSUtils.validateResponse(conn, HttpURLConnection.HTTP_OK);
     } catch (AuthenticationException ex) {
       throw new IOException(ex.toString(), ex);

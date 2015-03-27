@@ -18,16 +18,18 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt;
 
+import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
-import org.apache.hadoop.yarn.event.AbstractEvent;
+import org.apache.hadoop.yarn.event.AbstractEventTransaction;
 
-public class RMAppAttemptEvent extends AbstractEvent<RMAppAttemptEventType> {
+public class RMAppAttemptEvent
+    extends AbstractEventTransaction<RMAppAttemptEventType> {
 
   private final ApplicationAttemptId appAttemptId;
 
   public RMAppAttemptEvent(ApplicationAttemptId appAttemptId,
-      RMAppAttemptEventType type) {
-    super(type);
+      RMAppAttemptEventType type, TransactionState transactionState) {
+    super(type, transactionState);
     this.appAttemptId = appAttemptId;
   }
 

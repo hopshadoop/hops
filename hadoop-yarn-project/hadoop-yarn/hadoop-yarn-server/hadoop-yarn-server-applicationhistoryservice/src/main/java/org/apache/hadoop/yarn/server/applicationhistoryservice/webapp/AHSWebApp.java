@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.yarn.server.applicationhistoryservice.webapp;
 
-import static org.apache.hadoop.yarn.util.StringHelper.pajoin;
-
 import org.apache.hadoop.yarn.server.api.ApplicationContext;
 import org.apache.hadoop.yarn.server.applicationhistoryservice.ApplicationHistoryManager;
 import org.apache.hadoop.yarn.server.applicationhistoryservice.timeline.TimelineStore;
@@ -26,6 +24,8 @@ import org.apache.hadoop.yarn.webapp.GenericExceptionHandler;
 import org.apache.hadoop.yarn.webapp.WebApp;
 import org.apache.hadoop.yarn.webapp.YarnJacksonJaxbJsonProvider;
 import org.apache.hadoop.yarn.webapp.YarnWebParams;
+
+import static org.apache.hadoop.yarn.util.StringHelper.pajoin;
 
 public class AHSWebApp extends WebApp implements YarnWebParams {
 
@@ -50,10 +50,9 @@ public class AHSWebApp extends WebApp implements YarnWebParams {
     route(pajoin("/apps", APP_STATE), AHSController.class);
     route(pajoin("/app", APPLICATION_ID), AHSController.class, "app");
     route(pajoin("/appattempt", APPLICATION_ATTEMPT_ID), AHSController.class,
-      "appattempt");
+        "appattempt");
     route(pajoin("/container", CONTAINER_ID), AHSController.class, "container");
-    route(
-      pajoin("/logs", NM_NODENAME, CONTAINER_ID, ENTITY_STRING, APP_OWNER,
-        CONTAINER_LOG_TYPE), AHSController.class, "logs");
+    route(pajoin("/logs", NM_NODENAME, CONTAINER_ID, ENTITY_STRING, APP_OWNER,
+            CONTAINER_LOG_TYPE), AHSController.class, "logs");
   }
 }

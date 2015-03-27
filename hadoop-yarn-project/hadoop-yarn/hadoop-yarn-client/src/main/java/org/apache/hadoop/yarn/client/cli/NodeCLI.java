@@ -17,14 +17,6 @@
  */
 package org.apache.hadoop.yarn.client.cli;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.util.Date;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.HelpFormatter;
@@ -41,11 +33,19 @@ import org.apache.hadoop.yarn.api.records.NodeState;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
 @Private
 @Unstable
 public class NodeCLI extends YarnCLI {
-  private static final String NODES_PATTERN = "%16s\t%15s\t%17s\t%28s" +
-    System.getProperty("line.separator");
+  private static final String NODES_PATTERN =
+      "%16s\t%15s\t%17s\t%28s" + System.getProperty("line.separator");
 
   private static final String NODE_STATE_CMD = "states";
   private static final String NODE_ALL = "all";
@@ -73,8 +73,8 @@ public class NodeCLI extends YarnCLI {
     nodeStateOpt.setArgs(Option.UNLIMITED_VALUES);
     nodeStateOpt.setArgName("States");
     opts.addOption(nodeStateOpt);
-    Option allOpt = new Option(NODE_ALL, false,
-        "Works with -list to list all nodes.");
+    Option allOpt =
+        new Option(NODE_ALL, false, "Works with -list to list all nodes.");
     opts.addOption(allOpt);
     opts.getOption(STATUS_CMD).setArgName("NodeId");
 
@@ -122,7 +122,7 @@ public class NodeCLI extends YarnCLI {
 
   /**
    * It prints the usage of the command
-   * 
+   *
    * @param opts
    */
   private void printUsage(Options opts) {
@@ -131,35 +131,35 @@ public class NodeCLI extends YarnCLI {
 
   /**
    * Lists the nodes matching the given node states
-   * 
+   *
    * @param nodeStates
    * @throws YarnException
    * @throws IOException
    */
-  private void listClusterNodes(Set<NodeState> nodeStates) 
-            throws YarnException, IOException {
+  private void listClusterNodes(Set<NodeState> nodeStates)
+      throws YarnException, IOException {
     PrintWriter writer = new PrintWriter(sysout);
-    List<NodeReport> nodesReport = client.getNodeReports(
-                                       nodeStates.toArray(new NodeState[0]));
+    List<NodeReport> nodesReport =
+        client.getNodeReports(nodeStates.toArray(new NodeState[0]));
     writer.println("Total Nodes:" + nodesReport.size());
     writer.printf(NODES_PATTERN, "Node-Id", "Node-State", "Node-Http-Address",
         "Number-of-Running-Containers");
     for (NodeReport nodeReport : nodesReport) {
-      writer.printf(NODES_PATTERN, nodeReport.getNodeId(), nodeReport
-          .getNodeState(), nodeReport.getHttpAddress(), nodeReport
-          .getNumContainers());
+      writer.printf(NODES_PATTERN, nodeReport.getNodeId(),
+          nodeReport.getNodeState(), nodeReport.getHttpAddress(),
+          nodeReport.getNumContainers());
     }
     writer.flush();
   }
 
   /**
    * Prints the node report for node id.
-   * 
+   *
    * @param nodeIdStr
    * @throws YarnException
    */
-  private void printNodeStatus(String nodeIdStr) throws YarnException,
-      IOException {
+  private void printNodeStatus(String nodeIdStr)
+      throws YarnException, IOException {
     NodeId nodeId = ConverterUtils.toNodeId(nodeIdStr);
     List<NodeReport> nodesReport = client.getNodeReports();
     // Use PrintWriter.println, which uses correct platform line ending.
@@ -181,29 +181,29 @@ public class NodeCLI extends YarnCLI {
       nodeReportStr.print("\tNode-Http-Address : ");
       nodeReportStr.println(nodeReport.getHttpAddress());
       nodeReportStr.print("\tLast-Health-Update : ");
-      nodeReportStr.println(DateFormatUtils.format(
-          new Date(nodeReport.getLastHealthReportTime()),
-            "E dd/MMM/yy hh:mm:ss:SSzz"));
+      nodeReportStr.println(DateFormatUtils
+          .format(new Date(nodeReport.getLastHealthReportTime()),
+              "E dd/MMM/yy hh:mm:ss:SSzz"));
       nodeReportStr.print("\tHealth-Report : ");
-      nodeReportStr
-          .println(nodeReport.getHealthReport());
+      nodeReportStr.println(nodeReport.getHealthReport());
       nodeReportStr.print("\tContainers : ");
       nodeReportStr.println(nodeReport.getNumContainers());
       nodeReportStr.print("\tMemory-Used : ");
-      nodeReportStr.println((nodeReport.getUsed() == null) ? "0MB"
-          : (nodeReport.getUsed().getMemory() + "MB"));
+      nodeReportStr.println((nodeReport.getUsed() == null) ? "0MB" :
+          (nodeReport.getUsed().getMemory() + "MB"));
       nodeReportStr.print("\tMemory-Capacity : ");
       nodeReportStr.println(nodeReport.getCapability().getMemory() + "MB");
       nodeReportStr.print("\tCPU-Used : ");
-      nodeReportStr.println((nodeReport.getUsed() == null) ? "0 vcores"
-          : (nodeReport.getUsed().getVirtualCores() + " vcores"));
+      nodeReportStr.println((nodeReport.getUsed() == null) ? "0 vcores" :
+          (nodeReport.getUsed().getVirtualCores() + " vcores"));
       nodeReportStr.print("\tCPU-Capacity : ");
-      nodeReportStr.println(nodeReport.getCapability().getVirtualCores() + " vcores");
+      nodeReportStr
+          .println(nodeReport.getCapability().getVirtualCores() + " vcores");
     }
 
     if (nodeReport == null) {
-      nodeReportStr.print("Could not find the node report for node id : "
-          + nodeIdStr);
+      nodeReportStr
+          .print("Could not find the node report for node id : " + nodeIdStr);
     }
     nodeReportStr.close();
     sysout.println(baos.toString("UTF-8"));

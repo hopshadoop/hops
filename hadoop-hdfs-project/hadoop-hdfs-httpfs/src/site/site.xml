@@ -14,16 +14,16 @@
 -->
 <project name="HttpFS">
 
-    <skin>
-      <groupId>org.apache.maven.skins</groupId>
-      <artifactId>maven-stylus-skin</artifactId>
-      <version>1.2</version>
-    </skin>
+  <skin>
+    <groupId>org.apache.maven.skins</groupId>
+    <artifactId>maven-stylus-skin</artifactId>
+    <version>1.2</version>
+  </skin>
 
-    <body>
-      <links>
-        <item name="Apache Hadoop" href="http://hadoop.apache.org/"/>
-      </links>
-    </body>
+  <body>
+    <links>
+      <item name="Apache Hadoop" href="http://hadoop.apache.org/"/>
+    </links>
+  </body>
 
 </project>

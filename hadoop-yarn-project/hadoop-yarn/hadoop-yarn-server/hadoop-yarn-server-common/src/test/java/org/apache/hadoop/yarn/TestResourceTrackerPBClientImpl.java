@@ -17,9 +17,6 @@
  */
 package org.apache.hadoop.yarn;
 
-import java.io.IOException;
-import java.net.InetSocketAddress;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.net.NetUtils;
@@ -35,7 +32,13 @@ import org.apache.hadoop.yarn.server.api.protocolrecords.RegisterNodeManagerResp
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import static org.junit.Assert.*;
+
+import java.io.IOException;
+import java.net.InetSocketAddress;
+
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /**
  * Test ResourceTrackerPBClientImpl. this class should have methods
@@ -45,21 +48,22 @@ public class TestResourceTrackerPBClientImpl {
 
   private static ResourceTracker client;
   private static Server server;
-  private final static org.apache.hadoop.yarn.factories.RecordFactory recordFactory = RecordFactoryProvider
-      .getRecordFactory(null);
+  private final static org.apache.hadoop.yarn.factories.RecordFactory
+      recordFactory = RecordFactoryProvider.getRecordFactory(null);
 
   @BeforeClass
   public static void start() {
     InetSocketAddress address = new InetSocketAddress(0);
     Configuration configuration = new Configuration();
     ResourceTracker instance = new ResourceTrackerTestImpl();
-    server = RpcServerFactoryPBImpl.get().getServer(ResourceTracker.class,
-        instance, address, configuration, null, 1);
+    server = RpcServerFactoryPBImpl.get()
+        .getServer(ResourceTracker.class, instance, address, configuration,
+            null, 1);
     server.start();
 
-    client = (ResourceTracker) RpcClientFactoryPBImpl.get().getClient(
-        ResourceTracker.class, 1, NetUtils.getConnectAddress(server),
-        configuration);
+    client = (ResourceTracker) RpcClientFactoryPBImpl.get()
+        .getClient(ResourceTracker.class, 1, NetUtils.getConnectAddress(server),
+            configuration);
 
   }
 
@@ -73,12 +77,11 @@ public class TestResourceTrackerPBClientImpl {
   /**
    * Test the method registerNodeManager. Method should return a not null
    * result.
-   * 
    */
   @Test
   public void testResourceTrackerPBClientImpl() throws Exception {
-    RegisterNodeManagerRequest request = recordFactory
-        .newRecordInstance(RegisterNodeManagerRequest.class);
+    RegisterNodeManagerRequest request =
+        recordFactory.newRecordInstance(RegisterNodeManagerRequest.class);
     assertNotNull(client.registerNodeManager(request));
     
     ResourceTrackerTestImpl.exception = true;
@@ -87,7 +90,7 @@ public class TestResourceTrackerPBClientImpl {
       fail("there  should be YarnException");
     } catch (YarnException e) {
       assertTrue(e.getMessage().startsWith("testMessage"));
-    }finally{
+    } finally {
       ResourceTrackerTestImpl.exception = false;
     }
 
@@ -95,13 +98,12 @@ public class TestResourceTrackerPBClientImpl {
 
   /**
    * Test the method nodeHeartbeat. Method should return a not null result.
-   * 
    */
 
   @Test
   public void testNodeHeartbeat() throws Exception {
-    NodeHeartbeatRequest request = recordFactory
-        .newRecordInstance(NodeHeartbeatRequest.class);
+    NodeHeartbeatRequest request =
+        recordFactory.newRecordInstance(NodeHeartbeatRequest.class);
     assertNotNull(client.nodeHeartbeat(request));
     
     ResourceTrackerTestImpl.exception = true;
@@ -110,13 +112,12 @@ public class TestResourceTrackerPBClientImpl {
       fail("there  should be YarnException");
     } catch (YarnException e) {
       assertTrue(e.getMessage().startsWith("testMessage"));
-    }finally{
+    } finally {
       ResourceTrackerTestImpl.exception = false;
     }
 
   }
 
-  
 
   public static class ResourceTrackerTestImpl implements ResourceTracker {
 

@@ -18,12 +18,7 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.security;
 
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -37,40 +32,48 @@ import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore.RMState;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.Recoverable;
 
-import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * A ResourceManager specific delegation token secret manager.
  * The secret manager is responsible for generating and accepting the password
  * for each token.
  */
+//TORECOVER all the store action done in this class must be remplaced by transaction state actions (getStateStore)
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
-public class RMDelegationTokenSecretManager extends
-    AbstractDelegationTokenSecretManager<RMDelegationTokenIdentifier> implements
-    Recoverable {
-  private static final Log LOG = LogFactory
-      .getLog(RMDelegationTokenSecretManager.class);
+public class RMDelegationTokenSecretManager
+    extends AbstractDelegationTokenSecretManager<RMDelegationTokenIdentifier>
+    implements Recoverable {
+  private static final Log LOG =
+      LogFactory.getLog(RMDelegationTokenSecretManager.class);
 
   protected final RMContext rmContext;
 
   /**
    * Create a secret manager
-   * @param delegationKeyUpdateInterval the number of seconds for rolling new
-   *        secret keys.
-   * @param delegationTokenMaxLifetime the maximum lifetime of the delegation
-   *        tokens
-   * @param delegationTokenRenewInterval how often the tokens must be renewed
-   * @param delegationTokenRemoverScanInterval how often the tokens are scanned
-   *        for expired tokens
+   *
+   * @param delegationKeyUpdateInterval
+   *     the number of seconds for rolling new
+   *     secret keys.
+   * @param delegationTokenMaxLifetime
+   *     the maximum lifetime of the delegation
+   *     tokens
+   * @param delegationTokenRenewInterval
+   *     how often the tokens must be renewed
+   * @param delegationTokenRemoverScanInterval
+   *     how often the tokens are scanned
+   *     for expired tokens
    */
   public RMDelegationTokenSecretManager(long delegationKeyUpdateInterval,
-                                      long delegationTokenMaxLifetime,
-                                      long delegationTokenRenewInterval,
-                                      long delegationTokenRemoverScanInterval,
-                                      RMContext rmContext) {
+      long delegationTokenMaxLifetime, long delegationTokenRenewInterval,
+      long delegationTokenRemoverScanInterval, RMContext rmContext) {
     super(delegationKeyUpdateInterval, delegationTokenMaxLifetime,
-          delegationTokenRenewInterval, delegationTokenRemoverScanInterval);
+        delegationTokenRenewInterval, delegationTokenRemoverScanInterval);
     this.rmContext = rmContext;
   }
 
@@ -83,7 +86,7 @@ public class RMDelegationTokenSecretManager extends
   protected void storeNewMasterKey(DelegationKey newKey) {
     try {
       LOG.info("storing master key with keyID " + newKey.getKeyId());
-      rmContext.getStateStore().storeRMDTMasterKey(newKey);
+      rmContext.getStateStore().storeRMDTMasterKey(newKey, null);
     } catch (Exception e) {
       LOG.error("Error in storing master key with KeyID: " + newKey.getKeyId());
       ExitUtil.terminate(1, e);
@@ -94,7 +97,7 @@ public class RMDelegationTokenSecretManager extends
   protected void removeStoredMasterKey(DelegationKey key) {
     try {
       LOG.info("removing master key with keyID " + key.getKeyId());
-      rmContext.getStateStore().removeRMDTMasterKey(key);
+      rmContext.getStateStore().removeRMDTMasterKey(key, null);
     } catch (Exception e) {
       LOG.error("Error in removing master key with KeyID: " + key.getKeyId());
       ExitUtil.terminate(1, e);
@@ -105,13 +108,14 @@ public class RMDelegationTokenSecretManager extends
   protected void storeNewToken(RMDelegationTokenIdentifier identifier,
       long renewDate) {
     try {
-      LOG.info("storing RMDelegation token with sequence number: "
-          + identifier.getSequenceNumber());
-      rmContext.getStateStore().storeRMDelegationTokenAndSequenceNumber(
-        identifier, renewDate, identifier.getSequenceNumber());
+      LOG.info("storing RMDelegation token with sequence number: " +
+          identifier.getSequenceNumber());
+      rmContext.getStateStore()
+          .storeRMDelegationTokenAndSequenceNumber(identifier, renewDate,
+              identifier.getSequenceNumber(), null);
     } catch (Exception e) {
-      LOG.error("Error in storing RMDelegationToken with sequence number: "
-          + identifier.getSequenceNumber());
+      LOG.error("Error in storing RMDelegationToken with sequence number: " +
+          identifier.getSequenceNumber());
       ExitUtil.terminate(1, e);
     }
   }
@@ -120,13 +124,15 @@ public class RMDelegationTokenSecretManager extends
   protected void updateStoredToken(RMDelegationTokenIdentifier id,
       long renewDate) {
     try {
-      LOG.info("updating RMDelegation token with sequence number: "
-          + id.getSequenceNumber());
-      rmContext.getStateStore().updateRMDelegationTokenAndSequenceNumber(id,
-        renewDate, id.getSequenceNumber());
+      LOG.info("updating RMDelegation token with sequence number: " +
+          id.getSequenceNumber());
+      rmContext.getStateStore()
+          .updateRMDelegationTokenAndSequenceNumber(id, renewDate,
+              id.getSequenceNumber(), null);
     } catch (Exception e) {
-      LOG.error("Error in updating persisted RMDelegationToken with sequence number: "
-            + id.getSequenceNumber());
+      LOG.error(
+          "Error in updating persisted RMDelegationToken with sequence number: " +
+              id.getSequenceNumber());
       ExitUtil.terminate(1, e);
     }
   }
@@ -135,13 +141,13 @@ public class RMDelegationTokenSecretManager extends
   protected void removeStoredToken(RMDelegationTokenIdentifier ident)
       throws IOException {
     try {
-      LOG.info("removing RMDelegation token with sequence number: "
-          + ident.getSequenceNumber());
-      rmContext.getStateStore().removeRMDelegationToken(ident,
-        delegationTokenSequenceNumber);
+      LOG.info("removing RMDelegation token with sequence number: " +
+          ident.getSequenceNumber());
+      rmContext.getStateStore()
+          .removeRMDelegationToken(ident, delegationTokenSequenceNumber, null);
     } catch (Exception e) {
-      LOG.error("Error in removing RMDelegationToken with sequence number: "
-          + ident.getSequenceNumber());
+      LOG.error("Error in removing RMDelegationToken with sequence number: " +
+          ident.getSequenceNumber());
       ExitUtil.terminate(1, e);
     }
   }
@@ -160,8 +166,8 @@ public class RMDelegationTokenSecretManager extends
     Map<RMDelegationTokenIdentifier, Long> allTokens =
         new HashMap<RMDelegationTokenIdentifier, Long>();
 
-    for (Map.Entry<RMDelegationTokenIdentifier,
-        DelegationTokenInformation> entry : currentTokens.entrySet()) {
+    for (Map.Entry<RMDelegationTokenIdentifier, DelegationTokenInformation> entry : currentTokens
+        .entrySet()) {
       allTokens.put(entry.getKey(), entry.getValue().getRenewDate());
     }
     return allTokens;
@@ -179,7 +185,7 @@ public class RMDelegationTokenSecretManager extends
     LOG.info("recovering RMDelegationTokenSecretManager.");
     // recover RMDTMasterKeys
     for (DelegationKey dtKey : rmState.getRMDTSecretManagerState()
-      .getMasterKeyState()) {
+        .getMasterKeyState()) {
       addKey(dtKey);
     }
 
@@ -189,7 +195,7 @@ public class RMDelegationTokenSecretManager extends
     this.delegationTokenSequenceNumber =
         rmState.getRMDTSecretManagerState().getDTSequenceNumber();
     for (Map.Entry<RMDelegationTokenIdentifier, Long> entry : rmDelegationTokens
-      .entrySet()) {
+        .entrySet()) {
       addPersistedDelegationToken(entry.getKey(), entry.getValue());
     }
   }

@@ -17,19 +17,18 @@
  */
 package org.apache.hadoop.hdfs.util;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotSame;
-import static org.junit.Assert.assertSame;
+import com.google.common.collect.Lists;
+import org.junit.Test;
 
 import java.nio.ByteBuffer;
 import java.util.List;
 
-import org.junit.Test;
-
-import com.google.common.collect.Lists;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertSame;
 
 public class TestDirectBufferPool {
-  final DirectBufferPool pool = new DirectBufferPool();
+  DirectBufferPool pool = new DirectBufferPool();
   
   @Test
   public void testBasics() {
@@ -75,7 +74,7 @@ public class TestDirectBufferPool {
     }
     
     for (ByteBuffer buf : bufs) {
-      pool.returnBuffer(buf);      
+      pool.returnBuffer(buf);
     }
 
     assertEquals(10, pool.countBuffersOfSize(100));

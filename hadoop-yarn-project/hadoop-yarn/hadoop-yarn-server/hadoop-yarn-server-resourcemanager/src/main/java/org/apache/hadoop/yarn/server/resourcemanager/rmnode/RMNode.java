@@ -19,8 +19,7 @@
 package org.apache.hadoop.yarn.server.resourcemanager.rmnode;
 
 
-import java.util.List;
-
+import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.net.Node;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerId;
@@ -29,37 +28,45 @@ import org.apache.hadoop.yarn.api.records.NodeState;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.ResourceOption;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
+import org.apache.hadoop.yarn.server.resourcemanager.recovery.Recoverable;
+
+import java.util.List;
 
 /**
- * Node managers information on available resources 
+ * Node managers information on available resources
  * and other static information.
- *
  */
-public interface RMNode {
+public interface RMNode extends Recoverable {
 
-  /** negative value means no timeout */
+  /**
+   * negative value means no timeout
+   */
   public static final int OVER_COMMIT_TIMEOUT_MILLIS_DEFAULT = -1;
   
   /**
    * the node id of of this node.
+   *
    * @return the node id of this node.
    */
   public NodeId getNodeID();
   
   /**
    * the hostname of this node
+   *
    * @return hostname of this node
    */
   public String getHostName();
   
   /**
    * the command port for this node
+   *
    * @return command port for this node
    */
   public int getCommandPort();
   
   /**
    * the http port for this node
+   *
    * @return http port for this node
    */
   public int getHttpPort();
@@ -67,24 +74,28 @@ public interface RMNode {
 
   /**
    * the ContainerManager address for this node.
+   *
    * @return the ContainerManager address for this node.
    */
   public String getNodeAddress();
   
   /**
    * the http-Address for this node.
+   *
    * @return the http-url address for this node
    */
   public String getHttpAddress();
   
   /**
    * the latest health report received from this node.
+   *
    * @return the latest health report received from this node.
    */
   public String getHealthReport();
   
   /**
    * the time of the latest health report received from this node.
+   *
    * @return the time of the latest health report received from this node.
    */
   public long getLastHealthReportTime();
@@ -97,30 +108,36 @@ public interface RMNode {
 
   /**
    * the total available resource.
+   *
    * @return the total available resource.
    */
   public Resource getTotalCapability();
   
   /**
-   * Set resource option with total available resource and overCommitTimoutMillis
+   * Set resource option with total available resource and
+   * overCommitTimoutMillis
+   *
    * @param resourceOption
    */
   public void setResourceOption(ResourceOption resourceOption);
   
   /**
    * resource option with total available resource and overCommitTimoutMillis
+   *
    * @return ResourceOption
    */
   public ResourceOption getResourceOption();
   
   /**
    * The rack name for this node manager.
+   *
    * @return the rack name.
    */
   public String getRackName();
   
   /**
    * the {@link Node} information for this node.
+   *
    * @return {@link Node} information for this node.
    */
   public Node getNode();
@@ -134,17 +151,20 @@ public interface RMNode {
   /**
    * Update a {@link NodeHeartbeatResponse} with the list of containers and
    * applications to clean up for this node.
-   * @param response the {@link NodeHeartbeatResponse} to update
+   *
+   * @param response
+   *     the {@link NodeHeartbeatResponse} to update
    */
-  public void updateNodeHeartbeatResponseForCleanup(NodeHeartbeatResponse response);
+  public void updateNodeHeartbeatResponseForCleanup(
+      NodeHeartbeatResponse response, TransactionState ts);
 
   public NodeHeartbeatResponse getLastNodeHeartBeatResponse();
   
   /**
    * Get and clear the list of containerUpdates accumulated across NM
    * heartbeats.
-   * 
+   *
    * @return containerUpdates accumulated across NM heartbeats.
    */
-  public List<UpdatedContainerInfo> pullContainerUpdates();
+  public List<UpdatedContainerInfo> pullContainerUpdates(TransactionState ts);
 }

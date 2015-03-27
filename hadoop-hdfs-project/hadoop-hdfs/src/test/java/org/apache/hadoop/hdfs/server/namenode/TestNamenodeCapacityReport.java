@@ -18,12 +18,6 @@
 package org.apache.hadoop.hdfs.server.namenode;
 
 
-import static org.junit.Assert.assertTrue;
-
-import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -36,18 +30,24 @@ import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeManager;
 import org.junit.Test;
 
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.junit.Assert.assertTrue;
 
 
 /**
- * This tests InterDataNodeProtocol for block handling. 
+ * This tests InterDataNodeProtocol for block handling.
  */
 public class TestNamenodeCapacityReport {
-  private static final Log LOG = LogFactory.getLog(TestNamenodeCapacityReport.class);
+  private static final Log LOG =
+      LogFactory.getLog(TestNamenodeCapacityReport.class);
 
   /**
    * The following test first creates a file.
    * It verifies the block information from a datanode.
-   * Then, it updates the block with new information and verifies again. 
+   * Then, it updates the block with new information and verifies again.
    */
   @Test
   public void testVolumeSize() throws Exception {
@@ -63,8 +63,8 @@ public class TestNamenodeCapacityReport {
       cluster.waitActive();
       
       final FSNamesystem namesystem = cluster.getNamesystem();
-      final DatanodeManager dm = cluster.getNamesystem().getBlockManager(
-          ).getDatanodeManager();
+      final DatanodeManager dm =
+          cluster.getNamesystem().getBlockManager().getDatanodeManager();
       
       // Ensure the data reported for each data node is right
       final List<DatanodeDescriptor> live = new ArrayList<DatanodeDescriptor>();
@@ -86,21 +86,21 @@ public class TestNamenodeCapacityReport {
         bpUsed = datanode.getBlockPoolUsed();
         percentBpUsed = datanode.getBlockPoolUsedPercent();
         
-        LOG.info("Datanode configCapacity " + configCapacity
-            + " used " + used + " non DFS used " + nonDFSUsed 
-            + " remaining " + remaining + " perentUsed " + percentUsed
-            + " percentRemaining " + percentRemaining);
+        LOG.info("Datanode configCapacity " + configCapacity + " used " + used +
+            " non DFS used " + nonDFSUsed + " remaining " + remaining +
+            " perentUsed " + percentUsed + " percentRemaining " +
+            percentRemaining);
         
         assertTrue(configCapacity == (used + remaining + nonDFSUsed));
         assertTrue(percentUsed == DFSUtil.getPercentUsed(used, configCapacity));
-        assertTrue(percentRemaining == DFSUtil.getPercentRemaining(remaining,
-            configCapacity));
-        assertTrue(percentBpUsed == DFSUtil.getPercentUsed(bpUsed,
-            configCapacity));
-      }   
+        assertTrue(percentRemaining ==
+            DFSUtil.getPercentRemaining(remaining, configCapacity));
+        assertTrue(
+            percentBpUsed == DFSUtil.getPercentUsed(bpUsed, configCapacity));
+      }
       
       DF df = new DF(new File(cluster.getDataDirectory()), conf);
-     
+
       //
       // Currently two data directories are created by the data node
       // in the MiniDFSCluster. This results in each data directory having
@@ -126,13 +126,13 @@ public class TestNamenodeCapacityReport {
       percentBpUsed = namesystem.getPercentBlockPoolUsed();
       
       LOG.info("Data node directory " + cluster.getDataDirectory());
-           
-      LOG.info("Name node diskCapacity " + diskCapacity + " configCapacity "
-          + configCapacity + " reserved " + reserved + " used " + used 
-          + " remaining " + remaining + " nonDFSUsed " + nonDFSUsed 
-          + " remaining " + remaining + " percentUsed " + percentUsed 
-          + " percentRemaining " + percentRemaining + " bpUsed " + bpUsed
-          + " percentBpUsed " + percentBpUsed);
+
+      LOG.info("Name node diskCapacity " + diskCapacity + " configCapacity " +
+          configCapacity + " reserved " + reserved + " used " + used +
+          " remaining " + remaining + " nonDFSUsed " + nonDFSUsed +
+          " remaining " + remaining + " percentUsed " + percentUsed +
+          " percentRemaining " + percentRemaining + " bpUsed " + bpUsed +
+          " percentBpUsed " + percentBpUsed);
       
       // Ensure new total capacity reported excludes the reserved space
       assertTrue(configCapacity == diskCapacity - reserved);
@@ -144,13 +144,16 @@ public class TestNamenodeCapacityReport {
       assertTrue(percentUsed == DFSUtil.getPercentUsed(used, configCapacity));
 
       // Ensure percent used is calculated based on used and present capacity
-      assertTrue(percentBpUsed == DFSUtil.getPercentUsed(bpUsed, configCapacity));
+      assertTrue(
+          percentBpUsed == DFSUtil.getPercentUsed(bpUsed, configCapacity));
 
       // Ensure percent used is calculated based on used and present capacity
-      assertTrue(percentRemaining == ((float)remaining * 100.0f)/(float)configCapacity);
-    }
-    finally {
-      if (cluster != null) {cluster.shutdown();}
+      assertTrue(percentRemaining ==
+          ((float) remaining * 100.0f) / (float) configCapacity);
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
     }
   }
 }

@@ -17,24 +17,6 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.Enumeration;
-import java.util.List;
-import java.util.Vector;
-
-import javax.servlet.ServletContext;
-import javax.servlet.ServletOutputStream;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
 import org.apache.hadoop.fs.FSInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -48,14 +30,32 @@ import org.junit.Test;
 import org.mockito.Mockito;
 import org.mortbay.jetty.InclusiveByteRange;
 
+import javax.servlet.ServletContext;
+import javax.servlet.ServletOutputStream;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Enumeration;
+import java.util.List;
+import java.util.Vector;
+
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 /*
  * Mock input stream class that always outputs the current position of the stream. 
  */
 class MockFSInputStream extends FSInputStream {
   long currentPos = 0;
+
   @Override
   public int read() throws IOException {
-    return (int)(currentPos++);
+    return (int) (currentPos++);
   }
 
   @Override
@@ -80,36 +80,36 @@ class MockFSInputStream extends FSInputStream {
 
 
 public class TestStreamFile {
-  private final HdfsConfiguration CONF = new HdfsConfiguration();
-  private final DFSClient clientMock = Mockito.mock(DFSClient.class);
-  private final HttpServletRequest mockHttpServletRequest =
-    Mockito.mock(HttpServletRequest.class);
-  private final HttpServletResponse mockHttpServletResponse =
-    Mockito.mock(HttpServletResponse.class);
-  private final ServletContext mockServletContext = 
-    Mockito.mock(ServletContext.class);
+  private HdfsConfiguration CONF = new HdfsConfiguration();
+  private DFSClient clientMock = Mockito.mock(DFSClient.class);
+  private HttpServletRequest mockHttpServletRequest =
+      Mockito.mock(HttpServletRequest.class);
+  private HttpServletResponse mockHttpServletResponse =
+      Mockito.mock(HttpServletResponse.class);
+  private final ServletContext mockServletContext =
+      Mockito.mock(ServletContext.class);
 
-  final StreamFile sfile = new StreamFile() {
+  StreamFile sfile = new StreamFile() {
     private static final long serialVersionUID = -5513776238875189473L;
-  
+
     @Override
     public ServletContext getServletContext() {
       return mockServletContext;
     }
-  
+
     @Override
     protected DFSClient getDFSClient(HttpServletRequest request)
-      throws IOException, InterruptedException {
+        throws IOException, InterruptedException {
       return clientMock;
     }
   };
-     
+
   // return an array matching the output of mockfsinputstream
   private static byte[] getOutputArray(int start, int count) {
     byte[] a = new byte[count];
     
     for (int i = 0; i < count; i++) {
-      a[i] = (byte)(start+i);
+      a[i] = (byte) (start + i);
     }
 
     return a;
@@ -123,23 +123,17 @@ public class TestStreamFile {
 
     // new int[]{s_1, c_1, s_2, c_2, ..., s_n, c_n} means to test
     // reading c_i bytes starting at s_i
-    int[] pairs = new int[]{ 0, 10000,
-                             50, 100,
-                             50, 6000,
-                             1000, 2000,
-                             0, 1,
-                             0, 0,
-                             5000, 0,
-                            };
-                            
+    int[] pairs =
+        new int[]{0, 10000, 50, 100, 50, 6000, 1000, 2000, 0, 1, 0, 0, 5000,
+            0,};
+
     assertTrue("Pairs array must be even", pairs.length % 2 == 0);
     
-    for (int i = 0; i < pairs.length; i+=2) {
-      StreamFile.copyFromOffset(fsin, os, pairs[i], pairs[i+1]);
-      assertArrayEquals("Reading " + pairs[i+1]
-                        + " bytes from offset " + pairs[i],
-                        getOutputArray(pairs[i], pairs[i+1]),
-                        os.toByteArray());
+    for (int i = 0; i < pairs.length; i += 2) {
+      StreamFile.copyFromOffset(fsin, os, pairs[i], pairs[i + 1]);
+      assertArrayEquals(
+          "Reading " + pairs[i + 1] + " bytes from offset " + pairs[i],
+          getOutputArray(pairs[i], pairs[i + 1]), os.toByteArray());
       os.reset();
     }
     
@@ -147,7 +141,7 @@ public class TestStreamFile {
 
   @SuppressWarnings("unchecked")
   private List<InclusiveByteRange> strToRanges(String s, int contentLength) {
-    List<String> l = Arrays.asList(new String[]{"bytes="+s});
+    List<String> l = Arrays.asList(new String[]{"bytes=" + s});
     Enumeration<?> e = (new Vector<String>(l)).elements();
     return InclusiveByteRange.satisfiableRanges(e, contentLength);
   }
@@ -158,7 +152,7 @@ public class TestStreamFile {
     ByteArrayOutputStream os = new ByteArrayOutputStream();
 
     // test if multiple ranges, then 416
-    { 
+    {
       List<InclusiveByteRange> ranges = strToRanges("0-,10-300", 500);
       HttpServletResponse response = Mockito.mock(HttpServletResponse.class);
       StreamFile.sendPartialData(in, os, response, 500, ranges);
@@ -166,9 +160,9 @@ public class TestStreamFile {
       // Multiple ranges should result in a 416 error
       Mockito.verify(response).setStatus(416);
     }
-                              
+
     // test if no ranges, then 416
-    { 
+    {
       os.reset();
       HttpServletResponse response = Mockito.mock(HttpServletResponse.class);
       StreamFile.sendPartialData(in, os, response, 500, null);
@@ -178,7 +172,7 @@ public class TestStreamFile {
     }
 
     // test if invalid single range (out of bounds), then 416
-    { 
+    {
       List<InclusiveByteRange> ranges = strToRanges("600-800", 500);
       HttpServletResponse response = Mockito.mock(HttpServletResponse.class);
       StreamFile.sendPartialData(in, os, response, 500, ranges);
@@ -187,9 +181,9 @@ public class TestStreamFile {
       Mockito.verify(response).setStatus(416);
     }
 
-      
+
     // test if one (valid) range, then 206
-    { 
+    {
       List<InclusiveByteRange> ranges = strToRanges("100-300", 500);
       HttpServletResponse response = Mockito.mock(HttpServletResponse.class);
       StreamFile.sendPartialData(in, os, response, 500, ranges);
@@ -197,9 +191,8 @@ public class TestStreamFile {
       // Single (valid) range should result in a 206
       Mockito.verify(response).setStatus(206);
 
-      assertArrayEquals("Byte range from 100-300",
-                        getOutputArray(100, 201),
-                        os.toByteArray());
+      assertArrayEquals("Byte range from 100-300", getOutputArray(100, 201),
+          os.toByteArray());
     }
     
   }
@@ -210,8 +203,8 @@ public class TestStreamFile {
   public void testDoGetShouldWriteTheFileContentIntoServletOutputStream()
       throws Exception {
 
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(CONF).numDataNodes(1)
-        .build();
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(CONF).numDataNodes(1).build();
     try {
       Path testFile = createFile();
       setUpForDoGetTest(cluster, testFile);
@@ -240,8 +233,8 @@ public class TestStreamFile {
   public void testDoGetShouldCloseTheDFSInputStreamIfResponseGetOutPutStreamThrowsAnyException()
       throws Exception {
 
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(CONF).numDataNodes(1)
-        .build();
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(CONF).numDataNodes(1).build();
     try {
       Path testFile = createFile();
 
@@ -269,14 +262,14 @@ public class TestStreamFile {
 
   private void setUpForDoGetTest(MiniDFSCluster cluster, Path testFile) {
 
-    Mockito.doReturn(CONF).when(mockServletContext).getAttribute(
-        JspHelper.CURRENT_CONF);
+    Mockito.doReturn(CONF).when(mockServletContext)
+        .getAttribute(JspHelper.CURRENT_CONF);
     Mockito.doReturn(NetUtils.getHostPortString(NameNode.getAddress(CONF)))
-      .when(mockHttpServletRequest).getParameter("nnaddr");
+        .when(mockHttpServletRequest).getParameter("nnaddr");
     Mockito.doReturn(testFile.toString()).when(mockHttpServletRequest)
-      .getPathInfo();
-    Mockito.doReturn("/streamFile"+testFile.toString()).when(mockHttpServletRequest)
-      .getRequestURI();
+        .getPathInfo();
+    Mockito.doReturn("/streamFile" + testFile.toString())
+        .when(mockHttpServletRequest).getRequestURI();
   }
 
   static Path writeFile(FileSystem fs, Path f) throws IOException {
@@ -298,7 +291,7 @@ public class TestStreamFile {
   }
 
   public static class ServletOutputStreamExtn extends ServletOutputStream {
-    private final StringBuffer buffer = new StringBuffer(3);
+    private StringBuffer buffer = new StringBuffer(3);
 
     public String getResult() {
       return buffer.toString();

@@ -19,12 +19,10 @@
 package org.apache.hadoop.yarn.conf;
 
 import junit.framework.Assert;
-
 import org.apache.hadoop.yarn.webapp.util.WebAppUtils;
 import org.junit.Test;
 
 import java.net.InetSocketAddress;
-import java.net.SocketAddress;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;

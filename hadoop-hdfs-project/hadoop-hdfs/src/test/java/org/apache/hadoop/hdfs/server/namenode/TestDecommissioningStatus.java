@@ -17,16 +17,6 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Random;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -44,6 +34,16 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Random;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
 /**
  * This class tests the decommissioning of nodes.
  */
@@ -59,7 +59,7 @@ public class TestDecommissioningStatus {
   private static Configuration conf;
   private static Path dir;
 
-  final ArrayList<String> decommissionedNodes = new ArrayList<String>(numDatanodes);
+  ArrayList<String> decommissionedNodes = new ArrayList<String>(numDatanodes);
   
   @BeforeClass
   public static void setUp() throws Exception {
@@ -76,7 +76,8 @@ public class TestDecommissioningStatus {
     conf.set(DFSConfigKeys.DFS_HOSTS_EXCLUDE, excludeFile.toUri().getPath());
     Path includeFile = new Path(dir, "include");
     conf.set(DFSConfigKeys.DFS_HOSTS, includeFile.toUri().getPath());
-    conf.setInt(DFSConfigKeys.DFS_NAMENODE_HEARTBEAT_RECHECK_INTERVAL_KEY, 2000);
+    conf.setInt(DFSConfigKeys.DFS_NAMENODE_HEARTBEAT_RECHECK_INTERVAL_KEY,
+        2000);
     conf.setInt(DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY, 1);
     conf.setInt(DFSConfigKeys.DFS_NAMENODE_REPLICATION_PENDING_TIMEOUT_SEC_KEY,
         4);
@@ -85,15 +86,20 @@ public class TestDecommissioningStatus {
     writeConfigFile(localFileSys, excludeFile, null);
     writeConfigFile(localFileSys, includeFile, null);
 
-    cluster = new MiniDFSCluster.Builder(conf).numDataNodes(numDatanodes).build();
+    cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(numDatanodes).build();
     cluster.waitActive();
     fileSys = cluster.getFileSystem();
   }
 
   @AfterClass
   public static void tearDown() throws Exception {
-    if(fileSys != null) fileSys.close();
-    if(cluster != null) cluster.shutdown();
+    if (fileSys != null) {
+      fileSys.close();
+    }
+    if (cluster != null) {
+      cluster.shutdown();
+    }
   }
 
   private static void writeConfigFile(FileSystem fs, Path name,
@@ -107,7 +113,7 @@ public class TestDecommissioningStatus {
     FSDataOutputStream stm = fs.create(name);
 
     if (nodes != null) {
-      for (Iterator<String> it = nodes.iterator(); it.hasNext();) {
+      for (Iterator<String> it = nodes.iterator(); it.hasNext(); ) {
         String node = it.next();
         stm.writeBytes(node);
         stm.writeBytes("\n");
@@ -120,21 +126,21 @@ public class TestDecommissioningStatus {
       throws IOException {
     // create and write a file that contains three blocks of data
     FSDataOutputStream stm = fileSys.create(name, true, fileSys.getConf()
-        .getInt(CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096), repl,
-        blockSize);
+            .getInt(CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096),
+        repl, blockSize);
     byte[] buffer = new byte[fileSize];
     Random rand = new Random(seed);
     rand.nextBytes(buffer);
     stm.write(buffer);
     stm.close();
   }
- 
+
   private FSDataOutputStream writeIncompleteFile(FileSystem fileSys, Path name,
       short repl) throws IOException {
     // create and write a file that contains three blocks of data
     FSDataOutputStream stm = fileSys.create(name, true, fileSys.getConf()
-        .getInt(CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096), repl,
-        blockSize);
+            .getInt(CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096),
+        repl, blockSize);
     byte[] buffer = new byte[fileSize];
     Random rand = new Random(seed);
     rand.nextBytes(buffer);
@@ -153,9 +159,8 @@ public class TestDecommissioningStatus {
   /*
    * Decommissions the node at the given index
    */
-  private String decommissionNode(FSNamesystem namesystem,
-      DFSClient client, FileSystem localFileSys, int nodeIndex)
-      throws IOException {
+  private String decommissionNode(FSNamesystem namesystem, DFSClient client,
+      FileSystem localFileSys, int nodeIndex) throws IOException {
     DatanodeInfo[] info = client.datanodeReport(DatanodeReportType.LIVE);
 
     String nodename = info[nodeIndex].getXferAddr();
@@ -173,11 +178,11 @@ public class TestDecommissioningStatus {
       int expectedUnderRepInOpenFiles) {
     assertEquals(decommNode.decommissioningStatus.getUnderReplicatedBlocks(),
         expectedUnderRep);
-    assertEquals(
-        decommNode.decommissioningStatus.getDecommissionOnlyReplicas(),
+    assertEquals(decommNode.decommissioningStatus.getDecommissionOnlyReplicas(),
         expectedDecommissionOnly);
-    assertEquals(decommNode.decommissioningStatus
-        .getUnderReplicatedInOpenFiles(), expectedUnderRepInOpenFiles);
+    assertEquals(
+        decommNode.decommissioningStatus.getUnderReplicatedInOpenFiles(),
+        expectedUnderRepInOpenFiles);
   }
   
   /**
@@ -185,9 +190,10 @@ public class TestDecommissioningStatus {
    */
 
   @Test
-  public void testDecommissionStatus() throws IOException, InterruptedException {
-    InetSocketAddress addr = new InetSocketAddress("localhost", cluster
-        .getNameNodePort());
+  public void testDecommissionStatus()
+      throws IOException, InterruptedException {
+    InetSocketAddress addr =
+        new InetSocketAddress("localhost", cluster.getNameNodePort());
     DFSClient client = new DFSClient(addr, conf);
     DatanodeInfo[] info = client.datanodeReport(DatanodeReportType.LIVE);
     assertEquals("Number of Datanodes ", 2, info.length);
@@ -211,7 +217,8 @@ public class TestDecommissioningStatus {
       dm.refreshNodes(conf);
       decommissionedNodes.add(downnode);
       Thread.sleep(5000);
-      final List<DatanodeDescriptor> decommissioningNodes = dm.getDecommissioningNodes();
+      final List<DatanodeDescriptor> decommissioningNodes =
+          dm.getDecommissioningNodes();
       if (iteration == 0) {
         assertEquals(decommissioningNodes.size(), 1);
         DatanodeDescriptor decommNode = decommissioningNodes.get(0);

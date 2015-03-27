@@ -17,10 +17,15 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
+import io.hops.exception.StorageException;
 import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 
-/** SafeMode related operations. */
+import java.io.IOException;
+
+/**
+ * SafeMode related operations.
+ */
 @InterfaceAudience.Private
 public interface SafeMode {
   /**
@@ -28,26 +33,37 @@ public interface SafeMode {
    * If the corresponding conditions are satisfied,
    * trigger the system to enter/leave safe mode.
    */
-  public void checkSafeMode();
+  public void checkSafeMode() throws IOException;
 
-  /** Is the system in safe mode? */
-  public boolean isInSafeMode();
+  /**
+   * Is the system in safe mode?
+   */
+  public boolean isInSafeMode() throws IOException;
 
   /**
    * Is the system in startup safe mode, i.e. the system is starting up with
    * safe mode turned on automatically?
    */
-  public boolean isInStartupSafeMode();
+  public boolean isInStartupSafeMode() throws IOException;
 
-  /** Check whether replication queues are being populated. */
+  /**
+   * Check whether replication queues are being populated.
+   */
   public boolean isPopulatingReplQueues();
-    
+
   /**
    * Increment number of blocks that reached minimal replication.
-   * @param replication current replication 
+   *
+   * @param blk
+   *     current block
    */
-  public void incrementSafeBlockCount(int replication);
+  public void incrementSafeBlockCount(BlockInfo blk) throws IOException;
 
-  /** Decrement number of blocks that reached minimal replication. */
-  public void decrementSafeBlockCount(Block b);
+  /**
+   * Decrement number of blocks that reached minimal replication.
+   * @param blk
+   *     current block
+   */
+  public void decrementSafeBlockCount(BlockInfo blk)
+      throws StorageException, IOException;
 }

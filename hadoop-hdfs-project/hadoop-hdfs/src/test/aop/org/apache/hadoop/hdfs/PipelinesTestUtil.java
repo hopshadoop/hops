@@ -17,16 +17,16 @@
  */
 package org.apache.hadoop.hdfs;
 
-import static org.junit.Assert.assertTrue;
+import org.apache.hadoop.fi.DataTransferTestUtil;
+import org.apache.hadoop.fi.FiTestUtil;
+import org.apache.hadoop.fi.FiTestUtil.ActionContainer;
+import org.apache.hadoop.fi.PipelineTest;
+import org.apache.hadoop.hdfs.protocol.DatanodeID;
 
 import java.io.IOException;
 import java.util.LinkedList;
 
-import org.apache.hadoop.fi.DataTransferTestUtil;
-import org.apache.hadoop.fi.FiTestUtil;
-import org.apache.hadoop.fi.PipelineTest;
-import org.apache.hadoop.fi.FiTestUtil.ActionContainer;
-import org.apache.hadoop.hdfs.protocol.DatanodeID;
+import static org.junit.Assert.assertTrue;
 
 public class PipelinesTestUtil extends DataTransferTestUtil {
   /**
@@ -39,17 +39,19 @@ public class PipelinesTestUtil extends DataTransferTestUtil {
   /**
    * Storing acknowleged bytes num. action for fault injection tests
    */
-  public static class ReceivedCheckAction implements FiTestUtil.Action<NodeBytes, IOException> {
+  public static class ReceivedCheckAction
+      implements FiTestUtil.Action<NodeBytes, IOException> {
     String name;
     LinkedList<NodeBytes> rcv = ((PipelinesTest) getPipelineTest()).received;
     LinkedList<NodeBytes> ack = ((PipelinesTest) getPipelineTest()).acked;
 
     /**
-     * @param name of the test
+     * @param name
+     *     of the test
      */
-   public ReceivedCheckAction(String name) {
-     this.name = name;
-   }
+    public ReceivedCheckAction(String name) {
+      this.name = name;
+    }
 
     @Override
     public void run(NodeBytes nb) throws IOException {
@@ -64,9 +66,10 @@ public class PipelinesTestUtil extends DataTransferTestUtil {
           }
           assertTrue("FI: Wrong receiving length",
               counterPartsBytes <= n.bytes);
-          if(FiTestUtil.LOG.isDebugEnabled()) {
-            FiTestUtil.LOG.debug("FI: before compare of Recv bytes. Expected "
-                + n.bytes + ", got " + counterPartsBytes);
+          if (FiTestUtil.LOG.isDebugEnabled()) {
+            FiTestUtil.LOG.debug(
+                "FI: before compare of Recv bytes. Expected " + n.bytes +
+                    ", got " + counterPartsBytes);
           }
         }
       }
@@ -76,13 +79,15 @@ public class PipelinesTestUtil extends DataTransferTestUtil {
   /**
    * Storing acknowleged bytes num. action for fault injection tests
    */
-  public static class AckedCheckAction implements FiTestUtil.Action<NodeBytes, IOException> {
+  public static class AckedCheckAction
+      implements FiTestUtil.Action<NodeBytes, IOException> {
     String name;
     LinkedList<NodeBytes> rcv = ((PipelinesTest) getPipelineTest()).received;
     LinkedList<NodeBytes> ack = ((PipelinesTest) getPipelineTest()).acked;
 
     /**
-     * @param name of the test
+     * @param name
+     *     of the test
      */
     public AckedCheckAction(String name) {
       this.name = name;
@@ -97,16 +102,16 @@ public class PipelinesTestUtil extends DataTransferTestUtil {
         for (NodeBytes n : ack) {
           NodeBytes counterPart = null;
           long counterPartsBytes = -1;
-          if (rcv.size() > ack.indexOf(n)) { 
+          if (rcv.size() > ack.indexOf(n)) {
             counterPart = rcv.get(ack.indexOf(n));
             counterPartsBytes = counterPart.bytes;
           }
           assertTrue("FI: Wrong acknowledged length",
               counterPartsBytes == n.bytes);
-          if(FiTestUtil.LOG.isDebugEnabled()) {
-            FiTestUtil.LOG.debug(
-                "FI: before compare of Acked bytes. Expected " +
-                n.bytes + ", got " + counterPartsBytes);
+          if (FiTestUtil.LOG.isDebugEnabled()) {
+            FiTestUtil.LOG
+                .debug("FI: before compare of Acked bytes. Expected " +
+                        n.bytes + ", got " + counterPartsBytes);
           }
         }
       }
@@ -121,9 +126,9 @@ public class PipelinesTestUtil extends DataTransferTestUtil {
     LinkedList<NodeBytes> acked = new LinkedList<NodeBytes>();
 
     public final ActionContainer<NodeBytes, IOException> fiCallSetNumBytes =
-      new ActionContainer<NodeBytes, IOException>();
+        new ActionContainer<NodeBytes, IOException>();
     public final ActionContainer<NodeBytes, IOException> fiCallSetBytesAcked =
-      new ActionContainer<NodeBytes, IOException>();
+        new ActionContainer<NodeBytes, IOException>();
     
     private static boolean suspend = false;
     private static long lastQueuedPacket = -1;
@@ -131,12 +136,15 @@ public class PipelinesTestUtil extends DataTransferTestUtil {
     public void setSuspend(boolean flag) {
       suspend = flag;
     }
-    public boolean getSuspend () {
+
+    public boolean getSuspend() {
       return suspend;
     }
+
     public void setVerified(long packetNum) {
       PipelinesTest.lastQueuedPacket = packetNum;
     }
+
     public long getLastQueued() {
       return lastQueuedPacket;
     }
@@ -145,6 +153,7 @@ public class PipelinesTestUtil extends DataTransferTestUtil {
   public static class NodeBytes {
     DatanodeID id;
     long bytes;
+
     public NodeBytes(DatanodeID id, long bytes) {
       this.id = id;
       this.bytes = bytes;

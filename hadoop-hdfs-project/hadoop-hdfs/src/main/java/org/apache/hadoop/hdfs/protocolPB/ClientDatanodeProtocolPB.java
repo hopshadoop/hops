@@ -28,10 +28,10 @@ import org.apache.hadoop.security.token.TokenInfo;
 @KerberosInfo(
     serverPrincipal = DFSConfigKeys.DFS_DATANODE_USER_NAME_KEY)
 @TokenInfo(BlockTokenSelector.class)
-@ProtocolInfo(protocolName = 
-    "org.apache.hadoop.hdfs.protocol.ClientDatanodeProtocol",
+@ProtocolInfo(
+    protocolName = "org.apache.hadoop.hdfs.protocol.ClientDatanodeProtocol",
     protocolVersion = 1)
 @InterfaceAudience.Private
-public interface ClientDatanodeProtocolPB extends
-    ClientDatanodeProtocolService.BlockingInterface {
+public interface ClientDatanodeProtocolPB
+    extends ClientDatanodeProtocolService.BlockingInterface {
 }

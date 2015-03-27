@@ -18,13 +18,14 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.rmnode;
 
-import java.util.List;
-
+import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
 import org.apache.hadoop.yarn.server.api.records.NodeHealthStatus;
+
+import java.util.List;
 
 public class RMNodeStatusEvent extends RMNodeEvent {
 
@@ -35,8 +36,8 @@ public class RMNodeStatusEvent extends RMNodeEvent {
 
   public RMNodeStatusEvent(NodeId nodeId, NodeHealthStatus nodeHealthStatus,
       List<ContainerStatus> collection, List<ApplicationId> keepAliveAppIds,
-      NodeHeartbeatResponse latestResponse) {
-    super(nodeId, RMNodeEventType.STATUS_UPDATE);
+      NodeHeartbeatResponse latestResponse, TransactionState transactionState) {
+    super(nodeId, RMNodeEventType.STATUS_UPDATE, transactionState);
     this.nodeHealthStatus = nodeHealthStatus;
     this.containersCollection = collection;
     this.keepAliveAppIds = keepAliveAppIds;

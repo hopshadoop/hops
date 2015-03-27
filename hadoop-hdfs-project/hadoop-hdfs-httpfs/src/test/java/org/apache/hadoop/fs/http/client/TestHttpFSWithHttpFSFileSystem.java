@@ -44,8 +44,8 @@ public class TestHttpFSWithHttpFSFileSystem extends BaseTestHttpFSWith {
 
   @Override
   protected String getProxiedFSURI() {
-    return TestHdfsHelper.getHdfsConf().get(
-      CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY);
+    return TestHdfsHelper.getHdfsConf()
+        .get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY);
   }
 
   @Override

@@ -17,33 +17,29 @@
  */
 package org.apache.hadoop.hdfs;
 
-import static org.apache.hadoop.hdfs.server.common.Util.fileAsURI;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-import static org.junit.Assume.assumeTrue;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.StartupOption;
+import org.apache.hadoop.hdfs.server.datanode.DataNode;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
+import org.junit.Test;
 
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.StartupOption;
-import org.apache.hadoop.hdfs.server.datanode.DataNode;
-import org.apache.hadoop.io.nativeio.NativeIO;
-import org.apache.hadoop.test.GenericTestUtils;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import static org.apache.hadoop.hdfs.server.common.Util.fileAsURI;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Tests if a data-node can startup depending on configuration parameters.
  */
 public class TestDatanodeConfig {
   private static final File BASE_DIR =
-                                new File(MiniDFSCluster.getBaseDirectory());
+      new File(MiniDFSCluster.getBaseDirectory());
 
   private static MiniDFSCluster cluster;
 
@@ -57,14 +53,16 @@ public class TestDatanodeConfig {
 
   @AfterClass
   public static void tearDown() throws Exception {
-    if(cluster != null)
+    if (cluster != null) {
       cluster.shutdown();
+    }
     clearBaseDir();
   }
 
   private static void clearBaseDir() throws IOException {
-    if(BASE_DIR.exists() && ! FileUtil.fullyDelete(BASE_DIR))
+    if (BASE_DIR.exists() && !FileUtil.fullyDelete(BASE_DIR)) {
       throw new IOException("Cannot clear BASE_DIR " + BASE_DIR);
+    }
   }
 
   /**
@@ -83,67 +81,32 @@ public class TestDatanodeConfig {
     DataNode dn = null;
     try {
       dn = DataNode.createDataNode(new String[]{}, conf);
-      fail();
-    } catch(Exception e) {
+    } catch (IOException e) {
       // expecting exception here
     }
-    if(dn != null)
+    if (dn != null) {
       dn.shutdown();
+    }
     assertNull("Data-node startup should have failed.", dn);
 
     // 2. Test "file:" schema and no schema (path-only). Both should work.
     String dnDir1 = fileAsURI(dataDir).toString() + "1";
-    String dnDir2 = makeURI("file", "localhost",
-                    fileAsURI(dataDir).getPath() + "2");
+    String dnDir2 =
+        makeURI("file", "localhost", fileAsURI(dataDir).getPath() + "2");
     String dnDir3 = dataDir.getAbsolutePath() + "3";
     conf.set(DFSConfigKeys.DFS_DATANODE_DATA_DIR_KEY,
-                dnDir1 + "," + dnDir2 + "," + dnDir3);
+        dnDir1 + "," + dnDir2 + "," + dnDir3);
     cluster.startDataNodes(conf, 1, false, StartupOption.REGULAR, null);
     assertTrue("Data-node should startup.", cluster.isDataNodeUp());
   }
 
   private static String makeURI(String scheme, String host, String path)
-  throws IOException {
+      throws IOException {
     try {
       URI uDir = new URI(scheme, host, path, null);
       return uDir.toString();
-    } catch(URISyntaxException e) {
+    } catch (URISyntaxException e) {
       throw new IOException("Bad URI", e);
-    }
-  }
-
-  @Test(timeout=60000)
-  public void testMemlockLimit() throws Exception {
-    assumeTrue(NativeIO.isAvailable());
-    final long memlockLimit =
-        NativeIO.POSIX.getCacheManipulator().getMemlockLimit();
-
-    // Can't increase the memlock limit past the maximum.
-    assumeTrue(memlockLimit != Long.MAX_VALUE);
-
-    Configuration conf = cluster.getConfiguration(0);
-    long prevLimit = conf.
-        getLong(DFSConfigKeys.DFS_DATANODE_MAX_LOCKED_MEMORY_KEY,
-            DFSConfigKeys.DFS_DATANODE_MAX_LOCKED_MEMORY_DEFAULT);
-    try {
-      // Try starting the DN with limit configured to the ulimit
-      conf.setLong(DFSConfigKeys.DFS_DATANODE_MAX_LOCKED_MEMORY_KEY,
-          memlockLimit);
-      DataNode dn = null;
-      dn = DataNode.createDataNode(new String[]{},  conf);
-      dn.shutdown();
-      // Try starting the DN with a limit > ulimit
-      conf.setLong(DFSConfigKeys.DFS_DATANODE_MAX_LOCKED_MEMORY_KEY,
-          memlockLimit+1);
-      try {
-        dn = DataNode.createDataNode(new String[]{}, conf);
-      } catch (RuntimeException e) {
-        GenericTestUtils.assertExceptionContains(
-            "more than the datanode's available RLIMIT_MEMLOCK", e);
-      }
-    } finally {
-      conf.setLong(DFSConfigKeys.DFS_DATANODE_MAX_LOCKED_MEMORY_KEY,
-          prevLimit);
     }
   }
 }

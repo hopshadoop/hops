@@ -18,10 +18,6 @@
 
 package org.apache.hadoop.lib.service.scheduler;
 
-import static org.junit.Assert.assertNotNull;
-
-import java.util.Arrays;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.lib.server.Server;
 import org.apache.hadoop.lib.service.Scheduler;
@@ -32,6 +28,10 @@ import org.apache.hadoop.test.TestDirHelper;
 import org.apache.hadoop.util.StringUtils;
 import org.junit.Test;
 
+import java.util.Arrays;
+
+import static org.junit.Assert.assertNotNull;
+
 public class TestSchedulerService extends HTestCase {
 
   @Test
@@ -39,8 +39,9 @@ public class TestSchedulerService extends HTestCase {
   public void service() throws Exception {
     String dir = TestDirHelper.getTestDir().getAbsolutePath();
     Configuration conf = new Configuration(false);
-    conf.set("server.services", StringUtils.join(",", Arrays.asList(InstrumentationService.class.getName(),
-                                                                    SchedulerService.class.getName())));
+    conf.set("server.services", StringUtils.join(",", Arrays
+        .asList(InstrumentationService.class.getName(),
+            SchedulerService.class.getName())));
     Server server = new Server("server", dir, dir, dir, dir, conf);
     server.init();
     assertNotNull(server.get(Scheduler.class));

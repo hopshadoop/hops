@@ -18,22 +18,23 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity;
 
+import org.apache.hadoop.yarn.api.records.Resource;
+import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.ResourceInfo;
+
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 
-import org.apache.hadoop.yarn.api.records.Resource;
-import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.ResourceInfo;
-
 @XmlRootElement
 @XmlAccessorType(XmlAccessType.FIELD)
 public class UserInfo {
-  protected String  username;
+  protected String username;
   protected ResourceInfo resourcesUsed;
   protected int numPendingApplications;
   protected int numActiveApplications;
 
-  UserInfo() {}
+  UserInfo() {
+  }
 
   UserInfo(String username, Resource resUsed, int activeApps, int pendingApps) {
     this.username = username;

@@ -16,9 +16,6 @@
  * limitations under the License.
  */
 package org.apache.hadoop.hdfs;
-import static org.junit.Assert.assertTrue;
-
-import java.io.IOException;
 
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.logging.impl.Log4JLogger;
@@ -32,11 +29,16 @@ import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.log4j.Level;
 import org.junit.Test;
 
+import java.io.IOException;
+
+import static org.junit.Assert.assertTrue;
+
 public class TestRenameWhileOpen {
   {
-    ((Log4JLogger)NameNode.stateChangeLog).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger)LeaseManager.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger)LogFactory.getLog(FSNamesystem.class)).getLogger().setLevel(Level.ALL);
+    ((Log4JLogger) NameNode.stateChangeLog).getLogger().setLevel(Level.ALL);
+    ((Log4JLogger) LeaseManager.LOG).getLogger().setLevel(Level.ALL);
+    ((Log4JLogger) LogFactory.getLog(FSNamesystem.class)).getLogger()
+        .setLevel(Level.ALL);
   }
 
   //TODO: un-comment checkFullFile once the lease recovery is done
@@ -54,7 +56,8 @@ public class TestRenameWhileOpen {
     Configuration conf = new HdfsConfiguration();
     final int MAX_IDLE_TIME = 2000; // 2s
     conf.setInt("ipc.client.connection.maxidletime", MAX_IDLE_TIME);
-    conf.setInt(DFSConfigKeys.DFS_NAMENODE_HEARTBEAT_RECHECK_INTERVAL_KEY, 1000);
+    conf.setInt(DFSConfigKeys.DFS_NAMENODE_HEARTBEAT_RECHECK_INTERVAL_KEY,
+        1000);
     conf.setInt(DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY, 1);
     conf.setInt(DFSConfigKeys.DFS_NAMENODE_SAFEMODE_THRESHOLD_PCT_KEY, 1);
 
@@ -71,8 +74,8 @@ public class TestRenameWhileOpen {
       Path dir1 = new Path("/user/a+b/dir1");
       Path file1 = new Path(dir1, "file1");
       FSDataOutputStream stm1 = TestFileCreation.createFile(fs, file1, 1);
-      System.out.println("testFileCreationDeleteParent: "
-          + "Created file " + file1);
+      System.out
+          .println("testFileCreationDeleteParent: " + "Created file " + file1);
       TestFileCreation.writeFile(stm1);
       stm1.hflush();
 
@@ -80,8 +83,8 @@ public class TestRenameWhileOpen {
       Path dir2 = new Path("/user/dir2");
       Path file2 = new Path(dir2, "file2");
       FSDataOutputStream stm2 = TestFileCreation.createFile(fs, file2, 1);
-      System.out.println("testFileCreationDeleteParent: "
-          + "Created file " + file2);
+      System.out
+          .println("testFileCreationDeleteParent: " + "Created file " + file2);
       TestFileCreation.writeFile(stm2);
       stm2.hflush();
 
@@ -97,26 +100,32 @@ public class TestRenameWhileOpen {
       // rename file3 to some bad name
       try {
         fs.rename(file3, new Path(dir3, "$ "));
-      } catch(Exception e) {
+      } catch (Exception e) {
         e.printStackTrace();
       }
       
       // restart cluster with the same namenode port as before.
       // This ensures that leases are persisted in fsimage.
       cluster.shutdown();
-      try {Thread.sleep(2*MAX_IDLE_TIME);} catch (InterruptedException e) {}
-      cluster = new MiniDFSCluster.Builder(conf).nameNodePort(nnport)
-                                                .format(false)
-                                                .build();
+      try {
+        Thread.sleep(2 * MAX_IDLE_TIME);
+      } catch (InterruptedException e) {
+      }
+      cluster =
+          new MiniDFSCluster.Builder(conf).nameNodePort(nnport).format(false)
+              .build();
       cluster.waitActive();
 
       // restart cluster yet again. This triggers the code to read in
       // persistent leases from fsimage.
       cluster.shutdown();
-      try {Thread.sleep(5000);} catch (InterruptedException e) {}
-      cluster = new MiniDFSCluster.Builder(conf).nameNodePort(nnport)
-                                                .format(false)
-                                                .build();
+      try {
+        Thread.sleep(5000);
+      } catch (InterruptedException e) {
+      }
+      cluster =
+          new MiniDFSCluster.Builder(conf).nameNodePort(nnport).format(false)
+              .build();
       cluster.waitActive();
       fs = cluster.getFileSystem();
 
@@ -140,7 +149,8 @@ public class TestRenameWhileOpen {
     Configuration conf = new HdfsConfiguration();
     final int MAX_IDLE_TIME = 2000; // 2s
     conf.setInt("ipc.client.connection.maxidletime", MAX_IDLE_TIME);
-    conf.setInt(DFSConfigKeys.DFS_NAMENODE_HEARTBEAT_RECHECK_INTERVAL_KEY, 1000);
+    conf.setInt(DFSConfigKeys.DFS_NAMENODE_HEARTBEAT_RECHECK_INTERVAL_KEY,
+        1000);
     conf.setInt(DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY, 1);
     conf.setInt(DFSConfigKeys.DFS_NAMENODE_SAFEMODE_THRESHOLD_PCT_KEY, 1);
     System.out.println("Test 2************************************");
@@ -157,8 +167,8 @@ public class TestRenameWhileOpen {
       Path dir1 = new Path("/user/dir1");
       Path file1 = new Path(dir1, "file1");
       FSDataOutputStream stm1 = TestFileCreation.createFile(fs, file1, 1);
-      System.out.println("testFileCreationDeleteParent: "
-          + "Created file " + file1);
+      System.out
+          .println("testFileCreationDeleteParent: " + "Created file " + file1);
       TestFileCreation.writeFile(stm1);
       stm1.hflush();
 
@@ -166,8 +176,8 @@ public class TestRenameWhileOpen {
       Path dir2 = new Path("/user/dir2");
       Path file2 = new Path(dir2, "file2");
       FSDataOutputStream stm2 = TestFileCreation.createFile(fs, file2, 1);
-      System.out.println("testFileCreationDeleteParent: "
-          + "Created file " + file2);
+      System.out
+          .println("testFileCreationDeleteParent: " + "Created file " + file2);
       TestFileCreation.writeFile(stm2);
       stm2.hflush();
 
@@ -178,19 +188,25 @@ public class TestRenameWhileOpen {
       // restart cluster with the same namenode port as before.
       // This ensures that leases are persisted in fsimage.
       cluster.shutdown();
-      try {Thread.sleep(2*MAX_IDLE_TIME);} catch (InterruptedException e) {}
-      cluster = new MiniDFSCluster.Builder(conf).nameNodePort(nnport)
-                                                .format(false)
-                                                .build();
+      try {
+        Thread.sleep(2 * MAX_IDLE_TIME);
+      } catch (InterruptedException e) {
+      }
+      cluster =
+          new MiniDFSCluster.Builder(conf).nameNodePort(nnport).format(false)
+              .build();
       cluster.waitActive();
 
       // restart cluster yet again. This triggers the code to read in
       // persistent leases from fsimage.
       cluster.shutdown();
-      try {Thread.sleep(5000);} catch (InterruptedException e) {}
-      cluster = new MiniDFSCluster.Builder(conf).nameNodePort(nnport)
-                                                .format(false)
-                                                .build();
+      try {
+        Thread.sleep(5000);
+      } catch (InterruptedException e) {
+      }
+      cluster =
+          new MiniDFSCluster.Builder(conf).nameNodePort(nnport).format(false)
+              .build();
       cluster.waitActive();
       fs = cluster.getFileSystem();
 
@@ -206,7 +222,7 @@ public class TestRenameWhileOpen {
   }
 
   /**
-   * open /user/dir1/file1 
+   * open /user/dir1/file1
    * mkdir /user/dir2
    * move /user/dir1/file1 /user/dir2/
    */
@@ -215,7 +231,8 @@ public class TestRenameWhileOpen {
     Configuration conf = new HdfsConfiguration();
     final int MAX_IDLE_TIME = 2000; // 2s
     conf.setInt("ipc.client.connection.maxidletime", MAX_IDLE_TIME);
-    conf.setInt(DFSConfigKeys.DFS_NAMENODE_HEARTBEAT_RECHECK_INTERVAL_KEY, 1000);
+    conf.setInt(DFSConfigKeys.DFS_NAMENODE_HEARTBEAT_RECHECK_INTERVAL_KEY,
+        1000);
     conf.setInt(DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY, 1);
     conf.setInt(DFSConfigKeys.DFS_NAMENODE_SAFEMODE_THRESHOLD_PCT_KEY, 1);
     System.out.println("Test 3************************************");
@@ -233,7 +250,7 @@ public class TestRenameWhileOpen {
       Path file1 = new Path(dir1, "file1");
       FSDataOutputStream stm1 = TestFileCreation.createFile(fs, file1, 1);
       System.out.println("testFileCreationDeleteParent: " +
-                         "Created file " + file1);
+          "Created file " + file1);
       TestFileCreation.writeFile(stm1);
       stm1.hflush();
 
@@ -245,19 +262,25 @@ public class TestRenameWhileOpen {
       // restart cluster with the same namenode port as before.
       // This ensures that leases are persisted in fsimage.
       cluster.shutdown();
-      try {Thread.sleep(2*MAX_IDLE_TIME);} catch (InterruptedException e) {}
-      cluster = new MiniDFSCluster.Builder(conf).nameNodePort(nnport)
-                                                .format(false)
-                                                .build();
+      try {
+        Thread.sleep(2 * MAX_IDLE_TIME);
+      } catch (InterruptedException e) {
+      }
+      cluster =
+          new MiniDFSCluster.Builder(conf).nameNodePort(nnport).format(false)
+              .build();
       cluster.waitActive();
 
       // restart cluster yet again. This triggers the code to read in
       // persistent leases from fsimage.
       cluster.shutdown();
-      try {Thread.sleep(5000);} catch (InterruptedException e) {}
-      cluster = new MiniDFSCluster.Builder(conf).nameNodePort(nnport)
-                                                .format(false)
-                                                .build();
+      try {
+        Thread.sleep(5000);
+      } catch (InterruptedException e) {
+      }
+      cluster =
+          new MiniDFSCluster.Builder(conf).nameNodePort(nnport).format(false)
+              .build();
       cluster.waitActive();
       fs = cluster.getFileSystem();
 
@@ -272,7 +295,7 @@ public class TestRenameWhileOpen {
   }
 
   /**
-   * open /user/dir1/file1 
+   * open /user/dir1/file1
    * move /user/dir1/file1 /user/dir2/
    */
   @Test
@@ -280,7 +303,8 @@ public class TestRenameWhileOpen {
     Configuration conf = new HdfsConfiguration();
     final int MAX_IDLE_TIME = 2000; // 2s
     conf.setInt("ipc.client.connection.maxidletime", MAX_IDLE_TIME);
-    conf.setInt(DFSConfigKeys.DFS_NAMENODE_HEARTBEAT_RECHECK_INTERVAL_KEY, 1000);
+    conf.setInt(DFSConfigKeys.DFS_NAMENODE_HEARTBEAT_RECHECK_INTERVAL_KEY,
+        1000);
     conf.setInt(DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY, 1);
     conf.setInt(DFSConfigKeys.DFS_NAMENODE_SAFEMODE_THRESHOLD_PCT_KEY, 1);
     System.out.println("Test 4************************************");
@@ -297,8 +321,8 @@ public class TestRenameWhileOpen {
       Path dir1 = new Path("/user/dir1");
       Path file1 = new Path(dir1, "file1");
       FSDataOutputStream stm1 = TestFileCreation.createFile(fs, file1, 1);
-      System.out.println("testFileCreationDeleteParent: "
-          + "Created file " + file1);
+      System.out
+          .println("testFileCreationDeleteParent: " + "Created file " + file1);
       TestFileCreation.writeFile(stm1);
       stm1.hflush();
 
@@ -309,19 +333,25 @@ public class TestRenameWhileOpen {
       // restart cluster with the same namenode port as before.
       // This ensures that leases are persisted in fsimage.
       cluster.shutdown();
-      try {Thread.sleep(2*MAX_IDLE_TIME);} catch (InterruptedException e) {}
-      cluster = new MiniDFSCluster.Builder(conf).nameNodePort(nnport)
-                                                .format(false)
-                                                .build();
+      try {
+        Thread.sleep(2 * MAX_IDLE_TIME);
+      } catch (InterruptedException e) {
+      }
+      cluster =
+          new MiniDFSCluster.Builder(conf).nameNodePort(nnport).format(false)
+              .build();
       cluster.waitActive();
 
       // restart cluster yet again. This triggers the code to read in
       // persistent leases from fsimage.
       cluster.shutdown();
-      try {Thread.sleep(5000);} catch (InterruptedException e) {}
-      cluster = new MiniDFSCluster.Builder(conf).nameNodePort(nnport)
-                                                .format(false)
-                                                .build();
+      try {
+        Thread.sleep(5000);
+      } catch (InterruptedException e) {
+      }
+      cluster =
+          new MiniDFSCluster.Builder(conf).nameNodePort(nnport).format(false)
+              .build();
       cluster.waitActive();
       fs = cluster.getFileSystem();
 

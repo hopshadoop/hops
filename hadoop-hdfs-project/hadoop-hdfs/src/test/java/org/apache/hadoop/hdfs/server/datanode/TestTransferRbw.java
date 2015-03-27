@@ -17,9 +17,6 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
-import java.util.Collection;
-import java.util.Random;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.logging.impl.Log4JLogger;
@@ -42,43 +39,51 @@ import org.apache.log4j.Level;
 import org.junit.Assert;
 import org.junit.Test;
 
-/** Test transferring RBW between datanodes */
+import java.util.Collection;
+import java.util.Random;
+
+/**
+ * Test transferring RBW between datanodes
+ */
 public class TestTransferRbw {
   private static final Log LOG = LogFactory.getLog(TestTransferRbw.class);
   
   {
-    ((Log4JLogger)DataNode.LOG).getLogger().setLevel(Level.ALL);
+    ((Log4JLogger) DataNode.LOG).getLogger().setLevel(Level.ALL);
   }
 
   private static final Random RAN = new Random();
-  private static final short REPLICATION = (short)1;
+  private static final short REPLICATION = (short) 1;
 
   private static ReplicaBeingWritten getRbw(final DataNode datanode,
       String bpid) throws InterruptedException {
-    return (ReplicaBeingWritten)getReplica(datanode, bpid, ReplicaState.RBW);
+    return (ReplicaBeingWritten) getReplica(datanode, bpid, ReplicaState.RBW);
   }
+
   private static ReplicaInPipeline getReplica(final DataNode datanode,
-      final String bpid, final ReplicaState expectedState) throws InterruptedException {
-    final Collection<ReplicaInfo> replicas = FsDatasetTestUtil.getReplicas(
-        datanode.getFSDataset(), bpid);
-    for(int i = 0; i < 5 && replicas.size() == 0; i++) {
+      final String bpid, final ReplicaState expectedState)
+      throws InterruptedException {
+    final Collection<ReplicaInfo> replicas =
+        FsDatasetTestUtil.getReplicas(datanode.getFSDataset(), bpid);
+    for (int i = 0; i < 5 && replicas.size() == 0; i++) {
       LOG.info("wait since replicas.size() == 0; i=" + i);
       Thread.sleep(1000);
     }
     Assert.assertEquals(1, replicas.size());
     final ReplicaInfo r = replicas.iterator().next();
     Assert.assertEquals(expectedState, r.getState());
-    return (ReplicaInPipeline)r;
+    return (ReplicaInPipeline) r;
   }
 
   @Test
   public void testTransferRbw() throws Exception {
     final HdfsConfiguration conf = new HdfsConfiguration();
-    final MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf
-        ).numDataNodes(REPLICATION).build();
+    final MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(REPLICATION).build();
     try {
       cluster.waitActive();
-      final DistributedFileSystem fs = (DistributedFileSystem)cluster.getFileSystem();
+      final DistributedFileSystem fs =
+          (DistributedFileSystem) cluster.getFileSystem();
 
       //create a file, write some data and leave it open. 
       final Path p = new Path("/foo");
@@ -86,9 +91,9 @@ public class TestTransferRbw {
       LOG.info("size = " + size);
       final FSDataOutputStream out = fs.create(p, REPLICATION);
       final byte[] bytes = new byte[1024];
-      for(int remaining = size; remaining > 0; ) {
+      for (int remaining = size; remaining > 0; ) {
         RAN.nextBytes(bytes);
-        final int len = bytes.length < remaining? bytes.length: remaining;
+        final int len = bytes.length < remaining ? bytes.length : remaining;
         out.write(bytes, 0, len);
         out.hflush();
         remaining -= len;
@@ -110,22 +115,28 @@ public class TestTransferRbw {
         
         final DatanodeInfo oldnodeinfo;
         {
-          final DatanodeInfo[] datatnodeinfos = cluster.getNameNodeRpc(
-              ).getDatanodeReport(DatanodeReportType.LIVE);
+          final DatanodeInfo[] datatnodeinfos = cluster.getNameNodeRpc()
+              .getDatanodeReport(DatanodeReportType.LIVE);
           Assert.assertEquals(2, datatnodeinfos.length);
           int i = 0;
-          for(DatanodeRegistration dnReg = newnode.getDNRegistrationForBP(bpid);
-              i < datatnodeinfos.length && !datatnodeinfos[i].equals(dnReg); i++);
+          for (
+              DatanodeRegistration dnReg = newnode.getDNRegistrationForBP(bpid);
+              i < datatnodeinfos.length && !datatnodeinfos[i].equals(dnReg);
+              i++) {
+            ;
+          }
           Assert.assertTrue(i < datatnodeinfos.length);
           newnodeinfo = datatnodeinfos[i];
           oldnodeinfo = datatnodeinfos[1 - i];
         }
         
         //transfer RBW
-        final ExtendedBlock b = new ExtendedBlock(bpid, oldrbw.getBlockId(), oldrbw.getBytesAcked(),
-            oldrbw.getGenerationStamp());
-        final BlockOpResponseProto s = DFSTestUtil.transferRbw(
-            b, DFSClientAdapter.getDFSClient(fs), oldnodeinfo, newnodeinfo);
+        final ExtendedBlock b =
+            new ExtendedBlock(bpid, oldrbw.getBlockId(), oldrbw.getBytesAcked(),
+                oldrbw.getGenerationStamp());
+        final BlockOpResponseProto s = DFSTestUtil
+            .transferRbw(b, DFSClientAdapter.getDFSClient(fs), oldnodeinfo,
+                newnodeinfo);
         Assert.assertEquals(Status.SUCCESS, s.getStatus());
       }
 
@@ -133,7 +144,8 @@ public class TestTransferRbw {
       final ReplicaBeingWritten newrbw = getRbw(newnode, bpid);
       LOG.info("newrbw = " + newrbw);
       Assert.assertEquals(oldrbw.getBlockId(), newrbw.getBlockId());
-      Assert.assertEquals(oldrbw.getGenerationStamp(), newrbw.getGenerationStamp());
+      Assert.assertEquals(oldrbw.getGenerationStamp(),
+          newrbw.getGenerationStamp());
       Assert.assertEquals(oldrbw.getVisibleLength(), newrbw.getVisibleLength());
 
       LOG.info("DONE");

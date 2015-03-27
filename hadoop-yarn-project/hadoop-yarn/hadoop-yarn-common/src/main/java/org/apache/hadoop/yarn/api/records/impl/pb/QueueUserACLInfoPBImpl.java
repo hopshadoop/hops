@@ -18,10 +18,7 @@
 
 package org.apache.hadoop.yarn.api.records.impl.pb;
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-
+import com.google.protobuf.TextFormat;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.records.QueueACL;
@@ -30,7 +27,9 @@ import org.apache.hadoop.yarn.proto.YarnProtos.QueueACLProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.QueueUserACLInfoProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.QueueUserACLInfoProtoOrBuilder;
 
-import com.google.protobuf.TextFormat;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 
 @Private
 @Unstable
@@ -95,8 +94,9 @@ public class QueueUserACLInfoPBImpl extends QueueUserACLInfo {
 
   @Override
   public boolean equals(Object other) {
-    if (other == null)
+    if (other == null) {
       return false;
+    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -124,32 +124,33 @@ public class QueueUserACLInfoPBImpl extends QueueUserACLInfo {
   private void addQueueACLsToProto() {
     maybeInitBuilder();
     builder.clearUserAcls();
-    if (userAclsList == null)
+    if (userAclsList == null) {
       return;
+    }
     Iterable<QueueACLProto> iterable = new Iterable<QueueACLProto>() {
       @Override
       public Iterator<QueueACLProto> iterator() {
         return new Iterator<QueueACLProto>() {
-  
+
           Iterator<QueueACL> iter = userAclsList.iterator();
-  
+
           @Override
           public boolean hasNext() {
             return iter.hasNext();
           }
-  
+
           @Override
           public QueueACLProto next() {
             return convertToProtoFormat(iter.next());
           }
-  
+
           @Override
           public void remove() {
             throw new UnsupportedOperationException();
-  
+
           }
         };
-  
+
       }
     };
     builder.addAllUserAcls(iterable);
@@ -169,8 +170,9 @@ public class QueueUserACLInfoPBImpl extends QueueUserACLInfo {
   }
 
   private void mergeLocalToProto() {
-    if (viaProto) 
+    if (viaProto) {
       maybeInitBuilder();
+    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;

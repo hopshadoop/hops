@@ -17,15 +17,6 @@
  */
 package org.apache.hadoop.hdfs;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.util.List;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -43,12 +34,20 @@ import org.apache.hadoop.ipc.RemoteException;
 import org.junit.Assert;
 import org.junit.Test;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.util.List;
+
+import static org.junit.Assert.assertTrue;
+
 /**
  * This class tests the building blocks that are needed to
  * support HDFS appends.
  */
-public class TestFileAppend{
-  final boolean simulatedStorage = false;
+public class TestFileAppend {
+  boolean simulatedStorage = false;
 
   private static byte[] fileContents = null;
 
@@ -64,17 +63,20 @@ public class TestFileAppend{
   // verify that the data written to the full blocks are sane
   // 
   private void checkFile(FileSystem fileSys, Path name, int repl)
-    throws IOException {
+      throws IOException {
     boolean done = false;
 
     // wait till all full blocks are confirmed by the datanodes.
     while (!done) {
       try {
         Thread.sleep(1000);
-      } catch (InterruptedException e) {;}
+      } catch (InterruptedException e) {
+        ;
+      }
       done = true;
-      BlockLocation[] locations = fileSys.getFileBlockLocations(
-          fileSys.getFileStatus(name), 0, AppendTestUtil.FILE_SIZE);
+      BlockLocation[] locations = fileSys
+          .getFileBlockLocations(fileSys.getFileStatus(name), 0,
+              AppendTestUtil.FILE_SIZE);
       if (locations.length < AppendTestUtil.NUM_BLOCKS) {
         System.out.println("Number of blocks found " + locations.length);
         done = false;
@@ -88,10 +90,10 @@ public class TestFileAppend{
         }
       }
     }
-    byte[] expected = 
+    byte[] expected =
         new byte[AppendTestUtil.NUM_BLOCKS * AppendTestUtil.BLOCK_SIZE];
     if (simulatedStorage) {
-      for (int i= 0; i < expected.length; i++) {  
+      for (int i = 0; i < expected.length; i++) {
         expected[i] = SimulatedFSDataset.DEFAULT_DATABYTE;
       }
     } else {
@@ -99,13 +101,15 @@ public class TestFileAppend{
     }
     // do a sanity check. Read the file
     AppendTestUtil.checkFullFile(fileSys, name,
-        AppendTestUtil.NUM_BLOCKS * AppendTestUtil.BLOCK_SIZE,
-        expected, "Read 1");
+        AppendTestUtil.NUM_BLOCKS * AppendTestUtil.BLOCK_SIZE, expected,
+        "Read 1");
   }
 
   /**
    * Test that copy on write for blocks works correctly
-   * @throws IOException an exception might be thrown
+   *
+   * @throws IOException
+   *     an exception might be thrown
    */
   @Test
   public void testCopyOnWrite() throws IOException {
@@ -115,8 +119,8 @@ public class TestFileAppend{
     }
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).build();
     FileSystem fs = cluster.getFileSystem();
-    InetSocketAddress addr = new InetSocketAddress("localhost",
-                                                   cluster.getNameNodePort());
+    InetSocketAddress addr =
+        new InetSocketAddress("localhost", cluster.getNameNodePort());
     DFSClient client = new DFSClient(addr, conf);
     try {
 
@@ -130,10 +134,10 @@ public class TestFileAppend{
       // Get a handle to the datanode
       DataNode[] dn = cluster.listDataNodes();
       assertTrue("There should be only one datanode but found " + dn.length,
-                  dn.length == 1);
+          dn.length == 1);
 
-      LocatedBlocks locations = client.getNamenode().getBlockLocations(
-                                  file1.toString(), 0, Long.MAX_VALUE);
+      LocatedBlocks locations = client.getNamenode()
+          .getBlockLocations(file1.toString(), 0, Long.MAX_VALUE);
       List<LocatedBlock> blocks = locations.getLocatedBlocks();
 
       //
@@ -141,8 +145,8 @@ public class TestFileAppend{
       //
       for (int i = 0; i < blocks.size(); i = i + 2) {
         ExtendedBlock b = blocks.get(i).getBlock();
-        final File f = DataNodeTestUtils.getFile(dn[0],
-            b.getBlockPoolId(), b.getLocalBlock().getBlockId());
+        final File f = DataNodeTestUtils
+            .getFile(dn[0], b.getBlockPoolId(), b.getLocalBlock().getBlockId());
         File link = new File(f.toString() + ".link");
         System.out.println("Creating hardlink for File " + f + " to " + link);
         HardLink.createHardLink(f, link);
@@ -176,7 +180,9 @@ public class TestFileAppend{
 
   /**
    * Test a simple flush on a simple HDFS file.
-   * @throws IOException an exception might be thrown
+   *
+   * @throws IOException
+   *     an exception might be thrown
    */
   @Test
   public void testSimpleFlush() throws IOException {
@@ -195,7 +201,7 @@ public class TestFileAppend{
       System.out.println("Created file simpleFlush.dat");
 
       // write to file
-      int mid = AppendTestUtil.FILE_SIZE /2;
+      int mid = AppendTestUtil.FILE_SIZE / 2;
       stm.write(fileContents, 0, mid);
       stm.hflush();
       System.out.println("Wrote and Flushed first part of file.");
@@ -214,12 +220,13 @@ public class TestFileAppend{
       System.out.println("Closed file.");
 
       // verify that entire file is good
-      AppendTestUtil.checkFullFile(fs, file1, AppendTestUtil.FILE_SIZE,
-          fileContents, "Read 2");
+      AppendTestUtil
+          .checkFullFile(fs, file1, AppendTestUtil.FILE_SIZE, fileContents,
+              "Read 2");
 
     } catch (IOException e) {
       System.out.println("Exception :" + e);
-      throw e; 
+      throw e;
     } catch (Throwable e) {
       System.out.println("Throwable :" + e);
       e.printStackTrace();
@@ -232,7 +239,9 @@ public class TestFileAppend{
 
   /**
    * Test that file data can be flushed.
-   * @throws IOException an exception might be thrown
+   *
+   * @throws IOException
+   *     an exception might be thrown
    */
   @Test
   public void testComplexFlush() throws IOException {
@@ -256,18 +265,19 @@ public class TestFileAppend{
         stm.hflush();
         start += 29;
       }
-      stm.write(fileContents, start, AppendTestUtil.FILE_SIZE -start);
+      stm.write(fileContents, start, AppendTestUtil.FILE_SIZE - start);
 
       // verify that full blocks are sane
       checkFile(fs, file1, 1);
       stm.close();
 
       // verify that entire file is good
-      AppendTestUtil.checkFullFile(fs, file1, AppendTestUtil.FILE_SIZE,
-          fileContents, "Read 2");
+      AppendTestUtil
+          .checkFullFile(fs, file1, AppendTestUtil.FILE_SIZE, fileContents,
+              "Read 2");
     } catch (IOException e) {
       System.out.println("Exception :" + e);
-      throw e; 
+      throw e;
     } catch (Throwable e) {
       System.out.println("Throwable :" + e);
       e.printStackTrace();
@@ -277,11 +287,12 @@ public class TestFileAppend{
       cluster.shutdown();
     }
   }
- 
+
   /**
    * FileNotFoundException is expected for appending to a non-exisiting file
-   * 
-   * @throws FileNotFoundException as the result
+   *
+   * @throws FileNotFoundException
+   *     as the result
    */
   @Test(expected = FileNotFoundException.class)
   public void testFileNotFound() throws IOException {
@@ -300,7 +311,9 @@ public class TestFileAppend{
     }
   }
 
-  /** Test two consecutive appends on a file with a full block. */
+  /**
+   * Test two consecutive appends on a file with a full block.
+   */
   @Test
   public void testAppendTwice() throws Exception {
     Configuration conf = new HdfsConfiguration();
@@ -308,18 +321,18 @@ public class TestFileAppend{
     final FileSystem fs1 = cluster.getFileSystem();
     final FileSystem fs2 = AppendTestUtil.createHdfsWithDifferentUsername(conf);
     try {
-  
+
       final Path p = new Path("/testAppendTwice/foo");
       final int len = 1 << 16;
       final byte[] fileContents = AppendTestUtil.initBuffer(len);
 
       {
         // create a new file with a full block.
-        FSDataOutputStream out = fs2.create(p, true, 4096, (short)1, len);
+        FSDataOutputStream out = fs2.create(p, true, 4096, (short) 1, len);
         out.write(fileContents, 0, len);
         out.close();
       }
-  
+
       //1st append does not add any data so that the last block remains full
       //and the last block in INodeFileUnderConstruction is a BlockInfo
       //but not BlockInfoUnderConstruction. 
@@ -328,7 +341,7 @@ public class TestFileAppend{
       //2nd append should get AlreadyBeingCreatedException
       fs1.append(p);
       Assert.fail();
-    } catch(RemoteException re) {
+    } catch (RemoteException re) {
       AppendTestUtil.LOG.info("Got an exception:", re);
       Assert.assertEquals(AlreadyBeingCreatedException.class.getName(),
           re.getClassName());
@@ -338,47 +351,4 @@ public class TestFileAppend{
       cluster.shutdown();
     }
   }
-  
-  /** Tests appending after soft-limit expires. */
-  @Test
-  public void testAppendAfterSoftLimit() 
-      throws IOException, InterruptedException {
-    Configuration conf = new HdfsConfiguration();
-    conf.setInt(DFSConfigKeys.DFS_REPLICATION_KEY, 1);
-    conf.setBoolean(DFSConfigKeys.DFS_SUPPORT_APPEND_KEY, true);
-    //Set small soft-limit for lease
-    final long softLimit = 1L;
-    final long hardLimit = 9999999L;
-
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1)
-        .build();
-    cluster.setLeasePeriod(softLimit, hardLimit);
-    cluster.waitActive();
-
-    FileSystem fs = cluster.getFileSystem();
-    FileSystem fs2 = new DistributedFileSystem();
-    fs2.initialize(fs.getUri(), conf);
-
-    final Path testPath = new Path("/testAppendAfterSoftLimit");
-    final byte[] fileContents = AppendTestUtil.initBuffer(32);
-
-    // create a new file without closing
-    FSDataOutputStream out = fs.create(testPath);
-    out.write(fileContents);
-
-    //Wait for > soft-limit
-    Thread.sleep(250);
-
-    try {
-      FSDataOutputStream appendStream2 = fs2.append(testPath);
-      appendStream2.write(fileContents);
-      appendStream2.close();
-      assertEquals(fileContents.length, fs.getFileStatus(testPath).getLen());
-    } finally {
-      fs.close();
-      fs2.close();
-      cluster.shutdown();
-    }
-  }
-
 }

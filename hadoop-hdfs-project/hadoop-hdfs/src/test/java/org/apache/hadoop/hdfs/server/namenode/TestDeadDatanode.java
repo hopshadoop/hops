@@ -17,12 +17,6 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
-
-import java.io.IOException;
-import java.util.concurrent.TimeoutException;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -47,6 +41,12 @@ import org.apache.hadoop.util.Time;
 import org.junit.After;
 import org.junit.Test;
 
+import java.io.IOException;
+import java.util.concurrent.TimeoutException;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
+
 /**
  * Test to ensure requests from dead datnodes are rejected by namenode with
  * appropriate exceptions/failure response
@@ -70,8 +70,8 @@ public class TestDeadDatanode {
     FSNamesystem namesystem = cluster.getNamesystem();
     String state = alive ? "alive" : "dead";
     while (Time.now() < stopTime) {
-      final DatanodeDescriptor dd = BlockManagerTestUtil.getDatanode(
-          namesystem, nodeID);
+      final DatanodeDescriptor dd =
+          BlockManagerTestUtil.getDatanode(namesystem, nodeID);
       if (dd.isAlive == alive) {
         LOG.info("datanode " + nodeID + " is " + state);
         return;
@@ -79,16 +79,16 @@ public class TestDeadDatanode {
       LOG.info("Waiting for datanode " + nodeID + " to become " + state);
       Thread.sleep(1000);
     }
-    throw new TimeoutException("Timedout waiting for datanode reach state "
-        + state);
+    throw new TimeoutException(
+        "Timedout waiting for datanode reach state " + state);
   }
 
   /**
    * Test to ensure namenode rejects request from dead datanode
    * - Start a cluster
    * - Shutdown the datanode and wait for it to be marked dead at the namenode
-   * - Send datanode requests to Namenode and make sure it is rejected 
-   *   appropriately.
+   * - Send datanode requests to Namenode and make sure it is rejected
+   * appropriately.
    */
   @Test
   public void testDeadDatanode() throws Exception {
@@ -101,23 +101,22 @@ public class TestDeadDatanode {
     String poolId = cluster.getNamesystem().getBlockPoolId();
     // wait for datanode to be marked live
     DataNode dn = cluster.getDataNodes().get(0);
-    DatanodeRegistration reg = 
-      DataNodeTestUtils.getDNRegistrationForBP(cluster.getDataNodes().get(0), poolId);
-      
-    waitForDatanodeState(reg.getDatanodeUuid(), true, 20000);
+    DatanodeRegistration reg = DataNodeTestUtils
+        .getDNRegistrationForBP(cluster.getDataNodes().get(0), poolId);
+
+    waitForDatanodeState(reg.getStorageID(), true, 20000);
 
     // Shutdown and wait for datanode to be marked dead
     dn.shutdown();
-    waitForDatanodeState(reg.getDatanodeUuid(), false, 20000);
+    waitForDatanodeState(reg.getStorageID(), false, 20000);
 
     DatanodeProtocol dnp = cluster.getNameNodeRpc();
     
-    ReceivedDeletedBlockInfo[] blocks = { new ReceivedDeletedBlockInfo(
-        new Block(0), 
-        ReceivedDeletedBlockInfo.BlockStatus.RECEIVED_BLOCK,
-        null) };
-    StorageReceivedDeletedBlocks[] storageBlocks = { 
-        new StorageReceivedDeletedBlocks(reg.getDatanodeUuid(), blocks) };
+    ReceivedDeletedBlockInfo[] blocks =
+        {new ReceivedDeletedBlockInfo(new Block(0),
+            ReceivedDeletedBlockInfo.BlockStatus.RECEIVED_BLOCK, null)};
+    StorageReceivedDeletedBlocks[] storageBlocks =
+        {new StorageReceivedDeletedBlocks(reg.getStorageID(), blocks)};
     
     // Ensure blockReceived call from dead datanode is rejected with IOException
     try {
@@ -128,9 +127,12 @@ public class TestDeadDatanode {
     }
 
     // Ensure blockReport from dead datanode is rejected with IOException
-    StorageBlockReport[] report = { new StorageBlockReport(
-        new DatanodeStorage(reg.getDatanodeUuid()),
-        new long[] { 0L, 0L, 0L }) };
+    StorageBlockReport[] report =
+        {new StorageBlockReport(new DatanodeStorage(reg.getStorageID()),
+            new long[]{0L, 0L, 0L, 0L,
+                0L})};    //problem is with the check in the logging fucntion in BlockListAsLongs.
+    //This problem also occurs in the master branch. After looking in to the code
+    //we need to send array of length 5. enable debug log level to get the error in the master branch
     try {
       dnp.blockReport(reg, poolId, report);
       fail("Expected IOException is not thrown");
@@ -140,13 +142,10 @@ public class TestDeadDatanode {
 
     // Ensure heartbeat from dead datanode is rejected with a command
     // that asks datanode to register again
-    StorageReport[] rep = { new StorageReport(
-        new DatanodeStorage(reg.getDatanodeUuid()),
-        false, 0, 0, 0, 0) };
-    DatanodeCommand[] cmd = dnp.sendHeartbeat(reg, rep, 0L, 0L, 0, 0, 0)
-      .getCommands();
+    StorageReport[] rep =
+        {new StorageReport(reg.getStorageID(), false, 0, 0, 0, 0)};
+    DatanodeCommand[] cmd = dnp.sendHeartbeat(reg, rep, 0, 0, 0).getCommands();
     assertEquals(1, cmd.length);
-    assertEquals(cmd[0].getAction(), RegisterCommand.REGISTER
-        .getAction());
+    assertEquals(cmd[0].getAction(), RegisterCommand.REGISTER.getAction());
   }
 }

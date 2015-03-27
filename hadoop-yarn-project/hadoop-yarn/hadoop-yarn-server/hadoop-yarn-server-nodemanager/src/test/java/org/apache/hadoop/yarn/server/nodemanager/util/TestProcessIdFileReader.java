@@ -17,23 +17,21 @@
  */
 package org.apache.hadoop.yarn.server.nodemanager.util;
 
-import static org.junit.Assert.*;
+import junit.framework.Assert;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.util.Shell;
+import org.junit.Test;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 
-import junit.framework.Assert;
-
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.util.Shell;
-import org.apache.hadoop.yarn.server.nodemanager.util.ProcessIdFileReader;
-import org.junit.Test;
+import static org.junit.Assert.fail;
 
 public class TestProcessIdFileReader {
 
   
-  @Test (timeout = 30000)
+  @Test(timeout = 30000)
   public void testNullPath() {
     String pid = null;
     try {
@@ -42,46 +40,43 @@ public class TestProcessIdFileReader {
     } catch (Exception e) {
       // expected
     }
-    assert(pid == null);
+    assert (pid == null);
   }
   
-  @Test (timeout = 30000)
+  @Test(timeout = 30000)
   public void testSimpleGet() throws IOException {
-    String rootDir = new File(System.getProperty(
-        "test.build.data", "/tmp")).getAbsolutePath();
+    String rootDir = new File(System.getProperty("test.build.data", "/tmp"))
+        .getAbsolutePath();
     File testFile = null;
-    String expectedProcessId = Shell.WINDOWS ?
-      "container_1353742680940_0002_01_000001" :
-      "56789";
+    String expectedProcessId =
+        Shell.WINDOWS ? "container_1353742680940_0002_01_000001" : "56789";
     
     try {
       testFile = new File(rootDir, "temp.txt");
       PrintWriter fileWriter = new PrintWriter(testFile);
       fileWriter.println(expectedProcessId);
-      fileWriter.close();      
-      String processId = null; 
-                  
-      processId = ProcessIdFileReader.getProcessId(
-          new Path(rootDir + Path.SEPARATOR + "temp.txt"));
-      Assert.assertEquals(expectedProcessId, processId);      
+      fileWriter.close();
+      String processId = null;
+
+      processId = ProcessIdFileReader
+          .getProcessId(new Path(rootDir + Path.SEPARATOR + "temp.txt"));
+      Assert.assertEquals(expectedProcessId, processId);
       
     } finally {
-      if (testFile != null
-          && testFile.exists()) {
+      if (testFile != null && testFile.exists()) {
         testFile.delete();
       }
     }
   }
 
-    
-  @Test (timeout = 30000)
+
+  @Test(timeout = 30000)
   public void testComplexGet() throws IOException {
-    String rootDir = new File(System.getProperty(
-        "test.build.data", "/tmp")).getAbsolutePath();
+    String rootDir = new File(System.getProperty("test.build.data", "/tmp"))
+        .getAbsolutePath();
     File testFile = null;
-    String processIdInFile = Shell.WINDOWS ?
-      " container_1353742680940_0002_01_000001 " :
-      " 23 ";
+    String processIdInFile =
+        Shell.WINDOWS ? " container_1353742680940_0002_01_000001 " : " 23 ";
     String expectedProcessId = processIdInFile.trim();
     try {
       testFile = new File(rootDir, "temp.txt");
@@ -93,16 +88,15 @@ public class TestProcessIdFileReader {
       fileWriter.println("-123 ");
       fileWriter.println(processIdInFile);
       fileWriter.println("6236");
-      fileWriter.close();      
-      String processId = null; 
-                  
-      processId = ProcessIdFileReader.getProcessId(
-          new Path(rootDir + Path.SEPARATOR + "temp.txt"));
+      fileWriter.close();
+      String processId = null;
+
+      processId = ProcessIdFileReader
+          .getProcessId(new Path(rootDir + Path.SEPARATOR + "temp.txt"));
       Assert.assertEquals(expectedProcessId, processId);
       
     } finally {
-      if (testFile != null
-          && testFile.exists()) {
+      if (testFile != null && testFile.exists()) {
         testFile.delete();
       }
     }

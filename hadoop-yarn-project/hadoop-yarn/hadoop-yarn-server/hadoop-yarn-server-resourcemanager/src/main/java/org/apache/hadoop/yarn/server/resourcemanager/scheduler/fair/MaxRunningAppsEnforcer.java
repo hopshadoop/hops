@@ -17,19 +17,18 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.ListMultimap;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.ListMultimap;
 
 /**
  * Handles tracking and enforcement for user and queue maxRunningApps
@@ -91,8 +90,8 @@ public class MaxRunningAppsEnforcer {
     }
 
     Integer userNumRunnable = usersNumRunnableApps.get(user);
-    usersNumRunnableApps.put(user, (userNumRunnable == null ? 0
-        : userNumRunnable) + 1);
+    usersNumRunnableApps
+        .put(user, (userNumRunnable == null ? 0 : userNumRunnable) + 1);
   }
 
   /**
@@ -107,11 +106,12 @@ public class MaxRunningAppsEnforcer {
   /**
    * Checks to see whether any other applications runnable now that the given
    * application has been removed from the given queue.  And makes them so.
-   * 
+   * <p/>
    * Runs in O(n log(n)) where n is the number of queues that are under the
    * highest queue that went from having no slack to having slack.
    */
-  public void updateRunnabilityOnAppRemoval(FSSchedulerApp app, FSLeafQueue queue) {
+  public void updateRunnabilityOnAppRemoval(FSSchedulerApp app,
+      FSLeafQueue queue) {
     AllocationConfiguration allocConf = scheduler.getAllocationConfiguration();
     
     // childqueueX might have no pending apps itself, but if a queue higher up
@@ -126,8 +126,8 @@ public class MaxRunningAppsEnforcer {
         allocConf.getQueueMaxApps(queue.getName()) - 1) ? queue : null;
     FSParentQueue parent = queue.getParent();
     while (parent != null) {
-      if (parent.getNumRunnableApps() == allocConf.getQueueMaxApps(parent
-          .getName()) - 1) {
+      if (parent.getNumRunnableApps() ==
+          allocConf.getQueueMaxApps(parent.getName()) - 1) {
         highestQueueWithAppsNowRunnable = parent;
       }
       parent = parent.getParent();
@@ -157,8 +157,8 @@ public class MaxRunningAppsEnforcer {
     }
 
     // Scan through and check whether this means that any apps are now runnable
-    Iterator<FSSchedulerApp> iter = new MultiListStartTimeIterator(
-        appsNowMaybeRunnable);
+    Iterator<FSSchedulerApp> iter =
+        new MultiListStartTimeIterator(appsNowMaybeRunnable);
     FSSchedulerApp prev = null;
     List<AppSchedulable> noLongerPendingApps = new ArrayList<AppSchedulable>();
     while (iter.hasNext()) {
@@ -189,19 +189,22 @@ public class MaxRunningAppsEnforcer {
     for (AppSchedulable appSched : noLongerPendingApps) {
       if (!appSched.getApp().getQueue().getNonRunnableAppSchedulables()
           .remove(appSched)) {
-        LOG.error("Can't make app runnable that does not already exist in queue"
-            + " as non-runnable: " + appSched + ". This should never happen.");
+        LOG.error(
+            "Can't make app runnable that does not already exist in queue" +
+                " as non-runnable: " + appSched +
+                ". This should never happen.");
       }
       
       if (!usersNonRunnableApps.remove(appSched.getApp().getUser(), appSched)) {
-        LOG.error("Waiting app " + appSched + " expected to be in "
-        		+ "usersNonRunnableApps, but was not. This should never happen.");
+        LOG.error("Waiting app " + appSched + " expected to be in " +
+            "usersNonRunnableApps, but was not. This should never happen.");
       }
     }
   }
   
   /**
-   * Updates the relevant tracking variables after a runnable app with the given
+   * Updates the relevant tracking variables after a runnable app with the
+   * given
    * queue and user has been removed.
    */
   public void untrackRunnableApp(FSSchedulerApp app) {
@@ -239,7 +242,7 @@ public class MaxRunningAppsEnforcer {
     if (queue.getNumRunnableApps() < scheduler.getAllocationConfiguration()
         .getQueueMaxApps(queue.getName())) {
       if (queue instanceof FSLeafQueue) {
-        appLists.add(((FSLeafQueue)queue).getNonRunnableAppSchedulables());
+        appLists.add(((FSLeafQueue) queue).getNonRunnableAppSchedulables());
       } else {
         for (FSQueue child : queue.getChildQueues()) {
           gatherPossiblyRunnableAppLists(child, appLists);
@@ -251,15 +254,14 @@ public class MaxRunningAppsEnforcer {
   /**
    * Takes a list of lists, each of which is ordered by start time, and returns
    * their elements in order of start time.
-   * 
+   * <p/>
    * We maintain positions in each of the lists.  Each next() call advances
    * the position in one of the lists.  We maintain a heap that orders lists
    * by the start time of the app in the current position in that list.
    * This allows us to pick which list to advance in O(log(num lists)) instead
    * of O(num lists) time.
    */
-  static class MultiListStartTimeIterator implements
-      Iterator<FSSchedulerApp> {
+  static class MultiListStartTimeIterator implements Iterator<FSSchedulerApp> {
 
     private List<AppSchedulable>[] appLists;
     private int[] curPositionsInAppLists;
@@ -271,29 +273,31 @@ public class MaxRunningAppsEnforcer {
       curPositionsInAppLists = new int[appLists.length];
       appListsByCurStartTime = new PriorityQueue<IndexAndTime>();
       for (int i = 0; i < appLists.length; i++) {
-        long time = appLists[i].isEmpty() ? Long.MAX_VALUE : appLists[i].get(0)
-            .getStartTime();
+        long time = appLists[i].isEmpty() ? Long.MAX_VALUE :
+            appLists[i].get(0).getStartTime();
         appListsByCurStartTime.add(new IndexAndTime(i, time));
       }
     }
 
     @Override
     public boolean hasNext() {
-      return !appListsByCurStartTime.isEmpty()
-          && appListsByCurStartTime.peek().time != Long.MAX_VALUE;
+      return !appListsByCurStartTime.isEmpty() &&
+          appListsByCurStartTime.peek().time != Long.MAX_VALUE;
     }
 
     @Override
     public FSSchedulerApp next() {
       IndexAndTime indexAndTime = appListsByCurStartTime.remove();
       int nextListIndex = indexAndTime.index;
-      AppSchedulable next = appLists[nextListIndex]
-          .get(curPositionsInAppLists[nextListIndex]);
+      AppSchedulable next =
+          appLists[nextListIndex].get(curPositionsInAppLists[nextListIndex]);
       curPositionsInAppLists[nextListIndex]++;
 
-      if (curPositionsInAppLists[nextListIndex] < appLists[nextListIndex].size()) {
-        indexAndTime.time = appLists[nextListIndex]
-            .get(curPositionsInAppLists[nextListIndex]).getStartTime();
+      if (curPositionsInAppLists[nextListIndex] <
+          appLists[nextListIndex].size()) {
+        indexAndTime.time =
+            appLists[nextListIndex].get(curPositionsInAppLists[nextListIndex])
+                .getStartTime();
       } else {
         indexAndTime.time = Long.MAX_VALUE;
       }
@@ -326,13 +330,13 @@ public class MaxRunningAppsEnforcer {
         if (!(o instanceof IndexAndTime)) {
           return false;
         }
-        IndexAndTime other = (IndexAndTime)o;
+        IndexAndTime other = (IndexAndTime) o;
         return other.time == time;
       }
 
       @Override
       public int hashCode() {
-        return (int)time;
+        return (int) time;
       }
     }
   }

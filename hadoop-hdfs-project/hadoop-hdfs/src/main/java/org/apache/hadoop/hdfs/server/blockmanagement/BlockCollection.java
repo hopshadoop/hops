@@ -17,12 +17,14 @@
  */
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
-import java.io.IOException;
-
+import io.hops.exception.StorageException;
+import io.hops.exception.TransactionContextException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.ContentSummary;
 
-/** 
+import java.io.IOException;
+
+/**
  * This interface is used by the block manager to expose a
  * few characteristics of a collection of Block/BlockUnderConstruction.
  */
@@ -31,31 +33,35 @@ public interface BlockCollection {
   /**
    * Get the last block of the collection.
    */
-  public BlockInfo getLastBlock();
+  public BlockInfo getLastBlock() throws IOException, StorageException;
 
-  /** 
+  /**
    * Get content summary.
    */
-  public ContentSummary computeContentSummary();
+  public ContentSummary computeContentSummary()
+      throws StorageException, TransactionContextException;
 
   /**
    * @return the number of blocks
-   */ 
-  public int numBlocks();
+   */
+  public int numBlocks() throws StorageException, TransactionContextException;
 
   /**
    * Get the blocks.
    */
-  public BlockInfo[] getBlocks();
+  public BlockInfo[] getBlocks()
+      throws StorageException, TransactionContextException;
 
   /**
-   * Get preferred block size for the collection 
+   * Get preferred block size for the collection
+   *
    * @return preferred block size in bytes
    */
   public long getPreferredBlockSize();
 
   /**
-   * Get block replication for the collection 
+   * Get block replication for the collection
+   *
    * @return block replication value
    */
   public short getBlockReplication();
@@ -63,22 +69,11 @@ public interface BlockCollection {
   /**
    * Get the name of the collection.
    */
-  public String getName();
-
+  public String getName() throws StorageException, TransactionContextException;
+  
   /**
-   * Set the block at the given index.
+   * HOP:
+   * Get the Id of associated INode
    */
-  public void setBlock(int index, BlockInfo blk);
-
-  /**
-   * Convert the last block of the collection to an under-construction block
-   * and set the locations.
-   */
-  public BlockInfoUnderConstruction setLastBlock(BlockInfo lastBlock,
-      DatanodeStorageInfo[] locations) throws IOException;
-
-  /**
-   * @return whether the block collection is under construction.
-   */
-  public boolean isUnderConstruction();
+  public int getId();
 }

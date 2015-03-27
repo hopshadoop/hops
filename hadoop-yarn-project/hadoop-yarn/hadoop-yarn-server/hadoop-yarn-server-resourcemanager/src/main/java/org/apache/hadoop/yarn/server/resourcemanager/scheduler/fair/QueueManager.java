@@ -18,16 +18,6 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.CopyOnWriteArrayList;
-
-import javax.xml.parsers.ParserConfigurationException;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -36,22 +26,29 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.xml.sax.SAXException;
 
+import javax.xml.parsers.ParserConfigurationException;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
+
 /**
  * Maintains a list of queues as well as scheduling parameters for each queue,
  * such as guaranteed share allocations, from the fair scheduler config file.
- * 
  */
 @Private
 @Unstable
 public class QueueManager {
-  public static final Log LOG = LogFactory.getLog(
-    QueueManager.class.getName());
+  public static final Log LOG = LogFactory.getLog(QueueManager.class.getName());
 
   public static final String ROOT_QUEUE = "root";
   
   private final FairScheduler scheduler;
 
-  private final Collection<FSLeafQueue> leafQueues = 
+  private final Collection<FSLeafQueue> leafQueues =
       new CopyOnWriteArrayList<FSLeafQueue>();
   private final Map<String, FSQueue> queues = new HashMap<String, FSQueue>();
   private FSParentQueue rootQueue;
@@ -64,8 +61,9 @@ public class QueueManager {
     return rootQueue;
   }
 
-  public void initialize(Configuration conf) throws IOException,
-      SAXException, AllocationConfigurationException, ParserConfigurationException {
+  public void initialize(Configuration conf)
+      throws IOException, SAXException, AllocationConfigurationException,
+      ParserConfigurationException {
     rootQueue = new FSParentQueue("root", scheduler, null);
     queues.put(rootQueue.getName(), rootQueue);
     
@@ -74,14 +72,16 @@ public class QueueManager {
   }
   
   /**
-   * Get a queue by name, creating it if the create param is true and is necessary.
-   * If the queue is not or can not be a leaf queue, i.e. it already exists as a
+   * Get a queue by name, creating it if the create param is true and is
+   * necessary.
+   * If the queue is not or can not be a leaf queue, i.e. it already exists as
+   * a
    * parent queue, or one of the parents in its name is already a leaf queue,
    * null is returned.
-   * 
-   * The root part of the name is optional, so a queue underneath the root 
+   * <p/>
+   * The root part of the name is optional, so a queue underneath the root
    * named "queue1" could be referred to  as just "queue1", and a queue named
-   * "queue2" underneath a parent named "parent1" that is underneath the root 
+   * "queue2" underneath a parent named "parent1" that is underneath the root
    * could be referred to as just "parent1.queue2".
    */
   public FSLeafQueue getLeafQueue(String name, boolean create) {
@@ -97,17 +97,17 @@ public class QueueManager {
       } else if (queue instanceof FSParentQueue) {
         return null;
       }
-      return (FSLeafQueue)queue;
+      return (FSLeafQueue) queue;
     }
   }
   
   /**
    * Creates a leaf queue and places it in the tree. Creates any
    * parents that don't already exist.
-   * 
-   * @return
-   *    the created queue, if successful. null if not allowed (one of the parent
-   *    queues in the queue name is already a leaf queue)
+   *
+   * @return the created queue, if successful. null if not allowed (one of the
+   * parent
+   * queues in the queue name is already a leaf queue)
    */
   private FSLeafQueue createLeafQueue(String name) {
     List<String> newQueueNames = new ArrayList<String>();
@@ -117,7 +117,7 @@ public class QueueManager {
 
     // Move up the queue tree until we reach one that exists.
     while (sepIndex != -1) {
-      sepIndex = name.lastIndexOf('.', sepIndex-1);
+      sepIndex = name.lastIndexOf('.', sepIndex - 1);
       FSQueue queue;
       String curName = null;
       curName = name.substring(0, sepIndex);
@@ -127,7 +127,7 @@ public class QueueManager {
         newQueueNames.add(curName);
       } else {
         if (queue instanceof FSParentQueue) {
-          parent = (FSParentQueue)queue;
+          parent = (FSParentQueue) queue;
           break;
         } else {
           return null;
@@ -141,7 +141,7 @@ public class QueueManager {
     // and add them to the map.
     AllocationConfiguration queueConf = scheduler.getAllocationConfiguration();
     FSLeafQueue leafQueue = null;
-    for (int i = newQueueNames.size()-1; i >= 0; i--) {
+    for (int i = newQueueNames.size() - 1; i >= 0; i--) {
       String queueName = newQueueNames.get(i);
       if (i == 0) {
         // First name added was the leaf queue
@@ -149,19 +149,22 @@ public class QueueManager {
         try {
           leafQueue.setPolicy(queueConf.getDefaultSchedulingPolicy());
         } catch (AllocationConfigurationException ex) {
-          LOG.warn("Failed to set default scheduling policy "
-              + queueConf.getDefaultSchedulingPolicy() + " on new leaf queue.", ex);
+          LOG.warn("Failed to set default scheduling policy " +
+              queueConf.getDefaultSchedulingPolicy() + " on new leaf queue.",
+              ex);
         }
         parent.addChildQueue(leafQueue);
         queues.put(leafQueue.getName(), leafQueue);
         leafQueues.add(leafQueue);
       } else {
-        FSParentQueue newParent = new FSParentQueue(queueName, scheduler, parent);
+        FSParentQueue newParent =
+            new FSParentQueue(queueName, scheduler, parent);
         try {
           newParent.setPolicy(queueConf.getDefaultSchedulingPolicy());
         } catch (AllocationConfigurationException ex) {
-          LOG.warn("Failed to set default scheduling policy "
-              + queueConf.getDefaultSchedulingPolicy() + " on new parent queue.", ex);
+          LOG.warn("Failed to set default scheduling policy " +
+              queueConf.getDefaultSchedulingPolicy() + " on new parent queue.",
+              ex);
         }
         parent.addChildQueue(newParent);
         queues.put(newParent.getName(), newParent);
@@ -175,9 +178,10 @@ public class QueueManager {
   /**
    * Make way for the given leaf queue if possible, by removing incompatible
    * queues with no apps in them. Incompatibility could be due to
-   * (1) leafToCreate being currently being a parent, or (2) an existing leaf queue in
+   * (1) leafToCreate being currently being a parent, or (2) an existing leaf
+   * queue in
    * the ancestry of leafToCreate.
-   * 
+   * <p/>
    * We will never remove the root queue or the default queue in this way.
    *
    * @return true if we can create leafToCreate or it already exists.
@@ -187,9 +191,8 @@ public class QueueManager {
 
     // Ensure leafToCreate is not root and doesn't have the default queue in its
     // ancestry.
-    if (leafToCreate.equals(ROOT_QUEUE) ||
-        leafToCreate.startsWith(
-            ROOT_QUEUE + "." + YarnConfiguration.DEFAULT_QUEUE_NAME + ".")) {
+    if (leafToCreate.equals(ROOT_QUEUE) || leafToCreate.startsWith(
+        ROOT_QUEUE + "." + YarnConfiguration.DEFAULT_QUEUE_NAME + ".")) {
       return false;
     }
 
@@ -208,20 +211,21 @@ public class QueueManager {
     // Queue doesn't exist already. Check if the new queue would be created
     // under an existing leaf queue. If so, try removing that leaf queue.
     int sepIndex = leafToCreate.length();
-    sepIndex = leafToCreate.lastIndexOf('.', sepIndex-1);
+    sepIndex = leafToCreate.lastIndexOf('.', sepIndex - 1);
     while (sepIndex != -1) {
       String prefixString = leafToCreate.substring(0, sepIndex);
       FSQueue prefixQueue = queues.get(prefixString);
       if (prefixQueue != null && prefixQueue instanceof FSLeafQueue) {
         return removeQueueIfEmpty(prefixQueue);
       }
-      sepIndex = leafToCreate.lastIndexOf('.', sepIndex-1);
+      sepIndex = leafToCreate.lastIndexOf('.', sepIndex - 1);
     }
     return true;
   }
 
   /**
    * Remove the queue if it and its descendents are all empty.
+   *
    * @param queue
    * @return true if removed, false otherwise
    */
@@ -255,7 +259,7 @@ public class QueueManager {
    */
   protected boolean isEmpty(FSQueue queue) {
     if (queue instanceof FSLeafQueue) {
-      FSLeafQueue leafQueue = (FSLeafQueue)queue;
+      FSLeafQueue leafQueue = (FSLeafQueue) queue;
       return queue.getNumRunnableApps() == 0 &&
           leafQueue.getNonRunnableAppSchedulables().isEmpty();
     } else {
@@ -326,12 +330,13 @@ public class QueueManager {
       queueMetrics.setMaxShare(queue.getMaxShare());
       // Set scheduling policies
       try {
-        SchedulingPolicy policy = queueConf.getSchedulingPolicy(queue.getName());
+        SchedulingPolicy policy =
+            queueConf.getSchedulingPolicy(queue.getName());
         policy.initialize(scheduler.getClusterCapacity());
         queue.setPolicy(policy);
       } catch (AllocationConfigurationException ex) {
-        LOG.warn("Cannot apply configured scheduling policy to queue "
-            + queue.getName(), ex);
+        LOG.warn("Cannot apply configured scheduling policy to queue " +
+            queue.getName(), ex);
       }
     }
   }

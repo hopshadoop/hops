@@ -17,43 +17,42 @@
  */
 package org.apache.hadoop.hdfs.server.protocol;
 
-import java.util.Collection;
-import java.util.ArrayList;
-
+import com.google.common.base.Joiner;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 
-import com.google.common.base.Joiner;
+import java.util.ArrayList;
+import java.util.Collection;
 
 /**
  * BlockRecoveryCommand is an instruction to a data-node to recover
  * the specified blocks.
- *
+ * <p/>
  * The data-node that receives this command treats itself as a primary
  * data-node in the recover process.
- *
+ * <p/>
  * Block recovery is identified by a recoveryId, which is also the new
  * generation stamp, which the block will have after the recovery succeeds.
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class BlockRecoveryCommand extends DatanodeCommand {
-  final Collection<RecoveringBlock> recoveringBlocks;
+  Collection<RecoveringBlock> recoveringBlocks;
 
   /**
    * This is a block with locations from which it should be recovered
-   * and the new generation stamp, which the block will have after 
+   * and the new generation stamp, which the block will have after
    * successful recovery.
-   * 
+   * <p/>
    * The new generation stamp of the block, also plays role of the recovery id.
    */
   @InterfaceAudience.Private
   @InterfaceStability.Evolving
   public static class RecoveringBlock extends LocatedBlock {
-    private final long newGenerationStamp;
+    private long newGenerationStamp;
 
     /**
      * Create RecoveringBlock.

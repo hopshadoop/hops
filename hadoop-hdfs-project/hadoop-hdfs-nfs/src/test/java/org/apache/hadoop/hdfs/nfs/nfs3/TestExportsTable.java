@@ -17,10 +17,6 @@
  */
 package org.apache.hadoop.hdfs.nfs.nfs3;
 
-import static org.junit.Assert.assertTrue;
-
-import java.io.IOException;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.nfs.mount.Mountd;
@@ -28,8 +24,12 @@ import org.apache.hadoop.hdfs.nfs.mount.RpcProgramMountd;
 import org.apache.hadoop.nfs.nfs3.Nfs3Constant;
 import org.junit.Test;
 
+import java.io.IOException;
+
+import static org.junit.Assert.assertTrue;
+
 public class TestExportsTable {
- 
+
   @Test
   public void testExportPoint() throws IOException {
     Configuration config = new Configuration();

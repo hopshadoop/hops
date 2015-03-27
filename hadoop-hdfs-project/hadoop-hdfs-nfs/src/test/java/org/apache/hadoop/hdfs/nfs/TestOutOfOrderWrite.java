@@ -18,9 +18,6 @@
 
 package org.apache.hadoop.hdfs.nfs;
 
-import java.nio.ByteBuffer;
-import java.util.Arrays;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -48,6 +45,9 @@ import org.jboss.netty.channel.ChannelPipeline;
 import org.jboss.netty.channel.ChannelPipelineFactory;
 import org.jboss.netty.channel.Channels;
 import org.jboss.netty.channel.MessageEvent;
+
+import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 public class TestOutOfOrderWrite {
   public final static Log LOG = LogFactory.getLog(TestOutOfOrderWrite.class);
@@ -79,15 +79,16 @@ public class TestOutOfOrderWrite {
         Nfs3Constant.NFSPROC3.CREATE.getValue(), new CredentialsNone(),
         new VerifierNone()).write(request);
 
-    WRITE3Request write1 = new WRITE3Request(handle, offset, count,
-        WriteStableHow.UNSTABLE, ByteBuffer.wrap(data));
+    WRITE3Request write1 =
+        new WRITE3Request(handle, offset, count, WriteStableHow.UNSTABLE,
+            ByteBuffer.wrap(data));
     write1.serialize(request);
     return request;
   }
 
   static void testRequest(XDR request) {
-    RegistrationClient registrationClient = new RegistrationClient("localhost",
-        Nfs3Constant.SUN_RPCBIND, request);
+    RegistrationClient registrationClient =
+        new RegistrationClient("localhost", Nfs3Constant.SUN_RPCBIND, request);
     registrationClient.run();
   }
 
@@ -138,8 +139,7 @@ public class TestOutOfOrderWrite {
       this.pipelineFactory = new ChannelPipelineFactory() {
         @Override
         public ChannelPipeline getPipeline() {
-          return Channels.pipeline(
-              RpcUtil.constructRpcFrameDecoder(),
+          return Channels.pipeline(RpcUtil.constructRpcFrameDecoder(),
               new WriteHandler(request));
         }
       };
@@ -156,9 +156,9 @@ public class TestOutOfOrderWrite {
 
     // NFS3 Create request
     Configuration conf = new Configuration();
-    WriteClient client = new WriteClient("localhost", conf.getInt(
-        Nfs3Constant.NFS3_SERVER_PORT, Nfs3Constant.NFS3_SERVER_PORT_DEFAULT),
-        create(), false);
+    WriteClient client = new WriteClient("localhost",
+        conf.getInt(Nfs3Constant.NFS3_SERVER_PORT,
+            Nfs3Constant.NFS3_SERVER_PORT_DEFAULT), create(), false);
     client.run();
 
     while (handle == null) {

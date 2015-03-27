@@ -16,15 +16,6 @@
  * limitations under the License.
  */
 package org.apache.hadoop.hdfs;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.logging.impl.Log4JLogger;
@@ -46,6 +37,16 @@ import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 
 /**
  * This class tests the cases of a concurrent reads/writes to a file;
@@ -60,11 +61,12 @@ public class TestFileConcurrentReader {
 
 
   private static final Logger LOG =
-    Logger.getLogger(TestFileConcurrentReader.class);
+      Logger.getLogger(TestFileConcurrentReader.class);
 
   {
     ((Log4JLogger) LeaseManager.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger)LogFactory.getLog(FSNamesystem.class)).getLogger().setLevel(Level.ALL);
+    ((Log4JLogger) LogFactory.getLog(FSNamesystem.class)).getLogger()
+        .setLevel(Level.ALL);
     ((Log4JLogger) DFSClient.LOG).getLogger().setLevel(Level.ALL);
   }
 
@@ -99,37 +101,31 @@ public class TestFileConcurrentReader {
   }
 
   private void writeFileAndSync(FSDataOutputStream stm, int size)
-    throws IOException {
+      throws IOException {
     byte[] buffer = DFSTestUtil.generateSequentialBytes(0, size);
     stm.write(buffer, 0, size);
     stm.hflush();
   }
 
   private void checkCanRead(FileSystem fileSys, Path path, int numBytes)
-    throws IOException {
+      throws IOException {
     waitForBlocks(fileSys, path);
     assertBytesAvailable(fileSys, path, numBytes);
   }
 
   // make sure bytes are available and match expected
-  private void assertBytesAvailable(
-    FileSystem fileSystem,
-    Path path,
-    int numBytes
-  ) throws IOException {
+  private void assertBytesAvailable(FileSystem fileSystem, Path path,
+      int numBytes) throws IOException {
     byte[] buffer = new byte[numBytes];
     FSDataInputStream inputStream = fileSystem.open(path);
     IOUtils.readFully(inputStream, buffer, 0, numBytes);
     inputStream.close();
 
-    assertTrue(
-      "unable to validate bytes",
-      validateSequentialBytes(buffer, 0, numBytes)
-    );
+    assertTrue("unable to validate bytes",
+        validateSequentialBytes(buffer, 0, numBytes));
   }
 
-  private void waitForBlocks(FileSystem fileSys, Path name)
-    throws IOException {
+  private void waitForBlocks(FileSystem fileSys, Path name) throws IOException {
     // wait until we have at least one block in the file to read.
     boolean done = false;
 
@@ -139,8 +135,8 @@ public class TestFileConcurrentReader {
       } catch (InterruptedException e) {
       }
       done = true;
-      BlockLocation[] locations = fileSys.getFileBlockLocations(
-        fileSys.getFileStatus(name), 0, blockSize);
+      BlockLocation[] locations = fileSys
+          .getFileBlockLocations(fileSys.getFileStatus(name), 0, blockSize);
       if (locations.length < 1) {
         done = false;
         continue;
@@ -151,9 +147,8 @@ public class TestFileConcurrentReader {
   /**
    * Test that that writes to an incomplete block are available to a reader
    */
-  @Test (timeout = 30000)
-  public void testUnfinishedBlockRead()
-    throws IOException {
+  @Test
+  public void testUnfinishedBlockRead() throws IOException {
     // create a new file in the root, write data, do no close
     Path file1 = new Path("/unfinished-block");
     FSDataOutputStream stm = TestFileCreation.createFile(fileSystem, file1, 1);
@@ -174,7 +169,7 @@ public class TestFileConcurrentReader {
    * would result in too small a buffer to do the buffer-copy needed
    * for partial chunks.
    */
-  @Test (timeout = 30000)
+  @Test
   public void testUnfinishedBlockPacketBufferOverrun() throws IOException {
     // check that / exists
     Path path = new Path("/");
@@ -183,7 +178,7 @@ public class TestFileConcurrentReader {
     // create a new file in the root, write data, do no close
     Path file1 = new Path("/unfinished-block");
     final FSDataOutputStream stm =
-      TestFileCreation.createFile(fileSystem, file1, 1);
+        TestFileCreation.createFile(fileSystem, file1, 1);
 
     // write partial block and sync
     final int bytesPerChecksum = conf.getInt("io.bytes.per.checksum", 512);
@@ -200,9 +195,8 @@ public class TestFileConcurrentReader {
   // use a small block size and a large write so that DN is busy creating
   // new blocks.  This makes it almost 100% sure we can reproduce
   // case of client getting a DN that hasn't yet created the blocks
-  @Test (timeout = 30000)
-  public void testImmediateReadOfNewFile()
-    throws IOException {
+  @Test
+  public void testImmediateReadOfNewFile() throws IOException {
     final int blockSize = 64 * 1024;
     final int writeSize = 10 * blockSize;
     Configuration conf = new Configuration();
@@ -246,16 +240,12 @@ public class TestFileConcurrentReader {
           openerDone.set(true);
         } catch (IOException e) {
           openerDone.set(true);
-          errorMessage.set(String.format(
-            "got exception : %s",
-            StringUtils.stringifyException(e)
-          ));
+          errorMessage.set(String
+              .format("got exception : %s", StringUtils.stringifyException(e)));
         } catch (Exception e) {
           openerDone.set(true);
-          errorMessage.set(String.format(
-            "got exception : %s", 
-            StringUtils.stringifyException(e)
-          ));
+          errorMessage.set(String
+              .format("got exception : %s", StringUtils.stringifyException(e)));
           writer.interrupt();
           fail("here");
         }
@@ -277,56 +267,53 @@ public class TestFileConcurrentReader {
 
   // for some reason, using tranferTo evokes the race condition more often
   // so test separately
-  @Test (timeout = 30000)
+  @Test
   public void testUnfinishedBlockCRCErrorTransferTo() throws IOException {
     runTestUnfinishedBlockCRCError(true, SyncType.SYNC, DEFAULT_WRITE_SIZE);
   }
 
-  @Test (timeout = 30000)
+  @Test
   public void testUnfinishedBlockCRCErrorTransferToVerySmallWrite()
-    throws IOException {
+      throws IOException {
     runTestUnfinishedBlockCRCError(true, SyncType.SYNC, SMALL_WRITE_SIZE);
   }
 
   // fails due to issue w/append, disable 
   @Ignore
+  @Test
   public void _testUnfinishedBlockCRCErrorTransferToAppend()
-    throws IOException {
+      throws IOException {
     runTestUnfinishedBlockCRCError(true, SyncType.APPEND, DEFAULT_WRITE_SIZE);
   }
 
-  @Test (timeout = 30000)
+  @Test
   public void testUnfinishedBlockCRCErrorNormalTransfer() throws IOException {
     runTestUnfinishedBlockCRCError(false, SyncType.SYNC, DEFAULT_WRITE_SIZE);
   }
 
-  @Test (timeout = 30000)
+  @Test
   public void testUnfinishedBlockCRCErrorNormalTransferVerySmallWrite()
-    throws IOException {
+      throws IOException {
     runTestUnfinishedBlockCRCError(false, SyncType.SYNC, SMALL_WRITE_SIZE);
   }
 
   // fails due to issue w/append, disable 
   @Ignore
+  @Test
   public void _testUnfinishedBlockCRCErrorNormalTransferAppend()
-    throws IOException {
+      throws IOException {
     runTestUnfinishedBlockCRCError(false, SyncType.APPEND, DEFAULT_WRITE_SIZE);
   }
 
-  private void runTestUnfinishedBlockCRCError(
-    final boolean transferToAllowed, SyncType syncType, int writeSize
-  ) throws IOException {
-    runTestUnfinishedBlockCRCError(
-      transferToAllowed, syncType, writeSize, new Configuration()
-    );
+  private void runTestUnfinishedBlockCRCError(final boolean transferToAllowed,
+      SyncType syncType, int writeSize) throws IOException {
+    runTestUnfinishedBlockCRCError(transferToAllowed, syncType, writeSize,
+        new Configuration());
   }
 
-  private void runTestUnfinishedBlockCRCError(
-    final boolean transferToAllowed,
-    final SyncType syncType,
-    final int writeSize,
-    Configuration conf
-  ) throws IOException {
+  private void runTestUnfinishedBlockCRCError(final boolean transferToAllowed,
+      final SyncType syncType, final int writeSize, Configuration conf)
+      throws IOException {
     conf.setBoolean(DFSConfigKeys.DFS_DATANODE_TRANSFERTO_ALLOWED_KEY,
         transferToAllowed);
     init(conf);
@@ -336,33 +323,33 @@ public class TestFileConcurrentReader {
     final AtomicBoolean writerDone = new AtomicBoolean(false);
     final AtomicBoolean writerStarted = new AtomicBoolean(false);
     final AtomicBoolean error = new AtomicBoolean(false);
-
+    final FSDataOutputStream initialOutputStream = fileSystem.create(file);
     final Thread writer = new Thread(new Runnable() {
+      private FSDataOutputStream outputStream = initialOutputStream;
+
       @Override
       public void run() {
         try {
-          FSDataOutputStream outputStream = fileSystem.create(file);
-          if (syncType == SyncType.APPEND) {
-            outputStream.close();
-            outputStream = fileSystem.append(file);
-          }
-          try {
-            for (int i = 0; !error.get() && i < numWrites; i++) {
+          for (int i = 0; !error.get() && i < numWrites; i++) {
+            try {
               final byte[] writeBuf =
                   DFSTestUtil.generateSequentialBytes(i * writeSize, writeSize);
               outputStream.write(writeBuf);
               if (syncType == SyncType.SYNC) {
                 outputStream.hflush();
+              } else { // append
+                outputStream.close();
+                outputStream = fileSystem.append(file);
               }
               writerStarted.set(true);
+            } catch (IOException e) {
+              error.set(true);
+              LOG.error("error writing to file", e);
             }
-          } catch (IOException e) {
-            error.set(true);
-            LOG.error("error writing to file", e);
-          } finally {
-            outputStream.close();
           }
+
           writerDone.set(true);
+          outputStream.close();
         } catch (Exception e) {
           LOG.error("error in writer", e);
 
@@ -405,14 +392,13 @@ public class TestFileConcurrentReader {
       writer.join();
       tailer.join();
 
-      assertFalse(
-        "error occurred, see log above", error.get()
-      );
+      assertFalse("error occurred, see log above", error.get());
     } catch (InterruptedException e) {
       LOG.info("interrupted waiting for writer or tailer to complete");
 
       Thread.currentThread().interrupt();
     }
+    initialOutputStream.close();
   }
 
   private boolean validateSequentialBytes(byte[] buf, int startPos, int len) {
@@ -420,8 +406,9 @@ public class TestFileConcurrentReader {
       int expected = (i + startPos) % 127;
 
       if (buf[i] % 127 != expected) {
-        LOG.error(String.format("at position [%d], got [%d] and expected [%d]",
-          startPos, buf[i], expected));
+        LOG.error(String
+            .format("at position [%d], got [%d] and expected [%d]", startPos,
+                buf[i], expected));
 
         return false;
       }
@@ -443,10 +430,8 @@ public class TestFileConcurrentReader {
 
       if (!validateSequentialBytes(buf, (int) (startPos + numRead), read)) {
         LOG.error(String.format("invalid bytes: [%s]\n", Arrays.toString(buf)));
-        throw new ChecksumException(
-          String.format("unable to validate bytes"),
-          startPos
-        );
+        throw new ChecksumException(String.format("unable to validate bytes"),
+            startPos);
       }
 
       numRead += read;

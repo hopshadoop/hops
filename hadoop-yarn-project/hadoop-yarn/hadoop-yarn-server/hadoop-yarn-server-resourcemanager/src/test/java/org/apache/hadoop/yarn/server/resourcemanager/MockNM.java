@@ -18,13 +18,6 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerState;
@@ -32,7 +25,6 @@ import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
-import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatRequest;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
 import org.apache.hadoop.yarn.server.api.protocolrecords.RegisterNodeManagerRequest;
@@ -44,6 +36,12 @@ import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.apache.hadoop.yarn.util.Records;
 import org.apache.hadoop.yarn.util.YarnVersionInfo;
 import org.mortbay.log.Log;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class MockNM {
 
@@ -57,17 +55,18 @@ public class MockNM {
   private MasterKey currentNMTokenMasterKey;
   private String version;
 
-  public MockNM(String nodeIdStr, int memory, ResourceTrackerService resourceTracker) {
+  public MockNM(String nodeIdStr, int memory,
+      ResourceTrackerService resourceTracker) {
     // scale vcores based on the requested memory
-    this(nodeIdStr, memory,
-        Math.max(1, (memory * YarnConfiguration.DEFAULT_NM_VCORES) /
-            YarnConfiguration.DEFAULT_NM_PMEM_MB),
-        resourceTracker);
+    this(nodeIdStr, memory, Math.max(1,
+            (memory * YarnConfiguration.DEFAULT_NM_VCORES) /
+                YarnConfiguration.DEFAULT_NM_PMEM_MB), resourceTracker);
   }
 
   public MockNM(String nodeIdStr, int memory, int vcores,
       ResourceTrackerService resourceTracker) {
-    this(nodeIdStr, memory, vcores, resourceTracker, YarnVersionInfo.getVersion());
+    this(nodeIdStr, memory, vcores, resourceTracker,
+        YarnVersionInfo.getVersion());
   }
 
   public MockNM(String nodeIdStr, int memory, int vcores,
@@ -92,11 +91,13 @@ public class MockNM {
     this.resourceTracker = resourceTracker;
   }
 
-  public void containerStatus(ContainerStatus containerStatus) throws Exception {
-    Map<ApplicationId, List<ContainerStatus>> conts = 
+  public void containerStatus(ContainerStatus containerStatus)
+      throws Exception {
+    Map<ApplicationId, List<ContainerStatus>> conts =
         new HashMap<ApplicationId, List<ContainerStatus>>();
-    conts.put(containerStatus.getContainerId().getApplicationAttemptId().getApplicationId(),
-        Arrays.asList(new ContainerStatus[] { containerStatus }));
+    conts.put(containerStatus.getContainerId().getApplicationAttemptId()
+        .getApplicationId(),
+        Arrays.asList(new ContainerStatus[]{containerStatus}));
     nodeHeartbeat(conts, true);
   }
 
@@ -105,24 +106,34 @@ public class MockNM {
   }
 
   public RegisterNodeManagerResponse registerNode(
-      List<ContainerStatus> containerStatus) throws Exception{
-    RegisterNodeManagerRequest req = Records.newRecord(
-        RegisterNodeManagerRequest.class);
+      List<ContainerStatus> containerStatus) throws Exception {
+    RegisterNodeManagerRequest req =
+        Records.newRecord(RegisterNodeManagerRequest.class);
     req.setNodeId(nodeId);
     req.setHttpPort(httpPort);
     Resource resource = BuilderUtils.newResource(memory, vCores);
     req.setResource(resource);
     req.setContainerStatuses(containerStatus);
     req.setNMVersion(version);
-    RegisterNodeManagerResponse registrationResponse =
-        resourceTracker.registerNodeManager(req);
+    RegisterNodeManagerResponse registrationResponse = null;
+    int retries = 0;
+    while (registrationResponse == null && retries++ < 20) {
+      System.out.println("MockNM sending registration request");
+      registrationResponse = resourceTracker.registerNodeManager(req);
+      if (registrationResponse == null) {
+        System.out.println("MockNM sleep registration");
+        Thread.sleep(100);
+      }
+    }
+    
     this.currentContainerTokenMasterKey =
         registrationResponse.getContainerTokenMasterKey();
     this.currentNMTokenMasterKey = registrationResponse.getNMTokenMasterKey();
-    return registrationResponse;    
+    return registrationResponse;
   }
   
-  public NodeHeartbeatResponse nodeHeartbeat(boolean isHealthy) throws Exception {
+  public NodeHeartbeatResponse nodeHeartbeat(boolean isHealthy)
+      throws Exception {
     return nodeHeartbeat(new HashMap<ApplicationId, List<ContainerStatus>>(),
         isHealthy, ++responseId);
   }
@@ -131,9 +142,9 @@ public class MockNM {
       int containerId, ContainerState containerState) throws Exception {
     HashMap<ApplicationId, List<ContainerStatus>> nodeUpdate =
         new HashMap<ApplicationId, List<ContainerStatus>>(1);
-    ContainerStatus containerStatus = BuilderUtils.newContainerStatus(
-        BuilderUtils.newContainerId(attemptId, containerId), containerState,
-        "Success", 0);
+    ContainerStatus containerStatus = BuilderUtils
+        .newContainerStatus(BuilderUtils.newContainerId(attemptId, containerId),
+            containerState, "Success", 0);
     ArrayList<ContainerStatus> containerStatusList =
         new ArrayList<ContainerStatus>(1);
     containerStatusList.add(containerStatus);
@@ -142,18 +153,21 @@ public class MockNM {
     return nodeHeartbeat(nodeUpdate, true);
   }
 
-  public NodeHeartbeatResponse nodeHeartbeat(Map<ApplicationId,
-      List<ContainerStatus>> conts, boolean isHealthy) throws Exception {
+  public NodeHeartbeatResponse nodeHeartbeat(
+      Map<ApplicationId, List<ContainerStatus>> conts, boolean isHealthy)
+      throws Exception {
     return nodeHeartbeat(conts, isHealthy, ++responseId);
   }
 
-  public NodeHeartbeatResponse nodeHeartbeat(Map<ApplicationId,
-      List<ContainerStatus>> conts, boolean isHealthy, int resId) throws Exception {
+  public NodeHeartbeatResponse nodeHeartbeat(
+      Map<ApplicationId, List<ContainerStatus>> conts, boolean isHealthy,
+      int resId) throws Exception {
     NodeHeartbeatRequest req = Records.newRecord(NodeHeartbeatRequest.class);
     NodeStatus status = Records.newRecord(NodeStatus.class);
     status.setResponseId(resId);
     status.setNodeId(nodeId);
-    for (Map.Entry<ApplicationId, List<ContainerStatus>> entry : conts.entrySet()) {
+    for (Map.Entry<ApplicationId, List<ContainerStatus>> entry : conts
+        .entrySet()) {
       Log.info("entry.getValue() " + entry.getValue());
       status.setContainersStatuses(entry.getValue());
     }
@@ -163,22 +177,28 @@ public class MockNM {
     healthStatus.setLastHealthReportTime(1);
     status.setNodeHealthStatus(healthStatus);
     req.setNodeStatus(status);
-    req.setLastKnownContainerTokenMasterKey(this.currentContainerTokenMasterKey);
+    req.setLastKnownContainerTokenMasterKey(
+        this.currentContainerTokenMasterKey);
     req.setLastKnownNMTokenMasterKey(this.currentNMTokenMasterKey);
-    NodeHeartbeatResponse heartbeatResponse =
-        resourceTracker.nodeHeartbeat(req);
-    
+    NodeHeartbeatResponse heartbeatResponse = null;
+    int retries = 0;
+    while (heartbeatResponse == null && retries++ < 20) {
+      System.out.println("HOP :: MockNM sending heartbeat");
+      heartbeatResponse = resourceTracker.nodeHeartbeat(req);
+      if (heartbeatResponse == null) {
+        System.out.println("HOP :: MockNM sleep");
+        Thread.sleep(100);
+      }
+    }
     MasterKey masterKeyFromRM = heartbeatResponse.getContainerTokenMasterKey();
-    if (masterKeyFromRM != null
-        && masterKeyFromRM.getKeyId() != this.currentContainerTokenMasterKey
-            .getKeyId()) {
+    if (masterKeyFromRM != null && masterKeyFromRM.getKeyId() !=
+        this.currentContainerTokenMasterKey.getKeyId()) {
       this.currentContainerTokenMasterKey = masterKeyFromRM;
     }
 
     masterKeyFromRM = heartbeatResponse.getNMTokenMasterKey();
-    if (masterKeyFromRM != null
-        && masterKeyFromRM.getKeyId() != this.currentNMTokenMasterKey
-            .getKeyId()) {
+    if (masterKeyFromRM != null &&
+        masterKeyFromRM.getKeyId() != this.currentNMTokenMasterKey.getKeyId()) {
       this.currentNMTokenMasterKey = masterKeyFromRM;
     }
     

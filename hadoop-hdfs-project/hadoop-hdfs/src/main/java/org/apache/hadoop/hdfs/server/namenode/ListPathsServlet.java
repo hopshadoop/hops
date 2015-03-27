@@ -20,15 +20,18 @@ package org.apache.hadoop.hdfs.server.namenode;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdfs.HftpFileSystem;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
-import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.DirectoryListing;
+import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.server.common.JspHelper;
-import org.apache.hadoop.hdfs.web.HftpFileSystem;
 import org.apache.hadoop.util.ServletUtil;
 import org.apache.hadoop.util.VersionInfo;
-import org.znerd.xmlenc.*;
+import org.znerd.xmlenc.XMLOutputter;
 
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.security.PrivilegedExceptionAction;
@@ -39,31 +42,30 @@ import java.util.Map;
 import java.util.Stack;
 import java.util.regex.Pattern;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
 /**
  * Obtain meta-information about a filesystem.
- * @see org.apache.hadoop.hdfs.web.HftpFileSystem
+ *
+ * @see org.apache.hadoop.hdfs.HftpFileSystem
  */
 @InterfaceAudience.Private
 public class ListPathsServlet extends DfsServlet {
-  /** For java.io.Serializable */
+  /**
+   * For java.io.Serializable
+   */
   private static final long serialVersionUID = 1L;
 
   public static final ThreadLocal<SimpleDateFormat> df =
-    new ThreadLocal<SimpleDateFormat>() {
-      @Override
-      protected SimpleDateFormat initialValue() {
-        return HftpFileSystem.getDateFormat();
-      }
-    };
+      new ThreadLocal<SimpleDateFormat>() {
+        @Override
+        protected SimpleDateFormat initialValue() {
+          return HftpFileSystem.getDateFormat();
+        }
+      };
 
   /**
    * Write a node to output.
    * Node information includes path, modification, permission, owner and group.
-   * For files, it also includes size, replication and block-size. 
+   * For files, it also includes size, replication and block-size.
    */
   static void writeInfo(final Path fullpath, final HdfsFileStatus i,
       final XMLOutputter doc) throws IOException {
@@ -77,7 +79,7 @@ public class ListPathsServlet extends DfsServlet {
       doc.attribute("replication", String.valueOf(i.getReplication()));
       doc.attribute("blocksize", String.valueOf(i.getBlockSize()));
     }
-    doc.attribute("permission", (i.isDir()? "d": "-") + i.getPermission());
+    doc.attribute("permission", (i.isDir() ? "d" : "-") + i.getPermission());
     doc.attribute("owner", i.getOwner());
     doc.attribute("group", i.getGroup());
     doc.endTag();
@@ -86,15 +88,15 @@ public class ListPathsServlet extends DfsServlet {
   /**
    * Build a map from the query string, setting values and defaults.
    */
-  protected Map<String,String> buildRoot(HttpServletRequest request,
+  protected Map<String, String> buildRoot(HttpServletRequest request,
       XMLOutputter doc) {
     final String path = ServletUtil.getDecodedPath(request, "/listPaths");
-    final String exclude = request.getParameter("exclude") != null
-      ? request.getParameter("exclude") : "";
-    final String filter = request.getParameter("filter") != null
-      ? request.getParameter("filter") : ".*";
-    final boolean recur = request.getParameter("recursive") != null
-      && "yes".equals(request.getParameter("recursive"));
+    final String exclude = request.getParameter("exclude") != null ?
+        request.getParameter("exclude") : "";
+    final String filter = request.getParameter("filter") != null ?
+        request.getParameter("filter") : ".*";
+    final boolean recur = request.getParameter("recursive") != null &&
+        "yes".equals(request.getParameter("recursive"));
 
     Map<String, String> root = new HashMap<String, String>();
     root.put("path", path);
@@ -112,26 +114,26 @@ public class ListPathsServlet extends DfsServlet {
    * {@code
    * GET http://<nn>:<port>/listPaths[/<path>][<?option>[&option]*] HTTP/1.1
    * }
-   *
+   * <p/>
    * Where <i>option</i> (default) in:
    * recursive (&quot;no&quot;)
    * filter (&quot;.*&quot;)
    * exclude (&quot;\..*\.crc&quot;)
-   *
+   * <p/>
    * Response: A flat list of files/directories in the following format:
    * {@code
-   *   <listing path="..." recursive="(yes|no)" filter="..."
-   *            time="yyyy-MM-dd hh:mm:ss UTC" version="...">
-   *     <directory path="..." modified="yyyy-MM-dd hh:mm:ss"/>
-   *     <file path="..." modified="yyyy-MM-dd'T'hh:mm:ssZ" accesstime="yyyy-MM-dd'T'hh:mm:ssZ" 
-   *           blocksize="..."
-   *           replication="..." size="..."/>
-   *   </listing>
+   * <listing path="..." recursive="(yes|no)" filter="..."
+   * time="yyyy-MM-dd hh:mm:ss UTC" version="...">
+   * <directory path="..." modified="yyyy-MM-dd hh:mm:ss"/>
+   * <file path="..." modified="yyyy-MM-dd'T'hh:mm:ssZ" accesstime="yyyy-MM-dd'T'hh:mm:ssZ"
+   * blocksize="..."
+   * replication="..." size="..."/>
+   * </listing>
    * }
    */
   @Override
   public void doGet(HttpServletRequest request, HttpServletResponse response)
-    throws ServletException, IOException {
+      throws ServletException, IOException {
     final PrintWriter out = response.getWriter();
     final XMLOutputter doc = new XMLOutputter(out, "UTF-8");
 
@@ -143,8 +145,8 @@ public class ListPathsServlet extends DfsServlet {
       final boolean recur = "yes".equals(root.get("recursive"));
       final Pattern filter = Pattern.compile(root.get("filter"));
       final Pattern exclude = Pattern.compile(root.get("exclude"));
-      final Configuration conf = 
-        (Configuration) getServletContext().getAttribute(JspHelper.CURRENT_CONF);
+      final Configuration conf = (Configuration) getServletContext()
+          .getAttribute(JspHelper.CURRENT_CONF);
       
       getUGI(request, conf).doAs(new PrivilegedExceptionAction<Void>() {
         @Override
@@ -173,9 +175,8 @@ public class ListPathsServlet extends DfsServlet {
                 thisListing = nn.getListing(p, lastReturnedName, false);
                 if (thisListing == null) {
                   if (lastReturnedName.length == 0) {
-                    LOG
-                        .warn("ListPathsServlet - Path " + p
-                            + " does not exist");
+                    LOG.warn(
+                        "ListPathsServlet - Path " + p + " does not exist");
                   }
                   break;
                 }
@@ -183,8 +184,8 @@ public class ListPathsServlet extends DfsServlet {
                 for (HdfsFileStatus i : listing) {
                   final Path fullpath = i.getFullPath(new Path(p));
                   final String localName = fullpath.getName();
-                  if (exclude.matcher(localName).matches()
-                      || !filter.matcher(localName).matches()) {
+                  if (exclude.matcher(localName).matches() ||
+                      !filter.matcher(localName).matches()) {
                     continue;
                   }
                   if (recur && i.isDir()) {
@@ -201,7 +202,7 @@ public class ListPathsServlet extends DfsServlet {
           return null;
         }
       });
-    } catch(IOException ioe) {
+    } catch (IOException ioe) {
       writeXml(ioe, path, doc);
     } catch (InterruptedException e) {
       LOG.warn("ListPathServlet encountered InterruptedException", e);

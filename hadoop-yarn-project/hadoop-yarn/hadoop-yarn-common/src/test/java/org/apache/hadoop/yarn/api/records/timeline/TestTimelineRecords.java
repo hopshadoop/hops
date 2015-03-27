@@ -18,26 +18,19 @@
 
 package org.apache.hadoop.yarn.api.records.timeline;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import junit.framework.Assert;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.yarn.api.records.timeline.TimelineEntities;
-import org.apache.hadoop.yarn.api.records.timeline.TimelineEntity;
-import org.apache.hadoop.yarn.api.records.timeline.TimelineEvent;
-import org.apache.hadoop.yarn.api.records.timeline.TimelineEvents;
-import org.apache.hadoop.yarn.api.records.timeline.TimelinePutResponse;
 import org.apache.hadoop.yarn.api.records.timeline.TimelinePutResponse.TimelinePutError;
 import org.apache.hadoop.yarn.util.timeline.TimelineUtils;
 import org.junit.Test;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class TestTimelineRecords {
 
-  private static final Log LOG =
-      LogFactory.getLog(TestTimelineRecords.class);
+  private static final Log LOG = LogFactory.getLog(TestTimelineRecords.class);
 
   @Test
   public void testEntities() throws Exception {

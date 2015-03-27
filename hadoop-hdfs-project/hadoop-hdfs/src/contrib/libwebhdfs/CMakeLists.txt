@@ -48,7 +48,6 @@ add_executable(test_libwebhdfs_ops
 )
 target_link_libraries(test_libwebhdfs_ops
     webhdfs
-    native_mini_dfs
 )
 
 add_executable(test_libwebhdfs_read
@@ -70,6 +69,4 @@ add_executable(test_libwebhdfs_threaded
 )
 target_link_libraries(test_libwebhdfs_threaded
     webhdfs
-    native_mini_dfs
-    pthread
 )

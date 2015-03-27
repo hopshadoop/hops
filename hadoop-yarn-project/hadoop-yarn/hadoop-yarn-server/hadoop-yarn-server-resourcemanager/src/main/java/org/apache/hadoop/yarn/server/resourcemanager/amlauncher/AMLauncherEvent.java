@@ -18,15 +18,18 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.amlauncher;
 
-import org.apache.hadoop.yarn.event.AbstractEvent;
+import io.hops.ha.common.TransactionState;
+import org.apache.hadoop.yarn.event.AbstractEventTransaction;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
 
-public class AMLauncherEvent extends AbstractEvent<AMLauncherEventType> {
+public class AMLauncherEvent
+    extends AbstractEventTransaction<AMLauncherEventType> {
 
   private final RMAppAttempt appAttempt;
 
-  public AMLauncherEvent(AMLauncherEventType type, RMAppAttempt appAttempt) {
-    super(type);
+  public AMLauncherEvent(AMLauncherEventType type, RMAppAttempt appAttempt,
+      TransactionState transactionState) {
+    super(type, transactionState);
     this.appAttempt = appAttempt;
   }
 

@@ -1,30 +1,22 @@
 /**
-* Licensed to the Apache Software Foundation (ASF) under one
-* or more contributor license agreements.  See the NOTICE file
-* distributed with this work for additional information
-* regarding copyright ownership.  The ASF licenses this file
-* to you under the Apache License, Version 2.0 (the
-* "License"); you may not use this file except in compliance
-* with the License.  You may obtain a copy of the License at
-*
-*     http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package org.apache.hadoop.yarn.server.resourcemanager.security;
-
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Timer;
-import java.util.TimerTask;
-
-import javax.crypto.SecretKey;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -36,18 +28,25 @@ import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.security.AMRMTokenIdentifier;
 
+import javax.crypto.SecretKey;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
+
 /**
  * AMRM-tokens are per ApplicationAttempt. If users redistribute their
  * tokens, it is their headache, god save them. I mean you are not supposed to
  * distribute keys to your vault, right? Anyways, ResourceManager saves each
- * token locally in memory till application finishes and to a store for restart,
+ * token locally in memory till application finishes and to a store for
+ * restart,
  * so no need to remember master-keys even after rolling them.
  */
-public class AMRMTokenSecretManager extends
-    SecretManager<AMRMTokenIdentifier> {
+public class AMRMTokenSecretManager extends SecretManager<AMRMTokenIdentifier> {
 
-  private static final Log LOG = LogFactory
-    .getLog(AMRMTokenSecretManager.class);
+  private static final Log LOG =
+      LogFactory.getLog(AMRMTokenSecretManager.class);
 
   private SecretKey masterKey;
   private final Timer timer;
@@ -62,11 +61,10 @@ public class AMRMTokenSecretManager extends
   public AMRMTokenSecretManager(Configuration conf) {
     rollMasterKey();
     this.timer = new Timer();
-    this.rollingInterval =
-        conf
-          .getLong(
-            YarnConfiguration.RM_AMRM_TOKEN_MASTER_KEY_ROLLING_INTERVAL_SECS,
-            YarnConfiguration.DEFAULT_RM_AMRM_TOKEN_MASTER_KEY_ROLLING_INTERVAL_SECS) * 1000;
+    this.rollingInterval = conf.getLong(
+        YarnConfiguration.RM_AMRM_TOKEN_MASTER_KEY_ROLLING_INTERVAL_SECS,
+        YarnConfiguration.DEFAULT_RM_AMRM_TOKEN_MASTER_KEY_ROLLING_INTERVAL_SECS) *
+        1000;
   }
 
   public void start() {
@@ -110,11 +108,11 @@ public class AMRMTokenSecretManager extends
 
   /**
    * Create a password for a given {@link AMRMTokenIdentifier}. Used to
-   * send to the AppicationAttempt which can give it back during authentication.
+   * send to the AppicationAttempt which can give it back during
+   * authentication.
    */
   @Override
-  public synchronized byte[] createPassword(
-      AMRMTokenIdentifier identifier) {
+  public synchronized byte[] createPassword(AMRMTokenIdentifier identifier) {
     ApplicationAttemptId applicationAttemptId =
         identifier.getApplicationAttemptId();
     if (LOG.isDebugEnabled()) {
@@ -128,14 +126,14 @@ public class AMRMTokenSecretManager extends
   /**
    * Populate persisted password of AMRMToken back to AMRMTokenSecretManager.
    */
-  public synchronized void
-      addPersistedPassword(Token<AMRMTokenIdentifier> token) throws IOException {
+  public synchronized void addPersistedPassword(
+      Token<AMRMTokenIdentifier> token) throws IOException {
     AMRMTokenIdentifier identifier = token.decodeIdentifier();
     if (LOG.isDebugEnabled()) {
       LOG.debug("Adding password for " + identifier.getApplicationAttemptId());
     }
-    this.passwords.put(identifier.getApplicationAttemptId(),
-      token.getPassword());
+    this.passwords
+        .put(identifier.getApplicationAttemptId(), token.getPassword());
   }
 
   /**
@@ -143,8 +141,8 @@ public class AMRMTokenSecretManager extends
    * Used by RPC layer to validate a remote {@link AMRMTokenIdentifier}.
    */
   @Override
-  public synchronized byte[] retrievePassword(
-      AMRMTokenIdentifier identifier) throws InvalidToken {
+  public synchronized byte[] retrievePassword(AMRMTokenIdentifier identifier)
+      throws InvalidToken {
     ApplicationAttemptId applicationAttemptId =
         identifier.getApplicationAttemptId();
     if (LOG.isDebugEnabled()) {
@@ -152,8 +150,8 @@ public class AMRMTokenSecretManager extends
     }
     byte[] password = this.passwords.get(applicationAttemptId);
     if (password == null) {
-      throw new InvalidToken("Password not found for ApplicationAttempt "
-          + applicationAttemptId);
+      throw new InvalidToken(
+          "Password not found for ApplicationAttempt " + applicationAttemptId);
     }
     return password;
   }

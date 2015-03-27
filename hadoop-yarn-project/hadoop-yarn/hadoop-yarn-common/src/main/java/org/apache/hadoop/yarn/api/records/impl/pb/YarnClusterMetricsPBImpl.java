@@ -19,13 +19,12 @@
 package org.apache.hadoop.yarn.api.records.impl.pb;
 
 
+import com.google.protobuf.TextFormat;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.records.YarnClusterMetrics;
 import org.apache.hadoop.yarn.proto.YarnProtos.YarnClusterMetricsProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.YarnClusterMetricsProtoOrBuilder;
-
-import com.google.protobuf.TextFormat;
 
 @Private
 @Unstable
@@ -56,8 +55,9 @@ public class YarnClusterMetricsPBImpl extends YarnClusterMetrics {
 
   @Override
   public boolean equals(Object other) {
-    if (other == null)
+    if (other == null) {
       return false;
+    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -75,7 +75,7 @@ public class YarnClusterMetricsPBImpl extends YarnClusterMetrics {
     }
     viaProto = false;
   }
-    
+
   
   @Override
   public int getNumNodeManagers() {
@@ -88,7 +88,6 @@ public class YarnClusterMetricsPBImpl extends YarnClusterMetrics {
     maybeInitBuilder();
     builder.setNumNodeManagers((numNodeManagers));
   }
-
 
 
 }  

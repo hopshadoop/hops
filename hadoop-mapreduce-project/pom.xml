@@ -16,12 +16,12 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <groupId>org.apache.hadoop</groupId>
+    <groupId>io.hops</groupId>
     <artifactId>hadoop-project</artifactId>
     <version>2.4.0</version>
     <relativePath>../hadoop-project</relativePath>
   </parent>
-  <groupId>org.apache.hadoop</groupId>
+  <groupId>io.hops</groupId>
   <artifactId>hadoop-mapreduce</artifactId>
   <version>2.4.0</version>
   <packaging>pom</packaging>
@@ -78,7 +78,7 @@
       </exclusions>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-common</artifactId>
       <scope>provided</scope>
       <exclusions>
@@ -110,7 +110,7 @@
        <artifactId>slf4j-log4j12</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-annotations</artifactId>
     </dependency>
     <dependency>
@@ -119,13 +119,13 @@
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-common</artifactId>
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-hdfs</artifactId>
       <scope>test</scope>
     </dependency>
@@ -253,7 +253,7 @@
             <artifactId>maven-assembly-plugin</artifactId>
             <dependencies>
               <dependency>
-                <groupId>org.apache.hadoop</groupId>
+                <groupId>io.hops</groupId>
                 <artifactId>hadoop-assemblies</artifactId>
                 <version>${project.version}</version>
               </dependency>

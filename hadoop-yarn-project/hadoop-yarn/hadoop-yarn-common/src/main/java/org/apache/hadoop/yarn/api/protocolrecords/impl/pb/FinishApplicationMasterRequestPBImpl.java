@@ -19,6 +19,7 @@
 package org.apache.hadoop.yarn.api.protocolrecords.impl.pb;
 
 
+import com.google.protobuf.TextFormat;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.protocolrecords.FinishApplicationMasterRequest;
@@ -28,12 +29,12 @@ import org.apache.hadoop.yarn.proto.YarnProtos.FinalApplicationStatusProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.FinishApplicationMasterRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.FinishApplicationMasterRequestProtoOrBuilder;
 
-import com.google.protobuf.TextFormat;
-
 @Private
 @Unstable
-public class FinishApplicationMasterRequestPBImpl extends FinishApplicationMasterRequest {
-  FinishApplicationMasterRequestProto proto = FinishApplicationMasterRequestProto.getDefaultInstance();
+public class FinishApplicationMasterRequestPBImpl
+    extends FinishApplicationMasterRequest {
+  FinishApplicationMasterRequestProto proto =
+      FinishApplicationMasterRequestProto.getDefaultInstance();
   FinishApplicationMasterRequestProto.Builder builder = null;
   boolean viaProto = false;
 
@@ -41,13 +42,14 @@ public class FinishApplicationMasterRequestPBImpl extends FinishApplicationMaste
     builder = FinishApplicationMasterRequestProto.newBuilder();
   }
 
-  public FinishApplicationMasterRequestPBImpl(FinishApplicationMasterRequestProto proto) {
+  public FinishApplicationMasterRequestPBImpl(
+      FinishApplicationMasterRequestProto proto) {
     this.proto = proto;
     viaProto = true;
   }
 
   public FinishApplicationMasterRequestProto getProto() {
-      mergeLocalToProto();
+    mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
     viaProto = true;
     return proto;
@@ -60,8 +62,9 @@ public class FinishApplicationMasterRequestPBImpl extends FinishApplicationMaste
 
   @Override
   public boolean equals(Object other) {
-    if (other == null)
+    if (other == null) {
       return false;
+    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -77,8 +80,9 @@ public class FinishApplicationMasterRequestPBImpl extends FinishApplicationMaste
   }
 
   private void mergeLocalToProto() {
-    if (viaProto)
+    if (viaProto) {
       maybeInitBuilder();
+    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
@@ -128,7 +132,7 @@ public class FinishApplicationMasterRequestPBImpl extends FinishApplicationMaste
     FinishApplicationMasterRequestProtoOrBuilder p = viaProto ? proto : builder;
     if (!p.hasFinalApplicationStatus()) {
       return null;
-    }	
+    }
     return convertFromProtoFormat(p.getFinalApplicationStatus());
   }
 
@@ -142,11 +146,13 @@ public class FinishApplicationMasterRequestPBImpl extends FinishApplicationMaste
     builder.setFinalApplicationStatus(convertToProtoFormat(finalState));
   }
 
-  private FinalApplicationStatus convertFromProtoFormat(FinalApplicationStatusProto s) {
+  private FinalApplicationStatus convertFromProtoFormat(
+      FinalApplicationStatusProto s) {
     return ProtoUtils.convertFromProtoFormat(s);
   }
 
-  private FinalApplicationStatusProto convertToProtoFormat(FinalApplicationStatus s) {
+  private FinalApplicationStatusProto convertToProtoFormat(
+      FinalApplicationStatus s) {
     return ProtoUtils.convertToProtoFormat(s);
   }
 

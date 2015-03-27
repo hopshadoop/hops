@@ -18,26 +18,38 @@
 
 package org.apache.hadoop.yarn.server.webproxy.amfilter;
 
-import java.io.IOException;
-import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
-
-import javax.servlet.*;
-import javax.servlet.http.Cookie;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
-import static junit.framework.Assert.*;
-
 import org.apache.hadoop.yarn.server.webproxy.WebAppProxyServlet;
 import org.glassfish.grizzly.servlet.HttpServletResponseImpl;
 import org.junit.Test;
 import org.mockito.Mockito;
 
+import javax.servlet.Filter;
+import javax.servlet.FilterChain;
+import javax.servlet.FilterConfig;
+import javax.servlet.ServletContext;
+import javax.servlet.ServletException;
+import javax.servlet.ServletRequest;
+import javax.servlet.ServletResponse;
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.Collections;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import static junit.framework.Assert.assertEquals;
+import static junit.framework.Assert.assertFalse;
+import static junit.framework.Assert.assertTrue;
+import static junit.framework.Assert.fail;
+
 /**
  * Test AmIpFilter. Requests to a no declared hosts should has way through
  * proxy. Another requests can be filtered with (without) user name.
- * 
  */
 public class TestAmFilter {
 
@@ -101,7 +113,8 @@ public class TestAmFilter {
     FilterChain chain = new FilterChain() {
       @Override
       public void doFilter(ServletRequest servletRequest,
-          ServletResponse servletResponse) throws IOException, ServletException {
+          ServletResponse servletResponse)
+          throws IOException, ServletException {
         invoked.set(true);
       }
     };
@@ -132,7 +145,8 @@ public class TestAmFilter {
     FilterChain chain = new FilterChain() {
       @Override
       public void doFilter(ServletRequest servletRequest,
-          ServletResponse servletResponse) throws IOException, ServletException {
+          ServletResponse servletResponse)
+          throws IOException, ServletException {
         doFilterRequest = servletRequest.getClass().getName();
         if (servletRequest instanceof AmIpServletRequestWrapper) {
           servletWrapper = (AmIpServletRequestWrapper) servletRequest;
@@ -165,8 +179,8 @@ public class TestAmFilter {
     Mockito.when(request.getRemoteAddr()).thenReturn("127.0.0.1");
     testFilter.doFilter(request, response, chain);
 
-    assertTrue(doFilterRequest
-        .contains("javax.servlet.http.HttpServletRequest"));
+    assertTrue(
+        doFilterRequest.contains("javax.servlet.http.HttpServletRequest"));
     // cookie added
     Cookie[] cookies = new Cookie[1];
     cookies[0] = new Cookie(WebAppProxyServlet.PROXY_USER_COOKIE_NAME, "user");

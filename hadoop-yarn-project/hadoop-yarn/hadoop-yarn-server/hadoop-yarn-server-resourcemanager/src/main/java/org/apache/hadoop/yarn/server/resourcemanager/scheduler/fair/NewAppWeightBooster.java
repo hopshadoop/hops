@@ -24,8 +24,10 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 
 /**
- * A {@link WeightAdjuster} implementation that gives a weight boost to new jobs
- * for a certain amount of time -- by default, a 3x weight boost for 60 seconds.
+ * A {@link WeightAdjuster} implementation that gives a weight boost to new
+ * jobs
+ * for a certain amount of time -- by default, a 3x weight boost for 60
+ * seconds.
  * This can be used to make shorter jobs finish faster, emulating Shortest Job
  * First scheduling while not starving long jobs.
  */
@@ -40,10 +42,10 @@ public class NewAppWeightBooster extends Configured implements WeightAdjuster {
 
   public void setConf(Configuration conf) {
     if (conf != null) {
-      factor = conf.getFloat("mapred.newjobweightbooster.factor",
-          DEFAULT_FACTOR);
-      duration = conf.getLong("mapred.newjobweightbooster.duration",
-          DEFAULT_DURATION);
+      factor =
+          conf.getFloat("mapred.newjobweightbooster.factor", DEFAULT_FACTOR);
+      duration =
+          conf.getLong("mapred.newjobweightbooster.duration", DEFAULT_DURATION);
     }
     super.setConf(conf);
   }

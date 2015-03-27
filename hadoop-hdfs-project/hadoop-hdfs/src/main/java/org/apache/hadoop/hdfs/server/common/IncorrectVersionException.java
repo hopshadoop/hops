@@ -17,16 +17,15 @@
  */
 package org.apache.hadoop.hdfs.server.common;
 
-import java.io.IOException;
-
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 
+import java.io.IOException;
+
 /**
- * The exception is thrown when external version does not match 
+ * The exception is thrown when external version does not match
  * current version of the application.
- * 
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
@@ -37,25 +36,23 @@ public class IncorrectVersionException extends IOException {
     super(message);
   }
 
-  public IncorrectVersionException(String minimumVersion, String reportedVersion,
-      String remoteDaemon, String thisDaemon) {
+  public IncorrectVersionException(String minimumVersion,
+      String reportedVersion, String remoteDaemon, String thisDaemon) {
     this("The reported " + remoteDaemon + " version is too low to communicate" +
         " with this " + thisDaemon + ". " + remoteDaemon + " version: '" +
         reportedVersion + "' Minimum " + remoteDaemon + " version: '" +
         minimumVersion + "'");
   }
   
-  public IncorrectVersionException(int currentLayoutVersion,
-      int versionReported, String ofWhat) {
-    this(versionReported, ofWhat, currentLayoutVersion);
+  public IncorrectVersionException(int versionReported, String ofWhat) {
+    this(versionReported, ofWhat, HdfsConstants.LAYOUT_VERSION);
   }
   
-  public IncorrectVersionException(int versionReported,
-                                   String ofWhat,
-                                   int versionExpected) {
-    this("Unexpected version " 
-        + (ofWhat==null ? "" : "of " + ofWhat) + ". Reported: "
-        + versionReported + ". Expecting = " + versionExpected + ".");
+  public IncorrectVersionException(int versionReported, String ofWhat,
+      int versionExpected) {
+    this("Unexpected version " + (ofWhat == null ? "" : "of " + ofWhat) +
+        ". Reported: " + versionReported + ". Expecting = " + versionExpected +
+        ".");
   }
 
 }

@@ -17,10 +17,12 @@
  */
 package org.apache.hadoop.hdfs.web.resources;
 
-/** Integer parameter. */
+/**
+ * Integer parameter.
+ */
 abstract class IntegerParam extends Param<Integer, IntegerParam.Domain> {
-  IntegerParam(final Domain domain, final Integer value,
-      final Integer min, final Integer max) {
+  IntegerParam(final Domain domain, final Integer value, final Integer min,
+      final Integer max) {
     super(domain, value);
     checkRange(min, max);
   }
@@ -30,12 +32,14 @@ abstract class IntegerParam extends Param<Integer, IntegerParam.Domain> {
       return;
     }
     if (min != null && value < min) {
-      throw new IllegalArgumentException("Invalid parameter range: " + getName()
-          + " = " + domain.toString(value) + " < " + domain.toString(min));
+      throw new IllegalArgumentException(
+          "Invalid parameter range: " + getName() + " = " +
+              domain.toString(value) + " < " + domain.toString(min));
     }
     if (max != null && value > max) {
-      throw new IllegalArgumentException("Invalid parameter range: " + getName()
-          + " = " + domain.toString(value) + " > " + domain.toString(max));
+      throw new IllegalArgumentException(
+          "Invalid parameter range: " + getName() + " = " +
+              domain.toString(value) + " > " + domain.toString(max));
     }
   }
   
@@ -44,15 +48,21 @@ abstract class IntegerParam extends Param<Integer, IntegerParam.Domain> {
     return getName() + "=" + domain.toString(getValue());
   }
 
-  /** @return the parameter value as a string */
+  /**
+   * @return the parameter value as a string
+   */
   @Override
   public String getValueString() {
     return domain.toString(getValue());
   }
 
-  /** The domain of the parameter. */
+  /**
+   * The domain of the parameter.
+   */
   static final class Domain extends Param.Domain<Integer> {
-    /** The radix of the number. */
+    /**
+     * The radix of the number.
+     */
     final int radix;
 
     Domain(final String paramName) {
@@ -71,17 +81,20 @@ abstract class IntegerParam extends Param<Integer, IntegerParam.Domain> {
 
     @Override
     Integer parse(final String str) {
-      try{
-        return NULL.equals(str)? null: Integer.parseInt(str, radix);
-      } catch(NumberFormatException e) {
-        throw new IllegalArgumentException("Failed to parse \"" + str
-            + "\" as a radix-" + radix + " integer.", e);
+      try {
+        return NULL.equals(str) ? null : Integer.parseInt(str, radix);
+      } catch (NumberFormatException e) {
+        throw new IllegalArgumentException(
+            "Failed to parse \"" + str + "\" as a radix-" + radix + " integer.",
+            e);
       }
     }
 
-    /** Convert an Integer to a String. */ 
+    /**
+     * Convert an Integer to a String.
+     */
     String toString(final Integer n) {
-      return n == null? NULL: Integer.toString(n, radix);
+      return n == null ? NULL : Integer.toString(n, radix);
     }
   }
 }

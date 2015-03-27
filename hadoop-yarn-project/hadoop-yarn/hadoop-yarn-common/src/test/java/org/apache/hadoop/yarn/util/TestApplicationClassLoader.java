@@ -18,16 +18,12 @@
 
 package org.apache.hadoop.yarn.util;
 
-import static junit.framework.Assert.assertEquals;
-import static junit.framework.Assert.assertFalse;
-import static junit.framework.Assert.assertNotNull;
-import static junit.framework.Assert.assertNull;
-import static junit.framework.Assert.assertTrue;
-import static org.apache.hadoop.yarn.util.ApplicationClassLoader.constructUrlsFromClasspath;
-import static org.apache.hadoop.yarn.util.ApplicationClassLoader.isSystemClass;
-
 import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
+import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.fs.FileUtil;
+import org.junit.Before;
+import org.junit.Test;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -38,15 +34,19 @@ import java.util.List;
 import java.util.jar.JarOutputStream;
 import java.util.zip.ZipEntry;
 
-import org.apache.commons.io.IOUtils;
-import org.apache.hadoop.fs.FileUtil;
-import org.junit.Before;
-import org.junit.Test;
+import static junit.framework.Assert.assertEquals;
+import static junit.framework.Assert.assertFalse;
+import static junit.framework.Assert.assertNotNull;
+import static junit.framework.Assert.assertNull;
+import static junit.framework.Assert.assertTrue;
+import static org.apache.hadoop.yarn.util.ApplicationClassLoader.constructUrlsFromClasspath;
+import static org.apache.hadoop.yarn.util.ApplicationClassLoader.isSystemClass;
 
 public class TestApplicationClassLoader {
   
-  private static File testDir = new File(System.getProperty("test.build.data",
-          System.getProperty("java.io.tmpdir")), "appclassloader");
+  private static File testDir = new File(System
+      .getProperty("test.build.data", System.getProperty("java.io.tmpdir")),
+      "appclassloader");
   
   @Before
   public void setUp() {
@@ -74,10 +74,10 @@ public class TestApplicationClassLoader {
 
     StringBuilder cp = new StringBuilder();
     cp.append(file.getAbsolutePath()).append(File.pathSeparator)
-      .append(dir.getAbsolutePath()).append(File.pathSeparator)
-      .append(jarsDir.getAbsolutePath() + "/*").append(File.pathSeparator)
-      .append(nofile.getAbsolutePath()).append(File.pathSeparator)
-      .append(nofile.getAbsolutePath() + "/*").append(File.pathSeparator);
+        .append(dir.getAbsolutePath()).append(File.pathSeparator)
+        .append(jarsDir.getAbsolutePath() + "/*").append(File.pathSeparator)
+        .append(nofile.getAbsolutePath()).append(File.pathSeparator)
+        .append(nofile.getAbsolutePath() + "/*").append(File.pathSeparator);
     
     URL[] urls = constructUrlsFromClasspath(cp.toString());
     
@@ -94,8 +94,8 @@ public class TestApplicationClassLoader {
     assertTrue(isSystemClass("org.example.Foo", classes("org.example.Foo")));
     assertTrue(isSystemClass("/org.example.Foo", classes("org.example.Foo")));
     assertTrue(isSystemClass("org.example.Foo", classes("org.example.")));
-    assertTrue(isSystemClass("net.example.Foo",
-        classes("org.example.,net.example.")));
+    assertTrue(
+        isSystemClass("net.example.Foo", classes("org.example.,net.example.")));
     assertFalse(isSystemClass("org.example.Foo",
         classes("-org.example.Foo,org.example.")));
     assertTrue(isSystemClass("org.example.Bar",
@@ -111,8 +111,9 @@ public class TestApplicationClassLoader {
     URL testJar = makeTestJar().toURI().toURL();
     
     ClassLoader currentClassLoader = getClass().getClassLoader();
-    ClassLoader appClassloader = new ApplicationClassLoader(
-        new URL[] { testJar }, currentClassLoader, null);
+    ClassLoader appClassloader =
+        new ApplicationClassLoader(new URL[]{testJar}, currentClassLoader,
+            null);
 
     assertNull("Resource should be null for current classloader",
         currentClassLoader.getResourceAsStream("resource.txt"));

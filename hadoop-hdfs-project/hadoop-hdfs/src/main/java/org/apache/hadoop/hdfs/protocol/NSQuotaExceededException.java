@@ -26,9 +26,8 @@ import org.apache.hadoop.classification.InterfaceStability;
 public final class NSQuotaExceededException extends QuotaExceededException {
   protected static final long serialVersionUID = 1L;
   
-  private String prefix;
-  
-  public NSQuotaExceededException() {}
+  public NSQuotaExceededException() {
+  }
 
   public NSQuotaExceededException(String msg) {
     super(msg);
@@ -42,19 +41,11 @@ public final class NSQuotaExceededException extends QuotaExceededException {
   public String getMessage() {
     String msg = super.getMessage();
     if (msg == null) {
-      msg = "The NameSpace quota (directories and files)" + 
-      (pathName==null?"":(" of directory " + pathName)) + 
-          " is exceeded: quota=" + quota + " file count=" + count; 
-
-      if (prefix != null) {
-        msg = prefix + ": " + msg;
-      }
+      return "The NameSpace quota (directories and files)" +
+          (pathName == null ? "" : (" of directory " + pathName)) +
+          " is exceeded: quota=" + quota + " file count=" + count;
+    } else {
+      return msg;
     }
-    return msg;
-  }
-
-  /** Set a prefix for the error message. */
-  public void setMessagePrefix(final String prefix) {
-    this.prefix = prefix;
   }
 }

@@ -17,12 +17,7 @@
  */
 package org.apache.hadoop.yarn.server.webapp;
 
-import static org.apache.hadoop.yarn.util.StringHelper.join;
-import static org.apache.hadoop.yarn.webapp.YarnWebParams.APPLICATION_ATTEMPT_ID;
-
-import java.io.IOException;
-import java.util.Collection;
-
+import com.google.inject.Inject;
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -39,7 +34,11 @@ import org.apache.hadoop.yarn.webapp.hamlet.Hamlet.TBODY;
 import org.apache.hadoop.yarn.webapp.view.HtmlBlock;
 import org.apache.hadoop.yarn.webapp.view.InfoBlock;
 
-import com.google.inject.Inject;
+import java.io.IOException;
+import java.util.Collection;
+
+import static org.apache.hadoop.yarn.util.StringHelper.join;
+import static org.apache.hadoop.yarn.webapp.YarnWebParams.APPLICATION_ATTEMPT_ID;
 
 public class AppAttemptBlock extends HtmlBlock {
 
@@ -86,23 +85,18 @@ public class AppAttemptBlock extends HtmlBlock {
     setTitle(join("Application Attempt ", attemptid));
 
     String node = "N/A";
-    if (appAttempt.getHost() != null && appAttempt.getRpcPort() >= 0
-        && appAttempt.getRpcPort() < 65536) {
+    if (appAttempt.getHost() != null && appAttempt.getRpcPort() >= 0 &&
+        appAttempt.getRpcPort() < 65536) {
       node = appAttempt.getHost() + ":" + appAttempt.getRpcPort();
     }
     info("Application Attempt Overview")
-      ._("State", appAttempt.getAppAttemptState())
-      ._(
-        "Master Container",
-        appAttempt.getAmContainerId() == null ? "#" : root_url("container",
-          appAttempt.getAmContainerId()),
-        String.valueOf(appAttempt.getAmContainerId()))
-      ._("Node:", node)
-      ._(
-        "Tracking URL:",
-        appAttempt.getTrackingUrl() == null ? "#" : root_url(appAttempt
-          .getTrackingUrl()), "History")
-      ._("Diagnostics Info:", appAttempt.getDiagnosticsInfo());
+        ._("State", appAttempt.getAppAttemptState())._("Master Container",
+        appAttempt.getAmContainerId() == null ? "#" :
+            root_url("container", appAttempt.getAmContainerId()),
+        String.valueOf(appAttempt.getAmContainerId()))._("Node:", node)
+        ._("Tracking URL:", appAttempt.getTrackingUrl() == null ? "#" :
+                root_url(appAttempt.getTrackingUrl()), "History")
+        ._("Diagnostics Info:", appAttempt.getDiagnosticsInfo());
 
     html._(InfoBlock.class);
 
@@ -110,49 +104,41 @@ public class AppAttemptBlock extends HtmlBlock {
     try {
       containers = appContext.getContainers(appAttemptId).values();
     } catch (IOException e) {
-      html
-        .p()
-        ._(
-          "Sorry, Failed to get containers for application attempt" + attemptid
-              + ".")._();
+      html.p()._("Sorry, Failed to get containers for application attempt" +
+              attemptid + ".")._();
       return;
     }
 
     // Container Table
     TBODY<TABLE<Hamlet>> tbody =
         html.table("#containers").thead().tr().th(".id", "Container ID")
-          .th(".node", "Node").th(".exitstatus", "Container Exit Status")
-          .th(".logs", "Logs")._()._().tbody();
+            .th(".node", "Node").th(".exitstatus", "Container Exit Status")
+            .th(".logs", "Logs")._()._().tbody();
 
     StringBuilder containersTableData = new StringBuilder("[\n");
     for (ContainerReport containerReport : containers) {
       ContainerInfo container = new ContainerInfo(containerReport);
       // ConatinerID numerical value parsed by parseHadoopID in
       // yarn.dt.plugins.js
-      containersTableData
-        .append("[\"<a href='")
-        .append(url("container", container.getContainerId()))
-        .append("'>")
-        .append(container.getContainerId())
-        .append("</a>\",\"<a href='")
-        .append(container.getAssignedNodeId())
-        .append("'>")
-        .append(
-          StringEscapeUtils.escapeJavaScript(StringEscapeUtils
-            .escapeHtml(container.getAssignedNodeId()))).append("</a>\",\"")
-        .append(container.getContainerExitStatus()).append("\",\"<a href='")
-        .append(container.getLogUrl() == null ?
-            "#" : container.getLogUrl()).append("'>")
-        .append(container.getLogUrl() == null ?
-            "N/A" : "Logs").append("</a>\"],\n");
+      containersTableData.append("[\"<a href='")
+          .append(url("container", container.getContainerId())).append("'>")
+          .append(container.getContainerId()).append("</a>\",\"<a href='")
+          .append(container.getAssignedNodeId()).append("'>").append(
+          StringEscapeUtils.escapeJavaScript(
+              StringEscapeUtils.escapeHtml(container.getAssignedNodeId())))
+          .append("</a>\",\"").append(container.getContainerExitStatus())
+          .append("\",\"<a href='")
+          .append(container.getLogUrl() == null ? "#" : container.getLogUrl())
+          .append("'>").append(container.getLogUrl() == null ? "N/A" : "Logs")
+          .append("</a>\"],\n");
     }
     if (containersTableData.charAt(containersTableData.length() - 2) == ',') {
       containersTableData.delete(containersTableData.length() - 2,
-        containersTableData.length() - 1);
+          containersTableData.length() - 1);
     }
     containersTableData.append("]");
     html.script().$type("text/javascript")
-      ._("var containersTableData=" + containersTableData)._();
+        ._("var containersTableData=" + containersTableData)._();
 
     tbody._()._();
   }

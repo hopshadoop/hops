@@ -28,8 +28,11 @@ public class ApplicationFinishEvent extends ApplicationEvent {
 
   /**
    * Application event to abort all containers associated with the app
-   * @param appId to abort containers
-   * @param diagnostic reason for the abort
+   *
+   * @param appId
+   *     to abort containers
+   * @param diagnostic
+   *     reason for the abort
    */
   public ApplicationFinishEvent(ApplicationId appId, String diagnostic) {
     super(appId, ApplicationEventType.FINISH_APPLICATION);
@@ -38,6 +41,7 @@ public class ApplicationFinishEvent extends ApplicationEvent {
 
   /**
    * Why the app was aborted
+   *
    * @return diagnostic message
    */
   public String getDiagnostic() {

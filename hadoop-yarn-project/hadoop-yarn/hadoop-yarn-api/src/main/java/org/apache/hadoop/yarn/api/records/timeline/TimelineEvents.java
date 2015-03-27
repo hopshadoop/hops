@@ -18,16 +18,15 @@
 
 package org.apache.hadoop.yarn.api.records.timeline;
 
-import java.util.ArrayList;
-import java.util.List;
+import org.apache.hadoop.classification.InterfaceAudience.Public;
+import org.apache.hadoop.classification.InterfaceStability.Unstable;
 
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
-
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Unstable;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * The class that hosts a list of events, which are categorized according to
@@ -48,7 +47,7 @@ public class TimelineEvents {
 
   /**
    * Get a list of {@link EventsOfOneEntity} instances
-   * 
+   *
    * @return a list of {@link EventsOfOneEntity} instances
    */
   @XmlElement(name = "events")
@@ -58,9 +57,9 @@ public class TimelineEvents {
 
   /**
    * Add a single {@link EventsOfOneEntity} instance into the existing list
-   * 
+   *
    * @param eventsOfOneEntity
-   *          a single {@link EventsOfOneEntity} instance
+   *     a single {@link EventsOfOneEntity} instance
    */
   public void addEvent(EventsOfOneEntity eventsOfOneEntity) {
     allEvents.add(eventsOfOneEntity);
@@ -68,9 +67,9 @@ public class TimelineEvents {
 
   /**
    * Add a list of {@link EventsOfOneEntity} instances into the existing list
-   * 
+   *
    * @param allEvents
-   *          a list of {@link EventsOfOneEntity} instances
+   *     a list of {@link EventsOfOneEntity} instances
    */
   public void addEvents(List<EventsOfOneEntity> allEvents) {
     this.allEvents.addAll(allEvents);
@@ -78,9 +77,9 @@ public class TimelineEvents {
 
   /**
    * Set the list to the given list of {@link EventsOfOneEntity} instances
-   * 
+   *
    * @param allEvents
-   *          a list of {@link EventsOfOneEntity} instances
+   *     a list of {@link EventsOfOneEntity} instances
    */
   public void setEvents(List<EventsOfOneEntity> allEvents) {
     this.allEvents.clear();
@@ -106,7 +105,7 @@ public class TimelineEvents {
 
     /**
      * Get the entity Id
-     * 
+     *
      * @return the entity Id
      */
     @XmlElement(name = "entity")
@@ -116,9 +115,9 @@ public class TimelineEvents {
 
     /**
      * Set the entity Id
-     * 
+     *
      * @param entityId
-     *          the entity Id
+     *     the entity Id
      */
     public void setEntityId(String entityId) {
       this.entityId = entityId;
@@ -126,7 +125,7 @@ public class TimelineEvents {
 
     /**
      * Get the entity type
-     * 
+     *
      * @return the entity type
      */
     @XmlElement(name = "entitytype")
@@ -136,9 +135,9 @@ public class TimelineEvents {
 
     /**
      * Set the entity type
-     * 
+     *
      * @param entityType
-     *          the entity type
+     *     the entity type
      */
     public void setEntityType(String entityType) {
       this.entityType = entityType;
@@ -146,7 +145,7 @@ public class TimelineEvents {
 
     /**
      * Get a list of events
-     * 
+     *
      * @return a list of events
      */
     @XmlElement(name = "events")
@@ -156,9 +155,9 @@ public class TimelineEvents {
 
     /**
      * Add a single event to the existing event list
-     * 
+     *
      * @param event
-     *          a single event
+     *     a single event
      */
     public void addEvent(TimelineEvent event) {
       events.add(event);
@@ -166,9 +165,9 @@ public class TimelineEvents {
 
     /**
      * Add a list of event to the existing event list
-     * 
+     *
      * @param events
-     *          a list of events
+     *     a list of events
      */
     public void addEvents(List<TimelineEvent> events) {
       this.events.addAll(events);
@@ -176,9 +175,9 @@ public class TimelineEvents {
 
     /**
      * Set the event list to the given list of events
-     * 
+     *
      * @param events
-     *          a list of events
+     *     a list of events
      */
     public void setEvents(List<TimelineEvent> events) {
       this.events = events;

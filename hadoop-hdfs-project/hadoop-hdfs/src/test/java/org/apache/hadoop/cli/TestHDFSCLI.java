@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.cli;
 
-import static org.junit.Assert.assertTrue;
-
 import org.apache.hadoop.cli.util.CLICommand;
 import org.apache.hadoop.cli.util.CommandExecutor.Result;
 import org.apache.hadoop.fs.FileSystem;
@@ -31,6 +29,8 @@ import org.apache.hadoop.security.authorize.PolicyProvider;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+
+import static org.junit.Assert.assertTrue;
 
 public class TestHDFSCLI extends CLITestHelperDFS {
 
@@ -44,27 +44,27 @@ public class TestHDFSCLI extends CLITestHelperDFS {
     super.setUp();
     conf.setClass(PolicyProvider.POLICY_PROVIDER_CONFIG,
         HDFSPolicyProvider.class, PolicyProvider.class);
-    
+
     // Many of the tests expect a replication value of 1 in the output
     conf.setInt(DFSConfigKeys.DFS_REPLICATION_KEY, 1);
-    
+
     // Build racks and hosts configuration to test dfsAdmin -printTopology
-    String [] racks =  {"/rack1", "/rack1", "/rack2", "/rack2",
-                        "/rack2", "/rack3", "/rack4", "/rack4" };
-    String [] hosts = {"host1", "host2", "host3", "host4",
-                       "host5", "host6", "host7", "host8" };
-    dfsCluster = new MiniDFSCluster.Builder(conf).numDataNodes(8)
-                                                 .racks(racks)
-                                                 .hosts(hosts)
-                                                 .build();
+    String[] racks =
+        {"/rack1", "/rack1", "/rack2", "/rack2", "/rack2", "/rack3", "/rack4",
+            "/rack4"};
+    String[] hosts =
+        {"host1", "host2", "host3", "host4", "host5", "host6", "host7",
+            "host8"};
+    dfsCluster = new MiniDFSCluster.Builder(conf).numDataNodes(8).racks(racks)
+        .hosts(hosts).build();
     dfsCluster.waitClusterUp();
     namenode = conf.get(DFSConfigKeys.FS_DEFAULT_NAME_KEY, "file:///");
-    
+
     username = System.getProperty("user.name");
 
     fs = dfsCluster.getFileSystem();
-    assertTrue("Not a HDFS: "+fs.getUri(),
-               fs instanceof DistributedFileSystem);
+    assertTrue("Not a HDFS: " + fs.getUri(),
+        fs instanceof DistributedFileSystem);
   }
 
   @Override
@@ -100,7 +100,7 @@ public class TestHDFSCLI extends CLITestHelperDFS {
   
   @Test
   @Override
-  public void testAll () {
+  public void testAll() {
     super.testAll();
   }
 }

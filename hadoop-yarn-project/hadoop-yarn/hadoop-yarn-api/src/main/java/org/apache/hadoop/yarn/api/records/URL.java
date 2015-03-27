@@ -31,7 +31,8 @@ public abstract class URL {
 
   @Public
   @Stable
-  public static URL newInstance(String scheme, String host, int port, String file) {
+  public static URL newInstance(String scheme, String host, int port,
+      String file) {
     URL url = Records.newRecord(URL.class);
     url.setScheme(scheme);
     url.setHost(host);
@@ -42,6 +43,7 @@ public abstract class URL {
 
   /**
    * Get the scheme of the URL.
+   *
    * @return scheme of the URL
    */
   @Public
@@ -50,7 +52,9 @@ public abstract class URL {
   
   /**
    * Set the scheme of the URL
-   * @param scheme scheme of the URL
+   *
+   * @param scheme
+   *     scheme of the URL
    */
   @Public
   @Stable
@@ -58,6 +62,7 @@ public abstract class URL {
 
   /**
    * Get the user info of the URL.
+   *
    * @return user info of the URL
    */
   @Public
@@ -66,7 +71,9 @@ public abstract class URL {
   
   /**
    * Set the user info of the URL.
-   * @param userInfo user info of the URL
+   *
+   * @param userInfo
+   *     user info of the URL
    */
   @Public
   @Stable
@@ -74,6 +81,7 @@ public abstract class URL {
 
   /**
    * Get the host of the URL.
+   *
    * @return host of the URL
    */
   @Public
@@ -82,7 +90,9 @@ public abstract class URL {
   
   /**
    * Set the host of the URL.
-   * @param host host of the URL
+   *
+   * @param host
+   *     host of the URL
    */
   @Public
   @Stable
@@ -90,6 +100,7 @@ public abstract class URL {
 
   /**
    * Get the port of the URL.
+   *
    * @return port of the URL
    */
   @Public
@@ -98,7 +109,9 @@ public abstract class URL {
   
   /**
    * Set the port of the URL
-   * @param port port of the URL
+   *
+   * @param port
+   *     port of the URL
    */
   @Public
   @Stable
@@ -106,6 +119,7 @@ public abstract class URL {
 
   /**
    * Get the file of the URL.
+   *
    * @return file of the URL
    */
   @Public
@@ -114,7 +128,9 @@ public abstract class URL {
   
   /**
    * Set the file of the URL.
-   * @param file file of the URL
+   *
+   * @param file
+   *     file of the URL
    */
   @Public
   @Stable

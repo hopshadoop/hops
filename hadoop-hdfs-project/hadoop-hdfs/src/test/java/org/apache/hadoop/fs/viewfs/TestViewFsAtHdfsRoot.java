@@ -17,13 +17,7 @@
  */
 package org.apache.hadoop.fs.viewfs;
 
-import java.io.IOException;
-import java.net.URISyntaxException;
-
-import javax.security.auth.login.LoginException;
-
 import org.apache.hadoop.fs.FileContext;
-import org.apache.hadoop.fs.FileContextTestHelper;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
@@ -34,6 +28,10 @@ import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 
+import javax.security.auth.login.LoginException;
+import java.io.IOException;
+import java.net.URISyntaxException;
+
 /**
  * Make sure that ViewFs works when the root of an FS is mounted to a ViewFs
  * mount point.
@@ -41,30 +39,25 @@ import org.junit.BeforeClass;
 public class TestViewFsAtHdfsRoot extends ViewFsBaseTest {
   
   private static MiniDFSCluster cluster;
-  private static final HdfsConfiguration CONF = new HdfsConfiguration();
+  private static HdfsConfiguration CONF = new HdfsConfiguration();
   private static FileContext fc;
   
-  @Override
-  protected FileContextTestHelper createFileContextHelper() {
-    return new FileContextTestHelper();
-  }
-
   @BeforeClass
-  public static void clusterSetupAtBegining() throws IOException,
-      LoginException, URISyntaxException {
+  public static void clusterSetupAtBegining()
+      throws IOException, LoginException, URISyntaxException {
     SupportsBlocks = true;
-    CONF.setBoolean(
-        DFSConfigKeys.DFS_NAMENODE_DELEGATION_TOKEN_ALWAYS_USE_KEY, true);
+    CONF.setBoolean(DFSConfigKeys.DFS_NAMENODE_DELEGATION_TOKEN_ALWAYS_USE_KEY,
+        true);
 
     cluster = new MiniDFSCluster.Builder(CONF).numDataNodes(2).build();
     cluster.waitClusterUp();
     fc = FileContext.getFileContext(cluster.getURI(0), CONF);
   }
 
-      
+
   @AfterClass
   public static void ClusterShutdownAtEnd() throws Exception {
-    cluster.shutdown();   
+    cluster.shutdown();
   }
 
   @Override
@@ -72,12 +65,14 @@ public class TestViewFsAtHdfsRoot extends ViewFsBaseTest {
   public void setUp() throws Exception {
     // create the test root on local_fs
     fcTarget = fc;
-    super.setUp();    
+    super.setUp();
   }
   
   /**
-   * Override this so that we don't set the targetTestRoot to any path under the
-   * root of the FS, and so that we don't try to delete the test dir, but rather
+   * Override this so that we don't set the targetTestRoot to any path under
+   * the
+   * root of the FS, and so that we don't try to delete the test dir, but
+   * rather
    * only its contents.
    */
   @Override

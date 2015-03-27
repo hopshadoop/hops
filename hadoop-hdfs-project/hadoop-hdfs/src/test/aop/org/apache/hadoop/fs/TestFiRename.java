@@ -17,22 +17,19 @@
  */
 package org.apache.hadoop.fs;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.EnumSet;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Options.Rename;
-import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
-import org.apache.hadoop.test.PathUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+
+import java.io.IOException;
+import java.util.EnumSet;
 
 import static org.apache.hadoop.fs.FileContextTestHelper.*;
 
@@ -45,22 +42,24 @@ import static org.apache.hadoop.fs.FileContextTestHelper.*;
  * <li>dst if it exists is removed.
  * <li>src is renamed and added to directory tree as dst.
  * </ul>
- * 
+ * <p/>
  * During any of the above steps, the state of src and dst is reverted back to
  * what it was prior to rename. This test ensures that the state is reverted
  * back.
- * 
+ * <p/>
  * This test uses AspectJ to simulate failures.
  */
 public class TestFiRename {
   private static final Log LOG = LogFactory.getLog(TestFiRename.class);
   private static String removeChild = "";
   private static String addChild = "";
-  private static byte[] data = { 0 };
+  private static byte[] data = {0};
   
-  private static String TEST_ROOT_DIR = PathUtils.getTestDirName(TestFiRename.class);
+  private static String TEST_ROOT_DIR =
+      System.getProperty("test.build.data", "/tmp") + "/test";
   
   private static Configuration CONF = new Configuration();
+
   static {
     CONF.setInt("io.bytes.per.checksum", 1);
   }
@@ -117,13 +116,17 @@ public class TestFiRename {
     return status;
   }
 
-  /** Set child name on removal of which failure should be simulated */
+  /**
+   * Set child name on removal of which failure should be simulated
+   */
   public static void exceptionOnRemove(String child) {
     removeChild = child;
     addChild = "";
   }
 
-  /** Set child name on addition of which failure should be simulated */
+  /**
+   * Set child name on addition of which failure should be simulated
+   */
   public static void exceptionOnAdd(String child) {
     removeChild = "";
     addChild = child;
@@ -144,7 +147,9 @@ public class TestFiRename {
     out.close();
   }
 
-  /** Rename test when src exists and dst does not */
+  /**
+   * Rename test when src exists and dst does not
+   */
   @Test
   public void testFailureNonExistentDst() throws Exception {
     final Path src = getTestPath("testFailureNonExistenSrc/dir/src");
@@ -160,7 +165,9 @@ public class TestFiRename {
     rename(src, dst, true, true, false, Rename.NONE);
   }
 
-  /** Rename test when src and dst exist */
+  /**
+   * Rename test when src and dst exist
+   */
   @Test
   public void testFailuresExistingDst() throws Exception {
     final Path src = getTestPath("testFailuresExistingDst/dir/src");
@@ -181,7 +188,9 @@ public class TestFiRename {
     rename(src, dst, true, true, true, Rename.OVERWRITE);
   }
 
-  /** Rename test where both src and dst are files */
+  /**
+   * Rename test where both src and dst are files
+   */
   @Test
   public void testDeletionOfDstFile() throws Exception {
     Path src = getTestPath("testDeletionOfDstFile/dir/src");
@@ -221,7 +230,9 @@ public class TestFiRename {
     Assert.assertTrue(exists(fc, dst));
   }
 
-  /** Rename test where both src and dst are directories */
+  /**
+   * Rename test where both src and dst are directories
+   */
   @Test
   public void testDeletionOfDstDirectory() throws Exception {
     Path src = getTestPath("testDeletionOfDstDirectory/dir/src");

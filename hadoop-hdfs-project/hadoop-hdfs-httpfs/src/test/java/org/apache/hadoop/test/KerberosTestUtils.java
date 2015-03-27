@@ -13,14 +13,13 @@
  */
 package org.apache.hadoop.test;
 
+import org.apache.hadoop.security.authentication.util.KerberosUtil;
+
 import javax.security.auth.Subject;
 import javax.security.auth.kerberos.KerberosPrincipal;
 import javax.security.auth.login.AppConfigurationEntry;
 import javax.security.auth.login.Configuration;
 import javax.security.auth.login.LoginContext;
-
-import org.apache.hadoop.security.authentication.util.KerberosUtil;
-
 import java.io.File;
 import java.security.Principal;
 import java.security.PrivilegedActionException;
@@ -40,10 +39,10 @@ public class KerberosTestUtils {
   public static final String REALM = PREFIX + "kerberos.realm";
 
   public static final String CLIENT_PRINCIPAL =
-    PREFIX + "kerberos.client.principal";
+      PREFIX + "kerberos.client.principal";
 
   public static final String SERVER_PRINCIPAL =
-    PREFIX + "kerberos.server.principal";
+      PREFIX + "kerberos.server.principal";
 
   public static final String KEYTAB_FILE = PREFIX + "kerberos.keytab.file";
 
@@ -56,14 +55,13 @@ public class KerberosTestUtils {
   }
 
   public static String getServerPrincipal() {
-    return System.getProperty(SERVER_PRINCIPAL,
-                              "HTTP/localhost") + "@" + getRealm();
+    return System.getProperty(SERVER_PRINCIPAL, "HTTP/localhost") + "@" +
+        getRealm();
   }
 
   public static String getKeytabFile() {
-    String keytabFile =
-      new File(System.getProperty("user.home"),
-               System.getProperty("user.name") + ".keytab").toString();
+    String keytabFile = new File(System.getProperty("user.home"),
+        System.getProperty("user.name") + ".keytab").toString();
     return System.getProperty(KEYTAB_FILE, keytabFile);
   }
 
@@ -93,23 +91,22 @@ public class KerberosTestUtils {
       options.put("debug", "true");
 
       return new AppConfigurationEntry[]{
-        new AppConfigurationEntry(KerberosUtil.getKrb5LoginModuleName(),
-                                  AppConfigurationEntry.LoginModuleControlFlag.REQUIRED,
-                                  options),};
+          new AppConfigurationEntry(KerberosUtil.getKrb5LoginModuleName(),
+              AppConfigurationEntry.LoginModuleControlFlag.REQUIRED, options),};
     }
   }
 
   public static <T> T doAs(String principal, final Callable<T> callable)
-    throws Exception {
+      throws Exception {
     LoginContext loginContext = null;
     try {
       Set<Principal> principals = new HashSet<Principal>();
-      principals.add(
-        new KerberosPrincipal(KerberosTestUtils.getClientPrincipal()));
+      principals
+          .add(new KerberosPrincipal(KerberosTestUtils.getClientPrincipal()));
       Subject subject = new Subject(false, principals, new HashSet<Object>(),
-                                    new HashSet<Object>());
+          new HashSet<Object>());
       loginContext = new LoginContext("", subject, null,
-                                      new KerberosConfiguration(principal));
+          new KerberosConfiguration(principal));
       loginContext.login();
       subject = loginContext.getSubject();
       return Subject.doAs(subject, new PrivilegedExceptionAction<T>() {

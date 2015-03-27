@@ -19,6 +19,7 @@
 package org.apache.hadoop.yarn.api.records.impl.pb;
 
 import com.google.common.base.CharMatcher;
+import com.google.protobuf.TextFormat;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -34,16 +35,14 @@ import org.apache.hadoop.yarn.proto.YarnProtos.ContainerLaunchContextProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.PriorityProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.ResourceProto;
 
-import com.google.protobuf.TextFormat;
-
 import java.util.HashSet;
 import java.util.Set;
 
 @Private
 @Unstable
-public class ApplicationSubmissionContextPBImpl 
-extends ApplicationSubmissionContext {
-  ApplicationSubmissionContextProto proto = 
+public class ApplicationSubmissionContextPBImpl
+    extends ApplicationSubmissionContext {
+  ApplicationSubmissionContextProto proto =
       ApplicationSubmissionContextProto.getDefaultInstance();
   ApplicationSubmissionContextProto.Builder builder = null;
   boolean viaProto = false;
@@ -65,7 +64,7 @@ extends ApplicationSubmissionContext {
   }
   
   public ApplicationSubmissionContextProto getProto() {
-      mergeLocalToProto();
+    mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
     viaProto = true;
     return proto;
@@ -78,8 +77,9 @@ extends ApplicationSubmissionContext {
 
   @Override
   public boolean equals(Object other) {
-    if (other == null)
+    if (other == null) {
       return false;
+    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -101,9 +101,8 @@ extends ApplicationSubmissionContext {
     if (this.amContainer != null) {
       builder.setAmContainerSpec(convertToProtoFormat(this.amContainer));
     }
-    if (this.resource != null &&
-        !((ResourcePBImpl) this.resource).getProto().equals(
-            builder.getResource())) {
+    if (this.resource != null && !((ResourcePBImpl) this.resource).getProto()
+        .equals(builder.getResource())) {
       builder.setResource(convertToProtoFormat(this.resource));
     }
     if (this.applicationTags != null && !this.applicationTags.isEmpty()) {
@@ -112,8 +111,9 @@ extends ApplicationSubmissionContext {
   }
 
   private void mergeLocalToProto() {
-    if (viaProto) 
+    if (viaProto) {
       maybeInitBuilder();
+    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
@@ -125,7 +125,7 @@ extends ApplicationSubmissionContext {
     }
     viaProto = false;
   }
-    
+
   
   @Override
   public Priority getPriority() {
@@ -143,8 +143,9 @@ extends ApplicationSubmissionContext {
   @Override
   public void setPriority(Priority priority) {
     maybeInitBuilder();
-    if (priority == null)
+    if (priority == null) {
       builder.clearPriority();
+    }
     this.priority = priority;
   }
   
@@ -164,8 +165,9 @@ extends ApplicationSubmissionContext {
   @Override
   public void setApplicationId(ApplicationId applicationId) {
     maybeInitBuilder();
-    if (applicationId == null)
+    if (applicationId == null) {
       builder.clearApplicationId();
+    }
     this.applicationId = applicationId;
   }
   
@@ -243,8 +245,9 @@ extends ApplicationSubmissionContext {
 
   private void checkTags(Set<String> tags) {
     if (tags.size() > YarnConfiguration.APPLICATION_MAX_TAGS) {
-      throw new IllegalArgumentException("Too many applicationTags, a maximum of only "
-          + YarnConfiguration.APPLICATION_MAX_TAGS + " are allowed!");
+      throw new IllegalArgumentException(
+          "Too many applicationTags, a maximum of only " +
+              YarnConfiguration.APPLICATION_MAX_TAGS + " are allowed!");
     }
     for (String tag : tags) {
       if (tag.length() > YarnConfiguration.APPLICATION_MAX_TAG_LENGTH) {
@@ -357,8 +360,8 @@ extends ApplicationSubmissionContext {
   }
 
   @Override
-  public void
-      setKeepContainersAcrossApplicationAttempts(boolean keepContainers) {
+  public void setKeepContainersAcrossApplicationAttempts(
+      boolean keepContainers) {
     maybeInitBuilder();
     builder.setKeepContainersAcrossApplicationAttempts(keepContainers);
   }
@@ -374,7 +377,7 @@ extends ApplicationSubmissionContext {
   }
 
   private PriorityProto convertToProtoFormat(Priority t) {
-    return ((PriorityPBImpl)t).getProto();
+    return ((PriorityPBImpl) t).getProto();
   }
 
   private ApplicationIdPBImpl convertFromProtoFormat(ApplicationIdProto p) {
@@ -382,7 +385,7 @@ extends ApplicationSubmissionContext {
   }
 
   private ApplicationIdProto convertToProtoFormat(ApplicationId t) {
-    return ((ApplicationIdPBImpl)t).getProto();
+    return ((ApplicationIdPBImpl) t).getProto();
   }
 
   private ContainerLaunchContextPBImpl convertFromProtoFormat(
@@ -390,8 +393,9 @@ extends ApplicationSubmissionContext {
     return new ContainerLaunchContextPBImpl(p);
   }
 
-  private ContainerLaunchContextProto convertToProtoFormat(ContainerLaunchContext t) {
-    return ((ContainerLaunchContextPBImpl)t).getProto();
+  private ContainerLaunchContextProto convertToProtoFormat(
+      ContainerLaunchContext t) {
+    return ((ContainerLaunchContextPBImpl) t).getProto();
   }
 
   private ResourcePBImpl convertFromProtoFormat(ResourceProto p) {
@@ -399,6 +403,6 @@ extends ApplicationSubmissionContext {
   }
 
   private ResourceProto convertToProtoFormat(Resource t) {
-    return ((ResourcePBImpl)t).getProto();
+    return ((ResourcePBImpl) t).getProto();
   }
 }  

@@ -18,15 +18,17 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.rmapp;
 
+import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.hadoop.yarn.event.AbstractEvent;
+import org.apache.hadoop.yarn.event.AbstractEventTransaction;
 
-public class RMAppEvent extends AbstractEvent<RMAppEventType>{
+public class RMAppEvent extends AbstractEventTransaction<RMAppEventType> {
 
   private final ApplicationId appId;
 
-  public RMAppEvent(ApplicationId appId, RMAppEventType type) {
-    super(type);
+  public RMAppEvent(ApplicationId appId, RMAppEventType type,
+      TransactionState transactionState) {
+    super(type, transactionState);
     this.appId = appId;
   }
 

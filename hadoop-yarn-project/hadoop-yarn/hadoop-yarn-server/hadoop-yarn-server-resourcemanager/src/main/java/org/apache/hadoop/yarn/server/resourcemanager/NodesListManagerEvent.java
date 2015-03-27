@@ -18,15 +18,17 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager;
 
-import org.apache.hadoop.yarn.event.AbstractEvent;
+import io.hops.ha.common.TransactionState;
+import org.apache.hadoop.yarn.event.AbstractEventTransaction;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 
-public class NodesListManagerEvent extends
-    AbstractEvent<NodesListManagerEventType> {
+public class NodesListManagerEvent
+    extends AbstractEventTransaction<NodesListManagerEventType> {
   private final RMNode node;
 
-  public NodesListManagerEvent(NodesListManagerEventType type, RMNode node) {
-    super(type);
+  public NodesListManagerEvent(NodesListManagerEventType type, RMNode node,
+      TransactionState transactionState) {
+    super(type, transactionState);
     this.node = node;
   }
 

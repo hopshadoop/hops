@@ -17,14 +17,13 @@
  */
 package org.apache.hadoop.hdfs.nfs.nfs3;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-
-import org.apache.commons.lang.exception.ExceptionUtils;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 
 /**
  * This class is a thread pool to easily schedule async data operations.Current
@@ -68,9 +67,9 @@ public class AsyncDataService {
       throw new RuntimeException("AsyncDataService is already shutdown");
     }
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Current active thread number: " + executor.getActiveCount()
-          + " queue size:" + executor.getQueue().size()
-          + " scheduled task number:" + executor.getTaskCount());
+      LOG.debug("Current active thread number: " + executor.getActiveCount() +
+          " queue size:" + executor.getQueue().size() +
+          " scheduled task number:" + executor.getTaskCount());
     }
     executor.execute(task);
   }
@@ -97,8 +96,8 @@ public class AsyncDataService {
    */
   void writeAsync(OpenFileCtx openFileCtx) {
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Scheduling write back task for fileId: "
-          + openFileCtx.getLatestAttr().getFileId());
+      LOG.debug("Scheduling write back task for fileId: " +
+          openFileCtx.getLatestAttr().getFileId());
     }
     WriteBackTask wbTask = new WriteBackTask(openFileCtx);
     execute(wbTask);
@@ -125,9 +124,9 @@ public class AsyncDataService {
     @Override
     public String toString() {
       // Called in AsyncDataService.execute for displaying error messages.
-      return "write back data for fileId"
-          + openFileCtx.getLatestAttr().getFileId() + " with nextOffset "
-          + openFileCtx.getNextOffset();
+      return "write back data for fileId" +
+          openFileCtx.getLatestAttr().getFileId() + " with nextOffset " +
+          openFileCtx.getNextOffset();
     }
 
     @Override

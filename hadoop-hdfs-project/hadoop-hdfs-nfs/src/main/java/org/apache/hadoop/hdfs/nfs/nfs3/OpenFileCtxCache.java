@@ -17,11 +17,9 @@
  */
 package org.apache.hadoop.hdfs.nfs.nfs3;
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.Map.Entry;
-import java.util.concurrent.ConcurrentMap;
-
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Maps;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -29,9 +27,10 @@ import org.apache.hadoop.nfs.nfs3.FileHandle;
 import org.apache.hadoop.nfs.nfs3.Nfs3Constant;
 import org.apache.hadoop.util.Daemon;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Maps;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentMap;
 
 /**
  * A cache saves OpenFileCtx objects for different users. Each cache entry is
@@ -40,8 +39,8 @@ import com.google.common.collect.Maps;
 class OpenFileCtxCache {
   private static final Log LOG = LogFactory.getLog(OpenFileCtxCache.class);
   // Insert and delete with openFileMap are synced
-  private final ConcurrentMap<FileHandle, OpenFileCtx> openFileMap = Maps
-      .newConcurrentMap();
+  private final ConcurrentMap<FileHandle, OpenFileCtx> openFileMap =
+      Maps.newConcurrentMap();
 
   private final int maxStreams;
   private final long streamTimeout;
@@ -59,14 +58,14 @@ class OpenFileCtxCache {
    * The entry to be evicted is based on the following rules:<br>
    * 1. if the OpenFileCtx has any pending task, it will not be chosen.<br>
    * 2. if there is inactive OpenFileCtx, the first found one is to evict. <br>
-   * 3. For OpenFileCtx entries don't belong to group 1 or 2, the idlest one 
+   * 3. For OpenFileCtx entries don't belong to group 1 or 2, the idlest one
    * is select. If it's idle longer than OUTPUT_STREAM_TIMEOUT_MIN_DEFAULT, it
    * will be evicted. Otherwise, the whole eviction request is failed.
    */
   @VisibleForTesting
   Entry<FileHandle, OpenFileCtx> getEntryToEvict() {
-    Iterator<Entry<FileHandle, OpenFileCtx>> it = openFileMap.entrySet()
-        .iterator();
+    Iterator<Entry<FileHandle, OpenFileCtx>> it =
+        openFileMap.entrySet().iterator();
     if (LOG.isTraceEnabled()) {
       LOG.trace("openFileMap size:" + openFileMap.size());
     }
@@ -99,8 +98,8 @@ class OpenFileCtxCache {
       LOG.warn("No eviction candidate. All streams have pending work.");
       return null;
     } else {
-      long idleTime = System.currentTimeMillis()
-          - idlest.getValue().getLastAccessTime();
+      long idleTime =
+          System.currentTimeMillis() - idlest.getValue().getLastAccessTime();
       if (idleTime < Nfs3Constant.OUTPUT_STREAM_TIMEOUT_MIN_DEFAULT) {
         if (LOG.isDebugEnabled()) {
           LOG.debug("idlest stream's idle time:" + idleTime);
@@ -117,11 +116,11 @@ class OpenFileCtxCache {
     OpenFileCtx toEvict = null;
     synchronized (this) {
       Preconditions.checkState(openFileMap.size() <= this.maxStreams,
-          "stream cache size " + openFileMap.size()
-              + "  is larger than maximum" + this.maxStreams);
+          "stream cache size " + openFileMap.size() +
+              "  is larger than maximum" + this.maxStreams);
       if (openFileMap.size() == this.maxStreams) {
         Entry<FileHandle, OpenFileCtx> pairs = getEntryToEvict();
-        if (pairs ==null) {
+        if (pairs == null) {
           return false;
         } else {
           if (LOG.isDebugEnabled()) {
@@ -145,8 +144,8 @@ class OpenFileCtxCache {
   @VisibleForTesting
   void scan(long streamTimeout) {
     ArrayList<OpenFileCtx> ctxToRemove = new ArrayList<OpenFileCtx>();
-    Iterator<Entry<FileHandle, OpenFileCtx>> it = openFileMap.entrySet()
-        .iterator();
+    Iterator<Entry<FileHandle, OpenFileCtx>> it =
+        openFileMap.entrySet().iterator();
     if (LOG.isTraceEnabled()) {
       LOG.trace("openFileMap size:" + openFileMap.size());
     }
@@ -166,8 +165,8 @@ class OpenFileCtxCache {
           if (ctx2.streamCleanup(handle.getFileId(), streamTimeout)) {
             openFileMap.remove(handle);
             if (LOG.isDebugEnabled()) {
-              LOG.debug("After remove stream " + handle.getFileId()
-                  + ", the stream number:" + openFileMap.size());
+              LOG.debug("After remove stream " + handle.getFileId() +
+                  ", the stream number:" + openFileMap.size());
             }
             ctxToRemove.add(ctx2);
           }
@@ -197,8 +196,8 @@ class OpenFileCtxCache {
   void cleanAll() {
     ArrayList<OpenFileCtx> cleanedContext = new ArrayList<OpenFileCtx>();
     synchronized (this) {
-      Iterator<Entry<FileHandle, OpenFileCtx>> it = openFileMap.entrySet()
-          .iterator();
+      Iterator<Entry<FileHandle, OpenFileCtx>> it =
+          openFileMap.entrySet().iterator();
       if (LOG.isTraceEnabled()) {
         LOG.trace("openFileMap size:" + openFileMap.size());
       }
@@ -253,8 +252,8 @@ class OpenFileCtxCache {
           long workedTime = System.currentTimeMillis() - lastWakeupTime;
           if (workedTime < rotation) {
             if (LOG.isTraceEnabled()) {
-              LOG.trace("StreamMonitor can still have a sleep:"
-                  + ((rotation - workedTime) / 1000));
+              LOG.trace("StreamMonitor can still have a sleep:" +
+                  ((rotation - workedTime) / 1000));
             }
             Thread.sleep(rotation - workedTime);
           }

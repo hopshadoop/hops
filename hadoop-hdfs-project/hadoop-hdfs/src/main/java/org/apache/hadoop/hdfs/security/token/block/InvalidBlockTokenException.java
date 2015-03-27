@@ -18,10 +18,10 @@
 
 package org.apache.hadoop.hdfs.security.token.block;
 
-import java.io.IOException;
-
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+
+import java.io.IOException;
 
 /**
  * Access token verification failed.

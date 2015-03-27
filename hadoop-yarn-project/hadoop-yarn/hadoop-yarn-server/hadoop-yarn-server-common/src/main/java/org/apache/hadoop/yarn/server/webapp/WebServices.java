@@ -18,16 +18,6 @@
 
 package org.apache.hadoop.yarn.server.webapp;
 
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.Set;
-
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.ws.rs.WebApplicationException;
-
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptReport;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -46,6 +36,15 @@ import org.apache.hadoop.yarn.server.webapp.dao.ContainersInfo;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.hadoop.yarn.webapp.BadRequestException;
 import org.apache.hadoop.yarn.webapp.NotFoundException;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.ws.rs.WebApplicationException;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Set;
 
 public class WebServices {
 
@@ -86,7 +85,8 @@ public class WebServices {
       checkStart = true;
       sBegin = Long.parseLong(startedBegin);
       if (sBegin < 0) {
-        throw new BadRequestException("startedTimeBegin must be greater than 0");
+        throw new BadRequestException(
+            "startedTimeBegin must be greater than 0");
       }
     }
     if (startedEnd != null && !startedEnd.isEmpty()) {
@@ -98,7 +98,7 @@ public class WebServices {
     }
     if (sBegin > sEnd) {
       throw new BadRequestException(
-        "startedTimeEnd must be greater than startTimeBegin");
+          "startedTimeEnd must be greater than startTimeBegin");
     }
 
     if (finishBegin != null && !finishBegin.isEmpty()) {
@@ -117,7 +117,7 @@ public class WebServices {
     }
     if (fBegin > fEnd) {
       throw new BadRequestException(
-        "finishTimeEnd must be greater than finishTimeBegin");
+          "finishTimeEnd must be greater than finishTimeBegin");
     }
 
     Set<String> appTypes = parseQueries(applicationTypes, false);
@@ -147,15 +147,14 @@ public class WebServices {
         break;
       }
 
-      if (checkAppStates
-          && !appStates.contains(appReport.getYarnApplicationState().toString()
-            .toLowerCase())) {
+      if (checkAppStates && !appStates.contains(
+          appReport.getYarnApplicationState().toString().toLowerCase())) {
         continue;
       }
       if (finalStatusQuery != null && !finalStatusQuery.isEmpty()) {
         FinalApplicationStatus.valueOf(finalStatusQuery);
         if (!appReport.getFinalApplicationStatus().toString()
-          .equalsIgnoreCase(finalStatusQuery)) {
+            .equalsIgnoreCase(finalStatusQuery)) {
           continue;
         }
       }
@@ -169,18 +168,17 @@ public class WebServices {
           continue;
         }
       }
-      if (checkAppTypes
-          && !appTypes.contains(appReport.getApplicationType().trim()
-            .toLowerCase())) {
+      if (checkAppTypes && !appTypes
+          .contains(appReport.getApplicationType().trim().toLowerCase())) {
         continue;
       }
 
-      if (checkStart
-          && (appReport.getStartTime() < sBegin || appReport.getStartTime() > sEnd)) {
+      if (checkStart && (appReport.getStartTime() < sBegin ||
+          appReport.getStartTime() > sEnd)) {
         continue;
       }
-      if (checkEnd
-          && (appReport.getFinishTime() < fBegin || appReport.getFinishTime() > fEnd)) {
+      if (checkEnd && (appReport.getFinishTime() < fBegin ||
+          appReport.getFinishTime() > fEnd)) {
         continue;
       }
       AppInfo app = new AppInfo(appReport);
@@ -236,8 +234,8 @@ public class WebServices {
       throw new WebApplicationException(e);
     }
     if (appAttempt == null) {
-      throw new NotFoundException("app attempt with id: " + appAttemptId
-          + " not found");
+      throw new NotFoundException(
+          "app attempt with id: " + appAttemptId + " not found");
     }
     return new AppAttemptInfo(appAttempt);
   }
@@ -275,8 +273,8 @@ public class WebServices {
       throw new WebApplicationException(e);
     }
     if (container == null) {
-      throw new NotFoundException("container with id: " + containerId
-          + " not found");
+      throw new NotFoundException(
+          "container with id: " + containerId + " not found");
     }
     return new ContainerInfo(container);
   }
@@ -286,8 +284,8 @@ public class WebServices {
     response.setContentType(null);
   }
 
-  protected static Set<String>
-      parseQueries(Set<String> queries, boolean isState) {
+  protected static Set<String> parseQueries(Set<String> queries,
+      boolean isState) {
     Set<String> params = new HashSet<String>();
     if (!queries.isEmpty()) {
       for (String query : queries) {
@@ -303,9 +301,9 @@ public class WebServices {
                   YarnApplicationState[] stateArray =
                       YarnApplicationState.values();
                   String allAppStates = Arrays.toString(stateArray);
-                  throw new BadRequestException("Invalid application-state "
-                      + paramStr.trim() + " specified. It should be one of "
-                      + allAppStates);
+                  throw new BadRequestException(
+                      "Invalid application-state " + paramStr.trim() +
+                          " specified. It should be one of " + allAppStates);
                 }
               }
               params.add(paramStr.trim().toLowerCase());
@@ -331,8 +329,8 @@ public class WebServices {
   protected static ApplicationAttemptId parseApplicationAttemptId(
       String appAttemptId) {
     if (appAttemptId == null || appAttemptId.isEmpty()) {
-      throw new NotFoundException("appAttemptId, " + appAttemptId
-          + ", is empty or null");
+      throw new NotFoundException(
+          "appAttemptId, " + appAttemptId + ", is empty or null");
     }
     ApplicationAttemptId aaid =
         ConverterUtils.toApplicationAttemptId(appAttemptId);
@@ -344,8 +342,8 @@ public class WebServices {
 
   protected static ContainerId parseContainerId(String containerId) {
     if (containerId == null || containerId.isEmpty()) {
-      throw new NotFoundException("containerId, " + containerId
-          + ", is empty or null");
+      throw new NotFoundException(
+          "containerId, " + containerId + ", is empty or null");
     }
     ContainerId cid = ConverterUtils.toContainerId(containerId);
     if (cid == null) {
@@ -359,8 +357,8 @@ public class WebServices {
     if (!appAttemptId.getApplicationId().equals(appId)) {
       throw new NotFoundException("appId and appAttemptId don't match");
     }
-    if (containerId != null
-        && !containerId.getApplicationAttemptId().equals(appAttemptId)) {
+    if (containerId != null &&
+        !containerId.getApplicationAttemptId().equals(appAttemptId)) {
       throw new NotFoundException("appAttemptId and containerId don't match");
     }
   }

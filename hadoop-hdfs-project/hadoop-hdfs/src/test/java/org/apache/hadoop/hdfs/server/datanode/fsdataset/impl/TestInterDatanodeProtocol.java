@@ -17,15 +17,6 @@
  */
 package org.apache.hadoop.hdfs.server.datanode.fsdataset.impl;
 
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.SocketTimeoutException;
-import java.util.List;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DFSClientAdapter;
@@ -60,16 +51,24 @@ import org.apache.hadoop.net.NetUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.SocketTimeoutException;
+import java.util.List;
+
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import static org.junit.Assume.assumeTrue;
 
 /**
- * This tests InterDataNodeProtocol for block handling. 
+ * This tests InterDataNodeProtocol for block handling.
  */
 public class TestInterDatanodeProtocol {
   private static final String ADDRESS = "0.0.0.0";
   final static private int PING_INTERVAL = 1000;
   final static private int MIN_SLEEP_TIME = 1000;
-  private static final Configuration conf = new HdfsConfiguration();
+  private static Configuration conf = new HdfsConfiguration();
 
 
   private static class TestServer extends Server {
@@ -82,21 +81,21 @@ public class TestInterDatanodeProtocol {
 
     public TestServer(int handlerCount, boolean sleep,
         Class<? extends Writable> paramClass,
-        Class<? extends Writable> responseClass)
-      throws IOException {
+        Class<? extends Writable> responseClass) throws IOException {
       super(ADDRESS, 0, paramClass, handlerCount, conf);
       this.sleep = sleep;
       this.responseClass = responseClass;
     }
 
     @Override
-    public Writable call(RPC.RpcKind rpcKind, String protocol, Writable param, long receiveTime)
-        throws IOException {
+    public Writable call(RPC.RpcKind rpcKind, String protocol, Writable param,
+        long receiveTime) throws IOException {
       if (sleep) {
         // sleep a bit
         try {
           Thread.sleep(PING_INTERVAL + MIN_SLEEP_TIME);
-        } catch (InterruptedException e) {}
+        } catch (InterruptedException e) {
+        }
       }
       if (responseClass != null) {
         try {
@@ -110,17 +109,19 @@ public class TestInterDatanodeProtocol {
     }
   }
 
-  public static void checkMetaInfo(ExtendedBlock b, DataNode dn) throws IOException {
-    Block metainfo = DataNodeTestUtils.getFSDataset(dn).getStoredBlock(
-        b.getBlockPoolId(), b.getBlockId());
+  public static void checkMetaInfo(ExtendedBlock b, DataNode dn)
+      throws IOException {
+    Block metainfo = DataNodeTestUtils.getFSDataset(dn)
+        .getStoredBlock(b.getBlockPoolId(), b.getBlockId());
     Assert.assertEquals(b.getBlockId(), metainfo.getBlockId());
     Assert.assertEquals(b.getNumBytes(), metainfo.getNumBytes());
   }
 
-  public static LocatedBlock getLastLocatedBlock(
-      ClientProtocol namenode, String src) throws IOException {
+  public static LocatedBlock getLastLocatedBlock(ClientProtocol namenode,
+      String src) throws IOException {
     //get block info for the last block
-    LocatedBlocks locations = namenode.getBlockLocations(src, 0, Long.MAX_VALUE);
+    LocatedBlocks locations =
+        namenode.getBlockLocations(src, 0, Long.MAX_VALUE);
     List<LocatedBlock> blocks = locations.getLocatedBlocks();
     DataNode.LOG.info("blocks.size()=" + blocks.size());
     assertTrue(blocks.size() > 0);
@@ -128,13 +129,17 @@ public class TestInterDatanodeProtocol {
     return blocks.get(blocks.size() - 1);
   }
 
-  /** Test block MD access via a DN */
+  /**
+   * Test block MD access via a DN
+   */
   @Test
   public void testBlockMetaDataInfo() throws Exception {
     checkBlockMetaDataInfo(false);
   }
 
-  /** The same as above, but use hostnames for DN<->DN communication */
+  /**
+   * The same as above, but use hostnames for DN<->DN communication
+   */
   @Test
   public void testBlockMetaDataInfoWithHostname() throws Exception {
     assumeTrue(System.getProperty("os.name").startsWith("Linux"));
@@ -145,7 +150,9 @@ public class TestInterDatanodeProtocol {
    * The following test first creates a file.
    * It verifies the block information from a datanode.
    * Then, it updates the block with new information and verifies again.
-   * @param useDnHostname whether DNs should connect to other DNs by hostname
+   *
+   * @param useDnHostname
+   *     whether DNs should connect to other DNs by hostname
    */
   private void checkBlockMetaDataInfo(boolean useDnHostname) throws Exception {
     MiniDFSCluster cluster = null;
@@ -160,29 +167,30 @@ public class TestInterDatanodeProtocol {
     }
 
     try {
-      cluster = new MiniDFSCluster.Builder(conf)
-        .numDataNodes(3)
-        .checkDataNodeHostConfig(true)
-        .build();
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(3)
+          .checkDataNodeHostConfig(true).build();
       cluster.waitActive();
 
       //create a file
-      DistributedFileSystem dfs = cluster.getFileSystem();
+      DistributedFileSystem dfs =
+          (DistributedFileSystem) cluster.getFileSystem();
       String filestr = "/foo";
       Path filepath = new Path(filestr);
-      DFSTestUtil.createFile(dfs, filepath, 1024L, (short)3, 0L);
+      DFSTestUtil.createFile(dfs, filepath, 1024L, (short) 3, 0L);
       assertTrue(dfs.exists(filepath));
 
       //get block info
-      LocatedBlock locatedblock = getLastLocatedBlock(
-          DFSClientAdapter.getDFSClient(dfs).getNamenode(), filestr);
+      LocatedBlock locatedblock =
+          getLastLocatedBlock(DFSClientAdapter.getDFSClient(dfs).getNamenode(),
+              filestr);
       DatanodeInfo[] datanodeinfo = locatedblock.getLocations();
       assertTrue(datanodeinfo.length > 0);
 
       //connect to a data node
       DataNode datanode = cluster.getDataNode(datanodeinfo[0].getIpcPort());
-      InterDatanodeProtocol idp = DataNodeTestUtils.createInterDatanodeProtocolProxy(
-          datanode, datanodeinfo[0], conf, useDnHostname);
+      InterDatanodeProtocol idp = DataNodeTestUtils
+          .createInterDatanodeProtocolProxy(datanode, datanodeinfo[0], conf,
+              useDnHostname);
       
       //stop block scanner, so we could compare lastScanTime
       DataNodeTestUtils.shutdownBlockScanner(datanode);
@@ -196,20 +204,22 @@ public class TestInterDatanodeProtocol {
           new RecoveringBlock(b, locatedblock.getLocations(), recoveryId));
 
       //verify updateBlock
-      ExtendedBlock newblock = new ExtendedBlock(b.getBlockPoolId(),
-          b.getBlockId(), b.getNumBytes()/2, b.getGenerationStamp()+1);
+      ExtendedBlock newblock =
+          new ExtendedBlock(b.getBlockPoolId(), b.getBlockId(),
+              b.getNumBytes() / 2, b.getGenerationStamp() + 1);
       idp.updateReplicaUnderRecovery(b, recoveryId, newblock.getNumBytes());
       checkMetaInfo(newblock, datanode);
       
       // Verify correct null response trying to init recovery for a missing block
-      ExtendedBlock badBlock = new ExtendedBlock("fake-pool",
-          b.getBlockId(), 0, 0);
+      ExtendedBlock badBlock =
+          new ExtendedBlock("fake-pool", b.getBlockId(), 0, 0);
       assertNull(idp.initReplicaRecovery(
-          new RecoveringBlock(badBlock,
-              locatedblock.getLocations(), recoveryId)));
-    }
-    finally {
-      if (cluster != null) {cluster.shutdown();}
+          new RecoveringBlock(badBlock, locatedblock.getLocations(),
+              recoveryId)));
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
     }
   }
 
@@ -217,15 +227,20 @@ public class TestInterDatanodeProtocol {
     return new FinalizedReplica(b, null, null);
   }
 
-  private static void assertEquals(ReplicaInfo originalInfo, ReplicaRecoveryInfo recoveryInfo) {
+  private static void assertEquals(ReplicaInfo originalInfo,
+      ReplicaRecoveryInfo recoveryInfo) {
     Assert.assertEquals(originalInfo.getBlockId(), recoveryInfo.getBlockId());
-    Assert.assertEquals(originalInfo.getGenerationStamp(), recoveryInfo.getGenerationStamp());
-    Assert.assertEquals(originalInfo.getBytesOnDisk(), recoveryInfo.getNumBytes());
-    Assert.assertEquals(originalInfo.getState(), recoveryInfo.getOriginalReplicaState());
+    Assert.assertEquals(originalInfo.getGenerationStamp(),
+        recoveryInfo.getGenerationStamp());
+    Assert.assertEquals(originalInfo.getBytesOnDisk(),
+        recoveryInfo.getNumBytes());
+    Assert.assertEquals(originalInfo.getState(),
+        recoveryInfo.getOriginalReplicaState());
   }
 
-  /** Test 
-   * {@link FsDatasetImpl#initReplicaRecovery(String, ReplicaMap, Block, long, long)}
+  /**
+   * Test
+   * {@link FsDatasetImpl#initReplicaRecovery(String, ReplicaMap, Block, long)}
    */
   @Test
   public void testInitReplicaRecovery() throws IOException {
@@ -235,44 +250,42 @@ public class TestInterDatanodeProtocol {
     final ReplicaMap map = new ReplicaMap(this);
     String bpid = "BP-TEST";
     final Block[] blocks = new Block[5];
-    for(int i = 0; i < blocks.length; i++) {
+    for (int i = 0; i < blocks.length; i++) {
       blocks[i] = new Block(firstblockid + i, length, gs);
       map.add(bpid, createReplicaInfo(blocks[i]));
     }
     
-    { 
+    {
       //normal case
       final Block b = blocks[0];
       final ReplicaInfo originalInfo = map.get(bpid, b);
 
       final long recoveryid = gs + 1;
-      final ReplicaRecoveryInfo recoveryInfo = FsDatasetImpl
-          .initReplicaRecovery(bpid, map, blocks[0], recoveryid,
-              DFSConfigKeys.DFS_DATANODE_XCEIVER_STOP_TIMEOUT_MILLIS_DEFAULT);
+      final ReplicaRecoveryInfo recoveryInfo =
+          FsDatasetImpl.initReplicaRecovery(bpid, map, blocks[0], recoveryid);
       assertEquals(originalInfo, recoveryInfo);
 
-      final ReplicaUnderRecovery updatedInfo = (ReplicaUnderRecovery)map.get(bpid, b);
+      final ReplicaUnderRecovery updatedInfo =
+          (ReplicaUnderRecovery) map.get(bpid, b);
       Assert.assertEquals(originalInfo.getBlockId(), updatedInfo.getBlockId());
       Assert.assertEquals(recoveryid, updatedInfo.getRecoveryID());
 
       //recover one more time 
       final long recoveryid2 = gs + 2;
-      final ReplicaRecoveryInfo recoveryInfo2 = FsDatasetImpl
-          .initReplicaRecovery(bpid, map, blocks[0], recoveryid2,
-              DFSConfigKeys.DFS_DATANODE_XCEIVER_STOP_TIMEOUT_MILLIS_DEFAULT);
+      final ReplicaRecoveryInfo recoveryInfo2 =
+          FsDatasetImpl.initReplicaRecovery(bpid, map, blocks[0], recoveryid2);
       assertEquals(originalInfo, recoveryInfo2);
 
-      final ReplicaUnderRecovery updatedInfo2 = (ReplicaUnderRecovery)map.get(bpid, b);
+      final ReplicaUnderRecovery updatedInfo2 =
+          (ReplicaUnderRecovery) map.get(bpid, b);
       Assert.assertEquals(originalInfo.getBlockId(), updatedInfo2.getBlockId());
       Assert.assertEquals(recoveryid2, updatedInfo2.getRecoveryID());
       
       //case RecoveryInProgressException
       try {
-        FsDatasetImpl.initReplicaRecovery(bpid, map, b, recoveryid,
-            DFSConfigKeys.DFS_DATANODE_XCEIVER_STOP_TIMEOUT_MILLIS_DEFAULT);
+        FsDatasetImpl.initReplicaRecovery(bpid, map, b, recoveryid);
         Assert.fail();
-      }
-      catch(RecoveryInProgressException ripe) {
+      } catch (RecoveryInProgressException ripe) {
         System.out.println("GOOD: getting " + ripe);
       }
     }
@@ -280,9 +293,8 @@ public class TestInterDatanodeProtocol {
     { // BlockRecoveryFI_01: replica not found
       final long recoveryid = gs + 1;
       final Block b = new Block(firstblockid - 1, length, gs);
-      ReplicaRecoveryInfo r = FsDatasetImpl.initReplicaRecovery(bpid, map, b,
-          recoveryid,
-          DFSConfigKeys.DFS_DATANODE_XCEIVER_STOP_TIMEOUT_MILLIS_DEFAULT);
+      ReplicaRecoveryInfo r =
+          FsDatasetImpl.initReplicaRecovery(bpid, map, b, recoveryid);
       Assert.assertNull("Data-node should not have this replica.", r);
     }
     
@@ -290,11 +302,9 @@ public class TestInterDatanodeProtocol {
       final long recoveryid = gs - 1;
       final Block b = new Block(firstblockid + 1, length, gs);
       try {
-        FsDatasetImpl.initReplicaRecovery(bpid, map, b, recoveryid,
-            DFSConfigKeys.DFS_DATANODE_XCEIVER_STOP_TIMEOUT_MILLIS_DEFAULT);
+        FsDatasetImpl.initReplicaRecovery(bpid, map, b, recoveryid);
         Assert.fail();
-      }
-      catch(IOException ioe) {
+      } catch (IOException ioe) {
         System.out.println("GOOD: getting " + ioe);
       }
     }
@@ -302,23 +312,23 @@ public class TestInterDatanodeProtocol {
     // BlockRecoveryFI_03: Replica's gs is less than the block's gs
     {
       final long recoveryid = gs + 1;
-      final Block b = new Block(firstblockid, length, gs+1);
+      final Block b = new Block(firstblockid, length, gs + 1);
       try {
-        FsDatasetImpl.initReplicaRecovery(bpid, map, b, recoveryid,
-            DFSConfigKeys.DFS_DATANODE_XCEIVER_STOP_TIMEOUT_MILLIS_DEFAULT);
+        FsDatasetImpl.initReplicaRecovery(bpid, map, b, recoveryid);
         fail("InitReplicaRecovery should fail because replica's " +
-        		"gs is less than the block's gs");
+            "gs is less than the block's gs");
       } catch (IOException e) {
         e.getMessage().startsWith(
-           "replica.getGenerationStamp() < block.getGenerationStamp(), block=");
+            "replica.getGenerationStamp() < block.getGenerationStamp(), block=");
       }
     }
   }
 
-  /** 
+  /**
    * Test  for
-   * {@link FsDatasetImpl#updateReplicaUnderRecovery(ExtendedBlock, long, long)} 
-   * */
+   * {@link FsDatasetImpl#updateReplicaUnderRecovery(ExtendedBlock, long,
+   * long)}
+   */
   @Test
   public void testUpdateReplicaUnderRecovery() throws IOException {
     MiniDFSCluster cluster = null;
@@ -329,32 +339,36 @@ public class TestInterDatanodeProtocol {
       String bpid = cluster.getNamesystem().getBlockPoolId();
 
       //create a file
-      DistributedFileSystem dfs = cluster.getFileSystem();
+      DistributedFileSystem dfs =
+          (DistributedFileSystem) cluster.getFileSystem();
       String filestr = "/foo";
       Path filepath = new Path(filestr);
-      DFSTestUtil.createFile(dfs, filepath, 1024L, (short)3, 0L);
+      DFSTestUtil.createFile(dfs, filepath, 1024L, (short) 3, 0L);
 
       //get block info
-      final LocatedBlock locatedblock = getLastLocatedBlock(
-          DFSClientAdapter.getDFSClient(dfs).getNamenode(), filestr);
+      final LocatedBlock locatedblock =
+          getLastLocatedBlock(DFSClientAdapter.getDFSClient(dfs).getNamenode(),
+              filestr);
       final DatanodeInfo[] datanodeinfo = locatedblock.getLocations();
       Assert.assertTrue(datanodeinfo.length > 0);
 
       //get DataNode and FSDataset objects
-      final DataNode datanode = cluster.getDataNode(datanodeinfo[0].getIpcPort());
+      final DataNode datanode =
+          cluster.getDataNode(datanodeinfo[0].getIpcPort());
       Assert.assertTrue(datanode != null);
 
       //initReplicaRecovery
       final ExtendedBlock b = locatedblock.getBlock();
       final long recoveryid = b.getGenerationStamp() + 1;
       final long newlength = b.getNumBytes() - 1;
-      final FsDatasetSpi<?> fsdataset = DataNodeTestUtils.getFSDataset(datanode);
-      final ReplicaRecoveryInfo rri = fsdataset.initReplicaRecovery(
-          new RecoveringBlock(b, null, recoveryid));
+      final FsDatasetSpi<?> fsdataset =
+          DataNodeTestUtils.getFSDataset(datanode);
+      final ReplicaRecoveryInfo rri = fsdataset
+          .initReplicaRecovery(new RecoveringBlock(b, null, recoveryid));
 
       //check replica
-      final ReplicaInfo replica = FsDatasetTestUtil.fetchReplicaInfo(
-          fsdataset, bpid, b.getBlockId());
+      final ReplicaInfo replica =
+          FsDatasetTestUtil.fetchReplicaInfo(fsdataset, bpid, b.getBlockId());
       Assert.assertEquals(ReplicaState.RUR, replica.getState());
 
       //check meta data before update
@@ -364,13 +378,14 @@ public class TestInterDatanodeProtocol {
       //with (block length) != (stored replica's on disk length). 
       {
         //create a block with same id and gs but different length.
-        final ExtendedBlock tmp = new ExtendedBlock(b.getBlockPoolId(), rri
-            .getBlockId(), rri.getNumBytes() - 1, rri.getGenerationStamp());
+        final ExtendedBlock tmp =
+            new ExtendedBlock(b.getBlockPoolId(), rri.getBlockId(),
+                rri.getNumBytes() - 1, rri.getGenerationStamp());
         try {
           //update should fail
           fsdataset.updateReplicaUnderRecovery(tmp, recoveryid, newlength);
           Assert.fail();
-        } catch(IOException ioe) {
+        } catch (IOException ioe) {
           System.out.println("GOOD: getting " + ioe);
         }
       }
@@ -381,14 +396,17 @@ public class TestInterDatanodeProtocol {
       assertTrue(storageID != null);
 
     } finally {
-      if (cluster != null) cluster.shutdown();
+      if (cluster != null) {
+        cluster.shutdown();
+      }
     }
   }
 
-  /** Test to verify that InterDatanode RPC timesout as expected when
-   *  the server DN does not respond.
+  /**
+   * Test to verify that InterDatanode RPC timesout as expected when
+   * the server DN does not respond.
    */
-  @Test(expected=SocketTimeoutException.class)
+  @Test(expected = SocketTimeoutException.class)
   public void testInterDNProtocolTimeout() throws Throwable {
     final Server server = new TestServer(1, true);
     server.start();
@@ -399,11 +417,11 @@ public class TestInterDatanodeProtocol {
     InterDatanodeProtocol proxy = null;
 
     try {
-      proxy = DataNode.createInterDataNodeProtocolProxy(
-          dInfo, conf, 500, false);
-      proxy.initReplicaRecovery(new RecoveringBlock(
-          new ExtendedBlock("bpid", 1), null, 100));
-      fail ("Expected SocketTimeoutException exception, but did not get.");
+      proxy =
+          DataNode.createInterDataNodeProtocolProxy(dInfo, conf, 500, false);
+      proxy.initReplicaRecovery(
+          new RecoveringBlock(new ExtendedBlock("bpid", 1), null, 100));
+      fail("Expected SocketTimeoutException exception, but did not get.");
     } finally {
       if (proxy != null) {
         RPC.stopProxy(proxy);

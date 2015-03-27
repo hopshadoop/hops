@@ -39,7 +39,8 @@ public class ResourceWeights {
     }
   }
   
-  public ResourceWeights() { }
+  public ResourceWeights() {
+  }
 
   public void setWeight(ResourceType resourceType, float weight) {
     weights[resourceType.ordinal()] = weight;

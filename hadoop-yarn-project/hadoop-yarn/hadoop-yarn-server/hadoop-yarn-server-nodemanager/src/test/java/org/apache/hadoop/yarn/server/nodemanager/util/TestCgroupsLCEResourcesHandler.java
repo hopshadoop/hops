@@ -31,11 +31,13 @@ public class TestCgroupsLCEResourcesHandler {
 
   static class MockClock implements Clock {
     long time;
+
     @Override
     public long getTime() {
       return time;
     }
   }
+
   @Test
   public void testDeleteCgroup() throws Exception {
     final MockClock clock = new MockClock();

@@ -17,11 +17,6 @@
  */
 package org.apache.hadoop.hdfs.nfs.nfs3;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-
-import java.io.IOException;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSClient;
 import org.apache.hadoop.hdfs.client.HdfsDataOutputStream;
@@ -32,6 +27,11 @@ import org.apache.hadoop.nfs.nfs3.Nfs3Constant;
 import org.apache.hadoop.nfs.nfs3.Nfs3FileAttributes;
 import org.junit.Test;
 import org.mockito.Mockito;
+
+import java.io.IOException;
+
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 public class TestOpenFileCtxCache {
   static boolean cleaned = false;
@@ -48,16 +48,21 @@ public class TestOpenFileCtxCache {
     HdfsDataOutputStream fos = Mockito.mock(HdfsDataOutputStream.class);
     Mockito.when(fos.getPos()).thenReturn((long) 0);
 
-    OpenFileCtx context1 = new OpenFileCtx(fos, attr, "/dumpFilePath",
-        dfsClient, new IdUserGroup());
-    OpenFileCtx context2 = new OpenFileCtx(fos, attr, "/dumpFilePath",
-        dfsClient, new IdUserGroup());
-    OpenFileCtx context3 = new OpenFileCtx(fos, attr, "/dumpFilePath",
-        dfsClient, new IdUserGroup());
-    OpenFileCtx context4 = new OpenFileCtx(fos, attr, "/dumpFilePath",
-        dfsClient, new IdUserGroup());
-    OpenFileCtx context5 = new OpenFileCtx(fos, attr, "/dumpFilePath",
-        dfsClient, new IdUserGroup());
+    OpenFileCtx context1 =
+        new OpenFileCtx(fos, attr, "/dumpFilePath", dfsClient,
+            new IdUserGroup());
+    OpenFileCtx context2 =
+        new OpenFileCtx(fos, attr, "/dumpFilePath", dfsClient,
+            new IdUserGroup());
+    OpenFileCtx context3 =
+        new OpenFileCtx(fos, attr, "/dumpFilePath", dfsClient,
+            new IdUserGroup());
+    OpenFileCtx context4 =
+        new OpenFileCtx(fos, attr, "/dumpFilePath", dfsClient,
+            new IdUserGroup());
+    OpenFileCtx context5 =
+        new OpenFileCtx(fos, attr, "/dumpFilePath", dfsClient,
+            new IdUserGroup());
 
     OpenFileCtxCache cache = new OpenFileCtxCache(conf, 10 * 60 * 100);
 
@@ -88,8 +93,8 @@ public class TestOpenFileCtxCache {
     // Test eviction failure if all entries have pending work.
     context2.getPendingWritesForTest().put(new OffsetRange(0, 100),
         new WriteCtx(null, 0, 0, 0, null, null, null, 0, false, null));
-    context4.getPendingCommitsForTest().put(new Long(100),
-        new CommitCtx(0, null, 0, attr));
+    context4.getPendingCommitsForTest()
+        .put(new Long(100), new CommitCtx(0, null, 0, attr));
     Thread.sleep(Nfs3Constant.OUTPUT_STREAM_TIMEOUT_MIN_DEFAULT);
     ret = cache.put(new FileHandle(5), context5);
     assertFalse(ret);
@@ -107,14 +112,18 @@ public class TestOpenFileCtxCache {
     HdfsDataOutputStream fos = Mockito.mock(HdfsDataOutputStream.class);
     Mockito.when(fos.getPos()).thenReturn((long) 0);
 
-    OpenFileCtx context1 = new OpenFileCtx(fos, attr, "/dumpFilePath",
-        dfsClient, new IdUserGroup());
-    OpenFileCtx context2 = new OpenFileCtx(fos, attr, "/dumpFilePath",
-        dfsClient, new IdUserGroup());
-    OpenFileCtx context3 = new OpenFileCtx(fos, attr, "/dumpFilePath",
-        dfsClient, new IdUserGroup());
-    OpenFileCtx context4 = new OpenFileCtx(fos, attr, "/dumpFilePath",
-        dfsClient, new IdUserGroup());
+    OpenFileCtx context1 =
+        new OpenFileCtx(fos, attr, "/dumpFilePath", dfsClient,
+            new IdUserGroup());
+    OpenFileCtx context2 =
+        new OpenFileCtx(fos, attr, "/dumpFilePath", dfsClient,
+            new IdUserGroup());
+    OpenFileCtx context3 =
+        new OpenFileCtx(fos, attr, "/dumpFilePath", dfsClient,
+            new IdUserGroup());
+    OpenFileCtx context4 =
+        new OpenFileCtx(fos, attr, "/dumpFilePath", dfsClient,
+            new IdUserGroup());
 
     OpenFileCtxCache cache = new OpenFileCtxCache(conf, 10 * 60 * 100);
 

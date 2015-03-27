@@ -17,12 +17,12 @@
  */
 package org.apache.hadoop.hdfs.protocol;
 
-import java.util.List;
-import java.util.Collections;
-import java.util.Comparator;
-
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 
 /**
  * Collection of blocks with their locations and the file length.
@@ -30,9 +30,10 @@ import org.apache.hadoop.classification.InterfaceStability;
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class LocatedBlocks {
-  private final long fileLength;
-  private final List<LocatedBlock> blocks; // array of blocks with prioritized locations
-  private final boolean underConstruction;
+  private long fileLength;
+  private List<LocatedBlock> blocks;
+      // array of blocks with prioritized locations
+  private boolean underConstruction;
   private LocatedBlock lastLocatedBlock = null;
   private boolean isLastBlockComplete = false;
 
@@ -42,10 +43,12 @@ public class LocatedBlocks {
     underConstruction = false;
   }
   
-  /** public Constructor */
+  /**
+   * public Constructor
+   */
   public LocatedBlocks(long flength, boolean isUnderConstuction,
-      List<LocatedBlock> blks, 
-      LocatedBlock lastBlock, boolean isLastBlockCompleted) {
+      List<LocatedBlock> blks, LocatedBlock lastBlock,
+      boolean isLastBlockCompleted) {
     fileLength = flength;
     blocks = blks;
     underConstruction = isUnderConstuction;
@@ -60,12 +63,16 @@ public class LocatedBlocks {
     return blocks;
   }
   
-  /** Get the last located block. */
+  /**
+   * Get the last located block.
+   */
   public LocatedBlock getLastLocatedBlock() {
     return lastLocatedBlock;
   }
   
-  /** Is the last block completed? */
+  /**
+   * Is the last block completed?
+   */
   public boolean isLastBlockComplete() {
     return isLastBlockComplete;
   }
@@ -85,14 +92,14 @@ public class LocatedBlocks {
   }
 
   /**
-   * 
+   *
    */
   public long getFileLength() {
     return this.fileLength;
   }
 
   /**
-   * Return ture if file was under construction when 
+   * Return ture if file was under construction when
    * this LocatedBlocks was constructed, false otherwise.
    */
   public boolean isUnderConstruction() {
@@ -101,77 +108,75 @@ public class LocatedBlocks {
   
   /**
    * Find block containing specified offset.
-   * 
+   *
    * @return block if found, or null otherwise.
    */
   public int findBlock(long offset) {
     // create fake block of size 0 as a key
-    LocatedBlock key = new LocatedBlock(
-        new ExtendedBlock(), new DatanodeInfo[0], 0L, false);
+    LocatedBlock key =
+        new LocatedBlock(new ExtendedBlock(), new DatanodeInfo[0], 0L, false);
     key.setStartOffset(offset);
     key.getBlock().setNumBytes(1);
-    Comparator<LocatedBlock> comp = 
-      new Comparator<LocatedBlock>() {
-        // Returns 0 iff a is inside b or b is inside a
-        @Override
-        public int compare(LocatedBlock a, LocatedBlock b) {
-          long aBeg = a.getStartOffset();
-          long bBeg = b.getStartOffset();
-          long aEnd = aBeg + a.getBlockSize();
-          long bEnd = bBeg + b.getBlockSize();
-          if(aBeg <= bBeg && bEnd <= aEnd 
-              || bBeg <= aBeg && aEnd <= bEnd)
-            return 0; // one of the blocks is inside the other
-          if(aBeg < bBeg)
-            return -1; // a's left bound is to the left of the b's
-          return 1;
+    Comparator<LocatedBlock> comp = new Comparator<LocatedBlock>() {
+      // Returns 0 iff a is inside b or b is inside a
+      @Override
+      public int compare(LocatedBlock a, LocatedBlock b) {
+        long aBeg = a.getStartOffset();
+        long bBeg = b.getStartOffset();
+        long aEnd = aBeg + a.getBlockSize();
+        long bEnd = bBeg + b.getBlockSize();
+        if (aBeg <= bBeg && bEnd <= aEnd || bBeg <= aBeg && aEnd <= bEnd) {
+          return 0; // one of the blocks is inside the other
         }
-      };
+        if (aBeg < bBeg) {
+          return -1; // a's left bound is to the left of the b's
+        }
+        return 1;
+      }
+    };
     return Collections.binarySearch(blocks, key, comp);
   }
   
   public void insertRange(int blockIdx, List<LocatedBlock> newBlocks) {
     int oldIdx = blockIdx;
     int insStart = 0, insEnd = 0;
-    for(int newIdx = 0; newIdx < newBlocks.size() && oldIdx < blocks.size(); 
-                                                        newIdx++) {
+    for (int newIdx = 0; newIdx < newBlocks.size() && oldIdx < blocks.size();
+         newIdx++) {
       long newOff = newBlocks.get(newIdx).getStartOffset();
       long oldOff = blocks.get(oldIdx).getStartOffset();
-      if(newOff < oldOff) {
+      if (newOff < oldOff) {
         insEnd++;
-      } else if(newOff == oldOff) {
+      } else if (newOff == oldOff) {
         // replace old cached block by the new one
         blocks.set(oldIdx, newBlocks.get(newIdx));
-        if(insStart < insEnd) { // insert new blocks
+        if (insStart < insEnd) { // insert new blocks
           blocks.addAll(oldIdx, newBlocks.subList(insStart, insEnd));
           oldIdx += insEnd - insStart;
         }
-        insStart = insEnd = newIdx+1;
+        insStart = insEnd = newIdx + 1;
         oldIdx++;
       } else {  // newOff > oldOff
         assert false : "List of LocatedBlock must be sorted by startOffset";
       }
     }
     insEnd = newBlocks.size();
-    if(insStart < insEnd) { // insert new blocks
+    if (insStart < insEnd) { // insert new blocks
       blocks.addAll(oldIdx, newBlocks.subList(insStart, insEnd));
     }
   }
   
   public static int getInsertIndex(int binSearchResult) {
-    return binSearchResult >= 0 ? binSearchResult : -(binSearchResult+1);
+    return binSearchResult >= 0 ? binSearchResult : -(binSearchResult + 1);
   }
 
   @Override
   public String toString() {
     final StringBuilder b = new StringBuilder(getClass().getSimpleName());
-    b.append("{")
-     .append("\n  fileLength=").append(fileLength)
-     .append("\n  underConstruction=").append(underConstruction)
-     .append("\n  blocks=").append(blocks)
-     .append("\n  lastLocatedBlock=").append(lastLocatedBlock)
-     .append("\n  isLastBlockComplete=").append(isLastBlockComplete)
-     .append("}");
+    b.append("{").append("\n  fileLength=").append(fileLength)
+        .append("\n  underConstruction=").append(underConstruction)
+        .append("\n  blocks=").append(blocks).append("\n  lastLocatedBlock=")
+        .append(lastLocatedBlock).append("\n  isLastBlockComplete=")
+        .append(isLastBlockComplete).append("}");
     return b.toString();
   }
 }

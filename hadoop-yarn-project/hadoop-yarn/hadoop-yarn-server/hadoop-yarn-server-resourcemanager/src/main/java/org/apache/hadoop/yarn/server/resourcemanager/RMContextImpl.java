@@ -1,26 +1,25 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with this
+ * work for additional information regarding copyright ownership. The ASF
+ * licenses this file to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations under
+ * the License.
  */
-
 package org.apache.hadoop.yarn.server.resourcemanager;
 
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-
+import com.google.common.annotations.VisibleForTesting;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ha.HAServiceProtocol;
 import org.apache.hadoop.ha.HAServiceProtocol.HAServiceState;
 import org.apache.hadoop.yarn.LocalConfigurationProvider;
@@ -29,6 +28,7 @@ import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.conf.ConfigurationProvider;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.event.Dispatcher;
+import org.apache.hadoop.yarn.server.api.ResourceTracker;
 import org.apache.hadoop.yarn.server.resourcemanager.ahs.RMApplicationHistoryWriter;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.NullRMStateStore;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
@@ -44,50 +44,100 @@ import org.apache.hadoop.yarn.server.resourcemanager.security.NMTokenSecretManag
 import org.apache.hadoop.yarn.server.resourcemanager.security.RMContainerTokenSecretManager;
 import org.apache.hadoop.yarn.server.resourcemanager.security.RMDelegationTokenSecretManager;
 
-import com.google.common.annotations.VisibleForTesting;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ConcurrentSkipListSet;
 
 public class RMContextImpl implements RMContext {
 
+
+  private static final Log LOG = LogFactory.getLog(RMContextImpl.class);
+  private int rmId = Integer.MIN_VALUE;
+  //ResourceTracker client
+  public ResourceTracker client;
+
+  public ResourceTracker getResClient() {
+    return client;
+  }
+
+  public int getRMID() {
+    return rmId;
+  }
+
+  public void setRMID(int rmid) {
+    this.rmId = rmid;
+  }
+
+  private int id = -1;
+
+  public int getId() {
+    return this.id;
+  }
+
+  @Override
+  public void recover(RMStateStore.RMState state) throws Exception {
+    LOG.debug("recover rmcontext");
+    //1.Recover nodes map
+    Map<NodeId, RMNode> activeNodesRecovered = state.
+        recoverRMContextActiveNodes(this);
+    this.activesNodes.putAll(activeNodesRecovered);
+    this.resyncAfterRolback.addAll(activeNodesRecovered.keySet());
+    for (NodeId nodeId : activesNodes.keySet()) {
+      if (resourceTrackerService != null) {
+        resourceTrackerService.getNmLivelinessMonitor().register(nodeId);
+      }
+    }
+    nmTokenSecretManager.recover(state);
+    containerTokenSecretManager.recover(state);
+    //Recover rmNode state
+    //2. Recover inactiveNodes map
+    this.inactiveNodes.
+        putAll(state.getRMContextInactiveNodes(this, state));
+  }
+
   private Dispatcher rmDispatcher;
-
-  private final ConcurrentMap<ApplicationId, RMApp> applications
-    = new ConcurrentHashMap<ApplicationId, RMApp>();
-
-  private final ConcurrentMap<NodeId, RMNode> nodes
-    = new ConcurrentHashMap<NodeId, RMNode>();
-  
-  private final ConcurrentMap<String, RMNode> inactiveNodes
-    = new ConcurrentHashMap<String, RMNode>();
-
-  private boolean isHAEnabled;
+  private final ConcurrentMap<ApplicationId, RMApp> applications =
+      new ConcurrentHashMap<ApplicationId, RMApp>();
+      //recovered when rmappManager is recovered
+  private final ConcurrentSkipListSet<NodeId> resyncAfterRolback =
+      new ConcurrentSkipListSet<NodeId>();
+  private final ConcurrentMap<NodeId, RMNode> activesNodes =
+      new ConcurrentHashMap<NodeId, RMNode>();
+      //recovered, pushed and removed everywhere
+  private final ConcurrentMap<String, RMNode> inactiveNodes =
+      new ConcurrentHashMap<String, RMNode>();
+      //recovered, pushed and removed everywhere
+  private boolean isHAEnabled; //recovered through configuration file
   private HAServiceState haServiceState =
-      HAServiceProtocol.HAServiceState.INITIALIZING;
-  
-  private AMLivelinessMonitor amLivelinessMonitor;
-  private AMLivelinessMonitor amFinishingMonitor;
-  private RMStateStore stateStore = null;
-  private ContainerAllocationExpirer containerAllocationExpirer;
-  private DelegationTokenRenewer delegationTokenRenewer;
-  private AMRMTokenSecretManager amRMTokenSecretManager;
-  private RMContainerTokenSecretManager containerTokenSecretManager;
-  private NMTokenSecretManagerInRM nmTokenSecretManager;
+      HAServiceProtocol.HAServiceState.INITIALIZING; //recovered
+  private AMLivelinessMonitor amLivelinessMonitor;//recovered
+  private AMLivelinessMonitor amFinishingMonitor;//recovered
+  private RMStateStore stateStore = null; //recovered
+  private ContainerAllocationExpirer containerAllocationExpirer; //recovered
+  private DelegationTokenRenewer delegationTokenRenewer;//recovered
+  private AMRMTokenSecretManager amRMTokenSecretManager;//recovered
+  private RMContainerTokenSecretManager containerTokenSecretManager;//TORECOVER
+  private NMTokenSecretManagerInRM nmTokenSecretManager;//TORECOVER
   private ClientToAMTokenSecretManagerInRM clientToAMTokenSecretManager;
-  private AdminService adminService;
-  private ClientRMService clientRMService;
+      //recovered
+  private AdminService adminService;//recovered
+  private GroupMembershipService groupMembershipService;
+  private ClientRMService clientRMService;//recovered
   private RMDelegationTokenSecretManager rmDelegationTokenSecretManager;
-  private ResourceScheduler scheduler;
-  private NodesListManager nodesListManager;
-  private ResourceTrackerService resourceTrackerService;
-  private ApplicationMasterService applicationMasterService;
-  private RMApplicationHistoryWriter rmApplicationHistoryWriter;
-  private ConfigurationProvider configurationProvider;
+      //recovered
+  private ResourceScheduler scheduler;//recovered
+  private NodesListManager nodesListManager;//recovered
+  private ResourceTrackerService resourceTrackerService;//recovered
+  private ApplicationMasterService applicationMasterService;//recovered
+  private RMApplicationHistoryWriter rmApplicationHistoryWriter;//recovered
+  private ConfigurationProvider configurationProvider;//recovered
 
   /**
    * Default constructor. To be used in conjunction with setter methods for
    * individual fields.
    */
   public RMContextImpl() {
-
   }
 
   @VisibleForTesting
@@ -127,12 +177,55 @@ public class RMContextImpl implements RMContext {
     setConfigurationProvider(provider);
   }
 
+  @VisibleForTesting
+  // helper constructor for tests
+  public RMContextImpl(Dispatcher rmDispatcher,
+      ContainerAllocationExpirer containerAllocationExpirer,
+      AMLivelinessMonitor amLivelinessMonitor,
+      AMLivelinessMonitor amFinishingMonitor,
+      DelegationTokenRenewer delegationTokenRenewer,
+      AMRMTokenSecretManager appTokenSecretManager,
+      ClientToAMTokenSecretManagerInRM clientToAMTokenSecretManager,
+      RMApplicationHistoryWriter rmApplicationHistoryWriter,
+      Configuration conf) {
+    this();
+    this.setDispatcher(rmDispatcher);
+    this.setContainerAllocationExpirer(containerAllocationExpirer);
+    this.setAMLivelinessMonitor(amLivelinessMonitor);
+    this.setAMFinishingMonitor(amFinishingMonitor);
+    this.setDelegationTokenRenewer(delegationTokenRenewer);
+    this.setAMRMTokenSecretManager(appTokenSecretManager);
+
+    if (conf != null) {
+      this.setContainerTokenSecretManager(
+          new RMContainerTokenSecretManager(conf, this));
+      this.setNMTokenSecretManager(new NMTokenSecretManagerInRM(conf, this));
+    } else {
+      this.setContainerTokenSecretManager(null);
+      this.setNMTokenSecretManager(null);
+    }
+    this.setClientToAMTokenSecretManager(clientToAMTokenSecretManager);
+    this.setRMApplicationHistoryWriter(rmApplicationHistoryWriter);
+
+    RMStateStore nullStore = new NullRMStateStore();
+    nullStore.setRMDispatcher(rmDispatcher);
+    try {
+      nullStore.init(new YarnConfiguration());
+      setStateStore(nullStore);
+    } catch (Exception e) {
+      assert false;
+    }
+
+    ConfigurationProvider provider = new LocalConfigurationProvider();
+    setConfigurationProvider(provider);
+  }
+
   @Override
   public Dispatcher getDispatcher() {
     return this.rmDispatcher;
   }
-  
-  @Override 
+
+  @Override
   public RMStateStore getStateStore() {
     return stateStore;
   }
@@ -143,10 +236,15 @@ public class RMContextImpl implements RMContext {
   }
 
   @Override
-  public ConcurrentMap<NodeId, RMNode> getRMNodes() {
-    return this.nodes;
+  public ConcurrentMap<NodeId, RMNode> getActiveRMNodes() {
+    return this.activesNodes;
   }
-  
+
+  @Override
+  public ConcurrentSkipListSet<NodeId> getRMNodesToResyncAfterRolback() {
+    return this.resyncAfterRolback;
+  }
+
   @Override
   public ConcurrentMap<String, RMNode> getInactiveRMNodes() {
     return this.inactiveNodes;
@@ -181,7 +279,7 @@ public class RMContextImpl implements RMContext {
   public RMContainerTokenSecretManager getContainerTokenSecretManager() {
     return this.containerTokenSecretManager;
   }
-  
+
   @Override
   public NMTokenSecretManagerInRM getNMTokenSecretManager() {
     return this.nmTokenSecretManager;
@@ -207,11 +305,16 @@ public class RMContextImpl implements RMContext {
     return this.adminService;
   }
 
+  @Override
+  public GroupMembershipService getRMGroupMembershipService() {
+    return this.groupMembershipService;
+  }
+
   @VisibleForTesting
   public void setStateStore(RMStateStore store) {
     stateStore = store;
   }
-  
+
   @Override
   public ClientRMService getClientRMService() {
     return this.clientRMService;
@@ -234,6 +337,9 @@ public class RMContextImpl implements RMContext {
   void setHAServiceState(HAServiceState haServiceState) {
     synchronized (haServiceState) {
       this.haServiceState = haServiceState;
+      LOG.debug(
+          "setHAServiceState " + groupMembershipService.getHostname() + " " +
+              haServiceState);
     }
   }
 
@@ -245,16 +351,21 @@ public class RMContextImpl implements RMContext {
     this.adminService = adminService;
   }
 
+  public void setRMGroupMembershipService(
+      GroupMembershipService groupMembershipService) {
+    this.groupMembershipService = groupMembershipService;
+  }
+
   @Override
   public void setClientRMService(ClientRMService clientRMService) {
     this.clientRMService = clientRMService;
   }
-  
+
   @Override
   public RMDelegationTokenSecretManager getRMDelegationTokenSecretManager() {
     return this.rmDelegationTokenSecretManager;
   }
-  
+
   @Override
   public void setRMDelegationTokenSecretManager(
       RMDelegationTokenSecretManager delegationTokenSecretManager) {
@@ -279,8 +390,7 @@ public class RMContextImpl implements RMContext {
     this.containerTokenSecretManager = containerTokenSecretManager;
   }
 
-  void setNMTokenSecretManager(
-      NMTokenSecretManagerInRM nmTokenSecretManager) {
+  void setNMTokenSecretManager(NMTokenSecretManagerInRM nmTokenSecretManager) {
     this.nmTokenSecretManager = nmTokenSecretManager;
   }
 
@@ -303,7 +413,8 @@ public class RMContextImpl implements RMContext {
     this.amRMTokenSecretManager = amRMTokenSecretManager;
   }
 
-  void setNodesListManager(NodesListManager nodesListManager) {
+  @VisibleForTesting
+  public void setNodesListManager(NodesListManager nodesListManager) {
     this.nodesListManager = nodesListManager;
   }
 
@@ -325,6 +436,9 @@ public class RMContextImpl implements RMContext {
   @Override
   public HAServiceState getHAServiceState() {
     synchronized (haServiceState) {
+      LOG.debug(
+          "getHAServiceState " + groupMembershipService.getHostname() + " " +
+              haServiceState);
       return haServiceState;
     }
   }

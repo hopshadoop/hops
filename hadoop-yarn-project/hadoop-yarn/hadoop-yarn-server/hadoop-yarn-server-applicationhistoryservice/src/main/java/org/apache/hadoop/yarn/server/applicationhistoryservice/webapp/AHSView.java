@@ -18,6 +18,10 @@
 
 package org.apache.hadoop.yarn.server.applicationhistoryservice.webapp;
 
+import org.apache.hadoop.yarn.server.webapp.AppsBlock;
+import org.apache.hadoop.yarn.webapp.SubView;
+import org.apache.hadoop.yarn.webapp.view.TwoColumnLayout;
+
 import static org.apache.hadoop.yarn.util.StringHelper.sjoin;
 import static org.apache.hadoop.yarn.webapp.YarnWebParams.APP_STATE;
 import static org.apache.hadoop.yarn.webapp.view.JQueryUI.ACCORDION;
@@ -26,10 +30,6 @@ import static org.apache.hadoop.yarn.webapp.view.JQueryUI.DATATABLES;
 import static org.apache.hadoop.yarn.webapp.view.JQueryUI.DATATABLES_ID;
 import static org.apache.hadoop.yarn.webapp.view.JQueryUI.initID;
 import static org.apache.hadoop.yarn.webapp.view.JQueryUI.tableInit;
-
-import org.apache.hadoop.yarn.server.webapp.AppsBlock;
-import org.apache.hadoop.yarn.webapp.SubView;
-import org.apache.hadoop.yarn.webapp.view.TwoColumnLayout;
 
 // Do NOT rename/refactor this to AHSView as it will wreak havoc
 // on Mac OS HFS
@@ -68,23 +68,23 @@ public class AHSView extends TwoColumnLayout {
   private String appsTableInit() {
     // id, user, name, queue, starttime, finishtime, state, status, progress, ui
     return tableInit().append(", 'aaData': appsTableData")
-      .append(", bDeferRender: true").append(", bProcessing: true")
+        .append(", bDeferRender: true").append(", bProcessing: true")
 
-      .append("\n, aoColumnDefs: ").append(getAppsTableColumnDefs())
+        .append("\n, aoColumnDefs: ").append(getAppsTableColumnDefs())
 
-      // Sort by id upon page load
-      .append(", aaSorting: [[0, 'desc']]}").toString();
+            // Sort by id upon page load
+        .append(", aaSorting: [[0, 'desc']]}").toString();
   }
 
   protected String getAppsTableColumnDefs() {
     StringBuilder sb = new StringBuilder();
     return sb.append("[\n").append("{'sType':'numeric', 'aTargets': [0]")
-      .append(", 'mRender': parseHadoopID }")
+        .append(", 'mRender': parseHadoopID }")
 
-      .append("\n, {'sType':'numeric', 'aTargets': [5, 6]")
-      .append(", 'mRender': renderHadoopDate }")
+        .append("\n, {'sType':'numeric', 'aTargets': [5, 6]")
+        .append(", 'mRender': renderHadoopDate }")
 
-      .append("\n, {'sType':'numeric', bSearchable:false, 'aTargets': [9]")
-      .append(", 'mRender': parseHadoopProgress }]").toString();
+        .append("\n, {'sType':'numeric', bSearchable:false, 'aTargets': [9]")
+        .append(", 'mRender': parseHadoopProgress }]").toString();
   }
 }

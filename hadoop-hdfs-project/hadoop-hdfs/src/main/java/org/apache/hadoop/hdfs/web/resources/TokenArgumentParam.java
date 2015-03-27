@@ -22,16 +22,22 @@ package org.apache.hadoop.hdfs.web.resources;
  * different from {@link DelegationParam}.
  */
 public class TokenArgumentParam extends StringParam {
-  /** Parameter name. */
+  /**
+   * Parameter name.
+   */
   public static final String NAME = "token";
-  /** Default parameter value. */
+  /**
+   * Default parameter value.
+   */
   public static final String DEFAULT = "";
 
   private static final Domain DOMAIN = new Domain(NAME, null);
 
   /**
    * Constructor.
-   * @param str A string representation of the parameter value.
+   *
+   * @param str
+   *     A string representation of the parameter value.
    */
   public TokenArgumentParam(final String str) {
     super(DOMAIN, str != null && !str.equals(DEFAULT) ? str : null);

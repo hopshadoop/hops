@@ -17,14 +17,6 @@
  */
 package org.apache.hadoop.hdfs;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
-import java.io.File;
-import java.io.IOException;
-import java.io.RandomAccessFile;
-
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.conf.Configuration;
@@ -47,15 +39,26 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-/** This class implements some of tests posted in HADOOP-2658. */
-public class TestFileAppend3  {
+import java.io.File;
+import java.io.IOException;
+import java.io.RandomAccessFile;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+/**
+ * This class implements some of tests posted in HADOOP-2658.
+ */
+public class TestFileAppend3 {
   {
-    ((Log4JLogger)NameNode.stateChangeLog).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger)LeaseManager.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger)LogFactory.getLog(FSNamesystem.class)).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger)DataNode.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger)DFSClient.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger)InterDatanodeProtocol.LOG).getLogger().setLevel(Level.ALL);
+    ((Log4JLogger) NameNode.stateChangeLog).getLogger().setLevel(Level.ALL);
+    ((Log4JLogger) LeaseManager.LOG).getLogger().setLevel(Level.ALL);
+    ((Log4JLogger) LogFactory.getLog(FSNamesystem.class)).getLogger()
+        .setLevel(Level.ALL);
+    ((Log4JLogger) DataNode.LOG).getLogger().setLevel(Level.ALL);
+    ((Log4JLogger) DFSClient.LOG).getLogger().setLevel(Level.ALL);
+    ((Log4JLogger) InterDatanodeProtocol.LOG).getLogger().setLevel(Level.ALL);
   }
 
   static final long BLOCK_SIZE = 64 * 1024;
@@ -72,21 +75,29 @@ public class TestFileAppend3  {
     AppendTestUtil.LOG.info("setUp()");
     conf = new HdfsConfiguration();
     conf.setInt(DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY, 512);
-    buffersize = conf.getInt(CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096);
-    cluster = new MiniDFSCluster.Builder(conf).numDataNodes(DATANODE_NUM).build();
-    fs = (DistributedFileSystem)cluster.getFileSystem();
+    buffersize =
+        conf.getInt(CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096);
+    cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(DATANODE_NUM).build();
+    fs = (DistributedFileSystem) cluster.getFileSystem();
   }
-   
+
   @AfterClass
   public static void tearDown() throws Exception {
     AppendTestUtil.LOG.info("tearDown()");
-    if(fs != null) fs.close();
-    if(cluster != null) cluster.shutdown();
+    if (fs != null) {
+      fs.close();
+    }
+    if (cluster != null) {
+      cluster.shutdown();
+    }
   }
 
   /**
    * TC1: Append on block boundary.
-   * @throws IOException an exception might be thrown
+   *
+   * @throws IOException
+   *     an exception might be thrown
    */
   @Test
   public void testTC1() throws Exception {
@@ -94,15 +105,16 @@ public class TestFileAppend3  {
     System.out.println("p=" + p);
 
     //a. Create file and write one block of data. Close file.
-    final int len1 = (int)BLOCK_SIZE; 
+    final int len1 = (int) BLOCK_SIZE;
     {
-      FSDataOutputStream out = fs.create(p, false, buffersize, REPLICATION, BLOCK_SIZE);
+      FSDataOutputStream out =
+          fs.create(p, false, buffersize, REPLICATION, BLOCK_SIZE);
       AppendTestUtil.write(out, 0, len1);
       out.close();
     }
 
     //   Reopen file to append. Append half block of data. Close file.
-    final int len2 = (int)BLOCK_SIZE/2; 
+    final int len2 = (int) BLOCK_SIZE / 2;
     {
       FSDataOutputStream out = fs.append(p);
       AppendTestUtil.write(out, len1, len2);
@@ -115,7 +127,9 @@ public class TestFileAppend3  {
 
   /**
    * TC2: Append on non-block boundary.
-   * @throws IOException an exception might be thrown
+   *
+   * @throws IOException
+   *     an exception might be thrown
    */
   @Test
   public void testTC2() throws Exception {
@@ -123,9 +137,10 @@ public class TestFileAppend3  {
     System.out.println("p=" + p);
 
     //a. Create file with one and a half block of data. Close file.
-    final int len1 = (int)(BLOCK_SIZE + BLOCK_SIZE/2); 
+    final int len1 = (int) (BLOCK_SIZE + BLOCK_SIZE / 2);
     {
-      FSDataOutputStream out = fs.create(p, false, buffersize, REPLICATION, BLOCK_SIZE);
+      FSDataOutputStream out =
+          fs.create(p, false, buffersize, REPLICATION, BLOCK_SIZE);
       AppendTestUtil.write(out, 0, len1);
       out.close();
     }
@@ -133,7 +148,7 @@ public class TestFileAppend3  {
     AppendTestUtil.check(fs, p, len1);
 
     //   Reopen file to append quarter block of data. Close file.
-    final int len2 = (int)BLOCK_SIZE/4; 
+    final int len2 = (int) BLOCK_SIZE / 4;
     {
       FSDataOutputStream out = fs.append(p);
       AppendTestUtil.write(out, len1, len2);
@@ -146,7 +161,9 @@ public class TestFileAppend3  {
 
   /**
    * TC5: Only one simultaneous append.
-   * @throws IOException an exception might be thrown
+   *
+   * @throws IOException
+   *     an exception might be thrown
    */
   @Test
   public void testTC5() throws Exception {
@@ -155,8 +172,9 @@ public class TestFileAppend3  {
 
     //a. Create file on Machine M1. Write half block to it. Close file.
     {
-      FSDataOutputStream out = fs.create(p, false, buffersize, REPLICATION, BLOCK_SIZE);
-      AppendTestUtil.write(out, 0, (int)(BLOCK_SIZE/2));
+      FSDataOutputStream out =
+          fs.create(p, false, buffersize, REPLICATION, BLOCK_SIZE);
+      AppendTestUtil.write(out, 0, (int) (BLOCK_SIZE / 2));
       out.close();
     }
 
@@ -167,17 +185,19 @@ public class TestFileAppend3  {
     try {
       AppendTestUtil.createHdfsWithDifferentUsername(conf).append(p);
       fail("This should fail.");
-    } catch(IOException ioe) {
+    } catch (IOException ioe) {
       AppendTestUtil.LOG.info("GOOD: got an exception", ioe);
     }
 
     //d. On Machine M1, close file.
-    out.close();        
+    out.close();
   }
 
   /**
    * TC7: Corrupted replicas are present.
-   * @throws IOException an exception might be thrown
+   *
+   * @throws IOException
+   *     an exception might be thrown
    */
   @Test
   public void testTC7() throws Exception {
@@ -186,9 +206,10 @@ public class TestFileAppend3  {
     System.out.println("p=" + p);
     
     //a. Create file with replication factor of 2. Write half block of data. Close file.
-    final int len1 = (int)(BLOCK_SIZE/2); 
+    final int len1 = (int) (BLOCK_SIZE / 2);
     {
-      FSDataOutputStream out = fs.create(p, false, buffersize, repl, BLOCK_SIZE);
+      FSDataOutputStream out =
+          fs.create(p, false, buffersize, repl, BLOCK_SIZE);
       AppendTestUtil.write(out, 0, len1);
       out.close();
     }
@@ -196,7 +217,8 @@ public class TestFileAppend3  {
 
     //b. Log into one datanode that has one replica of this block.
     //   Find the block file on this datanode and truncate it to zero size.
-    final LocatedBlocks locatedblocks = fs.dfs.getNamenode().getBlockLocations(p.toString(), 0L, len1);
+    final LocatedBlocks locatedblocks =
+        fs.dfs.getNamenode().getBlockLocations(p.toString(), 0L, len1);
     assertEquals(1, locatedblocks.locatedBlockCount());
     final LocatedBlock lb = locatedblocks.get(0);
     final ExtendedBlock blk = lb.getBlock();
@@ -205,16 +227,17 @@ public class TestFileAppend3  {
     DatanodeInfo[] datanodeinfos = lb.getLocations();
     assertEquals(repl, datanodeinfos.length);
     final DataNode dn = cluster.getDataNode(datanodeinfos[0].getIpcPort());
-    final File f = DataNodeTestUtils.getBlockFile(
-        dn, blk.getBlockPoolId(), blk.getLocalBlock());
+    final File f = DataNodeTestUtils
+        .getBlockFile(dn, blk.getBlockPoolId(), blk.getLocalBlock());
     final RandomAccessFile raf = new RandomAccessFile(f, "rw");
-    AppendTestUtil.LOG.info("dn=" + dn + ", blk=" + blk + " (length=" + blk.getNumBytes() + ")");
+    AppendTestUtil.LOG.info(
+        "dn=" + dn + ", blk=" + blk + " (length=" + blk.getNumBytes() + ")");
     assertEquals(len1, raf.length());
     raf.setLength(0);
     raf.close();
 
     //c. Open file in "append mode".  Append a new block worth of data. Close file.
-    final int len2 = (int)BLOCK_SIZE; 
+    final int len2 = (int) BLOCK_SIZE;
     {
       FSDataOutputStream out = fs.append(p);
       AppendTestUtil.write(out, len1, len2);
@@ -227,7 +250,9 @@ public class TestFileAppend3  {
 
   /**
    * TC11: Racing rename
-   * @throws IOException an exception might be thrown
+   *
+   * @throws IOException
+   *     an exception might be thrown
    */
   @Test
   public void testTC11() throws Exception {
@@ -235,16 +260,17 @@ public class TestFileAppend3  {
     System.out.println("p=" + p);
 
     //a. Create file and write one block of data. Close file.
-    final int len1 = (int)BLOCK_SIZE; 
+    final int len1 = (int) BLOCK_SIZE;
     {
-      FSDataOutputStream out = fs.create(p, false, buffersize, REPLICATION, BLOCK_SIZE);
+      FSDataOutputStream out =
+          fs.create(p, false, buffersize, REPLICATION, BLOCK_SIZE);
       AppendTestUtil.write(out, 0, len1);
       out.close();
     }
 
     //b. Reopen file in "append" mode. Append half block of data.
     FSDataOutputStream out = fs.append(p);
-    final int len2 = (int)BLOCK_SIZE/2; 
+    final int len2 = (int) BLOCK_SIZE / 2;
     AppendTestUtil.write(out, len1, len2);
     out.hflush();
     
@@ -256,7 +282,7 @@ public class TestFileAppend3  {
     try {
       out.close();
       fail("close() should throw an exception");
-    } catch(Exception e) {
+    } catch (Exception e) {
       AppendTestUtil.LOG.info("GOOD!", e);
     }
 
@@ -266,27 +292,30 @@ public class TestFileAppend3  {
 
     //check block sizes 
     final long len = fs.getFileStatus(pnew).getLen();
-    final LocatedBlocks locatedblocks = fs.dfs.getNamenode().getBlockLocations(pnew.toString(), 0L, len);
+    final LocatedBlocks locatedblocks =
+        fs.dfs.getNamenode().getBlockLocations(pnew.toString(), 0L, len);
     final int numblock = locatedblocks.locatedBlockCount();
-    for(int i = 0; i < numblock; i++) {
+    for (int i = 0; i < numblock; i++) {
       final LocatedBlock lb = locatedblocks.get(i);
       final ExtendedBlock blk = lb.getBlock();
       final long size = lb.getBlockSize();
       if (i < numblock - 1) {
         assertEquals(BLOCK_SIZE, size);
       }
-      for(DatanodeInfo datanodeinfo : lb.getLocations()) {
+      for (DatanodeInfo datanodeinfo : lb.getLocations()) {
         final DataNode dn = cluster.getDataNode(datanodeinfo.getIpcPort());
-        final Block metainfo = DataNodeTestUtils.getFSDataset(dn).getStoredBlock(
-            blk.getBlockPoolId(), blk.getBlockId());
+        final Block metainfo = DataNodeTestUtils.getFSDataset(dn)
+            .getStoredBlock(blk.getBlockPoolId(), blk.getBlockId());
         assertEquals(size, metainfo.getNumBytes());
       }
     }
   }
 
-  /** 
+  /**
    * TC12: Append to partial CRC chunk
-   * @throws IOException an exception might be thrown
+   *
+   * @throws IOException
+   *     an exception might be thrown
    */
   @Test
   public void testTC12() throws Exception {
@@ -296,15 +325,16 @@ public class TestFileAppend3  {
     //a. Create file with a block size of 64KB
     //   and a default io.bytes.per.checksum of 512 bytes.
     //   Write 25687 bytes of data. Close file.
-    final int len1 = 25687; 
+    final int len1 = 25687;
     {
-      FSDataOutputStream out = fs.create(p, false, buffersize, REPLICATION, BLOCK_SIZE);
+      FSDataOutputStream out =
+          fs.create(p, false, buffersize, REPLICATION, BLOCK_SIZE);
       AppendTestUtil.write(out, 0, len1);
       out.close();
     }
 
     //b. Reopen file in "append" mode. Append another 5877 bytes of data. Close file.
-    final int len2 = 5877; 
+    final int len2 = 5877;
     {
       FSDataOutputStream out = fs.append(p);
       AppendTestUtil.write(out, len1, len2);
@@ -315,9 +345,11 @@ public class TestFileAppend3  {
     AppendTestUtil.check(fs, p, len1 + len2);
   }
   
-  /** Append to a partial CRC chunk and 
+  /**
+   * Append to a partial CRC chunk and
    * the first write does not fill up the partial CRC trunk
    * *
+   *
    * @throws IOException
    */
   @Test
@@ -362,12 +394,12 @@ public class TestFileAppend3  {
     System.out.println("Append and flush 2 byte");
 
     // fill up the partial chunk and close the file
-    stm.write(fileContents, 5, fileLen-5);
+    stm.write(fileContents, 5, fileLen - 5);
     stm.close();
     System.out.println("Flush 508 byte and closed the file " + p);
 
     // verify that entire file is good
-    AppendTestUtil.checkFullFile(fs, p, fileLen,
-        fileContents, "Failed to append to a partial chunk");
+    AppendTestUtil.checkFullFile(fs, p, fileLen, fileContents,
+        "Failed to append to a partial chunk");
   }
 }

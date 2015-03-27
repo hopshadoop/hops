@@ -18,8 +18,11 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager;
 
+import io.hops.exception.StorageInitializtionException;
+import io.hops.metadata.util.RMStorageFactory;
+import io.hops.metadata.util.RMUtilities;
+import io.hops.metadata.util.YarnAPIStorageFactory;
 import junit.framework.Assert;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.yarn.api.protocolrecords.AllocateResponse;
@@ -36,8 +39,10 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fifo.FifoScheduler;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
-import org.junit.BeforeClass;
+import org.junit.Before;
 import org.junit.Test;
+
+import java.io.IOException;
 
 public class TestApplicationMasterService {
   private static final Log LOG = LogFactory.getLog(TestFifoScheduler.class);
@@ -45,12 +50,16 @@ public class TestApplicationMasterService {
   private final int GB = 1024;
   private static YarnConfiguration conf;
 
-  @BeforeClass
-  public static void setup() {
+  @Before
+  public void setup() throws StorageInitializtionException, IOException {
     conf = new YarnConfiguration();
+    YarnAPIStorageFactory.setConfiguration(conf);
+    RMStorageFactory.setConfiguration(conf);
     conf.setClass(YarnConfiguration.RM_SCHEDULER, FifoScheduler.class,
-      ResourceScheduler.class);
+        ResourceScheduler.class);
+    RMUtilities.InitializeDB();
   }
+
 
   @Test(timeout = 3000000)
   public void testRMIdentifierOnContainerAllocation() throws Exception {
@@ -69,7 +78,7 @@ public class TestApplicationMasterService {
     MockAM am1 = rm.sendAMLaunched(attempt1.getAppAttemptId());
     am1.registerAppAttempt();
 
-    am1.addRequests(new String[] { "127.0.0.1" }, GB, 1, 1);
+    am1.addRequests(new String[]{"127.0.0.1"}, GB, 1, 1);
     AllocateResponse alloc1Response = am1.schedule(); // send the request
 
     // kick the scheduler
@@ -83,14 +92,13 @@ public class TestApplicationMasterService {
     // assert RMIdentifer is set properly in allocated containers
     Container allocatedContainer =
         alloc1Response.getAllocatedContainers().get(0);
-    ContainerTokenIdentifier tokenId =
-        BuilderUtils.newContainerTokenIdentifier(allocatedContainer
-          .getContainerToken());
+    ContainerTokenIdentifier tokenId = BuilderUtils
+        .newContainerTokenIdentifier(allocatedContainer.getContainerToken());
     Assert.assertEquals(MockRM.getClusterTimeStamp(), tokenId.getRMIdentifer());
     rm.stop();
   }
   
-  @Test(timeout=600000)
+  @Test(timeout = 600000)
   public void testInvalidContainerReleaseRequest() throws Exception {
     MockRM rm = new MockRM(conf);
     
@@ -109,7 +117,7 @@ public class TestApplicationMasterService {
       MockAM am1 = rm.sendAMLaunched(attempt1.getAppAttemptId());
       am1.registerAppAttempt();
       
-      am1.addRequests(new String[] { "127.0.0.1" }, GB, 1, 1);
+      am1.addRequests(new String[]{"127.0.0.1"}, GB, 1, 1);
       AllocateResponse alloc1Response = am1.schedule(); // send the request
 
       // kick the scheduler
@@ -149,7 +157,7 @@ public class TestApplicationMasterService {
     }
   }
   
-  @Test(timeout=1200000)
+  @Test(timeout = 1200000)
   public void testFinishApplicationMasterBeforeRegistering() throws Exception {
     MockRM rm = new MockRM(conf);
     try {
@@ -159,9 +167,8 @@ public class TestApplicationMasterService {
       // Submit an application
       RMApp app1 = rm.submitApp(2048);
       MockAM am1 = MockRM.launchAM(app1, rm, nm1);
-      FinishApplicationMasterRequest req =
-          FinishApplicationMasterRequest.newInstance(
-              FinalApplicationStatus.FAILED, "", "");
+      FinishApplicationMasterRequest req = FinishApplicationMasterRequest
+          .newInstance(FinalApplicationStatus.FAILED, "", "");
       Throwable cause = null;
       try {
         am1.unregisterAppAttempt(req, false);
@@ -169,14 +176,11 @@ public class TestApplicationMasterService {
         cause = e.getCause();
       }
       Assert.assertNotNull(cause);
-      Assert
-          .assertTrue(cause instanceof InvalidApplicationMasterRequestException);
+      Assert.assertTrue(
+          cause instanceof InvalidApplicationMasterRequestException);
       Assert.assertNotNull(cause.getMessage());
-      Assert
-          .assertTrue(cause
-              .getMessage()
-              .contains(
-                  "Application Master is trying to unregister before registering for:"));
+      Assert.assertTrue(cause.getMessage().contains(
+          "Application Master is trying to unregister before registering for:"));
     } finally {
       if (rm != null) {
         rm.stop();

@@ -17,15 +17,15 @@
  */
 package org.apache.hadoop.hdfs.server.common;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.junit.Test;
 
 import java.io.IOException;
 import java.net.URI;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.junit.Test;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 
 /**
  * This is a unit test, which tests {@link Util#stringAsURI(String)}
@@ -37,19 +37,20 @@ public class TestGetUriFromString {
   private static final String RELATIVE_FILE_PATH = "relativeFilePath";
   private static final String ABSOLUTE_PATH_UNIX = "/tmp/file1";
   private static final String ABSOLUTE_PATH_WINDOWS =
-    "C:\\Documents and Settings\\All Users";
+      "C:\\Documents and Settings\\All Users";
   private static final String URI_FILE_SCHEMA = "file";
   private static final String URI_PATH_UNIX = "/var/www";
   private static final String URI_PATH_WINDOWS =
-    "/C:/Documents%20and%20Settings/All%20Users";
-  private static final String URI_UNIX = URI_FILE_SCHEMA + "://"
-      + URI_PATH_UNIX;
-  private static final String URI_WINDOWS = URI_FILE_SCHEMA + "://"
-      + URI_PATH_WINDOWS;
+      "/C:/Documents%20and%20Settings/All%20Users";
+  private static final String URI_UNIX =
+      URI_FILE_SCHEMA + "://" + URI_PATH_UNIX;
+  private static final String URI_WINDOWS =
+      URI_FILE_SCHEMA + "://" + URI_PATH_WINDOWS;
 
   /**
    * Test for a relative path, os independent
-   * @throws IOException 
+   *
+   * @throws IOException
    */
   @Test
   public void testRelativePathAsURI() throws IOException {
@@ -60,7 +61,8 @@ public class TestGetUriFromString {
 
   /**
    * Test for an OS dependent absolute paths.
-   * @throws IOException 
+   *
+   * @throws IOException
    */
   @Test
   public void testAbsolutePathAsURI() throws IOException {
@@ -70,19 +72,21 @@ public class TestGetUriFromString {
         "Uri should not be null for Windows path" + ABSOLUTE_PATH_WINDOWS, u);
     assertEquals(URI_FILE_SCHEMA, u.getScheme());
     u = Util.stringAsURI(ABSOLUTE_PATH_UNIX);
-    assertNotNull("Uri should not be null for Unix path" + ABSOLUTE_PATH_UNIX, u);
+    assertNotNull("Uri should not be null for Unix path" + ABSOLUTE_PATH_UNIX,
+        u);
     assertEquals(URI_FILE_SCHEMA, u.getScheme());
   }
 
   /**
    * Test for a URI
-   * @throws IOException 
+   *
+   * @throws IOException
    */
   @Test
   public void testURI() throws IOException {
     LOG.info("Testing correct Unix URI: " + URI_UNIX);
     URI u = Util.stringAsURI(URI_UNIX);
-    LOG.info("Uri: " + u);    
+    LOG.info("Uri: " + u);
     assertNotNull("Uri should not be null at this point", u);
     assertEquals(URI_FILE_SCHEMA, u.getScheme());
     assertEquals(URI_PATH_UNIX, u.getPath());

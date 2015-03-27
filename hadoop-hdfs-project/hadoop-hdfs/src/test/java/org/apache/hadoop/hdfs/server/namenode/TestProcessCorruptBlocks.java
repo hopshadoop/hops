@@ -17,12 +17,13 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
-import java.io.File;
-import java.io.IOException;
-
+import io.hops.common.INodeUtil;
+import io.hops.exception.StorageException;
+import io.hops.metadata.hdfs.entity.INodeIdentifier;
+import io.hops.transaction.handler.HDFSOperationType;
+import io.hops.transaction.handler.HopsTransactionalRequestHandler;
+import io.hops.transaction.lock.LockFactory;
+import io.hops.transaction.lock.TransactionLocks;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -35,29 +36,37 @@ import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.server.blockmanagement.NumberReplicas;
 import org.junit.Test;
 
+import java.io.File;
+import java.io.IOException;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
 public class TestProcessCorruptBlocks {
   /**
    * The corrupt block has to be removed when the number of valid replicas
    * matches replication factor for the file. In this the above condition is
-   * tested by reducing the replication factor 
-   * The test strategy : 
-   *   Bring up Cluster with 3 DataNodes
-   *   Create a file of replication factor 3 
-   *   Corrupt one replica of a block of the file 
-   *   Verify that there are still 2 good replicas and 1 corrupt replica
-   *    (corrupt replica should not be removed since number of good
-   *     replicas (2) is less than replication factor (3))
-   *   Set the replication factor to 2 
-   *   Verify that the corrupt replica is removed. 
-   *     (corrupt replica  should not be removed since number of good
-   *      replicas (2) is equal to replication factor (2))
+   * tested by reducing the replication factor
+   * The test strategy :
+   * Bring up Cluster with 3 DataNodes
+   * Create a file of replication factor 3
+   * Corrupt one replica of a block of the file
+   * Verify that there are still 2 good replicas and 1 corrupt replica
+   * (corrupt replica should not be removed since number of good
+   * replicas (2) is less than replication factor (3))
+   * Set the replication factor to 2
+   * Verify that the corrupt replica is removed.
+   * (corrupt replica  should not be removed since number of good
+   * replicas (2) is equal to replication factor (2))
    */
   @Test
   public void testWhenDecreasingReplication() throws Exception {
     Configuration conf = new HdfsConfiguration();
     conf.setLong(DFSConfigKeys.DFS_BLOCKREPORT_INTERVAL_MSEC_KEY, 1000L);
-    conf.set(DFSConfigKeys.DFS_NAMENODE_REPLICATION_PENDING_TIMEOUT_SEC_KEY, Integer.toString(2));
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(3).build();
+    conf.set(DFSConfigKeys.DFS_NAMENODE_REPLICATION_PENDING_TIMEOUT_SEC_KEY,
+        Integer.toString(2));
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(3).build();
     FileSystem fs = cluster.getFileSystem();
     final FSNamesystem namesystem = cluster.getNamesystem();
 
@@ -92,27 +101,28 @@ public class TestProcessCorruptBlocks {
 
   /**
    * The corrupt block has to be removed when the number of valid replicas
-   * matches replication factor for the file. In this test, the above 
-   * condition is achieved by increasing the number of good replicas by 
-   * replicating on a new Datanode. 
-   * The test strategy : 
-   *   Bring up Cluster with 3 DataNodes
-   *   Create a file  of replication factor 3
-   *   Corrupt one replica of a block of the file 
-   *   Verify that there are still 2 good replicas and 1 corrupt replica 
-   *     (corrupt replica should not be removed since number of good replicas
-   *      (2) is less  than replication factor (3)) 
-   *   Start a new data node 
-   *   Verify that the a new replica is created and corrupt replica is
-   *   removed.
-   * 
+   * matches replication factor for the file. In this test, the above
+   * condition is achieved by increasing the number of good replicas by
+   * replicating on a new Datanode.
+   * The test strategy :
+   * Bring up Cluster with 3 DataNodes
+   * Create a file  of replication factor 3
+   * Corrupt one replica of a block of the file
+   * Verify that there are still 2 good replicas and 1 corrupt replica
+   * (corrupt replica should not be removed since number of good replicas
+   * (2) is less  than replication factor (3))
+   * Start a new data node
+   * Verify that the a new replica is created and corrupt replica is
+   * removed.
    */
   @Test
   public void testByAddingAnExtraDataNode() throws Exception {
     Configuration conf = new HdfsConfiguration();
     conf.setLong(DFSConfigKeys.DFS_BLOCKREPORT_INTERVAL_MSEC_KEY, 1000L);
-    conf.set(DFSConfigKeys.DFS_NAMENODE_REPLICATION_PENDING_TIMEOUT_SEC_KEY, Integer.toString(2));
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(4).build();
+    conf.set(DFSConfigKeys.DFS_NAMENODE_REPLICATION_PENDING_TIMEOUT_SEC_KEY,
+        Integer.toString(2));
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(4).build();
     FileSystem fs = cluster.getFileSystem();
     final FSNamesystem namesystem = cluster.getNamesystem();
     DataNodeProperties dnPropsFourth = cluster.stopDataNode(3);
@@ -145,25 +155,27 @@ public class TestProcessCorruptBlocks {
    * The corrupt block has to be removed when the number of valid replicas
    * matches replication factor for the file. The above condition should hold
    * true as long as there is one good replica. This test verifies that.
-   * 
-   * The test strategy : 
-   *   Bring up Cluster with 2 DataNodes
-   *   Create a file of replication factor 2 
-   *   Corrupt one replica of a block of the file 
-   *   Verify that there is  one good replicas and 1 corrupt replica 
-   *     (corrupt replica should not be removed since number of good 
-   *     replicas (1) is less than replication factor (2)).
-   *   Set the replication factor to 1 
-   *   Verify that the corrupt replica is removed. 
-   *     (corrupt replica should  be removed since number of good
-   *      replicas (1) is equal to replication factor (1))
+   * <p/>
+   * The test strategy :
+   * Bring up Cluster with 2 DataNodes
+   * Create a file of replication factor 2
+   * Corrupt one replica of a block of the file
+   * Verify that there is  one good replicas and 1 corrupt replica
+   * (corrupt replica should not be removed since number of good
+   * replicas (1) is less than replication factor (2)).
+   * Set the replication factor to 1
+   * Verify that the corrupt replica is removed.
+   * (corrupt replica should  be removed since number of good
+   * replicas (1) is equal to replication factor (1))
    */
-  @Test(timeout=20000)
+  @Test
   public void testWithReplicationFactorAsOne() throws Exception {
     Configuration conf = new HdfsConfiguration();
     conf.setLong(DFSConfigKeys.DFS_BLOCKREPORT_INTERVAL_MSEC_KEY, 1000L);
-    conf.set(DFSConfigKeys.DFS_NAMENODE_REPLICATION_PENDING_TIMEOUT_SEC_KEY, Integer.toString(2));
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(2).build();
+    conf.set(DFSConfigKeys.DFS_NAMENODE_REPLICATION_PENDING_TIMEOUT_SEC_KEY,
+        Integer.toString(2));
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(2).build();
     FileSystem fs = cluster.getFileSystem();
     final FSNamesystem namesystem = cluster.getNamesystem();
 
@@ -183,14 +195,9 @@ public class TestProcessCorruptBlocks {
       namesystem.setReplication(fileName.toString(), (short) 1);
 
       // wait for 3 seconds so that all block reports are processed.
-      for (int i = 0; i < 10; i++) {
-        try {
-          Thread.sleep(1000);
-        } catch (InterruptedException ignored) {
-        }
-        if (countReplicas(namesystem, block).corruptReplicas() == 0) {
-          break;
-        }
+      try {
+        Thread.sleep(3000);
+      } catch (InterruptedException ignored) {
       }
 
       assertEquals(1, countReplicas(namesystem, block).liveReplicas());
@@ -203,21 +210,23 @@ public class TestProcessCorruptBlocks {
 
   /**
    * None of the blocks can be removed if all blocks are corrupt.
-   * 
-   * The test strategy : 
-   *    Bring up Cluster with 3 DataNodes
-   *    Create a file of replication factor 3 
-   *    Corrupt all three replicas 
-   *    Verify that all replicas are corrupt and 3 replicas are present.
-   *    Set the replication factor to 1 
-   *    Verify that all replicas are corrupt and 3 replicas are present.
+   * <p/>
+   * The test strategy :
+   * Bring up Cluster with 3 DataNodes
+   * Create a file of replication factor 3
+   * Corrupt all three replicas
+   * Verify that all replicas are corrupt and 3 replicas are present.
+   * Set the replication factor to 1
+   * Verify that all replicas are corrupt and 3 replicas are present.
    */
   @Test
   public void testWithAllCorruptReplicas() throws Exception {
     Configuration conf = new HdfsConfiguration();
     conf.setLong(DFSConfigKeys.DFS_BLOCKREPORT_INTERVAL_MSEC_KEY, 1000L);
-    conf.set(DFSConfigKeys.DFS_NAMENODE_REPLICATION_PENDING_TIMEOUT_SEC_KEY, Integer.toString(2));
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(3).build();
+    conf.set(DFSConfigKeys.DFS_NAMENODE_REPLICATION_PENDING_TIMEOUT_SEC_KEY,
+        Integer.toString(2));
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(3).build();
     FileSystem fs = cluster.getFileSystem();
     final FSNamesystem namesystem = cluster.getNamesystem();
 
@@ -258,12 +267,38 @@ public class TestProcessCorruptBlocks {
     }
   }
 
-  private static NumberReplicas countReplicas(final FSNamesystem namesystem, ExtendedBlock block) {
-    return namesystem.getBlockManager().countNodes(block.getLocalBlock());
+  private static NumberReplicas countReplicas(final FSNamesystem namesystem,
+      final ExtendedBlock block) throws IOException {
+    return (NumberReplicas) new HopsTransactionalRequestHandler(
+        HDFSOperationType.COUNT_NODES) {
+      INodeIdentifier inodeIdentifier;
+
+      @Override
+      public void setUp() throws StorageException, IOException {
+        inodeIdentifier =
+            INodeUtil.resolveINodeFromBlock(block.getLocalBlock());
+      }
+
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = LockFactory.getInstance();
+        locks
+            .add(lf.getIndividualBlockLock(block.getBlockId(), inodeIdentifier))
+            .add(lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.ER,
+                LockFactory.BLK.CR));
+      }
+
+      @Override
+      public Object performTask() throws StorageException, IOException {
+        return namesystem.getBlockManager().countNodes(block.getLocalBlock());
+      }
+
+    }.handle(namesystem);
   }
 
-  private void corruptBlock(MiniDFSCluster cluster, FileSystem fs, final Path fileName,
-      int dnIndex, ExtendedBlock block) throws IOException {
+  private void corruptBlock(MiniDFSCluster cluster, FileSystem fs,
+      final Path fileName, int dnIndex, ExtendedBlock block)
+      throws IOException {
     // corrupt the block on datanode dnIndex
     // the indexes change once the nodes are restarted.
     // But the datadirectory will not change

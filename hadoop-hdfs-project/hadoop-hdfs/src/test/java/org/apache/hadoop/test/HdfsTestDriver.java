@@ -26,7 +26,7 @@ import org.apache.hadoop.util.ProgramDriver;
  */
 public class HdfsTestDriver {
 
-  private final ProgramDriver pgd;
+  private ProgramDriver pgd;
 
   public HdfsTestDriver() {
     this(new ProgramDriver());
@@ -35,11 +35,11 @@ public class HdfsTestDriver {
   public HdfsTestDriver(ProgramDriver pgd) {
     this.pgd = pgd;
     try {
-      pgd.addClass("dfsthroughput", BenchmarkThroughput.class, 
+      pgd.addClass("dfsthroughput", BenchmarkThroughput.class,
           "measure hdfs throughput");
-      pgd.addClass("minidfscluster", MiniDFSClusterManager.class, 
+      pgd.addClass("minidfscluster", MiniDFSClusterManager.class,
           "Run a single-process mini DFS cluster");
-    } catch(Throwable e) {
+    } catch (Throwable e) {
       e.printStackTrace();
     }
   }
@@ -48,14 +48,14 @@ public class HdfsTestDriver {
     int exitCode = -1;
     try {
       exitCode = pgd.run(argv);
-    } catch(Throwable e) {
+    } catch (Throwable e) {
       e.printStackTrace();
     }
 
     System.exit(exitCode);
   }
 
-  public static void main(String argv[]){
+  public static void main(String argv[]) {
     new HdfsTestDriver().run(argv);
   }
 }

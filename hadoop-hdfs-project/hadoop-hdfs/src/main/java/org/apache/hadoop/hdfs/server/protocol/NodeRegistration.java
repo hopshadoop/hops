@@ -22,12 +22,13 @@ import org.apache.hadoop.classification.InterfaceAudience;
 
 /**
  * Generic class specifying information, which need to be sent to the name-node
- * during the registration process. 
+ * during the registration process.
  */
 @InterfaceAudience.Private
 public interface NodeRegistration {
   /**
    * Get address of the server node.
+   *
    * @return ipAddr:portNumber
    */
   public String getAddress();

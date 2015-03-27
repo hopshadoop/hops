@@ -17,16 +17,6 @@
  */
 package org.apache.hadoop.hdfs.nfs.nfs3;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
-import java.io.IOException;
-import java.net.InetAddress;
-import java.nio.ByteBuffer;
-import java.util.Arrays;
-import java.util.concurrent.ConcurrentNavigableMap;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSClient;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
@@ -55,6 +45,16 @@ import org.jboss.netty.channel.Channel;
 import org.junit.Assert;
 import org.junit.Test;
 import org.mockito.Mockito;
+
+import java.io.IOException;
+import java.net.InetAddress;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.concurrent.ConcurrentNavigableMap;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 public class TestWrites {
   @Test
@@ -167,8 +167,8 @@ public class TestWrites {
     ret = ctx.checkCommit(dfsClient, 10, ch, 1, attr, false);
     Assert.assertTrue(ret == COMMIT_STATUS.COMMIT_FINISHED);
 
-    ConcurrentNavigableMap<Long, CommitCtx> commits = ctx
-        .getPendingCommitsForTest();
+    ConcurrentNavigableMap<Long, CommitCtx> commits =
+        ctx.getPendingCommitsForTest();
     Assert.assertTrue(commits.size() == 0);
     ret = ctx.checkCommit(dfsClient, 11, ch, 1, attr, false);
     Assert.assertTrue(ret == COMMIT_STATUS.COMMIT_WAIT);
@@ -213,7 +213,7 @@ public class TestWrites {
     ctx.setActiveStatusForTest(false);
     Channel ch = Mockito.mock(Channel.class);
     ret = ctx.checkCommit(dfsClient, 0, ch, 1, attr, true);
-    assertEquals( COMMIT_STATUS.COMMIT_INACTIVE_CTX, ret);
+    assertEquals(COMMIT_STATUS.COMMIT_INACTIVE_CTX, ret);
     assertEquals(Nfs3Status.NFS3_OK, wm.commitBeforeRead(dfsClient, h, 0));
     
     ctx.getPendingWritesForTest().put(new OffsetRange(5, 10),
@@ -231,27 +231,29 @@ public class TestWrites {
     ret = ctx.checkCommit(dfsClient, 5, ch, 1, attr, true);
     assertEquals(COMMIT_STATUS.COMMIT_FINISHED, ret);
     assertEquals(Nfs3Status.NFS3_OK, wm.commitBeforeRead(dfsClient, h, 5));
- 
+
     status = ctx.checkCommitInternal(10, ch, 1, attr, true);
     assertTrue(status == COMMIT_STATUS.COMMIT_DO_SYNC);
     ret = ctx.checkCommit(dfsClient, 10, ch, 1, attr, true);
     assertEquals(COMMIT_STATUS.COMMIT_FINISHED, ret);
     assertEquals(Nfs3Status.NFS3_OK, wm.commitBeforeRead(dfsClient, h, 10));
 
-    ConcurrentNavigableMap<Long, CommitCtx> commits = ctx
-        .getPendingCommitsForTest();
+    ConcurrentNavigableMap<Long, CommitCtx> commits =
+        ctx.getPendingCommitsForTest();
     assertTrue(commits.size() == 0);
     ret = ctx.checkCommit(dfsClient, 11, ch, 1, attr, true);
     assertEquals(COMMIT_STATUS.COMMIT_WAIT, ret);
     assertEquals(0, commits.size()); // commit triggered by read doesn't wait
-    assertEquals(Nfs3Status.NFS3ERR_JUKEBOX, wm.commitBeforeRead(dfsClient, h, 11));
+    assertEquals(Nfs3Status.NFS3ERR_JUKEBOX,
+        wm.commitBeforeRead(dfsClient, h, 11));
 
     // Test request with zero commit offset
     // There is one pending write [5,10]
     ret = ctx.checkCommit(dfsClient, 0, ch, 1, attr, true);
     assertEquals(COMMIT_STATUS.COMMIT_WAIT, ret);
     assertEquals(0, commits.size());
-    assertEquals(Nfs3Status.NFS3ERR_JUKEBOX, wm.commitBeforeRead(dfsClient, h, 0));
+    assertEquals(Nfs3Status.NFS3ERR_JUKEBOX,
+        wm.commitBeforeRead(dfsClient, h, 0));
 
     // Empty pending writes
     ctx.getPendingWritesForTest().remove(new OffsetRange(5, 10));
@@ -260,11 +262,10 @@ public class TestWrites {
     assertEquals(Nfs3Status.NFS3_OK, wm.commitBeforeRead(dfsClient, h, 0));
   }
   
-  private void waitWrite(RpcProgramNfs3 nfsd, FileHandle handle, int maxWaitTime)
-      throws InterruptedException {
+  private void waitWrite(RpcProgramNfs3 nfsd, FileHandle handle,
+      int maxWaitTime) throws InterruptedException {
     int waitedTime = 0;
-    OpenFileCtx ctx = nfsd.getWriteManager()
-        .getOpenFileCtxCache().get(handle);
+    OpenFileCtx ctx = nfsd.getWriteManager().getOpenFileCtxCache().get(handle);
     assertTrue(ctx != null);
     do {
       Thread.sleep(3000);
@@ -284,15 +285,11 @@ public class TestWrites {
     MiniDFSCluster cluster = null;
     RpcProgramNfs3 nfsd;
     SecurityHandler securityHandler = Mockito.mock(SecurityHandler.class);
-    Mockito.when(securityHandler.getUser()).thenReturn(
-        System.getProperty("user.name"));
+    Mockito.when(securityHandler.getUser())
+        .thenReturn(System.getProperty("user.name"));
     String currentUser = System.getProperty("user.name");
-    config.set(
-            ProxyUsers.getProxySuperuserGroupConfKey(currentUser),
-            "*");
-    config.set(
-            ProxyUsers.getProxySuperuserIpConfKey(currentUser),
-            "*");
+    config.set(ProxyUsers.getProxySuperuserGroupConfKey(currentUser), "*");
+    config.set(ProxyUsers.getProxySuperuserIpConfKey(currentUser), "*");
     ProxyUsers.refreshSuperUserGroupsConfiguration(config);
 
     try {
@@ -312,12 +309,14 @@ public class TestWrites {
       HdfsFileStatus status = client.getFileInfo("/");
       FileHandle rootHandle = new FileHandle(status.getFileId());
       // Create file1
-      CREATE3Request createReq = new CREATE3Request(rootHandle, "file1",
-          Nfs3Constant.CREATE_UNCHECKED, new SetAttr3(), 0);
+      CREATE3Request createReq =
+          new CREATE3Request(rootHandle, "file1", Nfs3Constant.CREATE_UNCHECKED,
+              new SetAttr3(), 0);
       XDR createXdr = new XDR();
       createReq.serialize(createXdr);
-      CREATE3Response createRsp = nfsd.create(createXdr.asReadOnlyWrap(),
-          securityHandler, InetAddress.getLocalHost());
+      CREATE3Response createRsp =
+          nfsd.create(createXdr.asReadOnlyWrap(), securityHandler,
+              InetAddress.getLocalHost());
       FileHandle handle = createRsp.getObjHandle();
 
       // Test DATA_SYNC
@@ -325,8 +324,9 @@ public class TestWrites {
       for (int i = 0; i < 10; i++) {
         buffer[i] = (byte) i;
       }
-      WRITE3Request writeReq = new WRITE3Request(handle, 0, 10,
-          WriteStableHow.DATA_SYNC, ByteBuffer.wrap(buffer));
+      WRITE3Request writeReq =
+          new WRITE3Request(handle, 0, 10, WriteStableHow.DATA_SYNC,
+              ByteBuffer.wrap(buffer));
       XDR writeXdr = new XDR();
       writeReq.serialize(writeXdr);
       nfsd.write(writeXdr.asReadOnlyWrap(), null, 1, securityHandler,
@@ -338,24 +338,28 @@ public class TestWrites {
       READ3Request readReq = new READ3Request(handle, 0, 10);
       XDR readXdr = new XDR();
       readReq.serialize(readXdr);
-      READ3Response readRsp = nfsd.read(readXdr.asReadOnlyWrap(),
-          securityHandler, InetAddress.getLocalHost());
+      READ3Response readRsp =
+          nfsd.read(readXdr.asReadOnlyWrap(), securityHandler,
+              InetAddress.getLocalHost());
 
       assertTrue(Arrays.equals(buffer, readRsp.getData().array()));
 
       // Test FILE_SYNC
 
       // Create file2
-      CREATE3Request createReq2 = new CREATE3Request(rootHandle, "file2",
-          Nfs3Constant.CREATE_UNCHECKED, new SetAttr3(), 0);
+      CREATE3Request createReq2 =
+          new CREATE3Request(rootHandle, "file2", Nfs3Constant.CREATE_UNCHECKED,
+              new SetAttr3(), 0);
       XDR createXdr2 = new XDR();
       createReq2.serialize(createXdr2);
-      CREATE3Response createRsp2 = nfsd.create(createXdr2.asReadOnlyWrap(),
-          securityHandler, InetAddress.getLocalHost());
+      CREATE3Response createRsp2 =
+          nfsd.create(createXdr2.asReadOnlyWrap(), securityHandler,
+              InetAddress.getLocalHost());
       FileHandle handle2 = createRsp2.getObjHandle();
 
-      WRITE3Request writeReq2 = new WRITE3Request(handle2, 0, 10,
-          WriteStableHow.FILE_SYNC, ByteBuffer.wrap(buffer));
+      WRITE3Request writeReq2 =
+          new WRITE3Request(handle2, 0, 10, WriteStableHow.FILE_SYNC,
+              ByteBuffer.wrap(buffer));
       XDR writeXdr2 = new XDR();
       writeReq2.serialize(writeXdr2);
       nfsd.write(writeXdr2.asReadOnlyWrap(), null, 1, securityHandler,
@@ -367,8 +371,9 @@ public class TestWrites {
       READ3Request readReq2 = new READ3Request(handle2, 0, 10);
       XDR readXdr2 = new XDR();
       readReq2.serialize(readXdr2);
-      READ3Response readRsp2 = nfsd.read(readXdr2.asReadOnlyWrap(),
-          securityHandler, InetAddress.getLocalHost());
+      READ3Response readRsp2 =
+          nfsd.read(readXdr2.asReadOnlyWrap(), securityHandler,
+              InetAddress.getLocalHost());
 
       assertTrue(Arrays.equals(buffer, readRsp2.getData().array()));
       // FILE_SYNC should sync the file size

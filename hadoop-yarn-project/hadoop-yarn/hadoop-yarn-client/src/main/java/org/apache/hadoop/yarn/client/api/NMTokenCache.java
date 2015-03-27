@@ -1,25 +1,24 @@
 /**
-* Licensed to the Apache Software Foundation (ASF) under one
-* or more contributor license agreements.  See the NOTICE file
-* distributed with this work for additional information
-* regarding copyright ownership.  The ASF licenses this file
-* to you under the Apache License, Version 2.0 (the
-* "License"); you may not use this file except in compliance
-* with the License.  You may obtain a copy of the License at
-*
-*     http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package org.apache.hadoop.yarn.client.api;
 
-import java.util.concurrent.ConcurrentHashMap;
-
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
@@ -29,7 +28,7 @@ import org.apache.hadoop.yarn.api.records.Token;
 import org.apache.hadoop.yarn.client.api.async.AMRMClientAsync;
 import org.apache.hadoop.yarn.client.api.async.NMClientAsync;
 
-import com.google.common.annotations.VisibleForTesting;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * NMTokenCache manages NMTokens required for an Application Master
@@ -41,7 +40,8 @@ import com.google.common.annotations.VisibleForTesting;
  * <li>Using the singleton instance of the cache is appropriate when running a
  * single ApplicationMaster in the same JVM.</li>
  * <li>When using the singleton, users don't need to do anything special,
- * {@link AMRMClient} and {@link NMClient} are already set up to use the default
+ * {@link AMRMClient} and {@link NMClient} are already set up to use the
+ * default
  * singleton {@link NMTokenCache}</li>
  * </ul>
  * <p/>
@@ -50,10 +50,11 @@ import com.google.common.annotations.VisibleForTesting;
  * <p/>
  * <ul>
  * <li>
- * If using the {@link AMRMClient} and the {@link NMClient}, setting up and using
+ * If using the {@link AMRMClient} and the {@link NMClient}, setting up and
+ * using
  * an instance cache is as follows:
  * <p/>
- * 
+ * <p/>
  * <pre>
  *   NMTokenCache nmTokenCache = new NMTokenCache();
  *   AMRMClient rmClient = AMRMClient.createAMRMClient();
@@ -63,17 +64,20 @@ import com.google.common.annotations.VisibleForTesting;
  * </pre>
  * </li>
  * <li>
- * If using the {@link AMRMClientAsync} and the {@link NMClientAsync}, setting up
+ * If using the {@link AMRMClientAsync} and the {@link NMClientAsync}, setting
+ * up
  * and using an instance cache is as follows:
  * <p/>
- * 
+ * <p/>
  * <pre>
  *   NMTokenCache nmTokenCache = new NMTokenCache();
  *   AMRMClient rmClient = AMRMClient.createAMRMClient();
  *   NMClient nmClient = NMClient.createNMClient();
  *   nmClient.setNMTokenCache(nmTokenCache);
- *   AMRMClientAsync rmClientAsync = new AMRMClientAsync(rmClient, 1000, [AMRM_CALLBACK]);
- *   NMClientAsync nmClientAsync = new NMClientAsync("nmClient", nmClient, [NM_CALLBACK]);
+ *   AMRMClientAsync rmClientAsync = new AMRMClientAsync(rmClient, 1000,
+ * [AMRM_CALLBACK]);
+ *   NMClientAsync nmClientAsync = new NMClientAsync("nmClient", nmClient,
+ * [NM_CALLBACK]);
  *   ...
  * </pre>
  * </li>
@@ -82,11 +86,12 @@ import com.google.common.annotations.VisibleForTesting;
  * {@link ContainerManagementProtocol} directly, setting up and using an
  * instance cache is as follows:
  * <p/>
- * 
+ * <p/>
  * <pre>
  *   NMTokenCache nmTokenCache = new NMTokenCache();
  *   ...
- *   ApplicationMasterProtocol amPro = ClientRMProxy.createRMProxy(conf, ApplicationMasterProtocol.class);
+ *   ApplicationMasterProtocol amPro = ClientRMProxy.createRMProxy(conf,
+ * ApplicationMasterProtocol.class);
  *   ...
  *   AllocateRequest allocateRequest = ...
  *   ...
@@ -95,7 +100,8 @@ import com.google.common.annotations.VisibleForTesting;
  *     nmTokenCache.setToken(token.getNodeId().toString(), token.getToken());
  *   }
  *   ...
- *   ContainerManagementProtocolProxy nmPro = ContainerManagementProtocolProxy(conf, nmTokenCache);
+ *   ContainerManagementProtocolProxy nmPro = ContainerManagementProtocolProxy(conf,
+ * nmTokenCache);
  *   ...
  *   nmPro.startContainer(container, containerContext);
  *   ...
@@ -103,7 +109,8 @@ import com.google.common.annotations.VisibleForTesting;
  * </li>
  * </ul>
  * It is also possible to mix the usage of a client (<code>AMRMClient</code> or
- * <code>NMClient</code>, or the async versions of them) with a protocol proxy (
+ * <code>NMClient</code>, or the async versions of them) with a protocol proxy
+ * (
  * <code>ContainerManagementProtocolProxy</code> or
  * <code>ApplicationMasterProtocol</code>).
  */
@@ -126,7 +133,7 @@ public class NMTokenCache {
    * {@link #getSingleton()} is looked at for the tokens. If you are using your
    * own NMTokenCache that is different from the singleton, use
    * {@link #getToken(String) }
-   * 
+   *
    * @param nodeAddr
    * @return {@link Token} NMToken required for communicating with node manager
    */
@@ -139,11 +146,11 @@ public class NMTokenCache {
    * Sets the NMToken for node address only in the singleton obtained from
    * {@link #getSingleton()}. If you are using your own NMTokenCache that is
    * different from the singleton, use {@link #setToken(String, Token) }
-   * 
+   *
    * @param nodeAddr
-   *          node address (host:port)
+   *     node address (host:port)
    * @param token
-   *          NMToken
+   *     NMToken
    */
   @Public
   public static void setNMToken(String nodeAddr, Token token) {
@@ -161,9 +168,10 @@ public class NMTokenCache {
   
   /**
    * Returns NMToken, null if absent
+   *
    * @param nodeAddr
    * @return {@link Token} NMToken required for communicating with node
-   *         manager
+   * manager
    */
   @Public
   @Evolving
@@ -173,8 +181,11 @@ public class NMTokenCache {
   
   /**
    * Sets the NMToken for node address
-   * @param nodeAddr node address (host:port)
-   * @param token NMToken
+   *
+   * @param nodeAddr
+   *     node address (host:port)
+   * @param token
+   *     NMToken
    */
   @Public
   @Evolving
@@ -202,7 +213,9 @@ public class NMTokenCache {
   
   /**
    * Removes NMToken for specified node manager
-   * @param nodeAddr node address (host:port)
+   *
+   * @param nodeAddr
+   *     node address (host:port)
    */
   @Private
   @VisibleForTesting

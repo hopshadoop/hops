@@ -19,10 +19,6 @@
 
 package org.apache.hadoop.yarn.client.api;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.Map;
-
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
@@ -35,6 +31,10 @@ import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.client.api.impl.NMClientImpl;
 import org.apache.hadoop.yarn.exceptions.YarnException;
+
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.Map;
 
 @InterfaceAudience.Public
 @InterfaceStability.Stable
@@ -67,31 +67,34 @@ public abstract class NMClient extends AbstractService {
 
   /**
    * <p>Start an allocated container.</p>
-   *
+   * <p/>
    * <p>The <code>ApplicationMaster</code> or other applications that use the
    * client must provide the details of the allocated container, including the
    * Id, the assigned node's Id and the token via {@link Container}. In
    * addition, the AM needs to provide the {@link ContainerLaunchContext} as
    * well.</p>
    *
-   * @param container the allocated container
-   * @param containerLaunchContext the context information needed by the
-   *                               <code>NodeManager</code> to launch the
-   *                               container
+   * @param container
+   *     the allocated container
+   * @param containerLaunchContext
+   *     the context information needed by the
+   *     <code>NodeManager</code> to launch the
+   *     container
    * @return a map between the auxiliary service names and their outputs
    * @throws YarnException
    * @throws IOException
    */
   public abstract Map<String, ByteBuffer> startContainer(Container container,
       ContainerLaunchContext containerLaunchContext)
-          throws YarnException, IOException;
+      throws YarnException, IOException;
 
   /**
    * <p>Stop an started container.</p>
    *
-   * @param containerId the Id of the started container
-   * @param nodeId the Id of the <code>NodeManager</code>
-   * 
+   * @param containerId
+   *     the Id of the started container
+   * @param nodeId
+   *     the Id of the <code>NodeManager</code>
    * @throws YarnException
    * @throws IOException
    */
@@ -101,9 +104,10 @@ public abstract class NMClient extends AbstractService {
   /**
    * <p>Query the status of a container.</p>
    *
-   * @param containerId the Id of the started container
-   * @param nodeId the Id of the <code>NodeManager</code>
-   * 
+   * @param containerId
+   *     the Id of the started container
+   * @param nodeId
+   *     the Id of the <code>NodeManager</code>
    * @return the status of a container
    * @throws YarnException
    * @throws IOException
@@ -114,10 +118,11 @@ public abstract class NMClient extends AbstractService {
   /**
    * <p>Set whether the containers that are started by this client, and are
    * still running should be stopped when the client stops. By default, the
-   * feature should be enabled.</p> However, containers will be stopped only  
-   * when service is stopped. i.e. after {@link NMClient#stop()}. 
+   * feature should be enabled.</p> However, containers will be stopped only
+   * when service is stopped. i.e. after {@link NMClient#stop()}.
    *
-   * @param enabled whether the feature is enabled or not
+   * @param enabled
+   *     whether the feature is enabled or not
    */
   public abstract void cleanupRunningContainersOnStop(boolean enabled);
 
@@ -129,7 +134,8 @@ public abstract class NMClient extends AbstractService {
    * If a NM token cache is not set, the {@link NMTokenCache#getSingleton()}
    * singleton instance will be used.
    *
-   * @param nmTokenCache the NM token cache to use.
+   * @param nmTokenCache
+   *     the NM token cache to use.
    */
   public void setNMTokenCache(NMTokenCache nmTokenCache) {
     this.nmTokenCache = nmTokenCache;

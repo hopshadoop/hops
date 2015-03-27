@@ -17,15 +17,6 @@
  */
 package org.apache.hadoop.hdfs;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Random;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -43,7 +34,18 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-/** Unit tests for permission */
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Random;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
+/**
+ * Unit tests for permission
+ */
 public class TestDFSPermission {
   public static final Log LOG = LogFactory.getLog(TestDFSPermission.class);
   final private static Configuration conf = new HdfsConfiguration();
@@ -56,17 +58,17 @@ public class TestDFSPermission {
   final private static String USER2_NAME = "user2";
   final private static String USER3_NAME = "user3";
 
-  private static final UserGroupInformation SUPERUSER;
-  private static final UserGroupInformation USER1;
-  private static final UserGroupInformation USER2;
-  private static final UserGroupInformation USER3;
+  private static UserGroupInformation SUPERUSER;
+  private static UserGroupInformation USER1;
+  private static UserGroupInformation USER2;
+  private static UserGroupInformation USER3;
 
   final private static short MAX_PERMISSION = 511;
   final private static short DEFAULT_UMASK = 022;
-  final private static FsPermission DEFAULT_PERMISSION = 
-    FsPermission.createImmutable((short) 0777);
-  final static private int NUM_TEST_PERMISSIONS = 
-    conf.getInt("test.dfs.permission.num", 10) * (MAX_PERMISSION + 1) / 100;
+  final private static FsPermission DEFAULT_PERMISSION =
+      FsPermission.createImmutable((short) 0777);
+  final static private int NUM_TEST_PERMISSIONS =
+      conf.getInt("test.dfs.permission.num", 10) * (MAX_PERMISSION + 1) / 100;
 
   final private static String PATH_NAME = "xx";
   final private static Path FILE_DIR_PATH = new Path("/", PATH_NAME);
@@ -75,7 +77,7 @@ public class TestDFSPermission {
 
   private FileSystem fs;
   private MiniDFSCluster cluster;
-  private static final Random r;
+  private static Random r;
 
   static {
     try {
@@ -89,20 +91,20 @@ public class TestDFSPermission {
       conf.setBoolean(DFSConfigKeys.DFS_PERMISSIONS_ENABLED_KEY, true);
       
       // create fake mapping for the groups
-      Map<String, String[]> u2g_map = new HashMap<String, String[]> (3);
-      u2g_map.put(USER1_NAME, new String[] {GROUP1_NAME, GROUP2_NAME });
-      u2g_map.put(USER2_NAME, new String[] {GROUP2_NAME, GROUP3_NAME });
-      u2g_map.put(USER3_NAME, new String[] {GROUP3_NAME, GROUP4_NAME });
+      Map<String, String[]> u2g_map = new HashMap<String, String[]>(3);
+      u2g_map.put(USER1_NAME, new String[]{GROUP1_NAME, GROUP2_NAME});
+      u2g_map.put(USER2_NAME, new String[]{GROUP2_NAME, GROUP3_NAME});
+      u2g_map.put(USER3_NAME, new String[]{GROUP3_NAME, GROUP4_NAME});
       DFSTestUtil.updateConfWithFakeGroupMapping(conf, u2g_map);
       
       // Initiate all four users
       SUPERUSER = UserGroupInformation.getCurrentUser();
       USER1 = UserGroupInformation.createUserForTesting(USER1_NAME,
-          new String[] { GROUP1_NAME, GROUP2_NAME });
+          new String[]{GROUP1_NAME, GROUP2_NAME});
       USER2 = UserGroupInformation.createUserForTesting(USER2_NAME,
-          new String[] { GROUP2_NAME, GROUP3_NAME });
+          new String[]{GROUP2_NAME, GROUP3_NAME});
       USER3 = UserGroupInformation.createUserForTesting(USER3_NAME,
-          new String[] { GROUP3_NAME, GROUP4_NAME });
+          new String[]{GROUP3_NAME, GROUP4_NAME});
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
@@ -121,7 +123,8 @@ public class TestDFSPermission {
     }
   }
   
-  /** This tests if permission setting in create, mkdir, and 
+  /**
+   * This tests if permission setting in create, mkdir, and
    * setPermission works correctly
    */
   @Test
@@ -155,15 +158,15 @@ public class TestDFSPermission {
     // case 2: use permission 0643 and the default umask
     uMask = DEFAULT_UMASK;
     initFileSystem(uMask);
-    createAndCheckPermission(op, FILE_DIR_PATH, uMask, new FsPermission(
-        (short) 0643), true);
+    createAndCheckPermission(op, FILE_DIR_PATH, uMask,
+        new FsPermission((short) 0643), true);
     closeFileSystem();
 
     // case 3: use permission 0643 and umask 0222
     uMask = (short) 0222;
     initFileSystem(uMask);
-    createAndCheckPermission(op, FILE_DIR_PATH, uMask, new FsPermission(
-        (short) 0643), false);
+    createAndCheckPermission(op, FILE_DIR_PATH, uMask,
+        new FsPermission((short) 0643), false);
     closeFileSystem();
 
     // case 4: set permission
@@ -178,8 +181,8 @@ public class TestDFSPermission {
     uMask = DEFAULT_UMASK;
     initFileSystem(uMask);
     assertFalse("File shouldn't exists", fs.exists(NON_EXISTENT_PATH));
-    createAndCheckPermission(op, NON_EXISTENT_PATH, uMask, new FsPermission(
-        DEFAULT_PERMISSION), false);
+    createAndCheckPermission(op, NON_EXISTENT_PATH, uMask,
+        new FsPermission(DEFAULT_PERMISSION), false);
     Path parent = NON_EXISTENT_PATH.getParent();
     checkPermission(parent, getPermission(parent.getParent()), true);
     closeFileSystem();
@@ -196,24 +199,24 @@ public class TestDFSPermission {
   }
 
   /* create a file/directory with the given umask and permission */
-  private void create(OpType op, Path name, short umask, 
+  private void create(OpType op, Path name, short umask,
       FsPermission permission) throws IOException {
     // set umask in configuration, converting to padded octal
     conf.set(FsPermission.UMASK_LABEL, String.format("%1$03o", umask));
 
     // create the file/directory
     switch (op) {
-    case CREATE:
-      FSDataOutputStream out = fs.create(name, permission, true, 
-          conf.getInt(CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096),
-          fs.getDefaultReplication(name), fs.getDefaultBlockSize(name), null);
-      out.close();
-      break;
-    case MKDIRS:
-      fs.mkdirs(name, permission);
-      break;
-    default:
-      throw new IOException("Unsupported operation: " + op);
+      case CREATE:
+        FSDataOutputStream out = fs.create(name, permission, true,
+            conf.getInt(CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096),
+            fs.getDefaultReplication(name), fs.getDefaultBlockSize(name), null);
+        out.close();
+        break;
+      case MKDIRS:
+        fs.mkdirs(name, permission);
+        break;
+      default:
+        throw new IOException("Unsupported operation: " + op);
     }
   }
 
@@ -228,12 +231,14 @@ public class TestDFSPermission {
     create(op, name, umask, permission);
 
     // get the short form of the permission
-    short permissionNum = (DEFAULT_PERMISSION.equals(permission)) ? MAX_PERMISSION
-        : permission.toShort();
+    short permissionNum =
+        (DEFAULT_PERMISSION.equals(permission)) ? MAX_PERMISSION :
+            permission.toShort();
 
     // get the expected permission
-    short expectedPermission = (op == OpType.CREATE) ? (short) (~umask
-        & permissionNum) : (short) (~umask & permissionNum);
+    short expectedPermission =
+        (op == OpType.CREATE) ? (short) (~umask & permissionNum) :
+            (short) (~umask & permissionNum);
 
     // check if permission is correctly set
     checkPermission(name, expectedPermission, delete);
@@ -265,8 +270,7 @@ public class TestDFSPermission {
     fs = FileSystem.get(conf);
 
     // set the permission of the root to be world-wide rwx
-    fs.setPermission(new Path("/"),
-        FsPermission.createImmutable((short)0777));
+    fs.setPermission(new Path("/"), FsPermission.createImmutable((short) 0777));
   }
   
   /* check if the ownership of a file/directory is set correctly */
@@ -287,7 +291,7 @@ public class TestDFSPermission {
       fs.setOwner(path, owner, group);
       checkOwnership(path, expectedOwner, expectedGroup);
       assertFalse(expectDeny);
-    } catch(AccessControlException e) {
+    } catch (AccessControlException e) {
       assertTrue(expectDeny);
     }
   }
@@ -353,9 +357,21 @@ public class TestDFSPermission {
   final static private String DIR_NAME = "dir";
   final static private String FILE_DIR_NAME = "filedir";
 
-  private enum OpType {CREATE, MKDIRS, OPEN, SET_REPLICATION,
-    GET_FILEINFO, IS_DIR, EXISTS, GET_CONTENT_LENGTH, LIST, RENAME, DELETE
-  };
+  private enum OpType {
+    CREATE,
+    MKDIRS,
+    OPEN,
+    SET_REPLICATION,
+    GET_FILEINFO,
+    IS_DIR,
+    EXISTS,
+    GET_CONTENT_LENGTH,
+    LIST,
+    RENAME,
+    DELETE
+  }
+
+  ;
 
   /* Check if namenode performs permission checking correctly for
    * superuser, file owner, group owner, and other users */
@@ -365,11 +381,11 @@ public class TestDFSPermission {
       fs = FileSystem.get(conf);
 
       // set the permission of the root to be world-wide rwx
-      fs.setPermission(new Path("/"), new FsPermission((short)0777));
+      fs.setPermission(new Path("/"), new FsPermission((short) 0777));
       
       // create a directory hierarchy and sets random permission for each inode
-      PermissionGenerator ancestorPermissionGenerator = 
-        new PermissionGenerator(r);
+      PermissionGenerator ancestorPermissionGenerator =
+          new PermissionGenerator(r);
       PermissionGenerator dirPermissionGenerator = new PermissionGenerator(r);
       PermissionGenerator filePermissionGenerator = new PermissionGenerator(r);
       short[] ancestorPermissions = new short[NUM_TEST_PERMISSIONS];
@@ -398,10 +414,10 @@ public class TestDFSPermission {
         ancestorPermissions[i] = ancestorPermissionGenerator.next();
         parentPermissions[i] = dirPermissionGenerator.next();
         permissions[i] = filePermissionGenerator.next();
-        fs.setPermission(ancestorPaths[i], new FsPermission(
-            ancestorPermissions[i]));
-        fs.setPermission(parentPaths[i], new FsPermission(
-                parentPermissions[i]));
+        fs.setPermission(ancestorPaths[i],
+            new FsPermission(ancestorPermissions[i]));
+        fs.setPermission(parentPaths[i],
+            new FsPermission(parentPermissions[i]));
       }
 
       /* file owner */
@@ -451,14 +467,15 @@ public class TestDFSPermission {
           filePermission[i]);
       testSetReplication(ugi, files[i], ancestorPermission[i],
           parentPermission[i], filePermission[i]);
-      testSetTimes(ugi, files[i], ancestorPermission[i],
-          parentPermission[i], filePermission[i]);
+      testSetTimes(ugi, files[i], ancestorPermission[i], parentPermission[i],
+          filePermission[i]);
       testStats(ugi, files[i], ancestorPermission[i], parentPermission[i]);
       testList(ugi, files[i], dirs[i], ancestorPermission[i],
           parentPermission[i], filePermission[i]);
       int next = i == NUM_TEST_PERMISSIONS - 1 ? 0 : i + 1;
       testRename(ugi, files[i], files[next], ancestorPermission[i],
-          parentPermission[i], ancestorPermission[next], parentPermission[next]);
+          parentPermission[i], ancestorPermission[next],
+          parentPermission[next]);
       testDeleteFile(ugi, files[i], ancestorPermission[i], parentPermission[i]);
       testDeleteDir(ugi, dirs[i], ancestorPermission[i], parentPermission[i],
           filePermission[i], null);
@@ -472,8 +489,8 @@ public class TestDFSPermission {
    * value is generated only once.
    */
   static private class PermissionGenerator {
-    private final Random r;
-    private final short[] permissions = new short[MAX_PERMISSION + 1];
+    private Random r;
+    private short permissions[] = new short[MAX_PERMISSION + 1];
     private int numLeft = MAX_PERMISSION + 1;
 
     PermissionGenerator(Random r) {
@@ -536,7 +553,7 @@ public class TestDFSPermission {
         try {
           call();
           assertFalse(expectPermissionDeny());
-        } catch(AccessControlException e) {
+        } catch (AccessControlException e) {
           assertTrue(expectPermissionDeny());
         }
       } catch (AssertionError ae) {
@@ -545,27 +562,29 @@ public class TestDFSPermission {
       }
     }
 
-    /** Log the permissions and required permissions */
+    /**
+     * Log the permissions and required permissions
+     */
     protected void logPermissions() {
-      LOG.info("required ancestor permission:"
-          + Integer.toOctalString(requiredAncestorPermission));
-      LOG.info("ancestor permission: "
-          + Integer.toOctalString(ancestorPermission));
-      LOG.info("required parent permission:"
-          + Integer.toOctalString(requiredParentPermission));
+      LOG.info("required ancestor permission:" +
+          Integer.toOctalString(requiredAncestorPermission));
+      LOG.info(
+          "ancestor permission: " + Integer.toOctalString(ancestorPermission));
+      LOG.info("required parent permission:" +
+          Integer.toOctalString(requiredParentPermission));
       LOG.info("parent permission: " + Integer.toOctalString(parentPermission));
-      LOG.info("required permission:"
-          + Integer.toOctalString(requiredPermission));
+      LOG.info(
+          "required permission:" + Integer.toOctalString(requiredPermission));
       LOG.info("permission: " + Integer.toOctalString(permission));
     }
 
     /* Return true if an AccessControlException is expected */
     protected boolean expectPermissionDeny() {
-      return (requiredPermission & permission) != requiredPermission
-          || (requiredParentPermission & parentPermission) !=
-                            requiredParentPermission
-          || (requiredAncestorPermission & ancestorPermission) !=
-                            requiredAncestorPermission;
+      return (requiredPermission & permission) != requiredPermission ||
+          (requiredParentPermission & parentPermission) !=
+              requiredParentPermission ||
+          (requiredAncestorPermission & ancestorPermission) !=
+              requiredAncestorPermission;
     }
 
     /* Set the permissions required to pass the permission checking */
@@ -575,17 +594,20 @@ public class TestDFSPermission {
         requiredParentPermission = SUPER_MASK;
         requiredPermission = SUPER_MASK;
       } else if (USER1.equals(ugi)) {
-        requiredAncestorPermission = (short)(opAncestorPermission & OWNER_MASK);
-        requiredParentPermission = (short)(opParentPermission & OWNER_MASK);
-        requiredPermission = (short)(opPermission & OWNER_MASK);
+        requiredAncestorPermission =
+            (short) (opAncestorPermission & OWNER_MASK);
+        requiredParentPermission = (short) (opParentPermission & OWNER_MASK);
+        requiredPermission = (short) (opPermission & OWNER_MASK);
       } else if (USER2.equals(ugi)) {
-        requiredAncestorPermission = (short)(opAncestorPermission & GROUP_MASK);
-        requiredParentPermission = (short)(opParentPermission & GROUP_MASK);
-        requiredPermission = (short)(opPermission & GROUP_MASK);
+        requiredAncestorPermission =
+            (short) (opAncestorPermission & GROUP_MASK);
+        requiredParentPermission = (short) (opParentPermission & GROUP_MASK);
+        requiredPermission = (short) (opPermission & GROUP_MASK);
       } else if (USER3.equals(ugi)) {
-        requiredAncestorPermission = (short)(opAncestorPermission & OTHER_MASK);
-        requiredParentPermission = (short)(opParentPermission & OTHER_MASK);
-        requiredPermission = (short)(opPermission & OTHER_MASK);
+        requiredAncestorPermission =
+            (short) (opAncestorPermission & OTHER_MASK);
+        requiredParentPermission = (short) (opParentPermission & OTHER_MASK);
+        requiredPermission = (short) (opPermission & OTHER_MASK);
       } else {
         throw new IllegalArgumentException("Non-supported user: " + ugi);
       }
@@ -642,13 +664,14 @@ public class TestDFSPermission {
     }
   }
 
-  private final CreatePermissionVerifier createVerifier =
-    new CreatePermissionVerifier();
+  private CreatePermissionVerifier createVerifier =
+      new CreatePermissionVerifier();
+
   /* test if the permission checking of create/mkdir is correct */
   private void testCreateMkdirs(UserGroupInformation ugi, Path path,
       short ancestorPermission, short parentPermission) throws Exception {
-    createVerifier.set(path, OpType.MKDIRS, ancestorPermission,
-        parentPermission);
+    createVerifier
+        .set(path, OpType.MKDIRS, ancestorPermission, parentPermission);
     createVerifier.verifyPermission(ugi);
     createVerifier.setOpType(OpType.CREATE);
     createVerifier.setCleanup(false);
@@ -672,7 +695,8 @@ public class TestDFSPermission {
     }
   }
 
-  private final OpenPermissionVerifier openVerifier = new OpenPermissionVerifier();
+  private OpenPermissionVerifier openVerifier = new OpenPermissionVerifier();
+
   /* test if the permission checking of open is correct */
   private void testOpen(UserGroupInformation ugi, Path path,
       short ancestorPermission, short parentPermission, short filePermission)
@@ -697,14 +721,15 @@ public class TestDFSPermission {
     }
   }
 
-  private final SetReplicationPermissionVerifier replicatorVerifier =
-    new SetReplicationPermissionVerifier();
+  private SetReplicationPermissionVerifier replicatorVerifier =
+      new SetReplicationPermissionVerifier();
+
   /* test if the permission checking of setReplication is correct */
   private void testSetReplication(UserGroupInformation ugi, Path path,
       short ancestorPermission, short parentPermission, short filePermission)
       throws Exception {
-    replicatorVerifier.set(path, ancestorPermission, parentPermission,
-        filePermission);
+    replicatorVerifier
+        .set(path, ancestorPermission, parentPermission, filePermission);
     replicatorVerifier.verifyPermission(ugi);
   }
 
@@ -725,14 +750,15 @@ public class TestDFSPermission {
     }
   }
 
-  private final SetTimesPermissionVerifier timesVerifier =
-    new SetTimesPermissionVerifier();
+  private SetTimesPermissionVerifier timesVerifier =
+      new SetTimesPermissionVerifier();
+
   /* test if the permission checking of setReplication is correct */
   private void testSetTimes(UserGroupInformation ugi, Path path,
       short ancestorPermission, short parentPermission, short filePermission)
       throws Exception {
-    timesVerifier.set(path, ancestorPermission, parentPermission,
-        filePermission);
+    timesVerifier
+        .set(path, ancestorPermission, parentPermission, filePermission);
     timesVerifier.verifyPermission(ugi);
   }
 
@@ -761,32 +787,33 @@ public class TestDFSPermission {
     @Override
     void call() throws IOException {
       switch (opType) {
-      case GET_FILEINFO:
-        fs.getFileStatus(path);
-        break;
-      case IS_DIR:
-        fs.isDirectory(path);
-        break;
-      case EXISTS:
-        fs.exists(path);
-        break;
-      case GET_CONTENT_LENGTH:
-        fs.getContentSummary(path).getLength();
-        break;
-      default:
-        throw new IllegalArgumentException("Unexpected operation type: "
-            + opType);
+        case GET_FILEINFO:
+          fs.getFileStatus(path);
+          break;
+        case IS_DIR:
+          fs.isDirectory(path);
+          break;
+        case EXISTS:
+          fs.exists(path);
+          break;
+        case GET_CONTENT_LENGTH:
+          fs.getContentSummary(path).getLength();
+          break;
+        default:
+          throw new IllegalArgumentException(
+              "Unexpected operation type: " + opType);
       }
     }
   }
 
-  private final StatsPermissionVerifier statsVerifier = new StatsPermissionVerifier();
+  private StatsPermissionVerifier statsVerifier = new StatsPermissionVerifier();
+
   /* test if the permission checking of isDirectory, exist,
    * getFileInfo, getContentSummary is correct */
   private void testStats(UserGroupInformation ugi, Path path,
       short ancestorPermission, short parentPermission) throws Exception {
-    statsVerifier.set(path, OpType.GET_FILEINFO, ancestorPermission,
-        parentPermission);
+    statsVerifier
+        .set(path, OpType.GET_FILEINFO, ancestorPermission, parentPermission);
     statsVerifier.verifyPermission(ugi);
     statsVerifier.setOpType(OpType.IS_DIR);
     statsVerifier.verifyPermission(ugi);
@@ -797,8 +824,11 @@ public class TestDFSPermission {
   }
 
   private enum InodeType {
-    FILE, DIR
-  };
+    FILE,
+    DIR
+  }
+
+  ;
 
   /* A class that verifies the permission checking is correct for list */
   private class ListPermissionVerifier extends PermissionVerifier {
@@ -823,14 +853,15 @@ public class TestDFSPermission {
     void setOpPermission() {
       this.opParentPermission = SEARCH_MASK;
       switch (inodeType) {
-      case FILE:
-        this.opPermission = 0;
-        break;
-      case DIR:
-        this.opPermission = READ_MASK | SEARCH_MASK;
-        break;
-      default:
-        throw new IllegalArgumentException("Illegal inode type: " + inodeType);
+        case FILE:
+          this.opPermission = 0;
+          break;
+        case DIR:
+          this.opPermission = READ_MASK | SEARCH_MASK;
+          break;
+        default:
+          throw new IllegalArgumentException(
+              "Illegal inode type: " + inodeType);
       }
     }
 
@@ -840,13 +871,14 @@ public class TestDFSPermission {
     }
   }
 
-  final ListPermissionVerifier listVerifier = new ListPermissionVerifier();
+  ListPermissionVerifier listVerifier = new ListPermissionVerifier();
+
   /* test if the permission checking of list is correct */
   private void testList(UserGroupInformation ugi, Path file, Path dir,
       short ancestorPermission, short parentPermission, short filePermission)
       throws Exception {
-    listVerifier.set(file, InodeType.FILE, ancestorPermission,
-        parentPermission, filePermission);
+    listVerifier.set(file, InodeType.FILE, ancestorPermission, parentPermission,
+        filePermission);
     listVerifier.verifyPermission(ugi);
     listVerifier.setInodeType(dir, InodeType.DIR);
     listVerifier.verifyPermission(ugi);
@@ -879,24 +911,25 @@ public class TestDFSPermission {
 
     @Override
     protected boolean expectPermissionDeny() {
-      return super.expectPermissionDeny()
-          || (requiredParentPermission & dstParentPermission) != 
-                requiredParentPermission
-          || (requiredAncestorPermission & dstAncestorPermission) != 
-                requiredAncestorPermission;
+      return super.expectPermissionDeny() ||
+          (requiredParentPermission & dstParentPermission) !=
+              requiredParentPermission ||
+          (requiredAncestorPermission & dstAncestorPermission) !=
+              requiredAncestorPermission;
     }
 
     @Override
     protected void logPermissions() {
       super.logPermissions();
-      LOG.info("dst ancestor permission: "
-          + Integer.toOctalString(dstAncestorPermission));
-      LOG.info("dst parent permission: "
-          + Integer.toOctalString(dstParentPermission));
+      LOG.info("dst ancestor permission: " +
+          Integer.toOctalString(dstAncestorPermission));
+      LOG.info("dst parent permission: " +
+          Integer.toOctalString(dstParentPermission));
     }
   }
 
-  final RenamePermissionVerifier renameVerifier = new RenamePermissionVerifier();
+  RenamePermissionVerifier renameVerifier = new RenamePermissionVerifier();
+
   /* test if the permission checking of rename is correct */
   private void testRename(UserGroupInformation ugi, Path src, Path dst,
       short srcAncestorPermission, short srcParentPermission,
@@ -958,8 +991,8 @@ public class TestDFSPermission {
     }
   }
 
-  final DeletePermissionVerifier fileDeletionVerifier =
-    new DeletePermissionVerifier();
+  DeletePermissionVerifier fileDeletionVerifier =
+      new DeletePermissionVerifier();
 
   /* test if the permission checking of file deletion is correct */
   private void testDeleteFile(UserGroupInformation ugi, Path file,
@@ -968,22 +1001,23 @@ public class TestDFSPermission {
     fileDeletionVerifier.verifyPermission(ugi);
   }
 
-  final DeleteDirPermissionVerifier dirDeletionVerifier =
-    new DeleteDirPermissionVerifier();
+  DeleteDirPermissionVerifier dirDeletionVerifier =
+      new DeleteDirPermissionVerifier();
 
   /* test if the permission checking of directory deletion is correct */
   private void testDeleteDir(UserGroupInformation ugi, Path path,
       short ancestorPermission, short parentPermission, short permission,
       short[] childPermissions) throws Exception {
-    dirDeletionVerifier.set(path, ancestorPermission, parentPermission,
-        permission, childPermissions);
+    dirDeletionVerifier
+        .set(path, ancestorPermission, parentPermission, permission,
+            childPermissions);
     dirDeletionVerifier.verifyPermission(ugi);
 
   }
 
   /* log into dfs as the given user */
-  private void login(UserGroupInformation ugi) throws IOException,
-      InterruptedException {
+  private void login(UserGroupInformation ugi)
+      throws IOException, InterruptedException {
     if (fs != null) {
       fs.close();
     }
@@ -1004,7 +1038,7 @@ public class TestDFSPermission {
       checkNoPermissionDeny(e);
     }
     try {
-      fs.setReplication(NON_EXISTENT_FILE, (short)4);
+      fs.setReplication(NON_EXISTENT_FILE, (short) 4);
     } catch (IOException e) {
       checkNoPermissionDeny(e);
     }
@@ -1013,7 +1047,7 @@ public class TestDFSPermission {
     } catch (IOException e) {
       checkNoPermissionDeny(e);
     }
-    try {      
+    try {
       fs.getContentSummary(NON_EXISTENT_FILE).getLength();
     } catch (IOException e) {
       checkNoPermissionDeny(e);
@@ -1029,7 +1063,7 @@ public class TestDFSPermission {
       checkNoPermissionDeny(e);
     }
     try {
-      fs.rename(NON_EXISTENT_FILE, new Path(NON_EXISTENT_FILE+".txt"));
+      fs.rename(NON_EXISTENT_FILE, new Path(NON_EXISTENT_FILE + ".txt"));
     } catch (IOException e) {
       checkNoPermissionDeny(e);
     }

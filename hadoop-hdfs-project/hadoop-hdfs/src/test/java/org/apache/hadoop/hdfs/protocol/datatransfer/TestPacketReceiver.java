@@ -17,30 +17,33 @@
  */
 package org.apache.hadoop.hdfs.protocol.datatransfer;
 
+import org.apache.hadoop.hdfs.AppendTestUtil;
+import org.junit.Test;
+import org.mockito.Mockito;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import org.apache.hadoop.hdfs.AppendTestUtil;
-import org.junit.Test;
-import org.mockito.Mockito;
-
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
 
 public class TestPacketReceiver {
 
-  private static final long OFFSET_IN_BLOCK = 12345L;
-  private static final int SEQNO = 54321;
+  private static long OFFSET_IN_BLOCK = 12345L;
+  private static int SEQNO = 54321;
 
-  private byte[] prepareFakePacket(byte[] data, byte[] sums) throws IOException {
+  private byte[] prepareFakePacket(byte[] data, byte[] sums)
+      throws IOException {
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     DataOutputStream dos = new DataOutputStream(baos);
     
     int packetLen = data.length + sums.length + 4;
-    PacketHeader header = new PacketHeader(
-        packetLen, OFFSET_IN_BLOCK, SEQNO, false, data.length, false);
+    PacketHeader header =
+        new PacketHeader(packetLen, OFFSET_IN_BLOCK, SEQNO, false, data.length,
+            false);
     header.write(dos);
     
     dos.write(sums);
@@ -68,8 +71,8 @@ public class TestPacketReceiver {
     pr.close();
   }
   
-  private void doTestReceiveAndMirror(PacketReceiver pr,
-      int dataLen, int checksumsLen) throws IOException {
+  private void doTestReceiveAndMirror(PacketReceiver pr, int dataLen,
+      int checksumsLen) throws IOException {
     final byte[] DATA = AppendTestUtil.initBuffer(dataLen);
     final byte[] CHECKSUMS = AppendTestUtil.initBuffer(checksumsLen);
 
@@ -97,8 +100,8 @@ public class TestPacketReceiver {
     // The write should be done in a single call. Otherwise we may hit
     // nasty interactions with nagling (eg HDFS-4049).
     Mockito.verify(mirrored, Mockito.times(1))
-      .write(Mockito.<byte[]>any(), Mockito.anyInt(),
-          Mockito.eq(packet.length));
+        .write(Mockito.<byte[]>any(), Mockito.anyInt(),
+            Mockito.eq(packet.length));
     Mockito.verifyNoMoreInteractions(mirrored);
 
     assertArrayEquals(packet, mirrored.toByteArray());

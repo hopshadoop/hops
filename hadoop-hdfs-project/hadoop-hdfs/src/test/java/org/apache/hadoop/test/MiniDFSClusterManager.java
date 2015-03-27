@@ -17,14 +17,6 @@
  */
 package org.apache.hadoop.test;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.util.Map;
-import java.util.TreeMap;
-
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.GnuParser;
@@ -40,26 +32,34 @@ import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.StartupOption;
 import org.mortbay.util.ajax.JSON;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.Map;
+import java.util.TreeMap;
+
 /**
  * This class drives the creation of a mini-cluster on the local machine. By
  * default, a MiniDFSCluster is spawned on the first available ports that are
  * found.
- * 
+ * <p/>
  * A series of command line flags controls the startup cluster options.
- * 
+ * <p/>
  * This class can dump a Hadoop configuration and some basic metadata (in JSON)
  * into a textfile.
- * 
+ * <p/>
  * To shutdown the cluster, kill the process.
- * 
+ * <p/>
  * To run this from the command line, do the following (replacing the jar
  * version as appropriate):
- * 
- * $HADOOP_HOME/bin/hadoop jar $HADOOP_HOME/share/hadoop/hdfs/hadoop-hdfs-0.24.0-SNAPSHOT-tests.jar org.apache.hadoop.test.MiniDFSClusterManager -options...
+ * <p/>
+ * $HADOOP_HOME/bin/hadoop jar $HADOOP_HOME/share/hadoop/hdfs/hadoop-hdfs-0.24.0-SNAPSHOT-tests.jar
+ * org.apache.hadoop.test.MiniDFSClusterManager -options...
  */
 public class MiniDFSClusterManager {
-  private static final Log LOG =
-    LogFactory.getLog(MiniDFSClusterManager.class);
+  private static final Log LOG = LogFactory.getLog(MiniDFSClusterManager.class);
 
   private MiniDFSCluster dfs;
   private String writeDetails;
@@ -84,25 +84,17 @@ public class MiniDFSClusterManager {
         .addOption("cmdport", true,
             "Which port to listen on for commands (default 0--we choose)")
         .addOption("nnport", true, "NameNode port (default 0--we choose)")
-        .addOption("namenode", true, "URL of the namenode (default "
-            + "is either the DFS cluster or a temporary dir)")     
-        .addOption(OptionBuilder
-            .hasArgs()
-            .withArgName("property=value")
+        .addOption("namenode", true, "URL of the namenode (default " +
+            "is either the DFS cluster or a temporary dir)").addOption(
+        OptionBuilder.hasArgs().withArgName("property=value")
             .withDescription("Options to pass into configuration object")
-            .create("D"))
-        .addOption(OptionBuilder
-            .hasArg()
-            .withArgName("path")
-            .withDescription("Save configuration to this XML file.")
-            .create("writeConfig"))
-         .addOption(OptionBuilder
-            .hasArg()
-            .withArgName("path")
+            .create("D")).addOption(OptionBuilder.hasArg().withArgName("path")
+        .withDescription("Save configuration to this XML file.")
+        .create("writeConfig")).addOption(
+        OptionBuilder.hasArg().withArgName("path")
             .withDescription("Write basic information to this JSON file.")
-            .create("writeDetails"))
-        .addOption(OptionBuilder.withDescription("Prints option help.")
-            .create("help"));
+            .create("writeDetails")).addOption(
+        OptionBuilder.withDescription("Prints option help.").create("help"));
     return options;
   }
 
@@ -117,7 +109,7 @@ public class MiniDFSClusterManager {
     sleepForever();
   }
 
-  private void sleepForever() {
+  private void sleepForever() throws IOException {
     while (true) {
       try {
         Thread.sleep(SLEEP_INTERVAL_MS);
@@ -137,14 +129,12 @@ public class MiniDFSClusterManager {
    */
   public void start() throws IOException, FileNotFoundException {
     dfs = new MiniDFSCluster.Builder(conf).nameNodePort(nameNodePort)
-                                          .numDataNodes(numDataNodes)
-                                          .startupOption(dfsOpts)
-                                          .format(format)
-                                          .build();
+        .numDataNodes(numDataNodes).startupOption(dfsOpts).format(format)
+        .build();
     dfs.waitActive();
     
-    LOG.info("Started MiniDFSCluster -- namenode on port "
-        + dfs.getNameNodePort());
+    LOG.info(
+        "Started MiniDFSCluster -- namenode on port " + dfs.getNameNodePort());
 
     if (writeConfig != null) {
       FileOutputStream fos = new FileOutputStream(new File(writeConfig));
@@ -166,7 +156,9 @@ public class MiniDFSClusterManager {
 
   /**
    * Parses arguments and fills out the member variables.
-   * @param args Command-line arguments.
+   *
+   * @param args
+   *     Command-line arguments.
    * @return true on successful parse; false to indicate that the
    * program should exit.
    */
@@ -176,8 +168,8 @@ public class MiniDFSClusterManager {
     try {
       CommandLineParser parser = new GnuParser();
       cli = parser.parse(options, args);
-    } catch(ParseException e) {
-      LOG.warn("options parsing failed:  "+e.getMessage());
+    } catch (ParseException e) {
+      LOG.warn("options parsing failed:  " + e.getMessage());
       new HelpFormatter().printHelp("...", options);
       return false;
     }
@@ -220,8 +212,10 @@ public class MiniDFSClusterManager {
   /**
    * Updates configuration based on what's given on the command line.
    *
-   * @param conf2 The configuration object
-   * @param keyvalues An array of interleaved key value pairs.
+   * @param conf2
+   *     The configuration object
+   * @param keyvalues
+   *     An array of interleaved key value pairs.
    */
   private void updateConfiguration(Configuration conf2, String[] keyvalues) {
     int num_confs_updated = 0;
@@ -248,17 +242,18 @@ public class MiniDFSClusterManager {
     try {
       if (o != null) {
         return Integer.parseInt(o);
-      } 
+      }
     } catch (NumberFormatException ex) {
-      LOG.error("Couldn't parse value (" + o + ") for option " 
-          + argName + ". Using default: " + defaultValue);
+      LOG.error("Couldn't parse value (" + o + ") for option " + argName +
+          ". Using default: " + defaultValue);
     }
     
-    return defaultValue;    
+    return defaultValue;
   }
 
   /**
-   * Starts a MiniDFSClusterManager with parameters drawn from the command line.
+   * Starts a MiniDFSClusterManager with parameters drawn from the command
+   * line.
    */
   public static void main(String[] args) throws IOException {
     new MiniDFSClusterManager().run(args);

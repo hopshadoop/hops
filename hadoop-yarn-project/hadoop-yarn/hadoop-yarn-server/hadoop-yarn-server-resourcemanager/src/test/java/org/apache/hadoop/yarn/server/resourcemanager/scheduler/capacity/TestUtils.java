@@ -18,11 +18,7 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity;
 
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.when;
-
+import io.hops.ha.common.TransactionState;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -48,50 +44,54 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaS
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode;
 import org.apache.hadoop.yarn.server.resourcemanager.security.AMRMTokenSecretManager;
 import org.apache.hadoop.yarn.server.resourcemanager.security.ClientToAMTokenSecretManagerInRM;
-import org.apache.hadoop.yarn.server.resourcemanager.security.RMContainerTokenSecretManager;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
-import org.apache.hadoop.yarn.server.resourcemanager.security.NMTokenSecretManagerInRM;
 import org.apache.hadoop.yarn.util.resource.Resources;
+
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.when;
 
 public class TestUtils {
   private static final Log LOG = LogFactory.getLog(TestUtils.class);
 
   /**
    * Get a mock {@link RMContext} for use in test cases.
+   *
    * @return a mock {@link RMContext} for use in test cases
    */
-  @SuppressWarnings("rawtypes") 
+  @SuppressWarnings("rawtypes")
   public static RMContext getMockRMContext() {
     // Null dispatcher
     Dispatcher nullDispatcher = new Dispatcher() {
-      private final EventHandler handler =
-          new EventHandler() {
-            @Override
-            public void handle(Event event) {
-            }
-          };
+      private final EventHandler handler = new EventHandler() {
+        @Override
+        public void handle(Event event) {
+        }
+      };
+
       @Override
-      public void register(Class<? extends Enum> eventType, 
+      public void register(Class<? extends Enum> eventType,
           EventHandler handler) {
       }
+
       @Override
       public EventHandler getEventHandler() {
-        return handler; 
+        return handler;
       }
     };
     
     // No op 
-    ContainerAllocationExpirer cae = 
+    ContainerAllocationExpirer cae =
         new ContainerAllocationExpirer(nullDispatcher);
     
     Configuration conf = new Configuration();
-    RMApplicationHistoryWriter writer =  mock(RMApplicationHistoryWriter.class);
+    RMApplicationHistoryWriter writer = mock(RMApplicationHistoryWriter.class);
     RMContext rmContext =
         new RMContextImpl(nullDispatcher, cae, null, null, null,
-          new AMRMTokenSecretManager(conf),
-          new RMContainerTokenSecretManager(conf),
-          new NMTokenSecretManagerInRM(conf),
-          new ClientToAMTokenSecretManagerInRM(), writer);
+            new AMRMTokenSecretManager(conf),
+
+            new ClientToAMTokenSecretManagerInRM(), writer, conf);
     
     return rmContext;
   }
@@ -105,23 +105,24 @@ public class TestUtils {
       return spy(queue);
     }
   }
+
   public static SpyHook spyHook = new SpyHook();
   
-  private static final RecordFactory recordFactory = 
+  private static final RecordFactory recordFactory =
       RecordFactoryProvider.getRecordFactory(null);
 
-  public static Priority createMockPriority( int priority) {
-//    Priority p = mock(Priority.class);
-//    when(p.getPriority()).thenReturn(priority);
+  public static Priority createMockPriority(int priority) {
+    //    Priority p = mock(Priority.class);
+    //    when(p.getPriority()).thenReturn(priority);
     Priority p = recordFactory.newRecordInstance(Priority.class);
     p.setPriority(priority);
     return p;
   }
   
-  public static ResourceRequest createResourceRequest(
-      String resourceName, int memory, int numContainers, boolean relaxLocality,
-      Priority priority, RecordFactory recordFactory) {
-    ResourceRequest request = 
+  public static ResourceRequest createResourceRequest(String resourceName,
+      int memory, int numContainers, boolean relaxLocality, Priority priority,
+      RecordFactory recordFactory) {
+    ResourceRequest request =
         recordFactory.newRecordInstance(ResourceRequest.class);
     Resource capability = Resources.createResource(memory, 1);
     
@@ -140,25 +141,26 @@ public class TestUtils {
     return applicationId;
   }
   
-  public static ApplicationAttemptId 
-  getMockApplicationAttemptId(int appId, int attemptId) {
+  public static ApplicationAttemptId getMockApplicationAttemptId(int appId,
+      int attemptId) {
     ApplicationId applicationId = BuilderUtils.newApplicationId(0l, appId);
-    ApplicationAttemptId applicationAttemptId = mock(ApplicationAttemptId.class);  
+    ApplicationAttemptId applicationAttemptId =
+        mock(ApplicationAttemptId.class);
     when(applicationAttemptId.getApplicationId()).thenReturn(applicationId);
     when(applicationAttemptId.getAttemptId()).thenReturn(attemptId);
     return applicationAttemptId;
   }
   
-  public static FiCaSchedulerNode getMockNode(
-      String host, String rack, int port, int capability) {
+  public static FiCaSchedulerNode getMockNode(String host, String rack,
+      int port, int capability) {
     NodeId nodeId = mock(NodeId.class);
     when(nodeId.getHost()).thenReturn(host);
     when(nodeId.getPort()).thenReturn(port);
     RMNode rmNode = mock(RMNode.class);
     when(rmNode.getNodeID()).thenReturn(nodeId);
-    when(rmNode.getTotalCapability()).thenReturn(
-        Resources.createResource(capability, 1));
-    when(rmNode.getNodeAddress()).thenReturn(host+":"+port);
+    when(rmNode.getTotalCapability())
+        .thenReturn(Resources.createResource(capability, 1));
+    when(rmNode.getNodeAddress()).thenReturn(host + ":" + port);
     when(rmNode.getHostName()).thenReturn(host);
     when(rmNode.getRackName()).thenReturn(rack);
     
@@ -167,17 +169,17 @@ public class TestUtils {
     return node;
   }
   
-  public static ContainerId getMockContainerId(FiCaSchedulerApp application) {
+  public static ContainerId getMockContainerId(FiCaSchedulerApp application,
+      TransactionState ts) {
     ContainerId containerId = mock(ContainerId.class);
     doReturn(application.getApplicationAttemptId()).
-    when(containerId).getApplicationAttemptId();
-    doReturn(application.getNewContainerId()).when(containerId).getId();
+        when(containerId).getApplicationAttemptId();
+    doReturn(application.getNewContainerId(ts)).when(containerId).getId();
     return containerId;
   }
   
-  public static Container getMockContainer(
-      ContainerId containerId, NodeId nodeId, 
-      Resource resource, Priority priority) {
+  public static Container getMockContainer(ContainerId containerId,
+      NodeId nodeId, Resource resource, Priority priority) {
     Container container = mock(Container.class);
     when(container.getId()).thenReturn(containerId);
     when(container.getNodeId()).thenReturn(nodeId);

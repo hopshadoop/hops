@@ -18,12 +18,6 @@
 
 package org.apache.hadoop.lib.service.security;
 
-import static org.junit.Assert.assertNotNull;
-
-import java.security.AccessControlException;
-import java.util.Arrays;
-import java.util.List;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.lib.server.Server;
 import org.apache.hadoop.lib.server.ServiceException;
@@ -36,6 +30,12 @@ import org.apache.hadoop.test.TestException;
 import org.apache.hadoop.util.StringUtils;
 import org.junit.Test;
 
+import java.security.AccessControlException;
+import java.util.Arrays;
+import java.util.List;
+
+import static org.junit.Assert.assertNotNull;
+
 public class TestProxyUserService extends HTestCase {
 
   @Test
@@ -43,8 +43,9 @@ public class TestProxyUserService extends HTestCase {
   public void service() throws Exception {
     String dir = TestDirHelper.getTestDir().getAbsolutePath();
     Configuration conf = new Configuration(false);
-    conf.set("server.services", StringUtils.join(",", Arrays.asList(GroupsService.class.getName(),
-                                                                    ProxyUserService.class.getName())));
+    conf.set("server.services", StringUtils.join(",", Arrays
+        .asList(GroupsService.class.getName(),
+            ProxyUserService.class.getName())));
     Server server = new Server("server", dir, dir, dir, dir, conf);
     server.init();
     ProxyUser proxyUser = server.get(ProxyUser.class);
@@ -58,8 +59,9 @@ public class TestProxyUserService extends HTestCase {
   public void wrongConfigGroups() throws Exception {
     String dir = TestDirHelper.getTestDir().getAbsolutePath();
     Configuration conf = new Configuration(false);
-    conf.set("server.services", StringUtils.join(",", Arrays.asList(GroupsService.class.getName(),
-                                                                    ProxyUserService.class.getName())));
+    conf.set("server.services", StringUtils.join(",", Arrays
+        .asList(GroupsService.class.getName(),
+            ProxyUserService.class.getName())));
     conf.set("server.proxyuser.foo.hosts", "*");
     Server server = new Server("server", dir, dir, dir, dir, conf);
     server.init();
@@ -71,8 +73,9 @@ public class TestProxyUserService extends HTestCase {
   public void wrongHost() throws Exception {
     String dir = TestDirHelper.getTestDir().getAbsolutePath();
     Configuration conf = new Configuration(false);
-    conf.set("server.services", StringUtils.join(",", Arrays.asList(GroupsService.class.getName(),
-                                                                    ProxyUserService.class.getName())));
+    conf.set("server.services", StringUtils.join(",", Arrays
+        .asList(GroupsService.class.getName(),
+            ProxyUserService.class.getName())));
     conf.set("server.proxyuser.foo.hosts", "otherhost");
     conf.set("server.proxyuser.foo.groups", "*");
     Server server = new Server("server", dir, dir, dir, dir, conf);
@@ -85,8 +88,9 @@ public class TestProxyUserService extends HTestCase {
   public void wrongConfigHosts() throws Exception {
     String dir = TestDirHelper.getTestDir().getAbsolutePath();
     Configuration conf = new Configuration(false);
-    conf.set("server.services", StringUtils.join(",", Arrays.asList(GroupsService.class.getName(),
-                                                                    ProxyUserService.class.getName())));
+    conf.set("server.services", StringUtils.join(",", Arrays
+        .asList(GroupsService.class.getName(),
+            ProxyUserService.class.getName())));
     conf.set("server.proxyuser.foo.groups", "*");
     Server server = new Server("server", dir, dir, dir, dir, conf);
     server.init();
@@ -97,8 +101,9 @@ public class TestProxyUserService extends HTestCase {
   public void validateAnyHostAnyUser() throws Exception {
     String dir = TestDirHelper.getTestDir().getAbsolutePath();
     Configuration conf = new Configuration(false);
-    conf.set("server.services", StringUtils.join(",", Arrays.asList(GroupsService.class.getName(),
-                                                                    ProxyUserService.class.getName())));
+    conf.set("server.services", StringUtils.join(",", Arrays
+        .asList(GroupsService.class.getName(),
+            ProxyUserService.class.getName())));
     conf.set("server.proxyuser.foo.hosts", "*");
     conf.set("server.proxyuser.foo.groups", "*");
     Server server = new Server("server", dir, dir, dir, dir, conf);
@@ -114,8 +119,9 @@ public class TestProxyUserService extends HTestCase {
   public void invalidProxyUser() throws Exception {
     String dir = TestDirHelper.getTestDir().getAbsolutePath();
     Configuration conf = new Configuration(false);
-    conf.set("server.services", StringUtils.join(",", Arrays.asList(GroupsService.class.getName(),
-                                                                    ProxyUserService.class.getName())));
+    conf.set("server.services", StringUtils.join(",", Arrays
+        .asList(GroupsService.class.getName(),
+            ProxyUserService.class.getName())));
     conf.set("server.proxyuser.foo.hosts", "*");
     conf.set("server.proxyuser.foo.groups", "*");
     Server server = new Server("server", dir, dir, dir, dir, conf);
@@ -131,8 +137,9 @@ public class TestProxyUserService extends HTestCase {
   public void validateHost() throws Exception {
     String dir = TestDirHelper.getTestDir().getAbsolutePath();
     Configuration conf = new Configuration(false);
-    conf.set("server.services", StringUtils.join(",", Arrays.asList(GroupsService.class.getName(),
-                                                                    ProxyUserService.class.getName())));
+    conf.set("server.services", StringUtils.join(",", Arrays
+        .asList(GroupsService.class.getName(),
+            ProxyUserService.class.getName())));
     conf.set("server.proxyuser.foo.hosts", "localhost");
     conf.set("server.proxyuser.foo.groups", "*");
     Server server = new Server("server", dir, dir, dir, dir, conf);
@@ -146,7 +153,8 @@ public class TestProxyUserService extends HTestCase {
   private String getGroup() throws Exception {
     String dir = TestDirHelper.getTestDir().getAbsolutePath();
     Configuration conf = new Configuration(false);
-    conf.set("server.services", StringUtils.join(",", Arrays.asList(GroupsService.class.getName())));
+    conf.set("server.services",
+        StringUtils.join(",", Arrays.asList(GroupsService.class.getName())));
     Server server = new Server("server", dir, dir, dir, dir, conf);
     server.init();
     Groups groups = server.get(Groups.class);
@@ -160,8 +168,9 @@ public class TestProxyUserService extends HTestCase {
   public void validateGroup() throws Exception {
     String dir = TestDirHelper.getTestDir().getAbsolutePath();
     Configuration conf = new Configuration(false);
-    conf.set("server.services", StringUtils.join(",", Arrays.asList(GroupsService.class.getName(),
-                                                                    ProxyUserService.class.getName())));
+    conf.set("server.services", StringUtils.join(",", Arrays
+        .asList(GroupsService.class.getName(),
+            ProxyUserService.class.getName())));
     conf.set("server.proxyuser.foo.hosts", "*");
     conf.set("server.proxyuser.foo.groups", getGroup());
     Server server = new Server("server", dir, dir, dir, dir, conf);
@@ -178,8 +187,9 @@ public class TestProxyUserService extends HTestCase {
   public void unknownHost() throws Exception {
     String dir = TestDirHelper.getTestDir().getAbsolutePath();
     Configuration conf = new Configuration(false);
-    conf.set("server.services", StringUtils.join(",", Arrays.asList(GroupsService.class.getName(),
-                                                                    ProxyUserService.class.getName())));
+    conf.set("server.services", StringUtils.join(",", Arrays
+        .asList(GroupsService.class.getName(),
+            ProxyUserService.class.getName())));
     conf.set("server.proxyuser.foo.hosts", "localhost");
     conf.set("server.proxyuser.foo.groups", "*");
     Server server = new Server("server", dir, dir, dir, dir, conf);
@@ -195,8 +205,9 @@ public class TestProxyUserService extends HTestCase {
   public void invalidHost() throws Exception {
     String dir = TestDirHelper.getTestDir().getAbsolutePath();
     Configuration conf = new Configuration(false);
-    conf.set("server.services", StringUtils.join(",", Arrays.asList(GroupsService.class.getName(),
-                                                                    ProxyUserService.class.getName())));
+    conf.set("server.services", StringUtils.join(",", Arrays
+        .asList(GroupsService.class.getName(),
+            ProxyUserService.class.getName())));
     conf.set("server.proxyuser.foo.hosts", "localhost");
     conf.set("server.proxyuser.foo.groups", "*");
     Server server = new Server("server", dir, dir, dir, dir, conf);
@@ -212,8 +223,9 @@ public class TestProxyUserService extends HTestCase {
   public void invalidGroup() throws Exception {
     String dir = TestDirHelper.getTestDir().getAbsolutePath();
     Configuration conf = new Configuration(false);
-    conf.set("server.services", StringUtils.join(",", Arrays.asList(GroupsService.class.getName(),
-                                                                    ProxyUserService.class.getName())));
+    conf.set("server.services", StringUtils.join(",", Arrays
+        .asList(GroupsService.class.getName(),
+            ProxyUserService.class.getName())));
     conf.set("server.proxyuser.foo.hosts", "localhost");
     conf.set("server.proxyuser.foo.groups", "nobody");
     Server server = new Server("server", dir, dir, dir, dir, conf);

@@ -17,14 +17,6 @@
  */
 package org.apache.hadoop.hdfs;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.Random;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.Path;
@@ -32,18 +24,20 @@ import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.util.Time;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
-import org.junit.Assume;
-import org.junit.Ignore;
-import org.junit.Test;
+
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.Random;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /**
  * Driver class for testing the use of DFSInputStream by multiple concurrent
- * readers, using the different read APIs.
- *
- * This class is marked as @Ignore so that junit doesn't try to execute the
- * tests in here directly.  They are executed from subclasses.
+ * readers, using the different read APIs. See subclasses for the actual test
+ * cases.
  */
-@Ignore
 public class TestParallelReadUtil {
 
   static final Log LOG = LogFactory.getLog(TestParallelReadUtil.class);
@@ -58,7 +52,7 @@ public class TestParallelReadUtil {
     // The client-trace log ends up causing a lot of blocking threads
     // in this when it's being used as a performance benchmark.
     LogManager.getLogger(DataNode.class.getName() + ".clienttrace")
-      .setLevel(Level.WARN);
+        .setLevel(Level.WARN);
   }
 
   private class TestFileInfo {
@@ -67,7 +61,8 @@ public class TestParallelReadUtil {
     public byte[] authenticData;
   }
 
-  public static void setupCluster(int replicationFactor, HdfsConfiguration conf) throws Exception {
+  public static void setupCluster(int replicationFactor, HdfsConfiguration conf)
+      throws Exception {
     util = new BlockReaderTestUtil(replicationFactor, conf);
     dfsClient = util.getDFSClient();
     long seed = Time.now();
@@ -76,12 +71,17 @@ public class TestParallelReadUtil {
   }
 
   /**
-   * Providers of this interface implement two different read APIs. Instances of
-   * this interface are shared across all ReadWorkerThreads, so should be stateless.
+   * Providers of this interface implement two different read APIs. Instances
+   * of
+   * this interface are shared across all ReadWorkerThreads, so should be
+   * stateless.
    */
   static interface ReadWorkerHelper {
-    public int read(DFSInputStream dis, byte[] target, int startOff, int len) throws IOException;
-    public int pRead(DFSInputStream dis, byte[] target, int startOff, int len) throws IOException;
+    public int read(DFSInputStream dis, byte[] target, int startOff, int len)
+        throws IOException;
+
+    public int pRead(DFSInputStream dis, byte[] target, int startOff, int len)
+        throws IOException;
   }
 
   /**
@@ -89,10 +89,11 @@ public class TestParallelReadUtil {
    */
   static class DirectReadWorkerHelper implements ReadWorkerHelper {
     @Override
-    public int read(DFSInputStream dis, byte[] target, int startOff, int len) throws IOException {
+    public int read(DFSInputStream dis, byte[] target, int startOff, int len)
+        throws IOException {
       ByteBuffer bb = ByteBuffer.allocateDirect(target.length);
       int cnt = 0;
-      synchronized(dis) {
+      synchronized (dis) {
         dis.seek(startOff);
         while (cnt < len) {
           int read = dis.read(bb);
@@ -108,7 +109,8 @@ public class TestParallelReadUtil {
     }
 
     @Override
-    public int pRead(DFSInputStream dis, byte[] target, int startOff, int len) throws IOException {
+    public int pRead(DFSInputStream dis, byte[] target, int startOff, int len)
+        throws IOException {
       // No pRead for bb read path
       return read(dis, target, startOff, len);
     }
@@ -124,7 +126,7 @@ public class TestParallelReadUtil {
     public int read(DFSInputStream dis, byte[] target, int startOff, int len)
         throws IOException {
       int cnt = 0;
-      synchronized(dis) {
+      synchronized (dis) {
         dis.seek(startOff);
         while (cnt < len) {
           int read = dis.read(target, cnt, len - cnt);
@@ -234,7 +236,7 @@ public class TestParallelReadUtil {
           }
         } catch (Throwable t) {
           LOG.error(getName() + ": Error while testing read at " + startOff +
-                    " length " + len, t);
+              " length " + len, t);
           error = true;
           fail(t.getMessage());
         }
@@ -294,16 +296,16 @@ public class TestParallelReadUtil {
       byte auth[] = testInfo.authenticData;
       if (end > auth.length) {
         throw new Exception(msg + ": Actual array (" + end +
-                            ") is past the end of authentic data (" +
-                            auth.length + ")");
+            ") is past the end of authentic data (" +
+            auth.length + ")");
       }
 
       int j = start;
       for (int i = 0; i < actual.length; ++i, ++j) {
         if (auth[j] != actual[i]) {
           throw new Exception(msg + ": Arrays byte " + i + " (at offset " +
-                              j + ") differs: expect " +
-                              auth[j] + " got " + actual[i]);
+              j + ") differs: expect " +
+              auth[j] + " got " + actual[i]);
         }
       }
     }
@@ -312,7 +314,8 @@ public class TestParallelReadUtil {
   /**
    * Start the parallel read with the given parameters.
    */
-  boolean runParallelRead(int nFiles, int nWorkerEach, ReadWorkerHelper helper) throws IOException {
+  boolean runParallelRead(int nFiles, int nWorkerEach, ReadWorkerHelper helper)
+      throws IOException {
     ReadWorker workers[] = new ReadWorker[nFiles * nWorkerEach];
     TestFileInfo testInfoArr[] = new TestFileInfo[nFiles];
 
@@ -325,7 +328,7 @@ public class TestParallelReadUtil {
       testInfo.filepath = new Path("/TestParallelRead.dat." + i);
       testInfo.authenticData = util.writeFile(testInfo.filepath, FILE_SIZE_K);
       testInfo.dis = dfsClient.open(testInfo.filepath.toString(),
-          dfsClient.getConf().ioBufferSize, verifyChecksums);
+          dfsClient.dfsClientConf.ioBufferSize, verifyChecksums);
 
       for (int j = 0; j < nWorkerEach; ++j) {
         workers[nWorkers++] = new ReadWorker(testInfo, nWorkers, helper);
@@ -341,7 +344,8 @@ public class TestParallelReadUtil {
     for (ReadWorker worker : workers) {
       try {
         worker.join();
-      } catch (InterruptedException ignored) { }
+      } catch (InterruptedException ignored) {
+      }
     }
     long endtime = Time.now();
 
@@ -356,7 +360,7 @@ public class TestParallelReadUtil {
     for (ReadWorker worker : workers) {
       long nread = worker.getBytesRead();
       LOG.info("--- Report: " + worker.getName() + " read " + nread + " B; " +
-               "average " + nread / ReadWorker.N_ITERATIONS + " B per read");
+          "average " + nread / ReadWorker.N_ITERATIONS + " B per read");
       totalRead += nread;
       if (worker.hasError()) {
         res = false;
@@ -366,10 +370,10 @@ public class TestParallelReadUtil {
     double timeTakenSec = (endtime - starttime) / 1000.0;
     long totalReadKB = totalRead / 1024;
     LOG.info("=== Report: " + nWorkers + " threads read " +
-             totalReadKB + " KB (across " +
-             nFiles + " file(s)) in " +
-             timeTakenSec + "s; average " +
-             totalReadKB / timeTakenSec + " KB/s");
+        totalReadKB + " KB (across " +
+        nFiles + " file(s)) in " +
+        timeTakenSec + "s; average " +
+        totalReadKB / timeTakenSec + " KB/s");
 
     return res;
   }
@@ -394,31 +398,4 @@ public class TestParallelReadUtil {
     util.shutdown();
   }
 
-  /**
-   * Do parallel read several times with different number of files and threads.
-   *
-   * Note that while this is the only "test" in a junit sense, we're actually
-   * dispatching a lot more. Failures in the other methods (and other threads)
-   * need to be manually collected, which is inconvenient.
-   */
-  @Test
-  public void testParallelReadCopying() throws IOException {
-    runTestWorkload(new CopyingReadWorkerHelper());
-  }
-
-  @Test
-  public void testParallelReadByteBuffer() throws IOException {
-    runTestWorkload(new DirectReadWorkerHelper());
-  }
-
-  @Test
-  public void testParallelReadMixed() throws IOException {
-    runTestWorkload(new MixedWorkloadHelper());
-  }
-  
-  @Test
-  public void testParallelNoChecksums() throws IOException {
-    verifyChecksums = false;
-    runTestWorkload(new MixedWorkloadHelper());
-  }
 }

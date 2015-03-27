@@ -40,16 +40,18 @@ import java.io.IOException;
  */
 @InterfaceAudience.Private
 public abstract class FileSystemReleaseFilter implements Filter {
-  private static final ThreadLocal<FileSystem> FILE_SYSTEM_TL = new ThreadLocal<FileSystem>();
+  private static final ThreadLocal<FileSystem> FILE_SYSTEM_TL =
+      new ThreadLocal<FileSystem>();
 
   /**
    * Initializes the filter.
    * <p/>
    * This implementation is a NOP.
    *
-   * @param filterConfig filter configuration.
-   *
-   * @throws ServletException thrown if the filter could not be initialized.
+   * @param filterConfig
+   *     filter configuration.
+   * @throws ServletException
+   *     thrown if the filter could not be initialized.
    */
   @Override
   public void init(FilterConfig filterConfig) throws ServletException {
@@ -60,16 +62,21 @@ public abstract class FileSystemReleaseFilter implements Filter {
    * at its completion (in a finally block) releases the filesystem instance
    * back to the {@link FileSystemAccess} service.
    *
-   * @param servletRequest servlet request.
-   * @param servletResponse servlet response.
-   * @param filterChain filter chain.
-   *
-   * @throws IOException thrown if an IO error occurrs.
-   * @throws ServletException thrown if a servet error occurrs.
+   * @param servletRequest
+   *     servlet request.
+   * @param servletResponse
+   *     servlet response.
+   * @param filterChain
+   *     filter chain.
+   * @throws IOException
+   *     thrown if an IO error occurrs.
+   * @throws ServletException
+   *     thrown if a servet error occurrs.
    */
   @Override
-  public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain filterChain)
-    throws IOException, ServletException {
+  public void doFilter(ServletRequest servletRequest,
+      ServletResponse servletResponse, FilterChain filterChain)
+      throws IOException, ServletException {
     try {
       filterChain.doFilter(servletRequest, servletResponse);
     } finally {
@@ -94,7 +101,8 @@ public abstract class FileSystemReleaseFilter implements Filter {
    * Static method that sets the <code>FileSystem</code> to release back to
    * the {@link FileSystemAccess} service on servlet request completion.
    *
-   * @param fs fileystem instance.
+   * @param fs
+   *     fileystem instance.
    */
   public static void setFileSystem(FileSystem fs) {
     FILE_SYSTEM_TL.set(fs);
@@ -102,7 +110,8 @@ public abstract class FileSystemReleaseFilter implements Filter {
 
   /**
    * Abstract method to be implemetned by concrete implementations of the
-   * filter that return the {@link FileSystemAccess} service to which the filesystem
+   * filter that return the {@link FileSystemAccess} service to which the
+   * filesystem
    * will be returned to.
    *
    * @return the FileSystemAccess service.

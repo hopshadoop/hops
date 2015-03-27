@@ -30,7 +30,7 @@ import org.junit.BeforeClass;
  */
 public class TestListFilesInDFS extends TestListFiles {
   {
-    ((Log4JLogger)FileSystem.LOG).getLogger().setLevel(Level.ALL);
+    ((Log4JLogger) FileSystem.LOG).getLogger().setLevel(Level.ALL);
   }
 
 

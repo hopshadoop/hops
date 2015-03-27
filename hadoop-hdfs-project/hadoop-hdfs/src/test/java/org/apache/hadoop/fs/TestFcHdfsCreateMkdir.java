@@ -18,11 +18,6 @@
 
 package org.apache.hadoop.fs;
 
-import java.io.IOException;
-import java.net.URISyntaxException;
-
-import javax.security.auth.login.LoginException;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
@@ -32,33 +27,30 @@ import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 
-public class TestFcHdfsCreateMkdir extends
-                    FileContextCreateMkdirBaseTest {
+import javax.security.auth.login.LoginException;
+import java.io.IOException;
+import java.net.URISyntaxException;
+
+public class TestFcHdfsCreateMkdir extends FileContextCreateMkdirBaseTest {
   
   private static MiniDFSCluster cluster;
   private static Path defaultWorkingDirectory;
   
-  @Override
-  protected FileContextTestHelper createFileContextHelper() {
-    return new FileContextTestHelper();
-  }
-
-
   @BeforeClass
   public static void clusterSetupAtBegining()
-                                    throws IOException, LoginException, URISyntaxException  {
+      throws IOException, LoginException, URISyntaxException {
     Configuration conf = new HdfsConfiguration();
     cluster = new MiniDFSCluster.Builder(conf).numDataNodes(2).build();
     fc = FileContext.getFileContext(cluster.getURI(0), conf);
-    defaultWorkingDirectory = fc.makeQualified( new Path("/user/" + 
-        UserGroupInformation.getCurrentUser().getShortUserName()));
+    defaultWorkingDirectory = fc.makeQualified(new Path(
+        "/user/" + UserGroupInformation.getCurrentUser().getShortUserName()));
     fc.mkdir(defaultWorkingDirectory, FileContext.DEFAULT_PERM, true);
   }
 
-      
+
   @AfterClass
   public static void ClusterShutdownAtEnd() throws Exception {
-    cluster.shutdown();   
+    cluster.shutdown();
   }
   
   @Override

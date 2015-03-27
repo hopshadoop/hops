@@ -17,30 +17,17 @@
  */
 package org.apache.hadoop.hdfs.web;
 
-import static org.apache.hadoop.fs.permission.AclEntryScope.*;
-import static org.apache.hadoop.fs.permission.AclEntryType.*;
-import static org.apache.hadoop.fs.permission.FsAction.*;
-import static org.apache.hadoop.hdfs.server.namenode.AclTestHelpers.*;
-
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.permission.AclEntry;
-import org.apache.hadoop.fs.permission.AclStatus;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSUtil;
-import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
-import org.apache.hadoop.hdfs.server.namenode.INodeId;
 import org.apache.hadoop.util.Time;
 import org.junit.Assert;
 import org.junit.Test;
 import org.mortbay.util.ajax.JSON;
 
-import com.google.common.collect.Lists;
+import java.util.Map;
 
 public class TestJsonUtil {
   static FileStatus toFileStatus(HdfsFileStatus f, String parent) {
@@ -55,144 +42,20 @@ public class TestJsonUtil {
   public void testHdfsFileStatus() {
     final long now = Time.now();
     final String parent = "/dir";
-    final HdfsFileStatus status = new HdfsFileStatus(1001L, false, 3, 1L << 26,
-        now, now + 10, new FsPermission((short) 0644), "user", "group",
-        DFSUtil.string2Bytes("bar"), DFSUtil.string2Bytes("foo"),
-        INodeId.GRANDFATHER_INODE_ID, 0);
+    final HdfsFileStatus status =
+        new HdfsFileStatus(1001L, false, 3, 1L << 26, now, now + 10,
+            new FsPermission((short) 0644), "user", "group",
+            DFSUtil.string2Bytes("bar"), DFSUtil.string2Bytes("foo"));
     final FileStatus fstatus = toFileStatus(status, parent);
     System.out.println("status  = " + status);
     System.out.println("fstatus = " + fstatus);
     final String json = JsonUtil.toJsonString(status, true);
     System.out.println("json    = " + json.replace(",", ",\n  "));
-    final HdfsFileStatus s2 = JsonUtil.toFileStatus((Map<?, ?>)JSON.parse(json), true);
+    final HdfsFileStatus s2 =
+        JsonUtil.toFileStatus((Map<?, ?>) JSON.parse(json), true);
     final FileStatus fs2 = toFileStatus(s2, parent);
     System.out.println("s2      = " + s2);
     System.out.println("fs2     = " + fs2);
     Assert.assertEquals(fstatus, fs2);
-  }
-  
-  @Test
-  public void testToDatanodeInfoWithoutSecurePort() throws Exception {
-    Map<String, Object> response = new HashMap<String, Object>();
-    
-    response.put("ipAddr", "127.0.0.1");
-    response.put("hostName", "localhost");
-    response.put("storageID", "fake-id");
-    response.put("xferPort", 1337l);
-    response.put("infoPort", 1338l);
-    // deliberately don't include an entry for "infoSecurePort"
-    response.put("ipcPort", 1339l);
-    response.put("capacity", 1024l);
-    response.put("dfsUsed", 512l);
-    response.put("remaining", 512l);
-    response.put("blockPoolUsed", 512l);
-    response.put("lastUpdate", 0l);
-    response.put("xceiverCount", 4096l);
-    response.put("networkLocation", "foo.bar.baz");
-    response.put("adminState", "NORMAL");
-    response.put("cacheCapacity", 123l);
-    response.put("cacheUsed", 321l);
-    
-    JsonUtil.toDatanodeInfo(response);
-  }
-
-  @Test
-  public void testToDatanodeInfoWithName() throws Exception {
-    Map<String, Object> response = new HashMap<String, Object>();
-
-    // Older servers (1.x, 0.23, etc.) sends 'name' instead of ipAddr
-    // and xferPort.
-    String name = "127.0.0.1:1004";
-    response.put("name", name);
-    response.put("hostName", "localhost");
-    response.put("storageID", "fake-id");
-    response.put("infoPort", 1338l);
-    response.put("ipcPort", 1339l);
-    response.put("capacity", 1024l);
-    response.put("dfsUsed", 512l);
-    response.put("remaining", 512l);
-    response.put("blockPoolUsed", 512l);
-    response.put("lastUpdate", 0l);
-    response.put("xceiverCount", 4096l);
-    response.put("networkLocation", "foo.bar.baz");
-    response.put("adminState", "NORMAL");
-    response.put("cacheCapacity", 123l);
-    response.put("cacheUsed", 321l);
-
-    DatanodeInfo di = JsonUtil.toDatanodeInfo(response);
-    Assert.assertEquals(name, di.getXferAddr());
-
-    // The encoded result should contain name, ipAddr and xferPort.
-    Map<String, Object> r = JsonUtil.toJsonMap(di);
-    Assert.assertEquals(name, (String)r.get("name"));
-    Assert.assertEquals("127.0.0.1", (String)r.get("ipAddr"));
-    // In this test, it is Integer instead of Long since json was not actually
-    // involved in constructing the map.
-    Assert.assertEquals(1004, (int)(Integer)r.get("xferPort"));
-
-    // Invalid names
-    String[] badNames = {"127.0.0.1", "127.0.0.1:", ":", "127.0.0.1:sweet", ":123"};
-    for (String badName : badNames) {
-      response.put("name", badName);
-      checkDecodeFailure(response);
-    }
-
-    // Missing both name and ipAddr
-    response.remove("name");
-    checkDecodeFailure(response);
-
-    // Only missing xferPort
-    response.put("ipAddr", "127.0.0.1");
-    checkDecodeFailure(response);
-  }
-  
-  @Test
-  public void testToAclStatus() {
-    String jsonString =
-        "{\"AclStatus\":{\"entries\":[\"user::rwx\",\"user:user1:rw-\",\"group::rw-\",\"other::r-x\"],\"group\":\"supergroup\",\"owner\":\"testuser\",\"stickyBit\":false}}";
-    Map<?, ?> json = (Map<?, ?>) JSON.parse(jsonString);
-
-    List<AclEntry> aclSpec =
-        Lists.newArrayList(aclEntry(ACCESS, USER, ALL),
-            aclEntry(ACCESS, USER, "user1", READ_WRITE),
-            aclEntry(ACCESS, GROUP, READ_WRITE),
-            aclEntry(ACCESS, OTHER, READ_EXECUTE));
-
-    AclStatus.Builder aclStatusBuilder = new AclStatus.Builder();
-    aclStatusBuilder.owner("testuser");
-    aclStatusBuilder.group("supergroup");
-    aclStatusBuilder.addEntries(aclSpec);
-    aclStatusBuilder.stickyBit(false);
-
-    Assert.assertEquals("Should be equal", aclStatusBuilder.build(),
-        JsonUtil.toAclStatus(json));
-  }
-
-  @Test
-  public void testToJsonFromAclStatus() {
-    String jsonString =
-        "{\"AclStatus\":{\"entries\":[\"user:user1:rwx\",\"group::rw-\"],\"group\":\"supergroup\",\"owner\":\"testuser\",\"stickyBit\":false}}";
-    AclStatus.Builder aclStatusBuilder = new AclStatus.Builder();
-    aclStatusBuilder.owner("testuser");
-    aclStatusBuilder.group("supergroup");
-    aclStatusBuilder.stickyBit(false);
-
-    List<AclEntry> aclSpec =
-        Lists.newArrayList(aclEntry(ACCESS, USER,"user1", ALL),
-            aclEntry(ACCESS, GROUP, READ_WRITE));
-
-    aclStatusBuilder.addEntries(aclSpec);
-    Assert.assertEquals(jsonString,
-        JsonUtil.toJsonString(aclStatusBuilder.build()));
-
-  }
-
-  private void checkDecodeFailure(Map<String, Object> map) {
-    try {
-      JsonUtil.toDatanodeInfo(map);
-      Assert.fail("Exception not thrown against bad input.");
-    } catch (Exception e) {
-      // expected
-    }
   }
 }

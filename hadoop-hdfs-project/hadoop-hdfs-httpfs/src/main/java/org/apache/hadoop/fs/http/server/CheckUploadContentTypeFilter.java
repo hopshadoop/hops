@@ -53,9 +53,10 @@ public class CheckUploadContentTypeFilter implements Filter {
    * <p/>
    * This implementation is a NOP.
    *
-   * @param config filter configuration.
-   *
-   * @throws ServletException thrown if the filter could not be initialized.
+   * @param config
+   *     filter configuration.
+   * @throws ServletException
+   *     thrown if the filter could not be initialized.
    */
   @Override
   public void init(FilterConfig config) throws ServletException {
@@ -65,17 +66,20 @@ public class CheckUploadContentTypeFilter implements Filter {
    * Enforces the content-type to be application/octet-stream for
    * POST and PUT requests.
    *
-   * @param request servlet request.
-   * @param response servlet response.
-   * @param chain filter chain.
-   *
-   * @throws IOException thrown if an IO error occurrs.
-   * @throws ServletException thrown if a servet error occurrs.
+   * @param request
+   *     servlet request.
+   * @param response
+   *     servlet response.
+   * @param chain
+   *     filter chain.
+   * @throws IOException
+   *     thrown if an IO error occurrs.
+   * @throws ServletException
+   *     thrown if a servet error occurrs.
    */
   @Override
   public void doFilter(ServletRequest request, ServletResponse response,
-                       FilterChain chain)
-    throws IOException, ServletException {
+      FilterChain chain) throws IOException, ServletException {
     boolean contentTypeOK = true;
     HttpServletRequest httpReq = (HttpServletRequest) request;
     HttpServletResponse httpRes = (HttpServletResponse) response;
@@ -83,20 +87,20 @@ public class CheckUploadContentTypeFilter implements Filter {
     if (method.equals("PUT") || method.equals("POST")) {
       String op = httpReq.getParameter(HttpFSFileSystem.OP_PARAM);
       if (op != null && UPLOAD_OPERATIONS.contains(op.toUpperCase())) {
-        if ("true".equalsIgnoreCase(httpReq.getParameter(HttpFSParametersProvider.DataParam.NAME))) {
+        if ("true".equalsIgnoreCase(
+            httpReq.getParameter(HttpFSParametersProvider.DataParam.NAME))) {
           String contentType = httpReq.getContentType();
-          contentTypeOK =
-            HttpFSFileSystem.UPLOAD_CONTENT_TYPE.equalsIgnoreCase(contentType);
+          contentTypeOK = HttpFSFileSystem.UPLOAD_CONTENT_TYPE
+              .equalsIgnoreCase(contentType);
         }
       }
     }
     if (contentTypeOK) {
       chain.doFilter(httpReq, httpRes);
-    }
-    else {
+    } else {
       httpRes.sendError(HttpServletResponse.SC_BAD_REQUEST,
-                        "Data upload requests must have content-type set to '" +
-                        HttpFSFileSystem.UPLOAD_CONTENT_TYPE + "'");
+          "Data upload requests must have content-type set to '" +
+              HttpFSFileSystem.UPLOAD_CONTENT_TYPE + "'");
 
     }
   }

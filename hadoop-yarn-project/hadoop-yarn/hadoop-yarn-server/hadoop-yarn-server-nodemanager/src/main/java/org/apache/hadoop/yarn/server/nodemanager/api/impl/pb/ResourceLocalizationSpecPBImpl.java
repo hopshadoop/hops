@@ -26,12 +26,12 @@ import org.apache.hadoop.yarn.proto.YarnServerNodemanagerServiceProtos.ResourceL
 import org.apache.hadoop.yarn.proto.YarnServerNodemanagerServiceProtos.ResourceLocalizationSpecProtoOrBuilder;
 import org.apache.hadoop.yarn.server.nodemanager.api.ResourceLocalizationSpec;
 
-public class ResourceLocalizationSpecPBImpl extends
-    ProtoBase<ResourceLocalizationSpecProto> implements
-    ResourceLocalizationSpec {
+public class ResourceLocalizationSpecPBImpl
+    extends ProtoBase<ResourceLocalizationSpecProto>
+    implements ResourceLocalizationSpec {
 
-  private ResourceLocalizationSpecProto proto = ResourceLocalizationSpecProto
-    .getDefaultInstance();
+  private ResourceLocalizationSpecProto proto =
+      ResourceLocalizationSpecProto.getDefaultInstance();
   private ResourceLocalizationSpecProto.Builder builder = null;
   private boolean viaProto;
   private LocalResource resource = null;
@@ -101,18 +101,16 @@ public class ResourceLocalizationSpecPBImpl extends
 
   private void mergeLocalToBuilder() {
     ResourceLocalizationSpecProtoOrBuilder l = viaProto ? proto : builder;
-    if (this.resource != null
-        && !(l.getResource()
-          .equals(((LocalResourcePBImpl) resource).getProto()))) {
+    if (this.resource != null && !(l.getResource()
+        .equals(((LocalResourcePBImpl) resource).getProto()))) {
       maybeInitBuilder();
       builder.setResource(((LocalResourcePBImpl) resource).getProto());
     }
-    if (this.destinationDirectory != null
-        && !(l.getDestinationDirectory()
-          .equals(((URLPBImpl) destinationDirectory).getProto()))) {
+    if (this.destinationDirectory != null && !(l.getDestinationDirectory()
+        .equals(((URLPBImpl) destinationDirectory).getProto()))) {
       maybeInitBuilder();
-      builder.setDestinationDirectory(((URLPBImpl) destinationDirectory)
-        .getProto());
+      builder.setDestinationDirectory(
+          ((URLPBImpl) destinationDirectory).getProto());
     }
   }
 }

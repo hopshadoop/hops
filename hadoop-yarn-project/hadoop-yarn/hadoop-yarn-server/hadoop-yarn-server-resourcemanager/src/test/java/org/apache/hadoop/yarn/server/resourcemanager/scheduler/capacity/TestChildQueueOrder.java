@@ -18,19 +18,7 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity;
 
-import static org.junit.Assert.assertEquals;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.inOrder;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
-import java.util.HashMap;
-import java.util.Map;
-
+import io.hops.ha.common.TransactionState;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
@@ -61,6 +49,19 @@ import org.mockito.InOrder;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
+import java.util.HashMap;
+import java.util.Map;
+
+import static org.junit.Assert.assertEquals;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 public class TestChildQueueOrder {
 
   private static final Log LOG = LogFactory.getLog(TestChildQueueOrder.class);
@@ -74,7 +75,7 @@ public class TestChildQueueOrder {
   final static String DEFAULT_RACK = "/default";
 
   private final ResourceCalculator resourceComparator =
-    new DefaultResourceCalculator();
+      new DefaultResourceCalculator();
 
   @Before
   public void setUp() throws Exception {
@@ -85,18 +86,18 @@ public class TestChildQueueOrder {
     csContext = mock(CapacitySchedulerContext.class);
     when(csContext.getConf()).thenReturn(conf);
     when(csContext.getConfiguration()).thenReturn(csConf);
-    when(csContext.getMinimumResourceCapability()).thenReturn(
-        Resources.createResource(GB, 1));
-    when(csContext.getMaximumResourceCapability()).thenReturn(
-        Resources.createResource(16*GB, 32));
+    when(csContext.getMinimumResourceCapability())
+        .thenReturn(Resources.createResource(GB, 1));
+    when(csContext.getMaximumResourceCapability())
+        .thenReturn(Resources.createResource(16 * GB, 32));
     when(csContext.getClusterResources()).
-    thenReturn(Resources.createResource(100 * 16 * GB, 100 * 32));
+        thenReturn(Resources.createResource(100 * 16 * GB, 100 * 32));
     when(csContext.getApplicationComparator()).
-    thenReturn(CapacityScheduler.applicationComparator);
+        thenReturn(CapacityScheduler.applicationComparator);
     when(csContext.getQueueComparator()).
-    thenReturn(CapacityScheduler.queueComparator);
+        thenReturn(CapacityScheduler.queueComparator);
     when(csContext.getResourceCalculator()).
-    thenReturn(resourceComparator);
+        thenReturn(resourceComparator);
   }
 
   private FiCaSchedulerApp getMockApplication(int appId, String user) {
@@ -106,15 +107,15 @@ public class TestChildQueueOrder {
     return application;
   }
 
-  private void stubQueueAllocation(final CSQueue queue, 
-      final Resource clusterResource, final FiCaSchedulerNode node, 
+  private void stubQueueAllocation(final CSQueue queue,
+      final Resource clusterResource, final FiCaSchedulerNode node,
       final int allocation) {
-    stubQueueAllocation(queue, clusterResource, node, allocation, 
+    stubQueueAllocation(queue, clusterResource, node, allocation,
         NodeType.NODE_LOCAL);
   }
 
-  private void stubQueueAllocation(final CSQueue queue, 
-      final Resource clusterResource, final FiCaSchedulerNode node, 
+  private void stubQueueAllocation(final CSQueue queue,
+      final Resource clusterResource, final FiCaSchedulerNode node,
       final int allocation, final NodeType type) {
 
     // Simulate the queue allocation
@@ -124,62 +125,61 @@ public class TestChildQueueOrder {
         try {
           throw new Exception();
         } catch (Exception e) {
-          LOG.info("FOOBAR q.assignContainers q=" + queue.getQueueName() + 
+          LOG.info("FOOBAR q.assignContainers q=" + queue.getQueueName() +
               " alloc=" + allocation + " node=" + node.getNodeName());
         }
         final Resource allocatedResource = Resources.createResource(allocation);
         if (queue instanceof ParentQueue) {
-          ((ParentQueue)queue).allocateResource(clusterResource, 
-              allocatedResource);
+          ((ParentQueue) queue)
+              .allocateResource(clusterResource, allocatedResource);
         } else {
           FiCaSchedulerApp app1 = getMockApplication(0, "");
-          ((LeafQueue)queue).allocateResource(clusterResource, app1, 
-              allocatedResource);
+          ((LeafQueue) queue)
+              .allocateResource(clusterResource, app1, allocatedResource);
         }
 
         // Next call - nothing
         if (allocation > 0) {
           doReturn(new CSAssignment(Resources.none(), type)).
-          when(queue).assignContainers(eq(clusterResource), eq(node));
+              when(queue).assignContainers(eq(clusterResource), eq(node),
+              any(TransactionState.class));
 
           // Mock the node's resource availability
           Resource available = node.getAvailableResource();
           doReturn(Resources.subtractFrom(available, allocatedResource)).
-          when(node).getAvailableResource();
+              when(node).getAvailableResource();
         }
 
         return new CSAssignment(allocatedResource, type);
       }
     }).
-    when(queue).assignContainers(eq(clusterResource), eq(node));
-    doNothing().when(node).releaseContainer(any(Container.class));
+        when(queue).assignContainers(eq(clusterResource), eq(node),
+        any(TransactionState.class));
+    doNothing().when(node)
+        .releaseContainer(any(Container.class), any(TransactionState.class));
   }
 
 
-  private float computeQueueAbsoluteUsedCapacity(CSQueue queue, 
+  private float computeQueueAbsoluteUsedCapacity(CSQueue queue,
       int expectedMemory, Resource clusterResource) {
-    return (
-        ((float)expectedMemory / (float)clusterResource.getMemory())
-      );
+    return (((float) expectedMemory / (float) clusterResource.getMemory()));
   }
 
-  private float computeQueueUsedCapacity(CSQueue queue,
-      int expectedMemory, Resource clusterResource) {
-    return (expectedMemory / 
+  private float computeQueueUsedCapacity(CSQueue queue, int expectedMemory,
+      Resource clusterResource) {
+    return (expectedMemory /
         (clusterResource.getMemory() * queue.getAbsoluteCapacity()));
   }
 
   final static float DELTA = 0.0001f;
-  private void verifyQueueMetrics(CSQueue queue, 
-      int expectedMemory, Resource clusterResource) {
+
+  private void verifyQueueMetrics(CSQueue queue, int expectedMemory,
+      Resource clusterResource) {
+    assertEquals(computeQueueAbsoluteUsedCapacity(queue, expectedMemory,
+        clusterResource), queue.getAbsoluteUsedCapacity(), DELTA);
     assertEquals(
-        computeQueueAbsoluteUsedCapacity(queue, expectedMemory, clusterResource), 
-        queue.getAbsoluteUsedCapacity(), 
-        DELTA);
-    assertEquals(
-        computeQueueUsedCapacity(queue, expectedMemory, clusterResource), 
-        queue.getUsedCapacity(), 
-        DELTA);
+        computeQueueUsedCapacity(queue, expectedMemory, clusterResource),
+        queue.getUsedCapacity(), DELTA);
 
   }
 
@@ -191,7 +191,8 @@ public class TestChildQueueOrder {
   private void setupSortedQueues(CapacitySchedulerConfiguration conf) {
 
     // Define queues
-    csConf.setQueues(CapacitySchedulerConfiguration.ROOT, new String[] {A, B, C, D});
+    csConf.setQueues(CapacitySchedulerConfiguration.ROOT,
+        new String[]{A, B, C, D});
 
     final String Q_A = CapacitySchedulerConfiguration.ROOT + "." + A;
     conf.setCapacity(Q_A, 25);
@@ -211,23 +212,22 @@ public class TestChildQueueOrder {
     // Setup queue configs
     setupSortedQueues(csConf);
     Map<String, CSQueue> queues = new HashMap<String, CSQueue>();
-    CSQueue root = 
-      CapacityScheduler.parseQueue(csContext, csConf, null, 
-          CapacitySchedulerConfiguration.ROOT, queues, queues, 
-          TestUtils.spyHook);
+    CSQueue root = CapacityScheduler.parseQueue(csContext, csConf, null,
+        CapacitySchedulerConfiguration.ROOT, queues, queues, TestUtils.spyHook);
 
     // Setup some nodes
     final int memoryPerNode = 10;
     final int coresPerNode = 16;
     final int numNodes = 1;
 
-    FiCaSchedulerNode node_0 = 
-      TestUtils.getMockNode("host_0", DEFAULT_RACK, 0, memoryPerNode*GB);
-    doNothing().when(node_0).releaseContainer(any(Container.class));
+    FiCaSchedulerNode node_0 =
+        TestUtils.getMockNode("host_0", DEFAULT_RACK, 0, memoryPerNode * GB);
+    doNothing().when(node_0)
+        .releaseContainer(any(Container.class), any(TransactionState.class));
     
-    final Resource clusterResource = 
-      Resources.createResource(numNodes * (memoryPerNode*GB), 
-          numNodes * coresPerNode);
+    final Resource clusterResource = Resources
+        .createResource(numNodes * (memoryPerNode * GB),
+            numNodes * coresPerNode);
     when(csContext.getNumClusterNodes()).thenReturn(numNodes);
 
     // Start testing
@@ -239,168 +239,167 @@ public class TestChildQueueOrder {
     final String user_0 = "user_0";
 
     // Stub an App and its containerCompleted
-    FiCaSchedulerApp app_0 = getMockApplication(0,user_0);
-    doReturn(true).when(app_0).containerCompleted(any(RMContainer.class),
-        any(ContainerStatus.class),any(RMContainerEventType.class));
+    FiCaSchedulerApp app_0 = getMockApplication(0, user_0);
+    doReturn(true).when(app_0)
+        .containerCompleted(any(RMContainer.class), any(ContainerStatus.class),
+            any(RMContainerEventType.class), any(TransactionState.class));
 
     //
-    Priority priority = TestUtils.createMockPriority(1); 
-    ContainerAllocationExpirer expirer = 
-      mock(ContainerAllocationExpirer.class);
+    Priority priority = TestUtils.createMockPriority(1);
+    ContainerAllocationExpirer expirer = mock(ContainerAllocationExpirer.class);
     DrainDispatcher drainDispatcher = new DrainDispatcher();
     RMApplicationHistoryWriter writer = mock(RMApplicationHistoryWriter.class);
     RMContext rmContext = mock(RMContext.class);
     when(rmContext.getContainerAllocationExpirer()).thenReturn(expirer);
     when(rmContext.getDispatcher()).thenReturn(drainDispatcher);
     when(rmContext.getRMApplicationHistoryWriter()).thenReturn(writer);
-    ApplicationAttemptId appAttemptId = BuilderUtils.newApplicationAttemptId(
-        app_0.getApplicationId(), 1);
+    ApplicationAttemptId appAttemptId =
+        BuilderUtils.newApplicationAttemptId(app_0.getApplicationId(), 1);
     ContainerId containerId = BuilderUtils.newContainerId(appAttemptId, 1);
-    Container container=TestUtils.getMockContainer(containerId, 
-        node_0.getNodeID(), Resources.createResource(1*GB), priority);
-    RMContainer rmContainer = new RMContainerImpl(container, appAttemptId,
-        node_0.getNodeID(), "user", rmContext);
+    Container container = TestUtils
+        .getMockContainer(containerId, node_0.getNodeID(),
+            Resources.createResource(1 * GB), priority);
+    RMContainer rmContainer =
+        new RMContainerImpl(container, appAttemptId, node_0.getNodeID(), "user",
+            rmContext, null);
 
     // Assign {1,2,3,4} 1GB containers respectively to queues
-    stubQueueAllocation(a, clusterResource, node_0, 1*GB);
-    stubQueueAllocation(b, clusterResource, node_0, 0*GB);
-    stubQueueAllocation(c, clusterResource, node_0, 0*GB);
-    stubQueueAllocation(d, clusterResource, node_0, 0*GB);
-    root.assignContainers(clusterResource, node_0);
-    for(int i=0; i < 2; i++)
-    {
-      stubQueueAllocation(a, clusterResource, node_0, 0*GB);
-      stubQueueAllocation(b, clusterResource, node_0, 1*GB);
-      stubQueueAllocation(c, clusterResource, node_0, 0*GB);
-      stubQueueAllocation(d, clusterResource, node_0, 0*GB);
-      root.assignContainers(clusterResource, node_0);
-    } 
-    for(int i=0; i < 3; i++)
-    {
-      stubQueueAllocation(a, clusterResource, node_0, 0*GB);
-      stubQueueAllocation(b, clusterResource, node_0, 0*GB);
-      stubQueueAllocation(c, clusterResource, node_0, 1*GB);
-      stubQueueAllocation(d, clusterResource, node_0, 0*GB);
-      root.assignContainers(clusterResource, node_0);
-    }  
-    for(int i=0; i < 4; i++)
-    {
-      stubQueueAllocation(a, clusterResource, node_0, 0*GB);
-      stubQueueAllocation(b, clusterResource, node_0, 0*GB);
-      stubQueueAllocation(c, clusterResource, node_0, 0*GB);
-      stubQueueAllocation(d, clusterResource, node_0, 1*GB);
-      root.assignContainers(clusterResource, node_0);
-    }    
-    verifyQueueMetrics(a, 1*GB, clusterResource);
-    verifyQueueMetrics(b, 2*GB, clusterResource);
-    verifyQueueMetrics(c, 3*GB, clusterResource);
-    verifyQueueMetrics(d, 4*GB, clusterResource);
-    LOG.info("status child-queues: " + ((ParentQueue)root).
+    stubQueueAllocation(a, clusterResource, node_0, 1 * GB);
+    stubQueueAllocation(b, clusterResource, node_0, 0 * GB);
+    stubQueueAllocation(c, clusterResource, node_0, 0 * GB);
+    stubQueueAllocation(d, clusterResource, node_0, 0 * GB);
+    root.assignContainers(clusterResource, node_0, null);
+    for (int i = 0; i < 2; i++) {
+      stubQueueAllocation(a, clusterResource, node_0, 0 * GB);
+      stubQueueAllocation(b, clusterResource, node_0, 1 * GB);
+      stubQueueAllocation(c, clusterResource, node_0, 0 * GB);
+      stubQueueAllocation(d, clusterResource, node_0, 0 * GB);
+      root.assignContainers(clusterResource, node_0, null);
+    }
+    for (int i = 0; i < 3; i++) {
+      stubQueueAllocation(a, clusterResource, node_0, 0 * GB);
+      stubQueueAllocation(b, clusterResource, node_0, 0 * GB);
+      stubQueueAllocation(c, clusterResource, node_0, 1 * GB);
+      stubQueueAllocation(d, clusterResource, node_0, 0 * GB);
+      root.assignContainers(clusterResource, node_0, null);
+    }
+    for (int i = 0; i < 4; i++) {
+      stubQueueAllocation(a, clusterResource, node_0, 0 * GB);
+      stubQueueAllocation(b, clusterResource, node_0, 0 * GB);
+      stubQueueAllocation(c, clusterResource, node_0, 0 * GB);
+      stubQueueAllocation(d, clusterResource, node_0, 1 * GB);
+      root.assignContainers(clusterResource, node_0, null);
+    }
+    verifyQueueMetrics(a, 1 * GB, clusterResource);
+    verifyQueueMetrics(b, 2 * GB, clusterResource);
+    verifyQueueMetrics(c, 3 * GB, clusterResource);
+    verifyQueueMetrics(d, 4 * GB, clusterResource);
+    LOG.info("status child-queues: " + ((ParentQueue) root).
         getChildQueuesToPrint());
 
     //Release 3 x 1GB containers from D
-    for(int i=0; i < 3;i++)
-    {
-      d.completedContainer(clusterResource, app_0, node_0,
-          rmContainer, null, RMContainerEventType.KILL, null);
+    for (int i = 0; i < 3; i++) {
+      d.completedContainer(clusterResource, app_0, node_0, rmContainer, null,
+          RMContainerEventType.KILL, null, null);
     }
-    verifyQueueMetrics(a, 1*GB, clusterResource);
-    verifyQueueMetrics(b, 2*GB, clusterResource);
-    verifyQueueMetrics(c, 3*GB, clusterResource);
-    verifyQueueMetrics(d, 1*GB, clusterResource);
+    verifyQueueMetrics(a, 1 * GB, clusterResource);
+    verifyQueueMetrics(b, 2 * GB, clusterResource);
+    verifyQueueMetrics(c, 3 * GB, clusterResource);
+    verifyQueueMetrics(d, 1 * GB, clusterResource);
     //reset manually resources on node
     node_0 = TestUtils.getMockNode("host_0", DEFAULT_RACK, 0,
-        (memoryPerNode-1-2-3-1)*GB);
-    LOG.info("status child-queues: " + 
-        ((ParentQueue)root).getChildQueuesToPrint());
+        (memoryPerNode - 1 - 2 - 3 - 1) * GB);
+    LOG.info(
+        "status child-queues: " + ((ParentQueue) root).getChildQueuesToPrint());
 
 
     // Assign 2 x 1GB Containers to A 
-    for(int i=0; i < 2; i++)
-    {
-      stubQueueAllocation(a, clusterResource, node_0, 1*GB);
-      stubQueueAllocation(b, clusterResource, node_0, 0*GB);
-      stubQueueAllocation(c, clusterResource, node_0, 0*GB);
-      stubQueueAllocation(d, clusterResource, node_0, 0*GB);
-      root.assignContainers(clusterResource, node_0);
+    for (int i = 0; i < 2; i++) {
+      stubQueueAllocation(a, clusterResource, node_0, 1 * GB);
+      stubQueueAllocation(b, clusterResource, node_0, 0 * GB);
+      stubQueueAllocation(c, clusterResource, node_0, 0 * GB);
+      stubQueueAllocation(d, clusterResource, node_0, 0 * GB);
+      root.assignContainers(clusterResource, node_0, null);
     }
-    verifyQueueMetrics(a, 3*GB, clusterResource);
-    verifyQueueMetrics(b, 2*GB, clusterResource);
-    verifyQueueMetrics(c, 3*GB, clusterResource);
-    verifyQueueMetrics(d, 1*GB, clusterResource);
-    LOG.info("status child-queues: " + 
-        ((ParentQueue)root).getChildQueuesToPrint());
+    verifyQueueMetrics(a, 3 * GB, clusterResource);
+    verifyQueueMetrics(b, 2 * GB, clusterResource);
+    verifyQueueMetrics(c, 3 * GB, clusterResource);
+    verifyQueueMetrics(d, 1 * GB, clusterResource);
+    LOG.info(
+        "status child-queues: " + ((ParentQueue) root).getChildQueuesToPrint());
 
     //Release 1GB Container from A
-    a.completedContainer(clusterResource, app_0, node_0, 
-        rmContainer, null, RMContainerEventType.KILL, null);
-    verifyQueueMetrics(a, 2*GB, clusterResource);
-    verifyQueueMetrics(b, 2*GB, clusterResource);
-    verifyQueueMetrics(c, 3*GB, clusterResource);
-    verifyQueueMetrics(d, 1*GB, clusterResource);
+    a.completedContainer(clusterResource, app_0, node_0, rmContainer, null,
+        RMContainerEventType.KILL, null, null);
+    verifyQueueMetrics(a, 2 * GB, clusterResource);
+    verifyQueueMetrics(b, 2 * GB, clusterResource);
+    verifyQueueMetrics(c, 3 * GB, clusterResource);
+    verifyQueueMetrics(d, 1 * GB, clusterResource);
     //reset manually resources on node
     node_0 = TestUtils.getMockNode("host_0", DEFAULT_RACK, 0,
-        (memoryPerNode-2-2-3-1)*GB);
-    LOG.info("status child-queues: " + 
-        ((ParentQueue)root).getChildQueuesToPrint());
+        (memoryPerNode - 2 - 2 - 3 - 1) * GB);
+    LOG.info(
+        "status child-queues: " + ((ParentQueue) root).getChildQueuesToPrint());
 
     // Assign 1GB container to B 
-    stubQueueAllocation(a, clusterResource, node_0, 0*GB);
-    stubQueueAllocation(b, clusterResource, node_0, 1*GB);
-    stubQueueAllocation(c, clusterResource, node_0, 0*GB);
-    stubQueueAllocation(d, clusterResource, node_0, 0*GB);
-    root.assignContainers(clusterResource, node_0);
-    verifyQueueMetrics(a, 2*GB, clusterResource);
-    verifyQueueMetrics(b, 3*GB, clusterResource);
-    verifyQueueMetrics(c, 3*GB, clusterResource);
-    verifyQueueMetrics(d, 1*GB, clusterResource);
-    LOG.info("status child-queues: " + 
-        ((ParentQueue)root).getChildQueuesToPrint());
+    stubQueueAllocation(a, clusterResource, node_0, 0 * GB);
+    stubQueueAllocation(b, clusterResource, node_0, 1 * GB);
+    stubQueueAllocation(c, clusterResource, node_0, 0 * GB);
+    stubQueueAllocation(d, clusterResource, node_0, 0 * GB);
+    root.assignContainers(clusterResource, node_0, null);
+    verifyQueueMetrics(a, 2 * GB, clusterResource);
+    verifyQueueMetrics(b, 3 * GB, clusterResource);
+    verifyQueueMetrics(c, 3 * GB, clusterResource);
+    verifyQueueMetrics(d, 1 * GB, clusterResource);
+    LOG.info(
+        "status child-queues: " + ((ParentQueue) root).getChildQueuesToPrint());
 
     //Release 1GB container resources from B
-    b.completedContainer(clusterResource, app_0, node_0, 
-        rmContainer, null, RMContainerEventType.KILL, null);
-    verifyQueueMetrics(a, 2*GB, clusterResource);
-    verifyQueueMetrics(b, 2*GB, clusterResource);
-    verifyQueueMetrics(c, 3*GB, clusterResource);
-    verifyQueueMetrics(d, 1*GB, clusterResource);
+    b.completedContainer(clusterResource, app_0, node_0, rmContainer, null,
+        RMContainerEventType.KILL, null, null);
+    verifyQueueMetrics(a, 2 * GB, clusterResource);
+    verifyQueueMetrics(b, 2 * GB, clusterResource);
+    verifyQueueMetrics(c, 3 * GB, clusterResource);
+    verifyQueueMetrics(d, 1 * GB, clusterResource);
     //reset manually resources on node
-    node_0 = TestUtils.getMockNode("host_0", DEFAULT_RACK, 0, 
-        (memoryPerNode-2-2-3-1)*GB);
-    LOG.info("status child-queues: " + 
-        ((ParentQueue)root).getChildQueuesToPrint());
+    node_0 = TestUtils.getMockNode("host_0", DEFAULT_RACK, 0,
+        (memoryPerNode - 2 - 2 - 3 - 1) * GB);
+    LOG.info(
+        "status child-queues: " + ((ParentQueue) root).getChildQueuesToPrint());
 
     // Assign 1GB container to A
-    stubQueueAllocation(a, clusterResource, node_0, 1*GB);
-    stubQueueAllocation(b, clusterResource, node_0, 0*GB);
-    stubQueueAllocation(c, clusterResource, node_0, 0*GB);
-    stubQueueAllocation(d, clusterResource, node_0, 0*GB);
-    root.assignContainers(clusterResource, node_0);
-    verifyQueueMetrics(a, 3*GB, clusterResource);
-    verifyQueueMetrics(b, 2*GB, clusterResource);
-    verifyQueueMetrics(c, 3*GB, clusterResource);
-    verifyQueueMetrics(d, 1*GB, clusterResource);
-    LOG.info("status child-queues: " + 
-        ((ParentQueue)root).getChildQueuesToPrint());
+    stubQueueAllocation(a, clusterResource, node_0, 1 * GB);
+    stubQueueAllocation(b, clusterResource, node_0, 0 * GB);
+    stubQueueAllocation(c, clusterResource, node_0, 0 * GB);
+    stubQueueAllocation(d, clusterResource, node_0, 0 * GB);
+    root.assignContainers(clusterResource, node_0, null);
+    verifyQueueMetrics(a, 3 * GB, clusterResource);
+    verifyQueueMetrics(b, 2 * GB, clusterResource);
+    verifyQueueMetrics(c, 3 * GB, clusterResource);
+    verifyQueueMetrics(d, 1 * GB, clusterResource);
+    LOG.info(
+        "status child-queues: " + ((ParentQueue) root).getChildQueuesToPrint());
 
     // Now do the real test, where B and D request a 1GB container
     // D should should get the next container if the order is correct
-    stubQueueAllocation(a, clusterResource, node_0, 0*GB);
-    stubQueueAllocation(b, clusterResource, node_0, 1*GB);
-    stubQueueAllocation(c, clusterResource, node_0, 0*GB);
-    stubQueueAllocation(d, clusterResource, node_0, 1*GB);
-    root.assignContainers(clusterResource, node_0);
-    InOrder allocationOrder = inOrder(d,b);
-    allocationOrder.verify(d).assignContainers(eq(clusterResource), 
-        any(FiCaSchedulerNode.class));
-    allocationOrder.verify(b).assignContainers(eq(clusterResource), 
-        any(FiCaSchedulerNode.class));
-    verifyQueueMetrics(a, 3*GB, clusterResource);
-    verifyQueueMetrics(b, 2*GB, clusterResource);
-    verifyQueueMetrics(c, 3*GB, clusterResource);
-    verifyQueueMetrics(d, 2*GB, clusterResource); //D got the container
-    LOG.info("status child-queues: " + 
-        ((ParentQueue)root).getChildQueuesToPrint());
+    stubQueueAllocation(a, clusterResource, node_0, 0 * GB);
+    stubQueueAllocation(b, clusterResource, node_0, 1 * GB);
+    stubQueueAllocation(c, clusterResource, node_0, 0 * GB);
+    stubQueueAllocation(d, clusterResource, node_0, 1 * GB);
+    root.assignContainers(clusterResource, node_0, null);
+    InOrder allocationOrder = inOrder(d, b);
+    allocationOrder.verify(d)
+        .assignContainers(eq(clusterResource), any(FiCaSchedulerNode.class),
+            any(TransactionState.class));
+    allocationOrder.verify(b)
+        .assignContainers(eq(clusterResource), any(FiCaSchedulerNode.class),
+            any(TransactionState.class));
+    verifyQueueMetrics(a, 3 * GB, clusterResource);
+    verifyQueueMetrics(b, 2 * GB, clusterResource);
+    verifyQueueMetrics(c, 3 * GB, clusterResource);
+    verifyQueueMetrics(d, 2 * GB, clusterResource); //D got the container
+    LOG.info(
+        "status child-queues: " + ((ParentQueue) root).getChildQueuesToPrint());
   }
 
   @After

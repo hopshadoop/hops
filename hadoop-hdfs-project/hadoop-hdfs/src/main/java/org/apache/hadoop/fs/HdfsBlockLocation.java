@@ -17,16 +17,15 @@
  */
 package org.apache.hadoop.fs;
 
-import java.io.IOException;
-
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 
+import java.io.IOException;
+
 /**
  * Wrapper for {@link BlockLocation} that also includes a {@link LocatedBlock},
  * allowing more detailed queries to the datanode about a block.
- *
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
@@ -34,10 +33,11 @@ public class HdfsBlockLocation extends BlockLocation {
 
   private final LocatedBlock block;
   
-  public HdfsBlockLocation(BlockLocation loc, LocatedBlock block) 
+  public HdfsBlockLocation(BlockLocation loc, LocatedBlock block)
       throws IOException {
     // Initialize with data from passed in BlockLocation
-    super(loc);
+    super(loc.getNames(), loc.getHosts(), loc.getTopologyPaths(),
+        loc.getOffset(), loc.getLength(), loc.isCorrupt());
     this.block = block;
   }
   

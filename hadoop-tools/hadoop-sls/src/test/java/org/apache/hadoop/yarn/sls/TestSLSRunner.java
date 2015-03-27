@@ -18,8 +18,11 @@
 
 package org.apache.hadoop.yarn.sls;
 
-import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.conf.Configuration;
 import org.junit.Test;
+import io.hops.metadata.HdfsStorageFactory;
+import io.hops.metadata.util.RMStorageFactory;
+import io.hops.metadata.util.YarnAPIStorageFactory;
 
 import java.io.File;
 import java.util.UUID;
@@ -29,6 +32,11 @@ public class TestSLSRunner {
   @Test
   @SuppressWarnings("all")
   public void testSimulatorRunning() throws Exception {
+    Configuration conf = new Configuration();
+    HdfsStorageFactory.setConfiguration(conf);
+    RMStorageFactory.setConfiguration(conf);
+    YarnAPIStorageFactory.setConfiguration(conf);
+
     File tempDir = new File("target", UUID.randomUUID().toString());
 
     // start the simulator

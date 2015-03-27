@@ -30,10 +30,11 @@ public interface Service {
    * Initializes the service. This method is called once, when the
    * {@link Server} owning the service is being initialized.
    *
-   * @param server the server initializing the service, give access to the
-   * server context.
-   *
-   * @throws ServiceException thrown if the service could not be initialized.
+   * @param server
+   *     the server initializing the service, give access to the
+   *     server context.
+   * @throws ServiceException
+   *     thrown if the service could not be initialized.
    */
   public void init(Server server) throws ServiceException;
 
@@ -41,8 +42,9 @@ public interface Service {
    * Post initializes the service. This method is called by the
    * {@link Server} after all services of the server have been initialized.
    *
-   * @throws ServiceException thrown if the service could not be
-   * post-initialized.
+   * @throws ServiceException
+   *     thrown if the service could not be
+   *     post-initialized.
    */
   public void postInit() throws ServiceException;
 
@@ -72,11 +74,14 @@ public interface Service {
   /**
    * Notification callback when the server changes its status.
    *
-   * @param oldStatus old server status.
-   * @param newStatus new server status.
-   *
-   * @throws ServiceException thrown if the service could not process the status change.
+   * @param oldStatus
+   *     old server status.
+   * @param newStatus
+   *     new server status.
+   * @throws ServiceException
+   *     thrown if the service could not process the status change.
    */
-  public void serverStatusChange(Server.Status oldStatus, Server.Status newStatus) throws ServiceException;
+  public void serverStatusChange(Server.Status oldStatus,
+      Server.Status newStatus) throws ServiceException;
 
 }

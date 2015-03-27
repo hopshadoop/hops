@@ -18,12 +18,6 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.webapp.dao;
 
-import javax.xml.bind.annotation.XmlAccessType;
-import javax.xml.bind.annotation.XmlAccessorType;
-import javax.xml.bind.annotation.XmlRootElement;
-import javax.xml.bind.annotation.XmlTransient;
-import javax.xml.bind.annotation.XmlType;
-
 import org.apache.hadoop.yarn.api.records.QueueInfo;
 import org.apache.hadoop.yarn.api.records.QueueState;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
@@ -31,6 +25,12 @@ import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerNodeReport;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fifo.FifoScheduler;
+
+import javax.xml.bind.annotation.XmlAccessType;
+import javax.xml.bind.annotation.XmlAccessorType;
+import javax.xml.bind.annotation.XmlRootElement;
+import javax.xml.bind.annotation.XmlTransient;
+import javax.xml.bind.annotation.XmlType;
 
 @XmlRootElement(name = "fifoScheduler")
 @XmlType(name = "fifoScheduler")
@@ -71,13 +71,13 @@ public class FifoSchedulerInfo extends SchedulerInfo {
     this.maxQueueMemoryCapacity = fs.getMaximumResourceCapability().getMemory();
     this.qstate = qInfo.getQueueState();
 
-    this.numNodes = rmContext.getRMNodes().size();
+    this.numNodes = rmContext.getActiveRMNodes().size();
     this.usedNodeCapacity = 0;
     this.availNodeCapacity = 0;
     this.totalNodeCapacity = 0;
     this.numContainers = 0;
 
-    for (RMNode ni : rmContext.getRMNodes().values()) {
+    for (RMNode ni : rmContext.getActiveRMNodes().values()) {
       SchedulerNodeReport report = fs.getNodeReport(ni.getNodeID());
       this.usedNodeCapacity += report.getUsedResource().getMemory();
       this.availNodeCapacity += report.getAvailableResource().getMemory();

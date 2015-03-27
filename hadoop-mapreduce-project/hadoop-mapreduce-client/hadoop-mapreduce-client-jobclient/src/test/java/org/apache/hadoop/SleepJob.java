@@ -23,6 +23,8 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
@@ -53,6 +55,7 @@ import org.apache.hadoop.util.ToolRunner;
  * some disk space.
  */
 public class SleepJob extends Configured implements Tool {
+  private static final Log LOG = LogFactory.getLog(SleepJob.class);
   public static String MAP_SLEEP_COUNT = "mapreduce.sleepjob.map.sleep.count";
   public static String REDUCE_SLEEP_COUNT = 
     "mapreduce.sleepjob.reduce.sleep.count";
@@ -149,6 +152,7 @@ public class SleepJob extends Configured implements Tool {
 
     public void map(IntWritable key, IntWritable value, Context context
                ) throws IOException, InterruptedException {
+      LOG.info("starting the map");
       //it is expected that every map processes mapSleepCount number of records. 
       try {
         context.setStatus("Sleeping... (" +
@@ -166,6 +170,7 @@ public class SleepJob extends Configured implements Tool {
       for (int i = 0; i < value.get(); ++i) {
         context.write(new IntWritable(k + i), NullWritable.get());
       }
+      LOG.info("finishing map");
     }
   }
   
@@ -187,6 +192,7 @@ public class SleepJob extends Configured implements Tool {
     public void reduce(IntWritable key, Iterable<NullWritable> values,
                        Context context)
       throws IOException {
+      LOG.info("Starting reduce");
       try {
         context.setStatus("Sleeping... (" +
             (reduceSleepDuration * (reduceSleepCount - count)) + ") ms left");
@@ -198,6 +204,7 @@ public class SleepJob extends Configured implements Tool {
           "Interrupted while sleeping").initCause(ex);
       }
       count++;
+      LOG.info("finishing reduce");
     }
   }
 

@@ -18,14 +18,16 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.recovery;
 
+import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore.ApplicationState;
 
 public class RMStateStoreAppEvent extends RMStateStoreEvent {
 
   private final ApplicationState appState;
 
-  public RMStateStoreAppEvent(ApplicationState appState) {
-    super(RMStateStoreEventType.STORE_APP);
+  public RMStateStoreAppEvent(ApplicationState appState,
+      TransactionState transactionState) {
+    super(RMStateStoreEventType.STORE_APP, transactionState);
     this.appState = appState;
   }
 

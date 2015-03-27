@@ -17,12 +17,6 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
-import java.io.IOException;
-import java.net.InetSocketAddress;
-
-import javax.servlet.ServletContext;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -34,16 +28,26 @@ import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.znerd.xmlenc.XMLOutputter;
 
+import javax.servlet.ServletContext;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+
 /**
  * A base class for the servlets in DFS.
  */
 abstract class DfsServlet extends HttpServlet {
-  /** For java.io.Serializable */
+  /**
+   * For java.io.Serializable
+   */
   private static final long serialVersionUID = 1L;
 
   static final Log LOG = LogFactory.getLog(DfsServlet.class.getCanonicalName());
 
-  /** Write the object to XML format */
+  /**
+   * Write the object to XML format
+   */
   protected void writeXml(Exception except, String path, XMLOutputter doc)
       throws IOException {
     doc.startTag(RemoteException.class.getSimpleName());
@@ -63,7 +67,7 @@ abstract class DfsServlet extends HttpServlet {
   }
 
   /**
-   * Create a {@link NameNode} proxy from the current {@link ServletContext}. 
+   * Create a {@link NameNode} proxy from the current {@link ServletContext}.
    */
   protected ClientProtocol createNameNodeProxy() throws IOException {
     ServletContext context = getServletContext();
@@ -74,15 +78,16 @@ abstract class DfsServlet extends HttpServlet {
       return nn.getRpcServer();
     }
     InetSocketAddress nnAddr =
-      NameNodeHttpServer.getNameNodeAddressFromContext(context);
-    Configuration conf = new HdfsConfiguration(
-        NameNodeHttpServer.getConfFromContext(context));
-    return NameNodeProxies.createProxy(conf, NameNode.getUri(nnAddr),
-        ClientProtocol.class).getProxy();
+        NameNodeHttpServer.getNameNodeAddressFromContext(context);
+    Configuration conf =
+        new HdfsConfiguration(NameNodeHttpServer.getConfFromContext(context));
+    return NameNodeProxies
+        .createProxy(conf, NameNode.getUri(nnAddr), ClientProtocol.class)
+        .getProxy();
   }
 
   protected UserGroupInformation getUGI(HttpServletRequest request,
-                                        Configuration conf) throws IOException {
+      Configuration conf) throws IOException {
     return JspHelper.getUGI(getServletContext(), request, conf);
   }
 }

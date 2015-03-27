@@ -37,6 +37,7 @@ public class NameValuePair {
 
   /**
    * Get the name.
+   *
    * @return The name.
    */
   public String getName() {
@@ -46,6 +47,7 @@ public class NameValuePair {
 
   /**
    * Get the value.
+   *
    * @return The value.
    */
   public Object getValue() {

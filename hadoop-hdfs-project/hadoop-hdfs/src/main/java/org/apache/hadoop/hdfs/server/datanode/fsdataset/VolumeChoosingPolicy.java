@@ -17,10 +17,10 @@
  */
 package org.apache.hadoop.hdfs.server.datanode.fsdataset;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+
 import java.io.IOException;
 import java.util.List;
-
-import org.apache.hadoop.classification.InterfaceAudience;
 
 /**
  * This interface specifies the policy for choosing volumes to store replicas.
@@ -31,13 +31,16 @@ public interface VolumeChoosingPolicy<V extends FsVolumeSpi> {
   /**
    * Choose a volume to place a replica,
    * given a list of volumes and the replica size sought for storage.
-   * 
+   * <p/>
    * The implementations of this interface must be thread-safe.
-   * 
-   * @param volumes - a list of available volumes.
-   * @param replicaSize - the size of the replica for which a volume is sought.
+   *
+   * @param volumes
+   *     - a list of available volumes.
+   * @param replicaSize
+   *     - the size of the replica for which a volume is sought.
    * @return the chosen volume.
-   * @throws IOException when disks are unavailable or are full.
+   * @throws IOException
+   *     when disks are unavailable or are full.
    */
   public V chooseVolume(List<V> volumes, long replicaSize) throws IOException;
 }

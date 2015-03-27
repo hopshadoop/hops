@@ -1,25 +1,24 @@
 /**
-* Licensed to the Apache Software Foundation (ASF) under one
-* or more contributor license agreements.  See the NOTICE file
-* distributed with this work for additional information
-* regarding copyright ownership.  The ASF licenses this file
-* to you under the Apache License, Version 2.0 (the
-* "License"); you may not use this file except in compliance
-* with the License.  You may obtain a copy of the License at
-*
-*     http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package org.apache.hadoop.yarn.client.cli;
 
-import java.io.IOException;
-
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.GnuParser;
@@ -44,7 +43,7 @@ import org.apache.hadoop.yarn.logaggregation.LogAggregationUtils;
 import org.apache.hadoop.yarn.logaggregation.LogCLIHelpers;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 
-import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
 
 @Public
 @Evolving
@@ -59,15 +58,16 @@ public class LogsCLI extends Configured implements Tool {
   public int run(String[] args) throws Exception {
 
     Options opts = new Options();
-    Option appIdOpt = new Option(APPLICATION_ID_OPTION, true, "ApplicationId (required)");
+    Option appIdOpt =
+        new Option(APPLICATION_ID_OPTION, true, "ApplicationId (required)");
     appIdOpt.setRequired(true);
     opts.addOption(appIdOpt);
     opts.addOption(CONTAINER_ID_OPTION, true,
-      "ContainerId (must be specified if node address is specified)");
-    opts.addOption(NODE_ADDRESS_OPTION, true, "NodeAddress in the format "
-      + "nodename:port (must be specified if container id is specified)");
+        "ContainerId (must be specified if node address is specified)");
+    opts.addOption(NODE_ADDRESS_OPTION, true, "NodeAddress in the format " +
+        "nodename:port (must be specified if container id is specified)");
     opts.addOption(APP_OWNER_OPTION, true,
-      "AppOwner (assumed to be current user if not specified)");
+        "AppOwner (assumed to be current user if not specified)");
     opts.getOption(APPLICATION_ID_OPTION).setArgName("Application ID");
     opts.getOption(CONTAINER_ID_OPTION).setArgName("Container ID");
     opts.getOption(NODE_ADDRESS_OPTION).setArgName("Node Address");
@@ -118,12 +118,12 @@ public class LogsCLI extends Configured implements Tool {
       int resultCode = verifyApplicationState(appId);
       if (resultCode != 0) {
         System.out.println("Application has not completed." +
-        		" Logs are only available after an application completes");
+            " Logs are only available after an application completes");
         return resultCode;
       }
     } catch (Exception e) {
       System.err.println("Unable to get ApplicationState." +
-      		" Attempting to fetch logs directly from the filesystem.");
+          " Attempting to fetch logs directly from the filesystem.");
     }
 
     LogCLIHelpers logCliHelper = new LogCLIHelpers();
@@ -134,48 +134,47 @@ public class LogsCLI extends Configured implements Tool {
     }
     int resultCode = 0;
     if (containerIdStr == null && nodeAddress == null) {
-      resultCode = logCliHelper.dumpAllContainersLogs(appId, appOwner, System.out);
-    } else if ((containerIdStr == null && nodeAddress != null)
-        || (containerIdStr != null && nodeAddress == null)) {
+      resultCode =
+          logCliHelper.dumpAllContainersLogs(appId, appOwner, System.out);
+    } else if ((containerIdStr == null && nodeAddress != null) ||
+        (containerIdStr != null && nodeAddress == null)) {
       System.out.println("ContainerId or NodeAddress cannot be null!");
       printHelpMessage(printOpts);
       resultCode = -1;
     } else {
-      Path remoteRootLogDir =
-        new Path(getConf().get(YarnConfiguration.NM_REMOTE_APP_LOG_DIR,
-            YarnConfiguration.DEFAULT_NM_REMOTE_APP_LOG_DIR));
+      Path remoteRootLogDir = new Path(getConf()
+          .get(YarnConfiguration.NM_REMOTE_APP_LOG_DIR,
+              YarnConfiguration.DEFAULT_NM_REMOTE_APP_LOG_DIR));
       AggregatedLogFormat.LogReader reader =
-          new AggregatedLogFormat.LogReader(getConf(),
-              LogAggregationUtils.getRemoteNodeLogFileForApp(
-                  remoteRootLogDir,
-                  appId,
-                  appOwner,
+          new AggregatedLogFormat.LogReader(getConf(), LogAggregationUtils
+              .getRemoteNodeLogFileForApp(remoteRootLogDir, appId, appOwner,
                   ConverterUtils.toNodeId(nodeAddress),
                   LogAggregationUtils.getRemoteNodeLogDirSuffix(getConf())));
-      resultCode = logCliHelper.dumpAContainerLogs(containerIdStr, reader, System.out);
+      resultCode =
+          logCliHelper.dumpAContainerLogs(containerIdStr, reader, System.out);
     }
 
     return resultCode;
   }
 
-  private int verifyApplicationState(ApplicationId appId) throws IOException,
-      YarnException {
+  private int verifyApplicationState(ApplicationId appId)
+      throws IOException, YarnException {
     YarnClient yarnClient = createYarnClient();
 
     try {
       ApplicationReport appReport = yarnClient.getApplicationReport(appId);
       switch (appReport.getYarnApplicationState()) {
-      case NEW:
-      case NEW_SAVING:
-      case ACCEPTED:
-      case SUBMITTED:
-      case RUNNING:
-        return -1;
-      case FAILED:
-      case FINISHED:
-      case KILLED:
-      default:
-        break;
+        case NEW:
+        case NEW_SAVING:
+        case ACCEPTED:
+        case SUBMITTED:
+        case RUNNING:
+          return -1;
+        case FAILED:
+        case FINISHED:
+        case KILLED:
+        default:
+          break;
 
       }
     } finally {
@@ -203,7 +202,8 @@ public class LogsCLI extends Configured implements Tool {
   private void printHelpMessage(Options options) {
     System.out.println("Retrieve logs for completed YARN applications.");
     HelpFormatter formatter = new HelpFormatter();
-    formatter.printHelp("yarn logs -applicationId <application ID> [OPTIONS]", new Options());
+    formatter.printHelp("yarn logs -applicationId <application ID> [OPTIONS]",
+        new Options());
     formatter.setSyntaxPrefix("");
     formatter.printHelp("general options are:", options);
   }

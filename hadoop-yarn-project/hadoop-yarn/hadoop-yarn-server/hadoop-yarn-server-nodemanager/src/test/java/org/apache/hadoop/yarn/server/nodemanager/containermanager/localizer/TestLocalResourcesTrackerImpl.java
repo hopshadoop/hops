@@ -1,37 +1,24 @@
 /**
-* Licensed to the Apache Software Foundation (ASF) under one
-* or more contributor license agreements.  See the NOTICE file
-* distributed with this work for additional information
-* regarding copyright ownership.  The ASF licenses this file
-* to you under the Apache License, Version 2.0 (the
-* "License"); you may not use this file except in compliance
-* with the License.  You may obtain a copy of the License at
-*
-*     http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer;
 
-import static org.mockito.Mockito.any;
-import static org.mockito.Matchers.isA;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-
-import java.io.File;
-import java.io.IOException;
-import java.util.Iterator;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-
 import junit.framework.Assert;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.yarn.api.records.ContainerId;
@@ -57,9 +44,21 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.even
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.junit.Test;
 
+import java.io.File;
+import java.io.IOException;
+import java.util.Iterator;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
+import static org.mockito.Matchers.isA;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+
 public class TestLocalResourcesTrackerImpl {
 
-  @Test(timeout=10000)
+  @Test(timeout = 10000)
   @SuppressWarnings("unchecked")
   public void test() {
     String user = "testuser";
@@ -81,10 +80,10 @@ public class TestLocalResourcesTrackerImpl {
       ContainerId cId2 = BuilderUtils.newContainerId(1, 1, 1, 2);
       LocalizerContext lc2 = new LocalizerContext(user, cId2, null);
 
-      LocalResourceRequest req1 =
-          createLocalResourceRequest(user, 1, 1, LocalResourceVisibility.PUBLIC);
-      LocalResourceRequest req2 =
-          createLocalResourceRequest(user, 2, 1, LocalResourceVisibility.PUBLIC);
+      LocalResourceRequest req1 = createLocalResourceRequest(user, 1, 1,
+          LocalResourceVisibility.PUBLIC);
+      LocalResourceRequest req2 = createLocalResourceRequest(user, 2, 1,
+          LocalResourceVisibility.PUBLIC);
       LocalizedResource lr1 = createLocalizedResource(req1, dispatcher);
       LocalizedResource lr2 = createLocalizedResource(req2, dispatcher);
       ConcurrentMap<LocalResourceRequest, LocalizedResource> localrsrc =
@@ -93,7 +92,7 @@ public class TestLocalResourcesTrackerImpl {
       localrsrc.put(req2, lr2);
       LocalResourcesTracker tracker =
           new LocalResourcesTrackerImpl(user, dispatcher, localrsrc, false,
-            conf);
+              conf);
 
       ResourceEvent req11Event =
           new ResourceRequestEvent(req1, LocalResourceVisibility.PUBLIC, lc1);
@@ -116,8 +115,8 @@ public class TestLocalResourcesTrackerImpl {
       tracker.handle(req21Event);
 
       dispatcher.await();
-      verify(localizerEventHandler, times(3)).handle(
-          any(LocalizerResourceRequestEvent.class));
+      verify(localizerEventHandler, times(3))
+          .handle(any(LocalizerResourceRequestEvent.class));
       // Verify refCount for R1 is 2
       Assert.assertEquals(2, lr1.getRefCount());
       // Verify refCount for R2 is 1
@@ -155,7 +154,7 @@ public class TestLocalResourcesTrackerImpl {
     }
   }
 
-  @Test(timeout=10000)
+  @Test(timeout = 10000)
   @SuppressWarnings("unchecked")
   public void testConsistency() {
     String user = "testuser";
@@ -163,8 +162,10 @@ public class TestLocalResourcesTrackerImpl {
     try {
       Configuration conf = new Configuration();
       dispatcher = createDispatcher(conf);
-      EventHandler<LocalizerEvent> localizerEventHandler = mock(EventHandler.class);
-      EventHandler<LocalizerEvent> containerEventHandler = mock(EventHandler.class);
+      EventHandler<LocalizerEvent> localizerEventHandler =
+          mock(EventHandler.class);
+      EventHandler<LocalizerEvent> containerEventHandler =
+          mock(EventHandler.class);
       dispatcher.register(LocalizerEventType.class, localizerEventHandler);
       dispatcher.register(ContainerEventType.class, containerEventHandler);
 
@@ -173,13 +174,15 @@ public class TestLocalResourcesTrackerImpl {
       LocalResourceRequest req1 = createLocalResourceRequest(user, 1, 1,
           LocalResourceVisibility.PUBLIC);
       LocalizedResource lr1 = createLocalizedResource(req1, dispatcher);
-      ConcurrentMap<LocalResourceRequest, LocalizedResource> localrsrc = new ConcurrentHashMap<LocalResourceRequest, LocalizedResource>();
+      ConcurrentMap<LocalResourceRequest, LocalizedResource> localrsrc =
+          new ConcurrentHashMap<LocalResourceRequest, LocalizedResource>();
       localrsrc.put(req1, lr1);
-      LocalResourcesTracker tracker = new LocalResourcesTrackerImpl(user,
-          dispatcher, localrsrc, false, conf);
+      LocalResourcesTracker tracker =
+          new LocalResourcesTrackerImpl(user, dispatcher, localrsrc, false,
+              conf);
 
-      ResourceEvent req11Event = new ResourceRequestEvent(req1,
-          LocalResourceVisibility.PUBLIC, lc1);
+      ResourceEvent req11Event =
+          new ResourceRequestEvent(req1, LocalResourceVisibility.PUBLIC, lc1);
 
       ResourceEvent rel11Event = new ResourceReleaseEvent(req1, cId1);
 
@@ -195,14 +198,14 @@ public class TestLocalResourcesTrackerImpl {
       verifyTrackedResourceCount(tracker, 1);
 
       // Localize resource1
-      ResourceLocalizedEvent rle = new ResourceLocalizedEvent(req1, new Path(
-          "file:///tmp/r1"), 1);
+      ResourceLocalizedEvent rle =
+          new ResourceLocalizedEvent(req1, new Path("file:///tmp/r1"), 1);
       lr1.handle(rle);
       Assert.assertTrue(lr1.getState().equals(ResourceState.LOCALIZED));
       Assert.assertTrue(createdummylocalizefile(new Path("file:///tmp/r1")));
       LocalizedResource rsrcbefore = tracker.iterator().next();
-      File resFile = new File(lr1.getLocalPath().toUri().getRawPath()
-          .toString());
+      File resFile =
+          new File(lr1.getLocalPath().toUri().getRawPath().toString());
       Assert.assertTrue(resFile.exists());
       Assert.assertTrue(resFile.delete());
 
@@ -246,10 +249,11 @@ public class TestLocalResourcesTrackerImpl {
       ConcurrentMap<LocalResourceRequest, LocalizedResource> localrsrc =
           new ConcurrentHashMap<LocalResourceRequest, LocalizedResource>();
       LocalResourcesTracker tracker =
-          new LocalResourcesTrackerImpl(user, dispatcher, localrsrc, true, conf);
+          new LocalResourcesTrackerImpl(user, dispatcher, localrsrc, true,
+              conf);
 
-      LocalResourceRequest lr =
-          createLocalResourceRequest(user, 1, 1, LocalResourceVisibility.PUBLIC);
+      LocalResourceRequest lr = createLocalResourceRequest(user, 1, 1,
+          LocalResourceVisibility.PUBLIC);
 
       // Creating 2 containers for same application which will be requesting
       // same local resource.
@@ -271,8 +275,8 @@ public class TestLocalResourcesTrackerImpl {
       Assert.assertTrue(localrsrc.containsKey(lr));
       Assert.assertEquals(1, localrsrc.get(lr).getRefCount());
       Assert.assertTrue(localrsrc.get(lr).ref.contains(cId1));
-      Assert.assertEquals(ResourceState.DOWNLOADING, localrsrc.get(lr)
-        .getState());
+      Assert.assertEquals(ResourceState.DOWNLOADING,
+          localrsrc.get(lr).getState());
 
       // Container 2 requesting the resource
       ContainerId cId2 = BuilderUtils.newContainerId(1, 1, 1, 2);
@@ -287,8 +291,9 @@ public class TestLocalResourcesTrackerImpl {
       Assert.assertTrue(localrsrc.get(lr).ref.contains(cId2));
 
       // Failing resource localization
-      ResourceEvent resourceFailedEvent = new ResourceFailedLocalizationEvent(
-          lr,(new Exception("test").getMessage()));
+      ResourceEvent resourceFailedEvent =
+          new ResourceFailedLocalizationEvent(lr,
+              (new Exception("test").getMessage()));
       
       // Backing up the resource to track its state change as it will be
       // removed after the failed event.
@@ -299,8 +304,8 @@ public class TestLocalResourcesTrackerImpl {
       // After receiving failed resource event; all waiting containers will be
       // notified with Container Resource Failed Event.
       Assert.assertEquals(0, localrsrc.size());
-      verify(containerEventHandler, times(2)).handle(
-        isA(ContainerResourceFailedEvent.class));
+      verify(containerEventHandler, times(2))
+          .handle(isA(ContainerResourceFailedEvent.class));
       Assert.assertEquals(ResourceState.FAILED, localizedResource.getState());
 
       // Container 1 trying to release the resource (This resource is already
@@ -342,10 +347,10 @@ public class TestLocalResourcesTrackerImpl {
       tracker.handle(localizedEvent);
       
       // Verifying ContainerResourceLocalizedEvent .
-      verify(containerEventHandler, times(1)).handle(
-        isA(ContainerResourceLocalizedEvent.class));
-      Assert.assertEquals(ResourceState.LOCALIZED, localrsrc.get(lr)
-        .getState());
+      verify(containerEventHandler, times(1))
+          .handle(isA(ContainerResourceLocalizedEvent.class));
+      Assert
+          .assertEquals(ResourceState.LOCALIZED, localrsrc.get(lr).getState());
       Assert.assertEquals(1, localrsrc.get(lr).getRefCount());
       
       // Container-3 releasing the resource.
@@ -383,8 +388,9 @@ public class TestLocalResourcesTrackerImpl {
 
       ConcurrentMap<LocalResourceRequest, LocalizedResource> localrsrc =
           new ConcurrentHashMap<LocalResourceRequest, LocalizedResource>();
-      LocalResourcesTracker tracker = new LocalResourcesTrackerImpl(user,
-          dispatcher, localrsrc, true, conf);
+      LocalResourcesTracker tracker =
+          new LocalResourcesTrackerImpl(user, dispatcher, localrsrc, true,
+              conf);
 
       // This is a random path. NO File creation will take place at this place.
       Path localDir = new Path("/tmp");
@@ -396,17 +402,16 @@ public class TestLocalResourcesTrackerImpl {
       LocalizerContext lc1 = new LocalizerContext(user, cId1, null);
 
       // Container 1 requests lr1 to be localized
-      ResourceEvent reqEvent1 = new ResourceRequestEvent(lr1,
-          LocalResourceVisibility.PUBLIC, lc1);
+      ResourceEvent reqEvent1 =
+          new ResourceRequestEvent(lr1, LocalResourceVisibility.PUBLIC, lc1);
       tracker.handle(reqEvent1);
 
       // Simulate the process of localization of lr1
       Path hierarchicalPath1 = tracker.getPathForLocalization(lr1, localDir);
       // Simulate lr1 getting localized
-      ResourceLocalizedEvent rle1 =
-          new ResourceLocalizedEvent(lr1,
-              new Path(hierarchicalPath1.toUri().toString() +
-                  Path.SEPARATOR + "file1"), 120);
+      ResourceLocalizedEvent rle1 = new ResourceLocalizedEvent(lr1,
+          new Path(hierarchicalPath1.toUri().toString() +
+              Path.SEPARATOR + "file1"), 120);
       tracker.handle(rle1);
       // Localization successful.
 
@@ -420,8 +425,8 @@ public class TestLocalResourcesTrackerImpl {
       Path hierarchicalPath2 = tracker.getPathForLocalization(lr2, localDir);
       // localization failed.
       ResourceFailedLocalizationEvent rfe2 =
-          new ResourceFailedLocalizationEvent(
-              lr2, new Exception("Test").toString());
+          new ResourceFailedLocalizationEvent(lr2,
+              new Exception("Test").toString());
       tracker.handle(rfe2);
 
       /*
@@ -432,14 +437,14 @@ public class TestLocalResourcesTrackerImpl {
 
       LocalResourceRequest lr3 = createLocalResourceRequest(user, 2, 2,
           LocalResourceVisibility.PUBLIC);
-      ResourceEvent reqEvent3 = new ResourceRequestEvent(lr3,
-          LocalResourceVisibility.PUBLIC, lc1);
+      ResourceEvent reqEvent3 =
+          new ResourceRequestEvent(lr3, LocalResourceVisibility.PUBLIC, lc1);
       tracker.handle(reqEvent3);
       Path hierarchicalPath3 = tracker.getPathForLocalization(lr3, localDir);
       // localization successful
-      ResourceLocalizedEvent rle3 =
-          new ResourceLocalizedEvent(lr3, new Path(hierarchicalPath3.toUri()
-            .toString() + Path.SEPARATOR + "file3"), 120);
+      ResourceLocalizedEvent rle3 = new ResourceLocalizedEvent(lr3, new Path(
+          hierarchicalPath3.toUri().toString() + Path.SEPARATOR + "file3"),
+          120);
       tracker.handle(rle3);
 
       // Verifying that path created is inside the subdirectory
@@ -498,8 +503,8 @@ public class TestLocalResourcesTrackerImpl {
       iter.next();
       count++;
     }
-    Assert.assertEquals("Tracker resource count does not match", expected,
-        count);
+    Assert
+        .assertEquals("Tracker resource count does not match", expected, count);
   }
 
   private LocalResourceRequest createLocalResourceRequest(String user, int i,

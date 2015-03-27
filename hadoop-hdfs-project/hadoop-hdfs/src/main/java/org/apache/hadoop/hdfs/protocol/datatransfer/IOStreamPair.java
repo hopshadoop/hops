@@ -17,10 +17,10 @@
  */
 package org.apache.hadoop.hdfs.protocol.datatransfer;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+
 import java.io.InputStream;
 import java.io.OutputStream;
-
-import org.apache.hadoop.classification.InterfaceAudience;
 
 /**
  * A little struct class to wrap an InputStream and an OutputStream.

@@ -17,17 +17,16 @@
  */
 package org.apache.hadoop.hdfs.server.common;
 
-import java.io.File;
-import java.io.IOException;
-
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.util.StringUtils;
 
+import java.io.File;
+import java.io.IOException;
+
 /**
- * The exception is thrown when file system state is inconsistent 
- * and is not recoverable. 
- * 
+ * The exception is thrown when file system state is inconsistent
+ * and is not recoverable.
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
@@ -35,8 +34,8 @@ public class InconsistentFSStateException extends IOException {
   private static final long serialVersionUID = 1L;
 
   public InconsistentFSStateException(File dir, String descr) {
-    super("Directory " + getFilePath(dir)
-          + " is in an inconsistent state: " + descr);
+    super("Directory " + getFilePath(dir) + " is in an inconsistent state: " +
+        descr);
   }
 
   public InconsistentFSStateException(File dir, String descr, Throwable ex) {
@@ -46,7 +45,8 @@ public class InconsistentFSStateException extends IOException {
   private static String getFilePath(File dir) {
     try {
       return dir.getCanonicalPath();
-    } catch(IOException e) {}
+    } catch (IOException e) {
+    }
     return dir.getPath();
   }
 }

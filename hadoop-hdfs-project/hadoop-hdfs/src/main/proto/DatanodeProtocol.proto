@@ -16,31 +16,30 @@
  * limitations under the License.
  */
 
-/**
- * These .proto interfaces are private and stable.
- * Please see http://wiki.apache.org/hadoop/Compatibility
- * for what changes are allowed for a *stable* .proto interface.
- */
-
 // This file contains protocol buffers that are used throughout HDFS -- i.e.
 // by the client, server, and data transfer protocols.
 
 option java_package = "org.apache.hadoop.hdfs.protocol.proto";
+
 option java_outer_classname = "DatanodeProtocolProtos";
+
 option java_generic_services = true;
+
 option java_generate_equals_and_hash = true;
+
 package hadoop.hdfs;
 
 import "hdfs.proto";
 
+import "ActiveNode.proto";
 /**
  * Information to identify a datanode to a namenode
  */
 message DatanodeRegistrationProto {
-  required DatanodeIDProto datanodeID = 1;    // Datanode information
-  required StorageInfoProto storageInfo = 2;  // Node information
-  required ExportedBlockKeysProto keys = 3;   // Block keys
-  required string softwareVersion = 4;        // Software version of the DN, e.g. "2.0.0"
+  required DatanodeIDProto datanodeID = 1; // Datanode information
+  required StorageInfoProto storageInfo = 2; // Node information
+  required ExportedBlockKeysProto keys = 3; // Block keys
+  required string softwareVersion = 4; // Software version of the DN, e.g. "2.0.0"
 }
 
 /**
@@ -49,12 +48,11 @@ message DatanodeRegistrationProto {
 message DatanodeStorageProto {
   enum StorageState {
     NORMAL = 0;
-    READ_ONLY_SHARED = 1;
+    READ_ONLY = 1;
   }
 
-  required string storageUuid = 1;
+  required string storageID = 1; // Unique identifier for the storage
   optional StorageState state = 2 [default = NORMAL];
-  optional StorageTypeProto storageType = 3 [default = DISK];
 }
 
 /**
@@ -70,10 +68,9 @@ message DatanodeCommandProto {
     RegisterCommand = 5;
     UnusedUpgradeCommand = 6;
     NullDatanodeCommand = 7;
-    BlockIdCommand = 8;
   }
 
-  required Type cmdType = 1;    // Type of the command
+  required Type cmdType = 1; // Type of the command
 
   // One of the following command is available when the corresponding
   // cmdType is set
@@ -83,7 +80,6 @@ message DatanodeCommandProto {
   optional FinalizeCommandProto finalizeCmd = 5;
   optional KeyUpdateCommandProto keyUpdateCmd = 6;
   optional RegisterCommandProto registerCmd = 7;
-  optional BlockIdCommandProto blkIdCmd = 8;
 }
 
 /**
@@ -101,31 +97,15 @@ message BalancerBandwidthCommandProto {
  * on the given set of blocks.
  */
 message BlockCommandProto {
-  enum Action {  
-    TRANSFER = 1;   // Transfer blocks to another datanode
+  enum Action {
+    TRANSFER = 1; // Transfer blocks to another datanode
     INVALIDATE = 2; // Invalidate blocks
-    SHUTDOWN = 3;   // Shutdown the datanode
+    SHUTDOWN = 3; // Shutdown the datanode
   }
-
   required Action action = 1;
   required string blockPoolId = 2;
   repeated BlockProto blocks = 3;
   repeated DatanodeInfosProto targets = 4;
-  repeated StorageUuidsProto targetStorageUuids = 5;
-}
-
-/**
- * Command to instruct datanodes to perform certain action
- * on the given set of block IDs.
- */
-message BlockIdCommandProto {
-  enum Action {
-    CACHE = 1;
-    UNCACHE = 2;
-  }
-  required Action action = 1;
-  required string blockPoolId = 2;
-  repeated uint64 blockIds = 3 [packed=true];
 }
 
 /**
@@ -181,40 +161,22 @@ message RegisterDatanodeResponseProto {
  * xmitsInProgress - number of transfers from this datanode to others
  * xceiverCount - number of active transceiver threads
  * failedVolumes - number of failed volumes
- * cacheCapacity - total cache capacity available at the datanode
- * cacheUsed - amount of cache used
  */
 message HeartbeatRequestProto {
   required DatanodeRegistrationProto registration = 1; // Datanode info
   repeated StorageReportProto reports = 2;
-  optional uint32 xmitsInProgress = 3 [ default = 0 ];
-  optional uint32 xceiverCount = 4 [ default = 0 ];
-  optional uint32 failedVolumes = 5 [ default = 0 ];
-  optional uint64 cacheCapacity = 6 [ default = 0 ];
-  optional uint64 cacheUsed = 7 [default = 0 ];
+  optional uint32 xmitsInProgress = 3 [default = 0];
+  optional uint32 xceiverCount = 4 [default = 0];
+  optional uint32 failedVolumes = 5 [default = 0];
 }
 
 message StorageReportProto {
-  required string storageUuid = 1 [ deprecated = true ];
-  optional bool failed = 2 [ default = false ];
-  optional uint64 capacity = 3 [ default = 0 ];
-  optional uint64 dfsUsed = 4 [ default = 0 ];
-  optional uint64 remaining = 5 [ default = 0 ];
-  optional uint64 blockPoolUsed = 6 [ default = 0 ];
-  optional DatanodeStorageProto storage = 7; // supersedes StorageUuid
-}
-
-/**
- * state - State the NN is in when returning response to the DN
- * txid - Highest transaction ID this NN has seen
- */
-message NNHAStatusHeartbeatProto {
-  enum State {
-    ACTIVE = 0;
-    STANDBY = 1;
-  }
-  required State state = 1; 
-  required uint64 txid = 2;
+  required string storageID = 1;
+  optional bool failed = 2 [default = false];
+  optional uint64 capacity = 3 [default = 0];
+  optional uint64 dfsUsed = 4 [default = 0];
+  optional uint64 remaining = 5 [default = 0];
+  optional uint64 blockPoolUsed = 6 [default = 0];
 }
 
 /**
@@ -223,18 +185,14 @@ message NNHAStatusHeartbeatProto {
  */
 message HeartbeatResponseProto {
   repeated DatanodeCommandProto cmds = 1; // Returned commands can be null
-  required NNHAStatusHeartbeatProto haStatus = 2;
-  optional RollingUpgradeStatusProto rollingUpgradeStatus = 3;
 }
 
 /**
  * registration - datanode registration information
  * blockPoolID  - block pool ID of the reported blocks
- * blocks       - each block is represented as multiple longs in the array.
+ * blocks       - each block is represented as two longs in the array.
  *                first long represents block ID
  *                second long represents length
- *                third long represents gen stamp
- *                fourth long (if under construction) represents replica state
  */
 message BlockReportRequestProto {
   required DatanodeRegistrationProto registration = 1;
@@ -246,29 +204,14 @@ message BlockReportRequestProto {
  * Report of blocks in a storage
  */
 message StorageBlockReportProto {
-  required DatanodeStorageProto storage = 1;    // Storage
-  repeated uint64 blocks = 2 [packed=true];
+  required DatanodeStorageProto storage = 1; // Storage
+  repeated uint64 blocks = 2 [packed = true];
 }
 
 /**
  * cmd - Command from namenode to the datanode
  */
 message BlockReportResponseProto {
-  optional DatanodeCommandProto cmd = 1;
-} 
-
-/**
- * registration - datanode registration information
- * blockPoolId  - block pool ID of the reported blocks
- * blocks       - representation of blocks as longs for efficiency reasons
- */
-message CacheReportRequestProto {
-  required DatanodeRegistrationProto registration = 1;
-  required string blockPoolId = 2;
-  repeated uint64 blocks = 3 [packed=true];
-}
-
-message CacheReportResponseProto {
   optional DatanodeCommandProto cmd = 1;
 }
 
@@ -292,9 +235,8 @@ message ReceivedDeletedBlockInfoProto {
  * List of blocks received and deleted for a storage.
  */
 message StorageReceivedDeletedBlocksProto {
-  required string storageUuid = 1 [ deprecated = true ];
+  required string storageID = 1;
   repeated ReceivedDeletedBlockInfoProto blocks = 2;
-  optional DatanodeStorageProto storage = 3;   // supersedes storageUuid.
 }
 
 /**
@@ -321,14 +263,14 @@ message BlockReceivedAndDeletedResponseProto {
  */
 message ErrorReportRequestProto {
   enum ErrorCode {
-    NOTIFY = 0;           // Error report to be logged at the namenode
-    DISK_ERROR = 1;       // DN has disk errors but still has valid volumes
-    INVALID_BLOCK = 2;    // Command from namenode has invalid block ID
+    NOTIFY = 0; // Error report to be logged at the namenode
+    DISK_ERROR = 1; // DN has disk errors but still has valid volumes
+    INVALID_BLOCK = 2; // Command from namenode has invalid block ID
     FATAL_DISK_ERROR = 3; // No valid volumes left on datanode
   }
   required DatanodeRegistrationProto registartion = 1; // Registartion info
-  required uint32 errorCode = 2;  // Error code
-  required string msg = 3;        // Error message
+  required uint32 errorCode = 2; // Error code
+  required string msg = 3; // Error message
 }
 
 /**
@@ -370,6 +312,32 @@ message CommitBlockSynchronizationResponseProto {
 }
 
 /**
+ * void request
+ */
+message ActiveNamenodeListRequestProto {
+}
+
+/**
+ * void response
+ */
+message ActiveNamenodeListResponseProto {
+  repeated hadoop.common.ActiveNodeProto namenodes = 1;
+}
+
+
+/**
+* getting a name node address from the leader to send block report
+*/
+
+/**
+ * void request
+ */
+message NameNodeAddressRequestForBlockReportingProto {
+}
+
+
+
+/**
  * Protocol used from datanode to the namenode
  * See the request and response for details of rpc call.
  */
@@ -377,51 +345,56 @@ service DatanodeProtocolService {
   /**
    * Register a datanode at a namenode
    */
-  rpc registerDatanode(RegisterDatanodeRequestProto)
-      returns(RegisterDatanodeResponseProto);
+  rpc registerDatanode (RegisterDatanodeRequestProto) returns (RegisterDatanodeResponseProto);
 
   /**
    * Send heartbeat from datanode to namenode
    */
-  rpc sendHeartbeat(HeartbeatRequestProto) returns(HeartbeatResponseProto);
+  rpc sendHeartbeat (HeartbeatRequestProto) returns (HeartbeatResponseProto);
 
   /**
    * Report blocks at a given datanode to the namenode
    */
-  rpc blockReport(BlockReportRequestProto) returns(BlockReportResponseProto);
-
-  /**
-   * Report cached blocks at a datanode to the namenode
-   */
-  rpc cacheReport(CacheReportRequestProto) returns(CacheReportResponseProto);
+  rpc blockReport (BlockReportRequestProto) returns (BlockReportResponseProto);
 
   /**
    * Incremental block report from the DN. This contains info about recently
    * received and deleted blocks, as well as when blocks start being
    * received.
    */
-  rpc blockReceivedAndDeleted(BlockReceivedAndDeletedRequestProto) 
-      returns(BlockReceivedAndDeletedResponseProto);
+  rpc blockReceivedAndDeleted (BlockReceivedAndDeletedRequestProto) returns (BlockReceivedAndDeletedResponseProto);
 
   /**
    * Report from a datanode of an error to the active namenode.
    * Used for debugging.
    */
-  rpc errorReport(ErrorReportRequestProto) returns(ErrorReportResponseProto);
-  
+  rpc errorReport (ErrorReportRequestProto) returns (ErrorReportResponseProto);
+
   /**
    * Request the version
    */
-  rpc versionRequest(VersionRequestProto) returns(VersionResponseProto);
+  rpc versionRequest (VersionRequestProto) returns (VersionResponseProto);
 
   /**
    * Report corrupt blocks at the specified location
    */
-  rpc reportBadBlocks(ReportBadBlocksRequestProto) returns(ReportBadBlocksResponseProto);
+  rpc reportBadBlocks (ReportBadBlocksRequestProto) returns (ReportBadBlocksResponseProto);
 
   /**
    * Commit block synchronization during lease recovery.
    */
-  rpc commitBlockSynchronization(CommitBlockSynchronizationRequestProto)
-      returns(CommitBlockSynchronizationResponseProto);
+  rpc commitBlockSynchronization (CommitBlockSynchronizationRequestProto) returns (CommitBlockSynchronizationResponseProto);
+
+  //HOP_CODE_START
+  /**
+   * data node sends a request to name node to get list of all active
+   * name nodes.
+   */
+  rpc getActiveNamenodes (ActiveNamenodeListRequestProto) returns (ActiveNamenodeListResponseProto);
+
+  /**
+   * Ask the leader which namenode the datanode should report to.
+   */
+  rpc getNextNamenodeToSendBlockReport (NameNodeAddressRequestForBlockReportingProto) returns (hadoop.common.ActiveNodeProto);
+
 }

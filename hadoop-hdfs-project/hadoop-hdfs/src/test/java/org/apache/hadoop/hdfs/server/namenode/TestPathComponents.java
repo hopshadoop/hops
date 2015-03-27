@@ -17,19 +17,18 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
-import static org.junit.Assert.assertTrue;
-
-import java.util.Arrays;
-
+import com.google.common.base.Charsets;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.junit.Test;
 
-import com.google.common.base.Charsets;
+import java.util.Arrays;
+
+import static org.junit.Assert.assertTrue;
 
 
 /**
- * 
+ *
  */
 public class TestPathComponents {
 
@@ -46,14 +45,14 @@ public class TestPathComponents {
   public void testString(String str) throws Exception {
     String pathString = str;
     byte[][] oldPathComponents = INode.getPathComponents(pathString);
-    byte[][] newPathComponents = 
-                DFSUtil.bytes2byteArray(pathString.getBytes(Charsets.UTF_8),
-                                        (byte) Path.SEPARATOR_CHAR);
+    byte[][] newPathComponents = DFSUtil
+        .bytes2byteArray(pathString.getBytes(Charsets.UTF_8),
+            (byte) Path.SEPARATOR_CHAR);
     if (oldPathComponents[0] == null) {
       assertTrue(oldPathComponents[0] == newPathComponents[0]);
     } else {
       assertTrue("Path components do not match for " + pathString,
-                  Arrays.deepEquals(oldPathComponents, newPathComponents));
+          Arrays.deepEquals(oldPathComponents, newPathComponents));
     }
   }
 }

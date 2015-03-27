@@ -1,13 +1,13 @@
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
+ * or more contributor license agreements. See the NOTICE file
  * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
+ * regarding copyright ownership. The ASF licenses this file
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * with the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,7 +15,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.apache.hadoop.yarn.server.resourcemanager;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -39,11 +38,10 @@ public class RMSecretManagerService extends AbstractService {
   RMContainerTokenSecretManager containerTokenSecretManager;
   RMDelegationTokenSecretManager rmDTSecretManager;
 
-  RMContextImpl rmContext;
+  protected RMContextImpl rmContext;
 
   /**
    * Construct the service.
-   *
    */
   public RMSecretManagerService(Configuration conf, RMContextImpl rmContext) {
     super(RMSecretManagerService.class.getName());
@@ -63,8 +61,7 @@ public class RMSecretManagerService extends AbstractService {
     amRmTokenSecretManager = createAMRMTokenSecretManager(conf);
     rmContext.setAMRMTokenSecretManager(amRmTokenSecretManager);
 
-    rmDTSecretManager =
-        createRMDelegationTokenSecretManager(conf, rmContext);
+    rmDTSecretManager = createRMDelegationTokenSecretManager(conf, rmContext);
     rmContext.setRMDelegationTokenSecretManager(rmDTSecretManager);
   }
 
@@ -81,8 +78,9 @@ public class RMSecretManagerService extends AbstractService {
 
     try {
       rmDTSecretManager.startThreads();
-    } catch(IOException ie) {
-      throw new YarnRuntimeException("Failed to start secret manager threads", ie);
+    } catch (IOException ie) {
+      throw new YarnRuntimeException("Failed to start secret manager threads",
+          ie);
     }
     super.serviceStart();
   }
@@ -98,7 +96,7 @@ public class RMSecretManagerService extends AbstractService {
     if (containerTokenSecretManager != null) {
       containerTokenSecretManager.stop();
     }
-    if(nmTokenSecretManager != null) {
+    if (nmTokenSecretManager != null) {
       nmTokenSecretManager.stop();
     }
     super.serviceStop();
@@ -106,12 +104,12 @@ public class RMSecretManagerService extends AbstractService {
 
   protected RMContainerTokenSecretManager createContainerTokenSecretManager(
       Configuration conf) {
-    return new RMContainerTokenSecretManager(conf);
+    return new RMContainerTokenSecretManager(conf, rmContext);
   }
 
   protected NMTokenSecretManagerInRM createNMTokenSecretManager(
       Configuration conf) {
-    return new NMTokenSecretManagerInRM(conf);
+    return new NMTokenSecretManagerInRM(conf, rmContext);
   }
 
   protected AMRMTokenSecretManager createAMRMTokenSecretManager(

@@ -19,7 +19,6 @@
 package org.apache.hadoop.yarn.api;
 
 import junit.framework.Assert;
-
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerId;
@@ -32,17 +31,17 @@ import org.junit.Test;
 public class TestContainerResourceIncreaseRequest {
   @Test
   public void ContainerResourceIncreaseRequest() {
-    ContainerId containerId = ContainerId
-        .newInstance(ApplicationAttemptId.newInstance(
-            ApplicationId.newInstance(1234, 3), 3), 7);
+    ContainerId containerId = ContainerId.newInstance(
+        ApplicationAttemptId.newInstance(ApplicationId.newInstance(1234, 3), 3),
+        7);
     Resource resource = Resource.newInstance(1023, 3);
-    ContainerResourceIncreaseRequest context = ContainerResourceIncreaseRequest
-        .newInstance(containerId, resource);
+    ContainerResourceIncreaseRequest context =
+        ContainerResourceIncreaseRequest.newInstance(containerId, resource);
 
     // to proto and get it back
-    ContainerResourceIncreaseRequestProto proto = 
+    ContainerResourceIncreaseRequestProto proto =
         ((ContainerResourceIncreaseRequestPBImpl) context).getProto();
-    ContainerResourceIncreaseRequest contextRecover = 
+    ContainerResourceIncreaseRequest contextRecover =
         new ContainerResourceIncreaseRequestPBImpl(proto);
 
     // check value
@@ -52,13 +51,13 @@ public class TestContainerResourceIncreaseRequest {
 
   @Test
   public void testResourceChangeContextWithNullField() {
-    ContainerResourceIncreaseRequest context = ContainerResourceIncreaseRequest
-        .newInstance(null, null);
+    ContainerResourceIncreaseRequest context =
+        ContainerResourceIncreaseRequest.newInstance(null, null);
 
     // to proto and get it back
-    ContainerResourceIncreaseRequestProto proto = 
+    ContainerResourceIncreaseRequestProto proto =
         ((ContainerResourceIncreaseRequestPBImpl) context).getProto();
-    ContainerResourceIncreaseRequest contextRecover = 
+    ContainerResourceIncreaseRequest contextRecover =
         new ContainerResourceIncreaseRequestPBImpl(proto);
 
     // check value

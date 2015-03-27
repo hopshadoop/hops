@@ -18,14 +18,16 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.event;
 
+import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 
 public class NodeAddedSchedulerEvent extends SchedulerEvent {
 
   private final RMNode rmNode;
 
-  public NodeAddedSchedulerEvent(RMNode rmNode) {
-    super(SchedulerEventType.NODE_ADDED);
+  public NodeAddedSchedulerEvent(RMNode rmNode,
+      TransactionState transactionState) {
+    super(SchedulerEventType.NODE_ADDED, transactionState);
     this.rmNode = rmNode;
   }
 

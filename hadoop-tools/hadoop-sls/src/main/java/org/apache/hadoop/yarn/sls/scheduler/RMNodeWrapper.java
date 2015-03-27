@@ -32,6 +32,8 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmnode
 
 import java.util.Collections;
 import java.util.List;
+import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
+import io.hops.ha.common.TransactionState;
 
 public class RMNodeWrapper implements RMNode {
   private RMNode node;
@@ -40,7 +42,7 @@ public class RMNodeWrapper implements RMNode {
   
   public RMNodeWrapper(RMNode node) {
     this.node = node;
-    updates = node.pullContainerUpdates();
+    updates = node.pullContainerUpdates(null);
   }
   
   @Override
@@ -115,8 +117,8 @@ public class RMNodeWrapper implements RMNode {
 
   @Override
   public void updateNodeHeartbeatResponseForCleanup(
-          NodeHeartbeatResponse nodeHeartbeatResponse) {
-    node.updateNodeHeartbeatResponseForCleanup(nodeHeartbeatResponse);
+          NodeHeartbeatResponse nodeHeartbeatResponse, TransactionState ts) {
+    node.updateNodeHeartbeatResponseForCleanup(nodeHeartbeatResponse, ts);
   }
 
   @Override
@@ -126,7 +128,7 @@ public class RMNodeWrapper implements RMNode {
 
   @Override
   @SuppressWarnings("unchecked")
-  public List<UpdatedContainerInfo> pullContainerUpdates() {
+  public List<UpdatedContainerInfo> pullContainerUpdates(TransactionState ts) {
     List<UpdatedContainerInfo> list = Collections.EMPTY_LIST;
     if (! pulled) {
       list = updates;
@@ -154,4 +156,10 @@ public class RMNodeWrapper implements RMNode {
     return node.getResourceOption();
   }
 
+    @Override
+    public void recover(RMStateStore.RMState state) throws Exception {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+  
 }

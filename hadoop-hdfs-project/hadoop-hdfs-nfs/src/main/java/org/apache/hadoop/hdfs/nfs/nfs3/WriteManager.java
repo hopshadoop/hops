@@ -17,8 +17,7 @@
  */
 package org.apache.hadoop.hdfs.nfs.nfs3;
 
-import java.io.IOException;
-
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -42,7 +41,7 @@ import org.apache.hadoop.oncrpc.XDR;
 import org.apache.hadoop.oncrpc.security.VerifierNone;
 import org.jboss.netty.channel.Channel;
 
-import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
 
 /**
  * Manage the writes and responds asynchronously.
@@ -52,7 +51,7 @@ public class WriteManager {
 
   private final Configuration config;
   private final IdUserGroup iug;
- 
+
   private AsyncDataService asyncDataService;
   private boolean asyncDataServiceStarted = false;
 
@@ -85,13 +84,13 @@ public class WriteManager {
         Nfs3Constant.OUTPUT_STREAM_TIMEOUT_DEFAULT);
     LOG.info("Stream timeout is " + streamTimeout + "ms.");
     if (streamTimeout < Nfs3Constant.OUTPUT_STREAM_TIMEOUT_MIN_DEFAULT) {
-      LOG.info("Reset stream timeout to minimum value "
-          + Nfs3Constant.OUTPUT_STREAM_TIMEOUT_MIN_DEFAULT + "ms.");
+      LOG.info("Reset stream timeout to minimum value " +
+          Nfs3Constant.OUTPUT_STREAM_TIMEOUT_MIN_DEFAULT + "ms.");
       streamTimeout = Nfs3Constant.OUTPUT_STREAM_TIMEOUT_MIN_DEFAULT;
     }
     maxStreams = config.getInt(Nfs3Constant.MAX_OPEN_FILES,
         Nfs3Constant.MAX_OPEN_FILES_DEFAULT);
-    LOG.info("Maximum open streams is "+ maxStreams);
+    LOG.info("Maximum open streams is " + maxStreams);
     this.fileContextCache = new OpenFileCtxCache(config, streamTimeout);
   }
 
@@ -119,8 +118,9 @@ public class WriteManager {
     byte[] data = request.getData().array();
     if (data.length < count) {
       WRITE3Response response = new WRITE3Response(Nfs3Status.NFS3ERR_INVAL);
-      Nfs3Utils.writeChannel(channel, response.writeHeaderAndResponse(
-          new XDR(), xid, new VerifierNone()), xid);
+      Nfs3Utils.writeChannel(channel,
+          response.writeHeaderAndResponse(new XDR(), xid, new VerifierNone()),
+          xid);
       return;
     }
 
@@ -139,9 +139,9 @@ public class WriteManager {
       HdfsDataOutputStream fos = null;
       Nfs3FileAttributes latestAttr = null;
       try {
-        int bufferSize = config.getInt(
-            CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_KEY,
-            CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_DEFAULT);
+        int bufferSize = config
+            .getInt(CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_KEY,
+                CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_DEFAULT);
         
         fos = dfsClient.append(fileIdPath, bufferSize, null, null);
 
@@ -149,9 +149,9 @@ public class WriteManager {
       } catch (RemoteException e) {
         IOException io = e.unwrapRemoteException();
         if (io instanceof AlreadyBeingCreatedException) {
-          LOG.warn("Can't append file:" + fileIdPath
-              + ". Possibly the file is being closed. Drop the request:"
-              + request + ", wait for the client to retry...");
+          LOG.warn("Can't append file:" + fileIdPath +
+              ". Possibly the file is being closed. Drop the request:" +
+              request + ", wait for the client to retry...");
           return;
         }
         throw e;
@@ -160,21 +160,22 @@ public class WriteManager {
         if (fos != null) {
           fos.close();
         }
-        WccData fileWcc = new WccData(Nfs3Utils.getWccAttr(preOpAttr),
-            preOpAttr);
-        WRITE3Response response = new WRITE3Response(Nfs3Status.NFS3ERR_IO,
-            fileWcc, count, request.getStableHow(),
-            Nfs3Constant.WRITE_COMMIT_VERF);
-        Nfs3Utils.writeChannel(channel, response.writeHeaderAndResponse(
-            new XDR(), xid, new VerifierNone()), xid);
+        WccData fileWcc =
+            new WccData(Nfs3Utils.getWccAttr(preOpAttr), preOpAttr);
+        WRITE3Response response =
+            new WRITE3Response(Nfs3Status.NFS3ERR_IO, fileWcc, count,
+                request.getStableHow(), Nfs3Constant.WRITE_COMMIT_VERF);
+        Nfs3Utils.writeChannel(channel,
+            response.writeHeaderAndResponse(new XDR(), xid, new VerifierNone()),
+            xid);
         return;
       }
 
       // Add open stream
       String writeDumpDir = config.get(Nfs3Constant.FILE_DUMP_DIR_KEY,
           Nfs3Constant.FILE_DUMP_DIR_DEFAULT);
-      openFileCtx = new OpenFileCtx(fos, latestAttr, writeDumpDir + "/"
-          + fileHandle.getFileId(), dfsClient, iug);
+      openFileCtx = new OpenFileCtx(fos, latestAttr,
+          writeDumpDir + "/" + fileHandle.getFileId(), dfsClient, iug);
 
       if (!addOpenFileStream(fileHandle, openFileCtx)) {
         LOG.info("Can't add new stream. Close it. Tell client to retry.");
@@ -185,8 +186,9 @@ public class WriteManager {
         }
         // Notify client to retry
         WccData fileWcc = new WccData(latestAttr.getWccAttr(), latestAttr);
-        WRITE3Response response = new WRITE3Response(Nfs3Status.NFS3ERR_JUKEBOX,
-            fileWcc, 0, request.getStableHow(), Nfs3Constant.WRITE_COMMIT_VERF);
+        WRITE3Response response =
+            new WRITE3Response(Nfs3Status.NFS3ERR_JUKEBOX, fileWcc, 0,
+                request.getStableHow(), Nfs3Constant.WRITE_COMMIT_VERF);
         Nfs3Utils.writeChannel(channel,
             response.writeHeaderAndResponse(new XDR(), xid, new VerifierNone()),
             xid);
@@ -199,8 +201,9 @@ public class WriteManager {
     }
 
     // Add write into the async job queue
-    openFileCtx.receivedNewWrite(dfsClient, request, channel, xid,
-        asyncDataService, iug);
+    openFileCtx
+        .receivedNewWrite(dfsClient, request, channel, xid, asyncDataService,
+            iug);
     return;
   }
 
@@ -213,71 +216,71 @@ public class WriteManager {
 
     if (openFileCtx == null) {
       if (LOG.isDebugEnabled()) {
-        LOG.debug("No opened stream for fileId:" + fileHandle.getFileId()
-            + " commitOffset=" + commitOffset
-            + ". Return success in this case.");
+        LOG.debug("No opened stream for fileId:" + fileHandle.getFileId() +
+            " commitOffset=" + commitOffset + ". Return success in this case.");
       }
       status = Nfs3Status.NFS3_OK;
 
     } else {
-      COMMIT_STATUS ret = openFileCtx.checkCommit(dfsClient, commitOffset,
-          null, 0, null, true);
+      COMMIT_STATUS ret =
+          openFileCtx.checkCommit(dfsClient, commitOffset, null, 0, null, true);
       switch (ret) {
-      case COMMIT_FINISHED:
-      case COMMIT_INACTIVE_CTX:
-        status = Nfs3Status.NFS3_OK;
-        break;
-      case COMMIT_INACTIVE_WITH_PENDING_WRITE:
-      case COMMIT_ERROR:
-        status = Nfs3Status.NFS3ERR_IO;
-        break;
-      case COMMIT_WAIT:
-        /**
-         * This should happen rarely in some possible cases, such as read
-         * request arrives before DFSClient is able to quickly flush data to DN,
-         * or Prerequisite writes is not available. Won't wait since we don't
-         * want to block read.
-         */     
-        status = Nfs3Status.NFS3ERR_JUKEBOX;
-        break;
-      default:
-        LOG.error("Should not get commit return code:" + ret.name());
-        throw new RuntimeException("Should not get commit return code:"
-            + ret.name());
+        case COMMIT_FINISHED:
+        case COMMIT_INACTIVE_CTX:
+          status = Nfs3Status.NFS3_OK;
+          break;
+        case COMMIT_INACTIVE_WITH_PENDING_WRITE:
+        case COMMIT_ERROR:
+          status = Nfs3Status.NFS3ERR_IO;
+          break;
+        case COMMIT_WAIT:
+          /**
+           * This should happen rarely in some possible cases, such as read
+           * request arrives before DFSClient is able to quickly flush data to DN,
+           * or Prerequisite writes is not available. Won't wait since we don't
+           * want to block read.
+           */
+          status = Nfs3Status.NFS3ERR_JUKEBOX;
+          break;
+        default:
+          LOG.error("Should not get commit return code:" + ret.name());
+          throw new RuntimeException(
+              "Should not get commit return code:" + ret.name());
       }
     }
     return status;
   }
   
   void handleCommit(DFSClient dfsClient, FileHandle fileHandle,
-      long commitOffset, Channel channel, int xid, Nfs3FileAttributes preOpAttr) {
+      long commitOffset, Channel channel, int xid,
+      Nfs3FileAttributes preOpAttr) {
     int status;
     OpenFileCtx openFileCtx = fileContextCache.get(fileHandle);
 
     if (openFileCtx == null) {
-      LOG.info("No opened stream for fileId:" + fileHandle.getFileId()
-          + " commitOffset=" + commitOffset + ". Return success in this case.");
+      LOG.info("No opened stream for fileId:" + fileHandle.getFileId() +
+          " commitOffset=" + commitOffset + ". Return success in this case.");
       status = Nfs3Status.NFS3_OK;
       
     } else {
-      COMMIT_STATUS ret = openFileCtx.checkCommit(dfsClient, commitOffset,
-          channel, xid, preOpAttr, false);
+      COMMIT_STATUS ret = openFileCtx
+          .checkCommit(dfsClient, commitOffset, channel, xid, preOpAttr, false);
       switch (ret) {
-      case COMMIT_FINISHED:
-      case COMMIT_INACTIVE_CTX:
-        status = Nfs3Status.NFS3_OK;
-        break;
-      case COMMIT_INACTIVE_WITH_PENDING_WRITE:
-      case COMMIT_ERROR:
-        status = Nfs3Status.NFS3ERR_IO;
-        break;
-      case COMMIT_WAIT:
-        // Do nothing. Commit is async now.
-        return;
-      default:
-        LOG.error("Should not get commit return code:" + ret.name());
-        throw new RuntimeException("Should not get commit return code:"
-            + ret.name());
+        case COMMIT_FINISHED:
+        case COMMIT_INACTIVE_CTX:
+          status = Nfs3Status.NFS3_OK;
+          break;
+        case COMMIT_INACTIVE_WITH_PENDING_WRITE:
+        case COMMIT_ERROR:
+          status = Nfs3Status.NFS3ERR_IO;
+          break;
+        case COMMIT_WAIT:
+          // Do nothing. Commit is async now.
+          return;
+        default:
+          LOG.error("Should not get commit return code:" + ret.name());
+          throw new RuntimeException(
+              "Should not get commit return code:" + ret.name());
       }
     }
     
@@ -290,8 +293,8 @@ public class WriteManager {
       LOG.info("Can't get postOpAttr for fileId: " + preOpAttr.getFileId(), e1);
     }
     WccData fileWcc = new WccData(Nfs3Utils.getWccAttr(preOpAttr), postOpAttr);
-    COMMIT3Response response = new COMMIT3Response(status, fileWcc,
-        Nfs3Constant.WRITE_COMMIT_VERF);
+    COMMIT3Response response =
+        new COMMIT3Response(status, fileWcc, Nfs3Constant.WRITE_COMMIT_VERF);
     Nfs3Utils.writeChannelCommit(channel,
         response.writeHeaderAndResponse(new XDR(), xid, new VerifierNone()),
         xid);
@@ -320,8 +323,8 @@ public class WriteManager {
     Nfs3FileAttributes attr = Nfs3Utils.getFileAttr(client, fileIdPath, iug);
 
     if ((attr != null) && (attr.getType() == NfsFileType.NFSREG.toValue())) {
-      OpenFileCtx openFileCtx = fileContextCache.get(new FileHandle(attr
-          .getFileId()));
+      OpenFileCtx openFileCtx =
+          fileContextCache.get(new FileHandle(attr.getFileId()));
 
       if (openFileCtx != null) {
         attr.setSize(openFileCtx.getNextOffset());

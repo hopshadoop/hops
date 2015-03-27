@@ -17,14 +17,10 @@
  */
 package org.apache.hadoop.hdfs.protocol;
 
-import java.util.List;
-
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
-import com.google.common.base.Joiner;
-import com.google.common.base.Preconditions;
-import com.google.common.primitives.Longs;
+import java.util.List;
 
 /**
  * Augments an array of blocks on a datanode with additional information about
@@ -34,13 +30,10 @@ import com.google.common.primitives.Longs;
 @InterfaceStability.Unstable
 public class HdfsBlocksMetadata {
   
-  /** The block pool that was queried */
-  private final String blockPoolId;
-  
   /**
    * List of blocks
    */
-  private final long[] blockIds;
+  private final ExtendedBlock[] blocks;
   
   /**
    * List of volumes
@@ -56,38 +49,34 @@ public class HdfsBlocksMetadata {
 
   /**
    * Constructs HdfsBlocksMetadata.
-   * 
-   * @param blockIds
-   *          List of blocks described
+   *
+   * @param blocks
+   *     List of blocks described
    * @param volumeIds
-   *          List of potential volume identifiers, specifying volumes where 
-   *          blocks may be stored
+   *     List of potential volume identifiers, specifying volumes where
+   *     blocks may be stored
    * @param volumeIndexes
-   *          Indexes into the list of volume identifiers, one per block
+   *     Indexes into the list of volume identifiers, one per block
    */
-  public HdfsBlocksMetadata(String blockPoolId,
-      long[] blockIds, List<byte[]> volumeIds, 
+  public HdfsBlocksMetadata(ExtendedBlock[] blocks, List<byte[]> volumeIds,
       List<Integer> volumeIndexes) {
-    Preconditions.checkArgument(blockIds.length == volumeIndexes.size(),
-        "Argument lengths should match");
-    this.blockPoolId = blockPoolId;
-    this.blockIds = blockIds;
+    this.blocks = blocks;
     this.volumeIds = volumeIds;
     this.volumeIndexes = volumeIndexes;
   }
 
   /**
    * Get the array of blocks.
-   * 
+   *
    * @return array of blocks
    */
-  public long[] getBlockIds() {
-    return blockIds;
+  public ExtendedBlock[] getBlocks() {
+    return blocks;
   }
   
   /**
    * Get the list of volume identifiers in raw byte form.
-   * 
+   *
    * @return list of ids
    */
   public List<byte[]> getVolumeIds() {
@@ -96,16 +85,10 @@ public class HdfsBlocksMetadata {
 
   /**
    * Get a list of indexes into the array of {@link VolumeId}s, one per block.
-   * 
+   *
    * @return list of indexes
    */
   public List<Integer> getVolumeIndexes() {
     return volumeIndexes;
-  }
-
-  @Override
-  public String toString() {
-    return "Metadata for " + blockIds.length + " blocks in " +
-        blockPoolId + ": " + Joiner.on(",").join(Longs.asList(blockIds));
   }
 }

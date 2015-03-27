@@ -28,12 +28,11 @@ import org.apache.hadoop.yarn.util.Records;
  * The response sent by the <code>ResourceManager</code> to a client requesting
  * a container report.
  * </p>
- * 
+ * <p/>
  * <p>
  * The response includes a {@link ContainerReport} which has details of a
  * container.
  * </p>
- * 
  */
 @Public
 @Unstable
@@ -50,7 +49,7 @@ public abstract class GetContainerReportResponse {
 
   /**
    * Get the <code>ContainerReport</code> for the container.
-   * 
+   *
    * @return <code>ContainerReport</code> for the container
    */
   @Public

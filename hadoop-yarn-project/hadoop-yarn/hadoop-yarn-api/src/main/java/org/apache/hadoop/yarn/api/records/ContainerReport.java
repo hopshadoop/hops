@@ -27,7 +27,7 @@ import org.apache.hadoop.yarn.util.Records;
  * <p>
  * <code>ContainerReport</code> is a report of an container.
  * </p>
- * 
+ * <p/>
  * <p>
  * It includes details such as:
  * <ul>
@@ -43,7 +43,6 @@ import org.apache.hadoop.yarn.util.Records;
  * <li>Log URL.</li>
  * </ul>
  * </p>
- * 
  */
 
 @Public
@@ -71,7 +70,7 @@ public abstract class ContainerReport {
 
   /**
    * Get the <code>ContainerId</code> of the container.
-   * 
+   *
    * @return <code>ContainerId</code> of the container.
    */
   @Public
@@ -84,7 +83,7 @@ public abstract class ContainerReport {
 
   /**
    * Get the allocated <code>Resource</code> of the container.
-   * 
+   *
    * @return allocated <code>Resource</code> of the container.
    */
   @Public
@@ -97,7 +96,7 @@ public abstract class ContainerReport {
 
   /**
    * Get the allocated <code>NodeId</code> where container is running.
-   * 
+   *
    * @return allocated <code>NodeId</code> where container is running.
    */
   @Public
@@ -110,7 +109,7 @@ public abstract class ContainerReport {
 
   /**
    * Get the allocated <code>Priority</code> of the container.
-   * 
+   *
    * @return allocated <code>Priority</code> of the container.
    */
   @Public
@@ -123,7 +122,7 @@ public abstract class ContainerReport {
 
   /**
    * Get the Start time of the container.
-   * 
+   *
    * @return Start time of the container
    */
   @Public
@@ -136,7 +135,7 @@ public abstract class ContainerReport {
 
   /**
    * Get the Finish time of the container.
-   * 
+   *
    * @return Finish time of the container
    */
   @Public
@@ -149,7 +148,7 @@ public abstract class ContainerReport {
 
   /**
    * Get the DiagnosticsInfo of the container.
-   * 
+   *
    * @return DiagnosticsInfo of the container
    */
   @Public
@@ -162,7 +161,7 @@ public abstract class ContainerReport {
 
   /**
    * Get the LogURL of the container.
-   * 
+   *
    * @return LogURL of the container
    */
   @Public
@@ -175,7 +174,7 @@ public abstract class ContainerReport {
 
   /**
    * Get the final <code>ContainerState</code> of the container.
-   * 
+   *
    * @return final <code>ContainerState</code> of the container.
    */
   @Public
@@ -188,7 +187,7 @@ public abstract class ContainerReport {
 
   /**
    * Get the final <code>exit status</code> of the container.
-   * 
+   *
    * @return final <code>exit status</code> of the container.
    */
   @Public

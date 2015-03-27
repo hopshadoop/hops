@@ -17,11 +17,6 @@
  */
 package org.apache.hadoop.hdfs;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
-import java.io.IOException;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileStatus;
@@ -31,22 +26,31 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.server.datanode.SimulatedFSDataset;
 import org.junit.Test;
 
+import java.io.IOException;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
 public class TestSetrepIncreasing {
-  static void setrep(int fromREP, int toREP, boolean simulatedStorage) throws IOException {
+  static void setrep(int fromREP, int toREP, boolean simulatedStorage)
+      throws IOException {
     Configuration conf = new HdfsConfiguration();
     if (simulatedStorage) {
       SimulatedFSDataset.setFactory(conf);
     }
     conf.set(DFSConfigKeys.DFS_REPLICATION_KEY, "" + fromREP);
     conf.setLong(DFSConfigKeys.DFS_BLOCKREPORT_INTERVAL_MSEC_KEY, 1000L);
-    conf.set(DFSConfigKeys.DFS_NAMENODE_REPLICATION_PENDING_TIMEOUT_SEC_KEY, Integer.toString(2));
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(10).build();
+    conf.set(DFSConfigKeys.DFS_NAMENODE_REPLICATION_PENDING_TIMEOUT_SEC_KEY,
+        Integer.toString(2));
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(10).build();
     FileSystem fs = cluster.getFileSystem();
-    assertTrue("Not a HDFS: "+fs.getUri(), fs instanceof DistributedFileSystem);
+    assertTrue("Not a HDFS: " + fs.getUri(),
+        fs instanceof DistributedFileSystem);
 
     try {
-      Path root = TestDFSShell.mkdir(fs, 
-          new Path("/test/setrep" + fromREP + "-" + toREP));
+      Path root = TestDFSShell
+          .mkdir(fs, new Path("/test/setrep" + fromREP + "-" + toREP));
       Path f = TestDFSShell.writeFile(fs, new Path(root, "foo"));
       
       // Verify setrep for changing replication
@@ -65,12 +69,15 @@ public class TestSetrepIncreasing {
       fs = cluster.getFileSystem();
       FileStatus file = fs.getFileStatus(f);
       long len = file.getLen();
-      for(BlockLocation locations : fs.getFileBlockLocations(file, 0, len)) {
+      for (BlockLocation locations : fs.getFileBlockLocations(file, 0, len)) {
         assertTrue(locations.getHosts().length == toREP);
       }
       TestDFSShell.show("done setrep waiting: " + root);
     } finally {
-      try {fs.close();} catch (Exception e) {}
+      try {
+        fs.close();
+      } catch (Exception e) {
+      }
       cluster.shutdown();
     }
   }
@@ -79,6 +86,7 @@ public class TestSetrepIncreasing {
   public void testSetrepIncreasing() throws IOException {
     setrep(3, 7, false);
   }
+
   @Test
   public void testSetrepIncreasingSimulatedStorage() throws IOException {
     setrep(3, 7, true);

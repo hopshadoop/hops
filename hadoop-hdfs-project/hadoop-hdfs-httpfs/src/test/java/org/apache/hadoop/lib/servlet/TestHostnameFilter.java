@@ -18,21 +18,20 @@
 
 package org.apache.hadoop.lib.servlet;
 
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-
-import java.io.IOException;
-import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.hadoop.test.HTestCase;
+import org.junit.Test;
+import org.mockito.Mockito;
 
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
 import javax.servlet.ServletException;
 import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
+import java.io.IOException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.apache.hadoop.test.HTestCase;
-import org.junit.Test;
-import org.mockito.Mockito;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 
 public class TestHostnameFilter extends HTestCase {
@@ -48,12 +47,10 @@ public class TestHostnameFilter extends HTestCase {
 
     FilterChain chain = new FilterChain() {
       @Override
-      public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse)
-        throws IOException, ServletException {
-        // Hostname was set to "localhost", but may get resolved automatically to
-        // "127.0.0.1" depending on OS.
-        assertTrue(HostnameFilter.get().contains("localhost") ||
-          HostnameFilter.get().contains("127.0.0.1"));
+      public void doFilter(ServletRequest servletRequest,
+          ServletResponse servletResponse)
+          throws IOException, ServletException {
+        assertTrue(HostnameFilter.get().contains("localhost"));
         invoked.set(true);
       }
     };
@@ -78,8 +75,9 @@ public class TestHostnameFilter extends HTestCase {
 
     FilterChain chain = new FilterChain() {
       @Override
-      public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse)
-        throws IOException, ServletException {
+      public void doFilter(ServletRequest servletRequest,
+          ServletResponse servletResponse)
+          throws IOException, ServletException {
         assertTrue(HostnameFilter.get().contains("???"));
         invoked.set(true);
       }

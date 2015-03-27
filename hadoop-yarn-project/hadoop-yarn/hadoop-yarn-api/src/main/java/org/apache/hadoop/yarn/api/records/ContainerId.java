@@ -18,13 +18,13 @@
 
 package org.apache.hadoop.yarn.api.records;
 
-import java.text.NumberFormat;
-
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Stable;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.util.Records;
+
+import java.text.NumberFormat;
 
 /**
  * <p><code>ContainerId</code> represents a globally unique identifier
@@ -32,7 +32,7 @@ import org.apache.hadoop.yarn.util.Records;
  */
 @Public
 @Stable
-public abstract class ContainerId implements Comparable<ContainerId>{
+public abstract class ContainerId implements Comparable<ContainerId> {
 
   @Private
   @Unstable
@@ -57,9 +57,9 @@ public abstract class ContainerId implements Comparable<ContainerId>{
    * managed by the current running attempt thus have the previous application
    * attempt's <code>ApplicationAttemptId</code>.
    * </p>
-   * 
+   *
    * @return <code>ApplicationAttemptId</code> of the application to which the
-   *         <code>Container</code> was assigned
+   * <code>Container</code> was assigned
    */
   @Public
   @Stable
@@ -71,6 +71,7 @@ public abstract class ContainerId implements Comparable<ContainerId>{
 
   /**
    * Get the identifier of the <code>ContainerId</code>.
+   *
    * @return identifier of the <code>ContainerId</code>
    */
   @Public
@@ -80,7 +81,7 @@ public abstract class ContainerId implements Comparable<ContainerId>{
   @Private
   @Unstable
   protected abstract void setId(int id);
- 
+
   
   // TODO: fail the app submission if attempts are more than 10 or something
   private static final ThreadLocal<NumberFormat> appAttemptIdFormat =
@@ -118,28 +119,34 @@ public abstract class ContainerId implements Comparable<ContainerId>{
 
   @Override
   public boolean equals(Object obj) {
-    if (this == obj)
+    if (this == obj) {
       return true;
-    if (obj == null)
+    }
+    if (obj == null) {
       return false;
-    if (getClass() != obj.getClass())
+    }
+    if (getClass() != obj.getClass()) {
       return false;
+    }
     ContainerId other = (ContainerId) obj;
-    if (!this.getApplicationAttemptId().equals(other.getApplicationAttemptId()))
+    if (!this.getApplicationAttemptId()
+        .equals(other.getApplicationAttemptId())) {
       return false;
-    if (this.getId() != other.getId())
+    }
+    if (this.getId() != other.getId()) {
       return false;
+    }
     return true;
   }
 
   @Override
   public int compareTo(ContainerId other) {
-    if (this.getApplicationAttemptId().compareTo(
-        other.getApplicationAttemptId()) == 0) {
+    if (this.getApplicationAttemptId()
+        .compareTo(other.getApplicationAttemptId()) == 0) {
       return this.getId() - other.getId();
     } else {
-      return this.getApplicationAttemptId().compareTo(
-          other.getApplicationAttemptId());
+      return this.getApplicationAttemptId()
+          .compareTo(other.getApplicationAttemptId());
     }
     
   }
@@ -152,9 +159,8 @@ public abstract class ContainerId implements Comparable<ContainerId>{
     sb.append(appId.getClusterTimestamp()).append("_");
     sb.append(ApplicationId.appIdFormat.get().format(appId.getId()))
         .append("_");
-    sb.append(
-        appAttemptIdFormat.get().format(
-            getApplicationAttemptId().getAttemptId())).append("_");
+    sb.append(appAttemptIdFormat.get()
+            .format(getApplicationAttemptId().getAttemptId())).append("_");
     sb.append(containerIdFormat.get().format(getId()));
     return sb.toString();
   }

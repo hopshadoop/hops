@@ -18,9 +18,6 @@
 
 package org.apache.hadoop.yarn.client.api;
 
-import java.io.IOException;
-import java.util.List;
-
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
@@ -36,6 +33,9 @@ import org.apache.hadoop.yarn.client.api.impl.AHSClientImpl;
 import org.apache.hadoop.yarn.exceptions.ApplicationAttemptNotFoundException;
 import org.apache.hadoop.yarn.exceptions.ContainerNotFoundException;
 import org.apache.hadoop.yarn.exceptions.YarnException;
+
+import java.io.IOException;
+import java.util.List;
 
 @InterfaceAudience.Public
 @InterfaceStability.Stable
@@ -59,12 +59,13 @@ public abstract class AHSClient extends AbstractService {
    * <p>
    * Get a report of the given Application.
    * </p>
-   * 
+   * <p/>
    * <p>
-   * In secure mode, <code>YARN</code> verifies access to the application, queue
+   * In secure mode, <code>YARN</code> verifies access to the application,
+   * queue
    * etc. before accepting the request.
    * </p>
-   * 
+   * <p/>
    * <p>
    * If the user does not have <code>VIEW_APP</code> access then the following
    * fields in the report will be set to stubbed values:
@@ -78,9 +79,9 @@ public abstract class AHSClient extends AbstractService {
    * <li>resource usage report - all values are -1</li>
    * </ul>
    * </p>
-   * 
+   *
    * @param appId
-   *          {@link ApplicationId} of the application that needs a report
+   *     {@link ApplicationId} of the application that needs a report
    * @return application report
    * @throws YarnException
    * @throws IOException
@@ -92,13 +93,13 @@ public abstract class AHSClient extends AbstractService {
    * <p>
    * Get a report (ApplicationReport) of all Applications in the cluster.
    * </p>
-   * 
+   * <p/>
    * <p>
    * If the user does not have <code>VIEW_APP</code> access for an application
    * then the corresponding report will be filtered as described in
    * {@link #getApplicationReport(ApplicationId)}.
    * </p>
-   * 
+   *
    * @return a list of reports for all applications
    * @throws YarnException
    * @throws IOException
@@ -110,33 +111,35 @@ public abstract class AHSClient extends AbstractService {
    * <p>
    * Get a report of the given ApplicationAttempt.
    * </p>
-   * 
+   * <p/>
    * <p>
-   * In secure mode, <code>YARN</code> verifies access to the application, queue
+   * In secure mode, <code>YARN</code> verifies access to the application,
+   * queue
    * etc. before accepting the request.
    * </p>
-   * 
+   *
    * @param applicationAttemptId
-   *          {@link ApplicationAttemptId} of the application attempt that needs
-   *          a report
+   *     {@link ApplicationAttemptId} of the application attempt that needs
+   *     a report
    * @return application attempt report
    * @throws YarnException
-   * @throws {@link ApplicationAttemptNotFoundException} if application attempt
-   *         not found
+   * @throws {@link
+   *     ApplicationAttemptNotFoundException} if application attempt
+   *     not found
    * @throws IOException
    */
   public abstract ApplicationAttemptReport getApplicationAttemptReport(
-      ApplicationAttemptId applicationAttemptId) throws YarnException,
-      IOException;
+      ApplicationAttemptId applicationAttemptId)
+      throws YarnException, IOException;
 
   /**
    * <p>
    * Get a report of all (ApplicationAttempts) of Application in the cluster.
    * </p>
-   * 
+   *
    * @param applicationId
    * @return a list of reports for all application attempts for specified
-   *         application
+   * application
    * @throws YarnException
    * @throws IOException
    */
@@ -147,17 +150,19 @@ public abstract class AHSClient extends AbstractService {
    * <p>
    * Get a report of the given Container.
    * </p>
-   * 
+   * <p/>
    * <p>
-   * In secure mode, <code>YARN</code> verifies access to the application, queue
+   * In secure mode, <code>YARN</code> verifies access to the application,
+   * queue
    * etc. before accepting the request.
    * </p>
-   * 
+   *
    * @param containerId
-   *          {@link ContainerId} of the container that needs a report
+   *     {@link ContainerId} of the container that needs a report
    * @return container report
    * @throws YarnException
-   * @throws {@link ContainerNotFoundException} if container not found
+   * @throws {@link
+   *     ContainerNotFoundException} if container not found
    * @throws IOException
    */
   public abstract ContainerReport getContainerReport(ContainerId containerId)
@@ -167,14 +172,14 @@ public abstract class AHSClient extends AbstractService {
    * <p>
    * Get a report of all (Containers) of ApplicationAttempt in the cluster.
    * </p>
-   * 
+   *
    * @param applicationAttemptId
    * @return a list of reports of all containers for specified application
-   *         attempt
+   * attempt
    * @throws YarnException
    * @throws IOException
    */
   public abstract List<ContainerReport> getContainers(
-      ApplicationAttemptId applicationAttemptId) throws YarnException,
-      IOException;
+      ApplicationAttemptId applicationAttemptId)
+      throws YarnException, IOException;
 }

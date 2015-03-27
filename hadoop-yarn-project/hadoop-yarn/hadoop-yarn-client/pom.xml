@@ -12,14 +12,14 @@
   See the License for the specific language governing permissions and
   limitations under the License. See accompanying LICENSE file.
 -->
-<project xmlns:pom="http://maven.apache.org/POM/4.0.0">
+<project>
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <artifactId>hadoop-yarn</artifactId>
-    <groupId>org.apache.hadoop</groupId>
+    <groupId>io.hops</groupId>
     <version>2.4.0</version>
   </parent>
-  <groupId>org.apache.hadoop</groupId>
+  <groupId>io.hops</groupId>
   <artifactId>hadoop-yarn-client</artifactId>
   <version>2.4.0</version>
   <name>hadoop-yarn-client</name>
@@ -32,7 +32,7 @@
   <dependencies>
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-common</artifactId>
       <scope>provided</scope>
       <exclusions>
@@ -86,7 +86,7 @@
 
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-annotations</artifactId>
     </dependency>
     <dependency>
@@ -96,7 +96,7 @@
     </dependency>
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-common</artifactId>
       <type>test-jar</type>
       <scope>test</scope>
@@ -115,37 +115,37 @@
     </dependency>
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
-  		<groupId>org.apache.hadoop</groupId>
-  		<artifactId>hadoop-yarn-api</artifactId>
-  	</dependency>
+      <groupId>io.hops</groupId>
+      <artifactId>hadoop-yarn-api</artifactId>
+    </dependency>
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
-  		<groupId>org.apache.hadoop</groupId>
-  		<artifactId>hadoop-yarn-common</artifactId>
-  	</dependency>
+      <groupId>io.hops</groupId>
+      <artifactId>hadoop-yarn-common</artifactId>
+    </dependency>
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-yarn-server-common</artifactId>
       <scope>test</scope>
     </dependency>
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
-  		<groupId>org.apache.hadoop</groupId>
-  		<artifactId>hadoop-yarn-server-resourcemanager</artifactId>
+      <groupId>io.hops</groupId>
+      <artifactId>hadoop-yarn-server-resourcemanager</artifactId>
       <scope>test</scope>
-  	</dependency>
+    </dependency>
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
-  		<groupId>org.apache.hadoop</groupId>
-  		<artifactId>hadoop-yarn-server-tests</artifactId>
+      <groupId>io.hops</groupId>
+      <artifactId>hadoop-yarn-server-tests</artifactId>
       <scope>test</scope>
       <type>test-jar</type>
-  	</dependency>
+    </dependency>
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
-    <groupId>org.apache.hadoop</groupId>
-    <artifactId>hadoop-yarn-server-resourcemanager</artifactId>
+      <groupId>io.hops</groupId>
+      <artifactId>hadoop-yarn-server-resourcemanager</artifactId>
       <scope>test</scope>
       <type>test-jar</type>
     </dependency>

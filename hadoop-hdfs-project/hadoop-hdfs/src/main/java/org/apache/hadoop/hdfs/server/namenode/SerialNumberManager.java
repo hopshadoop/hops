@@ -22,20 +22,36 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 
-/** Manage name-to-serial-number maps for users and groups. */
+/**
+ * Manage name-to-serial-number maps for users and groups.
+ */
 class SerialNumberManager {
-  /** This is the only instance of {@link SerialNumberManager}.*/
+  /**
+   * This is the only instance of {@link SerialNumberManager}.
+   */
   static final SerialNumberManager INSTANCE = new SerialNumberManager();
 
-  private final SerialNumberMap<String> usermap = new SerialNumberMap<String>();
-  private final SerialNumberMap<String> groupmap = new SerialNumberMap<String>();
+  private SerialNumberMap<String> usermap = new SerialNumberMap<String>();
+  private SerialNumberMap<String> groupmap = new SerialNumberMap<String>();
 
-  private SerialNumberManager() {}
+  private SerialNumberManager() {
+  }
 
-  int getUserSerialNumber(String u) {return usermap.get(u);}
-  int getGroupSerialNumber(String g) {return groupmap.get(g);}
-  String getUser(int n) {return usermap.get(n);}
-  String getGroup(int n) {return groupmap.get(n);}
+  int getUserSerialNumber(String u) {
+    return usermap.get(u);
+  }
+
+  int getGroupSerialNumber(String g) {
+    return groupmap.get(g);
+  }
+
+  String getUser(int n) {
+    return usermap.get(n);
+  }
+
+  String getGroup(int n) {
+    return groupmap.get(n);
+  }
 
   {
     getUserSerialNumber(null);
@@ -43,9 +59,9 @@ class SerialNumberManager {
   }
 
   private static class SerialNumberMap<T> {
-    private final AtomicInteger max = new AtomicInteger(1);
-    private final ConcurrentMap<T, Integer> t2i = new ConcurrentHashMap<T, Integer>();
-    private final ConcurrentMap<Integer, T> i2t = new ConcurrentHashMap<Integer, T>();
+    private AtomicInteger max = new AtomicInteger(1);
+    private ConcurrentMap<T, Integer> t2i = new ConcurrentHashMap<T, Integer>();
+    private ConcurrentMap<Integer, T> i2t = new ConcurrentHashMap<Integer, T>();
 
     int get(T t) {
       if (t == null) {
@@ -69,8 +85,8 @@ class SerialNumberManager {
       }
       T t = i2t.get(i);
       if (t == null) {
-        throw new IllegalStateException("!i2t.containsKey(" + i
-            + "), this=" + this);
+        throw new IllegalStateException(
+            "!i2t.containsKey(" + i + "), this=" + this);
       }
       return t;
     }

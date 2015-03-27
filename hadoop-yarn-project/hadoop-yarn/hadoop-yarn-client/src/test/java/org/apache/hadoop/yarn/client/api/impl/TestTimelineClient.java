@@ -18,17 +18,9 @@
 
 package org.apache.hadoop.yarn.client.api.impl;
 
-import static org.mockito.Matchers.any;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.when;
-
-import java.net.ConnectException;
-
+import com.sun.jersey.api.client.ClientHandlerException;
+import com.sun.jersey.api.client.ClientResponse;
 import junit.framework.Assert;
-
 import org.apache.hadoop.yarn.api.records.timeline.TimelineEntities;
 import org.apache.hadoop.yarn.api.records.timeline.TimelineEntity;
 import org.apache.hadoop.yarn.api.records.timeline.TimelineEvent;
@@ -40,8 +32,14 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.sun.jersey.api.client.ClientHandlerException;
-import com.sun.jersey.api.client.ClientResponse;
+import java.net.ConnectException;
+
+import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.when;
 
 public class TestTimelineClient {
 
@@ -76,10 +74,10 @@ public class TestTimelineClient {
     try {
       TimelinePutResponse response = client.putEntities(generateEntity());
       Assert.assertEquals(1, response.getErrors().size());
-      Assert.assertEquals("test entity id", response.getErrors().get(0)
-          .getEntityId());
-      Assert.assertEquals("test entity type", response.getErrors().get(0)
-          .getEntityType());
+      Assert.assertEquals("test entity id",
+          response.getErrors().get(0).getEntityId());
+      Assert.assertEquals("test entity type",
+          response.getErrors().get(0).getEntityType());
       Assert.assertEquals(TimelinePutResponse.TimelinePutError.IO_EXCEPTION,
           response.getErrors().get(0).getErrorCode());
     } catch (YarnException e) {
@@ -89,14 +87,14 @@ public class TestTimelineClient {
 
   @Test
   public void testPostEntitiesNoResponse() throws Exception {
-    mockClientResponse(
-        client, ClientResponse.Status.INTERNAL_SERVER_ERROR, false, false);
+    mockClientResponse(client, ClientResponse.Status.INTERNAL_SERVER_ERROR,
+        false, false);
     try {
       client.putEntities(generateEntity());
       Assert.fail("Exception is expected");
     } catch (YarnException e) {
-      Assert.assertTrue(e.getMessage().contains(
-          "Failed to get the response from the timeline server."));
+      Assert.assertTrue(e.getMessage()
+          .contains("Failed to get the response from the timeline server."));
     }
   }
 
@@ -116,8 +114,8 @@ public class TestTimelineClient {
     YarnConfiguration conf = new YarnConfiguration();
     conf.setBoolean(YarnConfiguration.TIMELINE_SERVICE_ENABLED, false);
     TimelineClientImpl client = createTimelineClient(conf);
-    mockClientResponse(
-        client, ClientResponse.Status.INTERNAL_SERVER_ERROR, false, false);
+    mockClientResponse(client, ClientResponse.Status.INTERNAL_SERVER_ERROR,
+        false, false);
     try {
       TimelinePutResponse response = client.putEntities(generateEntity());
       Assert.assertEquals(0, response.getErrors().size());

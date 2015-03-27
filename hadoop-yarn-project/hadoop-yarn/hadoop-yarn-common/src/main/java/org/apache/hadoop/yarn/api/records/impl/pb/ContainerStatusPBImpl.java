@@ -29,8 +29,6 @@ import org.apache.hadoop.yarn.proto.YarnProtos.ContainerStateProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.ContainerStatusProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.ContainerStatusProtoOrBuilder;
 
-import com.google.protobuf.TextFormat;
-
 @Private
 @Unstable
 public class ContainerStatusPBImpl extends ContainerStatus {
@@ -51,7 +49,7 @@ public class ContainerStatusPBImpl extends ContainerStatus {
   }
   
   public ContainerStatusProto getProto() {
-      mergeLocalToProto();
+    mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
     viaProto = true;
     return proto;
@@ -64,8 +62,9 @@ public class ContainerStatusPBImpl extends ContainerStatus {
 
   @Override
   public boolean equals(Object other) {
-    if (other == null)
+    if (other == null) {
       return false;
+    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -91,8 +90,9 @@ public class ContainerStatusPBImpl extends ContainerStatus {
   }
 
   private void mergeLocalToProto() {
-    if (viaProto) 
+    if (viaProto) {
       maybeInitBuilder();
+    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
@@ -104,7 +104,7 @@ public class ContainerStatusPBImpl extends ContainerStatus {
     }
     viaProto = false;
   }
-    
+
   
   @Override
   public ContainerState getState() {
@@ -124,6 +124,7 @@ public class ContainerStatusPBImpl extends ContainerStatus {
     }
     builder.setState(convertToProtoFormat(state));
   }
+
   @Override
   public ContainerId getContainerId() {
     ContainerStatusProtoOrBuilder p = viaProto ? proto : builder;
@@ -133,17 +134,19 @@ public class ContainerStatusPBImpl extends ContainerStatus {
     if (!p.hasContainerId()) {
       return null;
     }
-    this.containerId =  convertFromProtoFormat(p.getContainerId());
+    this.containerId = convertFromProtoFormat(p.getContainerId());
     return this.containerId;
   }
 
   @Override
   public void setContainerId(ContainerId containerId) {
     maybeInitBuilder();
-    if (containerId == null) 
+    if (containerId == null) {
       builder.clearContainerId();
+    }
     this.containerId = containerId;
   }
+
   @Override
   public int getExitStatus() {
     ContainerStatusProtoOrBuilder p = viaProto ? proto : builder;
@@ -159,7 +162,7 @@ public class ContainerStatusPBImpl extends ContainerStatus {
   @Override
   public String getDiagnostics() {
     ContainerStatusProtoOrBuilder p = viaProto ? proto : builder;
-    return (p.getDiagnostics());    
+    return (p.getDiagnostics());
   }
 
   @Override
@@ -181,9 +184,8 @@ public class ContainerStatusPBImpl extends ContainerStatus {
   }
 
   private ContainerIdProto convertToProtoFormat(ContainerId t) {
-    return ((ContainerIdPBImpl)t).getProto();
+    return ((ContainerIdPBImpl) t).getProto();
   }
-
 
 
 }  

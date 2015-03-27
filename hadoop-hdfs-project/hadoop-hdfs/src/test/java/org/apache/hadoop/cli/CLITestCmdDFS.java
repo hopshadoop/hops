@@ -30,9 +30,11 @@ public class CLITestCmdDFS extends CLITestCmd {
   }
 
   @Override
-  public CommandExecutor getExecutor(String tag) throws IllegalArgumentException {
-    if (getType() instanceof CLICommandDFSAdmin)
+  public CommandExecutor getExecutor(String tag)
+      throws IllegalArgumentException {
+    if (getType() instanceof CLICommandDFSAdmin) {
       return new FSCmdExecutor(tag, new DFSAdmin());
+    }
     return super.getExecutor(tag);
   }
 }

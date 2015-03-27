@@ -354,7 +354,7 @@ Administration Commands
 
    Runs a HDFS dfsadmin client.
 
-   Usage: <<<hadoop dfsadmin [GENERIC_OPTIONS] [-report] [-safemode enter | leave | get | wait] [-refreshNodes] [-finalizeUpgrade] [-upgradeProgress status | details | force] [-metasave filename] [-setQuota <quota> <dirname>...<dirname>] [-clrQuota <dirname>...<dirname>] [-restoreFailedStorage true|false|check] [-help [cmd]]>>>
+   Usage: <<<hadoop dfsadmin [GENERIC_OPTIONS] [-report] [-safemode enter | leave | get | wait] [-refreshNodes] [-finalizeUpgrade] [-upgradeProgress status | details | force] [-setQuota <quota> <dirname>...<dirname>] [-clrQuota <dirname>...<dirname>] [-restoreFailedStorage true|false|check] [-help [cmd]]>>>
 
 *-----------------+-----------------------------------------------------------+
 || COMMAND_OPTION || Description
@@ -382,15 +382,6 @@ Administration Commands
 | -upgradeProgress status / details / force | Request current distributed
                   | upgrade status, a detailed status or force the upgrade to
                   | proceed.
-*-----------------+-----------------------------------------------------------+
-| -metasave filename | Save Namenode's primary data structures to <filename> in
-                  | the directory specified by hadoop.log.dir property.
-                  | <filename> is overwritten if it exists.
-                  | <filename> will contain one line for each of the following\
-                  | 1. Datanodes heart beating with Namenode\
-                  | 2. Blocks waiting to be replicated\
-                  | 3. Blocks currrently being replicated\
-                  | 4. Blocks waiting to be deleted\
 *-----------------+-----------------------------------------------------------+
 | -setQuota <quota> <dirname>...<dirname> | Set the quota <quota> for each
                   | directory <dirname>. The directory quota is a long integer

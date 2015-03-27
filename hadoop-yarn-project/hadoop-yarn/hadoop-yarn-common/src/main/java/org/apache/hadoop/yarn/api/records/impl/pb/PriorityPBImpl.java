@@ -52,7 +52,7 @@ public class PriorityPBImpl extends Priority {
     }
     viaProto = false;
   }
-    
+
   
   @Override
   public int getPriority() {

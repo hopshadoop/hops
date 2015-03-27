@@ -18,7 +18,7 @@
 package org.apache.hadoop.lib.service;
 
 import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.hdfs.web.WebHdfsFileSystem;
+import org.apache.hadoop.fs.http.client.HttpFSKerberosAuthenticator;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.token.delegation.AbstractDelegationTokenIdentifier;
 
@@ -27,35 +27,37 @@ import org.apache.hadoop.security.token.delegation.AbstractDelegationTokenIdenti
  */
 @InterfaceAudience.Private
 public class DelegationTokenIdentifier
-  extends AbstractDelegationTokenIdentifier {
+    extends AbstractDelegationTokenIdentifier {
 
-  private Text kind = WebHdfsFileSystem.TOKEN_KIND;
+  public static final Text KIND_NAME =
+      new Text(HttpFSKerberosAuthenticator.TOKEN_KIND);
 
-  public DelegationTokenIdentifier(Text kind) {
-    this.kind = kind;
+  public DelegationTokenIdentifier() {
   }
 
   /**
    * Create a new delegation token identifier
    *
-   * @param kind token kind
-   * @param owner the effective username of the token owner
-   * @param renewer the username of the renewer
-   * @param realUser the real username of the token owner
+   * @param owner
+   *     the effective username of the token owner
+   * @param renewer
+   *     the username of the renewer
+   * @param realUser
+   *     the real username of the token owner
    */
-  public DelegationTokenIdentifier(Text kind, Text owner, Text renewer,
-      Text realUser) {
+  public DelegationTokenIdentifier(Text owner, Text renewer, Text realUser) {
     super(owner, renewer, realUser);
-    this.kind = kind;
   }
+
 
   /**
    * Returns the kind, <code>TOKEN_KIND</code>.
+   *
    * @return returns <code>TOKEN_KIND</code>.
    */
   @Override
   public Text getKind() {
-    return kind;
+    return KIND_NAME;
   }
 
 }

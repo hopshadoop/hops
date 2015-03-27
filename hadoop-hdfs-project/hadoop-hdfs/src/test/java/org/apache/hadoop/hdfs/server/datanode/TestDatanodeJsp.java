@@ -17,20 +17,6 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.URL;
-import java.net.URLEncoder;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.jsp.JspWriter;
-
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -43,6 +29,19 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.util.ServletUtil;
 import org.junit.Test;
 import org.mockito.Mockito;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.jsp.JspWriter;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.URL;
+import java.net.URLEncoder;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 public class TestDatanodeJsp {
   
@@ -61,24 +60,25 @@ public class TestDatanodeJsp {
     
     InetSocketAddress nnIpcAddress = cluster.getNameNode().getNameNodeAddress();
     InetSocketAddress nnHttpAddress = cluster.getNameNode().getHttpAddress();
-    String base = JspHelper.Url.url("http", cluster.getDataNodes().get(0)
-        .getDatanodeId());
-
-    URL url = new URL(base + "/"
-        + "browseDirectory.jsp" + JspHelper.getUrlParam("dir", 
-            URLEncoder.encode(testPath.toString(), "UTF-8"), true)
-        + JspHelper.getUrlParam("namenodeInfoPort", Integer
-            .toString(nnHttpAddress.getPort())) + JspHelper
+    int dnInfoPort = cluster.getDataNodes().get(0).getInfoPort();
+    
+    URL url = new URL(
+        "http://localhost:" + dnInfoPort + "/" + "browseDirectory.jsp" +
+            JspHelper.getUrlParam("dir",
+                URLEncoder.encode(testPath.toString(), "UTF-8"), true) +
+            JspHelper.getUrlParam("namenodeInfoPort",
+                Integer.toString(nnHttpAddress.getPort())) + JspHelper
             .getUrlParam("nnaddr", "localhost:" + nnIpcAddress.getPort()));
     
     viewFilePage = StringEscapeUtils.unescapeHtml(DFSTestUtil.urlGet(url));
     
-    assertTrue("page should show preview of file contents, got: " + viewFilePage,
+    assertTrue(
+        "page should show preview of file contents, got: " + viewFilePage,
         viewFilePage.contains(FILE_DATA));
     
-    assertTrue("page should show link to download file", viewFilePage
-        .contains("/streamFile" + ServletUtil.encodePath(filePath)
-            + "?nnaddr=localhost:" + nnIpcAddress.getPort()));
+    assertTrue("page should show link to download file", viewFilePage.contains(
+        "/streamFile" + ServletUtil.encodePath(filePath) +
+            "?nnaddr=localhost:" + nnIpcAddress.getPort()));
     
     // check whether able to tail the file
     String regex = "<a.+href=\"(.+?)\">Tail\\s*this\\s*file\\<\\/a\\>";
@@ -87,27 +87,23 @@ public class TestDatanodeJsp {
     // check whether able to 'Go Back to File View' after tailing the file
     regex = "<a.+href=\"(.+?)\">Go\\s*Back\\s*to\\s*File\\s*View\\<\\/a\\>";
     assertFileContents(regex, "Go Back to File View");
-
-    regex = "<a href=\"///" + nnHttpAddress.getHostName() + ":" +
-      nnHttpAddress.getPort() + "/dfshealth.jsp\">Go back to DFS home</a>";
-    assertTrue("page should generate DFS home scheme without explicit scheme", viewFilePage.contains(regex));
   }
   
   private static void assertFileContents(String regex, String text)
       throws IOException {
     Pattern compile = Pattern.compile(regex);
     Matcher matcher = compile.matcher(viewFilePage);
+    URL hyperlink = null;
     if (matcher.find()) {
       // got hyperlink for Tail this file
-      String u = matcher.group(1);
-      String urlString = u.startsWith("///") ? ("http://" + u.substring(3)) : u;
-      viewFilePage = StringEscapeUtils.unescapeHtml(DFSTestUtil
-          .urlGet(new URL(urlString)));
-      assertTrue("page should show preview of file contents", viewFilePage
-          .contains(FILE_DATA));
+      hyperlink = new URL(matcher.group(1));
+      viewFilePage =
+          StringEscapeUtils.unescapeHtml(DFSTestUtil.urlGet(hyperlink));
+      assertTrue("page should show preview of file contents",
+          viewFilePage.contains(FILE_DATA));
     } else {
-      fail(text + " hyperlink should be there in the page content : "
-          + viewFilePage);
+      fail(text + " hyperlink should be there in the page content : " +
+          viewFilePage);
     }
   }
   
@@ -117,18 +113,10 @@ public class TestDatanodeJsp {
     try {
       cluster = new MiniDFSCluster.Builder(CONF).build();
       cluster.waitActive();
-      String paths[] = {
-        "/test-file",
-        "/tmp/test-file",
-        "/tmp/test-file%with goofy&characters",
-        "/foo bar/foo bar",
-        "/foo+bar/foo+bar",
-        "/foo;bar/foo;bar",
-        "/foo=bar/foo=bar",
-        "/foo,bar/foo,bar",
-        "/foo?bar/foo?bar",
-        "/foo\">bar/foo\">bar"
-      };
+      String paths[] = {"/test-file", "/tmp/test-file",
+          "/tmp/test-file%with goofy&characters", "/foo bar/foo bar",
+          "/foo+bar/foo+bar", "/foo;bar/foo;bar", "/foo=bar/foo=bar",
+          "/foo,bar/foo,bar", "/foo?bar/foo?bar", "/foo\">bar/foo\">bar"};
       for (String p : paths) {
         testViewingFile(cluster, p);
         testViewingFile(cluster, p);
@@ -142,8 +130,8 @@ public class TestDatanodeJsp {
   
   @Test
   public void testGenStamp() throws Exception {
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(CONF).numDataNodes(1)
-        .build();
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(CONF).numDataNodes(1).build();
     try {
       FileSystem fs = cluster.getFileSystem();
       Path testFile = new Path("/test/mkdirs/TestchunkSizeToView");
@@ -171,7 +159,6 @@ public class TestDatanodeJsp {
     Mockito.doReturn(NetUtils.getHostPortString(NameNode.getAddress(CONF)))
         .when(reqMock).getParameter("nnaddr");
     Mockito.doReturn(testFile.toString()).when(reqMock).getPathInfo();
-    Mockito.doReturn("http").when(reqMock).getScheme();
   }
 
   static Path writeFile(FileSystem fs, Path f) throws IOException {

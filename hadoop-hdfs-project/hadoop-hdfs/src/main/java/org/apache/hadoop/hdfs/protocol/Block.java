@@ -17,39 +17,46 @@
  */
 package org.apache.hadoop.hdfs.protocol;
 
-import java.io.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.hdfs.server.common.GenerationStamp;
-import org.apache.hadoop.io.*;
+import org.apache.hadoop.io.Writable;
+import org.apache.hadoop.io.WritableFactories;
+import org.apache.hadoop.io.WritableFactory;
 
-/**************************************************
- * A Block is a Hadoop FS primitive, identified by a 
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.io.File;
+import java.io.IOException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * ***********************************************
+ * A Block is a Hadoop FS primitive, identified by a
  * long.
- *
- **************************************************/
+ * <p/>
+ * ************************************************
+ */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class Block implements Writable, Comparable<Block> {
   public static final String BLOCK_FILE_PREFIX = "blk_";
   public static final String METADATA_EXTENSION = ".meta";
+
   static {                                      // register a ctor
-    WritableFactories.setFactory
-      (Block.class,
-       new WritableFactory() {
-         @Override
-         public Writable newInstance() { return new Block(); }
-       });
+    WritableFactories.setFactory(Block.class, new WritableFactory() {
+          @Override
+          public Writable newInstance() {
+            return new Block();
+          }
+        });
   }
 
-  public static final Pattern blockFilePattern = Pattern
-      .compile(BLOCK_FILE_PREFIX + "(-??\\d++)$");
-  public static final Pattern metaFilePattern = Pattern
-      .compile(BLOCK_FILE_PREFIX + "(-??\\d++)_(\\d++)\\" + METADATA_EXTENSION
-          + "$");
+  public static final Pattern blockFilePattern =
+      Pattern.compile(BLOCK_FILE_PREFIX + "(-??\\d++)$");
+  public static final Pattern metaFilePattern = Pattern.compile(
+      BLOCK_FILE_PREFIX + "(-??\\d++)_(\\d++)\\" + METADATA_EXTENSION + "$");
 
   public static boolean isBlockFilename(File f) {
     String name = f.getName();
@@ -70,8 +77,8 @@ public class Block implements Writable, Comparable<Block> {
    */
   public static long getGenerationStamp(String metaFile) {
     Matcher m = metaFilePattern.matcher(metaFile);
-    return m.matches() ? Long.parseLong(m.group(2))
-        : GenerationStamp.GRANDFATHER_GENERATION_STAMP;
+    return m.matches() ? Long.parseLong(m.group(2)) :
+        GenerationStamp.GRANDFATHER_GENERATION_STAMP;
   }
 
   /**
@@ -82,14 +89,17 @@ public class Block implements Writable, Comparable<Block> {
     return m.matches() ? Long.parseLong(m.group(1)) : 0;
   }
 
+  private static long NON_EXISTING_BLK_ID = Long.MIN_VALUE;
   private long blockId;
   private long numBytes;
   private long generationStamp;
 
-  public Block() {this(0, 0, 0);}
+  public Block() {
+    this(NON_EXISTING_BLK_ID, 0, 0);
+  }
 
   public Block(final long blkid, final long len, final long generationStamp) {
-    set(blkid, len, generationStamp);
+    setNoPersistance(blkid, len, generationStamp);
   }
 
   public Block(final long blkid) {
@@ -100,25 +110,19 @@ public class Block implements Writable, Comparable<Block> {
     this(blk.blockId, blk.numBytes, blk.generationStamp);
   }
 
-  /**
-   * Find the blockid from the given filename
-   */
-  public Block(File f, long len, long genstamp) {
-    this(filename2id(f.getName()), len, genstamp);
-  }
-
-  public void set(long blkid, long len, long genStamp) {
+  public void setNoPersistance(long blkid, long len, long genStamp) {
     this.blockId = blkid;
     this.numBytes = len;
     this.generationStamp = genStamp;
   }
+
   /**
    */
   public long getBlockId() {
     return blockId;
   }
   
-  public void setBlockId(long bid) {
+  public void setBlockIdNoPersistance(long bid) {
     blockId = bid;
   }
 
@@ -133,7 +137,8 @@ public class Block implements Writable, Comparable<Block> {
   public long getNumBytes() {
     return numBytes;
   }
-  public void setNumBytes(long len) {
+
+  public void setNumBytesNoPersistance(long len) {
     this.numBytes = len;
   }
 
@@ -141,7 +146,7 @@ public class Block implements Writable, Comparable<Block> {
     return generationStamp;
   }
   
-  public void setGenerationStamp(long stamp) {
+  public void setGenerationStampNoPersistance(long stamp) {
     generationStamp = stamp;
   }
 
@@ -153,10 +158,8 @@ public class Block implements Writable, Comparable<Block> {
   }
 
   public void appendStringTo(StringBuilder sb) {
-    sb.append(BLOCK_FILE_PREFIX)
-      .append(blockId)
-      .append("_")
-      .append(getGenerationStamp());
+    sb.append(BLOCK_FILE_PREFIX).append(blockId).append("_")
+        .append(getGenerationStamp());
   }
 
 
@@ -202,8 +205,7 @@ public class Block implements Writable, Comparable<Block> {
 
   @Override // Comparable
   public int compareTo(Block b) {
-    return blockId < b.blockId ? -1 :
-           blockId > b.blockId ? 1 : 0;
+    return blockId < b.blockId ? -1 : blockId > b.blockId ? 1 : 0;
   }
 
   @Override // Object
@@ -214,7 +216,7 @@ public class Block implements Writable, Comparable<Block> {
     if (!(o instanceof Block)) {
       return false;
     }
-    return compareTo((Block)o) == 0;
+    return compareTo((Block) o) == 0;
   }
   
   /**
@@ -222,15 +224,18 @@ public class Block implements Writable, Comparable<Block> {
    * generation stamp, or if both blocks are null.
    */
   public static boolean matchingIdAndGenStamp(Block a, Block b) {
-    if (a == b) return true; // same block, or both null
-    if (a == null || b == null) return false; // only one null
-    return a.blockId == b.blockId &&
-           a.generationStamp == b.generationStamp;
+    if (a == b) {
+      return true; // same block, or both null
+    }
+    if (a == null || b == null) {
+      return false; // only one null
+    }
+    return a.blockId == b.blockId && a.generationStamp == b.generationStamp;
   }
 
   @Override // Object
   public int hashCode() {
     //GenerationStamp is IRRELEVANT and should not be used here
-    return (int)(blockId^(blockId>>>32));
+    return (int) (blockId ^ (blockId >>> 32));
   }
 }

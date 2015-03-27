@@ -16,13 +16,13 @@
   limitations under the License.
 -->
 
-<!DOCTYPE tabs PUBLIC "-//APACHE//DTD Cocoon Documentation Tab V1.0//EN" 
-          "http://forrest.apache.org/dtd/tab-cocoon-v10.dtd">
+<!DOCTYPE tabs PUBLIC "-//APACHE//DTD Cocoon Documentation Tab V1.0//EN"
+    "http://forrest.apache.org/dtd/tab-cocoon-v10.dtd">
 
 <tabs software="Hadoop"
       title="Hadoop"
       copyright="The Apache Software Foundation"
-      xmlns:xlink="http://www.w3.org/1999/xlink">
+    >
 
   <!-- The rules are:
     @dir will always have /index.html added.
@@ -30,8 +30,8 @@
     directory (ends in '/'), in which case /index.html will be added
   -->
 
-  <tab label="Project" href="http://hadoop.apache.org/hdfs/" />
-  <tab label="Wiki" href="http://wiki.apache.org/hadoop/HDFS" />
-  <tab label="HDFS 0.23 Documentation" dir="" />  
-  
+  <tab label="Project" href="http://hadoop.apache.org/hdfs/"/>
+  <tab label="Wiki" href="http://wiki.apache.org/hadoop/HDFS"/>
+  <tab label="HDFS 0.23 Documentation" dir=""/>
+
 </tabs>

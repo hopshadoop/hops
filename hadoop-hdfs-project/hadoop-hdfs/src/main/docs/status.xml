@@ -18,7 +18,7 @@
 <status>
 
   <developers>
-    <person name="Joe Bloggs"      email="joe@joescompany.org"      id="JB" />
+    <person name="Joe Bloggs" email="joe@joescompany.org" id="JB"/>
     <!-- Add more people here -->
   </developers>
 
@@ -45,18 +45,21 @@
   <todo>
     <actions priority="high">
       <action context="docs" dev="JB">
-        Customize this template project with your project's details.  This
+        Customize this template project with your project's details. This
         TODO list is generated from 'status.xml'.
       </action>
       <action context="docs" dev="JB">
-        Add lots of content.  XML content goes in
+        Add lots of content. XML content goes in
         <code>src/documentation/content/xdocs</code>, or wherever the
-        <code>${project.xdocs-dir}</code> property (set in
+        <code>${project.xdocs-dir}</code>
+        property (set in
         <code>forrest.properties</code>) points.
       </action>
       <action context="feedback" dev="JB">
-        Mail <link
-          href="mailto:forrest-dev@xml.apache.org">forrest-dev@xml.apache.org</link>
+        Mail
+        <link
+            href="mailto:forrest-dev@xml.apache.org">forrest-dev@xml.apache.org
+        </link>
         with feedback.
       </action>
     </actions>

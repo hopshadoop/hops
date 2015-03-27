@@ -13,17 +13,17 @@
   limitations under the License. See accompanying LICENSE file.
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <groupId>org.apache.hadoop</groupId>
+    <groupId>io.hops</groupId>
     <artifactId>hadoop-project-dist</artifactId>
     <version>2.4.0</version>
     <relativePath>../../hadoop-project-dist</relativePath>
   </parent>
-  <groupId>org.apache.hadoop</groupId>
+  <groupId>io.hops</groupId>
   <artifactId>hadoop-hdfs</artifactId>
   <version>2.4.0</version>
   <description>Apache Hadoop HDFS</description>
@@ -39,22 +39,42 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
 
   <dependencies>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
+      <artifactId>hops-leader-election</artifactId>
+      <version>2.4.0</version>
+    </dependency>
+    <dependency>
+      <groupId>io.hops.metadata</groupId>
+      <artifactId>hops-metadata-dal</artifactId>
+      <version>1.0-SNAPSHOT</version>
+    </dependency>
+    <dependency>
+      <groupId>org.json</groupId>
+      <artifactId>json</artifactId>
+      <version>20140107</version>
+    </dependency>
+    <dependency>
+      <groupId>net.spy</groupId>
+      <artifactId>spymemcached</artifactId>
+      <version>2.10.6</version>
+    </dependency>
+    <dependency>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-annotations</artifactId>
       <scope>provided</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-auth</artifactId>
       <scope>provided</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-common</artifactId>
       <scope>provided</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-common</artifactId>
       <scope>test</scope>
       <type>test-jar</type>
@@ -208,49 +228,15 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
             </goals>
             <configuration>
               <compile>false</compile>
-              <workingDirectory>${project.build.directory}/generated-sources/java</workingDirectory>
-              <webFragmentFile>${project.build.directory}/hdfs-jsp-servlet-definitions.xml</webFragmentFile>
+              <workingDirectory>
+                ${project.build.directory}/generated-sources/java
+              </workingDirectory>
+              <webFragmentFile>
+                ${project.build.directory}/hdfs-jsp-servlet-definitions.xml
+              </webFragmentFile>
               <packageName>org.apache.hadoop.hdfs.server.namenode</packageName>
               <sources>
                 <directory>${basedir}/src/main/webapps/hdfs</directory>
-                <includes>
-                  <include>*.jsp</include>
-                </includes>
-              </sources>
-            </configuration>
-          </execution>
-          <execution>
-            <id>secondary</id>
-            <phase>generate-sources</phase>
-            <goals>
-              <goal>compile</goal>
-            </goals>
-            <configuration>
-              <compile>false</compile>
-              <workingDirectory>${project.build.directory}/generated-sources/java</workingDirectory>
-              <webFragmentFile>${project.build.directory}/secondary-jsp-servlet-definitions.xml</webFragmentFile>
-              <packageName>org.apache.hadoop.hdfs.server.namenode</packageName>
-              <sources>
-                <directory>${basedir}/src/main/webapps/secondary</directory>
-                <includes>
-                  <include>*.jsp</include>
-                </includes>
-              </sources>
-            </configuration>
-          </execution>
-          <execution>
-            <id>journal</id>
-            <phase>generate-sources</phase>
-            <goals>
-              <goal>compile</goal>
-            </goals>
-            <configuration>
-              <compile>false</compile>
-              <workingDirectory>${project.build.directory}/generated-sources/java</workingDirectory>
-              <webFragmentFile>${project.build.directory}/journal-jsp-servlet-definitions.xml</webFragmentFile>
-              <packageName>org.apache.hadoop.hdfs.server.journalservice</packageName>
-              <sources>
-                <directory>${basedir}/src/main/webapps/journal</directory>
                 <includes>
                   <include>*.jsp</include>
                 </includes>
@@ -265,8 +251,12 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
             </goals>
             <configuration>
               <compile>false</compile>
-              <workingDirectory>${project.build.directory}/generated-sources/java</workingDirectory>
-              <webFragmentFile>${project.build.directory}/datanode-jsp-servlet-definitions.xml</webFragmentFile>
+              <workingDirectory>
+                ${project.build.directory}/generated-sources/java
+              </workingDirectory>
+              <webFragmentFile>
+                ${project.build.directory}/datanode-jsp-servlet-definitions.xml
+              </webFragmentFile>
               <packageName>org.apache.hadoop.hdfs.server.datanode</packageName>
               <sources>
                 <directory>${basedir}/src/main/webapps/datanode</directory>
@@ -328,7 +318,7 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
             </goals>
             <configuration>
               <target>
-                <mkdir dir="${project.build.directory}/generated-sources/java" />
+                <mkdir dir="${project.build.directory}/generated-sources/java"/>
               </target>
             </configuration>
           </execution>
@@ -340,27 +330,23 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
             </goals>
             <configuration>
               <target>
-                <loadfile property="hdfs.servlet.definitions" srcFile="${project.build.directory}/hdfs-jsp-servlet-definitions.xml"/>
-                <loadfile property="secondary.servlet.definitions" srcFile="${project.build.directory}/secondary-jsp-servlet-definitions.xml"/>
-                <loadfile property="datanode.servlet.definitions" srcFile="${project.build.directory}/datanode-jsp-servlet-definitions.xml"/>
-                <loadfile property="journal.servlet.definitions" srcFile="${project.build.directory}/journal-jsp-servlet-definitions.xml"/>               
-                <echoproperties destfile="${project.build.directory}/webxml.properties">
+                <loadfile property="hdfs.servlet.definitions"
+                          srcFile="${project.build.directory}/hdfs-jsp-servlet-definitions.xml"/>
+                <loadfile property="datanode.servlet.definitions"
+                          srcFile="${project.build.directory}/datanode-jsp-servlet-definitions.xml"/>
+                <echoproperties
+                    destfile="${project.build.directory}/webxml.properties">
                   <propertyset>
                     <propertyref regex=".*.servlet.definitions"/>
                   </propertyset>
                 </echoproperties>
-                <filter filtersfile="${project.build.directory}/webxml.properties"/>
+                <filter
+                    filtersfile="${project.build.directory}/webxml.properties"/>
                 <copy file="${basedir}/src/main/webapps/proto-hdfs-web.xml"
                       tofile="${project.build.directory}/webapps/hdfs/WEB-INF/web.xml"
                       filtering="true"/>
-                <copy file="${basedir}/src/main/webapps/proto-secondary-web.xml"
-                      tofile="${project.build.directory}/webapps/secondary/WEB-INF/web.xml"
-                      filtering="true"/>
                 <copy file="${basedir}/src/main/webapps/proto-datanode-web.xml"
                       tofile="${project.build.directory}/webapps/datanode/WEB-INF/web.xml"
-                      filtering="true"/>
-                <copy file="${basedir}/src/main/webapps/proto-journal-web.xml"
-                      tofile="${project.build.directory}/webapps/journal/WEB-INF/web.xml"
                       filtering="true"/>
                 <copy toDir="${project.build.directory}/webapps">
                   <fileset dir="${basedir}/src/main/webapps">
@@ -398,15 +384,17 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
             </goals>
             <configuration>
               <tasks>
-                <copy file="src/main/resources/hdfs-default.xml" todir="src/site/resources"/>
-                <copy file="src/main/xsl/configuration.xsl" todir="src/site/resources"/>
+                <copy file="src/main/resources/hdfs-default.xml"
+                      todir="src/site/resources"/>
+                <copy file="src/main/xsl/configuration.xsl"
+                      todir="src/site/resources"/>
               </tasks>
             </configuration>
           </execution>
         </executions>
       </plugin>
       <plugin>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-maven-plugins</artifactId>
         <executions>
           <execution>
@@ -419,15 +407,15 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
               <protocVersion>${protobuf.version}</protocVersion>
               <protocCommand>${protoc.path}</protocCommand>
               <imports>
-                <param>${basedir}/../../hadoop-common-project/hadoop-common/src/main/proto</param>
+                <param>
+                  ${basedir}/../../hadoop-common-project/hadoop-common/src/main/proto
+                </param>
                 <param>${basedir}/src/main/proto</param>
               </imports>
               <source>
                 <directory>${basedir}/src/main/proto</directory>
                 <includes>
-                  <include>HAZKInfo.proto</include>
                   <include>InterDatanodeProtocol.proto</include>
-                  <include>JournalProtocol.proto</include>
                   <include>datatransfer.proto</include>
                   <include>hdfs.proto</include>
                 </includes>
@@ -445,7 +433,9 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
               <protocVersion>${protobuf.version}</protocVersion>
               <protocCommand>${protoc.path}</protocCommand>
               <imports>
-                <param>${basedir}/../../hadoop-common-project/hadoop-common/src/main/proto</param>
+                <param>
+                  ${basedir}/../../hadoop-common-project/hadoop-common/src/main/proto
+                </param>
                 <param>${basedir}/src/main/proto</param>
               </imports>
               <source>
@@ -453,7 +443,6 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <includes>
                   <include>ClientDatanodeProtocol.proto</include>
                   <include>DatanodeProtocol.proto</include>
-                  <include>fsimage.proto</include>
                 </includes>
               </source>
               <output>${project.build.directory}/generated-sources/java</output>
@@ -469,7 +458,9 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
               <protocVersion>${protobuf.version}</protocVersion>
               <protocCommand>${protoc.path}</protocCommand>
               <imports>
-                <param>${basedir}/../../hadoop-common-project/hadoop-common/src/main/proto</param>
+                <param>
+                  ${basedir}/../../hadoop-common-project/hadoop-common/src/main/proto
+                </param>
                 <param>${basedir}/src/main/proto</param>
               </imports>
               <source>
@@ -483,35 +474,14 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
               <output>${project.build.directory}/generated-sources/java</output>
             </configuration>
           </execution>
-          <execution>
-            <id>compile-protoc-qjournal</id>
-            <phase>generate-sources</phase>
-            <goals>
-              <goal>protoc</goal>
-            </goals>
-            <configuration>
-              <protocVersion>${protobuf.version}</protocVersion>
-              <protocCommand>${protoc.path}</protocCommand>
-              <imports>
-                <param>${basedir}/../../hadoop-common-project/hadoop-common/src/main/proto</param>
-                <param>${basedir}/src/main/proto</param>
-              </imports>
-              <source>
-                <directory>${basedir}/src/main/proto</directory>
-                <includes>
-                  <include>QJournalProtocol.proto</include>
-                </includes>
-              </source>
-              <output>${project.build.directory}/generated-sources/java</output>
-            </configuration>
-          </execution>
         </executions>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-javadoc-plugin</artifactId>
         <configuration>
-          <excludePackageNames>org.apache.hadoop.hdfs.protocol.proto</excludePackageNames>
+          <excludePackageNames>org.apache.hadoop.hdfs.protocol.proto
+          </excludePackageNames>
         </configuration>
       </plugin>
       <plugin>
@@ -538,7 +508,9 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
             <exclude>src/test/resources/editsStored*</exclude>
             <exclude>src/test/resources/empty-file</exclude>
             <exclude>src/main/native/util/tree.h</exclude>
-            <exclude>src/test/aop/org/apache/hadoop/hdfs/server/datanode/DataXceiverAspects.aj</exclude>
+            <exclude>
+              src/test/aop/org/apache/hadoop/hdfs/server/datanode/DataXceiverAspects.aj
+            </exclude>
             <exclude>src/main/webapps/datanode/robots.txt</exclude>
             <exclude>src/main/docs/releasenotes.html</exclude>
             <exclude>src/contrib/**</exclude>
@@ -580,41 +552,57 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
               <execution>
                 <id>make</id>
                 <phase>compile</phase>
-                <goals><goal>run</goal></goals>
+                <goals>
+                  <goal>run</goal>
+                </goals>
                 <configuration>
                   <target>
                     <mkdir dir="${project.build.directory}/native"/>
-                    <exec executable="cmake" dir="${project.build.directory}/native" 
-                        failonerror="true">
-                      <arg line="${basedir}/src/ -DGENERATED_JAVAH=${project.build.directory}/native/javah -DJVM_ARCH_DATA_MODEL=${sun.arch.data.model} -DREQUIRE_LIBWEBHDFS=${require.libwebhdfs} -DREQUIRE_FUSE=${require.fuse}"/>
+                    <exec executable="cmake"
+                          dir="${project.build.directory}/native"
+                          failonerror="true">
+                      <arg
+                          line="${basedir}/src/ -DGENERATED_JAVAH=${project.build.directory}/native/javah -DJVM_ARCH_DATA_MODEL=${sun.arch.data.model} -DREQUIRE_LIBWEBHDFS=${require.libwebhdfs} -DREQUIRE_FUSE=${require.fuse}"/>
                     </exec>
-                    <exec executable="make" dir="${project.build.directory}/native" failonerror="true">
+                    <exec executable="make"
+                          dir="${project.build.directory}/native"
+                          failonerror="true">
                       <arg line="VERBOSE=1"/>
                     </exec>
                     <!-- The second make is a workaround for HADOOP-9215.  It can
                          be removed when version 2.6 of cmake is no longer supported . -->
-                    <exec executable="make" dir="${project.build.directory}/native" failonerror="true"></exec>
+                    <exec executable="make"
+                          dir="${project.build.directory}/native"
+                          failonerror="true"></exec>
                   </target>
                 </configuration>
               </execution>
               <execution>
                 <id>native_tests</id>
                 <phase>test</phase>
-                <goals><goal>run</goal></goals>
+                <goals>
+                  <goal>run</goal>
+                </goals>
                 <configuration>
                   <target>
-                    <property name="compile_classpath" refid="maven.compile.classpath"/>
-                    <property name="test_classpath" refid="maven.test.classpath"/>
-                    <exec executable="sh" failonerror="true" dir="${project.build.directory}/native/">
+                    <property name="compile_classpath"
+                              refid="maven.compile.classpath"/>
+                    <property name="test_classpath"
+                              refid="maven.test.classpath"/>
+                    <exec executable="sh" failonerror="true"
+                          dir="${project.build.directory}/native/">
                       <arg value="-c"/>
                       <arg value="[ x$SKIPTESTS = xtrue ] || ${project.build.directory}/native/test_libhdfs_threaded"/>
-                      <env key="CLASSPATH" value="${test_classpath}:${compile_classpath}"/>
+                      <env key="CLASSPATH"
+                           value="${test_classpath}:${compile_classpath}"/>
                       <env key="SKIPTESTS" value="${skipTests}"/>
                     </exec>
-                    <exec executable="sh" failonerror="true" dir="${project.build.directory}/native/">
-                        <arg value="-c"/>
-                        <arg value="[ x$SKIPTESTS = xtrue ] || ${project.build.directory}/native/test_libhdfs_threaded"/>
-                      <env key="CLASSPATH" value="${test_classpath}:${compile_classpath}"/>
+                    <exec executable="sh" failonerror="true"
+                          dir="${project.build.directory}/native/">
+                      <arg value="-c"/>
+                      <arg value="[ x$SKIPTESTS = xtrue ] || ${project.build.directory}/native/test_libhdfs_threaded"/>
+                      <env key="CLASSPATH"
+                           value="${test_classpath}:${compile_classpath}"/>
                       <env key="SKIPTESTS" value="${skipTests}"/>
                     </exec>
                   </target>
@@ -633,13 +621,14 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
             <artifactId>maven-antrun-plugin</artifactId>
             <executions>
               <execution>
-                <id>create-parallel-tests-dirs</id>               
+                <id>create-parallel-tests-dirs</id>
                 <phase>test-compile</phase>
                 <configuration>
                   <target>
                     <exec executable="sh">
                       <arg value="-c"/>
-                      <arg value="for i in {1..${testsThreadCount}}; do mkdir -p ${test.build.data}/$i; mkdir -p ${hadoop.tmp.dir}/$i; done"/>
+                      <arg
+                          value="for i in {1..${testsThreadCount}}; do mkdir -p ${test.build.data}/$i; mkdir -p ${hadoop.tmp.dir}/$i; done"/>
                     </exec>
                   </target>
                 </configuration>
@@ -654,10 +643,14 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
             <artifactId>maven-surefire-plugin</artifactId>
             <configuration>
               <forkCount>${testsThreadCount}</forkCount>
-              <argLine>-Xmx1024m -XX:+HeapDumpOnOutOfMemoryError -DminiClusterDedicatedDirs=true</argLine>
+              <argLine>-Xmx4096m -XX:+HeapDumpOnOutOfMemoryError
+                -DminiClusterDedicatedDirs=true
+              </argLine>
               <systemPropertyVariables>
-                <test.build.data>${test.build.data}/${surefire.forkNumber}</test.build.data>
-                <hadoop.tmp.dir>${hadoop.tmp.dir}/${surefire.forkNumber}</hadoop.tmp.dir>
+                <test.build.data>${test.build.data}/${surefire.forkNumber}
+                </test.build.data>
+                <hadoop.tmp.dir>${hadoop.tmp.dir}/${surefire.forkNumber}
+                </hadoop.tmp.dir>
               </systemPropertyVariables>
             </configuration>
           </plugin>

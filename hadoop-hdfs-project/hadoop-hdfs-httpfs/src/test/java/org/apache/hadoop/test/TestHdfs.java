@@ -25,14 +25,18 @@ import java.lang.annotation.Target;
  * Annotation for {@link HTestCase} subclasses to indicate that the test method
  * requires a FileSystemAccess cluster.
  * <p/>
- * The {@link TestHdfsHelper#getHdfsConf()} returns a FileSystemAccess JobConf preconfigured to connect
- * to the FileSystemAccess test minicluster or the FileSystemAccess cluster information.
+ * The {@link TestHdfsHelper#getHdfsConf()} returns a FileSystemAccess JobConf
+ * preconfigured to connect
+ * to the FileSystemAccess test minicluster or the FileSystemAccess cluster
+ * information.
  * <p/>
  * A HDFS test directory for the test will be created. The HDFS test directory
- * location can be retrieve using the {@link TestHdfsHelper#getHdfsTestDir()} method.
+ * location can be retrieve using the {@link TestHdfsHelper#getHdfsTestDir()}
+ * method.
  * <p/>
  * Refer to the {@link HTestCase} class for details on how to use and configure
- * a FileSystemAccess test minicluster or a real FileSystemAccess cluster for the tests.
+ * a FileSystemAccess test minicluster or a real FileSystemAccess cluster for
+ * the tests.
  */
 @Retention(java.lang.annotation.RetentionPolicy.RUNTIME)
 @Target(java.lang.annotation.ElementType.METHOD)

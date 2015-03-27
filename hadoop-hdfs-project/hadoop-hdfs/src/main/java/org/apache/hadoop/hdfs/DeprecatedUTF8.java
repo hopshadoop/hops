@@ -18,19 +18,19 @@
 
 package org.apache.hadoop.hdfs;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-
 /**
  * A simple wrapper around {@link org.apache.hadoop.io.UTF8}.
  * This class should be used only when it is absolutely necessary
- * to use {@link org.apache.hadoop.io.UTF8}. The only difference is that 
- * using this class does not require "@SuppressWarning" annotation to avoid 
+ * to use {@link org.apache.hadoop.io.UTF8}. The only difference is that
+ * using this class does not require "@SuppressWarning" annotation to avoid
  * javac warning. Instead the deprecation is implied in the class name.
- * 
+ * <p/>
  * This should be treated as package private class to HDFS.
  */
 @InterfaceAudience.Private
@@ -41,12 +41,16 @@ public class DeprecatedUTF8 extends org.apache.hadoop.io.UTF8 {
     super();
   }
 
-  /** Construct from a given string. */
+  /**
+   * Construct from a given string.
+   */
   public DeprecatedUTF8(String string) {
     super(string);
   }
 
-  /** Construct from a given string. */
+  /**
+   * Construct from a given string.
+   */
   public DeprecatedUTF8(DeprecatedUTF8 utf8) {
     super(utf8);
   }

@@ -18,9 +18,18 @@
 
 package org.apache.hadoop.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.util.Time;
+import org.junit.Test;
+import org.mortbay.jetty.Server;
+import org.mortbay.jetty.servlet.Context;
 
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -29,18 +38,8 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.util.Time;
-import org.junit.Test;
-import org.mortbay.jetty.Server;
-import org.mortbay.jetty.servlet.Context;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 
 public class TestHFSTestCase extends HFSTestCase {
 
@@ -143,10 +142,12 @@ public class TestHFSTestCase extends HFSTestCase {
     Configuration conf = TestHdfsHelper.getHdfsConf();
     FileSystem fs = FileSystem.get(conf);
     try {
-      OutputStream os = fs.create(new Path(TestHdfsHelper.getHdfsTestDir(), "foo"));
+      OutputStream os =
+          fs.create(new Path(TestHdfsHelper.getHdfsTestDir(), "foo"));
       os.write(new byte[]{1});
       os.close();
-      InputStream is = fs.open(new Path(TestHdfsHelper.getHdfsTestDir(), "foo"));
+      InputStream is =
+          fs.open(new Path(TestHdfsHelper.getHdfsTestDir(), "foo"));
       assertEquals(is.read(), 1);
       assertEquals(is.read(), -1);
       is.close();
@@ -157,7 +158,8 @@ public class TestHFSTestCase extends HFSTestCase {
 
   public static class MyServlet extends HttpServlet {
     @Override
-    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp)
+        throws ServletException, IOException {
       resp.getWriter().write("foo");
     }
   }
@@ -174,7 +176,8 @@ public class TestHFSTestCase extends HFSTestCase {
     URL url = new URL(TestJettyHelper.getJettyURL(), "/bar");
     HttpURLConnection conn = (HttpURLConnection) url.openConnection();
     assertEquals(conn.getResponseCode(), HttpURLConnection.HTTP_OK);
-    BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+    BufferedReader reader =
+        new BufferedReader(new InputStreamReader(conn.getInputStream()));
     assertEquals(reader.readLine(), "foo");
     reader.close();
   }

@@ -48,6 +48,7 @@ public abstract class ApplicationResourceUsageReport {
 
   /**
    * Get the number of used containers
+   *
    * @return the number of used containers
    */
   @Public
@@ -56,7 +57,9 @@ public abstract class ApplicationResourceUsageReport {
 
   /**
    * Set the number of used containers
-   * @param num_containers the number of used containers
+   *
+   * @param num_containers
+   *     the number of used containers
    */
   @Private
   @Unstable
@@ -64,6 +67,7 @@ public abstract class ApplicationResourceUsageReport {
 
   /**
    * Get the number of reserved containers
+   *
    * @return the number of reserved containers
    */
   @Private
@@ -72,7 +76,9 @@ public abstract class ApplicationResourceUsageReport {
 
   /**
    * Set the number of reserved containers
-   * @param num_reserved_containers the number of reserved containers
+   *
+   * @param num_reserved_containers
+   *     the number of reserved containers
    */
   @Private
   @Unstable
@@ -80,6 +86,7 @@ public abstract class ApplicationResourceUsageReport {
 
   /**
    * Get the used <code>Resource</code>
+   *
    * @return the used <code>Resource</code>
    */
   @Public
@@ -92,6 +99,7 @@ public abstract class ApplicationResourceUsageReport {
 
   /**
    * Get the reserved <code>Resource</code>
+   *
    * @return the reserved <code>Resource</code>
    */
   @Public
@@ -104,6 +112,7 @@ public abstract class ApplicationResourceUsageReport {
 
   /**
    * Get the needed <code>Resource</code>
+   *
    * @return the needed <code>Resource</code>
    */
   @Public

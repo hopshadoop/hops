@@ -17,13 +17,7 @@
  */
 package org.apache.hadoop.hdfs;
 
-import java.io.IOException;
-import java.nio.channels.ClosedChannelException;
-import java.util.ArrayList;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
-
+import com.google.common.base.Stopwatch;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
@@ -36,13 +30,17 @@ import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.junit.Test;
 
-import com.google.common.base.Stopwatch;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * This class tests hflushing concurrently from many threads.
  */
 public class TestMultiThreadedHflush {
-  static final int blockSize = 1024*1024;
+  static final int blockSize = 1024 * 1024;
 
   private static final int NUM_THREADS = 10;
   private static final int WRITE_SIZE = 517;
@@ -51,18 +49,17 @@ public class TestMultiThreadedHflush {
   private byte[] toWrite = null;
   
   private final SampleQuantiles quantiles = new SampleQuantiles(
-      new Quantile[] {
-        new Quantile(0.50, 0.050),
-        new Quantile(0.75, 0.025), new Quantile(0.90, 0.010),
-        new Quantile(0.95, 0.005), new Quantile(0.99, 0.001) });
+      new Quantile[]{new Quantile(0.50, 0.050), new Quantile(0.75, 0.025),
+          new Quantile(0.90, 0.010), new Quantile(0.95, 0.005),
+          new Quantile(0.99, 0.001)});
 
   /*
    * creates a file but does not close it
-   */ 
+   */
   private FSDataOutputStream createFile(FileSystem fileSys, Path name, int repl)
-    throws IOException {
+      throws IOException {
     FSDataOutputStream stm = fileSys.create(name, true, fileSys.getConf()
-        .getInt(CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096),
+            .getInt(CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096),
         (short) repl, blockSize);
     return stm;
   }
@@ -79,8 +76,8 @@ public class TestMultiThreadedHflush {
     private final CountDownLatch countdown;
 
     public WriterThread(FSDataOutputStream stm,
-      AtomicReference<Throwable> thrown,
-      CountDownLatch countdown, int numWrites) {
+        AtomicReference<Throwable> thrown, CountDownLatch countdown,
+        int numWrites) {
       this.stm = stm;
       this.thrown = thrown;
       this.numWrites = numWrites;
@@ -125,17 +122,15 @@ public class TestMultiThreadedHflush {
   
   private void doTestMultipleHflushers(int repl) throws Exception {
     Configuration conf = new Configuration();
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-        .numDataNodes(repl)
-        .build();
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(repl).build();
 
     FileSystem fs = cluster.getFileSystem();
     Path p = new Path("/multiple-hflushers.dat");
     try {
       doMultithreadedWrites(conf, p, NUM_THREADS, WRITE_SIZE,
           NUM_WRITES_PER_THREAD, repl);
-      System.out.println("Latency quantiles (in microseconds):\n" +
-          quantiles);
+      System.out.println("Latency quantiles (in microseconds):\n" + quantiles);
     } finally {
       fs.close();
       cluster.shutdown();
@@ -143,10 +138,12 @@ public class TestMultiThreadedHflush {
   }
 
   /**
-   * Test case where a bunch of threads are continuously calling hflush() while another
+   * Test case where a bunch of threads are continuously calling hflush() while
+   * another
    * thread appends some data and then closes the file.
-   *
-   * The hflushing threads should eventually catch an IOException stating that the stream
+   * <p/>
+   * The hflushing threads should eventually catch an IOException stating that
+   * the stream
    * was closed -- and not an NPE or anything like that.
    */
   @Test
@@ -164,22 +161,25 @@ public class TestMultiThreadedHflush {
     try {
       for (int i = 0; i < 10; i++) {
         Thread flusher = new Thread() {
-            @Override
-            public void run() {
-              try {
-                while (true) {
-                  try {
-                    stm.hflush();
-                  } catch (ClosedChannelException ioe) {
-                    // Expected exception caught. Ignoring.
+          @Override
+          public void run() {
+            try {
+              while (true) {
+                try {
+                  stm.hflush();
+                } catch (IOException ioe) {
+                  if (!ioe.toString().contains("DFSOutputStream is closed")) {
+                    throw ioe;
+                  } else {
                     return;
                   }
                 }
-              } catch (Throwable t) {
-                thrown.set(t);
               }
+            } catch (Throwable t) {
+              thrown.set(t);
             }
-          };
+          }
+        };
         flusher.start();
         flushers.add(flusher);
       }
@@ -209,9 +209,8 @@ public class TestMultiThreadedHflush {
     }
   }
 
-  public void doMultithreadedWrites(
-      Configuration conf, Path p, int numThreads, int bufferSize, int numWrites,
-      int replication) throws Exception {
+  public void doMultithreadedWrites(Configuration conf, Path p, int numThreads,
+      int bufferSize, int numWrites, int replication) throws Exception {
     initBuffer(bufferSize);
 
     // create a new file.
@@ -256,14 +255,13 @@ public class TestMultiThreadedHflush {
   private static class CLIBenchmark extends Configured implements Tool {
     public int run(String args[]) throws Exception {
       if (args.length != 1) {
-        System.err.println(
-          "usage: " + TestMultiThreadedHflush.class.getSimpleName() +
-          " <path to test file> ");
-        System.err.println(
-            "Configurations settable by -D options:\n" +
-            "  num.threads [default 10] - how many threads to run\n" +
-            "  write.size [default 511] - bytes per write\n" +
-            "  num.writes [default 50000] - how many writes to perform");
+        System.err
+            .println("usage: " + TestMultiThreadedHflush.class.getSimpleName() +
+                    " <path to test file> ");
+        System.err.println("Configurations settable by -D options:\n" +
+                "  num.threads [default 10] - how many threads to run\n" +
+                "  write.size [default 511] - bytes per write\n" +
+                "  num.writes [default 50000] - how many writes to perform");
         System.exit(1);
       }
       TestMultiThreadedHflush test = new TestMultiThreadedHflush();
@@ -280,10 +278,10 @@ public class TestMultiThreadedHflush {
       test.doMultithreadedWrites(conf, p, numThreads, writeSize, numWrites,
           replication);
       sw.stop();
-  
+
       System.out.println("Finished in " + sw.elapsedMillis() + "ms");
-      System.out.println("Latency quantiles (in microseconds):\n" +
-          test.quantiles);
+      System.out
+          .println("Latency quantiles (in microseconds):\n" + test.quantiles);
       return 0;
     }
   }

@@ -17,21 +17,19 @@
  */
 package org.apache.hadoop.fs.viewfs;
 
-import java.io.IOException;
-import java.net.URISyntaxException;
-
-import javax.security.auth.login.LoginException;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.FileSystemTestHelper;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
+
+import javax.security.auth.login.LoginException;
+import java.io.IOException;
+import java.net.URISyntaxException;
 
 /**
  * Make sure that ViewFileSystem works when the root of an FS is mounted to a
@@ -40,29 +38,22 @@ import org.junit.BeforeClass;
 public class TestViewFileSystemAtHdfsRoot extends ViewFileSystemBaseTest {
 
   private static MiniDFSCluster cluster;
-  private static final Configuration CONF = new Configuration();
+  private static Configuration CONF = new Configuration();
   private static FileSystem fHdfs;
   
-  @Override
-  protected FileSystemTestHelper createFileSystemHelper() {
-    return new FileSystemTestHelper();
-  }
-  
   @BeforeClass
-  public static void clusterSetupAtBegining() throws IOException,
-      LoginException, URISyntaxException {
+  public static void clusterSetupAtBegining()
+      throws IOException, LoginException, URISyntaxException {
     SupportsBlocks = true;
-    CONF.setBoolean(
-        DFSConfigKeys.DFS_NAMENODE_DELEGATION_TOKEN_ALWAYS_USE_KEY, true);
+    CONF.setBoolean(DFSConfigKeys.DFS_NAMENODE_DELEGATION_TOKEN_ALWAYS_USE_KEY,
+        true);
     
-    cluster = new MiniDFSCluster.Builder(CONF)
-      .numDataNodes(2)
-      .build();
+    cluster = new MiniDFSCluster.Builder(CONF).numDataNodes(2).build();
     cluster.waitClusterUp();
     
     fHdfs = cluster.getFileSystem();
   }
-      
+
   @AfterClass
   public static void clusterShutdownAtEnd() throws Exception {
     if (cluster != null) {
@@ -78,8 +69,10 @@ public class TestViewFileSystemAtHdfsRoot extends ViewFileSystemBaseTest {
   }
 
   /**
-   * Override this so that we don't set the targetTestRoot to any path under the
-   * root of the FS, and so that we don't try to delete the test dir, but rather
+   * Override this so that we don't set the targetTestRoot to any path under
+   * the
+   * root of the FS, and so that we don't try to delete the test dir, but
+   * rather
    * only its contents.
    */
   @Override

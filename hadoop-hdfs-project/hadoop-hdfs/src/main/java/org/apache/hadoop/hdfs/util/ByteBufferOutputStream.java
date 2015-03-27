@@ -17,12 +17,12 @@
  */
 package org.apache.hadoop.hdfs.util;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
-
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 
 /**
  * OutputStream that writes into a {@link ByteBuffer}.
@@ -39,7 +39,7 @@ public class ByteBufferOutputStream extends OutputStream {
 
   @Override
   public void write(int b) throws IOException {
-    buf.put((byte)b);
+    buf.put((byte) b);
   }
 
   @Override

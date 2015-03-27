@@ -18,13 +18,13 @@
 
 package org.apache.hadoop.yarn.api.protocolrecords;
 
-import java.util.List;
-
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Stable;
 import org.apache.hadoop.yarn.api.ContainerManagementProtocol;
 import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
 import org.apache.hadoop.yarn.util.Records;
+
+import java.util.List;
 
 /**
  * <p>
@@ -32,15 +32,17 @@ import org.apache.hadoop.yarn.util.Records;
  * the <code>ApplicationMaster</code> to the <code>NodeManager</code> to
  * <em>start</em> containers.
  * </p>
- * 
+ * <p/>
  * <p>
- * In each {@link StartContainerRequest}, the <code>ApplicationMaster</code> has
- * to provide details such as allocated resource capability, security tokens (if
+ * In each {@link StartContainerRequest}, the <code>ApplicationMaster</code>
+ * has
+ * to provide details such as allocated resource capability, security tokens
+ * (if
  * enabled), command to be executed to start the container, environment for the
  * process, necessary binaries/jar/shared-objects etc. via the
  * {@link ContainerLaunchContext}.
  * </p>
- * 
+ *
  * @see ContainerManagementProtocol#startContainers(StartContainersRequest)
  */
 @Public
@@ -59,6 +61,7 @@ public abstract class StartContainersRequest {
 
   /**
    * Get a list of {@link StartContainerRequest} to start containers.
+   *
    * @return a list of {@link StartContainerRequest} to start containers.
    */
   @Public
@@ -67,7 +70,9 @@ public abstract class StartContainersRequest {
 
   /**
    * Set a list of {@link StartContainerRequest} to start containers.
-   * @param request a list of {@link StartContainerRequest} to start containers
+   *
+   * @param request
+   *     a list of {@link StartContainerRequest} to start containers
    */
   @Public
   @Stable

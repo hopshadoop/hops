@@ -1,32 +1,27 @@
 /**
-* Licensed to the Apache Software Foundation (ASF) under one
-* or more contributor license agreements.  See the NOTICE file
-* distributed with this work for additional information
-* regarding copyright ownership.  The ASF licenses this file
-* to you under the Apache License, Version 2.0 (the
-* "License"); you may not use this file except in compliance
-* with the License.  You may obtain a copy of the License at
-*
-*     http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package org.apache.hadoop.yarn.server.resourcemanager;
 
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.nio.ByteBuffer;
-import java.security.PrivilegedAction;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
-
+import io.hops.exception.StorageInitializtionException;
+import io.hops.metadata.util.RMStorageFactory;
+import io.hops.metadata.util.RMUtilities;
+import io.hops.metadata.util.YarnAPIStorageFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -64,6 +59,15 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
 
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
+import java.security.PrivilegedAction;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+
 @RunWith(Parameterized.class)
 public class TestAMAuthorization {
 
@@ -73,13 +77,16 @@ public class TestAMAuthorization {
   private MockRM rm;
 
   @Parameters
-  public static Collection<Object[]> configs() {
+  public static Collection<Object[]> configs()
+      throws StorageInitializtionException, IOException {
     Configuration conf = new Configuration();
+    YarnAPIStorageFactory.setConfiguration(conf);
+    RMStorageFactory.setConfiguration(conf);
     Configuration confWithSecurity = new Configuration();
-    confWithSecurity.set(
-      CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION,
-      UserGroupInformation.AuthenticationMethod.KERBEROS.toString());
-    return Arrays.asList(new Object[][] {{ conf }, { confWithSecurity} });
+    confWithSecurity
+        .set(CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION,
+            UserGroupInformation.AuthenticationMethod.KERBEROS.toString());
+    return Arrays.asList(new Object[][]{{conf}, {confWithSecurity}});
   }
 
   public TestAMAuthorization(Configuration conf) {
@@ -90,11 +97,13 @@ public class TestAMAuthorization {
   @After
   public void tearDown() {
     if (rm != null) {
+      LOG.debug("HOP :: rm stop");
       rm.stop();
     }
   }
 
-  public static final class MyContainerManager implements ContainerManagementProtocol {
+  public static final class MyContainerManager
+      implements ContainerManagementProtocol {
 
     public ByteBuffer containerTokens;
 
@@ -102,10 +111,11 @@ public class TestAMAuthorization {
     }
 
     @Override
-    public StartContainersResponse
-        startContainers(StartContainersRequest request)
-            throws YarnException {
-      containerTokens = request.getStartContainerRequests().get(0).getContainerLaunchContext().getTokens();
+    public StartContainersResponse startContainers(
+        StartContainersRequest request) throws YarnException {
+      containerTokens =
+          request.getStartContainerRequests().get(0).getContainerLaunchContext()
+              .getTokens();
       return StartContainersResponse.newInstance(null, null, null);
     }
 
@@ -133,7 +143,8 @@ public class TestAMAuthorization {
 
   public static class MockRMWithAMS extends MockRMWithCustomAMLauncher {
 
-    public MockRMWithAMS(Configuration conf, ContainerManagementProtocol containerManager) {
+    public MockRMWithAMS(Configuration conf,
+        ContainerManagementProtocol containerManager) {
       super(conf, containerManager);
     }
 
@@ -163,9 +174,9 @@ public class TestAMAuthorization {
 
   @Test
   public void testAuthorizedAccess() throws Exception {
+    RMUtilities.InitializeDB();
     MyContainerManager containerManager = new MyContainerManager();
-    rm =
-        new MockRMWithAMS(conf, containerManager);
+    rm = new MockRMWithAMS(conf, containerManager);
     rm.start();
 
     MockNM nm1 = rm.registerNode("localhost:1234", 5120);
@@ -174,7 +185,7 @@ public class TestAMAuthorization {
         new HashMap<ApplicationAccessType, String>(2);
     acls.put(ApplicationAccessType.VIEW_APP, "*");
     RMApp app = rm.submitApp(1024, "appname", "appuser", acls);
-
+    Thread.sleep(2000);
     nm1.nodeHeartbeat(true);
 
     int waitCount = 0;
@@ -192,32 +203,32 @@ public class TestAMAuthorization {
     final Configuration conf = rm.getConfig();
     final YarnRPC rpc = YarnRPC.create(conf);
 
-    UserGroupInformation currentUser = UserGroupInformation
-        .createRemoteUser(applicationAttemptId.toString());
+    UserGroupInformation currentUser =
+        UserGroupInformation.createRemoteUser(applicationAttemptId.toString());
     Credentials credentials = containerManager.getContainerCredentials();
     final InetSocketAddress rmBindAddress =
         rm.getApplicationMasterService().getBindAddress();
-    Token<? extends TokenIdentifier> amRMToken =
-        MockRMWithAMS.setupAndReturnAMRMToken(rmBindAddress,
-          credentials.getAllTokens());
+    Token<? extends TokenIdentifier> amRMToken = MockRMWithAMS
+        .setupAndReturnAMRMToken(rmBindAddress, credentials.getAllTokens());
     currentUser.addToken(amRMToken);
-    ApplicationMasterProtocol client = currentUser
-        .doAs(new PrivilegedAction<ApplicationMasterProtocol>() {
+    ApplicationMasterProtocol client =
+        currentUser.doAs(new PrivilegedAction<ApplicationMasterProtocol>() {
           @Override
           public ApplicationMasterProtocol run() {
-            return (ApplicationMasterProtocol) rpc.getProxy(ApplicationMasterProtocol.class, rm
-              .getApplicationMasterService().getBindAddress(), conf);
+            return (ApplicationMasterProtocol) rpc
+                .getProxy(ApplicationMasterProtocol.class,
+                    rm.getApplicationMasterService().getBindAddress(), conf);
           }
         });
 
-    RegisterApplicationMasterRequest request = Records
-        .newRecord(RegisterApplicationMasterRequest.class);
+    RegisterApplicationMasterRequest request =
+        Records.newRecord(RegisterApplicationMasterRequest.class);
     RegisterApplicationMasterResponse response =
         client.registerApplicationMaster(request);
     Assert.assertNotNull(response.getClientToAMTokenMasterKey());
     if (UserGroupInformation.isSecurityEnabled()) {
-      Assert
-        .assertTrue(response.getClientToAMTokenMasterKey().array().length > 0);
+      Assert.assertTrue(
+          response.getClientToAMTokenMasterKey().array().length > 0);
     }
     Assert.assertEquals("Register response has bad ACLs", "*",
         response.getApplicationACLs().get(ApplicationAccessType.VIEW_APP));
@@ -225,6 +236,7 @@ public class TestAMAuthorization {
 
   @Test
   public void testUnauthorizedAccess() throws Exception {
+    RMUtilities.InitializeDB();
     MyContainerManager containerManager = new MyContainerManager();
     rm = new MockRMWithAMS(conf, containerManager);
     rm.start();
@@ -232,7 +244,7 @@ public class TestAMAuthorization {
     MockNM nm1 = rm.registerNode("localhost:1234", 5120);
 
     RMApp app = rm.submitApp(1024);
-
+    
     nm1.nodeHeartbeat(true);
 
     int waitCount = 0;
@@ -248,26 +260,26 @@ public class TestAMAuthorization {
 
     final Configuration conf = rm.getConfig();
     final YarnRPC rpc = YarnRPC.create(conf);
-    final InetSocketAddress serviceAddr = conf.getSocketAddr(
-        YarnConfiguration.RM_SCHEDULER_ADDRESS,
-        YarnConfiguration.DEFAULT_RM_SCHEDULER_ADDRESS,
-        YarnConfiguration.DEFAULT_RM_SCHEDULER_PORT);
+    final InetSocketAddress serviceAddr =
+        conf.getSocketAddr(YarnConfiguration.RM_SCHEDULER_ADDRESS,
+            YarnConfiguration.DEFAULT_RM_SCHEDULER_ADDRESS,
+            YarnConfiguration.DEFAULT_RM_SCHEDULER_PORT);
 
-    UserGroupInformation currentUser = UserGroupInformation
-        .createRemoteUser(applicationAttemptId.toString());
+    UserGroupInformation currentUser =
+        UserGroupInformation.createRemoteUser(applicationAttemptId.toString());
 
     // First try contacting NM without tokens
-    ApplicationMasterProtocol client = currentUser
-        .doAs(new PrivilegedAction<ApplicationMasterProtocol>() {
+    ApplicationMasterProtocol client =
+        currentUser.doAs(new PrivilegedAction<ApplicationMasterProtocol>() {
           @Override
           public ApplicationMasterProtocol run() {
-            return (ApplicationMasterProtocol) rpc.getProxy(ApplicationMasterProtocol.class,
-                serviceAddr, conf);
+            return (ApplicationMasterProtocol) rpc
+                .getProxy(ApplicationMasterProtocol.class, serviceAddr, conf);
           }
         });
     
-    RegisterApplicationMasterRequest request = Records
-        .newRecord(RegisterApplicationMasterRequest.class);
+    RegisterApplicationMasterRequest request =
+        Records.newRecord(RegisterApplicationMasterRequest.class);
     try {
       client.registerApplicationMaster(request);
       Assert.fail("Should fail with authorization error");
@@ -291,13 +303,12 @@ public class TestAMAuthorization {
   private void waitForLaunchedState(RMAppAttempt attempt)
       throws InterruptedException {
     int waitCount = 0;
-    while (attempt.getAppAttemptState() != RMAppAttemptState.LAUNCHED
-        && waitCount++ < 40) {
-      LOG.info("Waiting for AppAttempt to reach LAUNCHED state. "
-          + "Current state is " + attempt.getAppAttemptState());
+    while (attempt.getState() != RMAppAttemptState.LAUNCHED &&
+        waitCount++ < 40) {
+      LOG.info("Waiting for AppAttempt to reach LAUNCHED state. " +
+          "Current state is " + attempt.getState());
       Thread.sleep(1000);
     }
-    Assert.assertEquals(attempt.getAppAttemptState(),
-        RMAppAttemptState.LAUNCHED);
+    Assert.assertEquals(attempt.getState(), RMAppAttemptState.LAUNCHED);
   }
 }

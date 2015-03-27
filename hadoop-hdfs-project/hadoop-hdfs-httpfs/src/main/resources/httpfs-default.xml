@@ -76,9 +76,11 @@
     <description>
       File containing the secret to sign HttpFS hadoop-auth cookies.
 
-      This file should be readable only by the system user running HttpFS service.
+      This file should be readable only by the system user running HttpFS
+      service.
 
-      If multiple HttpFS servers are used in a load-balancer/round-robin fashion,
+      If multiple HttpFS servers are used in a load-balancer/round-robin
+      fashion,
       they should share the secret file.
     </description>
   </property>
@@ -94,7 +96,8 @@
       If using 'simple' HTTP clients must specify the username with the
       'user.name' query string parameter.
 
-      If using 'kerberos' HTTP clients must use HTTP SPNEGO or delegation tokens.
+      If using 'kerberos' HTTP clients must use HTTP SPNEGO or delegation
+      tokens.
     </description>
   </property>
 
@@ -223,14 +226,6 @@
     <value>60</value>
     <description>
       Timeout, in seconds, for an idle filesystem to be purged.
-    </description>
-  </property>
-
-  <property>
-    <name>httpfs.user.provider.user.pattern</name>
-    <value>^[A-Za-z_][A-Za-z0-9._-]*[$]?$</value>
-    <description>
-      Valid pattern for user and group names, it must be a valid java regex.
     </description>
   </property>
 

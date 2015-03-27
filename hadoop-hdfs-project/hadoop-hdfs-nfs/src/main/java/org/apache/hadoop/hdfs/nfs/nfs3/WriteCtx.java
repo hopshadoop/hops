@@ -17,11 +17,8 @@
  */
 package org.apache.hadoop.hdfs.nfs.nfs3;
 
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.nio.ByteBuffer;
-
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hdfs.client.HdfsDataOutputStream;
@@ -29,8 +26,10 @@ import org.apache.hadoop.nfs.nfs3.FileHandle;
 import org.apache.hadoop.nfs.nfs3.Nfs3Constant.WriteStableHow;
 import org.jboss.netty.channel.Channel;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
 
 /**
  * WriteCtx saves the context of one write request, such as request, channel,
@@ -55,7 +54,7 @@ class WriteCtx {
   private final int count;
   
   //Only needed for overlapped write, referring OpenFileCtx.addWritesToCache()  
-  private final int originalCount; 
+  private final int originalCount;
   public static final int INVALID_ORIGINAL_COUNT = -1;
   
   public int getOriginalCount() {
@@ -69,10 +68,10 @@ class WriteCtx {
   private final int xid;
   private boolean replied;
 
-  /** 
-   * Data belonging to the same {@link OpenFileCtx} may be dumped to a file. 
-   * After being dumped to the file, the corresponding {@link WriteCtx} records 
-   * the dump file and the offset.  
+  /**
+   * Data belonging to the same {@link OpenFileCtx} may be dumped to a file.
+   * After being dumped to the file, the corresponding {@link WriteCtx} records
+   * the dump file and the offset.
    */
   private RandomAccessFile raf;
   private long dumpFileOffset;
@@ -87,17 +86,18 @@ class WriteCtx {
     this.dataState = dataState;
   }
   
-  /** 
-   * Writing the data into a local file. After the writing, if 
-   * {@link #dataState} is still ALLOW_DUMP, set {@link #data} to null and set 
+  /**
+   * Writing the data into a local file. After the writing, if
+   * {@link #dataState} is still ALLOW_DUMP, set {@link #data} to null and set
    * {@link #dataState} to DUMPED.
    */
   long dumpData(FileOutputStream dumpOut, RandomAccessFile raf)
       throws IOException {
     if (dataState != DataState.ALLOW_DUMP) {
       if (LOG.isTraceEnabled()) {
-        LOG.trace("No need to dump with status(replied,dataState):" + "("
-            + replied + "," + dataState + ")");
+        LOG.trace(
+            "No need to dump with status(replied,dataState):" + "(" + replied +
+                "," + dataState + ")");
       }
       return 0;
     }
@@ -164,8 +164,8 @@ class WriteCtx {
     raf.seek(dumpFileOffset);
     int size = raf.read(rawData, 0, count);
     if (size != count) {
-      throw new IOException("Data count is " + count + ", but read back "
-          + size + "bytes");
+      throw new IOException(
+          "Data count is " + count + ", but read back " + size + "bytes");
     }
     data = ByteBuffer.wrap(rawData);
   }
@@ -177,8 +177,9 @@ class WriteCtx {
     try {
       dataBuffer = getData();
     } catch (Exception e1) {
-      LOG.error("Failed to get request data offset:" + offset + " count:"
-          + count + " error:" + e1);
+      LOG.error(
+          "Failed to get request data offset:" + offset + " count:" + count +
+              " error:" + e1);
       throw new IOException("Can't get WriteCtx.data");
     }
 
@@ -189,9 +190,9 @@ class WriteCtx {
     // Modified write has a valid original count
     if (position != 0) {
       if (limit != getOriginalCount()) {
-        throw new IOException("Modified write has differnt original size."
-            + "buff position:" + position + " buff limit:" + limit + ". "
-            + toString());
+        throw new IOException(
+            "Modified write has differnt original size." + "buff position:" +
+                position + " buff limit:" + limit + ". " + toString());
       }
     }
     
@@ -233,8 +234,8 @@ class WriteCtx {
   
   @Override
   public String toString() {
-    return "Id:" + handle.getFileId() + " offset:" + offset + " count:" + count
-        + " originalCount:" + originalCount + " stableHow:" + stableHow
-        + " replied:" + replied + " dataState:" + dataState + " xid:" + xid;
+    return "Id:" + handle.getFileId() + " offset:" + offset + " count:" +
+        count + " originalCount:" + originalCount + " stableHow:" + stableHow +
+        " replied:" + replied + " dataState:" + dataState + " xid:" + xid;
   }
 }

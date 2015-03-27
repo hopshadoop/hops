@@ -1,29 +1,23 @@
 /**
-* Licensed to the Apache Software Foundation (ASF) under one
-* or more contributor license agreements.  See the NOTICE file
-* distributed with this work for additional information
-* regarding copyright ownership.  The ASF licenses this file
-* to you under the Apache License, Version 2.0 (the
-* "License"); you may not use this file except in compliance
-* with the License.  You may obtain a copy of the License at
-*
-*     http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
-
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with this
+ * work for additional information regarding copyright ownership. The ASF
+ * licenses this file to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations under
+ * the License.
+ */
 package org.apache.hadoop.yarn.server.resourcemanager;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.InetSocketAddress;
-import java.util.Map;
-import java.util.Set;
-
+import com.google.common.annotations.VisibleForTesting;
+import com.google.protobuf.BlockingService;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -73,11 +67,14 @@ import org.apache.hadoop.yarn.server.api.protocolrecords.UpdateNodeResourceRespo
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 import org.apache.hadoop.yarn.server.resourcemanager.security.authorize.RMPolicyProvider;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.protobuf.BlockingService;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.InetSocketAddress;
+import java.util.Map;
+import java.util.Set;
 
-public class AdminService extends CompositeService implements
-    HAServiceProtocol, ResourceManagerAdministrationProtocol {
+public class AdminService extends CompositeService
+    implements HAServiceProtocol, ResourceManagerAdministrationProtocol {
 
   private static final Log LOG = LogFactory.getLog(AdminService.class);
 
@@ -91,8 +88,8 @@ public class AdminService extends CompositeService implements
   private InetSocketAddress masterServiceAddress;
   private AccessControlList adminAcl;
 
-  private final RecordFactory recordFactory = 
-    RecordFactoryProvider.getRecordFactory(null);
+  private final RecordFactory recordFactory =
+      RecordFactoryProvider.getRecordFactory(null);
 
   public AdminService(ResourceManager rm, RMContext rmContext) {
     super(AdminService.class.getName());
@@ -104,19 +101,13 @@ public class AdminService extends CompositeService implements
   public synchronized void serviceInit(Configuration conf) throws Exception {
     if (rmContext.isHAEnabled()) {
       autoFailoverEnabled = HAUtil.isAutomaticFailoverEnabled(conf);
-      if (autoFailoverEnabled) {
-        if (HAUtil.isAutomaticFailoverEmbedded(conf)) {
-          addIfService(createEmbeddedElectorService());
-        }
-      }
     }
 
-    masterServiceAddress = conf.getSocketAddr(
-        YarnConfiguration.RM_ADMIN_ADDRESS,
-        YarnConfiguration.DEFAULT_RM_ADMIN_ADDRESS,
-        YarnConfiguration.DEFAULT_RM_ADMIN_PORT);
-    adminAcl = new AccessControlList(conf.get(
-        YarnConfiguration.YARN_ADMIN_ACL,
+    masterServiceAddress =
+        conf.getSocketAddr(YarnConfiguration.RM_ADMIN_ADDRESS,
+            YarnConfiguration.DEFAULT_RM_ADMIN_ADDRESS,
+            YarnConfiguration.DEFAULT_RM_ADMIN_PORT);
+    adminAcl = new AccessControlList(conf.get(YarnConfiguration.YARN_ADMIN_ACL,
         YarnConfiguration.DEFAULT_YARN_ADMIN_ACL));
     rmId = conf.get(YarnConfiguration.RM_HA_ID);
     super.serviceInit(conf);
@@ -137,18 +128,17 @@ public class AdminService extends CompositeService implements
   protected void startServer() throws Exception {
     Configuration conf = getConfig();
     YarnRPC rpc = YarnRPC.create(conf);
-    this.server = (Server) rpc.getServer(
-        ResourceManagerAdministrationProtocol.class, this, masterServiceAddress,
-        conf, null,
-        conf.getInt(YarnConfiguration.RM_ADMIN_CLIENT_THREAD_COUNT,
-            YarnConfiguration.DEFAULT_RM_ADMIN_CLIENT_THREAD_COUNT));
+    this.server = (Server) rpc
+        .getServer(ResourceManagerAdministrationProtocol.class, this,
+            masterServiceAddress, conf, null,
+            conf.getInt(YarnConfiguration.RM_ADMIN_CLIENT_THREAD_COUNT,
+                YarnConfiguration.DEFAULT_RM_ADMIN_CLIENT_THREAD_COUNT));
 
     // Enable service authorization?
-    if (conf.getBoolean(
-        CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION,
-        false)) {
-      refreshServiceAcls(
-          getConfiguration(conf,
+    if (conf
+        .getBoolean(CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION,
+            false)) {
+      refreshServiceAcls(getConfiguration(conf,
               YarnConfiguration.HADOOP_POLICY_CONFIGURATION_FILE),
           RMPolicyProvider.getInstance());
     }
@@ -162,8 +152,9 @@ public class AdminService extends CompositeService implements
       BlockingService haPbService =
           HAServiceProtocolProtos.HAServiceProtocolService
               .newReflectiveBlockingService(haServiceProtocolXlator);
-      server.addProtocol(RPC.RpcKind.RPC_PROTOCOL_BUFFER,
-          HAServiceProtocol.class, haPbService);
+      server
+          .addProtocol(RPC.RpcKind.RPC_PROTOCOL_BUFFER, HAServiceProtocol.class,
+              haPbService);
     }
 
     this.server.start();
@@ -175,10 +166,6 @@ public class AdminService extends CompositeService implements
     if (this.server != null) {
       this.server.stop();
     }
-  }
-
-  protected EmbeddedElectorService createEmbeddedElectorService() {
-    return new EmbeddedElectorService(rmContext);
   }
 
   private UserGroupInformation checkAccess(String method) throws IOException {
@@ -194,12 +181,15 @@ public class AdminService extends CompositeService implements
   }
 
   /**
-   * Check that a request to change this node's HA state is valid.
-   * In particular, verifies that, if auto failover is enabled, non-forced
-   * requests from the HAAdmin CLI are rejected, and vice versa.
+   * Check that a request to change this node's HA state is valid. In
+   * particular, verifies that, if auto failover is enabled, non-forced
+   * requests
+   * from the HAAdmin CLI are rejected, and vice versa.
    *
-   * @param req the request to check
-   * @throws AccessControlException if the request is disallowed
+   * @param req
+   *     the request to check
+   * @throws AccessControlException
+   *     if the request is disallowed
    */
   private void checkHaStateChange(StateChangeRequestInfo req)
       throws AccessControlException {
@@ -239,8 +229,7 @@ public class AdminService extends CompositeService implements
   }
 
   @Override
-  public synchronized void monitorHealth()
-      throws IOException {
+  public synchronized void monitorHealth() throws IOException {
     checkAccess("monitorHealth");
     if (isRMActive() && !rm.areActiveServicesRunning()) {
       throw new HealthCheckFailedException(
@@ -262,11 +251,16 @@ public class AdminService extends CompositeService implements
     UserGroupInformation user = checkAccess("transitionToActive");
     checkHaStateChange(reqInfo);
     try {
-      rm.transitionToActive();
-      // call all refresh*s for active RM to get the updated configurations.
-      refreshAll();
-      RMAuditLogger.logSuccess(user.getShortUserName(),
-          "transitionToActive", "RMHAProtocolService");
+      if (!autoFailoverEnabled) {
+        LOG.
+            info("admin transition to active " + masterServiceAddress.
+                toString());
+        rm.transitionToActive();
+        // call all refresh*s for active RM to get the updated configurations.
+        refreshAll();
+        RMAuditLogger.logSuccess(user.getShortUserName(), "transitionToActive",
+            "RMHAProtocolService");
+      }
     } catch (Exception e) {
       RMAuditLogger.logFailure(user.getShortUserName(), "transitionToActive",
           adminAcl.toString(), "RMHAProtocolService",
@@ -289,9 +283,12 @@ public class AdminService extends CompositeService implements
     UserGroupInformation user = checkAccess("transitionToStandby");
     checkHaStateChange(reqInfo);
     try {
+      LOG.info("Transitioning to standby admin" + masterServiceAddress.
+          toString());
+      //TODO transition leader election to standby?
       rm.transitionToStandby(true);
-      RMAuditLogger.logSuccess(user.getShortUserName(),
-          "transitionToStandby", "RMHAProtocolService");
+      RMAuditLogger.logSuccess(user.getShortUserName(), "transitionToStandby",
+          "RMHAProtocolService");
     } catch (Exception e) {
       RMAuditLogger.logFailure(user.getShortUserName(), "transitionToStandby",
           adminAcl.toString(), "RMHAProtocolService",
@@ -312,7 +309,7 @@ public class AdminService extends CompositeService implements
       ret.setNotReadyToBecomeActive("State is " + haState);
     }
     return ret;
-  } 
+  }
 
   @Override
   public RefreshQueuesResponse refreshQueues(RefreshQueuesRequest request)
@@ -321,9 +318,10 @@ public class AdminService extends CompositeService implements
     UserGroupInformation user = checkAcls(argName);
 
     if (!isRMActive()) {
-      RMAuditLogger.logFailure(user.getShortUserName(), argName,
-          adminAcl.toString(), "AdminService",
-          "ResourceManager is not active. Can not refresh queues.");
+      RMAuditLogger
+          .logFailure(user.getShortUserName(), argName, adminAcl.toString(),
+              "AdminService",
+              "ResourceManager is not active. Can not refresh queues.");
       throwStandbyException();
     }
 
@@ -331,14 +329,14 @@ public class AdminService extends CompositeService implements
         recordFactory.newRecordInstance(RefreshQueuesResponse.class);
     try {
       rmContext.getScheduler().reinitialize(getConfig(), this.rmContext);
-      RMAuditLogger.logSuccess(user.getShortUserName(), argName,
-          "AdminService");
+      RMAuditLogger
+          .logSuccess(user.getShortUserName(), argName, "AdminService");
       return response;
     } catch (IOException ioe) {
       LOG.info("Exception refreshing queues ", ioe);
-      RMAuditLogger.logFailure(user.getShortUserName(), argName,
-          adminAcl.toString(), "AdminService",
-          "Exception refreshing queues");
+      RMAuditLogger
+          .logFailure(user.getShortUserName(), argName, adminAcl.toString(),
+              "AdminService", "Exception refreshing queues");
       throw RPCUtil.getRemoteException(ioe);
     }
   }
@@ -350,24 +348,25 @@ public class AdminService extends CompositeService implements
     UserGroupInformation user = checkAcls("refreshNodes");
 
     if (!isRMActive()) {
-      RMAuditLogger.logFailure(user.getShortUserName(), argName,
-          adminAcl.toString(), "AdminService",
-          "ResourceManager is not active. Can not refresh nodes.");
+      RMAuditLogger
+          .logFailure(user.getShortUserName(), argName, adminAcl.toString(),
+              "AdminService",
+              "ResourceManager is not active. Can not refresh nodes.");
       throwStandbyException();
     }
 
     try {
-      Configuration conf =
-          getConfiguration(new Configuration(false),
-              YarnConfiguration.YARN_SITE_CONFIGURATION_FILE);
+      Configuration conf = getConfiguration(new Configuration(false),
+          YarnConfiguration.YARN_SITE_CONFIGURATION_FILE);
       rmContext.getNodesListManager().refreshNodes(conf);
-      RMAuditLogger.logSuccess(user.getShortUserName(), argName,
-          "AdminService");
+      RMAuditLogger
+          .logSuccess(user.getShortUserName(), argName, "AdminService");
       return recordFactory.newRecordInstance(RefreshNodesResponse.class);
     } catch (IOException ioe) {
       LOG.info("Exception refreshing nodes ", ioe);
-      RMAuditLogger.logFailure(user.getShortUserName(), argName,
-          adminAcl.toString(), "AdminService", "Exception refreshing nodes");
+      RMAuditLogger
+          .logFailure(user.getShortUserName(), argName, adminAcl.toString(),
+              "AdminService", "Exception refreshing nodes");
       throw RPCUtil.getRemoteException(ioe);
     }
   }
@@ -380,21 +379,20 @@ public class AdminService extends CompositeService implements
     UserGroupInformation user = checkAcls(argName);
 
     if (!isRMActive()) {
-      RMAuditLogger.logFailure(user.getShortUserName(), argName,
-          adminAcl.toString(), "AdminService",
-          "ResourceManager is not active. Can not refresh super-user-groups.");
+      RMAuditLogger
+          .logFailure(user.getShortUserName(), argName, adminAcl.toString(),
+              "AdminService",
+              "ResourceManager is not active. Can not refresh super-user-groups.");
       throwStandbyException();
     }
 
-    Configuration conf =
-        getConfiguration(new Configuration(false),
-            YarnConfiguration.CORE_SITE_CONFIGURATION_FILE);
+    Configuration conf = getConfiguration(new Configuration(false),
+        YarnConfiguration.CORE_SITE_CONFIGURATION_FILE);
     ProxyUsers.refreshSuperUserGroupsConfiguration(conf);
-    RMAuditLogger.logSuccess(user.getShortUserName(),
-        argName, "AdminService");
-    
-    return recordFactory.newRecordInstance(
-        RefreshSuperUserGroupsConfigurationResponse.class);
+    RMAuditLogger.logSuccess(user.getShortUserName(), argName, "AdminService");
+
+    return recordFactory
+        .newRecordInstance(RefreshSuperUserGroupsConfigurationResponse.class);
   }
 
   @Override
@@ -405,9 +403,10 @@ public class AdminService extends CompositeService implements
     UserGroupInformation user = checkAcls(argName);
 
     if (!isRMActive()) {
-      RMAuditLogger.logFailure(user.getShortUserName(), argName,
-          adminAcl.toString(), "AdminService",
-          "ResourceManager is not active. Can not refresh user-groups.");
+      RMAuditLogger
+          .logFailure(user.getShortUserName(), argName, adminAcl.toString(),
+              "AdminService",
+              "ResourceManager is not active. Can not refresh user-groups.");
       throwStandbyException();
     }
 
@@ -417,8 +416,8 @@ public class AdminService extends CompositeService implements
 
     RMAuditLogger.logSuccess(user.getShortUserName(), argName, "AdminService");
 
-    return recordFactory.newRecordInstance(
-        RefreshUserToGroupsMappingsResponse.class);
+    return recordFactory
+        .newRecordInstance(RefreshUserToGroupsMappingsResponse.class);
   }
 
   @Override
@@ -433,19 +432,17 @@ public class AdminService extends CompositeService implements
     UserGroupInformation user = checkAcls(argName);
 
     if (checkRMHAState && !isRMActive()) {
-      RMAuditLogger.logFailure(user.getShortUserName(), argName,
-          adminAcl.toString(), "AdminService",
-          "ResourceManager is not active. Can not refresh user-groups.");
+      RMAuditLogger
+          .logFailure(user.getShortUserName(), argName, adminAcl.toString(),
+              "AdminService",
+              "ResourceManager is not active. Can not refresh user-groups.");
       throwStandbyException();
     }
-    Configuration conf =
-        getConfiguration(new Configuration(false),
-            YarnConfiguration.YARN_SITE_CONFIGURATION_FILE);
-    adminAcl = new AccessControlList(conf.get(
-        YarnConfiguration.YARN_ADMIN_ACL,
+    Configuration conf = getConfiguration(new Configuration(false),
+        YarnConfiguration.YARN_SITE_CONFIGURATION_FILE);
+    adminAcl = new AccessControlList(conf.get(YarnConfiguration.YARN_ADMIN_ACL,
         YarnConfiguration.DEFAULT_YARN_ADMIN_ACL));
-    RMAuditLogger.logSuccess(user.getShortUserName(), argName,
-        "AdminService");
+    RMAuditLogger.logSuccess(user.getShortUserName(), argName, "AdminService");
 
     return recordFactory.newRecordInstance(RefreshAdminAclsResponse.class);
   }
@@ -453,36 +450,35 @@ public class AdminService extends CompositeService implements
   @Override
   public RefreshServiceAclsResponse refreshServiceAcls(
       RefreshServiceAclsRequest request) throws YarnException, IOException {
-    if (!getConfig().getBoolean(
-             CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION, 
-             false)) {
-      throw RPCUtil.getRemoteException(
-          new IOException("Service Authorization (" + 
-              CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION + 
-              ") not enabled."));
+    if (!getConfig()
+        .getBoolean(CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION,
+            false)) {
+      throw RPCUtil.getRemoteException(new IOException(
+              "Service Authorization (" +
+                  CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION +
+                  ") not enabled."));
     }
 
     String argName = "refreshServiceAcls";
     if (!isRMActive()) {
-      RMAuditLogger.logFailure(UserGroupInformation.getCurrentUser()
-          .getShortUserName(), argName,
-          adminAcl.toString(), "AdminService",
-          "ResourceManager is not active. Can not refresh Service ACLs.");
+      RMAuditLogger
+          .logFailure(UserGroupInformation.getCurrentUser().getShortUserName(),
+              argName, adminAcl.toString(), "AdminService",
+              "ResourceManager is not active. Can not refresh Service ACLs.");
       throwStandbyException();
     }
 
     PolicyProvider policyProvider = RMPolicyProvider.getInstance();
-    Configuration conf =
-        getConfiguration(new Configuration(false),
-            YarnConfiguration.HADOOP_POLICY_CONFIGURATION_FILE);
+    Configuration conf = getConfiguration(new Configuration(false),
+        YarnConfiguration.HADOOP_POLICY_CONFIGURATION_FILE);
 
     refreshServiceAcls(conf, policyProvider);
     rmContext.getClientRMService().refreshServiceAcls(conf, policyProvider);
-    rmContext.getApplicationMasterService().refreshServiceAcls(
-        conf, policyProvider);
-    rmContext.getResourceTrackerService().refreshServiceAcls(
-        conf, policyProvider);
-    
+    rmContext.getApplicationMasterService()
+        .refreshServiceAcls(conf, policyProvider);
+    rmContext.getResourceTrackerService()
+        .refreshServiceAcls(conf, policyProvider);
+
     return recordFactory.newRecordInstance(RefreshServiceAclsResponse.class);
   }
 
@@ -506,16 +502,16 @@ public class AdminService extends CompositeService implements
     // if any invalid nodes, throw exception instead of partially updating
     // valid nodes.
     for (NodeId nodeId : nodeIds) {
-      RMNode node = this.rmContext.getRMNodes().get(nodeId);
+      RMNode node = this.rmContext.getActiveRMNodes().get(nodeId);
       if (node == null) {
-        LOG.error("Resource update get failed on all nodes due to change "
-            + "resource on an unrecognized node: " + nodeId);
+        LOG.error("Resource update get failed on all nodes due to change " +
+            "resource on an unrecognized node: " + nodeId);
         throw RPCUtil.getRemoteException(
-            "Resource update get failed on all nodes due to change resource "
-                + "on an unrecognized node: " + nodeId);
+            "Resource update get failed on all nodes due to change resource " +
+                "on an unrecognized node: " + nodeId);
       }
     }
-    
+
     // do resource update on each node.
     // Notice: it is still possible to have invalid NodeIDs as nodes decommission
     // may happen just at the same time. This time, only log and skip absent
@@ -523,18 +519,20 @@ public class AdminService extends CompositeService implements
     for (Map.Entry<NodeId, ResourceOption> entry : nodeResourceMap.entrySet()) {
       ResourceOption newResourceOption = entry.getValue();
       NodeId nodeId = entry.getKey();
-      RMNode node = this.rmContext.getRMNodes().get(nodeId);
+      RMNode node = this.rmContext.getActiveRMNodes().get(nodeId);
       if (node == null) {
-        LOG.warn("Resource update get failed on an unrecognized node: " + nodeId);
+        LOG.
+            warn("Resource update get failed on an unrecognized node: " +
+                nodeId);
       } else {
         node.setResourceOption(newResourceOption);
-        LOG.info("Update resource successfully on node(" + node.getNodeID()
-            +") with resource(" + newResourceOption.toString() + ")");
+        LOG.info("Update resource successfully on node(" + node.getNodeID() +
+            ") with resource(" + newResourceOption.toString() + ")");
       }
     }
-    UpdateNodeResourceResponse response = recordFactory.newRecordInstance(
-          UpdateNodeResourceResponse.class);
-      return response;
+    UpdateNodeResourceResponse response =
+        recordFactory.newRecordInstance(UpdateNodeResourceResponse.class);
+    return response;
   }
 
   private synchronized Configuration getConfiguration(Configuration conf,
@@ -556,11 +554,12 @@ public class AdminService extends CompositeService implements
       refreshUserToGroupsMappings(
           RefreshUserToGroupsMappingsRequest.newInstance());
       if (getConfig().getBoolean(
-          CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION,
-          false)) {
+          CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION, false)) {
         refreshServiceAcls(RefreshServiceAclsRequest.newInstance());
       }
-    } catch (Exception ex) {
+    } catch (YarnException ex) {
+      throw new ServiceFailedException(ex.getMessage());
+    } catch (IOException ex) {
       throw new ServiceFailedException(ex.getMessage());
     }
   }

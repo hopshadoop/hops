@@ -18,12 +18,7 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
-
+import io.hops.ha.common.TransactionState;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -36,15 +31,20 @@ import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ActiveUsersManager;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerAppUtils;
 import org.apache.hadoop.yarn.util.resource.Resources;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 
 @Private
 @Unstable
 public class FSLeafQueue extends FSQueue {
-  private static final Log LOG = LogFactory.getLog(
-      FSLeafQueue.class.getName());
-    
-  private final List<AppSchedulable> runnableAppScheds = // apps that are runnable
+  private static final Log LOG = LogFactory.getLog(FSLeafQueue.class.getName());
+
+  private final List<AppSchedulable> runnableAppScheds =
+      // apps that are runnable
       new ArrayList<AppSchedulable>();
   private final List<AppSchedulable> nonRunnableAppScheds =
       new ArrayList<AppSchedulable>();
@@ -82,6 +82,7 @@ public class FSLeafQueue extends FSQueue {
   
   /**
    * Removes the given app from this queue.
+   *
    * @return whether or not the app was runnable
    */
   public boolean removeApp(FSSchedulerApp app) {
@@ -149,8 +150,8 @@ public class FSLeafQueue extends FSQueue {
   public void updateDemand() {
     // Compute demand by iterating through apps in the queue
     // Limit demand to maxResources
-    Resource maxRes = scheduler.getAllocationConfiguration()
-        .getMaxResources(getName());
+    Resource maxRes =
+        scheduler.getAllocationConfiguration().getMaxResources(getName());
     demand = Resources.createResource(0);
     for (AppSchedulable sched : runnableAppScheds) {
       if (Resources.equals(demand, maxRes)) {
@@ -165,8 +166,8 @@ public class FSLeafQueue extends FSQueue {
       updateDemandForApp(sched, maxRes);
     }
     if (LOG.isDebugEnabled()) {
-      LOG.debug("The updated demand for " + getName() + " is " + demand
-          + "; the max is " + maxRes);
+      LOG.debug("The updated demand for " + getName() + " is " + demand +
+          "; the max is " + maxRes);
     }
   }
   
@@ -174,19 +175,20 @@ public class FSLeafQueue extends FSQueue {
     sched.updateDemand();
     Resource toAdd = sched.getDemand();
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Counting resource from " + sched.getName() + " " + toAdd
-          + "; Total resource consumption for " + getName() + " now "
-          + demand);
+      LOG.debug("Counting resource from " + sched.getName() + " " + toAdd +
+          "; Total resource consumption for " + getName() + " now " + demand);
     }
     demand = Resources.add(demand, toAdd);
     demand = Resources.componentwiseMin(demand, maxRes);
   }
 
   @Override
-  public Resource assignContainer(FSSchedulerNode node) {
+  public Resource assignContainer(FSSchedulerNode node,
+      TransactionState transactionState) {
     Resource assigned = Resources.none();
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Node " + node.getNodeName() + " offered to queue: " + getName());
+      LOG.debug(
+          "Node " + node.getNodeName() + " offered to queue: " + getName());
     }
 
     if (!assignContainerPreCheck(node)) {
@@ -200,7 +202,7 @@ public class FSLeafQueue extends FSQueue {
         continue;
       }
 
-      assigned = sched.assignContainer(node);
+      assigned = sched.assignContainer(node, transactionState);
       if (!assigned.equals(Resources.none())) {
         break;
       }
@@ -216,7 +218,7 @@ public class FSLeafQueue extends FSQueue {
   @Override
   public List<QueueUserACLInfo> getQueueUserAclInfo(UserGroupInformation user) {
     QueueUserACLInfo userAclInfo =
-      recordFactory.newRecordInstance(QueueUserACLInfo.class);
+        recordFactory.newRecordInstance(QueueUserACLInfo.class);
     List<QueueACL> operations = new ArrayList<QueueACL>();
     for (QueueACL operation : QueueACL.values()) {
       if (hasAccess(operation, user)) {

@@ -18,40 +18,40 @@
 
 package org.apache.hadoop.yarn.api.records;
 
-import java.io.Serializable;
-
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Stable;
 import org.apache.hadoop.yarn.api.ApplicationMasterProtocol;
 import org.apache.hadoop.yarn.util.Records;
 
+import java.io.Serializable;
+
 /**
  * <p><code>ResourceRequest</code> represents the request made by an
- * application to the <code>ResourceManager</code> to obtain various 
+ * application to the <code>ResourceManager</code> to obtain various
  * <code>Container</code> allocations.</p>
- * 
+ * <p/>
  * <p>It includes:
- *   <ul>
- *     <li>{@link Priority} of the request.</li>
- *     <li>
- *       The <em>name</em> of the machine or rack on which the allocation is 
- *       desired. A special value of <em>*</em> signifies that 
- *       <em>any</em> host/rack is acceptable to the application.
- *     </li>
- *     <li>{@link Resource} required for each request.</li>
- *     <li>
- *       Number of containers, of above specifications, which are required 
- *       by the application.
- *     </li>
- *     <li>
- *       A boolean <em>relaxLocality</em> flag, defaulting to <code>true</code>,
- *       which tells the <code>ResourceManager</code> if the application wants
- *       locality to be loose (i.e. allows fall-through to rack or <em>any</em>)
- *       or strict (i.e. specify hard constraint on resource allocation).
- *     </li>
- *   </ul>
+ * <ul>
+ * <li>{@link Priority} of the request.</li>
+ * <li>
+ * The <em>name</em> of the machine or rack on which the allocation is
+ * desired. A special value of <em>*</em> signifies that
+ * <em>any</em> host/rack is acceptable to the application.
+ * </li>
+ * <li>{@link Resource} required for each request.</li>
+ * <li>
+ * Number of containers, of above specifications, which are required
+ * by the application.
+ * </li>
+ * <li>
+ * A boolean <em>relaxLocality</em> flag, defaulting to <code>true</code>,
+ * which tells the <code>ResourceManager</code> if the application wants
+ * locality to be loose (i.e. allows fall-through to rack or <em>any</em>)
+ * or strict (i.e. specify hard constraint on resource allocation).
+ * </li>
+ * </ul>
  * </p>
- * 
+ *
  * @see Resource
  * @see ApplicationMasterProtocol#allocate(org.apache.hadoop.yarn.api.protocolrecords.AllocateRequest)
  */
@@ -81,8 +81,8 @@ public abstract class ResourceRequest implements Comparable<ResourceRequest> {
 
   @Public
   @Stable
-  public static class ResourceRequestComparator implements
-      java.util.Comparator<ResourceRequest>, Serializable {
+  public static class ResourceRequestComparator
+      implements java.util.Comparator<ResourceRequest>, Serializable {
 
     private static final long serialVersionUID = 1L;
 
@@ -114,7 +114,8 @@ public abstract class ResourceRequest implements Comparable<ResourceRequest> {
    * Check whether the given <em>host/rack</em> string represents an arbitrary
    * host name.
    *
-   * @param hostName <em>host/rack</em> on which the allocation is desired
+   * @param hostName
+   *     <em>host/rack</em> on which the allocation is desired
    * @return whether the given <em>host/rack</em> string represents an arbitrary
    * host name
    */
@@ -126,6 +127,7 @@ public abstract class ResourceRequest implements Comparable<ResourceRequest> {
 
   /**
    * Get the <code>Priority</code> of the request.
+   *
    * @return <code>Priority</code> of the request
    */
   @Public
@@ -134,35 +136,38 @@ public abstract class ResourceRequest implements Comparable<ResourceRequest> {
 
   /**
    * Set the <code>Priority</code> of the request
-   * @param priority <code>Priority</code> of the request
+   *
+   * @param priority
+   *     <code>Priority</code> of the request
    */
   @Public
   @Stable
   public abstract void setPriority(Priority priority);
   
   /**
-   * Get the resource (e.g. <em>host/rack</em>) on which the allocation 
+   * Get the resource (e.g. <em>host/rack</em>) on which the allocation
    * is desired.
-   * 
-   * A special value of <em>*</em> signifies that <em>any</em> resource 
+   * <p/>
+   * A special value of <em>*</em> signifies that <em>any</em> resource
    * (host/rack) is acceptable.
-   * 
-   * @return resource (e.g. <em>host/rack</em>) on which the allocation 
-   *                  is desired
+   *
+   * @return resource (e.g. <em>host/rack</em>) on which the allocation
+   * is desired
    */
   @Public
   @Stable
   public abstract String getResourceName();
 
   /**
-   * Set the resource name (e.g. <em>host/rack</em>) on which the allocation 
+   * Set the resource name (e.g. <em>host/rack</em>) on which the allocation
    * is desired.
-   * 
+   * <p/>
    * A special value of <em>*</em> signifies that <em>any</em> resource name
-   * (e.g. host/rack) is acceptable. 
-   * 
-   * @param resourceName (e.g. <em>host/rack</em>) on which the 
-   *                     allocation is desired
+   * (e.g. host/rack) is acceptable.
+   *
+   * @param resourceName
+   *     (e.g. <em>host/rack</em>) on which the
+   *     allocation is desired
    */
   @Public
   @Stable
@@ -170,6 +175,7 @@ public abstract class ResourceRequest implements Comparable<ResourceRequest> {
   
   /**
    * Get the <code>Resource</code> capability of the request.
+   *
    * @return <code>Resource</code> capability of the request
    */
   @Public
@@ -178,7 +184,9 @@ public abstract class ResourceRequest implements Comparable<ResourceRequest> {
   
   /**
    * Set the <code>Resource</code> capability of the request
-   * @param capability <code>Resource</code> capability of the request
+   *
+   * @param capability
+   *     <code>Resource</code> capability of the request
    */
   @Public
   @Stable
@@ -186,6 +194,7 @@ public abstract class ResourceRequest implements Comparable<ResourceRequest> {
 
   /**
    * Get the number of containers required with the given specifications.
+   *
    * @return number of containers required with the given specifications
    */
   @Public
@@ -194,8 +203,10 @@ public abstract class ResourceRequest implements Comparable<ResourceRequest> {
   
   /**
    * Set the number of containers required with the given specifications
-   * @param numContainers number of containers required with the given 
-   *                      specifications
+   *
+   * @param numContainers
+   *     number of containers required with the given
+   *     specifications
    */
   @Public
   @Stable
@@ -204,7 +215,7 @@ public abstract class ResourceRequest implements Comparable<ResourceRequest> {
   /**
    * Get whether locality relaxation is enabled with this
    * <code>ResourceRequest</code>. Defaults to true.
-   * 
+   *
    * @return whether locality relaxation is enabled with this
    * <code>ResourceRequest</code>.
    */
@@ -213,27 +224,30 @@ public abstract class ResourceRequest implements Comparable<ResourceRequest> {
   public abstract boolean getRelaxLocality();
   
   /**
-   * <p>For a request at a network hierarchy level, set whether locality can be relaxed
+   * <p>For a request at a network hierarchy level, set whether locality can be
+   * relaxed
    * to that level and beyond.<p>
-   * 
+   * <p/>
    * <p>If the flag is off on a rack-level <code>ResourceRequest</code>,
-   * containers at that request's priority will not be assigned to nodes on that
+   * containers at that request's priority will not be assigned to nodes on
+   * that
    * request's rack unless requests specifically for those nodes have also been
    * submitted.<p>
-   * 
+   * <p/>
    * <p>If the flag is off on an {@link ResourceRequest#ANY}-level
    * <code>ResourceRequest</code>, containers at that request's priority will
    * only be assigned on racks for which specific requests have also been
    * submitted.<p>
-   * 
+   * <p/>
    * <p>For example, to request a container strictly on a specific node, the
    * corresponding rack-level and any-level requests should have locality
    * relaxation set to false.  Similarly, to request a container strictly on a
    * specific rack, the corresponding any-level request should have locality
    * relaxation set to false.<p>
-   * 
-   * @param relaxLocality whether locality relaxation is enabled with this
-   * <code>ResourceRequest</code>.
+   *
+   * @param relaxLocality
+   *     whether locality relaxation is enabled with this
+   *     <code>ResourceRequest</code>.
    */
   @Public
   @Stable
@@ -256,33 +270,43 @@ public abstract class ResourceRequest implements Comparable<ResourceRequest> {
 
   @Override
   public boolean equals(Object obj) {
-    if (this == obj)
+    if (this == obj) {
       return true;
-    if (obj == null)
+    }
+    if (obj == null) {
       return false;
-    if (getClass() != obj.getClass())
+    }
+    if (getClass() != obj.getClass()) {
       return false;
+    }
     ResourceRequest other = (ResourceRequest) obj;
     Resource capability = getCapability();
     if (capability == null) {
-      if (other.getCapability() != null)
+      if (other.getCapability() != null) {
         return false;
-    } else if (!capability.equals(other.getCapability()))
+      }
+    } else if (!capability.equals(other.getCapability())) {
       return false;
+    }
     String hostName = getResourceName();
     if (hostName == null) {
-      if (other.getResourceName() != null)
+      if (other.getResourceName() != null) {
         return false;
-    } else if (!hostName.equals(other.getResourceName()))
+      }
+    } else if (!hostName.equals(other.getResourceName())) {
       return false;
-    if (getNumContainers() != other.getNumContainers())
+    }
+    if (getNumContainers() != other.getNumContainers()) {
       return false;
+    }
     Priority priority = getPriority();
     if (priority == null) {
-      if (other.getPriority() != null)
+      if (other.getPriority() != null) {
         return false;
-    } else if (!priority.equals(other.getPriority()))
+      }
+    } else if (!priority.equals(other.getPriority())) {
       return false;
+    }
     return true;
   }
 

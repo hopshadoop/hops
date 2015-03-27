@@ -42,11 +42,14 @@ import java.util.Map;
 public abstract class ConfigurationUtils {
 
   /**
-   * Copy configuration key/value pairs from one configuration to another if a property exists in the target, it gets
+   * Copy configuration key/value pairs from one configuration to another if a
+   * property exists in the target, it gets
    * replaced.
    *
-   * @param source source configuration.
-   * @param target target configuration.
+   * @param source
+   *     source configuration.
+   * @param target
+   *     target configuration.
    */
   public static void copy(Configuration source, Configuration target) {
     Check.notNull(source, "source");
@@ -57,13 +60,17 @@ public abstract class ConfigurationUtils {
   }
 
   /**
-   * Injects configuration key/value pairs from one configuration to another if the key does not exist in the target
+   * Injects configuration key/value pairs from one configuration to another if
+   * the key does not exist in the target
    * configuration.
    *
-   * @param source source configuration.
-   * @param target target configuration.
+   * @param source
+   *     source configuration.
+   * @param target
+   *     target configuration.
    */
-  public static void injectDefaults(Configuration source, Configuration target) {
+  public static void injectDefaults(Configuration source,
+      Configuration target) {
     Check.notNull(source, "source");
     Check.notNull(target, "target");
     for (Map.Entry<String, String> entry : source) {
@@ -93,13 +100,16 @@ public abstract class ConfigurationUtils {
    * <p/>
    * ERROR canibalized from <code>Configuration.loadResource()</code>.
    *
-   * @param is inputstream to read the configuration from.
-   *
-   * @throws IOException thrown if the configuration could not be read.
+   * @param is
+   *     inputstream to read the configuration from.
+   * @throws IOException
+   *     thrown if the configuration could not be read.
    */
-  public static void load(Configuration conf, InputStream is) throws IOException {
+  public static void load(Configuration conf, InputStream is)
+      throws IOException {
     try {
-      DocumentBuilderFactory docBuilderFactory = DocumentBuilderFactory.newInstance();
+      DocumentBuilderFactory docBuilderFactory =
+          DocumentBuilderFactory.newInstance();
       // ignore all comments inside the xml file
       docBuilderFactory.setIgnoringComments(true);
       DocumentBuilder builder = docBuilderFactory.newDocumentBuilder();
@@ -113,11 +123,13 @@ public abstract class ConfigurationUtils {
   }
 
   // Canibalized from FileSystemAccess <code>Configuration.loadResource()</code>.
-  private static void parseDocument(Configuration conf, Document doc) throws IOException {
+  private static void parseDocument(Configuration conf, Document doc)
+      throws IOException {
     try {
       Element root = doc.getDocumentElement();
       if (!"configuration".equals(root.getTagName())) {
-        throw new IOException("bad conf file: top-level element not <configuration>");
+        throw new IOException(
+            "bad conf file: top-level element not <configuration>");
       }
       NodeList props = root.getChildNodes();
       for (int i = 0; i < props.getLength(); i++) {

@@ -1,43 +1,41 @@
 /**
-* Licensed to the Apache Software Foundation (ASF) under one
-* or more contributor license agreements.  See the NOTICE file
-* distributed with this work for additional information
-* regarding copyright ownership.  The ASF licenses this file
-* to you under the Apache License, Version 2.0 (the
-* "License"); you may not use this file except in compliance
-* with the License.  You may obtain a copy of the License at
-*
-*     http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package org.apache.hadoop.yarn.webapp;
 
-import static org.apache.hadoop.yarn.util.StringHelper.join;
-import static org.apache.hadoop.yarn.util.StringHelper.ujoin;
-
-import java.io.PrintWriter;
-import java.util.Map;
-
-import javax.servlet.http.Cookie;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
+import com.google.common.collect.Maps;
+import com.google.inject.Inject;
+import com.google.inject.Injector;
+import com.google.inject.servlet.RequestScoped;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.yarn.webapp.view.DefaultPage;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.collect.Maps;
-import com.google.inject.Inject;
-import com.google.inject.Injector;
-import com.google.inject.servlet.RequestScoped;
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.PrintWriter;
+import java.util.Map;
+
+import static org.apache.hadoop.yarn.util.StringHelper.join;
+import static org.apache.hadoop.yarn.util.StringHelper.ujoin;
 
 @InterfaceAudience.LimitedPrivate({"YARN", "MapReduce"})
 public abstract class Controller implements Params {
@@ -45,7 +43,7 @@ public abstract class Controller implements Params {
   static final ObjectMapper jsonMapper = new ObjectMapper();
 
   @RequestScoped
-  public static class RequestContext{
+  public static class RequestContext {
     final Injector injector;
     final HttpServletRequest request;
     final HttpServletResponse response;
@@ -57,14 +55,17 @@ public abstract class Controller implements Params {
     boolean devMode = false;
     String prefix;
 
-    @Inject RequestContext(Injector injector, HttpServletRequest request,
-                           HttpServletResponse response) {
+    @Inject
+    RequestContext(Injector injector, HttpServletRequest request,
+        HttpServletResponse response) {
       this.injector = injector;
       this.request = request;
       this.response = response;
     }
 
-    public int status() { return status; }
+    public int status() {
+      return status;
+    }
 
     public void setStatus(int status) {
       this.status = status;
@@ -107,11 +108,14 @@ public abstract class Controller implements Params {
       return value == null ? defaultValue : value;
     }
 
-    public String prefix() { return prefix; }
+    public String prefix() {
+      return prefix;
+    }
   }
 
   private RequestContext context;
-  @Inject Injector injector;
+  @Inject
+  Injector injector;
 
   public Controller() {
     // Makes injection in subclasses optional.
@@ -136,25 +140,37 @@ public abstract class Controller implements Params {
     return context;
   }
 
-  public Throwable error() { return context().error; }
+  public Throwable error() {
+    return context().error;
+  }
 
-  public int status() { return context().status; }
+  public int status() {
+    return context().status;
+  }
 
   public void setStatus(int status) {
     context().setStatus(status);
   }
 
-  public boolean inDevMode() { return context().devMode; }
+  public boolean inDevMode() {
+    return context().devMode;
+  }
 
-  public Injector injector() { return context().injector; }
+  public Injector injector() {
+    return context().injector;
+  }
 
   public <T> T getInstance(Class<T> cls) {
     return injector.getInstance(cls);
   }
 
-  public HttpServletRequest request() { return context().request; }
+  public HttpServletRequest request() {
+    return context().request;
+  }
 
-  public HttpServletResponse response() { return context().response; }
+  public HttpServletResponse response() {
+    return context().response;
+  }
 
   public void set(String key, String value) {
     context().set(key, value);
@@ -183,15 +199,18 @@ public abstract class Controller implements Params {
 
   /**
    * Get the cookies
+   *
    * @return the cookies map
    */
   public Map<String, Cookie> cookies() {
     return context().cookies();
   }
 
- /**
+  /**
    * Create an url from url components
-   * @param parts components to join
+   *
+   * @param parts
+   *     components to join
    * @return an url string
    */
   public String url(String... parts) {
@@ -214,7 +233,9 @@ public abstract class Controller implements Params {
 
   /**
    * Convenience method for REST APIs (without explicit views)
-   * @param object - the object as the response (in JSON)
+   *
+   * @param object
+   *     - the object as the response (in JSON)
    */
   protected void renderJSON(Object object) {
     LOG.debug("{}: {}", MimeType.JSON, object);
@@ -235,7 +256,9 @@ public abstract class Controller implements Params {
 
   /**
    * Convenience method for hello world :)
-   * @param s - the content to render as plain text
+   *
+   * @param s
+   *     - the content to render as plain text
    */
   protected void renderText(String s) {
     LOG.debug("{}: {}", MimeType.TEXT, s);

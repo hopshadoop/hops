@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.yarn.util.timeline;
 
-import java.io.IOException;
-
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.codehaus.jackson.JsonGenerationException;
@@ -29,9 +27,10 @@ import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.map.annotate.JsonSerialize.Inclusion;
 import org.codehaus.jackson.xc.JaxbAnnotationIntrospector;
 
+import java.io.IOException;
+
 /**
  * The helper class for the timeline module.
- * 
  */
 @Public
 @Evolving
@@ -49,9 +48,9 @@ public class TimelineUtils {
 
   /**
    * Serialize a POJO object into a JSON string not in a pretty format
-   * 
+   *
    * @param o
-   *          an object to serialize
+   *     an object to serialize
    * @return a JSON string
    * @throws IOException
    * @throws JsonMappingException
@@ -64,11 +63,11 @@ public class TimelineUtils {
 
   /**
    * Serialize a POJO object into a JSON string
-   * 
+   *
    * @param o
-   *          an object to serialize
+   *     an object to serialize
    * @param pretty
-   *          whether in a pretty format or not
+   *     whether in a pretty format or not
    * @return a JSON string
    * @throws IOException
    * @throws JsonMappingException

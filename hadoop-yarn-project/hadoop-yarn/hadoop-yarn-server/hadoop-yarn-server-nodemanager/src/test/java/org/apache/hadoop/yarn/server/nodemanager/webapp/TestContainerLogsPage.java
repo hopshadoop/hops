@@ -18,22 +18,8 @@
 
 package org.apache.hadoop.yarn.server.nodemanager.webapp;
 
-import static org.junit.Assume.assumeTrue;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.verify;
-
-import java.io.BufferedOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-
+import com.google.inject.Injector;
+import com.google.inject.Module;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.io.nativeio.NativeIO;
@@ -62,42 +48,57 @@ import org.apache.hadoop.yarn.webapp.test.WebAppTests;
 import org.junit.Assert;
 import org.junit.Test;
 
-import com.google.inject.Injector;
-import com.google.inject.Module;
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
+import static org.junit.Assume.assumeTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 public class TestContainerLogsPage {
 
-  @Test(timeout=30000)
+  @Test(timeout = 30000)
   public void testContainerLogDirs() throws IOException, YarnException {
-    File absLogDir = new File("target",
-      TestNMWebServer.class.getSimpleName() + "LogDir").getAbsoluteFile();
+    File absLogDir =
+        new File("target", TestNMWebServer.class.getSimpleName() + "LogDir")
+            .getAbsoluteFile();
     String logdirwithFile = absLogDir.toURI().toString();
     Configuration conf = new Configuration();
     conf.set(YarnConfiguration.NM_LOG_DIRS, logdirwithFile);
     NodeHealthCheckerService healthChecker = new NodeHealthCheckerService();
     healthChecker.init(conf);
     LocalDirsHandlerService dirsHandler = healthChecker.getDiskHandler();
-    NMContext nmContext = new NodeManager.NMContext(null, null, dirsHandler, new ApplicationACLsManager(conf));
+    NMContext nmContext = new NodeManager.NMContext(null, null, dirsHandler,
+        new ApplicationACLsManager(conf));
     // Add an application and the corresponding containers
     RecordFactory recordFactory = RecordFactoryProvider.getRecordFactory(conf);
     String user = "nobody";
     long clusterTimeStamp = 1234;
-    ApplicationId appId = BuilderUtils.newApplicationId(recordFactory,
-        clusterTimeStamp, 1);
+    ApplicationId appId =
+        BuilderUtils.newApplicationId(recordFactory, clusterTimeStamp, 1);
     Application app = mock(Application.class);
     when(app.getUser()).thenReturn(user);
     when(app.getAppId()).thenReturn(appId);
-    ApplicationAttemptId appAttemptId = BuilderUtils.newApplicationAttemptId(
-        appId, 1);
-    ContainerId container1 = BuilderUtils.newContainerId(recordFactory, appId,
-        appAttemptId, 0);
+    ApplicationAttemptId appAttemptId =
+        BuilderUtils.newApplicationAttemptId(appId, 1);
+    ContainerId container1 =
+        BuilderUtils.newContainerId(recordFactory, appId, appAttemptId, 0);
     nmContext.getApplications().put(appId, app);
 
     MockContainer container =
         new MockContainer(appAttemptId, new AsyncDispatcher(), conf, user,
             appId, 1);
     container.setState(ContainerState.RUNNING);
-    nmContext.getContainers().put(container1, container);   
+    nmContext.getContainers().put(container1, container);
     List<File> files = null;
     files = ContainerLogsUtils.getContainerLogDirs(container1, user, nmContext);
     Assert.assertTrue(!(files.get(0).toString().contains("file:")));
@@ -118,15 +119,15 @@ public class TestContainerLogsPage {
     File absLogDir = null, appDir = null, containerDir = null, syslog = null;
     try {
       // target log directory
-      absLogDir =
-          new File("target", TestContainerLogsPage.class.getSimpleName()
-              + "LogDir").getAbsoluteFile();
+      absLogDir = new File("target",
+          TestContainerLogsPage.class.getSimpleName() + "LogDir")
+          .getAbsoluteFile();
       absLogDir.mkdir();
 
       Configuration conf = new Configuration();
       conf.set(YarnConfiguration.NM_LOG_DIRS, absLogDir.toURI().toString());
       conf.set(CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION,
-        "kerberos");
+          "kerberos");
       UserGroupInformation.setConfiguration(conf);
 
       NodeHealthCheckerService healthChecker = new NodeHealthCheckerService();
@@ -174,25 +175,25 @@ public class TestContainerLogsPage {
       when(context.getContainers()).thenReturn(containers);
       when(context.getLocalDirsHandler()).thenReturn(dirsHandler);
 
-      MockContainer container = new MockContainer(appAttemptId,
-        new AsyncDispatcher(), conf, user, appId, 1);
+      MockContainer container =
+          new MockContainer(appAttemptId, new AsyncDispatcher(), conf, user,
+              appId, 1);
       container.setState(ContainerState.RUNNING);
       context.getContainers().put(container1, container);
 
-      ContainersLogsBlock cLogsBlock =
-          new ContainersLogsBlock(context);
+      ContainersLogsBlock cLogsBlock = new ContainersLogsBlock(context);
 
       Map<String, String> params = new HashMap<String, String>();
       params.put(YarnWebParams.CONTAINER_ID, container1.toString());
       params.put(YarnWebParams.CONTAINER_LOG_TYPE, "syslog");
 
-      Injector injector =
-          WebAppTests.testPage(ContainerLogsPage.class,
-            ContainersLogsBlock.class, cLogsBlock, params, (Module[])null);
+      Injector injector = WebAppTests
+          .testPage(ContainerLogsPage.class, ContainersLogsBlock.class,
+              cLogsBlock, params, (Module[]) null);
       PrintWriter spyPw = WebAppTests.getPrintWriter(injector);
       verify(spyPw).write(
-        "Exception reading log file. Application submitted by '" + user
-            + "' doesn't own requested log file : syslog");
+          "Exception reading log file. Application submitted by '" + user +
+              "' doesn't own requested log file : syslog");
     } finally {
       if (syslog != null) {
         syslog.delete();

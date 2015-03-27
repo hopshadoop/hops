@@ -17,15 +17,15 @@
  */
 package org.apache.hadoop.yarn.state;
 
+import org.apache.commons.lang.StringEscapeUtils;
+import org.apache.hadoop.classification.InterfaceAudience.Private;
+
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-
-import org.apache.commons.lang.StringEscapeUtils;
-import org.apache.hadoop.classification.InterfaceAudience.Private;
 
 @Private
 public class Graph {
@@ -41,8 +41,7 @@ public class Graph {
     }
 
     public boolean sameAs(Edge rhs) {
-      if (this.from == rhs.from &&
-          this.to == rhs.to) {
+      if (this.from == rhs.from && this.to == rhs.to) {
         return true;
       }
       return false;
@@ -137,7 +136,7 @@ public class Graph {
 
   private static String wrapSafeString(String label) {
     if (label.indexOf(',') >= 0) {
-      if (label.length()>14) {
+      if (label.length() > 14) {
         label = label.replaceAll(",", ",\n");
       }
     }
@@ -149,32 +148,27 @@ public class Graph {
     StringBuilder sb = new StringBuilder();
     if (this.parent == null) {
       sb.append("digraph " + name + " {\n");
-      sb.append(String.format("graph [ label=%s, fontsize=24, fontname=Helvetica];\n",
-          wrapSafeString(name)));
+      sb.append(String
+          .format("graph [ label=%s, fontsize=24, fontname=Helvetica];\n",
+              wrapSafeString(name)));
       sb.append("node [fontsize=12, fontname=Helvetica];\n");
       sb.append("edge [fontsize=9, fontcolor=blue, fontname=Arial];\n");
     } else {
       sb.append("subgraph cluster_" + name + " {\nlabel=\"" + name + "\"\n");
     }
     for (Graph g : subgraphs) {
-      String ginfo = g.generateGraphViz(indent+"  ");
+      String ginfo = g.generateGraphViz(indent + "  ");
       sb.append(ginfo);
       sb.append("\n");
     }
     for (Node n : nodes) {
-      sb.append(String.format(
-          "%s%s [ label = %s ];\n",
-          indent,
-          wrapSafeString(n.getUniqueId()),
-          n.id));
+      sb.append(String.format("%s%s [ label = %s ];\n", indent,
+          wrapSafeString(n.getUniqueId()), n.id));
       List<Edge> combinedOuts = combineEdges(n.outs);
       for (Edge e : combinedOuts) {
-        sb.append(String.format(
-            "%s%s -> %s [ label = %s ];\n",
-            indent,
+        sb.append(String.format("%s%s -> %s [ label = %s ];\n", indent,
             wrapSafeString(e.from.getUniqueId()),
-            wrapSafeString(e.to.getUniqueId()),
-            wrapSafeString(e.label)));
+            wrapSafeString(e.to.getUniqueId()), wrapSafeString(e.label)));
       }
     }
     sb.append("}\n");

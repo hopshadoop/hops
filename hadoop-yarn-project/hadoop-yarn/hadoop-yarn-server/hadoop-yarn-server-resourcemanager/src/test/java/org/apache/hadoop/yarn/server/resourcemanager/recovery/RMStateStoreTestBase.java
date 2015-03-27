@@ -18,27 +18,10 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.recovery;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-
-import javax.crypto.SecretKey;
-
 import junit.framework.Assert;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.ha.ClientBaseWithFixes;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.delegation.DelegationKey;
@@ -69,12 +52,26 @@ import org.apache.hadoop.yarn.server.resourcemanager.security.AMRMTokenSecretMan
 import org.apache.hadoop.yarn.server.resourcemanager.security.ClientToAMTokenSecretManagerInRM;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 
-public class RMStateStoreTestBase extends ClientBaseWithFixes{
+import javax.crypto.SecretKey;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+public class RMStateStoreTestBase /*extends ClientBaseWithFixes*/ {
 
   public static final Log LOG = LogFactory.getLog(RMStateStoreTestBase.class);
 
-  static class TestDispatcher implements
-      Dispatcher, EventHandler<RMAppAttemptNewSavedEvent> {
+  static class TestDispatcher
+      implements Dispatcher, EventHandler<RMAppAttemptNewSavedEvent> {
 
     ApplicationAttemptId attemptId;
     Exception storedException;
@@ -84,7 +81,7 @@ public class RMStateStoreTestBase extends ClientBaseWithFixes{
     @SuppressWarnings("rawtypes")
     @Override
     public void register(Class<? extends Enum> eventType,
-                         EventHandler handler) {
+        EventHandler handler) {
     }
 
     @Override
@@ -107,15 +104,19 @@ public class RMStateStoreTestBase extends ClientBaseWithFixes{
 
   interface RMStateStoreHelper {
     RMStateStore getRMStateStore() throws Exception;
+
     boolean isFinalStateValid() throws Exception;
+
     void writeVersion(RMStateVersion version) throws Exception;
+
     RMStateVersion getCurrentVersion() throws Exception;
+
     boolean appExists(RMApp app) throws Exception;
   }
 
   void waitNotify(TestDispatcher dispatcher) {
     long startTime = System.currentTimeMillis();
-    while(!dispatcher.notified) {
+    while (!dispatcher.notified) {
       synchronized (dispatcher) {
         try {
           dispatcher.wait(1000);
@@ -123,7 +124,7 @@ public class RMStateStoreTestBase extends ClientBaseWithFixes{
           e.printStackTrace();
         }
       }
-      if(System.currentTimeMillis() - startTime > 1000*60) {
+      if (System.currentTimeMillis() - startTime > 1000 * 60) {
         fail("Timed out attempt store notification");
       }
     }
@@ -142,7 +143,7 @@ public class RMStateStoreTestBase extends ClientBaseWithFixes{
     when(mockApp.getStartTime()).thenReturn(startTime);
     when(mockApp.getApplicationSubmissionContext()).thenReturn(context);
     when(mockApp.getUser()).thenReturn("test");
-    store.storeNewApplication(mockApp);
+    store.storeNewApplication(mockApp, null);
     return mockApp;
   }
 
@@ -161,7 +162,7 @@ public class RMStateStoreTestBase extends ClientBaseWithFixes{
         .thenReturn(clientTokenMasterKey);
     dispatcher.attemptId = attemptId;
     dispatcher.storedException = null;
-    store.storeNewApplicationAttempt(mockAttempt);
+    store.storeNewApplicationAttempt(mockAttempt, null);
     waitNotify(dispatcher);
     return container.getId();
   }
@@ -175,8 +176,7 @@ public class RMStateStoreTestBase extends ClientBaseWithFixes{
     TestDispatcher dispatcher = new TestDispatcher();
     store.setRMDispatcher(dispatcher);
 
-    AMRMTokenSecretManager appTokenMgr =
-        new AMRMTokenSecretManager(conf);
+    AMRMTokenSecretManager appTokenMgr = new AMRMTokenSecretManager(conf);
     ClientToAMTokenSecretManagerInRM clientToAMTokenMgr =
         new ClientToAMTokenSecretManagerInRM();
 
@@ -190,12 +190,11 @@ public class RMStateStoreTestBase extends ClientBaseWithFixes{
         generateAMRMToken(attemptId1, appTokenMgr);
     HashSet<Token<?>> attemptTokenSet1 = new HashSet<Token<?>>();
     attemptTokenSet1.add(appAttemptToken1);
-    SecretKey clientTokenKey1 =
-        clientToAMTokenMgr.createMasterKey(attemptId1);
+    SecretKey clientTokenKey1 = clientToAMTokenMgr.createMasterKey(attemptId1);
 
     ContainerId containerId1 = storeAttempt(store, attemptId1,
-          "container_1352994193343_0001_01_000001",
-          appAttemptToken1, clientTokenKey1, dispatcher);
+        "container_1352994193343_0001_01_000001", appAttemptToken1,
+        clientTokenKey1, dispatcher);
 
     String appAttemptIdStr2 = "appattempt_1352994193343_0001_000002";
     ApplicationAttemptId attemptId2 =
@@ -206,12 +205,11 @@ public class RMStateStoreTestBase extends ClientBaseWithFixes{
         generateAMRMToken(attemptId2, appTokenMgr);
     HashSet<Token<?>> attemptTokenSet2 = new HashSet<Token<?>>();
     attemptTokenSet2.add(appAttemptToken2);
-    SecretKey clientTokenKey2 =
-        clientToAMTokenMgr.createMasterKey(attemptId2);
+    SecretKey clientTokenKey2 = clientToAMTokenMgr.createMasterKey(attemptId2);
 
     ContainerId containerId2 = storeAttempt(store, attemptId2,
-          "container_1352994193343_0001_02_000001",
-          appAttemptToken2, clientTokenKey2, dispatcher);
+        "container_1352994193343_0001_02_000001", appAttemptToken2,
+        clientTokenKey2, dispatcher);
 
     ApplicationAttemptId attemptIdRemoved = ConverterUtils
         .toApplicationAttemptId("appattempt_1352994193343_0002_000001");
@@ -222,7 +220,7 @@ public class RMStateStoreTestBase extends ClientBaseWithFixes{
 
     RMApp mockRemovedApp = mock(RMApp.class);
     HashMap<ApplicationAttemptId, RMAppAttempt> attempts =
-                              new HashMap<ApplicationAttemptId, RMAppAttempt>();
+        new HashMap<ApplicationAttemptId, RMAppAttempt>();
     ApplicationSubmissionContext context =
         new ApplicationSubmissionContextPBImpl();
     context.setApplicationId(appIdRemoved);
@@ -232,13 +230,13 @@ public class RMStateStoreTestBase extends ClientBaseWithFixes{
     RMAppAttempt mockRemovedAttempt = mock(RMAppAttempt.class);
     when(mockRemovedAttempt.getAppAttemptId()).thenReturn(attemptIdRemoved);
     attempts.put(attemptIdRemoved, mockRemovedAttempt);
-    store.removeApplication(mockRemovedApp);
+    store.removeApplication(mockRemovedApp, null);
 
     // remove application directory recursively.
     storeApp(store, appIdRemoved, submitTime, startTime);
     storeAttempt(store, attemptIdRemoved,
         "container_1352994193343_0002_01_000001", null, null, dispatcher);
-    store.removeApplication(mockRemovedApp);
+    store.removeApplication(mockRemovedApp, null);
 
     // let things settle down
     Thread.sleep(1000);
@@ -262,7 +260,7 @@ public class RMStateStoreTestBase extends ClientBaseWithFixes{
     assertEquals(startTime, appState.getStartTime());
     // submission context is loaded correctly
     assertEquals(appId1,
-                 appState.getApplicationSubmissionContext().getApplicationId());
+        appState.getApplicationSubmissionContext().getApplicationId());
     ApplicationAttemptState attemptState = appState.getAttempt(attemptId1);
     // attempt1 is loaded correctly
     assertNotNull(attemptState);
@@ -276,7 +274,7 @@ public class RMStateStoreTestBase extends ClientBaseWithFixes{
     // attempt1 client token master key is loaded correctly
     assertArrayEquals(clientTokenKey1.getEncoded(),
         attemptState.getAppAttemptCredentials()
-        .getSecretKey(RMStateStore.AM_CLIENT_TOKEN_MASTER_KEY_NAME));
+            .getSecretKey(RMStateStore.AM_CLIENT_TOKEN_MASTER_KEY_NAME));
 
     attemptState = appState.getAttempt(attemptId2);
     // attempt2 is loaded correctly
@@ -291,25 +289,25 @@ public class RMStateStoreTestBase extends ClientBaseWithFixes{
     // attempt2 client token master key is loaded correctly
     assertArrayEquals(clientTokenKey2.getEncoded(),
         attemptState.getAppAttemptCredentials()
-        .getSecretKey(RMStateStore.AM_CLIENT_TOKEN_MASTER_KEY_NAME));
+            .getSecretKey(RMStateStore.AM_CLIENT_TOKEN_MASTER_KEY_NAME));
 
     //******* update application/attempt state *******//
     ApplicationState appState2 =
         new ApplicationState(appState.submitTime, appState.startTime,
-          appState.context, appState.user, RMAppState.FINISHED,
-          "appDiagnostics", 1234);
+            appState.context, appState.user, RMAppState.FINISHED,
+            "appDiagnostics", 1234, null, null);
     appState2.attempts.putAll(appState.attempts);
-    store.updateApplicationState(appState2);
+    store.updateApplicationState(appState2, null);
 
     ApplicationAttemptState oldAttemptState = attemptState;
     ApplicationAttemptState newAttemptState =
         new ApplicationAttemptState(oldAttemptState.getAttemptId(),
-          oldAttemptState.getMasterContainer(),
-          oldAttemptState.getAppAttemptCredentials(),
-          oldAttemptState.getStartTime(), RMAppAttemptState.FINISHED,
-          "myTrackingUrl", "attemptDiagnostics",
-          FinalApplicationStatus.SUCCEEDED);
-    store.updateApplicationAttemptState(newAttemptState);
+            oldAttemptState.getMasterContainer(),
+            oldAttemptState.getAppAttemptCredentials(),
+            oldAttemptState.getStartTime(), RMAppAttemptState.FINISHED,
+            "myTrackingUrl", "attemptDiagnostics",
+            FinalApplicationStatus.SUCCEEDED, 0, "N/A", -1, null, null);
+    store.updateApplicationAttemptState(newAttemptState, null);
     // let things settle down
     Thread.sleep(1000);
     store.close();
@@ -321,12 +319,12 @@ public class RMStateStoreTestBase extends ClientBaseWithFixes{
     Map<ApplicationId, ApplicationState> newRMAppState =
         newRMState.getApplicationState();
     ApplicationState updatedAppState = newRMAppState.get(appId1);
-    assertEquals(appState.getAppId(),updatedAppState.getAppId());
+    assertEquals(appState.getAppId(), updatedAppState.getAppId());
     assertEquals(appState.getSubmitTime(), updatedAppState.getSubmitTime());
     assertEquals(appState.getStartTime(), updatedAppState.getStartTime());
     assertEquals(appState.getUser(), updatedAppState.getUser());
     // new app state fields
-    assertEquals( RMAppState.FINISHED, updatedAppState.getState());
+    assertEquals(RMAppState.FINISHED, updatedAppState.getState());
     assertEquals("appDiagnostics", updatedAppState.getDiagnostics());
     assertEquals(1234, updatedAppState.getFinishTime());
 
@@ -334,17 +332,18 @@ public class RMStateStoreTestBase extends ClientBaseWithFixes{
     ApplicationAttemptState updatedAttemptState =
         updatedAppState.getAttempt(newAttemptState.getAttemptId());
     assertEquals(oldAttemptState.getAttemptId(),
-      updatedAttemptState.getAttemptId());
-    assertEquals(containerId2, updatedAttemptState.getMasterContainer().getId());
+        updatedAttemptState.getAttemptId());
+    assertEquals(containerId2,
+        updatedAttemptState.getMasterContainer().getId());
     assertArrayEquals(clientTokenKey2.getEncoded(),
-      updatedAttemptState.getAppAttemptCredentials().getSecretKey(
-        RMStateStore.AM_CLIENT_TOKEN_MASTER_KEY_NAME));
+        updatedAttemptState.getAppAttemptCredentials()
+            .getSecretKey(RMStateStore.AM_CLIENT_TOKEN_MASTER_KEY_NAME));
     // new attempt state fields
     assertEquals(RMAppAttemptState.FINISHED, updatedAttemptState.getState());
     assertEquals("myTrackingUrl", updatedAttemptState.getFinalTrackingUrl());
     assertEquals("attemptDiagnostics", updatedAttemptState.getDiagnostics());
     assertEquals(FinalApplicationStatus.SUCCEEDED,
-      updatedAttemptState.getFinalApplicationStatus());
+        updatedAttemptState.getFinalApplicationStatus());
 
     // assert store is in expected state after everything is cleaned
     assertTrue(stateStoreHelper.isFinalStateValid());
@@ -361,34 +360,34 @@ public class RMStateStoreTestBase extends ClientBaseWithFixes{
     // store RM delegation token;
     RMDelegationTokenIdentifier dtId1 =
         new RMDelegationTokenIdentifier(new Text("owner1"),
-          new Text("renewer1"), new Text("realuser1"));
+            new Text("renewer1"), new Text("realuser1"));
     Long renewDate1 = new Long(System.currentTimeMillis());
     int sequenceNumber = 1111;
     store.storeRMDelegationTokenAndSequenceNumber(dtId1, renewDate1,
-      sequenceNumber);
+        sequenceNumber, null);
     modifyRMDelegationTokenState();
     Map<RMDelegationTokenIdentifier, Long> token1 =
         new HashMap<RMDelegationTokenIdentifier, Long>();
     token1.put(dtId1, renewDate1);
 
     // store delegation key;
-    DelegationKey key = new DelegationKey(1234, 4321 , "keyBytes".getBytes());
+    DelegationKey key = new DelegationKey(1234, 4321, "keyBytes".getBytes());
     HashSet<DelegationKey> keySet = new HashSet<DelegationKey>();
     keySet.add(key);
-    store.storeRMDTMasterKey(key);
+    store.storeRMDTMasterKey(key, null);
 
     RMDTSecretManagerState secretManagerState =
         store.loadState().getRMDTSecretManagerState();
     Assert.assertEquals(token1, secretManagerState.getTokenState());
     Assert.assertEquals(keySet, secretManagerState.getMasterKeyState());
-    Assert.assertEquals(sequenceNumber,
-        secretManagerState.getDTSequenceNumber());
+    Assert
+        .assertEquals(sequenceNumber, secretManagerState.getDTSequenceNumber());
 
     // update RM delegation token;
     renewDate1 = new Long(System.currentTimeMillis());
     ++sequenceNumber;
-    store.updateRMDelegationTokenAndSequenceNumber(
-        dtId1, renewDate1, sequenceNumber);
+    store.updateRMDelegationTokenAndSequenceNumber(dtId1, renewDate1,
+        sequenceNumber, null);
     token1.put(dtId1, renewDate1);
 
     RMDTSecretManagerState updateSecretManagerState =
@@ -399,7 +398,7 @@ public class RMStateStoreTestBase extends ClientBaseWithFixes{
         updateSecretManagerState.getDTSequenceNumber());
 
     // check to delete delegationKey
-    store.removeRMDTMasterKey(key);
+    store.removeRMDTMasterKey(key, null);
     keySet.clear();
     RMDTSecretManagerState noKeySecretManagerState =
         store.loadState().getRMDTSecretManagerState();
@@ -409,12 +408,12 @@ public class RMStateStoreTestBase extends ClientBaseWithFixes{
         noKeySecretManagerState.getDTSequenceNumber());
 
     // check to delete delegationToken
-    store.removeRMDelegationToken(dtId1, sequenceNumber);
+    store.removeRMDelegationToken(dtId1, sequenceNumber, null);
     RMDTSecretManagerState noKeyAndTokenSecretManagerState =
         store.loadState().getRMDTSecretManagerState();
     token1.clear();
-    Assert.assertEquals(token1,
-        noKeyAndTokenSecretManagerState.getTokenState());
+    Assert
+        .assertEquals(token1, noKeyAndTokenSecretManagerState.getTokenState());
     Assert.assertEquals(keySet,
         noKeyAndTokenSecretManagerState.getMasterKeyState());
     Assert.assertEquals(sequenceNumber,
@@ -424,10 +423,8 @@ public class RMStateStoreTestBase extends ClientBaseWithFixes{
   }
 
   private Token<AMRMTokenIdentifier> generateAMRMToken(
-      ApplicationAttemptId attemptId,
-      AMRMTokenSecretManager appTokenMgr) {
-    AMRMTokenIdentifier appTokenId =
-        new AMRMTokenIdentifier(attemptId);
+      ApplicationAttemptId attemptId, AMRMTokenSecretManager appTokenMgr) {
+    AMRMTokenIdentifier appTokenId = new AMRMTokenIdentifier(attemptId);
     Token<AMRMTokenIdentifier> appToken =
         new Token<AMRMTokenIdentifier>(appTokenId, appTokenMgr);
     appToken.setService(new Text("appToken service"));
@@ -445,9 +442,9 @@ public class RMStateStoreTestBase extends ClientBaseWithFixes{
     Assert.assertEquals(defaultVersion, store.loadVersion());
 
     // compatible version
-    RMStateVersion compatibleVersion =
-        RMStateVersion.newInstance(defaultVersion.getMajorVersion(),
-          defaultVersion.getMinorVersion() + 2);
+    RMStateVersion compatibleVersion = RMStateVersion
+        .newInstance(defaultVersion.getMajorVersion(),
+            defaultVersion.getMinorVersion() + 2);
     stateStoreHelper.writeVersion(compatibleVersion);
     Assert.assertEquals(compatibleVersion, store.loadVersion());
     store.checkVersion();
@@ -455,9 +452,9 @@ public class RMStateStoreTestBase extends ClientBaseWithFixes{
     Assert.assertEquals(defaultVersion, store.loadVersion());
 
     // incompatible version
-    RMStateVersion incompatibleVersion =
-        RMStateVersion.newInstance(defaultVersion.getMajorVersion() + 2,
-          defaultVersion.getMinorVersion());
+    RMStateVersion incompatibleVersion = RMStateVersion
+        .newInstance(defaultVersion.getMajorVersion() + 2,
+            defaultVersion.getMinorVersion());
     stateStoreHelper.writeVersion(incompatibleVersion);
     try {
       store.checkVersion();
@@ -494,7 +491,7 @@ public class RMStateStoreTestBase extends ClientBaseWithFixes{
 
     for (RMApp app : appList) {
       // remove the app
-      store.removeApplication(app);
+      store.removeApplication(app, null);
       // wait for app to be removed.
       while (true) {
         if (!stateStoreHelper.appExists(app)) {

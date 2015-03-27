@@ -20,9 +20,10 @@ package org.apache.hadoop.yarn.server.api.records;
 
 /**
  * The NodeManager is instructed to perform the given action.
- * 
  */
 
 public enum NodeAction {
-  NORMAL, RESYNC, SHUTDOWN
+  NORMAL,
+  RESYNC,
+  SHUTDOWN
 }

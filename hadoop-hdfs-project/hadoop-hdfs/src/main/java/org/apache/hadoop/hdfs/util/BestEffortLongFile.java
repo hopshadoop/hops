@@ -17,6 +17,11 @@
  */
 package org.apache.hadoop.hdfs.util;
 
+import com.google.common.io.Files;
+import com.google.common.primitives.Longs;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.io.IOUtils;
+
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -25,21 +30,15 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.io.IOUtils;
-
-import com.google.common.io.Files;
-import com.google.common.primitives.Longs;
-
 /**
  * Class that represents a file on disk which stores a single <code>long</code>
  * value, but does not make any effort to make it truly durable. This is in
  * contrast to {@link PersistentLongFile} which fsync()s the value on every
  * change.
- * 
+ * <p/>
  * This should be used for values which are updated frequently (such that
  * performance is important) and not required to be up-to-date for correctness.
- * 
+ * <p/>
  * This class also differs in that it stores the value as binary data instead
  * of a textual string.
  */
@@ -53,7 +52,7 @@ public class BestEffortLongFile implements Closeable {
   
   private FileChannel ch = null;
   
-  private final ByteBuffer buf = ByteBuffer.allocate(Long.SIZE/8);
+  private ByteBuffer buf = ByteBuffer.allocate(Long.SIZE / 8);
   
   public BestEffortLongFile(File file, long defaultVal) {
     this.file = file;

@@ -17,11 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
-import static org.junit.Assert.assertTrue;
-
-import java.io.IOException;
-import java.util.Random;
-
+import io.hops.exception.StorageException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -30,11 +26,13 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
-import org.apache.hadoop.hdfs.client.HdfsDataOutputStream;
 import org.apache.hadoop.hdfs.server.datanode.SimulatedFSDataset;
-import org.apache.hadoop.ipc.RemoteException;
-import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.Test;
+
+import java.io.IOException;
+import java.util.Random;
+
+import static org.junit.Assert.assertTrue;
 
 
 /**
@@ -47,10 +45,9 @@ public class TestFileLimit {
   boolean simulatedStorage = false;
 
   // creates a zero file.
-  private void createFile(FileSystem fileSys, Path name)
-    throws IOException {
+  private void createFile(FileSystem fileSys, Path name) throws IOException {
     FSDataOutputStream stm = fileSys.create(name, true, fileSys.getConf()
-        .getInt(CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096),
+            .getInt(CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096),
         (short) 1, blockSize);
     byte[] buffer = new byte[1024];
     Random rand = new Random(seed);
@@ -59,13 +56,12 @@ public class TestFileLimit {
     stm.close();
   }
 
-  private void waitForLimit(FSNamesystem namesys, long num)
-  {
+  private void waitForLimit(FSNamesystem namesys, long num) throws IOException {
     // wait for number of blocks to decrease
     while (true) {
       long total = namesys.getBlocksTotal() + namesys.dir.totalInodes();
       System.out.println("Comparing current nodes " + total +
-                         " to become " + num);
+          " to become " + num);
       if (total == num) {
         break;
       }
@@ -80,7 +76,7 @@ public class TestFileLimit {
    * Test that file data becomes available before file is closed.
    */
   @Test
-  public void testFileLimit() throws IOException {
+  public void testFileLimit() throws IOException, StorageException {
     Configuration conf = new HdfsConfiguration();
     int maxObjects = 5;
     conf.setLong(DFSConfigKeys.DFS_NAMENODE_MAX_OBJECTS_KEY, maxObjects);
@@ -100,14 +96,14 @@ public class TestFileLimit {
       // check that / exists
       //
       Path path = new Path("/");
-      assertTrue("/ should be a directory", 
-                 fs.getFileStatus(path).isDirectory());
+      assertTrue("/ should be a directory",
+          fs.getFileStatus(path).isDirectory());
       currentNodes = 1;          // root inode
 
       // verify that we can create the specified number of files. We leave
       // one for the "/". Each file takes an inode and a block.
       //
-      for (int i = 0; i < maxObjects/2; i++) {
+      for (int i = 0; i < maxObjects / 2; i++) {
         Path file = new Path("/filestatus" + i);
         createFile(fs, file);
         System.out.println("Created file " + file);
@@ -172,64 +168,9 @@ public class TestFileLimit {
   }
 
   @Test
-  public void testFileLimitSimulated() throws IOException {
+  public void testFileLimitSimulated() throws IOException, StorageException {
     simulatedStorage = true;
     testFileLimit();
     simulatedStorage = false;
-  }
-
-  @Test(timeout=60000)
-  public void testMaxBlocksPerFileLimit() throws Exception {
-    Configuration conf = new HdfsConfiguration();
-    // Make a small block size and a low limit
-    final long blockSize = 4096;
-    final long numBlocks = 2;
-    conf.setLong(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, blockSize);
-    conf.setLong(DFSConfigKeys.DFS_NAMENODE_MAX_BLOCKS_PER_FILE_KEY, numBlocks);
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).build();
-    FileSystem fs = cluster.getFileSystem();
-    HdfsDataOutputStream fout =
-        (HdfsDataOutputStream)fs.create(new Path("/testmaxfilelimit"));
-    try {
-      // Write maximum number of blocks
-      fout.write(new byte[(int)blockSize*(int)numBlocks]);
-      fout.hflush();
-      // Try to write one more block
-      try {
-        fout.write(new byte[1]);
-        fout.hflush();
-        assert false : "Expected IOException after writing too many blocks";
-      } catch (IOException e) {
-        GenericTestUtils.assertExceptionContains("File has reached the limit" +
-            " on maximum number of", e);
-      }
-    } finally {
-      cluster.shutdown();
-    }
-  }
-
-  @Test(timeout=60000)
-  public void testMinBlockSizeLimit() throws Exception {
-    final long blockSize = 4096;
-    Configuration conf = new HdfsConfiguration();
-    conf.setLong(DFSConfigKeys.DFS_NAMENODE_MIN_BLOCK_SIZE_KEY, blockSize);
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).build();
-    FileSystem fs = cluster.getFileSystem();
-
-    try {
-      // Try with min block size
-      fs.create(new Path("/testmblock1"), true, 4096, (short)3, blockSize);
-      try {
-        // Try with min block size - 1
-        fs.create(new Path("/testmblock2"), true, 4096, (short)3, blockSize-1);
-        assert false : "Expected IOException after creating a file with small" +
-            " blocks ";
-      } catch (IOException e) {
-        GenericTestUtils.assertExceptionContains("Specified block size is less",
-            e);
-      }
-    } finally {
-      cluster.shutdown();
-    }
   }
 }

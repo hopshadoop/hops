@@ -17,14 +17,11 @@
  */
 package org.apache.hadoop.hdfs.web;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
+import org.apache.hadoop.hdfs.web.resources.DelegationParam;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.authentication.server.AuthenticationFilter;
+import org.apache.hadoop.security.authentication.server.KerberosAuthenticationHandler;
+import org.apache.hadoop.security.authentication.server.PseudoAuthenticationHandler;
 
 import javax.servlet.FilterChain;
 import javax.servlet.FilterConfig;
@@ -33,12 +30,14 @@ import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
-
-import org.apache.hadoop.hdfs.web.resources.DelegationParam;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.authentication.server.AuthenticationFilter;
-import org.apache.hadoop.security.authentication.server.KerberosAuthenticationHandler;
-import org.apache.hadoop.security.authentication.server.PseudoAuthenticationHandler;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
 
 /**
  * Subclass of {@link AuthenticationFilter} that
@@ -52,22 +51,22 @@ public class AuthFilter extends AuthenticationFilter {
    * including the ones prefixed with {@link #CONF_PREFIX}.
    * The prefix is removed from the returned property names.
    *
-   * @param prefix parameter not used.
-   * @param config parameter contains the initialization values.
+   * @param prefix
+   *     parameter not used.
+   * @param config
+   *     parameter contains the initialization values.
    * @return Hadoop-Auth configuration properties.
-   * @throws ServletException 
+   * @throws ServletException
    */
   @Override
   protected Properties getConfiguration(String prefix, FilterConfig config)
       throws ServletException {
     final Properties p = super.getConfiguration(CONF_PREFIX, config);
     // set authentication type
-    p.setProperty(AUTH_TYPE, UserGroupInformation.isSecurityEnabled()?
-        KerberosAuthenticationHandler.TYPE: PseudoAuthenticationHandler.TYPE);
-    // if not set, enable anonymous for pseudo authentication
-    if (p.getProperty(PseudoAuthenticationHandler.ANONYMOUS_ALLOWED) == null) {
-      p.setProperty(PseudoAuthenticationHandler.ANONYMOUS_ALLOWED, "true");
-    }
+    p.setProperty(AUTH_TYPE, UserGroupInformation.isSecurityEnabled() ?
+        KerberosAuthenticationHandler.TYPE : PseudoAuthenticationHandler.TYPE);
+    //For Pseudo Authentication, allow anonymous.
+    p.setProperty(PseudoAuthenticationHandler.ANONYMOUS_ALLOWED, "true");
     //set cookie path
     p.setProperty(COOKIE_PATH, "/");
     return p;
@@ -76,7 +75,8 @@ public class AuthFilter extends AuthenticationFilter {
   @Override
   public void doFilter(ServletRequest request, ServletResponse response,
       FilterChain filterChain) throws IOException, ServletException {
-    final HttpServletRequest httpRequest = toLowerCase((HttpServletRequest)request);
+    final HttpServletRequest httpRequest =
+        toLowerCase((HttpServletRequest) request);
     final String tokenString = httpRequest.getParameter(DelegationParam.NAME);
     if (tokenString != null) {
       //Token is present in the url, therefore token will be used for
@@ -87,22 +87,24 @@ public class AuthFilter extends AuthenticationFilter {
     super.doFilter(httpRequest, response, filterChain);
   }
 
-  private static HttpServletRequest toLowerCase(final HttpServletRequest request) {
+  private static HttpServletRequest toLowerCase(
+      final HttpServletRequest request) {
     @SuppressWarnings("unchecked")
-    final Map<String, String[]> original = (Map<String, String[]>)request.getParameterMap();
+    final Map<String, String[]> original =
+        (Map<String, String[]>) request.getParameterMap();
     if (!ParamFilter.containsUpperCase(original.keySet())) {
       return request;
     }
 
     final Map<String, List<String>> m = new HashMap<String, List<String>>();
-    for(Map.Entry<String, String[]> entry : original.entrySet()) {
+    for (Map.Entry<String, String[]> entry : original.entrySet()) {
       final String key = entry.getKey().toLowerCase();
       List<String> strings = m.get(key);
       if (strings == null) {
         strings = new ArrayList<String>();
         m.put(key, strings);
       }
-      for(String v : entry.getValue()) {
+      for (String v : entry.getValue()) {
         strings.add(v);
       }
     }
@@ -114,18 +116,18 @@ public class AuthFilter extends AuthenticationFilter {
       public Map<String, String[]> getParameterMap() {
         if (parameters == null) {
           parameters = new HashMap<String, String[]>();
-          for(Map.Entry<String, List<String>> entry : m.entrySet()) {
+          for (Map.Entry<String, List<String>> entry : m.entrySet()) {
             final List<String> a = entry.getValue();
             parameters.put(entry.getKey(), a.toArray(new String[a.size()]));
           }
         }
-       return parameters;
+        return parameters;
       }
 
       @Override
       public String getParameter(String name) {
         final List<String> a = m.get(name);
-        return a == null? null: a.get(0);
+        return a == null ? null : a.get(0);
       }
       
       @Override
@@ -141,6 +143,7 @@ public class AuthFilter extends AuthenticationFilter {
           public boolean hasMoreElements() {
             return i.hasNext();
           }
+
           @Override
           public String nextElement() {
             return i.next();

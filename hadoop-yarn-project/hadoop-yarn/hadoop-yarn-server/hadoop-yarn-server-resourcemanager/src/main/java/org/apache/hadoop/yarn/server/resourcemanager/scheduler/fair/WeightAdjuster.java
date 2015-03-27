@@ -26,7 +26,7 @@ import org.apache.hadoop.conf.Configurable;
  * A pluggable object for altering the weights of apps in the fair scheduler,
  * which is used for example by {@link NewAppWeightBooster} to give higher
  * weight to new jobs so that short jobs finish faster.
- *
+ * <p/>
  * May implement {@link Configurable} to access configuration parameters.
  */
 @Private

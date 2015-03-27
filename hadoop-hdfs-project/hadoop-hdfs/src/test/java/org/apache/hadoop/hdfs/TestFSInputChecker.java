@@ -17,18 +17,6 @@
  */
 package org.apache.hadoop.hdfs;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
-import java.io.EOFException;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.RandomAccessFile;
-import java.util.Random;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.ChecksumException;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
@@ -39,8 +27,19 @@ import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.test.PathUtils;
 import org.junit.Test;
+
+import java.io.EOFException;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.RandomAccessFile;
+import java.util.Random;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /**
  * This class tests if FSInputChecker works correctly.
@@ -48,32 +47,33 @@ import org.junit.Test;
 public class TestFSInputChecker {
   static final long seed = 0xDEADBEEFL;
   static final int BYTES_PER_SUM = 10;
-  static final int BLOCK_SIZE = 2*BYTES_PER_SUM;
-  static final int HALF_CHUNK_SIZE = BYTES_PER_SUM/2;
-  static final int FILE_SIZE = 2*BLOCK_SIZE-1;
+  static final int BLOCK_SIZE = 2 * BYTES_PER_SUM;
+  static final int HALF_CHUNK_SIZE = BYTES_PER_SUM / 2;
+  static final int FILE_SIZE = 2 * BLOCK_SIZE - 1;
   static final short NUM_OF_DATANODES = 2;
-  final byte[] expected = new byte[FILE_SIZE];
+  byte[] expected = new byte[FILE_SIZE];
   byte[] actual;
   FSDataInputStream stm;
-  final Random rand = new Random(seed);
+  Random rand = new Random(seed);
 
   /* create a file */
   private void writeFile(FileSystem fileSys, Path name) throws IOException {
     // create and write a file that contains three blocks of data
-    FSDataOutputStream stm = fileSys.create(name, new FsPermission((short)0777),
-        true, fileSys.getConf().getInt(CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096),
-        NUM_OF_DATANODES, BLOCK_SIZE, null);
+    FSDataOutputStream stm = fileSys
+        .create(name, new FsPermission((short) 0777), true, fileSys.getConf()
+            .getInt(CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096),
+            NUM_OF_DATANODES, BLOCK_SIZE, null);
     stm.write(expected);
     stm.close();
   }
   
   /*validate data*/
-  private void checkAndEraseData(byte[] actual, int from, byte[] expected, 
+  private void checkAndEraseData(byte[] actual, int from, byte[] expected,
       String message) throws Exception {
     for (int idx = 0; idx < actual.length; idx++) {
-      assertEquals(message+" byte "+(from+idx)+" differs. expected "+
-                        expected[from+idx]+" actual "+actual[idx],
-                        actual[idx], expected[from+idx]);
+      assertEquals(message + " byte " + (from + idx) + " differs. expected " +
+              expected[from + idx] + " actual " + actual[idx], actual[idx],
+          expected[from + idx]);
       actual[idx] = 0;
     }
   }
@@ -84,12 +84,12 @@ public class TestFSInputChecker {
     // test reads that do not cross checksum boundary
     stm.seek(0);
     int offset;
-    for(offset=0; offset<BLOCK_SIZE+BYTES_PER_SUM;
-                  offset += BYTES_PER_SUM ) {
+    for (offset = 0; offset < BLOCK_SIZE + BYTES_PER_SUM;
+         offset += BYTES_PER_SUM) {
       assertEquals(stm.getPos(), offset);
       stm.readFully(actual, offset, BYTES_PER_SUM);
     }
-    stm.readFully(actual, offset, FILE_SIZE-BLOCK_SIZE-BYTES_PER_SUM);
+    stm.readFully(actual, offset, FILE_SIZE - BLOCK_SIZE - BYTES_PER_SUM);
     assertEquals(stm.getPos(), FILE_SIZE);
     checkAndEraseData(actual, 0, expected, "Read Sanity Test");
     
@@ -98,30 +98,29 @@ public class TestFSInputChecker {
     assertEquals(stm.getPos(), 0L);
     stm.readFully(actual, 0, HALF_CHUNK_SIZE);
     assertEquals(stm.getPos(), HALF_CHUNK_SIZE);
-    stm.readFully(actual, HALF_CHUNK_SIZE, BLOCK_SIZE-HALF_CHUNK_SIZE);
+    stm.readFully(actual, HALF_CHUNK_SIZE, BLOCK_SIZE - HALF_CHUNK_SIZE);
     assertEquals(stm.getPos(), BLOCK_SIZE);
-    stm.readFully(actual, BLOCK_SIZE, BYTES_PER_SUM+HALF_CHUNK_SIZE);
-    assertEquals(stm.getPos(), BLOCK_SIZE+BYTES_PER_SUM+HALF_CHUNK_SIZE);
-    stm.readFully(actual, 2*BLOCK_SIZE-HALF_CHUNK_SIZE, 
-        FILE_SIZE-(2*BLOCK_SIZE-HALF_CHUNK_SIZE));
+    stm.readFully(actual, BLOCK_SIZE, BYTES_PER_SUM + HALF_CHUNK_SIZE);
+    assertEquals(stm.getPos(), BLOCK_SIZE + BYTES_PER_SUM + HALF_CHUNK_SIZE);
+    stm.readFully(actual, 2 * BLOCK_SIZE - HALF_CHUNK_SIZE,
+        FILE_SIZE - (2 * BLOCK_SIZE - HALF_CHUNK_SIZE));
     assertEquals(stm.getPos(), FILE_SIZE);
     checkAndEraseData(actual, 0, expected, "Read Sanity Test");
     
     // test read that cross block boundary
     stm.seek(0L);
-    stm.readFully(actual, 0, BYTES_PER_SUM+HALF_CHUNK_SIZE);
-    assertEquals(stm.getPos(), BYTES_PER_SUM+HALF_CHUNK_SIZE);
-    stm.readFully(actual, BYTES_PER_SUM+HALF_CHUNK_SIZE, BYTES_PER_SUM);
-    assertEquals(stm.getPos(), BLOCK_SIZE+HALF_CHUNK_SIZE);
-    stm.readFully(actual, BLOCK_SIZE+HALF_CHUNK_SIZE,
-        FILE_SIZE-BLOCK_SIZE-HALF_CHUNK_SIZE);
+    stm.readFully(actual, 0, BYTES_PER_SUM + HALF_CHUNK_SIZE);
+    assertEquals(stm.getPos(), BYTES_PER_SUM + HALF_CHUNK_SIZE);
+    stm.readFully(actual, BYTES_PER_SUM + HALF_CHUNK_SIZE, BYTES_PER_SUM);
+    assertEquals(stm.getPos(), BLOCK_SIZE + HALF_CHUNK_SIZE);
+    stm.readFully(actual, BLOCK_SIZE + HALF_CHUNK_SIZE,
+        FILE_SIZE - BLOCK_SIZE - HALF_CHUNK_SIZE);
     assertEquals(stm.getPos(), FILE_SIZE);
     checkAndEraseData(actual, 0, expected, "Read Sanity Test");
   }
   
   /* test if one seek is correct */
-  private void testSeek1(int offset) 
-  throws Exception {
+  private void testSeek1(int offset) throws Exception {
     stm.seek(offset);
     assertEquals(offset, stm.getPos());
     stm.readFully(actual);
@@ -129,7 +128,7 @@ public class TestFSInputChecker {
   }
 
   /* test seek() */
-  private void checkSeek( ) throws Exception {
+  private void checkSeek() throws Exception {
     actual = new byte[HALF_CHUNK_SIZE];
     
     // test seeks to checksum boundary
@@ -138,16 +137,16 @@ public class TestFSInputChecker {
     testSeek1(BLOCK_SIZE);
     
     // test seek to non-checksum-boundary pos
-    testSeek1(BLOCK_SIZE+HALF_CHUNK_SIZE);
+    testSeek1(BLOCK_SIZE + HALF_CHUNK_SIZE);
     testSeek1(HALF_CHUNK_SIZE);
     
     // test seek to a position at the same checksum chunk
-    testSeek1(HALF_CHUNK_SIZE/2);
-    testSeek1(HALF_CHUNK_SIZE*3/2);
+    testSeek1(HALF_CHUNK_SIZE / 2);
+    testSeek1(HALF_CHUNK_SIZE * 3 / 2);
     
     // test end of file
     actual = new byte[1];
-    testSeek1(FILE_SIZE-1);
+    testSeek1(FILE_SIZE - 1);
     
     String errMsg = null;
     try {
@@ -155,22 +154,21 @@ public class TestFSInputChecker {
     } catch (IOException e) {
       errMsg = e.getMessage();
     }
-    assertTrue(errMsg==null);
+    assertTrue(errMsg == null);
   }
 
   /* test if one skip is correct */
-  private void testSkip1(int skippedBytes) 
-  throws Exception {
+  private void testSkip1(int skippedBytes) throws Exception {
     long oldPos = stm.getPos();
     IOUtils.skipFully(stm, skippedBytes);
     long newPos = oldPos + skippedBytes;
     assertEquals(stm.getPos(), newPos);
     stm.readFully(actual);
-    checkAndEraseData(actual, (int)newPos, expected, "Read Sanity Test");
+    checkAndEraseData(actual, (int) newPos, expected, "Read Sanity Test");
   }
 
   /* test skip() */
-  private void checkSkip( ) throws Exception {
+  private void checkSkip() throws Exception {
     actual = new byte[HALF_CHUNK_SIZE];
     
     // test skip to a checksum boundary
@@ -193,7 +191,7 @@ public class TestFSInputChecker {
     // test skip to end of file
     stm.seek(0);
     actual = new byte[1];
-    testSkip1(FILE_SIZE-1);
+    testSkip1(FILE_SIZE - 1);
     
     stm.seek(0);
     IOUtils.skipFully(stm, FILE_SIZE);
@@ -201,8 +199,8 @@ public class TestFSInputChecker {
       IOUtils.skipFully(stm, 10);
       fail("expected to get a PrematureEOFException");
     } catch (EOFException e) {
-      assertEquals(e.getMessage(), "Premature EOF from inputStream " +
-          "after skipping 0 byte(s).");
+      assertEquals(e.getMessage(),
+          "Premature EOF from inputStream " + "after skipping 0 byte(s).");
     }
     
     stm.seek(0);
@@ -233,7 +231,7 @@ public class TestFSInputChecker {
    * Tests read/seek/getPos/skipped opeation for input stream.
    */
   private void testChecker(FileSystem fileSys, boolean readCS)
-  throws Exception {
+      throws Exception {
     Path file = new Path("try.dat");
     writeFile(fileSys, file);
 
@@ -261,15 +259,15 @@ public class TestFSInputChecker {
     // create a file and verify that checksum corruption results in 
     // a checksum exception on LocalFS
     
-    String dir = PathUtils.getTestDirName(getClass());
+    String dir = System.getProperty("test.build.data", ".");
     Path file = new Path(dir + "/corruption-test.dat");
     Path crcFile = new Path(dir + "/.corruption-test.dat.crc");
     
     writeFile(fileSys, file);
     
-    int fileLen = (int)fileSys.getFileStatus(file).getLen();
+    int fileLen = (int) fileSys.getFileStatus(file).getLen();
     
-    byte [] buf = new byte[fileLen];
+    byte[] buf = new byte[fileLen];
 
     InputStream in = fileSys.open(file);
     IOUtils.readFully(in, buf, 0, buf.length);
@@ -287,20 +285,20 @@ public class TestFSInputChecker {
     fileSys.delete(file, true);
   }
   
-  private void checkFileCorruption(LocalFileSystem fileSys, Path file, 
-                                   Path fileToCorrupt) throws IOException {
+  private void checkFileCorruption(LocalFileSystem fileSys, Path file,
+      Path fileToCorrupt) throws IOException {
     
     // corrupt the file 
-    RandomAccessFile out = 
-      new RandomAccessFile(new File(fileToCorrupt.toString()), "rw");
+    RandomAccessFile out =
+        new RandomAccessFile(new File(fileToCorrupt.toString()), "rw");
     
-    byte[] buf = new byte[(int)fileSys.getFileStatus(file).getLen()];    
-    int corruptFileLen = (int)fileSys.getFileStatus(fileToCorrupt).getLen();
+    byte[] buf = new byte[(int) fileSys.getFileStatus(file).getLen()];
+    int corruptFileLen = (int) fileSys.getFileStatus(fileToCorrupt).getLen();
     assertTrue(buf.length >= corruptFileLen);
     
     rand.nextBytes(buf);
-    out.seek(corruptFileLen/2);
-    out.write(buf, 0, corruptFileLen/4);
+    out.seek(corruptFileLen / 2);
+    out.write(buf, 0, corruptFileLen / 4);
     out.close();
 
     boolean gotException = false;
@@ -312,7 +310,7 @@ public class TestFSInputChecker {
       gotException = true;
     }
     assertTrue(gotException);
-    in.close();    
+    in.close();
   }
   
   @Test
@@ -340,21 +338,18 @@ public class TestFSInputChecker {
     try {
       testChecker(fileSys, true);
       testChecker(fileSys, false);
-      testFileCorruption((LocalFileSystem)fileSys);
+      testFileCorruption((LocalFileSystem) fileSys);
       testSeekAndRead(fileSys);
-    }finally {
+    } finally {
       fileSys.close();
     }
   }
 
-  private void testSeekAndRead(FileSystem fileSys)
-  throws IOException {
+  private void testSeekAndRead(FileSystem fileSys) throws IOException {
     Path file = new Path("try.dat");
     writeFile(fileSys, file);
-    stm = fileSys.open(
-        file,
-        fileSys.getConf().getInt(
-            CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096));
+    stm = fileSys.open(file, fileSys.getConf()
+            .getInt(CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096));
     checkSeekAndRead();
     stm.close();
     cleanupFile(fileSys, file);

@@ -1,29 +1,25 @@
 /**
-* Licensed to the Apache Software Foundation (ASF) under one
-* or more contributor license agreements.  See the NOTICE file
-* distributed with this work for additional information
-* regarding copyright ownership.  The ASF licenses this file
-* to you under the Apache License, Version 2.0 (the
-* "License"); you may not use this file except in compliance
-* with the License.  You may obtain a copy of the License at
-*
-*     http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package org.apache.hadoop.yarn.server.nodemanager;
 
-import java.io.IOException;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ConcurrentSkipListMap;
-import java.util.concurrent.atomic.AtomicBoolean;
-
+import com.google.common.annotations.VisibleForTesting;
+import io.hops.exception.StorageInitializtionException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -31,6 +27,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.service.CompositeService;
+import org.apache.hadoop.util.ExitUtil;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.ShutdownHookManager;
 import org.apache.hadoop.util.StringUtils;
@@ -55,9 +52,13 @@ import org.apache.hadoop.yarn.server.nodemanager.security.NMTokenSecretManagerIn
 import org.apache.hadoop.yarn.server.nodemanager.webapp.WebServer;
 import org.apache.hadoop.yarn.server.security.ApplicationACLsManager;
 
-import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-public class NodeManager extends CompositeService 
+public class NodeManager extends CompositeService
     implements EventHandler<NodeManagerEvent> {
 
   /**
@@ -74,7 +75,7 @@ public class NodeManager extends CompositeService
   private AsyncDispatcher dispatcher;
   private ContainerManagerImpl containerManager;
   private NodeStatusUpdater nodeStatusUpdater;
-  private static CompositeServiceShutdownHook nodeManagerShutdownHook; 
+  private static CompositeServiceShutdownHook nodeManagerShutdownHook;
   
   private AtomicBoolean isStopping = new AtomicBoolean(false);
   
@@ -85,7 +86,7 @@ public class NodeManager extends CompositeService
   protected NodeStatusUpdater createNodeStatusUpdater(Context context,
       Dispatcher dispatcher, NodeHealthCheckerService healthChecker) {
     return new NodeStatusUpdaterImpl(context, dispatcher, healthChecker,
-      metrics);
+        metrics);
   }
 
   protected NodeResourceMonitor createNodeResourceMonitor() {
@@ -97,7 +98,7 @@ public class NodeManager extends CompositeService
       NodeStatusUpdater nodeStatusUpdater, ApplicationACLsManager aclsManager,
       LocalDirsHandlerService dirsHandler) {
     return new ContainerManagerImpl(context, exec, del, nodeStatusUpdater,
-      metrics, aclsManager, dirsHandler);
+        metrics, aclsManager, dirsHandler);
   }
 
   protected WebServer createWebServer(Context nmContext,
@@ -137,12 +138,13 @@ public class NodeManager extends CompositeService
 
     ContainerExecutor exec = ReflectionUtils.newInstance(
         conf.getClass(YarnConfiguration.NM_CONTAINER_EXECUTOR,
-          DefaultContainerExecutor.class, ContainerExecutor.class), conf);
+            DefaultContainerExecutor.class, ContainerExecutor.class), conf);
     try {
       exec.init();
     } catch (IOException e) {
-      throw new YarnRuntimeException("Failed to initialize container executor", e);
-    }    
+      throw new YarnRuntimeException("Failed to initialize container executor",
+          e);
+    }
     DeletionService del = createDeletionService(exec);
     addService(del);
 
@@ -153,8 +155,8 @@ public class NodeManager extends CompositeService
     addService(nodeHealthChecker);
     dirsHandler = nodeHealthChecker.getDiskHandler();
 
-    this.context = createNMContext(containerTokenSecretManager,
-        nmTokenSecretManager);
+    this.context =
+        createNMContext(containerTokenSecretManager, nmTokenSecretManager);
     
     nodeStatusUpdater =
         createNodeStatusUpdater(context, dispatcher, nodeHealthChecker);
@@ -164,12 +166,13 @@ public class NodeManager extends CompositeService
 
     containerManager =
         createContainerManager(context, exec, del, nodeStatusUpdater,
-        this.aclsManager, dirsHandler);
+            this.aclsManager, dirsHandler);
     addService(containerManager);
     ((NMContext) context).setContainerManager(containerManager);
 
-    WebServer webServer = createWebServer(context, containerManager
-        .getContainersMonitor(), this.aclsManager, dirsHandler);
+    WebServer webServer =
+        createWebServer(context, containerManager.getContainersMonitor(),
+            this.aclsManager, dirsHandler);
     addService(webServer);
     ((NMContext) context).setWebServer(webServer);
 
@@ -225,12 +228,13 @@ public class NodeManager extends CompositeService
       @Override
       public void run() {
         try {
-          LOG.info("Notifying ContainerManager to block new container-requests");
+          LOG.info(
+              "Notifying ContainerManager to block new container-requests");
           containerManager.setBlockNewContainerRequests(true);
           LOG.info("Cleaning up running containers on resync");
           containerManager.cleanupContainersOnNMResync();
           ((NodeStatusUpdaterImpl) nodeStatusUpdater)
-            .rebootNodeStatusUpdaterAndRegisterWithRM();
+              .rebootNodeStatusUpdaterAndRegisterWithRM();
         } catch (YarnRuntimeException e) {
           LOG.fatal("Error while rebooting NodeStatusUpdater.", e);
           shutDown();
@@ -253,12 +257,14 @@ public class NodeManager extends CompositeService
     private final LocalDirsHandlerService dirsHandler;
     private final ApplicationACLsManager aclsManager;
     private WebServer webServer;
-    private final NodeHealthStatus nodeHealthStatus = RecordFactoryProvider
-        .getRecordFactory(null).newRecordInstance(NodeHealthStatus.class);
-        
+    private final NodeHealthStatus nodeHealthStatus =
+        RecordFactoryProvider.getRecordFactory(null)
+            .newRecordInstance(NodeHealthStatus.class);
+
     public NMContext(NMContainerTokenSecretManager containerTokenSecretManager,
         NMTokenSecretManagerInNM nmTokenSecretManager,
-        LocalDirsHandlerService dirsHandler, ApplicationACLsManager aclsManager) {
+        LocalDirsHandlerService dirsHandler,
+        ApplicationACLsManager aclsManager) {
       this.containerTokenSecretManager = containerTokenSecretManager;
       this.nmTokenSecretManager = nmTokenSecretManager;
       this.dirsHandler = dirsHandler;
@@ -311,7 +317,8 @@ public class NodeManager extends CompositeService
       return this.containerManager;
     }
 
-    public void setContainerManager(ContainerManagementProtocol containerManager) {
+    public void setContainerManager(
+        ContainerManagementProtocol containerManager) {
       this.containerManager = containerManager;
     }
 
@@ -342,7 +349,8 @@ public class NodeManager extends CompositeService
     return nodeHealthChecker;
   }
 
-  private void initAndStartNodeManager(Configuration conf, boolean hasToReboot) {
+  private void initAndStartNodeManager(Configuration conf,
+      boolean hasToReboot) {
     try {
 
       // Remove the old hook if we are rebooting.
@@ -351,28 +359,28 @@ public class NodeManager extends CompositeService
       }
 
       nodeManagerShutdownHook = new CompositeServiceShutdownHook(this);
-      ShutdownHookManager.get().addShutdownHook(nodeManagerShutdownHook,
-                                                SHUTDOWN_HOOK_PRIORITY);
+      ShutdownHookManager.get()
+          .addShutdownHook(nodeManagerShutdownHook, SHUTDOWN_HOOK_PRIORITY);
 
       this.init(conf);
       this.start();
     } catch (Throwable t) {
       LOG.fatal("Error starting NodeManager", t);
-      System.exit(-1);
+      ExitUtil.terminate(-1);
     }
   }
 
   @Override
   public void handle(NodeManagerEvent event) {
     switch (event.getType()) {
-    case SHUTDOWN:
-      shutDown();
-      break;
-    case RESYNC:
-      resyncWithRM();
-      break;
-    default:
-      LOG.warn("Invalid shutdown event " + event.getType() + ". Ignoring.");
+      case SHUTDOWN:
+        shutDown();
+        break;
+      case RESYNC:
+        resyncWithRM();
+        break;
+      default:
+        LOG.warn("Invalid shutdown event " + event.getType() + ". Ignoring.");
     }
   }
   
@@ -387,7 +395,7 @@ public class NodeManager extends CompositeService
   }
   
   //For testing
-  Dispatcher getNMDispatcher(){
+  Dispatcher getNMDispatcher() {
     return dispatcher;
   }
 
@@ -396,8 +404,10 @@ public class NodeManager extends CompositeService
     return this.context;
   }
 
-  public static void main(String[] args) {
-    Thread.setDefaultUncaughtExceptionHandler(new YarnUncaughtExceptionHandler());
+  public static void main(String[] args)
+      throws StorageInitializtionException, IOException {
+    Thread
+        .setDefaultUncaughtExceptionHandler(new YarnUncaughtExceptionHandler());
     StringUtils.startupShutdownMessage(NodeManager.class, args, LOG);
     NodeManager nodeManager = new NodeManager();
     Configuration conf = new YarnConfiguration();

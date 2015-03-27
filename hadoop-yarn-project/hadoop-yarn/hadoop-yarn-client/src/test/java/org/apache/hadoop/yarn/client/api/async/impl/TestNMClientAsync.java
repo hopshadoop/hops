@@ -18,11 +18,26 @@
 
 package org.apache.hadoop.yarn.client.api.async.impl;
 
-import static org.mockito.Matchers.any;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import junit.framework.Assert;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.service.ServiceOperations;
+import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
+import org.apache.hadoop.yarn.api.records.ApplicationId;
+import org.apache.hadoop.yarn.api.records.Container;
+import org.apache.hadoop.yarn.api.records.ContainerId;
+import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
+import org.apache.hadoop.yarn.api.records.ContainerStatus;
+import org.apache.hadoop.yarn.api.records.NodeId;
+import org.apache.hadoop.yarn.api.records.Token;
+import org.apache.hadoop.yarn.client.api.NMClient;
+import org.apache.hadoop.yarn.client.api.async.NMClientAsync;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import org.apache.hadoop.yarn.exceptions.YarnException;
+import org.apache.hadoop.yarn.factories.RecordFactory;
+import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
+import org.apache.hadoop.yarn.ipc.RPCUtil;
+import org.junit.After;
+import org.junit.Test;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -36,28 +51,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicIntegerArray;
 
-import junit.framework.Assert;
-
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.service.ServiceOperations;
-import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
-import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.hadoop.yarn.api.records.Container;
-import org.apache.hadoop.yarn.api.records.ContainerId;
-import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
-import org.apache.hadoop.yarn.api.records.ContainerStatus;
-import org.apache.hadoop.yarn.api.records.NodeId;
-import org.apache.hadoop.yarn.api.records.Token;
-import org.apache.hadoop.yarn.client.api.NMClient;
-import org.apache.hadoop.yarn.client.api.async.NMClientAsync;
-import org.apache.hadoop.yarn.client.api.async.impl.NMClientAsyncImpl;
-import org.apache.hadoop.yarn.conf.YarnConfiguration;
-import org.apache.hadoop.yarn.exceptions.YarnException;
-import org.apache.hadoop.yarn.factories.RecordFactory;
-import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
-import org.apache.hadoop.yarn.ipc.RPCUtil;
-import org.junit.After;
-import org.junit.Test;
+import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 
 public class TestNMClientAsync {
@@ -74,7 +72,7 @@ public class TestNMClientAsync {
     ServiceOperations.stop(asyncClient);
   }
 
-  @Test (timeout = 10000)
+  @Test(timeout = 10000)
   public void testNMClientAsync() throws Exception {
     Configuration conf = new Configuration();
     conf.setInt(YarnConfiguration.NM_CLIENT_ASYNC_THREAD_POOL_MAX_SIZE, 10);
@@ -85,8 +83,8 @@ public class TestNMClientAsync {
 
     asyncClient = new MockNMClientAsync1(expectedSuccess, expectedFailure);
     asyncClient.init(conf);
-    Assert.assertEquals("The max thread pool size is not correctly set",
-        10, asyncClient.maxThreadPoolSize);
+    Assert.assertEquals("The max thread pool size is not correctly set", 10,
+        asyncClient.maxThreadPoolSize);
     asyncClient.start();
 
 
@@ -110,8 +108,8 @@ public class TestNMClientAsync {
     asyncClient.setClient(mockNMClient(2));
     ((TestCallbackHandler1) asyncClient.getCallbackHandler()).path = false;
     for (int i = 0; i < expectedFailure; ++i) {
-      Container container = mockContainer(
-          expectedSuccess + expectedFailure + i);
+      Container container =
+          mockContainer(expectedSuccess + expectedFailure + i);
       ContainerLaunchContext clc =
           recordFactory.newRecordInstance(ContainerLaunchContext.class);
       asyncClient.startContainerAsync(container, clc);
@@ -120,14 +118,13 @@ public class TestNMClientAsync {
         .isStopFailureCallsExecuted()) {
       Thread.sleep(10);
     }
-    for (String errorMsg :
-        ((TestCallbackHandler1) asyncClient.getCallbackHandler())
-            .errorMsgs) {
+    for (String errorMsg : ((TestCallbackHandler1) asyncClient
+        .getCallbackHandler()).errorMsgs) {
       System.out.println(errorMsg);
     }
     Assert.assertEquals("Error occurs in CallbackHandler", 0,
-        ((TestCallbackHandler1) asyncClient.getCallbackHandler())
-            .errorMsgs.size());
+        ((TestCallbackHandler1) asyncClient.getCallbackHandler()).errorMsgs
+            .size());
     for (String errorMsg : ((MockNMClientAsync1) asyncClient).errorMsgs) {
       System.out.println(errorMsg);
     }
@@ -182,8 +179,7 @@ public class TestNMClientAsync {
     }
   }
 
-  private class TestCallbackHandler1
-      implements NMClientAsync.CallbackHandler {
+  private class TestCallbackHandler1 implements NMClientAsync.CallbackHandler {
 
     private boolean path = true;
 
@@ -309,8 +305,8 @@ public class TestNMClientAsync {
       }
 
       actualStopFailure.addAndGet(1);
-      actualStopFailureArray.set(
-          containerId.getId() - expectedSuccess - expectedFailure, 1);
+      actualStopFailureArray
+          .set(containerId.getId() - expectedSuccess - expectedFailure, 1);
 
       // Shouldn't crash the test thread
       throw new RuntimeException("Ignorable Exception");
@@ -320,8 +316,8 @@ public class TestNMClientAsync {
     public void onGetContainerStatusError(ContainerId containerId,
         Throwable t) {
       if (t instanceof RuntimeException) {
-        errorMsgs.add("Unexpected throwable from callback functions should be"
-            + " ignored by Container " + containerId);
+        errorMsgs.add("Unexpected throwable from callback functions should be" +
+            " ignored by Container " + containerId);
       }
       if (containerId.getId() < expectedSuccess) {
         errorMsgs.add("Container " + containerId +
@@ -338,8 +334,8 @@ public class TestNMClientAsync {
     public boolean isAllSuccessCallsExecuted() {
       boolean isAllSuccessCallsExecuted =
           actualStartSuccess.get() == expectedSuccess &&
-          actualQuerySuccess.get() == expectedSuccess &&
-          actualStopSuccess.get() == expectedSuccess;
+              actualQuerySuccess.get() == expectedSuccess &&
+              actualStopSuccess.get() == expectedSuccess;
       if (isAllSuccessCallsExecuted) {
         assertAtomicIntegerArray(actualStartSuccessArray);
         assertAtomicIntegerArray(actualQuerySuccessArray);
@@ -351,7 +347,7 @@ public class TestNMClientAsync {
     public boolean isStartAndQueryFailureCallsExecuted() {
       boolean isStartAndQueryFailureCallsExecuted =
           actualStartFailure.get() == expectedFailure &&
-          actualQueryFailure.get() == expectedFailure;
+              actualQueryFailure.get() == expectedFailure;
       if (isStartAndQueryFailureCallsExecuted) {
         assertAtomicIntegerArray(actualStartFailureArray);
         assertAtomicIntegerArray(actualQueryFailureArray);
@@ -375,19 +371,18 @@ public class TestNMClientAsync {
     }
   }
 
-  private NMClient mockNMClient(int mode)
-      throws YarnException, IOException {
+  private NMClient mockNMClient(int mode) throws YarnException, IOException {
     NMClient client = mock(NMClient.class);
     switch (mode) {
       case 0:
         when(client.startContainer(any(Container.class),
-            any(ContainerLaunchContext.class))).thenReturn(
-                Collections.<String, ByteBuffer>emptyMap());
-        when(client.getContainerStatus(any(ContainerId.class),
-            any(NodeId.class))).thenReturn(
-                recordFactory.newRecordInstance(ContainerStatus.class));
-        doNothing().when(client).stopContainer(any(ContainerId.class),
-            any(NodeId.class));
+            any(ContainerLaunchContext.class)))
+            .thenReturn(Collections.<String, ByteBuffer>emptyMap());
+        when(client
+            .getContainerStatus(any(ContainerId.class), any(NodeId.class)))
+            .thenReturn(recordFactory.newRecordInstance(ContainerStatus.class));
+        doNothing().when(client)
+            .stopContainer(any(ContainerId.class), any(NodeId.class));
         break;
       case 1:
         doThrow(RPCUtil.getRemoteException("Start Exception")).when(client)
@@ -400,18 +395,18 @@ public class TestNMClientAsync {
         break;
       case 2:
         when(client.startContainer(any(Container.class),
-            any(ContainerLaunchContext.class))).thenReturn(
-                Collections.<String, ByteBuffer>emptyMap());
-        when(client.getContainerStatus(any(ContainerId.class),
-            any(NodeId.class))).thenReturn(
-                recordFactory.newRecordInstance(ContainerStatus.class));
+            any(ContainerLaunchContext.class)))
+            .thenReturn(Collections.<String, ByteBuffer>emptyMap());
+        when(client
+            .getContainerStatus(any(ContainerId.class), any(NodeId.class)))
+            .thenReturn(recordFactory.newRecordInstance(ContainerStatus.class));
         doThrow(RPCUtil.getRemoteException("Stop Exception")).when(client)
             .stopContainer(any(ContainerId.class), any(NodeId.class));
     }
     return client;
   }
 
-  @Test (timeout = 10000)
+  @Test(timeout = 10000)
   public void testOutOfOrder() throws Exception {
     CyclicBarrier barrierA = new CyclicBarrier(2);
     CyclicBarrier barrierB = new CyclicBarrier(2);
@@ -438,8 +433,8 @@ public class TestNMClientAsync {
     barrierC.await();
 
     Assert.assertFalse("Starting and stopping should be out of order",
-        ((TestCallbackHandler2) asyncClient.getCallbackHandler())
-            .exceptionOccurred.get());
+        ((TestCallbackHandler2) asyncClient
+            .getCallbackHandler()).exceptionOccurred.get());
   }
 
   private class MockNMClientAsync2 extends NMClientAsyncImpl {
@@ -486,8 +481,7 @@ public class TestNMClientAsync {
     }
   }
 
-  private class TestCallbackHandler2
-      implements NMClientAsync.CallbackHandler {
+  private class TestCallbackHandler2 implements NMClientAsync.CallbackHandler {
     private CyclicBarrier barrierC;
     private AtomicBoolean exceptionOccurred = new AtomicBoolean(false);
 
@@ -511,8 +505,8 @@ public class TestNMClientAsync {
 
     @Override
     public void onStartContainerError(ContainerId containerId, Throwable t) {
-      if (!t.getMessage().equals(NMClientAsyncImpl.StatefulContainer
-          .OutOfOrderTransition.STOP_BEFORE_START_ERROR_MSG)) {
+      if (!t.getMessage().equals(
+          NMClientAsyncImpl.StatefulContainer.OutOfOrderTransition.STOP_BEFORE_START_ERROR_MSG)) {
         exceptionOccurred.set(true);
         return;
       }
@@ -539,13 +533,12 @@ public class TestNMClientAsync {
   private Container mockContainer(int i) {
     ApplicationId appId =
         ApplicationId.newInstance(System.currentTimeMillis(), 1);
-    ApplicationAttemptId attemptId =
-        ApplicationAttemptId.newInstance(appId, 1);
+    ApplicationAttemptId attemptId = ApplicationAttemptId.newInstance(appId, 1);
     ContainerId containerId = ContainerId.newInstance(attemptId, i);
     nodeId = NodeId.newInstance("localhost", 0);
     // Create an empty record
     containerToken = recordFactory.newRecordInstance(Token.class);
-    return Container.newInstance(containerId, nodeId, null, null, null,
-      containerToken);
+    return Container
+        .newInstance(containerId, nodeId, null, null, null, containerToken);
   }
 }

@@ -18,15 +18,7 @@
 
 package org.apache.hadoop.yarn.server.webapp;
 
-import static org.apache.hadoop.yarn.util.StringHelper.join;
-import static org.apache.hadoop.yarn.webapp.YarnWebParams.APP_STATE;
-import static org.apache.hadoop.yarn.webapp.view.JQueryUI.C_PROGRESSBAR;
-import static org.apache.hadoop.yarn.webapp.view.JQueryUI.C_PROGRESSBAR_VALUE;
-
-import java.io.IOException;
-import java.util.Collection;
-import java.util.HashSet;
-
+import com.google.inject.Inject;
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.hadoop.yarn.api.records.ApplicationReport;
 import org.apache.hadoop.yarn.api.records.YarnApplicationState;
@@ -37,7 +29,14 @@ import org.apache.hadoop.yarn.webapp.hamlet.Hamlet.TABLE;
 import org.apache.hadoop.yarn.webapp.hamlet.Hamlet.TBODY;
 import org.apache.hadoop.yarn.webapp.view.HtmlBlock;
 
-import com.google.inject.Inject;
+import java.io.IOException;
+import java.util.Collection;
+import java.util.HashSet;
+
+import static org.apache.hadoop.yarn.util.StringHelper.join;
+import static org.apache.hadoop.yarn.webapp.YarnWebParams.APP_STATE;
+import static org.apache.hadoop.yarn.webapp.view.JQueryUI.C_PROGRESSBAR;
+import static org.apache.hadoop.yarn.webapp.view.JQueryUI.C_PROGRESSBAR_VALUE;
 
 public class AppsBlock extends HtmlBlock {
 
@@ -55,11 +54,11 @@ public class AppsBlock extends HtmlBlock {
 
     TBODY<TABLE<Hamlet>> tbody =
         html.table("#apps").thead().tr().th(".id", "ID").th(".user", "User")
-          .th(".name", "Name").th(".type", "Application Type")
-          .th(".queue", "Queue").th(".starttime", "StartTime")
-          .th(".finishtime", "FinishTime").th(".state", "State")
-          .th(".finalstatus", "FinalStatus").th(".progress", "Progress")
-          .th(".ui", "Tracking UI")._()._().tbody();
+            .th(".name", "Name").th(".type", "Application Type")
+            .th(".queue", "Queue").th(".starttime", "StartTime")
+            .th(".finishtime", "FinishTime").th(".state", "State")
+            .th(".finalstatus", "FinalStatus").th(".progress", "Progress")
+            .th(".ui", "Tracking UI")._()._().tbody();
     Collection<YarnApplicationState> reqAppStates = null;
     String reqStateString = $(APP_STATE);
     if (reqStateString != null && !reqStateString.isEmpty()) {
@@ -81,61 +80,48 @@ public class AppsBlock extends HtmlBlock {
     }
     StringBuilder appsTableData = new StringBuilder("[\n");
     for (ApplicationReport appReport : appReports) {
-      if (reqAppStates != null
-          && !reqAppStates.contains(appReport.getYarnApplicationState())) {
+      if (reqAppStates != null &&
+          !reqAppStates.contains(appReport.getYarnApplicationState())) {
         continue;
       }
       AppInfo app = new AppInfo(appReport);
       String percent = String.format("%.1f", app.getProgress());
       // AppID numerical value parsed by parseHadoopID in yarn.dt.plugins.js
-      appsTableData
-        .append("[\"<a href='")
-        .append(url("app", app.getAppId()))
-        .append("'>")
-        .append(app.getAppId())
-        .append("</a>\",\"")
-        .append(
-          StringEscapeUtils.escapeJavaScript(StringEscapeUtils.escapeHtml(app
-            .getUser())))
-        .append("\",\"")
-        .append(
-          StringEscapeUtils.escapeJavaScript(StringEscapeUtils.escapeHtml(app
-            .getName())))
-        .append("\",\"")
-        .append(
-          StringEscapeUtils.escapeJavaScript(StringEscapeUtils.escapeHtml(app
-            .getType())))
-        .append("\",\"")
-        .append(
-          StringEscapeUtils.escapeJavaScript(StringEscapeUtils.escapeHtml(app
-            .getQueue()))).append("\",\"").append(app.getStartedTime())
-        .append("\",\"").append(app.getFinishedTime())
-        .append("\",\"")
-        .append(app.getAppState())
-        .append("\",\"")
-        .append(app.getFinalAppStatus())
-        .append("\",\"")
-        // Progress bar
-        .append("<br title='").append(percent).append("'> <div class='")
-        .append(C_PROGRESSBAR).append("' title='").append(join(percent, '%'))
-        .append("'> ").append("<div class='").append(C_PROGRESSBAR_VALUE)
-        .append("' style='").append(join("width:", percent, '%'))
-        .append("'> </div> </div>").append("\",\"<a href='");
+      appsTableData.append("[\"<a href='").append(url("app", app.getAppId()))
+          .append("'>").append(app.getAppId()).append("</a>\",\"").append(
+          StringEscapeUtils
+              .escapeJavaScript(StringEscapeUtils.escapeHtml(app.getUser())))
+          .append("\",\"").append(StringEscapeUtils
+              .escapeJavaScript(StringEscapeUtils.escapeHtml(app.getName())))
+          .append("\",\"").append(StringEscapeUtils
+              .escapeJavaScript(StringEscapeUtils.escapeHtml(app.getType())))
+          .append("\",\"").append(StringEscapeUtils
+              .escapeJavaScript(StringEscapeUtils.escapeHtml(app.getQueue())))
+          .append("\",\"").append(app.getStartedTime()).append("\",\"")
+          .append(app.getFinishedTime()).append("\",\"")
+          .append(app.getAppState()).append("\",\"")
+          .append(app.getFinalAppStatus()).append("\",\"")
+          // Progress bar
+          .append("<br title='").append(percent).append("'> <div class='")
+          .append(C_PROGRESSBAR).append("' title='").append(join(percent, '%'))
+          .append("'> ").append("<div class='").append(C_PROGRESSBAR_VALUE)
+          .append("' style='").append(join("width:", percent, '%'))
+          .append("'> </div> </div>").append("\",\"<a href='");
 
       String trackingURL =
           app.getTrackingUrl() == null ? "#" : app.getTrackingUrl();
 
       appsTableData.append(trackingURL).append("'>").append("History")
-        .append("</a>\"],\n");
+          .append("</a>\"],\n");
 
     }
     if (appsTableData.charAt(appsTableData.length() - 2) == ',') {
-      appsTableData.delete(appsTableData.length() - 2,
-        appsTableData.length() - 1);
+      appsTableData
+          .delete(appsTableData.length() - 2, appsTableData.length() - 1);
     }
     appsTableData.append("]");
     html.script().$type("text/javascript")
-      ._("var appsTableData=" + appsTableData)._();
+        ._("var appsTableData=" + appsTableData)._();
 
     tbody._()._();
   }

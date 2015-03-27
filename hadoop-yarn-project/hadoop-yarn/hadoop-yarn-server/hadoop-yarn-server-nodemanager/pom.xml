@@ -13,16 +13,16 @@
   limitations under the License. See accompanying LICENSE file.
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
                       http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <artifactId>hadoop-yarn-server</artifactId>
-    <groupId>org.apache.hadoop</groupId>
+    <groupId>io.hops</groupId>
     <version>2.4.0</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
-  <groupId>org.apache.hadoop</groupId>
+  <groupId>io.hops</groupId>
   <artifactId>hadoop-yarn-server-nodemanager</artifactId>
   <version>2.4.0</version>
   <name>hadoop-yarn-server-nodemanager</name>
@@ -37,7 +37,7 @@
   <dependencies>
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-common</artifactId>
       <scope>provided</scope>
       <exclusions>
@@ -62,12 +62,12 @@
 
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-yarn-common</artifactId>
     </dependency>
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-yarn-api</artifactId>
     </dependency>
     <dependency>
@@ -117,7 +117,7 @@
     </dependency>
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-annotations</artifactId>
     </dependency>
     <dependency>
@@ -127,7 +127,7 @@
     </dependency>
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-common</artifactId>
       <type>test-jar</type>
       <scope>test</scope>
@@ -164,14 +164,14 @@
     </dependency>
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-yarn-common</artifactId>
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-yarn-server-common</artifactId>
     </dependency>
   </dependencies>
@@ -191,20 +191,29 @@
               <execution>
                 <id>make</id>
                 <phase>compile</phase>
-                <goals><goal>run</goal></goals>
+                <goals>
+                  <goal>run</goal>
+                </goals>
                 <configuration>
                   <target>
                     <mkdir dir="${project.build.directory}/native/target"/>
-                    <exec executable="cmake" dir="${project.build.directory}/native" failonerror="true">
+                    <exec executable="cmake"
+                          dir="${project.build.directory}/native"
+                          failonerror="true">
                       <arg line="${basedir}/src/ -DHADOOP_CONF_DIR=${container-executor.conf.dir} -DJVM_ARCH_DATA_MODEL=${sun.arch.data.model}"/>
-                      <env key="CFLAGS" value="${container-executor.additional_cflags}"/>
+                      <env key="CFLAGS"
+                           value="${container-executor.additional_cflags}"/>
                     </exec>
-                    <exec executable="make" dir="${project.build.directory}/native" failonerror="true">
+                    <exec executable="make"
+                          dir="${project.build.directory}/native"
+                          failonerror="true">
                       <arg line="VERBOSE=1"/>
                     </exec>
                     <!-- The second make is a workaround for HADOOP-9215.  It can
                          be removed when version 2.6 of cmake is no longer supported . -->
-                    <exec executable="make" dir="${project.build.directory}/native" failonerror="true"></exec>
+                    <exec executable="make"
+                          dir="${project.build.directory}/native"
+                          failonerror="true"></exec>
                   </target>
                 </configuration>
               </execution>
@@ -213,7 +222,8 @@
                 <phase>test</phase>
                 <configuration>
                   <target>
-                    <exec executable="sh" failonerror="true" dir="${project.build.directory}/native">
+                    <exec executable="sh" failonerror="true"
+                          dir="${project.build.directory}/native">
                       <arg value="-c"/>
                       <arg value="[ x$SKIPTESTS = xtrue ] || test-container-executor"/>
                       <env key="SKIPTESTS" value="${skipTests}"/>
@@ -246,13 +256,17 @@
                   <goal>java</goal>
                 </goals>
                 <configuration>
-                  <mainClass>org.apache.hadoop.yarn.state.VisualizeStateMachine</mainClass>
-		  <classpathScope>compile</classpathScope>
+                  <mainClass>
+                    org.apache.hadoop.yarn.state.VisualizeStateMachine
+                  </mainClass>
+                  <classpathScope>compile</classpathScope>
                   <arguments>
                     <argument>NodeManager</argument>
-                    <argument>org.apache.hadoop.yarn.server.nodemanager.containermanager.application.ApplicationImpl,
-                       org.apache.hadoop.yarn.server.nodemanager.containermanager.container.ContainerImpl,
-                       org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.LocalizedResource</argument>
+                    <argument>
+                      org.apache.hadoop.yarn.server.nodemanager.containermanager.application.ApplicationImpl,
+                      org.apache.hadoop.yarn.server.nodemanager.containermanager.container.ContainerImpl,
+                      org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.LocalizedResource
+                    </argument>
                     <argument>NodeManager.gv</argument>
                   </arguments>
                 </configuration>
@@ -278,10 +292,10 @@
               <name>application.submitter</name>
               <value>${application.submitter}</value>
             </property>
-	    <property>
-	      <name>yarn.log.dir</name>
-	      <value>${maven.project.build.directory}/logs</value>
-	    </property>
+            <property>
+              <name>yarn.log.dir</name>
+              <value>${maven.project.build.directory}/logs</value>
+            </property>
           </systemPropertyVariables>
           <excludes>
             <exclude>**/TestFSDownload.java</exclude>
@@ -290,7 +304,7 @@
       </plugin>
 
       <plugin>
-        <groupId>org.apache.hadoop</groupId>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-maven-plugins</artifactId>
         <executions>
           <execution>
@@ -303,7 +317,9 @@
               <protocVersion>${protobuf.version}</protocVersion>
               <protocCommand>${protoc.path}</protocCommand>
               <imports>
-                <param>${basedir}/../../../../hadoop-common-project/hadoop-common/src/main/proto</param>
+                <param>
+                  ${basedir}/../../../../hadoop-common-project/hadoop-common/src/main/proto
+                </param>
                 <param>${basedir}/../../hadoop-yarn-api/src/main/proto</param>
                 <param>${basedir}/src/main/proto</param>
               </imports>

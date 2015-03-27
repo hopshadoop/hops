@@ -18,17 +18,17 @@
 
 package org.apache.hadoop.hdfs.nfs;
 
-import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
-
 import org.apache.hadoop.nfs.nfs3.Nfs3Constant;
 import org.apache.hadoop.oncrpc.RpcCall;
 import org.apache.hadoop.oncrpc.XDR;
 import org.apache.hadoop.oncrpc.security.CredentialsNone;
 import org.apache.hadoop.oncrpc.security.VerifierNone;
+
+import java.io.IOException;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 
 // TODO: convert this to Junit
 public class TestUdpServer {
@@ -39,11 +39,12 @@ public class TestUdpServer {
       byte[] sendData = request.getBytes();
       byte[] receiveData = new byte[65535];
 
-      DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length,
-          IPAddress, Nfs3Constant.SUN_RPCBIND);
+      DatagramPacket sendPacket =
+          new DatagramPacket(sendData, sendData.length, IPAddress,
+              Nfs3Constant.SUN_RPCBIND);
       clientSocket.send(sendPacket);
-      DatagramPacket receivePacket = new DatagramPacket(receiveData,
-          receiveData.length);
+      DatagramPacket receivePacket =
+          new DatagramPacket(receiveData, receiveData.length);
       clientSocket.receive(receivePacket);
       clientSocket.close();
 
@@ -51,12 +52,12 @@ public class TestUdpServer {
       System.err.println("Don't know about host: localhost.");
       System.exit(1);
     } catch (IOException e) {
-      System.err.println("Couldn't get I/O for "
-          + "the connection to: localhost.");
+      System.err
+          .println("Couldn't get I/O for " + "the connection to: localhost.");
       System.exit(1);
     }
   }
- 
+
   public static void main(String[] args) throws InterruptedException {
     Thread t1 = new Runtest1();
     // TODO: cleanup
@@ -87,7 +88,7 @@ public class TestUdpServer {
     RpcCall.getInstance(0, 100000, 2, procedure, new CredentialsNone(),
         new VerifierNone()).write(xdr_out);
   }
- 
+
   static void testGetportMount() {
     XDR xdr_out = new XDR();
     createPortmapXDRheader(xdr_out, 3);

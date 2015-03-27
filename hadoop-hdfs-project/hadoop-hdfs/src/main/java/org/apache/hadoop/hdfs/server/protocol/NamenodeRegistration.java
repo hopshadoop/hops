@@ -20,26 +20,24 @@ package org.apache.hadoop.hdfs.server.protocol;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.NamenodeRole;
 import org.apache.hadoop.hdfs.server.common.Storage;
 import org.apache.hadoop.hdfs.server.common.StorageInfo;
-import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.NamenodeRole;
 
 /**
  * Information sent by a subordinate name-node to the active name-node
- * during the registration process. 
+ * during the registration process.
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class NamenodeRegistration extends StorageInfo
-implements NodeRegistration {
-  final String rpcAddress;          // RPC address of the node
-  final String httpAddress;         // HTTP address of the node
-  final NamenodeRole role;          // node role
+    implements NodeRegistration {
+  String rpcAddress;          // RPC address of the node
+  String httpAddress;         // HTTP address of the node
+  NamenodeRole role;          // node role
 
-  public NamenodeRegistration(String address,
-                              String httpAddress,
-                              StorageInfo storageInfo,
-                              NamenodeRole role) {
+  public NamenodeRegistration(String address, String httpAddress,
+      StorageInfo storageInfo, NamenodeRole role) {
     super(storageInfo);
     this.rpcAddress = address;
     this.httpAddress = httpAddress;
@@ -67,10 +65,8 @@ implements NodeRegistration {
 
   @Override // NodeRegistration
   public String toString() {
-    return getClass().getSimpleName()
-    + "(" + rpcAddress
-    + ", role=" + getRole()
-    + ")";
+    return getClass().getSimpleName() + "(" + rpcAddress + ", role=" +
+        getRole() + ")";
   }
 
   /**

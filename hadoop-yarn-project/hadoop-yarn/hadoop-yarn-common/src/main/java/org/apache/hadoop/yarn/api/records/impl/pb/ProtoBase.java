@@ -18,18 +18,17 @@
 
 package org.apache.hadoop.yarn.api.records.impl.pb;
 
-import java.nio.ByteBuffer;
-
-import org.apache.hadoop.classification.InterfaceAudience.Private;
-import org.apache.hadoop.classification.InterfaceStability.Unstable;
-
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Message;
 import com.google.protobuf.TextFormat;
+import org.apache.hadoop.classification.InterfaceAudience.Private;
+import org.apache.hadoop.classification.InterfaceStability.Unstable;
+
+import java.nio.ByteBuffer;
 
 @Private
 @Unstable
-public abstract class ProtoBase <T extends Message> {
+public abstract class ProtoBase<T extends Message> {
   
   public abstract T getProto();
 
@@ -42,8 +41,9 @@ public abstract class ProtoBase <T extends Message> {
   
   @Override
   public boolean equals(Object other) {
-    if (other == null)
+    if (other == null) {
       return false;
+    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }

@@ -1,27 +1,23 @@
 /**
-* Licensed to the Apache Software Foundation (ASF) under one
-* or more contributor license agreements.  See the NOTICE file
-* distributed with this work for additional information
-* regarding copyright ownership.  The ASF licenses this file
-* to you under the Apache License, Version 2.0 (the
-* "License"); you may not use this file except in compliance
-* with the License.  You may obtain a copy of the License at
-*
-*     http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.AccessControlList;
@@ -30,11 +26,16 @@ import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.server.resourcemanager.resource.ResourceWeights;
 import org.apache.hadoop.yarn.util.resource.Resources;
 
-import com.google.common.annotations.VisibleForTesting;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 public class AllocationConfiguration {
-  private static final AccessControlList EVERYBODY_ACL = new AccessControlList("*");
-  private static final AccessControlList NOBODY_ACL = new AccessControlList(" ");
+  private static final AccessControlList EVERYBODY_ACL =
+      new AccessControlList("*");
+  private static final AccessControlList NOBODY_ACL =
+      new AccessControlList(" ");
   
   // Minimum resource allocation for each queue
   private final Map<String, Resource> minQueueResources;
@@ -80,13 +81,13 @@ public class AllocationConfiguration {
   @VisibleForTesting
   Set<String> queueNames;
   
-  public AllocationConfiguration(Map<String, Resource> minQueueResources, 
-      Map<String, Resource> maxQueueResources, 
+  public AllocationConfiguration(Map<String, Resource> minQueueResources,
+      Map<String, Resource> maxQueueResources,
       Map<String, Integer> queueMaxApps, Map<String, Integer> userMaxApps,
       Map<String, ResourceWeights> queueWeights, int userMaxAppsDefault,
       int queueMaxAppsDefault, Map<String, SchedulingPolicy> schedulingPolicies,
       SchedulingPolicy defaultSchedulingPolicy,
-      Map<String, Long> minSharePreemptionTimeouts, 
+      Map<String, Long> minSharePreemptionTimeouts,
       Map<String, Map<QueueACL, AccessControlList>> queueAcls,
       long fairSharePreemptionTimeout, long defaultMinSharePreemptionTimeout,
       QueuePlacementPolicy placementPolicy, Set<String> queueNames) {
@@ -121,8 +122,8 @@ public class AllocationConfiguration {
     fairSharePreemptionTimeout = Long.MAX_VALUE;
     schedulingPolicies = new HashMap<String, SchedulingPolicy>();
     defaultSchedulingPolicy = SchedulingPolicy.DEFAULT_POLICY;
-    placementPolicy = QueuePlacementPolicy.fromConfiguration(conf,
-        new HashSet<String>());
+    placementPolicy =
+        QueuePlacementPolicy.fromConfiguration(conf, new HashSet<String>());
     queueNames = new HashSet<String>();
   }
   
@@ -150,8 +151,8 @@ public class AllocationConfiguration {
    */
   public long getMinSharePreemptionTimeout(String queueName) {
     Long minSharePreemptionTimeout = minSharePreemptionTimeouts.get(queueName);
-    return (minSharePreemptionTimeout == null) ? defaultMinSharePreemptionTimeout
-        : minSharePreemptionTimeout;
+    return (minSharePreemptionTimeout == null) ?
+        defaultMinSharePreemptionTimeout : minSharePreemptionTimeout;
   }
   
   /**
@@ -180,6 +181,7 @@ public class AllocationConfiguration {
   
   /**
    * Get the minimum resource allocation for the given queue.
+   *
    * @return the cap set on this queue, or 0 if not set.
    */
   public Resource getMinResources(String queue) {
@@ -189,12 +191,14 @@ public class AllocationConfiguration {
 
   /**
    * Get the maximum resource allocation for the given queue.
+   *
    * @return the cap set on this queue, or Integer.MAX_VALUE if not set.
    */
 
   public Resource getMaxResources(String queueName) {
     Resource maxQueueResource = maxQueueResources.get(queueName);
-    return (maxQueueResource == null) ? Resources.unbounded() : maxQueueResource;
+    return (maxQueueResource == null) ? Resources.unbounded() :
+        maxQueueResource;
   }
   
   public boolean hasAccess(String queueName, QueueACL acl,

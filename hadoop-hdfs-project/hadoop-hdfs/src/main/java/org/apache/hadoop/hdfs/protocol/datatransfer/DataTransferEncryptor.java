@@ -17,15 +17,19 @@
  */
 package org.apache.hadoop.hdfs.protocol.datatransfer;
 
-import static org.apache.hadoop.hdfs.protocolPB.PBHelper.vintPrefixed;
-
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.util.Map;
-import java.util.TreeMap;
+import com.google.common.base.Charsets;
+import com.google.common.collect.Maps;
+import com.google.protobuf.ByteString;
+import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.DataTransferEncryptorMessageProto;
+import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.DataTransferEncryptorMessageProto.DataTransferEncryptorStatus;
+import org.apache.hadoop.hdfs.security.token.block.BlockPoolTokenSecretManager;
+import org.apache.hadoop.hdfs.security.token.block.DataEncryptionKey;
+import org.apache.hadoop.security.SaslInputStream;
+import org.apache.hadoop.security.SaslOutputStream;
 
 import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.CallbackHandler;
@@ -39,21 +43,15 @@ import javax.security.sasl.Sasl;
 import javax.security.sasl.SaslClient;
 import javax.security.sasl.SaslException;
 import javax.security.sasl.SaslServer;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.Map;
+import java.util.TreeMap;
 
-import org.apache.commons.codec.binary.Base64;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.DataTransferEncryptorMessageProto;
-import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.DataTransferEncryptorMessageProto.DataTransferEncryptorStatus;
-import org.apache.hadoop.hdfs.security.token.block.BlockPoolTokenSecretManager;
-import org.apache.hadoop.hdfs.security.token.block.DataEncryptionKey;
-import org.apache.hadoop.security.SaslInputStream;
-import org.apache.hadoop.security.SaslOutputStream;
-
-import com.google.common.base.Charsets;
-import com.google.common.collect.Maps;
-import com.google.protobuf.ByteString;
+import static org.apache.hadoop.hdfs.protocolPB.PBHelper.vintPrefixed;
 
 /**
  * A class which, given connected input/output streams, will perform a
@@ -85,7 +83,8 @@ public class DataTransferEncryptor {
   
   private static final String PROTOCOL = "hdfs";
   private static final String MECHANISM = "DIGEST-MD5";
-  private static final Map<String, String> SASL_PROPS = new TreeMap<String, String>();
+  private static final Map<String, String> SASL_PROPS =
+      new TreeMap<String, String>();
   
   static {
     SASL_PROPS.put(Sasl.QOP, "auth-conf");
@@ -97,24 +96,29 @@ public class DataTransferEncryptor {
    * yet known. The nonce and keyId will be sent by the client, and the DN
    * will then use those pieces of info and the secret key shared with the NN
    * to determine the encryptionKey used for the SASL handshake/encryption.
-   * 
+   * <p/>
    * Establishes a secure connection assuming that the party on the other end
    * has the same shared secret. This does a SASL connection handshake, but not
    * a general-purpose one. It's specific to the MD5-DIGEST SASL mechanism with
-   * auth-conf enabled. In particular, it doesn't support an arbitrary number of
+   * auth-conf enabled. In particular, it doesn't support an arbitrary number
+   * of
    * challenge/response rounds, and we know that the client will never have an
    * initial response, so we don't check for one.
    *
-   * @param underlyingOut output stream to write to the other party
-   * @param underlyingIn input stream to read from the other party
-   * @param blockPoolTokenSecretManager secret manager capable of constructing
-   *        encryption key based on keyId, blockPoolId, and nonce
+   * @param underlyingOut
+   *     output stream to write to the other party
+   * @param underlyingIn
+   *     input stream to read from the other party
+   * @param blockPoolTokenSecretManager
+   *     secret manager capable of constructing
+   *     encryption key based on keyId, blockPoolId, and nonce
    * @return a pair of streams which wrap the given streams and encrypt/decrypt
-   *         all data read/written
-   * @throws IOException in the event of error
+   * all data read/written
+   * @throws IOException
+   *     in the event of error
    */
-  public static IOStreamPair getEncryptedStreams(
-      OutputStream underlyingOut, InputStream underlyingIn,
+  public static IOStreamPair getEncryptedStreams(OutputStream underlyingOut,
+      InputStream underlyingIn,
       BlockPoolTokenSecretManager blockPoolTokenSecretManager,
       String encryptionAlgorithm) throws IOException {
     
@@ -128,9 +132,9 @@ public class DataTransferEncryptor {
       LOG.debug("Server using encryption algorithm " + encryptionAlgorithm);
     }
     
-    SaslParticipant sasl = new SaslParticipant(Sasl.createSaslServer(MECHANISM,
-        PROTOCOL, SERVER_NAME, saslProps,
-        new SaslServerCallbackHandler(blockPoolTokenSecretManager)));
+    SaslParticipant sasl = new SaslParticipant(
+        Sasl.createSaslServer(MECHANISM, PROTOCOL, SERVER_NAME, saslProps,
+            new SaslServerCallbackHandler(blockPoolTokenSecretManager)));
     
     int magicNumber = in.readInt();
     if (magicNumber != ENCRYPTED_TRANSFER_MAGIC_NUMBER) {
@@ -167,25 +171,29 @@ public class DataTransferEncryptor {
   
   /**
    * Factory method for clients, where the encryption token is already created.
-   * 
+   * <p/>
    * Establishes a secure connection assuming that the party on the other end
    * has the same shared secret. This does a SASL connection handshake, but not
    * a general-purpose one. It's specific to the MD5-DIGEST SASL mechanism with
-   * auth-conf enabled. In particular, it doesn't support an arbitrary number of
+   * auth-conf enabled. In particular, it doesn't support an arbitrary number
+   * of
    * challenge/response rounds, and we know that the client will never have an
    * initial response, so we don't check for one.
    *
-   * @param underlyingOut output stream to write to the other party
-   * @param underlyingIn input stream to read from the other party
-   * @param encryptionKey all info required to establish an encrypted stream
+   * @param underlyingOut
+   *     output stream to write to the other party
+   * @param underlyingIn
+   *     input stream to read from the other party
+   * @param encryptionKey
+   *     all info required to establish an encrypted stream
    * @return a pair of streams which wrap the given streams and encrypt/decrypt
-   *         all data read/written
-   * @throws IOException in the event of error
+   * all data read/written
+   * @throws IOException
+   *     in the event of error
    */
-  public static IOStreamPair getEncryptedStreams(
-      OutputStream underlyingOut, InputStream underlyingIn,
-      DataEncryptionKey encryptionKey)
-          throws IOException {
+  public static IOStreamPair getEncryptedStreams(OutputStream underlyingOut,
+      InputStream underlyingIn, DataEncryptionKey encryptionKey)
+      throws IOException {
     
     Map<String, String> saslProps = Maps.newHashMap(SASL_PROPS);
     saslProps.put("com.sun.security.sasl.digest.cipher",
@@ -200,9 +208,11 @@ public class DataTransferEncryptor {
     DataInputStream in = new DataInputStream(underlyingIn);
     
     String userName = getUserNameFromEncryptionKey(encryptionKey);
-    SaslParticipant sasl = new SaslParticipant(Sasl.createSaslClient(
-        new String[] { MECHANISM }, userName, PROTOCOL, SERVER_NAME, saslProps,
-        new SaslClientCallbackHandler(encryptionKey.encryptionKey, userName)));
+    SaslParticipant sasl = new SaslParticipant(
+        Sasl.createSaslClient(new String[]{MECHANISM}, userName, PROTOCOL,
+            SERVER_NAME, saslProps,
+            new SaslClientCallbackHandler(encryptionKey.encryptionKey,
+                userName)));
     
     out.writeInt(ENCRYPTED_TRANSFER_MAGIC_NUMBER);
     out.flush();
@@ -236,7 +246,8 @@ public class DataTransferEncryptor {
     sendSaslMessage(out, localResponse);
   }
   
-  private static void checkSaslComplete(SaslParticipant sasl) throws IOException {
+  private static void checkSaslComplete(SaslParticipant sasl)
+      throws IOException {
     if (!sasl.isComplete()) {
       throw new IOException("Failed to complete SASL handshake");
     }
@@ -265,7 +276,7 @@ public class DataTransferEncryptor {
   
   private static void sendSaslMessage(OutputStream out,
       DataTransferEncryptorStatus status, byte[] payload, String message)
-          throws IOException {
+      throws IOException {
     DataTransferEncryptorMessageProto.Builder builder =
         DataTransferEncryptorMessageProto.newBuilder();
     
@@ -299,16 +310,16 @@ public class DataTransferEncryptor {
    */
   private static class SaslServerCallbackHandler implements CallbackHandler {
     
-    private final BlockPoolTokenSecretManager blockPoolTokenSecretManager;
+    private BlockPoolTokenSecretManager blockPoolTokenSecretManager;
     
-    public SaslServerCallbackHandler(BlockPoolTokenSecretManager
-        blockPoolTokenSecretManager) {
+    public SaslServerCallbackHandler(
+        BlockPoolTokenSecretManager blockPoolTokenSecretManager) {
       this.blockPoolTokenSecretManager = blockPoolTokenSecretManager;
     }
 
     @Override
-    public void handle(Callback[] callbacks) throws IOException,
-        UnsupportedCallbackException {
+    public void handle(Callback[] callbacks)
+        throws IOException, UnsupportedCallbackException {
       NameCallback nc = null;
       PasswordCallback pc = null;
       AuthorizeCallback ac = null;
@@ -328,8 +339,9 @@ public class DataTransferEncryptor {
       }
       
       if (pc != null) {
-        byte[] encryptionKey = getEncryptionKeyFromUserName(
-            blockPoolTokenSecretManager, nc.getDefaultName());
+        byte[] encryptionKey =
+            getEncryptionKeyFromUserName(blockPoolTokenSecretManager,
+                nc.getDefaultName());
         pc.setPassword(encryptionKeyToPassword(encryptionKey));
       }
       
@@ -347,8 +359,8 @@ public class DataTransferEncryptor {
    */
   private static class SaslClientCallbackHandler implements CallbackHandler {
     
-    private final byte[] encryptionKey;
-    private final String userName;
+    private byte[] encryptionKey;
+    private String userName;
     
     public SaslClientCallbackHandler(byte[] encryptionKey, String userName) {
       this.encryptionKey = encryptionKey;
@@ -356,8 +368,8 @@ public class DataTransferEncryptor {
     }
 
     @Override
-    public void handle(Callback[] callbacks) throws IOException,
-        UnsupportedCallbackException {
+    public void handle(Callback[] callbacks)
+        throws IOException, UnsupportedCallbackException {
       NameCallback nc = null;
       PasswordCallback pc = null;
       RealmCallback rc = null;
@@ -392,23 +404,28 @@ public class DataTransferEncryptor {
    * The SASL username consists of the keyId, blockPoolId, and nonce with the
    * first two encoded as Strings, and the third encoded using Base64. The
    * fields are each separated by a single space.
-   * 
-   * @param encryptionKey the encryption key to encode as a SASL username.
+   *
+   * @param encryptionKey
+   *     the encryption key to encode as a SASL username.
    * @return encoded username containing keyId, blockPoolId, and nonce
    */
   private static String getUserNameFromEncryptionKey(
       DataEncryptionKey encryptionKey) {
     return encryptionKey.keyId + NAME_DELIMITER +
         encryptionKey.blockPoolId + NAME_DELIMITER +
-        new String(Base64.encodeBase64(encryptionKey.nonce, false), Charsets.UTF_8);
+        new String(Base64.encodeBase64(encryptionKey.nonce, false),
+            Charsets.UTF_8);
   }
   
   /**
-   * Given a secret manager and a username encoded as described above, determine
+   * Given a secret manager and a username encoded as described above,
+   * determine
    * the encryption key.
-   * 
-   * @param blockPoolTokenSecretManager to determine the encryption key.
-   * @param userName containing the keyId, blockPoolId, and nonce.
+   *
+   * @param blockPoolTokenSecretManager
+   *     to determine the encryption key.
+   * @param userName
+   *     containing the keyId, blockPoolId, and nonce.
    * @return secret encryption key.
    * @throws IOException
    */
@@ -423,17 +440,18 @@ public class DataTransferEncryptor {
     int keyId = Integer.parseInt(nameComponents[0]);
     String blockPoolId = nameComponents[1];
     byte[] nonce = Base64.decodeBase64(nameComponents[2]);
-    return blockPoolTokenSecretManager.retrieveDataEncryptionKey(keyId,
-        blockPoolId, nonce);
+    return blockPoolTokenSecretManager
+        .retrieveDataEncryptionKey(keyId, blockPoolId, nonce);
   }
   
   private static char[] encryptionKeyToPassword(byte[] encryptionKey) {
-    return new String(Base64.encodeBase64(encryptionKey, false), Charsets.UTF_8).toCharArray();
+    return new String(Base64.encodeBase64(encryptionKey, false), Charsets.UTF_8)
+        .toCharArray();
   }
   
   /**
    * Strongly inspired by Thrift's TSaslTransport class.
-   * 
+   * <p/>
    * Used to abstract over the <code>SaslServer</code> and
    * <code>SaslClient</code> classes, which share a lot of their interface, but
    * unfortunately don't share a common superclass.
@@ -451,7 +469,8 @@ public class DataTransferEncryptor {
       this.saslClient = saslClient;
     }
     
-    public byte[] evaluateChallengeOrResponse(byte[] challengeOrResponse) throws SaslException {
+    public byte[] evaluateChallengeOrResponse(byte[] challengeOrResponse)
+        throws SaslException {
       if (saslClient != null) {
         return saslClient.evaluateChallenge(challengeOrResponse);
       } else {
@@ -460,10 +479,11 @@ public class DataTransferEncryptor {
     }
 
     public boolean isComplete() {
-      if (saslClient != null)
+      if (saslClient != null) {
         return saslClient.isComplete();
-      else
+      } else {
         return saslServer.isComplete();
+      }
     }
     
     public boolean supportsConfidentiality() {
@@ -478,15 +498,13 @@ public class DataTransferEncryptor {
     
     // Return some input/output streams that will henceforth have their
     // communication encrypted.
-    private IOStreamPair createEncryptedStreamPair(
-        DataOutputStream out, DataInputStream in) {
+    private IOStreamPair createEncryptedStreamPair(DataOutputStream out,
+        DataInputStream in) {
       if (saslClient != null) {
-        return new IOStreamPair(
-            new SaslInputStream(in, saslClient),
+        return new IOStreamPair(new SaslInputStream(in, saslClient),
             new SaslOutputStream(out, saslClient));
       } else {
-        return new IOStreamPair(
-            new SaslInputStream(in, saslServer),
+        return new IOStreamPair(new SaslInputStream(in, saslServer),
             new SaslOutputStream(out, saslServer));
       }
     }
@@ -498,8 +516,8 @@ public class DataTransferEncryptor {
     private static final long serialVersionUID = 1L;
 
     public InvalidMagicNumberException(int magicNumber) {
-      super(String.format("Received %x instead of %x from client.",
-          magicNumber, ENCRYPTED_TRANSFER_MAGIC_NUMBER));
+      super(String.format("Received %x instead of %x from client.", magicNumber,
+          ENCRYPTED_TRANSFER_MAGIC_NUMBER));
     }
   }
   

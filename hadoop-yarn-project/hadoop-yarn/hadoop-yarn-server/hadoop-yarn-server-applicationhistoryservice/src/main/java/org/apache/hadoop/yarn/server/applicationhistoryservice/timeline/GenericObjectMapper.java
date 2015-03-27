@@ -17,13 +17,13 @@
  */
 package org.apache.hadoop.yarn.server.applicationhistoryservice.timeline;
 
-import java.io.IOException;
-
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.map.ObjectReader;
 import org.codehaus.jackson.map.ObjectWriter;
+
+import java.io.IOException;
 
 /**
  * A utility class providing methods for serializing and deserializing
@@ -54,9 +54,11 @@ public class GenericObjectMapper {
    * as long as it is one of the JSON-compatible objects understood by
    * ObjectMapper.
    *
-   * @param o An Object
+   * @param o
+   *     An Object
    * @return A byte array representation of the Object
-   * @throws IOException if there is a write error
+   * @throws IOException
+   *     if there is a write error
    */
   public static byte[] write(Object o) throws IOException {
     if (o == null) {
@@ -69,9 +71,11 @@ public class GenericObjectMapper {
    * Deserializes an Object from a byte array created with
    * {@link #write(Object)}.
    *
-   * @param b A byte array
+   * @param b
+   *     A byte array
    * @return An Object
-   * @throws IOException if there is a read error
+   * @throws IOException
+   *     if there is a read error
    */
   public static Object read(byte[] b) throws IOException {
     return read(b, 0);
@@ -81,10 +85,13 @@ public class GenericObjectMapper {
    * Deserializes an Object from a byte array at a specified offset, assuming
    * the bytes were created with {@link #write(Object)}.
    *
-   * @param b A byte array
-   * @param offset Offset into the array
+   * @param b
+   *     A byte array
+   * @param offset
+   *     Offset into the array
    * @return An Object
-   * @throws IOException if there is a read error
+   * @throws IOException
+   *     if there is a read error
    */
   public static Object read(byte[] b, int offset) throws IOException {
     if (b == null || b.length == 0) {
@@ -97,7 +104,8 @@ public class GenericObjectMapper {
    * Converts a long to a 8-byte array so that lexicographic ordering of the
    * produced byte arrays sort the longs in descending order.
    *
-   * @param l A long
+   * @param l
+   *     A long
    * @return A byte array
    */
   public static byte[] writeReverseOrderedLong(long l) {
@@ -106,11 +114,11 @@ public class GenericObjectMapper {
   }
 
   public static byte[] writeReverseOrderedLong(long l, byte[] b, int offset) {
-    b[offset] = (byte)(0x7f ^ ((l >> 56) & 0xff));
-    for (int i = offset+1; i < offset+7; i++) {
-      b[i] = (byte)(0xff ^ ((l >> 8*(7-i)) & 0xff));
+    b[offset] = (byte) (0x7f ^ ((l >> 56) & 0xff));
+    for (int i = offset + 1; i < offset + 7; i++) {
+      b[i] = (byte) (0xff ^ ((l >> 8 * (7 - i)) & 0xff));
     }
-    b[offset+7] = (byte)(0xff ^ (l & 0xff));
+    b[offset + 7] = (byte) (0xff ^ (l & 0xff));
     return b;
   }
 
@@ -119,15 +127,17 @@ public class GenericObjectMapper {
    * converts them to a long.  The bytes are assumed to have been created
    * with {@link #writeReverseOrderedLong}.
    *
-   * @param b A byte array
-   * @param offset An offset into the byte array
+   * @param b
+   *     A byte array
+   * @param offset
+   *     An offset into the byte array
    * @return A long
    */
   public static long readReverseOrderedLong(byte[] b, int offset) {
     long l = b[offset] & 0xff;
     for (int i = 1; i < 8; i++) {
       l = l << 8;
-      l = l | (b[offset+i]&0xff);
+      l = l | (b[offset + i] & 0xff);
     }
     return l ^ 0x7fffffffffffffffl;
   }

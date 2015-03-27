@@ -17,12 +17,8 @@
  */
 package org.apache.hadoop.hdfs.protocolPB;
 
-import java.io.Closeable;
-import java.io.IOException;
-import java.net.InetSocketAddress;
-
-import javax.net.SocketFactory;
-
+import com.google.protobuf.RpcController;
+import com.google.protobuf.ServiceException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -41,8 +37,10 @@ import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RpcClientUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 
-import com.google.protobuf.RpcController;
-import com.google.protobuf.ServiceException;
+import javax.net.SocketFactory;
+import java.io.Closeable;
+import java.io.IOException;
+import java.net.InetSocketAddress;
 
 /**
  * This class is the client side translator to translate the requests made on
@@ -51,16 +49,17 @@ import com.google.protobuf.ServiceException;
  */
 @InterfaceAudience.Private
 @InterfaceStability.Stable
-public class InterDatanodeProtocolTranslatorPB implements
-    ProtocolMetaInterface, InterDatanodeProtocol, Closeable {
-  /** RpcController is not used and hence is set to null */
+public class InterDatanodeProtocolTranslatorPB
+    implements ProtocolMetaInterface, InterDatanodeProtocol, Closeable {
+  /**
+   * RpcController is not used and hence is set to null
+   */
   private final static RpcController NULL_CONTROLLER = null;
   final private InterDatanodeProtocolPB rpcProxy;
 
   public InterDatanodeProtocolTranslatorPB(InetSocketAddress addr,
       UserGroupInformation ugi, Configuration conf, SocketFactory factory,
-      int socketTimeout)
-      throws IOException {
+      int socketTimeout) throws IOException {
     RPC.setProtocolEngine(conf, InterDatanodeProtocolPB.class,
         ProtobufRpcEngine.class);
     rpcProxy = RPC.getProxy(InterDatanodeProtocolPB.class,
@@ -76,8 +75,9 @@ public class InterDatanodeProtocolTranslatorPB implements
   @Override
   public ReplicaRecoveryInfo initReplicaRecovery(RecoveringBlock rBlock)
       throws IOException {
-    InitReplicaRecoveryRequestProto req = InitReplicaRecoveryRequestProto
-        .newBuilder().setBlock(PBHelper.convert(rBlock)).build();
+    InitReplicaRecoveryRequestProto req =
+        InitReplicaRecoveryRequestProto.newBuilder()
+            .setBlock(PBHelper.convert(rBlock)).build();
     InitReplicaRecoveryResponseProto resp;
     try {
       resp = rpcProxy.initReplicaRecovery(NULL_CONTROLLER, req);
@@ -103,13 +103,13 @@ public class InterDatanodeProtocolTranslatorPB implements
   @Override
   public String updateReplicaUnderRecovery(ExtendedBlock oldBlock,
       long recoveryId, long newLength) throws IOException {
-    UpdateReplicaUnderRecoveryRequestProto req = 
+    UpdateReplicaUnderRecoveryRequestProto req =
         UpdateReplicaUnderRecoveryRequestProto.newBuilder()
-        .setBlock(PBHelper.convert(oldBlock))
-        .setNewLength(newLength).setRecoveryId(recoveryId).build();
+            .setBlock(PBHelper.convert(oldBlock)).setNewLength(newLength)
+            .setRecoveryId(recoveryId).build();
     try {
-      return rpcProxy.updateReplicaUnderRecovery(NULL_CONTROLLER, req
-          ).getStorageUuid();
+      return rpcProxy.updateReplicaUnderRecovery(NULL_CONTROLLER, req)
+          .getStorageID();
     } catch (ServiceException e) {
       throw ProtobufHelper.getRemoteException(e);
     }
@@ -117,8 +117,9 @@ public class InterDatanodeProtocolTranslatorPB implements
 
   @Override
   public boolean isMethodSupported(String methodName) throws IOException {
-    return RpcClientUtil.isMethodSupported(rpcProxy,
-        InterDatanodeProtocolPB.class, RPC.RpcKind.RPC_PROTOCOL_BUFFER,
-        RPC.getProtocolVersion(InterDatanodeProtocolPB.class), methodName);
+    return RpcClientUtil
+        .isMethodSupported(rpcProxy, InterDatanodeProtocolPB.class,
+            RPC.RpcKind.RPC_PROTOCOL_BUFFER,
+            RPC.getProtocolVersion(InterDatanodeProtocolPB.class), methodName);
   }
 }

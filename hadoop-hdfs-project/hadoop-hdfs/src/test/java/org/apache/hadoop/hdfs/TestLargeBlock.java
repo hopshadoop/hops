@@ -17,11 +17,6 @@
  */
 package org.apache.hadoop.hdfs;
 
-import static org.junit.Assert.assertTrue;
-
-import java.io.IOException;
-import java.util.Arrays;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -33,32 +28,36 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.server.datanode.SimulatedFSDataset;
 import org.junit.Test;
 
+import java.io.IOException;
+import java.util.Arrays;
+
+import static org.junit.Assert.assertTrue;
+
 /**
  * This class tests that blocks can be larger than 2GB
  */
 public class TestLargeBlock {
-/**
-  {
-    ((Log4JLogger)DataNode.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger)LeaseManager.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger)FSNamesystem.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger)DFSClient.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger)TestLargeBlock.LOG).getLogger().setLevel(Level.ALL);
-  }
- */
+  /**
+   * {
+   * ((Log4JLogger)DataNode.LOG).getLogger().setLevel(Level.ALL);
+   * ((Log4JLogger)LeaseManager.LOG).getLogger().setLevel(Level.ALL);
+   * ((Log4JLogger)FSNamesystem.LOG).getLogger().setLevel(Level.ALL);
+   * ((Log4JLogger)DFSClient.LOG).getLogger().setLevel(Level.ALL);
+   * ((Log4JLogger)TestLargeBlock.LOG).getLogger().setLevel(Level.ALL);
+   * }
+   */
   private static final Log LOG = LogFactory.getLog(TestLargeBlock.class);
 
   // should we verify the data read back from the file? (slow)
   static final boolean verifyData = true;
-  static final byte[] pattern = { 'D', 'E', 'A', 'D', 'B', 'E', 'E', 'F'};
+  static final byte[] pattern = {'D', 'E', 'A', 'D', 'B', 'E', 'E', 'F'};
   static final boolean simulatedStorage = false;
 
   // creates a file 
   static FSDataOutputStream createFile(FileSystem fileSys, Path name, int repl,
-                                       final long blockSize)
-    throws IOException {
+      final long blockSize) throws IOException {
     FSDataOutputStream stm = fileSys.create(name, true, fileSys.getConf()
-        .getInt(CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096),
+            .getInt(CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096),
         (short) repl, blockSize);
     LOG.info("createFile: Created " + name + " with " + repl + " replica.");
     return stm;
@@ -66,9 +65,13 @@ public class TestLargeBlock {
 
   /**
    * Writes pattern to file
-   * @param stm FSDataOutputStream to write the file
-   * @param fileSize size of the file to be written
-   * @throws IOException in case of errors
+   *
+   * @param stm
+   *     FSDataOutputStream to write the file
+   * @param fileSize
+   *     size of the file to be written
+   * @throws IOException
+   *     in case of errors
    */
   static void writeFile(FSDataOutputStream stm, final long fileSize)
       throws IOException {
@@ -77,7 +80,7 @@ public class TestLargeBlock {
 
     if (writeSize > Integer.MAX_VALUE) {
       throw new IOException("A single write is too large " + writeSize);
-    } 
+    }
 
     long bytesToWrite = fileSize;
     byte[] b = new byte[writeSize];
@@ -98,10 +101,15 @@ public class TestLargeBlock {
 
   /**
    * Reads from file and makes sure that it matches the pattern
-   * @param fs a reference to FileSystem
-   * @param name Path of a file
-   * @param fileSize size of the file
-   * @throws IOException in case of errors
+   *
+   * @param fs
+   *     a reference to FileSystem
+   * @param name
+   *     Path of a file
+   * @param fileSize
+   *     size of the file
+   * @throws IOException
+   *     in case of errors
    */
   static void checkFullFile(FileSystem fs, Path name, final long fileSize)
       throws IOException {
@@ -115,7 +123,8 @@ public class TestLargeBlock {
     byte[] b = new byte[readSize];
     long bytesToRead = fileSize;
 
-    byte[] compb = new byte[readSize]; // buffer with correct data for comparison
+    byte[] compb =
+        new byte[readSize]; // buffer with correct data for comparison
 
     if (verifyData) {
       // initialize compare buffer
@@ -130,13 +139,14 @@ public class TestLargeBlock {
       // how many bytes we are reading in this iteration
       int thisread = (int) Math.min(readSize, bytesToRead);
 
-      stm.readFully(b, 0, thisread); 
+      stm.readFully(b, 0, thisread);
       
       if (verifyData) {
         // verify data read
         if (thisread == readSize) {
-          assertTrue("file is corrupted at or after byte " +
-              (fileSize - bytesToRead), Arrays.equals(b, compb));
+          assertTrue(
+              "file is corrupted at or after byte " + (fileSize - bytesToRead),
+              Arrays.equals(b, compb));
         } else {
           // b was only partially filled by last read
           for (int k = 0; k < thisread; k++) {
@@ -146,21 +156,21 @@ public class TestLargeBlock {
         }
       }
       LOG.debug("Before update: to read: " + bytesToRead +
-          "; read already: "+ thisread);
+          "; read already: " + thisread);
       bytesToRead -= thisread;
       LOG.debug("After  update: to read: " + bytesToRead +
           "; read already: " + thisread);
     }
     stm.close();
   }
- 
+
   /**
-   * Test for block size of 2GB + 512B. This test can take a rather long time to
-   * complete on Windows (reading the file back can be slow) so we use a larger
-   * timeout here.
-   * @throws IOException in case of errors
+   * Test for block size of 2GB + 512B
+   *
+   * @throws IOException
+   *     in case of errors
    */
-  @Test (timeout = 900000)
+  @Test(timeout = 300000)
   public void testLargeBlockSize() throws IOException {
     final long blockSize = 2L * 1024L * 1024L * 1024L + 512L; // 2GB + 512B
     runTest(blockSize);
@@ -168,8 +178,11 @@ public class TestLargeBlock {
   
   /**
    * Test that we can write to and read from large blocks
-   * @param blockSize size of the block
-   * @throws IOException in case of errors
+   *
+   * @param blockSize
+   *     size of the block
+   * @throws IOException
+   *     in case of errors
    */
   public void runTest(final long blockSize) throws IOException {
 
@@ -192,8 +205,7 @@ public class TestLargeBlock {
           " blocksize " + blockSize);
 
       // verify that file exists in FS namespace
-      assertTrue(file1 + " should be a file", 
-                  fs.getFileStatus(file1).isFile());
+      assertTrue(file1 + " should be a file", fs.getFileStatus(file1).isFile());
 
       // write to file
       writeFile(stm, fileSize);
@@ -208,9 +220,8 @@ public class TestLargeBlock {
 
       // verify that file size has changed
       long len = fs.getFileStatus(file1).getLen();
-      assertTrue(file1 + " should be of size " +  fileSize +
-                 " but found to be of size " + len, 
-                  len == fileSize);
+      assertTrue(file1 + " should be of size " + fileSize +
+              " but found to be of size " + len, len == fileSize);
 
     } finally {
       cluster.shutdown();

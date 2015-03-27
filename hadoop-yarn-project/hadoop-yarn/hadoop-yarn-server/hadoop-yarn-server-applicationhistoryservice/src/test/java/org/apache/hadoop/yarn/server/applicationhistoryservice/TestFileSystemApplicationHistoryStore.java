@@ -18,11 +18,7 @@
 
 package org.apache.hadoop.yarn.server.applicationhistoryservice;
 
-import java.io.IOException;
-import java.net.URI;
-
 import junit.framework.Assert;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -39,8 +35,11 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-public class TestFileSystemApplicationHistoryStore extends
-    ApplicationHistoryStoreTestUtils {
+import java.io.IOException;
+import java.net.URI;
+
+public class TestFileSystemApplicationHistoryStore
+    extends ApplicationHistoryStoreTestUtils {
 
   private FileSystem fs;
   private Path fsWorkingPath;
@@ -52,7 +51,8 @@ public class TestFileSystemApplicationHistoryStore extends
     fs.initialize(new URI("/"), conf);
     fsWorkingPath = new Path("Test");
     fs.delete(fsWorkingPath, true);
-    conf.set(YarnConfiguration.FS_APPLICATION_HISTORY_STORE_URI, fsWorkingPath.toString());
+    conf.set(YarnConfiguration.FS_APPLICATION_HISTORY_STORE_URI,
+        fsWorkingPath.toString());
     store = new FileSystemApplicationHistoryStore();
     store.init(conf);
     store.start();
@@ -75,9 +75,8 @@ public class TestFileSystemApplicationHistoryStore extends
     testWriteHistoryData(num, false, false);
   }
   
-  private void testWriteHistoryData(
-      int num, boolean missingContainer, boolean missingApplicationAttempt)
-          throws IOException {
+  private void testWriteHistoryData(int num, boolean missingContainer,
+      boolean missingApplicationAttempt) throws IOException {
     // write application history data
     for (int i = 1; i <= num; ++i) {
       ApplicationId appId = ApplicationId.newInstance(0, i);
@@ -111,9 +110,8 @@ public class TestFileSystemApplicationHistoryStore extends
     testReadHistoryData(num, false, false);
   }
   
-  private void testReadHistoryData(
-      int num, boolean missingContainer, boolean missingApplicationAttempt)
-          throws IOException {
+  private void testReadHistoryData(int num, boolean missingContainer,
+      boolean missingApplicationAttempt) throws IOException {
     // read application history data
     Assert.assertEquals(num, store.getAllApplications().size());
     for (int i = 1; i <= num; ++i) {
@@ -148,7 +146,7 @@ public class TestFileSystemApplicationHistoryStore extends
           ContainerHistoryData containerData = store.getContainer(containerId);
           Assert.assertNotNull(containerData);
           Assert.assertEquals(Priority.newInstance(containerId.getId()),
-            containerData.getPriority());
+              containerData.getPriority());
           if (missingContainer && k == num) {
             Assert.assertNull(containerData.getDiagnosticsInfo());
           } else {
@@ -160,7 +158,7 @@ public class TestFileSystemApplicationHistoryStore extends
             store.getAMContainer(appAttemptId);
         Assert.assertNotNull(masterContainer);
         Assert.assertEquals(ContainerId.newInstance(appAttemptId, 1),
-          masterContainer.getContainerId());
+            masterContainer.getContainerId());
       }
     }
   }

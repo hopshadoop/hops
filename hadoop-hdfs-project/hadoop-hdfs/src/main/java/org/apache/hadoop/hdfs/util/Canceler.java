@@ -35,7 +35,9 @@ public class Canceler {
   /**
    * Requests that the current operation be canceled if it is still running.
    * This does not block until the cancellation is successful.
-   * @param reason the reason why cancellation is requested
+   *
+   * @param reason
+   *     the reason why cancellation is requested
    */
   public void cancel(String reason) {
     this.cancelReason = reason;

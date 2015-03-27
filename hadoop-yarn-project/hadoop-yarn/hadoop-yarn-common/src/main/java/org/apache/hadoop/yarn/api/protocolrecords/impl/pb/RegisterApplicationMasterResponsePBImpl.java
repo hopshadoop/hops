@@ -19,13 +19,8 @@
 package org.apache.hadoop.yarn.api.protocolrecords.impl.pb;
 
 
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-
+import com.google.protobuf.ByteString;
+import com.google.protobuf.TextFormat;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterResponse;
@@ -44,16 +39,20 @@ import org.apache.hadoop.yarn.proto.YarnServiceProtos.NMTokenProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.RegisterApplicationMasterResponseProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.RegisterApplicationMasterResponseProtoOrBuilder;
 
-import com.google.protobuf.ByteString;
-import com.google.protobuf.TextFormat;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 
 
 @Private
 @Unstable
-public class RegisterApplicationMasterResponsePBImpl extends
-    RegisterApplicationMasterResponse {
+public class RegisterApplicationMasterResponsePBImpl
+    extends RegisterApplicationMasterResponse {
   RegisterApplicationMasterResponseProto proto =
-    RegisterApplicationMasterResponseProto.getDefaultInstance();
+      RegisterApplicationMasterResponseProto.getDefaultInstance();
   RegisterApplicationMasterResponseProto.Builder builder = null;
   boolean viaProto = false;
 
@@ -66,7 +65,8 @@ public class RegisterApplicationMasterResponsePBImpl extends
     builder = RegisterApplicationMasterResponseProto.newBuilder();
   }
 
-  public RegisterApplicationMasterResponsePBImpl(RegisterApplicationMasterResponseProto proto) {
+  public RegisterApplicationMasterResponsePBImpl(
+      RegisterApplicationMasterResponseProto proto) {
     this.proto = proto;
     viaProto = true;
   }
@@ -85,8 +85,9 @@ public class RegisterApplicationMasterResponsePBImpl extends
 
   @Override
   public boolean equals(Object other) {
-    if (other == null)
+    if (other == null) {
       return false;
+    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -99,8 +100,9 @@ public class RegisterApplicationMasterResponsePBImpl extends
   }
 
   private void mergeLocalToProto() {
-    if (viaProto)
+    if (viaProto) {
       maybeInitBuilder();
+    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
@@ -138,19 +140,21 @@ public class RegisterApplicationMasterResponsePBImpl extends
       return this.maximumResourceCapability;
     }
 
-    RegisterApplicationMasterResponseProtoOrBuilder p = viaProto ? proto : builder;
+    RegisterApplicationMasterResponseProtoOrBuilder p =
+        viaProto ? proto : builder;
     if (!p.hasMaximumCapability()) {
       return null;
     }
 
-    this.maximumResourceCapability = convertFromProtoFormat(p.getMaximumCapability());
+    this.maximumResourceCapability =
+        convertFromProtoFormat(p.getMaximumCapability());
     return this.maximumResourceCapability;
   }
 
   @Override
   public void setMaximumResourceCapability(Resource capability) {
     maybeInitBuilder();
-    if(maximumResourceCapability == null) {
+    if (maximumResourceCapability == null) {
       builder.clearMaximumCapability();
     }
     this.maximumResourceCapability = capability;
@@ -166,15 +170,16 @@ public class RegisterApplicationMasterResponsePBImpl extends
     if (this.applicationACLS != null) {
       return;
     }
-    RegisterApplicationMasterResponseProtoOrBuilder p = viaProto ? proto
-        : builder;
+    RegisterApplicationMasterResponseProtoOrBuilder p =
+        viaProto ? proto : builder;
     List<ApplicationACLMapProto> list = p.getApplicationACLsList();
-    this.applicationACLS = new HashMap<ApplicationAccessType, String>(list
-        .size());
+    this.applicationACLS =
+        new HashMap<ApplicationAccessType, String>(list.size());
 
     for (ApplicationACLMapProto aclProto : list) {
-      this.applicationACLS.put(ProtoUtils.convertFromProtoFormat(aclProto
-          .getAccessType()), aclProto.getAcl());
+      this.applicationACLS
+          .put(ProtoUtils.convertFromProtoFormat(aclProto.getAccessType()),
+              aclProto.getAcl());
     }
   }
 
@@ -184,43 +189,45 @@ public class RegisterApplicationMasterResponsePBImpl extends
     if (applicationACLS == null) {
       return;
     }
-    Iterable<? extends ApplicationACLMapProto> values
-        = new Iterable<ApplicationACLMapProto>() {
-
-      @Override
-      public Iterator<ApplicationACLMapProto> iterator() {
-        return new Iterator<ApplicationACLMapProto>() {
-          Iterator<ApplicationAccessType> aclsIterator = applicationACLS
-              .keySet().iterator();
+    Iterable<? extends ApplicationACLMapProto> values =
+        new Iterable<ApplicationACLMapProto>() {
 
           @Override
-          public boolean hasNext() {
-            return aclsIterator.hasNext();
-          }
+          public Iterator<ApplicationACLMapProto> iterator() {
+            return new Iterator<ApplicationACLMapProto>() {
+              Iterator<ApplicationAccessType> aclsIterator =
+                  applicationACLS.keySet().iterator();
 
-          @Override
-          public ApplicationACLMapProto next() {
-            ApplicationAccessType key = aclsIterator.next();
-            return ApplicationACLMapProto.newBuilder().setAcl(
-                applicationACLS.get(key)).setAccessType(
-                ProtoUtils.convertToProtoFormat(key)).build();
-          }
+              @Override
+              public boolean hasNext() {
+                return aclsIterator.hasNext();
+              }
 
-          @Override
-          public void remove() {
-            throw new UnsupportedOperationException();
+              @Override
+              public ApplicationACLMapProto next() {
+                ApplicationAccessType key = aclsIterator.next();
+                return ApplicationACLMapProto.newBuilder()
+                    .setAcl(applicationACLS.get(key))
+                    .setAccessType(ProtoUtils.convertToProtoFormat(key))
+                    .build();
+              }
+
+              @Override
+              public void remove() {
+                throw new UnsupportedOperationException();
+              }
+            };
           }
         };
-      }
-    };
     this.builder.addAllApplicationACLs(values);
   }
 
   @Override
   public void setApplicationACLs(
       final Map<ApplicationAccessType, String> appACLs) {
-    if (appACLs == null)
+    if (appACLs == null) {
       return;
+    }
     initApplicationACLs();
     this.applicationACLS.clear();
     this.applicationACLS.putAll(appACLs);
@@ -254,8 +261,8 @@ public class RegisterApplicationMasterResponsePBImpl extends
   }
 
   @Override
-  public void
-      setContainersFromPreviousAttempts(final List<Container> containers) {
+  public void setContainersFromPreviousAttempts(
+      final List<Container> containers) {
     if (containers == null) {
       return;
     }
@@ -265,7 +272,8 @@ public class RegisterApplicationMasterResponsePBImpl extends
   
   @Override
   public String getQueue() {
-    RegisterApplicationMasterResponseProtoOrBuilder p = viaProto ? proto : builder;
+    RegisterApplicationMasterResponseProtoOrBuilder p =
+        viaProto ? proto : builder;
     if (!p.hasQueue()) {
       return null;
     }
@@ -327,7 +335,8 @@ public class RegisterApplicationMasterResponsePBImpl extends
   }
 
   private synchronized void initLocalNewNMTokenList() {
-    RegisterApplicationMasterResponseProtoOrBuilder p = viaProto ? proto : builder;
+    RegisterApplicationMasterResponseProtoOrBuilder p =
+        viaProto ? proto : builder;
     List<NMTokenProto> list = p.getNmTokensFromPreviousAttemptsList();
     nmTokens = new ArrayList<NMToken>();
     for (NMTokenProto t : list) {
@@ -369,7 +378,7 @@ public class RegisterApplicationMasterResponsePBImpl extends
   }
 
   private ResourceProto convertToProtoFormat(Resource resource) {
-    return ((ResourcePBImpl)resource).getProto();
+    return ((ResourcePBImpl) resource).getProto();
   }
 
   private ContainerPBImpl convertFromProtoFormat(ContainerProto p) {

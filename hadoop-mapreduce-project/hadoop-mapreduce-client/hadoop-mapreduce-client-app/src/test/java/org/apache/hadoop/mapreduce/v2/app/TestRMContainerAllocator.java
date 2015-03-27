@@ -73,6 +73,7 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.NetworkTopology;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.util.ExitUtil;
 import org.apache.hadoop.yarn.api.ApplicationMasterProtocol;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -103,6 +104,9 @@ import org.apache.hadoop.yarn.util.SystemClock;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import io.hops.ha.common.TransactionState;
+import io.hops.metadata.util.RMStorageFactory;
+import io.hops.metadata.util.YarnAPIStorageFactory;
 
 @SuppressWarnings("unchecked")
 public class TestRMContainerAllocator {
@@ -113,9 +117,13 @@ public class TestRMContainerAllocator {
       .getRecordFactory(null);
 
   @Before
-  public void setup() {
+  public void setup() throws IOException {
     MyContainerAllocator.getJobUpdatedNodeEvents().clear();
     MyContainerAllocator.getTaskAttemptKillEvents().clear();
+    Configuration conf = new Configuration();
+    YarnAPIStorageFactory.setConfiguration(conf);
+    RMStorageFactory.setConfiguration(conf);
+    ExitUtil.disableSystemExit();
   }
 
   @After
@@ -814,7 +822,7 @@ public class TestRMContainerAllocator {
     Assert.assertTrue(allocator.getTaskAttemptKillEvents().isEmpty());
   }
 
-  @Test
+  @Test(timeout = 60000)
   public void testBlackListedNodes() throws Exception {
     
     LOG.info("Running testBlackListedNodes");
@@ -1277,7 +1285,7 @@ public class TestRMContainerAllocator {
     public synchronized Allocation allocate(
         ApplicationAttemptId applicationAttemptId, List<ResourceRequest> ask,
         List<ContainerId> release, 
-        List<String> blacklistAdditions, List<String> blacklistRemovals) {
+        List<String> blacklistAdditions, List<String> blacklistRemovals, TransactionState ts) {
       List<ResourceRequest> askCopy = new ArrayList<ResourceRequest>();
       for (ResourceRequest req : ask) {
         ResourceRequest reqCopy = ResourceRequest.newInstance(req
@@ -1290,7 +1298,7 @@ public class TestRMContainerAllocator {
       lastBlacklistRemovals = blacklistRemovals;
       return super.allocate(
           applicationAttemptId, askCopy, release, 
-          blacklistAdditions, blacklistRemovals);
+          blacklistAdditions, blacklistRemovals, ts);
     }
   }
 

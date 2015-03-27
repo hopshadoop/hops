@@ -18,11 +18,7 @@
 
 package org.apache.hadoop.yarn.api.protocolrecords.impl.pb;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
+import com.google.protobuf.TextFormat;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.protocolrecords.GetContainerStatusesResponse;
@@ -39,14 +35,17 @@ import org.apache.hadoop.yarn.proto.YarnServiceProtos.ContainerExceptionMapProto
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetContainerStatusesResponseProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetContainerStatusesResponseProtoOrBuilder;
 
-import com.google.protobuf.TextFormat;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @Private
 @Unstable
-public class GetContainerStatusesResponsePBImpl extends
-    GetContainerStatusesResponse {
-  GetContainerStatusesResponseProto proto = GetContainerStatusesResponseProto
-    .getDefaultInstance();
+public class GetContainerStatusesResponsePBImpl
+    extends GetContainerStatusesResponse {
+  GetContainerStatusesResponseProto proto =
+      GetContainerStatusesResponseProto.getDefaultInstance();
   GetContainerStatusesResponseProto.Builder builder = null;
   boolean viaProto = false;
 
@@ -77,8 +76,9 @@ public class GetContainerStatusesResponsePBImpl extends
 
   @Override
   public boolean equals(Object other) {
-    if (other == null)
+    if (other == null) {
       return false;
+    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -100,8 +100,9 @@ public class GetContainerStatusesResponsePBImpl extends
   }
 
   private void mergeLocalToProto() {
-    if (viaProto)
+    if (viaProto) {
       maybeInitBuilder();
+    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
@@ -117,8 +118,9 @@ public class GetContainerStatusesResponsePBImpl extends
   private void addLocalContainerStatusesToProto() {
     maybeInitBuilder();
     builder.clearStatus();
-    if (this.containerStatuses == null)
+    if (this.containerStatuses == null) {
       return;
+    }
     List<ContainerStatusProto> protoList =
         new ArrayList<ContainerStatusProto>();
     for (ContainerStatus status : containerStatuses) {
@@ -130,15 +132,16 @@ public class GetContainerStatusesResponsePBImpl extends
   private void addFailedRequestsToProto() {
     maybeInitBuilder();
     builder.clearFailedRequests();
-    if (this.failedRequests == null)
+    if (this.failedRequests == null) {
       return;
+    }
     List<ContainerExceptionMapProto> protoList =
         new ArrayList<ContainerExceptionMapProto>();
     for (Map.Entry<ContainerId, SerializedException> entry : this.failedRequests
-      .entrySet()) {
+        .entrySet()) {
       protoList.add(ContainerExceptionMapProto.newBuilder()
-        .setContainerId(convertToProtoFormat(entry.getKey()))
-        .setException(convertToProtoFormat(entry.getValue())).build());
+          .setContainerId(convertToProtoFormat(entry.getKey()))
+          .setException(convertToProtoFormat(entry.getValue())).build());
     }
     builder.addAllFailedRequests(protoList);
   }
@@ -164,7 +167,7 @@ public class GetContainerStatusesResponsePBImpl extends
     this.failedRequests = new HashMap<ContainerId, SerializedException>();
     for (ContainerExceptionMapProto ce : protoList) {
       this.failedRequests.put(convertFromProtoFormat(ce.getContainerId()),
-        convertFromProtoFormat(ce.getException()));
+          convertFromProtoFormat(ce.getException()));
     }
   }
 
@@ -177,8 +180,9 @@ public class GetContainerStatusesResponsePBImpl extends
   @Override
   public void setContainerStatuses(List<ContainerStatus> statuses) {
     maybeInitBuilder();
-    if (statuses == null)
+    if (statuses == null) {
       builder.clearStatus();
+    }
     this.containerStatuses = statuses;
   }
 
@@ -192,8 +196,9 @@ public class GetContainerStatusesResponsePBImpl extends
   public void setFailedRequests(
       Map<ContainerId, SerializedException> failedRequests) {
     maybeInitBuilder();
-    if (failedRequests == null)
+    if (failedRequests == null) {
       builder.clearFailedRequests();
+    }
     this.failedRequests = failedRequests;
   }
 

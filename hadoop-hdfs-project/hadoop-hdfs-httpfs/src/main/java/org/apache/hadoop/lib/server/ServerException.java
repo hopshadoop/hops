@@ -45,15 +45,15 @@ public class ServerException extends XException {
     S11("Service [{0}] exception during status change to [{1}] -server shutting down-, {2}"),
     S12("Could not start service [{0}], {1}"),
     S13("Missing system property [{0}]"),
-    S14("Could not initialize server, {0}")
-    ;
+    S14("Could not initialize server, {0}");
 
     private String msg;
 
     /**
      * Constructor for the error code enum.
      *
-     * @param msg message template.
+     * @param msg
+     *     message template.
      */
     private ERROR(String msg) {
       this.msg = msg;
@@ -73,9 +73,11 @@ public class ServerException extends XException {
   /**
    * Constructor for sub-classes.
    *
-   * @param error error code for the XException.
-   * @param params parameters to use when creating the error message
-   * with the error code template.
+   * @param error
+   *     error code for the XException.
+   * @param params
+   *     parameters to use when creating the error message
+   *     with the error code template.
    */
   protected ServerException(XException.ERROR error, Object... params) {
     super(error, params);
@@ -86,9 +88,11 @@ public class ServerException extends XException {
    * The exception message is resolved using the error code template
    * and the passed parameters.
    *
-   * @param error error code for the XException.
-   * @param params parameters to use when creating the error message
-   * with the error code template.
+   * @param error
+   *     error code for the XException.
+   * @param params
+   *     parameters to use when creating the error message
+   *     with the error code template.
    */
   public ServerException(ERROR error, Object... params) {
     super(error, params);

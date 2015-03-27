@@ -16,31 +16,42 @@
   limitations under the License.
 -->
 
-<!DOCTYPE document PUBLIC "-//APACHE//DTD Documentation V2.0//EN" "http://forrest.apache.org/dtd/document-v20.dtd">
+<!DOCTYPE document PUBLIC "-//APACHE//DTD Documentation V2.0//EN"
+    "http://forrest.apache.org/dtd/document-v20.dtd">
 
 <document>
   <header>
     <title>Overview</title>
   </header>
   <body>
-  
-  <p>
-  The HDFS Documentation provides the information you need to get started using the Hadoop Distributed File System. 
-  Begin with the <a href="hdfs_user_guide.html">HDFS Users Guide</a> to obtain an overview of the system and then
-  move on to the <a href="hdfs_design.html">HDFS Architecture Guide</a> for more detailed information.
-  </p>
-  
-  <p>
-   HDFS commonly works in tandem with a cluster environment and MapReduce applications. 
-   For information about Hadoop clusters (single or multi node) see the 
- <a href="http://hadoop.apache.org/common/docs/current/index.html">Hadoop Common Documentation</a>.
-   For information about MapReduce see the 
- <a href="http://hadoop.apache.org/mapreduce/docs/current/index.html">MapReduce Documentation</a>.
-  </p>   
-  
-<p>
-If you have more questions, you can ask on the <a href="ext:lists">HDFS Mailing Lists</a> or browse the <a href="ext:archive">Mailing List Archives</a>.
-</p>
 
-</body>
+    <p>
+      The HDFS Documentation provides the information you need to get started
+      using the Hadoop Distributed File System.
+      Begin with the
+      <a href="hdfs_user_guide.html">HDFS Users Guide</a>
+      to obtain an overview of the system and then
+      move on to the
+      <a href="hdfs_design.html">HDFS Architecture Guide</a>
+      for more detailed information.
+    </p>
+
+    <p>
+      HDFS commonly works in tandem with a cluster environment and MapReduce
+      applications.
+      For information about Hadoop clusters (single or multi node) see the
+      <a href="http://hadoop.apache.org/common/docs/current/index.html">Hadoop
+        Common Documentation</a>.
+      For information about MapReduce see the
+      <a href="http://hadoop.apache.org/mapreduce/docs/current/index.html">
+        MapReduce Documentation</a>.
+    </p>
+
+    <p>
+      If you have more questions, you can ask on the
+      <a href="ext:lists">HDFS Mailing Lists</a>
+      or browse the<a href="ext:archive">Mailing List Archives</a>.
+    </p>
+
+  </body>
 </document>

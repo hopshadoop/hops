@@ -18,13 +18,6 @@
 
 package org.apache.hadoop.yarn.server.applicationhistoryservice;
 
-import java.io.IOException;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.service.AbstractService;
@@ -41,23 +34,32 @@ import org.apache.hadoop.yarn.server.applicationhistoryservice.records.Container
 import org.apache.hadoop.yarn.server.applicationhistoryservice.records.ContainerHistoryData;
 import org.apache.hadoop.yarn.server.applicationhistoryservice.records.ContainerStartData;
 
+import java.io.IOException;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
 /**
  * In-memory implementation of {@link ApplicationHistoryStore}. This
  * implementation is for test purpose only. If users improperly instantiate it,
  * they may encounter reading and writing history data in different memory
  * store.
- * 
  */
 @Private
 @Unstable
-public class MemoryApplicationHistoryStore extends AbstractService implements
-    ApplicationHistoryStore {
+public class MemoryApplicationHistoryStore extends AbstractService
+    implements ApplicationHistoryStore {
 
-  private final ConcurrentMap<ApplicationId, ApplicationHistoryData> applicationData =
+  private final ConcurrentMap<ApplicationId, ApplicationHistoryData>
+      applicationData =
       new ConcurrentHashMap<ApplicationId, ApplicationHistoryData>();
-  private final ConcurrentMap<ApplicationId, ConcurrentMap<ApplicationAttemptId, ApplicationAttemptHistoryData>> applicationAttemptData =
+  private final ConcurrentMap<ApplicationId, ConcurrentMap<ApplicationAttemptId, ApplicationAttemptHistoryData>>
+      applicationAttemptData =
       new ConcurrentHashMap<ApplicationId, ConcurrentMap<ApplicationAttemptId, ApplicationAttemptHistoryData>>();
-  private final ConcurrentMap<ApplicationAttemptId, ConcurrentMap<ContainerId, ContainerHistoryData>> containerData =
+  private final ConcurrentMap<ApplicationAttemptId, ConcurrentMap<ContainerId, ContainerHistoryData>>
+      containerData =
       new ConcurrentHashMap<ApplicationAttemptId, ConcurrentMap<ContainerId, ContainerHistoryData>>();
 
   public MemoryApplicationHistoryStore() {
@@ -75,16 +77,16 @@ public class MemoryApplicationHistoryStore extends AbstractService implements
   }
 
   @Override
-  public Map<ApplicationAttemptId, ApplicationAttemptHistoryData>
-      getApplicationAttempts(ApplicationId appId) {
+  public Map<ApplicationAttemptId, ApplicationAttemptHistoryData> getApplicationAttempts(
+      ApplicationId appId) {
     ConcurrentMap<ApplicationAttemptId, ApplicationAttemptHistoryData> subMap =
         applicationAttemptData.get(appId);
     if (subMap == null) {
       return Collections
-        .<ApplicationAttemptId, ApplicationAttemptHistoryData> emptyMap();
+          .<ApplicationAttemptId, ApplicationAttemptHistoryData>emptyMap();
     } else {
       return new HashMap<ApplicationAttemptId, ApplicationAttemptHistoryData>(
-        subMap);
+          subMap);
     }
   }
 
@@ -101,7 +103,8 @@ public class MemoryApplicationHistoryStore extends AbstractService implements
   }
 
   @Override
-  public ContainerHistoryData getAMContainer(ApplicationAttemptId appAttemptId) {
+  public ContainerHistoryData getAMContainer(
+      ApplicationAttemptId appAttemptId) {
     ApplicationAttemptHistoryData appAttempt =
         getApplicationAttempt(appAttemptId);
     if (appAttempt == null || appAttempt.getMasterContainerId() == null) {
@@ -128,7 +131,7 @@ public class MemoryApplicationHistoryStore extends AbstractService implements
     ConcurrentMap<ContainerId, ContainerHistoryData> subMap =
         containerData.get(appAttemptId);
     if (subMap == null) {
-      return Collections.<ContainerId, ContainerHistoryData> emptyMap();
+      return Collections.<ContainerId, ContainerHistoryData>emptyMap();
     } else {
       return new HashMap<ContainerId, ContainerHistoryData>(subMap);
     }
@@ -137,15 +140,16 @@ public class MemoryApplicationHistoryStore extends AbstractService implements
   @Override
   public void applicationStarted(ApplicationStartData appStart)
       throws IOException {
-    ApplicationHistoryData oldData =
-        applicationData.putIfAbsent(appStart.getApplicationId(),
-          ApplicationHistoryData.newInstance(appStart.getApplicationId(),
-            appStart.getApplicationName(), appStart.getApplicationType(),
-            appStart.getQueue(), appStart.getUser(), appStart.getSubmitTime(),
-            appStart.getStartTime(), Long.MAX_VALUE, null, null, null));
+    ApplicationHistoryData oldData = applicationData
+        .putIfAbsent(appStart.getApplicationId(), ApplicationHistoryData
+                .newInstance(appStart.getApplicationId(),
+                    appStart.getApplicationName(),
+                    appStart.getApplicationType(), appStart.getQueue(),
+                    appStart.getUser(), appStart.getSubmitTime(),
+                    appStart.getStartTime(), Long.MAX_VALUE, null, null, null));
     if (oldData != null) {
-      throw new IOException("The start information of application "
-          + appStart.getApplicationId() + " is already stored.");
+      throw new IOException("The start information of application " +
+          appStart.getApplicationId() + " is already stored.");
     }
   }
 
@@ -155,15 +159,15 @@ public class MemoryApplicationHistoryStore extends AbstractService implements
     ApplicationHistoryData data =
         applicationData.get(appFinish.getApplicationId());
     if (data == null) {
-      throw new IOException("The finish information of application "
-          + appFinish.getApplicationId() + " is stored before the start"
-          + " information.");
+      throw new IOException("The finish information of application " +
+          appFinish.getApplicationId() + " is stored before the start" +
+          " information.");
     }
     // Make the assumption that YarnApplicationState should not be null if
     // the finish information is already recorded
     if (data.getYarnApplicationState() != null) {
-      throw new IOException("The finish information of application "
-          + appFinish.getApplicationId() + " is already stored.");
+      throw new IOException("The finish information of application " +
+          appFinish.getApplicationId() + " is already stored.");
     }
     data.setFinishTime(appFinish.getFinishTime());
     data.setDiagnosticsInfo(appFinish.getDiagnosticsInfo());
@@ -176,15 +180,16 @@ public class MemoryApplicationHistoryStore extends AbstractService implements
       ApplicationAttemptStartData appAttemptStart) throws IOException {
     ConcurrentMap<ApplicationAttemptId, ApplicationAttemptHistoryData> subMap =
         getSubMap(appAttemptStart.getApplicationAttemptId().getApplicationId());
-    ApplicationAttemptHistoryData oldData =
-        subMap.putIfAbsent(appAttemptStart.getApplicationAttemptId(),
-          ApplicationAttemptHistoryData.newInstance(
-            appAttemptStart.getApplicationAttemptId(),
-            appAttemptStart.getHost(), appAttemptStart.getRPCPort(),
-            appAttemptStart.getMasterContainerId(), null, null, null, null));
+    ApplicationAttemptHistoryData oldData = subMap
+        .putIfAbsent(appAttemptStart.getApplicationAttemptId(),
+            ApplicationAttemptHistoryData
+                .newInstance(appAttemptStart.getApplicationAttemptId(),
+                    appAttemptStart.getHost(), appAttemptStart.getRPCPort(),
+                    appAttemptStart.getMasterContainerId(), null, null, null,
+                    null));
     if (oldData != null) {
-      throw new IOException("The start information of application attempt "
-          + appAttemptStart.getApplicationAttemptId() + " is already stored.");
+      throw new IOException("The start information of application attempt " +
+          appAttemptStart.getApplicationAttemptId() + " is already stored.");
     }
   }
 
@@ -192,33 +197,32 @@ public class MemoryApplicationHistoryStore extends AbstractService implements
   public void applicationAttemptFinished(
       ApplicationAttemptFinishData appAttemptFinish) throws IOException {
     ConcurrentMap<ApplicationAttemptId, ApplicationAttemptHistoryData> subMap =
-        getSubMap(appAttemptFinish.getApplicationAttemptId().getApplicationId());
+        getSubMap(
+            appAttemptFinish.getApplicationAttemptId().getApplicationId());
     ApplicationAttemptHistoryData data =
         subMap.get(appAttemptFinish.getApplicationAttemptId());
     if (data == null) {
-      throw new IOException("The finish information of application attempt "
-          + appAttemptFinish.getApplicationAttemptId() + " is stored before"
-          + " the start information.");
+      throw new IOException("The finish information of application attempt " +
+          appAttemptFinish.getApplicationAttemptId() + " is stored before" +
+          " the start information.");
     }
     // Make the assumption that YarnApplicationAttemptState should not be null
     // if the finish information is already recorded
     if (data.getYarnApplicationAttemptState() != null) {
-      throw new IOException("The finish information of application attempt "
-          + appAttemptFinish.getApplicationAttemptId() + " is already stored.");
+      throw new IOException("The finish information of application attempt " +
+          appAttemptFinish.getApplicationAttemptId() + " is already stored.");
     }
     data.setTrackingURL(appAttemptFinish.getTrackingURL());
     data.setDiagnosticsInfo(appAttemptFinish.getDiagnosticsInfo());
-    data
-      .setFinalApplicationStatus(appAttemptFinish.getFinalApplicationStatus());
-    data.setYarnApplicationAttemptState(appAttemptFinish
-      .getYarnApplicationAttemptState());
+    data.setFinalApplicationStatus(
+        appAttemptFinish.getFinalApplicationStatus());
+    data.setYarnApplicationAttemptState(
+        appAttemptFinish.getYarnApplicationAttemptState());
   }
 
-  private ConcurrentMap<ApplicationAttemptId, ApplicationAttemptHistoryData>
-      getSubMap(ApplicationId appId) {
-    applicationAttemptData
-      .putIfAbsent(
-        appId,
+  private ConcurrentMap<ApplicationAttemptId, ApplicationAttemptHistoryData> getSubMap(
+      ApplicationId appId) {
+    applicationAttemptData.putIfAbsent(appId,
         new ConcurrentHashMap<ApplicationAttemptId, ApplicationAttemptHistoryData>());
     return applicationAttemptData.get(appId);
   }
@@ -228,16 +232,16 @@ public class MemoryApplicationHistoryStore extends AbstractService implements
       throws IOException {
     ConcurrentMap<ContainerId, ContainerHistoryData> subMap =
         getSubMap(containerStart.getContainerId().getApplicationAttemptId());
-    ContainerHistoryData oldData =
-        subMap.putIfAbsent(containerStart.getContainerId(),
-          ContainerHistoryData.newInstance(containerStart.getContainerId(),
-            containerStart.getAllocatedResource(),
-            containerStart.getAssignedNode(), containerStart.getPriority(),
-            containerStart.getStartTime(), Long.MAX_VALUE, null,
-            Integer.MAX_VALUE, null));
+    ContainerHistoryData oldData = subMap
+        .putIfAbsent(containerStart.getContainerId(), ContainerHistoryData
+                .newInstance(containerStart.getContainerId(),
+                    containerStart.getAllocatedResource(),
+                    containerStart.getAssignedNode(),
+                    containerStart.getPriority(), containerStart.getStartTime(),
+                    Long.MAX_VALUE, null, Integer.MAX_VALUE, null));
     if (oldData != null) {
-      throw new IOException("The start information of container "
-          + containerStart.getContainerId() + " is already stored.");
+      throw new IOException("The start information of container " +
+          containerStart.getContainerId() + " is already stored.");
     }
   }
 
@@ -248,15 +252,15 @@ public class MemoryApplicationHistoryStore extends AbstractService implements
         getSubMap(containerFinish.getContainerId().getApplicationAttemptId());
     ContainerHistoryData data = subMap.get(containerFinish.getContainerId());
     if (data == null) {
-      throw new IOException("The finish information of container "
-          + containerFinish.getContainerId() + " is stored before"
-          + " the start information.");
+      throw new IOException("The finish information of container " +
+          containerFinish.getContainerId() + " is stored before" +
+          " the start information.");
     }
     // Make the assumption that ContainerState should not be null if
     // the finish information is already recorded
     if (data.getContainerState() != null) {
-      throw new IOException("The finish information of container "
-          + containerFinish.getContainerId() + " is already stored.");
+      throw new IOException("The finish information of container " +
+          containerFinish.getContainerId() + " is already stored.");
     }
     data.setFinishTime(containerFinish.getFinishTime());
     data.setDiagnosticsInfo(containerFinish.getDiagnosticsInfo());
@@ -267,7 +271,7 @@ public class MemoryApplicationHistoryStore extends AbstractService implements
   private ConcurrentMap<ContainerId, ContainerHistoryData> getSubMap(
       ApplicationAttemptId appAttemptId) {
     containerData.putIfAbsent(appAttemptId,
-      new ConcurrentHashMap<ContainerId, ContainerHistoryData>());
+        new ConcurrentHashMap<ContainerId, ContainerHistoryData>());
     return containerData.get(appAttemptId);
   }
 

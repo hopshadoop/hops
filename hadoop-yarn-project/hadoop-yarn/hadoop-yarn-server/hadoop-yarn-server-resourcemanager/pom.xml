@@ -13,16 +13,16 @@
   limitations under the License. See accompanying LICENSE file.
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
                       http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <artifactId>hadoop-yarn-server</artifactId>
-    <groupId>org.apache.hadoop</groupId>
+    <groupId>io.hops</groupId>
     <version>2.4.0</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
-  <groupId>org.apache.hadoop</groupId>
+  <groupId>io.hops</groupId>
   <artifactId>hadoop-yarn-server-resourcemanager</artifactId>
   <version>2.4.0</version>
   <name>hadoop-yarn-server-resourcemanager</name>
@@ -34,12 +34,22 @@
 
   <dependencies>
     <dependency>
+      <groupId>io.hops</groupId>
+      <artifactId>hops-leader-election</artifactId>
+      <version>2.4.0</version>
+    </dependency>
+    <dependency>
+      <groupId>io.hops.metadata</groupId>
+      <artifactId>hops-metadata-dal</artifactId>
+      <version>1.0-SNAPSHOT</version>
+    </dependency>
+    <dependency>
       <groupId>javax.servlet</groupId>
       <artifactId>servlet-api</artifactId>
     </dependency>
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-common</artifactId>
       <scope>provided</scope>
       <exclusions>
@@ -68,7 +78,7 @@
     </dependency>
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-annotations</artifactId>
     </dependency>
     <dependency>
@@ -78,7 +88,7 @@
     </dependency>
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-common</artifactId>
       <type>test-jar</type>
       <scope>test</scope>
@@ -102,7 +112,7 @@
     </dependency>
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-hdfs</artifactId>
       <scope>test</scope>
     </dependency>
@@ -125,19 +135,19 @@
     </dependency>
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-yarn-common</artifactId>
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-yarn-common</artifactId>
     </dependency>
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-yarn-api</artifactId>
     </dependency>
     <dependency>
@@ -179,32 +189,22 @@
 
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-yarn-server-common</artifactId>
     </dependency>
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-yarn-server-applicationhistoryservice</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-yarn-server-web-proxy</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.zookeeper</groupId>
-      <artifactId>zookeeper</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.zookeeper</groupId>
-      <artifactId>zookeeper</artifactId>
-      <type>test-jar</type>
-      <scope>test</scope>
     </dependency>
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-hdfs</artifactId>
       <type>test-jar</type>
       <scope>test</scope>
@@ -221,15 +221,15 @@
   <build>
 
     <testResources>
-     <testResource>
-       <directory>${basedir}/src/test/resources</directory>
-     </testResource>
-     <testResource>
-       <directory>${basedir}/conf</directory>
-       <includes>
-         <include>capacity-scheduler.xml</include>
-       </includes>
-     </testResource>
+      <testResource>
+        <directory>${basedir}/src/test/resources</directory>
+      </testResource>
+      <testResource>
+        <directory>${basedir}/conf</directory>
+        <includes>
+          <include>capacity-scheduler.xml</include>
+        </includes>
+      </testResource>
     </testResources>
 
 
@@ -268,14 +268,18 @@
                   <goal>java</goal>
                 </goals>
                 <configuration>
-                  <mainClass>org.apache.hadoop.yarn.state.VisualizeStateMachine</mainClass>
-		  <classpathScope>compile</classpathScope>
+                  <mainClass>
+                    org.apache.hadoop.yarn.state.VisualizeStateMachine
+                  </mainClass>
+                  <classpathScope>compile</classpathScope>
                   <arguments>
                     <argument>ResourceManager</argument>
-                    <argument>org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptImpl,
+                    <argument>
+                      org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptImpl,
                       org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppImpl,
                       org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerImpl,
-                      org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeImpl</argument>
+                      org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeImpl
+                    </argument>
                     <argument>ResourceManager.gv</argument>
                   </arguments>
                 </configuration>

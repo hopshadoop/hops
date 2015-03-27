@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.api.protocolrecords.impl.pb;
 
+import com.google.protobuf.TextFormat;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.security.proto.SecurityProtos.GetDelegationTokenResponseProto;
@@ -27,16 +28,15 @@ import org.apache.hadoop.yarn.api.protocolrecords.GetDelegationTokenResponse;
 import org.apache.hadoop.yarn.api.records.Token;
 import org.apache.hadoop.yarn.api.records.impl.pb.TokenPBImpl;
 
-import com.google.protobuf.TextFormat;
-
 @Private
 @Unstable
-public class GetDelegationTokenResponsePBImpl extends GetDelegationTokenResponse {
+public class GetDelegationTokenResponsePBImpl
+    extends GetDelegationTokenResponse {
 
   Token appToken;
 
 
-  GetDelegationTokenResponseProto proto = 
+  GetDelegationTokenResponseProto proto =
       GetDelegationTokenResponseProto.getDefaultInstance();
   GetDelegationTokenResponseProto.Builder builder = null;
   boolean viaProto = false;
@@ -45,7 +45,7 @@ public class GetDelegationTokenResponsePBImpl extends GetDelegationTokenResponse
     builder = GetDelegationTokenResponseProto.newBuilder();
   }
 
-  public GetDelegationTokenResponsePBImpl (
+  public GetDelegationTokenResponsePBImpl(
       GetDelegationTokenResponseProto proto) {
     this.proto = proto;
     viaProto = true;
@@ -61,14 +61,15 @@ public class GetDelegationTokenResponsePBImpl extends GetDelegationTokenResponse
       return null;
     }
     this.appToken = convertFromProtoFormat(p.getToken());
-    return this.appToken;  
+    return this.appToken;
   }
 
   @Override
   public void setRMDelegationToken(Token appToken) {
     maybeInitBuilder();
-    if (appToken == null) 
+    if (appToken == null) {
       builder.clearToken();
+    }
     this.appToken = appToken;
   }
 
@@ -86,8 +87,9 @@ public class GetDelegationTokenResponsePBImpl extends GetDelegationTokenResponse
 
   @Override
   public boolean equals(Object other) {
-    if (other == null)
+    if (other == null) {
       return false;
+    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -106,8 +108,9 @@ public class GetDelegationTokenResponsePBImpl extends GetDelegationTokenResponse
   }
 
   private void mergeLocalToProto() {
-    if (viaProto) 
+    if (viaProto) {
       maybeInitBuilder();
+    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
@@ -126,6 +129,6 @@ public class GetDelegationTokenResponsePBImpl extends GetDelegationTokenResponse
   }
 
   private TokenProto convertToProtoFormat(Token t) {
-    return ((TokenPBImpl)t).getProto();
+    return ((TokenPBImpl) t).getProto();
   }
 }

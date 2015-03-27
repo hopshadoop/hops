@@ -24,11 +24,11 @@ import org.apache.hadoop.yarn.server.api.ResourceManagerAdministrationProtocol;
 /**
  * <p>The response sent by the <code>ResourceManager</code> to Admin client on
  * node resource change.</p>
- * 
+ * <p/>
  * <p>Currently, this is empty.</p>
- * 
+ *
  * @see ResourceManagerAdministrationProtocol#updateNodeResource(
- *      UpdateNodeResourceRequest)
+ *UpdateNodeResourceRequest)
  */
 @Public
 @Evolving

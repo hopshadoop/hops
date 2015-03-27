@@ -17,11 +17,11 @@
  */
 package org.apache.hadoop.test;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Helper to configure FileSystemAccess user/group and proxyuser
@@ -38,14 +38,17 @@ public class HadoopUsersConfTestHelper {
 
   public static final String HADOOP_PROXYUSER = "test.hadoop.proxyuser";
 
-  public static final String HADOOP_PROXYUSER_HOSTS = "test.hadoop.proxyuser.hosts";
+  public static final String HADOOP_PROXYUSER_HOSTS =
+      "test.hadoop.proxyuser.hosts";
 
-  public static final String HADOOP_PROXYUSER_GROUPS = "test.hadoop.proxyuser.groups";
+  public static final String HADOOP_PROXYUSER_GROUPS =
+      "test.hadoop.proxyuser.groups";
 
   public static final String HADOOP_USER_PREFIX = "test.hadoop.user.";
 
   /**
-   * Returns a valid FileSystemAccess proxyuser for the FileSystemAccess cluster.
+   * Returns a valid FileSystemAccess proxyuser for the FileSystemAccess
+   * cluster.
    * <p/>
    * The user is read from the Java System property
    * <code>test.hadoop.proxyuser</code> which defaults to the current user
@@ -53,15 +56,19 @@ public class HadoopUsersConfTestHelper {
    * <p/>
    * This property should be set in the <code>test.properties</code> file.
    * <p/>
-   * When running FileSystemAccess minicluster it is used to configure the FileSystemAccess minicluster.
+   * When running FileSystemAccess minicluster it is used to configure the
+   * FileSystemAccess minicluster.
    * <p/>
-   * When using an external FileSystemAccess cluster, it is expected this property is set to
+   * When using an external FileSystemAccess cluster, it is expected this
+   * property is set to
    * a valid proxy user.
    *
-   * @return a valid FileSystemAccess proxyuser for the FileSystemAccess cluster.
+   * @return a valid FileSystemAccess proxyuser for the FileSystemAccess
+   * cluster.
    */
   public static String getHadoopProxyUser() {
-    return System.getProperty(HADOOP_PROXYUSER, System.getProperty("user.name"));
+    return System
+        .getProperty(HADOOP_PROXYUSER, System.getProperty("user.name"));
   }
 
   /**
@@ -72,7 +79,8 @@ public class HadoopUsersConfTestHelper {
    * <p/>
    * This property should be set in the <code>test.properties</code> file.
    * <p/>
-   * This property is ONLY used when running FileSystemAccess minicluster, it is used to
+   * This property is ONLY used when running FileSystemAccess minicluster, it is
+   * used to
    * configure the FileSystemAccess minicluster.
    * <p/>
    * When using an external FileSystemAccess cluster this property is ignored.
@@ -87,11 +95,13 @@ public class HadoopUsersConfTestHelper {
    * Returns the groups for the FileSystemAccess proxyuser settings.
    * <p/>
    * The hosts are read from the Java System property
-   * <code>test.hadoop.proxyuser.groups</code> which defaults to <code>*</code>.
+   * <code>test.hadoop.proxyuser.groups</code> which defaults to
+   * <code>*</code>.
    * <p/>
    * This property should be set in the <code>test.properties</code> file.
    * <p/>
-   * This property is ONLY used when running FileSystemAccess minicluster, it is used to
+   * This property is ONLY used when running FileSystemAccess minicluster, it is
+   * used to
    * configure the FileSystemAccess minicluster.
    * <p/>
    * When using an external FileSystemAccess cluster this property is ignored.
@@ -103,17 +113,21 @@ public class HadoopUsersConfTestHelper {
   }
 
   private static final String[] DEFAULT_USERS = new String[]{"user1", "user2"};
-  private static final String[] DEFAULT_USERS_GROUP = new String[]{"group1", "supergroup"};
+  private static final String[] DEFAULT_USERS_GROUP =
+      new String[]{"group1", "supergroup"};
 
   /**
-   * Returns the FileSystemAccess users to be used for tests. These users are defined
+   * Returns the FileSystemAccess users to be used for tests. These users are
+   * defined
    * in the <code>test.properties</code> file in properties of the form
    * <code>test.hadoop.user.#USER#=#GROUP1#,#GROUP2#,...</code>.
    * <p/>
-   * These properties are used to configure the FileSystemAccess minicluster user/group
+   * These properties are used to configure the FileSystemAccess minicluster
+   * user/group
    * information.
    * <p/>
-   * When using an external FileSystemAccess cluster these properties should match the
+   * When using an external FileSystemAccess cluster these properties should
+   * match the
    * user/groups settings in the cluster.
    *
    * @return the FileSystemAccess users used for testing.
@@ -125,22 +139,26 @@ public class HadoopUsersConfTestHelper {
         users.add(name.substring(HADOOP_USER_PREFIX.length()));
       }
     }
-    return (users.size() != 0) ? users.toArray(new String[users.size()]) : DEFAULT_USERS;
+    return (users.size() != 0) ? users.toArray(new String[users.size()]) :
+        DEFAULT_USERS;
   }
 
   /**
-   * Returns the groups a FileSystemAccess user belongs to during tests. These users/groups
+   * Returns the groups a FileSystemAccess user belongs to during tests. These
+   * users/groups
    * are defined in the <code>test.properties</code> file in properties of the
    * form <code>test.hadoop.user.#USER#=#GROUP1#,#GROUP2#,...</code>.
    * <p/>
-   * These properties are used to configure the FileSystemAccess minicluster user/group
+   * These properties are used to configure the FileSystemAccess minicluster
+   * user/group
    * information.
    * <p/>
-   * When using an external FileSystemAccess cluster these properties should match the
+   * When using an external FileSystemAccess cluster these properties should
+   * match the
    * user/groups settings in the cluster.
    *
-   * @param user user name to get gropus.
-   *
+   * @param user
+   *     user name to get gropus.
    * @return the groups of FileSystemAccess users used for testing.
    */
   public static String[] getHadoopUserGroups(String user) {
@@ -167,10 +185,12 @@ public class HadoopUsersConfTestHelper {
 
   public static void addUserConf(Configuration conf) {
     conf.set("hadoop.security.authentication", "simple");
-    conf.set("hadoop.proxyuser." + HadoopUsersConfTestHelper.getHadoopProxyUser() + ".hosts",
-             HadoopUsersConfTestHelper.getHadoopProxyUserHosts());
-    conf.set("hadoop.proxyuser." + HadoopUsersConfTestHelper.getHadoopProxyUser() + ".groups",
-             HadoopUsersConfTestHelper.getHadoopProxyUserGroups());
+    conf.set(
+        "hadoop.proxyuser." + HadoopUsersConfTestHelper.getHadoopProxyUser() +
+            ".hosts", HadoopUsersConfTestHelper.getHadoopProxyUserHosts());
+    conf.set(
+        "hadoop.proxyuser." + HadoopUsersConfTestHelper.getHadoopProxyUser() +
+            ".groups", HadoopUsersConfTestHelper.getHadoopProxyUserGroups());
 
     for (String user : HadoopUsersConfTestHelper.getHadoopUsers()) {
       String[] groups = HadoopUsersConfTestHelper.getHadoopUserGroups(user);

@@ -18,12 +18,12 @@
 
 package org.apache.hadoop.hdfs;
 
-import java.io.IOException;
-import java.util.NoSuchElementException;
-
-import org.apache.hadoop.hdfs.protocol.CorruptFileBlocks;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.hadoop.hdfs.protocol.CorruptFileBlocks;
+
+import java.io.IOException;
+import java.util.NoSuchElementException;
 
 /**
  * Provides an iterator interface for listCorruptFileBlocks.
@@ -31,7 +31,7 @@ import org.apache.hadoop.fs.RemoteIterator;
  */
 public class CorruptFileBlockIterator implements RemoteIterator<Path> {
   private final DFSClient dfs;
-  private final String path;
+  private String path;
 
   private String[] files = null;
   private int fileIdx = 0;

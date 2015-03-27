@@ -17,17 +17,6 @@
  */
 package org.apache.hadoop.hdfs;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
-import java.io.IOException;
-import java.io.OutputStream;
-import java.net.InetAddress;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -36,55 +25,43 @@ import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
-import org.apache.hadoop.hdfs.protocol.datatransfer.TrustedChannelResolver;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenSecretManager;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.StartupOption;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.test.GenericTestUtils.LogCapturer;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
 import org.mockito.Mockito;
 
-@RunWith(Parameterized.class)
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.List;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 public class TestEncryptedTransfer {
-  
-  @Parameters
-  public static Collection<Object[]> data() {
-    Collection<Object[]> params = new ArrayList<Object[]>();
-    params.add(new Object[]{null});
-    params.add(new Object[]{"org.apache.hadoop.hdfs.TestEncryptedTransfer$TestTrustedChannelResolver"});
-    return params;
-  }
   
   private static final Log LOG = LogFactory.getLog(TestEncryptedTransfer.class);
   
   private static final String PLAIN_TEXT = "this is very secret plain text";
   private static final Path TEST_PATH = new Path("/non-encrypted-file");
   
-  private void setEncryptionConfigKeys(Configuration conf) {
+  private static void setEncryptionConfigKeys(Configuration conf) {
     conf.setBoolean(DFSConfigKeys.DFS_ENCRYPT_DATA_TRANSFER_KEY, true);
     conf.setBoolean(DFSConfigKeys.DFS_BLOCK_ACCESS_TOKEN_ENABLE_KEY, true);
-    if (resolverClazz != null){
-      conf.set(DFSConfigKeys.DFS_TRUSTEDCHANNEL_RESOLVER_CLASS, resolverClazz);
-    }
   }
   
   // Unset DFS_ENCRYPT_DATA_TRANSFER_KEY and DFS_DATA_ENCRYPTION_ALGORITHM_KEY
   // on the client side to ensure that clients will detect this setting
   // automatically from the NN.
-  private static FileSystem getFileSystem(Configuration conf) throws IOException {
+  private static FileSystem getFileSystem(Configuration conf)
+      throws IOException {
     Configuration localConf = new Configuration(conf);
     localConf.setBoolean(DFSConfigKeys.DFS_ENCRYPT_DATA_TRANSFER_KEY, false);
     localConf.unset(DFSConfigKeys.DFS_DATA_ENCRYPTION_ALGORITHM_KEY);
     return FileSystem.get(localConf);
-  }
-  
-  String resolverClazz;
-  public TestEncryptedTransfer(String resolverClazz){
-    this.resolverClazz = resolverClazz;
   }
 
   @Test
@@ -93,23 +70,20 @@ public class TestEncryptedTransfer {
     try {
       Configuration conf = new Configuration();
       cluster = new MiniDFSCluster.Builder(conf).build();
-      
+
       FileSystem fs = getFileSystem(conf);
       writeTestDataToFile(fs);
       assertEquals(PLAIN_TEXT, DFSTestUtil.readFile(fs, TEST_PATH));
       FileChecksum checksum = fs.getFileChecksum(TEST_PATH);
       fs.close();
       cluster.shutdown();
-      
+
       setEncryptionConfigKeys(conf);
       
-      cluster = new MiniDFSCluster.Builder(conf)
-          .manageDataDfsDirs(false)
-          .manageNameDfsDirs(false)
-          .format(false)
-          .startupOption(StartupOption.REGULAR)
-          .build();
-      
+      cluster = new MiniDFSCluster.Builder(conf).manageDataDfsDirs(false)
+          .manageNameDfsDirs(false).format(false)
+          .startupOption(StartupOption.REGULAR).build();
+
       fs = getFileSystem(conf);
       assertEquals(PLAIN_TEXT, DFSTestUtil.readFile(fs, TEST_PATH));
       assertEquals(checksum, fs.getFileChecksum(TEST_PATH));
@@ -139,12 +113,9 @@ public class TestEncryptedTransfer {
       // It'll use 3DES by default, but we set it to rc4 here.
       conf.set(DFSConfigKeys.DFS_DATA_ENCRYPTION_ALGORITHM_KEY, "rc4");
       
-      cluster = new MiniDFSCluster.Builder(conf)
-          .manageDataDfsDirs(false)
-          .manageNameDfsDirs(false)
-          .format(false)
-          .startupOption(StartupOption.REGULAR)
-          .build();
+      cluster = new MiniDFSCluster.Builder(conf).manageDataDfsDirs(false)
+          .manageNameDfsDirs(false).format(false)
+          .startupOption(StartupOption.REGULAR).build();
       
       fs = getFileSystem(conf);
       assertEquals(PLAIN_TEXT, DFSTestUtil.readFile(fs, TEST_PATH));
@@ -173,12 +144,9 @@ public class TestEncryptedTransfer {
       
       setEncryptionConfigKeys(conf);
       
-      cluster = new MiniDFSCluster.Builder(conf)
-          .manageDataDfsDirs(false)
-          .manageNameDfsDirs(false)
-          .format(false)
-          .startupOption(StartupOption.REGULAR)
-          .build();
+      cluster = new MiniDFSCluster.Builder(conf).manageDataDfsDirs(false)
+          .manageNameDfsDirs(false).format(false)
+          .startupOption(StartupOption.REGULAR).build();
       
       fs = getFileSystem(conf);
       assertEquals(PLAIN_TEXT, DFSTestUtil.readFile(fs, TEST_PATH));
@@ -212,39 +180,33 @@ public class TestEncryptedTransfer {
       
       setEncryptionConfigKeys(conf);
       
-      cluster = new MiniDFSCluster.Builder(conf)
-          .manageDataDfsDirs(false)
-          .manageNameDfsDirs(false)
-          .format(false)
-          .startupOption(StartupOption.REGULAR)
-          .build();
+      cluster = new MiniDFSCluster.Builder(conf).manageDataDfsDirs(false)
+          .manageNameDfsDirs(false).format(false)
+          .startupOption(StartupOption.REGULAR).build();
       
       
       fs = getFileSystem(conf);
-      DFSClient client = DFSClientAdapter.getDFSClient((DistributedFileSystem) fs);
+      DFSClient client =
+          DFSClientAdapter.getDFSClient((DistributedFileSystem) fs);
       DFSClient spyClient = Mockito.spy(client);
       Mockito.doReturn(false).when(spyClient).shouldEncryptData();
       DFSClientAdapter.setDFSClient((DistributedFileSystem) fs, spyClient);
       
-      LogCapturer logs = GenericTestUtils.LogCapturer.captureLogs(
-          LogFactory.getLog(DataNode.class));
+      LogCapturer logs = GenericTestUtils.LogCapturer
+          .captureLogs(LogFactory.getLog(DataNode.class));
       try {
         assertEquals(PLAIN_TEXT, DFSTestUtil.readFile(fs, TEST_PATH));
-        if (resolverClazz != null && !resolverClazz.endsWith("TestTrustedChannelResolver")){
-          fail("Should not have been able to read without encryption enabled.");
-        }
+        fail("Should not have been able to read without encryption enabled.");
       } catch (IOException ioe) {
-        GenericTestUtils.assertExceptionContains("Could not obtain block:",
-            ioe);
+        GenericTestUtils
+            .assertExceptionContains("Could not obtain block:", ioe);
       } finally {
         logs.stopCapturing();
       }
       fs.close();
       
-      if (resolverClazz != null && !resolverClazz.endsWith("TestTrustedChannelResolver")){
-        GenericTestUtils.assertMatches(logs.getOutput(),
-        "Failed to read expected encryption handshake from client at");
-      }
+      GenericTestUtils.assertMatches(logs.getOutput(),
+          "Failed to read expected encryption handshake from client at");
     } finally {
       if (cluster != null) {
         cluster.shutdown();
@@ -268,12 +230,9 @@ public class TestEncryptedTransfer {
       
       setEncryptionConfigKeys(conf);
       
-      cluster = new MiniDFSCluster.Builder(conf)
-          .manageDataDfsDirs(false)
-          .manageNameDfsDirs(false)
-          .format(false)
-          .startupOption(StartupOption.REGULAR)
-          .build();
+      cluster = new MiniDFSCluster.Builder(conf).manageDataDfsDirs(false)
+          .manageNameDfsDirs(false).format(false)
+          .startupOption(StartupOption.REGULAR).build();
       
       fs = getFileSystem(conf);
       assertEquals(PLAIN_TEXT, DFSTestUtil.readFile(fs, TEST_PATH));
@@ -315,7 +274,8 @@ public class TestEncryptedTransfer {
       cluster.waitActive();
       
       writeTestDataToFile(fs);
-      assertEquals(PLAIN_TEXT + PLAIN_TEXT, DFSTestUtil.readFile(fs, TEST_PATH));
+      assertEquals(PLAIN_TEXT + PLAIN_TEXT,
+          DFSTestUtil.readFile(fs, TEST_PATH));
       
       fs.close();
     } finally {
@@ -341,12 +301,9 @@ public class TestEncryptedTransfer {
       
       setEncryptionConfigKeys(conf);
       
-      cluster = new MiniDFSCluster.Builder(conf)
-          .manageDataDfsDirs(false)
-          .manageNameDfsDirs(false)
-          .format(false)
-          .startupOption(StartupOption.REGULAR)
-          .build();
+      cluster = new MiniDFSCluster.Builder(conf).manageDataDfsDirs(false)
+          .manageNameDfsDirs(false).format(false)
+          .startupOption(StartupOption.REGULAR).build();
       
       BlockTokenSecretManager btsm = cluster.getNamesystem().getBlockManager()
           .getBlockTokenSecretManager();
@@ -426,7 +383,8 @@ public class TestEncryptedTransfer {
       assertEquals(PLAIN_TEXT, DFSTestUtil.readFile(fs, TEST_PATH));
       
       writeTestDataToFile(fs);
-      assertEquals(PLAIN_TEXT + PLAIN_TEXT, DFSTestUtil.readFile(fs, TEST_PATH));
+      assertEquals(PLAIN_TEXT + PLAIN_TEXT,
+          DFSTestUtil.readFile(fs, TEST_PATH));
       
       fs.close();
     } finally {
@@ -458,13 +416,15 @@ public class TestEncryptedTransfer {
       in.close();
       assertEquals(1, locatedBlocks.size());
       assertEquals(3, locatedBlocks.get(0).getLocations().length);
-      DataNode dn = cluster.getDataNode(locatedBlocks.get(0).getLocations()[0].getIpcPort());
+      DataNode dn = cluster
+          .getDataNode(locatedBlocks.get(0).getLocations()[0].getIpcPort());
       dn.shutdown();
       
       // Reopen the file for append, which will need to add another DN to the
       // pipeline and in doing so trigger a block transfer.
       writeTestDataToFile(fs);
-      assertEquals(PLAIN_TEXT + PLAIN_TEXT, DFSTestUtil.readFile(fs, TEST_PATH));
+      assertEquals(PLAIN_TEXT + PLAIN_TEXT,
+          DFSTestUtil.readFile(fs, TEST_PATH));
       
       fs.close();
     } finally {
@@ -484,16 +444,4 @@ public class TestEncryptedTransfer {
     out.write(PLAIN_TEXT.getBytes());
     out.close();
   }
-  
-  static class TestTrustedChannelResolver extends TrustedChannelResolver {
-    
-    public boolean isTrusted(){
-      return true;
-    }
-
-    public boolean isTrusted(InetAddress peerAddress){
-      return true;
-    }
-  }
-  
 }

@@ -17,14 +17,6 @@
  */
 package org.apache.hadoop.fs;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.fail;
-
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.util.Iterator;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -38,10 +30,17 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import java.io.FileNotFoundException;
+import java.io.IOException;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.fail;
+
 /**
  * A large directory listing may have to go through multiple RPCs.
  * The directory to be listed may be removed before all contents are listed.
- * 
+ * <p/>
  * This test uses AspectJ to simulate the scenario.
  */
 public class TestFiListPath {
@@ -71,8 +70,8 @@ public class TestFiListPath {
   @Before
   public void prepare() throws IOException {
     fs.mkdirs(TEST_PATH);
-    for (int i=0; i<LIST_LIMIT+1; i++) {
-      fs.mkdirs(new Path(TEST_PATH, "dir"+i));
+    for (int i = 0; i < LIST_LIMIT + 1; i++) {
+      fs.mkdirs(new Path(TEST_PATH, "dir" + i));
     }
   }
   
@@ -81,7 +80,9 @@ public class TestFiListPath {
     fs.delete(TEST_PATH, true);
   }
   
-  /** Remove the target directory after the getListing RPC */
+  /**
+   * Remove the target directory after the getListing RPC
+   */
   @Test
   public void testTargetDeletionForListStatus() throws Exception {
     LOG.info("Test Target Delete For listStatus");
@@ -94,12 +95,14 @@ public class TestFiListPath {
     }
   }
   
-  /** Remove the target directory after the getListing RPC */
+  /**
+   * Remove the target directory after the getListing RPC
+   */
   @Test
   public void testTargetDeletionForListLocatedStatus() throws Exception {
     LOG.info("Test Target Delete For listLocatedStatus");
     RemoteIterator<LocatedFileStatus> itor = fs.listLocatedStatus(TEST_PATH);
     itor.next();
-    assertFalse (itor.hasNext());
+    assertFalse(itor.hasNext());
   }
 }

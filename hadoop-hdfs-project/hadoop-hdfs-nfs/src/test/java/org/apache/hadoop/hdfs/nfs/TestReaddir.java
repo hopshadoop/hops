@@ -18,13 +18,6 @@
 
 package org.apache.hadoop.hdfs.nfs;
 
-import static org.junit.Assert.assertTrue;
-
-import java.io.IOException;
-import java.net.InetAddress;
-import java.util.Arrays;
-import java.util.List;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DFSTestUtil;
@@ -41,14 +34,18 @@ import org.apache.hadoop.nfs.nfs3.response.READDIRPLUS3Response;
 import org.apache.hadoop.nfs.nfs3.response.READDIRPLUS3Response.EntryPlus3;
 import org.apache.hadoop.oncrpc.XDR;
 import org.apache.hadoop.oncrpc.security.SecurityHandler;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.ProxyUsers;
-import org.apache.hadoop.util.StringUtils;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.mockito.Mockito;
+
+import java.io.IOException;
+import java.net.InetAddress;
+import java.util.List;
+
+import static org.junit.Assert.assertTrue;
 
 /**
  * Test READDIR and READDIRPLUS request with zero, nonzero cookies
@@ -66,12 +63,8 @@ public class TestReaddir {
   @BeforeClass
   public static void setup() throws Exception {
     String currentUser = System.getProperty("user.name");
-    config.set(
-            ProxyUsers.getProxySuperuserGroupConfKey(currentUser),
-            "*");
-    config.set(
-            ProxyUsers.getProxySuperuserIpConfKey(currentUser),
-            "*");
+    config.set(ProxyUsers.getProxySuperuserGroupConfKey(currentUser), "*");
+    config.set(ProxyUsers.getProxySuperuserIpConfKey(currentUser), "*");
     ProxyUsers.refreshSuperUserGroupsConfiguration(config);
     cluster = new MiniDFSCluster.Builder(config).numDataNodes(1).build();
     cluster.waitActive();
@@ -89,8 +82,8 @@ public class TestReaddir {
     nfsd = (RpcProgramNfs3) nfs3.getRpcProgram();
 
     securityHandler = Mockito.mock(SecurityHandler.class);
-    Mockito.when(securityHandler.getUser()).thenReturn(
-        System.getProperty("user.name"));
+    Mockito.when(securityHandler.getUser())
+        .thenReturn(System.getProperty("user.name"));
   }
 
   @AfterClass
@@ -123,8 +116,9 @@ public class TestReaddir {
     xdr_req.writeLongAsHyper(0); // verifier
     xdr_req.writeInt(100); // count
 
-    READDIR3Response response = nfsd.readdir(xdr_req.asReadOnlyWrap(),
-        securityHandler, InetAddress.getLocalHost());
+    READDIR3Response response =
+        nfsd.readdir(xdr_req.asReadOnlyWrap(), securityHandler,
+            InetAddress.getLocalHost());
     List<Entry3> dirents = response.getDirList().getEntries();
     assertTrue(dirents.size() == 5); // inculding dot, dotdot
 
@@ -172,8 +166,9 @@ public class TestReaddir {
     xdr_req.writeInt(100); // dirCount
     xdr_req.writeInt(1000); // maxCount
 
-    READDIRPLUS3Response responsePlus = nfsd.readdirplus(
-        xdr_req.asReadOnlyWrap(), securityHandler, InetAddress.getLocalHost());
+    READDIRPLUS3Response responsePlus =
+        nfsd.readdirplus(xdr_req.asReadOnlyWrap(), securityHandler,
+            InetAddress.getLocalHost());
     List<EntryPlus3> direntPlus = responsePlus.getDirListPlus().getEntries();
     assertTrue(direntPlus.size() == 5); // including dot, dotdot
 

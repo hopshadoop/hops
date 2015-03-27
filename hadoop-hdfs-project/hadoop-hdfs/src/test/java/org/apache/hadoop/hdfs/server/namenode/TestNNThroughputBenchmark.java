@@ -17,25 +17,16 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
-import java.io.File;
-import java.util.Arrays;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
-import org.apache.hadoop.hdfs.MiniDFSCluster;
-import org.junit.After;
 import org.junit.Test;
 
-public class TestNNThroughputBenchmark {
+import java.util.Arrays;
 
-  @After
-  public void cleanUp() {
-    FileUtil.fullyDeleteContents(new File(MiniDFSCluster.getBaseDirectory()));
-  }
+public class TestNNThroughputBenchmark {
 
   /**
    * This test runs all benchmarks defined in {@link NNThroughputBenchmark}.
@@ -43,13 +34,10 @@ public class TestNNThroughputBenchmark {
   @Test
   public void testNNThroughput() throws Exception {
     Configuration conf = new HdfsConfiguration();
-    File nameDir = new File(MiniDFSCluster.getBaseDirectory(), "name");
-    conf.set(DFSConfigKeys.DFS_NAMENODE_NAME_DIR_KEY,
-        nameDir.getAbsolutePath());
     FileSystem.setDefaultUri(conf, "hdfs://localhost:" + 0);
     conf.set(DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY, "0.0.0.0:0");
     DFSTestUtil.formatNameNode(conf);
-    String[] args = new String[] {"-op", "all"};
+    String[] args = new String[]{"-op", "all"};
     NNThroughputBenchmark.runBenchmark(conf, Arrays.asList(args));
   }
 }

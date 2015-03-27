@@ -17,22 +17,20 @@
  */
 package org.apache.hadoop.yarn.webapp;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
-
-import javax.servlet.http.HttpServletResponse;
-import javax.ws.rs.core.Context;
-import javax.ws.rs.core.Response;
-import javax.ws.rs.ext.ExceptionMapper;
-import javax.ws.rs.ext.Provider;
-
+import com.google.inject.Singleton;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.security.authorize.AuthorizationException;
 
-import com.google.inject.Singleton;
+import javax.servlet.http.HttpServletResponse;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.Response;
+import javax.ws.rs.ext.ExceptionMapper;
+import javax.ws.rs.ext.Provider;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 
 /**
  * Handle webservices jersey exceptions and create json or xml response
@@ -42,10 +40,11 @@ import com.google.inject.Singleton;
 @Singleton
 @Provider
 public class GenericExceptionHandler implements ExceptionMapper<Exception> {
-  public static final Log LOG = LogFactory
-      .getLog(GenericExceptionHandler.class);
+  public static final Log LOG =
+      LogFactory.getLog(GenericExceptionHandler.class);
 
-  private @Context
+  private
+  @Context
   HttpServletResponse response;
 
   @Override
@@ -93,10 +92,10 @@ public class GenericExceptionHandler implements ExceptionMapper<Exception> {
     }
 
     // let jaxb handle marshalling data out in the same format requested
-    RemoteExceptionData exception = new RemoteExceptionData(e.getClass().getSimpleName(),
-       e.getMessage(), e.getClass().getName());
+    RemoteExceptionData exception =
+        new RemoteExceptionData(e.getClass().getSimpleName(), e.getMessage(),
+            e.getClass().getName());
 
-    return Response.status(s).entity(exception)
-        .build();
+    return Response.status(s).entity(exception).build();
   }
 }

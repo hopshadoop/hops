@@ -17,97 +17,66 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
-import java.io.PrintWriter;
-import java.util.List;
-
+import io.hops.exception.StorageException;
+import io.hops.exception.TransactionContextException;
+import io.hops.transaction.EntityManager;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.DFSUtil;
-import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
-import org.apache.hadoop.hdfs.server.namenode.snapshot.Snapshot;
+import org.apache.hadoop.hdfs.protocol.Block;
+
+import java.util.List;
 
 /**
- * An {@link INode} representing a symbolic link.
+ * An INode representing a symbolic link.
  */
 @InterfaceAudience.Private
-public class INodeSymlink extends INodeWithAdditionalFields {
-  private final byte[] symlink; // The target URI
+public class INodeSymlink extends INode {
+  private byte[] symlink; // The target URI
 
-  INodeSymlink(long id, byte[] name, PermissionStatus permissions,
-      long mtime, long atime, String symlink) {
-    super(id, name, permissions, mtime, atime);
-    this.symlink = DFSUtil.string2Bytes(symlink);
-  }
-  
-  INodeSymlink(INodeSymlink that) {
-    super(that);
-    this.symlink = that.symlink;
+  public INodeSymlink(String value, long modTime, long atime,
+      PermissionStatus permissions) {
+    super(permissions, modTime, atime);
+    assert value != null;
+    setLinkValue(value);
+    setModificationTimeForceNoPersistance(modTime);
+    setAccessTimeNoPersistance(atime);
   }
 
-  @Override
-  INode recordModification(int latestSnapshotId) throws QuotaExceededException {
-    if (isInLatestSnapshot(latestSnapshotId)) {
-      INodeDirectory parent = getParent();
-      parent.saveChild2Snapshot(this, latestSnapshotId, new INodeSymlink(this));
-    }
-    return this;
-  }
-
-  /** @return true unconditionally. */
   @Override
   public boolean isSymlink() {
     return true;
   }
-
-  /** @return this object. */
-  @Override
-  public INodeSymlink asSymlink() {
-    return this;
+  
+  void setLinkValue(String value) {
+    this.symlink = DFSUtil.string2Bytes(value);
   }
 
-  public String getSymlinkString() {
+  public String getLinkValue() {
     return DFSUtil.bytes2String(symlink);
   }
 
   public byte[] getSymlink() {
     return symlink;
   }
-  
-  @Override
-  public Quota.Counts cleanSubtree(final int snapshotId, int priorSnapshotId,
-      final BlocksMapUpdateInfo collectedBlocks,
-      final List<INode> removedINodes, final boolean countDiffChange) {
-    if (snapshotId == Snapshot.CURRENT_STATE_ID
-        && priorSnapshotId == Snapshot.NO_SNAPSHOT_ID) {
-      destroyAndCollectBlocks(collectedBlocks, removedINodes);
-    }
-    return Quota.Counts.newInstance(1, 0);
-  }
-  
-  @Override
-  public void destroyAndCollectBlocks(final BlocksMapUpdateInfo collectedBlocks,
-      final List<INode> removedINodes) {
-    removedINodes.add(this);
-  }
 
   @Override
-  public Quota.Counts computeQuotaUsage(Quota.Counts counts,
-      boolean updateCache, int lastSnapshotId) {
-    counts.add(Quota.NAMESPACE, 1);
+  DirCounts spaceConsumedInTree(DirCounts counts) {
+    counts.nsCount += 1;
     return counts;
   }
-
+  
   @Override
-  public ContentSummaryComputationContext computeContentSummary(
-      final ContentSummaryComputationContext summary) {
-    summary.getCounts().add(Content.SYMLINK, 1);
-    return summary;
+  int collectSubtreeBlocksAndClear(List<Block> v)
+      throws StorageException, TransactionContextException {
+    //HOP:
+    EntityManager.remove(this);
+    return 1;
   }
 
   @Override
-  public void dumpTreeRecursively(PrintWriter out, StringBuilder prefix,
-      final int snapshot) {
-    super.dumpTreeRecursively(out, prefix, snapshot);
-    out.println();
+  long[] computeContentSummary(long[] summary) {
+    summary[1]++; // Increment the file count
+    return summary;
   }
 }

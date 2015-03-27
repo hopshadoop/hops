@@ -18,13 +18,12 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.security;
 
-import java.net.InetSocketAddress;
-import java.security.PrivilegedAction;
-import java.util.Arrays;
-import java.util.Collection;
-
-import javax.crypto.SecretKey;
-
+import io.hops.exception.StorageInitializtionException;
+import io.hops.ha.common.TransactionState;
+import io.hops.ha.common.TransactionStateImpl;
+import io.hops.metadata.util.RMStorageFactory;
+import io.hops.metadata.util.RMUtilities;
+import io.hops.metadata.util.YarnAPIStorageFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -57,6 +56,13 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
 
+import javax.crypto.SecretKey;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.security.PrivilegedAction;
+import java.util.Arrays;
+import java.util.Collection;
+
 @RunWith(Parameterized.class)
 public class TestAMRMTokens {
 
@@ -65,12 +71,17 @@ public class TestAMRMTokens {
   private final Configuration conf;
 
   @Parameters
-  public static Collection<Object[]> configs() {
+  public static Collection<Object[]> configs()
+      throws StorageInitializtionException, IOException {
     Configuration conf = new Configuration();
     Configuration confWithSecurity = new Configuration();
-    confWithSecurity.set(
-      CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION, "kerberos");
-    return Arrays.asList(new Object[][] {{ conf }, { confWithSecurity } });
+    confWithSecurity
+        .set(CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION,
+            "kerberos");
+    YarnAPIStorageFactory.setConfiguration(conf);
+    RMStorageFactory.setConfiguration(conf);
+
+    return Arrays.asList(new Object[][]{{conf}, {confWithSecurity}});
   }
 
   public TestAMRMTokens(Configuration conf) {
@@ -81,16 +92,15 @@ public class TestAMRMTokens {
   /**
    * Validate that application tokens are unusable after the
    * application-finishes.
-   * 
+   *
    * @throws Exception
    */
   @SuppressWarnings("unchecked")
   @Test
   public void testTokenExpiry() throws Exception {
-
+    RMUtilities.InitializeDB();
     MyContainerManager containerManager = new MyContainerManager();
-    final MockRMWithAMS rm =
-        new MockRMWithAMS(conf, containerManager);
+    final MockRMWithAMS rm = new MockRMWithAMS(conf, containerManager);
     rm.start();
 
     final Configuration conf = rm.getConfig();
@@ -115,15 +125,13 @@ public class TestAMRMTokens {
       ApplicationAttemptId applicationAttemptId = attempt.getAppAttemptId();
 
       // Create a client to the RM.
-      UserGroupInformation currentUser =
-          UserGroupInformation
-            .createRemoteUser(applicationAttemptId.toString());
+      UserGroupInformation currentUser = UserGroupInformation
+          .createRemoteUser(applicationAttemptId.toString());
       Credentials credentials = containerManager.getContainerCredentials();
       final InetSocketAddress rmBindAddress =
           rm.getApplicationMasterService().getBindAddress();
-      Token<? extends TokenIdentifier> amRMToken =
-          MockRMWithAMS.setupAndReturnAMRMToken(rmBindAddress,
-            credentials.getAllTokens());
+      Token<? extends TokenIdentifier> amRMToken = MockRMWithAMS
+          .setupAndReturnAMRMToken(rmBindAddress, credentials.getAllTokens());
       currentUser.addToken(amRMToken);
       rmClient = createRMClient(rm, conf, rpc, currentUser);
 
@@ -134,7 +142,7 @@ public class TestAMRMTokens {
       FinishApplicationMasterRequest finishAMRequest =
           Records.newRecord(FinishApplicationMasterRequest.class);
       finishAMRequest
-        .setFinalApplicationStatus(FinalApplicationStatus.SUCCEEDED);
+          .setFinalApplicationStatus(FinalApplicationStatus.SUCCEEDED);
       finishAMRequest.setDiagnostics("diagnostics");
       finishAMRequest.setTrackingUrl("url");
       rmClient.finishApplicationMaster(finishAMRequest);
@@ -142,16 +150,13 @@ public class TestAMRMTokens {
       // Send RMAppAttemptEventType.CONTAINER_FINISHED to transit RMAppAttempt
       // from Finishing state to Finished State. Both AMRMToken and
       // ClientToAMToken will be removed.
-      ContainerStatus containerStatus =
-          BuilderUtils.newContainerStatus(attempt.getMasterContainer().getId(),
-              ContainerState.COMPLETE,
-              "AM Container Finished", 0);
-      rm.getRMContext()
-          .getDispatcher()
-          .getEventHandler()
-          .handle(
-              new RMAppAttemptContainerFinishedEvent(applicationAttemptId,
-                  containerStatus));
+      ContainerStatus containerStatus = BuilderUtils
+          .newContainerStatus(attempt.getMasterContainer().getId(),
+              ContainerState.COMPLETE, "AM Container Finished", 0);
+      rm.getRMContext().getDispatcher().getEventHandler().handle(
+          new RMAppAttemptContainerFinishedEvent(applicationAttemptId,
+              containerStatus, new TransactionStateImpl(-1,
+              TransactionState.TransactionType.RM)));
 
       // Now simulate trying to allocate. RPC call itself should throw auth
       // exception.
@@ -161,15 +166,15 @@ public class TestAMRMTokens {
           Records.newRecord(AllocateRequest.class);
       try {
         rmClient.allocate(allocateRequest);
-        Assert.fail("You got to be kidding me! "
-            + "Using App tokens after app-finish should fail!");
+        Assert.fail("You got to be kidding me! " +
+            "Using App tokens after app-finish should fail!");
       } catch (Throwable t) {
         LOG.info("Exception found is ", t);
         // The exception will still have the earlier appAttemptId as it picks it
         // up from the token.
         Assert.assertTrue(t.getCause().getMessage().contains(
             "Password not found for ApplicationAttempt " +
-            applicationAttemptId.toString()));
+                applicationAttemptId.toString()));
       }
 
     } finally {
@@ -183,15 +188,14 @@ public class TestAMRMTokens {
   /**
    * Validate master-key-roll-over and that tokens are usable even after
    * master-key-roll-over.
-   * 
+   *
    * @throws Exception
    */
   @Test
   public void testMasterKeyRollOver() throws Exception {
-
+    RMUtilities.InitializeDB();
     MyContainerManager containerManager = new MyContainerManager();
-    final MockRMWithAMS rm =
-        new MockRMWithAMS(conf, containerManager);
+    final MockRMWithAMS rm = new MockRMWithAMS(conf, containerManager);
     rm.start();
 
     final Configuration conf = rm.getConfig();
@@ -216,15 +220,13 @@ public class TestAMRMTokens {
       ApplicationAttemptId applicationAttemptId = attempt.getAppAttemptId();
 
       // Create a client to the RM.
-      UserGroupInformation currentUser =
-          UserGroupInformation
-            .createRemoteUser(applicationAttemptId.toString());
+      UserGroupInformation currentUser = UserGroupInformation
+          .createRemoteUser(applicationAttemptId.toString());
       Credentials credentials = containerManager.getContainerCredentials();
       final InetSocketAddress rmBindAddress =
           rm.getApplicationMasterService().getBindAddress();
-      Token<? extends TokenIdentifier> amRMToken =
-          MockRMWithAMS.setupAndReturnAMRMToken(rmBindAddress,
-            credentials.getAllTokens());
+      Token<? extends TokenIdentifier> amRMToken = MockRMWithAMS
+          .setupAndReturnAMRMToken(rmBindAddress, credentials.getAllTokens());
       currentUser.addToken(amRMToken);
       rmClient = createRMClient(rm, conf, rpc, currentUser);
 
@@ -245,7 +247,7 @@ public class TestAMRMTokens {
       appTokenSecretManager.rollMasterKey();
       SecretKey newKey = appTokenSecretManager.getMasterKey();
       Assert.assertFalse("Master key should have changed!",
-        oldKey.equals(newKey));
+          oldKey.equals(newKey));
 
       // Another allocate call. Should continue to work.
       rpc.stopProxy(rmClient, conf); // To avoid using cached client
@@ -267,8 +269,9 @@ public class TestAMRMTokens {
     return currentUser.doAs(new PrivilegedAction<ApplicationMasterProtocol>() {
       @Override
       public ApplicationMasterProtocol run() {
-        return (ApplicationMasterProtocol) rpc.getProxy(ApplicationMasterProtocol.class, rm
-          .getApplicationMasterService().getBindAddress(), conf);
+        return (ApplicationMasterProtocol) rpc
+            .getProxy(ApplicationMasterProtocol.class,
+                rm.getApplicationMasterService().getBindAddress(), conf);
       }
     });
   }

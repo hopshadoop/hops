@@ -17,50 +17,53 @@
  */
 package org.apache.hadoop.hdfs.server.datanode.metrics;
 
-import java.io.IOException;
-
 import org.apache.hadoop.classification.InterfaceAudience;
 
+import java.io.IOException;
+
 /**
- * 
  * This Interface defines the methods to get the status of a the FSDataset of
  * a data node.
  * It is also used for publishing via JMX (hence we follow the JMX naming
- * convention.) 
- *  * Note we have not used the MetricsDynamicMBeanBase to implement this
+ * convention.)
+ * * Note we have not used the MetricsDynamicMBeanBase to implement this
  * because the interface for the FSDatasetMBean is stable and should
  * be published as an interface.
- * 
- * <p>
+ * <p/>
+ * <p/>
  * Data Node runtime statistic  info is report in another MBean
- * @see org.apache.hadoop.hdfs.server.datanode.metrics.DataNodeMetrics
  *
+ * @see org.apache.hadoop.hdfs.server.datanode.metrics.DataNodeMetrics
  */
 @InterfaceAudience.Private
 public interface FSDatasetMBean {
   
   /**
    * Returns the total space (in bytes) used by a block pool
-   * @return  the total space used by a block pool
+   *
+   * @return the total space used by a block pool
    * @throws IOException
-   */  
+   */
   public long getBlockPoolUsed(String bpid) throws IOException;
   
   /**
    * Returns the total space (in bytes) used by dfs datanode
-   * @return  the total space used by dfs datanode
+   *
+   * @return the total space used by dfs datanode
    * @throws IOException
-   */  
+   */
   public long getDfsUsed() throws IOException;
-    
+
   /**
    * Returns total capacity (in bytes) of storage (used and unused)
-   * @return  total capacity of storage (used and unused)
+   *
+   * @return total capacity of storage (used and unused)
    */
   public long getCapacity();
 
   /**
    * Returns the amount of free storage space (in bytes)
+   *
    * @return The amount of free storage space
    * @throws IOException
    */
@@ -73,32 +76,8 @@ public interface FSDatasetMBean {
 
   /**
    * Returns the number of failed volumes in the datanode.
+   *
    * @return The number of failed volumes in the datanode.
    */
   public int getNumFailedVolumes();
-
-  /**
-   * Returns the amount of cache used by the datanode (in bytes).
-   */
-  public long getCacheUsed();
-
-  /**
-   * Returns the total cache capacity of the datanode (in bytes).
-   */
-  public long getCacheCapacity();
-
-  /**
-   * Returns the number of blocks cached.
-   */
-  public long getNumBlocksCached();
-
-  /**
-   * Returns the number of blocks that the datanode was unable to cache
-   */
-  public long getNumBlocksFailedToCache();
-
-  /**
-   * Returns the number of blocks that the datanode was unable to uncache
-   */
-  public long getNumBlocksFailedToUncache();
 }

@@ -18,18 +18,19 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.ahs;
 
+import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.server.applicationhistoryservice.records.ApplicationStartData;
 
-public class WritingApplicationStartEvent extends
-    WritingApplicationHistoryEvent {
+public class WritingApplicationStartEvent
+    extends WritingApplicationHistoryEvent {
 
   private ApplicationId appId;
   private ApplicationStartData appStart;
 
   public WritingApplicationStartEvent(ApplicationId appId,
-      ApplicationStartData appStart) {
-    super(WritingHistoryEventType.APP_START);
+      ApplicationStartData appStart, TransactionState transactionState) {
+    super(WritingHistoryEventType.APP_START, transactionState);
     this.appId = appId;
     this.appStart = appStart;
   }

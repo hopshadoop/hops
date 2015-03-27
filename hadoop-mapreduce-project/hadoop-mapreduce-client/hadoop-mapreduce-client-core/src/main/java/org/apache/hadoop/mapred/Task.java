@@ -63,6 +63,7 @@ import org.apache.hadoop.mapreduce.lib.reduce.WrappedReducer;
 import org.apache.hadoop.mapreduce.task.ReduceContextImpl;
 import org.apache.hadoop.yarn.util.ResourceCalculatorProcessTree;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.util.ExitUtil;
 import org.apache.hadoop.util.Progress;
 import org.apache.hadoop.util.Progressable;
 import org.apache.hadoop.util.ReflectionUtils;
@@ -329,7 +330,7 @@ abstract public class Task implements Writable, Configurable {
       umbilical.fatalError(id, cause);
     } catch (IOException ioe) {
       LOG.fatal("Failed to contact the tasktracker", ioe);
-      System.exit(-1);
+      ExitUtil.terminate(-1);
     }
   }
 
@@ -741,7 +742,7 @@ abstract public class Task implements Writable, Configurable {
           if (!taskFound) {
             LOG.warn("Parent died.  Exiting "+taskId);
             resetDoneFlag();
-            System.exit(66);
+            ExitUtil.terminate(66);
           }
 
           sendProgress = resetProgressFlag(); 
@@ -754,7 +755,7 @@ abstract public class Task implements Writable, Configurable {
             ReflectionUtils.logThreadInfo(LOG, "Communication exception", 0);
             LOG.warn("Last retry, killing "+taskId);
             resetDoneFlag();
-            System.exit(65);
+            ExitUtil.terminate(65);
           }
         }
       }
@@ -1011,7 +1012,7 @@ abstract public class Task implements Writable, Configurable {
           LOG.warn("Failure sending commit pending: " + 
                     StringUtils.stringifyException(ie));
           if (--retries == 0) {
-            System.exit(67);
+            ExitUtil.terminate(67);
           }
         }
       }
@@ -1056,7 +1057,7 @@ abstract public class Task implements Writable, Configurable {
       try {
         if (!umbilical.statusUpdate(getTaskID(), taskStatus)) {
           LOG.warn("Parent died.  Exiting "+taskId);
-          System.exit(66);
+          ExitUtil.terminate(66);
         }
         taskStatus.clearStatus();
         return;
@@ -1146,7 +1147,7 @@ abstract public class Task implements Writable, Configurable {
         if (--retries == 0) {
           //if it couldn't query successfully then delete the output
           discardOutput(taskContext);
-          System.exit(68);
+          ExitUtil.terminate(68);
         }
       }
     }

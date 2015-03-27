@@ -17,9 +17,6 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
-import java.io.IOException;
-import java.util.Random;
-
 import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fi.DataTransferTestUtil;
@@ -30,7 +27,6 @@ import org.apache.hadoop.fi.DataTransferTestUtil.DataTransferTest;
 import org.apache.hadoop.fi.DataTransferTestUtil.SleepAction;
 import org.apache.hadoop.fi.DataTransferTestUtil.VerificationAction;
 import org.apache.hadoop.fi.FiTestUtil;
-import static org.apache.hadoop.fs.CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -43,7 +39,14 @@ import org.apache.log4j.Level;
 import org.junit.Assert;
 import org.junit.Test;
 
-/** Test DataTransferProtocol with fault injection. */
+import java.io.IOException;
+import java.util.Random;
+
+import static org.apache.hadoop.fs.CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY;
+
+/**
+ * Test DataTransferProtocol with fault injection.
+ */
 public class TestFiDataTransferProtocol2 {
   static final short REPLICATION = 3;
   static final long BLOCKSIZE = 1L * (1L << 20);
@@ -54,6 +57,7 @@ public class TestFiDataTransferProtocol2 {
   static final int MAX_SLEEP = 1000;
 
   static final Configuration conf = new Configuration();
+
   static {
     conf.setInt(DFSConfigKeys.DFS_DATANODE_HANDLER_COUNT_KEY, 1);
     conf.setInt(DFSConfigKeys.DFS_REPLICATION_KEY, REPLICATION);
@@ -64,17 +68,19 @@ public class TestFiDataTransferProtocol2 {
   static final byte[] bytes = new byte[MAX_N_PACKET * PACKET_SIZE];
   static final byte[] toRead = new byte[MAX_N_PACKET * PACKET_SIZE];
 
-  static private FSDataOutputStream createFile(FileSystem fs, Path p
-      ) throws IOException {
-    return fs.create(p, true, fs.getConf()
-        .getInt(IO_FILE_BUFFER_SIZE_KEY, 4096), REPLICATION, BLOCKSIZE);
+  static private FSDataOutputStream createFile(FileSystem fs, Path p)
+      throws IOException {
+    return fs
+        .create(p, true, fs.getConf().getInt(IO_FILE_BUFFER_SIZE_KEY, 4096),
+            REPLICATION, BLOCKSIZE);
   }
 
   {
     ((Log4JLogger) BlockReceiver.LOG).getLogger().setLevel(Level.ALL);
     ((Log4JLogger) DFSClient.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger)DataTransferProtocol.LOG).getLogger().setLevel(Level.ALL);
+    ((Log4JLogger) DataTransferProtocol.LOG).getLogger().setLevel(Level.ALL);
   }
+
   /**
    * 1. create files with dfs
    * 2. write MIN_N_PACKET to MAX_N_PACKET packets
@@ -82,17 +88,20 @@ public class TestFiDataTransferProtocol2 {
    * 4. open the same file
    * 5. read the bytes and compare results
    */
-  private static void writeSeveralPackets(String methodName) throws IOException {
+  private static void writeSeveralPackets(String methodName)
+      throws IOException {
     final Random r = FiTestUtil.RANDOM.get();
-    final int nPackets = FiTestUtil.nextRandomInt(MIN_N_PACKET, MAX_N_PACKET + 1);
+    final int nPackets =
+        FiTestUtil.nextRandomInt(MIN_N_PACKET, MAX_N_PACKET + 1);
     final int lastPacketSize = FiTestUtil.nextRandomInt(1, PACKET_SIZE + 1);
-    final int size = (nPackets - 1)*PACKET_SIZE + lastPacketSize;
+    final int size = (nPackets - 1) * PACKET_SIZE + lastPacketSize;
 
-    FiTestUtil.LOG.info("size=" + size + ", nPackets=" + nPackets
-        + ", lastPacketSize=" + lastPacketSize);
+    FiTestUtil.LOG.info(
+        "size=" + size + ", nPackets=" + nPackets + ", lastPacketSize=" +
+            lastPacketSize);
 
-    final MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf
-        ).numDataNodes(REPLICATION + 2).build();
+    final MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(REPLICATION + 2).build();
     final FileSystem dfs = cluster.getFileSystem();
     try {
       final Path p = new Path("/" + methodName + "/foo");
@@ -114,8 +123,7 @@ public class TestFiDataTransferProtocol2 {
       for (int i = 0; i < size; i++) {
         Assert.assertTrue("File content differ.", bytes[i] == toRead[i]);
       }
-    }
-    finally {
+    } finally {
       dfs.close();
       cluster.shutdown();
     }
@@ -128,15 +136,15 @@ public class TestFiDataTransferProtocol2 {
     t.fiStatusRead.set(a);
   }
 
-  private void runTest17_19(String methodName, int dnIndex)
-      throws IOException {
+  private void runTest17_19(String methodName, int dnIndex) throws IOException {
     FiTestUtil.LOG.info("Running " + methodName + " ...");
-    final DataTransferTest t = (DataTransferTest) DataTransferTestUtil
-        .initTest();
+    final DataTransferTest t =
+        (DataTransferTest) DataTransferTestUtil.initTest();
     initSlowDatanodeTest(t, new SleepAction(methodName, 0, 0, MAX_SLEEP));
     initSlowDatanodeTest(t, new SleepAction(methodName, 1, 0, MAX_SLEEP));
     initSlowDatanodeTest(t, new SleepAction(methodName, 2, 0, MAX_SLEEP));
-    t.fiCallWritePacketToDisk.set(new CountdownDoosAction(methodName, dnIndex, 3));
+    t.fiCallWritePacketToDisk
+        .set(new CountdownDoosAction(methodName, dnIndex, 3));
     t.fiPipelineErrorAfterInit.set(new VerificationAction(methodName, dnIndex));
     writeSeveralPackets(methodName);
     Assert.assertTrue(t.isSuccess());
@@ -144,12 +152,13 @@ public class TestFiDataTransferProtocol2 {
 
   private void runTest29_30(String methodName, int dnIndex) throws IOException {
     FiTestUtil.LOG.info("Running " + methodName + " ...");
-    final DataTransferTest t = (DataTransferTest) DataTransferTestUtil
-        .initTest();
+    final DataTransferTest t =
+        (DataTransferTest) DataTransferTestUtil.initTest();
     initSlowDatanodeTest(t, new SleepAction(methodName, 0, 0, MAX_SLEEP));
     initSlowDatanodeTest(t, new SleepAction(methodName, 1, 0, MAX_SLEEP));
     initSlowDatanodeTest(t, new SleepAction(methodName, 2, 0, MAX_SLEEP));
-    t.fiAfterDownstreamStatusRead.set(new CountdownOomAction(methodName, dnIndex, 3));
+    t.fiAfterDownstreamStatusRead
+        .set(new CountdownOomAction(methodName, dnIndex, 3));
     t.fiPipelineErrorAfterInit.set(new VerificationAction(methodName, dnIndex));
     writeSeveralPackets(methodName);
     Assert.assertTrue(t.isSuccess());
@@ -157,13 +166,15 @@ public class TestFiDataTransferProtocol2 {
   
   private void runTest34_35(String methodName, int dnIndex) throws IOException {
     FiTestUtil.LOG.info("Running " + methodName + " ...");
-    final DataTransferTest t = (DataTransferTest) DataTransferTestUtil
-        .initTest();
-    t.fiAfterDownstreamStatusRead.set(new CountdownSleepAction(methodName, dnIndex, 0, 3));
+    final DataTransferTest t =
+        (DataTransferTest) DataTransferTestUtil.initTest();
+    t.fiAfterDownstreamStatusRead
+        .set(new CountdownSleepAction(methodName, dnIndex, 0, 3));
     t.fiPipelineErrorAfterInit.set(new VerificationAction(methodName, dnIndex));
     writeSeveralPackets(methodName);
     Assert.assertTrue(t.isSuccess());
   }
+
   /**
    * Streaming:
    * Randomize datanode speed, write several packets,
@@ -208,8 +219,8 @@ public class TestFiDataTransferProtocol2 {
   public void pipeline_Fi_20() throws IOException {
     final String methodName = FiTestUtil.getMethodName();
     FiTestUtil.LOG.info("Running " + methodName + " ...");
-    final DataTransferTest t = (DataTransferTest) DataTransferTestUtil
-        .initTest();
+    final DataTransferTest t =
+        (DataTransferTest) DataTransferTestUtil.initTest();
     initSlowDatanodeTest(t, new SleepAction(methodName, 0, MAX_SLEEP));
     writeSeveralPackets(methodName);
   }
@@ -222,8 +233,8 @@ public class TestFiDataTransferProtocol2 {
   public void pipeline_Fi_21() throws IOException {
     final String methodName = FiTestUtil.getMethodName();
     FiTestUtil.LOG.info("Running " + methodName + " ...");
-    final DataTransferTest t = (DataTransferTest) DataTransferTestUtil
-        .initTest();
+    final DataTransferTest t =
+        (DataTransferTest) DataTransferTestUtil.initTest();
     initSlowDatanodeTest(t, new SleepAction(methodName, 1, MAX_SLEEP));
     writeSeveralPackets(methodName);
   }
@@ -236,15 +247,16 @@ public class TestFiDataTransferProtocol2 {
   public void pipeline_Fi_22() throws IOException {
     final String methodName = FiTestUtil.getMethodName();
     FiTestUtil.LOG.info("Running " + methodName + " ...");
-    final DataTransferTest t = (DataTransferTest) DataTransferTestUtil
-        .initTest();
+    final DataTransferTest t =
+        (DataTransferTest) DataTransferTestUtil.initTest();
     initSlowDatanodeTest(t, new SleepAction(methodName, 2, MAX_SLEEP));
     writeSeveralPackets(methodName);
   }
   
   /**
    * Streaming: Randomize datanode speed, write several packets, DN1 throws a
-   * OutOfMemoryException when it receives the ack of the third packet from DN2.
+   * OutOfMemoryException when it receives the ack of the third packet from
+   * DN2.
    * Client gets an IOException and determines DN1 bad.
    */
   @Test
@@ -255,7 +267,8 @@ public class TestFiDataTransferProtocol2 {
 
   /**
    * Streaming: Randomize datanode speed, write several packets, DN0 throws a
-   * OutOfMemoryException when it receives the ack of the third packet from DN1.
+   * OutOfMemoryException when it receives the ack of the third packet from
+   * DN1.
    * Client gets an IOException and determines DN0 bad.
    */
   @Test
@@ -266,7 +279,8 @@ public class TestFiDataTransferProtocol2 {
   
   /**
    * Streaming: Write several packets, DN1 never responses when it receives the
-   * ack of the third packet from DN2. Client gets an IOException and determines
+   * ack of the third packet from DN2. Client gets an IOException and
+   * determines
    * DN1 bad.
    */
   @Test
@@ -277,7 +291,8 @@ public class TestFiDataTransferProtocol2 {
 
   /**
    * Streaming: Write several packets, DN0 never responses when it receives the
-   * ack of the third packet from DN1. Client gets an IOException and determines
+   * ack of the third packet from DN1. Client gets an IOException and
+   * determines
    * DN0 bad.
    */
   @Test

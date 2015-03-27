@@ -18,11 +18,6 @@
 
 package org.apache.hadoop.yarn.client.cli;
 
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Map;
-
 import com.google.common.collect.ImmutableMap;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
@@ -49,36 +44,40 @@ import org.apache.hadoop.yarn.server.api.protocolrecords.RefreshServiceAclsReque
 import org.apache.hadoop.yarn.server.api.protocolrecords.RefreshSuperUserGroupsConfigurationRequest;
 import org.apache.hadoop.yarn.server.api.protocolrecords.RefreshUserToGroupsMappingsRequest;
 
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Map;
+
 @Private
 @Unstable
 public class RMAdminCLI extends HAAdmin {
 
-  private final RecordFactory recordFactory = 
-    RecordFactoryProvider.getRecordFactory(null);
+  private final RecordFactory recordFactory =
+      RecordFactoryProvider.getRecordFactory(null);
 
   protected final static Map<String, UsageInfo> ADMIN_USAGE =
-      ImmutableMap.<String, UsageInfo>builder()
-          .put("-refreshQueues", new UsageInfo("",
+      ImmutableMap.<String, UsageInfo>builder().put("-refreshQueues",
+          new UsageInfo("",
               "Reload the queues' acls, states and scheduler specific " +
                   "properties. \n\t\tResourceManager will reload the " +
-                  "mapred-queues configuration file."))
-          .put("-refreshNodes", new UsageInfo("",
+                  "mapred-queues configuration file.")).put("-refreshNodes",
+          new UsageInfo("",
               "Refresh the hosts information at the ResourceManager."))
-          .put("-refreshSuperUserGroupsConfiguration", new UsageInfo("",
-              "Refresh superuser proxy groups mappings"))
-          .put("-refreshUserToGroupsMappings", new UsageInfo("",
-              "Refresh user-to-groups mappings"))
+          .put("-refreshSuperUserGroupsConfiguration",
+              new UsageInfo("", "Refresh superuser proxy groups mappings"))
+          .put("-refreshUserToGroupsMappings",
+              new UsageInfo("", "Refresh user-to-groups mappings"))
           .put("-refreshAdminAcls", new UsageInfo("",
               "Refresh acls for administration of ResourceManager"))
           .put("-refreshServiceAcl", new UsageInfo("",
               "Reload the service-level authorization policy file. \n\t\t" +
                   "ResoureceManager will reload the authorization policy file."))
           .put("-getGroups", new UsageInfo("[username]",
-              "Get the groups which given user belongs to."))
-          .put("-help", new UsageInfo("[cmd]",
+              "Get the groups which given user belongs to.")).put("-help",
+          new UsageInfo("[cmd]",
               "Displays help for the given command or all commands if none " +
-                  "is specified."))
-          .build();
+                  "is specified.")).build();
 
   public RMAdminCLI() {
     super();
@@ -112,7 +111,7 @@ public class RMAdminCLI extends HAAdmin {
   }
 
   private static void buildIndividualUsageMsg(String cmd,
-                                              StringBuilder builder ) {
+      StringBuilder builder) {
     boolean isHACommand = false;
     UsageInfo usageInfo = ADMIN_USAGE.get(cmd);
     if (usageInfo == null) {
@@ -123,9 +122,8 @@ public class RMAdminCLI extends HAAdmin {
       isHACommand = true;
     }
     String space = (usageInfo.args == "") ? "" : " ";
-    builder.append("Usage: yarn rmadmin ["
-        + cmd + space + usageInfo.args
-        + "]\n");
+    builder
+        .append("Usage: yarn rmadmin [" + cmd + space + usageInfo.args + "]\n");
     if (isHACommand) {
       builder.append(cmd + " can only be used when RM HA is enabled");
     }
@@ -153,15 +151,15 @@ public class RMAdminCLI extends HAAdmin {
     summary.append("rmadmin is the command to execute YARN administrative " +
         "commands.\n");
     summary.append("The full syntax is: \n\n" +
-    "yarn rmadmin" +
-      " [-refreshQueues]" +
-      " [-refreshNodes]" +
-      " [-refreshSuperUserGroupsConfiguration]" +
-      " [-refreshUserToGroupsMappings]" +
-      " [-refreshAdminAcls]" +
-      " [-refreshServiceAcl]" +
-      " [-getGroup [username]]" +
-      " [-help [cmd]]");
+        "yarn rmadmin" +
+        " [-refreshQueues]" +
+        " [-refreshNodes]" +
+        " [-refreshSuperUserGroupsConfiguration]" +
+        " [-refreshUserToGroupsMappings]" +
+        " [-refreshAdminAcls]" +
+        " [-refreshServiceAcl]" +
+        " [-getGroup [username]]" +
+        " [-help [cmd]]");
     if (isHAEnabled) {
       appendHAUsage(summary);
     }
@@ -188,7 +186,9 @@ public class RMAdminCLI extends HAAdmin {
 
   /**
    * Displays format of commands.
-   * @param cmd The command that is being executed.
+   *
+   * @param cmd
+   *     The command that is being executed.
    */
   private static void printUsage(String cmd, boolean isHAEnabled) {
     StringBuilder usageBuilder = new StringBuilder();
@@ -202,17 +202,19 @@ public class RMAdminCLI extends HAAdmin {
 
   }
 
-  protected ResourceManagerAdministrationProtocol createAdminProtocol() throws IOException {
+  protected ResourceManagerAdministrationProtocol createAdminProtocol()
+      throws IOException {
     // Get the current configuration
     final YarnConfiguration conf = new YarnConfiguration(getConf());
-    return ClientRMProxy.createRMProxy(conf, ResourceManagerAdministrationProtocol.class);
+    return ClientRMProxy
+        .createRMProxy(conf, ResourceManagerAdministrationProtocol.class);
   }
   
   private int refreshQueues() throws IOException, YarnException {
     // Refresh the queue properties
     ResourceManagerAdministrationProtocol adminProtocol = createAdminProtocol();
-    RefreshQueuesRequest request = 
-      recordFactory.newRecordInstance(RefreshQueuesRequest.class);
+    RefreshQueuesRequest request =
+        recordFactory.newRecordInstance(RefreshQueuesRequest.class);
     adminProtocol.refreshQueues(request);
     return 0;
   }
@@ -220,28 +222,27 @@ public class RMAdminCLI extends HAAdmin {
   private int refreshNodes() throws IOException, YarnException {
     // Refresh the nodes
     ResourceManagerAdministrationProtocol adminProtocol = createAdminProtocol();
-    RefreshNodesRequest request = 
-      recordFactory.newRecordInstance(RefreshNodesRequest.class);
+    RefreshNodesRequest request =
+        recordFactory.newRecordInstance(RefreshNodesRequest.class);
     adminProtocol.refreshNodes(request);
     return 0;
   }
   
-  private int refreshUserToGroupsMappings() throws IOException,
-      YarnException {
+  private int refreshUserToGroupsMappings() throws IOException, YarnException {
     // Refresh the user-to-groups mappings
     ResourceManagerAdministrationProtocol adminProtocol = createAdminProtocol();
-    RefreshUserToGroupsMappingsRequest request = 
-      recordFactory.newRecordInstance(RefreshUserToGroupsMappingsRequest.class);
+    RefreshUserToGroupsMappingsRequest request = recordFactory
+        .newRecordInstance(RefreshUserToGroupsMappingsRequest.class);
     adminProtocol.refreshUserToGroupsMappings(request);
     return 0;
   }
   
-  private int refreshSuperUserGroupsConfiguration() throws IOException,
-      YarnException {
+  private int refreshSuperUserGroupsConfiguration()
+      throws IOException, YarnException {
     // Refresh the super-user groups
     ResourceManagerAdministrationProtocol adminProtocol = createAdminProtocol();
-    RefreshSuperUserGroupsConfigurationRequest request = 
-      recordFactory.newRecordInstance(RefreshSuperUserGroupsConfigurationRequest.class);
+    RefreshSuperUserGroupsConfigurationRequest request = recordFactory
+        .newRecordInstance(RefreshSuperUserGroupsConfigurationRequest.class);
     adminProtocol.refreshSuperUserGroupsConfiguration(request);
     return 0;
   }
@@ -249,8 +250,8 @@ public class RMAdminCLI extends HAAdmin {
   private int refreshAdminAcls() throws IOException, YarnException {
     // Refresh the admin acls
     ResourceManagerAdministrationProtocol adminProtocol = createAdminProtocol();
-    RefreshAdminAclsRequest request = 
-      recordFactory.newRecordInstance(RefreshAdminAclsRequest.class);
+    RefreshAdminAclsRequest request =
+        recordFactory.newRecordInstance(RefreshAdminAclsRequest.class);
     adminProtocol.refreshAdminAcls(request);
     return 0;
   }
@@ -258,8 +259,8 @@ public class RMAdminCLI extends HAAdmin {
   private int refreshServiceAcls() throws IOException, YarnException {
     // Refresh the service acls
     ResourceManagerAdministrationProtocol adminProtocol = createAdminProtocol();
-    RefreshServiceAclsRequest request = 
-      recordFactory.newRecordInstance(RefreshServiceAclsRequest.class);
+    RefreshServiceAclsRequest request =
+        recordFactory.newRecordInstance(RefreshServiceAclsRequest.class);
     adminProtocol.refreshServiceAcls(request);
     return 0;
   }
@@ -269,7 +270,8 @@ public class RMAdminCLI extends HAAdmin {
     ResourceManagerAdministrationProtocol adminProtocol = createAdminProtocol();
 
     if (usernames.length == 0) {
-      usernames = new String[] { UserGroupInformation.getCurrentUser().getUserName() };
+      usernames =
+          new String[]{UserGroupInformation.getCurrentUser().getUserName()};
     }
     
     for (String username : usernames) {
@@ -287,12 +289,10 @@ public class RMAdminCLI extends HAAdmin {
   
   @Override
   public int run(String[] args) throws Exception {
-    YarnConfiguration yarnConf =
-        getConf() == null ? new YarnConfiguration() : new YarnConfiguration(
-            getConf());
-    boolean isHAEnabled =
-        yarnConf.getBoolean(YarnConfiguration.RM_HA_ENABLED,
-            YarnConfiguration.DEFAULT_RM_HA_ENABLED);
+    YarnConfiguration yarnConf = getConf() == null ? new YarnConfiguration() :
+        new YarnConfiguration(getConf());
+    boolean isHAEnabled = yarnConf.getBoolean(YarnConfiguration.RM_HA_ENABLED,
+        YarnConfiguration.DEFAULT_RM_HA_ENABLED);
 
     if (args.length < 1) {
       printUsage("", isHAEnabled);
@@ -317,8 +317,8 @@ public class RMAdminCLI extends HAAdmin {
       if (isHAEnabled) {
         return super.run(args);
       }
-      System.out.println("Cannot run " + cmd
-          + " when ResourceManager HA is not enabled");
+      System.out.println(
+          "Cannot run " + cmd + " when ResourceManager HA is not enabled");
       return -1;
     }
 
@@ -369,16 +369,13 @@ public class RMAdminCLI extends HAAdmin {
       try {
         String[] content;
         content = e.getLocalizedMessage().split("\n");
-        System.err.println(cmd.substring(1) + ": "
-                           + content[0]);
+        System.err.println(cmd.substring(1) + ": " + content[0]);
       } catch (Exception ex) {
-        System.err.println(cmd.substring(1) + ": "
-                           + ex.getLocalizedMessage());
+        System.err.println(cmd.substring(1) + ": " + ex.getLocalizedMessage());
       }
     } catch (Exception e) {
       exitCode = -1;
-      System.err.println(cmd.substring(1) + ": "
-                         + e.getLocalizedMessage());
+      System.err.println(cmd.substring(1) + ": " + e.getLocalizedMessage());
     }
     return exitCode;
   }
@@ -394,7 +391,9 @@ public class RMAdminCLI extends HAAdmin {
   /**
    * Add the requisite security principal settings to the given Configuration,
    * returning a copy.
-   * @param conf the original config
+   *
+   * @param conf
+   *     the original config
    * @return a copy with the security settings added
    */
   private static Configuration addSecurityConfiguration(Configuration conf) {

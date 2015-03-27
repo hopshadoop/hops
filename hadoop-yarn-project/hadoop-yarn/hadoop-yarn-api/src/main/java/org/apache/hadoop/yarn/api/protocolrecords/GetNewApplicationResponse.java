@@ -28,9 +28,10 @@ import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * <p>The response sent by the <code>ResourceManager</code> to the client for 
- * a request to get a new {@link ApplicationId} for submitting applications.</p>
- * 
+ * <p>The response sent by the <code>ResourceManager</code> to the client for
+ * a request to get a new {@link ApplicationId} for submitting
+ * applications.</p>
+ * <p/>
  * <p>Clients can submit an application with the returned
  * {@link ApplicationId}.</p>
  *
@@ -53,10 +54,11 @@ public abstract class GetNewApplicationResponse {
   }
 
   /**
-   * Get the <em>new</em> <code>ApplicationId</code> allocated by the 
+   * Get the <em>new</em> <code>ApplicationId</code> allocated by the
    * <code>ResourceManager</code>.
-   * @return <em>new</em> <code>ApplicationId</code> allocated by the 
-   *          <code>ResourceManager</code>
+   *
+   * @return <em>new</em> <code>ApplicationId</code> allocated by the
+   * <code>ResourceManager</code>
    */
   @Public
   @Stable
@@ -67,8 +69,9 @@ public abstract class GetNewApplicationResponse {
   public abstract void setApplicationId(ApplicationId applicationId);
 
   /**
-   * Get the maximum capability for any {@link Resource} allocated by the 
+   * Get the maximum capability for any {@link Resource} allocated by the
    * <code>ResourceManager</code> in the cluster.
+   *
    * @return maximum capability of allocated resources in the cluster
    */
   @Public
@@ -77,5 +80,5 @@ public abstract class GetNewApplicationResponse {
   
   @Private
   @Unstable
-  public abstract void setMaximumResourceCapability(Resource capability); 
+  public abstract void setMaximumResourceCapability(Resource capability);
 }

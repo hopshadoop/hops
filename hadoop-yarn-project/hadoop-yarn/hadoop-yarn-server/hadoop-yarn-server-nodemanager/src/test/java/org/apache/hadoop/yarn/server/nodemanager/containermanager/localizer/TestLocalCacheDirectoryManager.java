@@ -19,7 +19,6 @@
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer;
 
 import junit.framework.Assert;
-
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
@@ -44,8 +43,8 @@ public class TestLocalCacheDirectoryManager {
       if (num.length() == 1) {
         sb.append(num.charAt(0));
       } else {
-        sb.append(Integer.toString(
-          Integer.parseInt(num.substring(0, 1), 36) - 1, 36));
+        sb.append(Integer
+            .toString(Integer.parseInt(num.substring(0, 1), 36) - 1, 36));
       }
       for (int j = 1; j < num.length(); j++) {
         sb.append(Path.SEPARATOR).append(num.charAt(j));
@@ -82,8 +81,8 @@ public class TestLocalCacheDirectoryManager {
     Assert.assertNotNull(e);
     Assert.assertEquals(YarnRuntimeException.class, e.getClass());
     Assert.assertEquals(e.getMessage(),
-      YarnConfiguration.NM_LOCAL_CACHE_MAX_FILES_PER_DIRECTORY
-          + " parameter is configured with a value less than 37.");
+        YarnConfiguration.NM_LOCAL_CACHE_MAX_FILES_PER_DIRECTORY +
+            " parameter is configured with a value less than 37.");
 
   }
 

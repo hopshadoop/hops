@@ -17,24 +17,12 @@
  */
 package org.apache.hadoop.hdfs;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.EnumSet;
-
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.FSInputChecker;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.ReadOption;
-import org.apache.hadoop.hdfs.client.ClientMmap;
-import org.apache.hadoop.hdfs.net.Peer;
-import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
-import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.datatransfer.DataTransferProtoUtil;
+import org.apache.hadoop.hdfs.protocol.datatransfer.IOStreamPair;
 import org.apache.hadoop.hdfs.protocol.datatransfer.PacketHeader;
 import org.apache.hadoop.hdfs.protocol.datatransfer.Sender;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.BlockOpResponseProto;
@@ -42,36 +30,53 @@ import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.ReadOpChecksumIn
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.Status;
 import org.apache.hadoop.hdfs.protocolPB.PBHelper;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
-import org.apache.hadoop.hdfs.server.datanode.CachingStrategy;
+import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.DataChecksum;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.nio.ByteBuffer;
+
 
 /**
  * @deprecated this is an old implementation that is being left around
- * in case any issues spring up with the new {@link RemoteBlockReader2} implementation.
+ * in case any issues spring up with the new {@link RemoteBlockReader2}
+ * implementation.
  * It will be removed in the next release.
  */
 @InterfaceAudience.Private
 @Deprecated
 public class RemoteBlockReader extends FSInputChecker implements BlockReader {
-  private final Peer peer;
-  private final DatanodeID datanodeID;
+
+  Socket dnSock;
+      //for now just sending the status code (e.g. checksumOk) after the read.
   private final DataInputStream in;
   private DataChecksum checksum;
 
-  /** offset in block of the last chunk received */
+  /**
+   * offset in block of the last chunk received
+   */
   private long lastChunkOffset = -1;
   private long lastChunkLen = -1;
   private long lastSeqNo = -1;
 
-  /** offset in block where reader wants to actually read */
+  /**
+   * offset in block where reader wants to actually read
+   */
   private long startOffset;
 
-  /** offset in block of of first chunk - may be less than startOffset
-      if startOffset is not chunk-aligned */
+  /**
+   * offset in block of of first chunk - may be less than startOffset
+   * if startOffset is not chunk-aligned
+   */
   private final long firstChunkOffset;
 
   private final int bytesPerChecksum;
@@ -83,21 +88,16 @@ public class RemoteBlockReader extends FSInputChecker implements BlockReader {
    * at the beginning so that the read can begin on a chunk boundary.
    */
   private final long bytesNeededToFinish;
-  
-  /**
-   * True if we are reading from a local DataNode.
-   */
-  private final boolean isLocal;
 
   private boolean eos = false;
   private boolean sentStatusCode = false;
   
   byte[] skipBuf = null;
   ByteBuffer checksumBytes = null;
-  /** Amount of unread data in the current received packet */
+  /**
+   * Amount of unread data in the current received packet
+   */
   int dataLeft = 0;
-  
-  private final PeerCache peerCache;
   
   /* FSInputChecker interface */
   
@@ -109,8 +109,8 @@ public class RemoteBlockReader extends FSInputChecker implements BlockReader {
    * the checksum.
    */
   @Override
-  public synchronized int read(byte[] buf, int off, int len) 
-                               throws IOException {
+  public synchronized int read(byte[] buf, int off, int len)
+      throws IOException {
     
     // This has to be set here, *before* the skip, since we can
     // hit EOS during the skip, in the case that our entire read
@@ -120,11 +120,11 @@ public class RemoteBlockReader extends FSInputChecker implements BlockReader {
     //for the first read, skip the extra bytes at the front.
     if (lastChunkLen < 0 && startOffset > firstChunkOffset && len > 0) {
       // Skip these bytes. But don't call this.skip()!
-      int toSkip = (int)(startOffset - firstChunkOffset);
-      if ( skipBuf == null ) {
+      int toSkip = (int) (startOffset - firstChunkOffset);
+      if (skipBuf == null) {
         skipBuf = new byte[bytesPerChecksum];
       }
-      if ( super.read(skipBuf, 0, toSkip) != toSkip ) {
+      if (super.read(skipBuf, 0, toSkip) != toSkip) {
         // should never happen
         throw new IOException("Could not skip required number of bytes");
       }
@@ -135,9 +135,9 @@ public class RemoteBlockReader extends FSInputChecker implements BlockReader {
     // if eos was set in the previous read, send a status code to the DN
     if (eos && !eosBefore && nRead >= 0) {
       if (needChecksum()) {
-        sendReadResult(peer, Status.CHECKSUM_OK);
+        sendReadResult(dnSock, Status.CHECKSUM_OK);
       } else {
-        sendReadResult(peer, Status.SUCCESS);
+        sendReadResult(dnSock, Status.SUCCESS);
       }
     }
     return nRead;
@@ -146,16 +146,16 @@ public class RemoteBlockReader extends FSInputChecker implements BlockReader {
   @Override
   public synchronized long skip(long n) throws IOException {
     /* How can we make sure we don't throw a ChecksumException, at least
-     * in majority of the cases?. This one throws. */  
-    if ( skipBuf == null ) {
-      skipBuf = new byte[bytesPerChecksum]; 
+     * in majority of the cases?. This one throws. */
+    if (skipBuf == null) {
+      skipBuf = new byte[bytesPerChecksum];
     }
 
     long nSkipped = 0;
-    while ( nSkipped < n ) {
-      int toSkip = (int)Math.min(n-nSkipped, skipBuf.length);
+    while (nSkipped < n) {
+      int toSkip = (int) Math.min(n - nSkipped, skipBuf.length);
       int ret = read(skipBuf, 0, toSkip);
-      if ( ret <= 0 ) {
+      if (ret <= 0) {
         return nSkipped;
       }
       nSkipped += ret;
@@ -166,7 +166,7 @@ public class RemoteBlockReader extends FSInputChecker implements BlockReader {
   @Override
   public int read() throws IOException {
     throw new IOException("read() is not expected to be invoked. " +
-                          "Use read(buf, off, len) instead.");
+        "Use read(buf, off, len) instead.");
   }
   
   @Override
@@ -174,7 +174,7 @@ public class RemoteBlockReader extends FSInputChecker implements BlockReader {
     /* Checksum errors are handled outside the BlockReader. 
      * DFSInputStream does not always call 'seekToNewSource'. In the 
      * case of pread(), it just tries a different replica without seeking.
-     */ 
+     */
     return false;
   }
   
@@ -185,20 +185,20 @@ public class RemoteBlockReader extends FSInputChecker implements BlockReader {
 
   @Override
   protected long getChunkPosition(long pos) {
-    throw new RuntimeException("getChunkPosition() is not supported, " +
-                               "since seek is not required");
+    throw new RuntimeException(
+        "getChunkPosition() is not supported, " + "since seek is not required");
   }
   
   /**
-   * Makes sure that checksumBytes has enough capacity 
-   * and limit is set to the number of checksum bytes needed 
+   * Makes sure that checksumBytes has enough capacity
+   * and limit is set to the number of checksum bytes needed
    * to be read.
    */
   private void adjustChecksumBytes(int dataLen) {
-    int requiredSize = 
-      ((dataLen + bytesPerChecksum - 1)/bytesPerChecksum)*checksumSize;
+    int requiredSize =
+        ((dataLen + bytesPerChecksum - 1) / bytesPerChecksum) * checksumSize;
     if (checksumBytes == null || requiredSize > checksumBytes.capacity()) {
-      checksumBytes =  ByteBuffer.wrap(new byte[requiredSize]);
+      checksumBytes = ByteBuffer.wrap(new byte[requiredSize]);
     } else {
       checksumBytes.clear();
     }
@@ -206,9 +206,8 @@ public class RemoteBlockReader extends FSInputChecker implements BlockReader {
   }
   
   @Override
-  protected synchronized int readChunk(long pos, byte[] buf, int offset, 
-                                       int len, byte[] checksumBuf) 
-                                       throws IOException {
+  protected synchronized int readChunk(long pos, byte[] buf, int offset,
+      int len, byte[] checksumBuf) throws IOException {
     // Read one chunk.
     if (eos) {
       // Already hit EOF
@@ -217,7 +216,7 @@ public class RemoteBlockReader extends FSInputChecker implements BlockReader {
     
     // Read one DATA_CHUNK.
     long chunkOffset = lastChunkOffset;
-    if ( lastChunkLen > 0 ) {
+    if (lastChunkLen > 0) {
       chunkOffset += lastChunkLen;
     }
     
@@ -225,9 +224,9 @@ public class RemoteBlockReader extends FSInputChecker implements BlockReader {
     // chunkOffset is relative to the start of the block.
     // This makes sure that the read passed from FSInputChecker is the
     // for the same chunk we expect to be reading from the DN.
-    if ( (pos + firstChunkOffset) != chunkOffset ) {
-      throw new IOException("Mismatch in pos : " + pos + " + " + 
-                            firstChunkOffset + " != " + chunkOffset);
+    if ((pos + firstChunkOffset) != chunkOffset) {
+      throw new IOException("Mismatch in pos : " + pos + " + " +
+          firstChunkOffset + " != " + chunkOffset);
     }
 
     // Read next packet if the previous packet has been read completely.
@@ -242,16 +241,14 @@ public class RemoteBlockReader extends FSInputChecker implements BlockReader {
 
       // Sanity check the lengths
       if (!header.sanityCheck(lastSeqNo)) {
-           throw new IOException("BlockReader: error in packet header " +
-                                 header);
+        throw new IOException("BlockReader: error in packet header " + header);
       }
 
       lastSeqNo = header.getSeqno();
       dataLeft = header.getDataLen();
       adjustChecksumBytes(header.getDataLen());
       if (header.getDataLen() > 0) {
-        IOUtils.readFully(in, checksumBytes.array(), 0,
-                          checksumBytes.limit());
+        IOUtils.readFully(in, checksumBytes.array(), 0, checksumBytes.limit());
       }
     }
 
@@ -271,22 +268,21 @@ public class RemoteBlockReader extends FSInputChecker implements BlockReader {
 
       // How many chunks we can fit in databuffer
       //  - note this is a floor since we always read full chunks
-      int chunksCanFit = Math.min(len / bytesPerChecksum,
-                                  checksumBuf.length / checksumSize);
+      int chunksCanFit =
+          Math.min(len / bytesPerChecksum, checksumBuf.length / checksumSize);
 
       // How many chunks should we read
       checksumsToRead = Math.min(chunksLeft, chunksCanFit);
       // How many bytes should we actually read
-      bytesToRead = Math.min(
-        checksumsToRead * bytesPerChecksum, // full chunks
-        dataLeft); // in case we have a partial
+      bytesToRead = Math.min(checksumsToRead * bytesPerChecksum, // full chunks
+          dataLeft); // in case we have a partial
     } else {
       // no checksum
       bytesToRead = Math.min(dataLeft, len);
       checksumsToRead = 0;
     }
 
-    if ( bytesToRead > 0 ) {
+    if (bytesToRead > 0) {
       // Assert we have enough space
       assert bytesToRead <= len;
       assert checksumBytes.remaining() >= checksumSize * checksumsToRead;
@@ -306,23 +302,21 @@ public class RemoteBlockReader extends FSInputChecker implements BlockReader {
     // an empty packet header from the DN to signify this.
     // Note that pos + bytesToRead may in fact be greater since the
     // DN finishes off the entire last chunk.
-    if (dataLeft == 0 &&
-        pos + bytesToRead >= bytesNeededToFinish) {
+    if (dataLeft == 0 && pos + bytesToRead >= bytesNeededToFinish) {
 
       // Read header
       PacketHeader hdr = new PacketHeader();
       hdr.readFields(in);
 
-      if (!hdr.isLastPacketInBlock() ||
-          hdr.getDataLen() != 0) {
-        throw new IOException("Expected empty end-of-read packet! Header: " +
-                              hdr);
+      if (!hdr.isLastPacketInBlock() || hdr.getDataLen() != 0) {
+        throw new IOException(
+            "Expected empty end-of-read packet! Header: " + hdr);
       }
 
       eos = true;
     }
 
-    if ( bytesToRead == 0 ) {
+    if (bytesToRead == 0) {
       return -1;
     }
 
@@ -331,23 +325,17 @@ public class RemoteBlockReader extends FSInputChecker implements BlockReader {
   
   private RemoteBlockReader(String file, String bpid, long blockId,
       DataInputStream in, DataChecksum checksum, boolean verifyChecksum,
-      long startOffset, long firstChunkOffset, long bytesToRead, Peer peer,
-      DatanodeID datanodeID, PeerCache peerCache) {
+      long startOffset, long firstChunkOffset, long bytesToRead,
+      Socket dnSock) {
     // Path is used only for printing block and file information in debug
-    super(new Path("/blk_" + blockId + ":" + bpid + ":of:"+ file)/*too non path-like?*/,
-          1, verifyChecksum,
-          checksum.getChecksumSize() > 0? checksum : null, 
-          checksum.getBytesPerChecksum(),
-          checksum.getChecksumSize());
-
-    this.isLocal = DFSClient.isLocalAddress(NetUtils.
-        createSocketAddr(datanodeID.getXferAddr()));
+    super(new Path("/blk_" + blockId + ":" + bpid + ":of:" + file)/*too non path-like?*/,
+        1, verifyChecksum, checksum.getChecksumSize() > 0 ? checksum : null,
+        checksum.getBytesPerChecksum(), checksum.getChecksumSize());
     
-    this.peer = peer;
-    this.datanodeID = datanodeID;
+    this.dnSock = dnSock;
     this.in = in;
     this.checksum = checksum;
-    this.startOffset = Math.max( startOffset, 0 );
+    this.startOffset = Math.max(startOffset, 0);
 
     // The total number of bytes that we need to transfer from the DN is
     // the amount that the user wants (bytesToRead), plus the padding at
@@ -361,79 +349,86 @@ public class RemoteBlockReader extends FSInputChecker implements BlockReader {
 
     bytesPerChecksum = this.checksum.getBytesPerChecksum();
     checksumSize = this.checksum.getChecksumSize();
-    this.peerCache = peerCache;
+  }
+
+  public static RemoteBlockReader newBlockReader(Socket sock, String file,
+      ExtendedBlock block, Token<BlockTokenIdentifier> blockToken,
+      long startOffset, long len, int bufferSize) throws IOException {
+    return newBlockReader(sock, file, block, blockToken, startOffset, len,
+        bufferSize, true, "");
   }
 
   /**
    * Create a new BlockReader specifically to satisfy a read.
    * This method also sends the OP_READ_BLOCK request.
    *
-   * @param sock  An established Socket to the DN. The BlockReader will not close it normally
-   * @param file  File location
-   * @param block  The block object
-   * @param blockToken  The block token for security
-   * @param startOffset  The read offset, relative to block head
-   * @param len  The number of bytes to read
-   * @param bufferSize  The IO buffer size (not the client buffer size)
-   * @param verifyChecksum  Whether to verify checksum
-   * @param clientName  Client name
+   * @param sock
+   *     An established Socket to the DN. The BlockReader will not close it
+   *     normally
+   * @param file
+   *     File location
+   * @param block
+   *     The block object
+   * @param blockToken
+   *     The block token for security
+   * @param startOffset
+   *     The read offset, relative to block head
+   * @param len
+   *     The number of bytes to read
+   * @param bufferSize
+   *     The IO buffer size (not the client buffer size)
+   * @param verifyChecksum
+   *     Whether to verify checksum
+   * @param clientName
+   *     Client name
    * @return New BlockReader instance, or null on error.
    */
-  public static RemoteBlockReader newBlockReader(String file,
-                                     ExtendedBlock block, 
-                                     Token<BlockTokenIdentifier> blockToken,
-                                     long startOffset, long len,
-                                     int bufferSize, boolean verifyChecksum,
-                                     String clientName, Peer peer,
-                                     DatanodeID datanodeID,
-                                     PeerCache peerCache,
-                                     CachingStrategy cachingStrategy)
-                                       throws IOException {
+  public static RemoteBlockReader newBlockReader(Socket sock, String file,
+      ExtendedBlock block, Token<BlockTokenIdentifier> blockToken,
+      long startOffset, long len, int bufferSize, boolean verifyChecksum,
+      String clientName) throws IOException {
     // in and out will be closed when sock is closed (by the caller)
-    final DataOutputStream out =
-        new DataOutputStream(new BufferedOutputStream(peer.getOutputStream()));
+    final DataOutputStream out = new DataOutputStream(new BufferedOutputStream(
+        NetUtils.getOutputStream(sock, HdfsServerConstants.WRITE_TIMEOUT)));
     new Sender(out).readBlock(block, blockToken, clientName, startOffset, len,
-        verifyChecksum, cachingStrategy);
+        verifyChecksum);
     
     //
     // Get bytes in block, set streams
     //
 
     DataInputStream in = new DataInputStream(
-        new BufferedInputStream(peer.getInputStream(), bufferSize));
+        new BufferedInputStream(NetUtils.getInputStream(sock), bufferSize));
     
-    BlockOpResponseProto status = BlockOpResponseProto.parseFrom(
-        PBHelper.vintPrefixed(in));
-    RemoteBlockReader2.checkSuccess(status, peer, block, file);
-    ReadOpChecksumInfoProto checksumInfo =
-      status.getReadOpChecksumInfo();
-    DataChecksum checksum = DataTransferProtoUtil.fromProto(
-        checksumInfo.getChecksum());
+    BlockOpResponseProto status =
+        BlockOpResponseProto.parseFrom(PBHelper.vintPrefixed(in));
+    RemoteBlockReader2.checkSuccess(status, sock, block, file);
+    ReadOpChecksumInfoProto checksumInfo = status.getReadOpChecksumInfo();
+    DataChecksum checksum =
+        DataTransferProtoUtil.fromProto(checksumInfo.getChecksum());
     //Warning when we get CHECKSUM_NULL?
     
     // Read the first chunk offset.
     long firstChunkOffset = checksumInfo.getChunkOffset();
     
-    if ( firstChunkOffset < 0 || firstChunkOffset > startOffset ||
+    if (firstChunkOffset < 0 || firstChunkOffset > startOffset ||
         firstChunkOffset <= (startOffset - checksum.getBytesPerChecksum())) {
       throw new IOException("BlockReader: error in first chunk offset (" +
-                            firstChunkOffset + ") startOffset is " + 
-                            startOffset + " for file " + file);
+          firstChunkOffset + ") startOffset is " +
+          startOffset + " for file " + file);
     }
 
-    return new RemoteBlockReader(file, block.getBlockPoolId(), block.getBlockId(),
-        in, checksum, verifyChecksum, startOffset, firstChunkOffset, len,
-        peer, datanodeID, peerCache);
+    return new RemoteBlockReader(file, block.getBlockPoolId(),
+        block.getBlockId(), in, checksum, verifyChecksum, startOffset,
+        firstChunkOffset, len, sock);
   }
 
   @Override
   public synchronized void close() throws IOException {
     startOffset = -1;
     checksum = null;
-    if (peerCache != null & sentStatusCode) {
-      peerCache.put(datanodeID, peer);
-    } else {
-      peer.close();
+    if (dnSock != null) {
+      dnSock.close();
     }
 
     // in will be closed when its Socket is closed.
@@ -450,48 +445,66 @@ public class RemoteBlockReader extends FSInputChecker implements BlockReader {
     return readFully(this, buf, offset, len);
   }
 
+  @Override
+  public Socket takeSocket() {
+    assert hasSentStatusCode() : "BlockReader shouldn't give back sockets mid-read";
+    Socket res = dnSock;
+    dnSock = null;
+    return res;
+  }
+
+  @Override
+  public boolean hasSentStatusCode() {
+    return sentStatusCode;
+  }
+
   /**
    * When the reader reaches end of the read, it sends a status response
    * (e.g. CHECKSUM_OK) to the DN. Failure to do so could lead to the DN
    * closing our connection (which we will re-open), but won't affect
    * data correctness.
    */
-  void sendReadResult(Peer peer, Status statusCode) {
-    assert !sentStatusCode : "already sent status code to " + peer;
+  void sendReadResult(Socket sock, Status statusCode) {
+    assert !sentStatusCode : "already sent status code to " + sock;
     try {
-      RemoteBlockReader2.writeReadResult(peer.getOutputStream(), statusCode);
+      RemoteBlockReader2.writeReadResult(
+          NetUtils.getOutputStream(sock, HdfsServerConstants.WRITE_TIMEOUT),
+          statusCode);
       sentStatusCode = true;
     } catch (IOException e) {
       // It's ok not to be able to send this. But something is probably wrong.
       LOG.info("Could not send read status (" + statusCode + ") to datanode " +
-               peer.getRemoteAddressString() + ": " + e.getMessage());
+          sock.getInetAddress() + ": " + e.getMessage());
     }
+  }
+  
+  /**
+   * File name to print when accessing a block directly (from servlets)
+   *
+   * @param s
+   *     Address of the block location
+   * @param poolId
+   *     Block pool ID of the block
+   * @param blockId
+   *     Block ID of the block
+   * @return string that has a file name for debug purposes
+   */
+  public static String getFileName(final InetSocketAddress s,
+      final String poolId, final long blockId) {
+    return s.toString() + ":" + poolId + ":" + blockId;
   }
 
   @Override
   public int read(ByteBuffer buf) throws IOException {
-    throw new UnsupportedOperationException("readDirect unsupported in RemoteBlockReader");
-  }
-  
-  @Override
-  public int available() throws IOException {
-    // An optimistic estimate of how much data is available
-    // to us without doing network I/O.
-    return DFSClient.TCP_WINDOW_SIZE;
+    throw new UnsupportedOperationException(
+        "readDirect unsupported in RemoteBlockReader");
   }
 
   @Override
-  public boolean isLocal() {
-    return isLocal;
-  }
-  
-  @Override
-  public boolean isShortCircuit() {
-    return false;
-  }
-
-  @Override
-  public ClientMmap getClientMmap(EnumSet<ReadOption> opts) {
+  public IOStreamPair getStreams() {
+    // This class doesn't support encryption, which is the only thing this
+    // method is used for. See HDFS-3637.
     return null;
   }
+
 }

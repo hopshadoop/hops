@@ -17,14 +17,7 @@
  */
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler;
 
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.RejectedExecutionException;
-
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -41,17 +34,24 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler.eve
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler.event.LogHandlerAppStartedEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler.event.LogHandlerEvent;
 
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 
 /**
- * Log Handler which schedules deletion of log files based on the configured log
+ * Log Handler which schedules deletion of log files based on the configured
+ * log
  * retention time.
  */
-public class NonAggregatingLogHandler extends AbstractService implements
-    LogHandler {
+public class NonAggregatingLogHandler extends AbstractService
+    implements LogHandler {
 
-  private static final Log LOG = LogFactory
-      .getLog(NonAggregatingLogHandler.class);
+  private static final Log LOG =
+      LogFactory.getLog(NonAggregatingLogHandler.class);
   private final Dispatcher dispatcher;
   private final DeletionService delService;
   private final Map<ApplicationId, String> appOwners;
@@ -74,7 +74,7 @@ public class NonAggregatingLogHandler extends AbstractService implements
     // Default 3 hours.
     this.deleteDelaySeconds =
         conf.getLong(YarnConfiguration.NM_LOG_RETAIN_SECONDS,
-                YarnConfiguration.DEFAULT_NM_LOG_RETAIN_SECONDS);
+            YarnConfiguration.DEFAULT_NM_LOG_RETAIN_SECONDS);
     sched = createScheduledThreadPoolExecutor(conf);
     super.serviceInit(conf);
   }
@@ -104,8 +104,8 @@ public class NonAggregatingLogHandler extends AbstractService implements
       case APPLICATION_STARTED:
         LogHandlerAppStartedEvent appStartedEvent =
             (LogHandlerAppStartedEvent) event;
-        this.appOwners.put(appStartedEvent.getApplicationId(),
-            appStartedEvent.getUser());
+        this.appOwners
+            .put(appStartedEvent.getApplicationId(), appStartedEvent.getUser());
         this.dispatcher.getEventHandler().handle(
             new ApplicationEvent(appStartedEvent.getApplicationId(),
                 ApplicationEventType.APPLICATION_LOG_HANDLING_INITED));
@@ -117,15 +117,14 @@ public class NonAggregatingLogHandler extends AbstractService implements
         LogHandlerAppFinishedEvent appFinishedEvent =
             (LogHandlerAppFinishedEvent) event;
         // Schedule - so that logs are available on the UI till they're deleted.
-        LOG.info("Scheduling Log Deletion for application: "
-            + appFinishedEvent.getApplicationId() + ", with delay of "
-            + this.deleteDelaySeconds + " seconds");
-        LogDeleterRunnable logDeleter =
-            new LogDeleterRunnable(appOwners.remove(appFinishedEvent
-                  .getApplicationId()), appFinishedEvent.getApplicationId());
+        LOG.info("Scheduling Log Deletion for application: " +
+            appFinishedEvent.getApplicationId() + ", with delay of " +
+            this.deleteDelaySeconds + " seconds");
+        LogDeleterRunnable logDeleter = new LogDeleterRunnable(
+            appOwners.remove(appFinishedEvent.getApplicationId()),
+            appFinishedEvent.getApplicationId());
         try {
-          sched.schedule(logDeleter, this.deleteDelaySeconds,
-              TimeUnit.SECONDS);
+          sched.schedule(logDeleter, this.deleteDelaySeconds, TimeUnit.SECONDS);
         } catch (RejectedExecutionException e) {
           // Handling this event in local thread before starting threads
           // or after calling sched.shutdownNow().
@@ -141,9 +140,8 @@ public class NonAggregatingLogHandler extends AbstractService implements
       Configuration conf) {
     ThreadFactory tf =
         new ThreadFactoryBuilder().setNameFormat("LogDeleter #%d").build();
-    sched =
-        new ScheduledThreadPoolExecutor(conf.getInt(
-            YarnConfiguration.NM_LOG_DELETION_THREADS_COUNT,
+    sched = new ScheduledThreadPoolExecutor(
+        conf.getInt(YarnConfiguration.NM_LOG_DELETION_THREADS_COUNT,
             YarnConfiguration.DEFAULT_NM_LOG_DELETE_THREAD_COUNT), tf);
     return sched;
   }
@@ -173,14 +171,14 @@ public class NonAggregatingLogHandler extends AbstractService implements
       NonAggregatingLogHandler.this.dispatcher.getEventHandler().handle(
           new ApplicationEvent(this.applicationId,
               ApplicationEventType.APPLICATION_LOG_HANDLING_FINISHED));
-      NonAggregatingLogHandler.this.delService.delete(user, null,
-          localAppLogDirs);
+      NonAggregatingLogHandler.this.delService
+          .delete(user, null, localAppLogDirs);
     }
 
     @Override
     public String toString() {
-      return "LogDeleter for AppId " + this.applicationId.toString()
-          + ", owned by " + user;
+      return "LogDeleter for AppId " + this.applicationId.toString() +
+          ", owned by " + user;
     }
   }
 }

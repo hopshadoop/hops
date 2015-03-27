@@ -257,4 +257,16 @@ public class CommonConfigurationKeys extends CommonConfigurationKeysPublic {
   public static final boolean RPC_METRICS_QUANTILE_ENABLE_DEFAULT = false;
   public static final String  RPC_METRICS_PERCENTILES_INTERVALS_KEY =
       "rpc.metrics.percentiles.intervals";
+
+  public static final String DFS_LEADER_CHECK_INTERVAL_IN_MS_KEY =
+      "dfs.leader.check.interval";
+  public static final int DFS_LEADER_CHECK_INTERVAL_IN_MS_DEFAULT = 2 * 1000; // 1 second
+  
+  public static final String DFS_LEADER_MISSED_HB_THRESHOLD_KEY =
+      "dfs.leader.missed.hb";
+  public static final int DFS_LEADER_MISSED_HB_THRESHOLD_DEFAULT = 2; // >= 2 . see paper
+  
+  public static final String DFS_LEADER_TP_INCREMENT_KEY =
+      "dfs.leader.tp.increment";
+  public static final int DFS_LEADER_TP_INCREMENT_DEFAULT = 100; // 100 ms
 }

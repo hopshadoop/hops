@@ -17,40 +17,43 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.net.InetAddress;
-import java.security.PrivilegedExceptionAction;
-import java.util.Map;
-
-import javax.servlet.ServletContext;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockManager;
 import org.apache.hadoop.security.UserGroupInformation;
 
+import javax.servlet.ServletContext;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.net.InetAddress;
+import java.security.PrivilegedExceptionAction;
+import java.util.Map;
+
 /**
  * This class is used in Namesystem's web server to do fsck on namenode.
  */
 @InterfaceAudience.Private
 public class FsckServlet extends DfsServlet {
-  /** for java.io.Serializable */
+  /**
+   * for java.io.Serializable
+   */
   private static final long serialVersionUID = 1L;
 
-  /** Handle fsck request */
+  /**
+   * Handle fsck request
+   */
   @Override
-  public void doGet(HttpServletRequest request, HttpServletResponse response
-      ) throws IOException {
+  public void doGet(HttpServletRequest request, HttpServletResponse response)
+      throws IOException {
     @SuppressWarnings("unchecked")
-    final Map<String,String[]> pmap = request.getParameterMap();
+    final Map<String, String[]> pmap = request.getParameterMap();
     final PrintWriter out = response.getWriter();
-    final InetAddress remoteAddress = 
-      InetAddress.getByName(request.getRemoteAddr());
-    final ServletContext context = getServletContext();    
+    final InetAddress remoteAddress =
+        InetAddress.getByName(request.getRemoteAddr());
+    final ServletContext context = getServletContext();
     final Configuration conf = NameNodeHttpServer.getConfFromContext(context);
 
     final UserGroupInformation ugi = getUGI(request, conf);
@@ -62,8 +65,8 @@ public class FsckServlet extends DfsServlet {
           
           final FSNamesystem namesystem = nn.getNamesystem();
           final BlockManager bm = namesystem.getBlockManager();
-          final int totalDatanodes = 
-              namesystem.getNumberOfDatanodes(DatanodeReportType.LIVE); 
+          final int totalDatanodes =
+              namesystem.getNumberOfDatanodes(DatanodeReportType.LIVE);
           new NamenodeFsck(conf, nn,
               bm.getDatanodeManager().getNetworkTopology(), pmap, out,
               totalDatanodes, bm.minReplication, remoteAddress).fsck();

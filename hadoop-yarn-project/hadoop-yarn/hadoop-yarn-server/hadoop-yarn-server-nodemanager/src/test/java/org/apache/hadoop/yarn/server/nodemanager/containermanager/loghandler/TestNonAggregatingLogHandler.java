@@ -17,15 +17,6 @@
  */
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler;
 
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-
-import java.io.File;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
@@ -48,6 +39,15 @@ import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.junit.Test;
 import org.mockito.exceptions.verification.WantedButNotInvoked;
 
+import java.io.File;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+
 public class TestNonAggregatingLogHandler {
 
   @Test
@@ -64,9 +64,8 @@ public class TestNonAggregatingLogHandler {
     localLogDirs[1] =
         new File("target", this.getClass().getName() + "-localLogDir1")
             .getAbsoluteFile();
-    String localLogDirsString =
-        localLogDirs[0].getAbsolutePath() + ","
-            + localLogDirs[1].getAbsolutePath();
+    String localLogDirsString = localLogDirs[0].getAbsolutePath() + "," +
+        localLogDirs[1].getAbsolutePath();
 
     conf.set(YarnConfiguration.NM_LOG_DIRS, localLogDirsString);
     conf.setBoolean(YarnConfiguration.LOG_AGGREGATION_ENABLED, false);
@@ -108,8 +107,9 @@ public class TestNonAggregatingLogHandler {
     boolean matched = false;
     while (!matched && System.currentTimeMillis() < verifyStartTime + 5000l) {
       try {
-        verify(delService).delete(eq(user), (Path) eq(null),
-            eq(localAppLogDirs[0]), eq(localAppLogDirs[1]));
+        verify(delService)
+            .delete(eq(user), (Path) eq(null), eq(localAppLogDirs[0]),
+                eq(localAppLogDirs[1]));
         matched = true;
       } catch (WantedButNotInvoked e) {
         notInvokedException = e;
@@ -138,15 +138,14 @@ public class TestNonAggregatingLogHandler {
     localLogDirs[1] =
         new File("target", this.getClass().getName() + "-localLogDir1")
             .getAbsoluteFile();
-    String localLogDirsString =
-        localLogDirs[0].getAbsolutePath() + ","
-            + localLogDirs[1].getAbsolutePath();
+    String localLogDirsString = localLogDirs[0].getAbsolutePath() + "," +
+        localLogDirs[1].getAbsolutePath();
 
     conf.set(YarnConfiguration.NM_LOG_DIRS, localLogDirsString);
     conf.setBoolean(YarnConfiguration.LOG_AGGREGATION_ENABLED, false);
 
     conf.setLong(YarnConfiguration.NM_LOG_RETAIN_SECONDS,
-            YarnConfiguration.DEFAULT_NM_LOG_RETAIN_SECONDS);
+        YarnConfiguration.DEFAULT_NM_LOG_RETAIN_SECONDS);
 
     DrainDispatcher dispatcher = createDispatcher(conf);
     EventHandler<ApplicationEvent> appEventHandler = mock(EventHandler.class);
@@ -162,7 +161,7 @@ public class TestNonAggregatingLogHandler {
 
     NonAggregatingLogHandler logHandler =
         new NonAggregatingLogHandlerWithMockExecutor(dispatcher, delService,
-                                                     dirsHandler);
+            dirsHandler);
     logHandler.init(conf);
     logHandler.start();
 
@@ -182,19 +181,19 @@ public class TestNonAggregatingLogHandler {
     ScheduledThreadPoolExecutor mockSched =
         ((NonAggregatingLogHandlerWithMockExecutor) logHandler).mockSched;
 
-    verify(mockSched).schedule(any(Runnable.class), eq(10800l),
-        eq(TimeUnit.SECONDS));
+    verify(mockSched)
+        .schedule(any(Runnable.class), eq(10800l), eq(TimeUnit.SECONDS));
   }
   
   @Test
   public void testStop() throws Exception {
-    NonAggregatingLogHandler aggregatingLogHandler = 
+    NonAggregatingLogHandler aggregatingLogHandler =
         new NonAggregatingLogHandler(null, null, null);
 
     // It should not throw NullPointerException
     aggregatingLogHandler.stop();
 
-    NonAggregatingLogHandlerWithMockExecutor logHandler = 
+    NonAggregatingLogHandlerWithMockExecutor logHandler =
         new NonAggregatingLogHandlerWithMockExecutor(null, null, null);
     logHandler.init(new Configuration());
     logHandler.stop();
@@ -207,11 +206,10 @@ public class TestNonAggregatingLogHandler {
   @Test
   public void testHandlingApplicationFinishedEvent() {
     Configuration conf = new Configuration();
-    LocalDirsHandlerService dirsService  = new LocalDirsHandlerService();
+    LocalDirsHandlerService dirsService = new LocalDirsHandlerService();
     DeletionService delService = new DeletionService(null);
     NonAggregatingLogHandler aggregatingLogHandler =
-        new NonAggregatingLogHandler(new InlineDispatcher(),
-            delService,
+        new NonAggregatingLogHandler(new InlineDispatcher(), delService,
             dirsService);
 
     dirsService.init(conf);
@@ -230,8 +228,8 @@ public class TestNonAggregatingLogHandler {
     aggregatingLogHandler.handle(new LogHandlerAppFinishedEvent(appId));
   }
 
-  private class NonAggregatingLogHandlerWithMockExecutor extends
-      NonAggregatingLogHandler {
+  private class NonAggregatingLogHandlerWithMockExecutor
+      extends NonAggregatingLogHandler {
 
     private ScheduledThreadPoolExecutor mockSched;
 

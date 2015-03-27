@@ -17,12 +17,11 @@
  */
 package org.apache.hadoop.hdfs.util;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.util.Time;
+import org.junit.Before;
+import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -30,17 +29,18 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.util.Time;
-import org.junit.Before;
-import org.junit.Test;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
 
-public class TestLightWeightHashSet{
+public class TestLightWeightHashSet {
 
-  private static final Log LOG = LogFactory
-      .getLog("org.apache.hadoop.hdfs.TestLightWeightHashSet");
-  private final ArrayList<Integer> list = new ArrayList<Integer>();
+  private static final Log LOG =
+      LogFactory.getLog("org.apache.hadoop.hdfs.TestLightWeightHashSet");
+  private ArrayList<Integer> list = new ArrayList<Integer>();
   private final int NUM = 100;
   private LightWeightHashSet<Integer> set;
   private Random rand;
@@ -359,8 +359,9 @@ public class TestLightWeightHashSet{
     // add NUM elements
     set.addAll(list);
     int expCap = LightWeightHashSet.MINIMUM_CAPACITY;
-    while (expCap < NUM && maxF * expCap < NUM)
+    while (expCap < NUM && maxF * expCap < NUM) {
       expCap <<= 1;
+    }
     assertEquals(expCap, set.getCapacity());
 
     // see if the set shrinks if we remove elements by removing
@@ -429,7 +430,8 @@ public class TestLightWeightHashSet{
   
   @Test
   public void testGetElement() {
-    LightWeightHashSet<TestObject> objSet = new LightWeightHashSet<TestObject>();
+    LightWeightHashSet<TestObject> objSet =
+        new LightWeightHashSet<TestObject>();
     TestObject objA = new TestObject("object A");
     TestObject equalToObjA = new TestObject("object A");
     TestObject objB = new TestObject("object B");
@@ -461,10 +463,15 @@ public class TestLightWeightHashSet{
 
     @Override
     public boolean equals(Object obj) {
-      if (this == obj) return true;
-      if (obj == null) return false;
-      if (getClass() != obj.getClass())
+      if (this == obj) {
+        return true;
+      }
+      if (obj == null) {
         return false;
+      }
+      if (getClass() != obj.getClass()) {
+        return false;
+      }
       TestObject other = (TestObject) obj;
       return this.value.equals(other.value);
     }

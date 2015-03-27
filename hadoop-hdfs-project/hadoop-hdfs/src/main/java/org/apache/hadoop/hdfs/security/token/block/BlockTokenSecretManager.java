@@ -18,16 +18,8 @@
 
 package org.apache.hadoop.hdfs.security.token.block;
 
-import java.io.ByteArrayInputStream;
-import java.io.DataInputStream;
-import java.io.IOException;
-import java.security.SecureRandom;
-import java.util.Arrays;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
-
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -39,75 +31,97 @@ import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Time;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
+import java.io.ByteArrayInputStream;
+import java.io.DataInputStream;
+import java.io.IOException;
+import java.security.SecureRandom;
+import java.util.Arrays;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
 
 /**
- * BlockTokenSecretManager can be instantiated in 2 modes, master mode and slave
+ * BlockTokenSecretManager can be instantiated in 2 modes, master mode and
+ * slave
  * mode. Master can generate new block keys and export block keys to slaves,
  * while slaves can only import and use block keys received from master. Both
- * master and slave can generate and verify block tokens. Typically, master mode
+ * master and slave can generate and verify block tokens. Typically, master
+ * mode
  * is used by NN and slave mode is used by DN.
  */
 @InterfaceAudience.Private
-public class BlockTokenSecretManager extends
-    SecretManager<BlockTokenIdentifier> {
-  public static final Log LOG = LogFactory
-      .getLog(BlockTokenSecretManager.class);
+public class BlockTokenSecretManager
+    extends SecretManager<BlockTokenIdentifier> {
+  public static final Log LOG =
+      LogFactory.getLog(BlockTokenSecretManager.class);
   
   // We use these in an HA setup to ensure that the pair of NNs produce block
   // token serial numbers that are in different ranges.
-  private static final int LOW_MASK  = ~(1 << 31);
+  private static final int LOW_MASK = ~(1 << 31);
   
-  public static final Token<BlockTokenIdentifier> DUMMY_TOKEN = new Token<BlockTokenIdentifier>();
+  public static final Token<BlockTokenIdentifier> DUMMY_TOKEN =
+      new Token<BlockTokenIdentifier>();
 
-  private final boolean isMaster;
+  protected final boolean isMaster;
   private int nnIndex;
   
   /**
-   * keyUpdateInterval is the interval that NN updates its block keys. It should
+   * keyUpdateInterval is the interval that NN updates its block keys. It
+   * should
    * be set long enough so that all live DN's and Balancer should have sync'ed
    * their block keys with NN at least once during each interval.
    */
-  private long keyUpdateInterval;
-  private volatile long tokenLifetime;
-  private int serialNo;
-  private BlockKey currentKey;
-  private BlockKey nextKey;
-  private final Map<Integer, BlockKey> allKeys;
-  private String blockPoolId;
-  private final String encryptionAlgorithm;
+  protected long keyUpdateInterval;
+  protected volatile long tokenLifetime;
+  protected int serialNo;
+  protected BlockKey currentKey;
+  protected BlockKey nextKey;
+  private Map<Integer, BlockKey> allKeys;
+  protected String blockPoolId;
+  protected String encryptionAlgorithm;
   
-  private final SecureRandom nonceGenerator = new SecureRandom();
+  protected SecureRandom nonceGenerator = new SecureRandom();
 
   public static enum AccessMode {
-    READ, WRITE, COPY, REPLACE
-  };
+    READ,
+    WRITE,
+    COPY,
+    REPLACE
+  }
+
+  ;
   
   /**
    * Constructor for slaves.
-   * 
-   * @param keyUpdateInterval how often a new key will be generated
-   * @param tokenLifetime how long an individual token is valid
+   *
+   * @param keyUpdateInterval
+   *     how often a new key will be generated
+   * @param tokenLifetime
+   *     how long an individual token is valid
    */
-  public BlockTokenSecretManager(long keyUpdateInterval,
-      long tokenLifetime, String blockPoolId, String encryptionAlgorithm) {
+  public BlockTokenSecretManager(long keyUpdateInterval, long tokenLifetime,
+      String blockPoolId, String encryptionAlgorithm) {
     this(false, keyUpdateInterval, tokenLifetime, blockPoolId,
         encryptionAlgorithm);
   }
   
   /**
    * Constructor for masters.
-   * 
-   * @param keyUpdateInterval how often a new key will be generated
-   * @param tokenLifetime how long an individual token is valid
-   * @param isHaEnabled whether or not HA is enabled
-   * @param thisNnId the NN ID of this NN in an HA setup
-   * @param otherNnId the NN ID of the other NN in an HA setup
+   *
+   * @param keyUpdateInterval
+   *     how often a new key will be generated
+   * @param tokenLifetime
+   *     how long an individual token is valid
+   * @param isHaEnabled
+   *     whether or not HA is enabled
+   * @param thisNnId
+   *     the NN ID of this NN in an HA setup
+   * @param otherNnId
+   *     the NN ID of the other NN in an HA setup
    */
-  public BlockTokenSecretManager(long keyUpdateInterval,
-      long tokenLifetime, int nnIndex, String blockPoolId,
-      String encryptionAlgorithm) {
+  private BlockTokenSecretManager(long keyUpdateInterval, long tokenLifetime,
+      int nnIndex, String blockPoolId, String encryptionAlgorithm) {
     this(true, keyUpdateInterval, tokenLifetime, blockPoolId,
         encryptionAlgorithm);
     Preconditions.checkArgument(nnIndex == 0 || nnIndex == 1);
@@ -116,7 +130,7 @@ public class BlockTokenSecretManager extends
     generateKeys();
   }
   
-  private BlockTokenSecretManager(boolean isMaster, long keyUpdateInterval,
+  protected BlockTokenSecretManager(boolean isMaster, long keyUpdateInterval,
       long tokenLifetime, String blockPoolId, String encryptionAlgorithm) {
     this.isMaster = isMaster;
     this.keyUpdateInterval = keyUpdateInterval;
@@ -136,10 +150,13 @@ public class BlockTokenSecretManager extends
     this.blockPoolId = blockPoolId;
   }
 
-  /** Initialize block keys */
+  /**
+   * Initialize block keys
+   */
   private synchronized void generateKeys() {
-    if (!isMaster)
+    if (!isMaster) {
       return;
+    }
     /*
      * Need to set estimated expiry dates for currentKey and nextKey so that if
      * NN crashes, DN can still expire those keys. NN will stop using the newly
@@ -153,29 +170,33 @@ public class BlockTokenSecretManager extends
      * more.
      */
     setSerialNo(serialNo + 1);
-    currentKey = new BlockKey(serialNo, Time.now() + 2
-        * keyUpdateInterval + tokenLifetime, generateSecret());
+    currentKey = new BlockKey(serialNo,
+        Time.now() + 2 * keyUpdateInterval + tokenLifetime, generateSecret());
     setSerialNo(serialNo + 1);
-    nextKey = new BlockKey(serialNo, Time.now() + 3
-        * keyUpdateInterval + tokenLifetime, generateSecret());
+    nextKey = new BlockKey(serialNo,
+        Time.now() + 3 * keyUpdateInterval + tokenLifetime, generateSecret());
     allKeys.put(currentKey.getKeyId(), currentKey);
     allKeys.put(nextKey.getKeyId(), nextKey);
   }
 
-  /** Export block keys, only to be used in master mode */
-  public synchronized ExportedBlockKeys exportKeys() {
-    if (!isMaster)
+  /**
+   * Export block keys, only to be used in master mode
+   */
+  public synchronized ExportedBlockKeys exportKeys() throws IOException {
+    if (!isMaster) {
       return null;
-    if (LOG.isDebugEnabled())
+    }
+    if (LOG.isDebugEnabled()) {
       LOG.debug("Exporting access keys");
+    }
     return new ExportedBlockKeys(true, keyUpdateInterval, tokenLifetime,
         currentKey, allKeys.values().toArray(new BlockKey[0]));
   }
 
   private synchronized void removeExpiredKeys() {
     long now = Time.now();
-    for (Iterator<Map.Entry<Integer, BlockKey>> it = allKeys.entrySet()
-        .iterator(); it.hasNext();) {
+    for (Iterator<Map.Entry<Integer, BlockKey>> it =
+             allKeys.entrySet().iterator(); it.hasNext(); ) {
       Map.Entry<Integer, BlockKey> e = it.next();
       if (e.getValue().getExpiryDate() < now) {
         it.remove();
@@ -188,24 +209,28 @@ public class BlockTokenSecretManager extends
    */
   public synchronized void addKeys(ExportedBlockKeys exportedKeys)
       throws IOException {
-    if (isMaster || exportedKeys == null)
+    if (isMaster || exportedKeys == null) {
       return;
+    }
     LOG.info("Setting block keys");
     removeExpiredKeys();
     this.currentKey = exportedKeys.getCurrentKey();
     BlockKey[] receivedKeys = exportedKeys.getAllKeys();
     for (int i = 0; i < receivedKeys.length; i++) {
-      if (receivedKeys[i] == null)
+      if (receivedKeys[i] == null) {
         continue;
+      }
       this.allKeys.put(receivedKeys[i].getKeyId(), receivedKeys[i]);
     }
   }
 
   /**
    * Update block keys if update time > update interval.
+   *
    * @return true if the keys are updated.
    */
-  public synchronized boolean updateKeys(final long updateTime) throws IOException {
+  public synchronized boolean updateKeys(final long updateTime)
+      throws IOException {
     if (updateTime > keyUpdateInterval) {
       return updateKeys();
     }
@@ -215,29 +240,31 @@ public class BlockTokenSecretManager extends
   /**
    * Update block keys, only to be used in master mode
    */
-  synchronized boolean updateKeys() throws IOException {
-    if (!isMaster)
+  public synchronized boolean updateKeys() throws IOException {
+    if (!isMaster) {
       return false;
+    }
 
     LOG.info("Updating block keys");
     removeExpiredKeys();
     // set final expiry date of retiring currentKey
     allKeys.put(currentKey.getKeyId(), new BlockKey(currentKey.getKeyId(),
-        Time.now() + keyUpdateInterval + tokenLifetime,
-        currentKey.getKey()));
+        Time.now() + keyUpdateInterval + tokenLifetime, currentKey.getKey()));
     // update the estimated expiry date of new currentKey
-    currentKey = new BlockKey(nextKey.getKeyId(), Time.now()
-        + 2 * keyUpdateInterval + tokenLifetime, nextKey.getKey());
+    currentKey = new BlockKey(nextKey.getKeyId(),
+        Time.now() + 2 * keyUpdateInterval + tokenLifetime, nextKey.getKey());
     allKeys.put(currentKey.getKeyId(), currentKey);
     // generate a new nextKey
     setSerialNo(serialNo + 1);
-    nextKey = new BlockKey(serialNo, Time.now() + 3
-        * keyUpdateInterval + tokenLifetime, generateSecret());
+    nextKey = new BlockKey(serialNo,
+        Time.now() + 3 * keyUpdateInterval + tokenLifetime, generateSecret());
     allKeys.put(nextKey.getKeyId(), nextKey);
     return true;
   }
 
-  /** Generate an block token for current user */
+  /**
+   * Generate an block token for current user
+   */
   public Token<BlockTokenIdentifier> generateToken(ExtendedBlock block,
       EnumSet<AccessMode> modes) throws IOException {
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
@@ -245,11 +272,14 @@ public class BlockTokenSecretManager extends
     return generateToken(userID, block, modes);
   }
 
-  /** Generate a block token for a specified user */
+  /**
+   * Generate a block token for a specified user
+   */
   public Token<BlockTokenIdentifier> generateToken(String userId,
       ExtendedBlock block, EnumSet<AccessMode> modes) throws IOException {
-    BlockTokenIdentifier id = new BlockTokenIdentifier(userId, block
-        .getBlockPoolId(), block.getBlockId(), modes);
+    BlockTokenIdentifier id =
+        new BlockTokenIdentifier(userId, block.getBlockPoolId(),
+            block.getBlockId(), modes);
     return new Token<BlockTokenIdentifier>(id, this);
   }
 
@@ -261,51 +291,57 @@ public class BlockTokenSecretManager extends
   public void checkAccess(BlockTokenIdentifier id, String userId,
       ExtendedBlock block, AccessMode mode) throws InvalidToken {
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Checking access for user=" + userId + ", block=" + block
-          + ", access mode=" + mode + " using " + id.toString());
+      LOG.debug("Checking access for user=" + userId + ", block=" + block +
+          ", access mode=" + mode + " using " + id.toString());
     }
     if (userId != null && !userId.equals(id.getUserId())) {
-      throw new InvalidToken("Block token with " + id.toString()
-          + " doesn't belong to user " + userId);
+      throw new InvalidToken(
+          "Block token with " + id.toString() + " doesn't belong to user " +
+              userId);
     }
     if (!id.getBlockPoolId().equals(block.getBlockPoolId())) {
-      throw new InvalidToken("Block token with " + id.toString()
-          + " doesn't apply to block " + block);
+      throw new InvalidToken(
+          "Block token with " + id.toString() + " doesn't apply to block " +
+              block);
     }
     if (id.getBlockId() != block.getBlockId()) {
-      throw new InvalidToken("Block token with " + id.toString()
-          + " doesn't apply to block " + block);
+      throw new InvalidToken(
+          "Block token with " + id.toString() + " doesn't apply to block " +
+              block);
     }
     if (isExpired(id.getExpiryDate())) {
-      throw new InvalidToken("Block token with " + id.toString()
-          + " is expired.");
+      throw new InvalidToken(
+          "Block token with " + id.toString() + " is expired.");
     }
     if (!id.getAccessModes().contains(mode)) {
-      throw new InvalidToken("Block token with " + id.toString()
-          + " doesn't have " + mode + " permission");
+      throw new InvalidToken(
+          "Block token with " + id.toString() + " doesn't have " + mode +
+              " permission");
     }
   }
 
-  /** Check if access should be allowed. userID is not checked if null */
+  /**
+   * Check if access should be allowed. userID is not checked if null
+   */
   public void checkAccess(Token<BlockTokenIdentifier> token, String userId,
       ExtendedBlock block, AccessMode mode) throws InvalidToken {
     BlockTokenIdentifier id = new BlockTokenIdentifier();
     try {
-      id.readFields(new DataInputStream(new ByteArrayInputStream(token
-          .getIdentifier())));
+      id.readFields(
+          new DataInputStream(new ByteArrayInputStream(token.getIdentifier())));
     } catch (IOException e) {
       throw new InvalidToken(
-          "Unable to de-serialize block token identifier for user=" + userId
-              + ", block=" + block + ", access mode=" + mode);
+          "Unable to de-serialize block token identifier for user=" + userId +
+              ", block=" + block + ", access mode=" + mode);
     }
     checkAccess(id, userId, block, mode);
     if (!Arrays.equals(retrievePassword(id), token.getPassword())) {
-      throw new InvalidToken("Block token with " + id.toString()
-          + " doesn't have the correct token password");
+      throw new InvalidToken("Block token with " + id.toString() +
+          " doesn't have the correct token password");
     }
   }
 
-  private static boolean isExpired(long expiryDate) {
+  protected static boolean isExpired(long expiryDate) {
     return Time.now() > expiryDate;
   }
 
@@ -321,14 +357,16 @@ public class BlockTokenSecretManager extends
     return isExpired(expiryDate);
   }
 
-  /** set token lifetime. */
+  /**
+   * set token lifetime.
+   */
   public void setTokenLifetime(long tokenLifetime) {
     this.tokenLifetime = tokenLifetime;
   }
 
   /**
    * Create an empty block token identifier
-   * 
+   *
    * @return a newly created empty block token identifier
    */
   @Override
@@ -338,9 +376,9 @@ public class BlockTokenSecretManager extends
 
   /**
    * Create a new password/secret for the given block token identifier.
-   * 
+   *
    * @param identifier
-   *          the block token identifier
+   *     the block token identifier
    * @return token password/secret
    */
   @Override
@@ -349,8 +387,9 @@ public class BlockTokenSecretManager extends
     synchronized (this) {
       key = currentKey;
     }
-    if (key == null)
+    if (key == null) {
       throw new IllegalStateException("currentKey hasn't been initialized.");
+    }
     identifier.setExpiryDate(Time.now() + tokenLifetime);
     identifier.setKeyId(key.getKeyId());
     if (LOG.isDebugEnabled()) {
@@ -361,9 +400,9 @@ public class BlockTokenSecretManager extends
 
   /**
    * Look up the token password/secret for the given block token identifier.
-   * 
+   *
    * @param identifier
-   *          the block token identifier to look up
+   *     the block token identifier to look up
    * @return token password/secret as byte[]
    * @throws InvalidToken
    */
@@ -371,17 +410,18 @@ public class BlockTokenSecretManager extends
   public byte[] retrievePassword(BlockTokenIdentifier identifier)
       throws InvalidToken {
     if (isExpired(identifier.getExpiryDate())) {
-      throw new InvalidToken("Block token with " + identifier.toString()
-          + " is expired.");
+      throw new InvalidToken(
+          "Block token with " + identifier.toString() + " is expired.");
     }
     BlockKey key = null;
     synchronized (this) {
       key = allKeys.get(identifier.getKeyId());
     }
     if (key == null) {
-      throw new InvalidToken("Can't re-compute password for "
-          + identifier.toString() + ", since the required block key (keyID="
-          + identifier.getKeyId() + ") doesn't exist.");
+      throw new InvalidToken(
+          "Can't re-compute password for " + identifier.toString() +
+              ", since the required block key (keyID=" + identifier.getKeyId() +
+              ") doesn't exist.");
     }
     return createPassword(identifier.getBytes(), key.getKey());
   }
@@ -389,11 +429,11 @@ public class BlockTokenSecretManager extends
   /**
    * Generate a data encryption key for this block pool, using the current
    * BlockKey.
-   * 
+   *
    * @return a data encryption key which may be used to encrypt traffic
-   *         over the DataTransferProtocol
+   * over the DataTransferProtocol
    */
-  public DataEncryptionKey generateDataEncryptionKey() {
+  public DataEncryptionKey generateDataEncryptionKey() throws IOException {
     byte[] nonce = new byte[8];
     nonceGenerator.nextBytes(nonce);
     BlockKey key = null;
@@ -402,18 +442,20 @@ public class BlockTokenSecretManager extends
     }
     byte[] encryptionKey = createPassword(nonce, key.getKey());
     return new DataEncryptionKey(key.getKeyId(), blockPoolId, nonce,
-        encryptionKey, Time.now() + tokenLifetime,
-        encryptionAlgorithm);
+        encryptionKey, Time.now() + tokenLifetime, encryptionAlgorithm);
   }
   
   /**
    * Recreate an encryption key based on the given key id and nonce.
-   * 
-   * @param keyId identifier of the secret key used to generate the encryption key.
-   * @param nonce random value used to create the encryption key
-   * @return the encryption key which corresponds to this (keyId, blockPoolId, nonce)
+   *
+   * @param keyId
+   *     identifier of the secret key used to generate the encryption key.
+   * @param nonce
+   *     random value used to create the encryption key
+   * @return the encryption key which corresponds to this (keyId, blockPoolId,
+   * nonce)
    * @throws InvalidToken
-   * @throws InvalidEncryptionKeyException 
+   * @throws InvalidEncryptionKeyException
    */
   public byte[] retrieveDataEncryptionKey(int keyId, byte[] nonce)
       throws InvalidEncryptionKeyException {
@@ -421,9 +463,10 @@ public class BlockTokenSecretManager extends
     synchronized (this) {
       key = allKeys.get(keyId);
       if (key == null) {
-        throw new InvalidEncryptionKeyException("Can't re-compute encryption key"
-            + " for nonce, since the required block key (keyID=" + keyId
-            + ") doesn't exist. Current key: " + currentKey.getKeyId());
+        throw new InvalidEncryptionKeyException(
+            "Can't re-compute encryption key" +
+                " for nonce, since the required block key (keyID=" + keyId +
+                ") doesn't exist. Current key: " + currentKey.getKeyId());
       }
     }
     return createPassword(nonce, key.getKey());

@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler;
 
-import java.util.List;
-
 import org.apache.commons.logging.Log;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
@@ -35,26 +33,28 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 import org.apache.hadoop.yarn.util.resource.ResourceCalculator;
 import org.apache.hadoop.yarn.util.resource.Resources;
 
+import java.util.List;
+
 /**
- * Utilities shared by schedulers. 
+ * Utilities shared by schedulers.
  */
 @Private
 @Unstable
 public class SchedulerUtils {
   
-  private static final RecordFactory recordFactory = 
+  private static final RecordFactory recordFactory =
       RecordFactoryProvider.getRecordFactory(null);
 
-  public static final String RELEASED_CONTAINER = 
+  public static final String RELEASED_CONTAINER =
       "Container released by application";
   
-  public static final String LOST_CONTAINER = 
+  public static final String LOST_CONTAINER =
       "Container released on a *lost* node";
   
-  public static final String PREEMPTED_CONTAINER = 
+  public static final String PREEMPTED_CONTAINER =
       "Container preempted by scheduler";
   
-  public static final String COMPLETED_APPLICATION = 
+  public static final String COMPLETED_APPLICATION =
       "Container of a completed application";
   
   public static final String EXPIRED_CONTAINER =
@@ -67,14 +67,16 @@ public class SchedulerUtils {
    * Utility to create a {@link ContainerStatus} during exceptional
    * circumstances.
    *
-   * @param containerId {@link ContainerId} of returned/released/lost container.
-   * @param diagnostics diagnostic message
-   * @return <code>ContainerStatus</code> for an returned/released/lost 
-   *         container
+   * @param containerId
+   *     {@link ContainerId} of returned/released/lost container.
+   * @param diagnostics
+   *     diagnostic message
+   * @return <code>ContainerStatus</code> for an returned/released/lost
+   * container
    */
   public static ContainerStatus createAbnormalContainerStatus(
       ContainerId containerId, String diagnostics) {
-    return createAbnormalContainerStatus(containerId, 
+    return createAbnormalContainerStatus(containerId,
         ContainerExitStatus.ABORTED, diagnostics);
   }
 
@@ -82,29 +84,33 @@ public class SchedulerUtils {
    * Utility to create a {@link ContainerStatus} during exceptional
    * circumstances.
    *
-   * @param containerId {@link ContainerId} of returned/released/lost container.
-   * @param diagnostics diagnostic message
+   * @param containerId
+   *     {@link ContainerId} of returned/released/lost container.
+   * @param diagnostics
+   *     diagnostic message
    * @return <code>ContainerStatus</code> for an returned/released/lost
-   *         container
+   * container
    */
   public static ContainerStatus createPreemptedContainerStatus(
       ContainerId containerId, String diagnostics) {
-    return createAbnormalContainerStatus(containerId, 
+    return createAbnormalContainerStatus(containerId,
         ContainerExitStatus.PREEMPTED, diagnostics);
   }
 
   /**
    * Utility to create a {@link ContainerStatus} during exceptional
    * circumstances.
-   * 
-   * @param containerId {@link ContainerId} of returned/released/lost container.
-   * @param diagnostics diagnostic message
-   * @return <code>ContainerStatus</code> for an returned/released/lost 
-   *         container
+   *
+   * @param containerId
+   *     {@link ContainerId} of returned/released/lost container.
+   * @param diagnostics
+   *     diagnostic message
+   * @return <code>ContainerStatus</code> for an returned/released/lost
+   * container
    */
   private static ContainerStatus createAbnormalContainerStatus(
       ContainerId containerId, int exitStatus, String diagnostics) {
-    ContainerStatus containerStatus = 
+    ContainerStatus containerStatus =
         recordFactory.newRecordInstance(ContainerStatus.class);
     containerStatus.setContainerId(containerId);
     containerStatus.setDiagnostics(diagnostics);
@@ -117,16 +123,12 @@ public class SchedulerUtils {
    * Utility method to normalize a list of resource requests, by insuring that
    * the memory for each request is a multiple of minMemory and is not zero.
    */
-  public static void normalizeRequests(
-    List<ResourceRequest> asks,
-    ResourceCalculator resourceCalculator,
-    Resource clusterResource,
-    Resource minimumResource,
-    Resource maximumResource) {
+  public static void normalizeRequests(List<ResourceRequest> asks,
+      ResourceCalculator resourceCalculator, Resource clusterResource,
+      Resource minimumResource, Resource maximumResource) {
     for (ResourceRequest ask : asks) {
-      normalizeRequest(
-        ask, resourceCalculator, clusterResource, minimumResource,
-        maximumResource, minimumResource);
+      normalizeRequest(ask, resourceCalculator, clusterResource,
+          minimumResource, maximumResource, minimumResource);
     }
   }
 
@@ -134,35 +136,36 @@ public class SchedulerUtils {
    * Utility method to normalize a resource request, by insuring that the
    * requested memory is a multiple of minMemory and is not zero.
    */
-  public static void normalizeRequest(
-    ResourceRequest ask,
-    ResourceCalculator resourceCalculator,
-    Resource clusterResource,
-    Resource minimumResource,
-    Resource maximumResource) {
-    Resource normalized =
-      Resources.normalize(
-        resourceCalculator, ask.getCapability(), minimumResource,
-        maximumResource, minimumResource);
+  public static void normalizeRequest(ResourceRequest ask,
+      ResourceCalculator resourceCalculator, Resource clusterResource,
+      Resource minimumResource, Resource maximumResource) {
+    Resource normalized = Resources
+        .normalize(resourceCalculator, ask.getCapability(), minimumResource,
+            maximumResource, minimumResource);
     ask.setCapability(normalized);
   }
   
   /**
    * Update resource in SchedulerNode if any resource change in RMNode.
-   * @param node SchedulerNode with old resource view
-   * @param rmNode RMNode with new resource view
-   * @param clusterResource the cluster's resource that need to update
-   * @param log Scheduler's log for resource change
+   *
+   * @param node
+   *     SchedulerNode with old resource view
+   * @param rmNode
+   *     RMNode with new resource view
+   * @param clusterResource
+   *     the cluster's resource that need to update
+   * @param log
+   *     Scheduler's log for resource change
    */
-  public static void updateResourceIfChanged(SchedulerNode node, 
-      RMNode rmNode, Resource clusterResource, Log log) {
+  public static void updateResourceIfChanged(SchedulerNode node, RMNode rmNode,
+      Resource clusterResource, Log log) {
     Resource oldAvailableResource = node.getAvailableResource();
-    Resource newAvailableResource = Resources.subtract(
-        rmNode.getTotalCapability(), node.getUsedResource());
+    Resource newAvailableResource =
+        Resources.subtract(rmNode.getTotalCapability(), node.getUsedResource());
     
     if (!newAvailableResource.equals(oldAvailableResource)) {
-      Resource deltaResource = Resources.subtract(newAvailableResource,
-          oldAvailableResource);
+      Resource deltaResource =
+          Resources.subtract(newAvailableResource, oldAvailableResource);
       // Reflect resource change to scheduler node.
       node.applyDeltaOnAvailableResource(deltaResource);
       // Reflect resource change to clusterResource.
@@ -172,9 +175,9 @@ public class SchedulerUtils {
       // overCommitTimeoutMillis.
       
       // Log resource change
-      log.info("Resource change on node: " + rmNode.getNodeAddress() 
-          + " with delta: CPU: " + deltaResource.getMemory() + "core, Memory: "
-          + deltaResource.getMemory() +"MB");
+      log.info("Resource change on node: " + rmNode.getNodeAddress() +
+          " with delta: CPU: " + deltaResource.getMemory() + "core, Memory: " +
+          deltaResource.getMemory() + "MB");
     }
   }
 
@@ -182,17 +185,13 @@ public class SchedulerUtils {
    * Utility method to normalize a list of resource requests, by insuring that
    * the memory for each request is a multiple of minMemory and is not zero.
    */
-  public static void normalizeRequests(
-      List<ResourceRequest> asks,
-      ResourceCalculator resourceCalculator, 
-      Resource clusterResource,
-      Resource minimumResource,
-      Resource maximumResource,
+  public static void normalizeRequests(List<ResourceRequest> asks,
+      ResourceCalculator resourceCalculator, Resource clusterResource,
+      Resource minimumResource, Resource maximumResource,
       Resource incrementResource) {
     for (ResourceRequest ask : asks) {
-      normalizeRequest(
-          ask, resourceCalculator, clusterResource, minimumResource,
-          maximumResource, incrementResource);
+      normalizeRequest(ask, resourceCalculator, clusterResource,
+          minimumResource, maximumResource, incrementResource);
     }
   }
 
@@ -200,16 +199,12 @@ public class SchedulerUtils {
    * Utility method to normalize a resource request, by insuring that the
    * requested memory is a multiple of minMemory and is not zero.
    */
-  public static void normalizeRequest(
-      ResourceRequest ask, 
-      ResourceCalculator resourceCalculator, 
-      Resource clusterResource,
-      Resource minimumResource,
-      Resource maximumResource,
+  public static void normalizeRequest(ResourceRequest ask,
+      ResourceCalculator resourceCalculator, Resource clusterResource,
+      Resource minimumResource, Resource maximumResource,
       Resource incrementResource) {
-    Resource normalized = 
-        Resources.normalize(
-            resourceCalculator, ask.getCapability(), minimumResource,
+    Resource normalized = Resources
+        .normalize(resourceCalculator, ask.getCapability(), minimumResource,
             maximumResource, incrementResource);
     ask.setCapability(normalized);
   }
@@ -217,29 +212,30 @@ public class SchedulerUtils {
   /**
    * Utility method to validate a resource request, by insuring that the
    * requested memory/vcore is non-negative and not greater than max
-   * 
-   * @throws <code>InvalidResourceRequestException</code> when there is invalid
-   *         request
+   *
+   * @throws <code>InvalidResourceRequestException</code>
+   *     when there is invalid
+   *     request
    */
   public static void validateResourceRequest(ResourceRequest resReq,
       Resource maximumResource) throws InvalidResourceRequestException {
     if (resReq.getCapability().getMemory() < 0 ||
         resReq.getCapability().getMemory() > maximumResource.getMemory()) {
-      throw new InvalidResourceRequestException("Invalid resource request"
-          + ", requested memory < 0"
-          + ", or requested memory > max configured"
-          + ", requestedMemory=" + resReq.getCapability().getMemory()
-          + ", maxMemory=" + maximumResource.getMemory());
+      throw new InvalidResourceRequestException(
+          "Invalid resource request" + ", requested memory < 0" +
+              ", or requested memory > max configured" + ", requestedMemory=" +
+              resReq.getCapability().getMemory() + ", maxMemory=" +
+              maximumResource.getMemory());
     }
     if (resReq.getCapability().getVirtualCores() < 0 ||
         resReq.getCapability().getVirtualCores() >
-        maximumResource.getVirtualCores()) {
-      throw new InvalidResourceRequestException("Invalid resource request"
-          + ", requested virtual cores < 0"
-          + ", or requested virtual cores > max configured"
-          + ", requestedVirtualCores="
-          + resReq.getCapability().getVirtualCores()
-          + ", maxVirtualCores=" + maximumResource.getVirtualCores());
+            maximumResource.getVirtualCores()) {
+      throw new InvalidResourceRequestException(
+          "Invalid resource request" + ", requested virtual cores < 0" +
+              ", or requested virtual cores > max configured" +
+              ", requestedVirtualCores=" +
+              resReq.getCapability().getVirtualCores() + ", maxVirtualCores=" +
+              maximumResource.getVirtualCores());
     }
   }
 }

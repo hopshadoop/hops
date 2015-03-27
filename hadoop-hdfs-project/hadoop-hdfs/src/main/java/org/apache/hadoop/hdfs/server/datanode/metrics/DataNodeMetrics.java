@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.hdfs.server.datanode.metrics;
 
-import static org.apache.hadoop.metrics2.impl.MsInfo.SessionId;
-
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
@@ -33,63 +31,87 @@ import org.apache.hadoop.metrics2.lib.MutableQuantiles;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.metrics2.source.JvmMetrics;
 
+import static org.apache.hadoop.metrics2.impl.MsInfo.SessionId;
+
 /**
- *
  * This class is for maintaining  the various DataNode statistics
  * and publishing them through the metrics interfaces.
  * This also registers the JMX MBean for RPC.
- * <p>
+ * <p/>
  * This class has a number of metrics variables that are publicly accessible;
  * these variables (objects) have methods to update their values;
- *  for example:
- *  <p> {@link #blocksRead}.inc()
- *
+ * for example:
+ * <p> {@link #blocksRead}.inc()
  */
 @InterfaceAudience.Private
-@Metrics(about="DataNode metrics", context="dfs")
+@Metrics(about = "DataNode metrics", context = "dfs")
 public class DataNodeMetrics {
 
-  @Metric MutableCounterLong bytesWritten;
-  @Metric MutableCounterLong bytesRead;
-  @Metric MutableCounterLong blocksWritten;
-  @Metric MutableCounterLong blocksRead;
-  @Metric MutableCounterLong blocksReplicated;
-  @Metric MutableCounterLong blocksRemoved;
-  @Metric MutableCounterLong blocksVerified;
-  @Metric MutableCounterLong blockVerificationFailures;
-  @Metric MutableCounterLong blocksCached;
-  @Metric MutableCounterLong blocksUncached;
-  @Metric MutableCounterLong readsFromLocalClient;
-  @Metric MutableCounterLong readsFromRemoteClient;
-  @Metric MutableCounterLong writesFromLocalClient;
-  @Metric MutableCounterLong writesFromRemoteClient;
-  @Metric MutableCounterLong blocksGetLocalPathInfo;
+  @Metric
+  MutableCounterLong bytesWritten;
+  @Metric
+  MutableCounterLong bytesRead;
+  @Metric
+  MutableCounterLong blocksWritten;
+  @Metric
+  MutableCounterLong blocksRead;
+  @Metric
+  MutableCounterLong blocksReplicated;
+  @Metric
+  MutableCounterLong blocksRemoved;
+  @Metric
+  MutableCounterLong blocksVerified;
+  @Metric
+  MutableCounterLong blockVerificationFailures;
+  @Metric
+  MutableCounterLong readsFromLocalClient;
+  @Metric
+  MutableCounterLong readsFromRemoteClient;
+  @Metric
+  MutableCounterLong writesFromLocalClient;
+  @Metric
+  MutableCounterLong writesFromRemoteClient;
+  @Metric
+  MutableCounterLong blocksGetLocalPathInfo;
 
-  @Metric MutableCounterLong fsyncCount;
+  @Metric
+  MutableCounterLong fsyncCount;
   
-  @Metric MutableCounterLong volumeFailures;
+  @Metric
+  MutableCounterLong volumeFailures;
 
-  @Metric MutableRate readBlockOp;
-  @Metric MutableRate writeBlockOp;
-  @Metric MutableRate blockChecksumOp;
-  @Metric MutableRate copyBlockOp;
-  @Metric MutableRate replaceBlockOp;
-  @Metric MutableRate heartbeats;
-  @Metric MutableRate blockReports;
-  @Metric MutableRate cacheReports;
-  @Metric MutableRate packetAckRoundTripTimeNanos;
-  final MutableQuantiles[] packetAckRoundTripTimeNanosQuantiles;
+  @Metric
+  MutableRate readBlockOp;
+  @Metric
+  MutableRate writeBlockOp;
+  @Metric
+  MutableRate blockChecksumOp;
+  @Metric
+  MutableRate copyBlockOp;
+  @Metric
+  MutableRate replaceBlockOp;
+  @Metric
+  MutableRate heartbeats;
+  @Metric
+  MutableRate blockReports;
+  @Metric
+  MutableRate packetAckRoundTripTimeNanos;
+  MutableQuantiles[] packetAckRoundTripTimeNanosQuantiles;
   
-  @Metric MutableRate flushNanos;
-  final MutableQuantiles[] flushNanosQuantiles;
+  @Metric
+  MutableRate flushNanos;
+  MutableQuantiles[] flushNanosQuantiles;
   
-  @Metric MutableRate fsyncNanos;
-  final MutableQuantiles[] fsyncNanosQuantiles;
+  @Metric
+  MutableRate fsyncNanos;
+  MutableQuantiles[] fsyncNanosQuantiles;
   
-  @Metric MutableRate sendDataPacketBlockedOnNetworkNanos;
-  final MutableQuantiles[] sendDataPacketBlockedOnNetworkNanosQuantiles;
-  @Metric MutableRate sendDataPacketTransferNanos;
-  final MutableQuantiles[] sendDataPacketTransferNanosQuantiles;
+  @Metric
+  MutableRate sendDataPacketBlockedOnNetworkNanos;
+  MutableQuantiles[] sendDataPacketBlockedOnNetworkNanosQuantiles;
+  @Metric
+  MutableRate sendDataPacketTransferNanos;
+  MutableQuantiles[] sendDataPacketTransferNanosQuantiles;
   
 
   final MetricsRegistry registry = new MetricsRegistry("datanode");
@@ -108,23 +130,23 @@ public class DataNodeMetrics {
     
     for (int i = 0; i < len; i++) {
       int interval = intervals[i];
-      packetAckRoundTripTimeNanosQuantiles[i] = registry.newQuantiles(
-          "packetAckRoundTripTimeNanos" + interval + "s",
-          "Packet Ack RTT in ns", "ops", "latency", interval);
-      flushNanosQuantiles[i] = registry.newQuantiles(
-          "flushNanos" + interval + "s", 
-          "Disk flush latency in ns", "ops", "latency", interval);
-      fsyncNanosQuantiles[i] = registry.newQuantiles(
-          "fsyncNanos" + interval + "s", "Disk fsync latency in ns", 
-          "ops", "latency", interval);
-      sendDataPacketBlockedOnNetworkNanosQuantiles[i] = registry.newQuantiles(
-          "sendDataPacketBlockedOnNetworkNanos" + interval + "s", 
-          "Time blocked on network while sending a packet in ns",
-          "ops", "latency", interval);
-      sendDataPacketTransferNanosQuantiles[i] = registry.newQuantiles(
-          "sendDataPacketTransferNanos" + interval + "s", 
-          "Time reading from disk and writing to network while sending " +
-          "a packet in ns", "ops", "latency", interval);
+      packetAckRoundTripTimeNanosQuantiles[i] = registry
+          .newQuantiles("packetAckRoundTripTimeNanos" + interval + "s",
+              "Packet Ack RTT in ns", "ops", "latency", interval);
+      flushNanosQuantiles[i] = registry
+          .newQuantiles("flushNanos" + interval + "s",
+              "Disk flush latency in ns", "ops", "latency", interval);
+      fsyncNanosQuantiles[i] = registry
+          .newQuantiles("fsyncNanos" + interval + "s",
+              "Disk fsync latency in ns", "ops", "latency", interval);
+      sendDataPacketBlockedOnNetworkNanosQuantiles[i] = registry
+          .newQuantiles("sendDataPacketBlockedOnNetworkNanos" + interval + "s",
+              "Time blocked on network while sending a packet in ns", "ops",
+              "latency", interval);
+      sendDataPacketTransferNanosQuantiles[i] = registry
+          .newQuantiles("sendDataPacketTransferNanos" + interval + "s",
+              "Time reading from disk and writing to network while sending " +
+                  "a packet in ns", "ops", "latency", interval);
     }
   }
 
@@ -132,19 +154,21 @@ public class DataNodeMetrics {
     String sessionId = conf.get(DFSConfigKeys.DFS_METRICS_SESSION_ID_KEY);
     MetricsSystem ms = DefaultMetricsSystem.instance();
     JvmMetrics.create("DataNode", sessionId, ms);
-    String name = "DataNodeActivity-"+ (dnName.isEmpty()
-        ? "UndefinedDataNodeName"+ DFSUtil.getRandom().nextInt() 
-            : dnName.replace(':', '-'));
+    String name = "DataNodeActivity-" + (dnName.isEmpty() ?
+        "UndefinedDataNodeName" + DFSUtil.getRandom().nextInt() :
+        dnName.replace(':', '-'));
 
     // Percentile measurement is off by default, by watching no intervals
-    int[] intervals = 
+    int[] intervals =
         conf.getInts(DFSConfigKeys.DFS_METRICS_PERCENTILES_INTERVALS_KEY);
     
-    return ms.register(name, null, new DataNodeMetrics(name, sessionId,
-        intervals));
+    return ms
+        .register(name, null, new DataNodeMetrics(name, sessionId, intervals));
   }
 
-  public String name() { return name; }
+  public String name() {
+    return name;
+  }
 
   public void addHeartbeat(long latency) {
     heartbeats.add(latency);
@@ -152,10 +176,6 @@ public class DataNodeMetrics {
 
   public void addBlockReport(long latency) {
     blockReports.add(latency);
-  }
-
-  public void addCacheReport(long latency) {
-    cacheReports.add(latency);
   }
 
   public void incrBlocksReplicated(int delta) {
@@ -180,15 +200,6 @@ public class DataNodeMetrics {
 
   public void incrBlocksVerified() {
     blocksVerified.incr();
-  }
-
-
-  public void incrBlocksCached(int delta) {
-    blocksCached.incr(delta);
-  }
-
-  public void incrBlocksUncached(int delta) {
-    blocksUncached.incr(delta);
   }
 
   public void addReadBlockOp(long latency) {
@@ -260,7 +271,9 @@ public class DataNodeMetrics {
     volumeFailures.incr();
   }
 
-  /** Increment for getBlockLocalPathInfo calls */
+  /**
+   * Increment for getBlockLocalPathInfo calls
+   */
   public void incrBlocksGetLocalPathInfo() {
     blocksGetLocalPathInfo.incr();
   }

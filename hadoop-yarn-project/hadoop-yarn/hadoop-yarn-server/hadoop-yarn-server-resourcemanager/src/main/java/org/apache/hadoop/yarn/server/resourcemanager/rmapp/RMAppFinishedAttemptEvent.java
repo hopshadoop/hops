@@ -18,14 +18,16 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.rmapp;
 
+import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 
 public class RMAppFinishedAttemptEvent extends RMAppEvent {
 
   private final String diagnostics;
 
-  public RMAppFinishedAttemptEvent(ApplicationId appId, String diagnostics) {
-    super(appId, RMAppEventType.ATTEMPT_FINISHED);
+  public RMAppFinishedAttemptEvent(ApplicationId appId, String diagnostics,
+      TransactionState transactionState) {
+    super(appId, RMAppEventType.ATTEMPT_FINISHED, transactionState);
     this.diagnostics = diagnostics;
   }
 

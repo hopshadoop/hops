@@ -257,8 +257,7 @@ int main(int argc, char **argv)
 
         const char* path[] = {"/foo", "/foo/bar", "foobar", "//foo/bar//foobar",
                               "foo//bar", "foo/bar///", "/", "////"};
-        int i;
-        for (i = 0; i < 8; i++) {
+        for (int i = 0; i < 8; i++) {
             fprintf(stderr, "hdfsSetWorkingDirectory: %s, %s\n",
                     ((result = hdfsSetWorkingDirectory(fs, path[i])) ?
                      "Failed!" : "Success!"),
@@ -282,8 +281,8 @@ int main(int argc, char **argv)
             fprintf(stderr, "Name: %s, ", fileInfo->mName);
             fprintf(stderr, "Type: %c, ", (char)(fileInfo->mKind));
             fprintf(stderr, "Replication: %d, ", fileInfo->mReplication);
-            fprintf(stderr, "BlockSize: %"PRId64", ", fileInfo->mBlockSize);
-            fprintf(stderr, "Size: %"PRId64", ", fileInfo->mSize);
+            fprintf(stderr, "BlockSize: %lld, ", fileInfo->mBlockSize);
+            fprintf(stderr, "Size: %lld, ", fileInfo->mSize);
             fprintf(stderr, "LastMod: %s", ctime(&fileInfo->mLastMod));
             fprintf(stderr, "Owner: %s, ", fileInfo->mOwner);
             fprintf(stderr, "Group: %s, ", fileInfo->mGroup);
@@ -306,8 +305,8 @@ int main(int argc, char **argv)
                 fprintf(stderr, "Name: %s, ", fileList[i].mName);
                 fprintf(stderr, "Type: %c, ", (char)fileList[i].mKind);
                 fprintf(stderr, "Replication: %d, ", fileList[i].mReplication);
-                fprintf(stderr, "BlockSize: %"PRId64", ", fileList[i].mBlockSize);
-                fprintf(stderr, "Size: %"PRId64", ", fileList[i].mSize);
+                fprintf(stderr, "BlockSize: %lld, ", fileList[i].mBlockSize);
+                fprintf(stderr, "Size: %lld, ", fileList[i].mSize);
                 fprintf(stderr, "LastMod: %s", ctime(&fileList[i].mLastMod));
                 fprintf(stderr, "Owner: %s, ", fileList[i].mOwner);
                 fprintf(stderr, "Group: %s, ", fileList[i].mGroup);

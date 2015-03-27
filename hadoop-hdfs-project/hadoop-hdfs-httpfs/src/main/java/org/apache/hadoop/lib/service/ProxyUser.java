@@ -26,6 +26,7 @@ import java.security.AccessControlException;
 @InterfaceAudience.Private
 public interface ProxyUser {
 
-  public void validate(String proxyUser, String proxyHost, String doAsUser) throws IOException, AccessControlException;
+  public void validate(String proxyUser, String proxyHost, String doAsUser)
+      throws IOException, AccessControlException;
 
 }

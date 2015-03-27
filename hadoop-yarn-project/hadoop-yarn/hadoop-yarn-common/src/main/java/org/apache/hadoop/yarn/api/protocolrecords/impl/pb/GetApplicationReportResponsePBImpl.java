@@ -19,6 +19,7 @@
 package org.apache.hadoop.yarn.api.protocolrecords.impl.pb;
 
 
+import com.google.protobuf.TextFormat;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.protocolrecords.GetApplicationReportResponse;
@@ -28,12 +29,12 @@ import org.apache.hadoop.yarn.proto.YarnProtos.ApplicationReportProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetApplicationReportResponseProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetApplicationReportResponseProtoOrBuilder;
 
-import com.google.protobuf.TextFormat;
-
 @Private
 @Unstable
-public class GetApplicationReportResponsePBImpl extends GetApplicationReportResponse {
-  GetApplicationReportResponseProto proto = GetApplicationReportResponseProto.getDefaultInstance();
+public class GetApplicationReportResponsePBImpl
+    extends GetApplicationReportResponse {
+  GetApplicationReportResponseProto proto =
+      GetApplicationReportResponseProto.getDefaultInstance();
   GetApplicationReportResponseProto.Builder builder = null;
   boolean viaProto = false;
   
@@ -44,13 +45,14 @@ public class GetApplicationReportResponsePBImpl extends GetApplicationReportResp
     builder = GetApplicationReportResponseProto.newBuilder();
   }
 
-  public GetApplicationReportResponsePBImpl(GetApplicationReportResponseProto proto) {
+  public GetApplicationReportResponsePBImpl(
+      GetApplicationReportResponseProto proto) {
     this.proto = proto;
     viaProto = true;
   }
   
   public GetApplicationReportResponseProto getProto() {
-      mergeLocalToProto();
+    mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
     viaProto = true;
     return proto;
@@ -63,8 +65,9 @@ public class GetApplicationReportResponsePBImpl extends GetApplicationReportResp
 
   @Override
   public boolean equals(Object other) {
-    if (other == null)
+    if (other == null) {
       return false;
+    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -78,13 +81,15 @@ public class GetApplicationReportResponsePBImpl extends GetApplicationReportResp
 
   private void mergeLocalToBuilder() {
     if (this.applicationReport != null) {
-      builder.setApplicationReport(convertToProtoFormat(this.applicationReport));
+      builder
+          .setApplicationReport(convertToProtoFormat(this.applicationReport));
     }
   }
 
   private void mergeLocalToProto() {
-    if (viaProto) 
+    if (viaProto) {
       maybeInitBuilder();
+    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
@@ -96,7 +101,7 @@ public class GetApplicationReportResponsePBImpl extends GetApplicationReportResp
     }
     viaProto = false;
   }
-    
+
   
   @Override
   public ApplicationReport getApplicationReport() {
@@ -114,19 +119,20 @@ public class GetApplicationReportResponsePBImpl extends GetApplicationReportResp
   @Override
   public void setApplicationReport(ApplicationReport applicationMaster) {
     maybeInitBuilder();
-    if (applicationMaster == null) 
+    if (applicationMaster == null) {
       builder.clearApplicationReport();
+    }
     this.applicationReport = applicationMaster;
   }
 
-  private ApplicationReportPBImpl convertFromProtoFormat(ApplicationReportProto p) {
+  private ApplicationReportPBImpl convertFromProtoFormat(
+      ApplicationReportProto p) {
     return new ApplicationReportPBImpl(p);
   }
 
   private ApplicationReportProto convertToProtoFormat(ApplicationReport t) {
-    return ((ApplicationReportPBImpl)t).getProto();
+    return ((ApplicationReportPBImpl) t).getProto();
   }
-
 
 
 }  

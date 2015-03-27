@@ -18,36 +18,35 @@
 
 package org.apache.hadoop.lib.server;
 
-import java.util.Arrays;
-import java.util.Collection;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.test.HTestCase;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
+import java.util.Arrays;
+import java.util.Collection;
+
 @RunWith(value = Parameterized.class)
 public class TestServerConstructor extends HTestCase {
 
   @Parameterized.Parameters
   public static Collection constructorFailParams() {
-    return Arrays.asList(new Object[][]{
-      {null, null, null, null, null, null},
-      {"", null, null, null, null, null},
-      {null, null, null, null, null, null},
-      {"server", null, null, null, null, null},
-      {"server", "", null, null, null, null},
-      {"server", "foo", null, null, null, null},
-      {"server", "/tmp", null, null, null, null},
-      {"server", "/tmp", "", null, null, null},
-      {"server", "/tmp", "foo", null, null, null},
-      {"server", "/tmp", "/tmp", null, null, null},
-      {"server", "/tmp", "/tmp", "", null, null},
-      {"server", "/tmp", "/tmp", "foo", null, null},
-      {"server", "/tmp", "/tmp", "/tmp", null, null},
-      {"server", "/tmp", "/tmp", "/tmp", "", null},
-      {"server", "/tmp", "/tmp", "/tmp", "foo", null}});
+    return Arrays.asList(new Object[][]{{null, null, null, null, null, null},
+        {"", null, null, null, null, null},
+        {null, null, null, null, null, null},
+        {"server", null, null, null, null, null},
+        {"server", "", null, null, null, null},
+        {"server", "foo", null, null, null, null},
+        {"server", "/tmp", null, null, null, null},
+        {"server", "/tmp", "", null, null, null},
+        {"server", "/tmp", "foo", null, null, null},
+        {"server", "/tmp", "/tmp", null, null, null},
+        {"server", "/tmp", "/tmp", "", null, null},
+        {"server", "/tmp", "/tmp", "foo", null, null},
+        {"server", "/tmp", "/tmp", "/tmp", null, null},
+        {"server", "/tmp", "/tmp", "/tmp", "", null},
+        {"server", "/tmp", "/tmp", "/tmp", "foo", null}});
   }
 
   private String name;
@@ -57,8 +56,8 @@ public class TestServerConstructor extends HTestCase {
   private String tempDir;
   private Configuration conf;
 
-  public TestServerConstructor(String name, String homeDir, String configDir, String logDir, String tempDir,
-                               Configuration conf) {
+  public TestServerConstructor(String name, String homeDir, String configDir,
+      String logDir, String tempDir, Configuration conf) {
     this.name = name;
     this.homeDir = homeDir;
     this.configDir = configDir;

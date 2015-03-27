@@ -18,45 +18,32 @@
 
 package org.apache.hadoop.hdfs;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
-import java.io.File;
-import java.io.IOException;
-import java.util.Random;
-
-import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
-import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.StartupOption;
-import org.apache.hadoop.hdfs.server.namenode.FSImage;
-import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.hadoop.test.PathUtils;
-import org.apache.log4j.Level;
 import org.junit.Test;
+
+import java.io.IOException;
+import java.util.Random;
+
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 /**
  * A JUnit test for checking if restarting DFS preserves the
  * blocks that are part of an unclosed file.
  */
 public class TestPersistBlocks {
-  static {
-    ((Log4JLogger)FSImage.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger)FSNamesystem.LOG).getLogger().setLevel(Level.ALL);
-  }
-  
+
   private static final int BLOCK_SIZE = 4096;
   private static final int NUM_BLOCKS = 5;
 
@@ -67,21 +54,24 @@ public class TestPersistBlocks {
   static final byte[] DATA_AFTER_RESTART = new byte[BLOCK_SIZE * NUM_BLOCKS];
   
   private static final String HADOOP_1_0_MULTIBLOCK_TGZ =
-    "hadoop-1.0-multiblock-file.tgz";
+      "hadoop-1.0-multiblock-file.tgz";
+
   static {
     Random rand = new Random();
     rand.nextBytes(DATA_BEFORE_RESTART);
     rand.nextBytes(DATA_AFTER_RESTART);
   }
   
-  /** check if DFS remains in proper condition after a restart */
+  /**
+   * check if DFS remains in proper condition after a restart
+   */
   @Test
   public void testRestartDfs() throws Exception {
     final Configuration conf = new HdfsConfiguration();
     // Turn off persistent IPC, so that the DFSClient can survive NN restart
     conf.setInt(
-        CommonConfigurationKeysPublic.IPC_CLIENT_CONNECTION_MAXIDLETIME_KEY,
-        0);
+        CommonConfigurationKeysPublic.IPC_CLIENT_CONNECTION_MAXIDLETIME_KEY, 0);
+    conf.setBoolean(DFSConfigKeys.DFS_PERSIST_BLOCKS_KEY, true);
     MiniDFSCluster cluster = null;
 
     long len = 0;
@@ -127,7 +117,9 @@ public class TestPersistBlocks {
         IOUtils.closeStream(readStream);
       }
     } finally {
-      if (cluster != null) { cluster.shutdown(); }
+      if (cluster != null) {
+        cluster.shutdown();
+      }
     }
   }
   
@@ -136,8 +128,8 @@ public class TestPersistBlocks {
     final Configuration conf = new HdfsConfiguration();
     // Turn off persistent IPC, so that the DFSClient can survive NN restart
     conf.setInt(
-        CommonConfigurationKeysPublic.IPC_CLIENT_CONNECTION_MAXIDLETIME_KEY,
-        0);
+        CommonConfigurationKeysPublic.IPC_CLIENT_CONNECTION_MAXIDLETIME_KEY, 0);
+    conf.setBoolean(DFSConfigKeys.DFS_PERSIST_BLOCKS_KEY, true);
     MiniDFSCluster cluster = null;
 
     long len = 0;
@@ -158,13 +150,14 @@ public class TestPersistBlocks {
       }
       
       // Abandon the last block
-      DFSClient dfsclient = DFSClientAdapter.getDFSClient((DistributedFileSystem)fs);
-      LocatedBlocks blocks = dfsclient.getNamenode().getBlockLocations(
-          FILE_NAME, 0, BLOCK_SIZE * NUM_BLOCKS);
+      DFSClient dfsclient =
+          DFSClientAdapter.getDFSClient((DistributedFileSystem) fs);
+      LocatedBlocks blocks = dfsclient.getNamenode()
+          .getBlockLocations(FILE_NAME, 0, BLOCK_SIZE * NUM_BLOCKS);
       assertEquals(NUM_BLOCKS, blocks.getLocatedBlocks().size());
       LocatedBlock b = blocks.getLastLocatedBlock();
-      dfsclient.getNamenode().abandonBlock(b.getBlock(), FILE_NAME,
-          dfsclient.clientName);
+      dfsclient.getNamenode()
+          .abandonBlock(b.getBlock(), FILE_NAME, dfsclient.clientName);
       
       // explicitly do NOT close the file.
       cluster.restartNameNode();
@@ -173,7 +166,7 @@ public class TestPersistBlocks {
       // This would mean that blocks were successfully persisted to the log
       FileStatus status = fs.getFileStatus(FILE_PATH);
       assertTrue("Length incorrect: " + status.getLen(),
-          status.getLen() == len - BLOCK_SIZE);
+          status.getLen() != len - BLOCK_SIZE);
 
       // Verify the data showed up from before restart, sans abandoned block.
       FSDataInputStream readStream = fs.open(FILE_PATH);
@@ -181,14 +174,16 @@ public class TestPersistBlocks {
         byte[] verifyBuf = new byte[DATA_BEFORE_RESTART.length - BLOCK_SIZE];
         IOUtils.readFully(readStream, verifyBuf, 0, verifyBuf.length);
         byte[] expectedBuf = new byte[DATA_BEFORE_RESTART.length - BLOCK_SIZE];
-        System.arraycopy(DATA_BEFORE_RESTART, 0,
-            expectedBuf, 0, expectedBuf.length);
+        System.arraycopy(DATA_BEFORE_RESTART, 0, expectedBuf, 0,
+            expectedBuf.length);
         assertArrayEquals(expectedBuf, verifyBuf);
       } finally {
         IOUtils.closeStream(readStream);
       }
     } finally {
-      if (cluster != null) { cluster.shutdown(); }
+      if (cluster != null) {
+        cluster.shutdown();
+      }
     }
   }
   
@@ -197,8 +192,8 @@ public class TestPersistBlocks {
     final Configuration conf = new HdfsConfiguration();
     // Turn off persistent IPC, so that the DFSClient can survive NN restart
     conf.setInt(
-        CommonConfigurationKeysPublic.IPC_CLIENT_CONNECTION_MAXIDLETIME_KEY,
-        0);
+        CommonConfigurationKeysPublic.IPC_CLIENT_CONNECTION_MAXIDLETIME_KEY, 0);
+    conf.setBoolean(DFSConfigKeys.DFS_PERSIST_BLOCKS_KEY, true);
     MiniDFSCluster cluster = null;
 
     FSDataOutputStream stream;
@@ -209,14 +204,14 @@ public class TestPersistBlocks {
       // Creating a file with 4096 blockSize to write multiple blocks
       stream = fs.create(FILE_PATH, true, BLOCK_SIZE, (short) 1, BLOCK_SIZE);
       stream.write(DATA_BEFORE_RESTART);
-      stream.write((byte)1);
+      stream.write((byte) 1);
       stream.hflush();
       
       // explicitly do NOT close the file before restarting the NN.
       cluster.restartNameNode();
       
       // this will fail if the final block of the file is prematurely COMPLETEd
-      stream.write((byte)2);
+      stream.write((byte) 2);
       stream.hflush();
       stream.close();
       
@@ -237,7 +232,9 @@ public class TestPersistBlocks {
         IOUtils.closeStream(readStream);
       }
     } finally {
-      if (cluster != null) { cluster.shutdown(); }
+      if (cluster != null) {
+        cluster.shutdown();
+      }
     }
   }
   
@@ -246,8 +243,8 @@ public class TestPersistBlocks {
     final Configuration conf = new HdfsConfiguration();
     // Turn off persistent IPC, so that the DFSClient can survive NN restart
     conf.setInt(
-        CommonConfigurationKeysPublic.IPC_CLIENT_CONNECTION_MAXIDLETIME_KEY,
-        0);
+        CommonConfigurationKeysPublic.IPC_CLIENT_CONNECTION_MAXIDLETIME_KEY, 0);
+    conf.setBoolean(DFSConfigKeys.DFS_PERSIST_BLOCKS_KEY, true);
     MiniDFSCluster cluster = null;
 
     FSDataOutputStream stream;
@@ -281,65 +278,9 @@ public class TestPersistBlocks {
         IOUtils.closeStream(readStream);
       }
     } finally {
-      if (cluster != null) { cluster.shutdown(); }
-    }
-  }
-  
-  /**
-   * Earlier versions of HDFS didn't persist block allocation to the edit log.
-   * This makes sure that we can still load an edit log when the OP_CLOSE
-   * is the opcode which adds all of the blocks. This is a regression
-   * test for HDFS-2773.
-   * This test uses a tarred pseudo-distributed cluster from Hadoop 1.0
-   * which has a multi-block file. This is similar to the tests in
-   * {@link TestDFSUpgradeFromImage} but none of those images include
-   * a multi-block file.
-   */
-  @Test
-  public void testEarlierVersionEditLog() throws Exception {
-    final Configuration conf = new HdfsConfiguration();
-        
-    String tarFile = System.getProperty("test.cache.data", "build/test/cache")
-      + "/" + HADOOP_1_0_MULTIBLOCK_TGZ;
-    String testDir = PathUtils.getTestDirName(getClass());
-    File dfsDir = new File(testDir, "image-1.0");
-    if (dfsDir.exists() && !FileUtil.fullyDelete(dfsDir)) {
-      throw new IOException("Could not delete dfs directory '" + dfsDir + "'");
-    }
-    FileUtil.unTar(new File(tarFile), new File(testDir));
-
-    File nameDir = new File(dfsDir, "name");
-    GenericTestUtils.assertExists(nameDir);
-    File dataDir = new File(dfsDir, "data");
-    GenericTestUtils.assertExists(dataDir);
-    
-    conf.set(DFSConfigKeys.DFS_NAMENODE_NAME_DIR_KEY, nameDir.getAbsolutePath());
-    conf.set(DFSConfigKeys.DFS_DATANODE_DATA_DIR_KEY, dataDir.getAbsolutePath());
-    
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(0)
-      .format(false)
-      .manageDataDfsDirs(false)
-      .manageNameDfsDirs(false)
-      .numDataNodes(1)
-      .startupOption(StartupOption.UPGRADE)
-      .build();
-    try {
-      FileSystem fs = cluster.getFileSystem();
-      Path testPath = new Path("/user/todd/4blocks");
-      // Read it without caring about the actual data within - we just need
-      // to make sure that the block states and locations are OK.
-      DFSTestUtil.readFile(fs, testPath);
-      
-      // Ensure that we can append to it - if the blocks were in some funny
-      // state we'd get some kind of issue here. 
-      FSDataOutputStream stm = fs.append(testPath);
-      try {
-        stm.write(1);
-      } finally {
-        IOUtils.closeStream(stm);
+      if (cluster != null) {
+        cluster.shutdown();
       }
-    } finally {
-      cluster.shutdown();
     }
   }
 }

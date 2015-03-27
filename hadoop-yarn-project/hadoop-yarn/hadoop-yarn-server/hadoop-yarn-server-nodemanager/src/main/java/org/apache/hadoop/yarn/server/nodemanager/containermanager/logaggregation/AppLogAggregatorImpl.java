@@ -1,22 +1,43 @@
 /**
-* Licensed to the Apache Software Foundation (ASF) under one
-* or more contributor license agreements.  See the NOTICE file
-* distributed with this work for additional information
-* regarding copyright ownership.  The ASF licenses this file
-* to you under the Apache License, Version 2.0 (the
-* "License"); you may not use this file except in compliance
-* with the License.  You may obtain a copy of the License at
-*
-*     http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.logaggregation;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.yarn.api.records.ApplicationAccessType;
+import org.apache.hadoop.yarn.api.records.ApplicationId;
+import org.apache.hadoop.yarn.api.records.ContainerId;
+import org.apache.hadoop.yarn.event.Dispatcher;
+import org.apache.hadoop.yarn.logaggregation.AggregatedLogFormat.LogKey;
+import org.apache.hadoop.yarn.logaggregation.AggregatedLogFormat.LogValue;
+import org.apache.hadoop.yarn.logaggregation.AggregatedLogFormat.LogWriter;
+import org.apache.hadoop.yarn.logaggregation.ContainerLogsRetentionPolicy;
+import org.apache.hadoop.yarn.server.nodemanager.DeletionService;
+import org.apache.hadoop.yarn.server.nodemanager.LocalDirsHandlerService;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.ApplicationEvent;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.ApplicationEventType;
+import org.apache.hadoop.yarn.util.ConverterUtils;
 
 import java.io.IOException;
 import java.security.PrivilegedExceptionAction;
@@ -26,32 +47,10 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.util.StringUtils;
-import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.hadoop.yarn.api.records.ApplicationAccessType;
-import org.apache.hadoop.yarn.api.records.ContainerId;
-import org.apache.hadoop.yarn.event.Dispatcher;
-import org.apache.hadoop.yarn.logaggregation.ContainerLogsRetentionPolicy;
-import org.apache.hadoop.yarn.logaggregation.AggregatedLogFormat.LogKey;
-import org.apache.hadoop.yarn.logaggregation.AggregatedLogFormat.LogValue;
-import org.apache.hadoop.yarn.logaggregation.AggregatedLogFormat.LogWriter;
-import org.apache.hadoop.yarn.server.nodemanager.DeletionService;
-import org.apache.hadoop.yarn.server.nodemanager.LocalDirsHandlerService;
-import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.ApplicationEvent;
-import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.ApplicationEventType;
-import org.apache.hadoop.yarn.util.ConverterUtils;
-
 
 public class AppLogAggregatorImpl implements AppLogAggregator {
 
-  private static final Log LOG = LogFactory
-      .getLog(AppLogAggregatorImpl.class);
+  private static final Log LOG = LogFactory.getLog(AppLogAggregatorImpl.class);
   private static final int THREAD_SLEEP_TIME = 1000;
   private static final String TMP_FILE_SUFFIX = ".tmp";
 
@@ -102,35 +101,34 @@ public class AppLogAggregatorImpl implements AppLogAggregator {
 
     // Lazy creation of the writer
     if (this.writer == null) {
-      LOG.info("Starting aggregate log-file for app " + this.applicationId
-          + " at " + this.remoteNodeTmpLogFileForApp);
+      LOG.info(
+          "Starting aggregate log-file for app " + this.applicationId + " at " +
+              this.remoteNodeTmpLogFileForApp);
       try {
-        this.writer =
-            new LogWriter(this.conf, this.remoteNodeTmpLogFileForApp,
-                this.userUgi);
+        this.writer = new LogWriter(this.conf, this.remoteNodeTmpLogFileForApp,
+            this.userUgi);
         //Write ACLs once when and if the writer is created.
         this.writer.writeApplicationACLs(appAcls);
         this.writer.writeApplicationOwner(this.userUgi.getShortUserName());
       } catch (IOException e) {
-        LOG.error("Cannot create writer for app " + this.applicationId
-            + ". Disabling log-aggregation for this app.", e);
+        LOG.error("Cannot create writer for app " + this.applicationId +
+            ". Disabling log-aggregation for this app.", e);
         this.logAggregationDisabled = true;
         return;
       }
     }
 
-    LOG.info("Uploading logs for container " + containerId
-        + ". Current good log dirs are "
-        + StringUtils.join(",", dirsHandler.getLogDirs()));
+    LOG.info("Uploading logs for container " + containerId +
+        ". Current good log dirs are " +
+        StringUtils.join(",", dirsHandler.getLogDirs()));
     LogKey logKey = new LogKey(containerId);
-    LogValue logValue =
-        new LogValue(dirsHandler.getLogDirs(), containerId,
-          userUgi.getShortUserName());
+    LogValue logValue = new LogValue(dirsHandler.getLogDirs(), containerId,
+        userUgi.getShortUserName());
     try {
       this.writer.append(logKey, logValue);
     } catch (IOException e) {
-      LOG.error("Couldn't upload logs for " + containerId
-          + ". Skipping this container.");
+      LOG.error("Couldn't upload logs for " + containerId +
+          ". Skipping this container.");
     }
   }
 
@@ -151,7 +149,7 @@ public class AppLogAggregatorImpl implements AppLogAggregator {
     ContainerId containerId;
 
     while (!this.appFinishing.get()) {
-      synchronized(this) {
+      synchronized (this) {
         try {
           wait(THREAD_SLEEP_TIME);
         } catch (InterruptedException e) {
@@ -174,8 +172,8 @@ public class AppLogAggregatorImpl implements AppLogAggregator {
       localAppLogDirs[index] = new Path(rootLogDir, this.applicationId);
       index++;
     }
-    this.delService.delete(this.userUgi.getShortUserName(), null,
-        localAppLogDirs);
+    this.delService
+        .delete(this.userUgi.getShortUserName(), null, localAppLogDirs);
 
     if (this.writer != null) {
       this.writer.close();
@@ -192,15 +190,14 @@ public class AppLogAggregatorImpl implements AppLogAggregator {
         }
       });
     } catch (Exception e) {
-      LOG.error("Failed to move temporary log file to final location: ["
-          + remoteNodeTmpLogFileForApp + "] to [" + remoteNodeLogFileForApp
-          + "]", e);
+      LOG.error("Failed to move temporary log file to final location: [" +
+          remoteNodeTmpLogFileForApp + "] to [" + remoteNodeLogFileForApp + "]",
+          e);
     }
     
-    this.dispatcher.getEventHandler().handle(
-        new ApplicationEvent(this.appId,
+    this.dispatcher.getEventHandler().handle(new ApplicationEvent(this.appId,
             ApplicationEventType.APPLICATION_LOG_HANDLING_FINISHED));
-    this.appAggregationFinished.set(true);    
+    this.appAggregationFinished.set(true);
   }
 
   private Path getRemoteNodeTmpLogFileForApp() {
@@ -231,7 +228,7 @@ public class AppLogAggregatorImpl implements AppLogAggregator {
         .equals(ContainerLogsRetentionPolicy.AM_AND_FAILED_CONTAINERS_ONLY)) {
       if (containerId.getId() == 1) {
         return true;
-      } else if(!wasContainerSuccessful) {
+      } else if (!wasContainerSuccessful) {
         return true;
       }
       return false;
@@ -243,8 +240,7 @@ public class AppLogAggregatorImpl implements AppLogAggregator {
   public void startContainerLogAggregation(ContainerId containerId,
       boolean wasContainerSuccessful) {
     if (shouldUploadLogs(containerId, wasContainerSuccessful)) {
-      LOG.info("Considering container " + containerId
-          + " for log-aggregation");
+      LOG.info("Considering container " + containerId + " for log-aggregation");
       this.pendingContainers.add(containerId);
     }
   }

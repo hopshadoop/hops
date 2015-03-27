@@ -17,30 +17,18 @@
  */
 package org.apache.hadoop.hdfs.protocol;
 
+import org.apache.hadoop.hdfs.protocol.LayoutVersion.Feature;
+import org.junit.Test;
+
+import java.util.EnumSet;
+
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.assertEquals;
-
-import java.util.SortedSet;
-
-import org.apache.hadoop.hdfs.protocol.LayoutVersion.Feature;
-import org.apache.hadoop.hdfs.protocol.LayoutVersion.FeatureInfo;
-import org.apache.hadoop.hdfs.protocol.LayoutVersion.LayoutFeature;
-import org.apache.hadoop.hdfs.server.datanode.DataNodeLayoutVersion;
-import org.apache.hadoop.hdfs.server.namenode.NameNodeLayoutVersion;
-import org.junit.Test;
 
 /**
  * Test for {@link LayoutVersion}
  */
 public class TestLayoutVersion {
-  public static final LayoutFeature LAST_NON_RESERVED_COMMON_FEATURE;
-  public static final LayoutFeature LAST_COMMON_FEATURE;
-  static {
-    final Feature[] features = Feature.values();
-    LAST_COMMON_FEATURE = features[features.length - 1];
-    LAST_NON_RESERVED_COMMON_FEATURE = LayoutVersion.getLastNonReservedFeature(features);
-  }
   
   /**
    * Tests to make sure a given layout version supports all the
@@ -48,7 +36,7 @@ public class TestLayoutVersion {
    */
   @Test
   public void testFeaturesFromAncestorSupported() {
-    for (LayoutFeature f : Feature.values()) {
+    for (Feature f : Feature.values()) {
       validateFeatureList(f);
     }
   }
@@ -58,8 +46,8 @@ public class TestLayoutVersion {
    */
   @Test
   public void testRelease203() {
-    assertTrue(NameNodeLayoutVersion.supports(LayoutVersion.Feature.DELEGATION_TOKEN, 
-        Feature.RESERVED_REL20_203.getInfo().getLayoutVersion()));
+    assertTrue(LayoutVersion
+        .supports(Feature.DELEGATION_TOKEN, Feature.RESERVED_REL20_203.lv));
   }
   
   /**
@@ -67,57 +55,21 @@ public class TestLayoutVersion {
    */
   @Test
   public void testRelease204() {
-    assertTrue(NameNodeLayoutVersion.supports(LayoutVersion.Feature.DELEGATION_TOKEN, 
-        Feature.RESERVED_REL20_204.getInfo().getLayoutVersion()));
-  }
-  
-  /**
-   * Test to make sure release 1.2.0 support CONCAT
-   */
-  @Test
-  public void testRelease1_2_0() {
-    assertTrue(NameNodeLayoutVersion.supports(LayoutVersion.Feature.CONCAT, 
-        Feature.RESERVED_REL1_2_0.getInfo().getLayoutVersion()));
-  }
-  
-  /**
-   * Test to make sure NameNode.Feature support previous features
-   */
-  @Test
-  public void testNameNodeFeature() {
-    final LayoutFeature first = NameNodeLayoutVersion.Feature.ROLLING_UPGRADE; 
-    assertTrue(NameNodeLayoutVersion.supports(LAST_NON_RESERVED_COMMON_FEATURE,
-        first.getInfo().getLayoutVersion()));
-    assertEquals(LAST_COMMON_FEATURE.getInfo().getLayoutVersion() - 1,
-        first.getInfo().getLayoutVersion());
-  }
-  
-  /**
-   * Test to make sure DataNode.Feature support previous features
-   */
-  @Test
-  public void testDataNodeFeature() {
-    final LayoutFeature first = DataNodeLayoutVersion.Feature.FIRST_LAYOUT; 
-    assertTrue(DataNodeLayoutVersion.supports(LAST_NON_RESERVED_COMMON_FEATURE,
-        first.getInfo().getLayoutVersion()));
-    assertEquals(LAST_COMMON_FEATURE.getInfo().getLayoutVersion() - 1,
-        first.getInfo().getLayoutVersion());
+    assertTrue(LayoutVersion
+        .supports(Feature.DELEGATION_TOKEN, Feature.RESERVED_REL20_204.lv));
   }
   
   /**
    * Given feature {@code f}, ensures the layout version of that feature
    * supports all the features supported by it's ancestor.
    */
-  private void validateFeatureList(LayoutFeature f) {
-    final FeatureInfo info = f.getInfo();
-    int lv = info.getLayoutVersion();
-    int ancestorLV = info.getAncestorLayoutVersion();
-    SortedSet<LayoutFeature> ancestorSet = NameNodeLayoutVersion.getFeatures(ancestorLV);
+  private void validateFeatureList(Feature f) {
+    int lv = f.lv;
+    int ancestorLV = f.ancestorLV;
+    EnumSet<Feature> ancestorSet = LayoutVersion.map.get(ancestorLV);
     assertNotNull(ancestorSet);
-    for (LayoutFeature  feature : ancestorSet) {
-      assertTrue("LV " + lv + " does nto support " + feature
-          + " supported by the ancestor LV " + info.getAncestorLayoutVersion(),
-          NameNodeLayoutVersion.supports(feature, lv));
+    for (Feature feature : ancestorSet) {
+      assertTrue(LayoutVersion.supports(feature, lv));
     }
   }
 }

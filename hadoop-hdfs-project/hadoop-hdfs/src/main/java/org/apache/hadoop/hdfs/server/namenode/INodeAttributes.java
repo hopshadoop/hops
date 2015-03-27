@@ -1,13 +1,11 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Copyright (C) 2015 hops.io.
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,116 +15,152 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.fs.permission.PermissionStatus;
-import org.apache.hadoop.hdfs.server.namenode.INodeWithAdditionalFields.PermissionStatusFormat;
+import io.hops.exception.StorageException;
+import io.hops.exception.TransactionContextException;
+import io.hops.metadata.common.FinderType;
+import io.hops.transaction.EntityManager;
 
 /**
- * The attributes of an inode.
+ * right now it holds quota info. later we can add more
+ * information like access time ( if we want to remove locks from the parent
+ * dirs )
  */
-@InterfaceAudience.Private
-public interface INodeAttributes {
-  /**
-   * @return null if the local name is null;
-   *         otherwise, return the local name byte array.
-   */
-  public byte[] getLocalNameBytes();
+public class INodeAttributes {
 
-  /** @return the user name. */
-  public String getUserName();
+  public static enum Finder implements FinderType<INodeAttributes> {
 
-  /** @return the group name. */
-  public String getGroupName();
-  
-  /** @return the permission. */
-  public FsPermission getFsPermission();
+    ByINodeId,
+    ByINodeIds;
 
-  /** @return the permission as a short. */
-  public short getFsPermissionShort();
-  
-  /** @return the permission information as a long. */
-  public long getPermissionLong();
-
-  /** @return the ACL feature. */
-  public AclFeature getAclFeature();
-
-  /** @return the modification time. */
-  public long getModificationTime();
-
-  /** @return the access time. */
-  public long getAccessTime();
-
-  /** A read-only copy of the inode attributes. */
-  public static abstract class SnapshotCopy implements INodeAttributes {
-    private final byte[] name;
-    private final long permission;
-    private final AclFeature aclFeature;
-    private final long modificationTime;
-    private final long accessTime;
-
-    SnapshotCopy(byte[] name, PermissionStatus permissions,
-        AclFeature aclFeature, long modificationTime, long accessTime) {
-      this.name = name;
-      this.permission = PermissionStatusFormat.toLong(permissions);
-      this.aclFeature = aclFeature;
-      this.modificationTime = modificationTime;
-      this.accessTime = accessTime;
-    }
-
-    SnapshotCopy(INode inode) {
-      this.name = inode.getLocalNameBytes();
-      this.permission = inode.getPermissionLong();
-      this.aclFeature = inode.getAclFeature();
-      this.modificationTime = inode.getModificationTime();
-      this.accessTime = inode.getAccessTime();
+    @Override
+    public Class getType() {
+      return INodeAttributes.class;
     }
 
     @Override
-    public final byte[] getLocalNameBytes() {
-      return name;
+    public Annotation getAnnotated() {
+      switch (this) {
+        case ByINodeId:
+          return Annotation.PrimaryKey;
+        case ByINodeIds:
+          return Annotation.Batched;
+        default:
+          throw new IllegalStateException();
+      }
     }
 
-    @Override
-    public final String getUserName() {
-      final int n = (int)PermissionStatusFormat.USER.retrieve(permission);
-      return SerialNumberManager.INSTANCE.getUser(n);
+  }
+
+  private Integer inodeId;
+  private Long nsQuota; /// NameSpace quota
+  private Long nsCount;
+  private Long dsQuota; /// disk space quota
+  private Long diskspace;
+
+  public INodeAttributes(Integer inodeId, Long nsQuota, Long nsCount,
+      Long dsQuota, Long diskspace) {
+    this.inodeId = inodeId;
+    if (nsQuota != null) {
+      this.nsQuota = nsQuota;
+    } else {
+      this.nsQuota = FSDirectory.UNKNOWN_DISK_SPACE;
+    }
+    if (nsCount != null) {
+      this.nsCount = nsCount;
+    } else {
+      this.nsCount = 1L;
+    }
+    if (dsQuota != null) {
+      this.dsQuota = dsQuota;
+    } else {
+      this.dsQuota = Long.MAX_VALUE;
+    }
+    if (diskspace != null) {
+      this.diskspace = diskspace;
+    } else {
+      throw new IllegalStateException(
+          "default value for diskspace is not defined");
     }
 
-    @Override
-    public final String getGroupName() {
-      final int n = (int)PermissionStatusFormat.GROUP.retrieve(permission);
-      return SerialNumberManager.INSTANCE.getGroup(n);
-    }
+  }
 
-    @Override
-    public final FsPermission getFsPermission() {
-      return new FsPermission(getFsPermissionShort());
-    }
+  public Integer getInodeId() {
+    return inodeId;
+  }
 
-    @Override
-    public final short getFsPermissionShort() {
-      return (short)PermissionStatusFormat.MODE.retrieve(permission);
-    }
-    
-    @Override
-    public long getPermissionLong() {
-      return permission;
-    }
+  public Long getNsQuota() {
+    return nsQuota;
+  }
 
-    @Override
-    public AclFeature getAclFeature() {
-      return aclFeature;
-    }
+  public Long getNsCount() {
+    return nsCount;
+  }
 
-    @Override
-    public final long getModificationTime() {
-      return modificationTime;
-    }
+  public Long getDsQuota() {
+    return dsQuota;
+  }
 
-    @Override
-    public final long getAccessTime() {
-      return accessTime;
-    }
+  public Long getDiskspace() {
+    return diskspace;
+  }
+
+  public void setInodeId(Integer inodeId)
+      throws StorageException, TransactionContextException {
+    setInodeIdNoPersistance(inodeId);
+    saveAttributes();
+  }
+
+  public void setNsQuota(Long nsQuota)
+      throws StorageException, TransactionContextException {
+    setNsQuotaNoPersistance(nsQuota);
+    saveAttributes();
+  }
+
+  public void setNsCount(Long nsCount)
+      throws StorageException, TransactionContextException {
+    setNsCountNoPersistance(nsCount);
+    saveAttributes();
+  }
+
+  public void setDsQuota(Long dsQuota)
+      throws StorageException, TransactionContextException {
+    setDsQuotaNoPersistance(dsQuota);
+    saveAttributes();
+  }
+
+  public void setDiskspace(Long diskspace)
+      throws StorageException, TransactionContextException {
+    setDiskspaceNoPersistance(diskspace);
+    saveAttributes();
+  }
+
+  public void setNsQuotaNoPersistance(Long nsQuota) {
+    this.nsQuota = nsQuota;
+  }
+
+  public void setNsCountNoPersistance(Long nsCount) {
+    this.nsCount = nsCount;
+  }
+
+  public void setDsQuotaNoPersistance(Long dsQuota) {
+    this.dsQuota = dsQuota;
+  }
+
+  public void setDiskspaceNoPersistance(Long diskspace) {
+    this.diskspace = diskspace;
+  }
+
+  public void setInodeIdNoPersistance(Integer inodeId) {
+    this.inodeId = inodeId;
+  }
+
+  protected void saveAttributes()
+      throws StorageException, TransactionContextException {
+    EntityManager.update(this);
+  }
+
+  protected void removeAttributes()
+      throws StorageException, TransactionContextException {
+    EntityManager.remove(this);
   }
 }

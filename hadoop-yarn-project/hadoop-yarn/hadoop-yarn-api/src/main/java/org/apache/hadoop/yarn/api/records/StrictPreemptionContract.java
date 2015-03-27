@@ -17,13 +17,13 @@
  */
 package org.apache.hadoop.yarn.api.records;
 
-import java.util.Set;
-
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.util.Records;
+
+import java.util.Set;
 
 /**
  * Enumeration of particular allocations to be reclaimed. The platform will
@@ -31,6 +31,7 @@ import org.apache.hadoop.yarn.util.Records;
  * may attempt to checkpoint work or adjust its execution plan to accommodate
  * it. In contrast to {@link PreemptionContract}, the AM has no flexibility in
  * selecting which resources to return to the cluster.
+ *
  * @see PreemptionMessage
  */
 @Public
@@ -39,7 +40,8 @@ public abstract class StrictPreemptionContract {
 
   @Private
   @Unstable
-  public static StrictPreemptionContract newInstance(Set<PreemptionContainer> containers) {
+  public static StrictPreemptionContract newInstance(
+      Set<PreemptionContainer> containers) {
     StrictPreemptionContract contract =
         Records.newRecord(StrictPreemptionContract.class);
     contract.setContainers(containers);
@@ -50,6 +52,7 @@ public abstract class StrictPreemptionContract {
    * Get the set of {@link PreemptionContainer} specifying containers owned by
    * the <code>ApplicationMaster</code> that may be reclaimed by the
    * <code>ResourceManager</code>.
+   *
    * @return the set of {@link ContainerId} to be preempted.
    */
   @Public

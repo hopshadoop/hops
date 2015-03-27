@@ -22,14 +22,13 @@ import java.util.Arrays;
 /**
  * Contains a list of paths corresponding to corrupt files and a cookie
  * used for iterative calls to NameNode.listCorruptFileBlocks.
- *
  */
 public class CorruptFileBlocks {
   // used for hashCode
   private static final int PRIME = 16777619;
 
-  private final String[] files;
-  private final String cookie;
+  private String[] files;
+  private String cookie;
 
   public CorruptFileBlocks() {
     this(new String[0], "");
@@ -57,8 +56,7 @@ public class CorruptFileBlocks {
       return false;
     }
     CorruptFileBlocks other = (CorruptFileBlocks) obj;
-    return cookie.equals(other.cookie) &&
-      Arrays.equals(files, other.files);
+    return cookie.equals(other.cookie) && Arrays.equals(files, other.files);
   }
 
   

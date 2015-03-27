@@ -17,25 +17,23 @@
  */
 package org.apache.hadoop.hdfs.util;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.ConcurrentModificationException;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.NoSuchElementException;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 
 /**
  * A low memory linked hash set implementation, which uses an array for storing
  * the elements and linked lists for collision resolution. This class does not
  * support null element.
- *
+ * <p/>
  * This class is not thread safe.
- *
  */
 public class LightWeightHashSet<T> implements Collection<T> {
   /**
@@ -74,13 +72,21 @@ public class LightWeightHashSet<T> implements Collection<T> {
    * size must be a power of two.
    */
   protected LinkedElement<T>[] entries;
-  /** Size of the entry table. */
+  /**
+   * Size of the entry table.
+   */
   private int capacity;
-  /** The size of the set (not the entry array). */
+  /**
+   * The size of the set (not the entry array).
+   */
   protected int size = 0;
-  /** Hashmask used for determining the bucket index **/
+  /**
+   * Hashmask used for determining the bucket index *
+   */
   private int hash_mask;
-  /** Capacity at initialization time **/
+  /**
+   * Capacity at initialization time *
+   */
   private final int initialCapacity;
 
   /**
@@ -88,34 +94,36 @@ public class LightWeightHashSet<T> implements Collection<T> {
    *
    * @see ConcurrentModificationException
    */
-  protected int modification = 0;
+  protected volatile int modification = 0;
 
   private float maxLoadFactor;
   private float minLoadFactor;
-  private final int expandMultiplier = 2;
+  private int expandMultiplier = 2;
 
   private int expandThreshold;
   private int shrinkThreshold;
 
   /**
    * @param initCapacity
-   *          Recommended size of the internal array.
+   *     Recommended size of the internal array.
    * @param maxLoadFactor
-   *          used to determine when to expand the internal array
+   *     used to determine when to expand the internal array
    * @param minLoadFactor
-   *          used to determine when to shrink the internal array
+   *     used to determine when to shrink the internal array
    */
   @SuppressWarnings("unchecked")
   public LightWeightHashSet(int initCapacity, float maxLoadFactor,
       float minLoadFactor) {
 
-    if (maxLoadFactor <= 0 || maxLoadFactor > 1.0f)
-      throw new IllegalArgumentException("Illegal maxload factor: "
-          + maxLoadFactor);
+    if (maxLoadFactor <= 0 || maxLoadFactor > 1.0f) {
+      throw new IllegalArgumentException(
+          "Illegal maxload factor: " + maxLoadFactor);
+    }
 
-    if (minLoadFactor <= 0 || minLoadFactor > maxLoadFactor)
-      throw new IllegalArgumentException("Illegal minload factor: "
-          + minLoadFactor);
+    if (minLoadFactor <= 0 || minLoadFactor > maxLoadFactor) {
+      throw new IllegalArgumentException(
+          "Illegal minload factor: " + minLoadFactor);
+    }
 
     this.initialCapacity = computeCapacity(initCapacity);
     this.capacity = this.initialCapacity;
@@ -127,8 +135,8 @@ public class LightWeightHashSet<T> implements Collection<T> {
     this.shrinkThreshold = (int) (capacity * minLoadFactor);
 
     entries = new LinkedElement[capacity];
-    LOG.debug("initial capacity=" + initialCapacity + ", max load factor= "
-        + maxLoadFactor + ", min load factor= " + minLoadFactor);
+    LOG.debug("initial capacity=" + initialCapacity + ", max load factor= " +
+        maxLoadFactor + ", min load factor= " + minLoadFactor);
   }
 
   public LightWeightHashSet() {
@@ -179,7 +187,7 @@ public class LightWeightHashSet<T> implements Collection<T> {
   @SuppressWarnings("unchecked")
   @Override
   public boolean contains(final Object key) {
-    return getElement((T)key) != null;
+    return getElement((T) key) != null;
   }
   
   /**
@@ -218,7 +226,8 @@ public class LightWeightHashSet<T> implements Collection<T> {
   /**
    * All all elements in the collection. Expand if necessary.
    *
-   * @param toAdd - elements to add.
+   * @param toAdd
+   *     - elements to add.
    * @return true if the set has changed, false otherwise
    */
   @Override
@@ -289,7 +298,8 @@ public class LightWeightHashSet<T> implements Collection<T> {
   }
 
   /**
-   * Remove the element corresponding to the key, given key.hashCode() == index.
+   * Remove the element corresponding to the key, given key.hashCode() ==
+   * index.
    *
    * @return If such element exists, return true. Otherwise, return false.
    */
@@ -300,7 +310,7 @@ public class LightWeightHashSet<T> implements Collection<T> {
     if (entries[index] == null) {
       return null;
     } else if (hashCode == entries[index].hashCode &&
-            entries[index].element.equals(key)) {
+        entries[index].element.equals(key)) {
       // remove the head of the bucket linked list
       modification++;
       size--;
@@ -310,9 +320,8 @@ public class LightWeightHashSet<T> implements Collection<T> {
       // head != null and key is not equal to head
       // search the element
       LinkedElement<T> prev = entries[index];
-      for (found = prev.next; found != null;) {
-        if (hashCode == found.hashCode &&
-                found.element.equals(key)) {
+      for (found = prev.next; found != null; ) {
+        if (hashCode == found.hashCode && found.element.equals(key)) {
           // found the element, remove it
           modification++;
           size--;
@@ -393,8 +402,8 @@ public class LightWeightHashSet<T> implements Collection<T> {
       return array;
     }
     if (array.length > size) {
-      array = (T[]) java.lang.reflect.Array.newInstance(array.getClass()
-          .getComponentType(), size);
+      array = (T[]) java.lang.reflect.Array
+          .newInstance(array.getClass().getComponentType(), size);
     }
     // do fast polling if the entire set needs to be fetched
     if (array.length == size) {
@@ -435,7 +444,7 @@ public class LightWeightHashSet<T> implements Collection<T> {
    * Compute capacity given initial capacity.
    *
    * @return final capacity, either MIN_CAPACITY, MAX_CAPACITY, or power of 2
-   *         closest to the requested capacity.
+   * closest to the requested capacity.
    */
   private int computeCapacity(int initial) {
     if (initial < MINIMUM_CAPACITY) {
@@ -505,12 +514,14 @@ public class LightWeightHashSet<T> implements Collection<T> {
   public String toString() {
     final StringBuilder b = new StringBuilder(getClass().getSimpleName());
     b.append("(size=").append(size).append(", modification=")
-        .append(modification).append(", entries.length=")
-        .append(entries.length).append(")");
+        .append(modification).append(", entries.length=").append(entries.length)
+        .append(")");
     return b.toString();
   }
 
-  /** Print detailed information of this object. */
+  /**
+   * Print detailed information of this object.
+   */
   public void printDetails(final PrintStream out) {
     out.print(this + ", entries = [");
     for (int i = 0; i < entries.length; i++) {
@@ -526,15 +537,23 @@ public class LightWeightHashSet<T> implements Collection<T> {
   }
 
   private class LinkedSetIterator implements Iterator<T> {
-    /** The starting modification for fail-fast. */
+    /**
+     * The starting modification for fail-fast.
+     */
     private final int startModification = modification;
-    /** The current index of the entry array. */
+    /**
+     * The current index of the entry array.
+     */
     private int index = -1;
-    /** The next element to return. */
+    /**
+     * The next element to return.
+     */
     private LinkedElement<T> next = nextNonemptyEntry();
 
     private LinkedElement<T> nextNonemptyEntry() {
-      for (index++; index < entries.length && entries[index] == null; index++);
+      for (index++; index < entries.length && entries[index] == null; index++) {
+        ;
+      }
       return index < entries.length ? entries[index] : null;
     }
 
@@ -546,8 +565,9 @@ public class LightWeightHashSet<T> implements Collection<T> {
     @Override
     public T next() {
       if (modification != startModification) {
-        throw new ConcurrentModificationException("modification="
-            + modification + " != startModification = " + startModification);
+        throw new ConcurrentModificationException(
+            "modification=" + modification + " != startModification = " +
+                startModification);
       }
       if (next == null) {
         throw new NoSuchElementException();
@@ -595,8 +615,8 @@ public class LightWeightHashSet<T> implements Collection<T> {
       throw new NullPointerException("Input array can not be null");
     }
     if (a.length < size) {
-      a = (U[]) java.lang.reflect.Array.newInstance(a.getClass()
-          .getComponentType(), size);
+      a = (U[]) java.lang.reflect.Array
+          .newInstance(a.getClass().getComponentType(), size);
     }
     int currentIndex = 0;
     for (int i = 0; i < entries.length; i++) {

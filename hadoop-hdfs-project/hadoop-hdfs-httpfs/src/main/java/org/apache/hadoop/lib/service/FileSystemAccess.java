@@ -32,10 +32,11 @@ public interface FileSystemAccess {
     public T execute(FileSystem fs) throws IOException;
   }
 
-  public <T> T execute(String user, Configuration conf, FileSystemExecutor<T> executor) throws
-    FileSystemAccessException;
+  public <T> T execute(String user, Configuration conf,
+      FileSystemExecutor<T> executor) throws FileSystemAccessException;
 
-  public FileSystem createFileSystem(String user, Configuration conf) throws IOException, FileSystemAccessException;
+  public FileSystem createFileSystem(String user, Configuration conf)
+      throws IOException, FileSystemAccessException;
 
   public void releaseFileSystem(FileSystem fs) throws IOException;
 

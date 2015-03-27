@@ -21,12 +21,16 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
 /**
- * Annotation for {@link TestJettyHelper} subclasses to indicate that the test method
+ * Annotation for {@link TestJettyHelper} subclasses to indicate that the test
+ * method
  * requires a Jetty servlet-container.
  * <p/>
- * The {@link TestJettyHelper#getJettyServer()} returns a ready to configure Jetty
- * servlet-container. After registering contexts, servlets, filters the the Jetty
- * server must be started (<code>getJettyServer.start()</code>. The Jetty server
+ * The {@link TestJettyHelper#getJettyServer()} returns a ready to configure
+ * Jetty
+ * servlet-container. After registering contexts, servlets, filters the the
+ * Jetty
+ * server must be started (<code>getJettyServer.start()</code>. The Jetty
+ * server
  * is automatically stopped at the end of the test method invocation.
  * <p/>
  * Use the {@link TestJettyHelper#getJettyURL()} to obtain the base URL

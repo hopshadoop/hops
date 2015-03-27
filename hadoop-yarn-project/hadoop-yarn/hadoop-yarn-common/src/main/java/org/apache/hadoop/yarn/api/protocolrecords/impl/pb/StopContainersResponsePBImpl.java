@@ -18,12 +18,7 @@
 
 package org.apache.hadoop.yarn.api.protocolrecords.impl.pb;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-
+import com.google.protobuf.TextFormat;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.protocolrecords.StopContainersResponse;
@@ -37,13 +32,17 @@ import org.apache.hadoop.yarn.proto.YarnServiceProtos.ContainerExceptionMapProto
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.StopContainersResponseProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.StopContainersResponseProtoOrBuilder;
 
-import com.google.protobuf.TextFormat;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 
 @Private
 @Unstable
 public class StopContainersResponsePBImpl extends StopContainersResponse {
-  StopContainersResponseProto proto = StopContainersResponseProto
-    .getDefaultInstance();
+  StopContainersResponseProto proto =
+      StopContainersResponseProto.getDefaultInstance();
   StopContainersResponseProto.Builder builder = null;
   boolean viaProto = false;
   private List<ContainerId> succeededRequests = null;
@@ -72,8 +71,9 @@ public class StopContainersResponsePBImpl extends StopContainersResponse {
 
   @Override
   public boolean equals(Object other) {
-    if (other == null)
+    if (other == null) {
       return false;
+    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -148,23 +148,25 @@ public class StopContainersResponsePBImpl extends StopContainersResponse {
   private void addFailedRequestsToProto() {
     maybeInitBuilder();
     builder.clearFailedRequests();
-    if (this.failedRequests == null)
+    if (this.failedRequests == null) {
       return;
+    }
     List<ContainerExceptionMapProto> protoList =
         new ArrayList<ContainerExceptionMapProto>();
 
     for (Map.Entry<ContainerId, SerializedException> entry : this.failedRequests
-      .entrySet()) {
+        .entrySet()) {
       protoList.add(ContainerExceptionMapProto.newBuilder()
-        .setContainerId(convertToProtoFormat(entry.getKey()))
-        .setException(convertToProtoFormat(entry.getValue())).build());
+          .setContainerId(convertToProtoFormat(entry.getKey()))
+          .setException(convertToProtoFormat(entry.getValue())).build());
     }
     builder.addAllFailedRequests(protoList);
   }
 
   private void initSucceededRequests() {
-    if (this.succeededRequests != null)
+    if (this.succeededRequests != null) {
       return;
+    }
     StopContainersResponseProtoOrBuilder p = viaProto ? proto : builder;
     List<ContainerIdProto> list = p.getSucceededRequestsList();
     this.succeededRequests = new ArrayList<ContainerId>();
@@ -182,7 +184,7 @@ public class StopContainersResponsePBImpl extends StopContainersResponse {
     this.failedRequests = new HashMap<ContainerId, SerializedException>();
     for (ContainerExceptionMapProto ce : protoList) {
       this.failedRequests.put(convertFromProtoFormat(ce.getContainerId()),
-        convertFromProtoFormat(ce.getException()));
+          convertFromProtoFormat(ce.getException()));
     }
   }
 
@@ -193,7 +195,8 @@ public class StopContainersResponsePBImpl extends StopContainersResponse {
   }
 
   @Override
-  public void setSuccessfullyStoppedContainers(List<ContainerId> succeededRequests) {
+  public void setSuccessfullyStoppedContainers(
+      List<ContainerId> succeededRequests) {
     maybeInitBuilder();
     if (succeededRequests == null) {
       builder.clearSucceededRequests();
@@ -211,8 +214,9 @@ public class StopContainersResponsePBImpl extends StopContainersResponse {
   public void setFailedRequests(
       Map<ContainerId, SerializedException> failedRequests) {
     maybeInitBuilder();
-    if (failedRequests == null)
+    if (failedRequests == null) {
       builder.clearFailedRequests();
+    }
     this.failedRequests = failedRequests;
   }
 

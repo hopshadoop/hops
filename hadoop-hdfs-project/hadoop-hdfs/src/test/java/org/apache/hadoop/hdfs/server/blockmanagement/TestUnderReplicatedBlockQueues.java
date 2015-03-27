@@ -18,25 +18,41 @@
 
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
+import io.hops.exception.StorageException;
+import io.hops.metadata.HdfsStorageFactory;
+import io.hops.metadata.hdfs.entity.INodeIdentifier;
+import io.hops.transaction.EntityManager;
+import io.hops.transaction.handler.HDFSOperationType;
+import io.hops.transaction.handler.HopsTransactionalRequestHandler;
+import io.hops.transaction.lock.LockFactory;
+import io.hops.transaction.lock.TransactionLocks;
+import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.junit.Assert;
 import org.junit.Test;
+
+import java.io.IOException;
 
 public class TestUnderReplicatedBlockQueues extends Assert {
 
   /**
    * Test that adding blocks with different replication counts puts them
    * into different queues
-   * @throws Throwable if something goes wrong
+   *
+   * @throws Throwable
+   *     if something goes wrong
    */
   @Test
   public void testBlockPriorities() throws Throwable {
+    HdfsStorageFactory.setConfiguration(new HdfsConfiguration());
+    HdfsStorageFactory.formatStorage();
+    
     UnderReplicatedBlocks queues = new UnderReplicatedBlocks();
-    Block block1 = new Block(1);
-    Block block2 = new Block(2);
-    Block block_very_under_replicated = new Block(3);
-    Block block_corrupt = new Block(4);
-
+    BlockInfo block1 = add(new BlockInfo(new Block(1), 1));
+    BlockInfo block2 = add(new BlockInfo(new Block(2), 2));
+    BlockInfo block_very_under_replicated = add(new BlockInfo(new Block(3), 3));
+    BlockInfo block_corrupt = add(new BlockInfo(new Block(4), 4));
+    
     //add a block with a single entry
     assertAdded(queues, block1, 1, 0, 3);
 
@@ -44,7 +60,7 @@ public class TestUnderReplicatedBlockQueues extends Assert {
     assertEquals(1, queues.size());
     assertInLevel(queues, block1, UnderReplicatedBlocks.QUEUE_HIGHEST_PRIORITY);
     //repeated additions fail
-    assertFalse(queues.add(block1, 1, 0, 3));
+    assertFalse(add(queues, block1, 1, 0, 3));
 
     //add a second block with two replicas
     assertAdded(queues, block2, 2, 0, 3);
@@ -57,40 +73,39 @@ public class TestUnderReplicatedBlockQueues extends Assert {
     assertEquals(2, queues.getUnderReplicatedBlockCount());
     assertEquals(1, queues.getCorruptBlockSize());
     assertInLevel(queues, block_corrupt,
-                  UnderReplicatedBlocks.QUEUE_WITH_CORRUPT_BLOCKS);
+        UnderReplicatedBlocks.QUEUE_WITH_CORRUPT_BLOCKS);
 
     //insert a very under-replicated block
     assertAdded(queues, block_very_under_replicated, 4, 0, 25);
     assertInLevel(queues, block_very_under_replicated,
-                  UnderReplicatedBlocks.QUEUE_VERY_UNDER_REPLICATED);
+        UnderReplicatedBlocks.QUEUE_VERY_UNDER_REPLICATED);
 
   }
 
-  private void assertAdded(UnderReplicatedBlocks queues,
-                           Block block,
-                           int curReplicas,
-                           int decomissionedReplicas,
-                           int expectedReplicas) {
+  private void assertAdded(UnderReplicatedBlocks queues, BlockInfo block,
+      int curReplicas, int decomissionedReplicas, int expectedReplicas)
+      throws IOException {
     assertTrue("Failed to add " + block,
-               queues.add(block,
-                          curReplicas,
-                          decomissionedReplicas,
-                          expectedReplicas));
+        add(queues, block, curReplicas, decomissionedReplicas,
+            expectedReplicas));
   }
 
   /**
    * Determine whether or not a block is in a level without changing the API.
    * Instead get the per-level iterator and run though it looking for a match.
    * If the block is not found, an assertion is thrown.
-   *
+   * <p/>
    * This is inefficient, but this is only a test case.
-   * @param queues queues to scan
-   * @param block block to look for
-   * @param level level to select
+   *
+   * @param queues
+   *     queues to scan
+   * @param block
+   *     block to look for
+   * @param level
+   *     level to select
    */
-  private void assertInLevel(UnderReplicatedBlocks queues,
-                             Block block,
-                             int level) {
+  private void assertInLevel(UnderReplicatedBlocks queues, BlockInfo block,
+      int level) {
     UnderReplicatedBlocks.BlockIterator bi = queues.iterator(level);
     while (bi.hasNext()) {
       Block next = bi.next();
@@ -99,5 +114,42 @@ public class TestUnderReplicatedBlockQueues extends Assert {
       }
     }
     fail("Block " + block + " not found in level " + level);
+  }
+  
+  
+  private BlockInfo add(final BlockInfo block) throws IOException {
+    new HopsTransactionalRequestHandler(HDFSOperationType.TEST) {
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+      }
+
+      @Override
+      public Object performTask() throws StorageException, IOException {
+        EntityManager.add(new BlockInfo(block));
+        return null;
+      }
+    }.handle();
+    return block;
+  }
+
+  private boolean add(final UnderReplicatedBlocks queues, final BlockInfo block,
+      final int curReplicas, final int decomissionedReplicas,
+      final int expectedReplicas) throws IOException {
+    return (Boolean) new HopsTransactionalRequestHandler(
+        HDFSOperationType.TEST) {
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = LockFactory.getInstance();
+        locks.add(lf.getIndividualBlockLock(block.getBlockId(),
+            new INodeIdentifier(block.getInodeId())))
+            .add(lf.getBlockRelated(LockFactory.BLK.UR));
+      }
+
+      @Override
+      public Object performTask() throws StorageException, IOException {
+        return queues
+            .add(block, curReplicas, decomissionedReplicas, expectedReplicas);
+      }
+    }.handle();
   }
 }

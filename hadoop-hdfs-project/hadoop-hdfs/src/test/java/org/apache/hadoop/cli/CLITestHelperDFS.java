@@ -33,11 +33,11 @@ public class CLITestHelperDFS extends CLITestHelper {
         throws SAXException {
       if (qName.equals("dfs-admin-command")) {
         if (testCommands != null) {
-          testCommands.add(new CLITestCmdDFS(charString,
-              new CLICommandDFSAdmin()));
+          testCommands
+              .add(new CLITestCmdDFS(charString, new CLICommandDFSAdmin()));
         } else if (cleanupCommands != null) {
-          cleanupCommands.add(new CLITestCmdDFS(charString,
-              new CLICommandDFSAdmin()));
+          cleanupCommands
+              .add(new CLITestCmdDFS(charString, new CLICommandDFSAdmin()));
         }
       } else {
         super.endElement(uri, localName, qName);

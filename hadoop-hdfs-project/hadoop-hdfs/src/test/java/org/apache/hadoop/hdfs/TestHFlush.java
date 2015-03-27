@@ -17,14 +17,6 @@
  */
 package org.apache.hadoop.hdfs;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-
-import java.io.IOException;
-import java.io.InterruptedIOException;
-import java.util.EnumSet;
-
 import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -35,19 +27,29 @@ import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.log4j.Level;
 import org.junit.Test;
 
-/** Class contains a set of tests to verify the correctness of 
- * newly introduced {@link FSDataOutputStream#hflush()} method */
+import java.io.IOException;
+import java.io.InterruptedIOException;
+import java.util.EnumSet;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
+/**
+ * Class contains a set of tests to verify the correctness of
+ * newly introduced {@link FSDataOutputStream#hflush()} method
+ */
 public class TestHFlush {
   {
-    ((Log4JLogger)DataNode.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger)DFSClient.LOG).getLogger().setLevel(Level.ALL);
+    ((Log4JLogger) DataNode.LOG).getLogger().setLevel(Level.ALL);
+    ((Log4JLogger) DFSClient.LOG).getLogger().setLevel(Level.ALL);
   }
   
   private final String fName = "hflushtest.dat";
   
   /**
    * The test uses
-   * {@link #doTheJob(Configuration, String, long, short, boolean, EnumSet)} 
+   * {@link #doTheJob(Configuration, String, long, short, boolean, EnumSet)}
    * to write a file with a standard block size
    */
   @Test
@@ -58,8 +60,8 @@ public class TestHFlush {
 
   /**
    * The test uses
-   * {@link #doTheJob(Configuration, String, long, short, boolean, EnumSet)} 
-   * to write a file with a custom block size so the writes will be 
+   * {@link #doTheJob(Configuration, String, long, short, boolean, EnumSet)}
+   * to write a file with a custom block size so the writes will be
    * happening across block' boundaries
    */
   @Test
@@ -68,7 +70,8 @@ public class TestHFlush {
     int customPerChecksumSize = 512;
     int customBlockSize = customPerChecksumSize * 3;
     // Modify defaul filesystem settings
-    conf.setInt(DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY, customPerChecksumSize);
+    conf.setInt(DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY,
+        customPerChecksumSize);
     conf.setLong(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, customBlockSize);
 
     doTheJob(conf, fName, customBlockSize, (short) 2, false,
@@ -77,8 +80,8 @@ public class TestHFlush {
 
   /**
    * The test uses
-   * {@link #doTheJob(Configuration, String, long, short, boolean, EnumSet)} 
-   * to write a file with a custom block size so the writes will be 
+   * {@link #doTheJob(Configuration, String, long, short, boolean, EnumSet)}
+   * to write a file with a custom block size so the writes will be
    * happening across block's and checksum' boundaries
    */
   @Test
@@ -87,7 +90,8 @@ public class TestHFlush {
     int customPerChecksumSize = 400;
     int customBlockSize = customPerChecksumSize * 3;
     // Modify defaul filesystem settings
-    conf.setInt(DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY, customPerChecksumSize);
+    conf.setInt(DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY,
+        customPerChecksumSize);
     conf.setLong(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, customBlockSize);
 
     doTheJob(conf, fName, customBlockSize, (short) 2, false,
@@ -101,18 +105,18 @@ public class TestHFlush {
   @Test
   public void hSyncUpdateLength_00() throws IOException {
     Configuration conf = new HdfsConfiguration();
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(
-        2).build();
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(2).build();
     DistributedFileSystem fileSystem =
-        (DistributedFileSystem)cluster.getFileSystem();
+        (DistributedFileSystem) cluster.getFileSystem();
     
     try {
       Path path = new Path(fName);
-      FSDataOutputStream stm = fileSystem.create(path, true, 4096, (short) 2,
-          AppendTestUtil.BLOCK_SIZE);
+      FSDataOutputStream stm = fileSystem
+          .create(path, true, 4096, (short) 2, AppendTestUtil.BLOCK_SIZE);
       System.out.println("Created file " + path.toString());
-      ((DFSOutputStream) stm.getWrappedStream()).hsync(EnumSet
-          .of(SyncFlag.UPDATE_LENGTH));
+      ((DFSOutputStream) stm.getWrappedStream())
+          .hsync(EnumSet.of(SyncFlag.UPDATE_LENGTH));
       long currentFileLength = fileSystem.getFileStatus(path).getLen();
       assertEquals(0L, currentFileLength);
       stm.close();
@@ -146,7 +150,8 @@ public class TestHFlush {
     int customPerChecksumSize = 512;
     int customBlockSize = customPerChecksumSize * 3;
     // Modify defaul filesystem settings
-    conf.setInt(DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY, customPerChecksumSize);
+    conf.setInt(DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY,
+        customPerChecksumSize);
     conf.setLong(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, customBlockSize);
 
     doTheJob(conf, fName, customBlockSize, (short) 2, true,
@@ -167,7 +172,8 @@ public class TestHFlush {
     int customPerChecksumSize = 400;
     int customBlockSize = customPerChecksumSize * 3;
     // Modify defaul filesystem settings
-    conf.setInt(DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY, customPerChecksumSize);
+    conf.setInt(DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY,
+        customPerChecksumSize);
     conf.setLong(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, customBlockSize);
 
     doTheJob(conf, fName, customBlockSize, (short) 2, true,
@@ -176,16 +182,25 @@ public class TestHFlush {
   
   /**
    * The method starts new cluster with defined Configuration; creates a file
-   * with specified block_size and writes 10 equal sections in it; it also calls
-   * hflush/hsync after each write and throws an IOException in case of an error.
-   * 
-   * @param conf cluster configuration
-   * @param fileName of the file to be created and processed as required
-   * @param block_size value to be used for the file's creation
-   * @param replicas is the number of replicas
-   * @param isSync hsync or hflush         
-   * @param syncFlags specify the semantic of the sync/flush
-   * @throws IOException in case of any errors
+   * with specified block_size and writes 10 equal sections in it; it also
+   * calls
+   * hflush/hsync after each write and throws an IOException in case of an
+   * error.
+   *
+   * @param conf
+   *     cluster configuration
+   * @param fileName
+   *     of the file to be created and processed as required
+   * @param block_size
+   *     value to be used for the file's creation
+   * @param replicas
+   *     is the number of replicas
+   * @param isSync
+   *     hsync or hflush
+   * @param syncFlags
+   *     specify the semantic of the sync/flush
+   * @throws IOException
+   *     in case of any errors
    */
   public static void doTheJob(Configuration conf, final String fileName,
       long block_size, short replicas, boolean isSync,
@@ -194,91 +209,101 @@ public class TestHFlush {
     final int SECTIONS = 10;
 
     fileContent = AppendTestUtil.initBuffer(AppendTestUtil.FILE_SIZE);
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-                                               .numDataNodes(replicas).build();
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(replicas).build();
     // Make sure we work with DFS in order to utilize all its functionality
     DistributedFileSystem fileSystem =
-        (DistributedFileSystem)cluster.getFileSystem();
+        (DistributedFileSystem) cluster.getFileSystem();
 
     FSDataInputStream is;
     try {
       Path path = new Path(fileName);
-      FSDataOutputStream stm = fileSystem.create(path, false, 4096, replicas,
-          block_size);
+      FSDataOutputStream stm =
+          fileSystem.create(path, false, 4096, replicas, block_size);
       System.out.println("Created file " + fileName);
 
-      int tenth = AppendTestUtil.FILE_SIZE/SECTIONS;
+      int tenth = AppendTestUtil.FILE_SIZE / SECTIONS;
       int rounding = AppendTestUtil.FILE_SIZE - tenth * SECTIONS;
-      for (int i=0; i<SECTIONS; i++) {
-        System.out.println("Writing " + (tenth * i) + " to " + (tenth * (i+1)) + " section to file " + fileName);
+      for (int i = 0; i < SECTIONS; i++) {
+        System.out.println(
+            "Writing " + (tenth * i) + " to " + (tenth * (i + 1)) +
+                " section to file " + fileName);
         // write to the file
         stm.write(fileContent, tenth * i, tenth);
         
         // Wait while hflush/hsync pushes all packets through built pipeline
         if (isSync) {
-          ((DFSOutputStream)stm.getWrappedStream()).hsync(syncFlags);
+          ((DFSOutputStream) stm.getWrappedStream()).hsync(syncFlags);
         } else {
-          ((DFSOutputStream)stm.getWrappedStream()).hflush();
+          ((DFSOutputStream) stm.getWrappedStream()).hflush();
         }
         
         // Check file length if updatelength is required
         if (isSync && syncFlags.contains(SyncFlag.UPDATE_LENGTH)) {
           long currentFileLength = fileSystem.getFileStatus(path).getLen();
           assertEquals(
-            "File size doesn't match for hsync/hflush with updating the length",
-            tenth * (i + 1), currentFileLength);
+              "File size doesn't match for hsync/hflush with updating the length",
+              tenth * (i + 1), currentFileLength);
         }
-        byte [] toRead = new byte[tenth];
-        byte [] expected = new byte[tenth];
+        byte[] toRead = new byte[tenth];
+        byte[] expected = new byte[tenth];
         System.arraycopy(fileContent, tenth * i, expected, 0, tenth);
         // Open the same file for read. Need to create new reader after every write operation(!)
         is = fileSystem.open(path);
         is.seek(tenth * i);
         int readBytes = is.read(toRead, 0, tenth);
         System.out.println("Has read " + readBytes);
-        assertTrue("Should've get more bytes", (readBytes > 0) && (readBytes <= tenth));
+        assertTrue("Should've get more bytes",
+            (readBytes > 0) && (readBytes <= tenth));
         is.close();
         checkData(toRead, 0, readBytes, expected, "Partial verification");
       }
-      System.out.println("Writing " + (tenth * SECTIONS) + " to " + (tenth * SECTIONS + rounding) + " section to file " + fileName);
+      System.out.println("Writing " + (tenth * SECTIONS) + " to " +
+          (tenth * SECTIONS + rounding) + " section to file " + fileName);
       stm.write(fileContent, tenth * SECTIONS, rounding);
       stm.close();
 
-      assertEquals("File size doesn't match ", AppendTestUtil.FILE_SIZE, fileSystem.getFileStatus(path).getLen());
-      AppendTestUtil.checkFullFile(fileSystem, path, fileContent.length, fileContent, "hflush()");
+      assertEquals("File size doesn't match ", AppendTestUtil.FILE_SIZE,
+          fileSystem.getFileStatus(path).getLen());
+      AppendTestUtil
+          .checkFullFile(fileSystem, path, fileContent.length, fileContent,
+              "hflush()");
     } finally {
       fileSystem.close();
       cluster.shutdown();
     }
   }
+
   static void checkData(final byte[] actual, int from, int len,
-                        final byte[] expected, String message) {
+      final byte[] expected, String message) {
     for (int idx = 0; idx < len; idx++) {
-      assertEquals(message+" byte "+(from+idx)+" differs. expected "+
-                   expected[from+idx]+" actual "+actual[idx],
-                   expected[from+idx], actual[idx]);
+      assertEquals(message + " byte " + (from + idx) + " differs. expected " +
+              expected[from + idx] + " actual " + actual[idx],
+          expected[from + idx], actual[idx]);
       actual[idx] = 0;
     }
   }
   
-  /** This creates a slow writer and check to see 
+  /**
+   * This creates a slow writer and check to see
    * if pipeline heartbeats work fine
    */
- @Test
+  @Test
   public void testPipelineHeartbeat() throws Exception {
     final int DATANODE_NUM = 2;
     final int fileLen = 6;
     Configuration conf = new HdfsConfiguration();
     final int timeout = 2000;
-    conf.setInt(DFSConfigKeys.DFS_CLIENT_SOCKET_TIMEOUT_KEY, 
-        timeout);
+    conf.setInt(DFSConfigKeys.DFS_CLIENT_SOCKET_TIMEOUT_KEY, timeout);
 
     final Path p = new Path("/pipelineHeartbeat/foo");
     System.out.println("p=" + p);
     
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(DATANODE_NUM).build();
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(DATANODE_NUM).build();
     try {
-      DistributedFileSystem fs = (DistributedFileSystem)cluster.getFileSystem();
+      DistributedFileSystem fs =
+          (DistributedFileSystem) cluster.getFileSystem();
 
       byte[] fileContents = AppendTestUtil.initBuffer(fileLen);
 
@@ -309,8 +334,8 @@ public class TestHFlush {
       stm.close();
 
       // verify that entire file is good
-      AppendTestUtil.checkFullFile(fs, p, fileLen,
-          fileContents, "Failed to slowly write to a file");
+      AppendTestUtil.checkFullFile(fs, p, fileLen, fileContents,
+          "Failed to slowly write to a file");
     } finally {
       cluster.shutdown();
     }
@@ -326,9 +351,11 @@ public class TestHFlush {
 
     System.out.println("p=" + p);
 
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(DATANODE_NUM).build();
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(DATANODE_NUM).build();
     try {
-      DistributedFileSystem fs = (DistributedFileSystem)cluster.getFileSystem();
+      DistributedFileSystem fs =
+          (DistributedFileSystem) cluster.getFileSystem();
 
       // create a new file.
       FSDataOutputStream stm = AppendTestUtil.createFile(fs, p, DATANODE_NUM);
@@ -374,8 +401,8 @@ public class TestHFlush {
 
 
       // verify that entire file is good
-      AppendTestUtil.checkFullFile(fs, p, fileLen,
-        fileContents, "Failed to deal with thread interruptions");
+      AppendTestUtil.checkFullFile(fs, p, fileLen, fileContents,
+          "Failed to deal with thread interruptions");
     } finally {
       cluster.shutdown();
     }

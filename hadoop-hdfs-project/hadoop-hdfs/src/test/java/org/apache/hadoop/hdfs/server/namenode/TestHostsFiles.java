@@ -17,11 +17,6 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
-import static org.junit.Assert.assertTrue;
-
-import java.net.InetSocketAddress;
-import java.net.URL;
-
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -36,13 +31,17 @@ import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.junit.Test;
 
+import java.net.InetSocketAddress;
+import java.net.URL;
+
+import static org.junit.Assert.assertTrue;
+
 /**
  * DFS_HOSTS and DFS_HOSTS_EXCLUDE tests
- * 
  */
 public class TestHostsFiles {
   private static final Log LOG =
-    LogFactory.getLog(TestHostsFiles.class.getName());
+      LogFactory.getLog(TestHostsFiles.class.getName());
 
   /*
    * Return a configuration object with low timeouts for testing and 
@@ -62,7 +61,8 @@ public class TestHostsFiles {
 
     // Have the NN check for pending replications every second so it
     // quickly schedules additional replicas as they are identified.
-    conf.setInt(DFSConfigKeys.DFS_NAMENODE_REPLICATION_PENDING_TIMEOUT_SEC_KEY, 1);
+    conf.setInt(DFSConfigKeys.DFS_NAMENODE_REPLICATION_PENDING_TIMEOUT_SEC_KEY,
+        1);
 
     // The DNs report blocks every second.
     conf.setLong(DFSConfigKeys.DFS_BLOCKREPORT_INTERVAL_MSEC_KEY, 1000L);
@@ -92,8 +92,9 @@ public class TestHostsFiles {
 
     // Two blocks and four racks
     String racks[] = {"/rack1", "/rack1", "/rack2", "/rack2"};
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-      .numDataNodes(racks.length).racks(racks).build();
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(racks.length).racks(racks)
+            .build();
     final FSNamesystem ns = cluster.getNameNode().getNamesystem();
 
     try {
@@ -106,11 +107,13 @@ public class TestHostsFiles {
       // Decommission one of the hosts with the block, this should cause 
       // the block to get replicated to another host on the same rack,
       // otherwise the rack policy is violated.
-      BlockLocation locs[] = fs.getFileBlockLocations(
-          fs.getFileStatus(filePath), 0, Long.MAX_VALUE);
+      BlockLocation locs[] =
+          fs.getFileBlockLocations(fs.getFileStatus(filePath), 0,
+              Long.MAX_VALUE);
       String name = locs[0].getNames()[0];
       String names = name + "\n" + "localhost:42\n";
-      LOG.info("adding '" + names + "' to exclude file " + excludeFile.toUri().getPath());
+      LOG.info("adding '" + names + "' to exclude file " +
+          excludeFile.toUri().getPath());
       DFSTestUtil.writeFile(localFileSys, excludeFile, name);
       ns.getBlockManager().getDatanodeManager().refreshNodes(conf);
       DFSTestUtil.waitForDecommission(fs, name);
@@ -120,13 +123,14 @@ public class TestHostsFiles {
       
       InetSocketAddress nnHttpAddress = cluster.getNameNode().getHttpAddress();
       LOG.info("nnaddr = '" + nnHttpAddress + "'");
-      String nnHostName = nnHttpAddress.getHostName();
-      URL nnjsp = new URL("http://" + nnHostName + ":" + nnHttpAddress.getPort() + "/dfshealth.jsp");
+      URL nnjsp = new URL("http://" + nnHttpAddress.getHostName() + ":" +
+          nnHttpAddress.getPort() + "/dfshealth.jsp");
       LOG.info("fetching " + nnjsp);
-      String dfshealthPage = StringEscapeUtils.unescapeHtml(DFSTestUtil.urlGet(nnjsp));
+      String dfshealthPage =
+          StringEscapeUtils.unescapeHtml(DFSTestUtil.urlGet(nnjsp));
       LOG.info("got " + dfshealthPage);
-      assertTrue("dfshealth should contain " + nnHostName + ", got:" + dfshealthPage,
-          dfshealthPage.contains(nnHostName));
+      assertTrue("dfshealth should contain localhost, got:" + dfshealthPage,
+          dfshealthPage.contains("localhost"));
 
     } finally {
       cluster.shutdown();

@@ -18,14 +18,14 @@
 
 package org.apache.hadoop.hdfs.security.token.block;
 
-import java.io.DataInput;
-import java.io.DataOutput;
-import java.io.IOException;
-
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableFactories;
 import org.apache.hadoop.io.WritableFactory;
+
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.io.IOException;
 
 /**
  * Object for passing block keys
@@ -36,7 +36,7 @@ public class ExportedBlockKeys implements Writable {
   private boolean isBlockTokenEnabled;
   private long keyUpdateInterval;
   private long tokenLifetime;
-  private final BlockKey currentKey;
+  private BlockKey currentKey;
   private BlockKey[] allKeys;
 
   public ExportedBlockKeys() {
@@ -76,13 +76,13 @@ public class ExportedBlockKeys implements Writable {
   // Writable
   // ///////////////////////////////////////////////
   static { // register a ctor
-    WritableFactories.setFactory(ExportedBlockKeys.class,
-        new WritableFactory() {
-          @Override
-          public Writable newInstance() {
-            return new ExportedBlockKeys();
-          }
-        });
+    WritableFactories
+        .setFactory(ExportedBlockKeys.class, new WritableFactory() {
+              @Override
+              public Writable newInstance() {
+                return new ExportedBlockKeys();
+              }
+            });
   }
 
   /**

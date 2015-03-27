@@ -17,9 +17,6 @@
  */
 package org.apache.hadoop.test;
 
-import java.io.File;
-import java.util.concurrent.atomic.AtomicInteger;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -28,6 +25,9 @@ import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.junit.Test;
 import org.junit.runners.model.FrameworkMethod;
 import org.junit.runners.model.Statement;
+
+import java.io.File;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class TestHdfsHelper extends TestDirHelper {
 
@@ -38,12 +38,15 @@ public class TestHdfsHelper extends TestDirHelper {
 
   public static final String HADOOP_MINI_HDFS = "test.hadoop.hdfs";
 
-  private static ThreadLocal<Configuration> HDFS_CONF_TL = new InheritableThreadLocal<Configuration>();
+  private static ThreadLocal<Configuration> HDFS_CONF_TL =
+      new InheritableThreadLocal<Configuration>();
 
-  private static ThreadLocal<Path> HDFS_TEST_DIR_TL = new InheritableThreadLocal<Path>();
+  private static ThreadLocal<Path> HDFS_TEST_DIR_TL =
+      new InheritableThreadLocal<Path>();
 
   @Override
-  public Statement apply(Statement statement, FrameworkMethod frameworkMethod, Object o) {
+  public Statement apply(Statement statement, FrameworkMethod frameworkMethod,
+      Object o) {
     TestHdfs testHdfsAnnotation = frameworkMethod.getAnnotation(TestHdfs.class);
     if (testHdfsAnnotation != null) {
       statement = new HdfsStatement(statement, frameworkMethod.getName());
@@ -82,8 +85,8 @@ public class TestHdfsHelper extends TestDirHelper {
 
     private Path resetHdfsTestDir(Configuration conf) {
 
-      Path testDir = new Path("/tmp/" + testName + "-" +
-        counter.getAndIncrement());
+      Path testDir = new Path("./" + TEST_DIR_ROOT,
+          testName + "-" + counter.getAndIncrement());
       try {
         // currentUser
         FileSystem fs = FileSystem.get(conf);
@@ -97,11 +100,13 @@ public class TestHdfsHelper extends TestDirHelper {
   }
 
   /**
-   * Returns the HDFS test directory for the current test, only available when the
+   * Returns the HDFS test directory for the current test, only available when
+   * the
    * test method has been annotated with {@link TestHdfs}.
    *
-   * @return the HDFS test directory for the current test. It is an full/absolute
-   *         <code>Path</code>.
+   * @return the HDFS test directory for the current test. It is an
+   * full/absolute
+   * <code>Path</code>.
    */
   public static Path getHdfsTestDir() {
     Path testDir = HDFS_TEST_DIR_TL.get();
@@ -112,13 +117,16 @@ public class TestHdfsHelper extends TestDirHelper {
   }
 
   /**
-   * Returns a FileSystemAccess <code>JobConf</code> preconfigured with the FileSystemAccess cluster
+   * Returns a FileSystemAccess <code>JobConf</code> preconfigured with the
+   * FileSystemAccess cluster
    * settings for testing. This configuration is only available when the test
-   * method has been annotated with {@link TestHdfs}. Refer to {@link HTestCase}
+   * method has been annotated with {@link TestHdfs}. Refer to {@link
+   * HTestCase}
    * header for details)
    *
-   * @return the FileSystemAccess <code>JobConf</code> preconfigured with the FileSystemAccess cluster
-   *         settings for testing
+   * @return the FileSystemAccess <code>JobConf</code> preconfigured with the
+   * FileSystemAccess cluster
+   * settings for testing
    */
   public static Configuration getHdfsConf() {
     Configuration conf = HDFS_CONF_TL.get();
@@ -130,13 +138,16 @@ public class TestHdfsHelper extends TestDirHelper {
 
   private static MiniDFSCluster MINI_DFS = null;
 
-  private static synchronized MiniDFSCluster startMiniHdfs(Configuration conf) throws Exception {
+  private static synchronized MiniDFSCluster startMiniHdfs(Configuration conf)
+      throws Exception {
     if (MINI_DFS == null) {
       if (System.getProperty("hadoop.log.dir") == null) {
-        System.setProperty("hadoop.log.dir", new File(TEST_DIR_ROOT, "hadoop-log").getAbsolutePath());
+        System.setProperty("hadoop.log.dir",
+            new File(TEST_DIR_ROOT, "hadoop-log").getAbsolutePath());
       }
       if (System.getProperty("test.build.data") == null) {
-        System.setProperty("test.build.data", new File(TEST_DIR_ROOT, "hadoop-data").getAbsolutePath());
+        System.setProperty("test.build.data",
+            new File(TEST_DIR_ROOT, "hadoop-data").getAbsolutePath());
       }
 
       conf = new Configuration(conf);
@@ -151,8 +162,10 @@ public class TestHdfsHelper extends TestDirHelper {
       FileSystem fileSystem = miniHdfs.getFileSystem();
       fileSystem.mkdirs(new Path("/tmp"));
       fileSystem.mkdirs(new Path("/user"));
-      fileSystem.setPermission(new Path("/tmp"), FsPermission.valueOf("-rwxrwxrwx"));
-      fileSystem.setPermission(new Path("/user"), FsPermission.valueOf("-rwxrwxrwx"));
+      fileSystem
+          .setPermission(new Path("/tmp"), FsPermission.valueOf("-rwxrwxrwx"));
+      fileSystem
+          .setPermission(new Path("/user"), FsPermission.valueOf("-rwxrwxrwx"));
       MINI_DFS = miniHdfs;
     }
     return MINI_DFS;

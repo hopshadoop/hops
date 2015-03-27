@@ -17,11 +17,6 @@
  */
 package org.apache.hadoop.hdfs;
 
-import static org.junit.Assert.*;
-
-import java.io.FileNotFoundException;
-import java.io.IOException;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.InvalidPathException;
@@ -32,20 +27,23 @@ import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocols;
 import org.apache.hadoop.util.Time;
 import org.junit.Test;
 
+import java.io.FileNotFoundException;
+import java.io.IOException;
+
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 /**
  * This class tests that the DFS command mkdirs only creates valid
  * directories, and generally behaves as expected.
  */
 public class TestDFSMkdirs {
-  private final Configuration conf = new HdfsConfiguration();
+  private Configuration conf = new HdfsConfiguration();
 
-  private static final String[] NON_CANONICAL_PATHS = new String[] {
-      "//test1",
-      "/test2/..",
-      "/test2//bar",
-      "/test2/../test4",
-      "/test5/."
-  };
+  private static final String[] NON_CANONICAL_PATHS =
+      new String[]{"//test1", "/test2/..", "/test2//bar", "/test2/../test4",
+          "/test5/."};
 
   /**
    * Tests mkdirs can create a directory that does not exist and will
@@ -53,7 +51,8 @@ public class TestDFSMkdirs {
    */
   @Test
   public void testDFSMkdirs() throws IOException {
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
     FileSystem fileSys = cluster.getFileSystem();
     try {
       // First create a new directory with mkdirs
@@ -65,7 +64,7 @@ public class TestDFSMkdirs {
       // Second, create a file in that directory.
       Path myFile = new Path("/test/mkdirs/myFile");
       DFSTestUtil.writeFile(fileSys, myFile, "hello world");
-   
+
       // Third, use mkdir to create a subdirectory off of that file,
       // and check that it fails.
       Path myIllegalPath = new Path("/test/mkdirs/myFile/subdir");
@@ -78,7 +77,7 @@ public class TestDFSMkdirs {
       assertFalse(exist);
       assertFalse(fileSys.exists(myIllegalPath));
       fileSys.delete(myFile, true);
-    	
+
     } finally {
       fileSys.close();
       cluster.shutdown();
@@ -91,7 +90,8 @@ public class TestDFSMkdirs {
   @Test
   public void testMkdir() throws IOException {
     Configuration conf = new HdfsConfiguration();
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(2).build();
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(2).build();
     DistributedFileSystem dfs = (DistributedFileSystem) cluster.getFileSystem();
     try {
       // Create a dir in root dir, should succeed
@@ -106,10 +106,10 @@ public class TestDFSMkdirs {
       } catch (IOException e) {
         expectedException = e;
       }
-      assertTrue("Create a directory when parent dir exists as file using"
-          + " mkdir() should throw ParentNotDirectoryException ",
-          expectedException != null
-              && expectedException instanceof ParentNotDirectoryException);
+      assertTrue("Create a directory when parent dir exists as file using" +
+              " mkdir() should throw ParentNotDirectoryException ",
+          expectedException != null &&
+              expectedException instanceof ParentNotDirectoryException);
       // Create a dir in a non-exist directory, should fail
       expectedException = null;
       try {
@@ -118,10 +118,10 @@ public class TestDFSMkdirs {
       } catch (IOException e) {
         expectedException = e;
       }
-      assertTrue("Create a directory in a non-exist parent dir using"
-          + " mkdir() should throw FileNotFoundException ",
-          expectedException != null
-              && expectedException instanceof FileNotFoundException);
+      assertTrue("Create a directory in a non-exist parent dir using" +
+              " mkdir() should throw FileNotFoundException ",
+          expectedException != null &&
+              expectedException instanceof FileNotFoundException);
     } finally {
       dfs.close();
       cluster.shutdown();
@@ -135,15 +135,16 @@ public class TestDFSMkdirs {
    */
   @Test
   public void testMkdirRpcNonCanonicalPath() throws IOException {
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(0).build();
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(0).build();
     try {
       NamenodeProtocols nnrpc = cluster.getNameNodeRpc();
       
       for (String pathStr : NON_CANONICAL_PATHS) {
         try {
-          nnrpc.mkdirs(pathStr, new FsPermission((short)0755), true);
-          fail("Did not fail when called with a non-canonicalized path: "
-             + pathStr);
+          nnrpc.mkdirs(pathStr, new FsPermission((short) 0755), true);
+          fail("Did not fail when called with a non-canonicalized path: " +
+              pathStr);
         } catch (InvalidPathException ipe) {
           // expected
         }

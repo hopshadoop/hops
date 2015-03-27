@@ -18,6 +18,29 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.security;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.hops.ha.common.TransactionState;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience.Private;
+import org.apache.hadoop.classification.InterfaceStability.Unstable;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.security.Credentials;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.service.AbstractService;
+import org.apache.hadoop.util.ExitUtil;
+import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.yarn.api.records.ApplicationId;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import org.apache.hadoop.yarn.event.AbstractEventTransaction;
+import org.apache.hadoop.yarn.security.client.RMDelegationTokenIdentifier;
+import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppEventType;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppRejectedEvent;
+
 import java.io.IOException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
@@ -40,28 +63,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.classification.InterfaceAudience.Private;
-import org.apache.hadoop.classification.InterfaceStability.Unstable;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.security.Credentials;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.service.AbstractService;
-import org.apache.hadoop.util.StringUtils;
-import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.hadoop.yarn.conf.YarnConfiguration;
-import org.apache.hadoop.yarn.event.AbstractEvent;
-import org.apache.hadoop.yarn.security.client.RMDelegationTokenIdentifier;
-import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
-import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppEvent;
-import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppEventType;
-import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppRejectedEvent;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
-
 /**
  * Service to renew application delegation tokens.
  */
@@ -69,7 +70,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 @Unstable
 public class DelegationTokenRenewer extends AbstractService {
   
-  private static final Log LOG = 
+  private static final Log LOG =
       LogFactory.getLog(DelegationTokenRenewer.class);
   
   public static final String SCHEME = "hdfs";
@@ -80,13 +81,13 @@ public class DelegationTokenRenewer extends AbstractService {
   
   // delegation token canceler thread
   private DelegationTokenCancelThread dtCancelThread =
-    new DelegationTokenCancelThread();
+      new DelegationTokenCancelThread();
   private ThreadPoolExecutor renewerService;
   
   // managing the list of tokens using Map
   // appId=>List<tokens>
-  private Set<DelegationTokenToRenew> delegationTokens = 
-    Collections.synchronizedSet(new HashSet<DelegationTokenToRenew>());
+  private Set<DelegationTokenToRenew> delegationTokens =
+      Collections.synchronizedSet(new HashSet<DelegationTokenToRenew>());
   
   private final ConcurrentMap<ApplicationId, Long> delayedRemovalMap =
       new ConcurrentHashMap<ApplicationId, Long>();
@@ -121,13 +122,13 @@ public class DelegationTokenRenewer extends AbstractService {
   }
 
   protected ThreadPoolExecutor createNewThreadPoolService(Configuration conf) {
-    int nThreads = conf.getInt(
-        YarnConfiguration.RM_DELEGATION_TOKEN_RENEWER_THREAD_COUNT,
-        YarnConfiguration.DEFAULT_RM_DELEGATION_TOKEN_RENEWER_THREAD_COUNT);
+    int nThreads =
+        conf.getInt(YarnConfiguration.RM_DELEGATION_TOKEN_RENEWER_THREAD_COUNT,
+            YarnConfiguration.DEFAULT_RM_DELEGATION_TOKEN_RENEWER_THREAD_COUNT);
 
-    ThreadFactory tf = new ThreadFactoryBuilder()
-        .setNameFormat("DelegationTokenRenewer #%d")
-        .build();
+    ThreadFactory tf =
+        new ThreadFactoryBuilder().setNameFormat("DelegationTokenRenewer #%d")
+            .build();
     ThreadPoolExecutor pool =
         new ThreadPoolExecutor((5 < nThreads ? 5 : nThreads), nThreads, 3L,
             TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
@@ -138,9 +139,9 @@ public class DelegationTokenRenewer extends AbstractService {
 
   // enable RM to short-circuit token operations directly to itself
   private void setLocalSecretManagerAndServiceAddr() {
-    RMDelegationTokenIdentifier.Renewer.setSecretManager(rmContext
-      .getRMDelegationTokenSecretManager(), rmContext.getClientRMService()
-      .getBindAddress());
+    RMDelegationTokenIdentifier.Renewer
+        .setSecretManager(rmContext.getRMDelegationTokenSecretManager(),
+            rmContext.getClientRMService().getBindAddress());
   }
 
   @Override
@@ -157,7 +158,7 @@ public class DelegationTokenRenewer extends AbstractService {
     serviceStateLock.writeLock().lock();
     isServiceStarted = true;
     serviceStateLock.writeLock().unlock();
-    while(!pendingEventQueue.isEmpty()) {
+    while (!pendingEventQueue.isEmpty()) {
       processDelegationTokenRenewerEvent(pendingEventQueue.take());
     }
     super.serviceStart();
@@ -202,7 +203,6 @@ public class DelegationTokenRenewer extends AbstractService {
 
   /**
    * class that is used for keeping tracks of DT to renew
-   *
    */
   @VisibleForTesting
   protected static class DelegationTokenToRenew {
@@ -213,8 +213,7 @@ public class DelegationTokenRenewer extends AbstractService {
     public TimerTask timerTask;
     public final boolean shouldCancelAtEnd;
     
-    public DelegationTokenToRenew(
-        ApplicationId jId, Token<?> token, 
+    public DelegationTokenToRenew(ApplicationId jId, Token<?> token,
         Configuration conf, long expirationDate, boolean shouldCancelAtEnd) {
       this.token = token;
       this.applicationId = jId;
@@ -222,7 +221,8 @@ public class DelegationTokenRenewer extends AbstractService {
       this.expirationDate = expirationDate;
       this.timerTask = null;
       this.shouldCancelAtEnd = shouldCancelAtEnd;
-      if (this.token==null || this.applicationId==null || this.conf==null) {
+      if (this.token == null || this.applicationId == null ||
+          this.conf == null) {
         throw new IllegalArgumentException("Invalid params to renew token" +
             ";token=" + this.token +
             ";appId=" + this.applicationId +
@@ -242,7 +242,7 @@ public class DelegationTokenRenewer extends AbstractService {
     @Override
     public boolean equals(Object obj) {
       return obj instanceof DelegationTokenToRenew &&
-        token.equals(((DelegationTokenToRenew)obj).token);
+          token.equals(((DelegationTokenToRenew) obj).token);
     }
     
     @Override
@@ -256,24 +256,26 @@ public class DelegationTokenRenewer extends AbstractService {
     private static class TokenWithConf {
       Token<?> token;
       Configuration conf;
+
       TokenWithConf(Token<?> token, Configuration conf) {
         this.token = token;
         this.conf = conf;
       }
     }
-    private LinkedBlockingQueue<TokenWithConf> queue =  
-      new LinkedBlockingQueue<TokenWithConf>();
-     
+
+    private LinkedBlockingQueue<TokenWithConf> queue =
+        new LinkedBlockingQueue<TokenWithConf>();
+
     public DelegationTokenCancelThread() {
       super("Delegation Token Canceler");
       setDaemon(true);
     }
-    public void cancelToken(Token<?> token,  
-        Configuration conf) {
+
+    public void cancelToken(Token<?> token, Configuration conf) {
       TokenWithConf tokenWithConf = new TokenWithConf(token, conf);
       while (!queue.offer(tokenWithConf)) {
         LOG.warn("Unable to add token " + token + " for cancellation. " +
-        		 "Will retry..");
+            "Will retry..");
         try {
           Thread.sleep(100);
         } catch (InterruptedException e) {
@@ -293,30 +295,31 @@ public class DelegationTokenRenewer extends AbstractService {
           }
           // need to use doAs so that http can find the kerberos tgt
           UserGroupInformation.getLoginUser()
-            .doAs(new PrivilegedExceptionAction<Void>(){
+              .doAs(new PrivilegedExceptionAction<Void>() {
 
-              @Override
-              public Void run() throws Exception {
-                current.token.cancel(current.conf);
-                return null;
-              }
-            });
+                @Override
+                public Void run() throws Exception {
+                  current.token.cancel(current.conf);
+                  return null;
+                }
+              });
         } catch (IOException e) {
-          LOG.warn("Failed to cancel token " + tokenWithConf.token + " " +  
+          LOG.warn("Failed to cancel token " + tokenWithConf.token + " " +
               StringUtils.stringifyException(e));
         } catch (RuntimeException e) {
-          LOG.warn("Failed to cancel token " + tokenWithConf.token + " " +  
+          LOG.warn("Failed to cancel token " + tokenWithConf.token + " " +
               StringUtils.stringifyException(e));
         } catch (InterruptedException ie) {
           return;
         } catch (Throwable t) {
-          LOG.warn("Got exception " + StringUtils.stringifyException(t) + 
-                   ". Exiting..");
-          System.exit(-1);
+          LOG.warn("Got exception " + StringUtils.stringifyException(t) +
+              ". Exiting..");
+          ExitUtil.terminate(-1);
         }
       }
     }
   }
+
   //adding token
   private void addTokenToList(DelegationTokenToRenew t) {
     delegationTokens.add(t);
@@ -325,7 +328,7 @@ public class DelegationTokenRenewer extends AbstractService {
   @VisibleForTesting
   public Set<Token<?>> getDelegationTokens() {
     Set<Token<?>> tokens = new HashSet<Token<?>>();
-    for(DelegationTokenToRenew delegationToken : delegationTokens) {
+    for (DelegationTokenToRenew delegationToken : delegationTokens) {
       tokens.add(delegationToken.token);
     }
     return tokens;
@@ -333,25 +336,38 @@ public class DelegationTokenRenewer extends AbstractService {
 
   /**
    * Asynchronously add application tokens for renewal.
-   * @param applicationId added application
-   * @param ts tokens
-   * @param shouldCancelAtEnd true if tokens should be canceled when the app is
-   * done else false. 
+   *
+   * @param applicationId
+   *     added application
+   * @param ts
+   *     tokens
+   * @param shouldCancelAtEnd
+   *     true if tokens should be canceled when the app is
+   *     done else false.
    * @throws IOException
    */
   public void addApplicationAsync(ApplicationId applicationId, Credentials ts,
-      boolean shouldCancelAtEnd) {
-    processDelegationTokenRenewerEvent(new DelegationTokenRenewerAppSubmitEvent(
-      applicationId, ts, shouldCancelAtEnd));
+      boolean shouldCancelAtEnd, TransactionState transactionState) {
+      /*The event will either be handled by another theread or put into a queue
+      * to wait, the transactionState counter need to be increased in order to
+      * ensure that other handlers for the same event do not commit it to the db.
+        */
+    transactionState.incCounter(
+        DelegationTokenRenewerEventType.VERIFY_AND_START_APPLICATION);
+    processDelegationTokenRenewerEvent(
+        new DelegationTokenRenewerAppSubmitEvent(applicationId, ts,
+            shouldCancelAtEnd, transactionState));
   }
 
   /**
    * Synchronously renew delegation tokens.
    */
   public void addApplicationSync(ApplicationId applicationId, Credentials ts,
-      boolean shouldCancelAtEnd) throws IOException{
-    handleAppSubmitEvent(new DelegationTokenRenewerAppSubmitEvent(
-      applicationId, ts, shouldCancelAtEnd));
+      boolean shouldCancelAtEnd, TransactionState transactionState)
+      throws IOException {
+    handleAppSubmitEvent(
+        new DelegationTokenRenewerAppSubmitEvent(applicationId, ts,
+            shouldCancelAtEnd, transactionState));
   }
 
   private void handleAppSubmitEvent(DelegationTokenRenewerAppSubmitEvent evt)
@@ -379,8 +395,9 @@ public class DelegationTokenRenewer extends AbstractService {
         new ArrayList<DelegationTokenRenewer.DelegationTokenToRenew>();
     for (Token<?> token : tokens) {
       if (token.isManaged()) {
-        tokenList.add(new DelegationTokenToRenew(applicationId,
-            token, getConfig(), now, shouldCancelAtEnd));
+        tokenList.add(
+            new DelegationTokenToRenew(applicationId, token, getConfig(), now,
+                shouldCancelAtEnd));
       }
     }
     if (!tokenList.isEmpty()) {
@@ -394,8 +411,8 @@ public class DelegationTokenRenewer extends AbstractService {
         addTokenToList(dtr);
         setTimerForTokenRenewal(dtr);
         if (LOG.isDebugEnabled()) {
-          LOG.debug("Registering token for renewal for:" + " service = "
-              + dtr.token.getService() + " for appId = " + dtr.applicationId);
+          LOG.debug("Registering token for renewal for:" + " service = " +
+              dtr.token.getService() + " for appId = " + dtr.applicationId);
         }
       }
     }
@@ -403,14 +420,13 @@ public class DelegationTokenRenewer extends AbstractService {
 
   /**
    * Task - to renew a token
-   *
    */
   private class RenewalTimerTask extends TimerTask {
     private DelegationTokenToRenew dttr;
     private boolean cancelled = false;
     
-    RenewalTimerTask(DelegationTokenToRenew t) {  
-      dttr = t;  
+    RenewalTimerTask(DelegationTokenToRenew t) {
+      dttr = t;
     }
     
     @Override
@@ -423,7 +439,7 @@ public class DelegationTokenRenewer extends AbstractService {
       try {
         renewToken(dttr);
         if (LOG.isDebugEnabled()) {
-          LOG.debug("Renewing delegation-token for:" + token.getService() + 
+          LOG.debug("Renewing delegation-token for:" + token.getService() +
               "; new expiration;" + dttr.expirationDate);
         }
         
@@ -447,10 +463,11 @@ public class DelegationTokenRenewer extends AbstractService {
   @VisibleForTesting
   protected void setTimerForTokenRenewal(DelegationTokenToRenew token)
       throws IOException {
-      
+
     // calculate timer time
     long expiresIn = token.expirationDate - System.currentTimeMillis();
-    long renewIn = token.expirationDate - expiresIn/10; // little bit before the expiration
+    long renewIn = token.expirationDate -
+        expiresIn / 10; // little bit before the expiration
     
     // need to create new task every time
     TimerTask tTask = new RenewalTimerTask(token);
@@ -466,13 +483,13 @@ public class DelegationTokenRenewer extends AbstractService {
     // need to use doAs so that http can find the kerberos tgt
     // NOTE: token renewers should be responsible for the correct UGI!
     try {
-      dttr.expirationDate = UserGroupInformation.getLoginUser().doAs(
-          new PrivilegedExceptionAction<Long>(){          
-            @Override
-            public Long run() throws Exception {
-              return dttr.token.renew(dttr.conf);
-            }
-          });
+      dttr.expirationDate = UserGroupInformation.getLoginUser()
+          .doAs(new PrivilegedExceptionAction<Long>() {
+                @Override
+                public Long run() throws Exception {
+                  return dttr.token.renew(dttr.conf);
+                }
+              });
     } catch (InterruptedException e) {
       throw new IOException(e);
     }
@@ -480,60 +497,68 @@ public class DelegationTokenRenewer extends AbstractService {
 
   // cancel a token
   private void cancelToken(DelegationTokenToRenew t) {
-    if(t.shouldCancelAtEnd) {
+    if (t.shouldCancelAtEnd) {
       dtCancelThread.cancelToken(t.token, t.conf);
     } else {
-      LOG.info("Did not cancel "+t);
+      LOG.info("Did not cancel " + t);
     }
   }
   
   /**
    * removing failed DT
+   *
    * @param applicationId
    */
   private void removeFailedDelegationToken(DelegationTokenToRenew t) {
     ApplicationId applicationId = t.applicationId;
-    if (LOG.isDebugEnabled())
-      LOG.debug("removing failed delegation token for appid=" + applicationId + 
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("removing failed delegation token for appid=" + applicationId +
           ";t=" + t.token.getService());
+    }
     delegationTokens.remove(t);
     // cancel the timer
-    if(t.timerTask!=null)
+    if (t.timerTask != null) {
       t.timerTask.cancel();
+    }
   }
 
   /**
    * Removing delegation token for completed applications.
-   * @param applicationId completed application
+   *
+   * @param applicationId
+   *     completed application
    */
-  public void applicationFinished(ApplicationId applicationId) {
-    processDelegationTokenRenewerEvent(new DelegationTokenRenewerEvent(
-        applicationId,
-        DelegationTokenRenewerEventType.FINISH_APPLICATION));
+  public void applicationFinished(ApplicationId applicationId,
+      TransactionState transactionState) {
+    transactionState
+        .incCounter(DelegationTokenRenewerEventType.FINISH_APPLICATION);
+    processDelegationTokenRenewerEvent(
+        new DelegationTokenRenewerEvent(applicationId,
+            DelegationTokenRenewerEventType.FINISH_APPLICATION,
+            transactionState));
   }
 
   private void handleAppFinishEvent(DelegationTokenRenewerEvent evt) {
     if (!tokenKeepAliveEnabled) {
       removeApplicationFromRenewal(evt.getApplicationId());
     } else {
-      delayedRemovalMap.put(evt.getApplicationId(), System.currentTimeMillis()
-          + tokenRemovalDelayMs);
+      delayedRemovalMap.put(evt.getApplicationId(),
+          System.currentTimeMillis() + tokenRemovalDelayMs);
     }
   }
   
   /**
    * Add a list of applications to the keep alive list. If an appId already
    * exists, update it's keep-alive time.
-   * 
+   *
    * @param appIds
-   *          the list of applicationIds to be kept alive.
-   * 
+   *     the list of applicationIds to be kept alive.
    */
   public void updateKeepAliveApplications(List<ApplicationId> appIds) {
     if (tokenKeepAliveEnabled && appIds != null && appIds.size() > 0) {
       for (ApplicationId appId : appIds) {
-        delayedRemovalMap.put(appId, System.currentTimeMillis()
-            + tokenRemovalDelayMs);
+        delayedRemovalMap
+            .put(appId, System.currentTimeMillis() + tokenRemovalDelayMs);
       }
     }
   }
@@ -541,17 +566,18 @@ public class DelegationTokenRenewer extends AbstractService {
   private void removeApplicationFromRenewal(ApplicationId applicationId) {
     synchronized (delegationTokens) {
       Iterator<DelegationTokenToRenew> it = delegationTokens.iterator();
-      while(it.hasNext()) {
+      while (it.hasNext()) {
         DelegationTokenToRenew dttr = it.next();
         if (dttr.applicationId.equals(applicationId)) {
           if (LOG.isDebugEnabled()) {
-            LOG.debug("Removing delegation token for appId=" + applicationId + 
+            LOG.debug("Removing delegation token for appId=" + applicationId +
                 "; token=" + dttr.token.getService());
           }
 
           // cancel the timer
-          if(dttr.timerTask!=null)
+          if (dttr.timerTask != null) {
             dttr.timerTask.cancel();
+          }
 
           // cancel the token
           cancelToken(dttr);
@@ -565,17 +591,15 @@ public class DelegationTokenRenewer extends AbstractService {
   /**
    * Takes care of cancelling app delegation tokens after the configured
    * cancellation delay, taking into consideration keep-alive requests.
-   * 
    */
   private class DelayedTokenRemovalRunnable implements Runnable {
 
     private long waitTimeMs;
 
     DelayedTokenRemovalRunnable(Configuration conf) {
-      waitTimeMs =
-          conf.getLong(
-              YarnConfiguration.RM_DELAYED_DELEGATION_TOKEN_REMOVAL_INTERVAL_MS,
-              YarnConfiguration.DEFAULT_RM_DELAYED_DELEGATION_TOKEN_REMOVAL_INTERVAL_MS);
+      waitTimeMs = conf.getLong(
+          YarnConfiguration.RM_DELAYED_DELEGATION_TOKEN_REMOVAL_INTERVAL_MS,
+          YarnConfiguration.DEFAULT_RM_DELAYED_DELEGATION_TOKEN_REMOVAL_INTERVAL_MS);
     }
 
     @Override
@@ -617,8 +641,7 @@ public class DelegationTokenRenewer extends AbstractService {
    * application submission and token removal as a part of application finish
    * is asynchronous in nature.
    */
-  private final class DelegationTokenRenewerRunnable
-      implements Runnable {
+  private final class DelegationTokenRenewerRunnable implements Runnable {
 
     private DelegationTokenRenewerEvent evt;
     
@@ -632,9 +655,14 @@ public class DelegationTokenRenewer extends AbstractService {
         DelegationTokenRenewerAppSubmitEvent appSubmitEvt =
             (DelegationTokenRenewerAppSubmitEvent) evt;
         handleDTRenewerAppSubmitEvent(appSubmitEvt);
-      } else if (evt.getType().equals(
-          DelegationTokenRenewerEventType.FINISH_APPLICATION)) {
+      } else if (evt.getType()
+          .equals(DelegationTokenRenewerEventType.FINISH_APPLICATION)) {
         DelegationTokenRenewer.this.handleAppFinishEvent(evt);
+      }
+      try {
+        evt.getTransactionState().decCounter("delegationTokenRenewer");
+      } catch (IOException ex) {
+        LOG.error(ex);
       }
     }
 
@@ -651,8 +679,11 @@ public class DelegationTokenRenewer extends AbstractService {
       try {
         // Setup tokens for renewal
         DelegationTokenRenewer.this.handleAppSubmitEvent(event);
-        rmContext.getDispatcher().getEventHandler()
-            .handle(new RMAppEvent(event.getApplicationId(), RMAppEventType.START));
+        LOG.debug(
+            "handle START for rpc " + event.getTransactionState().getId());
+        rmContext.getDispatcher().getEventHandler().handle(
+            new RMAppEvent(event.getApplicationId(), RMAppEventType.START,
+                event.getTransactionState()));
       } catch (Throwable t) {
         LOG.warn(
             "Unable to add the application to the delegation token renewer.",
@@ -661,20 +692,23 @@ public class DelegationTokenRenewer extends AbstractService {
         // RMApp is in NEW state and thus we havne't yet informed the
         // Scheduler about the existence of the application
         rmContext.getDispatcher().getEventHandler().handle(
-            new RMAppRejectedEvent(event.getApplicationId(), t.getMessage()));
+            new RMAppRejectedEvent(event.getApplicationId(), t.getMessage(),
+                event.getTransactionState()));
       }
     }
   }
   
-  private static class DelegationTokenRenewerAppSubmitEvent extends
-      DelegationTokenRenewerEvent {
+  private static class DelegationTokenRenewerAppSubmitEvent
+      extends DelegationTokenRenewerEvent {
 
     private Credentials credentials;
     private boolean shouldCancelAtEnd;
 
     public DelegationTokenRenewerAppSubmitEvent(ApplicationId appId,
-        Credentials credentails, boolean shouldCancelAtEnd) {
-      super(appId, DelegationTokenRenewerEventType.VERIFY_AND_START_APPLICATION);
+        Credentials credentails, boolean shouldCancelAtEnd,
+        TransactionState transactionState) {
+      super(appId, DelegationTokenRenewerEventType.VERIFY_AND_START_APPLICATION,
+          transactionState);
       this.credentials = credentails;
       this.shouldCancelAtEnd = shouldCancelAtEnd;
     }
@@ -693,14 +727,15 @@ public class DelegationTokenRenewer extends AbstractService {
     FINISH_APPLICATION
   }
   
-  private static class DelegationTokenRenewerEvent extends
-      AbstractEvent<DelegationTokenRenewerEventType> {
+  private static class DelegationTokenRenewerEvent
+      extends AbstractEventTransaction<DelegationTokenRenewerEventType> {
 
     private ApplicationId appId;
 
     public DelegationTokenRenewerEvent(ApplicationId appId,
-        DelegationTokenRenewerEventType type) {
-      super(type);
+        DelegationTokenRenewerEventType type,
+        TransactionState transactionState) {
+      super(type, transactionState);
       this.appId = appId;
     }
 

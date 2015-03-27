@@ -17,15 +17,15 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Collection;
 
-import org.junit.Test;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 public class TestNameNodeResourcePolicy {
 
@@ -72,12 +72,9 @@ public class TestNameNodeResourcePolicy {
     assertFalse(testResourceScenario(2, 2, 2, 1, 1));
   }
   
-  private static boolean testResourceScenario(
-      int numRedundantResources,
-      int numRequiredResources,
-      int numFailedRedundantResources,
-      int numFailedRequiredResources,
-      int minimumRedundantResources) {
+  private static boolean testResourceScenario(int numRedundantResources,
+      int numRequiredResources, int numFailedRedundantResources,
+      int numFailedRequiredResources, int minimumRedundantResources) {
     
     Collection<CheckableNameNodeResource> resources =
         new ArrayList<CheckableNameNodeResource>();
@@ -85,7 +82,8 @@ public class TestNameNodeResourcePolicy {
     for (int i = 0; i < numRedundantResources; i++) {
       CheckableNameNodeResource r = mock(CheckableNameNodeResource.class);
       when(r.isRequired()).thenReturn(false);
-      when(r.isResourceAvailable()).thenReturn(i >= numFailedRedundantResources);
+      when(r.isResourceAvailable())
+          .thenReturn(i >= numFailedRedundantResources);
       resources.add(r);
     }
     
@@ -96,7 +94,7 @@ public class TestNameNodeResourcePolicy {
       resources.add(r);
     }
     
-    return NameNodeResourcePolicy.areResourcesAvailable(resources,
-        minimumRedundantResources);    
+    return NameNodeResourcePolicy
+        .areResourcesAvailable(resources, minimumRedundantResources);
   }
 }

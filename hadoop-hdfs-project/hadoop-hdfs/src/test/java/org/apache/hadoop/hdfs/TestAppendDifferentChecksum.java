@@ -17,9 +17,6 @@
  */
 package org.apache.hadoop.hdfs;
 
-import java.io.IOException;
-import java.util.Random;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -31,6 +28,9 @@ import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
 
+import java.io.IOException;
+import java.util.Random;
+
 /**
  * Test cases for trying to append to a file with a different
  * checksum than the file was originally written with.
@@ -41,17 +41,15 @@ public class TestAppendDifferentChecksum {
   // run the randomized test for 5 seconds
   private static final long RANDOM_TEST_RUNTIME = 5000;
   private static MiniDFSCluster cluster;
-  private static FileSystem fs; 
-  
+  private static FileSystem fs;
+
 
   @BeforeClass
   public static void setupCluster() throws IOException {
     Configuration conf = new HdfsConfiguration();
     conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, 4096);
     conf.set("fs.hdfs.impl.disable.cache", "true");
-    cluster = new MiniDFSCluster.Builder(conf)
-      .numDataNodes(1)
-      .build();
+    cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
     fs = cluster.getFileSystem();
   }
   
@@ -100,7 +98,7 @@ public class TestAppendDifferentChecksum {
    * CRC32 and with CRC32C, crossing several block boundaries.
    * Then, checks that all of the data can be read back correct.
    */
-  @Test(timeout=RANDOM_TEST_RUNTIME*2)
+  @Test(timeout = RANDOM_TEST_RUNTIME * 2)
   public void testAlgoSwitchRandomized() throws IOException {
     FileSystem fsWithCrc32 = createFsWithChecksum("CRC32", 512);
     FileSystem fsWithCrc32C = createFsWithChecksum("CRC32C", 512);
@@ -154,7 +152,7 @@ public class TestAppendDifferentChecksum {
       AppendTestUtil.write(stm, SEGMENT_LENGTH, SEGMENT_LENGTH);
     } finally {
       stm.close();
-    }    
+    }
   }
 
 }

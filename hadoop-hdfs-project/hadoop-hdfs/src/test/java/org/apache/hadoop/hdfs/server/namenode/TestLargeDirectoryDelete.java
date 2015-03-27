@@ -17,9 +17,6 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
-import java.io.IOException;
-import java.util.Random;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -33,13 +30,17 @@ import org.apache.hadoop.util.Time;
 import org.junit.Assert;
 import org.junit.Test;
 
+import java.io.IOException;
+import java.util.Random;
+
 
 /**
- * Ensure during large directory delete, namenode does not block until the 
+ * Ensure during large directory delete, namenode does not block until the
  * deletion completes and handles new requests from other clients
  */
 public class TestLargeDirectoryDelete {
-  private static final Log LOG = LogFactory.getLog(TestLargeDirectoryDelete.class);
+  private static final Log LOG =
+      LogFactory.getLog(TestLargeDirectoryDelete.class);
   private static final Configuration CONF = new HdfsConfiguration();
   private static final int TOTAL_BLOCKS = 10000;
   private MiniDFSCluster mc = null;
@@ -51,22 +52,27 @@ public class TestLargeDirectoryDelete {
     CONF.setInt(DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY, 1);
   }
   
-  /** create a file with a length of <code>filelen</code> */
-  private void createFile(final String fileName, final long filelen) throws IOException {
+  /**
+   * create a file with a length of <code>filelen</code>
+   */
+  private void createFile(final String fileName, final long filelen)
+      throws IOException {
     FileSystem fs = mc.getFileSystem();
     Path filePath = new Path(fileName);
     DFSTestUtil.createFile(fs, filePath, filelen, (short) 1, 0);
   }
   
-  /** Create a large number of directories and files */
+  /**
+   * Create a large number of directories and files
+   */
   private void createFiles() throws IOException {
     Random rand = new Random();
     // Create files in a directory with random depth
     // ranging from 0-10.
-    for (int i = 0; i < TOTAL_BLOCKS; i+=100) {
+    for (int i = 0; i < TOTAL_BLOCKS; i += 100) {
       String filename = "/root/";
       int dirs = rand.nextInt(10);  // Depth of the directory
-      for (int j=i; j >=(i-dirs); j--) {
+      for (int j = i; j >= (i - dirs); j--) {
         filename += j + "/";
       }
       filename += "file" + i;
@@ -74,16 +80,18 @@ public class TestLargeDirectoryDelete {
     }
   }
   
-  private int getBlockCount() {
+  private int getBlockCount() throws IOException {
     Assert.assertNotNull("Null cluster", mc);
     Assert.assertNotNull("No Namenode in cluster", mc.getNameNode());
     FSNamesystem namesystem = mc.getNamesystem();
     Assert.assertNotNull("Null Namesystem in cluster", namesystem);
-    Assert.assertNotNull("Null Namesystem.blockmanager", namesystem.getBlockManager());
+    Assert.assertNotNull("Null Namesystem.blockmanager",
+        namesystem.getBlockManager());
     return (int) namesystem.getBlocksTotal();
   }
 
-  /** Run multiple threads doing simultaneous operations on the namenode
+  /**
+   * Run multiple threads doing simultaneous operations on the namenode
    * while a large directory is being deleted.
    */
   private void runThreads() throws Throwable {
@@ -93,7 +101,7 @@ public class TestLargeDirectoryDelete {
     threads[0] = new TestThread() {
       @Override
       protected void execute() throws Throwable {
-        while(live) {
+        while (live) {
           try {
             int blockcount = getBlockCount();
             if (blockcount < TOTAL_BLOCKS && blockcount > 0) {
@@ -114,16 +122,11 @@ public class TestLargeDirectoryDelete {
     threads[1] = new TestThread() {
       @Override
       protected void execute() throws Throwable {
-        while(live) {
+        while (live) {
           try {
             int blockcount = getBlockCount();
             if (blockcount < TOTAL_BLOCKS && blockcount > 0) {
-              mc.getNamesystem().writeLock();
-              try {
-                lockOps++;
-              } finally {
-                mc.getNamesystem().writeUnlock();
-              }
+              lockOps++;
               Thread.sleep(1);
             }
           } catch (InterruptedException ex) {
@@ -152,10 +155,10 @@ public class TestLargeDirectoryDelete {
 
 
   /**
-   * An abstract class for tests that catches exceptions and can 
-   * rethrow them on a different thread, and has an {@link #endThread()} 
+   * An abstract class for tests that catches exceptions and can
+   * rethrow them on a different thread, and has an {@link #endThread()}
    * operation that flips a volatile boolean before interrupting the thread.
-   * Also: after running the implementation of {@link #execute()} in the 
+   * Also: after running the implementation of {@link #execute()} in the
    * implementation class, the thread is notified: other threads can wait
    * for it to terminate
    */
@@ -185,7 +188,9 @@ public class TestLargeDirectoryDelete {
 
     /**
      * Rethrow anything caught
-     * @throws Throwable any non-null throwable raised by the execute method.
+     *
+     * @throws Throwable
+     *     any non-null throwable raised by the execute method.
      */
     public synchronized void rethrow() throws Throwable {
       if (thrown != null) {
@@ -202,14 +207,14 @@ public class TestLargeDirectoryDelete {
       try {
         wait();
       } catch (InterruptedException e) {
-        if(LOG.isDebugEnabled()) {
+        if (LOG.isDebugEnabled()) {
           LOG.debug("Ignoring " + e, e);
         }
       }
     }
   }
   
-  @Test
+  @Test(timeout = 3000000)
   public void largeDelete() throws Throwable {
     mc = new MiniDFSCluster.Builder(CONF).build();
     try {

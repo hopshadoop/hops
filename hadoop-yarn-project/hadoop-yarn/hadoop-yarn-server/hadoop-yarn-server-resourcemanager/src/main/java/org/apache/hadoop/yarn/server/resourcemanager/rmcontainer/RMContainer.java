@@ -29,11 +29,11 @@ import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.event.EventHandler;
 
 /**
- * Represents the ResourceManager's view of an application container. See 
+ * Represents the ResourceManager's view of an application container. See
  * {@link RMContainerImpl} for an implementation. Containers may be in one
  * of several states, given in {@link RMContainerState}. An RMContainer
- * instance may exist even if there is no actual running container, such as 
- * when resources are being reserved to fill space for a future container 
+ * instance may exist even if there is no actual running container, such as
+ * when resources are being reserved to fill space for a future container
  * allocation.
  */
 public interface RMContainer extends EventHandler<RMContainerEvent> {
@@ -50,6 +50,12 @@ public interface RMContainer extends EventHandler<RMContainerEvent> {
 
   NodeId getReservedNode();
   
+
+  NodeId getNodeId();
+  
+  String getUser();
+
+  
   Priority getReservedPriority();
 
   Resource getAllocatedResource();
@@ -61,6 +67,9 @@ public interface RMContainer extends EventHandler<RMContainerEvent> {
   long getStartTime();
 
   long getFinishTime();
+  
+
+  void recover(io.hops.metadata.yarn.entity.RMContainer hopRMContainer);
 
   String getDiagnosticsInfo();
 

@@ -20,29 +20,27 @@ package org.apache.hadoop.hdfs.server.datanode.fsdataset;
 import java.io.File;
 import java.io.IOException;
 
-import org.apache.hadoop.hdfs.StorageType;
-
 /**
  * This is an interface for the underlying volume.
  */
 public interface FsVolumeSpi {
-  /** @return the StorageUuid of the volume */
-  public String getStorageID();
-
-  /** @return a list of block pools. */
+  /**
+   * @return a list of block pools.
+   */
   public String[] getBlockPoolList();
 
-  /** @return the available storage space in bytes. */
+  /**
+   * @return the available storage space in bytes.
+   */
   public long getAvailable() throws IOException;
 
-  /** @return the base path to the volume */
-  public String getBasePath();
-
-  /** @return the path to the volume */
+  /**
+   * @return the path to the volume
+   */
   public String getPath(String bpid) throws IOException;
 
-  /** @return the directory for the finalized blocks in the block pool. */
+  /**
+   * @return the directory for the finalized blocks in the block pool.
+   */
   public File getFinalizedDir(String bpid) throws IOException;
-  
-  public StorageType getStorageType();
 }

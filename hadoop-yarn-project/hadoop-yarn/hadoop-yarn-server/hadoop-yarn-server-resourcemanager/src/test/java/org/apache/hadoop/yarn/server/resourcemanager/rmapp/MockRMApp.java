@@ -18,11 +18,7 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.rmapp;
 
-import java.util.Collection;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Set;
-
+import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.yarn.MockApps;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -34,6 +30,11 @@ import org.apache.hadoop.yarn.api.records.impl.pb.ApplicationSubmissionContextPB
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
+
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
 
 public class MockRMApp implements RMApp {
   static final int DT = 1000000; // ms
@@ -63,7 +64,8 @@ public class MockRMApp implements RMApp {
     user = userName;
   }
 
-  public MockRMApp(int newid, long time, RMAppState newState, String userName, String diag) {
+  public MockRMApp(int newid, long time, RMAppState newState, String userName,
+      String diag) {
     this(newid, time, newState, userName);
     this.diagnostics = new StringBuilder(diag);
   }
@@ -127,8 +129,8 @@ public class MockRMApp implements RMApp {
   @Override
   public Map<ApplicationAttemptId, RMAppAttempt> getAppAttempts() {
     Map<ApplicationAttemptId, RMAppAttempt> attempts =
-      new LinkedHashMap<ApplicationAttemptId, RMAppAttempt>();
-    if(attempt != null) {
+        new LinkedHashMap<ApplicationAttemptId, RMAppAttempt>();
+    if (attempt != null) {
       attempts.put(attempt.getAppAttemptId(), attempt);
     }
     return attempts;
@@ -144,8 +146,8 @@ public class MockRMApp implements RMApp {
   }
 
   @Override
-  public ApplicationReport createAndGetApplicationReport(
-      String clientUserName, boolean allowAccess) {
+  public ApplicationReport createAndGetApplicationReport(String clientUserName,
+      boolean allowAccess) {
     throw new UnsupportedOperationException("Not supported yet.");
   }
 
@@ -187,7 +189,7 @@ public class MockRMApp implements RMApp {
   }
 
   public void setDiagnostics(String diag) {
-    this.diagnostics  = new StringBuilder(diag);
+    this.diagnostics = new StringBuilder(diag);
   }
 
   @Override
@@ -209,7 +211,8 @@ public class MockRMApp implements RMApp {
   }
 
   @Override
-  public int pullRMNodeUpdates(Collection<RMNode> updatedNodes) {
+  public int pullRMNodeUpdates(Collection<RMNode> updatedNodes,
+      TransactionState ts) {
     throw new UnsupportedOperationException("Not supported yet.");
   }
 

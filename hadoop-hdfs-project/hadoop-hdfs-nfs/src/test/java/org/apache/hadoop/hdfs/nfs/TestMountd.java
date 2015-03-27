@@ -18,9 +18,6 @@
 
 package org.apache.hadoop.hdfs.nfs;
 
-import java.io.IOException;
-import java.net.InetAddress;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -31,6 +28,9 @@ import org.apache.hadoop.hdfs.nfs.nfs3.RpcProgramNfs3;
 import org.apache.hadoop.oncrpc.XDR;
 import org.junit.Test;
 
+import java.io.IOException;
+import java.net.InetAddress;
+
 public class TestMountd {
 
   public static final Log LOG = LogFactory.getLog(TestMountd.class);
@@ -39,8 +39,8 @@ public class TestMountd {
   public void testStart() throws IOException {
     // Start minicluster
     Configuration config = new Configuration();
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(config).numDataNodes(1)
-        .build();
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(config).numDataNodes(1).build();
     cluster.waitActive();
     
     // Use emphral port in case tests are running in parallel
@@ -51,8 +51,8 @@ public class TestMountd {
     Nfs3 nfs3 = new Nfs3(config);
     nfs3.startServiceInternal(false);
 
-    RpcProgramMountd mountd = (RpcProgramMountd) nfs3.getMountd()
-        .getRpcProgram();
+    RpcProgramMountd mountd =
+        (RpcProgramMountd) nfs3.getMountd().getRpcProgram();
     mountd.nullOp(new XDR(), 1234, InetAddress.getByName("localhost"));
     
     RpcProgramNfs3 nfsd = (RpcProgramNfs3) nfs3.getRpcProgram();

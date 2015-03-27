@@ -18,6 +18,8 @@
 
 WebHDFS REST API
 
+  \[ {{{./index.html}Go Back}} \]
+
 %{toc|section=1|fromDepth=0}
 
 * {Document Conventions}
@@ -52,7 +54,7 @@ WebHDFS REST API
     * {{{Status of a File/Directory}<<<GETFILESTATUS>>>}}
         (see  {{{../../api/org/apache/hadoop/fs/FileSystem.html}FileSystem}}.getFileStatus)
 
-    * {{{List a Directory}<<<LISTSTATUS>>>}}
+    * {{<<<LISTSTATUS>>>}}
         (see  {{{../../api/org/apache/hadoop/fs/FileSystem.html}FileSystem}}.listStatus)
 
     * {{{Get Content Summary of a Directory}<<<GETCONTENTSUMMARY>>>}}
@@ -183,10 +185,6 @@ curl -i --negotiate -u : "http://<HOST>:<PORT>/webhdfs/v1/<PATH>?op=..."
 curl -i "http://<HOST>:<PORT>/webhdfs/v1/<PATH>?delegation=<TOKEN>&op=..."
 +---------------------------------
 
-  []
- 
-  See also: {{{../hadoop-common/HttpAuthentication.html}Authentication for Hadoop HTTP web-consoles}}
-
 * {Proxy Users}
 
   When the proxy user feature is enabled, a proxy user <P> may submit a request on behalf of another user <U>.
@@ -309,7 +307,7 @@ Content-Length: 0
   * Submit a HTTP POST request.
 
 +---------------------------------
-curl -i -X POST "http://<HOST>:<PORT>/webhdfs/v1/<PATH>?op=CONCAT&sources=<PATHS>"
+curl -i -X POST "http://<HOST>:<PORT>/webhdfs/v1/<PATH>?op=CONCAT&sources=<SOURCES>"
 +---------------------------------
 
   The client receives a response with zero content length:
@@ -320,6 +318,10 @@ Content-Length: 0
 +---------------------------------
 
   []
+
+  This REST API call is available as of Hadoop version 2.0.3.
+  Please note that <SOURCES> is a comma seperated list of absolute paths.
+  (Example: sources=/test/file1,/test/file2,/test/file3)
 
   See also:
   {{{Sources}<<<sources>>>}},
@@ -752,148 +754,6 @@ Content-Length: 0
    {{{../../api/org/apache/hadoop/fs/FileSystem.html}FileSystem}}.setTimes
 
 
-** {Modify ACL Entries}
-
-  * Submit a HTTP PUT request.
-
-+---------------------------------
-curl -i -X PUT "http://<HOST>:<PORT>/webhdfs/v1/<PATH>?op=MODIFYACLENTRIES
-                              &aclspec=<ACLSPEC>"
-+---------------------------------
-
-  The client receives a response with zero content length:
-
-+---------------------------------
-HTTP/1.1 200 OK
-Content-Length: 0
-+---------------------------------
-
-  []
-
-  See also:
-  {{{../../api/org/apache/hadoop/fs/FileSystem.html}FileSystem}}.modifyAclEntries
-
-
-** {Remove ACL Entries}
-
-  * Submit a HTTP PUT request.
-
-+---------------------------------
-curl -i -X PUT "http://<HOST>:<PORT>/webhdfs/v1/<PATH>?op=REMOVEACLENTRIES
-                              &aclspec=<ACLSPEC>"
-+---------------------------------
-
-  The client receives a response with zero content length:
-
-+---------------------------------
-HTTP/1.1 200 OK
-Content-Length: 0
-+---------------------------------
-
-  []
-
-  See also:
-  {{{../../api/org/apache/hadoop/fs/FileSystem.html}FileSystem}}.removeAclEntries
-
-
-** {Remove Default ACL}
-
-  * Submit a HTTP PUT request.
-
-+---------------------------------
-curl -i -X PUT "http://<HOST>:<PORT>/webhdfs/v1/<PATH>?op=REMOVEDEFAULTACL"
-+---------------------------------
-
-  The client receives a response with zero content length:
-
-+---------------------------------
-HTTP/1.1 200 OK
-Content-Length: 0
-+---------------------------------
-
-  []
-
-  See also:
-  {{{../../api/org/apache/hadoop/fs/FileSystem.html}FileSystem}}.removeDefaultAcl
-
-
-** {Remove ACL}
-
-  * Submit a HTTP PUT request.
-
-+---------------------------------
-curl -i -X PUT "http://<HOST>:<PORT>/webhdfs/v1/<PATH>?op=REMOVEACL"
-+---------------------------------
-
-  The client receives a response with zero content length:
-
-+---------------------------------
-HTTP/1.1 200 OK
-Content-Length: 0
-+---------------------------------
-
-  []
-
-  See also:
-  {{{../../api/org/apache/hadoop/fs/FileSystem.html}FileSystem}}.removeAcl
-
-
-** {Set ACL}
-
-  * Submit a HTTP PUT request.
-
-+---------------------------------
-curl -i -X PUT "http://<HOST>:<PORT>/webhdfs/v1/<PATH>?op=SETACL
-                              &aclspec=<ACLSPEC>"
-+---------------------------------
-
-  The client receives a response with zero content length:
-
-+---------------------------------
-HTTP/1.1 200 OK
-Content-Length: 0
-+---------------------------------
-
-  []
-
-  See also:
-  {{{../../api/org/apache/hadoop/fs/FileSystem.html}FileSystem}}.setAcl
-
-
-** {Get ACL Status}
-
-  * Submit a HTTP GET request.
-
-+---------------------------------
-curl -i -X PUT "http://<HOST>:<PORT>/webhdfs/v1/<PATH>?op=GETACLSTATUS"
-+---------------------------------
-
-  The client receives a response with a {{{ACL Status JSON Schema}<<<AclStatus>>> JSON object}}:
-
-+---------------------------------
-HTTP/1.1 200 OK
-Content-Type: application/json
-Transfer-Encoding: chunked
-
-{
-    "AclStatus": {
-        "entries": [
-            "user:carla:rw-", 
-            "group::r-x"
-        ], 
-        "group": "supergroup", 
-        "owner": "hadoop", 
-        "stickyBit": false
-    }
-}
-+---------------------------------
-
-  []
-
-  See also:
-  {{{../../api/org/apache/hadoop/fs/FileSystem.html}FileSystem}}.getAclStatus
-
-
 * {Delegation Token Operations}
 
 ** {Get Delegation Token}
@@ -1011,7 +871,7 @@ Content-Length: 0
 * {Error Responses}
 
   When an operation fails, the server may throw an exception.
-  The JSON schema of error responses is defined in {{RemoteException JSON Schema}}.
+  The JSON schema of error responses is defined in {{<<<RemoteException>>> JSON schema}}.
   The table below shows the mapping from exceptions to HTTP response codes.
 
 ** {HTTP Response Codes}
@@ -1114,58 +974,6 @@ Transfer-Encoding: chunked
   The JSON schemas are shown below.
   See {{{http://tools.ietf.org/id/draft-zyp-json-schema-03.html}draft-zyp-json-schema-03}}
   for the syntax definitions of the JSON schemas.
-
-  <<Note>> that the default value of
-  {{{http://tools.ietf.org/id/draft-zyp-json-schema-03.html#additionalProperties}<<<additionalProperties>>>}}
-  is an empty schema which allows any value for additional properties.
-  Therefore, all WebHDFS JSON responses allow any additional property.
-  However, if additional properties are included in the responses, they are
-  considered as optional properties in order to maintain compatibility.
-
-** {ACL Status JSON Schema}
-
-+---------------------------------
-{
-  "name"      : "AclStatus",
-  "properties":
-  {
-    "AclStatus":
-    {
-      "type"      : "object",
-      "properties":
-      {
-        "entries":
-        {
-          "type": "array"
-          "items":
-          {
-            "description": "ACL entry.",
-            "type": "string"
-          }
-        },
-        "group":
-        {
-          "description": "The group owner.",
-          "type"       : "string",
-          "required"   : true
-        },
-        "owner":
-        {
-          "description": "The user who is the owner.",
-          "type"       : "string",
-          "required"   : true
-        },
-        "stickyBit":
-        {
-          "description": "True if the sticky bit is on.",
-          "type"       : "boolean",
-          "required"   : true
-        },
-      }
-    }
-  }
-}
-+---------------------------------
 
 
 ** {Boolean JSON Schema}
@@ -1305,7 +1113,7 @@ Transfer-Encoding: chunked
   See also:
   {{{FileStatus Properties}<<<FileStatus>>> Properties}},
   {{{Status of a File/Directory}<<<GETFILESTATUS>>>}},
-  {{{../../api/org/apache/hadoop/fs/FileStatus.html}FileStatus}}
+  {{{../../api/org/apache/hadoop/fs/FileStatus}FileStatus}}
 
 
 *** {FileStatus Properties}
@@ -1418,7 +1226,7 @@ var fileStatusProperties =
   See also:
   {{{FileStatus Properties}<<<FileStatus>>> Properties}},
   {{{List a Directory}<<<LISTSTATUS>>>}},
-  {{{../../api/org/apache/hadoop/fs/FileStatus.html}FileStatus}}
+  {{{../../api/org/apache/hadoop/fs/FileStatus}FileStatus}}
 
 
 ** {Long JSON Schema}
@@ -1461,7 +1269,7 @@ var fileStatusProperties =
 
   See also:
   {{{Get Home Directory}<<<GETHOMEDIRECTORY>>>}},
-  {{{../../api/org/apache/hadoop/fs/Path.html}Path}}
+  {{{../../api/org/apache/hadoop/fs/Path}Path}}
 
 
 ** {RemoteException JSON Schema}
@@ -1574,23 +1382,6 @@ var tokenProperties =
 
 
 * {HTTP Query Parameter Dictionary}
-
-** {ACL Spec}
-
-*----------------+-------------------------------------------------------------------+
-|| Name          | <<<aclspec>>> |
-*----------------+-------------------------------------------------------------------+
-|| Description   | The ACL spec included in ACL modification operations. |
-*----------------+-------------------------------------------------------------------+
-|| Type          | String |
-*----------------+-------------------------------------------------------------------+
-|| Default Value | \<empty\> |
-*----------------+-------------------------------------------------------------------+
-|| Valid Values  | See {{{./HdfsPermissionsGuide.html}Permissions and HDFS}}. |
-*----------------+-------------------------------------------------------------------+
-|| Syntax        | See {{{./HdfsPermissionsGuide.html}Permissions and HDFS}}. |
-*----------------+-------------------------------------------------------------------+
-
 
 ** {Access Time}
 
@@ -1970,7 +1761,7 @@ var tokenProperties =
 *----------------+-------------------------------------------------------------------+
 || Name          | <<<sources>>> |
 *----------------+-------------------------------------------------------------------+
-|| Description   | A list of source paths. |
+|| Description   | The comma seperated absolute paths used for concatenation. |
 *----------------+-------------------------------------------------------------------+
 || Type          | String |
 *----------------+-------------------------------------------------------------------+
@@ -1978,8 +1769,11 @@ var tokenProperties =
 *----------------+-------------------------------------------------------------------+
 || Valid Values  | A list of comma seperated absolute FileSystem paths without scheme and authority. |
 *----------------+-------------------------------------------------------------------+
-|| Syntax        | Any string. |
+|| Syntax        | See the note in {{Delegation}}. |
 *----------------+-------------------------------------------------------------------+
+
+  <<Note>> that sources are absolute FileSystem paths.
+
 
   See also:
   {{{Concat File(s)}<<<CONCAT>>>}}

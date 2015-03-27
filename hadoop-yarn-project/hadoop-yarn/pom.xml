@@ -11,15 +11,18 @@
   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
   See the License for the specific language governing permissions and
   limitations under the License. See accompanying LICENSE file.
---><project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <groupId>org.apache.hadoop</groupId>
+    <groupId>io.hops</groupId>
     <artifactId>hadoop-project</artifactId>
     <version>2.4.0</version>
     <relativePath>../../hadoop-project</relativePath>
   </parent>
-  <groupId>org.apache.hadoop</groupId>
+  <groupId>io.hops</groupId>
   <artifactId>hadoop-yarn</artifactId>
   <version>2.4.0</version>
   <packaging>pom</packaging>
@@ -29,20 +32,23 @@
     <test.logs>true</test.logs>
     <test.timeout>600000</test.timeout>
     <yarn.basedir>${basedir}</yarn.basedir>
-    <hadoop.common.build.dir>${basedir}/../../../hadoop-common-project/hadoop-common/target</hadoop.common.build.dir>
+    <hadoop.common.build.dir>
+      ${basedir}/../../../hadoop-common-project/hadoop-common/target
+    </hadoop.common.build.dir>
   </properties>
 
   <!-- Do not add dependencies here, add them to the POM of the leaf module -->
 
   <build>
     <plugins>
-       <plugin>
+      <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>findbugs-maven-plugin</artifactId>
-         <configuration>
+        <configuration>
           <findbugsXmlOutput>true</findbugsXmlOutput>
           <xmlOutput>true</xmlOutput>
-          <excludeFilterFile>${yarn.basedir}/dev-support/findbugs-exclude.xml</excludeFilterFile>
+          <excludeFilterFile>${yarn.basedir}/dev-support/findbugs-exclude.xml
+          </excludeFilterFile>
           <effort>Max</effort>
         </configuration>
       </plugin>

@@ -18,13 +18,15 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.recovery;
 
+import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore.ApplicationAttemptState;
 
 public class RMStateStoreAppAttemptEvent extends RMStateStoreEvent {
   ApplicationAttemptState attemptState;
   
-  public RMStateStoreAppAttemptEvent(ApplicationAttemptState attemptState) {
-    super(RMStateStoreEventType.STORE_APP_ATTEMPT);
+  public RMStateStoreAppAttemptEvent(ApplicationAttemptState attemptState,
+      TransactionState transactionState) {
+    super(RMStateStoreEventType.STORE_APP_ATTEMPT, transactionState);
     this.attemptState = attemptState;
   }
   

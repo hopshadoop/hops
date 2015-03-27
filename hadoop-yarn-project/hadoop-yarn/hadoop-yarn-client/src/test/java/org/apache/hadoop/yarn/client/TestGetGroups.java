@@ -18,9 +18,6 @@
 
 package org.apache.hadoop.yarn.client;
 
-import java.io.IOException;
-import java.io.PrintStream;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -33,6 +30,9 @@ import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 
+import java.io.IOException;
+import java.io.PrintStream;
+
 public class TestGetGroups extends GetGroupsTestBase {
   
   private static final Log LOG = LogFactory.getLog(TestGetGroups.class);
@@ -42,29 +42,33 @@ public class TestGetGroups extends GetGroupsTestBase {
   private static Configuration conf;
   
   @BeforeClass
-  public static void setUpResourceManager() throws IOException, InterruptedException {
+  public static void setUpResourceManager()
+      throws IOException, InterruptedException {
     conf = new YarnConfiguration();
     resourceManager = new ResourceManager() {
       @Override
       protected void doSecureLogin() throws IOException {
-      };
+      }
+
+      ;
     };
     resourceManager.init(conf);
     new Thread() {
       public void run() {
         resourceManager.start();
-      };
+      }
+
+      ;
     }.start();
     int waitCount = 0;
-    while (resourceManager.getServiceState() == STATE.INITED
-        && waitCount++ < 10) {
+    while (resourceManager.getServiceState() == STATE.INITED &&
+        waitCount++ < 10) {
       LOG.info("Waiting for RM to start...");
       Thread.sleep(1000);
     }
     if (resourceManager.getServiceState() != STATE.STARTED) {
-      throw new IOException(
-          "ResourceManager failed to start. Final state is "
-              + resourceManager.getServiceState());
+      throw new IOException("ResourceManager failed to start. Final state is " +
+          resourceManager.getServiceState());
     }
     LOG.info("ResourceManager RMAdmin address: " +
         conf.get(YarnConfiguration.RM_ADMIN_ADDRESS));

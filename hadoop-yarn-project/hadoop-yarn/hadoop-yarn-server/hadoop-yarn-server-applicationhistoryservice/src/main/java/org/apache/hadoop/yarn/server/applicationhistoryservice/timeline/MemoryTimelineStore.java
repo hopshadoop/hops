@@ -18,6 +18,17 @@
 
 package org.apache.hadoop.yarn.server.applicationhistoryservice.timeline;
 
+import org.apache.hadoop.classification.InterfaceAudience.Private;
+import org.apache.hadoop.classification.InterfaceStability.Unstable;
+import org.apache.hadoop.service.AbstractService;
+import org.apache.hadoop.yarn.api.records.timeline.TimelineEntities;
+import org.apache.hadoop.yarn.api.records.timeline.TimelineEntity;
+import org.apache.hadoop.yarn.api.records.timeline.TimelineEvent;
+import org.apache.hadoop.yarn.api.records.timeline.TimelineEvents;
+import org.apache.hadoop.yarn.api.records.timeline.TimelineEvents.EventsOfOneEntity;
+import org.apache.hadoop.yarn.api.records.timeline.TimelinePutResponse;
+import org.apache.hadoop.yarn.api.records.timeline.TimelinePutResponse.TimelinePutError;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -33,28 +44,16 @@ import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;
-import org.apache.hadoop.classification.InterfaceStability.Unstable;
-import org.apache.hadoop.service.AbstractService;
-import org.apache.hadoop.yarn.api.records.timeline.TimelineEntities;
-import org.apache.hadoop.yarn.api.records.timeline.TimelineEntity;
-import org.apache.hadoop.yarn.api.records.timeline.TimelineEvent;
-import org.apache.hadoop.yarn.api.records.timeline.TimelineEvents;
-import org.apache.hadoop.yarn.api.records.timeline.TimelinePutResponse;
-import org.apache.hadoop.yarn.api.records.timeline.TimelineEvents.EventsOfOneEntity;
-import org.apache.hadoop.yarn.api.records.timeline.TimelinePutResponse.TimelinePutError;
-
 /**
  * In-memory implementation of {@link TimelineStore}. This
  * implementation is for test purpose only. If users improperly instantiate it,
  * they may encounter reading and writing history data in different memory
  * store.
- * 
  */
 @Private
 @Unstable
-public class MemoryTimelineStore
-    extends AbstractService implements TimelineStore {
+public class MemoryTimelineStore extends AbstractService
+    implements TimelineStore {
 
   private Map<EntityIdentifier, TimelineEntity> entities =
       new HashMap<EntityIdentifier, TimelineEntity>();
@@ -85,8 +84,8 @@ public class MemoryTimelineStore
 
     Iterator<TimelineEntity> entityIterator = null;
     if (fromId != null) {
-      TimelineEntity firstEntity = entities.get(new EntityIdentifier(fromId,
-          entityType));
+      TimelineEntity firstEntity =
+          entities.get(new EntityIdentifier(fromId, entityType));
       if (firstEntity == null) {
         return new TimelineEntities();
       } else {
@@ -95,8 +94,8 @@ public class MemoryTimelineStore
       }
     }
     if (entityIterator == null) {
-      entityIterator = new PriorityQueue<TimelineEntity>(entities.values())
-          .iterator();
+      entityIterator =
+          new PriorityQueue<TimelineEntity>(entities.values()).iterator();
     }
 
     List<TimelineEntity> entitiesSelected = new ArrayList<TimelineEntity>();
@@ -114,8 +113,9 @@ public class MemoryTimelineStore
       if (entity.getStartTime() > windowEnd) {
         continue;
       }
-      if (fromTs != null && entityInsertTimes.get(new EntityIdentifier(
-          entity.getEntityId(), entity.getEntityType())) > fromTs) {
+      if (fromTs != null && entityInsertTimes.get(
+          new EntityIdentifier(entity.getEntityId(), entity.getEntityType())) >
+          fromTs) {
         continue;
       }
       if (primaryFilter != null &&
@@ -125,8 +125,9 @@ public class MemoryTimelineStore
       if (secondaryFilters != null) { // AND logic
         boolean flag = true;
         for (NameValuePair secondaryFilter : secondaryFilters) {
-          if (secondaryFilter != null && !matchPrimaryFilter(
-              entity.getPrimaryFilters(), secondaryFilter) &&
+          if (secondaryFilter != null &&
+              !matchPrimaryFilter(entity.getPrimaryFilters(),
+                  secondaryFilter) &&
               !matchFilter(entity.getOtherInfo(), secondaryFilter)) {
             flag = false;
             break;
@@ -154,7 +155,8 @@ public class MemoryTimelineStore
     if (fieldsToRetrieve == null) {
       fieldsToRetrieve = EnumSet.allOf(Field.class);
     }
-    TimelineEntity entity = entities.get(new EntityIdentifier(entityId, entityType));
+    TimelineEntity entity =
+        entities.get(new EntityIdentifier(entityId, entityType));
     if (entity == null) {
       return null;
     } else {
@@ -164,8 +166,7 @@ public class MemoryTimelineStore
 
   @Override
   public TimelineEvents getEntityTimelines(String entityType,
-      SortedSet<String> entityIds, Long limit, Long windowStart,
-      Long windowEnd,
+      SortedSet<String> entityIds, Long limit, Long windowStart, Long windowEnd,
       Set<String> eventTypes) {
     TimelineEvents allEvents = new TimelineEvents();
     if (entityIds == null) {
@@ -235,8 +236,8 @@ public class MemoryTimelineStore
       }
       // check startTime
       if (existingEntity.getStartTime() == null) {
-        if (existingEntity.getEvents() == null
-            || existingEntity.getEvents().isEmpty()) {
+        if (existingEntity.getEvents() == null ||
+            existingEntity.getEvents().isEmpty()) {
           TimelinePutError error = new TimelinePutError();
           error.setEntityId(entityId.getId());
           error.setEntityType(entityId.getType());
@@ -259,8 +260,8 @@ public class MemoryTimelineStore
         if (existingEntity.getPrimaryFilters() == null) {
           existingEntity.setPrimaryFilters(new HashMap<String, Set<Object>>());
         }
-        for (Entry<String, Set<Object>> pf :
-            entity.getPrimaryFilters().entrySet()) {
+        for (Entry<String, Set<Object>> pf : entity.getPrimaryFilters()
+            .entrySet()) {
           for (Object pfo : pf.getValue()) {
             existingEntity.addPrimaryFilter(pf.getKey(), maybeConvert(pfo));
           }
@@ -271,8 +272,8 @@ public class MemoryTimelineStore
           existingEntity.setOtherInfo(new HashMap<String, Object>());
         }
         for (Entry<String, Object> info : entity.getOtherInfo().entrySet()) {
-          existingEntity.addOtherInfo(info.getKey(),
-              maybeConvert(info.getValue()));
+          existingEntity
+              .addOtherInfo(info.getKey(), maybeConvert(info.getValue()));
         }
       }
       // relate it to other entities
@@ -289,8 +290,8 @@ public class MemoryTimelineStore
               new EntityIdentifier(idStr, partRelatedEntities.getKey());
           TimelineEntity relatedEntity = entities.get(relatedEntityId);
           if (relatedEntity != null) {
-            relatedEntity.addRelatedEntity(
-                existingEntity.getEntityType(), existingEntity.getEntityId());
+            relatedEntity.addRelatedEntity(existingEntity.getEntityType(),
+                existingEntity.getEntityId());
           } else {
             relatedEntity = new TimelineEntity();
             relatedEntity.setEntityId(relatedEntityId.getId());
@@ -307,22 +308,25 @@ public class MemoryTimelineStore
     return response;
   }
 
-  private static TimelineEntity maskFields(
-      TimelineEntity entity, EnumSet<Field> fields) {
+  private static TimelineEntity maskFields(TimelineEntity entity,
+      EnumSet<Field> fields) {
     // Conceal the fields that are not going to be exposed
     TimelineEntity entityToReturn = new TimelineEntity();
     entityToReturn.setEntityId(entity.getEntityId());
     entityToReturn.setEntityType(entity.getEntityType());
     entityToReturn.setStartTime(entity.getStartTime());
-    entityToReturn.setEvents(fields.contains(Field.EVENTS) ?
-        entity.getEvents() : fields.contains(Field.LAST_EVENT_ONLY) ?
-            Arrays.asList(entity.getEvents().get(0)) : null);
-    entityToReturn.setRelatedEntities(fields.contains(Field.RELATED_ENTITIES) ?
-        entity.getRelatedEntities() : null);
-    entityToReturn.setPrimaryFilters(fields.contains(Field.PRIMARY_FILTERS) ?
-        entity.getPrimaryFilters() : null);
-    entityToReturn.setOtherInfo(fields.contains(Field.OTHER_INFO) ?
-        entity.getOtherInfo() : null);
+    entityToReturn.setEvents(
+        fields.contains(Field.EVENTS) ? entity.getEvents() :
+            fields.contains(Field.LAST_EVENT_ONLY) ?
+                Arrays.asList(entity.getEvents().get(0)) : null);
+    entityToReturn.setRelatedEntities(
+        fields.contains(Field.RELATED_ENTITIES) ? entity.getRelatedEntities() :
+            null);
+    entityToReturn.setPrimaryFilters(
+        fields.contains(Field.PRIMARY_FILTERS) ? entity.getPrimaryFilters() :
+            null);
+    entityToReturn.setOtherInfo(
+        fields.contains(Field.OTHER_INFO) ? entity.getOtherInfo() : null);
     return entityToReturn;
   }
 
@@ -349,7 +353,7 @@ public class MemoryTimelineStore
 
   private static Object maybeConvert(Object o) {
     if (o instanceof Long) {
-      Long l = (Long)o;
+      Long l = (Long) o;
       if (l >= Integer.MIN_VALUE && l <= Integer.MAX_VALUE) {
         return l.intValue();
       }

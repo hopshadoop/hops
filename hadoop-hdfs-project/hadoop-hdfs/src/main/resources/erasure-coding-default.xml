@@ -1,0 +1,49 @@
+<?xml version="1.0"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+
+<configuration>
+
+  <property>
+    <name>fs.hdfs.impl</name>
+    <value>org.apache.hadoop.hdfs.DistributedFileSystem</value>
+    <description>The FileSystem for hdfs: uris.</description>
+  </property>
+
+  <property>
+    <name>dfs.erasure_coding.codecs.json</name>
+    <value>
+      [
+      {
+      "id" : "xor",
+      "parity_dir" : "/raid",
+      "stripe_length" : 10,
+      "parity_length" : 1,
+      "priority" : 100,
+      "erasure_code" : "io.hops.erasure_coding.XORCode",
+      "description" : "XOR code"
+      },
+      {
+      "id" : "rs",
+      "parity_dir" : "/raidrs",
+      "stripe_length" : 10,
+      "parity_length" : 4,
+      "priority" : 300,
+      "erasure_code" : "io.hops.erasure_coding.ReedSolomonCode",
+      "description" : "ReedSolomonCode code"
+      },
+      {
+      "id" : "src",
+      "parity_dir" : "/raidsrc",
+      "stripe_length" : 10,
+      "parity_length" : 6,
+      "parity_length_src" : 2,
+      "erasure_code" : "io.hops.erasure_coding.SimpleRegeneratingCode",
+      "priority" : 200,
+      "description" : "SimpleRegeneratingCode code"
+      },
+      ]
+    </value>
+    <description>JSon string that contains all erasure coding codecs</description>
+  </property>
+
+</configuration>

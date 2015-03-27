@@ -17,18 +17,26 @@
  */
 package org.apache.hadoop.hdfs.web.resources;
 
-/** Recursive parameter. */
+/**
+ * Recursive parameter.
+ */
 public class RecursiveParam extends BooleanParam {
-  /** Parameter name. */
+  /**
+   * Parameter name.
+   */
   public static final String NAME = "recursive";
-  /** Default parameter value. */
+  /**
+   * Default parameter value.
+   */
   public static final String DEFAULT = FALSE;
 
   private static final Domain DOMAIN = new Domain(NAME);
 
   /**
    * Constructor.
-   * @param value the parameter value.
+   *
+   * @param value
+   *     the parameter value.
    */
   public RecursiveParam(final Boolean value) {
     super(DOMAIN, value);
@@ -36,7 +44,9 @@ public class RecursiveParam extends BooleanParam {
 
   /**
    * Constructor.
-   * @param str a string representation of the parameter value.
+   *
+   * @param str
+   *     a string representation of the parameter value.
    */
   public RecursiveParam(final String str) {
     this(DOMAIN.parse(str));

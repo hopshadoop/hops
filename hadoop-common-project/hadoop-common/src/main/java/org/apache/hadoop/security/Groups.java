@@ -249,9 +249,8 @@ public class Groups {
    */
   @Private
   public static synchronized Groups
-      getUserToGroupsMappingServiceWithLoadedConfiguration(
-          Configuration conf) {
-
+    getUserToGroupsMappingServiceWithLoadedConfiguration(Configuration conf) {
+    LOG.debug(" Creating new Groups object");
     GROUPS = new Groups(conf);
     return GROUPS;
   }

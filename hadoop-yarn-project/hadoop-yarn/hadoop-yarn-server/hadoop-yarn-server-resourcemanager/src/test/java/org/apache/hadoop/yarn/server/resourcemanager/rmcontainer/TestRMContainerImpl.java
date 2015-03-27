@@ -18,14 +18,7 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.rmcontainer;
 
-import static org.junit.Assert.assertEquals;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.reset;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
+import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.Container;
@@ -50,61 +43,74 @@ import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 
-@SuppressWarnings({ "unchecked", "rawtypes" })
+import static org.junit.Assert.assertEquals;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@SuppressWarnings({"unchecked", "rawtypes"})
 public class TestRMContainerImpl {
 
   @Test
   public void testReleaseWhileRunning() {
 
     DrainDispatcher drainDispatcher = new DrainDispatcher();
-    EventHandler<RMAppAttemptEvent> appAttemptEventHandler = mock(EventHandler.class);
+    EventHandler<RMAppAttemptEvent> appAttemptEventHandler =
+        mock(EventHandler.class);
     EventHandler generic = mock(EventHandler.class);
-    drainDispatcher.register(RMAppAttemptEventType.class,
-        appAttemptEventHandler);
+    drainDispatcher
+        .register(RMAppAttemptEventType.class, appAttemptEventHandler);
     drainDispatcher.register(RMNodeEventType.class, generic);
     drainDispatcher.init(new YarnConfiguration());
     drainDispatcher.start();
     NodeId nodeId = BuilderUtils.newNodeId("host", 3425);
     ApplicationId appId = BuilderUtils.newApplicationId(1, 1);
-    ApplicationAttemptId appAttemptId = BuilderUtils.newApplicationAttemptId(
-        appId, 1);
+    ApplicationAttemptId appAttemptId =
+        BuilderUtils.newApplicationAttemptId(appId, 1);
     ContainerId containerId = BuilderUtils.newContainerId(appAttemptId, 1);
     ContainerAllocationExpirer expirer = mock(ContainerAllocationExpirer.class);
 
     Resource resource = BuilderUtils.newResource(512, 1);
     Priority priority = BuilderUtils.newPriority(5);
 
-    Container container = BuilderUtils.newContainer(containerId, nodeId,
-        "host:3465", resource, priority, null);
+    Container container = BuilderUtils
+        .newContainer(containerId, nodeId, "host:3465", resource, priority,
+            null);
 
     RMApplicationHistoryWriter writer = mock(RMApplicationHistoryWriter.class);
     RMContext rmContext = mock(RMContext.class);
     when(rmContext.getDispatcher()).thenReturn(drainDispatcher);
     when(rmContext.getContainerAllocationExpirer()).thenReturn(expirer);
     when(rmContext.getRMApplicationHistoryWriter()).thenReturn(writer);
-    RMContainer rmContainer = new RMContainerImpl(container, appAttemptId,
-        nodeId, "user", rmContext);
+    RMContainer rmContainer =
+        new RMContainerImpl(container, appAttemptId, nodeId, "user", rmContext,
+            null);
 
     assertEquals(RMContainerState.NEW, rmContainer.getState());
     assertEquals(resource, rmContainer.getAllocatedResource());
     assertEquals(nodeId, rmContainer.getAllocatedNode());
     assertEquals(priority, rmContainer.getAllocatedPriority());
-    verify(writer).containerStarted(any(RMContainer.class));
+    verify(writer)
+        .containerStarted(any(RMContainer.class), any(TransactionState.class));
 
-    rmContainer.handle(new RMContainerEvent(containerId,
-        RMContainerEventType.START));
+    rmContainer.handle(
+        new RMContainerEvent(containerId, RMContainerEventType.START, null));
     drainDispatcher.await();
     assertEquals(RMContainerState.ALLOCATED, rmContainer.getState());
-    rmContainer.handle(new RMContainerEvent(containerId,
-        RMContainerEventType.ACQUIRED));
+    rmContainer.handle(
+        new RMContainerEvent(containerId, RMContainerEventType.ACQUIRED, null));
     drainDispatcher.await();
     assertEquals(RMContainerState.ACQUIRED, rmContainer.getState());
 
-    rmContainer.handle(new RMContainerEvent(containerId,
-        RMContainerEventType.LAUNCHED));
+    rmContainer.handle(
+        new RMContainerEvent(containerId, RMContainerEventType.LAUNCHED, null));
     drainDispatcher.await();
     assertEquals(RMContainerState.RUNNING, rmContainer.getState());
-    assertEquals("//host:3465/node/containerlogs/container_1_0001_01_000001/user",
+    assertEquals(
+        "//host:3465/node/containerlogs/container_1_0001_01_000001/user",
         rmContainer.getLogURL());
 
     // In RUNNING state. Verify RELEASED and associated actions.
@@ -112,8 +118,9 @@ public class TestRMContainerImpl {
     ContainerStatus containerStatus = SchedulerUtils
         .createAbnormalContainerStatus(containerId,
             SchedulerUtils.RELEASED_CONTAINER);
-    rmContainer.handle(new RMContainerFinishedEvent(containerId,
-        containerStatus, RMContainerEventType.RELEASED));
+    rmContainer.handle(
+        new RMContainerFinishedEvent(containerId, containerStatus,
+            RMContainerEventType.RELEASED, null));
     drainDispatcher.await();
     assertEquals(RMContainerState.RELEASED, rmContainer.getState());
     assertEquals(SchedulerUtils.RELEASED_CONTAINER,
@@ -121,10 +128,11 @@ public class TestRMContainerImpl {
     assertEquals(ContainerExitStatus.ABORTED,
         rmContainer.getContainerExitStatus());
     assertEquals(ContainerState.COMPLETE, rmContainer.getContainerState());
-    verify(writer).containerFinished(any(RMContainer.class));
+    verify(writer)
+        .containerFinished(any(RMContainer.class), any(TransactionState.class));
 
-    ArgumentCaptor<RMAppAttemptContainerFinishedEvent> captor = ArgumentCaptor
-        .forClass(RMAppAttemptContainerFinishedEvent.class);
+    ArgumentCaptor<RMAppAttemptContainerFinishedEvent> captor =
+        ArgumentCaptor.forClass(RMAppAttemptContainerFinishedEvent.class);
     verify(appAttemptEventHandler).handle(captor.capture());
     RMAppAttemptContainerFinishedEvent cfEvent = captor.getValue();
     assertEquals(appAttemptId, cfEvent.getApplicationAttemptId());
@@ -134,7 +142,7 @@ public class TestRMContainerImpl {
     // In RELEASED state. A FINIHSED event may come in.
     rmContainer.handle(new RMContainerFinishedEvent(containerId, SchedulerUtils
         .createAbnormalContainerStatus(containerId, "FinishedContainer"),
-        RMContainerEventType.FINISHED));
+        RMContainerEventType.FINISHED, null));
     assertEquals(RMContainerState.RELEASED, rmContainer.getState());
   }
 
@@ -142,55 +150,60 @@ public class TestRMContainerImpl {
   public void testExpireWhileRunning() {
 
     DrainDispatcher drainDispatcher = new DrainDispatcher();
-    EventHandler<RMAppAttemptEvent> appAttemptEventHandler = mock(EventHandler.class);
+    EventHandler<RMAppAttemptEvent> appAttemptEventHandler =
+        mock(EventHandler.class);
     EventHandler generic = mock(EventHandler.class);
-    drainDispatcher.register(RMAppAttemptEventType.class,
-        appAttemptEventHandler);
+    drainDispatcher
+        .register(RMAppAttemptEventType.class, appAttemptEventHandler);
     drainDispatcher.register(RMNodeEventType.class, generic);
     drainDispatcher.init(new YarnConfiguration());
     drainDispatcher.start();
     NodeId nodeId = BuilderUtils.newNodeId("host", 3425);
     ApplicationId appId = BuilderUtils.newApplicationId(1, 1);
-    ApplicationAttemptId appAttemptId = BuilderUtils.newApplicationAttemptId(
-        appId, 1);
+    ApplicationAttemptId appAttemptId =
+        BuilderUtils.newApplicationAttemptId(appId, 1);
     ContainerId containerId = BuilderUtils.newContainerId(appAttemptId, 1);
     ContainerAllocationExpirer expirer = mock(ContainerAllocationExpirer.class);
 
     Resource resource = BuilderUtils.newResource(512, 1);
     Priority priority = BuilderUtils.newPriority(5);
 
-    Container container = BuilderUtils.newContainer(containerId, nodeId,
-        "host:3465", resource, priority, null);
+    Container container = BuilderUtils
+        .newContainer(containerId, nodeId, "host:3465", resource, priority,
+            null);
 
     RMApplicationHistoryWriter writer = mock(RMApplicationHistoryWriter.class);
     RMContext rmContext = mock(RMContext.class);
     when(rmContext.getDispatcher()).thenReturn(drainDispatcher);
     when(rmContext.getContainerAllocationExpirer()).thenReturn(expirer);
     when(rmContext.getRMApplicationHistoryWriter()).thenReturn(writer);
-    RMContainer rmContainer = new RMContainerImpl(container, appAttemptId,
-        nodeId, "user", rmContext);
+    RMContainer rmContainer =
+        new RMContainerImpl(container, appAttemptId, nodeId, "user", rmContext,
+            null);
 
     assertEquals(RMContainerState.NEW, rmContainer.getState());
     assertEquals(resource, rmContainer.getAllocatedResource());
     assertEquals(nodeId, rmContainer.getAllocatedNode());
     assertEquals(priority, rmContainer.getAllocatedPriority());
-    verify(writer).containerStarted(any(RMContainer.class));
+    verify(writer)
+        .containerStarted(any(RMContainer.class), any(TransactionState.class));
 
-    rmContainer.handle(new RMContainerEvent(containerId,
-        RMContainerEventType.START));
+    rmContainer.handle(
+        new RMContainerEvent(containerId, RMContainerEventType.START, null));
     drainDispatcher.await();
     assertEquals(RMContainerState.ALLOCATED, rmContainer.getState());
 
-    rmContainer.handle(new RMContainerEvent(containerId,
-        RMContainerEventType.ACQUIRED));
+    rmContainer.handle(
+        new RMContainerEvent(containerId, RMContainerEventType.ACQUIRED, null));
     drainDispatcher.await();
     assertEquals(RMContainerState.ACQUIRED, rmContainer.getState());
 
-    rmContainer.handle(new RMContainerEvent(containerId,
-        RMContainerEventType.LAUNCHED));
+    rmContainer.handle(
+        new RMContainerEvent(containerId, RMContainerEventType.LAUNCHED, null));
     drainDispatcher.await();
     assertEquals(RMContainerState.RUNNING, rmContainer.getState());
-    assertEquals("//host:3465/node/containerlogs/container_1_0001_01_000001/user",
+    assertEquals(
+        "//host:3465/node/containerlogs/container_1_0001_01_000001/user",
         rmContainer.getLogURL());
 
     // In RUNNING state. Verify EXPIRE and associated actions.
@@ -198,10 +211,12 @@ public class TestRMContainerImpl {
     ContainerStatus containerStatus = SchedulerUtils
         .createAbnormalContainerStatus(containerId,
             SchedulerUtils.EXPIRED_CONTAINER);
-    rmContainer.handle(new RMContainerFinishedEvent(containerId,
-        containerStatus, RMContainerEventType.EXPIRE));
+    rmContainer.handle(
+        new RMContainerFinishedEvent(containerId, containerStatus,
+            RMContainerEventType.EXPIRE, null));
     drainDispatcher.await();
     assertEquals(RMContainerState.RUNNING, rmContainer.getState());
-    verify(writer, never()).containerFinished(any(RMContainer.class));
+    verify(writer, never())
+        .containerFinished(any(RMContainer.class), any(TransactionState.class));
   }
 }

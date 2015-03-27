@@ -17,26 +17,12 @@
  */
 package org.apache.hadoop.hdfs;
 
-import java.io.BufferedOutputStream;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.net.InetSocketAddress;
-import java.nio.ByteBuffer;
-import java.nio.channels.ReadableByteChannel;
-import java.util.EnumSet;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.fs.ReadOption;
-import org.apache.hadoop.hdfs.client.ClientMmap;
-import org.apache.hadoop.hdfs.net.Peer;
-import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
-import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.datatransfer.DataTransferProtoUtil;
+import org.apache.hadoop.hdfs.protocol.datatransfer.IOStreamPair;
 import org.apache.hadoop.hdfs.protocol.datatransfer.PacketHeader;
 import org.apache.hadoop.hdfs.protocol.datatransfer.PacketReceiver;
 import org.apache.hadoop.hdfs.protocol.datatransfer.Sender;
@@ -46,58 +32,70 @@ import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.ReadOpChecksumIn
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.Status;
 import org.apache.hadoop.hdfs.protocolPB.PBHelper;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
+import org.apache.hadoop.hdfs.security.token.block.DataEncryptionKey;
 import org.apache.hadoop.hdfs.security.token.block.InvalidBlockTokenException;
-import org.apache.hadoop.hdfs.server.datanode.CachingStrategy;
-import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.net.SocketInputWrapper;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.DataChecksum;
 
-import com.google.common.annotations.VisibleForTesting;
+import java.io.BufferedOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.nio.ByteBuffer;
+import java.nio.channels.ReadableByteChannel;
 
 /**
  * This is a wrapper around connection to datanode
  * and understands checksum, offset etc.
- *
+ * <p/>
  * Terminology:
  * <dl>
  * <dt>block</dt>
- *   <dd>The hdfs block, typically large (~64MB).
- *   </dd>
+ * <dd>The hdfs block, typically large (~64MB).
+ * </dd>
  * <dt>chunk</dt>
- *   <dd>A block is divided into chunks, each comes with a checksum.
- *       We want transfers to be chunk-aligned, to be able to
- *       verify checksums.
- *   </dd>
+ * <dd>A block is divided into chunks, each comes with a checksum.
+ * We want transfers to be chunk-aligned, to be able to
+ * verify checksums.
+ * </dd>
  * <dt>packet</dt>
- *   <dd>A grouping of chunks used for transport. It contains a
- *       header, followed by checksum data, followed by real data.
- *   </dd>
+ * <dd>A grouping of chunks used for transport. It contains a
+ * header, followed by checksum data, followed by real data.
+ * </dd>
  * </dl>
  * Please see DataNode for the RPC specification.
- *
+ * <p/>
  * This is a new implementation introduced in Hadoop 0.23 which
  * is more efficient and simpler than the older BlockReader
  * implementation. It should be renamed to RemoteBlockReader
  * once we are confident in it.
  */
 @InterfaceAudience.Private
-public class RemoteBlockReader2  implements BlockReader {
+public class RemoteBlockReader2 implements BlockReader {
 
   static final Log LOG = LogFactory.getLog(RemoteBlockReader2.class);
   
-  final private Peer peer;
-  final private DatanodeID datanodeID;
-  final private PeerCache peerCache;
+  Socket dnSock;
+  // for now just sending the status code (e.g. checksumOk) after the read.
+  private IOStreamPair ioStreams;
   private final ReadableByteChannel in;
   private DataChecksum checksum;
   
-  private final PacketReceiver packetReceiver = new PacketReceiver(true);
+  private PacketReceiver packetReceiver = new PacketReceiver(true);
   private ByteBuffer curDataSlice = null;
 
-  /** offset in block of the last chunk received */
+  /**
+   * offset in block of the last chunk received
+   */
   private long lastSeqNo = -1;
 
-  /** offset in block where reader wants to actually read */
+  /**
+   * offset in block where reader wants to actually read
+   */
   private long startOffset;
   private final String filename;
 
@@ -111,30 +109,23 @@ public class RemoteBlockReader2  implements BlockReader {
    */
   private long bytesNeededToFinish;
 
-  /**
-   * True if we are reading from a local DataNode.
-   */
-  private final boolean isLocal;
-
   private final boolean verifyChecksum;
 
   private boolean sentStatusCode = false;
   
   byte[] skipBuf = null;
   ByteBuffer checksumBytes = null;
-  /** Amount of unread data in the current received packet */
+  /**
+   * Amount of unread data in the current received packet
+   */
   int dataLeft = 0;
   
-  @VisibleForTesting
-  public Peer getPeer() {
-    return peer;
-  }
-  
   @Override
-  public synchronized int read(byte[] buf, int off, int len) 
-                               throws IOException {
+  public synchronized int read(byte[] buf, int off, int len)
+      throws IOException {
 
-    if (curDataSlice == null || curDataSlice.remaining() == 0 && bytesNeededToFinish > 0) {
+    if (curDataSlice == null ||
+        curDataSlice.remaining() == 0 && bytesNeededToFinish > 0) {
       readNextPacket();
     }
     if (curDataSlice.remaining() == 0) {
@@ -151,7 +142,8 @@ public class RemoteBlockReader2  implements BlockReader {
 
   @Override
   public int read(ByteBuffer buf) throws IOException {
-    if (curDataSlice == null || curDataSlice.remaining() == 0 && bytesNeededToFinish > 0) {
+    if (curDataSlice == null ||
+        curDataSlice.remaining() == 0 && bytesNeededToFinish > 0) {
       readNextPacket();
     }
     if (curDataSlice.remaining() == 0) {
@@ -182,8 +174,7 @@ public class RemoteBlockReader2  implements BlockReader {
 
     // Sanity check the lengths
     if (!curHeader.sanityCheck(lastSeqNo)) {
-         throw new IOException("BlockReader: error in packet header " +
-                               curHeader);
+      throw new IOException("BlockReader: error in packet header " + curHeader);
     }
     
     if (curHeader.getDataLen() > 0) {
@@ -191,8 +182,9 @@ public class RemoteBlockReader2  implements BlockReader {
       int checksumsLen = chunks * checksumSize;
 
       assert packetReceiver.getChecksumSlice().capacity() == checksumsLen :
-        "checksum slice capacity=" + packetReceiver.getChecksumSlice().capacity() + 
-          " checksumsLen=" + checksumsLen;
+          "checksum slice capacity=" +
+              packetReceiver.getChecksumSlice().capacity() +
+              " checksumsLen=" + checksumsLen;
       
       lastSeqNo = curHeader.getSeqno();
       if (verifyChecksum && curDataSlice.remaining() > 0) {
@@ -200,12 +192,12 @@ public class RemoteBlockReader2  implements BlockReader {
         // relative to the start of the block, not the start of the file.
         // This is slightly misleading, but preserves the behavior from
         // the older BlockReader.
-        checksum.verifyChunkedSums(curDataSlice,
-            packetReceiver.getChecksumSlice(),
-            filename, curHeader.getOffsetInBlock());
+        checksum
+            .verifyChunkedSums(curDataSlice, packetReceiver.getChecksumSlice(),
+                filename, curHeader.getOffsetInBlock());
       }
       bytesNeededToFinish -= curHeader.getDataLen();
-    }    
+    }
     
     // First packet will include some data prior to the first byte
     // the user requested. Skip it.
@@ -229,16 +221,16 @@ public class RemoteBlockReader2  implements BlockReader {
   @Override
   public synchronized long skip(long n) throws IOException {
     /* How can we make sure we don't throw a ChecksumException, at least
-     * in majority of the cases?. This one throws. */  
-    if ( skipBuf == null ) {
-      skipBuf = new byte[bytesPerChecksum]; 
+     * in majority of the cases?. This one throws. */
+    if (skipBuf == null) {
+      skipBuf = new byte[bytesPerChecksum];
     }
 
     long nSkipped = 0;
-    while ( nSkipped < n ) {
-      int toSkip = (int)Math.min(n-nSkipped, skipBuf.length);
+    while (nSkipped < n) {
+      int toSkip = (int) Math.min(n - nSkipped, skipBuf.length);
       int ret = read(skipBuf, 0, toSkip);
-      if ( ret <= 0 ) {
+      if (ret <= 0) {
         return nSkipped;
       }
       nSkipped += ret;
@@ -254,28 +246,24 @@ public class RemoteBlockReader2  implements BlockReader {
     packetReceiver.receiveNextPacket(in);
 
     PacketHeader trailer = packetReceiver.getHeader();
-    if (!trailer.isLastPacketInBlock() ||
-       trailer.getDataLen() != 0) {
-      throw new IOException("Expected empty end-of-read packet! Header: " +
-                            trailer);
+    if (!trailer.isLastPacketInBlock() || trailer.getDataLen() != 0) {
+      throw new IOException(
+          "Expected empty end-of-read packet! Header: " + trailer);
     }
   }
 
   protected RemoteBlockReader2(String file, String bpid, long blockId,
-      DataChecksum checksum, boolean verifyChecksum,
-      long startOffset, long firstChunkOffset, long bytesToRead, Peer peer,
-      DatanodeID datanodeID, PeerCache peerCache) {
-    this.isLocal = DFSClient.isLocalAddress(NetUtils.
-        createSocketAddr(datanodeID.getXferAddr()));
+      ReadableByteChannel in, DataChecksum checksum, boolean verifyChecksum,
+      long startOffset, long firstChunkOffset, long bytesToRead, Socket dnSock,
+      IOStreamPair ioStreams) {
     // Path is used only for printing block and file information in debug
-    this.peer = peer;
-    this.datanodeID = datanodeID;
-    this.in = peer.getInputStreamChannel();
+    this.dnSock = dnSock;
+    this.ioStreams = ioStreams;
+    this.in = in;
     this.checksum = checksum;
     this.verifyChecksum = verifyChecksum;
-    this.startOffset = Math.max( startOffset, 0 );
+    this.startOffset = Math.max(startOffset, 0);
     this.filename = file;
-    this.peerCache = peerCache;
 
     // The total number of bytes that we need to transfer from the DN is
     // the amount that the user wants (bytesToRead), plus the padding at
@@ -290,17 +278,36 @@ public class RemoteBlockReader2  implements BlockReader {
   @Override
   public synchronized void close() throws IOException {
     packetReceiver.close();
+    
     startOffset = -1;
     checksum = null;
-    if (peerCache != null && sentStatusCode) {
-      peerCache.put(datanodeID, peer);
-    } else {
-      peer.close();
+    if (dnSock != null) {
+      dnSock.close();
     }
 
     // in will be closed when its Socket is closed.
   }
   
+  /**
+   * Take the socket used to talk to the DN.
+   */
+  @Override
+  public Socket takeSocket() {
+    assert hasSentStatusCode() : "BlockReader shouldn't give back sockets mid-read";
+    Socket res = dnSock;
+    dnSock = null;
+    return res;
+  }
+
+  /**
+   * Whether the BlockReader has reached the end of its input stream
+   * and successfully sent a status code back to the datanode.
+   */
+  @Override
+  public boolean hasSentStatusCode() {
+    return sentStatusCode;
+  }
+
   /**
    * When the reader reaches end of the read, it sends a status response
    * (e.g. CHECKSUM_OK) to the DN. Failure to do so could lead to the DN
@@ -308,14 +315,14 @@ public class RemoteBlockReader2  implements BlockReader {
    * data correctness.
    */
   void sendReadResult(Status statusCode) {
-    assert !sentStatusCode : "already sent status code to " + peer;
+    assert !sentStatusCode : "already sent status code to " + dnSock;
     try {
-      writeReadResult(peer.getOutputStream(), statusCode);
+      writeReadResult(ioStreams.out, statusCode);
       sentStatusCode = true;
     } catch (IOException e) {
       // It's ok not to be able to send this. But something is probably wrong.
       LOG.info("Could not send read status (" + statusCode + ") to datanode " +
-               peer.getRemoteAddressString() + ": " + e.getMessage());
+          dnSock.getInetAddress() + ": " + e.getMessage());
     }
   }
 
@@ -325,19 +332,21 @@ public class RemoteBlockReader2  implements BlockReader {
   static void writeReadResult(OutputStream out, Status statusCode)
       throws IOException {
     
-    ClientReadStatusProto.newBuilder()
-      .setStatus(statusCode)
-      .build()
-      .writeDelimitedTo(out);
+    ClientReadStatusProto.newBuilder().setStatus(statusCode).build()
+        .writeDelimitedTo(out);
 
     out.flush();
   }
   
   /**
    * File name to print when accessing a block directly (from servlets)
-   * @param s Address of the block location
-   * @param poolId Block pool ID of the block
-   * @param blockId Block ID of the block
+   *
+   * @param s
+   *     Address of the block location
+   * @param poolId
+   *     Block pool ID of the block
+   * @param blockId
+   *     Block ID of the block
    * @return string that has a file name for debug purposes
    */
   public static String getFileName(final InetSocketAddress s,
@@ -359,104 +368,97 @@ public class RemoteBlockReader2  implements BlockReader {
    * Create a new BlockReader specifically to satisfy a read.
    * This method also sends the OP_READ_BLOCK request.
    *
-   * @param sock  An established Socket to the DN. The BlockReader will not close it normally.
-   *             This socket must have an associated Channel.
-   * @param file  File location
-   * @param block  The block object
-   * @param blockToken  The block token for security
-   * @param startOffset  The read offset, relative to block head
-   * @param len  The number of bytes to read
-   * @param verifyChecksum  Whether to verify checksum
-   * @param clientName  Client name
-   * @param peer  The Peer to use
-   * @param datanodeID  The DatanodeID this peer is connected to
+   * @param sock
+   *     An established Socket to the DN. The BlockReader will not close it
+   *     normally.
+   *     This socket must have an associated Channel.
+   * @param file
+   *     File location
+   * @param block
+   *     The block object
+   * @param blockToken
+   *     The block token for security
+   * @param startOffset
+   *     The read offset, relative to block head
+   * @param len
+   *     The number of bytes to read
+   * @param bufferSize
+   *     The IO buffer size (not the client buffer size)
+   * @param verifyChecksum
+   *     Whether to verify checksum
+   * @param clientName
+   *     Client name
    * @return New BlockReader instance, or null on error.
    */
-  public static BlockReader newBlockReader(String file,
-                                     ExtendedBlock block,
-                                     Token<BlockTokenIdentifier> blockToken,
-                                     long startOffset, long len,
-                                     boolean verifyChecksum,
-                                     String clientName,
-                                     Peer peer, DatanodeID datanodeID,
-                                     PeerCache peerCache,
-                                     CachingStrategy cachingStrategy) throws IOException {
+  public static BlockReader newBlockReader(Socket sock, String file,
+      ExtendedBlock block, Token<BlockTokenIdentifier> blockToken,
+      long startOffset, long len, int bufferSize, boolean verifyChecksum,
+      String clientName, DataEncryptionKey encryptionKey,
+      IOStreamPair ioStreams) throws IOException {
+    
+    ReadableByteChannel ch;
+    if (ioStreams.in instanceof SocketInputWrapper) {
+      ch = ((SocketInputWrapper) ioStreams.in).getReadableByteChannel();
+    } else {
+      ch = (ReadableByteChannel) ioStreams.in;
+    }
+    
     // in and out will be closed when sock is closed (by the caller)
-    final DataOutputStream out = new DataOutputStream(new BufferedOutputStream(
-          peer.getOutputStream()));
+    final DataOutputStream out =
+        new DataOutputStream(new BufferedOutputStream(ioStreams.out));
     new Sender(out).readBlock(block, blockToken, clientName, startOffset, len,
-        verifyChecksum, cachingStrategy);
+        verifyChecksum);
 
     //
     // Get bytes in block
     //
-    DataInputStream in = new DataInputStream(peer.getInputStream());
+    DataInputStream in = new DataInputStream(ioStreams.in);
 
-    BlockOpResponseProto status = BlockOpResponseProto.parseFrom(
-        PBHelper.vintPrefixed(in));
-    checkSuccess(status, peer, block, file);
-    ReadOpChecksumInfoProto checksumInfo =
-      status.getReadOpChecksumInfo();
-    DataChecksum checksum = DataTransferProtoUtil.fromProto(
-        checksumInfo.getChecksum());
+    BlockOpResponseProto status =
+        BlockOpResponseProto.parseFrom(PBHelper.vintPrefixed(in));
+    checkSuccess(status, sock, block, file);
+    ReadOpChecksumInfoProto checksumInfo = status.getReadOpChecksumInfo();
+    DataChecksum checksum =
+        DataTransferProtoUtil.fromProto(checksumInfo.getChecksum());
     //Warning when we get CHECKSUM_NULL?
 
     // Read the first chunk offset.
     long firstChunkOffset = checksumInfo.getChunkOffset();
 
-    if ( firstChunkOffset < 0 || firstChunkOffset > startOffset ||
+    if (firstChunkOffset < 0 || firstChunkOffset > startOffset ||
         firstChunkOffset <= (startOffset - checksum.getBytesPerChecksum())) {
       throw new IOException("BlockReader: error in first chunk offset (" +
-                            firstChunkOffset + ") startOffset is " +
-                            startOffset + " for file " + file);
+          firstChunkOffset + ") startOffset is " +
+          startOffset + " for file " + file);
     }
 
-    return new RemoteBlockReader2(file, block.getBlockPoolId(), block.getBlockId(),
-        checksum, verifyChecksum, startOffset, firstChunkOffset, len, peer,
-        datanodeID, peerCache);
+    return new RemoteBlockReader2(file, block.getBlockPoolId(),
+        block.getBlockId(), ch, checksum, verifyChecksum, startOffset,
+        firstChunkOffset, len, sock, ioStreams);
   }
 
-  static void checkSuccess(
-      BlockOpResponseProto status, Peer peer,
-      ExtendedBlock block, String file)
-      throws IOException {
+  static void checkSuccess(BlockOpResponseProto status, Socket sock,
+      ExtendedBlock block, String file) throws IOException {
     if (status.getStatus() != Status.SUCCESS) {
       if (status.getStatus() == Status.ERROR_ACCESS_TOKEN) {
         throw new InvalidBlockTokenException(
-            "Got access token error for OP_READ_BLOCK, self="
-                + peer.getLocalAddressString() + ", remote="
-                + peer.getRemoteAddressString() + ", for file " + file
-                + ", for pool " + block.getBlockPoolId() + " block " 
-                + block.getBlockId() + "_" + block.getGenerationStamp());
+            "Got access token error for OP_READ_BLOCK, self=" +
+                sock.getLocalSocketAddress() + ", remote=" +
+                sock.getRemoteSocketAddress() + ", for file " + file +
+                ", for pool " + block.getBlockPoolId() + " block " +
+                block.getBlockId() + "_" + block.getGenerationStamp());
       } else {
-        throw new IOException("Got error for OP_READ_BLOCK, self="
-            + peer.getLocalAddressString() + ", remote="
-            + peer.getRemoteAddressString() + ", for file " + file
-            + ", for pool " + block.getBlockPoolId() + " block " 
-            + block.getBlockId() + "_" + block.getGenerationStamp());
+        throw new IOException("Got error for OP_READ_BLOCK, self=" +
+            sock.getLocalSocketAddress() + ", remote=" +
+            sock.getRemoteSocketAddress() + ", for file " + file +
+            ", for pool " + block.getBlockPoolId() + " block " +
+            block.getBlockId() + "_" + block.getGenerationStamp());
       }
     }
   }
-  
-  @Override
-  public int available() throws IOException {
-    // An optimistic estimate of how much data is available
-    // to us without doing network I/O.
-    return DFSClient.TCP_WINDOW_SIZE;
-  }
-  
-  @Override
-  public boolean isLocal() {
-    return isLocal;
-  }
-  
-  @Override
-  public boolean isShortCircuit() {
-    return false;
-  }
 
   @Override
-  public ClientMmap getClientMmap(EnumSet<ReadOption> opts) {
-    return null;
+  public IOStreamPair getStreams() {
+    return ioStreams;
   }
 }

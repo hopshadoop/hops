@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.yarn.client.api;
 
-import java.io.IOException;
-
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
@@ -29,11 +27,11 @@ import org.apache.hadoop.yarn.api.records.timeline.TimelinePutResponse;
 import org.apache.hadoop.yarn.client.api.impl.TimelineClientImpl;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 
+import java.io.IOException;
+
 /**
  * A client library that can be used to post some information in terms of a
  * number of conceptual entities.
- * 
- * @See Entity
  */
 @Public
 @Unstable
@@ -56,15 +54,15 @@ public abstract class TimelineClient extends AbstractService {
    * server. It is a blocking API. The method will not return until it gets the
    * response from the timeline server.
    * </p>
-   * 
+   *
    * @param entities
-   *          the collection of {@link TimelineEntity}
+   *     the collection of {@link TimelineEntity}
    * @return the error information if the sent entities are not correctly stored
    * @throws IOException
    * @throws YarnException
    */
   @Public
-  public abstract TimelinePutResponse putEntities(
-      TimelineEntity... entities) throws IOException, YarnException;
+  public abstract TimelinePutResponse putEntities(TimelineEntity... entities)
+      throws IOException, YarnException;
 
 }

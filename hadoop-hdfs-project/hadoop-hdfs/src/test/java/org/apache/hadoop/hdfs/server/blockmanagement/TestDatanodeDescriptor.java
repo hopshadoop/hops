@@ -17,16 +17,28 @@
  */
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
+import io.hops.common.INodeUtil;
+import io.hops.exception.StorageException;
+import io.hops.metadata.HdfsStorageFactory;
+import io.hops.metadata.hdfs.entity.INodeIdentifier;
+import io.hops.transaction.handler.HDFSOperationType;
+import io.hops.transaction.handler.HopsTransactionalRequestHandler;
+import io.hops.transaction.lock.LockFactory;
+import io.hops.transaction.lock.TransactionLocks;
+import org.apache.hadoop.hdfs.DFSTestUtil;
+import org.apache.hadoop.hdfs.HdfsConfiguration;
+import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.server.common.GenerationStamp;
+import org.apache.hadoop.hdfs.server.namenode.INode;
+import org.junit.Test;
+
+import java.io.IOException;
+import java.util.ArrayList;
+
+import static io.hops.transaction.lock.LockFactory.BLK;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-
-import java.util.ArrayList;
-
-import org.apache.hadoop.hdfs.DFSTestUtil;
-import org.apache.hadoop.hdfs.protocol.Block;
-import org.apache.hadoop.hdfs.server.common.GenerationStamp;
-import org.junit.Test;
 
 /**
  * This class tests that methods in DatanodeDescriptor
@@ -43,8 +55,8 @@ public class TestDatanodeDescriptor {
     
     DatanodeDescriptor dd = DFSTestUtil.getLocalDatanodeDescriptor();
     ArrayList<Block> blockList = new ArrayList<Block>(MAX_BLOCKS);
-    for (int i=0; i<MAX_BLOCKS; i++) {
-      blockList.add(new Block(i, 0, GenerationStamp.LAST_RESERVED_STAMP));
+    for (int i = 0; i < MAX_BLOCKS; i++) {
+      blockList.add(new Block(i, 0, GenerationStamp.FIRST_VALID_STAMP));
     }
     dd.addBlocksToBeInvalidated(blockList);
     Block[] bc = dd.getInvalidateBlocks(MAX_LIMIT);
@@ -55,30 +67,83 @@ public class TestDatanodeDescriptor {
   
   @Test
   public void testBlocksCounter() throws Exception {
-    DatanodeDescriptor dd = BlockManagerTestUtil.getLocalDatanodeDescriptor(true);
+    HdfsStorageFactory.setConfiguration(new HdfsConfiguration());
+    HdfsStorageFactory.formatStorage();
+    
+    DatanodeDescriptor dd = DFSTestUtil.getLocalDatanodeDescriptor();
     assertEquals(0, dd.numBlocks());
-    BlockInfo blk = new BlockInfo(new Block(1L), 1);
-    BlockInfo blk1 = new BlockInfo(new Block(2L), 2);
-    DatanodeStorageInfo[] storages = dd.getStorageInfos();
-    assertTrue(storages.length > 0);
-    final String storageID = storages[0].getStorageID();
+    BlockInfo blk = new BlockInfo(new Block(1L), INode.NON_EXISTING_ID);
+    BlockInfo blk1 = new BlockInfo(new Block(2L), INode.NON_EXISTING_ID);
     // add first block
-    assertTrue(dd.addBlock(storageID, blk));
+    assertTrue(addBlock(dd, blk));
     assertEquals(1, dd.numBlocks());
     // remove a non-existent block
-    assertFalse(dd.removeBlock(blk1));
+    assertFalse(removeBlock(dd, blk1));
     assertEquals(1, dd.numBlocks());
     // add an existent block
-    assertFalse(dd.addBlock(storageID, blk));
+    assertFalse(addBlock(dd, blk));
+    System.out.println("number of blks are " + dd.numBlocks());
     assertEquals(1, dd.numBlocks());
     // add second block
-    assertTrue(dd.addBlock(storageID, blk1));
+    assertTrue(addBlock(dd, blk1));
     assertEquals(2, dd.numBlocks());
     // remove first block
-    assertTrue(dd.removeBlock(blk));
+    assertTrue(removeBlock(dd, blk));
     assertEquals(1, dd.numBlocks());
     // remove second block
-    assertTrue(dd.removeBlock(blk1));
-    assertEquals(0, dd.numBlocks());    
+    assertTrue(removeBlock(dd, blk1));
+    assertEquals(0, dd.numBlocks());
+  }
+  
+  private boolean addBlock(final DatanodeDescriptor dn, final BlockInfo blk)
+      throws IOException {
+    return (Boolean) new HopsTransactionalRequestHandler(
+        HDFSOperationType.TEST) {
+      INodeIdentifier inodeIdentifier;
+
+      @Override
+      public void setUp() throws StorageException, IOException {
+        inodeIdentifier = INodeUtil.resolveINodeFromBlock(blk);
+      }
+
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = LockFactory.getInstance();
+        locks.add(lf.getIndividualBlockLock(blk.getBlockId(), inodeIdentifier))
+            .add(lf.getBlockRelated(BLK.RE));
+      }
+
+      @Override
+      public Object performTask() throws StorageException, IOException {
+        return dn.addBlock(blk);
+      }
+
+    }.handle();
+  }
+
+  private boolean removeBlock(final DatanodeDescriptor dn, final BlockInfo blk)
+      throws IOException {
+    return (Boolean) new HopsTransactionalRequestHandler(
+        HDFSOperationType.TEST) {
+      INodeIdentifier inodeIdentifier;
+
+      @Override
+      public void setUp() throws StorageException, IOException {
+        inodeIdentifier = INodeUtil.resolveINodeFromBlock(blk);
+      }
+
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = LockFactory.getInstance();
+        locks.add(lf.getIndividualBlockLock(blk.getBlockId(), inodeIdentifier))
+            .add(lf.getBlockRelated(BLK.RE));
+      }
+
+      @Override
+      public Object performTask() throws StorageException, IOException {
+        return dn.removeBlock(blk);
+      }
+
+    }.handle();
   }
 }

@@ -17,13 +17,27 @@
  */
 
 option java_package = "org.apache.hadoop.yarn.proto";
+
 option java_outer_classname = "YarnServerCommonServiceProtos";
+
 option java_generic_services = true;
+
 option java_generate_equals_and_hash = true;
+
 package hadoop.yarn;
 
 import "yarn_protos.proto";
+
 import "yarn_server_common_protos.proto";
+
+message RMNodeMsgRequestProto {
+  optional int32 id = 1;
+  optional int32 type = 2;
+}
+
+message RMNodeMsgResponseProto {
+  optional int32 result = 1;
+}
 
 message RegisterNodeManagerRequestProto {
   optional NodeIdProto node_id = 1;
@@ -57,4 +71,5 @@ message NodeHeartbeatResponseProto {
   repeated ApplicationIdProto applications_to_cleanup = 6;
   optional int64 nextHeartBeatInterval = 7;
   optional string diagnostics_message = 8;
+  optional bool nextheartbeat = 9;
 }

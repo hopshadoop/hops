@@ -33,7 +33,8 @@ public class Parameters {
   /**
    * Constructor that receives the request parsed parameters.
    *
-   * @param params the request parsed parameters.
+   * @param params
+   *     the request parsed parameters.
    */
   public Parameters(Map<String, Param<?>> params) {
     this.params = params;
@@ -42,13 +43,15 @@ public class Parameters {
   /**
    * Returns the value of a request parsed parameter.
    *
-   * @param name parameter name.
-   * @param klass class of the parameter, used for value casting.
-  * @return the value of the parameter.
+   * @param name
+   *     parameter name.
+   * @param klass
+   *     class of the parameter, used for value casting.
+   * @return the value of the parameter.
    */
   @SuppressWarnings("unchecked")
   public <V, T extends Param<V>> V get(String name, Class<T> klass) {
-    return ((T)params.get(name)).value();
+    return ((T) params.get(name)).value();
   }
   
 }

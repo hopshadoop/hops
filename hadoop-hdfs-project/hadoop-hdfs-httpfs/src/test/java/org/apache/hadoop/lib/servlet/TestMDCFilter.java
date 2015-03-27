@@ -18,13 +18,10 @@
 
 package org.apache.hadoop.lib.servlet;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-
-import java.io.IOException;
-import java.security.Principal;
-import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.hadoop.test.HTestCase;
+import org.junit.Test;
+import org.mockito.Mockito;
+import org.slf4j.MDC;
 
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
@@ -32,11 +29,13 @@ import javax.servlet.ServletException;
 import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
+import java.io.IOException;
+import java.security.Principal;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.apache.hadoop.test.HTestCase;
-import org.junit.Test;
-import org.mockito.Mockito;
-import org.slf4j.MDC;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 
 public class TestMDCFilter extends HTestCase {
@@ -54,8 +53,9 @@ public class TestMDCFilter extends HTestCase {
 
     FilterChain chain = new FilterChain() {
       @Override
-      public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse)
-        throws IOException, ServletException {
+      public void doFilter(ServletRequest servletRequest,
+          ServletResponse servletResponse)
+          throws IOException, ServletException {
         assertEquals(MDC.get("hostname"), null);
         assertEquals(MDC.get("user"), null);
         assertEquals(MDC.get("method"), "METHOD");
@@ -85,8 +85,9 @@ public class TestMDCFilter extends HTestCase {
     invoked.set(false);
     chain = new FilterChain() {
       @Override
-      public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse)
-        throws IOException, ServletException {
+      public void doFilter(ServletRequest servletRequest,
+          ServletResponse servletResponse)
+          throws IOException, ServletException {
         assertEquals(MDC.get("hostname"), null);
         assertEquals(MDC.get("user"), "name");
         assertEquals(MDC.get("method"), "METHOD");
@@ -102,8 +103,9 @@ public class TestMDCFilter extends HTestCase {
     invoked.set(false);
     chain = new FilterChain() {
       @Override
-      public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse)
-        throws IOException, ServletException {
+      public void doFilter(ServletRequest servletRequest,
+          ServletResponse servletResponse)
+          throws IOException, ServletException {
         assertEquals(MDC.get("hostname"), "HOST");
         assertEquals(MDC.get("user"), "name");
         assertEquals(MDC.get("method"), "METHOD");

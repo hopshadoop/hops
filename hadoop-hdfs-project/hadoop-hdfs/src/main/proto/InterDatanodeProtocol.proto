@@ -16,19 +16,17 @@
  * limitations under the License.
  */
 
-/**
- * These .proto interfaces are private and stable.
- * Please see http://wiki.apache.org/hadoop/Compatibility
- * for what changes are allowed for a *stable* .proto interface.
- */
-
 // This file contains protocol buffers that are used throughout HDFS -- i.e.
 // by the client, server, and data transfer protocols.
 
 option java_package = "org.apache.hadoop.hdfs.protocol.proto";
+
 option java_outer_classname = "InterDatanodeProtocolProtos";
+
 option java_generic_services = true;
+
 option java_generate_equals_and_hash = true;
+
 package hadoop.hdfs;
 
 import "hdfs.proto";
@@ -49,7 +47,7 @@ message InitReplicaRecoveryResponseProto {
 
   // The following entries are not set if there was no replica found.
   optional ReplicaStateProto state = 2; // State of the replica
-  optional BlockProto block = 3;   // block information
+  optional BlockProto block = 3; // block information
 }
 
 /**
@@ -57,15 +55,15 @@ message InitReplicaRecoveryResponseProto {
  */
 message UpdateReplicaUnderRecoveryRequestProto {
   required ExtendedBlockProto block = 1; // Block identifier
-  required uint64 recoveryId = 2;        // New genstamp of the replica
-  required uint64 newLength = 3;         // New length of the replica
+  required uint64 recoveryId = 2; // New genstamp of the replica
+  required uint64 newLength = 3; // New length of the replica
 }
 
 /**
  * Response returns updated block information
  */
 message UpdateReplicaUnderRecoveryResponseProto {
-  optional string storageUuid = 1; // ID of the storage that stores replica
+  required string storageID = 1; // ID of the storage that stores replica
 }
 
 /**
@@ -77,12 +75,10 @@ service InterDatanodeProtocolService {
   /**
    * Initialize recovery of a replica
    */
-  rpc initReplicaRecovery(InitReplicaRecoveryRequestProto)
-      returns(InitReplicaRecoveryResponseProto);
+  rpc initReplicaRecovery (InitReplicaRecoveryRequestProto) returns (InitReplicaRecoveryResponseProto);
 
   /**
    * Update a replica with new generation stamp and length
    */
-  rpc updateReplicaUnderRecovery(UpdateReplicaUnderRecoveryRequestProto)
-      returns(UpdateReplicaUnderRecoveryResponseProto);
+  rpc updateReplicaUnderRecovery (UpdateReplicaUnderRecoveryRequestProto) returns (UpdateReplicaUnderRecoveryResponseProto);
 }

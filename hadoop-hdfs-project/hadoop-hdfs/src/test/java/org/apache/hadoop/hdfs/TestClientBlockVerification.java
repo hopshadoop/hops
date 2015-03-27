@@ -18,12 +18,6 @@
 
 package org.apache.hadoop.hdfs;
 
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.verify;
-
-import java.util.List;
-
 import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
@@ -33,6 +27,12 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import java.util.List;
+
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
+
 public class TestClientBlockVerification {
 
   static BlockReaderTestUtil util = null;
@@ -41,8 +41,9 @@ public class TestClientBlockVerification {
   static LocatedBlock testBlock = null;
 
   static {
-    ((Log4JLogger)RemoteBlockReader2.LOG).getLogger().setLevel(Level.ALL);
+    ((Log4JLogger) RemoteBlockReader2.LOG).getLogger().setLevel(Level.ALL);
   }
+
   @BeforeClass
   public static void setupCluster() throws Exception {
     final int REPLICATION_FACTOR = 1;
@@ -57,7 +58,7 @@ public class TestClientBlockVerification {
    */
   @Test
   public void testBlockVerification() throws Exception {
-    RemoteBlockReader2 reader = (RemoteBlockReader2)spy(
+    RemoteBlockReader2 reader = (RemoteBlockReader2) spy(
         util.getBlockReader(testBlock, 0, FILE_SIZE_K * 1024));
     util.readAndCheckEOS(reader, FILE_SIZE_K * 1024, true);
     verify(reader).sendReadResult(Status.CHECKSUM_OK);
@@ -69,7 +70,7 @@ public class TestClientBlockVerification {
    */
   @Test
   public void testIncompleteRead() throws Exception {
-    RemoteBlockReader2 reader = (RemoteBlockReader2)spy(
+    RemoteBlockReader2 reader = (RemoteBlockReader2) spy(
         util.getBlockReader(testBlock, 0, FILE_SIZE_K * 1024));
     util.readAndCheckEOS(reader, FILE_SIZE_K / 2 * 1024, false);
 
@@ -87,7 +88,7 @@ public class TestClientBlockVerification {
   @Test
   public void testCompletePartialRead() throws Exception {
     // Ask for half the file
-    RemoteBlockReader2 reader = (RemoteBlockReader2)spy(
+    RemoteBlockReader2 reader = (RemoteBlockReader2) spy(
         util.getBlockReader(testBlock, 0, FILE_SIZE_K * 1024 / 2));
     // And read half the file
     util.readAndCheckEOS(reader, FILE_SIZE_K * 1024 / 2, true);
@@ -101,13 +102,13 @@ public class TestClientBlockVerification {
    */
   @Test
   public void testUnalignedReads() throws Exception {
-    int startOffsets[] = new int[] { 0, 3, 129 };
-    int lengths[] = new int[] { 30, 300, 512, 513, 1025 };
+    int startOffsets[] = new int[]{0, 3, 129};
+    int lengths[] = new int[]{30, 300, 512, 513, 1025};
     for (int startOffset : startOffsets) {
       for (int length : lengths) {
         DFSClient.LOG.info("Testing startOffset = " + startOffset + " and " +
-                           " len=" + length);
-        RemoteBlockReader2 reader = (RemoteBlockReader2)spy(
+            " len=" + length);
+        RemoteBlockReader2 reader = (RemoteBlockReader2) spy(
             util.getBlockReader(testBlock, startOffset, length));
         util.readAndCheckEOS(reader, length, true);
         verify(reader).sendReadResult(Status.CHECKSUM_OK);

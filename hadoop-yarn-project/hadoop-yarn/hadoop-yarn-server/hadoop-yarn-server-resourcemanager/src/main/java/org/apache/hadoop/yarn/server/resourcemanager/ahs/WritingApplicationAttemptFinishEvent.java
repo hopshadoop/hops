@@ -18,19 +18,20 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.ahs;
 
+import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.server.applicationhistoryservice.records.ApplicationAttemptFinishData;
 
-public class WritingApplicationAttemptFinishEvent extends
-    WritingApplicationHistoryEvent {
+public class WritingApplicationAttemptFinishEvent
+    extends WritingApplicationHistoryEvent {
 
   private ApplicationAttemptId appAttemptId;
   private ApplicationAttemptFinishData appAttemptFinish;
 
-  public WritingApplicationAttemptFinishEvent(
-      ApplicationAttemptId appAttemptId,
-      ApplicationAttemptFinishData appAttemptFinish) {
-    super(WritingHistoryEventType.APP_ATTEMPT_FINISH);
+  public WritingApplicationAttemptFinishEvent(ApplicationAttemptId appAttemptId,
+      ApplicationAttemptFinishData appAttemptFinish,
+      TransactionState transactionState) {
+    super(WritingHistoryEventType.APP_ATTEMPT_FINISH, transactionState);
     this.appAttemptId = appAttemptId;
     this.appAttemptFinish = appAttemptFinish;
   }

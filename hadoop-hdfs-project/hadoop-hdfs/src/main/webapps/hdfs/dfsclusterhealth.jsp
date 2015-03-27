@@ -38,7 +38,8 @@
     * accorss cluster reported by all name nodes.  
     * It also lists information such as used space per name node. 
     */
-   final ClusterJspHelper clusterhealthjsp  = new ClusterJspHelper();
+   final NameNode nn = NameNodeHttpServer.getNameNodeFromContext(application);
+   final ClusterJspHelper clusterhealthjsp  = new ClusterJspHelper(nn);
    ClusterStatus cInfo = clusterhealthjsp.generateClusterHealthReport();
    XMLOutputter doc = new XMLOutputter(out, "UTF-8");
    cInfo.toXML(doc);

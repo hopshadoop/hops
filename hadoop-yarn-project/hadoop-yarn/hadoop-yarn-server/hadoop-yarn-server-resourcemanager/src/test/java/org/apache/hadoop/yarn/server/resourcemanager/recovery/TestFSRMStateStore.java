@@ -18,13 +18,7 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.recovery;
 
-import static org.junit.Assert.assertTrue;
-
-import java.io.IOException;
-import java.util.concurrent.atomic.AtomicBoolean;
-
 import junit.framework.Assert;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -44,6 +38,11 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppState;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.junit.Test;
+
+import java.io.IOException;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import static org.junit.Assert.assertTrue;
 
 public class TestFSRMStateStore extends RMStateStoreTestBase {
 
@@ -68,7 +67,8 @@ public class TestFSRMStateStore extends RMStateStoreTestBase {
       }
 
       public Path getVersionNode() {
-        return new Path(new Path(workingDirPathURI, ROOT_DIR_NAME), VERSION_NODE);
+        return new Path(new Path(workingDirPathURI, ROOT_DIR_NAME),
+            VERSION_NODE);
       }
 
       public RMStateVersion getCurrentVersion() {
@@ -99,7 +99,7 @@ public class TestFSRMStateStore extends RMStateStoreTestBase {
       conf.set(YarnConfiguration.FS_RM_STATE_STORE_URI,
           workingDirPathURI.toString());
       conf.set(YarnConfiguration.FS_RM_STATE_STORE_RETRY_POLICY_SPEC,
-        "100,6000");
+          "100,6000");
       this.store = new TestFileSystemRMStore(conf);
       return store;
     }
@@ -113,8 +113,8 @@ public class TestFSRMStateStore extends RMStateStoreTestBase {
 
     @Override
     public void writeVersion(RMStateVersion version) throws Exception {
-      store.updateFile(store.getVersionNode(), ((RMStateVersionPBImpl) version)
-        .getProto().toByteArray());
+      store.updateFile(store.getVersionNode(),
+          ((RMStateVersionPBImpl) version).getProto().toByteArray());
     }
 
     @Override
@@ -124,8 +124,7 @@ public class TestFSRMStateStore extends RMStateStoreTestBase {
 
     public boolean appExists(RMApp app) throws IOException {
       FileSystem fs = cluster.getFileSystem();
-      Path nodePath =
-          store.getAppDir(app.getApplicationId().toString());
+      Path nodePath = store.getAppDir(app.getApplicationId().toString());
       return fs.exists(nodePath);
     }
   }
@@ -154,8 +153,8 @@ public class TestFSRMStateStore extends RMStateStoreTestBase {
       fsOut.close();
 
       testRMAppStateStore(fsTester);
-      Assert.assertFalse(fsTester.workingDirPathURI
-          .getFileSystem(conf).exists(tempAppAttemptFile));
+      Assert.assertFalse(fsTester.workingDirPathURI.getFileSystem(conf)
+          .exists(tempAppAttemptFile));
       testRMDTSecretManagerStateStore(fsTester);
       testCheckVersion(fsTester);
       testAppDeletion(fsTester);
@@ -164,7 +163,7 @@ public class TestFSRMStateStore extends RMStateStoreTestBase {
     }
   }
 
-  @Override
+  //  @Override
   protected void modifyAppState() throws Exception {
     // imitate appAttemptFile1 is still .new, but old one is deleted
     String appAttemptIdStr1 = "appattempt_1352994193343_0001_000001";
@@ -172,8 +171,7 @@ public class TestFSRMStateStore extends RMStateStoreTestBase {
         ConverterUtils.toApplicationAttemptId(appAttemptIdStr1);
     Path appDir =
         fsTester.store.getAppDir(attemptId1.getApplicationId().toString());
-    Path appAttemptFile1 =
-        new Path(appDir, attemptId1.toString() + ".new");
+    Path appAttemptFile1 = new Path(appDir, attemptId1.toString() + ".new");
     FileSystemRMStateStore fileSystemRMStateStore =
         (FileSystemRMStateStore) fsTester.getRMStateStore();
     fileSystemRMStateStore.renameFile(appAttemptFile1,
@@ -181,11 +179,11 @@ public class TestFSRMStateStore extends RMStateStoreTestBase {
             appAttemptFile1.getName() + ".new"));
   }
 
-  @Override
+  //  @Override
   protected void modifyRMDelegationTokenState() throws Exception {
     // imitate dt file is still .new, but old one is deleted
-    Path nodeCreatePath =
-        fsTester.store.getNodePath(fsTester.store.rmDTSecretManagerRoot,
+    Path nodeCreatePath = fsTester.store
+        .getNodePath(fsTester.store.rmDTSecretManagerRoot,
             FileSystemRMStateStore.DELEGATION_TOKEN_PREFIX + 0);
     FileSystemRMStateStore fileSystemRMStateStore =
         (FileSystemRMStateStore) fsTester.getRMStateStore();
@@ -194,7 +192,7 @@ public class TestFSRMStateStore extends RMStateStoreTestBase {
             nodeCreatePath.getName() + ".new"));
   }
 
-  @Test (timeout = 30000)
+  @Test(timeout = 30000)
   public void testFSRMStateStoreClientRetry() throws Exception {
     HdfsConfiguration conf = new HdfsConfiguration();
     MiniDFSCluster cluster =
@@ -215,7 +213,7 @@ public class TestFSRMStateStore extends RMStateStoreTestBase {
                 ApplicationId.newInstance(100L, 1),
                 (ApplicationStateDataPBImpl) ApplicationStateDataPBImpl
                     .newApplicationStateData(111, 111, "user", null,
-                        RMAppState.ACCEPTED, "diagnostics", 333));
+                        RMAppState.ACCEPTED, "diagnostics", 333, null));
           } catch (Exception e) {
             // TODO 0 datanode exception will not be retried by dfs client, fix
             // that separately.

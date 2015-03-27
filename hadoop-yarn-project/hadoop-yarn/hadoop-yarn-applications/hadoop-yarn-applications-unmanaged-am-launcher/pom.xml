@@ -13,16 +13,16 @@
   limitations under the License. See accompanying LICENSE file.
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
                       http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <artifactId>hadoop-yarn-applications</artifactId>
-    <groupId>org.apache.hadoop</groupId>
+    <groupId>io.hops</groupId>
     <version>2.4.0</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
-  <groupId>org.apache.hadoop</groupId>
+  <groupId>io.hops</groupId>
   <artifactId>hadoop-yarn-applications-unmanaged-am-launcher</artifactId>
   <version>2.4.0</version>
   <name>hadoop-yarn-applications-unmanaged-am-launcher</name>
@@ -47,7 +47,7 @@
       <artifactId>commons-cli</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-common</artifactId>
       <scope>provided</scope>
       <exclusions>
@@ -71,26 +71,26 @@
     </dependency>
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-common</artifactId>
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
 
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-yarn-client</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-yarn-api</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-yarn-common</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
+      <groupId>io.hops</groupId>
       <artifactId>hadoop-yarn-server-tests</artifactId>
       <type>test-jar</type>
       <scope>test</scope>
@@ -102,11 +102,13 @@
       <plugin>
         <artifactId>maven-jar-plugin</artifactId>
         <configuration>
-           <archive>
-             <manifest>
-               <mainClass>org.apache.hadoop.yarn.applications.unmanagedamlauncher.UnmanagedAMLauncher</mainClass>
-             </manifest>
-           </archive>
+          <archive>
+            <manifest>
+              <mainClass>
+                org.apache.hadoop.yarn.applications.unmanagedamlauncher.UnmanagedAMLauncher
+              </mainClass>
+            </manifest>
+          </archive>
         </configuration>
       </plugin>
       <plugin>
@@ -116,7 +118,7 @@
           <environmentVariables>
             <JAVA_HOME>${java.home}</JAVA_HOME>
           </environmentVariables>
-       </configuration>
+        </configuration>
       </plugin>
     </plugins>
   </build>

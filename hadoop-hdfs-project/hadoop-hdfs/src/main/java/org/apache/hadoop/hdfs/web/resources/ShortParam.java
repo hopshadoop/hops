@@ -17,10 +17,12 @@
  */
 package org.apache.hadoop.hdfs.web.resources;
 
-/** Short parameter. */
+/**
+ * Short parameter.
+ */
 abstract class ShortParam extends Param<Short, ShortParam.Domain> {
-  ShortParam(final Domain domain, final Short value,
-      final Short min, final Short max) {
+  ShortParam(final Domain domain, final Short value, final Short min,
+      final Short max) {
     super(domain, value);
     checkRange(min, max);
   }
@@ -30,12 +32,14 @@ abstract class ShortParam extends Param<Short, ShortParam.Domain> {
       return;
     }
     if (min != null && value < min) {
-      throw new IllegalArgumentException("Invalid parameter range: " + getName()
-          + " = " + domain.toString(value) + " < " + domain.toString(min));
+      throw new IllegalArgumentException(
+          "Invalid parameter range: " + getName() + " = " +
+              domain.toString(value) + " < " + domain.toString(min));
     }
     if (max != null && value > max) {
-      throw new IllegalArgumentException("Invalid parameter range: " + getName()
-          + " = " + domain.toString(value) + " > " + domain.toString(max));
+      throw new IllegalArgumentException(
+          "Invalid parameter range: " + getName() + " = " +
+              domain.toString(value) + " > " + domain.toString(max));
     }
   }
   
@@ -44,15 +48,21 @@ abstract class ShortParam extends Param<Short, ShortParam.Domain> {
     return getName() + "=" + domain.toString(getValue());
   }
 
-  /** @return the parameter value as a string */
+  /**
+   * @return the parameter value as a string
+   */
   @Override
   public final String getValueString() {
     return domain.toString(getValue());
   }
 
-  /** The domain of the parameter. */
+  /**
+   * The domain of the parameter.
+   */
   static final class Domain extends Param.Domain<Short> {
-    /** The radix of the number. */
+    /**
+     * The radix of the number.
+     */
     final int radix;
 
     Domain(final String paramName) {
@@ -72,16 +82,19 @@ abstract class ShortParam extends Param<Short, ShortParam.Domain> {
     @Override
     Short parse(final String str) {
       try {
-        return NULL.equals(str)? null: Short.parseShort(str, radix);
-      } catch(NumberFormatException e) {
-        throw new IllegalArgumentException("Failed to parse \"" + str
-            + "\" as a radix-" + radix + " short integer.", e);
+        return NULL.equals(str) ? null : Short.parseShort(str, radix);
+      } catch (NumberFormatException e) {
+        throw new IllegalArgumentException(
+            "Failed to parse \"" + str + "\" as a radix-" + radix +
+                " short integer.", e);
       }
     }
 
-    /** Convert a Short to a String. */ 
+    /**
+     * Convert a Short to a String.
+     */
     String toString(final Short n) {
-      return n == null? NULL: Integer.toString(n, radix);
+      return n == null ? NULL : Integer.toString(n, radix);
     }
   }
 }

@@ -18,10 +18,10 @@
 
 package org.apache.hadoop.hdfs.server.namenode;
 
-import java.io.IOException;
-
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+
+import java.io.IOException;
 
 /**
  * The lease that was being used to create this file has expired.

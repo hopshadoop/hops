@@ -232,6 +232,10 @@ elif [ "$COMMAND" = "logs" ] ; then
 elif [ "$COMMAND" = "daemonlog" ] ; then
   CLASS=org.apache.hadoop.log.LogLevel
   YARN_OPTS="$YARN_OPTS $YARN_CLIENT_OPTS"
+elif [ "$COMMAND" = "rmClientEval" ] ; then
+    CLASS='DistributedRTClientEvaluation'
+elif [ "$COMMAND" = "rmRTEval" ] ; then
+    CLASS='DistributedRTRMEvaluation'
 else
   CLASS=$COMMAND
 fi

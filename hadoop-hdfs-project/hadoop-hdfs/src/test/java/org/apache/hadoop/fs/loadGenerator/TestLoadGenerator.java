@@ -17,40 +17,41 @@
  */
 package org.apache.hadoop.fs.loadGenerator;
 
-import static org.junit.Assert.assertEquals;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
+import org.apache.hadoop.hdfs.HdfsConfiguration;
+import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.hadoop.util.Time;
+import org.apache.hadoop.util.Tool;
+import org.apache.hadoop.util.ToolRunner;
+import org.junit.Test;
 
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.conf.Configured;
-import org.apache.hadoop.hdfs.DFSConfigKeys;
-import org.apache.hadoop.hdfs.HdfsConfiguration;
-import org.apache.hadoop.hdfs.MiniDFSCluster;
-import org.apache.hadoop.test.PathUtils;
-import org.apache.hadoop.util.Time;
-import org.apache.hadoop.util.Tool;
-import org.apache.hadoop.util.ToolRunner;
-import org.junit.Test;
+import static org.junit.Assert.assertEquals;
+
 /**
  * This class tests if a balancer schedules tasks correctly.
  */
 public class TestLoadGenerator extends Configured implements Tool {
   private static final Configuration CONF = new HdfsConfiguration();
   private static final int DEFAULT_BLOCK_SIZE = 10;
-  private static final File OUT_DIR = PathUtils.getTestDir(TestLoadGenerator.class);
-  private static final File DIR_STRUCTURE_FILE = 
-    new File(OUT_DIR, StructureGenerator.DIR_STRUCTURE_FILE_NAME);
+  private static final String OUT_DIR =
+      System.getProperty("test.build.data", "build/test/data");
+  private static final File DIR_STRUCTURE_FILE =
+      new File(OUT_DIR, StructureGenerator.DIR_STRUCTURE_FILE_NAME);
   private static final File FILE_STRUCTURE_FILE =
-    new File(OUT_DIR, StructureGenerator.FILE_STRUCTURE_FILE_NAME);
+      new File(OUT_DIR, StructureGenerator.FILE_STRUCTURE_FILE_NAME);
   private static final String DIR_STRUCTURE_FIRST_LINE = "/dir0";
   private static final String DIR_STRUCTURE_SECOND_LINE = "/dir1";
   private static final String FILE_STRUCTURE_FIRST_LINE =
-    "/dir0/_file_0 0.3754598635933768";
+      "/dir0/_file_0 0.3754598635933768";
   private static final String FILE_STRUCTURE_SECOND_LINE =
-    "/dir1/_file_1 1.4729310851145203";
+      "/dir1/_file_1 1.4729310851145203";
   
 
   static {
@@ -59,13 +60,16 @@ public class TestLoadGenerator extends Configured implements Tool {
     CONF.setLong(DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY, 1L);
   }
 
-  /** Test if the structure generator works fine */ 
+  /**
+   * Test if the structure generator works fine
+   */
   @Test
   public void testStructureGenerator() throws Exception {
     StructureGenerator sg = new StructureGenerator();
-    String[] args = new String[]{"-maxDepth", "2", "-minWidth", "1",
-        "-maxWidth", "2", "-numOfFiles", "2",
-        "-avgFileSize", "1", "-outDir", OUT_DIR.getAbsolutePath(), "-seed", "1"};
+    String[] args =
+        new String[]{"-maxDepth", "2", "-minWidth", "1", "-maxWidth", "2",
+            "-numOfFiles", "2", "-avgFileSize", "1", "-outDir", OUT_DIR,
+            "-seed", "1"};
     
     final int MAX_DEPTH = 1;
     final int MIN_WIDTH = 3;
@@ -76,7 +80,8 @@ public class TestLoadGenerator extends Configured implements Tool {
     try {
       // successful case
       assertEquals(0, sg.run(args));
-      BufferedReader in = new BufferedReader(new FileReader(DIR_STRUCTURE_FILE));
+      BufferedReader in =
+          new BufferedReader(new FileReader(DIR_STRUCTURE_FILE));
       assertEquals(DIR_STRUCTURE_FIRST_LINE, in.readLine());
       assertEquals(DIR_STRUCTURE_SECOND_LINE, in.readLine());
       assertEquals(null, in.readLine());
@@ -128,34 +133,39 @@ public class TestLoadGenerator extends Configured implements Tool {
     }
   }
 
-  /** Test if the load generator works fine */
+  /**
+   * Test if the load generator works fine
+   */
   @Test
   public void testLoadGenerator() throws Exception {
     final String TEST_SPACE_ROOT = "/test";
 
-    final String SCRIPT_TEST_DIR = OUT_DIR.getAbsolutePath();
+    final String SCRIPT_TEST_DIR =
+        new File(System.getProperty("test.build.data", "/tmp"))
+            .getAbsolutePath();
     String script = SCRIPT_TEST_DIR + "/" + "loadgenscript";
     String script2 = SCRIPT_TEST_DIR + "/" + "loadgenscript2";
     File scriptFile1 = new File(script);
     File scriptFile2 = new File(script2);
     
     FileWriter writer = new FileWriter(DIR_STRUCTURE_FILE);
-    writer.write(DIR_STRUCTURE_FIRST_LINE+"\n");
-    writer.write(DIR_STRUCTURE_SECOND_LINE+"\n");
+    writer.write(DIR_STRUCTURE_FIRST_LINE + "\n");
+    writer.write(DIR_STRUCTURE_SECOND_LINE + "\n");
     writer.close();
     
     writer = new FileWriter(FILE_STRUCTURE_FILE);
-    writer.write(FILE_STRUCTURE_FIRST_LINE+"\n");
-    writer.write(FILE_STRUCTURE_SECOND_LINE+"\n");
+    writer.write(FILE_STRUCTURE_FIRST_LINE + "\n");
+    writer.write(FILE_STRUCTURE_SECOND_LINE + "\n");
     writer.close();
     
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(CONF).numDataNodes(3).build();
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(CONF).numDataNodes(3).build();
     cluster.waitActive();
     
     try {
       DataGenerator dg = new DataGenerator();
       dg.setConf(CONF);
-      String [] args = new String[] {"-inDir", OUT_DIR.getAbsolutePath(), "-root", TEST_SPACE_ROOT};
+      String[] args = new String[]{"-inDir", OUT_DIR, "-root", TEST_SPACE_ROOT};
       assertEquals(0, dg.run(args));
 
       final int READ_PROBABILITY = 1;
@@ -167,10 +177,9 @@ public class TestLoadGenerator extends Configured implements Tool {
       
       LoadGenerator lg = new LoadGenerator();
       lg.setConf(CONF);
-      args = new String[] {"-readProbability", "0.3", "-writeProbability", "0.3",
-          "-root", TEST_SPACE_ROOT, "-maxDelayBetweenOps", "0",
-          "-numOfThreads", "1", "-startTime", 
-          Long.toString(Time.now()), "-elapsedTime", "10"};
+      args = new String[]{"-readProbability", "0.3", "-writeProbability", "0.3",
+          "-root", TEST_SPACE_ROOT, "-maxDelayBetweenOps", "0", "-numOfThreads",
+          "1", "-startTime", Long.toString(Time.now()), "-elapsedTime", "10"};
       
       assertEquals(0, lg.run(args));
 
@@ -223,10 +232,10 @@ public class TestLoadGenerator extends Configured implements Tool {
       fw.write("6 0 .7\n");
       fw.close();
       
-      String[] scriptArgs = new String[] {
-          "-root", TEST_SPACE_ROOT, "-maxDelayBetweenOps", "0",
-          "-numOfThreads", "10", "-startTime", 
-          Long.toString(Time.now()), "-scriptFile", script};
+      String[] scriptArgs =
+          new String[]{"-root", TEST_SPACE_ROOT, "-maxDelayBetweenOps", "0",
+              "-numOfThreads", "10", "-startTime", Long.toString(Time.now()),
+              "-scriptFile", script};
       
       assertEquals(0, lg.run(scriptArgs));
       

@@ -25,12 +25,12 @@ import org.apache.hadoop.ipc.ProtocolInfo;
 import org.apache.hadoop.security.KerberosInfo;
 
 @KerberosInfo(
-    serverPrincipal = DFSConfigKeys.DFS_NAMENODE_USER_NAME_KEY, 
+    serverPrincipal = DFSConfigKeys.DFS_NAMENODE_USER_NAME_KEY,
     clientPrincipal = DFSConfigKeys.DFS_DATANODE_USER_NAME_KEY)
 @ProtocolInfo(
-    protocolName = "org.apache.hadoop.hdfs.server.protocol.DatanodeProtocol", 
+    protocolName = "org.apache.hadoop.hdfs.server.protocol.DatanodeProtocol",
     protocolVersion = 1)
 @InterfaceAudience.Private
-public interface DatanodeProtocolPB extends
-    DatanodeProtocolService.BlockingInterface {
+public interface DatanodeProtocolPB
+    extends DatanodeProtocolService.BlockingInterface {
 }

@@ -1,28 +1,22 @@
 /**
-* Licensed to the Apache Software Foundation (ASF) under one
-* or more contributor license agreements.  See the NOTICE file
-* distributed with this work for additional information
-* regarding copyright ownership.  The ASF licenses this file
-* to you under the Apache License, Version 2.0 (the
-* "License"); you may not use this file except in compliance
-* with the License.  You may obtain a copy of the License at
-*
-*     http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package org.apache.hadoop.yarn.server.nodemanager.security;
-
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map.Entry;
-import java.util.TreeMap;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -36,52 +30,56 @@ import org.apache.hadoop.yarn.server.api.records.MasterKey;
 import org.apache.hadoop.yarn.server.security.BaseContainerTokenSecretManager;
 import org.apache.hadoop.yarn.server.security.MasterKeyData;
 
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map.Entry;
+import java.util.TreeMap;
+
 /**
  * The NM maintains only two master-keys. The current key that RM knows and the
  * key from the previous rolling-interval.
- * 
  */
-public class NMContainerTokenSecretManager extends
-    BaseContainerTokenSecretManager {
+public class NMContainerTokenSecretManager
+    extends BaseContainerTokenSecretManager {
 
-  private static final Log LOG = LogFactory
-      .getLog(NMContainerTokenSecretManager.class);
+  private static final Log LOG =
+      LogFactory.getLog(NMContainerTokenSecretManager.class);
   
   private MasterKeyData previousMasterKey;
-  private final TreeMap<Long, List<ContainerId>> recentlyStartedContainerTracker;
+  private final TreeMap<Long, List<ContainerId>>
+      recentlyStartedContainerTracker;
 
   
   private String nodeHostAddr;
   
   public NMContainerTokenSecretManager(Configuration conf) {
     super(conf);
-    recentlyStartedContainerTracker =
-        new TreeMap<Long, List<ContainerId>>();
+    recentlyStartedContainerTracker = new TreeMap<Long, List<ContainerId>>();
   }
 
   /**
-   * Used by NodeManagers to create a token-secret-manager with the key obtained
+   * Used by NodeManagers to create a token-secret-manager with the key
+   * obtained
    * from the RM. This can happen during registration or when the RM rolls the
    * master-key and signals the NM.
-   * 
+   *
    * @param masterKeyRecord
    */
   @Private
   public synchronized void setMasterKey(MasterKey masterKeyRecord) {
-    LOG.info("Rolling master-key for container-tokens, got key with id "
-        + masterKeyRecord.getKeyId());
+    LOG.info("Rolling master-key for container-tokens, got key with id " +
+        masterKeyRecord.getKeyId());
     if (super.currentMasterKey == null) {
-      super.currentMasterKey =
-          new MasterKeyData(masterKeyRecord, createSecretKey(masterKeyRecord
-            .getBytes().array()));
+      super.currentMasterKey = new MasterKeyData(masterKeyRecord,
+          createSecretKey(masterKeyRecord.getBytes().array()));
     } else {
-      if (super.currentMasterKey.getMasterKey().getKeyId() != masterKeyRecord
-          .getKeyId()) {
+      if (super.currentMasterKey.getMasterKey().getKeyId() !=
+          masterKeyRecord.getKeyId()) {
         // Update keys only if the key has changed.
         this.previousMasterKey = super.currentMasterKey;
-        super.currentMasterKey =
-            new MasterKeyData(masterKeyRecord, createSecretKey(masterKeyRecord
-              .getBytes().array()));
+        super.currentMasterKey = new MasterKeyData(masterKeyRecord,
+            createSecretKey(masterKeyRecord.getBytes().array()));
       }
     }
   }
@@ -96,8 +94,8 @@ public class NMContainerTokenSecretManager extends
     int keyId = identifier.getMasterKeyId();
 
     MasterKeyData masterKeyToUse = null;
-    if (this.previousMasterKey != null
-        && keyId == this.previousMasterKey.getMasterKey().getKeyId()) {
+    if (this.previousMasterKey != null &&
+        keyId == this.previousMasterKey.getMasterKey().getKeyId()) {
       // A container-launch has come in with a token generated off the last
       // master-key
       masterKeyToUse = this.previousMasterKey;
@@ -107,13 +105,13 @@ public class NMContainerTokenSecretManager extends
       masterKeyToUse = super.currentMasterKey;
     }
 
-    if (nodeHostAddr != null
-        && !identifier.getNmHostAddress().equals(nodeHostAddr)) {
+    if (nodeHostAddr != null &&
+        !identifier.getNmHostAddress().equals(nodeHostAddr)) {
       // Valid container token used for incorrect node.
-      throw new SecretManager.InvalidToken("Given Container "
-          + identifier.getContainerID().toString()
-          + " identifier is not valid for current Node manager. Expected : "
-          + nodeHostAddr + " Found : " + identifier.getNmHostAddress());
+      throw new SecretManager.InvalidToken(
+          "Given Container " + identifier.getContainerID().toString() +
+              " identifier is not valid for current Node manager. Expected : " +
+              nodeHostAddr + " Found : " + identifier.getNmHostAddress());
     }
     
     if (masterKeyToUse != null) {
@@ -122,13 +120,14 @@ public class NMContainerTokenSecretManager extends
 
     // Invalid request. Like startContainer() with token generated off
     // old-master-keys.
-    throw new SecretManager.InvalidToken("Given Container "
-        + identifier.getContainerID().toString()
-        + " seems to have an illegally generated token.");
+    throw new SecretManager.InvalidToken(
+        "Given Container " + identifier.getContainerID().toString() +
+            " seems to have an illegally generated token.");
   }
 
   /**
-   * Container start has gone through. We need to store the containerId in order
+   * Container start has gone through. We need to store the containerId in
+   * order
    * to block future container start requests with same container token. This
    * container token needs to be saved till its container token expires.
    */
@@ -141,7 +140,7 @@ public class NMContainerTokenSecretManager extends
     // We might have multiple containers with same expiration time.
     if (!recentlyStartedContainerTracker.containsKey(expTime)) {
       recentlyStartedContainerTracker
-        .put(expTime, new ArrayList<ContainerId>());
+          .put(expTime, new ArrayList<ContainerId>());
     }
     recentlyStartedContainerTracker.get(expTime).add(tokenId.getContainerID());
 
@@ -166,6 +165,7 @@ public class NMContainerTokenSecretManager extends
    * Container will be remembered based on expiration time of the container
    * token used for starting the container. It is safe to use expiration time
    * as there is one to many mapping between expiration time and containerId.
+   *
    * @return true if the current token identifier is not present in cache.
    */
   public synchronized boolean isValidStartContainerRequest(
@@ -176,8 +176,8 @@ public class NMContainerTokenSecretManager extends
     Long expTime = containerTokenIdentifier.getExpiryTimeStamp();
     List<ContainerId> containers =
         this.recentlyStartedContainerTracker.get(expTime);
-    if (containers == null
-        || !containers.contains(containerTokenIdentifier.getContainerID())) {
+    if (containers == null ||
+        !containers.contains(containerTokenIdentifier.getContainerID())) {
       return true;
     } else {
       return false;

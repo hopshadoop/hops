@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.yarn.api.protocolrecords;
 
-import java.util.List;
-
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Stable;
@@ -28,10 +26,12 @@ import org.apache.hadoop.yarn.api.ApplicationClientProtocol;
 import org.apache.hadoop.yarn.api.records.ApplicationReport;
 import org.apache.hadoop.yarn.util.Records;
 
+import java.util.List;
+
 /**
  * <p>The response sent by the <code>ResourceManager</code> to a client
  * requesting an {@link ApplicationReport} for applications.</p>
- *
+ * <p/>
  * <p>The <code>ApplicationReport</code> for each application includes details
  * such as user, queue, name, host on which the <code>ApplicationMaster</code>
  * is running, RPC port, tracking URL, diagnostics, start time etc.</p>
@@ -54,6 +54,7 @@ public abstract class GetApplicationsResponse {
 
   /**
    * Get <code>ApplicationReport</code> for applications.
+   *
    * @return <code>ApplicationReport</code> for applications
    */
   @Public

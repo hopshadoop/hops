@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.yarn.server.api.protocolrecords;
 
-import java.util.Map;
-
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.hadoop.yarn.api.records.NodeId;
@@ -26,16 +24,18 @@ import org.apache.hadoop.yarn.api.records.ResourceOption;
 import org.apache.hadoop.yarn.server.api.ResourceManagerAdministrationProtocol;
 import org.apache.hadoop.yarn.util.Records;
 
+import java.util.Map;
+
 /**
- * <p>The request sent by admin to change a list of nodes' resource to the 
+ * <p>The request sent by admin to change a list of nodes' resource to the
  * <code>ResourceManager</code>.</p>
- * 
- * <p>The request contains details such as a map from {@link NodeId} to 
- * {@link ResourceOption} for updating the RMNodes' resources in 
+ * <p/>
+ * <p>The request contains details such as a map from {@link NodeId} to
+ * {@link ResourceOption} for updating the RMNodes' resources in
  * <code>ResourceManager</code>.
- * 
+ *
  * @see ResourceManagerAdministrationProtocol#updateNodeResource(
- *      UpdateNodeResourceRequest)
+ *UpdateNodeResourceRequest)
  */
 @Public
 @Evolving
@@ -54,6 +54,7 @@ public abstract class UpdateNodeResourceRequest {
   
   /**
    * Get the map from <code>NodeId</code> to <code>ResourceOption</code>.
+   *
    * @return the map of <NodeId, ResourceOption>
    */
   @Public
@@ -62,10 +63,13 @@ public abstract class UpdateNodeResourceRequest {
   
   /**
    * Set the map from <code>NodeId</code> to <code>ResourceOption</code>.
-   * @param nodeResourceMap the map of <NodeId, ResourceOption>
+   *
+   * @param nodeResourceMap
+   *     the map of <NodeId, ResourceOption>
    */
   @Public
   @Evolving
-  public abstract void setNodeResourceMap(Map<NodeId, ResourceOption> nodeResourceMap);
+  public abstract void setNodeResourceMap(
+      Map<NodeId, ResourceOption> nodeResourceMap);
 
 }

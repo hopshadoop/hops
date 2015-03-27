@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.yarn.api.records.impl.pb;
 
+import com.google.protobuf.TextFormat;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.records.ContainerId;
@@ -25,14 +26,12 @@ import org.apache.hadoop.yarn.proto.YarnProtos.ContainerIdProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.PreemptionContainerProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.PreemptionContainerProtoOrBuilder;
 
-import com.google.protobuf.TextFormat;
-
 @Private
 @Unstable
 public class PreemptionContainerPBImpl extends PreemptionContainer {
 
   PreemptionContainerProto proto =
-    PreemptionContainerProto.getDefaultInstance();
+      PreemptionContainerProto.getDefaultInstance();
   PreemptionContainerProto.Builder builder = null;
 
   boolean viaProto = false;
@@ -61,8 +60,9 @@ public class PreemptionContainerPBImpl extends PreemptionContainer {
 
   @Override
   public boolean equals(Object other) {
-    if (other == null)
+    if (other == null) {
       return false;
+    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -75,8 +75,9 @@ public class PreemptionContainerPBImpl extends PreemptionContainer {
   }
 
   private void mergeLocalToProto() {
-    if (viaProto)
+    if (viaProto) {
       maybeInitBuilder();
+    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
@@ -122,7 +123,7 @@ public class PreemptionContainerPBImpl extends PreemptionContainer {
   }
 
   private ContainerIdProto convertToProtoFormat(ContainerId t) {
-    return ((ContainerIdPBImpl)t).getProto();
+    return ((ContainerIdPBImpl) t).getProto();
   }
 
 }

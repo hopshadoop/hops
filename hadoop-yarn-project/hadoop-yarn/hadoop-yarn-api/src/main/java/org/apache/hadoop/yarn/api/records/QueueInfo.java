@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.yarn.api.records;
 
-import java.util.List;
-
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Stable;
@@ -27,19 +25,21 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.ApplicationClientProtocol;
 import org.apache.hadoop.yarn.util.Records;
 
+import java.util.List;
+
 /**
  * <p>QueueInfo is a report of the runtime information of the queue.</p>
- * 
+ * <p/>
  * <p>It includes information such as:
- *   <ul>
- *     <li>Queue name.</li>
- *     <li>Capacity of the queue.</li>
- *     <li>Maximum capacity of the queue.</li>
- *     <li>Current capacity of the queue.</li>
- *     <li>Child queues.</li>
- *     <li>Running applications.</li>
- *     <li>{@link QueueState} of the queue.</li>
- *   </ul>
+ * <ul>
+ * <li>Queue name.</li>
+ * <li>Capacity of the queue.</li>
+ * <li>Maximum capacity of the queue.</li>
+ * <li>Current capacity of the queue.</li>
+ * <li>Child queues.</li>
+ * <li>Running applications.</li>
+ * <li>{@link QueueState} of the queue.</li>
+ * </ul>
  * </p>
  *
  * @see QueueState
@@ -52,9 +52,8 @@ public abstract class QueueInfo {
   @Private
   @Unstable
   public static QueueInfo newInstance(String queueName, float capacity,
-      float maximumCapacity, float currentCapacity,
-      List<QueueInfo> childQueues, List<ApplicationReport> applications,
-      QueueState queueState) {
+      float maximumCapacity, float currentCapacity, List<QueueInfo> childQueues,
+      List<ApplicationReport> applications, QueueState queueState) {
     QueueInfo queueInfo = Records.newRecord(QueueInfo.class);
     queueInfo.setQueueName(queueName);
     queueInfo.setCapacity(capacity);
@@ -68,6 +67,7 @@ public abstract class QueueInfo {
 
   /**
    * Get the <em>name</em> of the queue.
+   *
    * @return <em>name</em> of the queue
    */
   @Public
@@ -80,6 +80,7 @@ public abstract class QueueInfo {
   
   /**
    * Get the <em>configured capacity</em> of the queue.
+   *
    * @return <em>configured capacity</em> of the queue
    */
   @Public
@@ -92,6 +93,7 @@ public abstract class QueueInfo {
   
   /**
    * Get the <em>maximum capacity</em> of the queue.
+   *
    * @return <em>maximum capacity</em> of the queue
    */
   @Public
@@ -104,6 +106,7 @@ public abstract class QueueInfo {
   
   /**
    * Get the <em>current capacity</em> of the queue.
+   *
    * @return <em>current capacity</em> of the queue
    */
   @Public
@@ -116,6 +119,7 @@ public abstract class QueueInfo {
   
   /**
    * Get the <em>child queues</em> of the queue.
+   *
    * @return <em>child queues</em> of the queue
    */
   @Public
@@ -128,6 +132,7 @@ public abstract class QueueInfo {
   
   /**
    * Get the <em>running applications</em> of the queue.
+   *
    * @return <em>running applications</em> of the queue
    */
   @Public
@@ -140,6 +145,7 @@ public abstract class QueueInfo {
   
   /**
    * Get the <code>QueueState</code> of the queue.
+   *
    * @return <code>QueueState</code> of the queue
    */
   @Public

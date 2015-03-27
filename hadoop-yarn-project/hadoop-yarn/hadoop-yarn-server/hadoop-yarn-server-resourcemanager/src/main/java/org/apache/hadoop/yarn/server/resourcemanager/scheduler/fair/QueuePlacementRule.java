@@ -17,49 +17,51 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair;
 
-import java.io.IOException;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 import org.apache.hadoop.security.Groups;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.w3c.dom.Element;
 import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 
+import java.io.IOException;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 public abstract class QueuePlacementRule {
   protected boolean create;
   
   /**
    * Initializes the rule with any arguments.
-   * 
+   *
    * @param args
-   *    Additional attributes of the rule's xml element other than create.
+   *     Additional attributes of the rule's xml element other than create.
    */
-  public QueuePlacementRule initialize(boolean create, Map<String, String> args) {
+  public QueuePlacementRule initialize(boolean create,
+      Map<String, String> args) {
     this.create = create;
     return this;
   }
   
   /**
-   * 
    * @param requestedQueue
-   *    The queue explicitly requested.
+   *     The queue explicitly requested.
    * @param user
-   *    The user submitting the app.
+   *     The user submitting the app.
    * @param groups
-   *    The groups of the user submitting the app.
+   *     The groups of the user submitting the app.
    * @param configuredQueues
-   *    The queues specified in the scheduler configuration.
-   * @return
-   *    The queue to place the app into. An empty string indicates that we should
-   *    continue to the next rule, and null indicates that the app should be rejected.
+   *     The queues specified in the scheduler configuration.
+   * @return The queue to place the app into. An empty string indicates that we
+   * should
+   * continue to the next rule, and null indicates that the app should be
+   * rejected.
    */
   public String assignAppToQueue(String requestedQueue, String user,
       Groups groups, Collection<String> configuredQueues) throws IOException {
-    String queue = getQueueForApp(requestedQueue, user, groups, configuredQueues);
+    String queue =
+        getQueueForApp(requestedQueue, user, groups, configuredQueues);
     if (create || configuredQueues.contains(queue)) {
       return queue;
     } else {
@@ -92,16 +94,15 @@ public abstract class QueuePlacementRule {
   /**
    * Applies this rule to an app with the given requested queue and user/group
    * information.
-   * 
+   *
    * @param requestedQueue
-   *    The queue specified in the ApplicationSubmissionContext
+   *     The queue specified in the ApplicationSubmissionContext
    * @param user
-   *    The user submitting the app.
+   *     The user submitting the app.
    * @param groups
-   *    The groups of the user submitting the app.
-   * @return
-   *    The name of the queue to assign the app to, or null to empty string
-   *    continue to the next rule.
+   *     The groups of the user submitting the app.
+   * @return The name of the queue to assign the app to, or null to empty string
+   * continue to the next rule.
    */
   protected abstract String getQueueForApp(String requestedQueue, String user,
       Groups groups, Collection<String> configuredQueues) throws IOException;
@@ -111,8 +112,8 @@ public abstract class QueuePlacementRule {
    */
   public static class User extends QueuePlacementRule {
     @Override
-    protected String getQueueForApp(String requestedQueue,
-        String user, Groups groups, Collection<String> configuredQueues) {
+    protected String getQueueForApp(String requestedQueue, String user,
+        Groups groups, Collection<String> configuredQueues) {
       return "root." + user;
     }
     
@@ -127,9 +128,8 @@ public abstract class QueuePlacementRule {
    */
   public static class PrimaryGroup extends QueuePlacementRule {
     @Override
-    protected String getQueueForApp(String requestedQueue,
-        String user, Groups groups, 
-        Collection<String> configuredQueues) throws IOException {
+    protected String getQueueForApp(String requestedQueue, String user,
+        Groups groups, Collection<String> configuredQueues) throws IOException {
       return "root." + groups.getGroups(user).get(0);
     }
     
@@ -141,15 +141,14 @@ public abstract class QueuePlacementRule {
   
   /**
    * Places apps in queues by secondary group of the submitter
-   * 
+   * <p/>
    * Match will be made on first secondary group that exist in
    * queues
    */
   public static class SecondaryGroupExistingQueue extends QueuePlacementRule {
     @Override
-    protected String getQueueForApp(String requestedQueue,
-        String user, Groups groups, 
-        Collection<String> configuredQueues) throws IOException {
+    protected String getQueueForApp(String requestedQueue, String user,
+        Groups groups, Collection<String> configuredQueues) throws IOException {
       List<String> groupNames = groups.getGroups(user);
       for (int i = 1; i < groupNames.size(); i++) {
         if (configuredQueues.contains("root." + groupNames.get(i))) {
@@ -159,7 +158,7 @@ public abstract class QueuePlacementRule {
       
       return "";
     }
-        
+
     @Override
     public boolean isTerminal() {
       return create;
@@ -171,8 +170,8 @@ public abstract class QueuePlacementRule {
    */
   public static class Specified extends QueuePlacementRule {
     @Override
-    protected String getQueueForApp(String requestedQueue,
-        String user, Groups groups, Collection<String> configuredQueues) {
+    protected String getQueueForApp(String requestedQueue, String user,
+        Groups groups, Collection<String> configuredQueues) {
       if (requestedQueue.equals(YarnConfiguration.DEFAULT_QUEUE_NAME)) {
         return "";
       } else {

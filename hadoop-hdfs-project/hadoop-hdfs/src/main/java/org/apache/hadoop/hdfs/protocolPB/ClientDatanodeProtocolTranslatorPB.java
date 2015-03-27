@@ -17,15 +17,9 @@
  */
 package org.apache.hadoop.hdfs.protocolPB;
 
-import java.io.Closeable;
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
-import javax.net.SocketFactory;
-
+import com.google.protobuf.ByteString;
+import com.google.protobuf.RpcController;
+import com.google.protobuf.ServiceException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -35,20 +29,15 @@ import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdfs.protocol.BlockLocalPathInfo;
 import org.apache.hadoop.hdfs.protocol.ClientDatanodeProtocol;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
-import org.apache.hadoop.hdfs.protocol.DatanodeLocalInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsBlocksMetadata;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.proto.ClientDatanodeProtocolProtos.DeleteBlockPoolRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientDatanodeProtocolProtos.GetBlockLocalPathInfoRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientDatanodeProtocolProtos.GetBlockLocalPathInfoResponseProto;
-import org.apache.hadoop.hdfs.protocol.proto.ClientDatanodeProtocolProtos.GetDatanodeInfoRequestProto;
-import org.apache.hadoop.hdfs.protocol.proto.ClientDatanodeProtocolProtos.GetDatanodeInfoResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientDatanodeProtocolProtos.GetHdfsBlockLocationsRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientDatanodeProtocolProtos.GetHdfsBlockLocationsResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientDatanodeProtocolProtos.GetReplicaVisibleLengthRequestProto;
-import org.apache.hadoop.hdfs.protocol.proto.ClientDatanodeProtocolProtos.RefreshNamenodesRequestProto;
-import org.apache.hadoop.hdfs.protocol.proto.ClientDatanodeProtocolProtos.ShutdownDatanodeRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.ExtendedBlockProto;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.ipc.ProtobufHelper;
@@ -62,10 +51,12 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.proto.SecurityProtos.TokenProto;
 import org.apache.hadoop.security.token.Token;
 
-import com.google.common.primitives.Longs;
-import com.google.protobuf.ByteString;
-import com.google.protobuf.RpcController;
-import com.google.protobuf.ServiceException;
+import javax.net.SocketFactory;
+import java.io.Closeable;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * This class is the client side translator to translate the requests made on
@@ -74,39 +65,44 @@ import com.google.protobuf.ServiceException;
  */
 @InterfaceAudience.Private
 @InterfaceStability.Stable
-public class ClientDatanodeProtocolTranslatorPB implements
-    ProtocolMetaInterface, ClientDatanodeProtocol,
+public class ClientDatanodeProtocolTranslatorPB
+    implements ProtocolMetaInterface, ClientDatanodeProtocol,
     ProtocolTranslator, Closeable {
-  public static final Log LOG = LogFactory
-      .getLog(ClientDatanodeProtocolTranslatorPB.class);
+  public static final Log LOG =
+      LogFactory.getLog(ClientDatanodeProtocolTranslatorPB.class);
   
-  /** RpcController is not used and hence is set to null */
+  /**
+   * RpcController is not used and hence is set to null
+   */
   private final static RpcController NULL_CONTROLLER = null;
   private final ClientDatanodeProtocolPB rpcProxy;
-  private final static RefreshNamenodesRequestProto VOID_REFRESH_NAMENODES = 
-      RefreshNamenodesRequestProto.newBuilder().build();
-  private final static GetDatanodeInfoRequestProto VOID_GET_DATANODE_INFO =
-      GetDatanodeInfoRequestProto.newBuilder().build();
 
   public ClientDatanodeProtocolTranslatorPB(DatanodeID datanodeid,
       Configuration conf, int socketTimeout, boolean connectToDnViaHostname,
       LocatedBlock locatedBlock) throws IOException {
-    rpcProxy = createClientDatanodeProtocolProxy( datanodeid, conf, 
-                  socketTimeout, connectToDnViaHostname, locatedBlock);
+    rpcProxy =
+        createClientDatanodeProtocolProxy(datanodeid, conf, socketTimeout,
+            connectToDnViaHostname, locatedBlock);
   }
   
   public ClientDatanodeProtocolTranslatorPB(InetSocketAddress addr,
       UserGroupInformation ticket, Configuration conf, SocketFactory factory)
       throws IOException {
-    rpcProxy = createClientDatanodeProtocolProxy(addr, ticket, conf, factory, 0);
+    rpcProxy =
+        createClientDatanodeProtocolProxy(addr, ticket, conf, factory, 0);
   }
   
   /**
    * Constructor.
-   * @param datanodeid Datanode to connect to.
-   * @param conf Configuration.
-   * @param socketTimeout Socket timeout to use.
-   * @param connectToDnViaHostname connect to the Datanode using its hostname
+   *
+   * @param datanodeid
+   *     Datanode to connect to.
+   * @param conf
+   *     Configuration.
+   * @param socketTimeout
+   *     Socket timeout to use.
+   * @param connectToDnViaHostname
+   *     connect to the Datanode using its hostname
    * @throws IOException
    */
   public ClientDatanodeProtocolTranslatorPB(DatanodeID datanodeid,
@@ -124,7 +120,8 @@ public class ClientDatanodeProtocolTranslatorPB implements
 
   static ClientDatanodeProtocolPB createClientDatanodeProtocolProxy(
       DatanodeID datanodeid, Configuration conf, int socketTimeout,
-      boolean connectToDnViaHostname, LocatedBlock locatedBlock) throws IOException {
+      boolean connectToDnViaHostname, LocatedBlock locatedBlock)
+      throws IOException {
     final String dnAddr = datanodeid.getIpcAddr(connectToDnViaHostname);
     InetSocketAddress addr = NetUtils.createSocketAddr(dnAddr);
     if (LOG.isDebugEnabled()) {
@@ -139,8 +136,8 @@ public class ClientDatanodeProtocolTranslatorPB implements
     // RPC.stopProxy() on the resulting object, but this is currently not
     // working in trunk. See the discussion on HDFS-1965.
     Configuration confWithNoIpcIdle = new Configuration(conf);
-    confWithNoIpcIdle.setInt(CommonConfigurationKeysPublic
-        .IPC_CLIENT_CONNECTION_MAXIDLETIME_KEY, 0);
+    confWithNoIpcIdle.setInt(
+        CommonConfigurationKeysPublic.IPC_CLIENT_CONNECTION_MAXIDLETIME_KEY, 0);
 
     UserGroupInformation ticket = UserGroupInformation
         .createRemoteUser(locatedBlock.getBlock().getLocalBlock().toString());
@@ -166,8 +163,9 @@ public class ClientDatanodeProtocolTranslatorPB implements
 
   @Override
   public long getReplicaVisibleLength(ExtendedBlock b) throws IOException {
-    GetReplicaVisibleLengthRequestProto req = GetReplicaVisibleLengthRequestProto
-        .newBuilder().setBlock(PBHelper.convert(b)).build();
+    GetReplicaVisibleLengthRequestProto req =
+        GetReplicaVisibleLengthRequestProto.newBuilder()
+            .setBlock(PBHelper.convert(b)).build();
     try {
       return rpcProxy.getReplicaVisibleLength(NULL_CONTROLLER, req).getLength();
     } catch (ServiceException e) {
@@ -175,19 +173,12 @@ public class ClientDatanodeProtocolTranslatorPB implements
     }
   }
 
-  @Override
-  public void refreshNamenodes() throws IOException {
-    try {
-      rpcProxy.refreshNamenodes(NULL_CONTROLLER, VOID_REFRESH_NAMENODES);
-    } catch (ServiceException e) {
-      throw ProtobufHelper.getRemoteException(e);
-    }
-  }
 
   @Override
   public void deleteBlockPool(String bpid, boolean force) throws IOException {
-    DeleteBlockPoolRequestProto req = DeleteBlockPoolRequestProto.newBuilder()
-        .setBlockPool(bpid).setForce(force).build();
+    DeleteBlockPoolRequestProto req =
+        DeleteBlockPoolRequestProto.newBuilder().setBlockPool(bpid)
+            .setForce(force).build();
     try {
       rpcProxy.deleteBlockPool(NULL_CONTROLLER, req);
     } catch (ServiceException e) {
@@ -200,8 +191,8 @@ public class ClientDatanodeProtocolTranslatorPB implements
       Token<BlockTokenIdentifier> token) throws IOException {
     GetBlockLocalPathInfoRequestProto req =
         GetBlockLocalPathInfoRequestProto.newBuilder()
-        .setBlock(PBHelper.convert(block))
-        .setToken(PBHelper.convert(token)).build();
+            .setBlock(PBHelper.convert(block)).setToken(PBHelper.convert(token))
+            .build();
     GetBlockLocalPathInfoResponseProto resp;
     try {
       resp = rpcProxy.getBlockLocalPathInfo(NULL_CONTROLLER, req);
@@ -214,9 +205,10 @@ public class ClientDatanodeProtocolTranslatorPB implements
 
   @Override
   public boolean isMethodSupported(String methodName) throws IOException {
-    return RpcClientUtil.isMethodSupported(rpcProxy,
-        ClientDatanodeProtocolPB.class, RPC.RpcKind.RPC_PROTOCOL_BUFFER,
-        RPC.getProtocolVersion(ClientDatanodeProtocolPB.class), methodName);
+    return RpcClientUtil
+        .isMethodSupported(rpcProxy, ClientDatanodeProtocolPB.class,
+            RPC.RpcKind.RPC_PROTOCOL_BUFFER,
+            RPC.getProtocolVersion(ClientDatanodeProtocolPB.class), methodName);
   }
 
   @Override
@@ -225,21 +217,22 @@ public class ClientDatanodeProtocolTranslatorPB implements
   }
 
   @Override
-  public HdfsBlocksMetadata getHdfsBlocksMetadata(String blockPoolId,
-      long[] blockIds,
+  public HdfsBlocksMetadata getHdfsBlocksMetadata(List<ExtendedBlock> blocks,
       List<Token<BlockTokenIdentifier>> tokens) throws IOException {
-    List<TokenProto> tokensProtos = 
-        new ArrayList<TokenProto>(tokens.size());
+    // Convert to proto objects
+    List<ExtendedBlockProto> blocksProtos =
+        new ArrayList<ExtendedBlockProto>(blocks.size());
+    List<TokenProto> tokensProtos = new ArrayList<TokenProto>(tokens.size());
+    for (ExtendedBlock b : blocks) {
+      blocksProtos.add(PBHelper.convert(b));
+    }
     for (Token<BlockTokenIdentifier> t : tokens) {
       tokensProtos.add(PBHelper.convert(t));
     }
     // Build the request
-    GetHdfsBlockLocationsRequestProto request = 
+    GetHdfsBlockLocationsRequestProto request =
         GetHdfsBlockLocationsRequestProto.newBuilder()
-        .setBlockPoolId(blockPoolId)
-        .addAllBlockIds(Longs.asList(blockIds))
-        .addAllTokens(tokensProtos)
-        .build();
+            .addAllBlocks(blocksProtos).addAllTokens(tokensProtos).build();
     // Send the RPC
     GetHdfsBlockLocationsResponseProto response;
     try {
@@ -256,30 +249,7 @@ public class ClientDatanodeProtocolTranslatorPB implements
     // Array of indexes into the list of volumes, one per block
     List<Integer> volumeIndexes = response.getVolumeIndexesList();
     // Parsed HdfsVolumeId values, one per block
-    return new HdfsBlocksMetadata(blockPoolId, blockIds,
+    return new HdfsBlocksMetadata(blocks.toArray(new ExtendedBlock[]{}),
         volumeIds, volumeIndexes);
   }
-
-  @Override
-  public void shutdownDatanode(boolean forUpgrade) throws IOException {
-    ShutdownDatanodeRequestProto request = ShutdownDatanodeRequestProto
-        .newBuilder().setForUpgrade(forUpgrade).build();
-    try {
-      rpcProxy.shutdownDatanode(NULL_CONTROLLER, request);
-    } catch (ServiceException e) {
-      throw ProtobufHelper.getRemoteException(e);
-    }
-  }
-
-  @Override
-  public DatanodeLocalInfo getDatanodeInfo() throws IOException {
-    GetDatanodeInfoResponseProto response;
-    try {
-      response = rpcProxy.getDatanodeInfo(NULL_CONTROLLER, VOID_GET_DATANODE_INFO);
-      return PBHelper.convert(response.getLocalInfo());
-    } catch (ServiceException e) {
-      throw ProtobufHelper.getRemoteException(e);
-    }
-  }
-
 }

@@ -19,26 +19,24 @@
 package org.apache.hadoop.yarn.server.resourcemanager.webapp.dao;
 
 
-import java.util.ArrayList;
-import java.util.Collection;
-
-import javax.xml.bind.annotation.XmlAccessType;
-import javax.xml.bind.annotation.XmlAccessorType;
-import javax.xml.bind.annotation.XmlRootElement;
-import javax.xml.bind.annotation.XmlSeeAlso;
-import javax.xml.bind.annotation.XmlTransient;
-
-import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.AllocationConfiguration;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FSLeafQueue;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FSQueue;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FairScheduler;
 import org.apache.hadoop.yarn.util.resource.Resources;
 
+import javax.xml.bind.annotation.XmlAccessType;
+import javax.xml.bind.annotation.XmlAccessorType;
+import javax.xml.bind.annotation.XmlRootElement;
+import javax.xml.bind.annotation.XmlSeeAlso;
+import javax.xml.bind.annotation.XmlTransient;
+import java.util.ArrayList;
+import java.util.Collection;
+
 @XmlRootElement
 @XmlAccessorType(XmlAccessType.FIELD)
 @XmlSeeAlso({FairSchedulerLeafQueueInfo.class})
-public class FairSchedulerQueueInfo {  
+public class FairSchedulerQueueInfo {
   private int maxApps;
   
   @XmlTransient
@@ -73,19 +71,21 @@ public class FairSchedulerQueueInfo {
     clusterResources = new ResourceInfo(scheduler.getClusterCapacity());
     
     usedResources = new ResourceInfo(queue.getResourceUsage());
-    fractionMemUsed = (float)usedResources.getMemory() /
-        clusterResources.getMemory();
+    fractionMemUsed =
+        (float) usedResources.getMemory() / clusterResources.getMemory();
     
     fairResources = new ResourceInfo(queue.getFairShare());
     minResources = new ResourceInfo(queue.getMinShare());
     maxResources = new ResourceInfo(queue.getMaxShare());
-    maxResources = new ResourceInfo(
-        Resources.componentwiseMin(queue.getMaxShare(),
-            scheduler.getClusterCapacity()));
+    maxResources = new ResourceInfo(Resources
+        .componentwiseMin(queue.getMaxShare(), scheduler.getClusterCapacity()));
     
-    fractionMemFairShare = (float)fairResources.getMemory() / clusterResources.getMemory();
-    fractionMemMinShare = (float)minResources.getMemory() / clusterResources.getMemory();
-    fractionMemMaxShare = (float)maxResources.getMemory() / clusterResources.getMemory();
+    fractionMemFairShare =
+        (float) fairResources.getMemory() / clusterResources.getMemory();
+    fractionMemMinShare =
+        (float) minResources.getMemory() / clusterResources.getMemory();
+    fractionMemMaxShare =
+        (float) maxResources.getMemory() / clusterResources.getMemory();
     
     maxApps = allocConf.getQueueMaxApps(queueName);
     
@@ -93,7 +93,8 @@ public class FairSchedulerQueueInfo {
     childQueues = new ArrayList<FairSchedulerQueueInfo>();
     for (FSQueue child : children) {
       if (child instanceof FSLeafQueue) {
-        childQueues.add(new FairSchedulerLeafQueueInfo((FSLeafQueue)child, scheduler));
+        childQueues.add(
+            new FairSchedulerLeafQueueInfo((FSLeafQueue) child, scheduler));
       } else {
         childQueues.add(new FairSchedulerQueueInfo(child, scheduler));
       }
@@ -113,7 +114,7 @@ public class FairSchedulerQueueInfo {
   public ResourceInfo getFairShare() {
     return fairResources;
   }
-    
+
   public ResourceInfo getMinResources() {
     return minResources;
   }
@@ -143,7 +144,7 @@ public class FairSchedulerQueueInfo {
   }
   
   /**
-   * Returns the memory used by this queue as a fraction of the entire 
+   * Returns the memory used by this queue as a fraction of the entire
    * cluster capacity.
    */
   public float getUsedMemoryFraction() {
@@ -151,7 +152,7 @@ public class FairSchedulerQueueInfo {
   }
   
   /**
-   * Returns the capacity of this queue as a fraction of the entire cluster 
+   * Returns the capacity of this queue as a fraction of the entire cluster
    * capacity.
    */
   public float getMaxResourcesFraction() {

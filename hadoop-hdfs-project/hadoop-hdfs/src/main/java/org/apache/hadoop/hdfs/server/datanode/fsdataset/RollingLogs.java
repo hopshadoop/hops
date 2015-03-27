@@ -23,7 +23,7 @@ import java.util.Iterator;
 
 /**
  * Rolling logs consist of a current log and a set of previous logs.
- *
+ * <p/>
  * The implementation should support a single appender and multiple readers.
  */
 public interface RollingLogs {
@@ -31,14 +31,10 @@ public interface RollingLogs {
    * To iterate the lines of the logs.
    */
   public interface LineIterator extends Iterator<String>, Closeable {
-    /** Is the iterator iterating the previous? */
-    public boolean isPrevious();
-
     /**
-     * Is the last read entry from previous? This should be called after
-     * reading.
+     * Is the iterator iterating the previous?
      */
-    public boolean isLastReadFromPrevious();
+    public boolean isPrevious();
   }
 
   /**
@@ -49,15 +45,16 @@ public interface RollingLogs {
 
   /**
    * Create an iterator to iterate the lines in the logs.
-   * 
-   * @param skipPrevious Should it skip reading the previous log? 
+   *
+   * @param skipPrevious
+   *     Should it skip reading the previous log?
    * @return a new iterator.
    */
   public LineIterator iterator(boolean skipPrevious) throws IOException;
 
   /**
    * @return the only appender to append text to the logs.
-   *   The same object is returned if it is invoked multiple times.
+   * The same object is returned if it is invoked multiple times.
    */
   public Appender appender();
 
@@ -65,9 +62,9 @@ public interface RollingLogs {
    * Roll current to previous.
    *
    * @return true if the rolling succeeded.
-   *   When it returns false, it is not equivalent to an error. 
-   *   It means that the rolling cannot be performed at the moment,
-   *   e.g. the logs are being read.
+   * When it returns false, it is not equivalent to an error.
+   * It means that the rolling cannot be performed at the moment,
+   * e.g. the logs are being read.
    */
   public boolean roll() throws IOException;
 }

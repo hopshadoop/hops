@@ -19,22 +19,26 @@ package org.apache.hadoop.hdfs.util;
 
 import static org.apache.hadoop.util.Time.monotonicNow;
 
-/** 
+/**
  * a class to throttle the data transfers.
  * This class is thread safe. It can be shared by multiple threads.
  * The parameter bandwidthPerSec specifies the total bandwidth shared by
  * threads.
  */
 public class DataTransferThrottler {
-  private final long period;          // period over which bw is imposed
-  private final long periodExtension; // Max period over which bw accumulates.
-  private long bytesPerPeriod;  // total number of bytes can be sent in each period
+  private long period;          // period over which bw is imposed
+  private long periodExtension; // Max period over which bw accumulates.
+  private long bytesPerPeriod;
+      // total number of bytes can be sent in each period
   private long curPeriodStart;  // current period starting time
   private long curReserve;      // remaining bytes can be sent in the period
   private long bytesAlreadyUsed;
 
-  /** Constructor 
-   * @param bandwidthPerSec bandwidth allowed in bytes per second. 
+  /**
+   * Constructor
+   *
+   * @param bandwidthPerSec
+   *     bandwidth allowed in bytes per second.
    */
   public DataTransferThrottler(long bandwidthPerSec) {
     this(500, bandwidthPerSec);  // by default throttling period is 500ms 
@@ -42,38 +46,42 @@ public class DataTransferThrottler {
 
   /**
    * Constructor
-   * @param period in milliseconds. Bandwidth is enforced over this
-   *        period.
-   * @param bandwidthPerSec bandwidth allowed in bytes per second. 
+   *
+   * @param period
+   *     in milliseconds. Bandwidth is enforced over this
+   *     period.
+   * @param bandwidthPerSec
+   *     bandwidth allowed in bytes per second.
    */
   public DataTransferThrottler(long period, long bandwidthPerSec) {
     this.curPeriodStart = monotonicNow();
     this.period = period;
-    this.curReserve = this.bytesPerPeriod = bandwidthPerSec*period/1000;
-    this.periodExtension = period*3;
+    this.curReserve = this.bytesPerPeriod = bandwidthPerSec * period / 1000;
+    this.periodExtension = period * 3;
   }
 
   /**
    * @return current throttle bandwidth in bytes per second.
    */
   public synchronized long getBandwidth() {
-    return bytesPerPeriod*1000/period;
+    return bytesPerPeriod * 1000 / period;
   }
   
   /**
    * Sets throttle bandwidth. This takes affect latest by the end of current
    * period.
-   * 
-   * @param bytesPerSecond 
+   *
+   * @param bytesPerSecond
    */
   public synchronized void setBandwidth(long bytesPerSecond) {
-    if ( bytesPerSecond <= 0 ) {
+    if (bytesPerSecond <= 0) {
       throw new IllegalArgumentException("" + bytesPerSecond);
     }
-    bytesPerPeriod = bytesPerSecond*period/1000;
+    bytesPerPeriod = bytesPerSecond * period / 1000;
   }
   
-  /** Given the numOfBytes sent/received since last time throttle was called,
+  /**
+   * Given the numOfBytes sent/received since last time throttle was called,
    * make the current thread sleep if I/O rate is too fast
    * compared to the given bandwidth.
    *
@@ -81,7 +89,7 @@ public class DataTransferThrottler {
    *     number of bytes sent/received since last time throttle was called
    */
   public synchronized void throttle(long numOfBytes) {
-    if ( numOfBytes <= 0 ) {
+    if (numOfBytes <= 0) {
       return;
     }
 
@@ -92,17 +100,17 @@ public class DataTransferThrottler {
       long now = monotonicNow();
       long curPeriodEnd = curPeriodStart + period;
 
-      if ( now < curPeriodEnd ) {
+      if (now < curPeriodEnd) {
         // Wait for next period so that curReserve can be increased.
         try {
-          wait( curPeriodEnd - now );
+          wait(curPeriodEnd - now);
         } catch (InterruptedException e) {
           // Abort throttle and reset interrupted status to make sure other
           // interrupt handling higher in the call stack executes.
           Thread.currentThread().interrupt();
           break;
         }
-      } else if ( now <  (curPeriodStart + periodExtension)) {
+      } else if (now < (curPeriodStart + periodExtension)) {
         curPeriodStart = curPeriodEnd;
         curReserve += bytesPerPeriod;
       } else {

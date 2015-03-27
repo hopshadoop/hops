@@ -23,12 +23,17 @@
  */
 
 option java_package = "org.apache.hadoop.yarn.proto";
+
 option java_outer_classname = "YarnServiceProtos";
+
 option java_generic_services = true;
+
 option java_generate_equals_and_hash = true;
+
 package hadoop.yarn;
 
 import "Security.proto";
+
 import "yarn_protos.proto";
 
 //////////////////////////////////////////////////////
@@ -69,7 +74,7 @@ message AllocateRequestProto {
 }
 
 message NMTokenProto {
-  optional NodeIdProto nodeId = 1; 
+  optional NodeIdProto nodeId = 1;
   optional hadoop.common.TokenProto token = 2;
 }
 
@@ -108,7 +113,7 @@ message GetApplicationReportResponseProto {
 }
 
 message SubmitApplicationRequestProto {
-  optional ApplicationSubmissionContextProto application_submission_context= 1;
+  optional ApplicationSubmissionContextProto application_submission_context = 1;
 }
 
 message SubmitApplicationResponseProto {

@@ -17,13 +17,6 @@
  */
 package org.apache.hadoop.hdfs;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
-import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -32,10 +25,17 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
 public class TestHdfsAdmin {
   
   private static final Path TEST_PATH = new Path("/test");
-  private final Configuration conf = new Configuration();
+  private Configuration conf = new Configuration();
   private MiniDFSCluster cluster;
   
   @Before
@@ -55,8 +55,7 @@ public class TestHdfsAdmin {
    */
   @Test
   public void testHdfsAdminSetQuota() throws Exception {
-    HdfsAdmin dfsAdmin = new HdfsAdmin(
-        FileSystem.getDefaultUri(conf), conf);
+    HdfsAdmin dfsAdmin = new HdfsAdmin(FileSystem.getDefaultUri(conf), conf);
     FileSystem fs = null;
     try {
       fs = FileSystem.get(conf);

@@ -32,9 +32,11 @@ public class ServiceException extends ServerException {
    * The exception message is resolved using the error code template
    * and the passed parameters.
    *
-   * @param error error code for the XException.
-   * @param params parameters to use when creating the error message
-   * with the error code template.
+   * @param error
+   *     error code for the XException.
+   * @param params
+   *     parameters to use when creating the error message
+   *     with the error code template.
    */
   public ServiceException(XException.ERROR error, Object... params) {
     super(error, params);

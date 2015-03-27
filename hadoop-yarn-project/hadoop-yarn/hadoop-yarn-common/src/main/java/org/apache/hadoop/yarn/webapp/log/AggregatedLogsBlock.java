@@ -1,33 +1,24 @@
 /**
-* Licensed to the Apache Software Foundation (ASF) under one
-* or more contributor license agreements.  See the NOTICE file
-* distributed with this work for additional information
-* regarding copyright ownership.  The ASF licenses this file
-* to you under the Apache License, Version 2.0 (the
-* "License"); you may not use this file except in compliance
-* with the License.  You may obtain a copy of the License at
-*
-*     http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package org.apache.hadoop.yarn.webapp.log;
 
-import static org.apache.hadoop.yarn.webapp.YarnWebParams.APP_OWNER;
-import static org.apache.hadoop.yarn.webapp.YarnWebParams.CONTAINER_ID;
-import static org.apache.hadoop.yarn.webapp.YarnWebParams.CONTAINER_LOG_TYPE;
-import static org.apache.hadoop.yarn.webapp.YarnWebParams.ENTITY_STRING;
-import static org.apache.hadoop.yarn.webapp.YarnWebParams.NM_NODENAME;
-
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.util.Map;
-
+import com.google.inject.Inject;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
@@ -45,7 +36,15 @@ import org.apache.hadoop.yarn.webapp.hamlet.Hamlet;
 import org.apache.hadoop.yarn.webapp.hamlet.Hamlet.PRE;
 import org.apache.hadoop.yarn.webapp.view.HtmlBlock;
 
-import com.google.inject.Inject;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.util.Map;
+
+import static org.apache.hadoop.yarn.webapp.YarnWebParams.APP_OWNER;
+import static org.apache.hadoop.yarn.webapp.YarnWebParams.CONTAINER_ID;
+import static org.apache.hadoop.yarn.webapp.YarnWebParams.CONTAINER_LOG_TYPE;
+import static org.apache.hadoop.yarn.webapp.YarnWebParams.ENTITY_STRING;
+import static org.apache.hadoop.yarn.webapp.YarnWebParams.NM_NODENAME;
 
 @InterfaceAudience.LimitedPrivate({"YARN", "MapReduce"})
 public class AggregatedLogsBlock extends HtmlBlock {
@@ -65,13 +64,13 @@ public class AggregatedLogsBlock extends HtmlBlock {
       NodeId nodeId = verifyAndGetNodeId(html);
       String appOwner = verifyAndGetAppOwner(html);
       LogLimits logLimits = verifyAndGetLogLimits(html);
-      if (containerId == null || nodeId == null || appOwner == null
-          || appOwner.isEmpty() || logLimits == null) {
+      if (containerId == null || nodeId == null || appOwner == null ||
+          appOwner.isEmpty() || logLimits == null) {
         return;
       }
 
-      ApplicationId applicationId = containerId.getApplicationAttemptId()
-          .getApplicationId();
+      ApplicationId applicationId =
+          containerId.getApplicationAttemptId().getApplicationId();
       String logEntity = $(ENTITY_STRING);
       if (logEntity == null || logEntity.isEmpty()) {
         logEntity = containerId.toString();
@@ -85,21 +84,20 @@ public class AggregatedLogsBlock extends HtmlBlock {
         return;
       }
 
-      Path remoteRootLogDir = new Path(conf.get(
-          YarnConfiguration.NM_REMOTE_APP_LOG_DIR,
-          YarnConfiguration.DEFAULT_NM_REMOTE_APP_LOG_DIR));
+      Path remoteRootLogDir = new Path(
+          conf.get(YarnConfiguration.NM_REMOTE_APP_LOG_DIR,
+              YarnConfiguration.DEFAULT_NM_REMOTE_APP_LOG_DIR));
 
       try {
-        reader = new AggregatedLogFormat.LogReader(conf,
-            LogAggregationUtils.getRemoteNodeLogFileForApp(remoteRootLogDir,
-                applicationId, appOwner, nodeId,
+        reader = new AggregatedLogFormat.LogReader(conf, LogAggregationUtils
+            .getRemoteNodeLogFileForApp(remoteRootLogDir, applicationId,
+                appOwner, nodeId,
                 LogAggregationUtils.getRemoteNodeLogDirSuffix(conf)));
       } catch (FileNotFoundException e) {
         // ACLs not available till the log file is opened.
-        html.h1()
-            ._("Logs not available for " + logEntity
-                + ". Aggregation may not be complete, "
-                + "Check back later or try the nodemanager at " + nodeId)._();
+        html.h1()._("Logs not available for " + logEntity +
+            ". Aggregation may not be complete, " +
+            "Check back later or try the nodemanager at " + nodeId)._();
         return;
       } catch (IOException e) {
         html.h1()._("Error getting logs for " + logEntity)._();
@@ -125,35 +123,35 @@ public class AggregatedLogsBlock extends HtmlBlock {
       if (remoteUser != null) {
         callerUGI = UserGroupInformation.createRemoteUser(remoteUser);
       }
-      if (callerUGI != null
-          && !aclsManager.checkAccess(callerUGI,
-              ApplicationAccessType.VIEW_APP, owner, applicationId)) {
-        html.h1()
-            ._("User [" + remoteUser
-                + "] is not authorized to view the logs for " + logEntity)._();
+      if (callerUGI != null && !aclsManager
+          .checkAccess(callerUGI, ApplicationAccessType.VIEW_APP, owner,
+              applicationId)) {
+        html.h1()._("User [" + remoteUser +
+            "] is not authorized to view the logs for " + logEntity)._();
         return;
       }
 
       String desiredLogType = $(CONTAINER_LOG_TYPE);
       try {
-        AggregatedLogFormat.ContainerLogsReader logReader = reader
-            .getContainerLogsReader(containerId);
+        AggregatedLogFormat.ContainerLogsReader logReader =
+            reader.getContainerLogsReader(containerId);
         if (logReader == null) {
-          html.h1()
-              ._("Logs not available for " + logEntity
-                  + ". Could be caused by the rentention policy")._();
+          html.h1()._("Logs not available for " + logEntity +
+              ". Could be caused by the rentention policy")._();
           return;
         }
 
-        boolean foundLog = readContainerLogs(html, logReader, logLimits,
-            desiredLogType);
+        boolean foundLog =
+            readContainerLogs(html, logReader, logLimits, desiredLogType);
 
         if (!foundLog) {
           if (desiredLogType.isEmpty()) {
-            html.h1("No logs available for container " + containerId.toString());
+            html.h1(
+                "No logs available for container " + containerId.toString());
           } else {
-            html.h1("Unable to locate '" + desiredLogType
-                + "' log for container " + containerId.toString());
+            html.h1(
+                "Unable to locate '" + desiredLogType + "' log for container " +
+                    containerId.toString());
           }
           return;
         }
@@ -178,8 +176,8 @@ public class AggregatedLogsBlock extends HtmlBlock {
     boolean foundLog = false;
     String logType = logReader.nextLog();
     while (logType != null) {
-      if (desiredLogType == null || desiredLogType.isEmpty()
-          || desiredLogType.equals(logType)) {
+      if (desiredLogType == null || desiredLogType.isEmpty() ||
+          desiredLogType.equals(logType)) {
         long logLength = logReader.getCurrentLogLength();
 
         if (foundLog) {
@@ -189,31 +187,30 @@ public class AggregatedLogsBlock extends HtmlBlock {
         html.p()._("Log Type: " + logType)._();
         html.p()._("Log Length: " + Long.toString(logLength))._();
 
-        long start = logLimits.start < 0
-            ? logLength + logLimits.start : logLimits.start;
+        long start =
+            logLimits.start < 0 ? logLength + logLimits.start : logLimits.start;
         start = start < 0 ? 0 : start;
         start = start > logLength ? logLength : start;
-        long end = logLimits.end < 0
-            ? logLength + logLimits.end : logLimits.end;
+        long end =
+            logLimits.end < 0 ? logLength + logLimits.end : logLimits.end;
         end = end < 0 ? 0 : end;
         end = end > logLength ? logLength : end;
         end = end < start ? start : end;
 
         long toRead = end - start;
         if (toRead < logLength) {
-            html.p()._("Showing " + toRead + " bytes of " + logLength
-                + " total. Click ")
-                .a(url("logs", $(NM_NODENAME), $(CONTAINER_ID),
-                    $(ENTITY_STRING), $(APP_OWNER),
-                    logType, "?start=0"), "here").
-                    _(" for the full log.")._();
+          html.p()._("Showing " + toRead + " bytes of " + logLength +
+              " total. Click ")
+              .a(url("logs", $(NM_NODENAME), $(CONTAINER_ID), $(ENTITY_STRING),
+                  $(APP_OWNER), logType, "?start=0"), "here").
+              _(" for the full log.")._();
         }
 
         long totalSkipped = 0;
         while (totalSkipped < start) {
           long ret = logReader.skip(start - totalSkipped);
           if (ret < 0) {
-            throw new IOException( "Premature EOF from container log");
+            throw new IOException("Premature EOF from container log");
           }
           totalSkipped += ret;
         }
@@ -222,8 +219,8 @@ public class AggregatedLogsBlock extends HtmlBlock {
         int currentToRead = toRead > bufferSize ? bufferSize : (int) toRead;
         PRE<Hamlet> pre = html.pre();
 
-        while (toRead > 0
-            && (len = logReader.read(cbuf, 0, currentToRead)) > 0) {
+        while (toRead > 0 &&
+            (len = logReader.read(cbuf, 0, currentToRead)) > 0) {
           pre._(new String(cbuf, 0, len));
           toRead = toRead - len;
           currentToRead = toRead > bufferSize ? bufferSize : (int) toRead;
@@ -249,9 +246,8 @@ public class AggregatedLogsBlock extends HtmlBlock {
     try {
       containerId = ConverterUtils.toContainerId(containerIdStr);
     } catch (IllegalArgumentException e) {
-      html.h1()
-          ._("Cannot get container logs for invalid containerId: "
-              + containerIdStr)._();
+      html.h1()._("Cannot get container logs for invalid containerId: " +
+          containerIdStr)._();
       return null;
     }
     return containerId;

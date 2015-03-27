@@ -18,9 +18,6 @@
 
 package org.apache.hadoop.yarn.api.protocolrecords;
 
-import java.util.List;
-import java.util.Map;
-
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Stable;
@@ -31,13 +28,16 @@ import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.SerializedException;
 import org.apache.hadoop.yarn.util.Records;
 
+import java.util.List;
+import java.util.Map;
+
 /**
  * <p>
  * The response sent by the <code>NodeManager</code> to the
  * <code>ApplicationMaster</code> when asked to obtain the
  * <code>ContainerStatus</code> of requested containers.
  * </p>
- * 
+ *
  * @see ContainerManagementProtocol#getContainerStatuses(GetContainerStatusesRequest)
  */
 @Public
@@ -58,7 +58,7 @@ public abstract class GetContainerStatusesResponse {
 
   /**
    * Get the <code>ContainerStatus</code>es of the requested containers.
-   * 
+   *
    * @return <code>ContainerStatus</code>es of the requested containers.
    */
   @Public
@@ -73,7 +73,8 @@ public abstract class GetContainerStatusesResponse {
   public abstract void setContainerStatuses(List<ContainerStatus> statuses);
 
   /**
-   * Get the containerId-to-exception map in which the exception indicates error
+   * Get the containerId-to-exception map in which the exception indicates
+   * error
    * from per container for failed requests
    */
   @Public
@@ -81,7 +82,8 @@ public abstract class GetContainerStatusesResponse {
   public abstract Map<ContainerId, SerializedException> getFailedRequests();
 
   /**
-   * Set the containerId-to-exception map in which the exception indicates error
+   * Set the containerId-to-exception map in which the exception indicates
+   * error
    * from per container for failed requests
    */
   @Private

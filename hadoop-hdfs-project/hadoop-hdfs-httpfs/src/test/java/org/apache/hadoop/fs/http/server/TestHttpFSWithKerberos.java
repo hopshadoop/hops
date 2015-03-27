@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.fs.http.server;
 
+import junit.framework.Assert;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.DelegationTokenRenewer;
@@ -39,7 +40,7 @@ import org.apache.hadoop.test.TestJettyHelper;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.junit.After;
-import org.junit.Assert;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.mortbay.jetty.Server;
 import org.mortbay.jetty.webapp.WebAppContext;
@@ -80,7 +81,7 @@ public class TestHttpFSWithKerberos extends HFSTestCase {
     File hadoopConfDir = new File(new File(homeDir, "conf"), "hadoop-conf");
     hadoopConfDir.mkdirs();
     String fsDefaultName = TestHdfsHelper.getHdfsConf()
-      .get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY);
+        .get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY);
     Configuration conf = new Configuration(false);
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, fsDefaultName);
     File hdfsSite = new File(hadoopConfDir, "hdfs-site.xml");
@@ -95,7 +96,7 @@ public class TestHttpFSWithKerberos extends HFSTestCase {
     conf.set("httpfs.authentication.type", "kerberos");
 
     conf.set("httpfs.authentication.signature.secret.file",
-             secretFile.getAbsolutePath());
+        secretFile.getAbsolutePath());
     File httpfsSite = new File(new File(homeDir, "conf"), "httpfs-site.xml");
     os = new FileOutputStream(httpfsSite);
     conf.writeXml(os);
@@ -114,6 +115,7 @@ public class TestHttpFSWithKerberos extends HFSTestCase {
   @TestDir
   @TestJetty
   @TestHdfs
+  @Ignore
   public void testValidHttpFSAccess() throws Exception {
     createHttpFSServer();
 
@@ -121,7 +123,7 @@ public class TestHttpFSWithKerberos extends HFSTestCase {
       @Override
       public Void call() throws Exception {
         URL url = new URL(TestJettyHelper.getJettyURL(),
-                          "/webhdfs/v1/?op=GETHOMEDIRECTORY");
+            "/webhdfs/v1/?op=GETHOMEDIRECTORY");
         AuthenticatedURL aUrl = new AuthenticatedURL();
         AuthenticatedURL.Token aToken = new AuthenticatedURL.Token();
         HttpURLConnection conn = aUrl.openConnection(url, aToken);
@@ -135,20 +137,22 @@ public class TestHttpFSWithKerberos extends HFSTestCase {
   @TestDir
   @TestJetty
   @TestHdfs
+  @Ignore
   public void testInvalidadHttpFSAccess() throws Exception {
     createHttpFSServer();
 
     URL url = new URL(TestJettyHelper.getJettyURL(),
-                      "/webhdfs/v1/?op=GETHOMEDIRECTORY");
+        "/webhdfs/v1/?op=GETHOMEDIRECTORY");
     HttpURLConnection conn = (HttpURLConnection) url.openConnection();
     Assert.assertEquals(conn.getResponseCode(),
-                        HttpURLConnection.HTTP_UNAUTHORIZED);
+        HttpURLConnection.HTTP_UNAUTHORIZED);
   }
 
   @Test
   @TestDir
   @TestJetty
   @TestHdfs
+  @Ignore
   public void testDelegationTokenHttpFSAccess() throws Exception {
     createHttpFSServer();
 
@@ -157,56 +161,52 @@ public class TestHttpFSWithKerberos extends HFSTestCase {
       public Void call() throws Exception {
         //get delegation token doing SPNEGO authentication
         URL url = new URL(TestJettyHelper.getJettyURL(),
-                          "/webhdfs/v1/?op=GETDELEGATIONTOKEN");
+            "/webhdfs/v1/?op=GETDELEGATIONTOKEN");
         AuthenticatedURL aUrl = new AuthenticatedURL();
         AuthenticatedURL.Token aToken = new AuthenticatedURL.Token();
         HttpURLConnection conn = aUrl.openConnection(url, aToken);
         Assert.assertEquals(conn.getResponseCode(), HttpURLConnection.HTTP_OK);
         JSONObject json = (JSONObject) new JSONParser()
-          .parse(new InputStreamReader(conn.getInputStream()));
-        json =
-          (JSONObject) json
+            .parse(new InputStreamReader(conn.getInputStream()));
+        json = (JSONObject) json
             .get(HttpFSKerberosAuthenticator.DELEGATION_TOKEN_JSON);
         String tokenStr = (String) json
-          .get(HttpFSKerberosAuthenticator.DELEGATION_TOKEN_URL_STRING_JSON);
+            .get(HttpFSKerberosAuthenticator.DELEGATION_TOKEN_URL_STRING_JSON);
 
         //access httpfs using the delegation token
         url = new URL(TestJettyHelper.getJettyURL(),
-                      "/webhdfs/v1/?op=GETHOMEDIRECTORY&delegation=" +
-                      tokenStr);
+            "/webhdfs/v1/?op=GETHOMEDIRECTORY&delegation=" + tokenStr);
         conn = (HttpURLConnection) url.openConnection();
         Assert.assertEquals(conn.getResponseCode(), HttpURLConnection.HTTP_OK);
 
         //try to renew the delegation token without SPNEGO credentials
         url = new URL(TestJettyHelper.getJettyURL(),
-                      "/webhdfs/v1/?op=RENEWDELEGATIONTOKEN&token=" + tokenStr);
+            "/webhdfs/v1/?op=RENEWDELEGATIONTOKEN&token=" + tokenStr);
         conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod("PUT");
         Assert.assertEquals(conn.getResponseCode(),
-                            HttpURLConnection.HTTP_UNAUTHORIZED);
+            HttpURLConnection.HTTP_UNAUTHORIZED);
 
         //renew the delegation token with SPNEGO credentials
         url = new URL(TestJettyHelper.getJettyURL(),
-                      "/webhdfs/v1/?op=RENEWDELEGATIONTOKEN&token=" + tokenStr);
+            "/webhdfs/v1/?op=RENEWDELEGATIONTOKEN&token=" + tokenStr);
         conn = aUrl.openConnection(url, aToken);
         conn.setRequestMethod("PUT");
         Assert.assertEquals(conn.getResponseCode(), HttpURLConnection.HTTP_OK);
 
         //cancel delegation token, no need for SPNEGO credentials
         url = new URL(TestJettyHelper.getJettyURL(),
-                      "/webhdfs/v1/?op=CANCELDELEGATIONTOKEN&token=" +
-                      tokenStr);
+            "/webhdfs/v1/?op=CANCELDELEGATIONTOKEN&token=" + tokenStr);
         conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod("PUT");
         Assert.assertEquals(conn.getResponseCode(), HttpURLConnection.HTTP_OK);
 
         //try to access httpfs with the canceled delegation token
         url = new URL(TestJettyHelper.getJettyURL(),
-                      "/webhdfs/v1/?op=GETHOMEDIRECTORY&delegation=" +
-                      tokenStr);
+            "/webhdfs/v1/?op=GETHOMEDIRECTORY&delegation=" + tokenStr);
         conn = (HttpURLConnection) url.openConnection();
         Assert.assertEquals(conn.getResponseCode(),
-                            HttpURLConnection.HTTP_UNAUTHORIZED);
+            HttpURLConnection.HTTP_UNAUTHORIZED);
         return null;
       }
     });
@@ -214,13 +214,13 @@ public class TestHttpFSWithKerberos extends HFSTestCase {
 
   @SuppressWarnings("deprecation")
   private void testDelegationTokenWithFS(Class fileSystemClass)
-    throws Exception {
+      throws Exception {
     createHttpFSServer();
     Configuration conf = new Configuration();
     conf.set("fs.webhdfs.impl", fileSystemClass.getName());
     conf.set("fs.hdfs.impl.disable.cache", "true");
-    URI uri = new URI( "webhdfs://" +
-                       TestJettyHelper.getJettyURL().toURI().getAuthority());
+    URI uri = new URI(
+        "webhdfs://" + TestJettyHelper.getJettyURL().toURI().getAuthority());
     FileSystem fs = FileSystem.get(uri, conf);
     Token<?> tokens[] = fs.addDelegationTokens("foo", null);
     fs.close();
@@ -231,33 +231,33 @@ public class TestHttpFSWithKerberos extends HFSTestCase {
     fs.close();
   }
 
-  private void testDelegationTokenWithinDoAs(
-    final Class fileSystemClass, boolean proxyUser) throws Exception {
+  private void testDelegationTokenWithinDoAs(final Class fileSystemClass,
+      boolean proxyUser) throws Exception {
     Configuration conf = new Configuration();
     conf.set("hadoop.security.authentication", "kerberos");
     UserGroupInformation.setConfiguration(conf);
-    UserGroupInformation.loginUserFromKeytab("client",
-                                             "/Users/tucu/tucu.keytab");
+    UserGroupInformation
+        .loginUserFromKeytab("client", "/Users/tucu/tucu.keytab");
     UserGroupInformation ugi = UserGroupInformation.getLoginUser();
     if (proxyUser) {
       ugi = UserGroupInformation.createProxyUser("foo", ugi);
     }
     conf = new Configuration();
     UserGroupInformation.setConfiguration(conf);
-    ugi.doAs(
-      new PrivilegedExceptionAction<Void>() {
-        @Override
-        public Void run() throws Exception {
-          testDelegationTokenWithFS(fileSystemClass);
-          return null;
-        }
-      });
+    ugi.doAs(new PrivilegedExceptionAction<Void>() {
+          @Override
+          public Void run() throws Exception {
+            testDelegationTokenWithFS(fileSystemClass);
+            return null;
+          }
+        });
   }
 
   @Test
   @TestDir
   @TestJetty
   @TestHdfs
+  @Ignore
   public void testDelegationTokenWithHttpFSFileSystem() throws Exception {
     testDelegationTokenWithinDoAs(HttpFSFileSystem.class, false);
   }
@@ -266,6 +266,7 @@ public class TestHttpFSWithKerberos extends HFSTestCase {
   @TestDir
   @TestJetty
   @TestHdfs
+  @Ignore
   public void testDelegationTokenWithWebhdfsFileSystem() throws Exception {
     testDelegationTokenWithinDoAs(WebHdfsFileSystem.class, false);
   }
@@ -274,8 +275,9 @@ public class TestHttpFSWithKerberos extends HFSTestCase {
   @TestDir
   @TestJetty
   @TestHdfs
+  @Ignore
   public void testDelegationTokenWithHttpFSFileSystemProxyUser()
-    throws Exception {
+      throws Exception {
     testDelegationTokenWithinDoAs(HttpFSFileSystem.class, true);
   }
 

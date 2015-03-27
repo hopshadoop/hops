@@ -17,6 +17,10 @@
  */
 package org.apache.hadoop.hdfs.server.datanode.fsdataset.impl;
 
+import com.google.common.base.Charsets;
+import org.apache.hadoop.hdfs.server.datanode.DataBlockScanner;
+import org.apache.hadoop.hdfs.server.datanode.fsdataset.RollingLogs;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -28,34 +32,28 @@ import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.apache.hadoop.hdfs.server.datanode.DataBlockScanner;
-import org.apache.hadoop.hdfs.server.datanode.fsdataset.RollingLogs;
-
-import com.google.common.base.Charsets;
-
 class RollingLogsImpl implements RollingLogs {
   private static final String CURR_SUFFIX = ".curr";
   private static final String PREV_SUFFIX = ".prev";
 
   static boolean isFilePresent(String dir, String filePrefix) {
     return new File(dir, filePrefix + CURR_SUFFIX).exists() ||
-           new File(dir, filePrefix + PREV_SUFFIX).exists();
+        new File(dir, filePrefix + PREV_SUFFIX).exists();
   }
 
   private final File curr;
   private final File prev;
   private PrintWriter out; //require synchronized access
 
-  private final Appender appender = new Appender() {
+  private Appender appender = new Appender() {
     @Override
     public Appendable append(CharSequence csq) {
-      synchronized(RollingLogsImpl.this) {
+      synchronized (RollingLogsImpl.this) {
         if (out == null) {
-          throw new IllegalStateException(RollingLogsImpl.this
-              + " is not yet opened.");
+          throw new IllegalStateException(
+              RollingLogsImpl.this + " is not yet opened.");
         }
         out.print(csq);
-        out.flush();
       }
       return this;
     }
@@ -72,7 +70,7 @@ class RollingLogsImpl implements RollingLogs {
 
     @Override
     public void close() {
-      synchronized(RollingLogsImpl.this) {
+      synchronized (RollingLogsImpl.this) {
         if (out != null) {
           out.close();
           out = null;
@@ -84,16 +82,17 @@ class RollingLogsImpl implements RollingLogs {
 
   private final AtomicInteger numReaders = new AtomicInteger();
 
-  RollingLogsImpl(String dir, String filePrefix) throws FileNotFoundException{
+  RollingLogsImpl(String dir, String filePrefix) throws FileNotFoundException {
     curr = new File(dir, filePrefix + CURR_SUFFIX);
     prev = new File(dir, filePrefix + PREV_SUFFIX);
-    out = new PrintWriter(new OutputStreamWriter(new FileOutputStream(
-        curr, true), Charsets.UTF_8));
+    out = new PrintWriter(
+        new OutputStreamWriter(new FileOutputStream(curr, true),
+            Charsets.UTF_8));
   }
 
   @Override
   public Reader iterator(boolean skipPrevFile) throws IOException {
-    numReaders.incrementAndGet(); 
+    numReaders.incrementAndGet();
     return new Reader(skipPrevFile);
   }
 
@@ -111,11 +110,12 @@ class RollingLogsImpl implements RollingLogs {
       throw new IOException("Failed to delete " + prev);
     }
 
-    synchronized(this) {
+    synchronized (this) {
       appender.close();
       final boolean renamed = curr.renameTo(prev);
-      out = new PrintWriter(new OutputStreamWriter(new FileOutputStream(
-          curr, true), Charsets.UTF_8));
+      out = new PrintWriter(
+          new OutputStreamWriter(new FileOutputStream(curr, true),
+              Charsets.UTF_8));
       if (!renamed) {
         throw new IOException("Failed to rename " + curr + " to " + prev);
       }
@@ -131,19 +131,18 @@ class RollingLogsImpl implements RollingLogs {
   /**
    * This is used to read the lines in order.
    * If the data is not read completely (i.e, untill hasNext() returns
-   * false), it needs to be explicitly 
+   * false), it needs to be explicitly
    */
   private class Reader implements RollingLogs.LineIterator {
     private File file;
-    private File lastReadFile;
     private BufferedReader reader;
     private String line;
     private boolean closed = false;
     
     private Reader(boolean skipPrevFile) throws IOException {
       reader = null;
-      file = skipPrevFile? curr : prev;
-      readNext();        
+      file = skipPrevFile ? curr : prev;
+      readNext();
     }
 
     @Override
@@ -151,17 +150,12 @@ class RollingLogsImpl implements RollingLogs {
       return file == prev;
     }
 
-    @Override
-    public boolean isLastReadFromPrevious() {
-      return lastReadFile == prev;
-    }
-
     private boolean openFile() throws IOException {
 
-      for(int i=0; i<2; i++) {
+      for (int i = 0; i < 2; i++) {
         if (reader != null || i > 0) {
           // move to next file
-          file = isPrevious()? curr : null;
+          file = isPrevious() ? curr : null;
         }
         if (file == null) {
           return false;
@@ -171,13 +165,13 @@ class RollingLogsImpl implements RollingLogs {
         }
       }
       
-      if (reader != null ) {
+      if (reader != null) {
         reader.close();
         reader = null;
       }
       
-      reader = new BufferedReader(new InputStreamReader(new FileInputStream(
-          file), Charsets.UTF_8));
+      reader = new BufferedReader(
+          new InputStreamReader(new FileInputStream(file), Charsets.UTF_8));
       return true;
     }
     
@@ -210,7 +204,6 @@ class RollingLogsImpl implements RollingLogs {
     public String next() {
       String curLine = line;
       try {
-        lastReadFile = file;
         readNext();
       } catch (IOException e) {
         DataBlockScanner.LOG.warn("Failed to read next line.", e);
@@ -235,7 +228,7 @@ class RollingLogsImpl implements RollingLogs {
           reader = null;
           closed = true;
           final int n = numReaders.decrementAndGet();
-          assert(n >= 0);
+          assert (n >= 0);
         }
       }
     }

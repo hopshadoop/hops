@@ -17,15 +17,6 @@
  */
 package org.apache.hadoop.hdfs;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.logging.impl.Log4JLogger;
@@ -54,35 +45,46 @@ import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 public class TestLeaseRecovery2 {
   
   public static final Log LOG = LogFactory.getLog(TestLeaseRecovery2.class);
   
   {
-    ((Log4JLogger)DataNode.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger)LeaseManager.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger)LogFactory.getLog(FSNamesystem.class)).getLogger().setLevel(Level.ALL);
+    ((Log4JLogger) DataNode.LOG).getLogger().setLevel(Level.ALL);
+    ((Log4JLogger) LeaseManager.LOG).getLogger().setLevel(Level.ALL);
+    ((Log4JLogger) LogFactory.getLog(FSNamesystem.class)).getLogger()
+        .setLevel(Level.ALL);
   }
 
   static final private long BLOCK_SIZE = 1024;
-  static final private int FILE_SIZE = (int)BLOCK_SIZE*2;
-  static final short REPLICATION_NUM = (short)3;
-  static final byte[] buffer = new byte[FILE_SIZE];
+  static final private int FILE_SIZE = (int) BLOCK_SIZE * 2;
+  static final short REPLICATION_NUM = (short) 3;
+  static byte[] buffer = new byte[FILE_SIZE];
   
-  static private final String fakeUsername = "fakeUser1";
-  static private final String fakeGroup = "supergroup";
+  static private String fakeUsername = "fakeUser1";
+  static private String fakeGroup = "supergroup";
 
   static private MiniDFSCluster cluster;
   static private DistributedFileSystem dfs;
   final static private Configuration conf = new HdfsConfiguration();
-  final static private int BUF_SIZE = conf.getInt(
-      CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096);
+  final static private int BUF_SIZE =
+      conf.getInt(CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096);
   
   final static private long SHORT_LEASE_PERIOD = 1000L;
-  final static private long LONG_LEASE_PERIOD = 60*60*SHORT_LEASE_PERIOD;
+  final static private long LONG_LEASE_PERIOD = 60 * 60 * SHORT_LEASE_PERIOD;
   
-  /** start a dfs cluster
-   * 
+  /**
+   * start a dfs cluster
+   *
    * @throws IOException
    */
   @BeforeClass
@@ -97,23 +99,27 @@ public class TestLeaseRecovery2 {
   
   /**
    * stop the cluster
+   *
    * @throws IOException
    */
   @AfterClass
   public static void tearDown() throws IOException {
     IOUtils.closeStream(dfs);
-    if (cluster != null) {cluster.shutdown();}
+    if (cluster != null) {
+      cluster.shutdown();
+    }
   }
 
   /**
    * Test the NameNode's revoke lease on current lease holder function.
+   *
    * @throws Exception
    */
   @Test
   public void testImmediateRecoveryOfLease() throws Exception {
     //create a file
     // write bytes into the file.
-    byte [] actual = new byte[FILE_SIZE];
+    byte[] actual = new byte[FILE_SIZE];
     int size = AppendTestUtil.nextInt(FILE_SIZE);
     Path filepath = createFile("/immediateRecoverLease-shortlease", size, true);
     // set the soft limit to be 1 second so that the
@@ -130,7 +136,7 @@ public class TestLeaseRecovery2 {
     size = AppendTestUtil.nextInt(FILE_SIZE);
     filepath = createFile("/immediateRecoverLease-longlease", size, false);
 
-    // test recoverLease from a different client
+    // test recoverLese from a different client
     recoverLease(filepath, null);
     verifyFile(dfs, filepath, actual, size);
 
@@ -140,8 +146,8 @@ public class TestLeaseRecovery2 {
 
     // create another file using the same client
     Path filepath1 = new Path(filepath.toString() + AppendTestUtil.nextInt());
-    FSDataOutputStream stm = dfs.create(filepath1, true, BUF_SIZE,
-      REPLICATION_NUM, BLOCK_SIZE);
+    FSDataOutputStream stm =
+        dfs.create(filepath1, true, BUF_SIZE, REPLICATION_NUM, BLOCK_SIZE);
 
     // recover the first file
     recoverLease(filepath, dfs);
@@ -155,11 +161,11 @@ public class TestLeaseRecovery2 {
 
   private Path createFile(final String filestr, final int size,
       final boolean triggerLeaseRenewerInterrupt)
-  throws IOException, InterruptedException {
+      throws IOException, InterruptedException {
     AppendTestUtil.LOG.info("filestr=" + filestr);
     Path filepath = new Path(filestr);
-    FSDataOutputStream stm = dfs.create(filepath, true, BUF_SIZE,
-      REPLICATION_NUM, BLOCK_SIZE);
+    FSDataOutputStream stm =
+        dfs.create(filepath, true, BUF_SIZE, REPLICATION_NUM, BLOCK_SIZE);
     assertTrue(dfs.dfs.exists(filestr));
 
     AppendTestUtil.LOG.info("size=" + size);
@@ -177,9 +183,9 @@ public class TestLeaseRecovery2 {
   }
 
   private void recoverLease(Path filepath, DistributedFileSystem dfs)
-  throws Exception {
+      throws Exception {
     if (dfs == null) {
-      dfs = (DistributedFileSystem)getFSAsAnotherUser(conf);
+      dfs = (DistributedFileSystem) getFSAsAnotherUser(conf);
     }
 
     while (!dfs.recoverLease(filepath)) {
@@ -189,46 +195,59 @@ public class TestLeaseRecovery2 {
   }
 
   private FileSystem getFSAsAnotherUser(final Configuration c)
-  throws IOException, InterruptedException {
-    return FileSystem.get(FileSystem.getDefaultUri(c), c,
-      UserGroupInformation.createUserForTesting(fakeUsername, 
-          new String [] {fakeGroup}).getUserName());
+      throws IOException, InterruptedException {
+    return FileSystem.get(FileSystem.getDefaultUri(c), c, UserGroupInformation
+            .createUserForTesting(fakeUsername, new String[]{fakeGroup})
+            .getUserName());
   }
 
   private void recoverLeaseUsingCreate(Path filepath)
-  throws IOException, InterruptedException {
+      throws IOException, InterruptedException {
     FileSystem dfs2 = getFSAsAnotherUser(conf);
-    for(int i = 0; i < 10; i++) {
+
+    boolean done = false;
+    for (int i = 0; i < 10 && !done; i++) {
       AppendTestUtil.LOG.info("i=" + i);
       try {
-        dfs2.create(filepath, false, BUF_SIZE, (short)1, BLOCK_SIZE);
+        dfs2.create(filepath, false, BUF_SIZE, (short) 1, BLOCK_SIZE);
         fail("Creation of an existing file should never succeed.");
-      } catch(FileAlreadyExistsException e) {
-        return; // expected
-      } catch(AlreadyBeingCreatedException e) {
-        return; // expected
-      } catch(IOException ioe) {
-        AppendTestUtil.LOG.warn("UNEXPECTED ", ioe);
+      } catch (IOException ioe) {
+        final String message = ioe.getMessage();
+        if (message.contains("file exists")) {
+          AppendTestUtil.LOG.info("done", ioe);
+          done = true;
+        } else if (message
+            .contains(AlreadyBeingCreatedException.class.getSimpleName())) {
+          AppendTestUtil.LOG.info("GOOD! got " + message);
+        } else {
+          AppendTestUtil.LOG.warn("UNEXPECTED IOException", ioe);
+        }
+      }
+
+      if (!done) {
         AppendTestUtil.LOG.info("sleep " + 5000 + "ms");
-        try {Thread.sleep(5000);} catch (InterruptedException e) {}
+        try {
+          Thread.sleep(5000);
+        } catch (InterruptedException e) {
+        }
       }
     }
-    fail("recoverLeaseUsingCreate failed");
+    assertTrue(done);
   }
 
   private void verifyFile(FileSystem dfs, Path filepath, byte[] actual,
       int size) throws IOException {
-    AppendTestUtil.LOG.info("Lease for file " +  filepath + " is recovered. "
-        + "Validating its contents now...");
+    AppendTestUtil.LOG.info("Lease for file " + filepath + " is recovered. " +
+        "Validating its contents now...");
 
     // verify that file-size matches
     assertTrue("File should be " + size + " bytes, but is actually " +
-               " found to be " + dfs.getFileStatus(filepath).getLen() +
-               " bytes",
-               dfs.getFileStatus(filepath).getLen() == size);
+            " found to be " + dfs.getFileStatus(filepath).getLen() +
+            " bytes", dfs.getFileStatus(filepath).getLen() == size);
 
     // verify that there is enough data to read.
-    System.out.println("File size is good. Now validating sizes from datanodes...");
+    System.out
+        .println("File size is good. Now validating sizes from datanodes...");
     FSDataInputStream stmin = dfs.open(filepath);
     stmin.readFully(0, actual, 0, size);
     stmin.close();
@@ -238,10 +257,10 @@ public class TestLeaseRecovery2 {
    * This test makes the client does not renew its lease and also
    * set the hard lease expiration period to be short 1s. Thus triggering
    * lease expiration to happen while the client is still alive.
-   * 
+   * <p/>
    * The test makes sure that the lease recovery completes and the client
    * fails if it continues to write to the file.
-   * 
+   *
    * @throws Exception
    */
   @Test
@@ -250,8 +269,8 @@ public class TestLeaseRecovery2 {
     String filestr = "/hardLeaseRecovery";
     AppendTestUtil.LOG.info("filestr=" + filestr);
     Path filepath = new Path(filestr);
-    FSDataOutputStream stm = dfs.create(filepath, true,
-        BUF_SIZE, REPLICATION_NUM, BLOCK_SIZE);
+    FSDataOutputStream stm =
+        dfs.create(filepath, true, BUF_SIZE, REPLICATION_NUM, BLOCK_SIZE);
     assertTrue(dfs.dfs.exists(filestr));
 
     // write bytes into the file.
@@ -285,11 +304,11 @@ public class TestLeaseRecovery2 {
       fail("Writer thread should have been killed");
     } catch (IOException e) {
       e.printStackTrace();
-    }      
+    }
 
     // verify data
-    AppendTestUtil.LOG.info(
-        "File size is good. Now validating sizes from datanodes...");
+    AppendTestUtil.LOG
+        .info("File size is good. Now validating sizes from datanodes...");
     AppendTestUtil.checkFullFile(dfs, filepath, size, buffer, filestr);
   }
   
@@ -298,15 +317,15 @@ public class TestLeaseRecovery2 {
    * set the soft lease expiration period to be short 1s. Thus triggering
    * soft lease expiration to happen immediately by having another client
    * trying to create the same file.
-   * 
+   * <p/>
    * The test makes sure that the lease recovery completes.
-   * 
+   *
    * @throws Exception
    */
   @Test
   public void testSoftLeaseRecovery() throws Exception {
-    Map<String, String []> u2g_map = new HashMap<String, String []>(1);
-    u2g_map.put(fakeUsername, new String[] {fakeGroup});
+    Map<String, String[]> u2g_map = new HashMap<String, String[]>(1);
+    u2g_map.put(fakeUsername, new String[]{fakeGroup});
     DFSTestUtil.updateConfWithFakeGroupMapping(conf, u2g_map);
 
     // Reset default lease periods
@@ -317,8 +336,8 @@ public class TestLeaseRecovery2 {
     String filestr = "/foo" + AppendTestUtil.nextInt();
     AppendTestUtil.LOG.info("filestr=" + filestr);
     Path filepath = new Path(filestr);
-    FSDataOutputStream stm = dfs.create(filepath, true,
-        BUF_SIZE, REPLICATION_NUM, BLOCK_SIZE);
+    FSDataOutputStream stm =
+        dfs.create(filepath, true, BUF_SIZE, REPLICATION_NUM, BLOCK_SIZE);
     assertTrue(dfs.dfs.exists(filestr));
 
     // write random number of bytes into it.
@@ -339,14 +358,13 @@ public class TestLeaseRecovery2 {
     // try to re-open the file before closing the previous handle. This
     // should fail but will trigger lease recovery.
     {
-      UserGroupInformation ugi = 
-        UserGroupInformation.createUserForTesting(fakeUsername, 
-            new String [] { fakeGroup});
+      UserGroupInformation ugi = UserGroupInformation
+          .createUserForTesting(fakeUsername, new String[]{fakeGroup});
 
       FileSystem dfs2 = DFSTestUtil.getFileSystemAs(ugi, conf);
 
       boolean done = false;
-      for(int i = 0; i < 10 && !done; i++) {
+      for (int i = 0; i < 10 && !done; i++) {
         AppendTestUtil.LOG.info("i=" + i);
         try {
           dfs2.create(filepath, false, BUF_SIZE, REPLICATION_NUM, BLOCK_SIZE);
@@ -361,14 +379,17 @@ public class TestLeaseRecovery2 {
 
         if (!done) {
           AppendTestUtil.LOG.info("sleep " + 5000 + "ms");
-          try {Thread.sleep(5000);} catch (InterruptedException e) {}
+          try {
+            Thread.sleep(5000);
+          } catch (InterruptedException e) {
+          }
         }
       }
       assertTrue(done);
     }
 
-    AppendTestUtil.LOG.info("Lease for file " +  filepath + " is recovered. "
-        + "Validating its contents now...");
+    AppendTestUtil.LOG.info("Lease for file " + filepath + " is recovered. " +
+        "Validating its contents now...");
 
     // verify that file-size matches
     long fileSize = dfs.getFileStatus(filepath).getLen();
@@ -377,7 +398,7 @@ public class TestLeaseRecovery2 {
 
     // verify data
     AppendTestUtil.LOG.info("File size is good. " +
-                     "Now validating data and sizes from datanodes...");
+        "Now validating data and sizes from datanodes...");
     AppendTestUtil.checkFullFile(dfs, filepath, size, buffer, filestr);
   }
   
@@ -388,10 +409,10 @@ public class TestLeaseRecovery2 {
    * also causes the NN to restart after lease recovery has begun, but before
    * the DNs have completed the blocks. This test verifies that when the NN
    * comes back up, the client no longer holds the lease.
-   * 
+   * <p/>
    * The test makes sure that the lease recovery completes and the client
    * fails if it continues to write to the file, even after NN restart.
-   * 
+   *
    * @throws Exception
    */
   @Test
@@ -413,23 +434,23 @@ public class TestLeaseRecovery2 {
   public void hardLeaseRecoveryRestartHelper(boolean doRename, int size)
       throws Exception {
     if (size < 0) {
-      size =  AppendTestUtil.nextInt(FILE_SIZE + 1);
+      size = AppendTestUtil.nextInt(FILE_SIZE + 1);
     }
 
     //create a file
     String fileStr = "/hardLeaseRecovery";
     AppendTestUtil.LOG.info("filestr=" + fileStr);
     Path filePath = new Path(fileStr);
-    FSDataOutputStream stm = dfs.create(filePath, true,
-        BUF_SIZE, REPLICATION_NUM, BLOCK_SIZE);
+    FSDataOutputStream stm =
+        dfs.create(filePath, true, BUF_SIZE, REPLICATION_NUM, BLOCK_SIZE);
     assertTrue(dfs.dfs.exists(fileStr));
 
     // write bytes into the file.
     AppendTestUtil.LOG.info("size=" + size);
     stm.write(buffer, 0, size);
     
-    String originalLeaseHolder = NameNodeAdapter.getLeaseHolderForPath(
-        cluster.getNameNode(), fileStr);
+    String originalLeaseHolder =
+        NameNodeAdapter.getLeaseHolderForPath(cluster.getNameNode(), fileStr);
     
     assertFalse("original lease holder should not be the NN",
         originalLeaseHolder.equals(HdfsServerConstants.NAMENODE_LEASE_HOLDER));
@@ -439,7 +460,7 @@ public class TestLeaseRecovery2 {
     stm.hflush();
     
     // check visible length
-    final HdfsDataInputStream in = (HdfsDataInputStream)dfs.open(filePath);
+    final HdfsDataInputStream in = (HdfsDataInputStream) dfs.open(filePath);
     Assert.assertEquals(size, in.getVisibleLength());
     in.close();
     
@@ -507,14 +528,14 @@ public class TestLeaseRecovery2 {
     }
 
     // verify data
-    AppendTestUtil.LOG.info(
-        "File size is good. Now validating sizes from datanodes...");
+    AppendTestUtil.LOG
+        .info("File size is good. Now validating sizes from datanodes...");
     AppendTestUtil.checkFullFile(dfs, filePath, size, buffer, fileStr);
   }
   
-  static void checkLease(String f, int size) {
-    final String holder = NameNodeAdapter.getLeaseHolderForPath(
-        cluster.getNameNode(), f); 
+  static void checkLease(String f, int size) throws IOException {
+    final String holder =
+        NameNodeAdapter.getLeaseHolderForPath(cluster.getNameNode(), f);
     if (size == 0) {
       assertEquals("lease holder should null, file is closed", null, holder);
     } else {

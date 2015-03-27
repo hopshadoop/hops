@@ -17,21 +17,25 @@
  */
 package org.apache.hadoop.fs;
 
-import org.junit.Ignore;
-import org.junit.Test;
-import static org.junit.Assert.*;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.util.NativeCodeLoader;
+import org.junit.Ignore;
+import org.junit.Test;
+
+import static org.junit.Assert.fail;
 
 public class TestHdfsNativeCodeLoader {
   static final Log LOG = LogFactory.getLog(TestHdfsNativeCodeLoader.class);
 
   private static boolean requireTestJni() {
     String rtj = System.getProperty("require.test.libhadoop");
-    if (rtj == null) return false;
-    if (rtj.compareToIgnoreCase("false") == 0) return false;
+    if (rtj == null) {
+      return false;
+    }
+    if (rtj.compareToIgnoreCase("false") == 0) {
+      return false;
+    }
     return true;
   }
 
@@ -44,7 +48,9 @@ public class TestHdfsNativeCodeLoader {
     }
     if (!NativeCodeLoader.isNativeCodeLoaded()) {
       String LD_LIBRARY_PATH = System.getenv().get("LD_LIBRARY_PATH");
-      if (LD_LIBRARY_PATH == null) LD_LIBRARY_PATH = "";
+      if (LD_LIBRARY_PATH == null) {
+        LD_LIBRARY_PATH = "";
+      }
       fail("TestNativeCodeLoader: libhadoop.so testing was required, but " +
           "libhadoop.so was not loaded.  LD_LIBRARY_PATH = " + LD_LIBRARY_PATH);
     }

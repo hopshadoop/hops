@@ -18,17 +18,9 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-import static org.mockito.Mockito.mock;
-
-import java.net.InetSocketAddress;
-import java.security.PrivilegedAction;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-
+import io.hops.metadata.util.RMStorageFactory;
+import io.hops.metadata.util.RMUtilities;
+import io.hops.metadata.util.YarnAPIStorageFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -74,11 +66,22 @@ import org.apache.hadoop.yarn.util.resource.Resources;
 import org.junit.Assert;
 import org.junit.Test;
 
+import java.net.InetSocketAddress;
+import java.security.PrivilegedAction;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+import static org.mockito.Mockito.mock;
+
 public class TestSchedulerUtils {
 
   private static final Log LOG = LogFactory.getLog(TestSchedulerUtils.class);
   
-  @Test (timeout = 30000)
+  @Test(timeout = 30000)
   public void testNormalizeRequest() {
     ResourceCalculator resourceCalculator = new DefaultResourceCalculator();
     
@@ -141,7 +144,7 @@ public class TestSchedulerUtils {
     assertEquals(maxResource.getMemory(), ask.getCapability().getMemory());
   }
   
-  @Test (timeout = 30000)
+  @Test(timeout = 30000)
   public void testNormalizeRequestWithDominantResourceCalculator() {
     ResourceCalculator resourceCalculator = new DominantResourceCalculator();
     
@@ -153,28 +156,31 @@ public class TestSchedulerUtils {
 
     // case negative memory/vcores
     ask.setCapability(Resources.createResource(-1024, -1));
-    SchedulerUtils.normalizeRequest(
-        ask, resourceCalculator, clusterResource, minResource, maxResource);
+    SchedulerUtils
+        .normalizeRequest(ask, resourceCalculator, clusterResource, minResource,
+            maxResource);
     assertEquals(minResource, ask.getCapability());
 
     // case zero memory/vcores
     ask.setCapability(Resources.createResource(0, 0));
-    SchedulerUtils.normalizeRequest(
-        ask, resourceCalculator, clusterResource, minResource, maxResource);
+    SchedulerUtils
+        .normalizeRequest(ask, resourceCalculator, clusterResource, minResource,
+            maxResource);
     assertEquals(minResource, ask.getCapability());
     assertEquals(1, ask.getCapability().getVirtualCores());
     assertEquals(1024, ask.getCapability().getMemory());
 
     // case non-zero memory & zero cores
     ask.setCapability(Resources.createResource(1536, 0));
-    SchedulerUtils.normalizeRequest(
-        ask, resourceCalculator, clusterResource, minResource, maxResource);
+    SchedulerUtils
+        .normalizeRequest(ask, resourceCalculator, clusterResource, minResource,
+            maxResource);
     assertEquals(Resources.createResource(2048, 1), ask.getCapability());
     assertEquals(1, ask.getCapability().getVirtualCores());
     assertEquals(2048, ask.getCapability().getMemory());
   }
 
-  @Test (timeout = 30000)
+  @Test(timeout = 30000)
   public void testValidateResourceRequest() {
     Resource maxResource = Resources.createResource(
         YarnConfiguration.DEFAULT_RM_SCHEDULER_MAXIMUM_ALLOCATION_MB,
@@ -182,11 +188,11 @@ public class TestSchedulerUtils {
 
     // zero memory
     try {
-      Resource resource = Resources.createResource(
-          0,
+      Resource resource = Resources.createResource(0,
           YarnConfiguration.DEFAULT_RM_SCHEDULER_MINIMUM_ALLOCATION_VCORES);
-      ResourceRequest resReq = BuilderUtils.newResourceRequest(
-          mock(Priority.class), ResourceRequest.ANY, resource, 1);
+      ResourceRequest resReq = BuilderUtils
+          .newResourceRequest(mock(Priority.class), ResourceRequest.ANY,
+              resource, 1);
       SchedulerUtils.validateResourceRequest(resReq, maxResource);
     } catch (InvalidResourceRequestException e) {
       fail("Zero memory should be accepted");
@@ -195,10 +201,10 @@ public class TestSchedulerUtils {
     // zero vcores
     try {
       Resource resource = Resources.createResource(
-          YarnConfiguration.DEFAULT_RM_SCHEDULER_MINIMUM_ALLOCATION_MB,
-          0);
-      ResourceRequest resReq = BuilderUtils.newResourceRequest(
-          mock(Priority.class), ResourceRequest.ANY, resource, 1);
+          YarnConfiguration.DEFAULT_RM_SCHEDULER_MINIMUM_ALLOCATION_MB, 0);
+      ResourceRequest resReq = BuilderUtils
+          .newResourceRequest(mock(Priority.class), ResourceRequest.ANY,
+              resource, 1);
       SchedulerUtils.validateResourceRequest(resReq, maxResource);
     } catch (InvalidResourceRequestException e) {
       fail("Zero vcores should be accepted");
@@ -209,8 +215,9 @@ public class TestSchedulerUtils {
       Resource resource = Resources.createResource(
           YarnConfiguration.DEFAULT_RM_SCHEDULER_MAXIMUM_ALLOCATION_MB,
           YarnConfiguration.DEFAULT_RM_SCHEDULER_MINIMUM_ALLOCATION_VCORES);
-      ResourceRequest resReq = BuilderUtils.newResourceRequest(
-          mock(Priority.class), ResourceRequest.ANY, resource, 1);
+      ResourceRequest resReq = BuilderUtils
+          .newResourceRequest(mock(Priority.class), ResourceRequest.ANY,
+              resource, 1);
       SchedulerUtils.validateResourceRequest(resReq, maxResource);
     } catch (InvalidResourceRequestException e) {
       fail("Max memory should be accepted");
@@ -221,8 +228,9 @@ public class TestSchedulerUtils {
       Resource resource = Resources.createResource(
           YarnConfiguration.DEFAULT_RM_SCHEDULER_MINIMUM_ALLOCATION_MB,
           YarnConfiguration.DEFAULT_RM_SCHEDULER_MAXIMUM_ALLOCATION_VCORES);
-      ResourceRequest resReq = BuilderUtils.newResourceRequest(
-          mock(Priority.class), ResourceRequest.ANY, resource, 1);
+      ResourceRequest resReq = BuilderUtils
+          .newResourceRequest(mock(Priority.class), ResourceRequest.ANY,
+              resource, 1);
       SchedulerUtils.validateResourceRequest(resReq, maxResource);
     } catch (InvalidResourceRequestException e) {
       fail("Max vcores should not be accepted");
@@ -230,11 +238,11 @@ public class TestSchedulerUtils {
 
     // negative memory
     try {
-      Resource resource = Resources.createResource(
-          -1,
+      Resource resource = Resources.createResource(-1,
           YarnConfiguration.DEFAULT_RM_SCHEDULER_MINIMUM_ALLOCATION_VCORES);
-      ResourceRequest resReq = BuilderUtils.newResourceRequest(
-          mock(Priority.class), ResourceRequest.ANY, resource, 1);
+      ResourceRequest resReq = BuilderUtils
+          .newResourceRequest(mock(Priority.class), ResourceRequest.ANY,
+              resource, 1);
       SchedulerUtils.validateResourceRequest(resReq, maxResource);
       fail("Negative memory should not be accepted");
     } catch (InvalidResourceRequestException e) {
@@ -244,10 +252,10 @@ public class TestSchedulerUtils {
     // negative vcores
     try {
       Resource resource = Resources.createResource(
-          YarnConfiguration.DEFAULT_RM_SCHEDULER_MINIMUM_ALLOCATION_MB,
-          -1);
-      ResourceRequest resReq = BuilderUtils.newResourceRequest(
-          mock(Priority.class), ResourceRequest.ANY, resource, 1);
+          YarnConfiguration.DEFAULT_RM_SCHEDULER_MINIMUM_ALLOCATION_MB, -1);
+      ResourceRequest resReq = BuilderUtils
+          .newResourceRequest(mock(Priority.class), ResourceRequest.ANY,
+              resource, 1);
       SchedulerUtils.validateResourceRequest(resReq, maxResource);
       fail("Negative vcores should not be accepted");
     } catch (InvalidResourceRequestException e) {
@@ -259,8 +267,9 @@ public class TestSchedulerUtils {
       Resource resource = Resources.createResource(
           YarnConfiguration.DEFAULT_RM_SCHEDULER_MAXIMUM_ALLOCATION_MB + 1,
           YarnConfiguration.DEFAULT_RM_SCHEDULER_MINIMUM_ALLOCATION_VCORES);
-      ResourceRequest resReq = BuilderUtils.newResourceRequest(
-          mock(Priority.class), ResourceRequest.ANY, resource, 1);
+      ResourceRequest resReq = BuilderUtils
+          .newResourceRequest(mock(Priority.class), ResourceRequest.ANY,
+              resource, 1);
       SchedulerUtils.validateResourceRequest(resReq, maxResource);
       fail("More than max memory should not be accepted");
     } catch (InvalidResourceRequestException e) {
@@ -271,10 +280,10 @@ public class TestSchedulerUtils {
     try {
       Resource resource = Resources.createResource(
           YarnConfiguration.DEFAULT_RM_SCHEDULER_MINIMUM_ALLOCATION_MB,
-          YarnConfiguration.DEFAULT_RM_SCHEDULER_MAXIMUM_ALLOCATION_VCORES
-          + 1);
-      ResourceRequest resReq = BuilderUtils.newResourceRequest(
-          mock(Priority.class), ResourceRequest.ANY, resource, 1);
+          YarnConfiguration.DEFAULT_RM_SCHEDULER_MAXIMUM_ALLOCATION_VCORES + 1);
+      ResourceRequest resReq = BuilderUtils
+          .newResourceRequest(mock(Priority.class), ResourceRequest.ANY,
+              resource, 1);
       SchedulerUtils.validateResourceRequest(resReq, maxResource);
       fail("More than max vcores should not be accepted");
     } catch (InvalidResourceRequestException e) {
@@ -286,8 +295,11 @@ public class TestSchedulerUtils {
   public void testValidateResourceBlacklistRequest() throws Exception {
 
     MyContainerManager containerManager = new MyContainerManager();
-    final MockRMWithAMS rm =
-        new MockRMWithAMS(new YarnConfiguration(), containerManager);
+    YarnConfiguration config = new YarnConfiguration();
+    YarnAPIStorageFactory.setConfiguration(config);
+    RMStorageFactory.setConfiguration(config);
+    RMUtilities.InitializeDB();
+    final MockRMWithAMS rm = new MockRMWithAMS(config, containerManager);
     rm.start();
 
     MockNM nm1 = rm.registerNode("localhost:1234", 5120);
@@ -301,37 +313,35 @@ public class TestSchedulerUtils {
 
     RMAppAttempt attempt = app.getCurrentAppAttempt();
     ApplicationAttemptId applicationAttemptId = attempt.getAppAttemptId();
-    waitForLaunchedState(attempt);
+    waitForLaunchedState(attempt, nm1);
 
     // Create a client to the RM.
     final Configuration conf = rm.getConfig();
     final YarnRPC rpc = YarnRPC.create(conf);
 
-    UserGroupInformation currentUser = 
+    UserGroupInformation currentUser =
         UserGroupInformation.createRemoteUser(applicationAttemptId.toString());
     Credentials credentials = containerManager.getContainerCredentials();
     final InetSocketAddress rmBindAddress =
         rm.getApplicationMasterService().getBindAddress();
-    Token<? extends TokenIdentifier> amRMToken =
-        MockRMWithAMS.setupAndReturnAMRMToken(rmBindAddress,
-          credentials.getAllTokens());
+    Token<? extends TokenIdentifier> amRMToken = MockRMWithAMS
+        .setupAndReturnAMRMToken(rmBindAddress, credentials.getAllTokens());
     currentUser.addToken(amRMToken);
     ApplicationMasterProtocol client =
         currentUser.doAs(new PrivilegedAction<ApplicationMasterProtocol>() {
           @Override
           public ApplicationMasterProtocol run() {
-            return (ApplicationMasterProtocol) rpc.getProxy(
-              ApplicationMasterProtocol.class, rmBindAddress, conf);
+            return (ApplicationMasterProtocol) rpc
+                .getProxy(ApplicationMasterProtocol.class, rmBindAddress, conf);
           }
         });
 
-    RegisterApplicationMasterRequest request = Records
-        .newRecord(RegisterApplicationMasterRequest.class);
+    RegisterApplicationMasterRequest request =
+        Records.newRecord(RegisterApplicationMasterRequest.class);
     client.registerApplicationMaster(request);
 
-    ResourceBlacklistRequest blacklistRequest =
-        ResourceBlacklistRequest.newInstance(
-            Collections.singletonList(ResourceRequest.ANY), null);
+    ResourceBlacklistRequest blacklistRequest = ResourceBlacklistRequest
+        .newInstance(Collections.singletonList(ResourceRequest.ANY), null);
 
     AllocateRequest allocateRequest =
         AllocateRequest.newInstance(0, 0.0f, null, null, blacklistRequest);
@@ -344,25 +354,26 @@ public class TestSchedulerUtils {
 
     rm.stop();
     
-    Assert.assertTrue(
-        "Didn't not catch InvalidResourceBlacklistRequestException", error);
+    Assert
+        .assertTrue("Didn't not catch InvalidResourceBlacklistRequestException",
+            error);
   }
 
-  private void waitForLaunchedState(RMAppAttempt attempt)
-      throws InterruptedException {
+  private void waitForLaunchedState(RMAppAttempt attempt, MockNM nm)
+      throws InterruptedException, Exception {
     int waitCount = 0;
-    while (attempt.getAppAttemptState() != RMAppAttemptState.LAUNCHED
-        && waitCount++ < 20) {
-      LOG.info("Waiting for AppAttempt to reach LAUNCHED state. "
-          + "Current state is " + attempt.getAppAttemptState());
+    while (attempt.getState() != RMAppAttemptState.LAUNCHED &&
+        waitCount++ < 20) {
+      LOG.info("Waiting for AppAttempt to reach LAUNCHED state. " +
+          "Current state is " + attempt.getState());
+      nm.nodeHeartbeat(true);
       Thread.sleep(1000);
     }
-    Assert.assertEquals(attempt.getAppAttemptState(),
-        RMAppAttemptState.LAUNCHED);
+    Assert.assertEquals(attempt.getState(), RMAppAttemptState.LAUNCHED);
   }
 
   @Test
-  public void testComparePriorities(){
+  public void testComparePriorities() {
     Priority high = Priority.newInstance(1);
     Priority low = Priority.newInstance(2);
     assertTrue(high.compareTo(low) > 0);
@@ -372,7 +383,8 @@ public class TestSchedulerUtils {
   public void testCreateAbnormalContainerStatus() {
     ContainerStatus cd = SchedulerUtils.createAbnormalContainerStatus(
         ContainerId.newInstance(ApplicationAttemptId.newInstance(
-          ApplicationId.newInstance(System.currentTimeMillis(), 1), 1), 1), "x");
+            ApplicationId.newInstance(System.currentTimeMillis(), 1), 1), 1),
+        "x");
     Assert.assertEquals(ContainerExitStatus.ABORTED, cd.getExitStatus());
   }
 
@@ -380,7 +392,8 @@ public class TestSchedulerUtils {
   public void testCreatePreemptedContainerStatus() {
     ContainerStatus cd = SchedulerUtils.createPreemptedContainerStatus(
         ContainerId.newInstance(ApplicationAttemptId.newInstance(
-          ApplicationId.newInstance(System.currentTimeMillis(), 1), 1), 1), "x");
+            ApplicationId.newInstance(System.currentTimeMillis(), 1), 1), 1),
+        "x");
     Assert.assertEquals(ContainerExitStatus.PREEMPTED, cd.getExitStatus());
   }
 
@@ -390,7 +403,7 @@ public class TestSchedulerUtils {
     ApplicationId appId =
         ApplicationId.newInstance(System.currentTimeMillis(), 1);
     AppAddedSchedulerEvent appAddedEvent =
-        new AppAddedSchedulerEvent(appId, queueName, "user");
+        new AppAddedSchedulerEvent(appId, queueName, "user", null);
     handler.handle(appAddedEvent);
     SchedulerApplication app = applications.get(appId);
     // verify application is added.
@@ -398,7 +411,7 @@ public class TestSchedulerUtils {
     Assert.assertEquals("user", app.getUser());
 
     AppRemovedSchedulerEvent appRemoveEvent =
-        new AppRemovedSchedulerEvent(appId, RMAppState.FINISHED);
+        new AppRemovedSchedulerEvent(appId, RMAppState.FINISHED, null);
     handler.handle(appRemoveEvent);
     Assert.assertNull(applications.get(appId));
     return app;

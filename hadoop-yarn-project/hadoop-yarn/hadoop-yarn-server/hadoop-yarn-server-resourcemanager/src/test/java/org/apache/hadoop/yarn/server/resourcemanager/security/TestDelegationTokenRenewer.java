@@ -19,31 +19,10 @@
 package org.apache.hadoop.yarn.server.resourcemanager.security;
 
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
-import static org.mockito.Matchers.any;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.BrokenBarrierException;
-import java.util.concurrent.CyclicBarrier;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
-
-
+import io.hops.ha.common.TransactionState;
+import io.hops.ha.common.TransactionStateImpl;
+import io.hops.metadata.util.RMStorageFactory;
+import io.hops.metadata.util.YarnAPIStorageFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -88,20 +67,44 @@ import org.junit.Test;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.BrokenBarrierException;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
+import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 /**
- * unit test - 
+ * unit test -
  * tests addition/deletion/cancellation of renewals of delegation tokens
- *
  */
 @SuppressWarnings("rawtypes")
 public class TestDelegationTokenRenewer {
-  private static final Log LOG = 
+  private static final Log LOG =
       LogFactory.getLog(TestDelegationTokenRenewer.class);
   private static final Text KIND = new Text("TestDelegationTokenRenewer.Token");
   
   private static BlockingQueue<Event> eventQueue;
   private static volatile AtomicInteger counter;
   private static AsyncDispatcher dispatcher;
+
   public static class Renewer extends TokenRenewer {
     private static int counter = 0;
     private static Token<?> lastRenewed = null;
@@ -125,45 +128,46 @@ public class TestDelegationTokenRenewer {
 
     @Override
     public long renew(Token<?> t, Configuration conf) throws IOException {
-      MyToken token = (MyToken)t;
-      if(token.isCanceled()) {
+      MyToken token = (MyToken) t;
+      if (token.isCanceled()) {
         throw new InvalidToken("token has been canceled");
       }
       lastRenewed = token;
-      counter ++;
-      LOG.info("Called MYDFS.renewdelegationtoken " + token + 
+      counter++;
+      LOG.info("Called MYDFS.renewdelegationtoken " + token +
           ";this dfs=" + this.hashCode() + ";c=" + counter);
-      if(tokenToRenewIn2Sec == token) { 
+      if (tokenToRenewIn2Sec == token) {
         // this token first renewal in 2 seconds
         LOG.info("RENEW in 2 seconds");
-        tokenToRenewIn2Sec=null;
-        return 2*1000 + System.currentTimeMillis();
+        tokenToRenewIn2Sec = null;
+        return 2 * 1000 + System.currentTimeMillis();
       } else {
-        return 86400*1000 + System.currentTimeMillis();
+        return 86400 * 1000 + System.currentTimeMillis();
       }
     }
 
     @Override
     public void cancel(Token<?> t, Configuration conf) {
-      MyToken token = (MyToken)t;
+      MyToken token = (MyToken) t;
       LOG.info("Cancel token " + token);
       token.cancelToken();
-   }
+    }
     
   }
 
   private static Configuration conf;
   DelegationTokenRenewer delegationTokenRenewer;
- 
+
   @BeforeClass
   public static void setUpClass() throws Exception {
     conf = new Configuration();
     
     // create a fake FileSystem (MyFS) and assosiate it
     // with "hdfs" schema.
-    URI uri = new URI(DelegationTokenRenewer.SCHEME+"://localhost:0");
+    URI uri = new URI(DelegationTokenRenewer.SCHEME + "://localhost:0");
     System.out.println("scheme is : " + uri.getScheme());
-    conf.setClass("fs." + uri.getScheme() + ".impl", MyFS.class, DistributedFileSystem.class);
+    conf.setClass("fs." + uri.getScheme() + ".impl", MyFS.class,
+        DistributedFileSystem.class);
     FileSystem.setDefaultUri(conf, uri);
     LOG.info("filesystem uri = " + FileSystem.getDefaultUri(conf).toString());
   }
@@ -181,8 +185,8 @@ public class TestDelegationTokenRenewer {
     delegationTokenRenewer = createNewDelegationTokenRenewer(conf, counter);
     RMContext mockContext = mock(RMContext.class);
     ClientRMService mockClientRMService = mock(ClientRMService.class);
-    when(mockContext.getDelegationTokenRenewer()).thenReturn(
-        delegationTokenRenewer);
+    when(mockContext.getDelegationTokenRenewer())
+        .thenReturn(delegationTokenRenewer);
     when(mockContext.getDispatcher()).thenReturn(dispatcher);
     when(mockContext.getClientRMService()).thenReturn(mockClientRMService);
     InetSocketAddress sockAddr =
@@ -198,7 +202,8 @@ public class TestDelegationTokenRenewer {
     delegationTokenRenewer.stop();
   }
   
-  private static class MyDelegationTokenSecretManager extends DelegationTokenSecretManager {
+  private static class MyDelegationTokenSecretManager
+      extends DelegationTokenSecretManager {
 
     public MyDelegationTokenSecretManager(long delegationKeyUpdateInterval,
         long delegationTokenMaxLifetime, long delegationTokenRenewInterval,
@@ -230,13 +235,17 @@ public class TestDelegationTokenRenewer {
       status = "GOOD";
     }
     
-    public boolean isCanceled() {return status.equals(CANCELED);}
+    public boolean isCanceled() {
+      return status.equals(CANCELED);
+    }
     
-    public void cancelToken() {this.status=CANCELED;}
+    public void cancelToken() {
+      this.status = CANCELED;
+    }
 
     @Override
-    public long renew(Configuration conf) throws IOException,
-        InterruptedException {
+    public long renew(Configuration conf)
+        throws IOException, InterruptedException {
       return super.renew(conf);
     }
 
@@ -246,7 +255,7 @@ public class TestDelegationTokenRenewer {
       sb.append("id=");
       String id = StringUtils.byteToHexString(this.getIdentifier());
       int idLen = id.length();
-      sb.append(id.substring(idLen-6));
+      sb.append(id.substring(idLen - 6));
       sb.append(";k=");
       sb.append(this.getKind());
       sb.append(";s=");
@@ -256,22 +265,27 @@ public class TestDelegationTokenRenewer {
   }
 
   /**
-   * fake FileSystem 
+   * fake FileSystem
    * overwrites three methods
    * 1. getDelegationToken() - generates a token
-   * 2. renewDelegataionToken - counts number of calls, and remembers 
+   * 2. renewDelegataionToken - counts number of calls, and remembers
    * most recently renewed token.
-   * 3. cancelToken -cancels token (subsequent renew will cause IllegalToken 
+   * 3. cancelToken -cancels token (subsequent renew will cause IllegalToken
    * exception
    */
   static class MyFS extends DistributedFileSystem {
     
-    public MyFS() {}
-    public void close() {}
+    public MyFS() {
+    }
+
+    public void close() {
+    }
+
     @Override
-    public void initialize(URI uri, Configuration conf) throws IOException {}
+    public void initialize(URI uri, Configuration conf) throws IOException {
+    }
     
-    @Override 
+    @Override
     public MyToken getDelegationToken(Text renewer) throws IOException {
       MyToken result = createTokens(renewer);
       LOG.info("Called MYDFS.getdelegationtoken " + result);
@@ -281,13 +295,13 @@ public class TestDelegationTokenRenewer {
   
   /**
    * Auxiliary - create token
+   *
    * @param renewer
    * @return
    * @throws IOException
    */
-  static MyToken createTokens(Text renewer) 
-    throws IOException {
-    Text user1= new Text("user1");
+  static MyToken createTokens(Text renewer) throws IOException {
+    Text user1 = new Text("user1");
     
     MyDelegationTokenSecretManager sm = new MyDelegationTokenSecretManager(
         DFSConfigKeys.DFS_NAMENODE_DELEGATION_KEY_UPDATE_INTERVAL_DEFAULT,
@@ -296,11 +310,11 @@ public class TestDelegationTokenRenewer {
         3600000, null);
     sm.startThreads();
     
-    DelegationTokenIdentifier dtId1 = 
-      new DelegationTokenIdentifier(user1, renewer, user1);
+    DelegationTokenIdentifier dtId1 =
+        new DelegationTokenIdentifier(user1, renewer, user1);
     
     MyToken token1 = new MyToken(dtId1, sm);
-   
+
     token1.setService(new Text("localhost:0"));
     return token1;
   }
@@ -314,18 +328,19 @@ public class TestDelegationTokenRenewer {
    * 3. register them for renewal
    * 4. sleep for 3 seconds
    * 5. count number of renewals (should 3 initial ones + one extra)
-   * 6. register another token for 2 seconds 
+   * 6. register another token for 2 seconds
    * 7. cancel it immediately
-   * 8. Sleep and check that the 2 seconds renew didn't happen 
+   * 8. Sleep and check that the 2 seconds renew didn't happen
    * (totally 5 renewals)
    * 9. check cancellation
+   *
    * @throws IOException
    * @throws URISyntaxException
    */
-  @Test(timeout=60000)
-  public void testDTRenewal () throws Exception {
-    MyFS dfs = (MyFS)FileSystem.get(conf);
-    LOG.info("dfs="+(Object)dfs.hashCode() + ";conf="+conf.hashCode());
+  @Test(timeout = 60000)
+  public void testDTRenewal() throws Exception {
+    MyFS dfs = (MyFS) FileSystem.get(conf);
+    LOG.info("dfs=" + (Object) dfs.hashCode() + ";conf=" + conf.hashCode());
     // Test 1. - add three tokens - make sure exactly one get's renewed
     
     // get the delegation tokens
@@ -336,7 +351,7 @@ public class TestDelegationTokenRenewer {
 
     //to cause this one to be set for renew in 2 secs
     Renewer.tokenToRenewIn2Sec = token1;
-    LOG.info("token="+token1+" should be renewed for 2 secs");
+    LOG.info("token=" + token1 + " should be renewed for 2 secs");
     
     // three distinct Namenodes
     String nn1 = DelegationTokenRenewer.SCHEME + "://host1:0";
@@ -351,30 +366,32 @@ public class TestDelegationTokenRenewer {
     ts.addToken(new Text(nn3), token3);
     
     // register the tokens for renewal
-    ApplicationId applicationId_0 = 
-        BuilderUtils.newApplicationId(0, 0);
-    delegationTokenRenewer.addApplicationAsync(applicationId_0, ts, true);
+    ApplicationId applicationId_0 = BuilderUtils.newApplicationId(0, 0);
+    delegationTokenRenewer.addApplicationAsync(applicationId_0, ts, true,
+        new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     waitForEventsToGetProcessed(delegationTokenRenewer);
 
     // first 3 initial renewals + 1 real
-    int numberOfExpectedRenewals = 3+1; 
+    int numberOfExpectedRenewals = 3 + 1;
     
     int attempts = 10;
-    while(attempts-- > 0) {
+    while (attempts-- > 0) {
       try {
-        Thread.sleep(3*1000); // sleep 3 seconds, so it has time to renew
-      } catch (InterruptedException e) {}
+        Thread.sleep(3 * 1000); // sleep 3 seconds, so it has time to renew
+      } catch (InterruptedException e) {
+      }
       
       // since we cannot guarantee timely execution - let's give few chances
-      if(Renewer.counter==numberOfExpectedRenewals)
+      if (Renewer.counter == numberOfExpectedRenewals) {
         break;
+      }
     }
     
-    LOG.info("dfs=" + dfs.hashCode() + 
-        ";Counter = " + Renewer.counter + ";t="+  Renewer.lastRenewed);
+    LOG.info("dfs=" + dfs.hashCode() +
+        ";Counter = " + Renewer.counter + ";t=" + Renewer.lastRenewed);
     assertEquals("renew wasn't called as many times as expected(4):",
         numberOfExpectedRenewals, Renewer.counter);
-    assertEquals("most recently renewed token mismatch", Renewer.lastRenewed, 
+    assertEquals("most recently renewed token mismatch", Renewer.lastRenewed,
         token1);
     
     // Test 2. 
@@ -385,23 +402,26 @@ public class TestDelegationTokenRenewer {
     MyToken token4 = dfs.getDelegationToken(new Text("user4"));
     
     //to cause this one to be set for renew in 2 secs
-    Renewer.tokenToRenewIn2Sec = token4; 
-    LOG.info("token="+token4+" should be renewed for 2 secs");
+    Renewer.tokenToRenewIn2Sec = token4;
+    LOG.info("token=" + token4 + " should be renewed for 2 secs");
     
     String nn4 = DelegationTokenRenewer.SCHEME + "://host4:0";
     ts.addToken(new Text(nn4), token4);
     
 
     ApplicationId applicationId_1 = BuilderUtils.newApplicationId(0, 1);
-    delegationTokenRenewer.addApplicationAsync(applicationId_1, ts, true);
+    delegationTokenRenewer.addApplicationAsync(applicationId_1, ts, true,
+        new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     waitForEventsToGetProcessed(delegationTokenRenewer);
-    delegationTokenRenewer.applicationFinished(applicationId_1);
+    delegationTokenRenewer.applicationFinished(applicationId_1,
+        new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     waitForEventsToGetProcessed(delegationTokenRenewer);
     numberOfExpectedRenewals = Renewer.counter; // number of renewals so far
     try {
-      Thread.sleep(6*1000); // sleep 6 seconds, so it has time to renew
-    } catch (InterruptedException e) {}
-    LOG.info("Counter = " + Renewer.counter + ";t="+ Renewer.lastRenewed);
+      Thread.sleep(6 * 1000); // sleep 6 seconds, so it has time to renew
+    } catch (InterruptedException e) {
+    }
+    LOG.info("Counter = " + Renewer.counter + ";t=" + Renewer.lastRenewed);
     
     // counter and the token should stil be the old ones
     assertEquals("renew wasn't called as many times as expected",
@@ -416,10 +436,10 @@ public class TestDelegationTokenRenewer {
     }
   }
   
-  @Test(timeout=60000)
+  @Test(timeout = 60000)
   public void testAppRejectionWithCancelledDelegationToken() throws Exception {
-    MyFS dfs = (MyFS)FileSystem.get(conf);
-    LOG.info("dfs="+(Object)dfs.hashCode() + ";conf="+conf.hashCode());
+    MyFS dfs = (MyFS) FileSystem.get(conf);
+    LOG.info("dfs=" + (Object) dfs.hashCode() + ";conf=" + conf.hashCode());
 
     MyToken token = dfs.getDelegationToken(new Text("user1"));
     token.cancelToken();
@@ -428,15 +448,16 @@ public class TestDelegationTokenRenewer {
     ts.addToken(token.getKind(), token);
     
     // register the tokens for renewal
-    ApplicationId appId =  BuilderUtils.newApplicationId(0, 0);
-    delegationTokenRenewer.addApplicationAsync(appId, ts, true);
+    ApplicationId appId = BuilderUtils.newApplicationId(0, 0);
+    delegationTokenRenewer.addApplicationAsync(appId, ts, true,
+        new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     int waitCnt = 20;
-    while (waitCnt-- >0) {
+    while (waitCnt-- > 0) {
       if (!eventQueue.isEmpty()) {
         Event evt = eventQueue.take();
         if (evt.getType() == RMAppEventType.APP_REJECTED) {
-          Assert.assertTrue(
-              ((RMAppEvent) evt).getApplicationId().equals(appId));
+          Assert
+              .assertTrue(((RMAppEvent) evt).getApplicationId().equals(appId));
           return;
         }
       } else {
@@ -450,38 +471,42 @@ public class TestDelegationTokenRenewer {
    * Basic idea of the test:
    * 1. register a token for 2 seconds with no cancel at the end
    * 2. cancel it immediately
-   * 3. Sleep and check that the 2 seconds renew didn't happen 
+   * 3. Sleep and check that the 2 seconds renew didn't happen
    * (totally 5 renewals)
    * 4. check cancellation
+   *
    * @throws IOException
    * @throws URISyntaxException
    */
-  @Test(timeout=60000)
-  public void testDTRenewalWithNoCancel () throws Exception {
-    MyFS dfs = (MyFS)FileSystem.get(conf);
-    LOG.info("dfs="+(Object)dfs.hashCode() + ";conf="+conf.hashCode());
+  @Test(timeout = 60000)
+  public void testDTRenewalWithNoCancel() throws Exception {
+    MyFS dfs = (MyFS) FileSystem.get(conf);
+    LOG.info("dfs=" + (Object) dfs.hashCode() + ";conf=" + conf.hashCode());
 
     Credentials ts = new Credentials();
     MyToken token1 = dfs.getDelegationToken(new Text("user1"));
 
     //to cause this one to be set for renew in 2 secs
-    Renewer.tokenToRenewIn2Sec = token1; 
-    LOG.info("token="+token1+" should be renewed for 2 secs");
+    Renewer.tokenToRenewIn2Sec = token1;
+    LOG.info("token=" + token1 + " should be renewed for 2 secs");
     
     String nn1 = DelegationTokenRenewer.SCHEME + "://host1:0";
     ts.addToken(new Text(nn1), token1);
     
 
     ApplicationId applicationId_1 = BuilderUtils.newApplicationId(0, 1);
-    delegationTokenRenewer.addApplicationAsync(applicationId_1, ts, false);
+    delegationTokenRenewer.addApplicationAsync(applicationId_1, ts, false,
+        new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     waitForEventsToGetProcessed(delegationTokenRenewer);
-    delegationTokenRenewer.applicationFinished(applicationId_1);
+    delegationTokenRenewer.applicationFinished(applicationId_1,
+        new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     waitForEventsToGetProcessed(delegationTokenRenewer);
     int numberOfExpectedRenewals = Renewer.counter; // number of renewals so far
     try {
-      Thread.sleep(6*1000); // sleep 6 seconds, so it has time to renew
-    } catch (InterruptedException e) {}
-    LOG.info("Counter = " + Renewer.counter + ";t="+ Renewer.lastRenewed);
+      Thread.sleep(6 * 1000); // sleep 6 seconds, so it has time to renew
+    } catch (InterruptedException e) {
+    }
+    LOG.info("Counter = " + Renewer.counter + ";t=" + Renewer.lastRenewed);
     
     // counter and the token should still be the old ones
     assertEquals("renew wasn't called as many times as expected",
@@ -500,11 +525,12 @@ public class TestDelegationTokenRenewer {
    * 3. Complete app.
    * 4. Verify token is alive within the KEEP_ALIVE time
    * 5. Verify token has been cancelled after the KEEP_ALIVE_TIME
+   *
    * @throws IOException
    * @throws URISyntaxException
    */
-  @Test(timeout=60000)
-  public void testDTKeepAlive1 () throws Exception {
+  @Test(timeout = 60000)
+  public void testDTKeepAlive1() throws Exception {
     Configuration lconf = new Configuration(conf);
     lconf.setBoolean(YarnConfiguration.LOG_AGGREGATION_ENABLED, true);
     //Keep tokens alive for 6 seconds.
@@ -518,8 +544,7 @@ public class TestDelegationTokenRenewer {
     RMContext mockContext = mock(RMContext.class);
     ClientRMService mockClientRMService = mock(ClientRMService.class);
     when(mockContext.getClientRMService()).thenReturn(mockClientRMService);
-    when(mockContext.getDelegationTokenRenewer()).thenReturn(
-        localDtr);
+    when(mockContext.getDelegationTokenRenewer()).thenReturn(localDtr);
     when(mockContext.getDispatcher()).thenReturn(dispatcher);
     InetSocketAddress sockAddr =
         InetSocketAddress.createUnresolved("localhost", 1234);
@@ -528,8 +553,8 @@ public class TestDelegationTokenRenewer {
     localDtr.init(lconf);
     localDtr.start();
     
-    MyFS dfs = (MyFS)FileSystem.get(lconf);
-    LOG.info("dfs="+(Object)dfs.hashCode() + ";conf="+lconf.hashCode());
+    MyFS dfs = (MyFS) FileSystem.get(lconf);
+    LOG.info("dfs=" + (Object) dfs.hashCode() + ";conf=" + lconf.hashCode());
     
     Credentials ts = new Credentials();
     // get the delegation tokens
@@ -539,19 +564,21 @@ public class TestDelegationTokenRenewer {
     ts.addToken(new Text(nn1), token1);
 
     // register the tokens for renewal
-    ApplicationId applicationId_0 =  BuilderUtils.newApplicationId(0, 0);
-    localDtr.addApplicationAsync(applicationId_0, ts, true);
+    ApplicationId applicationId_0 = BuilderUtils.newApplicationId(0, 0);
+    localDtr.addApplicationAsync(applicationId_0, ts, true,
+        new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     waitForEventsToGetProcessed(localDtr);
-    if (!eventQueue.isEmpty()){
+    if (!eventQueue.isEmpty()) {
       Event evt = eventQueue.take();
       if (evt instanceof RMAppEvent) {
-        Assert.assertEquals(((RMAppEvent)evt).getType(), RMAppEventType.START);
+        Assert.assertEquals(((RMAppEvent) evt).getType(), RMAppEventType.START);
       } else {
         fail("RMAppEvent.START was expected!!");
       }
     }
     
-    localDtr.applicationFinished(applicationId_0);
+    localDtr.applicationFinished(applicationId_0,
+        new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     waitForEventsToGetProcessed(localDtr);
 
     //Token should still be around. Renewal should not fail.
@@ -564,7 +591,8 @@ public class TestDelegationTokenRenewer {
     try {
       token1.renew(lconf);
       fail("Renewal of cancelled token should have failed");
-    } catch (InvalidToken ite) {}
+    } catch (InvalidToken ite) {
+    }
   }
 
   /**
@@ -577,10 +605,11 @@ public class TestDelegationTokenRenewer {
    * 5. Send an explicity KEEP_ALIVE_REQUEST
    * 6. Verify token KEEP_ALIVE time is renewed.
    * 7. Verify token has been cancelled after the renewed KEEP_ALIVE_TIME.
+   *
    * @throws IOException
    * @throws URISyntaxException
    */
-  @Test(timeout=60000)
+  @Test(timeout = 60000)
   public void testDTKeepAlive2() throws Exception {
     Configuration lconf = new Configuration(conf);
     lconf.setBoolean(YarnConfiguration.LOG_AGGREGATION_ENABLED, true);
@@ -595,8 +624,7 @@ public class TestDelegationTokenRenewer {
     RMContext mockContext = mock(RMContext.class);
     ClientRMService mockClientRMService = mock(ClientRMService.class);
     when(mockContext.getClientRMService()).thenReturn(mockClientRMService);
-    when(mockContext.getDelegationTokenRenewer()).thenReturn(
-        localDtr);
+    when(mockContext.getDelegationTokenRenewer()).thenReturn(localDtr);
     when(mockContext.getDispatcher()).thenReturn(dispatcher);
     InetSocketAddress sockAddr =
         InetSocketAddress.createUnresolved("localhost", 1234);
@@ -605,8 +633,8 @@ public class TestDelegationTokenRenewer {
     localDtr.init(lconf);
     localDtr.start();
     
-    MyFS dfs = (MyFS)FileSystem.get(lconf);
-    LOG.info("dfs="+(Object)dfs.hashCode() + ";conf="+lconf.hashCode());
+    MyFS dfs = (MyFS) FileSystem.get(lconf);
+    LOG.info("dfs=" + (Object) dfs.hashCode() + ";conf=" + lconf.hashCode());
 
     Credentials ts = new Credentials();
     // get the delegation tokens
@@ -616,13 +644,15 @@ public class TestDelegationTokenRenewer {
     ts.addToken(new Text(nn1), token1);
 
     // register the tokens for renewal
-    ApplicationId applicationId_0 =  BuilderUtils.newApplicationId(0, 0);
-    localDtr.addApplicationAsync(applicationId_0, ts, true);
-    localDtr.applicationFinished(applicationId_0);
+    ApplicationId applicationId_0 = BuilderUtils.newApplicationId(0, 0);
+    localDtr.addApplicationAsync(applicationId_0, ts, true,
+        new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
+    localDtr.applicationFinished(applicationId_0,
+        new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     waitForEventsToGetProcessed(delegationTokenRenewer);
     //Send another keep alive.
-    localDtr.updateKeepAliveApplications(Collections
-        .singletonList(applicationId_0));
+    localDtr.updateKeepAliveApplications(
+        Collections.singletonList(applicationId_0));
     //Renewal should not fail.
     token1.renew(lconf);
     //Token should be around after this. 
@@ -635,7 +665,8 @@ public class TestDelegationTokenRenewer {
     try {
       token1.renew(lconf);
       fail("Renewal of cancelled token should have failed");
-    } catch (InvalidToken ite) {}
+    } catch (InvalidToken ite) {
+    }
   }
 
   private DelegationTokenRenewer createNewDelegationTokenRenewer(
@@ -643,8 +674,8 @@ public class TestDelegationTokenRenewer {
     return new DelegationTokenRenewer() {
 
       @Override
-      protected ThreadPoolExecutor
-          createNewThreadPoolService(Configuration conf) {
+      protected ThreadPoolExecutor createNewThreadPoolService(
+          Configuration conf) {
         ThreadPoolExecutor pool =
             new ThreadPoolExecutor(5, 5, 3L, TimeUnit.SECONDS,
                 new LinkedBlockingQueue<Runnable>()) {
@@ -669,95 +700,97 @@ public class TestDelegationTokenRenewer {
   private void waitForEventsToGetProcessed(DelegationTokenRenewer dtr)
       throws InterruptedException {
     int wait = 40;
-    while (wait-- > 0
-        && counter.get() > 0) {
+    while (wait-- > 0 && counter.get() > 0) {
       Thread.sleep(200);
     }
   }
   
-  @Test(timeout=20000)                                                         
-  public void testConcurrentAddApplication()                                  
-      throws IOException, InterruptedException, BrokenBarrierException {       
-    final CyclicBarrier startBarrier = new CyclicBarrier(2);                   
-    final CyclicBarrier endBarrier = new CyclicBarrier(2);                     
-                                                                               
+  @Test(timeout = 20000)
+  public void testConcurrentAddApplication()
+      throws IOException, InterruptedException, BrokenBarrierException {
+    final CyclicBarrier startBarrier = new CyclicBarrier(2);
+    final CyclicBarrier endBarrier = new CyclicBarrier(2);
+
     // this token uses barriers to block during renew                          
-    final Credentials creds1 = new Credentials();                              
-    final Token<?> token1 = mock(Token.class);                                 
-    creds1.addToken(new Text("token"), token1);                                
-    doReturn(true).when(token1).isManaged();                                   
-    doAnswer(new Answer<Long>() {                                              
-      public Long answer(InvocationOnMock invocation)                          
-          throws InterruptedException, BrokenBarrierException { 
-        startBarrier.await();                                                  
-        endBarrier.await();                                                    
-        return Long.MAX_VALUE;                                                 
-      }}).when(token1).renew(any(Configuration.class));                        
-                                                                               
+    final Credentials creds1 = new Credentials();
+    final Token<?> token1 = mock(Token.class);
+    creds1.addToken(new Text("token"), token1);
+    doReturn(true).when(token1).isManaged();
+    doAnswer(new Answer<Long>() {
+      public Long answer(InvocationOnMock invocation)
+          throws InterruptedException, BrokenBarrierException {
+        startBarrier.await();
+        endBarrier.await();
+        return Long.MAX_VALUE;
+      }
+    }).when(token1).renew(any(Configuration.class));
+
     // this dummy token fakes renewing                                         
-    final Credentials creds2 = new Credentials();                              
-    final Token<?> token2 = mock(Token.class);                                 
-    creds2.addToken(new Text("token"), token2);                                
-    doReturn(true).when(token2).isManaged();                                   
-    doReturn(Long.MAX_VALUE).when(token2).renew(any(Configuration.class));     
-                                                                               
+    final Credentials creds2 = new Credentials();
+    final Token<?> token2 = mock(Token.class);
+    creds2.addToken(new Text("token"), token2);
+    doReturn(true).when(token2).isManaged();
+    doReturn(Long.MAX_VALUE).when(token2).renew(any(Configuration.class));
+
     // fire up the renewer                                                     
     final DelegationTokenRenewer dtr =
-        createNewDelegationTokenRenewer(conf, counter);           
-    RMContext mockContext = mock(RMContext.class);                             
-    ClientRMService mockClientRMService = mock(ClientRMService.class);         
-    when(mockContext.getClientRMService()).thenReturn(mockClientRMService);    
-    InetSocketAddress sockAddr =                                               
-        InetSocketAddress.createUnresolved("localhost", 1234);                 
-    when(mockClientRMService.getBindAddress()).thenReturn(sockAddr);           
-    dtr.setRMContext(mockContext);  
+        createNewDelegationTokenRenewer(conf, counter);
+    RMContext mockContext = mock(RMContext.class);
+    ClientRMService mockClientRMService = mock(ClientRMService.class);
+    when(mockContext.getClientRMService()).thenReturn(mockClientRMService);
+    InetSocketAddress sockAddr =
+        InetSocketAddress.createUnresolved("localhost", 1234);
+    when(mockClientRMService.getBindAddress()).thenReturn(sockAddr);
+    dtr.setRMContext(mockContext);
     when(mockContext.getDelegationTokenRenewer()).thenReturn(dtr);
     dtr.init(conf);
-    dtr.start();                                                                           
+    dtr.start();
     // submit a job that blocks during renewal                                 
-    Thread submitThread = new Thread() {                                       
-      @Override                                                                
+    Thread submitThread = new Thread() {
+      @Override
       public void run() {
-        dtr.addApplicationAsync(mock(ApplicationId.class), creds1, false);
-      }                                                                        
-    };                                                                         
-    submitThread.start();                                                      
-                                                                               
+        dtr.addApplicationAsync(mock(ApplicationId.class), creds1, false,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
+      }
+    };
+    submitThread.start();
+
     // wait till 1st submit blocks, then submit another
-    startBarrier.await();                           
-    dtr.addApplicationAsync(mock(ApplicationId.class), creds2, false);
+    startBarrier.await();
+    dtr.addApplicationAsync(mock(ApplicationId.class), creds2, false,
+        new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     // signal 1st to complete                                                  
-    endBarrier.await();                                                        
-    submitThread.join(); 
+    endBarrier.await();
+    submitThread.join();
   }
   
-  @Test(timeout=20000)
+  @Test(timeout = 40000)
   public void testAppSubmissionWithInvalidDelegationToken() throws Exception {
     Configuration conf = new Configuration();
-    conf.set(
-        CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION,
+    conf.set(CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION,
         "kerberos");
+    YarnAPIStorageFactory.setConfiguration(conf);
+    RMStorageFactory.setConfiguration(conf);
     UserGroupInformation.setConfiguration(conf);
     MockRM rm = new MockRM(conf);
-    ByteBuffer tokens = ByteBuffer.wrap("BOGUS".getBytes()); 
-    ContainerLaunchContext amContainer =
-        ContainerLaunchContext.newInstance(
-            new HashMap<String, LocalResource>(), new HashMap<String, String>(),
-            new ArrayList<String>(), new HashMap<String, ByteBuffer>(), tokens,
+    ByteBuffer tokens = ByteBuffer.wrap("BOGUS".getBytes());
+    ContainerLaunchContext amContainer = ContainerLaunchContext
+        .newInstance(new HashMap<String, LocalResource>(),
+            new HashMap<String, String>(), new ArrayList<String>(),
+            new HashMap<String, ByteBuffer>(), tokens,
             new HashMap<ApplicationAccessType, String>());
-    ApplicationSubmissionContext appSubContext =
-        ApplicationSubmissionContext.newInstance(
-            ApplicationId.newInstance(1234121, 0),
-            "BOGUS", "default", Priority.UNDEFINED, amContainer, false,
-            true, 1, Resource.newInstance(1024, 1), "BOGUS");
+    ApplicationSubmissionContext appSubContext = ApplicationSubmissionContext
+        .newInstance(ApplicationId.newInstance(1234121, 0), "BOGUS", "default",
+            Priority.UNDEFINED, amContainer, false, true, 1,
+            Resource.newInstance(1024, 1), "BOGUS");
     SubmitApplicationRequest request =
         SubmitApplicationRequest.newInstance(appSubContext);
     try {
       rm.getClientRMService().submitApplication(request);
       fail("Error was excepted.");
     } catch (YarnException e) {
-      Assert.assertTrue(e.getMessage().contains(
-          "Bad header found in token storage"));
+      Assert.assertTrue(
+          e.getMessage().contains("Bad header found in token storage"));
     }
   }
 }

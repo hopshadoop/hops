@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.event;
 
+import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptEventType;
@@ -27,8 +28,8 @@ public class RMAppAttemptLaunchFailedEvent extends RMAppAttemptEvent {
   private final String message;
 
   public RMAppAttemptLaunchFailedEvent(ApplicationAttemptId appAttemptId,
-      String message) {
-    super(appAttemptId, RMAppAttemptEventType.LAUNCH_FAILED);
+      String message, TransactionState transactionState) {
+    super(appAttemptId, RMAppAttemptEventType.LAUNCH_FAILED, transactionState);
     this.message = message;
   }
 

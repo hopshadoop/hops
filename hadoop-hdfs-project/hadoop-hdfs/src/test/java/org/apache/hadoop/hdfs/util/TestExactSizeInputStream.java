@@ -17,16 +17,16 @@
  */
 package org.apache.hadoop.hdfs.util;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.fail;
+import org.junit.Test;
 
 import java.io.ByteArrayInputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 
-import org.junit.Test;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.fail;
 
 public class TestExactSizeInputStream {
   @Test
@@ -34,9 +34,9 @@ public class TestExactSizeInputStream {
     ExactSizeInputStream s = new ExactSizeInputStream(byteStream("hello"), 3);
     assertEquals(3, s.available());
     
-    assertEquals((int)'h', s.read());
-    assertEquals((int)'e', s.read());
-    assertEquals((int)'l', s.read());
+    assertEquals((int) 'h', s.read());
+    assertEquals((int) 'e', s.read());
+    assertEquals((int) 'l', s.read());
     assertEquals(-1, s.read());
     assertEquals(0, s.available());
   }
@@ -74,8 +74,8 @@ public class TestExactSizeInputStream {
     ExactSizeInputStream s = new ExactSizeInputStream(byteStream("he"), 5);
     assertEquals(2, s.available());
     
-    assertEquals((int)'h', s.read());
-    assertEquals((int)'e', s.read());
+    assertEquals((int) 'h', s.read());
+    assertEquals((int) 'e', s.read());
     try {
       s.read();
       fail("Read when should be out of data");

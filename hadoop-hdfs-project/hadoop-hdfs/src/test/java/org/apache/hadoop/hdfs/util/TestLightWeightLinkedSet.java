@@ -17,27 +17,27 @@
  */
 package org.apache.hadoop.hdfs.util;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Random;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.util.Time;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Random;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+
 public class TestLightWeightLinkedSet {
 
-  private static final Log LOG = LogFactory
-	  .getLog("org.apache.hadoop.hdfs.TestLightWeightLinkedSet");
-  private final ArrayList<Integer> list = new ArrayList<Integer>();
+  private static final Log LOG =
+      LogFactory.getLog("org.apache.hadoop.hdfs.TestLightWeightLinkedSet");
+  private ArrayList<Integer> list = new ArrayList<Integer>();
   private final int NUM = 100;
   private LightWeightLinkedSet<Integer> set;
   private Random rand;
@@ -263,7 +263,9 @@ public class TestLightWeightLinkedSet {
       assertTrue(set.add(i));
     }
     // remove all elements by polling
-    while (set.pollFirst() != null);
+    while (set.pollFirst() != null) {
+      ;
+    }
     assertEquals(0, set.size());
     assertTrue(set.isEmpty());
 
