@@ -1,3 +1,10 @@
+Hops
+===
+
+Hadoop Open Platform-as-a-Service (Hops) is a new distribution of Apache Hadoop with scalable, highly available, customizable metadata.
+
+Hops consists internally of two main sub projects, Hops-Fs and Hops-Yarn. Hops-FS is a new implementation of the the Hadoop Filesystem (HDFS), that supports multiple stateless NameNodes, where the metadata is stored in an in-memory distributed database (MySQL Cluster). Hops-FS enables more scalable clusters than Apache HDFS (up to ten times larger clusters), and enables NameNode metadata to be both customized and analyzed, because it can now be easily accessed via a SQL API. Hops-YARN introduces a distributed stateless Resource Manager, whose state is migrated to MySQL Cluster, a replicated, partitioned, in-memory NewSQL database. This enables our YARN architecture to have no down-time, with failover of a ResourceManager happening in a few seconds. 
+
 For the latest information about Hops, please visit our website at:
 
    http://hops.io
@@ -38,23 +45,26 @@ by mortbay.org.
 
 How to build
 ===
-
+```
 sudo  aptitude install cmake libprotobuf-dev libprotobuf-c0-dev
 
 mvn clean generate-sources
 
 cd hadoop-maven-plugins
 mvn install
+```
+build the [hop-metadata-dal](https://github.com/hopshadoop/hops-metadata-dal) project first, then build the associated metadata-dal implementation which for now is [hop-metadata-dal-ndb-impl](https://github.com/hopshadoop/hops-metadata-dal-impl-ndb)
 
+```
 cd ..
 mvn package -Pdist -DskipTests -Dtar
-
-- for native deployment, you need to install these libraries first
-
+```
+for native deployment, you need to install these libraries first
+```
 sudo aptitude install zlib1g-dev libssl-dev
-
 cd ..
 mvn package -Pdist,native -DskipTests -Dtar
+```
 
 How to add RPC messages
 ===
@@ -68,27 +78,31 @@ to generate the java classes from the protocol buffer files.
 ===============================================================================
 
 Memcache Setup
-==================
+===
+
+for memcached backed ndb setup follow the 
 
 1- add ndbmemcache schema to mysql cluster
 
 Ex:
+```
 /usr/local/mysql/bin/mysql -S /tmp/mysql.sock < /usr/local/mysql/share/memcache-api/ndb_memcache_metadata.sql
-
+```
 2- insert the following rows to the ndbmemcache database
 
-
+```SQL
 use ndbmemcache;
-INSERT INTO containers VALUES ('path_cnt', 'hop_mahmoud','path_memcached', 'path', 'inodeids', 0, NULL, NULL, NULL, NULL);
+INSERT INTO containers VALUES ('path_cnt', 'DATABASE_NAME','path_memcached', 'path', 'inodeids', 0, NULL, NULL, NULL, NULL);
 INSERT INTO key_prefixes VALUES (3, 'p:', 0,'caching', 'path_cnt');
-
+```
 
 3- use the memcached command associated with the mysql cluster on your namenode
 
 Ex:
-/home/mahmoud/opt/mysql-cluster/bin/memcached -E /home/mahmoud/opt/mysql-cluster/lib/ndb_engine.so -e "connectstring=cloud11.sics.se:1186;role=ndb-caching" -p 11212 -U 11212 -v
-
+```
+/home/mahmoud/opt/mysql-cluster/bin/memcached -E /home/mahmoud/opt/mysql-cluster/lib/ndb_engine.so -e "connectstring=MYSQL_CLUSTER_ADDRESS;role=ndb-caching" -p 11212 -U 11212 -v
+```
 4- In DFSConfigKeys.java update the Memcache config parameters 
 
-NOTE: don't forget to change hop_mahmoud to your database name
+NOTE: don't forget to change DATABASE_NAME to your database name
 
