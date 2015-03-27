@@ -144,8 +144,7 @@ class BPOfferService implements Runnable {
   // sent immediately by the actor thread without waiting for the IBR timer
   // to elapse.
   private volatile boolean sendImmediateIBR = false;
-  volatile long lastDeletedReport = 0;
-  // lastBlockReport, lastDeletedReport and lastHeartbeat may be assigned/read
+  // lastBlockReport and lastHeartbeat may be assigned/read
   // by testing threads (through BPServiceActor#triggerXXX), while also
   // assigned/read by the actor thread. Thus they should be declared as volatile
   // to make sure the "happens-before" consistency.
@@ -153,6 +152,8 @@ class BPOfferService implements Runnable {
   private boolean resetBlockReportTime = true;
   
   volatile long lastCacheReport = 0;
+  
+  private volatile long lastHeartbeat = 0;
   
   private BPServiceActor blkReportHander = null;
   private List<ActiveNode> nnList = Collections.synchronizedList(new ArrayList<ActiveNode>());
@@ -827,11 +828,11 @@ class BPOfferService implements Runnable {
     while (dn.shouldRun) {  //as long as datanode is alive keep working
       try {
         long startTime = now();
+        boolean sendHeartbeat =
+            startTime - lastHeartbeat >= dnConf.heartBeatInterval;
 
-        if (sendImmediateIBR ||
-            (startTime - lastDeletedReport > dnConf.deleteReportInterval)) {
+        if (sendImmediateIBR || sendHeartbeat) {
           reportReceivedDeletedBlocks();
-          lastDeletedReport = startTime;
         }
 
         startBRThread();
@@ -1074,7 +1075,7 @@ public class IncrementalBRTask implements Callable{
     // or we will report an RBW replica after the BlockReport already reports
     // a FINALIZED one.
     reportReceivedDeletedBlocks();
-    lastDeletedReport = startTime;
+    lastHeartbeat = startTime;
 
     long brCreateStartTime = now();
     Map<DatanodeStorage, BlockReport> perVolumeBlockLists =
@@ -1266,10 +1267,10 @@ public class IncrementalBRTask implements Callable{
 
   void triggerDeletionReportForTestsInt() {
     synchronized (pendingIncrementalBRperStorage) {
-      lastDeletedReport = 0;
+      sendImmediateIBR = true;
       pendingIncrementalBRperStorage.notifyAll();
 
-      while (lastDeletedReport == 0) {
+      while (sendImmediateIBR) {
         try {
           pendingIncrementalBRperStorage.wait(100);
         } catch (InterruptedException e) {
