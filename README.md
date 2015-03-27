@@ -106,3 +106,7 @@ Ex:
 
 NOTE: don't forget to change DATABASE_NAME to your database name
 
+# License
+
+Hops is released under an [Apache 2.0 license](LICENSE.txt).
+
