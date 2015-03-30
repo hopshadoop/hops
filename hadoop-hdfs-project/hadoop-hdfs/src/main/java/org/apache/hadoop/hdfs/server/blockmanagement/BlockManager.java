@@ -2032,9 +2032,10 @@ public class BlockManager {
       if ((nodesCorrupt != null) && nodesCorrupt.contains(node)) {
         continue;
       }
-      if (priority != UnderReplicatedBlocks.QUEUE_HIGHEST_PRIORITY
-          && !node.isDecommissionInProgress()
-          && node.getNumberOfBlocksToBeReplicated() >= maxReplicationStreams) {
+      if(priority != UnderReplicatedBlocks.QUEUE_HIGHEST_PRIORITY 
+          && !node.isDecommissionInProgress() 
+          && node.getNumberOfBlocksToBeReplicated() >= maxReplicationStreams)
+      {
         continue; // already reached replication limit
       }
       if (node.getNumberOfBlocksToBeReplicated() >= replicationStreamsHardLimit) {
@@ -2048,15 +2049,6 @@ public class BlockManager {
       if (node.isDecommissioned()) {
         continue;
       }
-      // we prefer nodes that are in DECOMMISSION_INPROGRESS state
-      if (node.isDecommissionInProgress() || srcNode == null) {
-        srcNode = node;
-        continue;
-      }
-      if (srcNode.isDecommissionInProgress()) {
-        continue;
-      }
-
       // We got this far, current node is a reasonable choice
       if (srcNode == null) {
         srcNode = node;

@@ -765,6 +765,75 @@ public class TestBlockManager {
   }
 
   @Test
+  public void testFavorDecomUntilHardLimit() throws Exception {
+    Configuration conf = new HdfsConfiguration();
+    HdfsStorageFactory.setConfiguration(conf);
+    HdfsStorageFactory.resetDALInitialized();
+    formatStorage(conf);
+    bm.maxReplicationStreams = 0;
+    bm.replicationStreamsHardLimit = 1;
+
+    long blockId = 42;         // arbitrary
+    final Block aBlock = new Block(blockId, 0, 0);
+    final List<DatanodeDescriptor> origNodes = getNodes(0, 1);
+    addNodes(origNodes);
+    // Add the block to the first node.
+    addBlockOnNodes(blockId,origNodes.subList(0,1));
+    origNodes.get(0).startDecommission();
+
+    final List<DatanodeDescriptor> cntNodes = new LinkedList<DatanodeDescriptor>();
+    final List<DatanodeStorageInfo> liveNodes = new LinkedList<DatanodeStorageInfo>();
+
+    new HopsTransactionalRequestHandler(HDFSOperationType.TEST) {
+      INodeIdentifier inodeIdentifier;
+
+      @Override
+      public void setUp() throws StorageException {
+        inodeIdentifier = INodeUtil.resolveINodeFromBlock(aBlock);
+      }
+
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = LockFactory.getInstance();
+        locks.add(
+            lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier))
+            .add(
+                lf.getIndividualBlockLock(aBlock.getBlockId(), inodeIdentifier))
+            .add(lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UR, BLK.PE));
+      }
+
+      @Override
+      public Object performTask() throws IOException {
+        assertNotNull("Chooses decommissioning source node for a normal replication"
+            + " if all available source nodes have reached their replication"
+            + " limits below the hard limit.",
+            bm.chooseSourceDatanode(
+                aBlock,
+                cntNodes,
+                liveNodes,
+                new NumberReplicas(),
+                UnderReplicatedBlocks.QUEUE_UNDER_REPLICATED));
+
+        // Increase the replication count to test replication count > hard limit
+        DatanodeStorageInfo targets[] = {origNodes.get(1).getStorageInfos()[0]};
+        origNodes.get(0).addBlockToBeReplicated(aBlock, targets);
+
+        assertNull("Does not choose a source decommissioning node for a normal"
+            + " replication when all available nodes exceed the hard limit.",
+            bm.chooseSourceDatanode(
+                aBlock,
+                cntNodes,
+                liveNodes,
+                new NumberReplicas(),
+                UnderReplicatedBlocks.QUEUE_UNDER_REPLICATED));
+        return null;
+      }
+    }.handle();
+  }
+
+
+
+  @Test
   public void testSafeModeIBR() throws Exception {
     DatanodeDescriptor node = spy(nodes.get(0));
     DatanodeStorageInfo ds = node.getStorageInfos()[0];
