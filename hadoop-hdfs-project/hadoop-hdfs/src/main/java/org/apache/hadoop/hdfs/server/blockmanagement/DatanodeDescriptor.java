@@ -542,8 +542,10 @@ public class DatanodeDescriptor extends DatanodeInfo {
     if (checkFailedStorages) {
       LOG.info("Number of failed storage changes from "
           + this.volumeFailures + " to " + volFailures);
-      failedStorageInfos = new HashSet<DatanodeStorageInfo>(
-          storageMap.values());
+      synchronized (storageMap) {
+        failedStorageInfos =
+            new HashSet<DatanodeStorageInfo>(storageMap.values());
+      }
     }
 
     setXceiverCount(xceiverCount);
@@ -576,8 +578,11 @@ public class DatanodeDescriptor extends DatanodeInfo {
     if (checkFailedStorages) {
       updateFailedStorage(failedStorageInfos);
     }
-
-    if (storageMap.size() != reports.length) {
+    long storageMapSize;
+    synchronized (storageMap) {
+      storageMapSize = storageMap.size();
+    }
+    if (storageMapSize != reports.length) {
       pruneStorageMap(reports);
     }
   }
@@ -587,14 +592,14 @@ public class DatanodeDescriptor extends DatanodeInfo {
    * as long as they have associated block replicas.
    */
   private void pruneStorageMap(final StorageReport[] reports) {
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Number of storages reported in heartbeat=" + reports.length +
-                    "; Number of storages in storageMap=" + storageMap.size());
-    }
-
-    HashMap<String, DatanodeStorageInfo> excessStorages;
-
     synchronized (storageMap) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Number of storages reported in heartbeat=" + reports.length
+            + "; Number of storages in storageMap=" + storageMap.size());
+      }
+
+      HashMap<String, DatanodeStorageInfo> excessStorages;
+
       // Init excessStorages with all known storages.
       excessStorages = new HashMap<String, DatanodeStorageInfo>(storageMap);
 
@@ -617,7 +622,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
           }
         } catch (IOException e) {
           // Skip for a bit
-          e.printStackTrace();
+          LOG.warn(e, e);
         }
       }
     }
