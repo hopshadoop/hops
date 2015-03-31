@@ -91,7 +91,7 @@ public final class TestTriggerBlockReport {
     
     DataNode datanode = cluster.getDataNodes().get(0);
     BPOfferService service =
-        datanode.getAllBpOs()[0];
+        datanode.getAllBpOs().get(0);
     String storageUuid =
         datanode.getFSDataset().getVolumes().get(0).getStorageID();
     ExtendedBlock rdbi = new ExtendedBlock(service.getBlockPoolId(), 5678, 512, 1000);

@@ -213,7 +213,7 @@ public class TestBlockRecovery {
 
     };
 
-    BPOfferService bpos = dn.getAllBpOs()[0];
+    BPOfferService bpos = dn.getAllBpOs().get(0);
     BPServiceActor bpsa = bpos.getBPServiceActors().get(0);
     bpsa.bpNamenode = namenode;
     NamespaceInfo nsInfo = bpsa.retrieveNamespaceInfo();
@@ -221,7 +221,7 @@ public class TestBlockRecovery {
     bpos.bpRegistration = bpos.createRegistration();
 
     // Trigger a heartbeat so that it acknowledges the NN as active.
-    dn.getAllBpOs()[0].triggerHeartbeatForTests();
+    dn.getAllBpOs().get(0).triggerHeartbeatForTests();
   }
 
   public List<ActiveNode> getList(){
