@@ -18,19 +18,19 @@
 package org.apache.hadoop.hdfs.server.datanode;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import java.util.*;
+import java.util.concurrent.CopyOnWriteArrayList;
+
 import org.apache.commons.logging.Log;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.security.PrivilegedExceptionAction;
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -45,9 +45,11 @@ class BlockPoolManager {
   private static final Log LOG = DataNode.LOG;
   
   private final Map<String, BPOfferService> bpByNameserviceId =
-      Maps.newHashMap();
-  private final Map<String, BPOfferService> bpByBlockPoolId = Maps.newHashMap();
-  private final List<BPOfferService> offerServices = Lists.newArrayList();
+    Maps.newHashMap();
+  private final Map<String, BPOfferService> bpByBlockPoolId =
+    Maps.newHashMap();
+  private final List<BPOfferService> offerServices =
+      new CopyOnWriteArrayList<>();
 
   private final DataNode dn;
 
@@ -68,12 +70,14 @@ class BlockPoolManager {
   }
   
   /**
-   * Returns the array of BPOfferService objects.
+   * Returns a list of BPOfferService objects. The underlying list
+   * implementation is a CopyOnWriteArrayList so it can be safely
+   * iterated while BPOfferServices are being added or removed.
+   *
    * Caution: The BPOfferService returned could be shutdown any time.
    */
-  synchronized BPOfferService[] getAllNamenodeThreads() {
-    BPOfferService[] bposArray = new BPOfferService[offerServices.size()];
-    return offerServices.toArray(bposArray);
+  synchronized List<BPOfferService> getAllNamenodeThreads() {
+    return Collections.unmodifiableList(offerServices);
   }
 
   synchronized BPOfferService get(String bpid) {
@@ -104,15 +108,13 @@ class BlockPoolManager {
     }
   }
   
-  void shutDownAll(BPOfferService[] bposArray) throws InterruptedException {
-    if (bposArray != null) {
-      for (BPOfferService bpos : bposArray) {
-        bpos.stop(); //interrupts the threads
-      }
-      //now join
-      for (BPOfferService bpos : bposArray) {
-        bpos.join();
-      }
+  void shutDownAll(List<BPOfferService> bposList) throws InterruptedException {
+    for (BPOfferService bpos : bposList) {
+      bpos.stop(); //interrupts the threads
+    }
+    //now join
+    for (BPOfferService bpos : bposList) {
+      bpos.join();
     }
   }
   

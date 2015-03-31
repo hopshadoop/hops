@@ -289,8 +289,8 @@ public class TestBlockReportLoadBalancing1 {
       ActiveNode an = null;
       for (int i = 0; i < DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS_PER_NN * NN_COUNT; i++) {
         an = getLeader(cluster, NN_COUNT).getNextNamenodeToSendBlockReport(1000,
-                cluster.getDataNodes().get(i).getAllBpOs()[0].bpRegistration);
-        LOG.info("Assigned work for datanode " + cluster.getDataNodes().get(i).getAllBpOs()[0]
+                cluster.getDataNodes().get(i).getAllBpOs().get(0).bpRegistration);
+        LOG.info("Assigned work for datanode " + cluster.getDataNodes().get(i).getAllBpOs().get(0)
                 .bpRegistration.getXferAddr());
         assertTrue("Unable to assign work", an != null);
       }
@@ -298,7 +298,7 @@ public class TestBlockReportLoadBalancing1 {
       // more work assignment should fail
       try {
         an = getLeader(cluster, NN_COUNT).getNextNamenodeToSendBlockReport(1000,
-                cluster.getDataNodes().get(0).getAllBpOs()[0].bpRegistration);
+                cluster.getDataNodes().get(0).getAllBpOs().get(0).bpRegistration);
         fail("More work should not have been assigned");
       } catch (BRLoadBalancingOverloadException e) {
       } catch (BRLoadBalancingNonLeaderException e) {
@@ -316,7 +316,7 @@ public class TestBlockReportLoadBalancing1 {
 
       for (int i = 0; i < (2 * DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS_PER_NN)*NN_COUNT; i++) {
         an = getLeader(cluster, NN_COUNT).getNextNamenodeToSendBlockReport(10000,
-                cluster.getDataNodes().get(i).getAllBpOs()[0].bpRegistration);
+                cluster.getDataNodes().get(i).getAllBpOs().get(0).bpRegistration);
         assertTrue("Unable to assign work", an != null);
       }
 
@@ -329,13 +329,13 @@ public class TestBlockReportLoadBalancing1 {
 
       for (int i = 0; i < (2 * DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS_PER_NN)*(NN_COUNT-2); i++) {
         an = getLeader(cluster, NN_COUNT).getNextNamenodeToSendBlockReport(1000,
-                cluster.getDataNodes().get(i).getAllBpOs()[0].bpRegistration);
+                cluster.getDataNodes().get(i).getAllBpOs().get(0).bpRegistration);
         assertTrue("Unable to assign work", an != null);
       }
 
       try {
         an = getLeader(cluster, NN_COUNT).getNextNamenodeToSendBlockReport(1000,
-                cluster.getDataNodes().get(0).getAllBpOs()[0].bpRegistration);
+                cluster.getDataNodes().get(0).getAllBpOs().get(0).bpRegistration);
         fail("More work should not have been assigned");
 
       } catch (BRLoadBalancingOverloadException e) {
