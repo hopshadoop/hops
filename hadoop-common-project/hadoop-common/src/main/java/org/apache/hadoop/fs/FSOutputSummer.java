@@ -25,6 +25,7 @@ import org.apache.hadoop.util.DataChecksum;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.zip.Checksum;
+import org.apache.htrace.core.TraceScope;
 
 /**
  * This is a generic output stream for generating checksums for
@@ -51,7 +52,7 @@ abstract public class FSOutputSummer extends OutputStream {
   protected FSOutputSummer(DataChecksum sum) {
     this.sum = sum;
     this.buf = new byte[sum.getBytesPerChecksum() * BUFFER_NUM_CHUNKS];
-    this.checksum = new byte[sum.getChecksumSize() * BUFFER_NUM_CHUNKS];
+    this.checksum = new byte[getChecksumSize() * BUFFER_NUM_CHUNKS];
     this.count = 0;
   }
   
@@ -188,18 +189,34 @@ abstract public class FSOutputSummer extends OutputStream {
   protected synchronized int getBufferedDataSize() {
     return count;
   }
+
+  /** @return the size for a checksum. */
+  protected int getChecksumSize() {
+    return sum.getChecksumSize();
+  }
+
+  protected TraceScope createWriteTraceScope() {
+    return null;
+  }
   
   /** Generate checksums for the given data chunks and output chunks & checksums
    * to the underlying output stream.
    */
   private void writeChecksumChunks(byte b[], int off, int len)
-  throws IOException {
+      throws IOException {
     sum.calculateChunkedSums(b, off, len, checksum, 0);
-    for (int i = 0; i < len; i += sum.getBytesPerChecksum()) {
-      int chunkLen = Math.min(sum.getBytesPerChecksum(), len - i);
-      int ckOffset = i / sum.getBytesPerChecksum() * sum.getChecksumSize();
-      writeChunk(b, off + i, chunkLen, checksum, ckOffset,
-          sum.getChecksumSize());
+    TraceScope scope = createWriteTraceScope();
+    try {
+      for (int i = 0; i < len; i += sum.getBytesPerChecksum()) {
+        int chunkLen = Math.min(sum.getBytesPerChecksum(), len - i);
+        int ckOffset = i / sum.getBytesPerChecksum() * sum.getChecksumSize();
+        writeChunk(b, off + i, chunkLen, checksum, ckOffset,
+            sum.getChecksumSize());
+      }
+    } finally {
+      if (scope != null) {
+        scope.close();
+      }
     }
   }
 
