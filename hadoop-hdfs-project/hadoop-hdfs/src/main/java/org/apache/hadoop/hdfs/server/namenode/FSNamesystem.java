@@ -2944,7 +2944,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
             locks.add(lf.getLeaseLock(LockType.READ))
                     .add(lf.getLeasePathLock(LockType.READ_COMMITTED, src))
                     .add(lf.getBlockLock())
-                    .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.UC, BLK.UR));
+                    .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.UC, BLK.UR, BLK.ER));
             locks.add(lf.getAllUsedHashBucketsLock());
           }
 

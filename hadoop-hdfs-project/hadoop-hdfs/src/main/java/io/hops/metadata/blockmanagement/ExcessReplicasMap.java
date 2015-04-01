@@ -208,4 +208,17 @@ public class ExcessReplicasMap {
       }
     }.handle();
   }
+  
+  public boolean isEmpty() throws IOException {
+    return (boolean) new LightWeightRequestHandler(
+        HDFSOperationType.COUNT_CORRUPT_REPLICAS) {
+      @Override
+      public Object performTask() throws IOException {
+        ExcessReplicaDataAccess da =
+            (ExcessReplicaDataAccess) HdfsStorageFactory
+                .getDataAccess(ExcessReplicaDataAccess.class);
+        return da.countAllUniqueBlk()==0;
+      }
+    }.handle();
+  }
 }
