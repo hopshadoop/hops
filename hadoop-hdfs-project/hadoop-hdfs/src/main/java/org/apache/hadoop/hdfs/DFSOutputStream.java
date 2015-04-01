@@ -389,6 +389,10 @@ public class DFSOutputStream extends FSOutputSummer
     }
   }
 
+  protected TraceScope createWriteTraceScope() {
+    return dfsClient.newPathTraceScope("DFSOutputStream#write", src);
+  }
+
   // @see FSOutputSummer#writeChunk()
   @Override
   protected synchronized void writeChunk(byte[] b, int offset, int len,
