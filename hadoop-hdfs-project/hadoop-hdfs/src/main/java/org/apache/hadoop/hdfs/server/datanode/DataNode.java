@@ -371,6 +371,9 @@ public class DataNode extends ReconfigurableBase
   
   final Tracer tracer;
   private final TracerConfigurationManager tracerConfigurationManager;
+  private static final int NUM_CORES = Runtime.getRuntime()
+      .availableProcessors();
+  private static final double CONGESTION_RATIO = 1.5;
 
   private static Tracer createTracer(Configuration conf) {
     return new Tracer.Builder("DataNode").
@@ -518,8 +521,13 @@ public class DataNode extends ReconfigurableBase
    * </ul>
    */
   public PipelineAck.ECN getECN() {
-    return pipelineSupportECN ? PipelineAck.ECN.SUPPORTED : PipelineAck.ECN
-      .DISABLED;
+    if (!pipelineSupportECN) {
+      return PipelineAck.ECN.DISABLED;
+    }
+    double load = ManagementFactory.getOperatingSystemMXBean()
+        .getSystemLoadAverage();
+    return load > NUM_CORES * CONGESTION_RATIO ? PipelineAck.ECN.CONGESTED :
+        PipelineAck.ECN.SUPPORTED;
   }
 
   /**
