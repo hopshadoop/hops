@@ -319,6 +319,10 @@ class BlocksMap {
   public List<DatanodeStorageInfo> getStorages(BlockInfoContiguous block)
       throws TransactionContextException, StorageException {
     DatanodeStorageInfo[] array = block.getStorages(datanodeManager);
-    return Arrays.asList(array);
+    if(array!=null){
+      return Arrays.asList(array);
+    } else {
+      return Collections.EMPTY_LIST;
+    }
   }
 }

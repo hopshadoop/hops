@@ -253,7 +253,7 @@ class FSDirDeleteOp {
             locks.add(il).add(lf.getLeaseLock(LockType.WRITE))
                 .add(lf.getLeasePathLock(LockType.READ_COMMITTED))
                 .add(lf.getBlockLock()).add(
-                lf.getBlockRelated(BLK.RE, BLK.CR, BLK.UC, BLK.UR, BLK.PE, BLK.IV));
+                lf.getBlockRelated(BLK.RE, BLK.CR, BLK.UC, BLK.UR, BLK.PE, BLK.IV, BLK.ER));
 
             locks.add(lf.getAllUsedHashBucketsLock());
 
@@ -302,8 +302,7 @@ class FSDirDeleteOp {
             .skipReadingQuotaAttr(!fsd.isQuotaEnabled());
         locks.add(il).add(lf.getLeaseLock(LockType.WRITE))
             .add(lf.getLeasePathLock(LockType.READ_COMMITTED)).add(lf.getBlockLock())
-            .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.UC, BLK.UR,
-                BLK.PE, BLK.IV));
+            .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.UC, BLK.UR,BLK.PE, BLK.IV,BLK.ER));
         if (fsn.isRetryCacheEnabled()) {
           locks.add(lf.getRetryCacheEntryLock(Server.getClientId(),
               Server.getCallId()));

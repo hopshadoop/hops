@@ -4628,10 +4628,9 @@ public class BlockManager {
   public void removeBlock(Block block)
       throws StorageException, TransactionContextException, IOException {
     addToInvalidates(block);
-    corruptReplicas.removeFromCorruptReplicasMap(getBlockInfo(block));
     BlockInfoContiguous storedBlock = getBlockInfo(block);
-    blocksMap.removeBlock(block);
-    // Remove the block from pendingReplications and neededReplications
+    removeBlockFromMap(block);
+    // Remove the block from pendingReplications and neededReplications    
     pendingReplications.remove(storedBlock);
     neededReplications.remove(storedBlock);
     if (postponedMisreplicatedBlocks.remove(block)) {
@@ -4814,11 +4813,21 @@ public class BlockManager {
     return corruptReplicas.numCorruptReplicas(getBlockInfo(block));
   }
 
-  public void removeBlockFromMap(Block block)
-      throws StorageException, TransactionContextException {
+  public void removeBlockFromMap(Block block) throws IOException {
+    removeFromExcessReplicateMap(getBlockInfo(block));
     // If block is removed from blocksMap remove it from corruptReplicasMap
     corruptReplicas.removeFromCorruptReplicasMap(getBlockInfo(block));
     blocksMap.removeBlock(block);
+  }
+
+  /**
+   * If a block is removed from blocksMap, remove it from excessReplicateMap.
+   */
+  private void removeFromExcessReplicateMap(Block block) throws IOException {
+    BlockInfoContiguous blockInfo = getBlockInfo(block);
+    for (DatanodeStorageInfo info : blocksMap.getStorages(blockInfo)) {
+      excessReplicateMap.remove(info.getDatanodeDescriptor(), blockInfo);
+    }
   }
 
   public int getCapacity() {
