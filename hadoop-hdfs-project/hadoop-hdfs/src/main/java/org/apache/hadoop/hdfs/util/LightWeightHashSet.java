@@ -135,8 +135,10 @@ public class LightWeightHashSet<T> implements Collection<T> {
     this.shrinkThreshold = (int) (capacity * minLoadFactor);
 
     entries = new LinkedElement[capacity];
-    LOG.trace("initial capacity=" + initialCapacity + ", max load factor= " +
-        maxLoadFactor + ", min load factor= " + minLoadFactor);
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("initial capacity=" + initialCapacity + ", max load factor= "
+          + maxLoadFactor + ", min load factor= " + minLoadFactor);
+    }
   }
 
   public LightWeightHashSet() {

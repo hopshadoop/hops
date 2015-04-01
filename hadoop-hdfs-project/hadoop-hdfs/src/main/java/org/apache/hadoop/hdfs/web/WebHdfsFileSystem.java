@@ -206,12 +206,16 @@ public class WebHdfsFileSystem extends FileSystem
       // refetch tokens.  even if ugi has credentials, don't attempt
       // to get another token to match hdfs/rpc behavior
       if (token != null) {
-        LOG.debug("Using UGI token: " + token);
+        if(LOG.isDebugEnabled()) {
+          LOG.debug("Using UGI token: " + token);
+        }
         canRefreshDelegationToken = false; 
       } else {
         token = getDelegationToken(null);
         if (token != null) {
-          LOG.debug("Fetched new token: " + token);
+          if(LOG.isDebugEnabled()) {
+            LOG.debug("Fetched new token: " + token);
+          }
         } else { // security is disabled
           canRefreshDelegationToken = false;
         }
@@ -226,7 +230,9 @@ public class WebHdfsFileSystem extends FileSystem
     boolean replaced = false;
     if (canRefreshDelegationToken) {
       Token<?> token = getDelegationToken(null);
-      LOG.debug("Replaced expired token: " + token);
+      if(LOG.isDebugEnabled()) {
+        LOG.debug("Replaced expired token: " + token);
+      }
       setDelegationToken(token);
       replaced = (token != null);
     }
@@ -1107,7 +1113,9 @@ public class WebHdfsFileSystem extends FileSystem
         cancelDelegationToken(delegationToken);
       }
     } catch (IOException ioe) {
-      LOG.debug("Token cancel failed: "+ioe);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Token cancel failed: " + ioe);
+      }
     } finally {
       super.close();
     }

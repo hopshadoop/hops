@@ -1227,9 +1227,11 @@ public class IncrementalBRTask implements Callable{
       long createCost = createTime - startTime;
       long sendCost = sendTime - createTime;
       dn.getMetrics().addCacheReport(sendCost);
-      LOG.debug("CacheReport of " + blockIds.size()
-          + " block(s) took " + createCost + " msec to generate and "
-          + sendCost + " msecs for RPC and NN processing");
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("CacheReport of " + blockIds.size()
+            + " block(s) took " + createCost + " msec to generate and "
+            + sendCost + " msecs for RPC and NN processing");
+      }
     }
     return cmd;
   }
