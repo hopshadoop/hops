@@ -3236,13 +3236,12 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
    * @throws QuotaExceededException
    *     If addition of block exceeds space quota
    */
-  private BlockInfoContiguous saveAllocatedBlock(String src, INodesInPath inodesInPath,
+  private void saveAllocatedBlock(String src, INodesInPath inodesInPath,
       Block newBlock,
       DatanodeStorageInfo targets[]) throws IOException, StorageException {
     BlockInfoContiguous b = dir.addBlock(src, inodesInPath, newBlock, targets);
     NameNode.stateChangeLog.info("BLOCK* allocate " + b + " for " + src);
     DatanodeStorageInfo.incrementBlocksScheduled(targets);
-    return b;
   }
 
   /**
@@ -3265,54 +3264,16 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   private boolean checkFileProgress(String src, INodeFile v, boolean checkAll)
       throws IOException {
     if (checkAll) {
-      // check all blocks of the file.
-      for (BlockInfoContiguous block : v.getBlocks()) {
-        if (!isCompleteBlock(src, block, blockManager.minReplication, v, blockManager)) {
-          return false;
-        }
-      }
+      return blockManager.checkBlocksProperlyReplicated(src, v
+            .getBlocks());
     } else {
       // check the penultimate block of this file
       BlockInfoContiguous b = v.getPenultimateBlock();
-      if (b != null
-            && !isCompleteBlock(src, b, blockManager.minReplication, v, blockManager)) {
-        return false;
-      }
+      return b == null ||
+            blockManager.checkBlocksProperlyReplicated(
+                src, new BlockInfoContiguous[] { b });
     }
-    return true;
   }
-
-  private static boolean isCompleteBlock(String src, BlockInfoContiguous b, int minRepl, INodeFile v,
-      BlockManager blockManager) throws IOException {
-    if (!b.isComplete()) {
-      BlockInfoContiguous cBlock = blockManager
-          .tryToCompleteBlock(v, b.getBlockIndex());
-      if (cBlock != null) {
-        b = cBlock;
-      }
-      if (!b.isComplete()) {
-        final BlockInfoContiguousUnderConstruction uc = (BlockInfoContiguousUnderConstruction) b;
-        final int numNodes = b.getStorages(blockManager.getDatanodeManager()).length;
-        LOG.info("BLOCK* " + b + " is not COMPLETE (ucState = "
-            + uc.getBlockUCState() + ", replication# = " + numNodes
-            + (numNodes < minRepl ? " < " : " >= ")
-            + " minimum = " + minRepl + ") in file " + src);
-        return false;
-      }
-    }
-    return true;
-  }
-    
-  ////////////////////////////////////////////////////////////////
-  // Here's how to handle block-copy failure during client write:
-  // -- As usual, the client's write should result in a streaming
-  // backup write to a k-machine sequence.
-  // -- If one of the backup machines fails, no worries.  Fail silently.
-  // -- Before client is allowed to close and finalize file, make sure
-  // that the blocks are backed up.  Namenode may have to issue specific backup
-  // commands to make up for earlier datanode failures.  Once all copies
-  // are made, edit namespace and return to client.
-  ////////////////////////////////////////////////////////////////
 
   /** 
    * Change the indicated filename. 
