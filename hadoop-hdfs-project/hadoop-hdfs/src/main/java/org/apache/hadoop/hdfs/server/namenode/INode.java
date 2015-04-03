@@ -405,10 +405,57 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
 
   /**
    * Count subtree {@link Quota#NAMESPACE} and {@link Quota#STORAGESPACE} usages.
+   * Entry point for FSDirectory where blockStoragePolicyId is given its initial
+   * value.
    */
-  abstract QuotaCounts computeQuotaUsage( BlockStoragePolicySuite bsps, QuotaCounts counts)
+  public final QuotaCounts computeQuotaUsage(BlockStoragePolicySuite bsps) throws TransactionContextException, StorageException {
+    final byte storagePolicyId = isSymlink() ?
+        BlockStoragePolicySuite.ID_UNSPECIFIED : getStoragePolicyID();
+    return computeQuotaUsage(bsps, storagePolicyId,
+        new QuotaCounts.Builder().build());
+  }
+
+  /**
+   * Count subtree {@link Quota#NAMESPACE} and {@link Quota#STORAGESPACE} usages.
+   * 
+   * With the existence of {@link INodeReference}, the same inode and its
+   * subtree may be referred by multiple {@link WithName} nodes and a
+   * {@link DstReference} node. To avoid circles while quota usage computation,
+   * we have the following rules:
+   * 
+   * <pre>
+   * 1. For a {@link DstReference} node, since the node must be in the current
+   * tree (or has been deleted as the end point of a series of rename 
+   * operations), we compute the quota usage of the referred node (and its 
+   * subtree) in the regular manner, i.e., including every inode in the current
+   * tree and in snapshot copies, as well as the size of diff list.
+   * 
+   * 2. For a {@link WithName} node, since the node must be in a snapshot, we 
+   * only count the quota usage for those nodes that still existed at the 
+   * creation time of the snapshot associated with the {@link WithName} node.
+   * We do not count in the size of the diff list.  
+   * <pre>
+   *
+   * @param bsps Block storage policy suite to calculate intended storage type usage
+   * @param blockStoragePolicyId block storage policy id of the current INode
+   * @param counts The subtree counts for returning.
+   * @param useCache Whether to use cached quota usage. Note that 
+   *                 {@link WithName} node never uses cache for its subtree.
+   * @param lastSnapshotId {@link Snapshot#CURRENT_STATE_ID} indicates the 
+   *                       computation is in the current tree. Otherwise the id
+   *                       indicates the computation range for a 
+   *                       {@link WithName} node.
+   * @return The same objects as the counts parameter.
+   */
+  abstract QuotaCounts computeQuotaUsage( BlockStoragePolicySuite bsps,  byte blockStoragePolicyId, QuotaCounts counts)
       throws StorageException, TransactionContextException;
   
+  public final QuotaCounts computeQuotaUsage(
+    BlockStoragePolicySuite bsps, QuotaCounts counts) throws TransactionContextException, StorageException {
+    final byte storagePolicyId = isSymlink() ?
+        BlockStoragePolicySuite.ID_UNSPECIFIED : getStoragePolicyID();
+    return computeQuotaUsage(bsps, storagePolicyId, counts);
+}
   /**
    * Get local file name
    *
@@ -509,7 +556,7 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
     if (isRoot()) {
       return null;
     }
-    if (parent == null) {
+    if (parent == null && getParentId()!= ROOT_PARENT_ID) {
       parent = (INode) EntityManager
           .find(INode.Finder.ByINodeIdFTIS, getParentId());
     }
@@ -580,9 +627,21 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
   }
 
   /**
-   * Breaks file path into components.
-   *
-   * @param path
+   * Get the storage policy ID while computing quota usage
+   * @param parentStoragePolicyId the storage policy ID of the parent directory
+   * @return the storage policy ID of this INode. Note that for an
+   * {@link INodeSymlink} we return {@link BlockStoragePolicySuite#ID_UNSPECIFIED}
+   * instead of throwing Exception
+   */
+  public byte getStoragePolicyIDForQuota(byte parentStoragePolicyId) {
+    byte localId = isSymlink() ?
+        BlockStoragePolicySuite.ID_UNSPECIFIED : getLocalStoragePolicyID();
+    return localId != BlockStoragePolicySuite.ID_UNSPECIFIED ?
+        localId : parentStoragePolicyId;
+  }
+
+  /**
+   * Breaks {@code path} into components.
    * @return array of byte arrays each of which represents
    * a single path component.
    */

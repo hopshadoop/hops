@@ -38,6 +38,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
 
+import static org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite.ID_UNSPECIFIED;
+
 /**
  * Directory INode class.
  */
@@ -464,7 +466,7 @@ public class INodeDirectory extends INodeWithAdditionalFields {
   }
 
   @Override
-  QuotaCounts computeQuotaUsage(BlockStoragePolicySuite bsps, QuotaCounts counts)
+  QuotaCounts computeQuotaUsage(BlockStoragePolicySuite bsps, byte blockStoragePolicyId, QuotaCounts counts)
       throws StorageException, TransactionContextException {
     if (isWithQuota()) {
       final DirectoryWithQuotaFeature q = getDirectoryWithQuotaFeature();
@@ -472,27 +474,29 @@ public class INodeDirectory extends INodeWithAdditionalFields {
         return q.AddCurrentSpaceUsage(counts);
       }
     } else {
-      computeDirectoryQuotaUsage(bsps, counts);
+      computeDirectoryQuotaUsage(bsps, blockStoragePolicyId, counts);
     }
     return counts;
   }
   
   private QuotaCounts computeDirectoryQuotaUsage(BlockStoragePolicySuite bsps,
-      QuotaCounts counts) throws StorageException, TransactionContextException {
+      byte blockStoragePolicyId, QuotaCounts counts) throws StorageException, TransactionContextException {
     if (isInTree()) {
       List<INode> children = getChildren();
       if (children != null) {
         for (INode child : children) {
-          child.computeQuotaUsage(bsps, counts);
+          final byte childPolicyId = child.getStoragePolicyIDForQuota(blockStoragePolicyId);
+          child.computeQuotaUsage(bsps, childPolicyId, counts);
         }
       }
     }
-    return computeQuotaUsage4CurrentDirectory(bsps, counts);
+    return computeQuotaUsage4CurrentDirectory(bsps, blockStoragePolicyId,
+        counts);
   }
   
   /** Add quota usage for this inode excluding children. */
   public QuotaCounts computeQuotaUsage4CurrentDirectory(
-      BlockStoragePolicySuite bsps, QuotaCounts counts) {
+      BlockStoragePolicySuite bsps, byte storagePolicyId, QuotaCounts counts) {
     counts.addNameSpace(1);
     return counts;
   }
