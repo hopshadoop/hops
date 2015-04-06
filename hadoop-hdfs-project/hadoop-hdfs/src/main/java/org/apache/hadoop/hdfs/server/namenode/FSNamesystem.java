@@ -2585,6 +2585,10 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
             LocatedBlock[] onRetryBlock = new LocatedBlock[1];
             FileState fileState = analyzeFileState(src, fileId, clientName, previous, onRetryBlock);
             INodeFile pendingFile = fileState.inode;
+            // Check if the penultimate block is minimally replicated
+            if (!checkFileProgress(src, pendingFile, false)) {
+              throw new NotReplicatedYetException("Not replicated yet: " + src);
+            }
             String src2 = fileState.path;
 
             if (onRetryBlock[0] != null && onRetryBlock[0].getLocations().length > 0) {
@@ -2806,11 +2810,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       }
     }
 
-    // Check if the penultimate block is minimally replicated
-    if (!checkFileProgress(src, pendingFile, false)) {
-      throw new NotReplicatedYetException("Not replicated yet: " + src +
-              " block " + pendingFile.getPenultimateBlock());
-    }
     return new FileState(pendingFile, src, iip);
   }
 
@@ -3261,7 +3260,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
    * replicated.  If not, return false. If checkAll is true, then check
    * all blocks, otherwise check only penultimate block.
    */
-  private boolean checkFileProgress(String src, INodeFile v, boolean checkAll)
+  boolean checkFileProgress(String src, INodeFile v, boolean checkAll)
       throws IOException {
     if (checkAll) {
       return blockManager.checkBlocksProperlyReplicated(src, v

@@ -19,6 +19,9 @@
 package org.apache.hadoop.hdfs.server.namenode;
 
 
+
+import java.io.IOException;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -42,7 +45,6 @@ import org.mockito.stubbing.Answer;
 
 import java.lang.reflect.Field;
 import java.util.EnumSet;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 
@@ -103,7 +105,7 @@ public class TestAddBlockRetry {
   public void testRetryAddBlockWhileInChooseTarget() throws Exception {
     final String src = "/testRetryAddBlockWhileInChooseTarget";
 
-    FSNamesystem ns = cluster.getNamesystem();
+    final FSNamesystem ns = cluster.getNamesystem();
     BlockManager spyBM = spy(ns.getBlockManager());
     final NamenodeProtocols nn = cluster.getNameNodeRpc();
 
@@ -120,10 +122,15 @@ public class TestAddBlockRetry {
         LOG.info("chooseTarget for " + src);
         DatanodeStorageInfo[] ret =
             (DatanodeStorageInfo[]) invocation.callRealMethod();
+        assertTrue("Penultimate block must be complete",
+            checkFileProgress(src, false));
         count++;
         if (count == 1) { // run second addBlock()
           LOG.info("Starting second addBlock for " + src);
-          nn.addBlock(src, "clientName", null, null, INode.ROOT_PARENT_ID, null);
+          nn.addBlock(src, "clientName", null, null,
+              INode.ROOT_PARENT_ID, null);
+          assertTrue("Penultimate block must be complete",
+              checkFileProgress(src, false));
           LocatedBlocks lbs = nn.getBlockLocations(src, 0, Long.MAX_VALUE);
           assertEquals("Must be one block", 1, lbs.getLocatedBlocks().size());
           lb2 = lbs.get(0);
@@ -152,7 +159,12 @@ public class TestAddBlockRetry {
     assertEquals("Wrong replication", REPLICATION, lb1.getLocations().length);
     assertEquals("Blocks are not equal", lb1.getBlock(), lb2.getBlock());
   }
-  
+
+  boolean checkFileProgress(String src, boolean checkall) throws IOException {
+    final FSNamesystem ns = cluster.getNamesystem();
+    return ns.checkFileProgress(src, ns.dir.getINode(src).asFile(), checkall);
+  }
+
   /*
    * Since NameNode will not persist any locations of the block, addBlock()
    * retry call after restart NN should re-select the locations and return to
