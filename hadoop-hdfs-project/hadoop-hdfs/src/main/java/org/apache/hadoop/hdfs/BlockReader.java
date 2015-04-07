@@ -21,6 +21,9 @@ import org.apache.hadoop.fs.ByteBufferReadable;
 
 import java.io.IOException;
 import java.util.EnumSet;
+
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.fs.ByteBufferReadable;
 import org.apache.hadoop.fs.ReadOption;
 import org.apache.hadoop.hdfs.shortcircuit.ClientMmap;
 
@@ -28,6 +31,7 @@ import org.apache.hadoop.hdfs.shortcircuit.ClientMmap;
  * A BlockReader is responsible for reading a single block
  * from a single datanode.
  */
+@InterfaceAudience.Private
 public interface BlockReader extends ByteBufferReadable {
 
   /* same interface as inputStream java.io.InputStream#read()
