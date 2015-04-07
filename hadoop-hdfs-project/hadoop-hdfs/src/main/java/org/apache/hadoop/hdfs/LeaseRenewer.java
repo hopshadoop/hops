@@ -17,15 +17,6 @@
  */
 package org.apache.hadoop.hdfs;
 
-import com.google.common.annotations.VisibleForTesting;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.HadoopIllegalArgumentException;
-import org.apache.hadoop.hdfs.protocol.HdfsConstants;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.util.Daemon;
-import org.apache.hadoop.util.StringUtils;
-import org.apache.hadoop.util.Time;
 
 import java.io.IOException;
 import java.net.SocketTimeoutException;
@@ -36,6 +27,17 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.HadoopIllegalArgumentException;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdfs.protocol.HdfsConstants;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.Daemon;
+import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.util.Time;
+import com.google.common.annotations.VisibleForTesting;
 
 /**
  * <p>
@@ -68,7 +70,8 @@ import java.util.Map;
  * </ul>
  * </p>
  */
-public class LeaseRenewer {
+@InterfaceAudience.Private
+class LeaseRenewer {
   static final Log LOG = LogFactory.getLog(LeaseRenewer.class);
 
   static final long LEASE_RENEWER_GRACE_DEFAULT = 60 * 1000L;

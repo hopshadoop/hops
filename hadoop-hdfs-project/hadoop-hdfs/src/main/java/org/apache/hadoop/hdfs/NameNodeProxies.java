@@ -40,6 +40,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSClient.Conf;
 import org.apache.hadoop.hdfs.protocol.AlreadyBeingCreatedException;
@@ -91,6 +92,7 @@ import com.google.common.base.Preconditions;
  * {@link NameNodeProxies#createProxy(Configuration, URI, Class)}, which will
  * create either an HA- or non-HA-enabled client proxy as appropriate.
  */
+@InterfaceAudience.Private
 public class NameNodeProxies {
   
   private static final Log LOG = LogFactory.getLog(NameNodeProxies.class);

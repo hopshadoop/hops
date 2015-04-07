@@ -40,6 +40,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+
+import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdfs.protocol.DSQuotaExceededException;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
@@ -113,6 +115,7 @@ import org.apache.htrace.core.Tracer;
  *
  *********************************************************************/
 
+@InterfaceAudience.Private
 class DataStreamer extends Daemon {
   
   public static final Log LOG = LogFactory.getLog(DataStreamer.class);
