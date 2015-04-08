@@ -154,6 +154,12 @@ public class ReplicaInPipeline extends ReplicaInfo
     return bytesReserved;
   }
   
+  @Override
+  public void releaseAllBytesReserved() {  // ReplicaInPipelineInterface
+    getVolume().releaseReservedSpace(bytesReserved);
+    bytesReserved = 0;
+  }
+
   @Override // ReplicaInPipelineInterface
   public synchronized void setLastChecksumAndDataLen(long dataLength,
       byte[] lastChecksum) {
