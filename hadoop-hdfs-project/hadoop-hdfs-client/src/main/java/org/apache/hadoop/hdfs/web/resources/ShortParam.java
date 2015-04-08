@@ -18,16 +18,16 @@
 package org.apache.hadoop.hdfs.web.resources;
 
 /**
- * Integer parameter.
+ * Short parameter.
  */
-abstract class IntegerParam extends Param<Integer, IntegerParam.Domain> {
-  IntegerParam(final Domain domain, final Integer value, final Integer min,
-      final Integer max) {
+abstract class ShortParam extends Param<Short, ShortParam.Domain> {
+  ShortParam(final Domain domain, final Short value, final Short min,
+      final Short max) {
     super(domain, value);
     checkRange(min, max);
   }
 
-  private void checkRange(final Integer min, final Integer max) {
+  private void checkRange(final Short min, final Short max) {
     if (value == null) {
       return;
     }
@@ -42,7 +42,7 @@ abstract class IntegerParam extends Param<Integer, IntegerParam.Domain> {
               domain.toString(value) + " > " + domain.toString(max));
     }
   }
-  
+
   @Override
   public String toString() {
     return getName() + "=" + domain.toString(getValue());
@@ -52,14 +52,14 @@ abstract class IntegerParam extends Param<Integer, IntegerParam.Domain> {
    * @return the parameter value as a string
    */
   @Override
-  public String getValueString() {
+  public final String getValueString() {
     return domain.toString(getValue());
   }
 
   /**
    * The domain of the parameter.
    */
-  static final class Domain extends Param.Domain<Integer> {
+  static final class Domain extends Param.Domain<Short> {
     /**
      * The radix of the number.
      */
@@ -76,24 +76,22 @@ abstract class IntegerParam extends Param<Integer, IntegerParam.Domain> {
 
     @Override
     public String getDomain() {
-      return "<" + NULL + " | int in radix " + radix + ">";
+      return "<" + NULL + " | short in radix " + radix + ">";
     }
 
     @Override
-    Integer parse(final String str) {
-      try{
-        return NULL.equals(str) || str == null ? null : Integer.parseInt(str,
+    Short parse(final String str) {
+      try {
+        return NULL.equals(str) || str == null ? null : Short.parseShort(str,
           radix);
       } catch(NumberFormatException e) {
         throw new IllegalArgumentException("Failed to parse \"" + str
-            + "\" as a radix-" + radix + " integer.", e);
+            + "\" as a radix-" + radix + " short integer.", e);
       }
     }
 
-    /**
-     * Convert an Integer to a String.
-     */
-    String toString(final Integer n) {
+    /** Convert a Short to a String. */
+    String toString(final Short n) {
       return n == null ? NULL : Integer.toString(n, radix);
     }
   }

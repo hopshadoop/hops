@@ -42,7 +42,7 @@ public class PermissionParam extends ShortParam {
   public static FsPermission getDefaultFsPermission() {
     return new FsPermission(DEFAULT_PERMISSION);
   }
-  
+
   /**
    * Constructor.
    *

@@ -17,19 +17,19 @@
  */
 package org.apache.hadoop.hdfs.web.resources;
 
+import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_REPLICATION_DEFAULT;
+import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_REPLICATION_KEY;
+
 import org.apache.hadoop.conf.Configuration;
 
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_KEY;
-
 /**
- * Block size parameter.
+ * Replication parameter.
  */
-public class BlockSizeParam extends LongParam {
+public class ReplicationParam extends ShortParam {
   /**
    * Parameter name.
    */
-  public static final String NAME = "blocksize";
+  public static final String NAME = "replication";
   /**
    * Default parameter value.
    */
@@ -43,8 +43,8 @@ public class BlockSizeParam extends LongParam {
    * @param value
    *     the parameter value.
    */
-  public BlockSizeParam(final Long value) {
-    super(DOMAIN, value, 1L, null);
+  public ReplicationParam(final Short value) {
+    super(DOMAIN, value, (short) 1, null);
   }
 
   /**
@@ -53,7 +53,7 @@ public class BlockSizeParam extends LongParam {
    * @param str
    *     a string representation of the parameter value.
    */
-  public BlockSizeParam(final String str) {
+  public ReplicationParam(final String str) {
     this(DOMAIN.parse(str));
   }
 
@@ -65,8 +65,8 @@ public class BlockSizeParam extends LongParam {
   /**
    * @return the value or, if it is null, return the default from conf.
    */
-  public long getValue(final Configuration conf) {
+  public short getValue(final Configuration conf) {
     return getValue() != null ? getValue() :
-        conf.getLongBytes(DFS_BLOCK_SIZE_KEY, DFS_BLOCK_SIZE_DEFAULT);
+        (short) conf.getInt(DFS_REPLICATION_KEY, DFS_REPLICATION_DEFAULT);
   }
 }
