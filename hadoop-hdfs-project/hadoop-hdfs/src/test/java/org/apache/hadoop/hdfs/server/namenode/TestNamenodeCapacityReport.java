@@ -203,8 +203,13 @@ public class TestNamenodeCapacityReport {
         dn.shutdown();
         dnd.setLastUpdate(0L);
         BlockManagerTestUtil.checkHeartbeat(namesystem.getBlockManager());
+        //Verify decommission of dead node won't impact nodesInService metrics.
+        dnm.getDecomManager().startDecommission(dnd);
         expectedInServiceNodes--;
         assertEquals(expectedInServiceNodes, namesystem.getNumLiveDataNodes());
+        assertEquals(expectedInServiceNodes, getNumDNInService(namesystem));
+        //Verify recommission of dead node won't impact nodesInService metrics.
+        dnm.getDecomManager().stopDecommission(dnd);
         assertEquals(expectedInServiceNodes, getNumDNInService(namesystem));
       }
       // restart the nodes to verify that counts are correct after
