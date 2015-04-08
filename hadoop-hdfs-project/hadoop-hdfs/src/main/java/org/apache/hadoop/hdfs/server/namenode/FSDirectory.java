@@ -114,6 +114,7 @@ public class FSDirectory implements Closeable {
   private final int maxDirItems;
   private final int lsLimit;  // max list limit
   private final int contentCountLimit; // max content summary counts per run
+  private final long contentSleepMicroSec;
   private long yieldCount = 0; // keep track of lock yield count.
   private final int inodeXAttrsLimit; //inode xattrs max limit
   
@@ -187,6 +188,9 @@ public class FSDirectory implements Closeable {
     this.contentCountLimit = conf.getInt(
         DFSConfigKeys.DFS_CONTENT_SUMMARY_LIMIT_KEY,
         DFSConfigKeys.DFS_CONTENT_SUMMARY_LIMIT_DEFAULT);
+    this.contentSleepMicroSec = conf.getLong(
+        DFSConfigKeys.DFS_CONTENT_SUMMARY_SLEEP_MICROSEC_KEY,
+        DFSConfigKeys.DFS_CONTENT_SUMMARY_SLEEP_MICROSEC_DEFAULT);
     
     // filesystem limits
     this.maxComponentLength =
@@ -259,7 +263,11 @@ public class FSDirectory implements Closeable {
   int getContentCountLimit() {
     return contentCountLimit;
   }
-  
+
+  long getContentSleepMicroSec() {
+    return contentSleepMicroSec;
+  }
+
   /**
    * Shutdown the filestore
    */
