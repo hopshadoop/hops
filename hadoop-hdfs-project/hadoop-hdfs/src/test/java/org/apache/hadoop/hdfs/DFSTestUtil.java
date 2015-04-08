@@ -1534,6 +1534,9 @@ public class DFSTestUtil {
     filesystem.removeXAttr(pathConcatTarget, "user.a2");
   }
   
+  public static void abortStream(DFSOutputStream out) throws IOException {
+    out.abort();
+  }
 
   public static byte[] asArray(ByteBuffer buf) {
     byte arr[] = new byte[buf.remaining()];

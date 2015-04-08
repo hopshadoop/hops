@@ -49,6 +49,11 @@ public interface ReplicaInPipelineInterface extends Replica {
   void setBytesAcked(long bytesAcked);
   
   /**
+   * Release any disk space reserved for this replica.
+   */
+  public void releaseAllBytesReserved();
+
+  /**
    * store the checksum for the last chunk along with the data length
    *
    * @param dataLength
