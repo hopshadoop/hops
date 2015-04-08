@@ -32,6 +32,7 @@ import java.net.URI;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
@@ -50,6 +51,7 @@ public class NamenodeSelector extends Thread {
   enum NNSelectionPolicy {
 
     RANDOM("RANDOM"),
+    RANDOM_STICKY("RANDOM_STICKY"),
     ROUND_ROBIN("ROUND_ROBIN");
     private String description = null;
 
@@ -102,7 +104,7 @@ public class NamenodeSelector extends Thread {
 
   }
 
-  ;
+  
   /* List of name nodes */
   private List<NamenodeSelector.NamenodeHandle> nnList =
       new CopyOnWriteArrayList<NamenodeSelector.NamenodeHandle>();
@@ -111,11 +113,13 @@ public class NamenodeSelector extends Thread {
   private static Log LOG = LogFactory.getLog(NamenodeSelector.class);
   private final URI defaultUri;
   private final NamenodeSelector.NNSelectionPolicy policy;
+  private NamenodeSelector.NamenodeHandle stickyHandle = null; //only used if
+  // RANDOM_STICKY policy is used
   private final Configuration conf;
   private boolean periodicNNListUpdate = true;
   private final Object wiatObjectForUpdate = new Object();
   private final int namenodeListUpdateTimePeriod;
-  Random rand = new Random();
+  Random rand = new Random((UUID.randomUUID()).hashCode());
 
 
   //only for testing
@@ -135,7 +139,6 @@ public class NamenodeSelector extends Thread {
   NamenodeSelector(Configuration conf, URI defaultUri) throws IOException {
     this.defaultUri = defaultUri;
     this.conf = conf;
-    rand.setSeed(System.currentTimeMillis());
 
     namenodeListUpdateTimePeriod =
         conf.getInt(DFSConfigKeys.DFS_CLIENT_REFRESH_NAMENODE_LIST_IN_MS_KEY,
@@ -144,14 +147,16 @@ public class NamenodeSelector extends Thread {
     // Getting appropriate policy
     // supported policies are 'RANDOM' and 'ROUND_ROBIN'
     String policyName =
-        conf.get(DFSConfigKeys.DFS_NAMENODE_SELECTOR_POLICY_KEY, "ROUND_ROBIN");
-    if (policyName == NamenodeSelector.NNSelectionPolicy.RANDOM.toString()) {
+        conf.get(DFSConfigKeys.DFS_NAMENODE_SELECTOR_POLICY_KEY,
+            DFSConfigKeys.DFS_NAMENODE_SELECTOR_POLICY_DEFAULT);
+    if (policyName.equals(NamenodeSelector.NNSelectionPolicy.RANDOM.toString())){
       policy = NamenodeSelector.NNSelectionPolicy.RANDOM;
-    } else if (policyName ==
-        NamenodeSelector.NNSelectionPolicy.ROUND_ROBIN.toString()) {
+    } else if (policyName.equals(NamenodeSelector.NNSelectionPolicy.ROUND_ROBIN.toString())) {
       policy = NamenodeSelector.NNSelectionPolicy.ROUND_ROBIN;
+    }else if (policyName.equals(NamenodeSelector.NNSelectionPolicy.RANDOM_STICKY.toString())) {
+      policy = NamenodeSelector.NNSelectionPolicy.RANDOM_STICKY;
     } else {
-      policy = NamenodeSelector.NNSelectionPolicy.ROUND_ROBIN;
+      policy = NamenodeSelector.NNSelectionPolicy.RANDOM_STICKY;
     }
     LOG.debug("Client's namenode selection policy is " + policy);
 
@@ -263,14 +268,7 @@ public class NamenodeSelector extends Thread {
 
   private synchronized NamenodeSelector.NamenodeHandle getNextNNBasedOnPolicy() {
     if (policy == NamenodeSelector.NNSelectionPolicy.RANDOM) {
-      for (int i = 0; i < 10; i++) {
-        int index = rand.nextInt(nnList.size());
-        NamenodeSelector.NamenodeHandle handle = nnList.get(index);
-        if (!this.blackListedNamenodes.contains(handle)) {
-          return handle;
-        }
-      }
-      return null;
+      return getRandomNNInternal();
     } else if (policy == NamenodeSelector.NNSelectionPolicy.ROUND_ROBIN) {
       for (int i = 0; i < nnList.size() + 1; i++) {
         rrIndex = (++rrIndex) % nnList.size();
@@ -280,11 +278,33 @@ public class NamenodeSelector extends Thread {
         }
       }
       return null;
+    }  else if( policy == NamenodeSelector.NNSelectionPolicy.RANDOM_STICKY) {
+      // stick to a random NN untill the NN dies
+      //stickyHandle
+      if(stickyHandle != null && nnList.contains(stickyHandle) &&
+          !blackListedNamenodes.contains(stickyHandle)){
+        return stickyHandle;
+      } else { // stick to some other random alive NN
+        stickyHandle = getRandomNNInternal();
+        return stickyHandle;
+      }
     } else {
       throw new UnsupportedOperationException(
           "Namenode selection policy is not supported. Selected policy is " +
               policy);
     }
+  }
+  
+  // synchronize by the calling method
+  private NamenodeSelector.NamenodeHandle getRandomNNInternal(){
+    for (int i = 0; i < 10; i++) {
+      int index = rand.nextInt(nnList.size());
+      NamenodeSelector.NamenodeHandle handle = nnList.get(index);
+      if (!this.blackListedNamenodes.contains(handle)) {
+        return handle;
+      }
+    }
+    return null;
   }
 
   String printNamenodes() {
@@ -359,7 +379,7 @@ public class NamenodeSelector extends Thread {
       LOG.debug("Refreshing the Namenode handles");
       refreshNamenodeList(anl);
     } else {
-      LOG.debug("No new namenodes were found");
+      LOG.warn("No new namenodes were found");
     }
   }
 
