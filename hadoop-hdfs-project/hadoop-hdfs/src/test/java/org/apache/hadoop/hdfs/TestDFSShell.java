@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdfs;
 
-import io.hops.erasure_coding.Report;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -26,6 +25,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FsShell;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.datanode.DataNodeTestUtils;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
@@ -1454,8 +1454,6 @@ public class TestDFSShell {
     PrintStream bak = null;
     try {
       final Configuration conf = new HdfsConfiguration();
-      // Set short retry timeouts so this test runs faster
-      conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRY_WINDOW_BASE, 10);
       dfs = new MiniDFSCluster.Builder(conf).numDataNodes(2).build();
       FileSystem fs = dfs.getFileSystem();
       Path p = new Path("/foo");
@@ -1492,10 +1490,12 @@ public class TestDFSShell {
     }
   }
   
-  @Ignore //hop also fails in the master branch
+  @Test (timeout = 30000)
   public void testGet() throws IOException {
     DFSTestUtil.setLogLevel2All(FSInputChecker.LOG);
     final Configuration conf = new HdfsConfiguration();
+    // Set short retry timeouts so this test runs faster
+    conf.setInt(HdfsClientConfigKeys.Retry.WINDOW_BASE_KEY, 10);
     // Race can happen here: block scanner is reading the file when test tries
     // to corrupt the test file, which will fail the test on Windows platform.
     // Disable block scanner to avoid this race.

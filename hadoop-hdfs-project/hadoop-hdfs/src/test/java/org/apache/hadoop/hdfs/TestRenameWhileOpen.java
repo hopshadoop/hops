@@ -25,6 +25,7 @@ import org.apache.log4j.Level;
 import org.junit.Test;
 
 import java.io.IOException;
+import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 
 import static org.junit.Assert.assertTrue;
 
@@ -55,7 +56,7 @@ public class TestRenameWhileOpen {
     conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, TestFileCreation.blockSize);
 
     conf.setInt(DFSConfigKeys.DFS_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY, /*default 15*/ 1);
-    conf.setBoolean(DFSConfigKeys.DFS_CLIENT_RETRY_POLICY_ENABLED_KEY, false);
+    conf.setBoolean(HdfsClientConfigKeys.Retry.POLICY_ENABLED_KEY, false);
     
     // create cluster
     System.out.println("Test 1*****************************");

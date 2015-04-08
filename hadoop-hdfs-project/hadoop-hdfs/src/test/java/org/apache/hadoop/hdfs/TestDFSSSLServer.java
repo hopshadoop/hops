@@ -38,6 +38,7 @@ import java.io.FileOutputStream;
 import java.nio.file.Paths;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.ipc.RemoteException;
 
 @RunWith(Parameterized.class)
@@ -61,7 +62,7 @@ public class TestDFSSSLServer extends HopsSSLTestUtils {
     public void setUp() throws Exception {
         conf = new HdfsConfiguration();
         conf.setInt(DFSConfigKeys.DFS_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY, /*default 15*/ 1);
-        conf.set(DFSConfigKeys.DFS_CLIENT_RETRY_POLICY_SPEC_KEY, "1,1");
+        conf.set(HdfsClientConfigKeys.Retry.POLICY_SPEC_KEY, "1,1");
         filesToPurge = prepareCryptoMaterial(conf, classpathDir);
         setCryptoConfig(conf, classpathDir);
         

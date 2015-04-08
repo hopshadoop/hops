@@ -33,6 +33,7 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.util.Random;
+import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 
 import static org.junit.Assert.assertTrue;
 
@@ -50,7 +51,7 @@ public class TestLeaseRestart {
     conf.setInt(DFSConfigKeys.IPC_CLIENT_CONNECT_MAX_RETRIES_ON_SOCKET_TIMEOUTS_KEY, /*default
     45*/ 2);
     conf.setInt(DFSConfigKeys.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY, /*default 10*/ 1);
-    conf.set(DFSConfigKeys.DFS_CLIENT_RETRY_POLICY_SPEC_KEY,"1000,2");
+    conf.set(HdfsClientConfigKeys.Retry.POLICY_SPEC_KEY,"1000,2");
 
     return conf;
   }

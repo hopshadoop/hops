@@ -25,6 +25,7 @@ import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.datatransfer.sasl.DataTransferSaslUtil;
 import org.apache.hadoop.hdfs.protocol.datatransfer.sasl.SaslDataTransferServer;
@@ -102,8 +103,6 @@ public class TestEncryptedTransfer {
     MiniDFSCluster cluster = null;
     try {
       Configuration conf = new Configuration();
-      // Set short retry timeouts so this test runs faster
-      conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRY_WINDOW_BASE, 10);
       cluster = new MiniDFSCluster.Builder(conf).build();
 
       FileSystem fs = getFileSystem(conf);
@@ -298,6 +297,8 @@ public class TestEncryptedTransfer {
     MiniDFSCluster cluster = null;
     try {
       Configuration conf = new Configuration();
+      // Set short retry timeouts so this test runs faster
+      conf.setInt(HdfsClientConfigKeys.Retry.WINDOW_BASE_KEY, 10);
       cluster = new MiniDFSCluster.Builder(conf).build();
       
       FileSystem fs = getFileSystem(conf);
