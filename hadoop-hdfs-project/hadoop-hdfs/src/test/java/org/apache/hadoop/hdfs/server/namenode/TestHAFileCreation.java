@@ -15,6 +15,7 @@ import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
+import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 
 /* We have no control over the order in which the datanodes and clients communicate with the namenode. 
  * Consider a scenario where the client is writing to a file. 
@@ -86,7 +87,7 @@ public class TestHAFileCreation extends junit.framework.TestCase {
     conf.setInt(DFSConfigKeys.IPC_CLIENT_CONNECT_MAX_RETRIES_ON_SOCKET_TIMEOUTS_KEY, /*default
     45*/ 2);
     conf.setInt(DFSConfigKeys.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY, /*default 10*/ 1);
-    conf.set(DFSConfigKeys.DFS_CLIENT_RETRY_POLICY_SPEC_KEY,"1000,2");
+    conf.set(HdfsClientConfigKeys.Retry.POLICY_SPEC_KEY,"1000,2");
 
     cluster = new MiniDFSCluster.Builder(conf)
         .nnTopology(MiniDFSNNTopology.simpleHOPSTopology(NUM_NAMENODES))

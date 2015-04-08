@@ -42,6 +42,7 @@ import static org.junit.Assert.*;
 import org.apache.log4j.Level;
 import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
+import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 
 /**
  * check for the job submission options of
@@ -77,7 +78,7 @@ public class TestLocalJobSubmission {
     conf.set(FileSystem.FS_DEFAULT_NAME_KEY, "hdfs://localhost:9000");
     conf.set(MRConfig.FRAMEWORK_NAME, "local");
     conf.setInt(DFSConfigKeys.DFS_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY, /*default 15*/ 1);
-    conf.set(DFSConfigKeys.DFS_CLIENT_RETRY_POLICY_SPEC_KEY, "1,1");
+    conf.set(HdfsClientConfigKeys.Retry.POLICY_SPEC_KEY, "1,1");
     final String[] args = {
         "-jt" , "local", "-libjars", jarPath.toString(),
         "-m", "1", "-r", "1", "-mt", "1", "-rt", "1"

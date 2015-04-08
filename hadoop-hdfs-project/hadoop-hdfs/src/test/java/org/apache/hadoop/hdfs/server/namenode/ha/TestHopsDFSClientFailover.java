@@ -26,6 +26,7 @@ import org.apache.log4j.Level;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.commons.logging.Log;
+import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import static org.junit.Assert.fail;
 
 /**
@@ -52,7 +53,7 @@ public class TestHopsDFSClientFailover {
     conf.setInt(DFSConfigKeys.IPC_CLIENT_CONNECT_MAX_RETRIES_ON_SOCKET_TIMEOUTS_KEY, /*default
     45*/ 0);
     conf.setInt(DFSConfigKeys.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY, /*default 10*/ 0);
-    conf.set(DFSConfigKeys.DFS_CLIENT_RETRY_POLICY_SPEC_KEY,"1000,2");
+    conf.set(HdfsClientConfigKeys.Retry.POLICY_SPEC_KEY,"1000,2");
 
     long leadercheckInterval =
             conf.getInt(DFSConfigKeys.DFS_LEADER_CHECK_INTERVAL_IN_MS_KEY,
