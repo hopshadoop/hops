@@ -28,14 +28,13 @@ import java.util.Comparator;
  */
 public abstract class Param<T, D extends Param.Domain<T>> {
   static final String NULL = "null";
-  
-  static final Comparator<Param<?, ?>> NAME_CMP =
-      new Comparator<Param<?, ?>>() {
-        @Override
-        public int compare(Param<?, ?> left, Param<?, ?> right) {
-          return left.getName().compareTo(right.getName());
-        }
-      };
+
+  static final Comparator<Param<?,?>> NAME_CMP = new Comparator<Param<?,?>>() {
+    @Override
+    public int compare(Param<?, ?> left, Param<?, ?> right) {
+      return left.getName().compareTo(right.getName());
+    }
+  };
 
   /**
    * Convert the parameters to a sorted String.
@@ -109,14 +108,12 @@ public abstract class Param<T, D extends Param.Domain<T>> {
      * Parameter name.
      */
     final String paramName;
-    
+
     Domain(final String paramName) {
       this.paramName = paramName;
     }
 
-    /**
-     * @return the parameter name.
-     */
+    /** @return the parameter name. */
     public final String getParamName() {
       return paramName;
     }

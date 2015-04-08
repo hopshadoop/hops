@@ -42,7 +42,7 @@ abstract class LongParam extends Param<Long, LongParam.Domain> {
               domain.toString(value) + " > " + domain.toString(max));
     }
   }
-  
+
   @Override
   public String toString() {
     return getName() + "=" + domain.toString(getValue());
@@ -90,9 +90,7 @@ abstract class LongParam extends Param<Long, LongParam.Domain> {
       }
     }
 
-    /**
-     * Convert a Long to a String.
-     */
+    /** Convert a Long to a String. */
     String toString(final Long n) {
       return n == null ? NULL : Long.toString(n, radix);
     }

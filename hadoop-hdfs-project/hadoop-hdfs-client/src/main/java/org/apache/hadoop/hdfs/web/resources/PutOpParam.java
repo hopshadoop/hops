@@ -33,10 +33,10 @@ public class PutOpParam extends HttpOpParam<PutOpParam.Op> {
     SETOWNER(false, HttpURLConnection.HTTP_OK),
     SETPERMISSION(false, HttpURLConnection.HTTP_OK),
     SETTIMES(false, HttpURLConnection.HTTP_OK),
-    
+
     RENEWDELEGATIONTOKEN(false, HttpURLConnection.HTTP_OK, true),
     CANCELDELEGATIONTOKEN(false, HttpURLConnection.HTTP_OK, true),
-    
+
     MODIFYACLENTRIES(false, HttpURLConnection.HTTP_OK),
     REMOVEACLENTRIES(false, HttpURLConnection.HTTP_OK),
     REMOVEDEFAULTACL(false, HttpURLConnection.HTTP_OK),
@@ -54,7 +54,7 @@ public class PutOpParam extends HttpOpParam<PutOpParam.Op> {
     Op(final boolean doOutputAndRedirect, final int expectedHttpResponseCode) {
       this(doOutputAndRedirect, expectedHttpResponseCode, false);
     }
-    
+
     Op(final boolean doOutputAndRedirect, final int expectedHttpResponseCode,
        final boolean requireAuth) {
       this.doOutputAndRedirect = doOutputAndRedirect;
@@ -66,7 +66,7 @@ public class PutOpParam extends HttpOpParam<PutOpParam.Op> {
     public HttpOpParam.Type getType() {
       return HttpOpParam.Type.PUT;
     }
-    
+
     @Override
     public boolean getRequireAuth() {
       return requireAuth;
