@@ -337,7 +337,7 @@ public class WebHdfsFileSystem extends FileSystem
         return m;
       }
 
-      IOException re = JsonUtil.toRemoteException(m);
+      IOException re = JsonUtilClient.toRemoteException(m);
       // extract UGI-related exceptions and unwrap InvalidToken
       // the NN mangles these exceptions but the DN does not and may need
       // to re-fetch a token if either report the token is expired
@@ -808,7 +808,7 @@ public class WebHdfsFileSystem extends FileSystem
     HdfsFileStatus status = new FsPathResponseRunner<HdfsFileStatus>(op, f) {
       @Override
       HdfsFileStatus decodeResponse(Map<?,?> json) {
-        return JsonUtil.toFileStatus(json, true);
+        return JsonUtilClient.toFileStatus(json, true);
       }
     }.run();
     if (status == null) {
@@ -837,7 +837,7 @@ public class WebHdfsFileSystem extends FileSystem
     AclStatus status = new FsPathResponseRunner<AclStatus>(op, f) {
       @Override
       AclStatus decodeResponse(Map<?,?> json) {
-        return JsonUtil.toAclStatus(json);
+        return JsonUtilClient.toAclStatus(json);
       }
     }.run();
     if (status == null) {
@@ -1207,15 +1207,15 @@ public class WebHdfsFileSystem extends FileSystem
       @Override
       FileStatus[] decodeResponse(Map<?,?> json) throws IOException {
         final Map<?, ?> rootmap = (Map<?, ?>)json.get(FileStatus.class.getSimpleName() + "es");
-        final List<?> array = JsonUtil.getList(
-            rootmap, FileStatus.class.getSimpleName());
+        final List<?> array = JsonUtilClient.getList(rootmap,
+                                                     FileStatus.class.getSimpleName());
 
         //convert FileStatus
         final FileStatus[] statuses = new FileStatus[array.size()];
         int i = 0;
         for (Object object : array) {
           final Map<?, ?> m = (Map<?, ?>) object;
-          statuses[i++] = makeQualified(JsonUtil.toFileStatus(m, false), f);
+          statuses[i++] = makeQualified(JsonUtilClient.toFileStatus(m, false), f);
         }
         return statuses;
       }
@@ -1232,7 +1232,7 @@ public class WebHdfsFileSystem extends FileSystem
       @Override
       Token<DelegationTokenIdentifier> decodeResponse(Map<?,?> json)
           throws IOException {
-        return JsonUtil.toDelegationToken(json);
+        return JsonUtilClient.toDelegationToken(json);
       }
     }.run();
     if (token != null) {
@@ -1302,7 +1302,7 @@ public class WebHdfsFileSystem extends FileSystem
       @Override
       BlockLocation[] decodeResponse(Map<?,?> json) throws IOException {
         return DFSUtil.locatedBlocks2Locations(
-            JsonUtil.toLocatedBlocks(json));
+            JsonUtilClient.toLocatedBlocks(json));
       }
     }.run();
   }
@@ -1315,7 +1315,7 @@ public class WebHdfsFileSystem extends FileSystem
     return new FsPathResponseRunner<ContentSummary>(op, p) {
       @Override
       ContentSummary decodeResponse(Map<?,?> json) {
-        return JsonUtil.toContentSummary(json);        
+        return JsonUtilClient.toContentSummary(json);
       }
     }.run();
   }
@@ -1329,7 +1329,7 @@ public class WebHdfsFileSystem extends FileSystem
         return new FsPathResponseRunner<MD5MD5CRC32FileChecksum>(op, p) {
       @Override
       MD5MD5CRC32FileChecksum decodeResponse(Map<?,?> json) throws IOException {
-        return JsonUtil.toMD5MD5CRC32FileChecksum(json);
+        return JsonUtilClient.toMD5MD5CRC32FileChecksum(json);
       }
     }.run();
   }
