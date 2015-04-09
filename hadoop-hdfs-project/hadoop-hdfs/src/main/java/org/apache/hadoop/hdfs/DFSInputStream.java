@@ -661,7 +661,7 @@ implements ByteBufferReadable, CanSetDropBehind, CanSetReadahead,
   @Override
   public synchronized void close() throws IOException {
     if (!closed.compareAndSet(false, true)) {
-      DFSClient.LOG.warn("DFSInputStream has been closed already");
+      DFSClient.LOG.debug("DFSInputStream has been closed already");
       return;
     }
     dfsClient.checkOpen();
