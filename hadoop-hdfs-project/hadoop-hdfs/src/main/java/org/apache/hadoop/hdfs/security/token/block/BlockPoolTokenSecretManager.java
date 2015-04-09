@@ -19,7 +19,7 @@ package org.apache.hadoop.hdfs.security.token.block;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
-import org.apache.hadoop.hdfs.security.token.block.BlockTokenSecretManager.AccessMode;
+import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier.AccessMode;
 import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.Token;
 
@@ -86,8 +86,8 @@ public class BlockPoolTokenSecretManager
   }
 
   /**
-   * See {@link BlockTokenSecretManager#checkAccess(BlockTokenIdentifier,
-   * String, ExtendedBlock, AccessMode)}
+   * See {@link BlockTokenSecretManager#checkAccess(BlockTokenIdentifier, 
+   *                String, ExtendedBlock, BlockTokenIdentifier.AccessMode)}
    */
   public void checkAccess(BlockTokenIdentifier id, String userId,
       ExtendedBlock block, AccessMode mode) throws InvalidToken {
@@ -95,8 +95,8 @@ public class BlockPoolTokenSecretManager
   }
 
   /**
-   * See {@link BlockTokenSecretManager#checkAccess(Token, String,
-   * ExtendedBlock, AccessMode)}
+   * See {@link BlockTokenSecretManager#checkAccess(Token, String, 
+   *                ExtendedBlock, BlockTokenIdentifier.AccessMode)}
    */
   public void checkAccess(Token<BlockTokenIdentifier> token, String userId,
       ExtendedBlock block, AccessMode mode) throws InvalidToken {

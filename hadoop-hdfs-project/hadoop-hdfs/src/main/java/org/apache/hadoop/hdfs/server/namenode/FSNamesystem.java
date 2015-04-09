@@ -93,8 +93,7 @@ import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
 import org.apache.hadoop.hdfs.protocol.RecoveryInProgressException;
 import org.apache.hadoop.hdfs.protocol.datatransfer.ReplaceDatanodeOnFailure;
-import org.apache.hadoop.hdfs.security.token.block.BlockTokenSecretManager;
-import org.apache.hadoop.hdfs.security.token.block.BlockTokenSecretManager.AccessMode;
+import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenSecretManager;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
@@ -2787,8 +2786,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       throws IOException {
     LocatedBlock lBlk = LocatedBlock.createLocatedBlock(
         getExtendedBlock(blk), locs, offset, false);
-    getBlockManager().setBlockToken(lBlk,
-        BlockTokenSecretManager.AccessMode.WRITE);
+    getBlockManager().setBlockToken(
+        lBlk, BlockTokenIdentifier.AccessMode.WRITE);
     return lBlk;
   }
 
@@ -2875,7 +2874,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
                 excludes, preferredBlockSize, storagePolicyID);
 
             final LocatedBlock lb = new LocatedBlock(blk, targets, -1, false);
-            blockManager.setBlockToken(lb, AccessMode.COPY);
+            blockManager.setBlockToken(lb, BlockTokenIdentifier.AccessMode.COPY);
             return lb;
           }
         };
@@ -5701,7 +5700,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
             // get a new generation stamp and an access token
             block.setGenerationStamp(pendingFile.nextGenerationStamp());
             locatedBlock = new LocatedBlock(block, new DatanodeInfo[0]);
-            blockManager.setBlockToken(locatedBlock, AccessMode.WRITE);
+            blockManager.setBlockToken(locatedBlock, BlockTokenIdentifier.AccessMode.WRITE);
 
             return locatedBlock;
           }
