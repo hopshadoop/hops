@@ -44,7 +44,6 @@ import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.ShortCircuitShmR
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.Status;
 import org.apache.hadoop.hdfs.protocolPB.PBHelper;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
-import org.apache.hadoop.hdfs.security.token.block.BlockTokenSecretManager;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.LengthInputStream;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
@@ -522,11 +521,11 @@ class DataXceiver extends Receiver implements Runnable {
     previousOpClientName = clientName;
     long read = 0;
     OutputStream baseStream = getOutputStream();
-    DataOutputStream out = new DataOutputStream(
-        new BufferedOutputStream(baseStream, HdfsConstants.SMALL_BUFFER_SIZE));
-    checkAccess(out, true, block, blockToken, Op.READ_BLOCK,
-        BlockTokenSecretManager.AccessMode.READ);
-
+    DataOutputStream out = new DataOutputStream(new BufferedOutputStream(
+        baseStream, HdfsConstants.SMALL_BUFFER_SIZE));
+    checkAccess(out, true, block, blockToken,
+        Op.READ_BLOCK, BlockTokenIdentifier.AccessMode.READ);
+  
     // send the block
     BlockSender blockSender = null;
     DatanodeRegistration dnR =
@@ -667,8 +666,8 @@ class DataXceiver extends Receiver implements Runnable {
     final DataOutputStream replyOut = new DataOutputStream(
         new BufferedOutputStream(getOutputStream(),
             HdfsConstants.SMALL_BUFFER_SIZE));
-    checkAccess(replyOut, isClient, block, blockToken, Op.WRITE_BLOCK,
-        BlockTokenSecretManager.AccessMode.WRITE);
+    checkAccess(replyOut, isClient, block, blockToken,
+        Op.WRITE_BLOCK, BlockTokenIdentifier.AccessMode.WRITE);
 
     DataOutputStream mirrorOut = null;  // stream to next target
     DataInputStream mirrorIn = null;    // reply from next target
@@ -859,8 +858,8 @@ class DataXceiver extends Receiver implements Runnable {
       final String clientName,
       final DatanodeInfo[] targets,
       final StorageType[] targetStorageTypes) throws IOException {
-    checkAccess(socketOut, true, blk, blockToken, Op.TRANSFER_BLOCK,
-        BlockTokenSecretManager.AccessMode.COPY);
+    checkAccess(socketOut, true, blk, blockToken,
+        Op.TRANSFER_BLOCK, BlockTokenIdentifier.AccessMode.COPY);
     previousOpClientName = clientName;
     updateCurrentThreadName(Op.TRANSFER_BLOCK + " " + blk);
 
@@ -883,7 +882,7 @@ class DataXceiver extends Receiver implements Runnable {
       final Token<BlockTokenIdentifier> blockToken) throws IOException {
     final DataOutputStream out = new DataOutputStream(getOutputStream());
     checkAccess(out, true, block, blockToken, Op.BLOCK_CHECKSUM,
-        BlockTokenSecretManager.AccessMode.READ);
+        BlockTokenIdentifier.AccessMode.READ);
     updateCurrentThreadName("Reading metadata for block " + block);
     final LengthInputStream metadataIn =
         datanode.data.getMetaDataInputStream(block);
@@ -938,9 +937,8 @@ class DataXceiver extends Receiver implements Runnable {
     // Read in the header
     if (datanode.isBlockTokenEnabled) {
       try {
-        datanode.blockPoolTokenSecretManager
-            .checkAccess(blockToken, null, block,
-                BlockTokenSecretManager.AccessMode.COPY);
+        datanode.blockPoolTokenSecretManager.checkAccess(blockToken, null, block,
+            BlockTokenIdentifier.AccessMode.COPY);
       } catch (InvalidToken e) {
         LOG.warn("Invalid access token in request from " + remoteAddress +
             " for OP_COPY_BLOCK for block " + block + " : " +
@@ -1026,9 +1024,8 @@ class DataXceiver extends Receiver implements Runnable {
     /* read header */
     if (datanode.isBlockTokenEnabled) {
       try {
-        datanode.blockPoolTokenSecretManager
-            .checkAccess(blockToken, null, block,
-                BlockTokenSecretManager.AccessMode.REPLACE);
+        datanode.blockPoolTokenSecretManager.checkAccess(blockToken, null, block,
+            BlockTokenIdentifier.AccessMode.REPLACE);
       } catch (InvalidToken e) {
         LOG.warn("Invalid access token in request from " + remoteAddress +
             " for OP_REPLACE_BLOCK for block " + block + " : " +
@@ -1210,9 +1207,11 @@ class DataXceiver extends Receiver implements Runnable {
     datanode.incrDatanodeNetworkErrors(remoteAddressWithoutPort);
   }
 
-  private void checkAccess(OutputStream out, final boolean reply,
-      final ExtendedBlock blk, final Token<BlockTokenIdentifier> t, final Op op,
-      final BlockTokenSecretManager.AccessMode mode) throws IOException {
+  private void checkAccess(OutputStream out, final boolean reply, 
+      final ExtendedBlock blk,
+      final Token<BlockTokenIdentifier> t,
+      final Op op,
+      final BlockTokenIdentifier.AccessMode mode) throws IOException {
     if (datanode.isBlockTokenEnabled) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Checking block access token for block '" + blk.getBlockId() +
@@ -1223,11 +1222,11 @@ class DataXceiver extends Receiver implements Runnable {
       } catch (InvalidToken e) {
         try {
           if (reply) {
-            BlockOpResponseProto.Builder resp =
-                BlockOpResponseProto.newBuilder().setStatus(ERROR_ACCESS_TOKEN);
-            if (mode == BlockTokenSecretManager.AccessMode.WRITE) {
-              DatanodeRegistration dnR =
-                  datanode.getDNRegistrationForBP(blk.getBlockPoolId());
+            BlockOpResponseProto.Builder resp = BlockOpResponseProto.newBuilder()
+              .setStatus(ERROR_ACCESS_TOKEN);
+            if (mode == BlockTokenIdentifier.AccessMode.WRITE) {
+              DatanodeRegistration dnR = 
+                datanode.getDNRegistrationForBP(blk.getBlockPoolId());
               // NB: Unconditionally using the xfer addr w/o hostname
               resp.setFirstBadLink(dnR.getXferAddr());
             }
