@@ -191,8 +191,8 @@ public class DataNodeMetrics {
     cacheReports.add(latency);
   }
 
-  public void incrBlocksReplicated(int delta) {
-    blocksReplicated.incr(delta);
+  public void incrBlocksReplicated() {
+    blocksReplicated.incr();
   }
 
   public void incrBlocksWritten() {
