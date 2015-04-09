@@ -56,6 +56,7 @@ import org.apache.hadoop.fs.permission.AclStatus;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
+import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.hdfs.server.namenode.SafeModeException;
@@ -166,10 +167,10 @@ public class WebHdfsFileSystem extends FileSystem
     
     this.retryPolicy = RetryUtils.getDefaultRetryPolicy(
         conf,
-        DFSConfigKeys.DFS_HTTP_CLIENT_RETRY_POLICY_ENABLED_KEY,
-        DFSConfigKeys.DFS_HTTP_CLIENT_RETRY_POLICY_ENABLED_DEFAULT,
-        DFSConfigKeys.DFS_HTTP_CLIENT_RETRY_POLICY_SPEC_KEY,
-        DFSConfigKeys.DFS_HTTP_CLIENT_RETRY_POLICY_SPEC_DEFAULT,
+        HdfsClientConfigKeys.WebHdfsRetry.RETRY_POLICY_ENABLED_KEY,
+        HdfsClientConfigKeys.WebHdfsRetry.RETRY_POLICY_ENABLED_DEFAULT,
+        HdfsClientConfigKeys.WebHdfsRetry.RETRY_POLICY_SPEC_KEY,
+        HdfsClientConfigKeys.WebHdfsRetry.RETRY_POLICY_SPEC_DEFAULT,
         SafeModeException.class);
     
     this.workingDir = getHomeDirectory();
