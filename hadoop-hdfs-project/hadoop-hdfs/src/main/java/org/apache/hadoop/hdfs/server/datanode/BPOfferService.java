@@ -181,7 +181,7 @@ class BPOfferService implements Runnable {
   private Thread blockReportThread = null;
 
   private Random rand = new Random(System.currentTimeMillis());
-
+  private long prevBlockReportId;
 
   BPOfferService(List<InetSocketAddress> nnAddrs, DataNode dn) {
     Preconditions
@@ -200,6 +200,7 @@ class BPOfferService implements Runnable {
     maxNumIncrementalReportThreads = dnConf.iBRDispatherTPSize;
     incrementalBRExecutor = Executors.newFixedThreadPool(maxNumIncrementalReportThreads);
     brDispatcher = Executors.newSingleThreadExecutor();
+    prevBlockReportId = DFSUtil.getRandom().nextLong();
 
   }
 
@@ -1287,15 +1288,15 @@ public class IncrementalBRTask implements Callable{
     return sendImmediateIBR;
   }
 
-  private long prevBlockReportId = 0;
-
   private long generateUniqueBlockReportId() {
-    long id = System.nanoTime();
-    if (id <= prevBlockReportId) {
-      id = prevBlockReportId + 1;
+    // Initialize the block report ID the first time through.
+    // Note that 0 is used on the NN to indicate "uninitialized", so we should
+    // not send a 0 value ourselves.
+    prevBlockReportId++;
+    while (prevBlockReportId == 0) {
+      prevBlockReportId = DFSUtil.getRandom().nextLong();  
     }
-    prevBlockReportId = id;
-    return id;
+    return prevBlockReportId;
   }
   
   void updateNNList(SortedActiveNodeList list) throws IOException {
