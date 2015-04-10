@@ -17,46 +17,9 @@
  */
 package org.apache.hadoop.hdfs;
 
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_BLOCK_WRITE_LOCATEFOLLOWINGBLOCK_INITIAL_DELAY_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_BLOCK_WRITE_LOCATEFOLLOWINGBLOCK_INITIAL_DELAY_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_BLOCK_WRITE_LOCATEFOLLOWINGBLOCK_RETRIES_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_BLOCK_WRITE_LOCATEFOLLOWINGBLOCK_RETRIES_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_BLOCK_WRITE_RETRIES_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_BLOCK_WRITE_RETRIES_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_CACHED_CONN_RETRY_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_CACHED_CONN_RETRY_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_CACHE_DROP_BEHIND_READS;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_CACHE_DROP_BEHIND_WRITES;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_CACHE_READAHEAD;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_DATANODE_RESTART_TIMEOUT_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_DATANODE_RESTART_TIMEOUT_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_FAILOVER_MAX_ATTEMPTS_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_FAILOVER_SLEEPTIME_BASE_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_FAILOVER_SLEEPTIME_BASE_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_FAILOVER_SLEEPTIME_MAX_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_FAILOVER_SLEEPTIME_MAX_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_MAX_BLOCK_ACQUIRE_FAILURES_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_MAX_BLOCK_ACQUIRE_FAILURES_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_READ_PREFETCH_SIZE_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_SOCKET_CACHE_CAPACITY_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_SOCKET_CACHE_CAPACITY_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_SOCKET_CACHE_EXPIRY_MSEC_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_SOCKET_CACHE_EXPIRY_MSEC_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_SOCKET_TIMEOUT_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_USE_DN_HOSTNAME;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_USE_DN_HOSTNAME_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_WRITE_EXCLUDE_NODES_CACHE_EXPIRY_INTERVAL;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_WRITE_EXCLUDE_NODES_CACHE_EXPIRY_INTERVAL_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_WRITE_PACKET_SIZE_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_WRITE_PACKET_SIZE_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_SOCKET_WRITE_TIMEOUT_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_REPLICATION_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_REPLICATION_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_CONTEXT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_CONTEXT_DEFAULT;
 
@@ -71,7 +34,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.*;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -79,29 +41,18 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-
-import org.apache.hadoop.ipc.ProtocolTranslator;
-import org.apache.hadoop.net.StandardSocketFactory;
-import org.apache.hadoop.util.Daemon;
 
 import javax.net.SocketFactory;
 
-import io.hops.metadata.hdfs.entity.EncodingStatus;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.BlockStorageLocation;
 import org.apache.hadoop.fs.CacheFlag;
-import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
-import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileSystem;
@@ -113,28 +64,20 @@ import org.apache.hadoop.fs.MD5MD5CRC32CastagnoliFileChecksum;
 import org.apache.hadoop.fs.MD5MD5CRC32FileChecksum;
 import org.apache.hadoop.fs.MD5MD5CRC32GzipFileChecksum;
 import org.apache.hadoop.fs.Options;
-import org.apache.hadoop.fs.XAttr;
-import org.apache.hadoop.fs.XAttrSetFlag;
 import org.apache.hadoop.fs.Options.ChecksumOpt;
 import org.apache.hadoop.fs.ParentNotDirectoryException;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.fs.VolumeId;
-import org.apache.hadoop.fs.permission.AclEntry;
-import org.apache.hadoop.fs.permission.AclStatus;
-import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.hdfs.client.HdfsDataInputStream;
 import org.apache.hadoop.hdfs.client.HdfsDataOutputStream;
+import org.apache.hadoop.hdfs.client.impl.DfsClientConf;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveEntry;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveIterator;
 import org.apache.hadoop.hdfs.protocol.CachePoolEntry;
 import org.apache.hadoop.hdfs.protocol.CachePoolInfo;
 import org.apache.hadoop.hdfs.protocol.CachePoolIterator;
-import org.apache.hadoop.hdfs.net.Peer;
-import org.apache.hadoop.hdfs.net.TcpPeerServer;
 import org.apache.hadoop.hdfs.protocol.*;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.RollingUpgradeAction;
@@ -144,7 +87,6 @@ import org.apache.hadoop.hdfs.protocol.LastBlockWithStatus;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.protocol.NSQuotaExceededException;
-import org.apache.hadoop.hdfs.protocol.QuotaByStorageTypeExceededException;
 import org.apache.hadoop.hdfs.protocol.RollingUpgradeInfo;
 import org.apache.hadoop.hdfs.protocol.UnresolvedPathException;
 import org.apache.hadoop.hdfs.protocol.datatransfer.DataTransferProtoUtil;
@@ -162,14 +104,12 @@ import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.hdfs.server.datanode.CachingStrategy;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.namenode.SafeModeException;
-import org.apache.hadoop.hdfs.util.ByteArrayManager;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.EnumSetWritable;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.MD5Hash;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.retry.LossyRetryInvocationHandler;
-import org.apache.hadoop.ipc.Client;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.net.DNS;
@@ -188,18 +128,35 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import com.google.common.net.InetAddresses;
+import io.hops.metadata.hdfs.entity.EncodingStatus;
+import java.util.Collection;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.HadoopIllegalArgumentException;
+import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FsTracer;
 import org.apache.hadoop.hdfs.shortcircuit.DomainSocketFactory;
 import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.hadoop.fs.StorageType;
+import org.apache.hadoop.fs.XAttr;
+import org.apache.hadoop.fs.XAttrSetFlag;
+import org.apache.hadoop.fs.permission.AclEntry;
+import org.apache.hadoop.fs.permission.AclStatus;
+import org.apache.hadoop.fs.permission.FsAction;
+import org.apache.hadoop.hdfs.net.Peer;
+import org.apache.hadoop.hdfs.net.TcpPeerServer;
 import org.apache.hadoop.hdfs.protocol.datatransfer.TrustedChannelResolver;
 import org.apache.hadoop.hdfs.protocol.datatransfer.sasl.DataEncryptionKeyFactory;
 import org.apache.hadoop.hdfs.protocol.datatransfer.sasl.DataTransferSaslUtil;
 import org.apache.hadoop.hdfs.protocol.datatransfer.sasl.SaslDataTransferClient;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorageReport;
+import org.apache.hadoop.ipc.Client;
+import org.apache.hadoop.ipc.ProtocolTranslator;
+import org.apache.hadoop.net.StandardSocketFactory;
+import org.apache.hadoop.util.Daemon;
 import org.apache.htrace.core.TraceScope;
 import org.apache.htrace.core.Tracer;
 
@@ -223,7 +180,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
 
   private final Configuration conf;
   private final Tracer tracer;
-  private final Conf dfsClientConf;
+  private final DfsClientConf dfsClientConf;
   final ClientProtocol namenode;
   ClientProtocol leaderNN;
   final List<ClientProtocol> allNNs = new ArrayList<ClientProtocol>();
@@ -244,7 +201,6 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
   private SocketAddress[] localInterfaceAddrs;
   private DataEncryptionKey encryptionKey;
   final SaslDataTransferClient saslClient;
-  private boolean shouldUseLegacyBlockReaderLocal;
   private final CachingStrategy defaultReadCachingStrategy;
   private final CachingStrategy defaultWriteCachingStrategy;
   private final ClientContext clientContext;
@@ -253,314 +209,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
           new DFSHedgedReadMetrics();
   private static ThreadPoolExecutor HEDGED_READ_THREAD_POOL;
 
-  /**
-   * DFSClient configuration
-   */
-  public static class Conf {
-    final int hdfsTimeout;    // timeout value for a DFS operation.
-    final int maxFailoverAttempts;
-    final int maxRetryAttempts;
-    final int failoverSleepBaseMillis;
-    final int failoverSleepMaxMillis;
-    final int maxBlockAcquireFailures;
-    final int confTime;
-    final int ioBufferSize;
-    final ChecksumOpt defaultChecksumOpt;
-    final int writePacketSize;
-    final int writeMaxPackets;
-    final ByteArrayManager.Conf writeByteArrayManagerConf;
-    final int socketTimeout;
-    final int socketCacheCapacity;
-    final long socketCacheExpiry;
-    final long excludedNodesCacheExpiry;
-    /** Wait time window (in msec) if BlockMissingException is caught */
-    final int timeWindow;
-    final int nCachedConnRetry;
-    final int nBlockWriteRetry;
-    final int nBlockWriteLocateFollowingRetry;
-    final int blockWriteLocateFollowingInitialDelayMs;
-    final long defaultBlockSize;
-    final long prefetchSize;
-    final short defaultReplication;
-    final String taskId;
-    final FsPermission uMask;
-    final boolean connectToDnViaHostname;
-    final boolean getHdfsBlocksMetadataEnabled;
-    final int getFileBlockStorageLocationsNumThreads;
-    final int getFileBlockStorageLocationsTimeoutMs;
-    final int retryTimesForGetLastBlockLength;
-    final int retryIntervalForGetLastBlockLength;
-    final long datanodeRestartTimeout;
-    final long dfsclientSlowIoWarningThresholdMs;
-
-    final boolean useLegacyBlockReader;
-    final boolean useLegacyBlockReaderLocal;
-    final String domainSocketPath;
-    final boolean skipShortCircuitChecksums;
-    final int shortCircuitBufferSize;
-    final boolean shortCircuitLocalReads;
-    final boolean domainSocketDataTraffic;
-    final int shortCircuitStreamsCacheSize;
-    final long shortCircuitStreamsCacheExpiryMs;
-    final int shortCircuitSharedMemoryWatcherInterruptCheckMs;
-    final int dbFileMaxSize;
-    //small delay before closing the file ensures that incremental block reporst are processed by the
-    //namenodes before the file close operation.
-    final int delayBeforeClose;
-    //only for testing
-    final boolean forceClientToWriteSFToDisk;
-
-    final boolean shortCircuitMmapEnabled;
-    final int shortCircuitMmapCacheSize;
-    final long shortCircuitMmapCacheExpiryMs;
-    final long shortCircuitMmapCacheRetryTimeout;
-    final long shortCircuitCacheStaleThresholdMs;
-
-    public BlockReaderFactory.FailureInjector brfFailureInjector =
-      new BlockReaderFactory.FailureInjector();
-
-    public Conf(Configuration conf) {
-      // The hdfsTimeout is currently the same as the ipc timeout
-      hdfsTimeout = Client.getTimeout(conf);
-
-      maxFailoverAttempts = conf.getInt(
-          DFS_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY,
-          DFS_CLIENT_FAILOVER_MAX_ATTEMPTS_DEFAULT);
-      maxRetryAttempts = conf.getInt(
-          HdfsClientConfigKeys.Retry.MAX_ATTEMPTS_KEY,
-          HdfsClientConfigKeys.Retry.MAX_ATTEMPTS_DEFAULT);
-      failoverSleepBaseMillis = conf.getInt(
-          DFS_CLIENT_FAILOVER_SLEEPTIME_BASE_KEY,
-          DFS_CLIENT_FAILOVER_SLEEPTIME_BASE_DEFAULT);
-      failoverSleepMaxMillis = conf.getInt(
-          DFS_CLIENT_FAILOVER_SLEEPTIME_MAX_KEY,
-          DFS_CLIENT_FAILOVER_SLEEPTIME_MAX_DEFAULT);
-
-      maxBlockAcquireFailures = conf.getInt(
-          DFS_CLIENT_MAX_BLOCK_ACQUIRE_FAILURES_KEY,
-          DFS_CLIENT_MAX_BLOCK_ACQUIRE_FAILURES_DEFAULT);
-      confTime = conf.getInt(DFS_DATANODE_SOCKET_WRITE_TIMEOUT_KEY,
-          HdfsServerConstants.WRITE_TIMEOUT);
-      ioBufferSize = conf.getInt(
-          CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_KEY,
-          CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_DEFAULT);
-      defaultChecksumOpt = getChecksumOptFromConf(conf);
-      socketTimeout = conf.getInt(DFS_CLIENT_SOCKET_TIMEOUT_KEY,
-          HdfsServerConstants.READ_TIMEOUT);
-      /** dfs.write.packet.size is an internal config variable */
-      writePacketSize = conf.getInt(DFS_CLIENT_WRITE_PACKET_SIZE_KEY,
-          DFS_CLIENT_WRITE_PACKET_SIZE_DEFAULT);
-      writeMaxPackets = conf.getInt(
-          DFSConfigKeys.DFS_CLIENT_WRITE_MAX_PACKETS_IN_FLIGHT_KEY,
-          DFSConfigKeys.DFS_CLIENT_WRITE_MAX_PACKETS_IN_FLIGHT_DEFAULT);
-      
-      final boolean byteArrayManagerEnabled = conf.getBoolean(
-          DFSConfigKeys.DFS_CLIENT_WRITE_BYTE_ARRAY_MANAGER_ENABLED_KEY,
-          DFSConfigKeys.DFS_CLIENT_WRITE_BYTE_ARRAY_MANAGER_ENABLED_DEFAULT);
-      if (!byteArrayManagerEnabled) {
-        writeByteArrayManagerConf = null;
-      } else {
-        final int countThreshold = conf.getInt(
-            DFSConfigKeys.DFS_CLIENT_WRITE_BYTE_ARRAY_MANAGER_COUNT_THRESHOLD_KEY,
-            DFSConfigKeys.DFS_CLIENT_WRITE_BYTE_ARRAY_MANAGER_COUNT_THRESHOLD_DEFAULT);
-        final int countLimit = conf.getInt(
-            DFSConfigKeys.DFS_CLIENT_WRITE_BYTE_ARRAY_MANAGER_COUNT_LIMIT_KEY,
-            DFSConfigKeys.DFS_CLIENT_WRITE_BYTE_ARRAY_MANAGER_COUNT_LIMIT_DEFAULT);
-        final long countResetTimePeriodMs = conf.getLong(
-            DFSConfigKeys.DFS_CLIENT_WRITE_BYTE_ARRAY_MANAGER_COUNT_RESET_TIME_PERIOD_MS_KEY,
-            DFSConfigKeys.DFS_CLIENT_WRITE_BYTE_ARRAY_MANAGER_COUNT_RESET_TIME_PERIOD_MS_DEFAULT);
-        writeByteArrayManagerConf = new ByteArrayManager.Conf(
-            countThreshold, countLimit, countResetTimePeriodMs); 
-      }
-      
-      
-      defaultBlockSize = conf.getLongBytes(DFS_BLOCK_SIZE_KEY,
-          DFS_BLOCK_SIZE_DEFAULT);
-      defaultReplication = (short) conf.getInt(
-          DFS_REPLICATION_KEY, DFS_REPLICATION_DEFAULT);
-      taskId = conf.get("mapreduce.task.attempt.id", "NONMAPREDUCE");
-      socketCacheCapacity = conf.getInt(DFS_CLIENT_SOCKET_CACHE_CAPACITY_KEY,
-          DFS_CLIENT_SOCKET_CACHE_CAPACITY_DEFAULT);
-      socketCacheExpiry = conf.getLong(DFS_CLIENT_SOCKET_CACHE_EXPIRY_MSEC_KEY,
-          DFS_CLIENT_SOCKET_CACHE_EXPIRY_MSEC_DEFAULT);
-      excludedNodesCacheExpiry = conf.getLong(
-          DFS_CLIENT_WRITE_EXCLUDE_NODES_CACHE_EXPIRY_INTERVAL,
-          DFS_CLIENT_WRITE_EXCLUDE_NODES_CACHE_EXPIRY_INTERVAL_DEFAULT);
-      prefetchSize = conf.getLong(DFS_CLIENT_READ_PREFETCH_SIZE_KEY,
-          10 * defaultBlockSize);
-      timeWindow = conf.getInt(
-          HdfsClientConfigKeys.Retry.WINDOW_BASE_KEY,
-          HdfsClientConfigKeys.Retry.WINDOW_BASE_DEFAULT);
-      nCachedConnRetry = conf.getInt(DFS_CLIENT_CACHED_CONN_RETRY_KEY,
-          DFS_CLIENT_CACHED_CONN_RETRY_DEFAULT);
-      nBlockWriteRetry = conf.getInt(DFS_CLIENT_BLOCK_WRITE_RETRIES_KEY,
-          DFS_CLIENT_BLOCK_WRITE_RETRIES_DEFAULT);
-      nBlockWriteLocateFollowingRetry = conf.getInt(
-          DFS_CLIENT_BLOCK_WRITE_LOCATEFOLLOWINGBLOCK_RETRIES_KEY,
-          DFS_CLIENT_BLOCK_WRITE_LOCATEFOLLOWINGBLOCK_RETRIES_DEFAULT);
-      blockWriteLocateFollowingInitialDelayMs = conf.getInt(
-          DFS_CLIENT_BLOCK_WRITE_LOCATEFOLLOWINGBLOCK_INITIAL_DELAY_KEY,
-          DFS_CLIENT_BLOCK_WRITE_LOCATEFOLLOWINGBLOCK_INITIAL_DELAY_DEFAULT);
-      uMask = FsPermission.getUMask(conf);
-      connectToDnViaHostname = conf.getBoolean(DFS_CLIENT_USE_DN_HOSTNAME,
-          DFS_CLIENT_USE_DN_HOSTNAME_DEFAULT);
-      getHdfsBlocksMetadataEnabled = conf.getBoolean(
-          DFSConfigKeys.DFS_HDFS_BLOCKS_METADATA_ENABLED,
-          DFSConfigKeys.DFS_HDFS_BLOCKS_METADATA_ENABLED_DEFAULT);
-      getFileBlockStorageLocationsNumThreads = conf.getInt(
-          DFSConfigKeys.DFS_CLIENT_FILE_BLOCK_STORAGE_LOCATIONS_NUM_THREADS,
-          DFSConfigKeys.DFS_CLIENT_FILE_BLOCK_STORAGE_LOCATIONS_NUM_THREADS_DEFAULT);
-      getFileBlockStorageLocationsTimeoutMs = conf.getInt(
-          DFSConfigKeys.DFS_CLIENT_FILE_BLOCK_STORAGE_LOCATIONS_TIMEOUT_MS,
-          DFSConfigKeys.DFS_CLIENT_FILE_BLOCK_STORAGE_LOCATIONS_TIMEOUT_MS_DEFAULT);
-      retryTimesForGetLastBlockLength = conf.getInt(
-          HdfsClientConfigKeys.Retry.TIMES_GET_LAST_BLOCK_LENGTH_KEY,
-          HdfsClientConfigKeys.Retry.TIMES_GET_LAST_BLOCK_LENGTH_DEFAULT);
-      retryIntervalForGetLastBlockLength = conf.getInt(
-          HdfsClientConfigKeys.Retry.INTERVAL_GET_LAST_BLOCK_LENGTH_KEY,
-          HdfsClientConfigKeys.Retry.INTERVAL_GET_LAST_BLOCK_LENGTH_DEFAULT);
-
-      useLegacyBlockReader = conf.getBoolean(
-          DFSConfigKeys.DFS_CLIENT_USE_LEGACY_BLOCKREADER,
-          DFSConfigKeys.DFS_CLIENT_USE_LEGACY_BLOCKREADER_DEFAULT);
-      useLegacyBlockReaderLocal = conf.getBoolean(
-          DFSConfigKeys.DFS_CLIENT_USE_LEGACY_BLOCKREADERLOCAL,
-          DFSConfigKeys.DFS_CLIENT_USE_LEGACY_BLOCKREADERLOCAL_DEFAULT);
-      shortCircuitLocalReads = conf.getBoolean(
-          DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_KEY,
-          DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_DEFAULT);
-      domainSocketDataTraffic = conf.getBoolean(
-          DFSConfigKeys.DFS_CLIENT_DOMAIN_SOCKET_DATA_TRAFFIC,
-          DFSConfigKeys.DFS_CLIENT_DOMAIN_SOCKET_DATA_TRAFFIC_DEFAULT);
-      domainSocketPath = conf.getTrimmed(
-          DFSConfigKeys.DFS_DOMAIN_SOCKET_PATH_KEY,
-          DFSConfigKeys.DFS_DOMAIN_SOCKET_PATH_DEFAULT);
-
-      if (BlockReaderLocal.LOG.isDebugEnabled()) {
-        BlockReaderLocal.LOG.debug(
-            DFSConfigKeys.DFS_CLIENT_USE_LEGACY_BLOCKREADERLOCAL
-            + " = " + useLegacyBlockReaderLocal);
-        BlockReaderLocal.LOG.debug(
-            DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_KEY
-            + " = " + shortCircuitLocalReads);
-        BlockReaderLocal.LOG.debug(
-            DFSConfigKeys.DFS_CLIENT_DOMAIN_SOCKET_DATA_TRAFFIC
-            + " = " + domainSocketDataTraffic);
-        BlockReaderLocal.LOG.debug(
-            DFSConfigKeys.DFS_DOMAIN_SOCKET_PATH_KEY
-            + " = " + domainSocketPath);
-      }
-
-      skipShortCircuitChecksums = conf.getBoolean(
-              DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_SKIP_CHECKSUM_KEY,
-              DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_SKIP_CHECKSUM_DEFAULT);
-      shortCircuitBufferSize = conf.getInt(
-              DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_BUFFER_SIZE_KEY,
-              DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_BUFFER_SIZE_DEFAULT);
-      shortCircuitStreamsCacheSize = conf.getInt(
-              DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_STREAMS_CACHE_SIZE_KEY,
-              DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_STREAMS_CACHE_SIZE_DEFAULT);
-      shortCircuitStreamsCacheExpiryMs = conf.getLong(
-              DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_STREAMS_CACHE_EXPIRY_MS_KEY,
-              DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_STREAMS_CACHE_EXPIRY_MS_DEFAULT);
-      shortCircuitMmapEnabled = conf.getBoolean(
-              DFSConfigKeys.DFS_CLIENT_MMAP_ENABLED,
-              DFSConfigKeys.DFS_CLIENT_MMAP_ENABLED_DEFAULT);
-      shortCircuitMmapCacheSize = conf.getInt(
-              DFSConfigKeys.DFS_CLIENT_MMAP_CACHE_SIZE,
-              DFSConfigKeys.DFS_CLIENT_MMAP_CACHE_SIZE_DEFAULT);
-      shortCircuitMmapCacheExpiryMs = conf.getLong(
-              DFSConfigKeys.DFS_CLIENT_MMAP_CACHE_TIMEOUT_MS,
-              DFSConfigKeys.DFS_CLIENT_MMAP_CACHE_TIMEOUT_MS_DEFAULT);
-      shortCircuitMmapCacheRetryTimeout = conf.getLong(
-              DFSConfigKeys.DFS_CLIENT_MMAP_RETRY_TIMEOUT_MS,
-              DFSConfigKeys.DFS_CLIENT_MMAP_RETRY_TIMEOUT_MS_DEFAULT);
-      shortCircuitCacheStaleThresholdMs = conf.getLong(
-              DFSConfigKeys.DFS_CLIENT_SHORT_CIRCUIT_REPLICA_STALE_THRESHOLD_MS,
-              DFSConfigKeys.DFS_CLIENT_SHORT_CIRCUIT_REPLICA_STALE_THRESHOLD_MS_DEFAULT);
-      shortCircuitSharedMemoryWatcherInterruptCheckMs = conf.getInt(
-              DFSConfigKeys.DFS_SHORT_CIRCUIT_SHARED_MEMORY_WATCHER_INTERRUPT_CHECK_MS,
-              DFSConfigKeys.DFS_SHORT_CIRCUIT_SHARED_MEMORY_WATCHER_INTERRUPT_CHECK_MS_DEFAULT);
-
-      datanodeRestartTimeout = conf.getLong(
-          DFS_CLIENT_DATANODE_RESTART_TIMEOUT_KEY,
-          DFS_CLIENT_DATANODE_RESTART_TIMEOUT_DEFAULT) * 1000;
-      
-      dbFileMaxSize = conf.getInt(DFSConfigKeys.DFS_DB_FILE_MAX_SIZE_KEY,
-              DFSConfigKeys.DFS_DB_FILE_MAX_SIZE_DEFAULT);
-
-      forceClientToWriteSFToDisk = conf.getBoolean(DFSConfigKeys.DFS_FORCE_CLIENT_TO_WRITE_SMALL_FILES_TO_DISK_KEY
-              ,DFSConfigKeys.DFS_FORCE_CLIENT_TO_WRITE_SMALL_FILES_TO_DISK_DEFAULT);
-
-      delayBeforeClose = conf.getInt(DFSConfigKeys.DFS_CLIENT_DELAY_BEFORE_FILE_CLOSE_KEY,
-              DFSConfigKeys.DFS_CLIENT_DELAY_BEFORE_FILE_CLOSE_DEFAULT);
-      dfsclientSlowIoWarningThresholdMs = conf.getLong(
-          DFSConfigKeys.DFS_CLIENT_SLOW_IO_WARNING_THRESHOLD_KEY,
-          DFSConfigKeys.DFS_CLIENT_SLOW_IO_WARNING_THRESHOLD_DEFAULT);
-    }
-
-    public boolean isUseLegacyBlockReaderLocal() {
-      return useLegacyBlockReaderLocal;
-    }
-    public String getDomainSocketPath() {
-      return domainSocketPath;
-    }
-    public boolean isShortCircuitLocalReads() {
-      return shortCircuitLocalReads;
-    }
-    public boolean isDomainSocketDataTraffic() {
-      return domainSocketDataTraffic;
-    }
-
-    private DataChecksum.Type getChecksumType(Configuration conf) {
-      final String checksum = conf.get(
-          DFSConfigKeys.DFS_CHECKSUM_TYPE_KEY,
-          DFSConfigKeys.DFS_CHECKSUM_TYPE_DEFAULT);
-      try {
-        return DataChecksum.Type.valueOf(checksum);
-      } catch(IllegalArgumentException iae) {
-        LOG.warn("Bad checksum type: " + checksum + ". Using default "
-            + DFSConfigKeys.DFS_CHECKSUM_TYPE_DEFAULT);
-        return DataChecksum.Type.valueOf(
-            DFSConfigKeys.DFS_CHECKSUM_TYPE_DEFAULT);
-      }
-    }
-
-    // Construct a checksum option from conf
-    private ChecksumOpt getChecksumOptFromConf(Configuration conf) {
-      DataChecksum.Type type = getChecksumType(conf);
-      int bytesPerChecksum = conf.getInt(DFS_BYTES_PER_CHECKSUM_KEY,
-          DFS_BYTES_PER_CHECKSUM_DEFAULT);
-      return new ChecksumOpt(type, bytesPerChecksum);
-    }
-
-    // create a DataChecksum with the default option.
-    private DataChecksum createChecksum() throws IOException {
-      return createChecksum(null);
-    }
-
-    private DataChecksum createChecksum(ChecksumOpt userOpt)
-        throws IOException {
-      // Fill in any missing field with the default.
-      ChecksumOpt myOpt = ChecksumOpt.processChecksumOpt(
-          defaultChecksumOpt, userOpt);
-      DataChecksum dataChecksum = DataChecksum.newDataChecksum(
-          myOpt.getChecksumType(),
-          myOpt.getBytesPerChecksum());
-      if (dataChecksum == null) {
-        throw new IOException("Invalid checksum type specified: "
-            + myOpt.getChecksumType().name());
-      }
-      return dataChecksum;
-    }
-
-    @VisibleForTesting
-    public int getBlockWriteLocateFollowingInitialDelayMs() {
-      return blockWriteLocateFollowingInitialDelayMs;
-    }
-  }
-
-  public Conf getConf() {
+  public DfsClientConf getConf() {
     return dfsClientConf;
   }
 
@@ -575,8 +224,6 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
    */
   private final Map<Long, DFSOutputStream> filesBeingWritten
       = new HashMap<Long, DFSOutputStream>();
-
-  private final DomainSocketFactory domainSocketFactory;
 
   /**
    * Same as this(NameNode.getAddress(conf), conf);
@@ -625,13 +272,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     throws IOException {
     // Copy only the required DFSClient configuration
     this.tracer = FsTracer.get(conf);
-    this.dfsClientConf = new Conf(conf);
-    this.shouldUseLegacyBlockReaderLocal =
-        this.dfsClientConf.useLegacyBlockReaderLocal;
-    if (this.dfsClientConf.useLegacyBlockReaderLocal) {
-      LOG.debug("Using legacy short-circuit local reads.");
-    }
-
+    this.dfsClientConf = new DfsClientConf(conf);
     this.conf = conf;
     this.stats = stats;
     this.socketFactory = NetUtils.getSocketFactory(conf, ClientProtocol.class);
@@ -642,12 +283,12 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     this.authority = nameNodeUri == null? "null": nameNodeUri.getAuthority();
 
     String clientNamePrefix = "";
-    if(dfsClientConf.forceClientToWriteSFToDisk){
+    if(dfsClientConf.getForceClientToWriteSFToDisk()){
       clientNamePrefix = "DFSClient";
     }else{
       clientNamePrefix = "HopsFS_DFSClient";
     }
-    this.clientName = clientNamePrefix+ "_" + dfsClientConf.taskId + "_" +
+    this.clientName = clientNamePrefix+ "_" + dfsClientConf.getTaskId() + "_" +
             DFSUtil.getRandom().nextInt() + "_" + Thread.currentThread().getId();
 
     int numResponseToDrop = conf.getInt(
@@ -700,9 +341,6 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
         }
       }
     }
-
-    // read directly from the block file if configured.
-    this.domainSocketFactory = new DomainSocketFactory(dfsClientConf);
 
     String localInterfaces[] =
       conf.getTrimmedStrings(DFSConfigKeys.DFS_CLIENT_LOCAL_INTERFACES);
@@ -795,30 +433,17 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
   }
 
   /**
-   * Return the number of times the client should go back to the namenode
-   * to retrieve block locations when reading.
-   */
-  int getMaxBlockAcquireFailures() {
-    return dfsClientConf.maxBlockAcquireFailures;
-  }
-
-  /**
    * Return the timeout that clients should use when writing to datanodes.
    * @param numNodes the number of nodes in the pipeline.
    */
   int getDatanodeWriteTimeout(int numNodes) {
-    return (dfsClientConf.confTime > 0) ?
-      (dfsClientConf.confTime + HdfsServerConstants.WRITE_TIMEOUT_EXTENSION * numNodes) : 0;
+    final int t = dfsClientConf.getDatanodeSocketWriteTimeout();
+    return t > 0? t + HdfsServerConstants.WRITE_TIMEOUT_EXTENSION*numNodes: 0;
   }
 
   int getDatanodeReadTimeout(int numNodes) {
-    return dfsClientConf.socketTimeout > 0 ?
-        (HdfsServerConstants.READ_TIMEOUT_EXTENSION * numNodes +
-            dfsClientConf.socketTimeout) : 0;
-  }
-
-  int getHdfsTimeout() {
-    return dfsClientConf.hdfsTimeout;
+    final int t = dfsClientConf.getSocketTimeout();
+    return t > 0? HdfsServerConstants.READ_TIMEOUT_EXTENSION*numNodes + t: 0;
   }
 
   @VisibleForTesting
@@ -1009,22 +634,6 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
       // close connections to the namenode
       closeConnectionsToNamenodes();
     }
-  }
-
-  /**
-   * Get max size of a file that can be stored in the database.
-   * @return Max size of a file that can be stored in the database.
-   */
-  private int getDBFileMaxSize(){
-    return  dfsClientConf.dbFileMaxSize;
-  }
-
-  /**
-   * Get the default block size for this cluster
-   * @return the default block size in bytes
-   */
-  public long getDefaultBlockSize() {
-    return dfsClientConf.defaultBlockSize;
   }
 
   /**
@@ -1232,13 +841,9 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     namenode.reportBadBlocks(blocks);
   }
 
-  public short getDefaultReplication() {
-    return dfsClientConf.defaultReplication;
-  }
-
   public LocatedBlocks getLocatedBlocks(String src, long start)
       throws IOException {
-    return getLocatedBlocks(src, start, dfsClientConf.prefetchSize);
+    return getLocatedBlocks(src, start, dfsClientConf.getPrefetchSize());
   }
 
   /*
@@ -1331,7 +936,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
   public BlockStorageLocation[] getBlockStorageLocations(
       List<BlockLocation> blockLocations) throws IOException,
       UnsupportedOperationException, InvalidBlockTokenException {
-    if (!getConf().getHdfsBlocksMetadataEnabled) {
+    if (!getConf().isHdfsBlocksMetadataEnabled()) {
       throw new UnsupportedOperationException("Datanode-side support for " +
           "getVolumeBlockLocations() must also be enabled in the client " +
           "configuration.");
@@ -1366,12 +971,11 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
       tracer.newScope("getBlockStorageLocations");
     Map<DatanodeInfo, HdfsBlocksMetadata> metadatas;
     try {
-      metadatas = BlockStorageLocationUtil
-          .queryDatanodesForHdfsBlocksMetadata(conf, datanodeBlocks,
-              getConf().getFileBlockStorageLocationsNumThreads,
-              getConf().getFileBlockStorageLocationsTimeoutMs,
-              getConf().connectToDnViaHostname, tracer, scope.getSpanId());
-
+      metadatas = BlockStorageLocationUtil.
+          queryDatanodesForHdfsBlocksMetadata(conf, datanodeBlocks,
+              getConf().getFileBlockStorageLocationsNumThreads(),
+              getConf().getFileBlockStorageLocationsTimeoutMs(),
+              getConf().isConnectToDnViaHostname(), tracer, scope.getSpanId());
       if (LOG.isTraceEnabled()) {
         LOG.trace("metadata returned: "
             + Joiner.on("\n").withKeyValueSeparator("=").join(metadatas));
@@ -1425,7 +1029,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
 
   public DFSInputStream open(String src)
       throws IOException, UnresolvedLinkException {
-    return open(src, dfsClientConf.ioBufferSize, true, null);
+    return open(src, dfsClientConf.getIoBufferSize(), true, null);
   }
 
   /**
@@ -1454,7 +1058,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     checkOpen();
     //    Get block info from namenode
     try (TraceScope ignored = newPathTraceScope("newDFSInputStream", src)) {
-      return new DFSInputStream(this, src, verifyChecksum, dfsClientConf.forceClientToWriteSFToDisk);
+      return new DFSInputStream(this, src, verifyChecksum, dfsClientConf.getForceClientToWriteSFToDisk());
     }
   }
 
@@ -1473,8 +1077,8 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
    */
   public OutputStream create(String src, boolean overwrite)
       throws IOException {
-    return create(src, overwrite, dfsClientConf.defaultReplication,
-        dfsClientConf.defaultBlockSize, null);
+    return create(src, overwrite, dfsClientConf.getDefaultReplication(),
+        dfsClientConf.getDefaultBlockSize(), null);
   }
 
   /**
@@ -1484,8 +1088,8 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
   public OutputStream create(String src,
                              boolean overwrite,
                              Progressable progress) throws IOException {
-    return create(src, overwrite, dfsClientConf.defaultReplication,
-        dfsClientConf.defaultBlockSize, progress);
+    return create(src, overwrite, dfsClientConf.getDefaultReplication(),
+        dfsClientConf.getDefaultBlockSize(), progress);
   }
 
   /**
@@ -1506,7 +1110,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
   public OutputStream create(String src, boolean overwrite, short replication,
       long blockSize, Progressable progress) throws IOException {
     return create(src, overwrite, replication, blockSize, progress,
-        dfsClientConf.ioBufferSize);
+        dfsClientConf.getIoBufferSize());
   }
 
   /**
@@ -1589,6 +1193,13 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
         progress, buffersize, checksumOpt, null, null);
   }
 
+  private FsPermission applyUMask(FsPermission permission) {
+    if (permission == null) {
+      permission = FsPermission.getFileDefault();
+    }
+    return permission.applyUMask(dfsClientConf.getUMask());
+  }
+
   /**
    * Same as {@link #create(String, FsPermission, EnumSet, boolean, short, long,
    * Progressable, int, ChecksumOpt)} with the addition of favoredNodes that is
@@ -1610,10 +1221,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
                              InetSocketAddress[] favoredNodes,
                              EncodingPolicy policy) throws IOException {
     checkOpen();
-    if (permission == null) {
-      permission = FsPermission.getFileDefault();
-    }
-    FsPermission masked = permission.applyUMask(dfsClientConf.uMask);
+    final FsPermission masked = applyUMask(permission);
     if(LOG.isDebugEnabled()) {
       LOG.debug(src + ": masked=" + masked);
     }
@@ -1621,7 +1229,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
         src, masked, flag, createParent, replication, blockSize, progress,
         buffersize, dfsClientConf.createChecksum(checksumOpt),
         getFavoredNodesStr(favoredNodes),
-        policy, getDBFileMaxSize(), dfsClientConf.forceClientToWriteSFToDisk);
+        policy, dfsClientConf.getDBFileMaxSize(), dfsClientConf.getForceClientToWriteSFToDisk());
     beginFileLease(result.getFileId(), result);
     return result;
   }
@@ -1681,7 +1289,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
       DataChecksum checksum = dfsClientConf.createChecksum(checksumOpt);
       result = DFSOutputStream.newStreamForCreate(this, src, absPermission,
           flag, createParent, replication, blockSize, progress, buffersize,
-          checksum, getDBFileMaxSize(), dfsClientConf.forceClientToWriteSFToDisk);
+          checksum, dfsClientConf.getDBFileMaxSize(), dfsClientConf.getForceClientToWriteSFToDisk());
     }
     beginFileLease(result.getFileId(), result);
     return result;
@@ -1695,8 +1303,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
   public void createSymlink(String target, String link, boolean createParent)
       throws IOException {
     try (TraceScope ignored = newPathTraceScope("createSymlink", target)) {
-      FsPermission dirPerm =
-          FsPermission.getDefault().applyUMask(dfsClientConf.uMask);
+      final FsPermission dirPerm = applyUMask(null);
       namenode.createSymlink(target, link, dirPerm, createParent);
     } catch (RemoteException re) {
       throw re.unwrapRemoteException(AccessControlException.class,
@@ -1734,9 +1341,9 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
           new EnumSetWritable<>(flag, CreateFlag.class));
       return DFSOutputStream.newStreamForAppend(this, src, flag, buffersize,
           progress, blkWithStatus.getLastBlock(),
-          blkWithStatus.getFileStatus(), dfsClientConf.createChecksum(),
+          blkWithStatus.getFileStatus(), dfsClientConf.createChecksum(null),
           favoredNodes,
-          getDBFileMaxSize(), dfsClientConf.forceClientToWriteSFToDisk);
+          dfsClientConf.getDBFileMaxSize(), dfsClientConf.getForceClientToWriteSFToDisk());
     } catch(RemoteException re) {
       throw re.unwrapRemoteException(AccessControlException.class,
                                      FileNotFoundException.class,
@@ -2087,7 +1694,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
       final DatanodeInfo[] datanodes = lb.getLocations();
 
       //try each datanode location of the block
-      final int timeout = 3000 * datanodes.length + dfsClientConf.socketTimeout;
+      final int timeout = 3000*datanodes.length + dfsClientConf.getSocketTimeout();
       boolean done = false;
       for(int j = 0; !done && j < datanodes.length; j++) {
         DataOutputStream out = null;
@@ -2225,7 +1832,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     Socket sock = null;
     try {
       sock = socketFactory.createSocket();
-      String dnAddr = dn.getXferAddr(getConf().connectToDnViaHostname);
+      String dnAddr = dn.getXferAddr(getConf().isConnectToDnViaHostname());
       if (LOG.isDebugEnabled()) {
         LOG.debug("Connecting to datanode " + dnAddr);
       }
@@ -2258,7 +1865,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
    */
   private Type inferChecksumTypeByReading(LocatedBlock lb, DatanodeInfo dn)
       throws IOException {
-    IOStreamPair pair = connectToDN(dn, dfsClientConf.socketTimeout, lb);
+    IOStreamPair pair = connectToDN(dn, dfsClientConf.getSocketTimeout(), lb);
 
     try {
       DataOutputStream out = new DataOutputStream(new BufferedOutputStream(pair.out,
@@ -2569,10 +2176,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
    */
   public boolean mkdirs(String src, FsPermission permission,
       boolean createParent) throws IOException {
-    if (permission == null) {
-      permission = FsPermission.getDefault();
-    }
-    FsPermission masked = permission.applyUMask(dfsClientConf.uMask);
+    final FsPermission masked = applyUMask(permission);
     return primitiveMkdir(src, masked, createParent);
   }
 
@@ -2595,9 +2199,8 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
 
     checkOpen();
     if (absPermission == null) {
-      absPermission =
-        FsPermission.getDefault().applyUMask(dfsClientConf.uMask);
-    }
+      absPermission = applyUMask(null);
+    } 
 
     if(LOG.isDebugEnabled()) {
       LOG.debug(src + ": masked=" + absPermission);
@@ -2814,19 +2417,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     return getClass().getSimpleName() + "[clientName=" + clientName
         + ", ugi=" + ugi + "]";
   }
-
-  public DomainSocketFactory getDomainSocketFactory() {
-    return domainSocketFactory;
-  }
   
-  public void disableLegacyBlockReaderLocal() {
-    shouldUseLegacyBlockReaderLocal = false;
-  }
-
-  public boolean useLegacyBlockReaderLocal() {
-    return shouldUseLegacyBlockReaderLocal;
-  }
-
   public CachingStrategy getDefaultReadCachingStrategy() {
     return defaultReadCachingStrategy;
   }
@@ -3146,14 +2737,13 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     Peer peer = null;
     boolean success = false;
     Socket sock = null;
+    final int socketTimeout = dfsClientConf.getSocketTimeout(); 
     try {
       sock = getSocketFactory(conf).createSocket();
-      NetUtils.connect(sock, addr,
-              getRandomLocalInterfaceAddr(),
-              dfsClientConf.socketTimeout);
+      NetUtils.connect(sock, addr, getRandomLocalInterfaceAddr(), socketTimeout);
       peer = TcpPeerServer.peerFromSocketAndKey(saslClient, sock, this,
           blockToken, datanodeId);
-      peer.setReadTimeout(dfsClientConf.socketTimeout);
+      peer.setReadTimeout(socketTimeout);
       success = true;
       return peer;
     } finally {

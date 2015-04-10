@@ -29,6 +29,7 @@ import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.hadoop.hdfs.client.impl.DfsClientConf;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
@@ -41,7 +42,6 @@ import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsDatasetSpi;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsVolumeSpi;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.impl.FsDatasetTestUtil;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
-import org.apache.hadoop.hdfs.server.protocol.BlockReportContext;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocols;
@@ -60,7 +60,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdfs.BlockReader;
 import org.apache.hadoop.hdfs.ClientContext;
-import org.apache.hadoop.hdfs.DFSClient;
 import org.apache.hadoop.hdfs.RemotePeerFactory;
 import org.apache.hadoop.hdfs.net.Peer;
 import org.apache.hadoop.hdfs.net.TcpPeerServer;
@@ -68,7 +67,6 @@ import org.apache.hadoop.hdfs.server.protocol.BlockReport;
 import org.apache.hadoop.io.IOUtils;
 
 import javax.net.SocketFactory;
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.FsTracer;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
@@ -430,7 +428,7 @@ public class TestDataNodeVolumeFailure {
 
     targetAddr = NetUtils.createSocketAddr(datanode.getXferAddr());
 
-    BlockReader blockReader = new BlockReaderFactory(new DFSClient.Conf(conf)).
+    BlockReader blockReader = new BlockReaderFactory(new DfsClientConf(conf)).
       setInetSocketAddress(targetAddr).
       setExtendedBlock(block).
       setFileName(BlockReaderFactory.getFileName(targetAddr,
