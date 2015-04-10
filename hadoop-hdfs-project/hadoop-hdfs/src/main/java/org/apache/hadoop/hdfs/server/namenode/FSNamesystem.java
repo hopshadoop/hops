@@ -2477,150 +2477,180 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
    * are replicated.  Will return an empty 2-elt array if we want the
    * client to "try again later".
    */
-  LocatedBlock getAdditionalBlock(final String src1, final long fileId, final String clientName,
+  LocatedBlock getAdditionalBlock(final String srcArg, final long fileId, final String clientName,
       final ExtendedBlock previous, final Set<Node> excludedNodes,
       final List<String> favoredNodes) throws IOException {
-    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
-    final String src = dir.resolvePath(src1, pathComponents, dir);
-    HopsTransactionalRequestHandler additionalBlockHandler =
-        new HopsTransactionalRequestHandler(
-            HDFSOperationType.GET_ADDITIONAL_BLOCK, src) {
-          @Override
-          public void acquireLock(TransactionLocks locks) throws IOException {
-            LockFactory lf = getInstance();
-            if (fileId == INode.ROOT_PARENT_ID) {
-              // Older clients may not have given us an inode ID to work with.
-              // In this case, we have to try to resolve the path and hope it
-              // hasn't changed or been deleted since the file was opened for write.
-              INodeLock il = lf.getINodeLock(INodeLockType.WRITE, INodeResolveType.PATH, src)
-                  .setNameNodeID(nameNode.getId())
-                  .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
-              locks.add(il)
-                  .add(lf.getLastTwoBlocksLock(src));
-            } else {
-              INodeLock il = lf.getINodeLock(INodeLockType.WRITE, INodeResolveType.PATH, fileId)
-                  .setNameNodeID(nameNode.getId())
-                  .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
-              locks.add(il)
-                  .add(lf.getLastTwoBlocksLock(fileId));
-            }
-            locks.add(lf.getLeaseLock(LockType.READ, clientName))
-                .add(lf.getLeasePathLock(LockType.READ_COMMITTED))
-                .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC));
-          }
+    final LocatedBlock[] onRetryBlock = new LocatedBlock[1];
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
+    final String src = dir.resolvePath(srcArg, pathComponents, dir);
+    HopsTransactionalRequestHandler additionalBlockHandler = new HopsTransactionalRequestHandler(
+        HDFSOperationType.GET_ADDITIONAL_BLOCK, src) {
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = getInstance();
+        if (fileId == INode.ROOT_PARENT_ID) {
+          // Older clients may not have given us an inode ID to work with.
+          // In this case, we have to try to resolve the path and hope it
+          // hasn't changed or been deleted since the file was opened for write.
+          INodeLock il = lf.getINodeLock(INodeLockType.WRITE, INodeResolveType.PATH, src)
+              .setNameNodeID(nameNode.getId())
+              .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
+          locks.add(il)
+              .add(lf.getLastTwoBlocksLock(src));
+        } else {
+          INodeLock il = lf.getINodeLock(INodeLockType.WRITE, INodeResolveType.PATH, fileId)
+              .setNameNodeID(nameNode.getId())
+              .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
+          locks.add(il)
+              .add(lf.getLastTwoBlocksLock(fileId));
+        }
+        locks.add(lf.getLeaseLock(LockType.READ, clientName))
+            .add(lf.getLeasePathLock(LockType.READ_COMMITTED))
+            .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC));
+      }
 
-          @Override
-          public Object performTask() throws IOException {
-            long blockSize;
-            int replication;
-            Node clientNode;
-            String clientMachine = null;
+      @Override
+      public Object performTask() throws IOException {
+        DatanodeStorageInfo targets[] = getNewBlockTargets(src, fileId,
+            clientName, previous, excludedNodes, favoredNodes, onRetryBlock);
+        if (targets == null) {
+          assert onRetryBlock[0] != null : "Retry block is null";
+          // This is a retry. Just return the last block.
+          return onRetryBlock[0];
+        }
+        LocatedBlock newBlock = storeAllocatedBlock(
+            src, fileId, clientName, previous, targets);
 
-            if (NameNode.stateChangeLog.isDebugEnabled()) {
-              NameNode.stateChangeLog.debug("BLOCK* getAdditionalBlock: "
-                  + src + " inodeId " + fileId + " for " + clientName);
-            }
-
-            // Part I. Analyze the state of the file with respect to the input data.
-            LocatedBlock[] onRetryBlock = new LocatedBlock[1];
-            FileState fileState = analyzeFileState(src, fileId, clientName, previous, onRetryBlock);
-            INodeFile pendingFile = fileState.inode;
-            // Check if the penultimate block is minimally replicated
-            if (!checkFileProgress(src, pendingFile, false)) {
-              throw new NotReplicatedYetException("Not replicated yet: " + src);
-            }
-            String src2 = fileState.path;
-
-            if (onRetryBlock[0] != null && onRetryBlock[0].getLocations().length > 0) {
-              // This is a retry. Just return the last block if having locations.
-              return onRetryBlock[0];
-            }
-
-            if (pendingFile.getBlocks().length >= maxBlocksPerFile) {
-              throw new IOException("File has reached the limit on maximum number of"
-                  + " blocks (" + DFSConfigKeys.DFS_NAMENODE_MAX_BLOCKS_PER_FILE_KEY
-                  + "): " + pendingFile.getBlocks().length + " >= "
-                  + maxBlocksPerFile);
-            }
-            blockSize = pendingFile.getPreferredBlockSize();
-            clientMachine = pendingFile.getFileUnderConstructionFeature()
-                .getClientMachine();
-            clientNode = blockManager.getDatanodeManager().getDatanodeByHost(
-              clientMachine);
-
-            replication = pendingFile.getBlockReplication();
-
-            // Get the storagePolicyID of this file
-            byte storagePolicyID = pendingFile.getStoragePolicyID();
-
-            if (clientNode == null) {
-              clientNode = getClientNode(clientMachine);
-            }
-            // choose targets for the new block to be allocated.
-            final DatanodeStorageInfo targets[] = getBlockManager().chooseTarget4NewBlock(
-                src2, replication, clientNode, excludedNodes, blockSize,
-                favoredNodes, storagePolicyID);
-
-            // Part II.
-            // Allocate a new block, add it to the INode and the BlocksMap.
-            Block newBlock;
-            long offset;
-            onRetryBlock = new LocatedBlock[1];
-            fileState =
-                analyzeFileState(src2, fileId, clientName, previous, onRetryBlock);
-            pendingFile = fileState.inode;
-            src2 = fileState.path;
-            if (onRetryBlock[0] != null) {
-              if (onRetryBlock[0].getLocations().length > 0) {
-                // This is a retry. Just return the last block if having locations.
-                return onRetryBlock[0];
-              } else {
-                // add new chosen targets to already allocated block and return
-                BlockInfoContiguous lastBlockInFile = pendingFile.getLastBlock();
-                ((BlockInfoContiguousUnderConstruction) lastBlockInFile)
-                    .setExpectedLocations(targets);
-                offset = pendingFile.computeFileSize();
-                return makeLocatedBlock(lastBlockInFile, targets, offset);
-              }
-            }
-
-            // commit the last block and complete it if it has minimum replicas
-            commitOrCompleteLastBlock(pendingFile, fileState.iip,
-                ExtendedBlock.getLocalBlock(previous));
-
-            // allocate new block, record block locations in INode.
-            newBlock = createNewBlock(pendingFile);
-            INodesInPath inodesInPath = INodesInPath.fromINode(pendingFile);
-            saveAllocatedBlock(src2, inodesInPath, newBlock, targets);
-
-
-            persistNewBlock(src2, pendingFile);
-            offset = pendingFile.computeFileSize();
-
-            Lease lease = leaseManager.getLease(clientName);
-            lease.updateLastTwoBlocksInLeasePath(src2, newBlock,
-                ExtendedBlock.getLocalBlock(previous));
-
-
-            // Return located block
-            LocatedBlock lb =  makeLocatedBlock(newBlock, targets, offset);
-            if(pendingFile.isFileStoredInDB()){
-
-              //appending to a file stored in the database
-              //delete the file data from database and unset the flag
-
-              pendingFile.setFileStoredInDB(false);
-              pendingFile.deleteFileDataStoredInDB();
-              LOG.debug("Stuffed Inode:  appending to a file stored in the database. In the current implementation there is" +
-                  " potential for data loss if the client fails");
-              //the data has been deleted. if the client fails to write the data on the datanodes then the data will
-              // be lost. Solution. instead of deleting the data mark it and recover the data in the lease recovery
-              // process.
-            }
-            return lb;
-          }
-        };
+        return newBlock;
+      }
+    };
     return (LocatedBlock) additionalBlockHandler.handle(this);
+  }
+
+  /**
+   * Part I of getAdditionalBlock().
+   * Analyze the state of the file under read lock to determine if the client
+   * can add a new block, detect potential retries, lease mismatches,
+   * and minimal replication of the penultimate block.
+   * 
+   * Generate target DataNode locations for the new block,
+   * but do not create the new block yet.
+   */
+  DatanodeStorageInfo[] getNewBlockTargets(String src, long fileId,
+      String clientName, ExtendedBlock previous, Set<Node> excludedNodes,
+      List<String> favoredNodes, LocatedBlock[] onRetryBlock) throws IOException {
+
+    long blockSize;
+    int replication;
+    Node clientNode;
+    String clientMachine = null;
+
+    if (NameNode.stateChangeLog.isDebugEnabled()) {
+      NameNode.stateChangeLog.debug("BLOCK* getAdditionalBlock: "
+          + src + " inodeId " + fileId + " for " + clientName);
+    }
+
+    FileState fileState = analyzeFileState(src, fileId, clientName, previous, onRetryBlock);
+    INodeFile pendingFile = fileState.inode;
+    // Check if the penultimate block is minimally replicated
+    if (!checkFileProgress(src, pendingFile, false)) {
+      throw new NotReplicatedYetException("Not replicated yet: " + src);
+    }
+    src = fileState.path;
+
+    if (onRetryBlock[0] != null && onRetryBlock[0].getLocations().length > 0) {
+      // This is a retry. No need to generate new locations.
+      // Use the last block if it has locations.
+      return null;
+    }
+
+    if (pendingFile.getBlocks().length >= maxBlocksPerFile) {
+      throw new IOException("File has reached the limit on maximum number of"
+          + " blocks (" + DFSConfigKeys.DFS_NAMENODE_MAX_BLOCKS_PER_FILE_KEY
+          + "): " + pendingFile.getBlocks().length + " >= "
+          + maxBlocksPerFile);
+    }
+    blockSize = pendingFile.getPreferredBlockSize();
+    clientMachine = pendingFile.getFileUnderConstructionFeature()
+        .getClientMachine();
+    clientNode = blockManager.getDatanodeManager().getDatanodeByHost(
+        clientMachine);
+
+    replication = pendingFile.getBlockReplication();
+
+    // Get the storagePolicyID of this file
+    byte storagePolicyID = pendingFile.getStoragePolicyID();
+
+    if (clientNode == null) {
+      clientNode = getClientNode(clientMachine);
+    }
+    // choose targets for the new block to be allocated.
+    return getBlockManager().chooseTarget4NewBlock(
+        src, replication, clientNode, excludedNodes, blockSize,
+        favoredNodes, storagePolicyID);
+  }
+      
+              /**
+   * Part II of getAdditionalBlock().
+   * Should repeat the same analysis of the file state as in Part 1,
+   * but under the write lock.
+   * If the conditions still hold, then allocate a new block with
+   * the new targets, add it to the INode and to the BlocksMap.
+   */
+  LocatedBlock storeAllocatedBlock(String src, long fileId, String clientName,
+      ExtendedBlock previous, DatanodeStorageInfo[] targets) throws IOException {
+    Block newBlock;
+    long offset;
+    LocatedBlock[] onRetryBlock = new LocatedBlock[1];
+    FileState fileState = 
+        analyzeFileState(src, fileId, clientName, previous, onRetryBlock);
+    final INodeFile pendingFile = fileState.inode;
+    src = fileState.path;
+    if (onRetryBlock[0] != null) {
+      if (onRetryBlock[0].getLocations().length > 0) {
+        // This is a retry. Just return the last block if having locations.
+        return onRetryBlock[0];
+      } else {
+        // add new chosen targets to already allocated block and return
+        BlockInfoContiguous lastBlockInFile = pendingFile.getLastBlock();
+        ((BlockInfoContiguousUnderConstruction) lastBlockInFile)
+            .setExpectedLocations(targets);
+        offset = pendingFile.computeFileSize();
+        return makeLocatedBlock(lastBlockInFile, targets, offset);
+      }
+    }
+
+    // commit the last block and complete it if it has minimum replicas
+    commitOrCompleteLastBlock(pendingFile, fileState.iip,
+        ExtendedBlock.getLocalBlock(previous));
+
+    // allocate new block, record block locations in INode.
+    newBlock = createNewBlock(pendingFile);
+    INodesInPath inodesInPath = INodesInPath.fromINode(pendingFile);
+    saveAllocatedBlock(src, inodesInPath, newBlock, targets);
+
+    persistNewBlock(src, pendingFile);
+    offset = pendingFile.computeFileSize();
+
+    Lease lease = leaseManager.getLease(clientName);
+    lease.updateLastTwoBlocksInLeasePath(src, newBlock,
+        ExtendedBlock.getLocalBlock(previous));
+
+    // Return located block
+    LocatedBlock lb = makeLocatedBlock(newBlock, targets, offset);
+    if (pendingFile.isFileStoredInDB()) {
+
+      //appending to a file stored in the database
+      //delete the file data from database and unset the flag
+      pendingFile.setFileStoredInDB(false);
+      pendingFile.deleteFileDataStoredInDB();
+      LOG.debug("Stuffed Inode:  appending to a file stored in the database. In the current implementation there is"
+          + " potential for data loss if the client fails");
+      //the data has been deleted. if the client fails to write the data on the datanodes then the data will
+      // be lost. Solution. instead of deleting the data mark it and recover the data in the lease recovery
+      // process.
+    }
+    return lb;
   }
 
   /*
