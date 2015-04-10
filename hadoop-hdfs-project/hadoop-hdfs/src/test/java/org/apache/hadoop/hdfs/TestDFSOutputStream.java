@@ -32,6 +32,7 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.StreamCapabilities.StreamCapability;
+import org.apache.hadoop.hdfs.client.impl.DfsClientConf;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
@@ -120,7 +121,7 @@ public class TestDFSOutputStream {
 
   @Test
   public void testCongestionBackoff() throws IOException {
-    DFSClient.Conf dfsClientConf = mock(DFSClient.Conf.class);
+    DfsClientConf dfsClientConf = mock(DfsClientConf.class);
     DFSClient client = mock(DFSClient.class);
     when(client.getConf()).thenReturn(dfsClientConf);
     client.clientRunning = true;

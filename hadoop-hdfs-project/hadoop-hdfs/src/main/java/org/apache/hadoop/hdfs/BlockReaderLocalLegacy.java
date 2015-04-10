@@ -29,12 +29,13 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import org.apache.hadoop.hdfs.shortcircuit.ClientMmap;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.ReadOption;
+import org.apache.hadoop.hdfs.client.impl.DfsClientConf;
+import org.apache.hadoop.hdfs.client.impl.DfsClientConf.ShortCircuitConf;
 import org.apache.hadoop.hdfs.protocol.BlockLocalPathInfo;
 import org.apache.hadoop.hdfs.protocol.ClientDatanodeProtocol;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
@@ -42,6 +43,7 @@ import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.hdfs.server.datanode.BlockMetadataHeader;
 import org.apache.hadoop.hdfs.util.DirectBufferPool;
+import org.apache.hadoop.hdfs.shortcircuit.ClientMmap;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -179,11 +181,12 @@ class BlockReaderLocalLegacy implements BlockReader {
   /**
    * The only way this object can be instantiated.
    */
-  static BlockReaderLocalLegacy newBlockReader(DFSClient.Conf conf,
+  static BlockReaderLocalLegacy newBlockReader(DfsClientConf conf,
       UserGroupInformation userGroupInformation,
       Configuration configuration, String file, ExtendedBlock blk,
       Token<BlockTokenIdentifier> token, DatanodeInfo node, 
       long startOffset, long length, Tracer tracer) throws IOException {
+    final ShortCircuitConf scConf = conf.getShortCircuitConf();
     LocalDatanodeInfo localDatanodeInfo = getLocalDatanodeInfo(node
         .getIpcPort());
     // check the cache first
@@ -193,8 +196,8 @@ class BlockReaderLocalLegacy implements BlockReader {
         userGroupInformation = UserGroupInformation.getCurrentUser();
       }
       pathinfo = getBlockPathInfo(userGroupInformation, blk, node,
-          configuration, conf.socketTimeout, token,
-          conf.connectToDnViaHostname);
+          configuration, conf.getSocketTimeout(), token,
+          conf.isConnectToDnViaHostname());
     }
 
     // check to see if the file exists. It may so happen that the
@@ -206,7 +209,7 @@ class BlockReaderLocalLegacy implements BlockReader {
     FileInputStream dataIn = null;
     FileInputStream checksumIn = null;
     BlockReaderLocalLegacy localBlockReader = null;
-    boolean skipChecksumCheck = conf.skipShortCircuitChecksums;
+    final boolean skipChecksumCheck = scConf.isSkipShortCircuitChecksums();
     try {
       // get a local file system
       File blkfile = new File(pathinfo.getBlockPath());
@@ -234,11 +237,11 @@ class BlockReaderLocalLegacy implements BlockReader {
         DataChecksum checksum = header.getChecksum();
         long firstChunkOffset = startOffset
             - (startOffset % checksum.getBytesPerChecksum());
-        localBlockReader = new BlockReaderLocalLegacy(conf, file, blk, token,
+        localBlockReader = new BlockReaderLocalLegacy(scConf, file, blk, token,
             startOffset, length, pathinfo, checksum, true, dataIn,
             firstChunkOffset, checksumIn, tracer);
       } else {
-        localBlockReader = new BlockReaderLocalLegacy(conf, file, blk, token,
+        localBlockReader = new BlockReaderLocalLegacy(scConf, file, blk, token,
             startOffset, length, pathinfo, dataIn, tracer);
       }
     } catch (IOException e) {
@@ -308,7 +311,7 @@ class BlockReaderLocalLegacy implements BlockReader {
     return bufferSizeBytes / bytesPerChecksum;
   }
 
-  private BlockReaderLocalLegacy(DFSClient.Conf conf, String hdfsfile,
+  private BlockReaderLocalLegacy(ShortCircuitConf conf, String hdfsfile,
       ExtendedBlock block, Token<BlockTokenIdentifier> token, long startOffset,
       long length, BlockLocalPathInfo pathinfo, FileInputStream dataIn, Tracer tracer)
       throws IOException {
@@ -317,7 +320,7 @@ class BlockReaderLocalLegacy implements BlockReader {
         dataIn, startOffset, null, tracer);
   }
 
-  private BlockReaderLocalLegacy(DFSClient.Conf conf, String hdfsfile,
+  private BlockReaderLocalLegacy(ShortCircuitConf conf, String hdfsfile,
       ExtendedBlock block, Token<BlockTokenIdentifier> token, long startOffset,
       long length, BlockLocalPathInfo pathinfo, DataChecksum checksum,
       boolean verifyChecksum, FileInputStream dataIn, long firstChunkOffset,
@@ -335,8 +338,8 @@ class BlockReaderLocalLegacy implements BlockReader {
     this.checksumIn = checksumIn;
     this.offsetFromChunkBoundary = (int) (startOffset-firstChunkOffset);
 
-    int chunksPerChecksumRead = getSlowReadBufferNumChunks(
-        conf.shortCircuitBufferSize, bytesPerChecksum);
+    final int chunksPerChecksumRead = getSlowReadBufferNumChunks(
+        conf.getShortCircuitBufferSize(), bytesPerChecksum);
     slowReadBuff = bufferPool.getBuffer(bytesPerChecksum * chunksPerChecksumRead);
     checksumBuff = bufferPool.getBuffer(checksumSize * chunksPerChecksumRead);
     // Initially the buffers have nothing to read.
