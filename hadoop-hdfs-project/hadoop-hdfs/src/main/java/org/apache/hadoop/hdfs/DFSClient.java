@@ -3136,6 +3136,11 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     return tracer;
   }
   
+  public boolean isHDFSEncryptionEnabled() {
+    return conf.get(
+        DFSConfigKeys.DFS_ENCRYPTION_KEY_PROVIDER_URI, null) != null;
+  }
+
   /**
    * Returns the SaslDataTransferClient configured for this DFSClient.
    *
