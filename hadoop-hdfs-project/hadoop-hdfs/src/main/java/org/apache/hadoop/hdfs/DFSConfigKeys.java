@@ -171,9 +171,6 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String DFS_DB_FILE_MAX_SIZE_KEY = "dfs.db.file.max.size";
   public static final int DFS_DB_FILE_MAX_SIZE_DEFAULT = 64 * 1024;
 
-  public static final String DFS_CLIENT_DELAY_BEFORE_FILE_CLOSE_KEY = "dsf.client.delay.before.file.close";
-  public static final int DFS_CLIENT_DELAY_BEFORE_FILE_CLOSE_DEFAULT = 0;
-
   public static final String  DFS_BLOCK_SIZE_KEY =
       HdfsClientConfigKeys.DFS_BLOCK_SIZE_KEY;
   public static final long    DFS_BLOCK_SIZE_DEFAULT =

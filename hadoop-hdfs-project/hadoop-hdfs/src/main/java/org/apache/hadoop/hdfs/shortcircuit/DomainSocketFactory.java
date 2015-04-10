@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.logging.Log;
 import org.apache.hadoop.HadoopIllegalArgumentException;
-import org.apache.hadoop.hdfs.DFSClient.Conf;
+import org.apache.hadoop.hdfs.client.impl.DfsClientConf.ShortCircuitConf;
 import org.apache.hadoop.net.unix.DomainSocket;
 
 import com.google.common.base.Preconditions;
@@ -96,7 +96,7 @@ public class DomainSocketFactory {
       .expireAfterWrite(10, TimeUnit.MINUTES)
       .build();
 
-  public DomainSocketFactory(Conf conf) {
+  public DomainSocketFactory(ShortCircuitConf conf) {
     final String feature;
     if (conf.isShortCircuitLocalReads() && (!conf.isUseLegacyBlockReaderLocal())) {
       feature = "The short-circuit local reads feature";
@@ -130,7 +130,7 @@ public class DomainSocketFactory {
    *
    * @return             Information about the socket path.
    */
-  public PathInfo getPathInfo(InetSocketAddress addr, DFSClient.Conf conf) {
+  public PathInfo getPathInfo(InetSocketAddress addr, ShortCircuitConf conf) {
     // If there is no domain socket path configured, we can't use domain
     // sockets.
     if (conf.getDomainSocketPath().isEmpty()) return PathInfo.NOT_CONFIGURED;

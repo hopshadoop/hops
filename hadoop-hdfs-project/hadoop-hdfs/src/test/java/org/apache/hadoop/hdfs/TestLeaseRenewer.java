@@ -18,6 +18,8 @@
 package org.apache.hadoop.hdfs;
 
 import com.google.common.base.Supplier;
+
+import org.apache.hadoop.hdfs.client.impl.DfsClientConf;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.Time;
@@ -58,9 +60,12 @@ public class TestLeaseRenewer {
   }
 
   private DFSClient createMockClient() {
+    final DfsClientConf mockConf = Mockito.mock(DfsClientConf.class);
+    Mockito.doReturn((int)FAST_GRACE_PERIOD).when(mockConf).getHdfsTimeout();
+
     DFSClient mock = Mockito.mock(DFSClient.class);
     Mockito.doReturn(true).when(mock).isClientRunning();
-    Mockito.doReturn((int) FAST_GRACE_PERIOD).when(mock).getHdfsTimeout();
+    Mockito.doReturn(mockConf).when(mock).getConf();
     Mockito.doReturn("myclient").when(mock).getClientName();
     return mock;
   }

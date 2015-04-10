@@ -30,10 +30,11 @@ import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FSOutputSummer;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.ParentNotDirectoryException;
-import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.Syncable;
+import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.client.HdfsDataOutputStream;
 import org.apache.hadoop.hdfs.client.HdfsDataOutputStream.SyncFlag;
+import org.apache.hadoop.hdfs.client.impl.DfsClientConf;
 import org.apache.hadoop.hdfs.protocol.DSQuotaExceededException;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
@@ -187,7 +188,7 @@ public class DFSOutputStream extends FSOutputSummer
     this(dfsClient, src, progress, stat, checksum);
     this.shouldSyncBlock = flag.contains(CreateFlag.SYNC_BLOCK);
 
-    computePacketChunkSize(dfsClient.getConf().writePacketSize, checksum.getBytesPerChecksum());
+    computePacketChunkSize(dfsClient.getConf().getWritePacketSize(), checksum.getBytesPerChecksum());
 
     streamer = new DataStreamer(stat, null, dfsClient, src, progress, checksum,
         cachingStrategy, byteArrayManager, dbFileMaxSize, forceClientToWriteSFToDisk);
@@ -265,7 +266,7 @@ public class DFSOutputStream extends FSOutputSummer
       adjustPacketChunkSize(stat);
       streamer.setPipelineInConstruction(lastBlock);
     } else {
-      computePacketChunkSize(dfsClient.getConf().writePacketSize,
+      computePacketChunkSize(dfsClient.getConf().getWritePacketSize(),
           checksum.getBytesPerChecksum());
       if (stat.isFileStoredInDB() && lastBlock != null) {
         streamer = new DataStreamer(stat, null, dfsClient, src, progress, checksum, cachingStrategy, byteArrayManager,
@@ -312,7 +313,7 @@ public class DFSOutputStream extends FSOutputSummer
       // that expected size of of a packet, then create
       // smaller size packet.
       //
-      computePacketChunkSize(Math.min(dfsClient.getConf().writePacketSize, freeInLastBlock),
+      computePacketChunkSize(Math.min(dfsClient.getConf().getWritePacketSize(), freeInLastBlock),
           checksum.getBytesPerChecksum());
     }
   }
@@ -360,7 +361,7 @@ public class DFSOutputStream extends FSOutputSummer
     this(dfsClient, src, progress, stat, checksum);
     singleBlock = true;
 
-    computePacketChunkSize(dfsClient.getConf().writePacketSize,
+    computePacketChunkSize(dfsClient.getConf().getWritePacketSize(),
             checksum.getBytesPerChecksum());
     streamer = new DataStreamer(stat, lb, singleBlock, dfsClient, src, progress, checksum, cachingStrategy,
         byteArrayManager, -1, false);
@@ -464,7 +465,7 @@ public class DFSOutputStream extends FSOutputSummer
 
     if (!streamer.getAppendChunk()) {
       int psize = Math.min((int)(blockSize- streamer.getBytesCurBlock()),
-          dfsClient.getConf().writePacketSize);
+          dfsClient.getConf().getWritePacketSize());
       computePacketChunkSize(psize, this.checksum.getBytesPerChecksum());
     }
   }
@@ -742,7 +743,7 @@ public class DFSOutputStream extends FSOutputSummer
       return;
     }
     streamer.setLastException(new IOException("Lease timeout of "
-        + (dfsClient.getHdfsTimeout()/1000) + " seconds expired."));
+        + (dfsClient.getConf().getHdfsTimeout()/1000) + " seconds expired."));
     closeThreads(true);
     dfsClient.endFileLease(fileId);
   }
@@ -843,17 +844,15 @@ public class DFSOutputStream extends FSOutputSummer
       return;
     }
     long localstart = Time.monotonicNow();
-    long sleeptime = dfsClient.getConf().
-        blockWriteLocateFollowingInitialDelayMs;
+    final DfsClientConf conf = dfsClient.getConf();
+    long sleeptime = conf.getBlockWriteLocateFollowingInitialDelayMs();
     boolean fileComplete = false;
-    int retries = dfsClient.getConf().nBlockWriteLocateFollowingRetry;
-    
-    backoffBeforeClose(last);
+    int retries = conf.getNumBlockWriteLocateFollowingRetry();
     
     while (!fileComplete) {
       fileComplete = completeFileInternal(last);
       if (!fileComplete) {
-        final int hdfsTimeout = dfsClient.getHdfsTimeout();
+        final int hdfsTimeout = conf.getHdfsTimeout();
         if (!dfsClient.clientRunning
             || (hdfsTimeout > 0
                 && localstart + hdfsTimeout < Time.monotonicNow())) {
@@ -882,18 +881,6 @@ public class DFSOutputStream extends FSOutputSummer
     }
   }
   
-  private void backoffBeforeClose(ExtendedBlock last){
-      try {
-        if ((last != null && last.getNumBytes() > 0)) {
-          // Default delay is 0.
-          // A small delay ensures that the namenodes have processed
-          // the incremental block reports before the complete file request.
-          Thread.sleep(dfsClient.getConf().delayBeforeClose);
-        }
-      } catch (InterruptedException e) { }
-    }
-
-
   private boolean completeFileInternal(ExtendedBlock last) throws IOException {
     boolean fileComplete = false;
     byte data[] = null;

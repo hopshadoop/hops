@@ -40,8 +40,8 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdfs.DFSClient.Conf;
 import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
+import org.apache.hadoop.hdfs.client.impl.DfsClientConf;
 import org.apache.hadoop.hdfs.protocol.AlreadyBeingCreatedException;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
@@ -170,12 +170,12 @@ public class NameNodeProxies {
       FailoverProxyProvider<T> failoverProxyProvider = NameNodeProxies
           .createFailoverProxyProvider(conf, failoverProxyProviderClass, xface,
               nameNodeUri, fallbackToSimpleAuth);
-      Conf config = new Conf(conf);
+      DfsClientConf config = new DfsClientConf(conf);
       T proxy = (T) RetryProxy.create(xface, failoverProxyProvider,
           RetryPolicies.failoverOnNetworkException(
-              RetryPolicies.TRY_ONCE_THEN_FAIL, config.maxFailoverAttempts,
-              config.maxRetryAttempts, config.failoverSleepBaseMillis,
-              config.failoverSleepMaxMillis));
+              RetryPolicies.TRY_ONCE_THEN_FAIL, config.getMaxFailoverAttempts(),
+              config.getMaxRetryAttempts(), config.getFailoverSleepBaseMillis(),
+              config.getFailoverSleepMaxMillis()));
       
       Text dtService = HAUtil.buildTokenServiceForLogicalUri(nameNodeUri);
       return new ProxyAndInfo<T>(proxy, dtService);
@@ -509,7 +509,7 @@ public class NameNodeProxies {
     FailoverProxyProvider<T> failoverProxyProvider = NameNodeProxies
             .createFailoverProxyProvider(conf, failoverProxyProviderClass, xface,
                     nameNodeUri, fallbackToSimpleAuth);
-    Conf config = new Conf(conf);
+    DfsClientConf config = new DfsClientConf(conf);
 
     final RetryPolicy defaultPolicy =
             RetryUtils.getDefaultRetryPolicy(
@@ -528,8 +528,8 @@ public class NameNodeProxies {
     T proxy = (T) RetryProxy.create(xface,
             failoverProxyProvider,
             RetryPolicies.failoverOnNetworkException(RetryPolicies.TRY_ONCE_THEN_FAIL,
-                    config.maxFailoverAttempts, config.maxRetryAttempts,
-                    config.failoverSleepBaseMillis, config.failoverSleepMaxMillis,
+                    config.getMaxFailoverAttempts(), config.getMaxRetryAttempts(),
+                    config.getFailoverSleepBaseMillis(), config.getFailoverSleepMaxMillis(),
                     remoteExceptionToPolicyMap));
 
     Text dtService = HAUtil.buildTokenServiceForLogicalUri(nameNodeUri);
@@ -549,7 +549,7 @@ public class NameNodeProxies {
     FailoverProxyProvider<T> failoverProxyProvider = NameNodeProxies
             .createFailoverProxyProvider(conf, failoverProxyProviderClass, xface,
                     nameNodeUri, fallbackToSimpleAuth);
-    Conf config = new Conf(conf);
+    DfsClientConf config = new DfsClientConf(conf);
 
     final RetryPolicy defaultPolicy =
             RetryUtils.getDefaultRetryPolicy(
@@ -566,9 +566,9 @@ public class NameNodeProxies {
     remoteExceptionToPolicyMap.put(SafeModeException.class, defaultPolicy);
     T proxy = (T) RetryProxy.create(xface, failoverProxyProvider,
             RetryPolicies.failoverOnLeaderChange(
-                    RetryPolicies.TRY_ONCE_THEN_FAIL, config.maxFailoverAttempts,
-                    config.maxRetryAttempts, config.failoverSleepBaseMillis,
-                    config.failoverSleepMaxMillis, remoteExceptionToPolicyMap));
+                    RetryPolicies.TRY_ONCE_THEN_FAIL, config.getMaxFailoverAttempts(),
+                    config.getMaxRetryAttempts(), config.getFailoverSleepBaseMillis(),
+                    config.getFailoverSleepMaxMillis(), remoteExceptionToPolicyMap));
 
     Text dtService = HAUtil.buildTokenServiceForLogicalUri(nameNodeUri);
     return new ProxyAndInfo<T>(proxy, dtService);

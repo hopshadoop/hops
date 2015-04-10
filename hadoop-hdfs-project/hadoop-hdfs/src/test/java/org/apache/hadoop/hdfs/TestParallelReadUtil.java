@@ -333,7 +333,7 @@ public class TestParallelReadUtil {
       testInfo.filepath = new Path("/TestParallelRead.dat." + i);
       testInfo.authenticData = util.writeFile(testInfo.filepath, FILE_SIZE_K);
       testInfo.dis = dfsClient.open(testInfo.filepath.toString(),
-          dfsClient.getConf().ioBufferSize, verifyChecksums);
+          dfsClient.getConf().getIoBufferSize(), verifyChecksums);
 
       for (int j = 0; j < nWorkerEach; ++j) {
         workers[nWorkers++] = new ReadWorker(testInfo, nWorkers, helper);
