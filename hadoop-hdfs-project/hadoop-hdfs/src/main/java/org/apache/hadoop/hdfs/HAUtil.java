@@ -17,12 +17,14 @@
  */
 package org.apache.hadoop.hdfs;
 
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenSelector;
@@ -36,7 +38,6 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Map;
 
-import static org.apache.hadoop.hdfs.DFSConfigKeys.*;
 import static org.apache.hadoop.hdfs.protocol.HdfsConstants.HA_DT_SERVICE_PREFIX;
 
 @InterfaceAudience.Private
@@ -100,7 +101,7 @@ public class HAUtil {
   public static boolean isLogicalUri(
       Configuration conf, URI nameNodeUri) {
     String host = nameNodeUri.getHost();
-    String configKey = DFS_CLIENT_FAILOVER_PROXY_PROVIDER_KEY_PREFIX + "."
+    String configKey = HdfsClientConfigKeys.Failover.PROXY_PROVIDER_KEY_PREFIX + "."
         + host;
     return conf.get(configKey) != null;
   }
