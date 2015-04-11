@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.hdfs.web;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.io.BufferedOutputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -72,10 +71,8 @@ import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.util.Progressable;
-import org.apache.hadoop.util.StringUtils;
 import org.codehaus.jackson.map.ObjectMapper;
 
-import com.google.common.base.Charsets;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -167,10 +164,10 @@ public class WebHdfsFileSystem extends FileSystem
     
     this.retryPolicy = RetryUtils.getDefaultRetryPolicy(
         conf,
-        HdfsClientConfigKeys.WebHdfsRetry.RETRY_POLICY_ENABLED_KEY,
-        HdfsClientConfigKeys.WebHdfsRetry.RETRY_POLICY_ENABLED_DEFAULT,
-        HdfsClientConfigKeys.WebHdfsRetry.RETRY_POLICY_SPEC_KEY,
-        HdfsClientConfigKeys.WebHdfsRetry.RETRY_POLICY_SPEC_DEFAULT,
+        HdfsClientConfigKeys.HttpClient.RETRY_POLICY_ENABLED_KEY,
+        HdfsClientConfigKeys.HttpClient.RETRY_POLICY_ENABLED_DEFAULT,
+        HdfsClientConfigKeys.HttpClient.RETRY_POLICY_SPEC_KEY,
+        HdfsClientConfigKeys.HttpClient.RETRY_POLICY_SPEC_DEFAULT,
         SafeModeException.class);
     
     this.workingDir = getHomeDirectory();
