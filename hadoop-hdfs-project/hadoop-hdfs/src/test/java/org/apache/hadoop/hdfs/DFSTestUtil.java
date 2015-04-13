@@ -73,6 +73,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.client.HdfsDataInputStream;
+import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo.AdminStates;
@@ -91,6 +92,7 @@ import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.StartupOption;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.datanode.DataNodeLayoutVersion;
+import org.apache.hadoop.hdfs.server.datanode.SimulatedFSDataset;
 import org.apache.hadoop.hdfs.server.datanode.TestTransferRbw;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.INode;
@@ -1706,4 +1708,28 @@ public class DFSTestUtil {
     LOG.info("failed to change length of block " + blk);
     return false;
   }
+
+  /**
+   * This method takes a set of block locations and fills the provided buffer
+   * with expected bytes based on simulated content from
+   * {@link SimulatedFSDataset}.
+   *
+   * @param lbs The block locations of a file
+   * @param expected The buffer to be filled with expected bytes on the above
+   *                 locations.
+   */
+  public static void fillExpectedBuf(LocatedBlocks lbs, byte[] expected) {
+    Block[] blks = new Block[lbs.getLocatedBlocks().size()];
+    for (int i = 0; i < lbs.getLocatedBlocks().size(); i++) {
+      blks[i] = lbs.getLocatedBlocks().get(i).getBlock().getLocalBlock();
+    }
+    int bufPos = 0;
+    for (Block b : blks) {
+      for (long blkPos = 0; blkPos < b.getNumBytes(); blkPos++) {
+        assert bufPos < expected.length;
+        expected[bufPos++] = SimulatedFSDataset.simulatedByte(b, blkPos);
+      }
+    }
+  }
+
 }
