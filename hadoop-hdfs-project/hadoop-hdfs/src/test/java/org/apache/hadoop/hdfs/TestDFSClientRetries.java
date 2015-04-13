@@ -232,9 +232,7 @@ public class TestDFSClientRetries {
   public void testNotYetReplicatedErrors() throws IOException {
     final String exceptionMsg = "Nope, not replicated yet...";
     final int maxRetries = 1; // Allow one retry (total of two calls)
-    conf.setInt(
-        DFSConfigKeys.DFS_CLIENT_BLOCK_WRITE_LOCATEFOLLOWINGBLOCK_RETRIES_KEY,
-        maxRetries);
+    conf.setInt(HdfsClientConfigKeys.BlockWrite.LOCATEFOLLOWINGBLOCK_RETRIES_KEY, maxRetries);
     
     NamenodeProtocols mockNN = mock(NamenodeProtocols.class);
     Answer<Object> answer = new ThrowsException(new IOException()) {
@@ -1173,7 +1171,7 @@ public class TestDFSClientRetries {
   @Test
   public void testDFSClientConfigurationLocateFollowingBlockInitialDelay()
       throws Exception {
-    // test if DFS_CLIENT_BLOCK_WRITE_LOCATEFOLLOWINGBLOCK_INITIAL_DELAY_KEY
+    // test if HdfsClientConfigKeys.BlockWrite.LOCATEFOLLOWINGBLOCK_INITIAL_DELAY_KEY
     // is not configured, verify DFSClient uses the default value 400.
     Configuration dfsConf = new HdfsConfiguration();
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(dfsConf).build();
@@ -1184,10 +1182,11 @@ public class TestDFSClientRetries {
       assertEquals(client.getConf().
               getBlockWriteLocateFollowingInitialDelayMs(), 400);
 
-      // change DFS_CLIENT_BLOCK_WRITE_LOCATEFOLLOWINGBLOCK_INITIAL_DELAY_KEY,
+      // change HdfsClientConfigKeys.BlockWrite.LOCATEFOLLOWINGBLOCK_INITIAL_DELAY_KEY,
       // verify DFSClient uses the configured value 1000.
-      dfsConf.setInt(DFSConfigKeys.
-              DFS_CLIENT_BLOCK_WRITE_LOCATEFOLLOWINGBLOCK_INITIAL_DELAY_KEY, 1000);
+      dfsConf.setInt(
+          HdfsClientConfigKeys.BlockWrite.LOCATEFOLLOWINGBLOCK_INITIAL_DELAY_MS_KEY,
+          1000);
       client = new DFSClient(null, nn, dfsConf, null);
       assertEquals(client.getConf().
               getBlockWriteLocateFollowingInitialDelayMs(), 1000);

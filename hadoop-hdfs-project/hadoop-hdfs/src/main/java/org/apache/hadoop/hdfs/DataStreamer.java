@@ -43,6 +43,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.StorageType;
+import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.hdfs.client.impl.DfsClientConf;
 import org.apache.hadoop.hdfs.protocol.DSQuotaExceededException;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
@@ -1100,7 +1101,7 @@ class DataStreamer extends Daemon {
               .append("The current failed datanode replacement policy is ")
               .append(dfsClient.dtpReplaceDatanodeOnFailure).append(", and ")
               .append("a client may configure this via '")
-              .append(DFSConfigKeys.DFS_CLIENT_WRITE_REPLACE_DATANODE_ON_FAILURE_POLICY_KEY)
+              .append(HdfsClientConfigKeys.BlockWrite.ReplaceDatanodeOnFailure.POLICY_KEY)
               .append("' in its configuration.")
               .toString());
     }
@@ -1311,7 +1312,7 @@ class DataStreamer extends Daemon {
           }
           DFSClient.LOG.warn("Failed to replace datanode."
               + " Continue with the remaining datanodes since "
-              + DFSConfigKeys.DFS_CLIENT_WRITE_REPLACE_DATANODE_ON_FAILURE_BEST_EFFORT_KEY
+              + HdfsClientConfigKeys.BlockWrite.ReplaceDatanodeOnFailure.BEST_EFFORT_KEY
               + " is set to true.", ioe);
         }
       }
