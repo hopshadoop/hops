@@ -44,8 +44,8 @@ HFTP Guide
 * Implementation
 
    The code for HFTP lives in the Java class
-   <<<org.apache.hadoop.hdfs.HftpFileSystem>>>. Likewise, HSFTP is implemented
-   in <<<org.apache.hadoop.hdfs.HsftpFileSystem>>>.
+   <<<org.apache.hadoop.hdfs.web.HftpFileSystem>>>. Likewise, HSFTP is implemented
+   in <<<org.apache.hadoop.hdfs.web.HsftpFileSystem>>>.
 
 * Configuration Options
 
