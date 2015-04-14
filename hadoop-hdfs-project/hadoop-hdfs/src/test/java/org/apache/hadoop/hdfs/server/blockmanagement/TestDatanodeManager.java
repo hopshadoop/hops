@@ -20,6 +20,10 @@ package org.apache.hadoop.hdfs.server.blockmanagement;
 
 import io.hops.metadata.HdfsStorageFactory;
 import java.io.IOException;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -29,7 +33,9 @@ import java.util.Map.Entry;
 import java.util.Random;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.StorageType;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
@@ -38,10 +44,11 @@ import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfoWithStorage;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
-import org.junit.Test;
-import org.mockito.Mockito;
 import org.mortbay.log.Log;
 
+import org.apache.hadoop.util.Shell;
+import org.junit.Test;
+import org.mockito.Mockito;
 import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.*;
 
@@ -163,26 +170,78 @@ public class TestDatanodeManager {
    * with the storage ids and storage types.
    */
   @Test
-  public void testSortLocatedBlocks() throws IOException {
+  public void testSortLocatedBlocks() throws IOException, URISyntaxException {
     Configuration conf = new HdfsConfiguration();
     HdfsStorageFactory.setConfiguration(conf);
+    HelperFunction(null);
+  }
+
+  /**
+   * Execute a functional topology script and make sure that helper
+   * function works correctly
+   *
+   * @throws IOException
+   * @throws URISyntaxException
+   */
+  @Test
+  public void testgoodScript() throws IOException, URISyntaxException {
+    Configuration conf = new HdfsConfiguration();
+    HdfsStorageFactory.setConfiguration(conf);
+    HelperFunction("/" + Shell.appendScriptExtension("topology-script"));
+  }
+
+
+  /**
+   * Run a broken script and verify that helper function is able to
+   * ignore the broken script and work correctly
+   *
+   * @throws IOException
+   * @throws URISyntaxException
+   */
+  @Test
+  public void testBadScript() throws IOException, URISyntaxException {
+    Configuration conf = new HdfsConfiguration();
+    HdfsStorageFactory.setConfiguration(conf);
+    HelperFunction("/"+ Shell.appendScriptExtension("topology-broken-script"));
+  }
+
+
+  /**
+   * Helper function that tests the DatanodeManagers SortedBlock function
+   * we invoke this function with and without topology scripts
+   *
+   * @param scriptFileName - Script Name or null
+   *
+   * @throws URISyntaxException
+   * @throws IOException
+   */
+  public void HelperFunction(String scriptFileName)
+    throws URISyntaxException, IOException {
     // create the DatanodeManager which will be tested
+    Configuration conf = new Configuration();
     FSNamesystem fsn = Mockito.mock(FSNamesystem.class);
+    if (scriptFileName != null && !scriptFileName.isEmpty()) {
+      URL shellScript = getClass().getResource(scriptFileName);
+      Path resourcePath = Paths.get(shellScript.toURI());
+      FileUtil.setExecutable(resourcePath.toFile(), true);
+      conf.set(DFSConfigKeys.NET_TOPOLOGY_SCRIPT_FILE_NAME_KEY,
+        resourcePath.toString());
+    }
     DatanodeManager dm = new DatanodeManager(Mockito.mock(BlockManager.class),
-        fsn, new Configuration());
+      fsn, conf);
 
     // register 4 datanodes, each with different storage ID and type
     DatanodeInfo[] locs = new DatanodeInfo[4];
     String[] storageIDs = new String[4];
     StorageType[] storageTypes = new StorageType[]{
-        StorageType.ARCHIVE,
-        StorageType.DEFAULT,
-        StorageType.DISK,
-        StorageType.SSD
+      StorageType.ARCHIVE,
+      StorageType.DEFAULT,
+      StorageType.DISK,
+      StorageType.SSD
     };
-    for(int i = 0; i < 4; i++) {
+    for (int i = 0; i < 4; i++) {
       // register new datanode
-      String uuid = "UUID-"+i;
+      String uuid = "UUID-" + i;
       String ip = "IP-" + i;
       DatanodeRegistration dr = Mockito.mock(DatanodeRegistration.class);
       Mockito.when(dr.getDatanodeUuid()).thenReturn(uuid);
@@ -194,7 +253,7 @@ public class TestDatanodeManager {
 
       // get location and storage information
       locs[i] = dm.getDatanode(new DatanodeID(ip, ip, uuid, 9000, 9000, 9000, 9000));
-      storageIDs[i] = "storageID-"+i;
+      storageIDs[i] = "storageID-" + i;
     }
 
     // set first 2 locations as decomissioned
@@ -219,18 +278,19 @@ public class TestDatanodeManager {
     assertThat(sortedLocs.length, is(4));
     assertThat(storageIDs.length, is(4));
     assertThat(storageTypes.length, is(4));
-    for(int i = 0; i < sortedLocs.length; i++) {
-      assertThat(((DatanodeInfoWithStorage)sortedLocs[i]).getStorageID(), is(storageIDs[i]));
-      assertThat(((DatanodeInfoWithStorage)sortedLocs[i]).getStorageType(), is(storageTypes[i]));
+    for (int i = 0; i < sortedLocs.length; i++) {
+      assertThat(((DatanodeInfoWithStorage) sortedLocs[i]).getStorageID(),
+        is(storageIDs[i]));
+      assertThat(((DatanodeInfoWithStorage) sortedLocs[i]).getStorageType(),
+        is(storageTypes[i]));
     }
-
     // Ensure the local node is first.
     assertThat(sortedLocs[0].getIpAddr(), is(targetIp));
-
     // Ensure the two decommissioned DNs were moved to the end.
-    assertThat(sortedLocs[sortedLocs.length-1].getAdminState(),
-        is(DatanodeInfo.AdminStates.DECOMMISSIONED));
-    assertThat(sortedLocs[sortedLocs.length-2].getAdminState(),
-        is(DatanodeInfo.AdminStates.DECOMMISSIONED));
+    assertThat(sortedLocs[sortedLocs.length - 1].getAdminState(),
+      is(DatanodeInfo.AdminStates.DECOMMISSIONED));
+    assertThat(sortedLocs[sortedLocs.length - 2].getAdminState(),
+      is(DatanodeInfo.AdminStates.DECOMMISSIONED));
   }
 }
+
