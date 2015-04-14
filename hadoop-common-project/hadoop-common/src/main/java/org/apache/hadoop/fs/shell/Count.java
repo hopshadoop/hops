@@ -18,14 +18,18 @@
 package org.apache.hadoop.fs.shell;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedList;
+import java.util.List;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FsShell;
+import org.apache.hadoop.fs.StorageType;
 
 /**
  * Count the number of directories, files, bytes, quota, and remaining quota.
@@ -44,20 +48,38 @@ public class Count extends FsCommand {
 
   private static final String OPTION_QUOTA = "q";
   private static final String OPTION_HUMAN = "h";
+  private static final String OPTION_HEADER = "v";
+  private static final String OPTION_TYPE = "t";
 
   public static final String NAME = "count";
   public static final String USAGE =
-      "[-" + OPTION_QUOTA + "] [-" + OPTION_HUMAN + "] <path> ...";
-  public static final String DESCRIPTION = 
+      "[-" + OPTION_QUOTA + "] [-" + OPTION_HUMAN + "] [-" + OPTION_HEADER
+          + "] [-" + OPTION_TYPE + " [<storage type>]] <path> ...";
+  public static final String DESCRIPTION =
       "Count the number of directories, files and bytes under the paths\n" +
-      "that match the specified file pattern.  The output columns are:\n" +
-      "DIR_COUNT FILE_COUNT CONTENT_SIZE FILE_NAME or\n" +
-      "QUOTA REMAINING_QUOTA SPACE_QUOTA REMAINING_SPACE_QUOTA \n" +
-      "      DIR_COUNT FILE_COUNT CONTENT_SIZE FILE_NAME\n" +
-      "The -h option shows file sizes in human readable format.";
-  
+          "that match the specified file pattern.  The output columns are:\n" +
+          StringUtils.join(ContentSummary.getHeaderFields(), ' ') +
+          " PATHNAME\n" +
+          "or, with the -" + OPTION_QUOTA + " option:\n" +
+          StringUtils.join(ContentSummary.getQuotaHeaderFields(), ' ') + "\n" +
+          "      " +
+          StringUtils.join(ContentSummary.getHeaderFields(), ' ') +
+          " PATHNAME\n" +
+          "The -" + OPTION_HUMAN +
+          " option shows file sizes in human readable format.\n" +
+          "The -" + OPTION_HEADER + " option displays a header line.\n" +
+          "The -" + OPTION_TYPE + " option displays quota by storage types.\n" +
+          "It must be used with -" + OPTION_QUOTA + " option.\n" +
+          "If a comma-separated list of storage types is given after the -" +
+          OPTION_TYPE + " option, \n" +
+          "it displays the quota and usage for the specified types. \n" +
+          "Otherwise, it displays the quota and usage for all the storage \n" +
+          "types that support quota";
+
   private boolean showQuotas;
   private boolean humanReadable;
+  private boolean showQuotabyType;
+  private List<StorageType> storageTypes = null;
 
   /** Constructor */
   public Count() {}
@@ -65,7 +87,7 @@ public class Count extends FsCommand {
   /** Constructor
    * @deprecated invoke via {@link FsShell}
    * @param cmd the count command
-   * @param pos the starting index of the arguments 
+   * @param pos the starting index of the arguments
    * @param conf configuration
    */
   @Deprecated
@@ -77,19 +99,55 @@ public class Count extends FsCommand {
   @Override
   protected void processOptions(LinkedList<String> args) {
     CommandFormat cf = new CommandFormat(1, Integer.MAX_VALUE,
-      OPTION_QUOTA, OPTION_HUMAN);
+        OPTION_QUOTA, OPTION_HUMAN, OPTION_HEADER);
+    cf.addOptionWithValue(OPTION_TYPE);
     cf.parse(args);
     if (args.isEmpty()) { // default path is the current working directory
       args.add(".");
     }
     showQuotas = cf.getOpt(OPTION_QUOTA);
     humanReadable = cf.getOpt(OPTION_HUMAN);
+
+    if (showQuotas) {
+      String types = cf.getOptValue(OPTION_TYPE);
+
+      if (null != types) {
+        showQuotabyType = true;
+        storageTypes = getAndCheckStorageTypes(types);
+      } else {
+        showQuotabyType = false;
+      }
+    }
+
+    if (cf.getOpt(OPTION_HEADER)) {
+      if (showQuotabyType) {
+        out.println(ContentSummary.getStorageTypeHeader(storageTypes) + "PATHNAME");
+      } else {
+        out.println(ContentSummary.getHeader(showQuotas) + "PATHNAME");
+      }
+    }
+  }
+
+  private List<StorageType> getAndCheckStorageTypes(String types) {
+    if ("".equals(types) || "all".equalsIgnoreCase(types)) {
+      return StorageType.getTypesSupportingQuota();
+    }
+
+    String[] typeArray = StringUtils.split(types, ',');
+    List<StorageType> stTypes = new ArrayList<>();
+
+    for (String t : typeArray) {
+      stTypes.add(StorageType.parseStorageType(t));
+    }
+
+    return stTypes;
   }
 
   @Override
   protected void processPath(PathData src) throws IOException {
     ContentSummary summary = src.fs.getContentSummary(src.path);
-    out.println(summary.toString(showQuotas, isHumanReadable()) + src);
+    out.println(summary.toString(showQuotas, isHumanReadable(),
+        showQuotabyType, storageTypes) + src);
   }
   
   /**
@@ -109,4 +167,23 @@ public class Count extends FsCommand {
   boolean isHumanReadable() {
     return humanReadable;
   }
+
+  /**
+   * should print quota by storage types
+   * @return true if enables quota by storage types
+   */
+  @InterfaceAudience.Private
+  boolean isShowQuotabyType() {
+    return showQuotabyType;
+  }
+
+  /**
+   * show specified storage types
+   * @return specified storagetypes
+   */
+  @InterfaceAudience.Private
+  List<StorageType> getStorageTypes() {
+    return storageTypes;
+  }
+
 }
