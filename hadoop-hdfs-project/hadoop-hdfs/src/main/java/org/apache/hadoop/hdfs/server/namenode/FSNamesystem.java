@@ -917,10 +917,12 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       //HOPS as we are distributed we may stop one NN without stopping all of them. In this case we should not clear
       //the information used by the other NN.
       //TODO: check if there is some case where we really need to do the clear.
-//      cacheManager.clearDirectiveStats();
-//      blockManager.getDatanodeManager().clearPendingCachingCommands();
-//      blockManager.getDatanodeManager().setShouldSendCachingCommands(false);
-//      blockManager.clearQueues();
+//      if (blockManager != null) {
+//        blockManager.getDatanodeManager().clearPendingCachingCommands();
+//        blockManager.getDatanodeManager().setShouldSendCachingCommands(false);
+//        // Don't want to keep replication queues when not in Active.
+//        blockManager.clearQueues();
+//      }
 //      initializedReplQueues = false;
     }
   }

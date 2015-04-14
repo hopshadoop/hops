@@ -161,6 +161,18 @@ Release 2.8.0 - UNRELEASED
     HDFS-8091: ACLStatus and XAttributes should be presented to
     INodeAttributesProvider before returning to client (asuresh)
 
+    HDFS-7939. Two fsimage_rollback_* files are created which are not deleted
+    after rollback. (J.Andreina via vinayakumarb)
+
+    HDFS-8111. NPE thrown when invalid FSImage filename given for
+    'hdfs oiv_legacy' cmd ( surendra singh lilhore via vinayakumarb )
+
+    HDFS-7701. Support reporting per storage type quota and usage
+    with hadoop/hdfs shell. (Peter Shi via Arpit Agarwal)
+
+    HDFS-6666. Abort NameNode and DataNode startup if security is enabled but
+    block access token is not enabled. (Vijay Bhat via cnauroth)
+
 Release 2.7.1 - UNRELEASED
 
   INCOMPATIBLE CHANGES
