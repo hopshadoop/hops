@@ -190,6 +190,18 @@ Release 2.7.1 - UNRELEASED
 
   BUG FIXES
 
+    HDFS-8127. NameNode Failover during HA upgrade can cause DataNode to
+    finalize upgrade. (jing9)
+
+    HDFS-8151. Always use snapshot path as source when invalid snapshot names
+    are used for diff based distcp. (jing9)
+
+    HDFS-7934. Update RollingUpgrade rollback documentation: should use
+    bootstrapstandby for standby NN. (J. Andreina via jing9)
+
+    HDFS-8149. The footer of the Web UI "Hadoop, 2014" is old.
+    (Brahma Reddy Battula via aajisaka)
+
 Release 2.7.0 - UNRELEASED
 
   INCOMPATIBLE CHANGES
