@@ -43,6 +43,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import org.apache.hadoop.hdfs.protocol.HdfsConstantsClient;
 
 public class INodeContext extends BaseEntityContext<Long, INode> {
 
@@ -380,7 +381,7 @@ public class INodeContext extends BaseEntityContext<Long, INode> {
     if (canReadCachedRootINode(names[0], parentIds[0])) {
       rootINode = RootINodeCache.getRootINode();
       if (rootINode != null) {
-        if(names[0].equals(INodeDirectory.ROOT_NAME) && parentIds[0] == INodeDirectory.ROOT_PARENT_ID){
+        if(names[0].equals(INodeDirectory.ROOT_NAME) && parentIds[0] == HdfsConstantsClient.GRANDFATHER_INODE_ID){
           LOG.debug("Reading root inode from the cache "+rootINode);
           //remove root from the batch operation. Cached root inode will be added later to the results
           names = Arrays.copyOfRange(names, 1, names.length);
@@ -446,7 +447,7 @@ public class INodeContext extends BaseEntityContext<Long, INode> {
   }
 
   private boolean canReadCachedRootINode(String name, long parentId) {
-    if (name.equals(INodeDirectory.ROOT_NAME) && parentId == INodeDirectory.ROOT_PARENT_ID) {
+    if (name.equals(INodeDirectory.ROOT_NAME) && parentId == HdfsConstantsClient.GRANDFATHER_INODE_ID) {
       if (RootINodeCache.isRootInCache() && currentLockMode.get() == LockMode.READ_COMMITTED) {
         return true;
       } else {

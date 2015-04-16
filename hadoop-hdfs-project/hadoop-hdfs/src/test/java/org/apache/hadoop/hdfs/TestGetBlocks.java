@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdfs;
 
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -27,26 +26,25 @@ import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
+import org.apache.hadoop.hdfs.protocol.HdfsConstantsClient;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
-import org.apache.hadoop.hdfs.server.common.GenerationStamp;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.datanode.DataNodeTestUtils;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations.BlockWithLocations;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocol;
 import org.apache.hadoop.ipc.RemoteException;
-import org.apache.hadoop.util.Time;
 import org.junit.Test;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import org.apache.hadoop.util.Time;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -296,13 +294,13 @@ public class TestGetBlocks {
       map.put(new Block(blkids[i], 0, blkids[i]), blkids[i]);
     }
     System.out.println("map=" + map.toString().replace(",", "\n  "));
-  
-    for (long blkid : blkids) {
-      Block b =
-          new Block(blkid, 0, GenerationStamp.GRANDFATHER_GENERATION_STAMP);
+
+    for (int i = 0; i < blkids.length; i++) {
+      Block b = new Block(blkids[i], 0,
+          HdfsConstantsClient.GRANDFATHER_GENERATION_STAMP);
       Long v = map.get(b);
       System.out.println(b + " => " + v);
-      assertEquals(v.longValue(), blkid);
+      assertEquals(v.longValue(), blkids[i]);
     }
   }
 

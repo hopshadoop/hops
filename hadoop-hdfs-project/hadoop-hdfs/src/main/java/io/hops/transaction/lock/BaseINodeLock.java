@@ -43,6 +43,7 @@ import java.util.Map;
 import java.util.Random;
 import org.apache.commons.math3.stat.StatUtils;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdfs.protocol.HdfsConstantsClient;
 import org.apache.hadoop.hdfs.protocol.UnresolvedPathException;
 import org.apache.hadoop.hdfs.server.namenode.INodeDirectory;
 
@@ -342,7 +343,7 @@ public abstract class BaseINodeLock extends Lock {
     LinkedList<INode> pathInodes = new LinkedList<>();
     pathInodes.add(leaf);
     INode curr = leaf;
-    while (curr.getParentId() != INodeDirectory.ROOT_PARENT_ID) {
+    while (curr.getParentId() != HdfsConstantsClient.GRANDFATHER_INODE_ID) {
       curr = find(TransactionLockTypes.INodeLockType.READ_COMMITTED,
           curr.getParentId());
       if(curr==null){
@@ -419,7 +420,7 @@ public abstract class BaseINodeLock extends Lock {
 
     protected long[] getParentIds(long[] inodeIds, boolean partial) {
       long[] parentIds = new long[partial ? inodeIds.length + 1 : inodeIds.length];
-      parentIds[0] = INodeDirectory.ROOT_PARENT_ID;
+      parentIds[0] = HdfsConstantsClient.GRANDFATHER_INODE_ID;
       System.arraycopy(inodeIds, 0, parentIds, 1, (partial ? inodeIds.length
           : inodeIds.length - 1));
       return parentIds;
@@ -538,7 +539,7 @@ public abstract class BaseINodeLock extends Lock {
     }
 
     void getPathInodes(long parentId, Map<Long, INode> alreadyFetchedInodes) throws IOException {
-      if (parentId == INode.ROOT_PARENT_ID) {
+      if (parentId == HdfsConstantsClient.GRANDFATHER_INODE_ID) {
         return;
       }
       INodeIdentifier cur = Cache.getInstance().get(parentId);
@@ -595,7 +596,7 @@ public abstract class BaseINodeLock extends Lock {
           getPathInodes(identifier.getInodeId(), alreadyFetchedInodes);
         }
       }
-      if (parentId != INode.ROOT_PARENT_ID) {
+      if (parentId != HdfsConstantsClient.GRANDFATHER_INODE_ID) {
         getPathInodes(parentId, alreadyFetchedInodes);
       }
     }

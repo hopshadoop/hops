@@ -11,6 +11,7 @@ import org.apache.hadoop.hdfs.server.namenode.INode;
 import org.apache.hadoop.hdfs.server.namenode.INodeDirectory;
 
 import java.io.IOException;
+import org.apache.hadoop.hdfs.protocol.HdfsConstantsClient;
 
 /**
  * Created by salman on 2016-08-21.
@@ -75,7 +76,8 @@ public class RootINodeCache {
     public void run() {
       running = true;
       LOG.debug("RootCache Started");
-      final long rootPartitionId = INode.calculatePartitionId(INodeDirectory.ROOT_PARENT_ID, INodeDirectory.ROOT_NAME, INodeDirectory.ROOT_DIR_DEPTH);
+      final long rootPartitionId = INode.calculatePartitionId(HdfsConstantsClient.GRANDFATHER_INODE_ID,
+          INodeDirectory.ROOT_NAME, INodeDirectory.ROOT_DIR_DEPTH);
 
       LightWeightRequestHandler getRootINode =
               new LightWeightRequestHandler(HDFSOperationType.GET_ROOT) {
@@ -83,7 +85,8 @@ public class RootINodeCache {
                 public Object performTask() throws IOException {
                   INodeDataAccess da = (INodeDataAccess) HdfsStorageFactory
                           .getDataAccess(INodeDataAccess.class);
-                  INode rootINode = (INode) da.findInodeByNameParentIdAndPartitionIdPK(INodeDirectory.ROOT_NAME, INodeDirectory.ROOT_PARENT_ID, rootPartitionId);
+                  INode rootINode = (INode) da.findInodeByNameParentIdAndPartitionIdPK(INodeDirectory.ROOT_NAME,
+                      HdfsConstantsClient.GRANDFATHER_INODE_ID, rootPartitionId);
                   return rootINode;
                 }
               };

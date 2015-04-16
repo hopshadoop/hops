@@ -28,12 +28,12 @@ import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.protocol.Block;
-import org.apache.hadoop.hdfs.protocol.BlockListAsLongs;
 import org.apache.hadoop.hdfs.protocol.BlockListAsLongs.BlockReportReplica;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
+import org.apache.hadoop.hdfs.protocol.HdfsConstantsClient;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.security.token.block.ExportedBlockKeys;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockManagerTestUtil;
@@ -68,7 +68,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import org.apache.hadoop.util.Tool;
@@ -636,11 +635,10 @@ public class NNThroughputBenchmark implements Tool {
                   EnumSet.of(CreateFlag.CREATE, CreateFlag.OVERWRITE)), true,
               replication, BLOCK_SIZE);
       long end = Time.now();
-      for (boolean written = !closeUponCreate; !written; written = nameNodeProto
-          .complete(fileNames[daemonId][inputIdx], clientName, null, INode.ROOT_PARENT_ID, null)) {
-        ;
-      }
-      return end - start;
+      for(boolean written = !closeUponCreate; !written; 
+        written = nameNodeProto.complete(fileNames[daemonId][inputIdx],
+                                    clientName, null, HdfsConstantsClient.GRANDFATHER_INODE_ID, null));
+      return end-start;
     }
 
     @Override
@@ -1200,7 +1198,7 @@ public class NNThroughputBenchmark implements Tool {
                 EnumSet.of(CreateFlag.CREATE, CreateFlag.OVERWRITE)), true,
             replication, BLOCK_SIZE);
         ExtendedBlock lastBlock = addBlocks(fileName, clientName);
-        nameNodeProto.complete(fileName, clientName, lastBlock, INode.ROOT_PARENT_ID, null);
+        nameNodeProto.complete(fileName, clientName, lastBlock, HdfsConstantsClient.GRANDFATHER_INODE_ID, null);
       }
       // prepare block reports
       for (int idx = 0; idx < nrDatanodes; idx++) {
@@ -1211,9 +1209,9 @@ public class NNThroughputBenchmark implements Tool {
     private ExtendedBlock addBlocks(String fileName, String clientName)
         throws IOException {
       ExtendedBlock prevBlock = null;
-      for (int jdx = 0; jdx < blocksPerFile; jdx++) {
-        LocatedBlock loc =
-            nameNodeProto.addBlock(fileName, clientName, prevBlock, null, INode.ROOT_PARENT_ID, null);
+      for(int jdx = 0; jdx < blocksPerFile; jdx++) {
+        LocatedBlock loc = nameNodeProto.addBlock(fileName, clientName,
+            prevBlock, null, HdfsConstantsClient.GRANDFATHER_INODE_ID, null);
         prevBlock = loc.getBlock();
         for (DatanodeInfo dnInfo : loc.getLocations()) {
           int dnIdx = Arrays.binarySearch(datanodes, dnInfo.getXferAddr());

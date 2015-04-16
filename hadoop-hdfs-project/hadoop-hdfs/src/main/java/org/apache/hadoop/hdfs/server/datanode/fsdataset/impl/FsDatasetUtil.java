@@ -19,7 +19,7 @@ package org.apache.hadoop.hdfs.server.datanode.fsdataset.impl;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hdfs.protocol.Block;
-import org.apache.hadoop.hdfs.server.common.GenerationStamp;
+import org.apache.hadoop.hdfs.protocol.HdfsConstantsClient;
 import org.apache.hadoop.hdfs.server.datanode.DatanodeUtil;
 
 import java.io.File;
@@ -95,7 +95,7 @@ public class FsDatasetUtil {
       }
     }
     FsDatasetImpl.LOG.warn("Block " + blockFile + " does not have a metafile!");
-    return GenerationStamp.GRANDFATHER_GENERATION_STAMP;
+    return HdfsConstantsClient.GRANDFATHER_GENERATION_STAMP;
   }
 
   /**
