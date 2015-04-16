@@ -67,6 +67,7 @@ import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.protocol.DirectoryListing;
+import org.apache.hadoop.hdfs.protocol.HdfsConstantsClient;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
@@ -215,8 +216,9 @@ public class TestINodeFile {
     INodeFile inf =createINodeFile(replication, preferredBlockSize);
     inf.setLocalName("f");
 
-    INodeDirectory root = new INodeDirectory(INodeDirectory.ROOT_INODE_ID ,INodeDirectory.ROOT_NAME, perms);
-    INodeDirectory dir = new INodeDirectory(IDsGeneratorFactory.getInstance().getUniqueINodeID() ,"d", perms);
+    INodeDirectory root = new INodeDirectory(HdfsConstantsClient.GRANDFATHER_INODE_ID,
+        INodeDirectory.ROOT_NAME, perm);
+    INodeDirectory dir = new INodeDirectory(IDsGeneratorFactory.getInstance().getUniqueINodeID(), "d", perm);
 
     assertEquals("f", inf.getFullPathName());
     assertEquals("", inf.getLocalParentDir());
@@ -393,8 +395,8 @@ public class TestINodeFile {
       }
     }
 
-    {
-      final INode from = new INodeFile(0, perm, BlockInfoContiguous.EMPTY_ARRAY,
+    {//cast from INodeFileUnderConstruction
+      final INode from = new INodeFile(HdfsConstantsClient.GRANDFATHER_INODE_ID, perm, BlockInfoContiguous.EMPTY_ARRAY,
           replication, 0L, 0L, preferredBlockSize, (byte) 0);
       
       //cast to INodeFile, should success
@@ -410,7 +412,7 @@ public class TestINodeFile {
     }
 
     {//cast from INodeDirectory
-      final INode from = new INodeDirectory(0, perm, 0L);
+      final INode from = new INodeDirectory(HdfsConstantsClient.GRANDFATHER_INODE_ID, perm, 0L);
 
       //cast to INodeFile, should fail
       try {
@@ -1203,7 +1205,7 @@ public class TestINodeFile {
   @Test
   public void testFileUnderConstruction() throws IOException {
     replication = 3;
-    final INodeFile file = new INodeFile(0, perm, null,
+    final INodeFile file = new INodeFile(HdfsConstantsClient.GRANDFATHER_INODE_ID, perm, null,
         replication, 0L, 0L, preferredBlockSize, (byte) 0);
     assertFalse(file.isUnderConstruction());
     

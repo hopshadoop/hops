@@ -28,6 +28,8 @@ import org.apache.hadoop.fs.permission.AclStatus;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.XAttrHelper;
+import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
+import org.apache.hadoop.hdfs.protocol.HdfsConstantsClient;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.util.Time;
 import org.codehaus.jackson.map.ObjectMapper;
@@ -65,10 +67,10 @@ public class TestJsonUtil {
   public void testHdfsFileStatus() throws IOException {
     final long now = Time.now();
     final String parent = "/dir";
-    final HdfsFileStatus status =
-        new HdfsFileStatus(1001L, false, 3, 1L << 26, now, now + 10,
-            new FsPermission((short) 0644), "user", "group",
-            DFSUtil.string2Bytes("bar"), DFSUtil.string2Bytes("foo"), -1,  0, false/*not stored in the database*/, (byte) 0);
+    final HdfsFileStatus status = new HdfsFileStatus(1001L, false, 3, 1L << 26,
+        now, now + 10, new FsPermission((short) 0644), "user", "group",
+        DFSUtil.string2Bytes("bar"), DFSUtil.string2Bytes("foo"),
+        HdfsConstantsClient.GRANDFATHER_INODE_ID, 0, false/*not stored in the database*/, (byte) 0);
     final FileStatus fstatus = toFileStatus(status, parent);
     System.out.println("status  = " + status);
     System.out.println("fstatus = " + fstatus);

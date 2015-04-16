@@ -26,21 +26,12 @@ import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLocks;
 import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
-import java.net.InetSocketAddress;
-import java.net.URI;
-import java.net.UnknownHostException;
-import java.security.PrivilegedExceptionAction;
-import java.util.EnumSet;
-
-import org.apache.commons.logging.LogFactory;
-import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.*;
 import org.apache.hadoop.fs.FileSystem;
@@ -54,6 +45,7 @@ import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
+import org.apache.hadoop.hdfs.protocol.HdfsConstantsClient;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
@@ -70,7 +62,6 @@ import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.Time;
 import org.junit.Test;
 
-import java.io.*;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.UnknownHostException;
@@ -83,7 +74,6 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_FILE_BUFFER_
 import static org.apache.hadoop.hdfs.DFSConfigKeys.*;
 import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
-import org.apache.hadoop.hdfs.server.namenode.INode;
 import org.apache.hadoop.hdfs.server.namenode.LeaseExpiredException;
 import static org.junit.Assert.*;
 import static org.junit.Assume.assumeTrue;
@@ -561,10 +551,10 @@ public class TestFileCreation {
           locations.locatedBlockCount() + " blocks.");
 
       // add one block to the file
-      LocatedBlock location = client.getNamenode()
-          .addBlock(file1.toString(), client.clientName, null, null, INode.ROOT_PARENT_ID, null);
-      System.out.println(
-          "testFileCreationError2: " + "Added block " + location.getBlock());
+      LocatedBlock location = client.getNamenode().addBlock(file1.toString(),
+          client.clientName, null, null, HdfsConstantsClient.GRANDFATHER_INODE_ID, null);
+      System.out.println("testFileCreationError2: "
+          + "Added block " + location.getBlock());
 
       locations = client.getNamenode()
           .getBlockLocations(file1.toString(), 0, Long.MAX_VALUE);
@@ -616,8 +606,8 @@ public class TestFileCreation {
       final Path f = new Path("/foo.txt");
       createFile(dfs, f, 3);
       try {
-        cluster.getNameNodeRpc()
-            .addBlock(f.toString(), client.clientName, null, null, INode.ROOT_PARENT_ID, null);
+        cluster.getNameNodeRpc().addBlock(f.toString(), client.clientName,
+            null, null, HdfsConstantsClient.GRANDFATHER_INODE_ID, null);
         fail();
       } catch (IOException ioe) {
         FileSystem.LOG.info("GOOD!", ioe);

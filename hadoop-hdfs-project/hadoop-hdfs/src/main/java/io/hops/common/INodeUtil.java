@@ -57,6 +57,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
+import org.apache.hadoop.hdfs.protocol.HdfsConstantsClient;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguousUnderConstruction;
 import static org.apache.hadoop.hdfs.server.namenode.INode.EMPTY_LIST;
@@ -190,7 +191,7 @@ public class INodeUtil {
   private static INode getRoot()
       throws StorageException, TransactionContextException {
     return getNode(INodeDirectory.ROOT_NAME.getBytes(),
-        INodeDirectory.ROOT_PARENT_ID, INodeDirectory.getRootDirPartitionKey(), false);
+        HdfsConstantsClient.GRANDFATHER_INODE_ID, INodeDirectory.getRootDirPartitionKey(), false);
   }
 
   public static INode indexINodeScanById(long id) throws StorageException {
@@ -205,7 +206,7 @@ public class INodeUtil {
       throws StorageException {
     INode temp = inode;
     while (temp != null &&
-        temp.getParentId() != INodeDirectory.ROOT_PARENT_ID) {
+        temp.getParentId() != HdfsConstantsClient.GRANDFATHER_INODE_ID) {
       temp = indexINodeScanById(
           temp.getParentId()); // all upper components are dirs
       if (temp != null) {

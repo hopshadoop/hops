@@ -50,6 +50,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.apache.hadoop.hdfs.protocol.HdfsConstantsClient;
 import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
 import org.apache.hadoop.hdfs.util.ChunkedArrayList;
 import org.apache.hadoop.util.LightWeightGSet.LinkedElement;
@@ -126,7 +127,6 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
   protected boolean subtreeLocked;
   protected long subtreeLockOwner;
 
-  public final static long ROOT_PARENT_ID = 0;
   public final static long ROOT_INODE_ID = 1;
   
   private byte numXAttrs;
@@ -137,7 +137,7 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
    */
   public static void checkId(long requestId, INode inode)
       throws FileNotFoundException {
-    if (requestId != ROOT_PARENT_ID && requestId != inode.getId()) {
+    if (requestId != HdfsConstantsClient.GRANDFATHER_INODE_ID && requestId != inode.getId()) {
       throw new FileNotFoundException(
           "ID mismatch. Request id and saved id: " + requestId + " , "
           + inode.getId());
@@ -556,7 +556,7 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
     if (isRoot()) {
       return null;
     }
-    if (parent == null && getParentId()!= ROOT_PARENT_ID) {
+    if (parent == null && getParentId()!= HdfsConstantsClient.GRANDFATHER_INODE_ID) {
       parent = (INode) EntityManager
           .find(INode.Finder.ByINodeIdFTIS, getParentId());
     }

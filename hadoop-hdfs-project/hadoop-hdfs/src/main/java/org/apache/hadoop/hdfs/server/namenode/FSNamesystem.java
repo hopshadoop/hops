@@ -83,6 +83,7 @@ import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.DirectoryListing;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
+import org.apache.hadoop.hdfs.protocol.HdfsConstantsClient;
 import org.apache.hadoop.hdfs.protocol.LastBlockWithStatus;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.SafeModeAction;
@@ -2489,7 +2490,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = getInstance();
-        if (fileId == INode.ROOT_PARENT_ID) {
+        if (fileId == HdfsConstantsClient.GRANDFATHER_INODE_ID) {
           // Older clients may not have given us an inode ID to work with.
           // In this case, we have to try to resolve the path and hope it
           // hasn't changed or been deleted since the file was opened for write.
@@ -2698,7 +2699,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     Block previousBlock = ExtendedBlock.getLocalBlock(previous);
         final INode inode;
     final INodesInPath iip;
-    if (fileId == INode.ROOT_PARENT_ID) {
+    if (fileId == HdfsConstantsClient.GRANDFATHER_INODE_ID) {
       // Older clients may not have given us an inode ID to work with.
       // In this case, we have to try to resolve the path and hope it
       // hasn't changed or been deleted since the file was opened for write.
@@ -2808,7 +2809,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           @Override
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = getInstance();
-            if (fileId == INode.ROOT_PARENT_ID) {
+            if (fileId == HdfsConstantsClient.GRANDFATHER_INODE_ID) {
               // Older clients may not have given us an inode ID to work with.
               // In this case, we have to try to resolve the path and hope it
               // hasn't changed or been deleted since the file was opened for write.
@@ -2840,7 +2841,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
             String src2=src;
             //check lease
             final INode inode;
-            if (fileId == INode.ROOT_PARENT_ID) {
+            if (fileId == HdfsConstantsClient.GRANDFATHER_INODE_ID) {
               // Older clients may not have given us an inode ID to work with.
               // In this case, we have to try to resolve the path and hope it
               // hasn't changed or been deleted since the file was opened for write.
@@ -2897,7 +2898,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           @Override
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = getInstance();
-            if (fileId == INode.ROOT_PARENT_ID) {
+            if (fileId == HdfsConstantsClient.GRANDFATHER_INODE_ID) {
               // Older clients may not have given us an inode ID to work with.
               // In this case, we have to try to resolve the path and hope it
               // hasn't changed or been deleted since the file was opened for write.
@@ -2932,7 +2933,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
             String srcInt = src;
             final INode inode;
             final INodesInPath iip;
-            if (fileId == INode.ROOT_PARENT_ID) {
+            if (fileId == HdfsConstantsClient.GRANDFATHER_INODE_ID) {
               // Older clients may not have given us an inode ID to work with.
               // In this case, we have to try to resolve the path and hope it
               // hasn't changed or been deleted since the file was opened for write.
@@ -3024,7 +3025,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           @Override
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = getInstance();
-            if (fileId == INode.ROOT_PARENT_ID) {
+            if (fileId == HdfsConstantsClient.GRANDFATHER_INODE_ID) {
               // Older clients may not have given us an inode ID to work with.
               // In this case, we have to try to resolve the path and hope it
               // hasn't changed or been deleted since the file was opened for write.
@@ -3088,7 +3089,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     final INodesInPath iip;
     INode inode = null;
     try {
-      if (fileId == INode.ROOT_PARENT_ID) {
+      if (fileId == HdfsConstantsClient.GRANDFATHER_INODE_ID) {
         // Older clients may not have given us an inode ID to work with.
         // In this case, we have to try to resolve the path and hope it
         // hasn't changed or been deleted since the file was opened for write.
@@ -3149,7 +3150,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     INodeFile pendingFile;
     final INodesInPath iip;
     INode inode = null;
-    if (fileId == INode.ROOT_PARENT_ID) {
+    if (fileId == HdfsConstantsClient.GRANDFATHER_INODE_ID) {
       // Older clients may not have given us an inode ID to work with.
       // In this case, we have to try to resolve the path and hope it
       // hasn't changed or been deleted since the file was opened for write.
@@ -3492,7 +3493,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = getInstance();
-        if (fileId == INode.ROOT_PARENT_ID) {
+        if (fileId == HdfsConstantsClient.GRANDFATHER_INODE_ID) {
           // Older clients may not have given us an inode ID to work with.
           // In this case, we have to try to resolve the path and hope it
           // hasn't changed or been deleted since the file was opened for write.
@@ -3518,7 +3519,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         checkNameNodeSafeMode("Cannot fsync file " + src);
         final INode inode;
         String src2 = src;
-        if (fileId == INode.ROOT_PARENT_ID) {
+        if (fileId == HdfsConstantsClient.GRANDFATHER_INODE_ID) {
           // Older clients may not have given us an inode ID to work with.
           // In this case, we have to try to resolve the path and hope it
           // hasn't changed or been deleted since the file was opened for write.

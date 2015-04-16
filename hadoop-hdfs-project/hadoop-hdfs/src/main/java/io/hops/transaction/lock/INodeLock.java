@@ -28,6 +28,7 @@ import org.apache.hadoop.ipc.RetriableException;
 
 import java.io.IOException;
 import java.util.*;
+import org.apache.hadoop.hdfs.protocol.HdfsConstantsClient;
 
 public class INodeLock extends BaseINodeLock {
   
@@ -347,7 +348,8 @@ public class INodeLock extends BaseINodeLock {
   private INode acquireLockOnRoot(TransactionLockTypes.INodeLockType lock)
       throws StorageException, TransactionContextException {
     LOG.debug("Acquiring " + lock + " on the root node");
-    return find(lock, INodeDirectory.ROOT_NAME, INodeDirectory.ROOT_PARENT_ID, INodeDirectory.getRootDirPartitionKey());
+    return find(lock, INodeDirectory.ROOT_NAME, HdfsConstantsClient.GRANDFATHER_INODE_ID, INodeDirectory.
+        getRootDirPartitionKey());
   }
 
   private String buildPath(String path, int size) {

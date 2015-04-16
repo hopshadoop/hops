@@ -36,6 +36,7 @@ import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdfs.protocol.HdfsConstantsClient;
 import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
 
 import static org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite.ID_UNSPECIFIED;
@@ -63,7 +64,7 @@ public class INodeDirectory extends INodeWithAdditionalFields {
   protected static final int DEFAULT_FILES_PER_DIRECTORY = 5;
   public final static String ROOT_NAME = "";
 
-  public static final long ROOT_DIR_PARTITION_KEY = ROOT_PARENT_ID;
+  public static final long ROOT_DIR_PARTITION_KEY = HdfsConstantsClient.GRANDFATHER_INODE_ID;
   public static final short ROOT_DIR_DEPTH =0;
 
   private boolean metaEnabled;
@@ -124,7 +125,7 @@ public class INodeDirectory extends INodeWithAdditionalFields {
   public static INodeDirectory createRootDir(PermissionStatus permissions) throws IOException {
     final INodeDirectory newRootINode = new INodeDirectory(ROOT_INODE_ID, ROOT_NAME, permissions);
     newRootINode.inTree();
-    newRootINode.setParentIdNoPersistance(ROOT_PARENT_ID);
+    newRootINode.setParentIdNoPersistance(HdfsConstantsClient.GRANDFATHER_INODE_ID);
     newRootINode.setPartitionIdNoPersistance(getRootDirPartitionKey());
     return newRootINode;
   }
@@ -608,11 +609,12 @@ public class INodeDirectory extends INodeWithAdditionalFields {
   }
 
   public static long getRootDirPartitionKey(){
-    return INode.calculatePartitionId(ROOT_PARENT_ID,ROOT_NAME,ROOT_DIR_DEPTH);
+    return INode.calculatePartitionId(HdfsConstantsClient.GRANDFATHER_INODE_ID,ROOT_NAME,ROOT_DIR_DEPTH);
   }
 
   public static INodeIdentifier getRootIdentifier(){
-    INodeIdentifier rootINodeIdentifier = new INodeIdentifier(INodeDirectory.ROOT_INODE_ID,INodeDirectory.ROOT_PARENT_ID, INodeDirectory.ROOT_NAME,
+    INodeIdentifier rootINodeIdentifier = new INodeIdentifier(INodeDirectory.ROOT_INODE_ID,
+        HdfsConstantsClient.GRANDFATHER_INODE_ID, INodeDirectory.ROOT_NAME,
         INodeDirectory.getRootDirPartitionKey());
     rootINodeIdentifier.setDepth(INodeDirectory.ROOT_DIR_DEPTH);
     return rootINodeIdentifier;
