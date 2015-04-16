@@ -27,6 +27,7 @@ import org.apache.hadoop.hdfs.server.namenode.INodeDirectory;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import org.apache.hadoop.hdfs.protocol.HdfsConstantsClient;
 
 public class InMemoryCache extends Cache{
 
@@ -78,7 +79,7 @@ public class InMemoryCache extends Cache{
   protected long[] getInternal(String path) throws IOException {
     String[] pathComponents = INode.getPathNames(path);
     long[] inodeIds = new long[pathComponents.length];
-    long parentId = INodeDirectory.ROOT_PARENT_ID;
+    long parentId = HdfsConstantsClient.GRANDFATHER_INODE_ID;
     int index = 0;
     while(index <pathComponents.length){
       String cmp = pathComponents[index];

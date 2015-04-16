@@ -90,6 +90,7 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_STORAGE_POLICY_ENABLED_KE
 import static org.apache.hadoop.util.Time.now;
 import io.hops.metadata.hdfs.dal.DirectoryWithQuotaFeatureDataAccess;
 import org.apache.hadoop.hdfs.XAttrHelper;
+import org.apache.hadoop.hdfs.protocol.HdfsConstantsClient;
 
 /**
  * Both FSDirectory and FSNamesystem manage the state of the namespace.
@@ -1413,7 +1414,7 @@ public class FSDirectory implements Closeable {
                 .getDataAccess(INodeDataAccess.class);
             INodeDirectory rootInode = (INodeDirectory) da
                 .findInodeByNameParentIdAndPartitionIdPK(INodeDirectory.ROOT_NAME,
-                    INodeDirectory.ROOT_PARENT_ID, INodeDirectory.getRootDirPartitionKey());
+                    HdfsConstantsClient.GRANDFATHER_INODE_ID, INodeDirectory.getRootDirPartitionKey());
             if (rootInode == null || overwrite == true) {
               newRootINode = INodeDirectory.createRootDir(ps);
 

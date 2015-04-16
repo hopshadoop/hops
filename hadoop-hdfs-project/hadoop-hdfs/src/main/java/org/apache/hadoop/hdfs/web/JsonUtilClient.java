@@ -32,6 +32,7 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
+import org.apache.hadoop.hdfs.protocol.HdfsConstantsClient;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
@@ -119,7 +120,7 @@ class JsonUtilClient {
     final short replication = ((Number) m.get("replication")).shortValue();
     final boolean isFileStoredInDB = m.containsKey("isFileStoredInDB")? ((Boolean) m.get("isFileStoredInDB") ): false;
     final long fileId = m.containsKey("fileId") ?
-        ((Number) m.get("fileId")).longValue() : INode.ROOT_PARENT_ID;
+        ((Number) m.get("fileId")).longValue() : HdfsConstantsClient.GRANDFATHER_INODE_ID;
     final int childrenNum = getInt(m, "childrenNum", -1);
     final byte storagePolicy = m.containsKey("storagePolicy") ?
         (byte) ((Number) m.get("storagePolicy")).longValue() :

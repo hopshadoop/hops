@@ -36,8 +36,8 @@ import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.BlockLocalPathInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsBlocksMetadata;
+import org.apache.hadoop.hdfs.protocol.HdfsConstantsClient;
 import org.apache.hadoop.hdfs.protocol.RecoveryInProgressException;
-import org.apache.hadoop.hdfs.server.common.GenerationStamp;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.ReplicaState;
 import org.apache.hadoop.hdfs.server.common.Storage;
 import org.apache.hadoop.hdfs.server.datanode.BlockMetadataHeader;
@@ -1957,7 +1957,7 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
 
       final long diskGS = diskMetaFile != null && diskMetaFile.exists() ?
           Block.getGenerationStamp(diskMetaFile.getName()) :
-          GenerationStamp.GRANDFATHER_GENERATION_STAMP;
+            HdfsConstantsClient.GRANDFATHER_GENERATION_STAMP;
 
       if (diskFile == null || !diskFile.exists()) {
         if (memBlockInfo == null) {
@@ -2041,9 +2041,9 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
           // Metadata file corresponding to block in memory is missing
           // If metadata file found during the scan is on the same directory
           // as the block file, then use the generation stamp from it
-          long gs = diskMetaFile != null && diskMetaFile.exists() &&
-              diskMetaFile.getParent().equals(memFile.getParent()) ? diskGS :
-              GenerationStamp.GRANDFATHER_GENERATION_STAMP;
+          long gs = diskMetaFile != null && diskMetaFile.exists()
+              && diskMetaFile.getParent().equals(memFile.getParent()) ? diskGS
+              : HdfsConstantsClient.GRANDFATHER_GENERATION_STAMP;
 
           LOG.warn("Updating generation stamp for block " + blockId + " from " +
               memBlockInfo.getGenerationStamp() + " to " + gs);

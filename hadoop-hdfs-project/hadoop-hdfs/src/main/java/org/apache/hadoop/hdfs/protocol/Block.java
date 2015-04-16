@@ -20,9 +20,6 @@ package org.apache.hadoop.hdfs.protocol;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.hdfs.server.common.GenerationStamp;
-import org.apache.hadoop.io.Writable;
-import org.apache.hadoop.io.WritableFactories;
-import org.apache.hadoop.io.WritableFactory;
 
 import java.io.DataInput;
 import java.io.DataOutput;
@@ -30,6 +27,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.apache.hadoop.io.*;
 
 /**
  * ***********************************************
@@ -86,8 +84,8 @@ public class Block implements Writable, Comparable<Block> {
    */
   public static long getGenerationStamp(String metaFile) {
     Matcher m = metaFilePattern.matcher(metaFile);
-    return m.matches() ? Long.parseLong(m.group(2)) :
-        GenerationStamp.GRANDFATHER_GENERATION_STAMP;
+    return m.matches() ? Long.parseLong(m.group(2))
+        : HdfsConstantsClient.GRANDFATHER_GENERATION_STAMP;
   }
 
   /**
@@ -112,7 +110,7 @@ public class Block implements Writable, Comparable<Block> {
   }
 
   public Block(final long blkid) {
-    this(blkid, 0, GenerationStamp.GRANDFATHER_GENERATION_STAMP);
+    this(blkid, 0, HdfsConstantsClient.GRANDFATHER_GENERATION_STAMP);
   }
 
   public Block(Block blk) {
