@@ -19,12 +19,12 @@
 package org.apache.hadoop.hdfs;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdfs.protocol.FSConstants;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.io.File;
+import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -125,7 +125,7 @@ public class TestMiniDFSCluster {
     try {
       DistributedFileSystem dfs =
           (DistributedFileSystem) cluster4.getFileSystem();
-      dfs.setSafeMode(FSConstants.SafeModeAction.SAFEMODE_ENTER);
+      dfs.setSafeMode(HdfsConstants.SafeModeAction.SAFEMODE_ENTER);
       cluster4.shutdown();
     } finally {
       while (cluster4.isClusterUp()) {
