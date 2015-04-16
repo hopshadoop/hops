@@ -34,6 +34,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.ReadOption;
+import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.hdfs.client.impl.DfsClientConf;
 import org.apache.hadoop.hdfs.client.impl.DfsClientConf.ShortCircuitConf;
 import org.apache.hadoop.hdfs.protocol.BlockLocalPathInfo;
@@ -303,7 +304,7 @@ class BlockReaderLocalLegacy implements BlockReader {
       throw new IllegalArgumentException("Configured BlockReaderLocalLegacy " +
           "buffer size (" + bufferSizeBytes + ") is not large enough to hold " +
           "a single chunk (" + bytesPerChecksum +  "). Please configure " +
-          DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_BUFFER_SIZE_KEY +
+          HdfsClientConfigKeys.Read.ShortCircuit.BUFFER_SIZE_KEY +
           " appropriately");
     }
 

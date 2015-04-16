@@ -1169,6 +1169,7 @@ implements ByteBufferReadable, CanSetDropBehind, CanSetReadahead,
       long end, byte[] buf, int offset,
       Map<ExtendedBlock, Set<DatanodeInfo>> corruptedBlockMap)
       throws IOException {
+    final DfsClientConf conf = dfsClient.getConf();
     ArrayList<Future<ByteBuffer>> futures = new ArrayList<Future<ByteBuffer>>();
     CompletionService<ByteBuffer> hedgedService =
         new ExecutorCompletionService<ByteBuffer>(
@@ -1196,13 +1197,13 @@ implements ByteBufferReadable, CanSetDropBehind, CanSetReadahead,
         futures.add(firstRequest);
         try {
           Future<ByteBuffer> future = hedgedService.poll(
-              dfsClient.getHedgedReadTimeout(), TimeUnit.MILLISECONDS);
+              conf.getHedgedReadThresholdMillis(), TimeUnit.MILLISECONDS);
           if (future != null) {
             future.get();
             return;
           }
           if (DFSClient.LOG.isDebugEnabled()) {
-            DFSClient.LOG.debug("Waited " + dfsClient.getHedgedReadTimeout()
+            DFSClient.LOG.debug("Waited " + conf.getHedgedReadThresholdMillis()
                 + "ms to read from " + chosenNode.info
                 + "; spawning hedged read");
           }

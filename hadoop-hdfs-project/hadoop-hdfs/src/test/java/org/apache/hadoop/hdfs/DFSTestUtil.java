@@ -158,6 +158,7 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
 import com.google.common.collect.Lists;
+import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 
 /**
  * Utilities for HDFS tests
@@ -1612,7 +1613,7 @@ public class DFSTestUtil {
     
     public Configuration newConfiguration() {
       Configuration conf = new Configuration();
-      conf.setBoolean(DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_KEY, true);
+      conf.setBoolean(HdfsClientConfigKeys.Read.ShortCircuit.KEY, true);
       conf.set(DFSConfigKeys.DFS_DOMAIN_SOCKET_PATH_KEY,
           new File(sockDir.getDir(),
               testName + "._PORT.sock").getAbsolutePath());
