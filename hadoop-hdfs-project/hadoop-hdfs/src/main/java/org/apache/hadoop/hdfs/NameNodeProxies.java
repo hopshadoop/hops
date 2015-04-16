@@ -169,7 +169,7 @@ public class NameNodeProxies {
               config.getMaxRetryAttempts(), config.getFailoverSleepBaseMillis(),
               config.getFailoverSleepMaxMillis()));
       
-      Text dtService = HAUtil.buildTokenServiceForLogicalUri(nameNodeUri);
+      Text dtService = HAUtilClient.buildTokenServiceForLogicalUri(nameNodeUri, HdfsConstants.HDFS_URI_SCHEME);
       return new ProxyAndInfo<T>(proxy, dtService);
     }
   }
@@ -228,7 +228,8 @@ public class NameNodeProxies {
       T proxy = (T) Proxy.newProxyInstance(
           failoverProxyProvider.getInterface().getClassLoader(),
           new Class[] { xface }, dummyHandler);
-      Text dtService = HAUtil.buildTokenServiceForLogicalUri(nameNodeUri);
+      Text dtService = HAUtilClient.buildTokenServiceForLogicalUri(nameNodeUri,
+                                                                HdfsConstants.HDFS_URI_SCHEME);
       return new ProxyAndInfo<T>(proxy, dtService);
     } else {
       LOG.warn("Currently creating proxy using " +
@@ -523,7 +524,8 @@ public class NameNodeProxies {
                     config.getFailoverSleepBaseMillis(), config.getFailoverSleepMaxMillis(),
                     remoteExceptionToPolicyMap));
 
-    Text dtService = HAUtil.buildTokenServiceForLogicalUri(nameNodeUri);
+    Text dtService = HAUtilClient.buildTokenServiceForLogicalUri(nameNodeUri,
+                                                                HdfsConstants.HDFS_URI_SCHEME);
     return new ProxyAndInfo<T>(proxy, dtService);
   }
 
@@ -561,7 +563,8 @@ public class NameNodeProxies {
                     config.getMaxRetryAttempts(), config.getFailoverSleepBaseMillis(),
                     config.getFailoverSleepMaxMillis(), remoteExceptionToPolicyMap));
 
-    Text dtService = HAUtil.buildTokenServiceForLogicalUri(nameNodeUri);
+    Text dtService = HAUtilClient.buildTokenServiceForLogicalUri(nameNodeUri,
+                                                                HdfsConstants.HDFS_URI_SCHEME);
     return new ProxyAndInfo<T>(proxy, dtService);
   }
 }

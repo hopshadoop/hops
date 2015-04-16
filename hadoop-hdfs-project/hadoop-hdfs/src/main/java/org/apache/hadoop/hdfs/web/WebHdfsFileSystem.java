@@ -89,12 +89,10 @@ import org.apache.hadoop.security.token.delegation.AbstractDelegationTokenSelect
 public class WebHdfsFileSystem extends FileSystem
     implements DelegationTokenRenewer.Renewable, TokenAspect.TokenManagementDelegator {
   public static final Log LOG = LogFactory.getLog(WebHdfsFileSystem.class);
-  /** File System URI: {SCHEME}://namenode:port/path/to/file */
-  public static final String SCHEME = "webhdfs";
   /** WebHdfs version. */
   public static final int VERSION = 1;
   /** Http URI: http://namenode:port/{PATH_PREFIX}/path/to/file */
-  public static final String PATH_PREFIX = "/" + SCHEME + "/v" + VERSION;
+  public static final String PATH_PREFIX = "/" + WebHdfsConstants.WEBHDFS_SCHEME + "/v" + VERSION;
 
   /** Default connection factory may be overridden in tests to use smaller timeout values */
   protected URLConnectionFactory connectionFactory;
@@ -123,7 +121,7 @@ public class WebHdfsFileSystem extends FileSystem
    */
   @Override
   public String getScheme() {
-    return SCHEME;
+    return WebHdfsConstants.WEBHDFS_SCHEME;
   }
   
   /**

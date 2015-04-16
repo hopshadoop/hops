@@ -24,7 +24,6 @@ import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
@@ -39,6 +38,7 @@ import org.junit.Test;
 
 import java.net.InetSocketAddress;
 import java.net.URI;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
 
 /**
  * Test WebHDFS with multiple NameNodes
@@ -81,10 +81,9 @@ public class TestWebHdfsWithMultipleNameNodes {
     webhdfs = new WebHdfsFileSystem[nNameNodes];
     for (int i = 0; i < webhdfs.length; i++) {
       final InetSocketAddress addr = cluster.getNameNode(i).getHttpAddress();
-      final String uri =
-          WebHdfsFileSystem.SCHEME + "://" + addr.getHostName() + ":" +
-              addr.getPort() + "/";
-      webhdfs[i] = (WebHdfsFileSystem) FileSystem.get(new URI(uri), conf);
+      final String uri = WebHdfsConstants.WEBHDFS_SCHEME + "://"
+          + addr.getHostName() + ":" + addr.getPort() + "/";
+      webhdfs[i] = (WebHdfsFileSystem)FileSystem.get(new URI(uri), conf);
     }
   }
 
