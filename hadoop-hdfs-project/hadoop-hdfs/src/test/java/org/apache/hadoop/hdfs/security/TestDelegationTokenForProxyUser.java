@@ -21,7 +21,6 @@ package org.apache.hadoop.hdfs.security;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
@@ -32,36 +31,26 @@ import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
-import org.apache.hadoop.hdfs.server.namenode.web.resources.NamenodeWebHdfsMethods;
+import org.apache.hadoop.hdfs.web.WebHdfsConstants;
 import org.apache.hadoop.hdfs.web.WebHdfsFileSystem;
 import org.apache.hadoop.hdfs.web.WebHdfsTestUtil;
-import org.apache.hadoop.hdfs.web.resources.DoAsParam;
-import org.apache.hadoop.hdfs.web.resources.ExceptionHandler;
-import org.apache.hadoop.hdfs.web.resources.GetOpParam;
-import org.apache.hadoop.hdfs.web.resources.PostOpParam;
-import org.apache.hadoop.hdfs.web.resources.PutOpParam;
 import org.apache.hadoop.security.TestDoAsEffectiveUser;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.ProxyUsers;
 import org.apache.hadoop.security.token.Token;
-import org.apache.log4j.Level;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
-import java.net.HttpURLConnection;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
-import java.net.URL;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Enumeration;
-import java.util.Map;
 import org.apache.hadoop.security.authorize.DefaultImpersonationProvider;
 import org.mockito.internal.util.reflection.Whitebox;
 
@@ -162,13 +151,10 @@ public class TestDelegationTokenForProxyUser {
   @Test(timeout=20000)
   public void testWebHdfsDoAs() throws Exception {
     WebHdfsTestUtil.LOG.info("START: testWebHdfsDoAs()");
-    WebHdfsTestUtil.LOG
-        .info("ugi.getShortUserName()=" + ugi.getShortUserName());
+    WebHdfsTestUtil.LOG.info("ugi.getShortUserName()=" + ugi.getShortUserName());
     final UserGroupInformation proxyUgi = UserGroupInformation
         .createProxyUserForTesting(PROXY_USER, ugi, GROUP_NAMES);
-    
-    final WebHdfsFileSystem webhdfs =
-        WebHdfsTestUtil.getWebHdfsFileSystemAs(ugi, config, WebHdfsFileSystem.SCHEME);
+    final WebHdfsFileSystem webhdfs = WebHdfsTestUtil.getWebHdfsFileSystemAs(ugi, config, WebHdfsConstants.WEBHDFS_SCHEME);
     
     final Path root = new Path("/");
     cluster.getFileSystem().setPermission(root, new FsPermission((short) 0777));

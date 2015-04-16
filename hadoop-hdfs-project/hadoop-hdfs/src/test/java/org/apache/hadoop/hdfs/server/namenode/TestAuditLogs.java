@@ -29,6 +29,7 @@ import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.web.HftpFileSystem;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.hadoop.hdfs.web.WebHdfsConstants;
 import org.apache.hadoop.hdfs.web.WebHdfsFileSystem;
 import org.apache.hadoop.hdfs.web.WebHdfsTestUtil;
 import org.apache.hadoop.security.AccessControlException;
@@ -207,8 +208,7 @@ public class TestAuditLogs {
 
     setupAuditLogs();
 
-    WebHdfsFileSystem webfs =
-        WebHdfsTestUtil.getWebHdfsFileSystemAs(userGroupInfo, conf, WebHdfsFileSystem.SCHEME);
+    WebHdfsFileSystem webfs = WebHdfsTestUtil.getWebHdfsFileSystemAs(userGroupInfo, conf, WebHdfsConstants.WEBHDFS_SCHEME);
     InputStream istream = webfs.open(file);
     int val = istream.read();
     istream.close();
@@ -229,8 +229,7 @@ public class TestAuditLogs {
 
     setupAuditLogs();
 
-    WebHdfsFileSystem webfs =
-        WebHdfsTestUtil.getWebHdfsFileSystemAs(userGroupInfo, conf, WebHdfsFileSystem.SCHEME);
+    WebHdfsFileSystem webfs = WebHdfsTestUtil.getWebHdfsFileSystemAs(userGroupInfo, conf, WebHdfsConstants.WEBHDFS_SCHEME);
     FileStatus st = webfs.getFileStatus(file);
 
     verifyAuditLogs(true);
@@ -277,8 +276,7 @@ public class TestAuditLogs {
 
     setupAuditLogs();
     try {
-      WebHdfsFileSystem webfs =
-          WebHdfsTestUtil.getWebHdfsFileSystemAs(userGroupInfo, conf, WebHdfsFileSystem.SCHEME);
+      WebHdfsFileSystem webfs = WebHdfsTestUtil.getWebHdfsFileSystemAs(userGroupInfo, conf, WebHdfsConstants.WEBHDFS_SCHEME);
       InputStream istream = webfs.open(file);
       int val = istream.read();
       fail("open+read must not succeed, got " + val);
@@ -295,7 +293,8 @@ public class TestAuditLogs {
     fs.setPermission(file, new FsPermission((short)0644));
     fs.setOwner(file, "root", null);
     setupAuditLogs();
-    WebHdfsFileSystem webfs = WebHdfsTestUtil.getWebHdfsFileSystemAs(userGroupInfo, conf, WebHdfsFileSystem.SCHEME);
+
+    WebHdfsFileSystem webfs = WebHdfsTestUtil.getWebHdfsFileSystemAs(userGroupInfo, conf, WebHdfsConstants.WEBHDFS_SCHEME);
     webfs.open(file);
     verifyAuditLogsCheckPattern(true, 3, webOpenPattern);
   }

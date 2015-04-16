@@ -24,21 +24,13 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
-import org.apache.hadoop.hdfs.protocol.HdfsConstants;
-import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenSelector;
-import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.security.token.Token;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.Map;
 
-import static org.apache.hadoop.hdfs.protocol.HdfsConstants.HA_DT_SERVICE_PREFIX;
 
 @InterfaceAudience.Private
 public class HAUtil {
@@ -79,72 +71,6 @@ public class HAUtil {
       return ids[1];
     }
     return null;
-  }
-  
-  /**
-   * This is used only by tests at the moment.
-   * @return true if the NN should allow read operations while in standby mode.
-   */
-  public static boolean shouldAllowStandbyReads(Configuration conf) {
-    return conf.getBoolean("dfs.ha.allow.stale.reads", false);
-  }
-
-  public static void setAllowStandbyReads(Configuration conf, boolean val) {
-    conf.setBoolean("dfs.ha.allow.stale.reads", val);
-  }
-
-  /**
-   * @return true if the given nameNodeUri appears to be a logical URI.
-   * This is the case if there is a failover proxy provider configured
-   * for it in the given configuration.
-   */
-  public static boolean isLogicalUri(
-      Configuration conf, URI nameNodeUri) {
-    String host = nameNodeUri.getHost();
-    String configKey = HdfsClientConfigKeys.Failover.PROXY_PROVIDER_KEY_PREFIX + "."
-        + host;
-    return conf.get(configKey) != null;
-  }
-
-  /**
-   * Parse the HDFS URI out of the provided token.
-   * @throws IOException if the token is invalid
-   */
-  public static URI getServiceUriFromToken(
-      Token<DelegationTokenIdentifier> token)
-      throws IOException {
-    String tokStr = token.getService().toString();
-
-    if (tokStr.startsWith(HA_DT_SERVICE_PREFIX)) {
-      tokStr = tokStr.replaceFirst(HA_DT_SERVICE_PREFIX, "");
-    }
-
-    try {
-      return new URI(HdfsConstants.HDFS_URI_SCHEME + "://" +
-          tokStr);
-    } catch (URISyntaxException e) {
-      throw new IOException("Invalid token contents: '" +
-          tokStr + "'");
-    }
-  }
-
-  /**
-   * Get the service name used in the delegation token for the given logical
-   * HA service.
-   * @param uri the logical URI of the cluster
-   * @return the service name
-   */
-  public static Text buildTokenServiceForLogicalUri(URI uri) {
-    return new Text(HA_DT_SERVICE_PREFIX + uri.getHost());
-  }
-
-  /**
-   * @return true if this token corresponds to a logical nameservice
-   * rather than a specific namenode.
-   */
-  public static boolean isTokenForLogicalUri(
-      Token<DelegationTokenIdentifier> token) {
-    return token.getService().toString().startsWith(HA_DT_SERVICE_PREFIX);
   }
 
   /**

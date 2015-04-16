@@ -42,14 +42,14 @@ public class TestWebHDFSAcl extends FSAclBaseTest {
   
   @Override
   protected FileSystem createFileSystem() throws Exception {
-    return WebHdfsTestUtil.getWebHdfsFileSystem(conf, WebHdfsFileSystem.SCHEME);
+    return WebHdfsTestUtil.getWebHdfsFileSystem(conf, WebHdfsConstants.WEBHDFS_SCHEME);
   }
   
   @Override
   protected FileSystem createFileSystem(UserGroupInformation user)
     throws Exception {
     return WebHdfsTestUtil.getWebHdfsFileSystemAs(user, conf,
-        WebHdfsFileSystem.SCHEME);
+        WebHdfsConstants.WEBHDFS_SCHEME);
   }
   
   /**

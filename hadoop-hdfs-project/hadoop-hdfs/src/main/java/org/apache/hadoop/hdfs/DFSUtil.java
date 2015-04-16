@@ -19,30 +19,22 @@
 package org.apache.hadoop.hdfs;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Charsets;
-import com.google.common.base.Joiner;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import com.google.protobuf.BlockingService;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_ADMIN;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_HTTPS_NEED_AUTH_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_HTTPS_NEED_AUTH_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_HA_NAMENODES_KEY_PREFIX;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_HTTPS_ADDRESS_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_HTTPS_ADDRESS_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_RPC_ADDRESS_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMESERVICES;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMESERVICE_ID;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_SERVER_HTTPS_KEYPASSWORD_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_SERVER_HTTPS_KEYSTORE_PASSWORD_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_SERVER_HTTPS_TRUSTSTORE_PASSWORD_KEY;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
@@ -88,7 +80,6 @@ import javax.net.SocketFactory;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -104,6 +95,12 @@ import org.apache.hadoop.http.HttpConfig;
 import org.apache.hadoop.http.HttpServer3;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.authorize.AccessControlList;
+import com.google.common.base.Charsets;
+import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import com.google.protobuf.BlockingService;
+import java.net.InetAddress;
 
 @InterfaceAudience.Private
 public class DFSUtil {
@@ -436,8 +433,8 @@ public class DFSUtil {
       for (int hCnt = 0; hCnt < locations.length; hCnt++) {
         hosts[hCnt] = locations[hCnt].getHostName();
         xferAddrs[hCnt] = locations[hCnt].getXferAddr();
-        NodeBase node =
-            new NodeBase(xferAddrs[hCnt], locations[hCnt].getNetworkLocation());
+        NodeBase node = new NodeBase(xferAddrs[hCnt],
+                                     locations[hCnt].getNetworkLocation());
         racks[hCnt] = node.toString();
       }
       DatanodeInfo[] cachedLocations = blk.getCachedLocations();
@@ -454,108 +451,11 @@ public class DFSUtil {
   }
   
   /**
-   * Returns collection of nameservice Ids from the configuration.
-   * @param conf configuration
-   * @return collection of nameservice Ids, or null if not specified
-   */
-  public static Collection<String> getNameServiceIds(Configuration conf) {
-    return conf.getTrimmedStringCollection(DFS_NAMESERVICES);
-  }
-
-  /**
-   * @return <code>coll</code> if it is non-null and non-empty. Otherwise,
-   * returns a list with a single null value.
-   */
-  private static Collection<String> emptyAsSingletonNull(Collection<String> coll) {
-    if (coll == null || coll.isEmpty()) {
-      return Collections.singletonList(null);
-    } else {
-      return coll;
-    }
-  }
-  
-  /**
-   * Namenode HighAvailability related configuration.
-   * Returns collection of namenode Ids from the configuration. One logical id
-   * for each namenode in the in the HA setup.
-   * 
-   * @param conf configuration
-   * @param nsId the nameservice ID to look at, or null for non-federated 
-   * @return collection of namenode Ids
-   */
-  public static Collection<String> getNameNodeIds(Configuration conf, String nsId) {
-    String key = addSuffix(DFS_HA_NAMENODES_KEY_PREFIX, nsId);
-    return conf.getTrimmedStringCollection(key);
-  }
-  
-  /** Add non empty and non null suffix to a key */
-  private static String addSuffix(String key, String suffix) {
-    if (suffix == null || suffix.isEmpty()) {
-      return key;
-    }
-    assert !suffix.startsWith(".") :
-      "suffix '" + suffix + "' should not already have '.' prepended.";
-    return key + "." + suffix;
-  }
-  
-  /** Concatenate list of suffix strings '.' separated */
-  private static String concatSuffixes(String... suffixes) {
-    if (suffixes == null) {
-      return null;
-    }
-    return Joiner.on(".").skipNulls().join(suffixes);
-  }
-  
-  /**
    * Return configuration key of format key.suffix1.suffix2...suffixN
    */
   public static String addKeySuffixes(String key, String... suffixes) {
-    String keySuffix = concatSuffixes(suffixes);
-    return addSuffix(key, keySuffix);
-  }
-  
-  /**
-   * Substitute a default host in the case that an address has been configured
-   * with a wildcard. This is used, for example, when determining the HTTP
-   * address of the NN -- if it's configured to bind to 0.0.0.0, we want to
-   * substitute the hostname from the filesystem URI rather than trying to
-   * connect to 0.0.0.0.
-   *
-   * @param configuredAddress
-   *     the address found in the configuration
-   * @param defaultHost
-   *     the host to substitute with, if configuredAddress
-   *     is a local/wildcard address.
-   * @return the substituted address
-   * @throws IOException
-   *     if it is a wildcard address and security is enabled
-   */
-  @VisibleForTesting
-  public static String substituteForWildcardAddress(String configuredAddress,
-      String defaultHost) throws IOException {
-    InetSocketAddress sockAddr = NetUtils.createSocketAddr(configuredAddress);
-    InetSocketAddress defaultSockAddr =
-        NetUtils.createSocketAddr(defaultHost + ":0");
-    final InetAddress addr = sockAddr.getAddress();
-    if (addr != null && addr.isAnyLocalAddress()) {
-      if (UserGroupInformation.isSecurityEnabled() &&
-          defaultSockAddr.getAddress().isAnyLocalAddress()) {
-        throw new IOException("Cannot use a wildcard address with security. " +
-            "Must explicitly set bind address for Kerberos");
-      }
-      return defaultHost + ":" + sockAddr.getPort();
-    } else {
-      return configuredAddress;
-    }
-  }
-  
-  private static String getSuffixedConf(Configuration conf,
-      String key, String defaultVal, String[] suffixes) {
-    String ret = conf.get(DFSUtil.addKeySuffixes(key, suffixes));
-    if (ret != null) {
-      return ret;
-    }
-    return conf.get(key, defaultVal);
+    String keySuffix = DFSUtilClient.concatSuffixes(suffixes);
+    return DFSUtilClient.addSuffix(key, keySuffix);
   }
 
   /**
@@ -621,14 +521,14 @@ public class DFSUtil {
     String namenodeId = null;
     int found = 0;
     
-    Collection<String> nsIds = getNameServiceIds(conf);
-    for (String nsId : emptyAsSingletonNull(nsIds)) {
+    Collection<String> nsIds = DFSUtilClient.getNameServiceIds(conf);
+    for (String nsId : DFSUtilClient.emptyAsSingletonNull(nsIds)) {
       if (knownNsId != null && !knownNsId.equals(nsId)) {
         continue;
       }
       
-      Collection<String> nnIds = getNameNodeIds(conf, nsId);
-      for (String nnId : emptyAsSingletonNull(nnIds)) {
+      Collection<String> nnIds = DFSUtilClient.getNameNodeIds(conf, nsId);
+      for (String nnId : DFSUtilClient.emptyAsSingletonNull(nnIds)) {
         if (LOG.isTraceEnabled()) {
           LOG.trace(String.format("addressKey: %s nsId: %s nnId: %s",
               addressKey, nsId, nnId));
@@ -1066,6 +966,45 @@ public class DFSUtil {
     return policy == HttpConfig.Policy.HTTPS_ONLY ? "https" : "http";
   }  
   
+  /**
+   * Substitute a default host in the case that an address has been configured
+   * with a wildcard. This is used, for example, when determining the HTTP
+   * address of the NN -- if it's configured to bind to 0.0.0.0, we want to
+   * substitute the hostname from the filesystem URI rather than trying to
+   * connect to 0.0.0.0.
+   * @param configuredAddress the address found in the configuration
+   * @param defaultHost the host to substitute with, if configuredAddress
+   * is a local/wildcard address.
+   * @return the substituted address
+   * @throws IOException if it is a wildcard address and security is enabled
+   */
+  @VisibleForTesting
+  static String substituteForWildcardAddress(String configuredAddress,
+    String defaultHost) throws IOException {
+    InetSocketAddress sockAddr = NetUtils.createSocketAddr(configuredAddress);
+    InetSocketAddress defaultSockAddr = NetUtils.createSocketAddr(defaultHost
+        + ":0");
+    final InetAddress addr = sockAddr.getAddress();
+    if (addr != null && addr.isAnyLocalAddress()) {
+      if (UserGroupInformation.isSecurityEnabled() &&
+          defaultSockAddr.getAddress().isAnyLocalAddress()) {
+        throw new IOException("Cannot use a wildcard address with security. " +
+            "Must explicitly set bind address for Kerberos");
+      }
+      return defaultHost + ":" + sockAddr.getPort();
+    } else {
+      return configuredAddress;
+    }
+  }
+  
+  private static String getSuffixedConf(Configuration conf,
+      String key, String defaultVal, String[] suffixes) {
+    String ret = conf.get(DFSUtil.addKeySuffixes(key, suffixes));
+    if (ret != null) {
+      return ret;
+    }
+    return conf.get(key, defaultVal);
+  }
   
   public static List<URI> getNsServiceRpcUris(Configuration conf)
       throws URISyntaxException {
@@ -1087,30 +1026,6 @@ public class DFSUtil {
         DFSConfigKeys.DFS_CLIENT_FAILOVER_PROXY_PROVIDER_KEY_PREFIX + "." +
             host;
     return conf.get(configKey) != null;
-  }
-
-  /**
-   * Parse the HDFS URI out of the provided token.
-   *
-   * @throws IOException
-   *     if the token is invalid
-   */
-  public static URI getServiceUriFromToken(
-      Token<DelegationTokenIdentifier> token) throws IOException {
-    String tokStr = token.getService().toString();
-
-    //FIXME:
-    if (tokStr.startsWith(HdfsConstants.HA_DT_SERVICE_PREFIX)) {
-      tokStr = tokStr.replaceFirst(HdfsConstants.HA_DT_SERVICE_PREFIX, "");
-    }
-
-    try {
-      return new URI(HdfsConstants.HDFS_URI_SCHEME + "://" +
-          tokStr);
-    } catch (URISyntaxException e) {
-      throw new IOException("Invalid token contents: '" +
-          tokStr + "'");
-    }
   }
 
   public static URI createHDFSUri(String server) {
