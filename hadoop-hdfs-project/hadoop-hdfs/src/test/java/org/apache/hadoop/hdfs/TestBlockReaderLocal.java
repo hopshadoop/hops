@@ -33,6 +33,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FsTracer;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.shortcircuit.ShortCircuitShm.ShmId;
+import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.hdfs.client.HdfsDataInputStream;
 import org.apache.hadoop.hdfs.client.impl.DfsClientConf;
 import org.apache.hadoop.hdfs.shortcircuit.ShortCircuitCache;
@@ -124,8 +125,8 @@ public class TestBlockReaderLocal {
     Assume.assumeThat(DomainSocket.getLoadingFailureReason(), equalTo(null));
     MiniDFSCluster cluster = null;
     HdfsConfiguration conf = new HdfsConfiguration();
-    conf.setBoolean(DFSConfigKeys.
-        DFS_CLIENT_READ_SHORTCIRCUIT_SKIP_CHECKSUM_KEY, !checksum);
+    conf.setBoolean(HdfsClientConfigKeys.Read.ShortCircuit.SKIP_CHECKSUM_KEY,
+        !checksum);
     conf.setLong(DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY,
         BlockReaderLocalTest.BYTES_PER_CHECKSUM);
     conf.set(DFSConfigKeys.DFS_CHECKSUM_TYPE_KEY, "CRC32C");
@@ -723,10 +724,10 @@ public class TestBlockReaderLocal {
       conf.set(DFSConfigKeys.DFS_DOMAIN_SOCKET_PATH_KEY,
         new File(sockDir.getDir(), "TestStatisticsForLocalRead.%d.sock").
           getAbsolutePath());
-      conf.setBoolean(DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_KEY, true);
+      conf.setBoolean(HdfsClientConfigKeys.Read.ShortCircuit.KEY, true);
       DomainSocket.disableBindPathValidation();
     } else {
-      conf.setBoolean(DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_KEY, false);
+      conf.setBoolean(HdfsClientConfigKeys.Read.ShortCircuit.KEY, false);
     }
     MiniDFSCluster cluster = null;
     final Path TEST_PATH = new Path("/a");

@@ -18,11 +18,11 @@
 
 package org.apache.hadoop.hdfs;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configuration.DeprecationDelta;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 
 /**
  * Adds deprecated keys into the configuration.
@@ -84,7 +84,7 @@ public class HdfsConfiguration extends Configuration {
       new DeprecationDelta("dfs.name.dir.restore",
         DFSConfigKeys.DFS_NAMENODE_NAME_DIR_RESTORE_KEY),
       new DeprecationDelta("dfs.read.prefetch.size",
-        DFSConfigKeys.DFS_CLIENT_READ_PREFETCH_SIZE_KEY),
+        HdfsClientConfigKeys.Read.PREFETCH_SIZE_KEY),
       new DeprecationDelta("dfs.safemode.extension",
         DFSConfigKeys.DFS_NAMENODE_SAFEMODE_EXTENSION_KEY),
       new DeprecationDelta("dfs.safemode.threshold.pct",
