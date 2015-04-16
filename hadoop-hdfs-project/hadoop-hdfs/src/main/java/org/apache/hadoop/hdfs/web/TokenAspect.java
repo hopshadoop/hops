@@ -29,6 +29,7 @@ import org.apache.hadoop.fs.DelegationTokenRenewer;
 import org.apache.hadoop.fs.DelegationTokenRenewer.Renewable;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hdfs.DFSUtil;
+import org.apache.hadoop.hdfs.HAUtilClient;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.SecurityUtil;
@@ -74,9 +75,9 @@ final class TokenAspect<T extends FileSystem & Renewable> {
       Text kind = token.getKind();
       final URI uri;
       if (kind.equals(WebHdfsConstants.WEBHDFS_TOKEN_KIND)) {
-        uri = DFSUtil.createUri(WebHdfsFileSystem.SCHEME, address);
+        uri = DFSUtil.createUri(WebHdfsConstants.WEBHDFS_SCHEME, address);
       } else if (kind.equals(WebHdfsConstants.SWEBHDFS_TOKEN_KIND)) {
-        uri = DFSUtil.createUri(SWebHdfsFileSystem.SCHEME, address);
+        uri = DFSUtil.createUri(WebHdfsConstants.SWEBHDFS_SCHEME, address);
       } else {
         throw new IllegalArgumentException("Unsupported scheme");
       }

@@ -36,6 +36,7 @@ import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.StartupOption;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.namenode.NameNodeAdapter;
 import org.apache.hadoop.hdfs.server.namenode.web.resources.NamenodeWebHdfsMethods;
+import org.apache.hadoop.hdfs.web.WebHdfsConstants;
 import org.apache.hadoop.hdfs.web.WebHdfsFileSystem;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.AccessControlException;
@@ -174,9 +175,9 @@ public class TestDelegationToken {
   @SuppressWarnings("deprecation")
   @Test
   public void testDelegationTokenWebHdfsApi() throws Exception {
-    ((Log4JLogger) NamenodeWebHdfsMethods.LOG).getLogger().setLevel(Level.ALL);
-    final String uri = WebHdfsFileSystem.SCHEME + "://" +
-        config.get(DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY);
+    ((Log4JLogger)NamenodeWebHdfsMethods.LOG).getLogger().setLevel(Level.ALL);
+    final String uri = WebHdfsConstants.WEBHDFS_SCHEME + "://"
+        + config.get(DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY);
     //get file system as JobTracker
     final UserGroupInformation ugi = UserGroupInformation
         .createUserForTesting("JobTracker", new String[]{"user"});
