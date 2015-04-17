@@ -37,11 +37,11 @@ import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.DirectoryListing;
+import org.apache.hadoop.hdfs.protocol.HdfsConstantsClient;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.HdfsLocatedFileStatus;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -198,7 +198,7 @@ class FSDirStatAndListingOp {
   }
 
   private static byte getStoragePolicyID(byte inodePolicy, byte parentPolicy) {
-    return inodePolicy != BlockStoragePolicySuite.ID_UNSPECIFIED ? inodePolicy :
+    return inodePolicy != HdfsConstantsClient.BLOCK_STORAGE_POLICY_ID_UNSPECIFIED ? inodePolicy :
         parentPolicy;
   }
 
@@ -228,8 +228,8 @@ class FSDirStatAndListingOp {
       if (targetNode == null)
         return null;
       byte parentStoragePolicy = isSuperUser ?
-          targetNode.getStoragePolicyID() : BlockStoragePolicySuite
-          .ID_UNSPECIFIED;
+          targetNode.getStoragePolicyID() : HdfsConstantsClient
+          .BLOCK_STORAGE_POLICY_ID_UNSPECIFIED;
 
       if (!targetNode.isDirectory()) {
         return new DirectoryListing(
@@ -251,7 +251,7 @@ class FSDirStatAndListingOp {
         INode cur = contents.get(startChild+i);
         byte curPolicy = isSuperUser && !cur.isSymlink()?
             cur.getLocalStoragePolicyID():
-            BlockStoragePolicySuite.ID_UNSPECIFIED;
+            HdfsConstantsClient.BLOCK_STORAGE_POLICY_ID_UNSPECIFIED;
         listing[i] = createFileStatus(fsd, cur.getLocalNameBytes(), cur,
             needLocation, getStoragePolicyID(curPolicy, parentStoragePolicy), isRawPath, iip);
         listingCnt++;
@@ -287,7 +287,7 @@ class FSDirStatAndListingOp {
 
     final INode i = src.getLastINode();
     byte policyId = includeStoragePolicy && i != null && !i.isSymlink() ? i.getStoragePolicyID()
-        : BlockStoragePolicySuite.ID_UNSPECIFIED;
+        : HdfsConstantsClient.BLOCK_STORAGE_POLICY_ID_UNSPECIFIED;
     return i == null ? null : createFileStatus(
         fsd, HdfsFileStatus.EMPTY_NAME, i, policyId, isRawPath,
         src);

@@ -73,19 +73,15 @@ public class DatanodeID implements Comparable<DatanodeID> {
   
   /**
    * Create a DatanodeID
-   *
-   * @param ipAddr
-   *     IP
-   * @param hostName
-   *     hostname
-   * @param datanodeUuid
-   *     data storage ID
-   * @param xferPort
-   *     data transfer port
-   * @param infoPort
-   *     info server port
-   * @param ipcPort
-   *     ipc server port
+   * @param ipAddr IP
+   * @param hostName hostname
+   * @param datanodeUuid data node ID, UUID for new Datanodes, may be the
+   *                     storage ID for pre-UUID datanodes. NULL if unknown
+   *                     e.g. if this is a new datanode. A new UUID will
+   *                     be assigned by the namenode.
+   * @param xferPort data transfer port
+   * @param infoPort info server port
+   * @param ipcPort ipc server port
    */
   public DatanodeID(String ipAddr, String hostName, String datanodeUuid,
       int xferPort, int infoPort, int infoSecurePort, int ipcPort) {
@@ -123,7 +119,7 @@ public class DatanodeID implements Comparable<DatanodeID> {
   public void setPeerHostName(String peerHostName) {
     this.peerHostName = peerHostName;
   }
-  
+
   /**
    * @return data node ID.
    */
@@ -159,7 +155,7 @@ public class DatanodeID implements Comparable<DatanodeID> {
   public String getPeerHostName() {
     return peerHostName;
   }
-  
+
   /**
    * @return IP:xferPort string
    */
@@ -259,17 +255,17 @@ public class DatanodeID implements Comparable<DatanodeID> {
     return (getXferAddr().equals(((DatanodeID) to).getXferAddr()) &&
         datanodeUuid.equals(((DatanodeID) to).getDatanodeUuid()));
   }
-  
+
   @Override
   public int hashCode() {
     return datanodeUuid.hashCode();
   }
-  
+
   @Override
   public String toString() {
     return getXferAddr();
   }
-  
+
   /**
    * Update fields when a new registration request comes in.
    * Note that this does not update datanodeUuid.

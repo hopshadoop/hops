@@ -27,6 +27,8 @@ import org.apache.hadoop.fs.DF;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.DFSUtil;
+import org.apache.hadoop.hdfs.DFSUtilClient;
+import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
@@ -104,12 +106,13 @@ public class TestNamenodeCapacityReport {
             percentRemaining);
         
         assertTrue(configCapacity == (used + remaining + nonDFSUsed));
-        assertTrue(percentUsed == DFSUtil.getPercentUsed(used, configCapacity));
-        assertTrue(percentRemaining ==
-            DFSUtil.getPercentRemaining(remaining, configCapacity));
-        assertTrue(
-            percentBpUsed == DFSUtil.getPercentUsed(bpUsed, configCapacity));
-      }
+        assertTrue(percentUsed == DFSUtilClient.getPercentUsed(used,
+                                                               configCapacity));
+        assertTrue(percentRemaining == DFSUtilClient.getPercentRemaining(
+            remaining, configCapacity));
+        assertTrue(percentBpUsed == DFSUtilClient.getPercentUsed(bpUsed,
+                                                                 configCapacity));
+      }   
       
       DF df = new DF(new File(cluster.getDataDirectory()), conf);
 
@@ -153,11 +156,12 @@ public class TestNamenodeCapacityReport {
       assertTrue(configCapacity == (used + remaining + nonDFSUsed));
 
       // Ensure percent used is calculated based on used and present capacity
-      assertTrue(percentUsed == DFSUtil.getPercentUsed(used, configCapacity));
+      assertTrue(percentUsed == DFSUtilClient.getPercentUsed(used,
+                                                             configCapacity));
 
       // Ensure percent used is calculated based on used and present capacity
-      assertTrue(
-          percentBpUsed == DFSUtil.getPercentUsed(bpUsed, configCapacity));
+      assertTrue(percentBpUsed == DFSUtilClient.getPercentUsed(bpUsed,
+                                                               configCapacity));
 
       // Ensure percent used is calculated based on used and present capacity
       assertTrue(percentRemaining ==

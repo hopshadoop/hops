@@ -52,6 +52,7 @@ import java.util.concurrent.Future;
 import io.hops.metadata.hdfs.dal.DirectoryWithQuotaFeatureDataAccess;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
+import org.apache.hadoop.hdfs.protocol.HdfsConstantsClient;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
 
 @VisibleForTesting
@@ -155,7 +156,7 @@ abstract class AbstractFileTree {
                 List<AclEntry> newDefaults = filterAccessEntries(acls.get(child));
                 if (child.isDirectory()) {
                   byte storagePolicy = inheritedStoragePolicy;
-                  if (child.getStoragePolicyID() != BlockStoragePolicySuite.ID_UNSPECIFIED) {
+                  if (child.getStoragePolicyID() != HdfsConstantsClient.BLOCK_STORAGE_POLICY_ID_UNSPECIFIED) {
                     storagePolicy = child.getStoragePolicyID();
                   }
                   collectChildren(child, ((short) (depth + 1)), level + 1, newDefaults.isEmpty()
@@ -367,7 +368,7 @@ abstract class AbstractFileTree {
         nodes.getLast().getLocalName(),
         nodes.getLast().getPartitionId());
     rootId.setDepth((short) (INodeDirectory.ROOT_DIR_DEPTH + (nodes.size() - 1)));
-    return new CountingFileTree(namesystem, rootId, BlockStoragePolicySuite.ID_UNSPECIFIED);
+    return new CountingFileTree(namesystem, rootId, HdfsConstantsClient.BLOCK_STORAGE_POLICY_ID_UNSPECIFIED);
   }
 
   @VisibleForTesting
@@ -409,10 +410,10 @@ abstract class AbstractFileTree {
         usedCounts.addStorageSpace(node.getFileSize() * INode.HeaderFormat.getReplication(node.getHeader()));
         usedCounts.addNameSpace(1);
         byte storagePolicy = node.getStoragePolicyID();
-        if (storagePolicy == BlockStoragePolicySuite.ID_UNSPECIFIED) {
+        if (storagePolicy == HdfsConstantsClient.BLOCK_STORAGE_POLICY_ID_UNSPECIFIED) {
           storagePolicy = inheritedStoragePolicy;
         }
-        if (storagePolicy != BlockStoragePolicySuite.ID_UNSPECIFIED) {
+        if (storagePolicy != HdfsConstantsClient.BLOCK_STORAGE_POLICY_ID_UNSPECIFIED) {
           BlockStoragePolicy bsp = bsps.getPolicy(storagePolicy);
           List<StorageType> storageTypes = bsp.chooseStorageTypes(INode.HeaderFormat.getReplication(node.getHeader()));
           for (StorageType t : storageTypes) {
@@ -441,7 +442,7 @@ abstract class AbstractFileTree {
   
     public QuotaCountingFileTree(FSNamesystem namesystem, INodeIdentifier subtreeRootId)
         throws AccessControlException {
-      super(namesystem, subtreeRootId, BlockStoragePolicySuite.ID_UNSPECIFIED);
+      super(namesystem, subtreeRootId, HdfsConstantsClient.BLOCK_STORAGE_POLICY_ID_UNSPECIFIED);
     }
   
     @Override
@@ -568,7 +569,7 @@ abstract class AbstractFileTree {
       
       public FileTree(FSNamesystem namesystem, INodeIdentifier subtreeRootId)
           throws AccessControlException {
-        this(namesystem, subtreeRootId, null, false, null, BlockStoragePolicySuite.ID_UNSPECIFIED);
+        this(namesystem, subtreeRootId, null, false, null, HdfsConstantsClient.BLOCK_STORAGE_POLICY_ID_UNSPECIFIED);
       }
 
       public FileTree(FSNamesystem namesystem, INodeIdentifier subtreeRootId,
