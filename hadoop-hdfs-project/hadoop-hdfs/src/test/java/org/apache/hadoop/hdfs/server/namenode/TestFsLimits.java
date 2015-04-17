@@ -26,6 +26,7 @@ import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.security.GroupAlreadyExistsException;
 import io.hops.security.UserAlreadyInGroupException;
 import io.hops.security.UsersGroups;
+import static org.junit.Assert.assertTrue;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Options.Rename;
 import org.apache.hadoop.fs.permission.FsPermission;
@@ -191,29 +192,108 @@ public class TestFsLimits {
   private static long id = 1 + INodeDirectory.ROOT_INODE_ID;
 
   
-  private void mkdirs(final String name, final Class<?> expected)
-      throws Exception {
+  @Test
+  /**
+   * This test verifies that error string contains the
+   * right parent directory name if the operation fails with
+   * PathComponentTooLongException
+   */
+  public void testParentDirectoryNameIsCorrect() throws Exception {
+    conf.setInt(DFSConfigKeys.DFS_NAMENODE_MAX_COMPONENT_LENGTH_KEY, 20);
+    mkdirs("/user", null);
+    mkdirs("/user/testHome", null);
+    mkdirs("/user/testHome/FileNameLength", null);
+
+    mkdirCheckParentDirectory(
+      "/user/testHome/FileNameLength/really_big_name_0003_fail",
+      "/user/testHome/FileNameLength", PathComponentTooLongException.class);
+
+    renameCheckParentDirectory("/user/testHome/FileNameLength",
+      "/user/testHome/really_big_name_0003_fail", "/user/testHome/",
+      PathComponentTooLongException.class);
+
+  }
+
+
+  /**
+   * Verifies that Parent Directory is correct after a failed call to mkdir
+   * @param name Directory Name
+   * @param ParentDirName Expected Parent Directory
+   * @param expected Exception that is expected
+   * @throws Exception
+   */
+  private void mkdirCheckParentDirectory(String name, String ParentDirName,
+                                         Class<?> expected)
+    throws Exception {
+    verify(mkdirs(name, expected), ParentDirName);
+  }
+
+  /**
+   *
+   /**
+   * Verifies that Parent Directory is correct after a failed call to mkdir
+   * @param name Directory Name
+   * @param dst Destination Name
+   * @param ParentDirName Expected Parent Directory
+   * @param expected Exception that is expected
+   * @throws Exception
+   */
+  private void renameCheckParentDirectory(String name, String dst,
+                                          String ParentDirName,
+                                          Class<?> expected)
+    throws Exception {
+    verify(rename(name, dst, expected), ParentDirName);
+  }
+
+  /**
+   * verifies the ParentDirectory Name is present in the message given.
+   * @param message - Expection Message
+   * @param ParentDirName - Parent Directory Name to look for.
+   */
+  private void verify(String message, String ParentDirName) {
+    boolean found = false;
+    if (message != null) {
+      String[] tokens = message.split("\\s+");
+      for (String token : tokens) {
+        if (token != null && token.equals(ParentDirName)) {
+          found = true;
+          break;
+        }
+      }
+    }
+    assertTrue(found);
+  }
+
+  private String mkdirs(String name, Class<?> expected)
+  throws Exception {
     lazyInitFSDirectory();
     Class<?> generated = null;
+    String errorString = null;
     try {
       fs.mkdirs(name, perms, false);
     } catch (Throwable e) {
       generated = e.getClass();
+      e.printStackTrace();
+      errorString = e.getMessage();
     }
     assertEquals(expected, generated);
+    return errorString;
   }
 
-  private void rename(final String src, final String dst, final Class<?> expected)
+  private String rename(String src, String dst, Class<?> expected)
       throws Exception {
     lazyInitFSDirectory();
     Class<?> generated = null;
+    String errorString = null;
     try {
       Collection<MetadataLogEntry> logEntries = Collections.EMPTY_LIST;
       fs.renameTo(src, dst, new Rename[]{});
     } catch (Throwable e) {
       generated = e.getClass();
+      errorString = e.getMessage();
     }
     assertEquals(expected, generated);
+    return errorString;
   }
 
   @SuppressWarnings("deprecation")
