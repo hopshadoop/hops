@@ -38,7 +38,6 @@ public class BlockStoragePolicySuite {
       = "hsm.block.storage.policy.id";
 
   public static final int ID_BIT_LENGTH = 4;
-  public static final byte ID_UNSPECIFIED = 0;
 
   @VisibleForTesting
   public static BlockStoragePolicySuite createDefaultSuite() {

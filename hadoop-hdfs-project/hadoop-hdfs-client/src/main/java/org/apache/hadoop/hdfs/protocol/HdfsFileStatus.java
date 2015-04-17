@@ -23,7 +23,7 @@ import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.hdfs.DFSUtil;
+import org.apache.hadoop.hdfs.DFSUtilClient;
 
 import java.net.URI;
 
@@ -85,8 +85,10 @@ public class HdfsFileStatus {
     this.modification_time = modification_time;
     this.access_time = access_time;
     this.permission = (permission == null) ?
-        ((isdir || symlink != null) ? FsPermission.getDefault() :
-            FsPermission.getFileDefault()) : permission;
+        ((isdir || symlink!=null) ?
+            FsPermission.getDefault() :
+            FsPermission.getFileDefault()) :
+        permission;
     this.owner = (owner == null) ? "" : owner;
     this.group = (group == null) ? "" : group;
     this.symlink = symlink;
@@ -124,7 +126,7 @@ public class HdfsFileStatus {
   public boolean isSymlink() {
     return symlink != null;
   }
-  
+
   /**
    * Get the block size of the file.
    *
@@ -170,7 +172,7 @@ public class HdfsFileStatus {
   public final FsPermission getPermission() {
     return permission;
   }
-  
+
   /**
    * Get the owner of the file.
    *
@@ -179,16 +181,15 @@ public class HdfsFileStatus {
   public final String getOwner() {
     return owner;
   }
-  
+
   /**
    * Get the group associated with the file.
-   *
    * @return group for the file.
    */
   public final String getGroup() {
     return group;
   }
-  
+
   /**
    * Check if the local name is empty
    *
@@ -204,9 +205,9 @@ public class HdfsFileStatus {
    * @return the local name in string
    */
   public final String getLocalName() {
-    return DFSUtil.bytes2String(path);
+    return DFSUtilClient.bytes2String(path);
   }
-  
+
   /**
    * Get the Java UTF8 representation of the local name
    *
@@ -227,7 +228,7 @@ public class HdfsFileStatus {
     if (isEmptyLocalName()) {
       return parent;
     }
-    
+
     StringBuilder fullName = new StringBuilder(parent);
     if (!parent.endsWith(Path.SEPARATOR)) {
       fullName.append(Path.SEPARATOR);
@@ -247,7 +248,7 @@ public class HdfsFileStatus {
     if (isEmptyLocalName()) {
       return parent;
     }
-    
+
     return new Path(parent, getLocalName());
   }
 
@@ -257,15 +258,15 @@ public class HdfsFileStatus {
    * @return the symlink as a string.
    */
   public final String getSymlink() {
-    return DFSUtil.bytes2String(symlink);
+    return DFSUtilClient.bytes2String(symlink);
   }
 
   public final byte[] getSymlinkInBytes() {
     return symlink;
   }
 
-  public final long getFileId() { 
-    return fileId; 
+  public final long getFileId() {
+    return fileId;
   }
   
   public final FileEncryptionInfo getFileEncryptionInfo() {

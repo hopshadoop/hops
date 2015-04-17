@@ -39,7 +39,6 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdfs.protocol.HdfsConstantsClient;
 import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
 
-import static org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite.ID_UNSPECIFIED;
 
 /**
  * Directory INode class.

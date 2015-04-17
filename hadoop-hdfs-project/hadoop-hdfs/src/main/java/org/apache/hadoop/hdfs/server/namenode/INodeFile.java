@@ -23,7 +23,7 @@ import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.*;
 import io.hops.metadata.hdfs.entity.FileInodeData;
 import io.hops.transaction.EntityManager;
-import static org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite.ID_UNSPECIFIED;
+import static org.apache.hadoop.hdfs.protocol.HdfsConstantsClient.BLOCK_STORAGE_POLICY_ID_UNSPECIFIED;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.permission.PermissionStatus;
@@ -161,7 +161,7 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
   @Override
   public byte getStoragePolicyID() throws TransactionContextException, StorageException {
     byte id = getLocalStoragePolicyID();
-    if (id == ID_UNSPECIFIED) {
+    if (id == BLOCK_STORAGE_POLICY_ID_UNSPECIFIED) {
       return this.getParent() != null ? this.getParent().getStoragePolicyID() : id;
     }
     return id;
@@ -353,7 +353,7 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
     counts.addContent(Content.LENGTH, fileLen);
     counts.addContent(Content.DISKSPACE, storagespaceConsumed());
 
-    if (getStoragePolicyID() != ID_UNSPECIFIED){
+    if (getStoragePolicyID() != BLOCK_STORAGE_POLICY_ID_UNSPECIFIED){
       BlockStoragePolicy bsp = summary.getBlockStoragePolicySuite().
           getPolicy(getStoragePolicyID());
       List<StorageType> storageTypes = bsp.chooseStorageTypes(HeaderFormat.getReplication(header));
@@ -422,7 +422,7 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
     counts.addStorageSpace(ssDeltaNoReplication * replication);
     
     //storage policy is not set for new inodes
-    if (blockStoragePolicyId != ID_UNSPECIFIED){
+    if (blockStoragePolicyId != BLOCK_STORAGE_POLICY_ID_UNSPECIFIED){
       BlockStoragePolicy bsp = bsps.getPolicy(blockStoragePolicyId);
       List<StorageType> storageTypes = bsp.chooseStorageTypes(replication);
       for (StorageType t : storageTypes) {
