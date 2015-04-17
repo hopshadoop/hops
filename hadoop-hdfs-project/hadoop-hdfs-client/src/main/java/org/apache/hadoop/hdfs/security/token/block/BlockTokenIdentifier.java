@@ -45,8 +45,8 @@ public class BlockTokenIdentifier extends TokenIdentifier {
   private long blockId;
   private EnumSet<AccessMode> modes;
 
-  private byte[] cache;
-  
+  private byte [] cache;
+
   public BlockTokenIdentifier() {
     this(null, null, 0, EnumSet.noneOf(AccessMode.class));
   }
@@ -127,10 +127,11 @@ public class BlockTokenIdentifier extends TokenIdentifier {
     }
     if (obj instanceof BlockTokenIdentifier) {
       BlockTokenIdentifier that = (BlockTokenIdentifier) obj;
-      return this.expiryDate == that.expiryDate && this.keyId == that.keyId &&
-          isEqual(this.userId, that.userId) &&
-          isEqual(this.blockPoolId, that.blockPoolId) &&
-          this.blockId == that.blockId && isEqual(this.modes, that.modes);
+      return this.expiryDate == that.expiryDate && this.keyId == that.keyId
+          && isEqual(this.userId, that.userId)
+          && isEqual(this.blockPoolId, that.blockPoolId)
+          && this.blockId == that.blockId
+          && isEqual(this.modes, that.modes);
     }
     return false;
   }
@@ -169,13 +170,11 @@ public class BlockTokenIdentifier extends TokenIdentifier {
       WritableUtils.writeEnum(out, aMode);
     }
   }
-  
+
   @Override
   public byte[] getBytes() {
-    if (cache == null) {
-      cache = super.getBytes();
-    }
-    
+    if(cache == null) cache = super.getBytes();
+
     return cache;
   }
 

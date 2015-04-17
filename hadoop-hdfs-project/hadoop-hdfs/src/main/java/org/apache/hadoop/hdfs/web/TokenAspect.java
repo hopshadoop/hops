@@ -56,8 +56,8 @@ final class TokenAspect<T extends FileSystem & Renewable> {
     public boolean handleKind(Text kind) {
       return kind.equals(HftpFileSystem.TOKEN_KIND)
           || kind.equals(HsftpFileSystem.TOKEN_KIND)
-          || kind.equals(WebHdfsFileSystem.TOKEN_KIND)
-          || kind.equals(SWebHdfsFileSystem.TOKEN_KIND);
+          || kind.equals(WebHdfsConstants.WEBHDFS_TOKEN_KIND)
+          || kind.equals(WebHdfsConstants.SWEBHDFS_TOKEN_KIND);
     }
 
     @Override
@@ -79,9 +79,9 @@ final class TokenAspect<T extends FileSystem & Renewable> {
         uri = DFSUtil.createUri(HftpFileSystem.SCHEME, address);
       } else if (kind.equals(HsftpFileSystem.TOKEN_KIND)) {
         uri = DFSUtil.createUri(HsftpFileSystem.SCHEME, address);
-      } else if (kind.equals(WebHdfsFileSystem.TOKEN_KIND)) {
+      } else if (kind.equals(WebHdfsConstants.WEBHDFS_TOKEN_KIND)) {
         uri = DFSUtil.createUri(WebHdfsFileSystem.SCHEME, address);
-      } else if (kind.equals(SWebHdfsFileSystem.TOKEN_KIND)) {
+      } else if (kind.equals(WebHdfsConstants.SWEBHDFS_TOKEN_KIND)) {
         uri = DFSUtil.createUri(SWebHdfsFileSystem.SCHEME, address);
       } else {
         throw new IllegalArgumentException("Unsupported scheme");

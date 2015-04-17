@@ -19,8 +19,7 @@ package org.apache.hadoop.hdfs.protocol;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
-import org.apache.hadoop.hdfs.DFSConfigKeys;
-import org.apache.hadoop.hdfs.DFSUtil;
+import org.apache.hadoop.hdfs.DFSUtilClient;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.NetworkTopology;
 import org.apache.hadoop.net.Node;
@@ -34,7 +33,7 @@ import java.util.List;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
-import static org.apache.hadoop.hdfs.DFSUtil.percent2String;
+import static org.apache.hadoop.hdfs.DFSUtilClient.percent2String;
 
 /**
  * This class extends the primary identifier of a Datanode with ephemeral
@@ -73,7 +72,7 @@ public class DatanodeInfo extends DatanodeID implements Node {
     public String toString() {
       return value;
     }
-    
+
     public static AdminStates fromValue(final String value) {
       for (AdminStates as : AdminStates.values()) {
         if (as.value.equals(value)) {
@@ -114,12 +113,12 @@ public class DatanodeInfo extends DatanodeID implements Node {
     this.xceiverCount = 0;
     this.adminState = null;
   }
-  
+
   public DatanodeInfo(DatanodeID nodeID, String location) {
     this(nodeID);
     this.location = location;
   }
-  
+
   public DatanodeInfo(DatanodeID nodeID, String location,
       final long capacity, final long dfsUsed, final long remaining,
       final long blockPoolUsed, final long cacheCapacity, final long cacheUsed,
@@ -158,27 +157,17 @@ public class DatanodeInfo extends DatanodeID implements Node {
     this.adminState = adminState;
   }
 
-  /**
-   * Network location name
-   */
+  /** Network location name */
   @Override
   public String getName() {
     return getXferAddr();
   }
-  
-  /**
-   * The raw capacity.
-   */
-  public long getCapacity() {
-    return capacity;
-  }
-  
-  /**
-   * The used space by the data node.
-   */
-  public long getDfsUsed() {
-    return dfsUsed;
-  }
+
+  /** The raw capacity. */
+  public long getCapacity() { return capacity; }
+
+  /** The used space by the data node. */
+  public long getDfsUsed() { return dfsUsed; }
 
   /**
    * The used space by the block pool on data node.
@@ -187,19 +176,15 @@ public class DatanodeInfo extends DatanodeID implements Node {
     return blockPoolUsed;
   }
 
-  /**
-   * The used space by the data node.
-   */
+  /** The used space by the data node. */
   public long getNonDfsUsed() {
     long nonDFSUsed = capacity - dfsUsed - remaining;
     return nonDFSUsed < 0 ? 0 : nonDFSUsed;
   }
 
-  /**
-   * The used space by the data node as percentage of present capacity
-   */
+  /** The used space by the data node as percentage of present capacity */
   public float getDfsUsedPercent() {
-    return DFSUtil.getPercentUsed(dfsUsed, capacity);
+    return DFSUtilClient.getPercentUsed(dfsUsed, capacity);
   }
 
   /**
@@ -213,14 +198,12 @@ public class DatanodeInfo extends DatanodeID implements Node {
    * Used space by the block pool as percentage of present capacity
    */
   public float getBlockPoolUsedPercent() {
-    return DFSUtil.getPercentUsed(blockPoolUsed, capacity);
+    return DFSUtilClient.getPercentUsed(blockPoolUsed, capacity);
   }
-  
-  /**
-   * The remaining space as percentage of configured capacity.
-   */
+
+  /** The remaining space as percentage of configured capacity. */
   public float getRemainingPercent() {
-    return DFSUtil.getPercentRemaining(remaining, capacity);
+    return DFSUtilClient.getPercentRemaining(remaining, capacity);
   }
 
   /**
@@ -241,7 +224,7 @@ public class DatanodeInfo extends DatanodeID implements Node {
    * @return Cache used as a percentage of the datanode's total cache capacity
    */
   public float getCacheUsedPercent() {
-    return DFSUtil.getPercentUsed(cacheUsed, cacheCapacity);
+    return DFSUtilClient.getPercentUsed(cacheUsed, cacheCapacity);
   }
 
   /**
@@ -256,7 +239,7 @@ public class DatanodeInfo extends DatanodeID implements Node {
    * capacity
    */
   public float getCacheRemainingPercent() {
-    return DFSUtil.getPercentRemaining(getCacheRemaining(), cacheCapacity);
+    return DFSUtilClient.getPercentRemaining(getCacheRemaining(), cacheCapacity);
   }
 
   /**
@@ -265,10 +248,10 @@ public class DatanodeInfo extends DatanodeID implements Node {
    */
   public long getLastUpdate() { return lastUpdate; }
 
-  /** 
+  /**
    * The time when this information was accurate. <br>
    * Ps: So return value is ideal for calculation of time differences.
-   * Should not be used to convert to Date.  
+   * Should not be used to convert to Date.
    */
   public long getLastUpdateMonotonic() { return lastUpdateMonotonic;}
 
@@ -282,30 +265,22 @@ public class DatanodeInfo extends DatanodeID implements Node {
   /** number of active connections */
   public int getXceiverCount() { return xceiverCount; }
 
-  /**
-   * Sets raw capacity.
-   */
+  /** Sets raw capacity. */
   public void setCapacity(long capacity) {
     this.capacity = capacity;
   }
-  
-  /**
-   * Sets the used space for the datanode.
-   */
+
+  /** Sets the used space for the datanode. */
   public void setDfsUsed(long dfsUsed) {
     this.dfsUsed = dfsUsed;
   }
 
-  /**
-   * Sets raw free space.
-   */
+  /** Sets raw free space. */
   public void setRemaining(long remaining) {
     this.remaining = remaining;
   }
 
-  /**
-   * Sets block pool used space
-   */
+  /** Sets block pool used space */
   public void setBlockPoolUsed(long bpUsed) {
     this.blockPoolUsed = bpUsed;
   }
@@ -323,23 +298,19 @@ public class DatanodeInfo extends DatanodeID implements Node {
     this.cacheUsed = cacheUsed;
   }
 
-  /**
-   * Sets time when this information was accurate.
-   */
+  /** Sets time when this information was accurate. */
   public void setLastUpdate(long lastUpdate) {
     this.lastUpdate = lastUpdate;
   }
 
-  /**
-   * Sets number of active connections
-   */
+  /** Sets number of active connections */
   public void setXceiverCount(int xceiverCount) {
     this.xceiverCount = xceiverCount;
   }
 
   /** network location */
   public synchronized String getNetworkLocation() {return location;}
-    
+
   /** Sets the network location */
   public synchronized void setNetworkLocation(String location) {
     this.location = NodeBase.normalize(location);
@@ -349,20 +320,18 @@ public class DatanodeInfo extends DatanodeID implements Node {
   public void addDependentHostName(String hostname) {
     dependentHostNames.add(hostname);
   }
-  
+
   /** List of Network dependencies */
   public List<String> getDependentHostNames() {
     return dependentHostNames;
   }
-  
+
   /** Sets the network dependencies */
   public void setDependentHostNames(List<String> dependencyList) {
     dependentHostNames = dependencyList;
   }
-  
-  /**
-   * A formatted string for reporting the status of the DataNode.
-   */
+
+  /** A formatted string for reporting the status of the DataNode. */
   public String getDatanodeReport() {
     StringBuilder buffer = new StringBuilder();
     long c = getCapacity();
@@ -502,8 +471,7 @@ public class DatanodeInfo extends DatanodeID implements Node {
   /**
    * Check if the datanode is in stale state. Here if
    * the namenode has not received heartbeat msg from a
-   * datanode for more than staleInterval (default value is
-   * {@link DFSConfigKeys#DFS_NAMENODE_STALE_DATANODE_INTERVAL_DEFAULT}),
+   * datanode for more than staleInterval,
    * the datanode will be treated as stale node.
    *
    * @param staleInterval
@@ -515,7 +483,7 @@ public class DatanodeInfo extends DatanodeID implements Node {
   public boolean isStale(long staleInterval) {
     return (Time.monotonicNow() - lastUpdateMonotonic) >= staleInterval;
   }
-  
+
   /**
    * Sets the admin state of this node.
    */
@@ -539,12 +507,9 @@ public class DatanodeInfo extends DatanodeID implements Node {
   }
 
   @Override
-  public void setParent(Node parent) {
-    this.parent = parent;
-  }
+  public void setParent(Node parent) {this.parent = parent;}
 
-  /**
-   * Return this node's level in the tree.
+  /** Return this node's level in the tree.
    * E.g. the root of a tree returns 0 and its children return 1
    */
   @Override
@@ -562,7 +527,7 @@ public class DatanodeInfo extends DatanodeID implements Node {
     // Super implementation is sufficient
     return super.hashCode();
   }
-  
+
   @Override
   public boolean equals(Object obj) {
     // Sufficient to use super equality as datanodes are uniquely identified

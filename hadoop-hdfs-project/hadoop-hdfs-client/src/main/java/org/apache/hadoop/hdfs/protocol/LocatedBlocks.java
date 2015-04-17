@@ -91,16 +91,12 @@ public class LocatedBlocks {
     return blocks;
   }
 
-  /**
-   * Get the last located block.
-   */
+  /** Get the last located block. */
   public LocatedBlock getLastLocatedBlock() {
     return lastLocatedBlock;
   }
 
-  /**
-   * Is the last block completed?
-   */
+  /** Is the last block completed? */
   public boolean isLastBlockComplete() {
     return isLastBlockComplete;
   }

@@ -18,16 +18,16 @@
 
 package org.apache.hadoop.hdfs.security.token.delegation;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.io.Text;
-import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.security.token.delegation.AbstractDelegationTokenIdentifier;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
-import org.apache.hadoop.hdfs.web.SWebHdfsFileSystem;
-import org.apache.hadoop.hdfs.web.WebHdfsFileSystem;
+
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdfs.web.WebHdfsConstants;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.security.token.delegation.AbstractDelegationTokenIdentifier;
 
 /**
  * A delegation token identifier that is specific to HDFS.
@@ -84,7 +84,7 @@ public class DelegationTokenIdentifier
       return ident.toString();
     }
   }
-  
+
   public static class WebHdfsDelegationTokenIdentifier
       extends DelegationTokenIdentifier {
     public WebHdfsDelegationTokenIdentifier() {
@@ -92,18 +92,19 @@ public class DelegationTokenIdentifier
     }
     @Override
     public Text getKind() {
-      return WebHdfsFileSystem.TOKEN_KIND;
+      return WebHdfsConstants.WEBHDFS_TOKEN_KIND;
     }
   }
-  
-  public static class SWebHdfsDelegationTokenIdentifier
-      extends WebHdfsDelegationTokenIdentifier {
+
+  public static class SWebHdfsDelegationTokenIdentifier extends WebHdfsDelegationTokenIdentifier {
+
     public SWebHdfsDelegationTokenIdentifier() {
       super();
     }
+
     @Override
     public Text getKind() {
-      return SWebHdfsFileSystem.TOKEN_KIND;
+      return WebHdfsConstants.SWEBHDFS_TOKEN_KIND;
     }
   }
 }

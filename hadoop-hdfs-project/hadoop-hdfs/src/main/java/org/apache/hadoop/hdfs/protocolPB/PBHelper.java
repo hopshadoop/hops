@@ -172,7 +172,6 @@ import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.hdfs.security.token.block.DataEncryptionKey;
 import org.apache.hadoop.hdfs.security.token.block.ExportedBlockKeys;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.NamenodeRole;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.NodeType;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.ReplicaState;
@@ -1374,7 +1373,8 @@ public class PBHelper {
         fs.hasFileEncryptionInfo() ? convert(fs.getFileEncryptionInfo()) :
             null,
         fs.hasIsFileStoredInDB() ? fs.getIsFileStoredInDB() : false,
-        fs.hasStoragePolicy() ? (byte) fs.getStoragePolicy(): BlockStoragePolicySuite.ID_UNSPECIFIED);
+        fs.hasStoragePolicy() ? (byte) fs.getStoragePolicy()
+            : HdfsConstantsClient.BLOCK_STORAGE_POLICY_ID_UNSPECIFIED);
   }
 
   public static HdfsFileStatusProto convert(HdfsFileStatus fs) {

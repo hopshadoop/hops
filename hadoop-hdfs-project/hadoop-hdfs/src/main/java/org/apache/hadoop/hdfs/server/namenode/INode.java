@@ -35,6 +35,8 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
+import org.apache.hadoop.hdfs.protocol.HdfsConstantsClient;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.AclException;
 import org.apache.hadoop.hdfs.protocol.Block;
@@ -410,7 +412,7 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
    */
   public final QuotaCounts computeQuotaUsage(BlockStoragePolicySuite bsps) throws TransactionContextException, StorageException {
     final byte storagePolicyId = isSymlink() ?
-        BlockStoragePolicySuite.ID_UNSPECIFIED : getStoragePolicyID();
+        HdfsConstantsClient.BLOCK_STORAGE_POLICY_ID_UNSPECIFIED : getStoragePolicyID();
     return computeQuotaUsage(bsps, storagePolicyId,
         new QuotaCounts.Builder().build());
   }
@@ -453,9 +455,10 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
   public final QuotaCounts computeQuotaUsage(
     BlockStoragePolicySuite bsps, QuotaCounts counts) throws TransactionContextException, StorageException {
     final byte storagePolicyId = isSymlink() ?
-        BlockStoragePolicySuite.ID_UNSPECIFIED : getStoragePolicyID();
+        HdfsConstantsClient.BLOCK_STORAGE_POLICY_ID_UNSPECIFIED : getStoragePolicyID();
     return computeQuotaUsage(bsps, storagePolicyId, counts);
-}
+  }
+
   /**
    * Get local file name
    *
@@ -604,7 +607,7 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
    */
   public byte getStoragePolicyID() throws TransactionContextException, StorageException {
     byte id = getLocalStoragePolicyID();
-    if (id == BlockStoragePolicySuite.ID_UNSPECIFIED) {
+    if (id == HdfsConstantsClient.BLOCK_STORAGE_POLICY_ID_UNSPECIFIED) {
       return this.getParent() != null ? this.getParent().getStoragePolicyID() : id;
     }
     return id;
@@ -612,7 +615,7 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
 
   /**
    * @return the storage policy directly specified on the INode. Return
-   * {@link BlockStoragePolicySuite#ID_UNSPECIFIED} if no policy has
+   * {@link HdfsConstantsClient#BLOCK_STORAGE_POLICY_ID_UNSPECIFIED} if no policy has
    * been specified.
    */
   public byte getLocalStoragePolicyID() {
@@ -630,13 +633,13 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
    * Get the storage policy ID while computing quota usage
    * @param parentStoragePolicyId the storage policy ID of the parent directory
    * @return the storage policy ID of this INode. Note that for an
-   * {@link INodeSymlink} we return {@link BlockStoragePolicySuite#ID_UNSPECIFIED}
+   * {@link INodeSymlink} we return {@link HdfsConstantsClient#BLOCK_STORAGE_POLICY_ID_UNSPECIFIED}
    * instead of throwing Exception
    */
   public byte getStoragePolicyIDForQuota(byte parentStoragePolicyId) {
     byte localId = isSymlink() ?
-        BlockStoragePolicySuite.ID_UNSPECIFIED : getLocalStoragePolicyID();
-    return localId != BlockStoragePolicySuite.ID_UNSPECIFIED ?
+        HdfsConstantsClient.BLOCK_STORAGE_POLICY_ID_UNSPECIFIED : getLocalStoragePolicyID();
+    return localId != HdfsConstantsClient.BLOCK_STORAGE_POLICY_ID_UNSPECIFIED ?
         localId : parentStoragePolicyId;
   }
 
