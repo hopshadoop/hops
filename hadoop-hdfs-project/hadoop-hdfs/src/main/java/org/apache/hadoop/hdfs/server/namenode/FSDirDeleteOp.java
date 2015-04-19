@@ -61,6 +61,7 @@ class FSDirDeleteOp {
   /**
    * Delete the target directory and collect the blocks under it
    *
+   * @param fsd the FSDirectory instance
    * @param iip the INodesInPath instance containing all the INodes for the path
    * @param collectedBlocks Blocks under the deleted directory
    * @param removedINodes INodes that should be removed from inodeMap
@@ -91,6 +92,13 @@ class FSDirDeleteOp {
    * <p>
    * For small directory or file the deletion is done in one shot.
    *
+   * @param fsn namespace
+   * @param src path name to be deleted
+   * @param recursive boolean true to apply to all sub-directories recursively
+   * @param logRetryCache whether to record RPC ids in editlog for retry cache
+   *          rebuilding
+   * @return blocks collected from the deleted path
+   * @throws IOException
    */
   static boolean delete(
       final FSNamesystem fsn, String srcArg, final boolean recursive)
@@ -354,6 +362,13 @@ class FSDirDeleteOp {
    * the {@link org.apache.hadoop.hdfs.server.namenode.FSNamesystem} lock.
    * <p>
    * For small directory or file the deletion is done in one shot.
+   * @param fsn namespace
+   * @param src path name to be deleted
+   * @param iip the INodesInPath instance containing all the INodes for the path
+   * @param logRetryCache whether to record RPC ids in editlog for retry cache
+   *          rebuilding
+   * @return blocks collected from the deleted path
+   * @throws IOException
    */
   static boolean deleteInternal(
       FSNamesystem fsn, String src, INodesInPath iip)
@@ -411,6 +426,7 @@ class FSDirDeleteOp {
   /**
    * Delete a path from the name space
    * Update the count at each ancestor directory with quota
+   * @param fsd the FSDirectory instance
    * @param iip the inodes resolved from the path
    * @param collectedBlocks blocks collected from the deleted path
    * @param removedINodes inodes that should be removed from inodeMap
