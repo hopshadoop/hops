@@ -1620,6 +1620,14 @@ public class MiniDFSCluster {
       }
     }
     UsersGroups.stop();
+    if (base_dir != null) {
+      if (deleteDfsDir) {
+        base_dir.delete();
+      } else {
+        base_dir.deleteOnExit();
+      }
+    }
+
   }
   
   /**
