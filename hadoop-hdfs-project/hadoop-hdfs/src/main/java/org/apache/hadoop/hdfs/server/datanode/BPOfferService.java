@@ -61,6 +61,7 @@ import org.apache.hadoop.hdfs.client.BlockReportOptions;
 import org.apache.hadoop.hdfs.server.protocol.BlockIdCommand;
 import org.apache.hadoop.hdfs.server.protocol.BlockReport;
 import org.apache.hadoop.hdfs.server.protocol.BlockReportContext;
+import org.apache.hadoop.util.Time;
 
 import static org.apache.hadoop.util.Time.monotonicNow;
 
@@ -134,18 +135,10 @@ class BPOfferService implements Runnable {
   // sent immediately by the actor thread without waiting for the IBR timer
   // to elapse.
   private volatile boolean sendImmediateIBR = false;
-  // lastBlockReport and lastHeartbeat may be assigned/read
-  // by testing threads (through BPServiceActor#triggerXXX), while also
-  // assigned/read by the actor thread. Thus they should be declared as volatile
-  // to make sure the "happens-before" consistency.
-  private volatile long lastBlockReport = 0;
-  private boolean resetBlockReportTime = true;
-  private boolean nextBlockReportOverwritten = false;
-  
+    
   volatile long lastCacheReport = 0;
-  
-  private volatile long lastHeartbeat = 0;
-  
+  private final Scheduler scheduler;
+    
   private BPServiceActor blkReportHander = null;
   private List<ActiveNode> nnList = Collections.synchronizedList(new ArrayList<ActiveNode>());
   private List<InetSocketAddress> blackListNN = Collections.synchronizedList(new ArrayList<InetSocketAddress>());
@@ -184,6 +177,7 @@ class BPOfferService implements Runnable {
 
     dnConf = dn.getDnConf();
     prevBlockReportId = DFSUtil.getRandom().nextLong();
+    scheduler = new Scheduler(dnConf.heartBeatInterval, dnConf.blockReportInterval);
   }
 
   void refreshNNList(ArrayList<InetSocketAddress> addrs) throws IOException {
@@ -529,7 +523,7 @@ class BPOfferService implements Runnable {
    * delay.
    */
   void scheduleBlockReport(long delay) {
-    scheduleBlockReportInt(delay);
+    scheduler.scheduleBlockReport(delay);
   }
 
   public boolean otherActorsConnectedToNNs(BPServiceActor skip){
@@ -611,14 +605,6 @@ class BPOfferService implements Runnable {
   @VisibleForTesting
   int countNameNodes() {
     return bpServices.size();
-  }
-
-  /**
-   * Run an immediate block report on this thread. Used by tests.
-   */
-  @VisibleForTesting
-  void triggerBlockReportForTests() throws IOException {
-    triggerBlockReportForTestsInt();
   }
 
   /**
@@ -809,21 +795,32 @@ class BPOfferService implements Runnable {
 
     while (dn.shouldRun) {  //as long as datanode is alive keep working
       try {
-        long startTime = monotonicNow();
-        boolean sendHeartbeat =
-            startTime - lastHeartbeat >= dnConf.heartBeatInterval;
+        long startTime = scheduler.monotonicNow();
+        boolean sendHeartbeat = scheduler.isHeartbeatDue(startTime);
 
+        if(sendHeartbeat){
+            scheduler.scheduleNextHeartbeat();
+        }
+        
         if (sendImmediateIBR || sendHeartbeat) {
           reportReceivedDeletedBlocks();
         }
 
-        blockReportInternal();
+        List<DatanodeCommand> cmds = blockReport();
+        if (cmds != null && blkReportHander != null) { //it is not null if the block report is successful
+          blkReportHander.processCommand(cmds == null ? null : cmds.toArray(new DatanodeCommand[cmds.size()]));
+        }
+
+        DatanodeCommand cmd = cacheReport(cmds != null);
+        if (cmd != null && blkReportHander != null) {
+          blkReportHander.processCommand(new DatanodeCommand[]{cmd});
+        }
 
         //
         // There is no work to do;  sleep until hearbeat timer elapses,
         // or work arrives, and then iterate again.
         //
-        long waitTime = 1000;
+        long waitTime = scheduler.getHeartbeatWaitTime();
         synchronized (pendingIncrementalBRperStorage) {
           if (waitTime > 0 && !sendImmediateIBR) {
             try {
@@ -847,20 +844,6 @@ class BPOfferService implements Runnable {
     } // while (shouldRun())
   } // offerService
 
-  private void blockReportInternal() throws IOException, InterruptedException {
-    List<DatanodeCommand> cmds = blockReport();
-
-    if(cmds != null && blkReportHander != null) { //it is not null if the block report is successful
-      blkReportHander.processCommand(cmds == null ? null : cmds.toArray(new DatanodeCommand[cmds.size()]));
-    }
-
-    DatanodeCommand cmd = cacheReport(cmds!=null);
-    if (cmd != null && blkReportHander != null) {
-      blkReportHander.processCommand(new DatanodeCommand[]{cmd});
-    }
-  }
-
-  private final Object incrementalBRLock = new Object();
   /**
    * Report received blocks and delete hints to the Namenode
    *
@@ -988,14 +971,12 @@ class BPOfferService implements Runnable {
   
   List<DatanodeCommand> blockReport() throws IOException {
     // send block report if timer has expired.
-    final long startTime = monotonicNow();
-    if (startTime - lastBlockReport <= dnConf.blockReportInterval) {
+    if (!scheduler.isBlockReportDue()) {
       return null;
     }
     
-    nextBlockReportOverwritten = false;
+    scheduler.setNextBlockReportOverwritten(false);
     
-
     ArrayList<DatanodeCommand> cmds = new ArrayList<DatanodeCommand>();
 
     // Flush any block information that precedes the block report. Otherwise
@@ -1003,7 +984,6 @@ class BPOfferService implements Runnable {
     // or we will report an RBW replica after the BlockReport already reports
     // a FINALIZED one.
     reportReceivedDeletedBlocks();
-    lastHeartbeat = startTime;
 
     long brCreateStartTime = monotonicNow();
     Map<DatanodeStorage, BlockReport> perVolumeBlockLists =
@@ -1107,7 +1087,7 @@ class BPOfferService implements Runnable {
       }
     }
 
-    scheduleNextBlockReport(startTime);
+    scheduler.scheduleNextBlockReport();
     return cmds.size() == 0 ? null : cmds;
   }
 
@@ -1149,31 +1129,6 @@ class BPOfferService implements Runnable {
         report.getBuckets()[i].setBlocks(BlockListAsLongs.EMPTY);
         report.getBuckets()[i].setSkip(true);
       }
-    }
-  }
-
-  private void scheduleNextBlockReport(long previousReportStartTime) {
-    //do not set lastBlockReport when thisone has been set through 
-    // scheduleBlockReportInt
-    if(nextBlockReportOverwritten){
-      nextBlockReportOverwritten = false;
-      return;
-    }
-    // If we have sent the first set of block reports, then wait a random
-    // time before we start the periodic block reports.
-    if (resetBlockReportTime) {
-      lastBlockReport = previousReportStartTime -
-          DFSUtil.getRandom().nextInt((int)(dnConf.blockReportInterval));
-      resetBlockReportTime = false;
-    } else {
-      /* say the last block report was at 8:20:14. The current report
-       * should have started around 9:20:14 (default 1 hour interval).
-       * If current time is :
-       *   1) normal like 9:20:18, next report should be at 10:20:14
-       *   2) unexpected like 11:35:43, next report should be at 12:20:14
-       */
-      lastBlockReport += (monotonicNow() - lastBlockReport) /
-          dnConf.blockReportInterval * dnConf.blockReportInterval;
     }
   }
 
@@ -1221,30 +1176,16 @@ class BPOfferService implements Runnable {
     }
     return cmd;
   }
-  
-  /**
-   * This methods arranges for the data node to send the block report at the
-   * next heartbeat.
-   */
-  void scheduleBlockReportInt(long delay) {
-    if (delay > 0) { // send BR after random delay
-      lastBlockReport = monotonicNow() - (dnConf.blockReportInterval -
-          DFSUtil.getRandom().nextInt((int) (delay)));
-    } else { // send at next heartbeat
-      lastBlockReport = 0;
-    }
-    resetBlockReportTime = true; // reset future BRs for randomness
-    nextBlockReportOverwritten = true; //make sure that if there is an ongoing blockreport it will not cancel this
-  }
 
   /**
    * Run an immediate block report on this thread. Used by tests.
    */
-  void triggerBlockReportForTestsInt() {
+  @VisibleForTesting
+  void triggerBlockReportForTests() {
     synchronized (pendingIncrementalBRperStorage) {
-      lastBlockReport = 0;
+      long nextBlockReportTime = scheduler.scheduleBlockReport(0);
       pendingIncrementalBRperStorage.notifyAll();
-      while (lastBlockReport == 0) {
+      while (nextBlockReportTime - scheduler.nextBlockReportTime >= 0) {
         try {
           pendingIncrementalBRperStorage.wait(100);
         } catch (InterruptedException e) {
@@ -1371,7 +1312,7 @@ class BPOfferService implements Runnable {
       }
       blocks += "]";
     }
-    NameNode.LOG.info("sending blockReceivedAndDeletedWithRetry for blocks "
+    LOG.info("sending blockReceivedAndDeletedWithRetry for blocks "
         + blocks);
 
     doActorActionWithRetry(new ActorActionHandler() {
@@ -1643,9 +1584,121 @@ class BPOfferService implements Runnable {
     } else {
       LOG.info(this.toString() + ": scheduling a full block report.");
       synchronized(pendingIncrementalBRperStorage) {
-        lastBlockReport = 0;
+        scheduler.scheduleBlockReport(0);
         pendingIncrementalBRperStorage.notifyAll();
       }
+    }
+  }
+  
+    /**
+   * Utility class that wraps the timestamp computations for scheduling
+   * heartbeats and block reports.
+   */
+  static class Scheduler {
+    // nextBlockReportTime and nextHeartbeatTime may be assigned/read
+    // by testing threads (through BPOfferService#triggerXXX), while also
+    // assigned/read by the service thread.
+    @VisibleForTesting
+    volatile long nextBlockReportTime = monotonicNow();
+    
+    @VisibleForTesting
+    volatile long nextHeartbeatTime = monotonicNow();
+
+    @VisibleForTesting
+    boolean resetBlockReportTime = true;
+
+    private final long heartbeatIntervalMs;
+    private final long blockReportIntervalMs;
+    private boolean nextBlockReportOverwritten = false;
+
+    Scheduler(long heartbeatIntervalMs, long blockReportIntervalMs) {
+      this.heartbeatIntervalMs = heartbeatIntervalMs;
+      this.blockReportIntervalMs = blockReportIntervalMs;
+    }
+
+    long scheduleHeartbeat() {
+      nextHeartbeatTime = monotonicNow();
+      return nextHeartbeatTime;
+    }
+
+    long scheduleNextHeartbeat() {
+      // Numerical overflow is possible here and is okay.
+      nextHeartbeatTime += heartbeatIntervalMs;
+      return nextHeartbeatTime;
+    }
+
+    boolean isHeartbeatDue(long startTime) {
+      return (nextHeartbeatTime - startTime <= 0);
+    }
+    
+    boolean isBlockReportDue() {
+      return nextBlockReportTime - monotonicNow() <= 0;
+    }
+
+    /**
+     * This methods  arranges for the data node to send the block report at
+     * the next heartbeat.
+     */
+    long scheduleBlockReport(long delay) {
+      if (delay > 0) { // send BR after random delay
+        // Numerical overflow is possible here and is okay.
+        nextBlockReportTime =
+            monotonicNow() + DFSUtil.getRandom().nextInt((int) (delay));
+      } else { // send at next heartbeat
+        nextBlockReportTime = monotonicNow();
+      }
+      resetBlockReportTime = true; // reset future BRs for randomness
+      nextBlockReportOverwritten = true; //make sure that if there is an ongoing blockreport it will not cancel this
+      return nextBlockReportTime;
+    }
+
+    /**
+     * Schedule the next block report after the block report interval. If the
+     * current block report was delayed then the next block report is sent per
+     * the original schedule.
+     * Numerical overflow is possible here.
+     */
+    void scheduleNextBlockReport() {
+    //do not set lastBlockReport when thisone has been set through 
+    // scheduleBlockReport and not run yet
+    if(nextBlockReportOverwritten){
+      nextBlockReportOverwritten = false;
+      return;
+    }
+      // If we have sent the first set of block reports, then wait a random
+      // time before we start the periodic block reports.
+      if (resetBlockReportTime) {
+        nextBlockReportTime = monotonicNow() +
+            DFSUtil.getRandom().nextInt((int)(blockReportIntervalMs));
+        resetBlockReportTime = false;
+      } else {
+        /* say the last block report was at 8:20:14. The current report
+         * should have started around 9:20:14 (default 1 hour interval).
+         * If current time is :
+         *   1) normal like 9:20:18, next report should be at 10:20:14
+         *   2) unexpected like 11:35:43, next report should be at 12:20:14
+         */
+        nextBlockReportTime +=
+              (((monotonicNow() - nextBlockReportTime + blockReportIntervalMs) /
+                  blockReportIntervalMs)) * blockReportIntervalMs;
+      }
+    }
+
+    void setNextBlockReportOverwritten(boolean value){
+      nextBlockReportOverwritten = value;
+    }
+    
+    long getHeartbeatWaitTime() {
+      return nextHeartbeatTime - monotonicNow();
+    }
+    
+    /**
+     * Wrapped for testing.
+     * @return
+     */
+    @VisibleForTesting
+    public long monotonicNow() {
+      return Time.monotonicNow();
     }
   }
 }

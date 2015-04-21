@@ -36,6 +36,7 @@ import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.protocol.*;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ipc.RemoteException;
+import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.VersionInfo;
 import org.apache.hadoop.util.VersionUtil;
 
@@ -63,7 +64,7 @@ class BPServiceActor implements Runnable {
   BPOfferService bpos;
   Thread bpThread;
   DatanodeProtocolClientSideTranslatorPB bpNamenode;
-  private volatile long lastHeartbeat = 0;
+  private final Scheduler scheduler;
   
   static enum RunningState {
     CONNECTING, INIT_FAILED, RUNNING, EXITED, FAILED;
@@ -83,6 +84,7 @@ class BPServiceActor implements Runnable {
     this.dn = bpos.getDataNode();
     this.nnAddr = nnAddr;
     this.dnConf = dn.getDnConf();
+    scheduler = new Scheduler(dnConf.heartBeatInterval);
   }
 
   boolean isRunning(){
@@ -193,18 +195,6 @@ class BPServiceActor implements Runnable {
     register(nsInfo);
   }
 
-  // This is useful to make sure NN gets Heartbeat before Blockreport
-  // upon NN restart while DN keeps retrying Otherwise,
-  // 1. NN restarts.
-  // 2. Heartbeat RPC will retry and succeed. NN asks DN to reregister.
-  // 3. After reregistration completes, DN will send Blockreport first.
-  // 4. Given NN receives Blockreport after Heartbeat, it won't mark
-  //    DatanodeStorageInfo#blockContentsStale to false until the next
-  //    Blockreport.
-  void scheduleHeartbeat() {
-    lastHeartbeat = 0;
-  }
-
   void reportBadBlocks(ExtendedBlock block, String storageUuid,
       StorageType storageType) throws IOException {
     if (bpRegistration == null) {
@@ -230,9 +220,9 @@ class BPServiceActor implements Runnable {
 
   @VisibleForTesting
   synchronized void triggerHeartbeatForTests() {
-    lastHeartbeat = 0;
+    final long nextHeartbeatTime = scheduler.scheduleHeartbeat();
     this.notifyAll();
-    while (lastHeartbeat == 0) {
+    while (nextHeartbeatTime - scheduler.nextHeartbeatTime >= 0) {
       try {
         this.wait(100);
       } catch (InterruptedException e) {
@@ -344,13 +334,12 @@ class BPServiceActor implements Runnable {
     //
     while (shouldRun()) {
       try {
-        long startTime = monotonicNow();
+        long startTime = scheduler.monotonicNow();
 
         //
         // Every so often, send heartbeat or block-report
         //
-        boolean sendHeartbeat =
-            startTime - lastHeartbeat >= dnConf.heartBeatInterval;
+        final boolean sendHeartbeat = scheduler.isHeartbeatDue(startTime);
         if (sendHeartbeat) {
 
           refreshNNConnections();
@@ -362,14 +351,14 @@ class BPServiceActor implements Runnable {
           // -- Total capacity
           // -- Bytes remaining
           //
-          lastHeartbeat = startTime;
+          scheduler.scheduleNextHeartbeat();
           if (!dn.areHeartbeatsDisabledForTests()) {
             HeartbeatResponse resp = sendHeartBeat();
             assert resp != null;
 
             connectedToNN = true;
 
-            dn.getMetrics().addHeartbeat(monotonicNow() - startTime);
+            dn.getMetrics().addHeartbeat(scheduler.monotonicNow() - startTime);
 
             handleRollingUpgradeStatus(resp);
             
@@ -386,9 +375,8 @@ class BPServiceActor implements Runnable {
           }
         }
 
-        long waitTime =
-            Math.abs(dnConf.heartBeatInterval - (monotonicNow() - startTime));
-        if (waitTime > dnConf.heartBeatInterval) {
+        long waitTime = scheduler.getHeartbeatWaitTime();
+        if (waitTime <= 0) {
           // above code took longer than dnConf.heartBeatInterval to execute
           // set wait time to 1 ms to send a new HB immediately
           waitTime = 1;
@@ -595,7 +583,7 @@ class BPServiceActor implements Runnable {
       NamespaceInfo nsInfo = retrieveNamespaceInfo();
       // and re-register
       register(nsInfo);
-      scheduleHeartbeat();
+      scheduler.scheduleHeartbeat();
     }
   }
 
@@ -673,5 +661,59 @@ class BPServiceActor implements Runnable {
 
   public boolean connectedToNN(){
     return connectedToNN;
+  }
+  
+  /**
+   * Utility class that wraps the timestamp computations for scheduling
+   * heartbeats and block reports.
+   */
+  static class Scheduler {
+    // nextHeartbeatTime may be assigned/read
+    // by testing threads (through BPServiceActor#triggerXXX), while also
+    // assigned/read by the actor thread.
+    @VisibleForTesting
+    volatile long nextHeartbeatTime = monotonicNow();
+
+    private final long heartbeatIntervalMs;
+
+    Scheduler(long heartbeatIntervalMs) {
+      this.heartbeatIntervalMs = heartbeatIntervalMs;
+    }
+
+    // This is useful to make sure NN gets Heartbeat before Blockreport
+    // upon NN restart while DN keeps retrying Otherwise,
+    // 1. NN restarts.
+    // 2. Heartbeat RPC will retry and succeed. NN asks DN to reregister.
+    // 3. After reregistration completes, DN will send Blockreport first.
+    // 4. Given NN receives Blockreport after Heartbeat, it won't mark
+    //    DatanodeStorageInfo#blockContentsStale to false until the next
+    //    Blockreport.
+    long scheduleHeartbeat() {
+      nextHeartbeatTime = monotonicNow();
+      return nextHeartbeatTime;
+    }
+
+    long scheduleNextHeartbeat() {
+      // Numerical overflow is possible here and is okay.
+      nextHeartbeatTime += heartbeatIntervalMs;
+      return nextHeartbeatTime;
+    }
+
+    boolean isHeartbeatDue(long startTime) {
+      return (nextHeartbeatTime - startTime <= 0);
+    }
+
+    long getHeartbeatWaitTime() {
+      return nextHeartbeatTime - monotonicNow();
+    }
+
+    /**
+     * Wrapped for testing.
+     * @return
+     */
+    @VisibleForTesting
+    public long monotonicNow() {
+      return Time.monotonicNow();
+    }
   }
 }
