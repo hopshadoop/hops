@@ -132,7 +132,7 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String DFS_NAMENODE_SELECTOR_POLICY_KEY =
       "dfs.namenode.selector-policy";
   public static final String DFS_NAMENODE_SELECTOR_POLICY_DEFAULT =
-      "ROUND_ROBIN";     //RANDOM
+      "RANDOM_STICKY";     //RANDOM ROUND_ROBIN RANDOM_STICKY
   
   public static final String DFS_BLOCK_POOL_ID_KEY = "dfs.block.pool.id";
   public static final String DFS_BLOCK_POOL_ID_DEFAULT = "HOP_BLOCK_POOL_123";
