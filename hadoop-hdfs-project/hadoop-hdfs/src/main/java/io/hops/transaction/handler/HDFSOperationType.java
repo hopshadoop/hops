@@ -396,5 +396,10 @@ public enum HDFSOperationType implements OperationType {
   CREATE_EZ,
   GET_EZ_PATH,
   GET_ALL_EZ,
-  LIST_EZ
+  LIST_EZ,
+
+  //FSCK
+  FSCK_GET_NUM_REPLICAS,
+  FSCK_GET_CORRUPT_REPLICAS,
+  FSCK_GET_STORAGES
 }
