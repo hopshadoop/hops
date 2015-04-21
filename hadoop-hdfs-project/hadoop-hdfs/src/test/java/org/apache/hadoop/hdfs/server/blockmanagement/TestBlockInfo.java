@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
 import io.hops.exception.StorageException;
+import io.hops.exception.TransactionContextException;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.BlockInfoDataAccess;
 import io.hops.metadata.hdfs.dal.ReplicaDataAccess;
@@ -27,6 +28,7 @@ import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import io.hops.transaction.lock.LockFactory;
+import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLocks;
 import java.io.IOException;
 import static org.hamcrest.core.Is.is;
@@ -44,6 +46,7 @@ import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.Mockito;
 
 /**
  * This class provides tests for BlockInfo class, which is used in BlocksMap.
@@ -61,6 +64,17 @@ public class TestBlockInfo {
     HdfsStorageFactory.setConfiguration(conf);
     HdfsStorageFactory.formatStorage();
     HashBuckets.initialize(1);
+  }
+
+  @Test
+  public void testIsDeleted() throws StorageException, TransactionContextException, IOException {
+    Block block = new Block(0);
+    BlockInfoContiguous blockInfo = new BlockInfoContiguous(block, (short) 3);
+    BlockCollection bc = Mockito.mock(BlockCollection.class);
+    setBlockCollection(blockInfo, bc);
+    Assert.assertFalse(blockInfo.isDeleted());
+    blockInfo.setBlockCollection(null);
+    Assert.assertTrue(isDeleted(blockInfo));
   }
 
   @Test
@@ -164,5 +178,62 @@ public class TestBlockInfo {
       }
     }.handle();
     
+  }
+  
+  private void setBlockCollection(final BlockInfoContiguous blockInfo, 
+      final BlockCollection bc ) throws IOException {
+    new HopsTransactionalRequestHandler(
+        HDFSOperationType.COMMIT_BLOCK_SYNCHRONIZATION) {
+      INodeIdentifier inodeIdentifier = new INodeIdentifier(0L);
+
+      @Override
+      public void setUp() throws StorageException {
+      }
+
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = LockFactory.getInstance();
+        locks.add(lf.getIndividualINodeLock(TransactionLockTypes.INodeLockType.WRITE, inodeIdentifier, true))
+            .add(lf.getLeaseLock(TransactionLockTypes.LockType.WRITE))
+            .add(lf.getLeasePathLock(TransactionLockTypes.LockType.READ_COMMITTED))
+            .add(lf.getBlockLock(10, inodeIdentifier))
+            .add(lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.ER, LockFactory.BLK.UC,
+                LockFactory.BLK.UR));
+      }
+
+      @Override
+      public Object performTask() throws IOException {
+        blockInfo.setBlockCollection(bc);
+        return null;
+      }
+
+    }.handle();
+  }
+  
+  private boolean isDeleted(final BlockInfoContiguous blockInfo) throws IOException {
+    return (boolean) new HopsTransactionalRequestHandler(HDFSOperationType.COMMIT_BLOCK_SYNCHRONIZATION) {
+      INodeIdentifier inodeIdentifier = new INodeIdentifier(0L);
+
+      @Override
+      public void setUp() throws StorageException {
+      }
+
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = LockFactory.getInstance();
+        locks.add(lf.getIndividualINodeLock(TransactionLockTypes.INodeLockType.WRITE, inodeIdentifier, true))
+            .add(lf.getLeaseLock(TransactionLockTypes.LockType.WRITE))
+            .add(lf.getLeasePathLock(TransactionLockTypes.LockType.READ_COMMITTED))
+            .add(lf.getBlockLock(10, inodeIdentifier))
+            .add(lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.ER, LockFactory.BLK.UC,
+                LockFactory.BLK.UR));
+      }
+
+      @Override
+      public Object performTask() throws IOException {
+        return blockInfo.isDeleted();
+      }
+
+    }.handle();
   }
 }

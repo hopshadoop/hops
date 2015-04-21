@@ -200,6 +200,15 @@ public class BlockInfoContiguous extends Block {
     }
   }
 
+  public boolean isDeleted() throws StorageException, TransactionContextException {
+    if(bc!=null){
+      return false;
+    } else {
+      getBlockCollection();
+    }
+    return (bc == null);
+  }
+
   /**
    * Count the number of data-nodes the block belongs to.
    */
