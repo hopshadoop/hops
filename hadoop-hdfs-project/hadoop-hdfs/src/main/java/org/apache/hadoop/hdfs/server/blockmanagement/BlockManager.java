@@ -4864,6 +4864,12 @@ public class BlockManager {
     return blocksMap.getBlockCollection(b);
   }
 
+  /** @return an iterator of the datanodes. */
+  public Iterable<DatanodeStorageInfo> getStorages(final Block block) throws StorageException,
+      TransactionContextException {
+    return blocksMap.getStorages(block);
+  }
+  
   /**
    * @return an iterator of the datanodes.
    */

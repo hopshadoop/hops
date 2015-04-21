@@ -316,6 +316,14 @@ class BlocksMap {
     }.handle();
   }
   
+  /**
+   * Searches for the block in the BlocksMap and 
+   * returns {@link Iterable} of the storages the block belongs to.
+   */
+  Iterable<DatanodeStorageInfo> getStorages(Block b) throws StorageException, TransactionContextException {
+    return getStorages(getStoredBlock(b));
+  }
+  
   public List<DatanodeStorageInfo> getStorages(BlockInfoContiguous block)
       throws TransactionContextException, StorageException {
     DatanodeStorageInfo[] array = block.getStorages(datanodeManager);
