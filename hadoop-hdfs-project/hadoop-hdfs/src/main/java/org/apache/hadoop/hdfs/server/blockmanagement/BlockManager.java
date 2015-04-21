@@ -1463,19 +1463,20 @@ public class BlockManager {
       DatanodeStorageInfo storageInfo,
       DatanodeDescriptor node) throws IOException, StorageException {
 
-    BlockCollection bc = b.corrupted.getBlockCollection();
-    if (bc == null) {
+    if (b.corrupted.isDeleted()) {
       blockLog.info("BLOCK markBlockAsCorrupt: {} cannot be marked as" +
           " corrupt as it does not belong to any file", b);
       addToInvalidates(b.corrupted, node);
       return;
-    }
+    } 
+    BlockCollection bc = b.corrupted.getBlockCollection();
+    short expectedReplicas = bc.getBlockReplication();
 
     // Lookup which storage we are working on if we didn't know it yet
     if(storageInfo == null) {
       storageInfo = b.corrupted.getStorageOnNode(node);
     }
-
+    
     // Add replica to the storage if it is not already there
     if (storageInfo != null) {
       storageInfo.addBlock(b.stored);
@@ -1485,13 +1486,13 @@ public class BlockManager {
     corruptReplicas.addToCorruptReplicasMap(b.corrupted, storageInfo, b.reason, b.reasonCode);
 
     NumberReplicas numberOfReplicas = countNodes(b.stored);
-    boolean hasEnoughLiveReplicas = numberOfReplicas.liveReplicas() >= bc
-        .getBlockReplication();
+    boolean hasEnoughLiveReplicas = numberOfReplicas.liveReplicas() >=
+        expectedReplicas;
     boolean minReplicationSatisfied =
         numberOfReplicas.liveReplicas() >= minReplication;
     boolean hasMoreCorruptReplicas = minReplicationSatisfied &&
         (numberOfReplicas.liveReplicas() + numberOfReplicas.corruptReplicas()) >
-            bc.getBlockReplication();
+        expectedReplicas;
     boolean corruptedDuringWrite = minReplicationSatisfied &&
         (b.stored.getGenerationStamp() > b.corrupted.getGenerationStamp());
     // case 1: have enough number of live replicas
@@ -3265,7 +3266,7 @@ public class BlockManager {
     } else {
       storedBlock = block;
     }
-    if (storedBlock == null || storedBlock.getBlockCollection() == null) {
+    if (storedBlock == null || storedBlock.isDeleted()) {
       // If this block does not belong to anyfile, then we are done.
       blockLog.info("BLOCK* addStoredBlock: {} on {} size {} but it does not" +
           " belong to any file", block, storageInfo.getStorageID(), block.getNumBytes());
@@ -3751,10 +3752,8 @@ public class BlockManager {
    * appropriate queues if necessary, and returns a result code indicating
    * what happened with it.
    */
-  private MisReplicationResult processMisReplicatedBlock(BlockInfoContiguous block)
-      throws IOException {
-    BlockCollection bc = block.getBlockCollection();
-    if (bc == null) {
+  private MisReplicationResult processMisReplicatedBlock(BlockInfoContiguous block) throws IOException {
+    if (block.isDeleted()) {
       // block does not belong to any file
       addToInvalidates(block);
       return MisReplicationResult.INVALID;
@@ -3765,7 +3764,8 @@ public class BlockManager {
       return MisReplicationResult.UNDER_CONSTRUCTION;
     }
     // calculate current replication
-    short expectedReplication = bc.getBlockReplication();
+    short expectedReplication =
+        block.getBlockCollection().getBlockReplication();
     NumberReplicas num = countNodes(block);
     int numCurrentReplica = num.liveReplicas();
     // add to under-replicated queue if need to be
