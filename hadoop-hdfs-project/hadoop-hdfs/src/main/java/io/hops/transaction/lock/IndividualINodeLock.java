@@ -70,7 +70,8 @@ final class IndividualINodeLock extends BaseINodeLock {
 
     if (readUpPathInodes) {
       List<INode> pathInodes = readUpInodes(inode);
-      addPathINodes(INodeUtil.constructPath(pathInodes), pathInodes);
+      addPathINodesAndUpdateResolvingCache(INodeUtil.constructPath(pathInodes),
+          pathInodes);
     } else {
       addIndividualINode(inode);
     }

@@ -22,7 +22,7 @@ import io.hops.common.IDsMonitor;
 import io.hops.exception.StorageException;
 import io.hops.exception.StorageInitializtionException;
 import io.hops.log.NDCWrapper;
-import io.hops.memcache.PathMemcache;
+import io.hops.resolvingcache.Cache;
 import io.hops.metadata.adaptor.BlockInfoDALAdaptor;
 import io.hops.metadata.adaptor.INodeAttributeDALAdaptor;
 import io.hops.metadata.adaptor.INodeDALAdaptor;
@@ -126,7 +126,7 @@ public class HdfsStorageFactory {
 
   public static void setConfiguration(Configuration conf) throws IOException {
     IDsMonitor.getInstance().setConfiguration(conf);
-    PathMemcache.getInstance().setConfiguration(conf);
+    Cache.getInstance(conf);
     LockFactory.getInstance().setConfiguration(conf);
     NDCWrapper.enableNDC(conf.getBoolean(DFSConfigKeys.DFS_NDC_ENABLED_KEY,
         DFSConfigKeys.DFS_NDC_ENABLED_DEFAULT));
@@ -136,7 +136,9 @@ public class HdfsStorageFactory {
         conf.get(DFSConfigKeys.DFS_TRANSACTION_STATS_DIR,
             DFSConfigKeys.DFS_TRANSACTION_STATS_DIR_DEFAULT), conf.getInt
             (DFSConfigKeys.DFS_TRANSACTION_STATS_WRITER_ROUND, DFSConfigKeys
-                .DFS_TRANSACTION_STATS_WRITER_ROUND_DEFAULT));
+                .DFS_TRANSACTION_STATS_WRITER_ROUND_DEFAULT), conf
+            .getBoolean(DFSConfigKeys.DFS_TRANSACTION_STATS_DETAILED_ENABLED,
+                DFSConfigKeys.DFS_TRANSACTION_STATS_DETAILED_ENABLED_DEFAULT));
     if (!isDALInitialized) {
       HdfsVariables.registerDefaultValues();
       addToClassPath(conf.get(DFSConfigKeys.DFS_STORAGE_DRIVER_JAR_FILE,
@@ -301,19 +303,19 @@ public class HdfsStorageFactory {
   }
   
   public static boolean formatStorage() throws StorageException {
-    PathMemcache.getInstance().flush();
+    Cache.getInstance().flush();
     return dStorageFactory.getConnector().formatStorage();
   }
   
   public static boolean formatStorageNonTransactional()
       throws StorageException {
-    PathMemcache.getInstance().flush();
+    Cache.getInstance().flush();
     return dStorageFactory.getConnector().formatStorageNonTransactional();
   }
 
   public static boolean formatStorage(Class<? extends EntityDataAccess>... das)
       throws StorageException {
-    PathMemcache.getInstance().flush();
+    Cache.getInstance().flush();
     return dStorageFactory.getConnector().formatStorage(das);
   }
 }

@@ -1181,11 +1181,11 @@ public class DistributedFileSystem extends FileSystem {
 
 
   public void enableMemcached() throws IOException {
-    changeConf(DFSConfigKeys.DFS_MEMCACHE_ENABLED, String.valueOf(true));
+    changeConf(DFSConfigKeys.DFS_RESOLVING_CACHE_ENABLED, String.valueOf(true));
   }
 
   public void disableMemcached() throws IOException {
-    changeConf(DFSConfigKeys.DFS_MEMCACHE_ENABLED, String.valueOf(false));
+    changeConf(DFSConfigKeys.DFS_RESOLVING_CACHE_ENABLED, String.valueOf(false));
   }
 
   public void enableSetPartitionKey() throws IOException {

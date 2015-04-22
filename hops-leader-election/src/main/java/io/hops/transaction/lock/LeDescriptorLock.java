@@ -17,13 +17,7 @@
  */
 package io.hops.transaction.lock;
 
-import io.hops.exception.StorageException;
-import io.hops.leaderElection.LeaderElection;
-import io.hops.metadata.election.dal.LeDescriptorDataAccess;
-import io.hops.metadata.election.entity.LeDescriptor;
 import io.hops.metadata.election.entity.LeDescriptorFactory;
-import io.hops.transaction.EntityManager;
-
 import java.io.IOException;
 
 final class LeDescriptorLock extends Lock {
@@ -39,15 +33,6 @@ final class LeDescriptorLock extends Lock {
   @Override
   protected void acquire(TransactionLocks locks) throws IOException {
     acquireLockList(lockType, leFactory.getAllFinder());
-  }
-
-  private void setPartitioningKey() throws StorageException {
-    if (isSetPartitionKeyEnabled()) {
-      Object[] key = new Object[2];
-      key[0] = LeaderElection.LEADER_INITIALIZATION_ID;
-      key[1] = LeDescriptor.DEFAULT_PARTITION_VALUE;
-      EntityManager.setPartitionKey(LeDescriptorDataAccess.class, key);
-    }
   }
 
   @Override

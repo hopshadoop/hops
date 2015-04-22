@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdfs.server.namenode;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Charsets;
 import com.google.common.collect.Lists;
 import io.hops.common.BlockIdGen;
 import io.hops.common.IDsMonitor;
@@ -27,7 +26,7 @@ import io.hops.erasure_coding.Codec;
 import io.hops.erasure_coding.ErasureCodingManager;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
-import io.hops.memcache.PathMemcache;
+import io.hops.resolvingcache.Cache;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.HdfsVariables;
 import io.hops.metadata.hdfs.dal.BlockChecksumDataAccess;
@@ -135,17 +134,11 @@ import org.mortbay.util.ajax.JSON;
 import javax.management.NotCompliantMBeanException;
 import javax.management.ObjectName;
 import javax.management.StandardMBean;
-import java.io.BufferedWriter;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.lang.management.ManagementFactory;
 import java.net.InetAddress;
 import java.util.ArrayList;
@@ -5408,12 +5401,12 @@ public class FSNamesystem
     for (int i = 0; i < props.size(); i++) {
       String prop = props.get(i);
       String value = newVals.get(i);
-      if (prop.equals(DFSConfigKeys.DFS_MEMCACHE_ENABLED) ||
+      if (prop.equals(DFSConfigKeys.DFS_RESOLVING_CACHE_ENABLED) ||
           prop.equals(DFSConfigKeys.DFS_SET_PARTITION_KEY_ENABLED)) {
         LOG.info("change configuration for  " + prop + " to " + value);
         conf.set(prop, value);
-        if (prop.equals(DFSConfigKeys.DFS_MEMCACHE_ENABLED)) {
-          PathMemcache.getInstance()
+        if (prop.equals(DFSConfigKeys.DFS_RESOLVING_CACHE_ENABLED)) {
+          Cache.getInstance()
               .enableOrDisable(Boolean.parseBoolean(value));
         }
       } else {

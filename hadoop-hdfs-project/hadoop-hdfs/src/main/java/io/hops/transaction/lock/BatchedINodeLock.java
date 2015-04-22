@@ -47,23 +47,11 @@ public class BatchedINodeLock extends BaseINodeLock {
         inodeIds[i] = inodeIdentifier.getInodeId();
       }
 
-      find(DEFAULT_INODE_LOCK_TYPE, names, parentIds);
+      find(DEFAULT_INODE_LOCK_TYPE, names, parentIds, false);
     } else {
       throw new StorageException(
           "INodeIdentifier object is not properly initialized ");
     }
-  }
-
-  private Collection<INode> find(TransactionLockTypes.INodeLockType lock,
-      String[] names, int[] parentIds)
-      throws StorageException, TransactionContextException {
-    setINodeLockType(lock);
-    Collection<INode> inodes = EntityManager
-        .findList(INode.Finder.ByNamesAndParentIds, names, parentIds);
-    for (INode inode : inodes) {
-      addLockedINodes(inode, lock);
-    }
-    return inodes;
   }
 
   int[] getINodeIds() {

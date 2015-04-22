@@ -1331,17 +1331,28 @@ public class TestFileCreation {
     DistributedFileSystem dfs = (DistributedFileSystem) FileSystem
         .newInstance(fs.getUri(), fs.getConf());
     try {
-      dfs.mkdirs(new Path("/f1/f2"));
-      dfs.mkdirs(new Path("/f1/f2/f3/f4/f5"));
-      Path p1 = new Path("/f1/f2/test.txt");
-      Path p2 = new Path("/f2");
-      int blocks = 1;
-      FSDataOutputStream out = dfs.create(p1);
-      int i = 0;
-      for (; i < blocks; i++) {
-        out.write(i);
+      final int FILES = 10;
+      final int BLOCKS = 2;
+
+      Path base = new Path("/f1/f2/f3/f4/f5");
+      dfs.mkdirs(base);
+      
+      for(int f=0; f < FILES; f++){
+        FSDataOutputStream out = dfs.create(new Path(base, "test"+f));
+        for(int k=0; k<BLOCKS; k++){
+          out.write(k);
+        }
+        out.close();
       }
-      out.close();
+
+      for(int f=0; f<FILES; f++){
+        FSDataInputStream in = dfs.open(new Path(base, "test" + f));
+        for(int k=0; k<BLOCKS; k++){
+          assertTrue(in.read() == k);
+        }
+        in.close();
+      }
+      
     } catch (Exception e) {
       e.printStackTrace();
     } finally {
