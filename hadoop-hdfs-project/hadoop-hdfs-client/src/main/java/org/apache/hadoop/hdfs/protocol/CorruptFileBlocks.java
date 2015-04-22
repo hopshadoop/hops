@@ -59,7 +59,7 @@ public class CorruptFileBlocks {
     return cookie.equals(other.cookie) && Arrays.equals(files, other.files);
   }
 
-  
+
   @Override
   public int hashCode() {
     int result = cookie.hashCode();

@@ -28,7 +28,7 @@ import org.apache.hadoop.classification.InterfaceStability;
 public class DirectoryListing {
   private HdfsFileStatus[] partialListing;
   private int remainingEntries;
-  
+
   /**
    * constructor
    *
@@ -58,7 +58,7 @@ public class DirectoryListing {
   public HdfsFileStatus[] getPartialListing() {
     return partialListing;
   }
-  
+
   /**
    * Get the number of remaining entries that are left to be listed
    *
@@ -67,7 +67,7 @@ public class DirectoryListing {
   public int getRemainingEntries() {
     return remainingEntries;
   }
-  
+
   /**
    * Check if there are more entries that are left to be listed
    *
@@ -77,7 +77,7 @@ public class DirectoryListing {
   public boolean hasMore() {
     return remainingEntries != 0;
   }
-  
+
   /**
    * Get the last name in this list
    *
