@@ -15,37 +15,37 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-package org.apache.hadoop.hdfs.protocol;
+package org.apache.hadoop.hdfs.security.token.block;
 
 import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 
+/**
+ * A little struct class to contain all fields required to perform encryption
+ * of
+ * the DataTransferProtocol.
+ */
 @InterfaceAudience.Private
-@InterfaceStability.Evolving
-public final class NSQuotaExceededException extends QuotaExceededException {
-  protected static final long serialVersionUID = 1L;
-  
-  public NSQuotaExceededException() {
-  }
+public class DataEncryptionKey {
+  public final int keyId;
+  public final String blockPoolId;
+  public final byte[] nonce;
+  public final byte[] encryptionKey;
+  public final long expiryDate;
+  public final String encryptionAlgorithm;
 
-  public NSQuotaExceededException(String msg) {
-    super(msg);
-  }
-  
-  public NSQuotaExceededException(long quota, long count) {
-    super(quota, count);
+  public DataEncryptionKey(int keyId, String blockPoolId, byte[] nonce,
+      byte[] encryptionKey, long expiryDate, String encryptionAlgorithm) {
+    this.keyId = keyId;
+    this.blockPoolId = blockPoolId;
+    this.nonce = nonce;
+    this.encryptionKey = encryptionKey;
+    this.expiryDate = expiryDate;
+    this.encryptionAlgorithm = encryptionAlgorithm;
   }
 
   @Override
-  public String getMessage() {
-    String msg = super.getMessage();
-    if (msg == null) {
-      return "The NameSpace quota (directories and files)" +
-          (pathName == null ? "" : (" of directory " + pathName)) +
-          " is exceeded: quota=" + quota + " file count=" + count;
-    } else {
-      return msg;
-    }
+  public String toString() {
+    return keyId + "/" + blockPoolId + "/" + nonce.length + "/" +
+        encryptionKey.length;
   }
 }

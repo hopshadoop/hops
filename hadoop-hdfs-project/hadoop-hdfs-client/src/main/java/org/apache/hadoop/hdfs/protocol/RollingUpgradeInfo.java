@@ -17,15 +17,6 @@
  */
 package org.apache.hadoop.hdfs.protocol;
 
-import io.hops.exception.StorageException;
-import io.hops.metadata.HdfsVariables;
-import io.hops.metadata.common.entity.Variable;
-import io.hops.transaction.handler.HDFSOperationType;
-import io.hops.transaction.handler.HopsTransactionalRequestHandler;
-import io.hops.transaction.lock.LockFactory;
-import io.hops.transaction.lock.TransactionLockTypes;
-import io.hops.transaction.lock.TransactionLocks;
-import java.io.IOException;
 import java.util.Date;
 
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -50,7 +41,7 @@ public class RollingUpgradeInfo extends RollingUpgradeStatus {
   public boolean isStarted() {
     return startTime != 0;
   }
-  
+
   /** @return The rolling upgrade starting time. */
   public long getStartTime() {
     return startTime;
@@ -89,7 +80,7 @@ public class RollingUpgradeInfo extends RollingUpgradeStatus {
       +  "\n     Start Time: " + (startTime == 0? "<NOT STARTED>": timestamp2String(startTime))
       +  "\n  Finalize Time: " + (finalizeTime == 0? "<NOT FINALIZED>": timestamp2String(finalizeTime));
   }
-  
+
   private static String timestamp2String(long timestamp) {
     return new Date(timestamp) + " (=" + timestamp + ")";
   }
