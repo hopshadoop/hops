@@ -3064,9 +3064,11 @@ public class DataNode extends ReconfigurableBase
     ExtendedBlock block = rb.getBlock();
     DatanodeInfo[] targets = rb.getLocations();
     
-    LOG.info(who + " calls recoverBlock(" + block + ", targets=[" +
-        Joiner.on(", ").join(targets) + "]" + ", newGenerationStamp=" +
-        rb.getNewGenerationStamp() + ")");
+    LOG.info(who + " calls recoverBlock(" + block
+        + ", targets=[" + Joiner.on(", ").join(targets) + "]"
+        + ((rb.getNewBlock() == null) ? ", newGenerationStamp="
+            + rb.getNewGenerationStamp() : ", newBlock=" + rb.getNewBlock())
+        + ")");
   }
 
   @Override // ClientDataNodeProtocol
