@@ -1323,7 +1323,7 @@ public class DataNode extends ReconfigurableBase
    *
    * @throws IOException
    */
-  private synchronized void checkDatanodeUuid() throws IOException {
+  synchronized void checkDatanodeUuid() throws IOException {
     if (storage.getDatanodeUuid() == null) {
       storage.setDatanodeUuid(generateUuid());
       storage.writeAll();
@@ -3380,7 +3380,7 @@ public class DataNode extends ReconfigurableBase
   }
 
   public String getDatanodeUuid() {
-    return id == null ? null : id.getDatanodeUuid();
+    return storage == null ? null : storage.getDatanodeUuid();
   }
 
   boolean shouldRun() {
