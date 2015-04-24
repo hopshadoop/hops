@@ -26,14 +26,17 @@ public interface HdfsClientConfigKeys {
   long    DFS_BLOCK_SIZE_DEFAULT = 128*1024*1024;
   String  DFS_REPLICATION_KEY = "dfs.replication";
   short   DFS_REPLICATION_DEFAULT = 3;
+  String  DFS_WEBHDFS_USER_PATTERN_KEY = "dfs.webhdfs.user.provider.user.pattern";
   String  DFS_WEBHDFS_USER_PATTERN_DEFAULT = "^[A-Za-z_][A-Za-z0-9._-]*[$]?$";
   String DFS_WEBHDFS_ACL_PERMISSION_PATTERN_DEFAULT =
       "^(default:)?(user|group|mask|other):[[A-Za-z_][A-Za-z0-9._-]]*:([rwx-]{3})?(,(default:)?(user|group|mask|other):[[A-Za-z_][A-Za-z0-9._-]]*:([rwx-]{3})?)*$";
 
   static final String PREFIX = "dfs.client.";
   String  DFS_NAMESERVICES = "dfs.nameservices";
+  String  DFS_NAMENODE_HTTP_PORT_KEY = "dfs.http.port";
   int     DFS_NAMENODE_HTTP_PORT_DEFAULT = 50070;
   String  DFS_NAMENODE_HTTP_ADDRESS_KEY = "dfs.namenode.http-address";
+  String  DFS_NAMENODE_HTTPS_PORT_KEY = "dfs.https.port";
   int     DFS_NAMENODE_HTTPS_PORT_DEFAULT = 50470;
   String  DFS_NAMENODE_HTTPS_ADDRESS_KEY = "dfs.namenode.https-address";
   String DFS_HA_NAMENODES_KEY_PREFIX = "dfs.ha.namenodes";

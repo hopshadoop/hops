@@ -53,12 +53,12 @@ import org.apache.hadoop.fs.XAttrSetFlag;
 import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.AclStatus;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.hdfs.DFSConfigKeys;
-import org.apache.hadoop.hdfs.DFSUtil;
+import org.apache.hadoop.hdfs.DFSUtilClient;
+import org.apache.hadoop.hdfs.HAUtilClient;
 import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
+import org.apache.hadoop.hdfs.protocol.HdfsConstantsClient;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
-import org.apache.hadoop.hdfs.server.namenode.SafeModeException;
 import org.apache.hadoop.hdfs.web.resources.*;
 import org.apache.hadoop.hdfs.web.resources.HttpOpParam.Op;
 import org.apache.hadoop.io.Text;
@@ -144,13 +144,12 @@ public class WebHdfsFileSystem extends FileSystem
         .newDefaultURLConnectionFactory(conf);
     /** set user pattern based on configuration file */
     UserParam.setUserPattern(conf.get(
-        DFSConfigKeys.DFS_WEBHDFS_USER_PATTERN_KEY,
-        DFSConfigKeys.DFS_WEBHDFS_USER_PATTERN_DEFAULT));
+        HdfsClientConfigKeys.DFS_WEBHDFS_USER_PATTERN_KEY,
+        HdfsClientConfigKeys.DFS_WEBHDFS_USER_PATTERN_DEFAULT));
 
     ugi = UserGroupInformation.getCurrentUser();
     
     this.uri = URI.create(uri.getScheme() + "://" + uri.getAuthority());
-
     // In non-HA case, the code needs to call getCanonicalUri() in order to
     // handle the case where no port is specified in the URI
     this.tokenServiceName = SecurityUtil.buildTokenService(getCanonicalUri());
@@ -163,7 +162,7 @@ public class WebHdfsFileSystem extends FileSystem
         HdfsClientConfigKeys.HttpClient.RETRY_POLICY_ENABLED_DEFAULT,
         HdfsClientConfigKeys.HttpClient.RETRY_POLICY_SPEC_KEY,
         HdfsClientConfigKeys.HttpClient.RETRY_POLICY_SPEC_DEFAULT,
-        SafeModeException.class);
+        HdfsConstantsClient.SAFEMODE_EXCEPTION_CLASS_NAME);
     
     this.workingDir = getHomeDirectory();
 
@@ -178,13 +177,6 @@ public class WebHdfsFileSystem extends FileSystem
   public URI getCanonicalUri() {
     return super.getCanonicalUri();
    }
-
-  /** Is WebHDFS enabled in conf? */
-  public static boolean isEnabled(final Configuration conf, final Log log) {
-    final boolean b = conf.getBoolean(DFSConfigKeys.DFS_WEBHDFS_ENABLED_KEY,
-        DFSConfigKeys.DFS_WEBHDFS_ENABLED_DEFAULT);
-    return b;
-  }
 
   TokenSelector<DelegationTokenIdentifier> tokenSelector =
       new AbstractDelegationTokenSelector<DelegationTokenIdentifier>(getTokenKind()){};
@@ -201,7 +193,7 @@ public class WebHdfsFileSystem extends FileSystem
         if(LOG.isDebugEnabled()) {
           LOG.debug("Using UGI token: " + token);
         }
-        canRefreshDelegationToken = false; 
+        canRefreshDelegationToken = false;
       } else {
         token = getDelegationToken(null);
         if (token != null) {
@@ -234,15 +226,15 @@ public class WebHdfsFileSystem extends FileSystem
   @Override
   @VisibleForTesting
   public int getDefaultPort() {
-    return getConf().getInt(DFSConfigKeys.DFS_NAMENODE_HTTP_PORT_KEY,
-        DFSConfigKeys.DFS_NAMENODE_HTTP_PORT_DEFAULT);
+    return getConf().getInt(HdfsClientConfigKeys.DFS_NAMENODE_HTTP_PORT_KEY,
+        HdfsClientConfigKeys.DFS_NAMENODE_HTTP_PORT_DEFAULT);
   }
 
   @Override
   public URI getUri() {
     return this.uri;
   }
-  
+
   @Override
   protected URI canonicalizeUri(URI uri) {
     return NetUtils.getCanonicalUri(uri, getDefaultPort());
@@ -266,7 +258,7 @@ public class WebHdfsFileSystem extends FileSystem
   @Override
   public synchronized void setWorkingDirectory(final Path dir) {
     String result = makeAbsolute(dir).toUri().getPath();
-    if (!DFSUtil.isValidName(result)) {
+    if (!DFSUtilClient.isValidName(result)) {
       throw new IllegalArgumentException("Invalid DFS directory name " +
                                          result);
     }
@@ -391,7 +383,7 @@ public class WebHdfsFileSystem extends FileSystem
     }
     return url;
   }
-  
+
   Param<?,?>[] getAuthParameters(final HttpOpParam.Op op) throws IOException {
     List<Param<?,?>> authParams = Lists.newArrayList();
     // Skip adding delegation token for token operations because these
@@ -473,11 +465,11 @@ public class WebHdfsFileSystem extends FileSystem
   
     /**
      * Two-step requests redirected to a DN
-     * 
+     *
      * Create/Append:
-     * Step 1) Submit a Http request with neither auto-redirect nor data. 
+     * Step 1) Submit a Http request with neither auto-redirect nor data.
      * Step 2) Submit another Http request with the URL from the Location header with data.
-     * 
+     *
      * The reason of having two-step create/append is for preventing clients to
      * send out the data before the redirect. This issue is addressed by the
      * "Expect: 100-continue" header in HTTP/1.1; see RFC 2616, Section 8.2.3.
@@ -485,7 +477,7 @@ public class WebHdfsFileSystem extends FileSystem
      * and Java 6 http client), which do not correctly implement "Expect:
      * 100-continue". The two-step create/append is a temporary workaround for
      * the software library bugs.
-     * 
+     *
      * Open/Checksum
      * Also implements two-step connects for other operations redirected to
      * a DN such as open and checksum
@@ -493,7 +485,8 @@ public class WebHdfsFileSystem extends FileSystem
     private HttpURLConnection connect(URL url) throws IOException {
       //redirect hostname and port
       String redirectHost = null;
-      
+
+
       // resolve redirects for a DN operation unless already resolved
       if (op.getRedirect() && !redirected) {
         final HttpOpParam.Op redirectOp =
@@ -534,7 +527,7 @@ public class WebHdfsFileSystem extends FileSystem
       conn.setInstanceFollowRedirects(false);
       switch (op.getType()) {
         // if not sending a message body for a POST or PUT operation, need
-        // to ensure the server/proxy knows this 
+        // to ensure the server/proxy knows this
         case POST:
         case PUT: {
           conn.setDoOutput(true);
@@ -639,21 +632,21 @@ public class WebHdfsFileSystem extends FileSystem
   abstract class AbstractFsPathRunner<T> extends AbstractRunner<T> {
     private final Path fspath;
     private final Param<?,?>[] parameters;
-    
+
     AbstractFsPathRunner(final HttpOpParam.Op op, final Path fspath,
         Param<?,?>... parameters) {
       super(op, false);
       this.fspath = fspath;
       this.parameters = parameters;
     }
-    
+
     AbstractFsPathRunner(final HttpOpParam.Op op, Param<?,?>[] parameters,
         final Path fspath) {
       super(op, false);
       this.fspath = fspath;
       this.parameters = parameters;
     }
-    
+
     @Override
     protected URL getUrl() throws IOException {
       if (excludeDatanodes.getValue() != null) {
@@ -689,12 +682,12 @@ public class WebHdfsFileSystem extends FileSystem
         Param<?,?>... parameters) {
       super(op, fspath, parameters);
     }
-    
+
     FsPathResponseRunner(final HttpOpParam.Op op, Param<?,?>[] parameters,
         final Path fspath) {
       super(op, parameters, fspath);
     }
-    
+
     @Override
     final T getResponse(HttpURLConnection conn) throws IOException {
       try {
@@ -718,6 +711,7 @@ public class WebHdfsFileSystem extends FileSystem
         conn.disconnect();
       }
     }
+
     abstract T decodeResponse(Map<?,?> json) throws IOException;
   }
 
@@ -740,13 +734,13 @@ public class WebHdfsFileSystem extends FileSystem
    */
   class FsPathOutputStreamRunner extends AbstractFsPathRunner<FSDataOutputStream> {
     private final int bufferSize;
-    
+
     FsPathOutputStreamRunner(Op op, Path fspath, int bufferSize,
         Param<?,?>... parameters) {
       super(op, fspath, parameters);
       this.bufferSize = bufferSize;
     }
-    
+
     @Override
     FSDataOutputStream getResponse(final HttpURLConnection conn)
         throws IOException {
@@ -778,7 +772,7 @@ public class WebHdfsFileSystem extends FileSystem
       return conn;
     }
   }
-  
+
   /**
    * Used by open() which tracks the resolved url itself
    */
@@ -893,7 +887,7 @@ public class WebHdfsFileSystem extends FileSystem
         new RenameOptionSetParam(options)
     ).run();
   }
-  
+
   @Override
   public void setXAttr(Path p, String name, byte[] value,
       EnumSet<XAttrSetFlag> flag) throws IOException {
@@ -908,7 +902,7 @@ public class WebHdfsFileSystem extends FileSystem
           new XAttrSetFlagParam(flag)).run();
     }
   }
-  
+
   @Override
   public byte[] getXAttr(Path p, final String name) throws IOException {
     final HttpOpParam.Op op = GetOpParam.Op.GETXATTRS;
@@ -916,11 +910,11 @@ public class WebHdfsFileSystem extends FileSystem
         new XAttrEncodingParam(XAttrCodec.HEX)) {
       @Override
       byte[] decodeResponse(Map<?, ?> json) throws IOException {
-        return JsonUtil.getXAttr(json, name);
+        return JsonUtilClient.getXAttr(json, name);
       }
     }.run();
   }
-  
+
   @Override
   public Map<String, byte[]> getXAttrs(Path p) throws IOException {
     final HttpOpParam.Op op = GetOpParam.Op.GETXATTRS;
@@ -928,11 +922,11 @@ public class WebHdfsFileSystem extends FileSystem
         new XAttrEncodingParam(XAttrCodec.HEX)) {
       @Override
       Map<String, byte[]> decodeResponse(Map<?, ?> json) throws IOException {
-        return JsonUtil.toXAttrs(json);
+        return JsonUtilClient.toXAttrs(json);
       }
     }.run();
   }
-  
+
   @Override
   public Map<String, byte[]> getXAttrs(Path p, final List<String> names)
       throws IOException {
@@ -943,23 +937,23 @@ public class WebHdfsFileSystem extends FileSystem
       parameters[i] = new XAttrNameParam(names.get(i));
     }
     parameters[parameters.length - 1] = new XAttrEncodingParam(XAttrCodec.HEX);
-    
+
     final HttpOpParam.Op op = GetOpParam.Op.GETXATTRS;
     return new FsPathResponseRunner<Map<String, byte[]>>(op, parameters, p) {
       @Override
       Map<String, byte[]> decodeResponse(Map<?, ?> json) throws IOException {
-        return JsonUtil.toXAttrs(json);
+        return JsonUtilClient.toXAttrs(json);
       }
     }.run();
   }
-  
+
   @Override
   public List<String> listXAttrs(Path p) throws IOException {
     final HttpOpParam.Op op = GetOpParam.Op.LISTXATTRS;
     return new FsPathResponseRunner<List<String>>(op, p) {
       @Override
       List<String> decodeResponse(Map<?, ?> json) throws IOException {
-        return JsonUtil.toXAttrNames(json);
+        return JsonUtilClient.toXAttrNames(json);
       }
     }.run();
   }
@@ -1054,14 +1048,14 @@ public class WebHdfsFileSystem extends FileSystem
 
   @Override
   public long getDefaultBlockSize() {
-    return getConf().getLongBytes(DFSConfigKeys.DFS_BLOCK_SIZE_KEY,
-        DFSConfigKeys.DFS_BLOCK_SIZE_DEFAULT);
+    return getConf().getLongBytes(HdfsClientConfigKeys.DFS_BLOCK_SIZE_KEY,
+        HdfsClientConfigKeys.DFS_BLOCK_SIZE_DEFAULT);
   }
 
   @Override
   public short getDefaultReplication() {
-    return (short)getConf().getInt(DFSConfigKeys.DFS_REPLICATION_KEY,
-        DFSConfigKeys.DFS_REPLICATION_DEFAULT);
+    return (short)getConf().getInt(HdfsClientConfigKeys.DFS_REPLICATION_KEY,
+        HdfsClientConfigKeys.DFS_REPLICATION_DEFAULT);
   }
 
   @Override
@@ -1302,7 +1296,7 @@ public class WebHdfsFileSystem extends FileSystem
         new TokenArgumentParam(token.encodeToUrlString())
     ).run();
   }
-  
+
   @Override
   public BlockLocation[] getFileBlockLocations(final FileStatus status,
       final long offset, final long length) throws IOException {
@@ -1322,7 +1316,7 @@ public class WebHdfsFileSystem extends FileSystem
         new OffsetParam(offset), new LengthParam(length)) {
       @Override
       BlockLocation[] decodeResponse(Map<?,?> json) throws IOException {
-        return DFSUtil.locatedBlocks2Locations(
+        return DFSUtilClient.locatedBlocks2Locations(
             JsonUtilClient.toLocatedBlocks(json));
       }
     }.run();
@@ -1345,7 +1339,7 @@ public class WebHdfsFileSystem extends FileSystem
   public MD5MD5CRC32FileChecksum getFileChecksum(final Path p
       ) throws IOException {
     statistics.incrementReadOps(1);
-  
+
     final HttpOpParam.Op op = GetOpParam.Op.GETFILECHECKSUM;
         return new FsPathResponseRunner<MD5MD5CRC32FileChecksum>(op, p) {
       @Override

@@ -27,7 +27,6 @@ import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.Options.ChecksumOpt;
 import org.apache.hadoop.hdfs.DFSClient;
-import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.DFSInputStream;
 import org.apache.hadoop.hdfs.DFSOutputStream;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
@@ -56,6 +55,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import org.apache.hadoop.hdfs.DFSUtilClient;
 
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
@@ -168,7 +168,7 @@ public class Hdfs extends AbstractFileSystem {
         f.isSymlink() ? new Path(f.getSymlink()) : null,
         (f.getFullPath(parent)).makeQualified(getUri(), null),
         // fully-qualify path
-        DFSUtil.locatedBlocks2Locations(f.getBlockLocations()));
+        DFSUtilClient.locatedBlocks2Locations(f.getBlockLocations()));
   }
 
   @Override

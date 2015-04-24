@@ -917,7 +917,6 @@ public class TestSmallFilesQuota {
     conf.setInt(DFSConfigKeys.DFS_DB_FILE_MAX_SIZE_KEY, MAX_SMALL_FILE_SIZE);
     conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE);
 
-    conf.setBoolean(DFSConfigKeys.DFS_WEBHDFS_ENABLED_KEY, true);
     MiniDFSCluster cluster =
         new MiniDFSCluster.Builder(conf).numDataNodes(3).build();
     cluster.waitActive();
@@ -1038,7 +1037,6 @@ public class TestSmallFilesQuota {
 
     conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE);
     conf.setInt(DFSConfigKeys.DFS_DB_FILE_MAX_SIZE_KEY, MAX_SMALL_FILE_SIZE);
-    conf.setBoolean(DFSConfigKeys.DFS_WEBHDFS_ENABLED_KEY, true);
     conf.setInt(DFSConfigKeys.DFS_NAMENODE_QUOTA_UPDATE_INTERVAL_KEY, 1000);
     MiniDFSCluster cluster =
         new MiniDFSCluster.Builder(conf).numDataNodes(3).build();

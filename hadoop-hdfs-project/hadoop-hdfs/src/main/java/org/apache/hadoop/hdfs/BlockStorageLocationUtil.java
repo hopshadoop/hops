@@ -298,8 +298,8 @@ class BlockStorageLocationUtil {
       List<LocatedBlock> blocks,
       Map<LocatedBlock, List<VolumeId>> blockVolumeIds) throws IOException {
     // Construct the final return value of VolumeBlockLocation[]
-    BlockLocation[] locations = DFSUtil.locatedBlocks2Locations(blocks);
-    List<BlockStorageLocation> volumeBlockLocs =
+    BlockLocation[] locations = DFSUtilClient.locatedBlocks2Locations(blocks);
+    List<BlockStorageLocation> volumeBlockLocs = 
         new ArrayList<>(locations.length);
     for (int i = 0; i < locations.length; i++) {
       LocatedBlock locBlock = blocks.get(i);

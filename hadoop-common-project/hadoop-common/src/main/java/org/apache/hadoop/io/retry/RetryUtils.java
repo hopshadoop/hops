@@ -61,7 +61,7 @@ public class RetryUtils {
       boolean defaultRetryPolicyEnabled,
       String retryPolicySpecKey,
       String defaultRetryPolicySpec,
-      final Class<? extends Exception> remoteExceptionToRetry
+      final String remoteExceptionToRetry
       ) {
     
     final RetryPolicy multipleLinearRandomRetry = 
@@ -99,7 +99,7 @@ public class RetryUtils {
             p = multipleLinearRandomRetry;
           } else if (e instanceof RemoteException) {
             final RemoteException re = (RemoteException)e;
-            p = remoteExceptionToRetry.getName().equals(re.getClassName())?
+            p = remoteExceptionToRetry.equals(re.getClassName())?
                 multipleLinearRandomRetry: RetryPolicies.TRY_ONCE_THEN_FAIL;
           } else if (e instanceof IOException || e instanceof ServiceException) {
             p = multipleLinearRandomRetry;
