@@ -4071,6 +4071,9 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       final boolean closeFile, final boolean deleteBlock,
       final DatanodeID[] newTargets, final String[] newTargetStorages)
       throws IOException {
+    final String[] src = new String[]{""};
+    final boolean[] copyTruncate = new boolean[]{false};
+    final BlockInfoContiguousUnderConstruction[] truncatedBlock = new BlockInfoContiguousUnderConstruction[]{null};
     new HopsTransactionalRequestHandler(
         HDFSOperationType.COMMIT_BLOCK_SYNCHRONIZATION) {
       INodeIdentifier inodeIdentifier;
@@ -4096,7 +4099,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
 
       @Override
       public Object performTask() throws IOException {
-        String src;
         // If a DN tries to commit to the standby, the recovery will
         // fail, and the next retry will succeed on the new NN.
 
@@ -4156,11 +4158,10 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           return null;
         }
           
-        BlockInfoContiguousUnderConstruction truncatedBlock =
-          (BlockInfoContiguousUnderConstruction) iFile.getLastBlock();
-        long recoveryId = truncatedBlock.getBlockRecoveryId();
-        boolean copyTruncate =
-          truncatedBlock.getBlockId() != storedBlock.getBlockId();
+        truncatedBlock[0] = (BlockInfoContiguousUnderConstruction) iFile
+            .getLastBlock();
+        long recoveryId = truncatedBlock[0].getBlockRecoveryId();
+        copyTruncate[0] = truncatedBlock[0].getBlockId() != storedBlock.getBlockId();
         if (recoveryId != newGenerationStamp) {
           throw new IOException("The recovery id " + newGenerationStamp +
               " does not match current recovery id " + recoveryId +
@@ -4175,7 +4176,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           }
         } else {
           // update last block
-          if (!copyTruncate) {
+          if (!copyTruncate[0]) {
             storedBlock.setGenerationStamp(newGenerationStamp);
             storedBlock.setNumBytes(newLength);
           }
@@ -4200,8 +4201,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
             for (int i = 0; i < trimmedTargets.size(); i++) {
               DatanodeStorageInfo storageInfo = trimmedTargets.get(i).getStorageInfo(trimmedStorages.get(i));
               if (storageInfo != null) {
-                if (copyTruncate) {
-                  storageInfo.addBlock(truncatedBlock);
+                if (copyTruncate[0]) {
+                  storageInfo.addBlock(truncatedBlock[0]);
                 } else {
                   storageInfo.addBlock(storedBlock);
                 }
@@ -4213,8 +4214,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
               blockManager.getDatanodeManager().getDatanodeStorageInfos(
                   trimmedTargets.toArray(new DatanodeID[trimmedTargets.size()]),
                   trimmedStorages.toArray(new String[trimmedStorages.size()]));
-          if(copyTruncate) {
-            iFile.setLastBlock(truncatedBlock, trimmedStorageInfos);
+          if(copyTruncate[0]) {
+            iFile.setLastBlock(truncatedBlock[0], trimmedStorageInfos);
           } else {
             iFile.setLastBlock(storedBlock, trimmedStorageInfos);
             if (closeFile) {
@@ -4225,31 +4226,34 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         }
 
         if (closeFile) {
-          if(copyTruncate) {
-            src = closeFileCommitBlocks(iFile, truncatedBlock);
+          if(copyTruncate[0]) {
+            src[0] = closeFileCommitBlocks(iFile, truncatedBlock[0]);
             blockManager.removeBlock(storedBlock);
           } else {
-            src = closeFileCommitBlocks(iFile, storedBlock);
+            src[0] = closeFileCommitBlocks(iFile, storedBlock);
           }
         } else {
           // If this commit does not want to close the file, persist blocks
-          src = iFile.getFullPathName();
-          persistBlocks(src, iFile);
-        }
-        if (closeFile) {
-          LOG.info(
-              "commitBlockSynchronization(oldBlock=" + oldBlock + ", file=" +
-                  src + ", newGenerationStamp=" + newGenerationStamp +
-                  ", newLength=" + newLength + ", newTargets=" +
-                  Arrays.asList(newTargets) +
-                  ") successful");
-        } else {
-          LOG.info("commitBlockSynchronization(" + oldBlock + ") successful");
+          src[0] = iFile.getFullPathName();
+          persistBlocks(src[0], iFile);
         }
         return null;
       }
 
     }.handle(this);
+    if (closeFile) {
+      LOG.info(
+          "commitBlockSynchronization(oldBlock=" + oldBlock
+          + ", file=" + src[0]
+          + (copyTruncate[0] ? ", newBlock=" + truncatedBlock
+              : ", newgenerationstamp=" + newGenerationStamp)
+          + ", newLength=" + newLength + ", newTargets=" + Arrays.asList(newTargets)
+          + ") successful"
+      
+      );
+        } else {
+          LOG.info("commitBlockSynchronization(" + oldBlock + ") successful");
+    }
   }
 
   /**
