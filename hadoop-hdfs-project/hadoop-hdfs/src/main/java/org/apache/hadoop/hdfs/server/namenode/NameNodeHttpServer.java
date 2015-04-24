@@ -21,6 +21,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
+import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.hdfs.server.common.JspHelper;
 import org.apache.hadoop.hdfs.server.namenode.web.resources.NamenodeWebHdfsMethods;
 import org.apache.hadoop.hdfs.web.WebHdfsFileSystem;
@@ -67,29 +68,28 @@ public class NameNodeHttpServer {
   }
   
   private void initWebHdfs(Configuration conf) throws IOException {
-    if (WebHdfsFileSystem.isEnabled(conf, HttpServer3.LOG)) {
-      UserParam.setUserPattern(conf.get(
-          DFSConfigKeys.DFS_WEBHDFS_USER_PATTERN_KEY,
-          DFSConfigKeys.DFS_WEBHDFS_USER_PATTERN_DEFAULT));
+    // set user pattern based on configuration file
+    UserParam.setUserPattern(conf.get(
+        HdfsClientConfigKeys.DFS_WEBHDFS_USER_PATTERN_KEY,
+        HdfsClientConfigKeys.DFS_WEBHDFS_USER_PATTERN_DEFAULT));
 
-      // add authentication filter for webhdfs
-      final String className = conf.get(
-          DFSConfigKeys.DFS_WEBHDFS_AUTHENTICATION_FILTER_KEY,
-          DFSConfigKeys.DFS_WEBHDFS_AUTHENTICATION_FILTER_DEFAULT);
-      final String name = className;
+    // add authentication filter for webhdfs
+    final String className = conf.get(
+        DFSConfigKeys.DFS_WEBHDFS_AUTHENTICATION_FILTER_KEY,
+        DFSConfigKeys.DFS_WEBHDFS_AUTHENTICATION_FILTER_DEFAULT);
+    final String name = className;
 
-      final String pathSpec = WebHdfsFileSystem.PATH_PREFIX + "/*";
-      Map<String, String> params = getAuthFilterParams(conf);
-      HttpServer3.defineFilter(httpServer.getWebAppContext(), name, className,
-          params, new String[] { pathSpec });
-      HttpServer3.LOG.info("Added filter '" + name + "' (class=" + className
-          + ")");
+    final String pathSpec = WebHdfsFileSystem.PATH_PREFIX + "/*";
+    Map<String, String> params = getAuthFilterParams(conf);
+    HttpServer3.defineFilter(httpServer.getWebAppContext(), name, className,
+        params, new String[] { pathSpec });
+    HttpServer3.LOG.info("Added filter '" + name + "' (class=" + className
+        + ")");
 
-      // add webhdfs packages
-      httpServer.addJerseyResourcePackage(NamenodeWebHdfsMethods.class
-          .getPackage().getName() + ";" + Param.class.getPackage().getName(),
-          pathSpec);
-    }
+    // add webhdfs packages
+    httpServer.addJerseyResourcePackage(NamenodeWebHdfsMethods.class
+        .getPackage().getName() + ";" + Param.class.getPackage().getName(),
+        pathSpec);
   }
 
   /**

@@ -959,7 +959,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     long length) throws IOException, UnresolvedLinkException {
     try (TraceScope ignored = newPathTraceScope("getBlockLocations", src)) {
       LocatedBlocks blocks = getLocatedBlocks(src, start, length);
-      BlockLocation[] locations = DFSUtil.locatedBlocks2Locations(blocks);
+      BlockLocation[] locations =  DFSUtilClient.locatedBlocks2Locations(blocks);
       HdfsBlockLocation[] hdfsLocations = new HdfsBlockLocation[locations.length];
       for (int i = 0; i < locations.length; i++) {
         hdfsLocations[i] = new HdfsBlockLocation(locations[i], blocks.get(i));
