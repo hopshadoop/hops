@@ -223,7 +223,8 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
     "dfs.namenode.path.based.cache.block.map.allocation.percent";
   public static final float    DFS_NAMENODE_PATH_BASED_CACHE_BLOCK_MAP_ALLOCATION_PERCENT_DEFAULT = 0.25f;
 
-  public static final String  DFS_NAMENODE_HTTP_PORT_KEY = "dfs.http.port";
+  public static final String  DFS_NAMENODE_HTTP_PORT_KEY =
+      HdfsClientConfigKeys.DFS_NAMENODE_HTTP_PORT_KEY;
   public static final int     DFS_NAMENODE_HTTP_PORT_DEFAULT =
       HdfsClientConfigKeys.DFS_NAMENODE_HTTP_PORT_DEFAULT;
   public static final String  DFS_NAMENODE_HTTP_ADDRESS_KEY =
@@ -272,9 +273,10 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
    */
   public static final String  DFS_WEBHDFS_AUTHENTICATION_FILTER_DEFAULT =
       "org.apache.hadoop.hdfs.web.AuthFilter".toString();
-  public static final String  DFS_WEBHDFS_ENABLED_KEY = "dfs.webhdfs.enabled";
-  public static final boolean DFS_WEBHDFS_ENABLED_DEFAULT = true;
-  public static final String  DFS_WEBHDFS_USER_PATTERN_KEY = "dfs.webhdfs.user.provider.user.pattern";
+  @Deprecated
+  public static final String  DFS_WEBHDFS_USER_PATTERN_KEY =
+      HdfsClientConfigKeys.DFS_WEBHDFS_USER_PATTERN_KEY;
+  @Deprecated
   public static final String  DFS_WEBHDFS_USER_PATTERN_DEFAULT =
       HdfsClientConfigKeys.DFS_WEBHDFS_USER_PATTERN_DEFAULT;
   public static final String  DFS_PERMISSIONS_ENABLED_KEY = "dfs.permissions.enabled";
@@ -394,7 +396,8 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
 
   //Following keys have no defaults
   public static final String  DFS_DATANODE_DATA_DIR_KEY = "dfs.datanode.data.dir";
-  public static final String  DFS_NAMENODE_HTTPS_PORT_KEY = "dfs.https.port";
+  public static final String  DFS_NAMENODE_HTTPS_PORT_KEY = 
+      HdfsClientConfigKeys.DFS_NAMENODE_HTTPS_PORT_KEY;
   public static final int     DFS_NAMENODE_HTTPS_PORT_DEFAULT =
       HdfsClientConfigKeys.DFS_NAMENODE_HTTPS_PORT_DEFAULT;
   public static final String  DFS_NAMENODE_HTTPS_ADDRESS_KEY =

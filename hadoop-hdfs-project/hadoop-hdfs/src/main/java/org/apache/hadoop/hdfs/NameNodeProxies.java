@@ -75,6 +75,7 @@ import org.apache.hadoop.tools.protocolPB.GetUserMappingsProtocolPB;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdfs.protocol.HdfsConstantsClient;
 
 /**
  * Create proxy objects to communicate with a remote NN. All remote access to an
@@ -510,7 +511,7 @@ public class NameNodeProxies {
                     HdfsClientConfigKeys.Retry.POLICY_ENABLED_DEFAULT, 
                     HdfsClientConfigKeys.Retry.POLICY_SPEC_KEY,
                     HdfsClientConfigKeys.Retry.POLICY_SPEC_DEFAULT,
-                    SafeModeException.class.getName());
+                    HdfsConstantsClient.SAFEMODE_EXCEPTION_CLASS_NAME);
 
     Map<Class<? extends Exception>, RetryPolicy> remoteExceptionToPolicyMap
             = new HashMap<Class<? extends Exception>, RetryPolicy>();
@@ -551,7 +552,7 @@ public class NameNodeProxies {
                     HdfsClientConfigKeys.Retry.POLICY_ENABLED_DEFAULT, 
                     HdfsClientConfigKeys.Retry.POLICY_SPEC_KEY,
                     HdfsClientConfigKeys.Retry.POLICY_SPEC_DEFAULT,
-                    SafeModeException.class.getName());
+                    HdfsConstantsClient.SAFEMODE_EXCEPTION_CLASS_NAME);
 
     Map<Class<? extends Exception>, RetryPolicy> remoteExceptionToPolicyMap
 

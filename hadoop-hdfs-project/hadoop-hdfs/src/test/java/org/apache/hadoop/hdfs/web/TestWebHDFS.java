@@ -53,6 +53,7 @@ import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.TestDFSClientRetries;
+import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocols;
 import org.apache.hadoop.hdfs.web.resources.LengthParam;
@@ -252,7 +253,8 @@ public class TestWebHDFS {
   @Test(timeout=300000)
   public void testNumericalUserName() throws Exception {
     final Configuration conf = WebHdfsTestUtil.createConf();
-    conf.set(DFSConfigKeys.DFS_WEBHDFS_USER_PATTERN_KEY, "^[A-Za-z0-9_][A-Za-z0-9._-]*[$]?$");
+    conf.set(HdfsClientConfigKeys.DFS_WEBHDFS_USER_PATTERN_KEY, "^[A-Za-z0-9_][A-Za-z0-9" +
+        "._-]*[$]?$");
     final MiniDFSCluster cluster =
         new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
     try {
@@ -301,19 +303,7 @@ public class TestWebHDFS {
       }
     }
   }
-  
-  /**
-   * WebHdfs should be enabled by default after HDFS-5532
-   * 
-   * @throws Exception
-   */
-  @Test
-  public void testWebHdfsEnabledByDefault() throws Exception {
-    Configuration conf = new HdfsConfiguration();
-    Assert.assertTrue(conf.getBoolean(DFSConfigKeys.DFS_WEBHDFS_ENABLED_KEY,
-        false));
-  }
-  
+    
   /**
    * Make sure a RetriableException is thrown when rpcServer is null in
    * NamenodeWebHdfsMethods.
