@@ -1459,6 +1459,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
                                      ParentNotDirectoryException.class,
                                      NSQuotaExceededException.class,
                                      DSQuotaExceededException.class,
+                                    QuotaByStorageTypeExceededException.class,
                                      UnresolvedPathException.class);
     }
   }
@@ -1496,6 +1497,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
                                      FileNotFoundException.class,
                                      SafeModeException.class,
                                      DSQuotaExceededException.class,
+                                     QuotaByStorageTypeExceededException.class,
                                      UnsupportedOperationException.class,
                                      UnresolvedPathException.class);
     }
@@ -1569,6 +1571,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
                                      FileNotFoundException.class,
                                      SafeModeException.class,
                                      DSQuotaExceededException.class,
+                                     QuotaByStorageTypeExceededException.class,
                                      UnresolvedPathException.class);
     }
   }
@@ -1587,6 +1590,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
       throw re.unwrapRemoteException(AccessControlException.class,
                                      NSQuotaExceededException.class,
                                      DSQuotaExceededException.class,
+                                     QuotaByStorageTypeExceededException.class,
                                      UnresolvedPathException.class);
     }
   }
@@ -1616,6 +1620,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     } catch(RemoteException re) {
       throw re.unwrapRemoteException(AccessControlException.class,
                                      DSQuotaExceededException.class,
+                                     QuotaByStorageTypeExceededException.class,
                                      FileAlreadyExistsException.class,
                                      FileNotFoundException.class,
                                      ParentNotDirectoryException.class,
@@ -2371,6 +2376,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
                                      SafeModeException.class,
                                      NSQuotaExceededException.class,
                                      DSQuotaExceededException.class,
+                                     QuotaByStorageTypeExceededException.class,
                                      UnresolvedPathException.class);
     }
   }
@@ -2415,6 +2421,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
                                      FileNotFoundException.class,
                                      NSQuotaExceededException.class,
                                      DSQuotaExceededException.class,
+                                     QuotaByStorageTypeExceededException.class,
                                      UnresolvedPathException.class);
     }
   }
