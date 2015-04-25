@@ -1,5 +1,326 @@
 Hadoop HDFS Change Log
 
+Trunk (Unreleased)
+
+  INCOMPATIBLE CHANGES
+
+    HDFS-3034. Remove the deprecated DFSOutputStream.sync() method.  (szetszwo)
+
+    HDFS-5079. Cleaning up NNHAStatusHeartbeat.State from
+    DatanodeProtocolProtos. (Tao Luo via shv)
+
+    HDFS-5570. Deprecate hftp / hsftp and replace them with webhdfs / swebhdfs.
+    (wheat9)
+
+    HDFS-2538. option to disable fsck dots (Mohammad Kamrul Islam via aw)
+
+    HDFS-7302. Remove "downgrade" from "namenode -rollingUpgrade" startup
+    option since it may incorrectly finalize an ongoing rolling upgrade.
+    (Kai Sasaki via szetszwo)
+
+    HDFS-7985. WebHDFS should be always enabled. (Li Lu via wheat9)
+
+  NEW FEATURES
+
+    HDFS-3125. Add JournalService to enable Journal Daemon. (suresh)
+
+  IMPROVEMENTS
+
+    HDFS-4665. Move TestNetworkTopologyWithNodeGroup to common.
+    (Junping Du via llu)
+
+    HDFS-1620. Rename HdfsConstants -> HdfsServerConstants, FSConstants ->
+               HdfsConstants. (Harsh J Chouraria via atm)
+
+    HDFS-2197. Refactor RPC call implementations out of NameNode class (todd)
+
+    HDFS-2572. Remove unnecessary double-check in DN#getHostName. (harsh)
+
+    HDFS-2857. Cleanup BlockInfo class. (suresh)
+
+    HDFS-2786. Fix host-based token incompatibilities in DFSUtil. (Kihwal Lee
+    via jitendra)
+
+    HDFS-2878. Fix TestBlockRecovery and move it back into main test directory.
+    (todd)
+
+    HDFS-2655. BlockReaderLocal#skip performs unnecessary IO.
+    (Brandon Li via jitendra) 
+
+    HDFS-3009. Remove duplicate code in DFSClient#isLocalAddress by using 
+    NetUtils. (Hari Mankude via suresh)
+
+    HDFS-3002. TestNameNodeMetrics need not wait for metrics update.
+    (suresh)
+
+    HDFS-3016. Security in unit tests. (Jaimin Jetly via jitendra)
+
+    HDFS-3030. Remove getProtocolVersion and getProtocolSignature from translators.
+    (jitendra)
+
+    HDFS-3111. Missing license headers in trunk. (umamahesh)
+
+    HDFS-3091. Update the usage limitations of ReplaceDatanodeOnFailure policy in
+    the config description for the smaller clusters. (szetszwo via umamahesh)
+
+    HDFS-309. FSEditLog should log progress during replay. (Sho Shimauchi
+    via todd)
+
+    HDFS-3131. Improve TestStorageRestore. (Brandon Li via atm)
+
+    HDFS-3178. Add states and state handler for journal synchronization in
+    JournalService.  (szetszwo)
+
+    HDFS-3273. Refactor BackupImage and FSEditLog, and rename
+    JournalListener.rollLogs(..) to startLogSegment(..).  (szetszwo)
+
+    HDFS-3292. Remove the deprecated DiskStatus, getDiskStatus(), getRawUsed()
+    and getRawCapacity() from DistributedFileSystem.  (Arpit Gupta via szetszwo)
+
+    HADOOP-8285. HDFS changes for Use ProtoBuf for RpcPayLoadHeader. (sanjay
+    radia)
+
+    HDFS-2743. Streamline usage of bookkeeper journal manager. 
+    (Ivan Kelly via umamahesh)
+
+    HDFS-3293. Add toString(), equals(..) and hashCode() to JournalInfo.
+    (Hari Mankude via szetszwo)
+
+    HDFS-3197. Incorrect class comments in a few tests. (Andy Isaacson via eli)
+
+    HDFS-3476. Correct the default used in TestDFSClientRetries.busyTest()
+    after HDFS-3462 (harsh)
+
+    HDFS-3478. Test quotas with Long.Max_Value. (Sujay Rau via eli)
+
+    HDFS-3630 Modify TestPersistBlocks to use both flush and hflush  (sanjay)
+
+    HDFS-3768. Exception in TestJettyHelper is incorrect. 
+    (Eli Reisman via jghoman)
+
+    HDFS-2580. NameNode#main(...) can make use of GenericOptionsParser. (harsh)
+
+    HDFS-2127. Add a test that ensure AccessControlExceptions contain
+    a full path. (Stephen Chu via eli)
+
+    HDFS-3995. Use DFSTestUtil.createFile() for file creation and 
+    writing in test cases. (Jing Zhao via suresh)
+
+    HDFS-3735. NameNode WebUI should allow sorting live datanode list by fields
+    Block Pool Used, Block Pool Used(%) and Failed Volumes.
+    (Brahma Reddy Battula via suresh)
+
+    HDFS-4052. BlockManager#invalidateWork should print log outside the lock.
+    (Jing Zhao via suresh)
+
+    HDFS-3358. Specify explicitly that the NN UI status total is talking
+    of persistent objects on heap. (harsh)
+
+    HDFS-4904. Remove JournalService. (Arpit Agarwal via cnauroth)
+
+    HDFS-5041. Add the time of last heartbeat to dead server Web UI (Shinichi
+    Yamashita via brandonli)
+
+    HDFS-5721. sharedEditsImage in Namenode#initializeSharedEdits() should be 
+    closed before method returns. (Ted Yu via junping_du)
+
+    HDFS-6228. comments typo fix for FsDatasetImpl.java (zhaoyunjiong via umamahesh)
+
+    HDFS-6246. Remove 'dfs.support.append' flag from trunk code. (umamahesh)
+
+    HDFS-6609. Use DirectorySnapshottableFeature to represent a snapshottable
+    directory. (Jing Zhao via wheat9)
+
+    HDFS-7591. hdfs classpath command should support same options as hadoop
+    classpath (Varun Saxena via Arpit Agarwal)
+
+    HDFS-7546. Document, and set an accepting default for
+    dfs.namenode.kerberos.principal.pattern (Harsh J via aw)
+
+    HDFS-316. Balancer should run for a configurable # of iterations (Xiaoyu
+    Yao via aw)
+
+    HDFS-7322. deprecate sbin/hadoop-daemon.sh (aw)
+
+    HDFS-7668. Convert site documentation from apt to markdown (Masatake
+    Iwasaki via aw)
+
+    HDFS-7460. Rewrite httpfs to use new shell framework (John Smith via aw)
+
+    HDFS-6353. Check and make checkpoint before stopping the NameNode. (jing9)
+
+  OPTIMIZATIONS
+
+  BUG FIXES
+ 
+    HADOOP-9635 Fix potential Stack Overflow in DomainSocket.c (V. Karthik Kumar
+                via cmccabe)
+
+    HDFS-2299. TestOfflineEditsViewer is failing on trunk. (Uma Maheswara Rao G
+               via atm)
+    HDFS-2310. TestBackupNode fails since HADOOP-7524 went in.
+               (Ivan Kelly via todd)
+
+    HDFS-2313. Rat excludes has a typo for excluding editsStored files. (atm)
+
+    HDFS-2314. MRV1 test compilation broken after HDFS-2197 (todd)
+
+    HDFS-46.   Change default namespace quota of root directory from
+    Integer.MAX_VALUE to Long.MAX_VALUE. (Uma Maheswara Rao G via szetszwo)
+
+    HDFS-2373. Commands using WebHDFS and hftp print unnecessary debug 
+    info on the console with security enabled. (Arpit Gupta via suresh)
+
+    HDFS-2776. Missing interface annotation on JournalSet. 
+    (Brandon Li via jitendra)
+
+    HDFS-3037. TestMulitipleNNDataBlockScanner#testBlockScannerAfterRestart is
+    racy. (atm)
+
+    HDFS-3116. Typo in fetchdt error message. (AOE Takashi via atm)
+
+    HDFS-3126. Journal stream from Namenode to BackupNode needs to have 
+    timeout. (Hari Mankude via suresh)
+
+    HDFS-3121. Add HDFS tests for HADOOP-8014 change. (John George via
+    suresh)
+
+    HDFS-3119. Overreplicated block is not deleted even after the replication 
+    factor is reduced after sync follwed by closing that file. (Ashish Singhi 
+    via umamahesh)
+
+    HDFS-3265. PowerPc Build error. (Kumar Ravi via mattf)
+
+    HDFS-2312. FSNamesystem javadoc incorrectly says its for DNs. (harsh)
+
+    HDFS-3163. TestHDFSCLI.testAll fails if the user name is not all lowercase.
+    (Brandon Li via atm)
+
+    HDFS-3462. TestDFSClientRetries.busyTest() should restore default
+    xceiver count in the config. (Madhukara Phatak via harsh)
+
+    HDFS-3550. Fix raid javadoc warnings. (Jason Lowe via daryn)
+
+    HDFS-3549. Fix dist tar build fails in hadoop-hdfs-raid project. (Jason Lowe via daryn)
+
+    HDFS-3614. Revert unused MiniDFSCluster constructor from HDFS-3049.
+    (acmurthy via eli)
+
+    HDFS-3792. Fix two findbugs introduced by HDFS-3695 (todd)
+
+    HDFS-3827. TestHASafeMode#assertSafemode method should be made static.
+    (Jing Zhao via suresh)
+
+    HDFS-3834. Remove unused static fields NAME, DESCRIPTION and Usage from
+    Command. (Jing Zhao via suresh)
+
+    HDFS-2434. TestNameNodeMetrics.testCorruptBlock fails intermittently.
+    (Jing Zhao via suresh)
+
+    HDFS-4067. TestUnderReplicatedBlocks intermittently fails due to 
+    ReplicaAlreadyExistsException. (Jing Zhao via suresh)
+
+    HDFS-4115. TestHDFSCLI.testAll fails one test due to number format.
+    (Trevor Robinson via suresh)
+
+    HDFS-4105. The SPNEGO user for secondary namenode should use the web 
+    keytab. (Arpit Gupta via jitendra)
+
+    HDFS-4003. test-patch should build the common native libs before
+    running hdfs tests. (Colin Patrick McCabe via eli)
+
+    HDFS-4260 Fix HDFS tests to set test dir to a valid HDFS path as opposed
+    to the local build path (Chri Nauroth via Sanjay)
+
+    HDFS-4310. fix test org.apache.hadoop.hdfs.server.datanode.
+    TestStartSecureDataNode (Ivan A. Veselovsky via atm)
+
+    HDFS-4275. MiniDFSCluster-based tests fail on Windows due to failure
+    to delete test namenode directory. (Chris Nauroth via suresh)
+
+    HDFS-4338. TestNameNodeMetrics#testCorruptBlock is flaky. (Andrew Wang via
+    atm)
+
+    HDFS-4391. TestDataTransferKeepalive fails when tests are executed in a
+    certain order. (Andrew Wang via atm)
+
+    HDFS-4757. Update FSDirectory#inodeMap when replacing an INodeDirectory
+    while setting quota.  (Jing Zhao via szetszwo)
+
+    HDFS-4761. When resetting FSDirectory, the inodeMap should also be reset.
+    (Jing Zhao via szetszwo)
+
+    HDFS-4687. TestDelegationTokenForProxyUser#testWebHdfsDoAs is flaky with
+    JDK7. (Andrew Wang via atm)
+
+    HDFS-3934. duplicative dfs_hosts entries handled wrong. (Colin Patrick
+    McCabe)
+
+    HDFS-4366. Block Replication Policy Implementation May Skip Higher-Priority
+    Blocks for Lower-Priority Blocks (Derek Dagit via kihwal)
+
+    HDFS-5719. FSImage#doRollback() should close prevState before return
+    (Ted Yu via brandonli)
+
+    HDFS-5794. Fix the inconsistency of layout version number of 
+    ADD_DATANODE_AND_STORAGE_UUIDS between trunk and branch-2. (jing9)
+
+    HDFS-6694. TestPipelinesFailover.testPipelineRecoveryStress tests fail
+    intermittently with various symptoms - debugging patch. (Yongjun Zhang via
+    Arpit Agarwal)
+
+    HDFS-6893. crypto subcommand is not sorted properly in hdfs's hadoop_usage
+    (David Luo via aw)
+
+    HDFS-6981. Fix DN upgrade with layout version change. (Arpit Agarwal)
+
+    HDFS-7204. balancer doesn't run as a daemon (aw)
+
+    HDFS-7319. Remove dead link to HFTP documentation from index.xml.
+    (Masatake Iwasaki via wheat9)
+
+    HDFS-7407. Minor typo in privileged pid/out/log names (aw)
+
+    HDFS-7581. HDFS documentation needs updating post-shell rewrite (aw)
+
+    HADOOP-11484. hadoop-mapreduce-client-nativetask fails to build on ARM
+    AARCH64 due to x86 asm statements (Edward Nevill via Colin P. McCabe)
+
+    HDFS-7667. Various typos and improvements to HDFS Federation doc
+    (Charles Lamb via aw)
+
+    HDFS-3750. API docs don't include HDFS (Jolly Chen via aw)
+
+    HDFS-7320. The appearance of hadoop-hdfs-httpfs site docs is inconsistent 
+    (Masatake Iwasaki via aw)
+
+    HDFS-7670. HDFS Quota guide has typos, incomplete command lines
+    (Brahma Reddy Battula via aw)
+
+    HDFS-7669. HDFS Design Doc references commands that no longer exist.
+    (Brahma Reddy Battula via aw)
+
+    HDFS-7755. httpfs shell code has hardcoded path to bash (Dmitry
+    Sivachenko via aw)
+
+    HDFS-7711. Fix various typos in ClusterSetup.md.
+    (Brahma Reddy Battula via wheat9)
+
+    HDFS-7791. dfs count -v should be added to quota documentation (Akira
+    AJISAKA via aw)
+
+    HDFS-7803. Wrong command mentioned in HDFSHighAvailabilityWithQJM
+    documentation (Arshad Mohammad via aw)
+
+    HDFS-4681. TestBlocksWithNotEnoughRacks#testCorruptBlockRereplicatedAcrossRacks 
+    fails using IBM java (Ayappan via aw)
+
+    HDFS-8110. Remove unsupported 'hdfs namenode -rollingUpgrade downgrade'
+    from document. (J.Andreina via aajisaka)
+
+    HDFS-7673. synthetic load generator docs give incorrect/incomplete commands
+    (Brahma Reddy Battula via aw)
+
 Release 2.8.0 - UNRELEASED
 
   INCOMPATIBLE CHANGES
