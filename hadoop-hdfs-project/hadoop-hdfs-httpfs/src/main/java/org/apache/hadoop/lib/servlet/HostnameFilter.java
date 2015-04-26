@@ -61,16 +61,12 @@ public class HostnameFilter implements Filter {
    * <p>
    * The requester hostname is available via the {@link #get} method.
    *
-   * @param request
-   *     servlet request.
-   * @param response
-   *     servlet response.
-   * @param chain
-   *     filter chain.
-   * @throws IOException
-   *     thrown if an IO error occurrs.
-   * @throws ServletException
-   *     thrown if a servet error occurrs.
+   * @param request servlet request.
+   * @param response servlet response.
+   * @param chain filter chain.
+   *
+   * @throws IOException thrown if an IO error occurs.
+   * @throws ServletException thrown if a servlet error occurs.
    */
   @Override
   public void doFilter(ServletRequest request, ServletResponse response,

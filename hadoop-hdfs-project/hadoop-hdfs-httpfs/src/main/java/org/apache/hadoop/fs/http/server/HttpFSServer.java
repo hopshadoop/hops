@@ -103,11 +103,10 @@ public class HttpFSServer {
    * @param executor FileSystemExecutor to execute.
    *
    * @return FileSystemExecutor response
-   * @throws IOException
-   *     thrown if an IO error occurrs.
-   * @throws FileSystemAccessException
-   *     thrown if a FileSystemAccess releated error occurred. Thrown
-   *     exceptions are handled by {@link HttpFSExceptionProvider}.
+   *
+   * @throws IOException thrown if an IO error occurs.
+   * @throws FileSystemAccessException thrown if a FileSystemAccess releated error occurred. Thrown
+   * exceptions are handled by {@link HttpFSExceptionProvider}.
    */
   private <T> T fsExecute(UserGroupInformation ugi, FileSystemAccess.FileSystemExecutor<T> executor)
     throws IOException, FileSystemAccessException {
