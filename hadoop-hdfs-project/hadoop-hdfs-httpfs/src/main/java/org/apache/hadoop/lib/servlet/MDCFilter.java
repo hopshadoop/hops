@@ -63,16 +63,12 @@ public class MDCFilter implements Filter {
   /**
    * Sets the slf4j <code>MDC</code> and delegates the request to the chain.
    *
-   * @param request
-   *     servlet request.
-   * @param response
-   *     servlet response.
-   * @param chain
-   *     filter chain.
-   * @throws IOException
-   *     thrown if an IO error occurrs.
-   * @throws ServletException
-   *     thrown if a servet error occurrs.
+   * @param request servlet request.
+   * @param response servlet response.
+   * @param chain filter chain.
+   *
+   * @throws IOException thrown if an IO error occurs.
+   * @throws ServletException thrown if a servlet error occurs.
    */
   @Override
   public void doFilter(ServletRequest request, ServletResponse response,

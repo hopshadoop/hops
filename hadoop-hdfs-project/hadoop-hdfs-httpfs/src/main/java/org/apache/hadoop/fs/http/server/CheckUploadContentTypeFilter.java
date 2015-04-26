@@ -66,16 +66,12 @@ public class CheckUploadContentTypeFilter implements Filter {
    * Enforces the content-type to be application/octet-stream for
    * POST and PUT requests.
    *
-   * @param request
-   *     servlet request.
-   * @param response
-   *     servlet response.
-   * @param chain
-   *     filter chain.
-   * @throws IOException
-   *     thrown if an IO error occurrs.
-   * @throws ServletException
-   *     thrown if a servet error occurrs.
+   * @param request servlet request.
+   * @param response servlet response.
+   * @param chain filter chain.
+   *
+   * @throws IOException thrown if an IO error occurs.
+   * @throws ServletException thrown if a servlet error occurs.
    */
   @Override
   public void doFilter(ServletRequest request, ServletResponse response,
