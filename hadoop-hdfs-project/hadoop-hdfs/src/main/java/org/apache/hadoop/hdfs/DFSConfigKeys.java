@@ -119,6 +119,10 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String DFS_TRANSACTION_STATS_DIR_DEFAULT =
       "/tmp/hopsstats";
 
+  public static final String DFS_TRANSACTION_STATS_WRITER_ROUND =
+      "dfs.transaction.stats.writerround";
+  public static final int DFS_TRANSACTION_STATS_WRITER_ROUND_DEFAULT = 120;
+
   /*for client failover api*/
   // format {ip:port, ip:port, ip:port} comma separated
   public static final String DFS_NAMENODES_RPC_ADDRESS_KEY =

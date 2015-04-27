@@ -134,7 +134,9 @@ public class HdfsStorageFactory {
         conf.getBoolean(DFSConfigKeys.DFS_TRANSACTION_STATS_ENABLED,
             DFSConfigKeys.DFS_TRANSACTION_STATS_ENABLED_DEFAULT),
         conf.get(DFSConfigKeys.DFS_TRANSACTION_STATS_DIR,
-            DFSConfigKeys.DFS_TRANSACTION_STATS_DIR_DEFAULT));
+            DFSConfigKeys.DFS_TRANSACTION_STATS_DIR_DEFAULT), conf.getInt
+            (DFSConfigKeys.DFS_TRANSACTION_STATS_WRITER_ROUND, DFSConfigKeys
+                .DFS_TRANSACTION_STATS_WRITER_ROUND_DEFAULT));
     if (!isDALInitialized) {
       HdfsVariables.registerDefaultValues();
       addToClassPath(conf.get(DFSConfigKeys.DFS_STORAGE_DRIVER_JAR_FILE,
