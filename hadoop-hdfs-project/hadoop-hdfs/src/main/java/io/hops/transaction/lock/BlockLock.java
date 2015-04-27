@@ -44,38 +44,33 @@ final class BlockLock extends IndividualBlockLock {
   @Override
   protected void acquire(TransactionLocks locks) throws IOException {
     BaseINodeLock inodeLock = (BaseINodeLock) locks.getLock(Type.INode);
+    boolean individualBlockAlreadyRead = false;
     Iterable blks = Collections.EMPTY_LIST;
     for (INode inode : inodeLock.getAllResolvedINodes()) {
       if (inode instanceof INodeFile) {
         Collection<BlockInfo> inodeBlocks =
             acquireLockList(DEFAULT_LOCK_TYPE, BlockInfo.Finder.ByINodeId,
                 inode.getId());
+
+        if(!individualBlockAlreadyRead){
+          individualBlockAlreadyRead = inode.getId() == inodeId;
+        }
+
+        if(inodeBlocks == null || inodeBlocks.isEmpty()){
+          announceEmptyFile(inode.getId());
+        }
+        
         blks = Iterables.concat(blks, inodeBlocks);
         files.add((INodeFile) inode);
       }
     }
-    //FIXME we need to bring null to the cache instead
-    fixTheCache(locks, blks);
+
+    if(!individualBlockAlreadyRead) {
+      super.acquire(locks);
+    }
   }
   
   Collection<INodeFile> getFiles() {
     return files;
   }
-  
-  private void fixTheCache(TransactionLocks locks, Iterable<BlockInfo> blks)
-      throws IOException {
-    if (!contains(blks, blockId)) {
-      super.acquire(locks);
-    }
-  }
-  
-  private boolean contains(Iterable<BlockInfo> blks, long blockId) {
-    for (BlockInfo blk : blks) {
-      if (blockId == blk.getBlockId()) {
-        return true;
-      }
-    }
-    return false;
-  }
-  
 }
