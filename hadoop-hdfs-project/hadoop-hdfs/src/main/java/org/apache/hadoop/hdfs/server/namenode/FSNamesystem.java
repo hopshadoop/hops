@@ -1141,13 +1141,14 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   }
 
   public static class GetBlockLocationsResult {
-    final INodesInPath iip;
+    final boolean updateAccessTime;
     public final LocatedBlocks blocks;
     boolean updateAccessTime() {
-      return iip != null;
+      return updateAccessTime;
     }
-    private GetBlockLocationsResult(INodesInPath iip, LocatedBlocks blocks) {
-      this.iip = iip;
+    private GetBlockLocationsResult(
+        boolean updateAccessTime, LocatedBlocks blocks) {
+      this.updateAccessTime = updateAccessTime;
       this.blocks = blocks;
     }
   }
@@ -1157,7 +1158,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
    *
    * @see ClientProtocol#getBlockLocations(String, long, long)
    */
-  public LocatedBlocks getBlockLocations(final String clientMachine, final String src,
+  public LocatedBlocks getBlockLocations(final String clientMachine, final String srcArg,
       final long offset, final long length) throws IOException {
 
     // First try the operation using shared lock.
@@ -1169,17 +1170,17 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     LocatedBlocks result = null;
     try {
       try {
-        result = getBlockLocationsWithLock(clientMachine, src, offset, length, INodeLockType.READ);
+        result = getBlockLocationsWithLock(clientMachine, srcArg, offset, length, INodeLockType.READ);
       } catch (LockUpgradeException e) {
-        LOG.debug("Encountered LockUpgradeException while reading " + src
+        LOG.debug("Encountered LockUpgradeException while reading " + srcArg
             + ". Retrying the operation using exclusive locks");
-        result = getBlockLocationsWithLock(clientMachine, src, offset, length, INodeLockType.WRITE);
+        result = getBlockLocationsWithLock(clientMachine, srcArg, offset, length, INodeLockType.WRITE);
       }
     } catch (AccessControlException e) {
-      logAuditEvent(false, "open", src);
+      logAuditEvent(false, "open", srcArg);
       throw e;
     }
-    logAuditEvent(true, "open", src);
+    logAuditEvent(true, "open", srcArg);
     return result;
   }
 
@@ -1217,8 +1218,10 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         if (res.updateAccessTime()) {
           final long now = now();
           try {
-            INode inode = res.iip.getLastINode();
-            boolean updateAccessTime = now > inode.getAccessTime() + getAccessTimePrecision();
+            final INodesInPath iip = dir.getINodesInPath(src, true);
+            INode inode = iip.getLastINode();
+            boolean updateAccessTime = inode != null &&
+                now > inode.getAccessTime() + getAccessTimePrecision();
             if (!isInSafeMode() && updateAccessTime) {
               boolean changed = FSDirAttrOp.setTimes(dir,
                   inode, -1, now, false);
@@ -1354,7 +1357,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     final long now = now();
     boolean updateAccessTime = isAccessTimeSupported() && !isInSafeMode()
         && now > inode.getAccessTime() + getAccessTimePrecision();
-    return new GetBlockLocationsResult(updateAccessTime ? iip : null, blocks);
+    return new GetBlockLocationsResult(updateAccessTime, blocks);
     
   }
 
@@ -1394,7 +1397,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     final long now = now();
     boolean updateAccessTime = isAccessTimeSupported() && !isInSafeMode()
         && now > inode.getAccessTime() + getAccessTimePrecision();
-    return new GetBlockLocationsResult(updateAccessTime ? iip : null, blocks);
+    return new GetBlockLocationsResult(updateAccessTime, blocks);
   }
   
   private void checkUnreadableBySuperuser(FSPermissionChecker pc,

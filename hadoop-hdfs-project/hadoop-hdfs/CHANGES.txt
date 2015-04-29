@@ -631,6 +631,9 @@ Release 2.7.1 - UNRELEASED
     HDFS-8205. CommandFormat#parse() should not parse option as
     value of option. (Peter Shi and Xiaoyu Yao via Arpit Agarwal)
 
+    HDFS-8269. getBlockLocations() does not resolve the .reserved path and
+    generates incorrect edit logs when updating the atime. (wheat9)
+
 Release 2.7.0 - 2015-04-20
 
   INCOMPATIBLE CHANGES
