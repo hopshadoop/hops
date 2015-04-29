@@ -147,8 +147,7 @@ public class DFSOutputStream extends FSOutputSummer
   @Override
   protected void checkClosed() throws IOException {
     if (isClosed()) {
-      IOException e = streamer.getLastException().get();
-      throw e != null ? e : new ClosedChannelException();
+      streamer.getLastException().throwException4Close();
     }
   }
 
@@ -210,7 +209,7 @@ public class DFSOutputStream extends FSOutputSummer
     computePacketChunkSize(dfsClient.getConf().getWritePacketSize(), checksum.getBytesPerChecksum());
 
     streamer = new DataStreamer(stat, null, dfsClient, src, progress, checksum,
-        cachingStrategy, byteArrayManager, dbFileMaxSize, forceClientToWriteSFToDisk);
+        cachingStrategy, byteArrayManager, dbFileMaxSize, forceClientToWriteSFToDisk, favoredNodes);
     
     if (policy != null) {
       Codec codec = Codec.getCodec(policy.getCodec());
@@ -219,11 +218,6 @@ public class DFSOutputStream extends FSOutputSummer
       }
       streamer.enableSourceStream(codec.getStripeLength());
     }
-    
-    if (favoredNodes != null && favoredNodes.length != 0) {
-      streamer.setFavoredNodes(favoredNodes);
-    }
-
   }
 
   static DFSOutputStream newStreamForCreate(DFSClient dfsClient, String src,
@@ -285,8 +279,8 @@ public class DFSOutputStream extends FSOutputSummer
   /** Construct a new output stream for append. */
   private DFSOutputStream(DFSClient dfsClient, String src,
       EnumSet<CreateFlag> flags, Progressable progress, LocatedBlock lastBlock,
-      HdfsFileStatus stat, DataChecksum checksum, final int dbFileMaxSize, boolean forceClientToWriteSFToDisk) throws
-      IOException {
+      HdfsFileStatus stat, DataChecksum checksum, final int dbFileMaxSize, boolean forceClientToWriteSFToDisk,
+      String[] favoredNodes) throws IOException {
     this(dfsClient, src, progress, stat, checksum);
     initialFileSize = stat.getLen(); // length of file when opened
     this.shouldSyncBlock = flags.contains(CreateFlag.SYNC_BLOCK);
@@ -306,14 +300,14 @@ public class DFSOutputStream extends FSOutputSummer
           checksum.getBytesPerChecksum());
       if (stat.isFileStoredInDB() && lastBlock != null) {
         streamer = new DataStreamer(stat, null, dfsClient, src, progress, checksum, cachingStrategy, byteArrayManager,
-            dbFileMaxSize, forceClientToWriteSFToDisk);
+            dbFileMaxSize, forceClientToWriteSFToDisk, favoredNodes);
         streamer.setBytesCurBlock(0);
         write(lastBlock.getData(), 0, lastBlock.getData().length);
         LOG.debug("Stuffed Inode:  Putting Existing data in packets");
       } else {
         streamer = new DataStreamer(stat, lastBlock != null ? lastBlock.getBlock() : null,
             dfsClient, src, progress, checksum, cachingStrategy, byteArrayManager, dbFileMaxSize,
-            forceClientToWriteSFToDisk);
+            forceClientToWriteSFToDisk, favoredNodes);
       }
     }
     streamer.setFileStoredInDB(stat.isFileStoredInDB());
@@ -378,10 +372,7 @@ public class DFSOutputStream extends FSOutputSummer
         }
       }
       final DFSOutputStream out = new DFSOutputStream(dfsClient, src, flags,
-          progress, lastBlock, stat, checksum, dbFileMaxSize, forceClientToWriteSFToDisk);
-      if (favoredNodes != null && favoredNodes.length != 0) {
-        out.streamer.setFavoredNodes(favoredNodes);
-      }
+          progress, lastBlock, stat, checksum, dbFileMaxSize, forceClientToWriteSFToDisk, favoredNodes);
       out.start();
       return out;
     } finally {
@@ -712,7 +703,7 @@ public class DFSOutputStream extends FSOutputSummer
       DFSClient.LOG.warn("Error while syncing", e);
       synchronized (this) {
         if (!isClosed()) {
-          streamer.getLastException().set(new IOException("IOException flush: " + e));
+          streamer.getLastException().set(e);
           closeThreads(true);
         }
       }
@@ -779,7 +770,7 @@ public class DFSOutputStream extends FSOutputSummer
     if (isClosed()) {
       return;
     }
-    streamer.setLastException(new IOException("Lease timeout of "
+    streamer.getLastException().set(new IOException("Lease timeout of "
         + (dfsClient.getConf().getHdfsTimeout()/1000) + " seconds expired."));
     closeThreads(true);
     dfsClient.endFileLease(fileId);
@@ -826,11 +817,8 @@ public class DFSOutputStream extends FSOutputSummer
 
   protected synchronized void closeImpl() throws IOException {
     if (isClosed()) {
-      IOException e = streamer.getLastException().getAndSet(null);
-      if (e == null)
-        return;
-      else
-        throw e;
+      streamer.getLastException().check();
+      return;
     }
 
     try {
