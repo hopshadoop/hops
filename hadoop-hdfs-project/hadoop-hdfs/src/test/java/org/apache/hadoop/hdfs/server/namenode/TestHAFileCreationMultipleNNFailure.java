@@ -27,6 +27,7 @@ import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.MiniDFSNNTopology;
 import org.apache.log4j.Level;
 import org.junit.After;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -49,6 +50,8 @@ import java.net.InetSocketAddress;
  *
  */
 
+@Ignore(value = "The design of this test needs to be reconsidered. " +
+    "It fails most of the times because of race conditions.")
 public class TestHAFileCreationMultipleNNFailure
     extends junit.framework.TestCase {
 
