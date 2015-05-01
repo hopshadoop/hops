@@ -32,6 +32,7 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.StreamCapabilities.StreamCapability;
+import org.apache.hadoop.hdfs.DataStreamer.LastExceptionInStreamer;
 import org.apache.hadoop.hdfs.client.impl.DfsClientConf;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
@@ -72,9 +73,10 @@ public class TestDFSOutputStream {
     DataStreamer streamer = (DataStreamer) Whitebox
         .getInternalState(dos, "streamer");
     @SuppressWarnings("unchecked")
-    AtomicReference<IOException> ex = (AtomicReference<IOException>) Whitebox
+    LastExceptionInStreamer ex = (LastExceptionInStreamer) Whitebox
         .getInternalState(streamer, "lastException");
-    Assert.assertEquals(null, ex.get());
+    Throwable thrown = (Throwable) Whitebox.getInternalState(ex, "thrown");
+    Assert.assertNull(thrown);
 
     dos.close();
 
@@ -85,7 +87,8 @@ public class TestDFSOutputStream {
     } catch (IOException e) {
       Assert.assertEquals(e, dummy);
     }
-    Assert.assertEquals(null, ex.get());
+    thrown = (Throwable) Whitebox.getInternalState(ex, "thrown");
+    Assert.assertNull(thrown);
     dos.close();
   }
 
