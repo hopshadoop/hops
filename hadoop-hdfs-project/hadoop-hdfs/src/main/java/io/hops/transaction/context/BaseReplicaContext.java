@@ -175,6 +175,14 @@ abstract class BaseReplicaContext<Key extends BlockPK, Entity>
         List<BlockInfo> oldBlks = (List<BlockInfo>) params[2];
         updateReplicas(trg_param, srcs_param);
         break;
+
+      case BlockDoesNotExist:
+        blockDoesNotExist((Long) params[0], (Integer) params[1]);
+        break;
+
+      case EmptyFile:
+        emptyFile((Integer) params[0]);
+        break;
     }
   }
 
@@ -222,6 +230,19 @@ abstract class BaseReplicaContext<Key extends BlockPK, Entity>
         log("snapshot-maintenance-added-replica", "bid",
             toBeAddedKey.getBlockId(), "inodeId", toBeAddedKey.getInodeId());
       }
+    }
+  }
+
+  private void blockDoesNotExist(long blockId, int inodeId){
+    emptyFile(inodeId);
+    if (!containsByBlock(blockId)) {
+      blocksToReplicas.put(blockId, null);
+    }
+  }
+
+  private void emptyFile(int inodeId){
+    if(!containsByINode(inodeId)){
+      inodesToReplicas.put(inodeId, null);
     }
   }
 

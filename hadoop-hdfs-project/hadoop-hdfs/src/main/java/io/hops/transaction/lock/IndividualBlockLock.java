@@ -15,7 +15,10 @@
  */
 package io.hops.transaction.lock;
 
+import io.hops.exception.TransactionContextException;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
+import io.hops.transaction.EntityManager;
+import io.hops.transaction.context.HdfsTransactionContextMaintenanceCmds;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 
@@ -25,7 +28,7 @@ class IndividualBlockLock extends BaseIndividualBlockLock {
 
   private final static long NON_EXISTING_BLOCK = Long.MIN_VALUE;
   protected final long blockId;
-  private final int inodeId;
+  protected final int inodeId;
 
   public IndividualBlockLock() {
     this.blockId = NON_EXISTING_BLOCK;
@@ -46,12 +49,19 @@ class IndividualBlockLock extends BaseIndividualBlockLock {
       if (result != null) {
         blocks.add(result);
       } else {
-        //TODO fix this add a method to bring null in the others caches 
-        BlockInfo dummy = new BlockInfo();
-        dummy.setINodeIdNoPersistance(inodeId);
-        dummy.setBlockIdNoPersistance(blockId);
-        blocks.add(dummy);
+        announceBlockDoesNotExist();
       }
     }
   }
+
+  private void announceBlockDoesNotExist() throws TransactionContextException {
+    EntityManager.snapshotMaintenance
+        (HdfsTransactionContextMaintenanceCmds.BlockDoesNotExist, blockId, inodeId);
+  }
+
+  protected void announceEmptyFile(int inodeFileId) throws TransactionContextException {
+    EntityManager.snapshotMaintenance
+        (HdfsTransactionContextMaintenanceCmds.EmptyFile, inodeFileId);
+  }
+
 }
