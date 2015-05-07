@@ -118,6 +118,7 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SERVICE_HANDLER_
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SERVICE_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.hdfs.protocol.HdfsConstants.MAX_PATH_DEPTH;
 import static org.apache.hadoop.hdfs.protocol.HdfsConstants.MAX_PATH_LENGTH;
+import org.tukaani.xz.UnsupportedOptionsException;
 
 /**
  * This class is responsible for handling all of the RPC calls to the NameNode.
@@ -597,7 +598,9 @@ class NameNodeRpcServer implements NamenodeProtocols {
 
     boolean ret;
     if (namesystem.isLegacyDeleteEnabled()) {
-      ret = namesystem.incrementalDelete(src, recursive);
+      //ret = namesystem.incrementalDelete(src, recursive);
+      throw new UnsupportedOptionsException("Old single transaction delete "
+              + "is not supported ");
     } else {
       ret = namesystem.multiTransactionalDelete(src, recursive);
     }
@@ -727,7 +730,8 @@ class NameNodeRpcServer implements NamenodeProtocols {
   public void setQuota(String path, long namespaceQuota, long diskspaceQuota)
       throws IOException {
     if (namesystem.isLegacySetQuotaEnabled()) {
-      namesystem.setQuota(path, namespaceQuota, diskspaceQuota);
+      //namesystem.setQuota(path, namespaceQuota, diskspaceQuota);
+      throw new UnsupportedOperationException("Legacy SetQuota is not supported");
     } else {
       namesystem
           .multiTransactionalSetQuota(path, namespaceQuota, diskspaceQuota);

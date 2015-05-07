@@ -27,6 +27,10 @@ public class SubtreeLockedException extends TransientStorageException {
     super(createMessage(inodeName, namenodes));
   }
 
+  public SubtreeLockedException(String message) {
+    super(message);
+  }
+  
   private static String createMessage(String inodeName,
       Collection<ActiveNode> namenodes) {
     StringBuilder builder = new StringBuilder();
@@ -35,5 +39,5 @@ public class SubtreeLockedException extends TransientStorageException {
       builder.append(namenode.toString() + ", ");
     }
     return builder.toString();
-  }
+  }  
 }

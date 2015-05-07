@@ -262,7 +262,12 @@ public class TestPermission {
       nnfs.setPermission(new Path("/"), new FsPermission((short) 0777));
       final Path RENAME_PATH = new Path("/foo/bar");
       userfs.mkdirs(RENAME_PATH);
-      assertTrue(canRename(userfs, RENAME_PATH, CHILD_DIR1));
+      assertTrue(canRename(userfs, RENAME_PATH, new Path(CHILD_DIR1.toString()+"/new")));
+      //assertTrue(canRename(userfs, RENAME_PATH, CHILD_DIR1));
+      //CHILD_DIR1 = /data/child1
+      //the data dir does not have write permission
+      //the permission checker complains that the parent "/data" does not 
+      //have write permission. 
     } finally {
       cluster.shutdown();
     }

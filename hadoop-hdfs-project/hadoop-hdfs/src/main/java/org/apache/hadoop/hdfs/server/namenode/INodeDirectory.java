@@ -253,13 +253,13 @@ public class INodeDirectory extends INode {
         }
         throw new UnresolvedPathException(path, preceding, remainder, target);
       }
+      count++;
+      index++;
       if (lastComp || !curNode.isDirectory()) {
         break;
       }
       INodeDirectory parentDir = (INodeDirectory) curNode;
-      curNode = parentDir.getChildINode(components[count + 1]);
-      count++;
-      index++;
+      curNode = parentDir.getChildINode(components[count]);
     }
     return count;
   }

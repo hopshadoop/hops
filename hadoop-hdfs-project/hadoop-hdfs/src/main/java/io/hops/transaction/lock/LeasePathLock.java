@@ -31,15 +31,26 @@ public final class LeasePathLock extends Lock {
   private final TransactionLockTypes.LockType lockType;
   private final List<LeasePath> leasePaths;
   private final int expectedCount;
+  private final String src; //read all leases of src dir. needed for rename
 
-  LeasePathLock(TransactionLockTypes.LockType lockType, int expectedCount) {
+  private LeasePathLock(TransactionLockTypes.LockType lockType, int expectedCount, 
+          String src) {
     this.lockType = lockType;
     this.leasePaths = new ArrayList<LeasePath>();
     this.expectedCount = expectedCount;
+    this.src = src;
+  }
+  
+  LeasePathLock(TransactionLockTypes.LockType lockType, int expectedCount) {
+    this(lockType, expectedCount, null);
   }
 
   LeasePathLock(TransactionLockTypes.LockType lockType) {
-    this(lockType, Integer.MAX_VALUE);
+    this(lockType, Integer.MAX_VALUE,null);
+  }
+  
+  LeasePathLock(TransactionLockTypes.LockType lockType, String src) {
+    this(lockType, Integer.MAX_VALUE,src);
   }
 
   @Override
@@ -55,6 +66,10 @@ public final class LeasePathLock extends Lock {
     LeaseLock leaseLock = (LeaseLock) locks.getLock(Type.Lease);
     for (Lease lease : leaseLock.getLeases()) {
       acquireLeasePaths(lease);
+    }
+    
+    if(src != null && !src.equals("")){
+      acquireAllLeasePathsForDir(src);
     }
 
     if (leasePaths.size() > expectedCount) {
@@ -74,6 +89,14 @@ public final class LeasePathLock extends Lock {
     }
   }
 
+  private void acquireAllLeasePathsForDir(String src)
+      throws StorageException, TransactionContextException {
+    Collection<LeasePath> result =
+        acquireLockList(lockType, LeasePath.Finder.ByPrefix,
+            src);
+      leasePaths.addAll(result);
+  }
+  
   @Override
   protected final Type getType() {
     return Type.LeasePath;

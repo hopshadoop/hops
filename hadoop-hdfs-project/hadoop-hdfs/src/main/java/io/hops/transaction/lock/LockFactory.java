@@ -236,6 +236,11 @@ public class LockFactory {
   public Lock getLeasePathLock(TransactionLockTypes.LockType lockType) {
     return new LeasePathLock(lockType);
   }
+  
+  public Lock getLeasePathLock(TransactionLockTypes.LockType lockType,
+          String src) {
+    return new LeasePathLock(lockType, src);
+  }
 
   public Lock getNameNodeLeaseLock(TransactionLockTypes.LockType lockType) {
     return new NameNodeLeaseLock(lockType);
@@ -284,6 +289,11 @@ public class LockFactory {
       TransactionLockTypes.LockType lockType, int inodeId) {
     return new BaseEncodingStatusLock.IndividualEncodingStatusLock(lockType,
         inodeId);
+  }
+  
+  public Lock getSubTreeOpsLock(TransactionLockTypes.LockType lockType, 
+          String pathPrefix) {
+    return new SubTreeOpLock(lockType, pathPrefix);
   }
   
   public Collection<Lock> getBlockRelated(BLK... relatedBlks) {

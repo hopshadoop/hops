@@ -345,7 +345,6 @@ public class FSDirectory implements Closeable {
               file.getBlocks().length +
               " blocks is persisted to the file system");
     }
-
     file.logMetadataEvent(MetadataLogEntry.Operation.ADD);
   }
 
@@ -503,15 +502,19 @@ public class FSDirectory implements Closeable {
             .warn("DIR* FSDirectory.unprotectedRenameTo: " + error);
         throw new FileAlreadyExistsException(error);
       }
-      List<INode> children =
-          dstInode.isDirectory() ? ((INodeDirectory) dstInode).getChildren() :
-              null;
-      if (children != null && children.size() != 0) {
-        error =
-            "rename cannot overwrite non empty destination directory " + dst;
-        NameNode.stateChangeLog
-            .warn("DIR* FSDirectory.unprotectedRenameTo: " + error);
-        throw new IOException(error);
+
+      if (dstInode.isDirectory()) {
+        //[S] this a hack. handle this in the acquire lock phase
+        INodeDataAccess ida = (INodeDataAccess) HdfsStorageFactory
+                .getDataAccess(INodeDataAccess.class);
+
+        if (ida.hasChildren(dstInode.getId())) {
+          error =
+                  "rename cannot overwrite non empty destination directory " + dst;
+          NameNode.stateChangeLog
+                  .warn("DIR* FSDirectory.unprotectedRenameTo: " + error);
+          throw new IOException(error);
+        }
       }
     }
     if (dstInodes[dstInodes.length - 2] == null) {
@@ -548,7 +551,8 @@ public class FSDirectory implements Closeable {
     INode removedDst = null;
     try {
       if (dstInode != null) { // dst exists remove it
-        removedDst = removeChild(dstInodes, dstInodes.length - 1);
+        removedDst = removeChild(dstInodes, dstInodes.length - 1,dstNsCount,
+                dstDsCount);
         dstChildName = removedDst.getLocalName();
       }
 
@@ -577,7 +581,8 @@ public class FSDirectory implements Closeable {
           INode rmdst = removedDst;
           removedDst = null;
           List<Block> collectedBlocks = new ArrayList<Block>();
-          filesDeleted = rmdst.collectSubtreeBlocksAndClear(collectedBlocks);
+          filesDeleted = 1; // rmdst.collectSubtreeBlocksAndClear(collectedBlocks);
+                            // [S] as the dst dir was empty it will always return 1
           getFSNamesystem().removePathAndBlocks(src, collectedBlocks);
         }
 
@@ -2013,7 +2018,7 @@ public class FSDirectory implements Closeable {
     }
 
     if (addedNode != null) {
-      if(!addedNode.isDirectory()) {
+      if (!addedNode.isDirectory()) {
         INode[] pc = Arrays.copyOf(pathComponents, pathComponents.length);
         pc[pc.length - 1] = addedNode;
         String path = getFullPathName(pc, pc.length - 1);
@@ -2050,7 +2055,7 @@ public class FSDirectory implements Closeable {
     }
 
     if (addedNode != null) {
-      if(!addedNode.isDirectory()) {
+      if (!addedNode.isDirectory()) {
         INode[] pc = Arrays.copyOf(pathComponents, pathComponents.length);
         pc[pc.length - 1] = addedNode;
         String path = getFullPathName(pc, pc.length - 1);
@@ -2125,6 +2130,34 @@ public class FSDirectory implements Closeable {
     }
     return removedNode;
   }
+  
+  INode removeChild(INode[] pathComponents, int pos, boolean forRename, 
+          final long nsCount, final long dsCount)
+      throws StorageException, TransactionContextException {
+    INode removedNode = null;
+    if (forRename) {
+      removedNode = pathComponents[pos];
+      removedNode.logMetadataEvent(MetadataLogEntry.Operation.DELETE);
+    } else {
+      removedNode = ((INodeDirectory) pathComponents[pos - 1])
+          .removeChild(pathComponents[pos]);
+    }
+    if (removedNode != null && isQuotaEnabled()) {
+      List<QuotaUpdate> outstandingUpdates = (List<QuotaUpdate>) EntityManager
+          .findList(QuotaUpdate.Finder.ByINodeId, removedNode.getId());
+      long nsDelta = 0;
+      long dsDelta = 0;
+      for (QuotaUpdate update : outstandingUpdates) {
+        nsDelta += update.getNamespaceDelta();
+        dsDelta += update.getDiskspaceDelta();
+      }
+      //INode.DirCounts counts = new INode.DirCounts();
+      //removedNode.spaceConsumedInTree(counts);
+      updateCountNoQuotaCheck(pathComponents, pos,
+          -nsCount + nsDelta, -dsCount + dsDelta);
+    }
+    return removedNode;
+  }
 
   INode removeChildNonRecursively(INode[] pathComponents, int pos)
       throws StorageException, TransactionContextException {
@@ -2150,28 +2183,18 @@ public class FSDirectory implements Closeable {
     }
     return removedNode;
   }
-
-  private INode removeChild(INode[] pathComponents, int pos, boolean forRename,
-      long nsCount, long dsCount)
-      throws StorageException, TransactionContextException {
-    INode removedNode = null;
-    if (forRename) {
-      removedNode = pathComponents[pos];
-      removedNode.logMetadataEvent(MetadataLogEntry.Operation.DELETE);
-    } else {
-      removedNode = ((INodeDirectory) pathComponents[pos - 1])
-          .removeChild(pathComponents[pos]);
-    }
-    if (removedNode != null && isQuotaEnabled()) {
-      updateCountNoQuotaCheck(pathComponents, pos, -nsCount, -dsCount);
-    }
-    return removedNode;
-  }
   
   private INode removeChild(INode[] pathComponents, int pos)
       throws StorageException, TransactionContextException {
     return removeChild(pathComponents, pos, false);
   }
+  
+  private INode removeChild(INode[] pathComponents, int pos, final long nsCount,
+          final long dsCount)
+      throws StorageException, TransactionContextException {
+    return removeChild(pathComponents, pos, false,nsCount,dsCount);
+  }
+  
 
   private INode removeChildForRename(INode[] pathComponents, int pos)
       throws StorageException, TransactionContextException {
@@ -2756,5 +2779,18 @@ public class FSDirectory implements Closeable {
       clone = new INodeDirectory((INodeDirectory) inode);
     }
     return clone;
+  }
+
+  public boolean hasChildren(final int parentId) throws IOException {
+    LightWeightRequestHandler hasChildrenHandler =
+            new LightWeightRequestHandler(HDFSOperationType.HAS_CHILDREN) {
+      @Override
+      public Object performTask() throws IOException {
+        INodeDataAccess ida = (INodeDataAccess) HdfsStorageFactory
+                .getDataAccess(INodeDataAccess.class);
+        return ida.hasChildren(parentId);
+      }
+    };
+    return (Boolean) hasChildrenHandler.handle();
   }
 }

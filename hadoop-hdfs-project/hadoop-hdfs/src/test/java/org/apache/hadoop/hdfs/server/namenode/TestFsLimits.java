@@ -177,7 +177,7 @@ public class TestFsLimits {
             LockFactory lf = LockFactory.getInstance();
             locks.add(lf.getINodeLock(getMockNamesystem().getNameNode(),
                 TransactionLockTypes.INodeLockType.WRITE_ON_TARGET_AND_PARENT,
-                TransactionLockTypes.INodeResolveType.PATH_AND_ALL_CHILDREN_RECURSIVELY,
+                TransactionLockTypes.INodeResolveType.PATH_AND_IMMEDIATE_CHILDREN,
                 "/", "/" + name));
           }
 

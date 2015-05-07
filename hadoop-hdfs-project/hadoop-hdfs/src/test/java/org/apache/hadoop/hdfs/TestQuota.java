@@ -37,6 +37,7 @@ import org.junit.Test;
 import java.io.FileNotFoundException;
 import java.io.OutputStream;
 import java.security.PrivilegedExceptionAction;
+import org.apache.hadoop.hdfs.server.namenode.TestSubtreeLock;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -478,6 +479,7 @@ public class TestQuota {
       // 9: Move /nqdir0/qdir1/qdir21/nqdir32 /nqdir0/qdir1/qdir20/nqdir30
       tempPath = new Path(quotaDir2, "nqdir30");
       dfs.rename(new Path(quotaDir3, "nqdir32"), tempPath);
+      assertFalse("Not all sub Tree locks cleared",TestSubtreeLock.subTreeLocksExists());
       c = dfs.getContentSummary(quotaDir2);
       assertEquals(c.getDirectoryCount(), 4);
       assertEquals(c.getQuota(), 7);
