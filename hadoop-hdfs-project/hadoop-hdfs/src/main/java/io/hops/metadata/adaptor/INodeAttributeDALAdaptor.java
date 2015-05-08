@@ -59,7 +59,7 @@ public class INodeAttributeDALAdaptor extends
       INodeAttributes hia =
           new INodeAttributes(attribute.getInodeId(), attribute.getNsQuota(),
               attribute.getNsCount(), attribute.getDsQuota(),
-              attribute.getDiskspace());
+              attribute.getDiskspace(), attribute.getStatus());
       return hia;
     } else {
       return null;
@@ -73,7 +73,7 @@ public class INodeAttributeDALAdaptor extends
       org.apache.hadoop.hdfs.server.namenode.INodeAttributes iNodeAttributes =
           new org.apache.hadoop.hdfs.server.namenode.INodeAttributes(
               hia.getInodeId(), hia.getNsQuota(), hia.getNsCount(),
-              hia.getDsQuota(), hia.getDiskspace());
+              hia.getDsQuota(), hia.getDiskspace(),hia.getStatus());
       return iNodeAttributes;
     } else {
       return null;

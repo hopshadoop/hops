@@ -39,6 +39,7 @@ import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLockTypes.INodeLockType;
 import io.hops.transaction.lock.TransactionLockTypes.LockType;
 import io.hops.transaction.lock.TransactionLocks;
+import io.hops.metadata.hdfs.snapshots.SnapShotConstants;
 import io.hops.util.Slicer;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -594,7 +595,21 @@ public class BlockManager {
     if (lastBlock.isComplete()) {
       return false; // already completed (e.g. by syncBlock)
     }
-    
+    //START ROOT_LEVEL_SNAPSHOT
+    if(((FSNamesystem)namesystem).isSnapshotAtRootTaken()){
+        if(lastBlock.getStatus()==SnapShotConstants.Original&& lastBlock.getBlockUCState()!=BlockUCState.COMMITTED){
+            LOG.debug("Last Block status="+lastBlock.getStatus());
+            //SnapShot was taken while writing to the block is in progress.
+            //Save the original row with negative id and change the status of the current row to -2.
+            BlockInfo blockRecordTobeSaved = new BlockInfo(lastBlock);
+            blockRecordTobeSaved.setBlockIdNoPersistance(-lastBlock.getBlockId());
+            blockRecordTobeSaved.setINodeIdNoPersistance(-lastBlock.getInodeId());
+            EntityManager.add(blockRecordTobeSaved);
+            lastBlock.status=SnapShotConstants.Modified;
+            EntityManager.update(lastBlock);
+        }
+    }
+    //END ROOT_LEVEL_SNAPSHOT
     final boolean b =
         commitBlock((BlockInfoUnderConstruction) lastBlock, commitBlock);
     LOG.debug(
@@ -707,7 +722,22 @@ public class BlockManager {
         getStoredBlock(oldBlock) : "last block of the file is not in blocksMap";
 
     DatanodeDescriptor[] targets = getNodes(oldBlock);
-
+//START ROOT_LEVEL_SNAPSHOT
+    if(((FSNamesystem)namesystem).isSnapshotAtRootTaken()){
+        if(oldBlock.getStatus()==SnapShotConstants.Original){
+            //Since this block is modified by adding/appending new data, we need to save the old lengh of the block.
+            BlockInfo blockRecordToBeSaved = new BlockInfo(oldBlock);
+            blockRecordToBeSaved.setBlockIdNoPersistance(-oldBlock.getBlockId());
+            blockRecordToBeSaved.setINodeIdNoPersistance(-oldBlock.getInodeId());
+            //Set the oldBlock status to modified.
+            oldBlock.setStatusNoPersistance(SnapShotConstants.Modified);
+            //Add the newly created block record and update the oldrecord.
+            EntityManager.add(blockRecordToBeSaved);
+            EntityManager.update(oldBlock);
+            LOG.debug("Added new record and changed status to modified for the block="+oldBlock.getBlockId());
+        }
+    }
+    //END ROOT_LEVEL_SNAPSHOT
     BlockInfoUnderConstruction ucBlock = bc.setLastBlock(oldBlock, targets);
     blocksMap.replaceBlock(ucBlock);
 

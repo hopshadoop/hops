@@ -31,6 +31,7 @@ import io.hops.transaction.EntityManager;
 import io.hops.transaction.context.HdfsTransactionContextMaintenanceCmds;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
+import io.hops.metadata.hdfs.snapshots.SnapShotConstants;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
@@ -62,6 +63,8 @@ import org.apache.hadoop.hdfs.server.blockmanagement.BlockManager;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.BlockUCState;
 import org.apache.hadoop.hdfs.util.ByteArray;
+
+import io.hops.metadata.hdfs.snapshots.SnapShotConstants;
 
 import java.io.Closeable;
 import java.io.FileNotFoundException;
@@ -215,6 +218,12 @@ public class FSDirectory implements Closeable {
         new INodeFileUnderConstruction(permissions, replication,
             preferredBlockSize, modTime, clientName, clientMachine, clientNode);
 
+ //START_ROOT_LEVEL_SNAPSHOT
+    if(namesystem.isSnapshotAtRootTaken()){
+        newNode.setStatusNoPersistance(SnapShotConstants.New); 
+        
+    }
+    //END_ROOT_LEVEL_SNAPSHOT
 
     newNode = addNode(path, newNode, UNKNOWN_DISK_SPACE);
 
@@ -303,6 +312,13 @@ public class FSDirectory implements Closeable {
     BlockInfoUnderConstruction blockInfo =
         new BlockInfoUnderConstruction(block, fileINode.getId(),
             BlockUCState.UNDER_CONSTRUCTION, targets);
+
+ //START ROOT_LEVEL_SNAPSHOT
+      if(namesystem.isSnapshotAtRootTaken()){
+           blockInfo.setStatusNoPersistance(SnapShotConstants.New);
+      }     
+      //END ROOT_LEVEL_SNAPSHOT
+      
     getBlockManager().addBlockCollection(blockInfo, fileINode);
     fileINode.addBlock(blockInfo);
 
@@ -442,6 +458,14 @@ public class FSDirectory implements Closeable {
       throws FileAlreadyExistsException, FileNotFoundException,
       ParentNotDirectoryException, QuotaExceededException,
       UnresolvedLinkException, IOException, StorageException {
+ //START ROOT_LEVEL_SNAPSHOT
+      /*
+       * Read whether snapshot was taken at root or not. This values has to be same throughout the operation.
+       * This is to avoid the case where snapshot is taken in the mid of an operation.
+       */
+      boolean isSnapshotAtRootTaken = namesystem.isSnapshotAtRootTaken();
+     // System.out.println("isSnapshotAtRootTaken="+isSnapshotAtRootTaken);
+      //END ROOT_LEVEL_SNAPSHOT
     boolean overwrite = false;
     if (null != options) {
       for (Rename option : options) {
@@ -542,7 +566,20 @@ public class FSDirectory implements Closeable {
     INode removedDst = null;
     try {
       if (dstInode != null) { // dst exists remove it
-        removedDst = removeChild(dstInodes, dstInodes.length - 1);
+       //START ROOT_LEVEL_SNAPSHOT
+          /*
+           * If snapshot at Root is taken then we do not delete this destination permanently if this child is created after taking snapshot
+           * This dstInode will be included in future NsQuota and DSQuota calculations.
+           */
+          if(isSnapshotAtRootTaken&&dstInodes[dstInodes.length -1].getStatus()!=SnapShotConstants.New){
+              removedDst = ((INodeDirectory)dstInodes[dstInodes.length -2]).getChild(dstInodes[dstInodes.length -1].getLocalName());
+              removedDst.setIsDeletedNoPersistance(SnapShotConstants.isDeleted);
+              EntityManager.update(removedDst);
+          }else{
+              //destination exists, remove it.
+              removedDst = removeChild(dstInodes, dstInodes.length - 1);
+          }
+        //END ROOT_LEVEL_SNAPSHOT
         dstChildName = removedDst.getLocalName();
       }
 
@@ -561,10 +598,62 @@ public class FSDirectory implements Closeable {
               "DIR* FSDirectory.unprotectedRenameTo: " + src +
                   " is renamed to " + dst);
         }
+ //START ROOT_LEVEL_SNAPSHOT
+        if(isSnapshotAtRootTaken){
+            /*
+             * Since we are updating the modification time, if the inode is before exisiting before snapshot, we need to take back-up of it.
+             * 
+             */
+            
+            if( srcInodes[srcInodes.length - 2].getStatus()==SnapShotConstants.Original){
+                INodeDirectory node = (INodeDirectory) srcInodes[srcInodes.length - 2];
+                INode backUpRecord;
+                if (node instanceof INodeDirectoryWithQuota) {
+                    INodeDirectoryWithQuota nodeQuota = (INodeDirectoryWithQuota) node;
+                    backUpRecord = new INodeDirectoryWithQuota(nodeQuota.getNsQuota(),nodeQuota.getDsQuota(),nodeQuota);
+                } else {
+                    backUpRecord = cloneINode(node);
+                }
+                backUpRecord.setIdNoPersistance(-node.getId());
+                backUpRecord.setParentIdNoPersistance(-node.getParentId());
+                node.setStatusNoPersistance(SnapShotConstants.Modified);
+                EntityManager.add(backUpRecord);
+            }
+            
+            if(dstInodes[dstInodes.length - 2].getStatus()==SnapShotConstants.Original){
+                INodeDirectory node = (INodeDirectory) dstInodes[dstInodes.length - 2];
+                INode backUpRecord;
+                if (node instanceof INodeDirectoryWithQuota) {
+                    INodeDirectoryWithQuota nodeQuota = (INodeDirectoryWithQuota) node;
+                    backUpRecord =new INodeDirectoryWithQuota(nodeQuota.getNsQuota(),nodeQuota.getDsQuota(),nodeQuota);
+                } else {
+                    backUpRecord = cloneINode(node);
+                }
+                backUpRecord.setIdNoPersistance(-node.getId());
+                backUpRecord.setParentIdNoPersistance(-node.getParentId());
+                node.setStatusNoPersistance(SnapShotConstants.Modified);
+                EntityManager.add(backUpRecord);
+            }
+        }
+        //END ROOT_LEVEL_SNAPSHOT
         srcInodes[srcInodes.length - 2].setModificationTime(timestamp);
         dstInodes[dstInodes.length - 2].setModificationTime(timestamp);
         // update moved lease with new filename
         getFSNamesystem().unprotectedChangeLease(src, dst);
+         
+          //START ROOT_LEVEL_SNAPSHOT
+          if (!isSnapshotAtRootTaken) {
+              
+              if (removedDst != null) {
+                  removedDst.setSubtreeLocked(false);//It is done here,since in unLockSubTree() the children with isDeleted=1 are not retrieved from INodeCusterj findInodesByParentId and findInodesByNameAndParentId.
+                  removedDst.setSubtreeLockOwner(0);
+                  EntityManager.update(removedDst);
+                  removedDst = null;
+              }
+              //EntityManager.snapshotMaintenance(HOPTransactionContextMaintenanceCmds.INodePKChanged, srcClone, dstChild);..Now we do not have to do this, since primary key is now id.
+              return true;
+ } else {
+              //END ROOT_LEVEL_SNAPSHOT
 
         // Collect the blocks and remove the lease for previous dst
         if (removedDst != null) {
@@ -580,6 +669,9 @@ public class FSDirectory implements Closeable {
             dstChild);
 
         return filesDeleted > 0;
+ //START ROOT_LEVEL_SNAPSHOT
+          }
+          //END ROOT_LEVEL_SNAPSHOT
       }
     } finally {
       if (removedSrc != null) {
@@ -869,6 +961,13 @@ public class FSDirectory implements Closeable {
       throws FileAlreadyExistsException, FileNotFoundException,
       ParentNotDirectoryException, QuotaExceededException,
       UnresolvedLinkException, IOException, StorageException {
+//START ROOT_LEVEL_SNAPSHOT
+      /*
+       * Read whether snapshot was taken at root or not. This values has to be same throughout the operation.
+       * This is to avoid the case where snapshot is taken in the mid of an operation.
+       */
+      boolean isSnapshotAtRootTaken = namesystem.isSnapshotAtRootTaken();
+      //END ROOT_LEVEL_SNAPSHOT
     boolean overwrite = false;
     if (null != options) {
       for (Rename option : options) {
@@ -979,8 +1078,20 @@ public class FSDirectory implements Closeable {
     String dstChildName = null;
     INode removedDst = null;
     try {
-      if (dstInode != null) { // dst exists remove it
-        removedDst = removeChild(dstInodes, dstInodes.length - 1);
+      if (dstInode != null) { //START ROOT_LEVEL_SNAPSHOT
+          /*
+           * If snapshot at Root is taken then we do not delete this destination permanently if this child is created after taking snapshot
+           * This dstInode will be included in future NsQuota and DSQuota calculations.
+           */
+          if(isSnapshotAtRootTaken&&dstInodes[dstInodes.length -1].getStatus()!=SnapShotConstants.New){
+              removedDst = ((INodeDirectory)dstInodes[dstInodes.length -2]).getChild(dstInodes[dstInodes.length -1].getLocalName());
+              removedDst.setIsDeletedNoPersistance(SnapShotConstants.isDeleted);
+              EntityManager.update(removedDst);
+          }else{
+              //destination exists, remove it.
+              removedDst = removeChild(dstInodes, dstInodes.length - 1);
+          }
+        //END ROOT_LEVEL_SNAPSHOT
         dstChildName = removedDst.getLocalName();
       }
 
@@ -999,11 +1110,52 @@ public class FSDirectory implements Closeable {
               "DIR* FSDirectory.unprotectedRenameTo: " + src +
                   " is renamed to " + dst);
         }
+         //START ROOT_LEVEL_SNAPSHOT
+        if(isSnapshotAtRootTaken){
+            /*
+             * Since we are updating the modification time, if the inode is before exisiting before snapshot, we need to take back-up of it.
+             * 
+             */
+            
+            if (srcInodes[srcInodes.length - 2].getStatus() == SnapShotConstants.Original) {
+                INodeDirectory node = (INodeDirectory) srcInodes[srcInodes.length - 2];
+                INode backUpRecord;
+                if (node instanceof INodeDirectoryWithQuota) {
+                    INodeDirectoryWithQuota nodeQuota = (INodeDirectoryWithQuota) node;
+                    backUpRecord =new INodeDirectoryWithQuota(nodeQuota.getNsQuota(),nodeQuota.getDsQuota(),nodeQuota);
+                } else {
+                    backUpRecord = cloneINode(node);
+                }
+                backUpRecord.setIdNoPersistance(-node.getId());
+                backUpRecord.setParentIdNoPersistance(-node.getParentId());
+                node.setStatusNoPersistance(SnapShotConstants.Modified);
+                EntityManager.add(backUpRecord);
+            }
+
+            if (dstInodes[dstInodes.length - 2].getStatus() == SnapShotConstants.Original) {
+                INodeDirectory node = (INodeDirectory) dstInodes[dstInodes.length - 2];
+                INode backUpRecord;
+                if (node instanceof INodeDirectoryWithQuota) {
+                    INodeDirectoryWithQuota nodeQuota = (INodeDirectoryWithQuota) node;
+                    backUpRecord =new INodeDirectoryWithQuota(nodeQuota.getNsQuota(),nodeQuota.getDsQuota(),nodeQuota);
+                } else {
+                    backUpRecord = cloneINode(node);
+                }
+                backUpRecord.setIdNoPersistance(-node.getId());
+                backUpRecord.setParentIdNoPersistance(-node.getParentId());
+                node.setStatusNoPersistance(SnapShotConstants.Modified);
+                EntityManager.add(backUpRecord);
+            }
+        }
+        //END ROOT_LEVEL_SNAPSHOT
+        
         srcInodes[srcInodes.length - 2].setModificationTime(timestamp);
         dstInodes[dstInodes.length - 2].setModificationTime(timestamp);
         // update moved lease with new filename
         getFSNamesystem().unprotectedChangeLease(src, dst);
 
+   //START ROOT_LEVEL_SNAPSHOT
+          if (!isSnapshotAtRootTaken) {
         // Collect the blocks and remove the lease for previous dst
         if (removedDst != null) {
           INode rmdst = removedDst;
@@ -1018,6 +1170,15 @@ public class FSDirectory implements Closeable {
             dstChild);
 
         return filesDeleted > 0;
+}
+else{
+if (removedDst != null) {
+                  removedDst = null;
+              }
+              //EntityManager.snapshotMaintenance(HOPTransactionContextMaintenanceCmds.INodePKChanged, srcClone, dstChild);..Now we do not have to do this, since primary key is now id.
+              return true;
+}
+
       }
     } finally {
       if (removedSrc != null) {
@@ -1248,19 +1409,77 @@ public class FSDirectory implements Closeable {
     if (NameNode.stateChangeLog.isDebugEnabled()) {
       NameNode.stateChangeLog.debug("DIR* FSDirectory.delete: " + src);
     }
-    long now = now();
-    int filesRemoved = unprotectedDelete(src, collectedBlocks, now);
+     long now = now();
+        int filesRemoved;
+       
+        if (namesystem.isSnapshotAtRootTaken()) {
+            src = normalizePath(src);
 
-    if (filesRemoved <= 0) {
-      return false;
+            INode[] inodes = getRootDir().getExistingPathINodes(src, false);
+            INode targetNode = inodes[inodes.length - 1];
+
+            if (targetNode == null) { // non-existent src
+                if (NameNode.stateChangeLog.isDebugEnabled()) {
+                    NameNode.stateChangeLog.debug("DIR* FSDirectory.unprotectedDelete: "
+                            + "failed to remove " + src + " because it does not exist");
+                }
+                return false;
+            }
+            if (inodes.length == 1) { // src is the root
+                NameNode.stateChangeLog.warn("DIR* FSDirectory.unprotectedDelete: "
+                        + "failed to remove " + src
+                        + " because the root is not allowed to be deleted");
+                 return false;
+            }
+            int pos = inodes.length - 1;
+            
+             targetNode = ((INodeDirectory)inodes[pos-1]).getChild(inodes[pos].getLocalName());    
+            
+            if (targetNode == null) {
+                 return false;
+            }
+            
+            targetNode.setIsDeletedNoPersistance(SnapShotConstants.isDeleted);
+            EntityManager.update(targetNode);
+            
+            // set the parent's modification time
+            if (inodes[pos - 1].getStatus() == SnapShotConstants.Original) {
+                 INode backUpRecord ;
+                
+                if(inodes[pos-1] instanceof INodeDirectoryWithQuota){
+                    INodeDirectoryWithQuota nodeQuota = (INodeDirectoryWithQuota) inodes[pos - 1];
+                    backUpRecord =new INodeDirectoryWithQuota(nodeQuota.getNsQuota(),nodeQuota.getDsQuota(),nodeQuota);
+                }else{
+                    backUpRecord = cloneINode(inodes[pos-1]);
+                }
+               
+                backUpRecord.setIdNoPersistance(-inodes[pos - 1].getId());
+                backUpRecord.setParentIdNoPersistance(-inodes[pos - 1].getParentId());
+                inodes[pos - 1].setStatusNoPersistance(SnapShotConstants.Modified);
+                inodes[pos - 1].setModificationTimeNoPersistance(now);
+                EntityManager.update(inodes[pos - 1]);
+                EntityManager.add(backUpRecord);
+                
+            } else {
+                inodes[pos - 1].setModificationTime(now);
+            }
+            
+        } else {
+
+                filesRemoved = unprotectedDelete(src, collectedBlocks, now);
+
+            if (filesRemoved <= 0) {
+                return false;
+            }
+            incrDeletedFileCount(filesRemoved);
+            // Blocks will be deleted later by the caller of this method
+            getFSNamesystem().removePathAndBlocks(src, null);
+        }
+
+
+        return true;
     }
-    incrDeletedFileCount(filesRemoved);
-    // Blocks will be deleted later by the caller of this method
-    getFSNamesystem().removePathAndBlocks(src, null);
-
-    return true;
-  }
-  
+   
   /**
    * @return true if the path is a non-empty directory; otherwise, return false.
    */
@@ -1278,10 +1497,6 @@ public class FSDirectory implements Closeable {
   /**
    * Delete a path from the name space
    * Update the count at each ancestor directory with quota
-   * <br>
-   * Note: This is to be used by {@link FSEditLog} only.
-   * <br>
-   *
    * @param src
    *     a string representation of a path to an inode
    * @param mtime
@@ -1380,7 +1595,20 @@ public class FSDirectory implements Closeable {
     HdfsFileStatus listing[] = new HdfsFileStatus[numOfListing];
     for (int i = 0; i < numOfListing; i++) {
       INode cur = contents.get(startChild + i);
-      listing[i] = createFileStatus(cur.name, cur, needLocation);
+      //START ROOT_LEVEL_SNAPSHOT
+          if (namesystem.isSnapshotAtRootTaken()) {
+              if (cur.getIsDeleted() != SnapShotConstants.isDeleted) {
+                  /*
+                   * If inode is deleted after taking snapshot,we should not show it in the listing
+                   */
+                  listing[i] = createFileStatus(cur.name, cur, needLocation);
+              }
+          }
+          else{
+              listing[i] = createFileStatus(cur.name, cur, needLocation);
+          }
+       
+        //END ROOT_LEVEL_SNAPSHOT
     }
     return new DirectoryListing(listing,
         totalNumChildren - startChild - numOfListing);
@@ -1457,7 +1685,6 @@ public class FSDirectory implements Closeable {
    * deepest INodes. The array size will be the number of expected
    * components in the path, and non existing components will be
    * filled with null
-   * @see INodeDirectory#getExistingPathINodes(byte[][], INode[])
    */
   INode[] getExistingPathINodes(String path)
       throws UnresolvedLinkException, StorageException,
@@ -1516,7 +1743,6 @@ public class FSDirectory implements Closeable {
    *     the delta change of diskspace
    * @throws QuotaExceededException
    *     if the new count violates any quota limit
-   * @throws FileNotFound
    *     if path does not exist.
    */
   void updateSpaceConsumed(String path, long nsDelta, long dsDelta)
@@ -1564,6 +1790,25 @@ public class FSDirectory implements Closeable {
     if (checkQuota) {
       verifyQuota(inodes, numOfINodes, nsDelta, dsDelta, null);
     }
+  /*  for(int i = 0; i < numOfINodes; i++) {
+      if (inodes[i].isQuotaSet()) { // a directory with quota
+        INodeDirectoryWithQuota node =(INodeDirectoryWithQuota)inodes[i]; 
+        //START ROOT_LEVEL_SNAPSHOT
+        //Since the quota gets chnaged and snapshot has been taken we need to save the state.
+        if(((FSNamesystem)namesystem).isSnapshotAtRootTaken()){
+            if(node.getStatus()==SnapShotConstants.Original){
+                INodeDirectoryWithQuota inodeTobeSaved = new INodeDirectoryWithQuota(node.getNsQuota(), node.getDsQuota(),new INodeDirectory(node));
+                 inodeTobeSaved.setIdNoPersistance(-node.getId());
+                 inodeTobeSaved.setParentIdNoPersistance(-node.getParentId());
+                node.setStatusNoPersistance(SnapShotConstants.Modified);
+                EntityManager.add(inodeTobeSaved);
+            }
+        }
+        //END ROOT_LEVEL_SNAPSHOT
+        node.updateNumItemsInTree(nsDelta, dsDelta);
+      }
+    }*/
+    
     INode iNode = inodes[numOfINodes - 1];
     namesystem.getQuotaUpdateManager()
         .addUpdate(iNode.getId(), nsDelta, dsDelta);
@@ -1655,7 +1900,6 @@ public class FSDirectory implements Closeable {
    *     string representation of the path to the directory
    * @param permissions
    *     the permission of the directory
-   * @param isAutocreate
    *     if the permission of the directory should inherit
    *     from its parent or not. u+wx is implicitly added to
    *     the automatically created directories, and to the
@@ -1773,9 +2017,14 @@ public class FSDirectory implements Closeable {
       PermissionStatus permission, long timestamp)
       throws QuotaExceededException, StorageException,
       TransactionContextException {
-    inodes[pos] =
-        addChild(inodes, pos, new INodeDirectory(name, permission, timestamp),
-            -1);
+   INodeDirectory direc = new INodeDirectory(name, permission, timestamp);
+        //START_ROOT_LEVEL_SNAPSHOT
+        if (namesystem.isSnapshotAtRootTaken()) {
+            //Since snapshot was taken set status to SnapShotConstants.New for newly created inodes[file or directory]
+            direc.status = SnapShotConstants.New;
+        }
+        //END_ROOT_LEVEL_SNAPSHOT
+        inodes[pos] = addChild(inodes, pos,direc,-1);
   }
   
   /**
@@ -1884,12 +2133,28 @@ public class FSDirectory implements Closeable {
     
     // Reduce the required quota by dst that is being removed
     INode dstInode = dstInodes[dstInodes.length - 1];
-    if (dstInode != null) {
-      INode.DirCounts dstCounts = new INode.DirCounts();
-      dstInode.spaceConsumedInTree(dstCounts);
-      nsDelta -= dstCounts.getNsCount();
-      dsDelta -= dstCounts.getDsCount();
-    }
+   
+     //START ROOT_LEVEL_SNAPSHOT
+    /*
+     * The semantics of space calculations after taking snapshot are
+     * Consider /A/B/C and /A/D/C
+     * 1. If we B is deleted, then the subtree under B is included in NSQuota and DSQuota for /(Root) and A.
+     * 2. If C is moved to D,i.e, by overwriting the file C. Then C is included in NSQuota, DSQuota of {/,A,D}. 
+     *  2.1 The NSQuota of B is decreased by 1 and DSQuota is decreased by the size of C.
+     *  2.2 The NSQUota of D is increased by 1 and DAQuota is increased by the size of C.
+     *  2.3 Similary if C is directory(over-writing an non-empty directory is not allowed), then
+     *     2.3.1 The NSQuota of B is decreased by NSQuota of C and DSQuota of B is decreased by the size(DSQuota) of subtree at C.
+     *     2.3.2 The NSQUota of D is increased by NSQuota of C and DAQuota is increased by the the size(DSQuota) of subtree at C.
+     */
+    if(!namesystem.isSnapshotAtRootTaken()){
+        if (dstInode != null) {
+            INode.DirCounts dstCounts = new INode.DirCounts();
+            dstInode.spaceConsumedInTree(dstCounts);
+            nsDelta -= dstCounts.getNsCount();
+            dsDelta -= dstCounts.getDsCount();
+        }
+    }   
+    //END ROOT_LEVEL_SNAPSHOT
     verifyQuota(dstInodes, dstInodes.length - 1, nsDelta, dsDelta,
         commonAncestor);
   }
@@ -1916,10 +2181,25 @@ public class FSDirectory implements Closeable {
     INode dstInode = dstInodes[dstInodes.length - 1];
     long nsDelta = srcNsCount;
     long dsDelta = srcDsCount;
-    if (dstInode != null) {
-      nsDelta -= dstNsCount;
-      dsDelta -= dstDsCount;
-    }
+   //START ROOT_LEVEL_SNAPSHOT
+    /*
+     * The semantics of space calculations after taking snapshot are
+     * Consider /A/B/C and /A/D/C
+     * 1. If we B is deleted, then the subtree under B is included in NSQuota and DSQuota for /(Root) and A.
+     * 2. If C is moved to D,i.e, by overwriting the file C. Then C is included in NSQuota, DSQuota of {/,A,D}. 
+     *  2.1 The NSQuota of B is decreased by 1 and DSQuota is decreased by the size of C.
+     *  2.2 The NSQUota of D is increased by 1 and DAQuota is increased by the size of C.
+     *  2.3 Similary if C is directory(over-writing an non-empty directory is not allowed), then
+     *     2.3.1 The NSQuota of B is decreased by NSQuota of C and DSQuota of B is decreased by the size(DSQuota) of subtree at C.
+     *     2.3.2 The NSQUota of D is increased by NSQuota of C and DAQuota is increased by the the size(DSQuota) of subtree at C.
+     */
+    if(!namesystem.isSnapshotAtRootTaken()){
+        if (dstInode != null) {
+            nsDelta -= dstNsCount;
+            dsDelta -= dstDsCount;
+        }
+    }   
+    //END ROOT_LEVEL_SNAPSHOT
     verifyQuota(dstInodes, dstInodes.length - 1, nsDelta, dsDelta,
         commonAncestor);
   }
@@ -1999,6 +2279,20 @@ public class FSDirectory implements Closeable {
     if (pathComponents[pos - 1] == null) {
       throw new NullPointerException("Panic: parent does not exist");
     }
+ //START ROOT_LEVEL_SNAPSHOT
+    //This is used for storing the state, since if the child is successfully added, then its state needs to be saved[The modification time will be changed.
+    //INode backUpRecord = new INodeDirectory((INodeDirectory)pathComponents[pos-1]);
+  
+      INode backUpRecord;
+      if (pathComponents[pos - 1] instanceof INodeDirectoryWithQuota) {
+          INodeDirectoryWithQuota nodeQuota = (INodeDirectoryWithQuota) pathComponents[pos - 1];
+          backUpRecord = new INodeDirectoryWithQuota(nodeQuota.getNsQuota(),nodeQuota.getDsQuota(),nodeQuota);
+      } else {
+          backUpRecord = cloneINode(pathComponents[pos - 1]);
+      }
+
+
+   //END ROOT_LEVEL_SNAPSHOT
     T addedNode =
         ((INodeDirectory) pathComponents[pos - 1]).addChild(child, true);
     if (addedNode == null) {
@@ -2006,15 +2300,31 @@ public class FSDirectory implements Closeable {
           true);
     }
 
-    if (addedNode != null) {
-      if (!addedNode.isDirectory()) {
-        INode[] pc = Arrays.copyOf(pathComponents, pathComponents.length);
-        pc[pc.length - 1] = addedNode;
-        String path = getFullPathName(pc, pc.length - 1);
-        PathMemcache.getInstance().set(path, pc);
-      }
-    }
-    //
+   //START ROOT_LEVEL_SNAPSHOT
+      if (addedNode != null) {
+
+          if (namesystem.isSnapshotAtRootTaken()&&pathComponents[pos-1].getStatus()==SnapShotConstants.Original) {
+               //The parent inode's modification time is changed in method pathComponents[pos-1]).addChild(
+              //So we need to persist the old state.[With old modification]
+              backUpRecord.setIdNoPersistance(-pathComponents[pos-1].getId());
+              backUpRecord.setParentIdNoPersistance(-pathComponents[pos-1].getParentId());
+              pathComponents[pos-1].setStatusNoPersistance(SnapShotConstants.Modified);
+              EntityManager.update(pathComponents[pos-1]);
+              EntityManager.add(backUpRecord);
+     
+          }    
+          
+          
+              if (!addedNode.isDirectory()) {
+                  INode[] pc = Arrays.copyOf(pathComponents, pathComponents.length);
+                  pc[pc.length - 1] = addedNode;
+                  String path = getFullPathName(pc, pc.length - 1);
+                  PathMemcache.getInstance().set(path, pc);
+              }
+          
+      }    
+      //END ROOT_LEVEL_SNAPSHOT
+
     return addedNode;
   }
 
@@ -2221,7 +2531,6 @@ public class FSDirectory implements Closeable {
    *
    * @param dir
    *     the root of the tree that represents the directory
-   * @param counters
    *     counters for name space and disk space
    * @param nodesInPath
    *     INodes for the each of components in the path.
@@ -2422,7 +2731,23 @@ public class FSDirectory implements Closeable {
 
       if (dirNode instanceof INodeDirectoryWithQuota) {
         // a directory with quota; so set the quota to the new value
-        ((INodeDirectoryWithQuota) dirNode).setQuota(nsQuota, dsQuota);
+          
+          //START ROOT_LEVEL_SNAPSHOT
+          /**
+           * Since the original quota values are changed in the INodeAttributes table for this directory with quota, we take a backup of that row.
+           */
+          INodeAttributes attributes = ((INodeDirectoryWithQuota)dirNode).getINodeAttributes();
+          if(namesystem.isSnapshotAtRootTaken()&&dirNode.getStatus()!= SnapShotConstants.New&&attributes.getStatus()==SnapShotConstants.Original){
+              INodeAttributes backUpRecord = new INodeAttributes(-attributes.getInodeId(),  attributes.getNsQuota(),attributes.getNsCount(), attributes.getDsQuota(), attributes.getDiskspace(), SnapShotConstants.Original);
+             ((INodeDirectoryWithQuota)dirNode).setQuota(nsQuota, dsQuota);
+              attributes.setStatus(SnapShotConstants.Modified);
+              EntityManager.add(backUpRecord);
+          }
+          else{
+              ((INodeDirectoryWithQuota)dirNode).setQuota(nsQuota, dsQuota);
+          }
+          //END ROOT_LEVEL_SNAPSHOT
+        
         if (!dirNode.isQuotaSet()) {
           // will not come here for root because root's nsQuota is always set
           INodeDirectory newNode = new INodeDirectory(dirNode);
@@ -2431,9 +2756,34 @@ public class FSDirectory implements Closeable {
           parent.replaceChild(newNode);
         }
       } else {
+           // a non-quota directory; so replace it with a directory with quota
+          //START ROOT_LEVEL_SNAPSHOT
+          if(namesystem.isSnapshotAtRootTaken()){
+              if(dirNode.getStatus()==SnapShotConstants.Original){
+                  INodeDirectory backUpRecord = new INodeDirectory(dirNode);
+                  backUpRecord.setIdNoPersistance(-dirNode.getId());
+                  backUpRecord.setParentIdNoPersistance(-dirNode.getParentId());
+                  
+                  INodeDirectoryWithQuota newNode = new INodeDirectoryWithQuota(nsQuota, dsQuota, nsCount, dsCount,SnapShotConstants.New, dirNode);
+                  newNode.setStatusNoPersistance(SnapShotConstants.Modified);
+                  INodeDirectory parent = (INodeDirectory) inodes[inodes.length - 2];
+                  dirNode = newNode;
+                  parent.replaceChild(newNode);
+                  
+                  EntityManager.add(backUpRecord);
+              }else if(dirNode.getStatus()==SnapShotConstants.Modified){
+                  
+                  INodeDirectoryWithQuota newNode = new INodeDirectoryWithQuota(nsQuota, dsQuota, nsCount, dsCount,SnapShotConstants.New, dirNode);
+                  INodeDirectory parent = (INodeDirectory) inodes[inodes.length - 2];
+                  dirNode = newNode;
+                  parent.replaceChild(newNode);
+              }
+                     
+          }
+          //END ROOT_LEVEL_SNAPSHOT    
         // a non-quota directory; so replace it with a directory with quota
         INodeDirectoryWithQuota newNode =
-            new INodeDirectoryWithQuota(nsQuota, dsQuota, nsCount, dsCount,
+            new INodeDirectoryWithQuota(nsQuota, dsQuota, nsCount, dsCount,dirNode.getStatus(),
                 dirNode);
         // non-root directory node; parent != null
         INodeDirectory parent = (INodeDirectory) inodes[inodes.length - 2];
@@ -2685,7 +3035,7 @@ public class FSDirectory implements Closeable {
 
               INodeAttributes inodeAttributes =
                   new INodeAttributes(newRootINode.getId(), Long.MAX_VALUE, 1L,
-                      FSDirectory.UNKNOWN_DISK_SPACE, 0L);
+                      FSDirectory.UNKNOWN_DISK_SPACE, 0L,SnapShotConstants.Original);
               INodeAttributesDataAccess ida =
                   (INodeAttributesDataAccess) HdfsStorageFactory
                       .getDataAccess(INodeAttributesDataAccess.class);
@@ -2717,6 +3067,8 @@ public class FSDirectory implements Closeable {
       clone.setIdNoPersistance(inode.getId());
       clone.setParentIdNoPersistance(inode.getParentId());
       clone.setUser(inode.getUserName());
+       clone.setStatusNoPersistance(inode.getStatus());
+            clone.setIsDeletedNoPersistance(inode.getIsDeleted());
     } else if (inode instanceof INodeFileUnderConstruction) {
       int id = ((INodeFileUnderConstruction) inode).getId();
       int pid = ((INodeFileUnderConstruction) inode).getParentId();
@@ -2739,6 +3091,8 @@ public class FSDirectory implements Closeable {
           new INodeFileUnderConstruction(name, replication, modificationTime,
               preferredBlockSize, blocks, permissionStatus, clientName,
               clientMachineName, datanodeID, id, pid);
+            clone.setStatusNoPersistance(inode.getStatus());
+            clone.setIsDeletedNoPersistance(inode.getIsDeleted());
 
     } else if (inode instanceof INodeFile) {
       clone = new INodeFile((INodeFile) inode);

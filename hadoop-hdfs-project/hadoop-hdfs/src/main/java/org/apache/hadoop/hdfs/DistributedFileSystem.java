@@ -1201,4 +1201,8 @@ public class DistributedFileSystem extends FileSystem {
   private void changeConf(String prop, String value) throws IOException {
     dfs.changeConf(Arrays.asList(prop), Arrays.asList(value));
   }
+  public boolean takeRootLevelSnapshot(String userName) throws IOException{
+      return dfs.takeRootLevelSnapshot(userName);
+  }
+  //STOP_HOP_CODE
 }

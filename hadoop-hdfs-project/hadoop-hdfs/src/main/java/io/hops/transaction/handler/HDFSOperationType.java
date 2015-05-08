@@ -163,6 +163,8 @@ public enum HDFSOperationType implements OperationType {
   GET_COMPLETE_BLOCKS_TOTAL,
   SET_GEN_STAMP,
   //ClusterInfos
+  GET_ROLLBACK_STATUS,SET_ROLLBACK_STATUS,
+  //ClusterInfos
   GET_CLUSTER_INFO,
   // NNStorage
   ADD_STORAGE_INFO,
@@ -172,6 +174,9 @@ public enum HDFSOperationType implements OperationType {
   GET_INODE,
   TO_XML_BLOCK_INFO,
   TO_XML_CORRUPT_BLOCK_INFO,
+  //Root Level Single Snapshot
+  GET_ROOT_BACKUP,LOCK_ROOT,
+    DELETE_SINGLE_SNAPSHOT,
   // TestNamenodePing
   COUNT_LEASE,
   // BLockManagerTestUtil

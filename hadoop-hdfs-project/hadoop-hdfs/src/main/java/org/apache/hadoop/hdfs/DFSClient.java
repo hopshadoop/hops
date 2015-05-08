@@ -3161,4 +3161,26 @@ public class DFSClient implements java.io.Closeable {
     }
     return null;
   }
+   
+    public boolean takeRootLevelSnapshot(final String userName) throws IOException {
+      ClientActionHandler handler = new ClientActionHandler() {
+            @Override
+            public Object doAction(ClientProtocol namenode) throws RemoteException, IOException {
+                return namenode.takeRootLevelSnapshot(userName);
+            }
+        };
+        return (Boolean) doClientActionWithRetry(handler, "takeRootLevelSnapshot");
+    }
+    
+    public void rollBack(final String userName) throws IOException {
+      ClientActionHandler handler = new ClientActionHandler() {
+            @Override
+            public Object doAction(ClientProtocol namenode) throws RemoteException, IOException {
+                 namenode.rollBack(userName);
+                 return null;
+            }
+        };
+         doClientActionWithRetry(handler, "rollBack");
+    }
+      
 }

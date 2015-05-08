@@ -220,7 +220,6 @@ public interface ClientProtocol {
    *     block replication factor.
    * @param blockSize
    *     maximum block size.
-   * @param codec
    *     name of the codec used for erasure coding. Use Codec.NO_ENCODING fo no
    *     encoding
    * @throws AccessControlException
@@ -1233,6 +1232,16 @@ public interface ClientProtocol {
    */
   public void cancelDelegationToken(Token<DelegationTokenIdentifier> token)
       throws IOException;
+  /**
+   * Takes a snap shot on root.Only one snapshot on root is allowed.
+     * @param userName, only specified users are allowed to take snapshot on root. Only one snapshot is allowed.
+     * @return true if taking snapshot at root succeeds else false.
+     * @throws java.io.IOException, Since only snapshot is allowed, if snapshot is already taken and a user who can take snapshot requests for 
+     * taking snapshot again, will be thrown SnapShotAlreadyTakenException.
+   */
+  public boolean takeRootLevelSnapshot(String userName) throws IOException;
+  
+  public void rollBack(String userName) throws IOException;
   
   /**
    * @return encryption key so a client can encrypt data sent via the

@@ -92,14 +92,7 @@ import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoUnderConstruction;
 import org.apache.hadoop.hdfs.server.blockmanagement.PendingBlockInfo;
 import org.apache.hadoop.hdfs.server.blockmanagement.ReplicaUnderConstruction;
-import org.apache.hadoop.hdfs.server.namenode.INode;
-import org.apache.hadoop.hdfs.server.namenode.INodeAttributes;
-import org.apache.hadoop.hdfs.server.namenode.INodeDirectory;
-import org.apache.hadoop.hdfs.server.namenode.INodeDirectoryWithQuota;
-import org.apache.hadoop.hdfs.server.namenode.INodeFile;
-import org.apache.hadoop.hdfs.server.namenode.INodeFileUnderConstruction;
-import org.apache.hadoop.hdfs.server.namenode.INodeSymlink;
-import org.apache.hadoop.hdfs.server.namenode.Lease;
+import org.apache.hadoop.hdfs.server.namenode.*;
 
 import java.io.File;
 import java.io.IOException;
@@ -206,6 +199,7 @@ public class HdfsStorageFactory {
     dataAccessAdaptors.put(INodeAttributesDataAccess.class,
         new INodeAttributeDALAdaptor((INodeAttributesDataAccess) getDataAccess(
             INodeAttributesDataAccess.class)));
+
   }
 
   private static ContextInitializer getContextInitializer() {

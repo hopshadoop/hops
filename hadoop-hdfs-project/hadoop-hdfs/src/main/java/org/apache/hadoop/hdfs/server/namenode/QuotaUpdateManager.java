@@ -30,6 +30,7 @@ import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.SubtreeLockHelper;
 import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLocks;
+import io.hops.metadata.hdfs.snapshots.SnapShotConstants;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -265,6 +266,16 @@ public class QuotaUpdateManager {
         if (dir != null && dir.isQuotaSet()) {
           INodeDirectoryWithQuota quotaDir = (INodeDirectoryWithQuota) dir;
           INodeAttributes attributes = quotaDir.getINodeAttributes();
+  //START ROOT_LEVEL_SNAPSHOT
+          /**
+           * Since the original quota values are changed in the INodeAttributes table for this directory with quota, we take a backup of that row.
+           */
+          if(namesystem.isSnapshotAtRootTaken()&&quotaDir.getStatus()!= SnapShotConstants.New&&attributes.getStatus()==SnapShotConstants.Original){
+              INodeAttributes backUpRecord = new INodeAttributes(-attributes.getInodeId(),  attributes.getNsQuota(),attributes.getNsCount(), attributes.getDsQuota(), attributes.getDiskspace(), SnapShotConstants.Original);
+              attributes.setStatus(SnapShotConstants.Modified);
+              EntityManager.add(backUpRecord);
+          }
+          //END ROOT_LEVEL_SNAPSHOT
           attributes.setNsCount(attributes.getNsCount() + namespaceDelta);
           attributes.setDiskspace(attributes.getDiskspace() + diskspaceDelta);
           LOG.debug("applying aggregated update for directory " + dir.getId() +

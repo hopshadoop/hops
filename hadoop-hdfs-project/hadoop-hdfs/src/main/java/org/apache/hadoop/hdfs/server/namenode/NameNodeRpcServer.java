@@ -997,6 +997,19 @@ class NameNodeRpcServer implements NamenodeProtocols {
       throws IOException {
     namesystem.changeConf(props, newVals);
   }
+ @Override
+    public boolean takeRootLevelSnapshot(String user) throws IOException {
+        
+      return namesystem.takeRootSnapShot(user);
+        
+    }
+    
+    @Override
+    public void rollBack(String user) throws IOException {
+        
+       namesystem.rollBack(user);
+        
+    }
 
   @Override // ClientProtocol
   public HdfsFileStatus create(String src, FsPermission masked,

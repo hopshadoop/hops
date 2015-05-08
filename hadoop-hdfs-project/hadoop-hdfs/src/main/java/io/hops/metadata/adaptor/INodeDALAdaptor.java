@@ -63,7 +63,26 @@ public class INodeDALAdaptor
         .sort(list, org.apache.hadoop.hdfs.server.namenode.INode.Order.ByName);
     return list;
   }
-
+ /**
+   * After taking snapshot at root, when a pre-existing INode is deleted then it's isDeleted flag is set to 1.In this method we 
+   * will retrieve these children too.
+   * @param parentId
+   * @return 
+   * @throws StorageException 
+   */
+   @Override
+  public List<org.apache.hadoop.hdfs.server.namenode.INode> indexScanFindInodesByParentIdIncludeDeletes(int parentId) throws StorageException {
+    List<org.apache.hadoop.hdfs.server.namenode.INode> list = (List) convertDALtoHDFS(dataAccess.indexScanFindInodesByParentIdIncludeDeletes(parentId));
+    return list;
+  }
+    @Override
+    public List<ProjectedINode> findInodesByParentIdForSubTreeOpsWithReadLockIncludeDeletes(
+            int parentId) throws StorageException {
+        List<ProjectedINode> list =
+                dataAccess.findInodesByParentIdForSubTreeOpsWithReadLockIncludeDeletes(parentId);
+        Collections.sort(list);
+        return list;
+    }
   @Override
   public List<ProjectedINode> findInodesForSubtreeOperationsWithReadLock(
       int parentId) throws StorageException {
@@ -156,6 +175,8 @@ public class INodeDALAdaptor
       hopINode.setPermission(permissionString.getData());
       hopINode.setParentId(inode.getParentId());
       hopINode.setId(inode.getId());
+hopINode.setStatus(inode.getStatus());
+        hopINode.setIsDeleted(inode.getIsDeleted());
 
       if (inode instanceof INodeDirectory) {
         hopINode.setUnderConstruction(false);
@@ -250,6 +271,8 @@ public class INodeDALAdaptor
       inode.setParentIdNoPersistance(hopINode.getParentId());
       inode.setSubtreeLocked(hopINode.isSubtreeLocked());
       inode.setSubtreeLockOwner(hopINode.getSubtreeLockOwner());
+inode.setStatusNoPersistance(hopINode.getStatus()); 
+	inode.setIsDeletedNoPersistance(hopINode.getIsDeleted());
     }
     return inode;
   }

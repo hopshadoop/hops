@@ -511,6 +511,21 @@ message ChangeConfProto {
 message ChangeConfResponseProto {
 }
 
+message TakeRootSnapshotRequestProto{
+required string user=1;
+}
+
+message TakeRootSnapshotResponseProto{
+required bool isSuccess=1;
+optional string errorMessage=2;
+}
+
+message RollBackRequestProto{
+required string user=1;
+}
+
+message RollBackResponseProto{
+}
 
 service ClientNamenodeProtocol {
   rpc getBlockLocations (GetBlockLocationsRequestProto) returns (GetBlockLocationsResponseProto);
@@ -565,4 +580,7 @@ service ClientNamenodeProtocol {
   rpc revokeEncoding (RevokeEncodingRequestProto) returns (RevokeEncodingResponseProto);
   rpc getRepairedBlockLocations (GetRepairedBlockLocationsRequsestProto) returns (GetRepairedBlockLocationsResponseProto);
   rpc changeConf (ChangeConfProto) returns (ChangeConfResponseProto);
+  rpc takeRootSnapshot(TakeRootSnapshotRequestProto) returns (TakeRootSnapshotResponseProto);
+  rpc rollBack(RollBackRequestProto) returns (RollBackResponseProto);
+  
 }

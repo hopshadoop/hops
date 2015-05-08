@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdfs.server.namenode;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Charsets;
 import com.google.common.collect.Lists;
 import io.hops.common.BlockIdGen;
 import io.hops.common.IDsMonitor;
@@ -50,6 +49,7 @@ import io.hops.transaction.lock.TransactionLockTypes.INodeLockType;
 import io.hops.transaction.lock.TransactionLockTypes.INodeResolveType;
 import io.hops.transaction.lock.TransactionLockTypes.LockType;
 import io.hops.transaction.lock.TransactionLocks;
+import io.hops.metadata.hdfs.snapshots.SnapShotConstants;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.HadoopIllegalArgumentException;
@@ -132,20 +132,15 @@ import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.VersionInfo;
 import org.mortbay.util.ajax.JSON;
 
+
 import javax.management.NotCompliantMBeanException;
 import javax.management.ObjectName;
 import javax.management.StandardMBean;
-import java.io.BufferedWriter;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.lang.management.ManagementFactory;
 import java.net.InetAddress;
 import java.util.ArrayList;
@@ -381,11 +376,17 @@ public class FSNamesystem
   private NameNode nameNode;
   private final Configuration conf;
   private final QuotaUpdateManager quotaUpdateManager;
+  private final RollBackManager rollBackManager;
   private final boolean legacyDeleteEnabled;
   private final boolean legacyRenameEnabled;
   private final boolean legacyContentSummaryEnabled;
   private final boolean legacySetQuotaEnabled;
-
+    //START_ROOT_LEVEL_SNAPSHOT
+    private boolean isSnapshotAtRootTaken = false;
+ public boolean isSnapshotAtRootTaken() {
+        return isSnapshotAtRootTaken;
+    }
+    //END_ROOT_LEVEL_SNAPSHOT 
   private final ExecutorService subtreeOperationsExecutor;
   private final boolean erasureCodingEnabled;
   private final ErasureCodingManager erasureCodingManager;
@@ -475,6 +476,7 @@ public class FSNamesystem
       blockManager.setBlockPoolId(blockPoolId);
       hopSpecificInitialization(conf);
       this.quotaUpdateManager = new QuotaUpdateManager(this, conf);
+  this.rollBackManager = new RollBackManager(this);
       legacyDeleteEnabled = conf.getBoolean(DFS_LEGACY_DELETE_ENABLE_KEY,
           DFS_LEGACY_DELETE_ENABLE_DEFAULT);
       legacyRenameEnabled = conf.getBoolean(DFS_LEGACY_RENAME_ENABLE_KEY,
@@ -633,7 +635,7 @@ public class FSNamesystem
     if (dir.isQuotaEnabled()) {
       quotaUpdateManager.activate();
     }
-    
+    rollBackManager.checkAndStartRollBack();
     registerMXBean();
     DefaultMetricsSystem.instance().register(this);
   }
@@ -1665,6 +1667,21 @@ public class FSNamesystem
   LocatedBlock prepareFileForWrite(String src, INodeFile file,
       String leaseHolder, String clientMachine, DatanodeDescriptor clientNode)
       throws IOException, StorageException {
+//START ROOT_LEVEL_SNAPSHOT
+        if (isSnapshotAtRootTaken()) {
+            if (file.getStatus() == SnapShotConstants.Original) {
+                //Create new inode row with id=-(file.id) and parent_id=-(file.parentId)
+                INodeFile inodeRecordTobeSaved = new INodeFile(file);
+                inodeRecordTobeSaved.setIdNoPersistance(-file.getId());
+                inodeRecordTobeSaved.setParentIdNoPersistance(-file.getParentId());
+                //Set the status of original record to modified.                
+                file.setStatusNoPersistance(SnapShotConstants.Modified);
+                //Add the new record and update the original record.
+                EntityManager.add(inodeRecordTobeSaved);
+                EntityManager.update(file);
+            }
+        }
+        //END ROOT_LEVEL_SNAPSHOT
     INodeFileUnderConstruction cons =
         file.convertToUnderConstruction(leaseHolder, clientMachine, clientNode);
     leaseManager.addLease(cons.getClientName(), src);
@@ -2944,6 +2961,14 @@ public class FSNamesystem
         }
         INodeFileUnderConstruction pendingFile = checkLease(src, clientName);
         if (lastBlockLength > 0) {
+  //START ROOT_LEVEL_SNAPSHOT
+                      //pendingFile.updateLengthOfLastBlock(lastBlockLength);
+                        if (isSnapshotAtRootTaken()) {
+                            pendingFile.updateLengthOfLastBlock(lastBlockLength, true);
+                        } else {
+                            pendingFile.updateLengthOfLastBlock(lastBlockLength, false);
+                        }
+                        //END ROOT_LEVEL_SNAPSHOTs
           pendingFile.updateLengthOfLastBlock(lastBlockLength);
         }
         dir.persistBlocks(src, pendingFile);
@@ -3128,6 +3153,20 @@ public class FSNamesystem
       throws IOException, UnresolvedLinkException, StorageException {
     leaseManager.removeLease(pendingFile.getClientName(), src);
 
+        //START ROOT_LEVEL_SNAPSHOT
+        //If SnapShot was taken while file is underConstruction.We want to save the state[e.g modification time, which will be changed after InodeFileUnderConstruction is changed to InodeFile].
+        if (isSnapshotAtRootTaken()) {
+            if (pendingFile.getStatus() == SnapShotConstants.Original) {
+                LOG.debug("Finalize InodeFileUnderConstruction.PendingFile Status = 0");
+                INodeFile temp = new INodeFile(pendingFile);
+                temp.setIdNoPersistance(-pendingFile.getId());
+                temp.setParentIdNoPersistance(-pendingFile.getParentId());
+                EntityManager.add(temp);
+                pendingFile.setStatusNoPersistance(SnapShotConstants.Modified);
+
+            }
+        }
+        //END ROOT_LEVEL_SNAPSHOT
     // The file is no longer pending.
     // Create permanent INode, update blocks
     INodeFile newFile = pendingFile.convertToInodeFile();
@@ -3420,7 +3459,29 @@ public class FSNamesystem
   boolean nameNodeHasResourcesAvailable() {
     return hasResourcesAvailable;
   }
+//START ROOT_LEVEL_SNAPSHOT
+    boolean takeRootSnapShot(String user) {
+        if (!isSnapshotAtRootTaken) {
+            return isSnapshotAtRootTaken = true;
 
+        } else {
+            //Acually has to throw snapShotAlreadyTaken Exception, but now returning false.
+            return false;
+        }
+
+    }
+    
+    void rollBack(String user) throws IOException{
+        if(isLeader()){
+            if(isSnapshotAtRootTaken){
+               rollBackManager.processRollBack();
+                
+            }else{
+                //throw Exception("RollBacking withOut taking Snapshot"); 
+            }
+        }
+    }
+//END ROOT_LEVEL_SNAPSHOT
   /**
    * Periodically calls hasAvailableResources of NameNodeResourceChecker, and
    * if
@@ -6126,6 +6187,7 @@ public class FSNamesystem
 
   private boolean multiTransactionalDeleteInternal(final String path,
       final boolean recursive) throws IOException {
+ boolean snapshotOnRootTaken = isSnapshotAtRootTaken();
     if (isInSafeMode()) {
       throw new SafeModeException("Cannot delete " + path, safeMode);
     }
@@ -6161,15 +6223,86 @@ public class FSNamesystem
         throw new IOException(path + " is non empty");
       }
 
-      for (int i = fileTree.getHeight(); i > 0; i--) {
-        if (deleteTreeLevel(path, fileTree, i) == false) {
-          return false;
-        }
-      }
+     if (snapshotOnRootTaken) {
+                /* Even if the directory created after taking snapshot, it is not deleted permanently because it may have some 
+                 * directories/files moved into it(which are existing before snapshot).
+                 *1.Quota is Not updated. since this subtree still occupies the space.
+                 *2.Just the isDeleted flag is set to 1.
+                 * */
+         HopsTransactionalRequestHandler deleteHanlder = new HopsTransactionalRequestHandler(HDFSOperationType.DELETE_SINGLE_SNAPSHOT, path) {
+
+                    @Override
+                    public void acquireLock(TransactionLocks locks) throws  IOException {
+
+                        LockFactory lf = LockFactory.getInstance();
+                        locks.add(lf.getINodeLock(nameNode, INodeLockType.WRITE_ON_TARGET_AND_PARENT,
+                                INodeResolveType.PATH, false, path))
+                                .add(lf.getLeaseLock(LockType.WRITE))
+                                .add(lf.getLeasePathLock(LockType.WRITE))
+                                .add(lf.getBlockLock()).add(
+                                lf.getBlockRelated(BLK.RE, BLK.CR, BLK.UC, BLK.UR, BLK.PE,
+                                        BLK.IV));
+                        locks.add(lf.getQuotaUpdateLock(true, path));/*This quota lock is necessary??*/
+
+                    }
+
+                    @Override
+                    public Object performTask() throws UnresolvedLinkException,IOException {
+                        String src = dir.normalizePath(path);
+
+                        INode[] inodes = dir.getRootDir().getExistingPathINodes(src, false);
+                        INode targetNode = inodes[inodes.length - 1];
+                        targetNode.setIsDeletedNoPersistance(SnapShotConstants.isDeleted);
+                        targetNode.setSubtreeLocked(false);
+                        targetNode.setSubtreeLockOwner(0);
+                        EntityManager.update(targetNode);
+                         // set the parent's modification time
+                        int pos = inodes.length-1;
+                        if (inodes[pos - 1].getStatus() == SnapShotConstants.Original) {
+                            INode backUpRecord;
+
+                            if (inodes[pos - 1] instanceof INodeDirectoryWithQuota) {
+                                INodeDirectoryWithQuota quotaNode = (INodeDirectoryWithQuota) inodes[pos - 1];
+                                backUpRecord = new INodeDirectoryWithQuota(quotaNode.getNsQuota(),quotaNode.getDsQuota(),quotaNode);
+                            } else {
+                                backUpRecord = new INodeDirectory((INodeDirectory)inodes[pos - 1]);
+                            }
+
+                            backUpRecord.setIdNoPersistance(-inodes[pos - 1].getId());
+                            backUpRecord.setParentIdNoPersistance(-inodes[pos - 1].getParentId());
+                            inodes[pos - 1].setStatusNoPersistance(SnapShotConstants.Modified);
+                            inodes[pos - 1].setModificationTimeNoPersistance(System.currentTimeMillis());
+                            EntityManager.update(inodes[pos - 1]);
+                            EntityManager.add(backUpRecord);
+
+                        } else {
+                            inodes[pos - 1].setModificationTime(System.currentTimeMillis());
+                        }
+
+
+                        return new Object();
+                    }
+                };
+
+                deleteHanlder.handle(this);
+            } else {
+                for (int i = fileTree.getHeight(); i > 0; i--) {
+                    if (deleteTreeLevel(path, fileTree, i) == false) {
+                        return false;
+                    }
+                }
+
+            }
+
     } finally {
       unlockSubtree(path);
     }
-    return true;
+    if(!snapshotOnRootTaken){
+                //For the case of snapshotOnRootTaken, we unlockSubtree in the code above. 
+                //That is because,after we set isDeleted=1, we will not get children with isDeleted=1, when we call findInodeByNameAndParentId or findInodesByParentId.
+                 unlockSubtree(path);
+            }
+      return  true;
   }
 
   private boolean deleteTreeLevel(final String subtreeRootPath,

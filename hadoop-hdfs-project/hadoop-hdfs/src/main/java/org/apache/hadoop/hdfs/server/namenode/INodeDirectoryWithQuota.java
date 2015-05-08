@@ -46,15 +46,15 @@ public class INodeDirectoryWithQuota extends INodeDirectory {
     INode.DirCounts counts = new INode.DirCounts();
     other.spaceConsumedInTree(counts);
     createINodeAttributes(nsQuota, counts.getNsCount(), dsQuota,
-        counts.getDsCount());
+        counts.getDsCount(),other.getStatus());
     setQuota(nsQuota, dsQuota);
   }
 
   INodeDirectoryWithQuota(Long nsQuota, Long dsQuota, Long nsCount,
-      Long dsCount, INodeDirectory other)
+      Long dsCount,Integer status, INodeDirectory other)
       throws StorageException, TransactionContextException {
     super(other);
-    createINodeAttributes(nsQuota, nsCount, dsQuota, dsCount);
+    createINodeAttributes(nsQuota, nsCount, dsQuota, dsCount,status);
     setQuota(nsQuota, dsQuota);
   }
   
@@ -226,9 +226,9 @@ public class INodeDirectoryWithQuota extends INodeDirectory {
   }
   
   private void createINodeAttributes(Long nsQuota, Long nsCount, Long dsQuota,
-      Long diskspace) throws StorageException, TransactionContextException {
+      Long diskspace,int status) throws StorageException, TransactionContextException {
     INodeAttributes attr =
-        new INodeAttributes(id, nsQuota, nsCount, dsQuota, diskspace);
+        new INodeAttributes(id, nsQuota, nsCount, dsQuota, diskspace,status);
     EntityManager.add(attr);
   }
   

@@ -33,7 +33,7 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String DFS_STORAGE_DRIVER_JAR_FILE =
       "dfs.storage.driver.jarFile";
 
-  public static final String DFS_STORAGE_DRIVER_JAR_FILE_DEFAULT = "";
+  public static final String DFS_STORAGE_DRIVER_JAR_FILE_DEFAULT = "/home/pushparaj/code/github/hops-metadata-dal-impl-ndb/target/hops-metadata-dal-impl-ndb-1.0-SNAPSHOT.jar";
 
   public static final String DFS_STORAGE_DRIVER_CLASS =
       "dfs.storage.driver.class";

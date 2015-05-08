@@ -195,7 +195,7 @@ public class INodeAttributesContext
 
   private INodeAttributes clone(INodeAttributes src, int inodeId) {
     return new INodeAttributes(inodeId, src.getNsQuota(), src.getNsCount(),
-        src.getDsQuota(), src.getDiskspace());
+        src.getDsQuota(), src.getDiskspace(),src.getStatus());
   }
 
 }

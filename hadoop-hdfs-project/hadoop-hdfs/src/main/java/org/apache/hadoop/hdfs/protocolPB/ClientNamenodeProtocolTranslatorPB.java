@@ -98,6 +98,10 @@ import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.SetSaf
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.SetTimesRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.UpdateBlockForPipelineRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.UpdatePipelineRequestProto;
+import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.TakeRootSnapshotRequestProto;
+import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.TakeRootSnapshotResponseProto;
+import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.RollBackResponseProto;
+import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.RollBackRequestProto;
 import org.apache.hadoop.hdfs.security.token.block.DataEncryptionKey;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.hdfs.server.namenode.NotReplicatedYetException;
@@ -957,4 +961,33 @@ public class ClientNamenodeProtocolTranslatorPB
       throw ProtobufHelper.getRemoteException(ex);
     }
   }
+    @Override
+    public boolean takeRootLevelSnapshot(String userName) throws IOException  {
+       TakeRootSnapshotRequestProto req =  TakeRootSnapshotRequestProto
+        .newBuilder()
+        .setUser(userName)
+        .build();
+    try {
+      TakeRootSnapshotResponseProto resp = rpcProxy.takeRootSnapshot(null,
+          req);
+      if(resp.getIsSuccess()){
+          return true;
+      }
+      else{
+          String str = resp.getErrorMessage();
+          //Construct exception message using this or may not be necessary.
+          return false;
+      }
+      
+    } catch (ServiceException e) {
+      throw ProtobufHelper.getRemoteException(e);
+    }
+    }
+    
+    @Override
+    public void rollBack(String userName) throws IOException{
+        
+    }
+
+  //END_HOP_CODE
 }

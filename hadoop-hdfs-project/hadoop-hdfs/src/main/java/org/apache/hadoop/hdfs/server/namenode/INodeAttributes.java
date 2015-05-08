@@ -56,9 +56,10 @@ public class INodeAttributes {
   private Long nsCount;
   private Long dsQuota; /// disk space quota
   private Long diskspace;
+  private Integer status;//To indicate whether Quota has been changed ot not.
 
   public INodeAttributes(Integer inodeId, Long nsQuota, Long nsCount,
-      Long dsQuota, Long diskspace) {
+      Long dsQuota, Long diskspace,Integer status) {
     this.inodeId = inodeId;
     if (nsQuota != null) {
       this.nsQuota = nsQuota;
@@ -82,6 +83,7 @@ public class INodeAttributes {
           "default value for diskspace is not defined");
     }
 
+    this.status = status;
   }
 
   public Integer getInodeId() {
@@ -103,7 +105,9 @@ public class INodeAttributes {
   public Long getDiskspace() {
     return diskspace;
   }
-
+public Integer getStatus() {
+    return status;
+  }
   public void setInodeId(Integer inodeId)
       throws StorageException, TransactionContextException {
     setInodeIdNoPersistance(inodeId);
@@ -134,6 +138,11 @@ public class INodeAttributes {
     saveAttributes();
   }
 
+  public void setStatus(Integer status) throws  StorageException, TransactionContextException {
+    setStatusNoPersistance(status);
+    saveAttributes();
+  }
+  
   public void setNsQuotaNoPersistance(Long nsQuota) {
     this.nsQuota = nsQuota;
   }
@@ -153,7 +162,9 @@ public class INodeAttributes {
   public void setInodeIdNoPersistance(Integer inodeId) {
     this.inodeId = inodeId;
   }
-
+public void setStatusNoPersistance(Integer status) {
+    this.status = status;
+  }
   protected void saveAttributes()
       throws StorageException, TransactionContextException {
     EntityManager.update(this);

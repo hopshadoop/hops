@@ -19,11 +19,7 @@ import io.hops.common.CountersQueue;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.leaderElection.VarsRegister;
-import io.hops.metadata.common.entity.ArrayVariable;
-import io.hops.metadata.common.entity.ByteArrayVariable;
-import io.hops.metadata.common.entity.IntVariable;
-import io.hops.metadata.common.entity.LongVariable;
-import io.hops.metadata.common.entity.Variable;
+import io.hops.metadata.common.entity.*;
 import io.hops.metadata.hdfs.dal.VariableDataAccess;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
@@ -251,8 +247,49 @@ public class HdfsVariables {
       throws StorageException, TransactionContextException {
     Variables.updateVariable(new IntVariable(Variable.Finder.SIdCounter, sid));
   }
+ public static long getMaxNNID()throws StorageException, TransactionContextException {
+      return (Long) Variables.getVariable(Variable.Finder.MaxNNID).getValue();
+  }
   
-  private static Map<Integer, BlockKey> getAllBlockTokenKeys(boolean useKeyId,
+  public static void setMaxNNID(long val) throws StorageException, TransactionContextException {
+      Variables.updateVariable(new LongVariable(Variable.Finder.MaxNNID, val));
+  }
+
+    public static String getRollBackStatus() throws StorageException, TransactionContextException {
+        return (String) Variables.getVariable(Variable.Finder.RollBackStatus).getValue();
+    }
+
+    public static void setRollBackStatus(String status)  throws StorageException, TransactionContextException {
+
+        Variables.updateVariable(new  StringVariable(Variable.Finder.RollBackStatus, status));
+    }
+
+    public static String getRollBackStatus2()  throws IOException {
+        return (String) new LightWeightRequestHandler(HDFSOperationType.GET_ROLLBACK_STATUS) {
+            @Override
+            public Object performTask() throws  IOException {
+                VariableDataAccess vd = (VariableDataAccess) HdfsStorageFactory.getDataAccess(VariableDataAccess.class);
+                HdfsStorageFactory.getConnector().readCommitted();
+                return  ((StringVariable) vd.getVariable(Variable.Finder.RollBackStatus)).getValue();
+            }
+        }.handle();
+
+    }
+
+    public static boolean setRollBackStatus2(final String status)  throws IOException {
+        return (Boolean) new LightWeightRequestHandler(HDFSOperationType.SET_ROLLBACK_STATUS) {
+            @Override
+            public Object performTask() throws  IOException {
+                VariableDataAccess vd = (VariableDataAccess) HdfsStorageFactory.getDataAccess(VariableDataAccess.class);
+                HdfsStorageFactory.getConnector().writeLock();
+                vd.setVariable(new StringVariable(Variable.Finder.RollBackStatus, status));
+                return true;
+            }
+        }.handle();
+
+    }
+
+    private static Map<Integer, BlockKey> getAllBlockTokenKeys(boolean useKeyId,
       boolean leightWeight) throws IOException {
     List<Variable> vars = (List<Variable>) (leightWeight ?
         getVariableLightWeight(Variable.Finder.BlockTokenKeys).getValue() :
@@ -306,7 +343,6 @@ public class HdfsVariables {
       }
     }.handle();
   }
-  
   public static void registerDefaultValues() {
     Variable.registerVariableDefaultValue(Variable.Finder.BlockID,
         new LongVariable(0).getBytes());
@@ -327,5 +363,7 @@ public class HdfsVariables {
     VarsRegister.registerHdfsDefaultValues();
     // This is a workaround that is needed until HA-YARN has its own format command
     VarsRegister.registerYarnDefaultValues();
+      Variable.registerVariableDefaultValue(Variable.Finder.RollBackStatus,new StringVariable(Variable.Finder.RollBackStatus,"NOT_STARTED").getBytes());
   }
+
 }

@@ -100,8 +100,30 @@ abstract class AbstractFileTree {
               INodeDataAccess<INode> dataAccess =
                   (INodeDataAccess) HdfsStorageFactory
                       .getDataAccess(INodeDataAccess.class);
-              List<ProjectedINode> children = dataAccess
-                  .findInodesForSubtreeOperationsWithReadLock(parentId);
+
+                //START ROOT_LEVEL_SNAPSHOT
+             /*
+               * The semantics of space calculations after taking snapshot are
+               * Consider /A/B/C and /A/D/C
+               * 1. If we B is deleted, then the subtree under B is included in NSQuota and DSQuota for /(Root) and A.
+               * 2. If C is moved to D,i.e, by overwriting the file C. Then C is included in NSQuota, DSQuota of {/,A,D}.
+               *  2.1 The NSQuota of B is decreased by 1 and DSQuota is decreased by the size of C.
+               *  2.2 The NSQUota of D is increased by 1 and DAQuota is increased by the size of C.
+               *  2.3 Similary if C is directory(over-writing an non-empty directory is not allowed), then
+               *     2.3.1 The NSQuota of B is decreased by NSQuota of C and DSQuota of B is decreased by the size(DSQuota) of subtree at C.
+               *     2.3.2 The NSQUota of D is increased by NSQuota of C and DAQuota is increased by the the size(DSQuota) of subtree at C.
+               */
+
+                //END ROOT_LELEVL_SNAPSHOT
+                List<ProjectedINode> children;
+                if(namesystem.isSnapshotAtRootTaken()&&(AbstractFileTree.this instanceof CountingFileTree)){
+                    children = dataAccess.findInodesByParentIdForSubTreeOpsWithReadLockIncludeDeletes(parentId);
+                }else{
+                    children= dataAccess
+                            .findInodesForSubtreeOperationsWithReadLock(parentId);
+                }
+
+
               for (ProjectedINode child : children) {
                 if (namesystem.isPermissionEnabled() && subAccess != null) {
                   checkAccess(child, subAccess);
@@ -249,7 +271,7 @@ abstract class AbstractFileTree {
                 subtreeRoot instanceof INodeDirectoryWithQuota ? true : false,
                 subtreeRoot.isUnderConstruction(),
                 subtreeRoot.isSubtreeLocked(),
-                subtreeRoot.getSubtreeLockOwner()));
+                subtreeRoot.getSubtreeLockOwner(),subtreeRoot.getStatus(),subtreeRoot.getIsDeleted()));
         return subtreeRoot;
       }
     }.handle(this);

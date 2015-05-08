@@ -113,6 +113,8 @@ import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.Update
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.UpdateBlockForPipelineResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.UpdatePipelineRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.UpdatePipelineResponseProto;
+
+
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.DatanodeIDProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.DatanodeInfoProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.LocatedBlockProto;
@@ -996,4 +998,29 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
     }
   }
 
+    @Override
+    public ClientNamenodeProtocolProtos.TakeRootSnapshotResponseProto takeRootSnapshot(RpcController controller, ClientNamenodeProtocolProtos.TakeRootSnapshotRequestProto request) throws ServiceException {
+        boolean isSuccess=false;
+        try {
+     isSuccess =server.takeRootLevelSnapshot(request.getUser());
+    } catch (IOException e) {
+      throw new ServiceException(e);
+    }
+     ClientNamenodeProtocolProtos.TakeRootSnapshotResponseProto.Builder resp=  ClientNamenodeProtocolProtos.TakeRootSnapshotResponseProto.newBuilder();
+     resp.setIsSuccess(isSuccess);
+     return resp.build();
+    }
+    
+    @Override
+    public ClientNamenodeProtocolProtos.RollBackResponseProto rollBack(RpcController controller, ClientNamenodeProtocolProtos.RollBackRequestProto request) throws ServiceException {
+
+        try {
+            server.rollBack(request.getUser());
+        } catch (IOException e) {
+            throw new ServiceException(e);
+        }
+
+        ClientNamenodeProtocolProtos.RollBackResponseProto.Builder resp = ClientNamenodeProtocolProtos.RollBackResponseProto.newBuilder();
+        return resp.build();
+    }
 }

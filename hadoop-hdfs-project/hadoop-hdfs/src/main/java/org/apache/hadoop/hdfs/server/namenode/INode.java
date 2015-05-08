@@ -25,6 +25,7 @@ import io.hops.exception.TransactionContextException;
 import io.hops.metadata.common.FinderType;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
 import io.hops.transaction.EntityManager;
+import io.hops.metadata.hdfs.snapshots.SnapShotConstants;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.Path;
@@ -41,6 +42,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
 
 /**
  * We keep an in-memory representation of the file/block hierarchy.
@@ -119,7 +121,11 @@ public abstract class INode implements Comparable<byte[]> {
   protected long modificationTime;
   protected long accessTime;
   
-
+//START_HOP_CODE
+  //START_ROOT_LEVEL_SNAPSHOT
+  protected int status=SnapShotConstants.Original;
+  protected int isDeleted;
+  //END_ROOT_LEVRL_SNAPSHOT
   public static final int NON_EXISTING_ID = 0;
   protected int id = NON_EXISTING_ID;
   protected int parentId = NON_EXISTING_ID;
@@ -207,6 +213,12 @@ public abstract class INode implements Comparable<byte[]> {
 
     this.parentId = other.getParentId();
     this.id = other.getId();
+    
+    //START ROOT_LEVEL_SNAPSHOT
+    this.status = other.status;
+    this.isDeleted = other.isDeleted;
+   //END ROOT_LEVEL_SNAPSHOT
+  
   }
 
   /**
@@ -617,6 +629,22 @@ public abstract class INode implements Comparable<byte[]> {
     return parentId + name;
   }
 
+  public int getStatus(){
+      return status;
+  }
+
+  public void setStatusNoPersistance(int status){
+      this.status = status;
+  }
+  
+  public int getIsDeleted(){
+      return isDeleted;
+  }
+  
+  public void setIsDeletedNoPersistance(int isDeleted){
+      this.isDeleted= isDeleted;
+  }
+  
   public String nameParentKey() {
     return nameParentKey(parentId, getLocalName());
   }

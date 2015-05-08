@@ -19,6 +19,8 @@ package org.apache.hadoop.hdfs.server.namenode;
 
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
+import io.hops.metadata.hdfs.snapshots.SnapShotConstants;
+import io.hops.transaction.EntityManager;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.protocol.Block;
@@ -193,7 +195,36 @@ public class INodeFileUnderConstruction extends INodeFile
             " is not a BlockInfoUnderConstruction when updating its length";
     lastBlock.setNumBytes(lastBlockLength);
   }
+ //START ROOT_LEVEL_SNAPSHOT
+    /**
+     * Update the length for the last block
+     *
+     * @param lastBlockLength The length of the last block reported from client
+     * @throws IOException
+     */
+    void updateLengthOfLastBlock(long lastBlockLength, boolean isSnapshotAtRootTaken) throws IOException{
+        BlockInfo lastBlock = this.getLastBlock();
+        assert (lastBlock != null) : "The last block for path "
+                + this.getFullPathName() + " is null when updating its length";
+        assert (lastBlock instanceof BlockInfoUnderConstruction) : "The last block for path "
+                + this.getFullPathName()
+                + " is not a BlockInfoUnderConstruction when updating its length";
 
+        if (isSnapshotAtRootTaken ) {
+            if(lastBlock.getStatus()==SnapShotConstants.Original){
+                //Snapshot was taken while writing to block is in progress.
+                BlockInfo temp = new BlockInfo(lastBlock,lastBlock.getInodeId());
+            temp.setINodeId(-temp.getInodeId());
+                EntityManager.add(temp);
+                lastBlock.setStatusNoPersistance(SnapShotConstants.Modified);
+            }
+            
+        }
+        
+            lastBlock.setNumBytes(lastBlockLength);
+        
+    }
+  //END ROOT_LEVEL_SNAPSHOT
 
   public void removeBlock(BlockInfo block)
       throws StorageException, TransactionContextException {

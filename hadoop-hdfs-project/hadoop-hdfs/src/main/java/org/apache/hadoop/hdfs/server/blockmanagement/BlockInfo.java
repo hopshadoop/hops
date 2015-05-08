@@ -22,6 +22,7 @@ import io.hops.metadata.common.FinderType;
 import io.hops.metadata.hdfs.entity.IndexedReplica;
 import io.hops.metadata.hdfs.entity.Replica;
 import io.hops.transaction.EntityManager;
+import io.hops.metadata.hdfs.snapshots.SnapShotConstants;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.BlockUCState;
@@ -139,6 +140,9 @@ public class BlockInfo extends Block {
   private BlockCollection bc;
   private int blockIndex = -1;
   private long timestamp = 1;
+  //START ROOT_LEVEL_SNAPSHOT
+  protected int status=SnapShotConstants.Original;  
+  //END ROOT_LEVEL_SNAPSHOT
   
   protected int inodeId = INode.NON_EXISTING_ID;
   
@@ -149,7 +153,11 @@ public class BlockInfo extends Block {
       this.bc = ((BlockInfo) blk).bc;
       this.blockIndex = ((BlockInfo) blk).blockIndex;
       this.timestamp = ((BlockInfo) blk).timestamp;
-      if (inodeId != ((BlockInfo) blk).inodeId) {
+      //START ROOT_LEVEL_SNAPSHOT
+      this.status=((BlockInfo) blk).status;
+      //END ROOT_LEVEL_SNAPSHOT
+      if(inodeId != ((BlockInfo) blk).inodeId)
+      {
         throw new IllegalArgumentException("inodeId does not match");
       }
     }
@@ -171,6 +179,9 @@ public class BlockInfo extends Block {
     this.blockIndex = from.blockIndex;
     this.timestamp = from.timestamp;
     this.inodeId = from.inodeId;
+    //START ROOT_LEVEL_SNAPSHOT
+    this.status = from.status;
+    //END_ROOT_LEVEL_SNAPSHOT
   }
   
   public BlockCollection getBlockCollection()
@@ -339,6 +350,15 @@ public class BlockInfo extends Block {
     return ucBlock;
   }
   
+  //START ROOT_LEVEL_SNAPSHOT
+  
+  public int getStatus(){
+      return status;
+  }
+  public void setStatusNoPersistance(int sts){
+      this.status=sts;
+  }
+  //END START ROOT_LEVEL_SNAPSHOT
   public int getInodeId() {
     return inodeId;
   }

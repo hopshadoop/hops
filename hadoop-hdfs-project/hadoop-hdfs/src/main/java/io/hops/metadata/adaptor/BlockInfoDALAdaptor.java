@@ -115,7 +115,7 @@ public class BlockInfoDALAdaptor extends
           new BlockInfo(hdfsClass.getBlockId(), hdfsClass.getBlockIndex(),
               hdfsClass.getInodeId(), hdfsClass.getNumBytes(),
               hdfsClass.getGenerationStamp(),
-              hdfsClass.getBlockUCState().ordinal(), hdfsClass.getTimestamp());
+              hdfsClass.getBlockUCState().ordinal(), hdfsClass.getTimestamp(),hdfsClass.getStatus());
       if (hdfsClass instanceof BlockInfoUnderConstruction) {
         BlockInfoUnderConstruction ucBlock =
             (BlockInfoUnderConstruction) hdfsClass;
@@ -153,6 +153,7 @@ public class BlockInfoDALAdaptor extends
                 dalClass.getInodeId());
       }
 
+	   blockInfo.setStatusNoPersistance(dalClass.getStatus());
       blockInfo.setINodeIdNoPersistance(dalClass.getInodeId());
       blockInfo.setTimestampNoPersistance(dalClass.getTimeStamp());
       blockInfo.setBlockIndexNoPersistance(dalClass.getBlockIndex());
