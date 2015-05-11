@@ -228,9 +228,9 @@ public class TestLocalResourcesTrackerImpl {
     }
   }
 
-  @Test(timeout = 1000)
+  @Test(timeout = 10000)
   @SuppressWarnings("unchecked")
-  public void testLocalResourceCache() {
+  public void testLocalResourceCache() throws InterruptedException {
     String user = "testuser";
     DrainDispatcher dispatcher = null;
     try {
@@ -268,7 +268,9 @@ public class TestLocalResourcesTrackerImpl {
 
       // Container-1 requesting local resource.
       tracker.handle(reqEvent1);
-
+      //leting the time to all the event triggered by the handler to be handle
+      Thread.sleep(1000);
+      
       // New localized Resource should have been added to local resource map
       // and the requesting container will be added to its waiting queue.
       Assert.assertEquals(1, localrsrc.size());
@@ -284,7 +286,9 @@ public class TestLocalResourcesTrackerImpl {
       ResourceEvent reqEvent2 =
           new ResourceRequestEvent(lr, LocalResourceVisibility.PRIVATE, lc2);
       tracker.handle(reqEvent2);
-
+      //leting the time to all the event trigered by the handler to be handle
+      Thread.sleep(1000);
+      
       // Container 2 should have been added to the waiting queue of the local
       // resource
       Assert.assertEquals(2, localrsrc.get(lr).getRefCount());
@@ -300,7 +304,9 @@ public class TestLocalResourcesTrackerImpl {
       LocalizedResource localizedResource = localrsrc.get(lr);
       
       tracker.handle(resourceFailedEvent);
-
+      //leting the time to all the event trigered by the handler to be handle
+      Thread.sleep(1000);
+      
       // After receiving failed resource event; all waiting containers will be
       // notified with Container Resource Failed Event.
       Assert.assertEquals(0, localrsrc.size());
@@ -313,7 +319,9 @@ public class TestLocalResourcesTrackerImpl {
       // exception.
       ResourceReleaseEvent relEvent1 = new ResourceReleaseEvent(lr, cId1);
       tracker.handle(relEvent1);
-
+      //leting the time to all the event trigered by the handler to be handle
+      Thread.sleep(1000);
+      
       // Container-3 now requests for the same resource. This request call
       // is coming prior to Container-2's release call.
       ContainerId cId3 = BuilderUtils.newContainerId(1, 1, 1, 3);
@@ -321,7 +329,9 @@ public class TestLocalResourcesTrackerImpl {
       ResourceEvent reqEvent3 =
           new ResourceRequestEvent(lr, LocalResourceVisibility.PRIVATE, lc3);
       tracker.handle(reqEvent3);
-
+      //leting the time to all the event trigered by the handler to be handle
+      Thread.sleep(1000);
+      
       // Local resource cache now should have the requested resource and the
       // number of waiting containers should be 1.
       Assert.assertEquals(1, localrsrc.size());
@@ -332,7 +342,9 @@ public class TestLocalResourcesTrackerImpl {
       // Container-2 Releases the resource
       ResourceReleaseEvent relEvent2 = new ResourceReleaseEvent(lr, cId2);
       tracker.handle(relEvent2);
-
+      //leting the time to all the event trigered by the handler to be handle
+      Thread.sleep(1000);
+      
       // Making sure that there is no change in the cache after the release.
       Assert.assertEquals(1, localrsrc.size());
       Assert.assertTrue(localrsrc.containsKey(lr));
@@ -345,6 +357,8 @@ public class TestLocalResourcesTrackerImpl {
       ResourceLocalizedEvent localizedEvent =
           new ResourceLocalizedEvent(lr, localizedPath, 123L);
       tracker.handle(localizedEvent);
+      //leting the time to all the event trigered by the handler to be handle
+      Thread.sleep(1000);
       
       // Verifying ContainerResourceLocalizedEvent .
       verify(containerEventHandler, times(1))
@@ -356,6 +370,8 @@ public class TestLocalResourcesTrackerImpl {
       // Container-3 releasing the resource.
       ResourceReleaseEvent relEvent3 = new ResourceReleaseEvent(lr, cId3);
       tracker.handle(relEvent3);
+      //leting the time to all the event trigered by the handler to be handle
+      Thread.sleep(1000);
       
       Assert.assertEquals(0, localrsrc.get(lr).getRefCount());
       
