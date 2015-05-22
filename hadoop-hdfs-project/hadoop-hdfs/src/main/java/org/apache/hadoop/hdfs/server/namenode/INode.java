@@ -59,6 +59,7 @@ public abstract class INode implements Comparable<byte[]> {
     ByINodeId,
     ByParentId,
     ByNameAndParentId,
+    ByNamesAndParentIdsCheckLocal,
     ByNamesAndParentIds;
 
     @Override
@@ -76,6 +77,8 @@ public abstract class INode implements Comparable<byte[]> {
         case ByNameAndParentId:
           return Annotation.PrimaryKey;
         case ByNamesAndParentIds:
+          return Annotation.Batched;
+        case ByNamesAndParentIdsCheckLocal:
           return Annotation.Batched;
         default:
           throw new IllegalStateException();

@@ -114,6 +114,11 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
       "dfs.transaction.stats.enabled";
   public static final boolean DFS_TRANSACTION_STATS_ENABLED_DEFAULT = false;
 
+  public static final String DFS_TRANSACTION_STATS_DETAILED_ENABLED =
+      "dfs.transaction.stats.detailed.enabled";
+  public static final boolean DFS_TRANSACTION_STATS_DETAILED_ENABLED_DEFAULT =
+      false;
+
   public static final String DFS_TRANSACTION_STATS_DIR =
       "dfs.transaction.stats.dir";
   public static final String DFS_TRANSACTION_STATS_DIR_DEFAULT =
@@ -161,25 +166,41 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String DFS_SET_PARTITION_KEY_ENABLED =
       "dfs.ndb.setpartitionkey.enabled";
   public static final boolean DFS_SET_PARTITION_KEY_ENABLED_DEFAULT = true;
-  
-  public static final String DFS_MEMCACHE_ENABLED = "dfs.memcache.enabled";
-  public static final boolean DFS_MEMCACHE_ENABLED_DEFAULT = false;
+
+  public static final String  DFS_SET_RANDOM_PARTITION_KEY_ENABLED =
+      "dfs.ndb.setrandompartitionkey.enabled";
+  public static final boolean  DFS_SET_RANDOM_PARTITION_KEY_ENABLED_DEFAULT =
+      true;
+
+  public static final String DFS_RESOLVING_CACHE_ENABLED = "dfs" +
+      ".resolvingcache.enabled";
+  public static final boolean DFS_RESOLVING_CACHE_ENABLED_DEFAULT = false;
   
   public static final String DFS_MEMCACHE_SERVER =
-      "dfs.memcache.server.address";
+      "dfs.resolvingcache.memcache.server.address";
   public static final String DFS_MEMCACHE_SERVER_DEFAULT = "127.0.0.1:11212";
   
   public static final String DFS_MEMCACHE_CONNECTION_POOL_SIZE =
-      "dfs.memcache.connectionpool.size";
+      "dfs.resolvingcache.memcache.connectionpool.size";
   public static final int DFS_MEMCACHE_CONNECTION_POOL_SIZE_DEFAULT = 10;
   
   public static final String DFS_MEMCACHE_KEY_PREFIX =
-      "dfs.memcache.key.prefix";
+      "dfs.resolvingcache.memcache.key.prefix";
   public static final String DFS_MEMCACHE_KEY_PREFIX_DEFAULT = "p:";
   
   public static final String DFS_MEMCACHE_KEY_EXPIRY_IN_SECONDS =
-      "dfs.memcache.key.expiry";
+      "dfs.resolvingcache.memcache.key.expiry";
   public static final int DFS_MEMCACHE_KEY_EXPIRY_IN_SECONDS_DEFAULT = 0;
+
+  public static final String DFS_RESOLVING_CACHE_TYPE = "dfs.resolvingcache" +
+      ".type";
+
+  //INode, Path, InMemory, Optimal
+  public static final String DFS_RESOLVING_CACHE_TYPE_DEFAULT = "InMemory";
+
+  public static final String DFS_INMEMORY_CACHE_MAX_SIZE = "dfs" +
+      ".resolvingcache.inmemory.maxsize";
+  public static final int DFS_INMEMORY_CACHE_MAX_SIZE_DEFAULT = 100000;
 
   public static final String DFS_LEGACY_DELETE_ENABLE_KEY =
       "dfs.namenode.legacy-delete.enable";

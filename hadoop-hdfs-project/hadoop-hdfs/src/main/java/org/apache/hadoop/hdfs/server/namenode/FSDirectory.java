@@ -21,7 +21,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
-import io.hops.memcache.PathMemcache;
+import io.hops.resolvingcache.Cache;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.INodeAttributesDataAccess;
 import io.hops.metadata.hdfs.dal.INodeDataAccess;
@@ -2007,11 +2007,11 @@ public class FSDirectory implements Closeable {
     }
 
     if (addedNode != null) {
-      if (!addedNode.isDirectory()) {
+      if(!addedNode.isDirectory()) {
         INode[] pc = Arrays.copyOf(pathComponents, pathComponents.length);
         pc[pc.length - 1] = addedNode;
         String path = getFullPathName(pc, pc.length - 1);
-        PathMemcache.getInstance().set(path, pc);
+        Cache.getInstance().set(path, pc);
       }
     }
     //
@@ -2044,11 +2044,11 @@ public class FSDirectory implements Closeable {
     }
 
     if (addedNode != null) {
-      if (!addedNode.isDirectory()) {
+      if(!addedNode.isDirectory()) {
         INode[] pc = Arrays.copyOf(pathComponents, pathComponents.length);
         pc[pc.length - 1] = addedNode;
         String path = getFullPathName(pc, pc.length - 1);
-        PathMemcache.getInstance().set(path, pc);
+        Cache.getInstance().set(path, pc);
       }
     }
     //

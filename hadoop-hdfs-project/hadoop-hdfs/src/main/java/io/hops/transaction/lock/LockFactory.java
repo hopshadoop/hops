@@ -348,9 +348,12 @@ public class LockFactory {
 
 
   public void setConfiguration(Configuration conf) {
-    Lock.enableSetPartitionKey(
+    BaseINodeLock.enableSetPartitionKey(
         conf.getBoolean(DFSConfigKeys.DFS_SET_PARTITION_KEY_ENABLED,
             DFSConfigKeys.DFS_SET_PARTITION_KEY_ENABLED_DEFAULT));
+    BaseINodeLock.enableSetRandomPartitionKey(conf.getBoolean(DFSConfigKeys
+        .DFS_SET_RANDOM_PARTITION_KEY_ENABLED, DFSConfigKeys
+        .DFS_SET_RANDOM_PARTITION_KEY_ENABLED_DEFAULT));
     BaseINodeLock.setDefaultLockType(getPrecedingPathLockType(conf));
   }
   

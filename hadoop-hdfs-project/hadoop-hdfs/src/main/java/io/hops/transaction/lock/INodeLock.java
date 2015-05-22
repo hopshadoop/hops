@@ -15,10 +15,16 @@
  */
 package io.hops.transaction.lock;
 
+import com.google.common.base.Joiner;
 import io.hops.common.INodeResolver;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.leader_election.node.ActiveNode;
+import io.hops.resolvingcache.Cache;
+import io.hops.resolvingcache.OptimalMemcache;
+import io.hops.resolvingcache.PathMemcache;
+import org.apache.commons.math3.stat.StatUtils;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.UnresolvedPathException;
 import org.apache.hadoop.hdfs.server.namenode.INode;
@@ -68,6 +74,262 @@ class INodeLock extends BaseINodeLock {
     this(lockType, resolveType, true, false, -1, activeNamenodes, paths);
   }
 
+
+  private CacheResolver instance = null;
+
+  private CacheResolver getCacheResolver(){
+    if(instance == null){
+      if(Cache.getInstance() instanceof OptimalMemcache){
+        instance = new OptimalPathResolver();
+      } else if(Cache.getInstance() instanceof PathMemcache){
+        instance = new FullPathResolver();
+      }else {
+        instance = new PartialPathResolver();
+      }
+    }
+    return instance;
+  }
+
+  private abstract class CacheResolver {
+    abstract List<INode> fetchINodes(String path,
+        boolean tryToSetParitionKey) throws IOException;
+
+    protected int verifyINodesFull(final List<INode> inodes, final String[]
+        names, final int[] parentIds, final int[] inodeIds) throws IOException {
+      int index = -1;
+      if (names.length == parentIds.length) {
+        if (inodes.size() == names.length) {
+          index = verifyINodesPartial(inodes, names, parentIds, inodeIds);
+        }
+      }
+      return index;
+    }
+
+    protected int verifyINodesPartial(final List<INode> inodes, final String[]
+        names, final int[] parentIds, final int[] inodeIds) throws IOException {
+      int index = (int)StatUtils.min(new double[]{inodes.size(), inodeIds
+          .length, parentIds.length, names.length});
+      for (int i = 0; i < index; i++) {
+        INode inode = inodes.get(i);
+        boolean noChangeInInodes =
+            inode != null && inode.getLocalName().equals(names[i]) &&
+                inode.getParentId() == parentIds[i] &&
+                inode.getId() == inodeIds[i];
+        if (!noChangeInInodes) {
+          index = i;
+          break;
+        }
+      }
+      return index;
+    }
+
+    protected int[] getParentIds(int[] inodeIds) {
+      return getParentIds(inodeIds, false);
+    }
+
+    protected int[] getParentIds(int[] inodeIds, boolean partial) {
+      int[] parentIds = new int[partial ? inodeIds.length + 1 : inodeIds.length];
+      parentIds[0] = INodeDirectory.ROOT_PARENT_ID;
+      System.arraycopy(inodeIds, 0, parentIds, 1, (partial ? inodeIds.length
+          : inodeIds.length - 1));
+      return parentIds;
+    }
+
+    protected void setPartitionKey(int[] inodeIds, boolean partial)
+        throws TransactionContextException, StorageException {
+      setPartitionKey(partial ? null : inodeIds);
+    }
+
+    protected void setPartitionKey(int[] inodeIds)
+        throws TransactionContextException, StorageException {
+      setPartitioningKey(inodeIds == null ? null : inodeIds[inodeIds.length - 1]);
+    }
+  }
+
+  private class FullPathResolver extends CacheResolver {
+
+    @Override
+    List<INode> fetchINodes(String path, boolean tryToSetParitionKey) throws IOException {
+      int[] inodeIds = Cache.getInstance().get(path);
+      if (inodeIds != null) {
+        if (tryToSetParitionKey) {
+          setPartitionKey(inodeIds);
+        }
+        final String[] names = INode.getPathNames(path);
+        final int[] parentIds = getParentIds(inodeIds);
+
+        List<INode> inodes = readINodesWhileRespectingLocks(path,names,
+            parentIds);
+        if (inodes != null) {
+          if (verifyINodes(inodes, names, parentIds, inodeIds)) {
+            addPathINodes(path, inodes);
+            return inodes;
+          } else {
+            Cache.getInstance().delete(path);
+          }
+        }
+      }
+      return null;
+    }
+
+    private boolean verifyINodes(List<INode> inodes, String[] names,
+        int[] parentIds, int[] inodeIds) throws IOException {
+      return verifyINodesFull(inodes, names, parentIds, inodeIds) == inodes
+          .size();
+    }
+
+    protected List<INode> readINodesWhileRespectingLocks(final String path,
+        final String[] names, final int[] parentIds)
+        throws TransactionContextException, StorageException,
+        UnresolvedPathException {
+      int rowsToReadWithDefaultLock = names.length;
+      if (!lockType.equals(DEFAULT_INODE_LOCK_TYPE)) {
+        if (lockType.equals(
+            TransactionLockTypes.INodeLockType.WRITE_ON_TARGET_AND_PARENT)) {
+          rowsToReadWithDefaultLock -= 2;
+        } else {
+          rowsToReadWithDefaultLock -= 1;
+        }
+      }
+
+      rowsToReadWithDefaultLock = Math.min(rowsToReadWithDefaultLock,
+          parentIds.length);
+
+      List<INode> inodes = null;
+      if (rowsToReadWithDefaultLock > 0) {
+        inodes = find(DEFAULT_INODE_LOCK_TYPE,
+            Arrays.copyOf(names, rowsToReadWithDefaultLock),
+            Arrays.copyOf(parentIds, rowsToReadWithDefaultLock), true);
+      }
+
+      if(inodes != null) {
+        for (INode inode : inodes) {
+          addLockedINodes(inode, DEFAULT_INODE_LOCK_TYPE);
+        }
+      }
+      
+      if(rowsToReadWithDefaultLock == names.length){
+        return inodes;
+      }
+  
+      boolean partialPath = parentIds.length < names.length;
+
+      if (inodes != null && !partialPath) {
+        resolveRestOfThePath(path, inodes);
+      }
+      return inodes;
+    }
+
+    protected void resolveRestOfThePath(String path, List<INode> inodes)
+        throws StorageException, TransactionContextException,
+        UnresolvedPathException {
+      byte[][] components = INode.getPathComponents(path);
+      INode currentINode = inodes.get(inodes.size() - 1);
+      INodeResolver resolver =
+          new INodeResolver(components, currentINode, resolveLink, true,
+              inodes.size() - 1);
+      while (resolver.hasNext()) {
+        TransactionLockTypes.INodeLockType currentINodeLock =
+            identifyLockType(resolver.getCount() + 1, components);
+        setINodeLockType(currentINodeLock);
+        currentINode = resolver.next();
+        if (currentINode != null) {
+          addLockedINodes(currentINode, currentINodeLock);
+          inodes.add(currentINode);
+        }
+      }
+    }
+  }
+
+  private class PartialPathResolver extends FullPathResolver {
+
+    @Override
+    List<INode> fetchINodes(String path, boolean tryToSetParitionKey) throws
+        IOException {
+      int[] inodeIds = Cache.getInstance().get(path);
+      if (inodeIds != null) {
+        final String[] names = INode.getPathNames(path);
+        final boolean partial = names.length > inodeIds.length;
+
+        if (tryToSetParitionKey) {
+            setPartitionKey(inodeIds, partial);
+        }
+
+        final int[] parentIds = getParentIds(inodeIds, partial);
+
+        List<INode> inodes = readINodesWhileRespectingLocks(path, names,
+            parentIds);
+        if (inodes != null && !inodes.isEmpty()) {
+          final int unverifiedInode = verifyINodesPartial(inodes, names,
+              parentIds, inodeIds);
+
+          int diff = inodes.size() - unverifiedInode;
+          while (diff > 0){
+            INode node = inodes.remove(inodes.size() - 1);
+            Cache.getInstance().delete(node);
+            diff--;
+          }
+
+          if(unverifiedInode <= 1)
+            return null;
+
+          tryResolvingTheRest(path, inodes, inodes.size() - unverifiedInode);
+          return inodes;
+        }
+      }
+      return null;
+    }
+
+    protected void tryResolvingTheRest(String path, List<INode> inodes, int
+        diff)
+        throws TransactionContextException, UnresolvedPathException,
+        StorageException {
+      int offset = inodes.size();
+
+      resolveRestOfThePath(path, inodes);
+
+      addPathINodesWithOffset(path, inodes, offset);
+    }
+
+
+    private void addPathINodesWithOffset(String path, List<INode> inodes, int
+        offset){
+      addPathINodes(path, inodes);
+      if(offset == 0){
+        updateResolvingCache(path, inodes);
+      }else {
+        if(offset == inodes.size()){
+          return;
+        }
+        List<INode> newInodes = inodes.subList(offset, inodes.size());
+        String[] newPath = Arrays.copyOfRange(INode.getPathNames(path), offset,
+            inodes.size());
+        updateResolvingCache(
+            Joiner.on(Path.SEPARATOR_CHAR).join(newPath), newInodes);
+      }
+    }
+  }
+
+  private class OptimalPathResolver extends PartialPathResolver{
+    @Override
+    protected void tryResolvingTheRest(String path, List<INode> inodes,
+        int diff)
+        throws TransactionContextException, UnresolvedPathException,
+        StorageException {
+
+      resolveRestOfThePath(path, inodes);
+
+      addPathINodes(path, inodes);
+
+      if(diff > 1){
+        Cache.getInstance().delete(path);
+        updateResolvingCache(path, inodes);
+      }else{
+        updateResolvingCache(inodes.get(inodes.size() - 1));
+      }
+    }
+  }
+
   @Override
   protected void acquire(TransactionLocks locks) throws IOException {
     /*
@@ -98,7 +360,7 @@ class INodeLock extends BaseINodeLock {
           resolveUsingMemcache(path, tryToSetParitionKey);
       if (resolvedINodes == null) {
         resolvedINodes = acquireINodeLockByPath(path);
-        addPathINodes(path, resolvedINodes);
+        addPathINodesAndUpdateResolvingCache(path, resolvedINodes);
       }
       if (resolvedINodes.size() > 0) {
         INode lastINode = resolvedINodes.get(resolvedINodes.size() - 1);
@@ -119,12 +381,16 @@ class INodeLock extends BaseINodeLock {
 
   private List<INode> resolveUsingMemcache(String path,
       boolean tryToSetParitionKey) throws IOException {
-    List<INode> resolvedINodes =
-        fetchINodesUsingMemcache(lockType, path, tryToSetParitionKey);
+    CacheResolver memcacheResolver = getCacheResolver();
+    if(memcacheResolver == null)
+      return null;
+    List<INode> resolvedINodes = memcacheResolver.fetchINodes(path,
+        tryToSetParitionKey);
     if (resolvedINodes != null) {
       for (INode iNode : resolvedINodes) {
         checkSubtreeLock(iNode);
       }
+      handleLockUpgrade(resolvedINodes, INode.getPathComponents(path), path);
     }
     return resolvedINodes;
   }
