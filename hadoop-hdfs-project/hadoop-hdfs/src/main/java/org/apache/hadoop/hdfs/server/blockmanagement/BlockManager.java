@@ -1158,7 +1158,6 @@ public class BlockManager {
       updateNeededReplications(b.stored, -1, 0);
     }
 
-    // TODO STEFFEN - Are other instances of Namesystem being used?
     FSNamesystem fsNamesystem = (FSNamesystem) namesystem;
     if (!fsNamesystem.isErasureCodingEnabled()) {
       return;
@@ -1179,8 +1178,8 @@ public class BlockManager {
             .find(EncodingStatus.Finder.ByParityInodeId, bc.getId());
         if (status != null) {
           if (status.isParityCorrupt() == false) {
-            status
-                .setParityStatus(EncodingStatus.ParityStatus.REPAIR_REQUESTED);
+            status.setParityStatus(
+                EncodingStatus.ParityStatus.REPAIR_REQUESTED);
             status.setParityStatusModificationTime(System.currentTimeMillis());
           }
           status.setLostParityBlocks(status.getLostParityBlocks() + 1);
@@ -2307,11 +2306,9 @@ public class BlockManager {
     BlockCollection bc = storedBlock.getBlockCollection();
     assert bc != null : "Block must belong to a file";
 
-    // TODO STEFFEN - Are other instances of Namesystem being used?
     FSNamesystem fsNamesystem = (FSNamesystem) namesystem;
     NumberReplicas numBeforeAdding = null;
     if (fsNamesystem.isErasureCodingEnabled()) {
-      // TODO STEFFEN - Not so nice to count it twice is liveReplicas - 1 OK?
       numBeforeAdding = countNodes(block);
     }
 
@@ -2413,8 +2410,8 @@ public class BlockManager {
             status.setLostParityBlocks(lostParityBlockCount);
             if (lostParityBlockCount == 0) {
               status.setParityStatus(EncodingStatus.ParityStatus.HEALTHY);
-              status
-                  .setParityStatusModificationTime(System.currentTimeMillis());
+              status.setParityStatusModificationTime(
+                  System.currentTimeMillis());
             }
             EntityManager.update(status);
             LOG.info("addStoredBlock found set status to potentially fixed");
@@ -3913,6 +3910,11 @@ public class BlockManager {
             lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier))
             .add(lf.getIndividualBlockLock(timedOutItemId, inodeIdentifier))
             .add(lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.PE, BLK.UR));
+        if (((FSNamesystem) namesystem).isErasureCodingEnabled() &&
+            inodeIdentifier != null) {
+          locks.add(lf.getIndivdualEncodingStatusLock(LockType.WRITE,
+              inodeIdentifier.getInodeId()));
+        }
       }
 
       @Override
@@ -4084,6 +4086,11 @@ public class BlockManager {
             .add(lf.getIndividualBlockLock(block.getBlockId(), inodeIdentifier))
             .add(lf.getBlockRelated(BLK.RE, BLK.UC, BLK.CR, BLK.ER, BLK.PE,
                 BLK.UR));
+        if (((FSNamesystem) namesystem).isErasureCodingEnabled() &&
+            inodeIdentifier != null) {
+          locks.add(lf.getIndivdualEncodingStatusLock(LockType.WRITE,
+              inodeIdentifier.getInodeId()));
+        }
       }
 
       @Override
@@ -4118,6 +4125,11 @@ public class BlockManager {
             .add(lf.getIndividualBlockLock(block.getBlockId(), inodeIdentifier))
             .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.PE, BLK.IV,
                 BLK.UR));
+        if (((FSNamesystem) namesystem).isErasureCodingEnabled() &&
+            inodeIdentifier != null) {
+          locks.add(lf.getIndivdualEncodingStatusLock(LockType.WRITE,
+              inodeIdentifier.getInodeId()));
+        }
       }
 
       @Override

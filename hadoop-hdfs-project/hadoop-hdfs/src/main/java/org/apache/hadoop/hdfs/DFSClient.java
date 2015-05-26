@@ -3046,7 +3046,6 @@ public class DFSClient implements java.io.Closeable {
    */
   public void encodeFile(final String filePath, final EncodingPolicy policy)
       throws IOException {
-    // TODO STEFFEN - Not used for now because of placement enforcement hack
     ClientActionHandler handler = new ClientActionHandler() {
       @Override
       public Object doAction(ClientProtocol namenode) throws IOException {

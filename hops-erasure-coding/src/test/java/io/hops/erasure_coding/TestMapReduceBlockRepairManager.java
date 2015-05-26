@@ -15,7 +15,12 @@
  */
 package io.hops.erasure_coding;
 
+import io.hops.metadata.HdfsStorageFactory;
+import io.hops.metadata.hdfs.dal.BlockChecksumDataAccess;
+import io.hops.metadata.hdfs.entity.BlockChecksum;
 import io.hops.metadata.hdfs.entity.EncodingPolicy;
+import io.hops.transaction.handler.HDFSOperationType;
+import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -79,7 +84,7 @@ public class TestMapReduceBlockRepairManager extends ClusterTest {
     Codec.initializeCodecs(conf);
     FileStatus testFileStatus = dfs.getFileStatus(testFile);
     EncodingPolicy policy = new EncodingPolicy("src", (short) 1);
-    encodingManager.encodeFile(policy, testFile, parityFile);
+    encodingManager.encodeFile(policy, testFile, parityFile, false);
 
     // Busy waiting until the encoding is done
     while (encodingManager.computeReports().size() > 0) {
@@ -97,7 +102,7 @@ public class TestMapReduceBlockRepairManager extends ClusterTest {
     LocatedBlocks locatedBlocks =
         new LocatedBlocks(0, false, lostBlocks, null, true);
     testDfsClient.setMissingLocatedBlocks(locatedBlocks);
-    LOG.info("Loosing block " + lb.toString());
+    LOG.info("Losing block " + lb.toString());
     getCluster().triggerBlockReports();
 
     MapReduceBlockRepairManager repairManager =
@@ -137,7 +142,7 @@ public class TestMapReduceBlockRepairManager extends ClusterTest {
     Codec.initializeCodecs(conf);
     FileStatus testFileStatus = dfs.getFileStatus(testFile);
     EncodingPolicy policy = new EncodingPolicy("src", (short) 1);
-    encodingManager.encodeFile(policy, testFile, parityFile);
+    encodingManager.encodeFile(policy, testFile, parityFile, false);
 
     // Busy waiting until the encoding is done
     while (encodingManager.computeReports().size() > 0) {
@@ -147,7 +152,8 @@ public class TestMapReduceBlockRepairManager extends ClusterTest {
     String path = testFileStatus.getPath().toUri().getPath();
     int blockToLoose = new Random(seed).nextInt(
         (int) (testFileStatus.getLen() / testFileStatus.getBlockSize()));
-    LocatedBlock lb = dfs.getClient().getLocatedBlocks(path, 0, Long.MAX_VALUE)
+    final LocatedBlock lb = dfs.getClient()
+        .getLocatedBlocks(path, 0, Long.MAX_VALUE)
         .get(blockToLoose);
     DataNodeUtil.loseBlock(getCluster(), lb);
     List<LocatedBlock> lostBlocks = new ArrayList<LocatedBlock>();
@@ -158,8 +164,18 @@ public class TestMapReduceBlockRepairManager extends ClusterTest {
     LOG.info("Loosing block " + lb.toString());
     getCluster().triggerBlockReports();
 
-    dfs.getClient().addBlockChecksum(testFile.toUri().getPath(),
-        (int) (lb.getStartOffset() / lb.getBlockSize()), 0);
+    final int inodeId = io.hops.TestUtil.getINodeId(cluster.getNameNode(),
+        testFile);
+    new LightWeightRequestHandler(HDFSOperationType.TEST) {
+      @Override
+      public Object performTask() throws IOException {
+        BlockChecksumDataAccess da = (BlockChecksumDataAccess)
+            HdfsStorageFactory.getDataAccess(BlockChecksumDataAccess.class);
+        da.update(new BlockChecksum(inodeId,
+            (int) (lb.getStartOffset() / lb.getBlockSize()), 0));
+        return null;
+      }
+    }.handle();
 
     MapReduceBlockRepairManager repairManager =
         new MapReduceBlockRepairManager(conf);

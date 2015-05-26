@@ -49,6 +49,11 @@ class PolicyInfo implements Writable {
   private String description;      // A verbose description of this policy
   private Configuration conf;      // Hadoop configuration
 
+  public static String PROPERTY_PARITY_PATH = "parityPath";
+  public static String PROPERTY_REPLICATION = "targetReplication";
+  public static String PROPERTY_PARITY_REPLICATION = "metaReplication";
+  public static String PROPERTY_COPY = "copy";
+
   private Properties properties;   // Policy-dependent properties
 
   /**

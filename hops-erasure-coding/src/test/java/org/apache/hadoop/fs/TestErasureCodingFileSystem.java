@@ -19,7 +19,12 @@ import io.hops.erasure_coding.ClusterTest;
 import io.hops.erasure_coding.Codec;
 import io.hops.erasure_coding.TestLocalEncodingManagerImpl;
 import io.hops.erasure_coding.Util;
+import io.hops.metadata.HdfsStorageFactory;
+import io.hops.metadata.hdfs.dal.BlockChecksumDataAccess;
+import io.hops.metadata.hdfs.entity.BlockChecksum;
 import io.hops.metadata.hdfs.entity.EncodingPolicy;
+import io.hops.transaction.handler.HDFSOperationType;
+import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -136,7 +141,8 @@ public class TestErasureCodingFileSystem extends ClusterTest {
     String path = testFileStatus.getPath().toUri().getPath();
     int blockToLoose = new Random(seed).nextInt(
         (int) (testFileStatus.getLen() / testFileStatus.getBlockSize()));
-    LocatedBlock lb = dfs.getClient().getLocatedBlocks(path, 0, Long.MAX_VALUE)
+    final LocatedBlock lb = dfs.getClient()
+        .getLocatedBlocks(path, 0, Long.MAX_VALUE)
         .get(blockToLoose);
     DataNodeUtil.loseBlock(getCluster(), lb);
     List<LocatedBlock> lostBlocks = new ArrayList<LocatedBlock>();
@@ -147,9 +153,18 @@ public class TestErasureCodingFileSystem extends ClusterTest {
     LOG.info("Loosing block " + lb.toString());
     getCluster().triggerBlockReports();
 
-    dfs.getClient().addBlockChecksum(testFile.toUri().getPath(),
-        (int) (lb.getStartOffset() / lb.getBlockSize()), 0);
-
+    final int inodeId = io.hops.TestUtil.getINodeId(cluster.getNameNode(),
+        testFile);
+    new LightWeightRequestHandler(HDFSOperationType.TEST) {
+      @Override
+      public Object performTask() throws IOException {
+        BlockChecksumDataAccess da = (BlockChecksumDataAccess)
+            HdfsStorageFactory.getDataAccess(BlockChecksumDataAccess.class);
+        da.update(new BlockChecksum(inodeId,
+            (int) (lb.getStartOffset() / lb.getBlockSize()), 0));
+        return null;
+      }
+    }.handle();
 
     ErasureCodingFileSystem ecfs = new ErasureCodingFileSystem();
     NameNode nameNode = getCluster().getNameNode();

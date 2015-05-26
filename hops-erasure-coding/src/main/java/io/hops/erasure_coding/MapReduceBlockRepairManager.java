@@ -165,7 +165,8 @@ public class MapReduceBlockRepairManager extends BlockRepairManager {
       SequenceFileOutputFormat.setOutputPath(job, outDir);
 
       submitJob(job);
-      currentRepairs.put(sourceFile.toUri().getPath(), job);
+      currentRepairs.put(type == RepairType.SOURCE_FILE ?
+          sourceFile.toUri().getPath() : parityFile.toUri().getPath(), job);
     }
 
     void submitJob(Job job)
@@ -400,13 +401,14 @@ public class MapReduceBlockRepairManager extends BlockRepairManager {
           LOG.info("REPAIR FAILED");
           reports.add(new Report(fileName, Report.Status.FAILED));
           cleanup(job);
-        } /* TODO FIX timeout
-         else if (System.currentTimeMillis() - job.getStartTime() > getMaxFixTimeForFile()) {
-          LOG.info("Timeout: " + (System.currentTimeMillis() - job.getStartTime()) + " " + job.getStartTime());
+        } else if (job.getStartTime() > 0 && System.currentTimeMillis()
+            - job.getStartTime() > getMaxFixTimeForFile()){
+          LOG.info("Timeout: " + (System.currentTimeMillis()
+              - job.getStartTime()) + " " + job.getStartTime());
           job.killJob();
           reports.add(new Report(fileName, Report.Status.CANCELED));
           cleanup(job);
-        }*/ else {
+        } else {
           LOG.info("REPAIR RUNNING");
           reports.add(new Report(fileName, Report.Status.ACTIVE));
         }

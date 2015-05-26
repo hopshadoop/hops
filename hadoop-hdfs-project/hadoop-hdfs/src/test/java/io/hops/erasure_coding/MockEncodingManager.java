@@ -33,7 +33,8 @@ public class MockEncodingManager extends EncodingManager {
   }
 
   @Override
-  public void encodeFile(EncodingPolicy encodingPolicy, Path path, Path path1) {
+  public void encodeFile(EncodingPolicy encodingPolicy, Path path, Path path1,
+      boolean copy) {
 
   }
 

@@ -54,7 +54,15 @@ abstract class BaseEncodingStatusLock extends Lock {
       Arrays.sort(targets);
       for (String target : targets) {
         INode iNode = iNodeLock.getTargetINode(target);
-        acquireLock(getLockType(), EncodingStatus.Finder.ByInodeId,
+        EncodingStatus status = acquireLock(getLockType(),
+            EncodingStatus.Finder.ByInodeId,
+            iNode.getId());
+        if (status != null) {
+          // It's a source file
+          return;
+        }
+        // It's a parity file
+        acquireLock(getLockType(), EncodingStatus.Finder.ByParityInodeId,
             iNode.getId());
       }
     }
@@ -74,8 +82,8 @@ abstract class BaseEncodingStatusLock extends Lock {
     protected void acquire(TransactionLocks locks) throws IOException {
       // TODO STEFFEN - Should only acquire the locks if we know it has a status and also not twice.
       // Maybe add a flag to iNode specifying whether it's encoded or a parity file
-      EncodingStatus status =
-          acquireLock(getLockType(), EncodingStatus.Finder.ByInodeId, inodeId);
+      EncodingStatus status = acquireLock(
+          getLockType(), EncodingStatus.Finder.ByInodeId, inodeId);
       if (status != null) {
         // It's a source file
         return;

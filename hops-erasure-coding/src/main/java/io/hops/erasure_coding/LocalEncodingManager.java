@@ -45,7 +45,7 @@ public class LocalEncodingManager extends BaseEncodingManager {
 
   @Override
   public void encodeFile(EncodingPolicy policy, Path sourceFile,
-      Path parityFile) {
+      Path parityFile, boolean copy) {
     if (!initialized) {
       try {
         cleanUpTempDirectory(conf);
@@ -60,11 +60,13 @@ public class LocalEncodingManager extends BaseEncodingManager {
     try {
       policyInfo.setSrcPath(sourceFile.toUri().getPath());
       policyInfo.setCodecId(codec.getId());
-      policyInfo.setProperty("parityPath", parityFile.toUri().getPath());
-      policyInfo.setProperty("targetReplication",
+      policyInfo.setProperty(PolicyInfo.PROPERTY_PARITY_PATH,
+          parityFile.toUri().getPath());
+      policyInfo.setProperty(PolicyInfo.PROPERTY_REPLICATION,
           String.valueOf(policy.getTargetReplication()));
-      policyInfo.setProperty("metaReplication",
-          String.valueOf(policy.getTargetReplication()));
+      policyInfo.setProperty(PolicyInfo.PROPERTY_PARITY_REPLICATION,
+          String.valueOf(1));
+      policyInfo.setProperty(PolicyInfo.PROPERTY_COPY, String.valueOf(copy));
       doRaid(conf, policyInfo);
     } catch (IOException e) {
       LOG.error("Exception", e);
