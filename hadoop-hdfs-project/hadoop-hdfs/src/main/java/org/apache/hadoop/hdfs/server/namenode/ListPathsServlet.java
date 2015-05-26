@@ -20,7 +20,7 @@ package org.apache.hadoop.hdfs.server.namenode;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.HftpFileSystem;
+import org.apache.hadoop.hdfs.web.HftpFileSystem;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.DirectoryListing;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
@@ -45,7 +45,7 @@ import java.util.regex.Pattern;
 /**
  * Obtain meta-information about a filesystem.
  *
- * @see org.apache.hadoop.hdfs.HftpFileSystem
+ * @see HftpFileSystem
  */
 @InterfaceAudience.Private
 public class ListPathsServlet extends DfsServlet {

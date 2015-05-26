@@ -80,6 +80,7 @@ import java.nio.BufferOverflowException;
 import java.nio.channels.ClosedChannelException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashSet;
@@ -157,9 +158,10 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
   private int currentBlockIndex = 0;
   private int stripeLength;
   private int parityLength;
-  private ArrayList<LocatedBlock> sourceBlocks;
+  private List<LocatedBlock> sourceBlocks = Collections.emptyList();
   private List<DatanodeInfo> stripeNodes = new LinkedList<DatanodeInfo>();
-  
+  private List<DatanodeInfo> parityStripeNodes = new LinkedList<DatanodeInfo>();
+
   private class Packet {
     long seqno;               // sequencenumber of buffer in block
     long offsetInBlock;       // offset in block
@@ -1136,7 +1138,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
 
         if (erasureCodingSourceStream || erasureCodingParityStream) {
           excluded = new DatanodeInfo[excludedNodes.size() + usedNodes.size() +
-              stripeNodes.size()];
+              stripeNodes.size() + parityStripeNodes.size()];
           int i = 0;
           for (DatanodeInfo node : excludedNodes) {
             excluded[i] = node;
@@ -1148,6 +1150,11 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
             i++;
           }
           for (DatanodeInfo node : stripeNodes) {
+            excluded[i] = node;
+            LOG.info("Block " + currentBlockIndex + " excluding " + node);
+            i++;
+          }
+          for (DatanodeInfo node : parityStripeNodes) {
             excluded[i] = node;
             LOG.info("Block " + currentBlockIndex + " excluding " + node);
             i++;
@@ -2083,10 +2090,11 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
     this.erasureCodingParityStream = true;
     this.stripeLength = stripeLength;
     this.parityLength = parityLength;
-    this.sourceBlocks = new ArrayList(
-        dfsClient.getLocatedBlocks(sourceFile, 0, Long.MAX_VALUE)
-            .getLocatedBlocks());
-    Collections.sort(sourceBlocks, LocatedBlock.blockIdComparator);
+    if (sourceFile != null) {
+      this.sourceBlocks = new ArrayList(dfsClient.getLocatedBlocks(
+          sourceFile, 0, Long.MAX_VALUE).getLocatedBlocks());
+      Collections.sort(sourceBlocks, LocatedBlock.blockIdComparator);
+    }
   }
 
   @Override
@@ -2095,5 +2103,15 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
       IOException e = lastException;
       throw e != null ? e : new ClosedChannelException();
     }
+  }
+
+  public Collection<DatanodeInfo> getUsedNodes() {
+    return usedNodes;
+  }
+
+  public void setParityStripeNodesForNextStripe(
+      Collection<DatanodeInfo> locations) {
+    parityStripeNodes.clear();
+    parityStripeNodes.addAll(locations);
   }
 }

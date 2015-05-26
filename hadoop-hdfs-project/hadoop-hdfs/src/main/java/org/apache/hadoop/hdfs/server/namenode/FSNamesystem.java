@@ -5959,6 +5959,24 @@ public class FSNamesystem
           throw new InvalidPathException("Invalid name: " + dst);
         }
 
+        for (Options.Rename op : options) {
+          if (op == Rename.KEEP_ENCODING_STATUS) {
+            INode[] srcNodes =
+                dir.getRootDir().getExistingPathINodes(src, false);
+            INode[] dstNodes =
+                dir.getRootDir().getExistingPathINodes(dst, false);
+            INode srcNode = srcNodes[srcNodes.length - 1];
+            INode dstNode = dstNodes[dstNodes.length - 1];
+            EncodingStatus status = EntityManager.find(
+                EncodingStatus.Finder.ByInodeId, dstNode.getId());
+            EncodingStatus newStatus = new EncodingStatus(status);
+            newStatus.setInodeId(srcNode.getId());
+            EntityManager.add(newStatus);
+            EntityManager.remove(status);
+            break;
+          }
+        }
+
         dir.renameTo(src, dst, srcNsCount, srcDsCount, dstNsCount, dstDsCount,
             options);
         return null;
@@ -6475,7 +6493,8 @@ public class FSNamesystem
    * @throws IOException
    */
   public void addEncodingStatus(final String sourcePath,
-      final EncodingPolicy policy) throws IOException {
+      final EncodingPolicy policy, final EncodingStatus.Status status)
+      throws IOException {
     new HopsTransactionalRequestHandler(HDFSOperationType.ADD_ENCODING_STATUS) {
 
       @Override
@@ -6488,9 +6507,8 @@ public class FSNamesystem
       @Override
       public Object performTask() throws IOException {
         int inodeId = dir.getINode(sourcePath).getId();
-        EncodingStatus encodingStatus = new EncodingStatus(inodeId,
-            EncodingStatus.Status.ENCODING_REQUESTED, policy,
-            System.currentTimeMillis());
+        EncodingStatus encodingStatus = new EncodingStatus(inodeId, status,
+            policy, System.currentTimeMillis());
         EntityManager.add(encodingStatus);
         return null;
       }

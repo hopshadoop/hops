@@ -360,12 +360,14 @@ public class ErasureCodingManager extends Configured {
 
         LOG.info("Schedule encoding for " + path);
         UUID parityFileName = UUID.randomUUID();
-        encodingManager
-            .encodeFile(encodingStatus.getEncodingPolicy(), new Path(path),
-                new Path(parityFolder + "/" + parityFileName.toString()));
-        namesystem
-            .updateEncodingStatus(path, EncodingStatus.Status.ENCODING_ACTIVE,
-                parityFileName.toString());
+        encodingManager.encodeFile(
+            encodingStatus.getEncodingPolicy(),
+            new Path(path),
+            new Path(parityFolder + "/" + parityFileName.toString()),
+            encodingStatus.getStatus() ==
+                EncodingStatus.Status.COPY_ENCODING_REQUESTED ? true : false);
+        namesystem.updateEncodingStatus(path,
+            EncodingStatus.Status.ENCODING_ACTIVE, parityFileName.toString());
         activeEncodings++;
       } catch (IOException e) {
         LOG.error(StringUtils.stringifyException(e));

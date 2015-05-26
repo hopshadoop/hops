@@ -27,6 +27,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FsServerDefaults;
+import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.Options.Rename;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.CorruptFileBlocks;
@@ -493,8 +494,15 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
       Rename2RequestProto req) throws ServiceException {
 
     try {
-      server.rename2(req.getSrc(), req.getDst(),
-          req.getOverwriteDest() ? Rename.OVERWRITE : Rename.NONE);
+      Options.Rename[] options;
+      if (req.hasKeepEncodingStatus() && req.getKeepEncodingStatus()) {
+        options = new Rename[2];
+        options[1] = Rename.KEEP_ENCODING_STATUS;
+      } else {
+        options = new Rename[1];
+      }
+      options[0] = req.getOverwriteDest() ? Rename.OVERWRITE : Rename.NONE;
+      server.rename2(req.getSrc(), req.getDst(), options);
     } catch (IOException e) {
       throw new ServiceException(e);
     }
