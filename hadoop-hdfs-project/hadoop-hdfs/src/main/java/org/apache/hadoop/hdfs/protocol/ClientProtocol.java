@@ -405,6 +405,11 @@ public interface ClientProtocol {
       FileNotFoundException, SafeModeException, UnresolvedLinkException,
       IOException;
 
+  @Idempotent
+  public void setMetaEnabled(String src, boolean metaEnabled)
+      throws AccessControlException, FileNotFoundException, SafeModeException,
+      UnresolvedLinkException, IOException;
+
   /**
    * Set permissions for an existing file/directory.
    *

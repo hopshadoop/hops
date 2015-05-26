@@ -15,13 +15,9 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
-import io.hops.transaction.handler.HDFSOperationType;
-import io.hops.transaction.handler.HopsTransactionalRequestHandler;
+import io.hops.TestUtil;
 import io.hops.transaction.handler.RequestHandler;
-import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.SubtreeLockedException;
-import io.hops.transaction.lock.TransactionLockTypes;
-import io.hops.transaction.lock.TransactionLocks;
 import junit.framework.TestCase;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -123,34 +119,13 @@ public class TestSubtreeLock extends TestCase {
       assertEquals(7, fileTree.getAll().size());
       assertEquals(4, fileTree.getHeight());
       assertEquals(file3.toUri().getPath(), fileTree
-          .createAbsolutePath(path0.toUri().getPath(),
-              fileTree.getInodeById(getINodeId(file3, cluster.getNameNode()))));
+          .createAbsolutePath(path0.toUri().getPath(), fileTree.getInodeById(
+              TestUtil.getINodeId(cluster.getNameNode(), file3))));
     } finally {
       if (cluster != null) {
         cluster.shutdown();
       }
     }
-  }
-
-  private int getINodeId(final Path path, final NameNode nameNode)
-      throws IOException {
-    final String filePath = path.toUri().getPath();
-    return (Integer) new HopsTransactionalRequestHandler(
-        HDFSOperationType.TEST) {
-      @Override
-      public void acquireLock(TransactionLocks locks) throws IOException {
-        LockFactory lf = LockFactory.getInstance();
-        locks.add(lf.getINodeLock(nameNode,
-            TransactionLockTypes.INodeLockType.READ_COMMITTED,
-            TransactionLockTypes.INodeResolveType.PATH, filePath));
-      }
-
-      @Override
-      public Object performTask() throws IOException {
-        INode targetNode = nameNode.namesystem.getINode(filePath);
-        return targetNode.getId();
-      }
-    }.handle();
   }
 
   @Test

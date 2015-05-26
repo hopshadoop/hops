@@ -22,8 +22,12 @@ import io.hops.erasure_coding.ErasureCodingManager;
 import io.hops.exception.HopsException;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
+import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.common.FinderType;
+import io.hops.metadata.hdfs.dal.AccessTimeLogDataAccess;
+import io.hops.metadata.hdfs.entity.AccessTimeLogEntry;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
+import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.transaction.EntityManager;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.ContentSummary;
@@ -32,8 +36,10 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.StringUtils;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -668,8 +674,14 @@ public abstract class INode implements Comparable<byte[]> {
   }
 
   public void setAccessTime(long atime)
-      throws StorageException, TransactionContextException {
+      throws TransactionContextException, StorageException {
     setAccessTimeNoPersistance(atime);
+    if (isPathMetaEnabled()) {
+      AccessTimeLogDataAccess da = (AccessTimeLogDataAccess)
+          HdfsStorageFactory.getDataAccess(AccessTimeLogDataAccess.class);
+      int userId = -1; // TODO get userId
+      da.add(new AccessTimeLogEntry(getId(), userId, atime));
+    }
     save();
   }
 
@@ -754,5 +766,29 @@ public abstract class INode implements Comparable<byte[]> {
 
   long getPermission() {
     return permission;
+  }
+
+  void logMetadataEvent(MetadataLogEntry.Operation operation)
+      throws StorageException, TransactionContextException {
+    if (isPathMetaEnabled()) {
+      INodeDirectory datasetDir = getMetaEnabledParent();
+      EntityManager.add(new MetadataLogEntry(datasetDir.getId(), getId(), operation));
+    }
+  }
+
+  boolean isPathMetaEnabled() throws TransactionContextException, StorageException {
+    return getMetaEnabledParent() != null ? true : false;
+  }
+
+  INodeDirectory getMetaEnabledParent()
+      throws TransactionContextException, StorageException {
+    INodeDirectory dir = getParent();
+    while (!isRoot() && !dir.isRoot()) {
+      if (dir.isMetaEnabled()) {
+        return dir;
+      }
+      dir = dir.getParent();
+    }
+    return null;
   }
 }

@@ -20,6 +20,7 @@ package org.apache.hadoop.hdfs.server.namenode;
 import io.hops.common.INodeIdGen;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
+import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.transaction.EntityManager;
 import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.fs.permission.PermissionStatus;
@@ -56,7 +57,8 @@ public class INodeDirectory extends INode {
   public final static int ROOT_ID = 1;
   public final static int ROOT_PARENT_ID = NON_EXISTING_ID;
 
-  
+  private boolean metaEnabled;
+
   public INodeDirectory(String name, PermissionStatus permissions) {
     super(name, permissions);
   }
@@ -93,11 +95,20 @@ public class INodeDirectory extends INode {
     return true;
   }
 
+  public boolean isMetaEnabled() {
+    return metaEnabled;
+  }
+
+  public void setMetaEnabled(boolean metaEnabled) {
+    this.metaEnabled = metaEnabled;
+  }
+
   INode removeChild(INode node)
       throws StorageException, TransactionContextException {
     INode existingInode = getChildINode(node.getLocalNameBytes());
     if (existingInode != null) {
       remove(existingInode);
+      existingInode.logMetadataEvent(MetadataLogEntry.Operation.DELETE);
       return existingInode;
     }
     return null;
@@ -336,6 +347,10 @@ public class INodeDirectory extends INode {
     }
     if (node.getGroupName() == null) {
       node.setGroup(getGroupName());
+    }
+
+    if (!node.isUnderConstruction()) {
+      node.logMetadataEvent(MetadataLogEntry.Operation.ADD);
     }
 
     return node;

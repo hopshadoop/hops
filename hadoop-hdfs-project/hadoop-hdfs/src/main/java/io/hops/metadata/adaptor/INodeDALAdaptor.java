@@ -157,13 +157,11 @@ public class INodeDALAdaptor
       hopINode.setParentId(inode.getParentId());
       hopINode.setId(inode.getId());
 
-      if (inode instanceof INodeDirectory) {
+      if (inode.isDirectory()) {
         hopINode.setUnderConstruction(false);
-        hopINode.setDirWithQuota(false);
-      }
-      if (inode instanceof INodeDirectoryWithQuota) {
-        hopINode.setUnderConstruction(false);
-        hopINode.setDirWithQuota(true);
+        hopINode.setDirWithQuota(inode instanceof INodeDirectoryWithQuota ?
+            true : false);
+        hopINode.setMetaEnabled(((INodeDirectory) inode).isMetaEnabled());
       }
       if (inode instanceof INodeFile) {
         hopINode
@@ -181,6 +179,7 @@ public class INodeDALAdaptor
                   .getXferAddr());
         }
         hopINode.setGenerationStamp(((INodeFile) inode).getGenerationStamp());
+        hopINode.setSize(((INodeFile) inode).getSize());
       }
       if (inode instanceof INodeSymlink) {
         hopINode.setUnderConstruction(false);
@@ -222,6 +221,7 @@ public class INodeDALAdaptor
 
         inode.setAccessTimeNoPersistance(hopINode.getAccessTime());
         inode.setModificationTimeNoPersistance(hopINode.getModificationTime());
+        ((INodeDirectory) inode).setMetaEnabled(hopINode.isMetaEnabled());
       } else if (hopINode.getSymlink() != null) {
         inode = new INodeSymlink(hopINode.getSymlink(),
             hopINode.getModificationTime(), hopINode.getAccessTime(), ps);
@@ -242,8 +242,9 @@ public class INodeDALAdaptor
           inode = new INodeFile(ps, hopINode.getHeader(),
               hopINode.getModificationTime(), hopINode.getAccessTime());
         }
-        ((INodeFile) inode)
-            .setGenerationStampNoPersistence(hopINode.getGenerationStamp());
+        ((INodeFile) inode).setGenerationStampNoPersistence(
+            hopINode.getGenerationStamp());
+        ((INodeFile) inode).setSize(hopINode.getSize());
       }
       inode.setIdNoPersistance(hopINode.getId());
       inode.setLocalNameNoPersistance(hopINode.getName());

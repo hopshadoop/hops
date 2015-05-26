@@ -475,6 +475,12 @@ public class DistributedFileSystem extends FileSystem {
     statistics.incrementWriteOps(1);
     return dfs.setReplication(getPathName(src), replication);
   }
+
+  public void setMetaEnabled(Path src, boolean metaEnabled)
+      throws IOException {
+    statistics.incrementWriteOps(1);
+    dfs.setMetaEnabled(getPathName(src), metaEnabled);
+  }
   
   /**
    * Move blocks from srcs to trg

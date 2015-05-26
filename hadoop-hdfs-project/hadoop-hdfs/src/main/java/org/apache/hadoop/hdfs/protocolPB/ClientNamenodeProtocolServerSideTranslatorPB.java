@@ -218,6 +218,11 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
       VOID_CHANGECONF_RESPONSE =
       ClientNamenodeProtocolProtos.ChangeConfResponseProto.newBuilder().build();
 
+  private static final ClientNamenodeProtocolProtos.SetMetaEnabledResponseProto
+      VOID_SET_META_ENABLED_RESPONSE =
+      ClientNamenodeProtocolProtos.SetMetaEnabledResponseProto.newBuilder()
+          .build();
+
   /**
    * Constructor
    *
@@ -363,6 +368,19 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
     } catch (IOException e) {
       throw new ServiceException(e);
     }
+  }
+
+  @Override
+  public ClientNamenodeProtocolProtos.SetMetaEnabledResponseProto setMetaEnabled(
+      RpcController controller,
+      ClientNamenodeProtocolProtos.SetMetaEnabledRequestProto req)
+      throws ServiceException {
+    try {
+      server.setMetaEnabled(req.getSrc(), req.getMetaEnabled());
+    } catch (IOException e) {
+      throw new ServiceException(e);
+    }
+    return VOID_SET_META_ENABLED_RESPONSE;
   }
 
 

@@ -25,6 +25,7 @@ import io.hops.common.IDsMonitor;
 import io.hops.common.INodeUtil;
 import io.hops.erasure_coding.Codec;
 import io.hops.erasure_coding.ErasureCodingManager;
+import io.hops.exception.StorageCallPreventedException;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.memcache.PathMemcache;
@@ -34,12 +35,17 @@ import io.hops.metadata.hdfs.dal.BlockChecksumDataAccess;
 import io.hops.metadata.hdfs.dal.EncodingStatusDataAccess;
 import io.hops.metadata.hdfs.dal.INodeAttributesDataAccess;
 import io.hops.metadata.hdfs.dal.INodeDataAccess;
+import io.hops.metadata.hdfs.dal.MetadataLogDataAccess;
 import io.hops.metadata.hdfs.dal.SafeBlocksDataAccess;
+import io.hops.metadata.hdfs.dal.SizeLogDataAccess;
 import io.hops.metadata.hdfs.entity.BlockChecksum;
 import io.hops.metadata.hdfs.entity.EncodingPolicy;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
+import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.metadata.hdfs.entity.ProjectedINode;
+import io.hops.metadata.hdfs.entity.SizeLogEntry;
+import io.hops.metadata.ndb.NdbStorageFactory;
 import io.hops.transaction.EntityManager;
 import io.hops.transaction.handler.EncodingStatusOperationType;
 import io.hops.transaction.handler.HDFSOperationType;
@@ -1419,6 +1425,72 @@ public class FSNamesystem
       logAuditEvent(true, "setReplication", src);
     }
     return isFile;
+  }
+
+  void setMetaEnabled(final String src, final boolean metaEnabled)
+      throws IOException {
+    try {
+      INode[] inodes = lockSubtree(src);
+      INode inode = inodes[inodes.length - 1];
+      final AbstractFileTree.FileTree fileTree = new AbstractFileTree.FileTree(
+          FSNamesystem.this, inode.getId());
+      fileTree.buildUp();
+      new HopsTransactionalRequestHandler(HDFSOperationType.SET_META_ENABLED,
+          src) {
+        @Override
+        public void acquireLock(TransactionLocks locks) throws IOException {
+          LockFactory lf = getInstance();
+          locks.add(lf.getINodeLock(nameNode, INodeLockType.WRITE,
+              INodeResolveType.PATH, true, true, src));
+        }
+
+        @Override
+        public Object performTask() throws IOException {
+          try {
+            logMetadataEvents(fileTree, MetadataLogEntry.Operation.ADD);
+            setMetaEnabledInt(src, metaEnabled);
+          } catch (AccessControlException e) {
+            logAuditEvent(false, "setMetaEnabled", src);
+            throw e;
+          }
+          return null;
+        }
+      }.handle(this);
+    } finally {
+      unlockSubtree(src);
+    }
+  }
+
+  private void setMetaEnabledInt(final String src, final boolean metaEnabled)
+      throws IOException {
+    FSPermissionChecker pc = getPermissionChecker();
+    if (isInSafeMode()) {
+      throw new SafeModeException("Cannot set metaEnabled for " + src,
+          safeMode);
+    }
+    if (isPermissionEnabled) {
+      checkPathAccess(pc, src, FsAction.WRITE);
+    }
+
+    INode targetNode = getINode(src);
+    if (!targetNode.isDirectory()) {
+      throw new FileNotFoundException(src + ": Is not a directory");
+    } else {
+      INodeDirectory dirNode = (INodeDirectory) targetNode;
+      dirNode.setMetaEnabled(metaEnabled);
+      EntityManager.update(dirNode);
+    }
+  }
+
+  private void logMetadataEvents(AbstractFileTree.FileTree fileTree,
+      MetadataLogEntry.Operation operation) throws TransactionContextException,
+      StorageException {
+    ProjectedINode datasetDir = fileTree.getSubtreeRoot();
+    for (ProjectedINode node : fileTree.getAllChildren()) {
+      MetadataLogEntry logEntry = new MetadataLogEntry(datasetDir.getId(),
+          node.getId(), operation);
+      EntityManager.add(logEntry);
+    }
   }
 
   long getPreferredBlockSize(final String filename) throws IOException {
@@ -3110,16 +3182,27 @@ public class FSNamesystem
       return;
     }
 
-    if (dir.isQuotaEnabled()) { //HOP
-      // Adjust disk space consumption if required
-      final long diff =
-          fileINode.getPreferredBlockSize() - commitBlock.getNumBytes();
+    if (dir.isQuotaEnabled()) {
+      final long diff = fileINode.getPreferredBlockSize()
+          - commitBlock.getNumBytes();
       if (diff > 0) {
-        String path = leaseManager.findPath(fileINode);
-        dir.updateSpaceConsumed(path, 0,
-            -diff * fileINode.getBlockReplication());
-
+      // Adjust disk space consumption if required
+      String path = leaseManager.findPath(fileINode);
+      dir.updateSpaceConsumed(path, 0,
+          -diff * fileINode.getBlockReplication());
       }
+    }
+
+    fileINode.inrementSize((int) (commitBlock.getNumBytes() / 1024));
+    try {
+      if (fileINode.isPathMetaEnabled()) {
+        SizeLogDataAccess da = (SizeLogDataAccess)
+            HdfsStorageFactory.getDataAccess(SizeLogDataAccess.class);
+        da.add(new SizeLogEntry(fileINode.getId(), fileINode.getSize()));
+      }
+    } catch (StorageCallPreventedException e) {
+      // Path is not available during block synchronization but it is OK
+      // for us if search results are off by one block
     }
   }
 
@@ -5744,7 +5827,8 @@ public class FSNamesystem
     }
 
     try {
-      INode subtreeRoot = lockSubtree(path);
+      INode[] inodes = lockSubtree(path);
+      INode subtreeRoot = inodes[inodes.length - 1];
 
       if (subtreeRoot == null) {
         throw new FileNotFoundException("Directory does not exist: " + path);
@@ -5813,7 +5897,8 @@ public class FSNamesystem
       throws AccessControlException, FileNotFoundException,
       UnresolvedLinkException, IOException {
     try {
-      final INode subtreeRoot = lockSubtree(path);
+      INode[] inodes = lockSubtree(path);
+      final INode subtreeRoot = inodes[inodes.length - 1];
       if (subtreeRoot == null) {
         throw new FileNotFoundException("File does not exist: " + path);
       }
@@ -5889,17 +5974,32 @@ public class FSNamesystem
     }
 
     try {
-      INode srcNode = lockSubtreeAndCheckPathPermission(src, false, null,
+      INode[] srcInodes = lockSubtreeAndCheckPathPermission(src, false, null,
           FsAction.WRITE, null, null);
-      INode dstNode = lockSubtreeAndCheckPathPermission(dst, false,
+      INode srcNode = srcInodes[srcInodes.length - 1];
+      INode[] dstInodes = lockSubtreeAndCheckPathPermission(dst, false,
           FsAction.WRITE, null, null, null);
+      INode dstNode = dstInodes[dstInodes.length - 1];
+
+      INode srcDataset = getMetaEnabledParent(srcInodes);
+      INode dstDataset = getMetaEnabledParent(dstInodes);
 
       long srcNsCount = 0;
       long srcDsCount = 0;
+      Collection<MetadataLogEntry> logEntries = Collections.EMPTY_LIST;
       if (srcNode != null) {
-        AbstractFileTree.QuotaCountingFileTree srcFileTree =
-            new AbstractFileTree.QuotaCountingFileTree(this, srcNode.getId());
-        srcFileTree.buildUp();
+        AbstractFileTree.QuotaCountingFileTree srcFileTree;
+        if (pathIsMetaEnabled(srcInodes) || pathIsMetaEnabled(dstInodes)) {
+          srcFileTree = new AbstractFileTree.LoggingQuotaCountingFileTree(this,
+              srcNode.getId(), srcDataset, dstDataset);
+          srcFileTree.buildUp();
+          logEntries = ((AbstractFileTree.LoggingQuotaCountingFileTree)
+              srcFileTree).getMetadataLogEntries();
+        } else {
+          srcFileTree = new AbstractFileTree.QuotaCountingFileTree(this,
+              srcNode.getId());
+          srcFileTree.buildUp();
+        }
         srcNsCount = srcFileTree.getNamespaceCount();
         srcDsCount = srcFileTree.getDiskspaceCount();
       }
@@ -5915,15 +6015,32 @@ public class FSNamesystem
       }
 
       renameTo(src, dst, srcNsCount, srcDsCount, dstNsCount, dstDsCount,
-          options);
+          logEntries, options);
     } finally {
       unlockSubtree(src);
       unlockSubtree(dst);
     }
   }
 
+  private boolean pathIsMetaEnabled(INode[] pathComponents) {
+    return getMetaEnabledParent(pathComponents) == null ? false : true;
+  }
+
+  private INode getMetaEnabledParent(INode[] pathComponents) {
+    for (INode node : pathComponents) {
+      if (node != null && node.isDirectory()) {
+        INodeDirectory dir = (INodeDirectory) node;
+        if (dir.isMetaEnabled()) {
+          return dir;
+        }
+      }
+    }
+    return null;
+  }
+
   private void renameTo(final String src, final String dst, final long srcNsCount,
       final long srcDsCount, final long dstNsCount, final long dstDsCount,
+      final Collection<MetadataLogEntry> logEntries,
       final Options.Rename... options)
       throws IOException, UnresolvedLinkException {
     new HopsTransactionalRequestHandler(HDFSOperationType.SUBTREE_RENAME, src) {
@@ -5957,6 +6074,10 @@ public class FSNamesystem
         }
         if (!DFSUtil.isValidName(dst)) {
           throw new InvalidPathException("Invalid name: " + dst);
+        }
+
+        for (MetadataLogEntry logEntry : logEntries) {
+          EntityManager.add(logEntry);
         }
 
         dir.renameTo(src, dst, srcNsCount, srcDsCount, dstNsCount, dstDsCount,
@@ -6011,17 +6132,32 @@ public class FSNamesystem
     }
 
     try {
-      INode srcNode = lockSubtreeAndCheckPathPermission(src, false, null,
+      INode[] srcNodes = lockSubtreeAndCheckPathPermission(src, false, null,
           FsAction.WRITE, null, null);
-      INode dstNode = lockSubtreeAndCheckPathPermission(actualdst, false,
+      INode srcNode = srcNodes[srcNodes.length - 1];
+      INode[] dstNodes = lockSubtreeAndCheckPathPermission(actualdst, false,
           FsAction.WRITE, null, null, null);
+      INode dstNode = dstNodes[dstNodes.length - 1];
+
+      INode srcDataset = getMetaEnabledParent(srcNodes);
+      INode dstDataset = getMetaEnabledParent(dstNodes);
 
       long srcNsCount = 0;
       long srcDsCount = 0;
+      Collection<MetadataLogEntry> logEntries = Collections.EMPTY_LIST;
       if (srcNode != null) {
-        AbstractFileTree.QuotaCountingFileTree srcFileTree =
-            new AbstractFileTree.QuotaCountingFileTree(this, srcNode.getId());
-        srcFileTree.buildUp();
+        AbstractFileTree.QuotaCountingFileTree srcFileTree;
+        if (pathIsMetaEnabled(srcNodes) || pathIsMetaEnabled(dstNodes)) {
+          srcFileTree = new AbstractFileTree.LoggingQuotaCountingFileTree(this,
+              srcNode.getId(), srcDataset, dstDataset);
+          srcFileTree.buildUp();
+          logEntries = ((AbstractFileTree.LoggingQuotaCountingFileTree)
+              srcFileTree).getMetadataLogEntries();
+        } else {
+          srcFileTree = new AbstractFileTree.QuotaCountingFileTree(this,
+              srcNode.getId());
+          srcFileTree.buildUp();
+        }
         srcNsCount = srcFileTree.getNamespaceCount();
         srcDsCount = srcFileTree.getDiskspaceCount();
       }
@@ -6036,7 +6172,8 @@ public class FSNamesystem
         dstDsCount = dstFileTree.getDiskspaceCount();
       }
 
-      return renameTo(src, dst, srcNsCount, srcDsCount, dstNsCount, dstDsCount);
+      return renameTo(src, dst, srcNsCount, srcDsCount, dstNsCount, dstDsCount,
+          logEntries);
     } finally {
       unlockSubtree(src);
       unlockSubtree(actualdst);
@@ -6051,7 +6188,8 @@ public class FSNamesystem
    */
   @Deprecated
   boolean renameTo(final String src, final String dst, final long srcNsCount,
-      final long srcDsCount, final long dstNsCount, final long dstDsCount)
+      final long srcDsCount, final long dstNsCount, final long dstDsCount,
+      final Collection<MetadataLogEntry> logEntries)
       throws IOException, UnresolvedLinkException {
     HopsTransactionalRequestHandler renameToHandler =
         new HopsTransactionalRequestHandler(HDFSOperationType.RENAME_TO, src) {
@@ -6082,6 +6220,10 @@ public class FSNamesystem
             }
             if (!DFSUtil.isValidName(dst)) {
               throw new IOException("Invalid name: " + dst);
+            }
+
+            for (MetadataLogEntry logEntry : logEntries) {
+              EntityManager.add(logEntry);
             }
 
             return dir.renameTo(src, dst, srcNsCount, srcDsCount, dstNsCount,
@@ -6136,9 +6278,10 @@ public class FSNamesystem
     }
 
     try {
-      INode subtreeRoot =
-          lockSubtreeAndCheckPathPermission(path, false, null, FsAction.WRITE,
-              null, null);
+      INode[] inodes = lockSubtreeAndCheckPathPermission(path, false, null,
+          FsAction.WRITE, null, null);
+      INode subtreeRoot = inodes[inodes.length - 1];
+
       if (subtreeRoot == null) {
         NameNode.stateChangeLog
             .debug("Failed to remove " + path + " because it does not exist");
@@ -6264,7 +6407,7 @@ public class FSNamesystem
    * @throws IOException
    */
   @VisibleForTesting
-  INode lockSubtree(final String path) throws IOException {
+  INode[] lockSubtree(final String path) throws IOException {
     return lockSubtreeAndCheckPathPermission(path, false, null, null, null,
         null);
   }
@@ -6291,11 +6434,11 @@ public class FSNamesystem
    * @throws IOException
    */
   @VisibleForTesting
-  INode lockSubtreeAndCheckPathPermission(final String path,
+  INode[] lockSubtreeAndCheckPathPermission(final String path,
       final boolean doCheckOwner, final FsAction ancestorAccess,
       final FsAction parentAccess, final FsAction access,
       final FsAction subAccess) throws IOException {
-    return (INode) new HopsTransactionalRequestHandler(
+    return (INode[]) new HopsTransactionalRequestHandler(
         HDFSOperationType.SET_SUBTREE_LOCK) {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
@@ -6319,7 +6462,7 @@ public class FSNamesystem
           inode.setSubtreeLockOwner(getNamenodeId());
           EntityManager.update(inode);
         }
-        return inode;
+        return nodes;
       }
     }.handle(this);
   }

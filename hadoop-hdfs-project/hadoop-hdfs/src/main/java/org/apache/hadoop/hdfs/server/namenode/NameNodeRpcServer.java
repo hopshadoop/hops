@@ -88,6 +88,7 @@ import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ipc.WritableRpcEngine;
 import org.apache.hadoop.net.Node;
+import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.Groups;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.AuthorizationException;
@@ -106,6 +107,7 @@ import org.apache.hadoop.tools.protocolPB.GetUserMappingsProtocolServerSideTrans
 import org.apache.hadoop.util.VersionInfo;
 import org.apache.hadoop.util.VersionUtil;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
@@ -411,6 +413,13 @@ class NameNodeRpcServer implements NamenodeProtocols {
   public boolean setReplication(String src, short replication)
       throws IOException {
     return namesystem.setReplication(src, replication);
+  }
+
+  @Override // ClientProtocol
+  public void setMetaEnabled(String src, boolean metaEnabled)
+      throws AccessControlException, FileNotFoundException, SafeModeException,
+      UnresolvedLinkException, IOException {
+    namesystem.setMetaEnabled(src, metaEnabled);
   }
 
   @Override // ClientProtocol
