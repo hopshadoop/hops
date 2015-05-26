@@ -101,9 +101,8 @@ public class Util {
     LocalEncodingManager encodingManager = new LocalEncodingManager(conf);
 
     BaseEncodingManager.Statistics stats = new BaseEncodingManager.Statistics();
-    return encodingManager
-        .doFileRaid(conf, sourceFile, parityPath, codec, stats,
-            RaidUtils.NULL_PROGRESSABLE, 1, 1);
+    return encodingManager.doFileRaid(conf, sourceFile, parityPath, codec,
+        stats, RaidUtils.NULL_PROGRESSABLE, 1, 1, false);
   }
 
   public static Codec getCodec(Codecs codec) {

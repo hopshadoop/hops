@@ -1008,7 +1008,8 @@ class NameNodeRpcServer implements NamenodeProtocols {
             blockSize);
     if (policy != null && namesystem.isErasureCodingEnabled()) {
       LOG.info("Create file " + src + " with policy " + policy.toString());
-      namesystem.addEncodingStatus(src, policy);
+      namesystem.addEncodingStatus(src, policy,
+          EncodingStatus.Status.ENCODING_REQUESTED);
     }
     return stat;
   }
@@ -1030,7 +1031,8 @@ class NameNodeRpcServer implements NamenodeProtocols {
       throws IOException {
     // TODO Check file access rights?
     // TODO STEFFEN - Throw error if already encoded
-    namesystem.addEncodingStatus(filePath, policy);
+    namesystem.addEncodingStatus(filePath, policy,
+        EncodingStatus.Status.COPY_ENCODING_REQUESTED);
   }
 
   @Override

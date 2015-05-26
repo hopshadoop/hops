@@ -30,7 +30,7 @@ public abstract class EncodingManager extends Configured
   }
 
   public abstract void encodeFile(EncodingPolicy policy, Path sourceFile,
-      Path parityFile);
+      Path parityFile, boolean copy);
 
   public abstract List<Report> computeReports();
 }

@@ -43,15 +43,7 @@ public abstract class ClusterTest extends TestCase {
 
   @Override
   public void tearDown() throws Exception {
-    try {
-      FileStatus[] files = fs.globStatus(new Path("/*"));
-      for (FileStatus file : files) {
-        fs.delete(file.getPath(), true);
-      }
-      fs.close();
-    } finally {
-      cluster.shutdown();
-    }
+    cluster.shutdown();
   }
 
   public FileSystem getFileSystem() {

@@ -204,7 +204,8 @@ public final class Options {
    */
   public static enum Rename {
     NONE((byte) 0), // No options
-    OVERWRITE((byte) 1); // Overwrite the rename destination
+    OVERWRITE((byte) 1),
+    KEEP_ENCODING_STATUS((byte)2 ); // Overwrite the rename destination
 
     private final byte code;
     

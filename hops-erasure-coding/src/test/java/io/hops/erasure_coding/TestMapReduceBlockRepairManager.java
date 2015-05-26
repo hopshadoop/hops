@@ -79,7 +79,7 @@ public class TestMapReduceBlockRepairManager extends ClusterTest {
     Codec.initializeCodecs(conf);
     FileStatus testFileStatus = dfs.getFileStatus(testFile);
     EncodingPolicy policy = new EncodingPolicy("src", (short) 1);
-    encodingManager.encodeFile(policy, testFile, parityFile);
+    encodingManager.encodeFile(policy, testFile, parityFile, false);
 
     // Busy waiting until the encoding is done
     while (encodingManager.computeReports().size() > 0) {
@@ -137,7 +137,7 @@ public class TestMapReduceBlockRepairManager extends ClusterTest {
     Codec.initializeCodecs(conf);
     FileStatus testFileStatus = dfs.getFileStatus(testFile);
     EncodingPolicy policy = new EncodingPolicy("src", (short) 1);
-    encodingManager.encodeFile(policy, testFile, parityFile);
+    encodingManager.encodeFile(policy, testFile, parityFile, false);
 
     // Busy waiting until the encoding is done
     while (encodingManager.computeReports().size() > 0) {
