@@ -30,6 +30,7 @@ import io.hops.transaction.lock.Lock;
 import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLocks;
 import org.apache.hadoop.hdfs.server.namenode.INode;
+import org.apache.hadoop.hdfs.server.namenode.INodeFile;
 
 import java.util.ArrayList;
 import java.util.Arrays;

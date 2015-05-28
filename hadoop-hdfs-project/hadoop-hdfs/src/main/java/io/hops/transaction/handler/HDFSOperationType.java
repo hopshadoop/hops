@@ -32,6 +32,7 @@ public enum HDFSOperationType implements OperationType {
   CREATE_SYM_LINK,
   GET_PREFERRED_BLOCK_SIZE,
   SET_REPLICATION,
+  SET_META_ENABLED,
   START_FILE,
   RECOVER_LEASE,
   APPEND_FILE,
@@ -72,6 +73,7 @@ public enum HDFSOperationType implements OperationType {
   GET_EXCESS_BLOCKS_COUNT,
   SET_ROOT,
   GET_ROOT,
+  GET_METADATA_LOG_ENTRIES,
   //BlockManager
   FIND_AND_MARK_BLOCKS_AS_CORRUPT,
   PREPARE_PROCESS_REPORT,

@@ -49,6 +49,7 @@ import io.hops.metadata.hdfs.dal.INodeDataAccess;
 import io.hops.metadata.hdfs.dal.InvalidateBlockDataAccess;
 import io.hops.metadata.hdfs.dal.LeaseDataAccess;
 import io.hops.metadata.hdfs.dal.LeasePathDataAccess;
+import io.hops.metadata.hdfs.dal.MetadataLogDataAccess;
 import io.hops.metadata.hdfs.dal.PendingBlockDataAccess;
 import io.hops.metadata.hdfs.dal.QuotaUpdateDataAccess;
 import io.hops.metadata.hdfs.dal.ReplicaDataAccess;
@@ -62,6 +63,7 @@ import io.hops.metadata.hdfs.entity.ExcessReplica;
 import io.hops.metadata.hdfs.entity.IndexedReplica;
 import io.hops.metadata.hdfs.entity.InvalidatedBlock;
 import io.hops.metadata.hdfs.entity.LeasePath;
+import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.metadata.hdfs.entity.QuotaUpdate;
 import io.hops.metadata.hdfs.entity.UnderReplicatedBlock;
 import io.hops.transaction.EntityManager;
@@ -78,6 +80,7 @@ import io.hops.transaction.context.InvalidatedBlockContext;
 import io.hops.transaction.context.LeSnapshot;
 import io.hops.transaction.context.LeaseContext;
 import io.hops.transaction.context.LeasePathContext;
+import io.hops.transaction.context.MetadataLogContext;
 import io.hops.transaction.context.PendingBlockContext;
 import io.hops.transaction.context.QuotaUpdateContext;
 import io.hops.transaction.context.ReplicaContext;
@@ -284,6 +287,9 @@ public class HdfsStorageFactory {
         entityContexts.put(QuotaUpdate.class, new QuotaUpdateContext(
             (QuotaUpdateDataAccess) getDataAccess(
                 QuotaUpdateDataAccess.class)));
+        entityContexts.put(MetadataLogEntry.class, new MetadataLogContext(
+            (MetadataLogDataAccess) getDataAccess(MetadataLogDataAccess.class)
+        ));
 
         return entityContexts;
       }

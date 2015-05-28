@@ -300,6 +300,20 @@ public class ClientNamenodeProtocolTranslatorPB
   }
 
   @Override
+  public void setMetaEnabled(String src, boolean metaEnabled)
+      throws AccessControlException, FileNotFoundException, SafeModeException,
+      UnresolvedLinkException, IOException {
+    ClientNamenodeProtocolProtos.SetMetaEnabledRequestProto req =
+        ClientNamenodeProtocolProtos.SetMetaEnabledRequestProto.newBuilder()
+            .setSrc(src).setMetaEnabled(metaEnabled).build();
+    try {
+      rpcProxy.setMetaEnabled(null, req);
+    } catch (ServiceException e) {
+      throw ProtobufHelper.getRemoteException(e);
+    }
+  }
+
+  @Override
   public void setPermission(String src, FsPermission permission)
       throws AccessControlException, FileNotFoundException, SafeModeException,
       UnresolvedLinkException, IOException {

@@ -19,8 +19,12 @@ package org.apache.hadoop.hdfs.server.namenode;
 
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
+import io.hops.metadata.HdfsStorageFactory;
+import io.hops.metadata.hdfs.dal.MetadataLogDataAccess;
+import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.transaction.EntityManager;
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
@@ -62,6 +66,7 @@ public class INodeFile extends INode implements BlockCollection {
 
   private long header;
   private int generationStamp = (int) GenerationStamp.FIRST_VALID_STAMP;
+  private int size;
   
 
   public INodeFile(PermissionStatus permissions, BlockInfo[] blklist,
@@ -85,6 +90,7 @@ public class INodeFile extends INode implements BlockCollection {
     setReplicationNoPersistance(other.getBlockReplication());
     setPreferredBlockSizeNoPersistance(other.getPreferredBlockSize());
     setGenerationStampNoPersistence(other.getGenerationStamp());
+    setSize(other.getSize());
   }
 
   /**
@@ -372,4 +378,17 @@ public class INodeFile extends INode implements BlockCollection {
     return generationStamp;
   }
 
+  public int getSize() {
+    return size;
+  }
+
+  public void setSize(int size) {
+    this.size = size;
+  }
+
+  public void inrementSize(int increment)
+      throws TransactionContextException, StorageException {
+    this.size += increment;
+    save();
+  }
 }

@@ -27,6 +27,7 @@ import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.BlockInfoDataAccess;
 import io.hops.metadata.hdfs.dal.INodeAttributesDataAccess;
 import io.hops.metadata.hdfs.dal.INodeDataAccess;
+import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.metadata.hdfs.entity.ProjectedINode;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
@@ -166,6 +167,10 @@ abstract class AbstractFileTree {
     if (!pc.isSuperUser() && node.isDirectory()) {
       pc.check(node, action);
     }
+  }
+
+  public int getSubtreeRootId() {
+    return subtreeRootId;
   }
 
   public void buildUp() throws IOException {
@@ -449,6 +454,47 @@ abstract class AbstractFileTree {
 
     long getDiskspaceCount() {
       return diskspaceCount.get();
+    }
+  }
+
+  static class LoggingQuotaCountingFileTree extends QuotaCountingFileTree {
+    private LinkedList<MetadataLogEntry> metadataLogEntries =
+        new LinkedList<MetadataLogEntry>();
+    private final INode srcDataset;
+    private final INode dstDataset;
+    public LoggingQuotaCountingFileTree(
+        FSNamesystem namesystem, int subtreeRootId, INode srcDataset,
+        INode dstDataset) {
+      super(namesystem, subtreeRootId);
+      this.srcDataset = srcDataset;
+      this.dstDataset = dstDataset;
+    }
+
+    public LoggingQuotaCountingFileTree(
+        FSNamesystem namesystem, int subtreeRootId,
+        FsAction subAccess, INode srcDataset,
+        INode dstDataset) {
+      super(namesystem, subtreeRootId, subAccess);
+      this.srcDataset = srcDataset;
+      this.dstDataset = dstDataset;
+    }
+
+    @Override
+    protected void addChildNode(int level, ProjectedINode node,
+        boolean quotaEnabledBranch) {
+      if (srcDataset != null) {
+        metadataLogEntries.add(new MetadataLogEntry(srcDataset.getId(),
+            node.getId(), MetadataLogEntry.Operation.DELETE));
+      }
+      if (dstDataset != null) {
+        metadataLogEntries.add(new MetadataLogEntry(dstDataset.getId(),
+            node.getId(), MetadataLogEntry.Operation.ADD));
+      }
+      super.addChildNode(level, node, quotaEnabledBranch);
+    }
+
+    public Collection<MetadataLogEntry> getMetadataLogEntries() {
+      return metadataLogEntries;
     }
   }
 

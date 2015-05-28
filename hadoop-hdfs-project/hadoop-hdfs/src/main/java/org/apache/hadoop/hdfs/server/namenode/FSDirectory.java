@@ -23,9 +23,12 @@ import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.resolvingcache.Cache;
 import io.hops.metadata.HdfsStorageFactory;
+import io.hops.metadata.hdfs.dal.AccessTimeLogDataAccess;
 import io.hops.metadata.hdfs.dal.INodeAttributesDataAccess;
 import io.hops.metadata.hdfs.dal.INodeDataAccess;
+import io.hops.metadata.hdfs.entity.AccessTimeLogEntry;
 import io.hops.metadata.hdfs.entity.INodeCandidatePrimaryKey;
+import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.metadata.hdfs.entity.QuotaUpdate;
 import io.hops.transaction.EntityManager;
 import io.hops.transaction.context.HdfsTransactionContextMaintenanceCmds;
@@ -62,6 +65,7 @@ import org.apache.hadoop.hdfs.server.blockmanagement.BlockManager;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.BlockUCState;
 import org.apache.hadoop.hdfs.util.ByteArray;
+import org.apache.hadoop.security.AccessControlException;
 
 import java.io.Closeable;
 import java.io.FileNotFoundException;
@@ -341,6 +345,8 @@ public class FSDirectory implements Closeable {
               file.getBlocks().length +
               " blocks is persisted to the file system");
     }
+
+    file.logMetadataEvent(MetadataLogEntry.Operation.ADD);
   }
 
   /**
@@ -2098,6 +2104,7 @@ public class FSDirectory implements Closeable {
     INode removedNode = null;
     if (forRename) {
       removedNode = pathComponents[pos];
+      removedNode.logMetadataEvent(MetadataLogEntry.Operation.DELETE);
     } else {
       removedNode = ((INodeDirectory) pathComponents[pos - 1])
           .removeChild(pathComponents[pos]);
@@ -2150,6 +2157,7 @@ public class FSDirectory implements Closeable {
     INode removedNode = null;
     if (forRename) {
       removedNode = pathComponents[pos];
+      removedNode.logMetadataEvent(MetadataLogEntry.Operation.DELETE);
     } else {
       removedNode = ((INodeDirectory) pathComponents[pos - 1])
           .removeChild(pathComponents[pos]);
@@ -2463,20 +2471,22 @@ public class FSDirectory implements Closeable {
    * log.
    */
   void setTimes(String src, INode inode, long mtime, long atime, boolean force)
-      throws StorageException, TransactionContextException {
+      throws StorageException, TransactionContextException,
+      AccessControlException {
     unprotectedSetTimes(src, inode, mtime, atime, force);
   }
 
   boolean unprotectedSetTimes(String src, long mtime, long atime, boolean force)
       throws UnresolvedLinkException, StorageException,
-      TransactionContextException {
+      TransactionContextException, AccessControlException {
     INode inode = getINode(src);
     return unprotectedSetTimes(src, inode, mtime, atime, force);
   }
 
   private boolean unprotectedSetTimes(String src, INode inode, long mtime,
       long atime, boolean force)
-      throws StorageException, TransactionContextException {
+      throws StorageException, TransactionContextException,
+      AccessControlException {
     boolean status = false;
     if (mtime != -1) {
       inode.setModificationTimeForce(mtime);
@@ -2747,5 +2757,4 @@ public class FSDirectory implements Closeable {
     }
     return clone;
   }
-
 }
