@@ -450,16 +450,21 @@ public class ClientNamenodeProtocolTranslatorPB
       NSQuotaExceededException, ParentNotDirectoryException, SafeModeException,
       UnresolvedLinkException, IOException {
     boolean overwrite = false;
+    boolean keepEncodingStatus = false;
     if (options != null) {
       for (Rename option : options) {
         if (option == Rename.OVERWRITE) {
           overwrite = true;
+        }
+        if (option == Rename.KEEP_ENCODING_STATUS) {
+          keepEncodingStatus = true;
         }
       }
     }
     Rename2RequestProto req = Rename2RequestProto.newBuilder().
         setSrc(src).
         setDst(dst).setOverwriteDest(overwrite).
+        setKeepEncodingStatus(keepEncodingStatus).
         build();
     try {
       rpcProxy.rename2(null, req);

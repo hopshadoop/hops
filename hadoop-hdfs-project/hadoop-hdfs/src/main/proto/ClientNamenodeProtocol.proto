@@ -224,6 +224,7 @@ message Rename2RequestProto {
   required string src = 1;
   required string dst = 2;
   required bool overwriteDest = 3;
+  optional bool keepEncodingStatus = 4;
 }
 
 message Rename2ResponseProto { // void response
@@ -455,23 +456,17 @@ message ActiveNamenodeListResponseProto {
 }
 
 message EncodingStatusProto {
-  enum StatusProto {
-    NOT_ENCODED = 0;
-    ENCODING_REQUESTED = 1;
-    ENCODING_ACTIVE = 2;
-    ENCODING_CANCELED = 3;
-    ENCODING_FAILED = 4;
-    ENCODED = 5;
-    REPAIR_REQUESTED = 6;
-    REPAIR_ACTIVE = 7;
-    REPAIR_CANCELED = 8;
-    REPAIR_FAILED = 9;
-    DELETED = 10;
-  }
-
-  required StatusProto status = 1;
-  optional EncodingPolicyProto policy = 2;
-  optional string parityFileName = 3;
+  optional uint32 inodeId = 1;
+  optional uint32 parityInodeId = 2;
+  required uint32 status = 3;
+  optional uint32 parityStatus = 4;
+  optional EncodingPolicyProto policy = 5;
+  optional uint64 statusModificationTime = 6;
+  optional uint64 parityStatusModificationTime = 7;
+  optional string parityFileName = 8;
+  optional uint32 lostBlocks = 9;
+  optional uint32 lostParityBlocks = 10;
+  optional bool revoked = 11;
 }
 
 message GetEncodingStatusRequestProto {

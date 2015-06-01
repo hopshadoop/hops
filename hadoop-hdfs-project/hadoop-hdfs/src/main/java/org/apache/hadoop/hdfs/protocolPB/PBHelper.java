@@ -1321,26 +1321,83 @@ public class PBHelper {
 
   public static EncodingStatus convert(
       ClientNamenodeProtocolProtos.EncodingStatusProto encodingStatusProto) {
-    EncodingStatus.Status status = convert(encodingStatusProto.getStatus());
-    EncodingPolicy policy = encodingStatusProto.hasPolicy() ?
-        PBHelper.convert(encodingStatusProto.getPolicy()) : null;
-    String parityFileName = encodingStatusProto.hasParityFileName() ?
-        encodingStatusProto.getParityFileName() : null;
-    return new EncodingStatus(status, policy, parityFileName);
+    EncodingStatus status = new EncodingStatus();
+    if (encodingStatusProto.hasInodeId()) {
+      status.setInodeId(encodingStatusProto.getInodeId());
+    }
+    if (encodingStatusProto.hasParityInodeId()) {
+      status.setParityInodeId(encodingStatusProto.getParityInodeId());
+    }
+    status.setStatus(EncodingStatus.Status.values()[
+        encodingStatusProto.getStatus()]);
+    if (encodingStatusProto.hasParityStatus()) {
+      status.setParityStatus(EncodingStatus.ParityStatus.values()[
+          encodingStatusProto.getParityStatus()]);
+    }
+    if (encodingStatusProto.hasPolicy()) {
+      status.setEncodingPolicy(
+          PBHelper.convert(encodingStatusProto.getPolicy()));
+    }
+    if (encodingStatusProto.hasStatusModificationTime()) {
+      status.setStatusModificationTime(
+          encodingStatusProto.getStatusModificationTime());
+    }
+    if (encodingStatusProto.hasParityStatusModificationTime()) {
+      status.setParityStatusModificationTime(
+          encodingStatusProto.getParityStatusModificationTime());
+    }
+    if (encodingStatusProto.hasParityFileName()) {
+      status.setParityFileName(encodingStatusProto.getParityFileName());
+    }
+    if (encodingStatusProto.hasLostBlocks()) {
+      status.setLostBlocks(encodingStatusProto.getLostBlocks());
+    }
+    if (encodingStatusProto.hasLostParityBlocks()) {
+      status.setLostParityBlocks(encodingStatusProto.getLostParityBlocks());
+    }
+    if (encodingStatusProto.hasRevoked()) {
+      status.setRevoked(encodingStatusProto.getRevoked());
+    }
+    return status;
   }
 
   public static ClientNamenodeProtocolProtos.EncodingStatusProto convert(
       EncodingStatus encodingStatus) {
-    ClientNamenodeProtocolProtos.EncodingStatusProto.StatusProto status =
-        convert(encodingStatus.getStatus());
     ClientNamenodeProtocolProtos.EncodingStatusProto.Builder builder =
         ClientNamenodeProtocolProtos.EncodingStatusProto.newBuilder();
-    builder.setStatus(status);
+    if (encodingStatus.getInodeId() != null) {
+      builder.setInodeId(encodingStatus.getInodeId());
+    }
+    if (encodingStatus.getParityInodeId() != null) {
+      builder.setParityInodeId(encodingStatus.getParityInodeId());
+    }
+    builder.setStatus(encodingStatus.getStatus().ordinal());
+    if (encodingStatus.getParityStatus() != null) {
+      builder.setParityStatus(encodingStatus.getParityStatus().ordinal());
+    }
     if (encodingStatus.getEncodingPolicy() != null) {
-      builder.setPolicy(PBHelper.convert(encodingStatus.getEncodingPolicy()));
+      builder.setPolicy(PBHelper.convert(
+          encodingStatus.getEncodingPolicy()));
+    }
+    if (encodingStatus.getStatusModificationTime() != null) {
+      builder.setStatusModificationTime(
+          encodingStatus.getStatusModificationTime());
+    }
+    if (encodingStatus.getParityStatusModificationTime() != null) {
+      builder.setParityStatusModificationTime(
+          encodingStatus.getParityStatusModificationTime());
     }
     if (encodingStatus.getParityFileName() != null) {
       builder.setParityFileName(encodingStatus.getParityFileName());
+    }
+    if (encodingStatus.getLostBlocks() != null) {
+      builder.setLostBlocks(encodingStatus.getLostBlocks());
+    }
+    if (encodingStatus.getLostParityBlocks() != null) {
+      builder.setLostParityBlocks(encodingStatus.getLostParityBlocks());
+    }
+    if (encodingStatus.getRevoked() != null) {
+      builder.setRevoked(encodingStatus.getRevoked());
     }
     return builder.build();
   }
@@ -1359,66 +1416,4 @@ public class PBHelper {
     return new EncodingPolicy(encodingPolicyProto.getCodec(),
         (short) encodingPolicyProto.getTargetReplication());
   }
-
-  public static EncodingStatus.Status convert(
-      ClientNamenodeProtocolProtos.EncodingStatusProto.StatusProto status) {
-    switch (status) {
-      case NOT_ENCODED:
-        return EncodingStatus.Status.NOT_ENCODED;
-      case ENCODING_REQUESTED:
-        return EncodingStatus.Status.ENCODING_REQUESTED;
-      case ENCODING_ACTIVE:
-        return EncodingStatus.Status.ENCODING_ACTIVE;
-      case ENCODING_CANCELED:
-        return EncodingStatus.Status.ENCODING_CANCELED;
-      case ENCODING_FAILED:
-        return EncodingStatus.Status.ENCODING_FAILED;
-      case ENCODED:
-        return EncodingStatus.Status.ENCODED;
-      case REPAIR_REQUESTED:
-        return EncodingStatus.Status.REPAIR_REQUESTED;
-      case REPAIR_ACTIVE:
-        return EncodingStatus.Status.REPAIR_ACTIVE;
-      case REPAIR_CANCELED:
-        return EncodingStatus.Status.REPAIR_CANCELED;
-      case REPAIR_FAILED:
-        return EncodingStatus.Status.REPAIR_FAILED;
-      case DELETED:
-        return EncodingStatus.Status.DELETED;
-      default:
-        throw new RuntimeException("Trying to convert and unknown status");
-    }
-  }
-
-  public static ClientNamenodeProtocolProtos.EncodingStatusProto.StatusProto convert(
-      EncodingStatus.Status status) {
-    switch (status) {
-      case NOT_ENCODED:
-        return ClientNamenodeProtocolProtos.EncodingStatusProto.StatusProto.NOT_ENCODED;
-      case ENCODING_REQUESTED:
-        return ClientNamenodeProtocolProtos.EncodingStatusProto.StatusProto.ENCODING_REQUESTED;
-      case ENCODING_ACTIVE:
-        return ClientNamenodeProtocolProtos.EncodingStatusProto.StatusProto.ENCODING_ACTIVE;
-      case ENCODING_CANCELED:
-        return ClientNamenodeProtocolProtos.EncodingStatusProto.StatusProto.ENCODING_CANCELED;
-      case ENCODING_FAILED:
-        return ClientNamenodeProtocolProtos.EncodingStatusProto.StatusProto.ENCODING_FAILED;
-      case ENCODED:
-        return ClientNamenodeProtocolProtos.EncodingStatusProto.StatusProto.ENCODED;
-      case REPAIR_REQUESTED:
-        return ClientNamenodeProtocolProtos.EncodingStatusProto.StatusProto.REPAIR_REQUESTED;
-      case REPAIR_ACTIVE:
-        return ClientNamenodeProtocolProtos.EncodingStatusProto.StatusProto.REPAIR_ACTIVE;
-      case REPAIR_CANCELED:
-        return ClientNamenodeProtocolProtos.EncodingStatusProto.StatusProto.REPAIR_CANCELED;
-      case REPAIR_FAILED:
-        return ClientNamenodeProtocolProtos.EncodingStatusProto.StatusProto.REPAIR_FAILED;
-      case DELETED:
-        return ClientNamenodeProtocolProtos.EncodingStatusProto.StatusProto.DELETED;
-      default:
-        throw new RuntimeException("Trying to convert and unknown status");
-    }
-  }
-
-
 }

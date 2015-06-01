@@ -15,10 +15,12 @@
  */
 package io.hops.erasure_coding;
 
+import com.google.common.collect.Iterables;
 import io.hops.metadata.hdfs.entity.EncodingPolicy;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
@@ -26,9 +28,12 @@ import org.apache.hadoop.hdfs.BlockMissingException;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
+import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.util.HashSet;
+import java.util.Set;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_REPLICATION_KEY;
@@ -50,7 +55,7 @@ public class TestMapReduceEncodingManager extends ClusterTest {
     conf.setLong(DFS_BLOCK_SIZE_KEY, DFS_TEST_BLOCK_SIZE);
     conf.setInt(DFS_REPLICATION_KEY, 1);
     conf.set(DFSConfigKeys.ERASURE_CODING_CODECS_KEY, Util.JSON_CODEC_ARRAY);
-    numDatanode = 16;
+    numDatanode = 20; // Sometimes a node gets excluded during the test
   }
 
   @Override
@@ -66,15 +71,12 @@ public class TestMapReduceEncodingManager extends ClusterTest {
 
     Util.createRandomFile(dfs, testFile, seed, TEST_BLOCK_COUNT,
         DFS_TEST_BLOCK_SIZE);
-    FileStatus testFileStatus = dfs.getFileStatus(testFile);
     Codec.initializeCodecs(conf);
     EncodingPolicy policy = new EncodingPolicy("src", (short) 1);
-    encodingManager.encodeFile(policy, testFile, parityFile);
+    encodingManager.encodeFile(policy, testFile, parityFile, false);
 
     // Busy waiting until the encoding is done
-    while (encodingManager.computeReports().size() > 0) {
-      ;
-    }
+    while (encodingManager.computeReports().size() > 0) {}
     FileStatus parityStatus = dfs.getFileStatus(parityFile);
     assertEquals(parityStatus.getLen(), 6 * DFS_TEST_BLOCK_SIZE);
     try {

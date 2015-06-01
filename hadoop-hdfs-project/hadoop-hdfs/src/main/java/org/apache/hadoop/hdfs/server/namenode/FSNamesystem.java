@@ -1890,12 +1890,24 @@ public class FSNamesystem
                 .add(lf.getLeasePathLock(LockType.WRITE)).add(
                 lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR,
                     BLK.IV, BLK.PE));
+            // Always needs to be read. Erasure coding might have been
+            // enabled earlier and we don't want to end up in an inconsistent
+            // state.
+            locks.add(lf.getEncodingStatusLock(LockType.READ_COMMITTED, src));
           }
 
 
           @Override
           public Object performTask() throws IOException {
             try {
+              INode target = getINode(src);
+              if (target != null) {
+                EncodingStatus status = EntityManager.find(
+                    EncodingStatus.Finder.ByInodeId, target.getId());
+                if (status != null) {
+                  throw new IOException("Cannot append to erasure-coded file");
+                }
+              }
               return appendFileInt(src, holder, clientMachine);
             } catch (AccessControlException e) {
               logAuditEvent(false, "append", src);
@@ -6073,6 +6085,24 @@ public class FSNamesystem
           EntityManager.add(logEntry);
         }
 
+        for (Options.Rename op : options) {
+          if (op == Rename.KEEP_ENCODING_STATUS) {
+            INode[] srcNodes =
+                dir.getRootDir().getExistingPathINodes(src, false);
+            INode[] dstNodes =
+                dir.getRootDir().getExistingPathINodes(dst, false);
+            INode srcNode = srcNodes[srcNodes.length - 1];
+            INode dstNode = dstNodes[dstNodes.length - 1];
+            EncodingStatus status = EntityManager.find(
+                EncodingStatus.Finder.ByInodeId, dstNode.getId());
+            EncodingStatus newStatus = new EncodingStatus(status);
+            newStatus.setInodeId(srcNode.getId());
+            EntityManager.add(newStatus);
+            EntityManager.remove(status);
+            break;
+          }
+        }
+
         dir.renameTo(src, dst, srcNsCount, srcDsCount, dstNsCount, dstDsCount,
             options);
         return null;
@@ -6523,7 +6553,19 @@ public class FSNamesystem
 
           @Override
           public Object performTask() throws IOException {
+            FSPermissionChecker pc = getPermissionChecker();
+            try {
+              if (isPermissionEnabled) {
+                checkPathAccess(pc, filePath, FsAction.READ);
+              }
+            } catch (AccessControlException e){
+              logAuditEvent(false, "getEncodingStatus", filePath);
+              throw e;
+            }
             INode targetNode = getINode(filePath);
+            if (targetNode == null) {
+              throw new FileNotFoundException();
+            }
             return EntityManager
                 .find(EncodingStatus.Finder.ByInodeId, targetNode.getId());
           }
@@ -6611,7 +6653,8 @@ public class FSNamesystem
    * @throws IOException
    */
   public void addEncodingStatus(final String sourcePath,
-      final EncodingPolicy policy) throws IOException {
+      final EncodingPolicy policy, final EncodingStatus.Status status)
+      throws IOException {
     new HopsTransactionalRequestHandler(HDFSOperationType.ADD_ENCODING_STATUS) {
 
       @Override
@@ -6619,14 +6662,30 @@ public class FSNamesystem
         LockFactory lf = LockFactory.getInstance();
         locks.add(lf.getINodeLock(nameNode, INodeLockType.WRITE,
             INodeResolveType.PATH, sourcePath));
+        locks.add(lf.getEncodingStatusLock(LockType.WRITE, sourcePath));
       }
 
       @Override
       public Object performTask() throws IOException {
+        FSPermissionChecker pc = getPermissionChecker();
+        try {
+          if (isPermissionEnabled) {
+            checkPathAccess(pc, sourcePath, FsAction.WRITE);
+          }
+        } catch (AccessControlException e){
+          logAuditEvent(false, "encodeFile", sourcePath);
+          throw e;
+        }
+        INode target = getINode(sourcePath);
+        EncodingStatus existing = EntityManager.find(
+            EncodingStatus.Finder.ByInodeId, target.getId());
+        if (existing != null) {
+          throw new IOException("Attempting to request encoding for an" +
+              "encoded file");
+        }
         int inodeId = dir.getINode(sourcePath).getId();
-        EncodingStatus encodingStatus = new EncodingStatus(inodeId,
-            EncodingStatus.Status.ENCODING_REQUESTED, policy,
-            System.currentTimeMillis());
+        EncodingStatus encodingStatus = new EncodingStatus(inodeId, status,
+            policy, System.currentTimeMillis());
         EntityManager.add(encodingStatus);
         return null;
       }
@@ -6712,6 +6771,15 @@ public class FSNamesystem
 
       @Override
       public Object performTask() throws IOException {
+        FSPermissionChecker pc = getPermissionChecker();
+        try {
+          if (isPermissionEnabled) {
+            checkPathAccess(pc, filePath, FsAction.WRITE);
+          }
+        } catch (AccessControlException e){
+          logAuditEvent(false, "revokeEncoding", filePath);
+          throw e;
+        }
         INode targetNode = getINode(filePath);
         EncodingStatus encodingStatus = EntityManager
             .find(EncodingStatus.Finder.ByInodeId, targetNode.getId());
@@ -6843,6 +6911,15 @@ public class FSNamesystem
 
       @Override
       public Object performTask() throws IOException {
+        FSPermissionChecker pc = getPermissionChecker();
+        try {
+          if (isPermissionEnabled) {
+            checkPathAccess(pc, src, FsAction.WRITE);
+          }
+        } catch (AccessControlException e){
+          logAuditEvent(false, "addBlockChecksum", src);
+          throw e;
+        }
         int inodeId = dir.getINode(src).getId();
         BlockChecksum blockChecksum =
             new BlockChecksum(inodeId, blockIndex, checksum);
@@ -6870,6 +6947,15 @@ public class FSNamesystem
 
       @Override
       public Object performTask() throws IOException {
+        FSPermissionChecker pc = getPermissionChecker();
+        try {
+          if (isPermissionEnabled) {
+            checkPathAccess(pc, src, FsAction.READ);
+          }
+        } catch (AccessControlException e){
+          logAuditEvent(false, "getBlockChecksum", src);
+          throw e;
+        }
         INode node = dir.getINode(src);
         BlockChecksumDataAccess.KeyTuple key =
             new BlockChecksumDataAccess.KeyTuple(node.getId(), blockIndex);
@@ -6877,7 +6963,6 @@ public class FSNamesystem
             EntityManager.find(BlockChecksum.Finder.ByKeyTuple, key);
 
         if (checksum == null) {
-          // TODO Should probably use a specific exception type.
           throw new IOException("No checksum was found for " + key);
         }
 

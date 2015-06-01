@@ -144,7 +144,7 @@ public class BlockReconstructor extends Configured {
   public boolean processParityFile(Path sourceFile, Path parityFile,
       LocatedBlocks missingBlocks, Decoder decoder, Context context)
       throws IOException, InterruptedException {
-    LOG.info("Processing parity file " + sourceFile.toString());
+    LOG.info("Processing parity file for " + sourceFile.toString());
 
     Progressable progress = context;
     if (progress == null) {
@@ -158,13 +158,6 @@ public class BlockReconstructor extends Configured {
     FileStatus parityStat = parityFs.getFileStatus(parityPath);
     long blockSize = parityStat.getBlockSize();
     FileStatus srcStat = srcFs.getFileStatus(srcPath);
-
-    // Check timestamp.
-    if (srcStat.getModificationTime() != parityStat.getModificationTime()) {
-      LOG.warn("Mismatching timestamp for " + srcPath + " and " + parityPath +
-          ", ignoring...");
-      return false;
-    }
 
     int numBlocksReconstructed = 0;
     for (LocatedBlock lb : missingBlocks.getLocatedBlocks()) {

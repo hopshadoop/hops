@@ -352,17 +352,17 @@ public class TestEncodingStatus extends TestCase {
         EncodingStatusDataAccess dataAccess =
             (EncodingStatusDataAccess) HdfsStorageFactory
                 .getDataAccess(EncodingStatusDataAccess.class);
-        Long limit = (Long) getParams()[0];
+        Integer limit = (Integer) getParams()[0];
         return dataAccess.findRequestedEncodings(limit);
       }
     };
-    findReq.setParams(Long.MAX_VALUE);
+    findReq.setParams(100);
     Collection<EncodingStatus> foundStatus =
         (Collection<EncodingStatus>) findReq.handle();
     assertEquals(count(statusToAdd, EncodingStatus.Status.ENCODING_REQUESTED),
         count(foundStatus, EncodingStatus.Status.ENCODING_REQUESTED));
 
-    long limit = 1;
+    int limit = 1;
     findReq.setParams(limit);
     foundStatus = (Collection<EncodingStatus>) findReq.handle();
     assertEquals(count(foundStatus, EncodingStatus.Status.ENCODING_REQUESTED),
