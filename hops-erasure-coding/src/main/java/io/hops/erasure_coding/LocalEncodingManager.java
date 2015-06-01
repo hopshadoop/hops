@@ -35,8 +35,6 @@ public class LocalEncodingManager extends BaseEncodingManager {
 
   public static final Log LOG = LogFactory.getLog(LocalEncodingManager.class);
 
-  private boolean initialized = false;
-
   public LocalEncodingManager(Configuration conf) throws IOException {
     super(conf);
 
@@ -46,15 +44,6 @@ public class LocalEncodingManager extends BaseEncodingManager {
   @Override
   public void encodeFile(EncodingPolicy policy, Path sourceFile,
       Path parityFile, boolean copy) {
-    if (!initialized) {
-      try {
-        cleanUpTempDirectory(conf);
-      } catch (IOException e) {
-        LOG.error("Cleanup tmp failed ", e);
-      }
-      initialized = true;
-    }
-
     Codec codec = Codec.getCodec(policy.getCodec());
     PolicyInfo policyInfo = new PolicyInfo();
     try {

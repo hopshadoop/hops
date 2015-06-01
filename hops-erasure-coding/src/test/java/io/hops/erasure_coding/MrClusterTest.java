@@ -15,42 +15,31 @@
  */
 package io.hops.erasure_coding;
 
-import junit.framework.TestCase;
+import io.hops.metadata.util.RMStorageFactory;
+import io.hops.metadata.util.YarnAPIStorageFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.hadoop.mapreduce.v2.MiniMRYarnCluster;
 
-public abstract class ClusterTest extends TestCase {
-
-  protected static final int DFS_TEST_BLOCK_SIZE = 4 * 1024;
-
-  protected int numDatanode = 3;
-  protected MiniDFSCluster cluster;
-  protected FileSystem fs;
-
-  protected abstract Configuration getConfig();
+public abstract class MrClusterTest extends ClusterTest {
+  protected MiniMRYarnCluster mrCluster;
 
   @Override
   public void setUp() throws Exception {
-    cluster = new MiniDFSCluster.Builder(getConfig()).numDataNodes(numDatanode)
-        .build();
-    cluster.waitActive();
-    fs = cluster.getFileSystem();
+    super.setUp();
+    Configuration conf = new Configuration(getConfig());
+    mrCluster = new MiniMRYarnCluster(this.getClass().getName(), numDatanode);
+    conf.set("fs.defaultFS", fs.getUri().toString());
+    YarnAPIStorageFactory.setConfiguration(conf);
+    RMStorageFactory.setConfiguration(conf);
+    mrCluster.init(conf);
+    mrCluster.start();
   }
 
   @Override
   public void tearDown() throws Exception {
-    if (cluster != null) {
-      cluster.shutdown();
+    super.tearDown();
+    if (mrCluster != null) {
+      mrCluster.stop();
     }
   }
-
-  public FileSystem getFileSystem() {
-    return fs;
-  }
-
-  public MiniDFSCluster getCluster() {
-    return cluster;
-  }
 }
-

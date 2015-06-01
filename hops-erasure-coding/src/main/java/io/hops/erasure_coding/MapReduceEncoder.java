@@ -18,6 +18,7 @@
 
 package io.hops.erasure_coding;
 
+import io.hops.metadata.hdfs.entity.EncodingJob;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -34,6 +35,7 @@ import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobClient;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.JobID;
+import org.apache.hadoop.mapred.JobStatus;
 import org.apache.hadoop.mapred.Mapper;
 import org.apache.hadoop.mapred.OutputCollector;
 import org.apache.hadoop.mapred.RecordReader;
@@ -97,6 +99,25 @@ public class MapReduceEncoder {
 
   public MapReduceEncoder(Configuration conf) {
     setConf(createJobConf(conf));
+  }
+
+  /**
+   * Recovery constructor for NameNode failures.
+   *
+   * The job start time is currently not recovered. This means that jobs might
+   * need more time to timeout after recovery.
+   *
+   * @param job the job to recover
+   */
+  MapReduceEncoder(Configuration conf, EncodingJob job) throws IOException {
+    jobconf = new JobConf(conf);
+    jobconf.set(JOB_DIR_LABEL, job.getJobDir());
+    JobID jobID = new JobID(job.getJtIdentifier(), job.getJobId());
+    JobClient jobClient = new JobClient(jobconf);
+    runningJob = jobClient.getJob(jobID);
+    if (runningJob == null) {
+      throw new IOException("Failed to recover");
+    }
   }
 
   private static final Random RANDOM = new Random();
@@ -325,7 +346,6 @@ public class MapReduceEncoder {
       } else {
         LOG.info("Job Complete(Failed): " + jobID);
       }
-      cleanUp();
       return true;
     } else {
       String report = (" job " + jobID +
@@ -350,20 +370,6 @@ public class MapReduceEncoder {
 
   public void killJob() throws IOException {
     runningJob.killJob();
-  }
-
-  public void cleanUp() {
-    for (Codec codec : Codec.getCodecs()) {
-      Path tmpdir = new Path(codec.tmpParityDirectory, this.getJobID());
-      try {
-        FileSystem fs = tmpdir.getFileSystem(jobconf);
-        if (fs.exists(tmpdir)) {
-          fs.delete(tmpdir, true);
-        }
-      } catch (IOException ioe) {
-        LOG.error("Fail to delete " + tmpdir, ioe);
-      }
-    }
   }
 
   public boolean successful() throws IOException {
@@ -420,7 +426,7 @@ public class MapReduceEncoder {
     return this.runningJob.getCounters();
   }
 
-  public String getJobID() {
-    return this.runningJob.getID().toString();
+  public JobID getJobID() {
+    return this.runningJob.getID();
   }
 }

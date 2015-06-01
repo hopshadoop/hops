@@ -17,8 +17,10 @@ package io.hops.erasure_coding;
 
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.BlockChecksumDataAccess;
+import io.hops.metadata.hdfs.dal.EncodingStatusDataAccess;
 import io.hops.metadata.hdfs.entity.BlockChecksum;
 import io.hops.metadata.hdfs.entity.EncodingPolicy;
+import io.hops.metadata.hdfs.entity.EncodingStatus;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.commons.logging.Log;
@@ -31,9 +33,7 @@ import org.apache.hadoop.hdfs.BlockMissingException;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
-import org.apache.hadoop.hdfs.TestDfsClient;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
-import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.server.datanode.DataNodeUtil;
 import org.junit.Test;
 
@@ -45,7 +45,7 @@ import java.util.Random;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_REPLICATION_KEY;
 
-public class TestMapReduceBlockRepairManager extends ClusterTest {
+public class TestMapReduceBlockRepairManager extends MrClusterTest {
 
   public static final Log LOG =
       LogFactory.getLog(TestLocalEncodingManagerImpl.class);
@@ -62,7 +62,8 @@ public class TestMapReduceBlockRepairManager extends ClusterTest {
     conf.setLong(DFS_BLOCK_SIZE_KEY, DFS_TEST_BLOCK_SIZE);
     conf.setInt(DFS_REPLICATION_KEY, 1);
     conf.set(DFSConfigKeys.ERASURE_CODING_CODECS_KEY, Util.JSON_CODEC_ARRAY);
-    numDatanode = 16;
+    conf.setBoolean(DFSConfigKeys.ERASURE_CODING_ENABLED_KEY, false);
+    numDatanode = 20; // Sometimes a node gets excluded during the test
   }
 
   @Override
@@ -73,8 +74,6 @@ public class TestMapReduceBlockRepairManager extends ClusterTest {
   @Test
   public void testBlockRepair() throws IOException, InterruptedException {
     DistributedFileSystem dfs = (DistributedFileSystem) getFileSystem();
-    TestDfsClient testDfsClient = new TestDfsClient(getConfig());
-    testDfsClient.injectIntoDfs(dfs);
 
     MapReduceEncodingManager encodingManager =
         new MapReduceEncodingManager(conf);
@@ -87,9 +86,13 @@ public class TestMapReduceBlockRepairManager extends ClusterTest {
     encodingManager.encodeFile(policy, testFile, parityFile, false);
 
     // Busy waiting until the encoding is done
-    while (encodingManager.computeReports().size() > 0) {
-      ;
+    List<Report> reports;
+    while ((reports = encodingManager.computeReports()).size() > 0) {
+      assertNotSame(Report.Status.FAILED, reports.get(0).getStatus());
+      Thread.sleep(1000);
     }
+
+    addEncodingStatus(testFile, policy);
 
     String path = testFileStatus.getPath().toUri().getPath();
     int blockToLoose = new Random(seed).nextInt(
@@ -99,9 +102,6 @@ public class TestMapReduceBlockRepairManager extends ClusterTest {
     DataNodeUtil.loseBlock(getCluster(), lb);
     List<LocatedBlock> lostBlocks = new ArrayList<LocatedBlock>();
     lostBlocks.add(lb);
-    LocatedBlocks locatedBlocks =
-        new LocatedBlocks(0, false, lostBlocks, null, true);
-    testDfsClient.setMissingLocatedBlocks(locatedBlocks);
     LOG.info("Losing block " + lb.toString());
     getCluster().triggerBlockReports();
 
@@ -109,13 +109,9 @@ public class TestMapReduceBlockRepairManager extends ClusterTest {
         new MapReduceBlockRepairManager(conf);
     repairManager.repairSourceBlocks("src", testFile, parityFile);
 
-    while (true) {
-      List<Report> reports = repairManager.computeReports();
-      if (reports.size() == 0) {
-        break;
-      }
-      LOG.info(reports.get(0).getStatus());
-      System.out.println("WAIT");
+    while ((reports = repairManager.computeReports()).size() > 0) {
+      assertNotSame("Repair failed.", Report.Status.FAILED,
+          reports.get(0).getStatus());
       Thread.sleep(1000);
     }
 
@@ -131,8 +127,6 @@ public class TestMapReduceBlockRepairManager extends ClusterTest {
   @Test
   public void testCorruptedRepair() throws IOException, InterruptedException {
     DistributedFileSystem dfs = (DistributedFileSystem) getFileSystem();
-    TestDfsClient testDfsClient = new TestDfsClient(getConfig());
-    testDfsClient.injectIntoDfs(dfs);
 
     MapReduceEncodingManager encodingManager =
         new MapReduceEncodingManager(conf);
@@ -145,9 +139,13 @@ public class TestMapReduceBlockRepairManager extends ClusterTest {
     encodingManager.encodeFile(policy, testFile, parityFile, false);
 
     // Busy waiting until the encoding is done
-    while (encodingManager.computeReports().size() > 0) {
-      ;
+    List<Report> reports;
+    while ((reports = encodingManager.computeReports()).size() > 0) {
+      assertNotSame(Report.Status.FAILED, reports.get(0).getStatus());
+      Thread.sleep(1000);
     }
+
+    addEncodingStatus(testFile, policy);
 
     String path = testFileStatus.getPath().toUri().getPath();
     int blockToLoose = new Random(seed).nextInt(
@@ -158,10 +156,7 @@ public class TestMapReduceBlockRepairManager extends ClusterTest {
     DataNodeUtil.loseBlock(getCluster(), lb);
     List<LocatedBlock> lostBlocks = new ArrayList<LocatedBlock>();
     lostBlocks.add(lb);
-    LocatedBlocks locatedBlocks =
-        new LocatedBlocks(0, false, lostBlocks, null, true);
-    testDfsClient.setMissingLocatedBlocks(locatedBlocks);
-    LOG.info("Loosing block " + lb.toString());
+    LOG.info("Losing block " + lb.toString());
     getCluster().triggerBlockReports();
 
     final int inodeId = io.hops.TestUtil.getINodeId(cluster.getNameNode(),
@@ -181,15 +176,12 @@ public class TestMapReduceBlockRepairManager extends ClusterTest {
         new MapReduceBlockRepairManager(conf);
     repairManager.repairSourceBlocks("src", testFile, parityFile);
 
-    while (true) {
-      List<Report> reports = repairManager.computeReports();
-      if (reports.size() == 0) {
-        break;
-      }
-      LOG.info(reports.get(0).getStatus());
-      System.out.println("WAIT");
+    Report lastReport = null;
+    while ((reports = repairManager.computeReports()).size() > 0) {
       Thread.sleep(1000);
+      lastReport = reports.get(0);
     }
+    assertEquals(Report.Status.FAILED, lastReport.getStatus());
 
     try {
       FSDataInputStream in = dfs.open(testFile);
@@ -198,5 +190,81 @@ public class TestMapReduceBlockRepairManager extends ClusterTest {
       fail("Repair succeeded with bogus checksum.");
     } catch (BlockMissingException e) {
     }
+  }
+
+  @Test
+  public void testFailover() throws IOException, InterruptedException {
+    DistributedFileSystem dfs = (DistributedFileSystem) getFileSystem();
+    MapReduceEncodingManager encodingManager =
+        new MapReduceEncodingManager(conf);
+
+    Util.createRandomFile(dfs, testFile, seed, TEST_BLOCK_COUNT,
+        DFS_TEST_BLOCK_SIZE);
+    Codec.initializeCodecs(conf);
+    FileStatus testFileStatus = dfs.getFileStatus(testFile);
+    EncodingPolicy policy = new EncodingPolicy("src", (short) 1);
+    encodingManager.encodeFile(policy, testFile, parityFile, false);
+
+    // Busy waiting until the encoding is done
+    List<Report> reports;
+    while ((reports = encodingManager.computeReports()).size() > 0) {
+      assertNotSame(Report.Status.FAILED, reports.get(0).getStatus());
+      Thread.sleep(1000);
+    }
+
+    addEncodingStatus(testFile, policy);
+
+    String path = testFileStatus.getPath().toUri().getPath();
+    int blockToLoose = new Random(seed).nextInt(
+        (int) (testFileStatus.getLen() / testFileStatus.getBlockSize()));
+    LocatedBlock lb = dfs.getClient().getLocatedBlocks(path, 0, Long.MAX_VALUE)
+        .get(blockToLoose);
+    DataNodeUtil.loseBlock(getCluster(), lb);
+    List<LocatedBlock> lostBlocks = new ArrayList<LocatedBlock>();
+    lostBlocks.add(lb);
+    LOG.info("Losing block " + lb.toString());
+    getCluster().triggerBlockReports();
+
+    MapReduceBlockRepairManager repairManager =
+        new MapReduceBlockRepairManager(mrCluster.getConfig());
+    repairManager.repairSourceBlocks("src", testFile, parityFile);
+
+    MapReduceBlockRepairManager recoverdManager =
+        new MapReduceBlockRepairManager(mrCluster.getConfig());
+
+    reports = recoverdManager.computeReports();
+    assertEquals(1, reports.size());
+    assertNotSame("Repair failed.", Report.Status.FAILED,
+        reports.get(0).getStatus());
+
+    while ((reports = recoverdManager.computeReports()).size() > 0) {
+      assertNotSame("Repair failed.", Report.Status.FAILED,
+          reports.get(0).getStatus());
+      Thread.sleep(1000);
+    }
+
+    try {
+      FSDataInputStream in = dfs.open(testFile);
+      byte[] buff = new byte[TEST_BLOCK_COUNT * DFS_TEST_BLOCK_SIZE];
+      in.readFully(0, buff);
+    } catch (BlockMissingException e) {
+      fail("Repair failed. Missing a block.");
+    }
+  }
+
+  private void addEncodingStatus(Path src, EncodingPolicy policy)
+      throws IOException {
+    final EncodingStatus status = new EncodingStatus(EncodingStatus.Status.ENCODED);
+    status.setEncodingPolicy(policy);
+    status.setInodeId(io.hops.TestUtil.getINodeId(cluster.getNameNode(), src));
+    new LightWeightRequestHandler(HDFSOperationType.TEST) {
+      @Override
+      public Object performTask() throws IOException {
+        EncodingStatusDataAccess da = (EncodingStatusDataAccess)
+            HdfsStorageFactory.getDataAccess(EncodingStatusDataAccess.class);
+        da.add(status);
+        return null;
+      }
+    }.handle();
   }
 }
