@@ -64,8 +64,6 @@ public abstract class BaseEncodingManager extends EncodingManager {
    */
   protected Configuration conf;
 
-  protected boolean initialized = false;  // Are we initialized?
-
   // statistics about RAW hdfs blocks. This counts all replicas of a block.
   public static class Statistics {
     long numProcessedBlocks; // total blocks encountered in namespace
@@ -111,28 +109,10 @@ public abstract class BaseEncodingManager extends EncodingManager {
     }
   }
 
-  private void cleanUpDirectory(String dir, Configuration conf)
-      throws IOException {
-    Path pdir = new Path(dir);
-    FileSystem fs = pdir.getFileSystem(conf);
-    if (fs.exists(pdir)) {
-      fs.delete(pdir);
-    }
-  }
-
-  protected void cleanUpTempDirectory(Configuration conf) throws IOException {
-    for (Codec codec : Codec.getCodecs()) {
-      cleanUpDirectory(codec.tmpParityDirectory, conf);
-    }
-  }
-
   private void initialize(Configuration conf)
       throws IOException, SAXException, InterruptedException,
       ClassNotFoundException, ParserConfigurationException {
     this.conf = conf;
-    // clean up temporay directory
-    cleanUpTempDirectory(conf);
-    initialized = true;
   }
 
   static long numBlocks(FileStatus stat) {

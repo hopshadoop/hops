@@ -22,6 +22,7 @@ import io.hops.common.IDsMonitor;
 import io.hops.exception.StorageException;
 import io.hops.exception.StorageInitializtionException;
 import io.hops.log.NDCWrapper;
+import io.hops.metadata.hdfs.entity.EncodingJob;
 import io.hops.resolvingcache.Cache;
 import io.hops.metadata.adaptor.BlockInfoDALAdaptor;
 import io.hops.metadata.adaptor.INodeAttributeDALAdaptor;

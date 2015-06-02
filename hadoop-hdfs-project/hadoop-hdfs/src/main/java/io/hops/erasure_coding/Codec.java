@@ -88,11 +88,6 @@ public class Codec implements Serializable {
   public final String parityDirectory;
 
   /**
-   * Where to store the temp parity files
-   */
-  public final String tmpParityDirectory;
-
-  /**
    * Priority of the codec.
    * <p/>
    * Purge parity files:
@@ -177,10 +172,7 @@ public class Codec implements Serializable {
     this.parityDirectory = json.getString("parity_dir");
     this.priority = json.getInt("priority");
     this.description = getJSONString(json, "description", "");
-    this.tmpParityDirectory =
-        getJSONString(json, "tmp_parity_dir", "/tmp" + this.parityDirectory);
     checkDirectory(parityDirectory);
-    checkDirectory(tmpParityDirectory);
   }
 
   /**

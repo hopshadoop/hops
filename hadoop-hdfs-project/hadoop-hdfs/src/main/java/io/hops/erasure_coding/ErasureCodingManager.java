@@ -206,7 +206,7 @@ public class ErasureCodingManager extends Configured {
     }
   }
 
-  private void checkActiveEncodings() {
+  private void checkActiveEncodings() throws IOException {
     LOG.info("Checking active encoding.");
     List<Report> reports = encodingManager.computeReports();
     for (Report report : reports) {
@@ -269,6 +269,12 @@ public class ErasureCodingManager extends Configured {
 
           EncodingStatus encodingStatus = EntityManager
               .find(EncodingStatus.Finder.ByInodeId, sourceInode.getId());
+
+          // Might get reported a second time after recovery
+          if (encodingStatus.getStatus()
+              != EncodingStatus.Status.ENCODING_ACTIVE) {
+            return null;
+          }
 
           if (parityInode == null) {
             encodingStatus.setStatus(EncodingStatus.Status.ENCODING_FAILED);

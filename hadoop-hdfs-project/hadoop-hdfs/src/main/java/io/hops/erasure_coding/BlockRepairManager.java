@@ -19,6 +19,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.Path;
 
+import java.io.IOException;
 import java.util.List;
 
 public abstract class BlockRepairManager extends Configured
@@ -29,10 +30,10 @@ public abstract class BlockRepairManager extends Configured
   }
 
   public abstract void repairSourceBlocks(String codecId, Path sourceFile,
-      Path parityFile);
+      Path parityFile) throws IOException;
 
   public abstract void repairParityBlocks(String codecId, Path sourceFile,
-      Path parityFile);
+      Path parityFile) throws IOException;
 
-  public abstract List<Report> computeReports();
+  public abstract List<Report> computeReports() throws IOException;
 }
