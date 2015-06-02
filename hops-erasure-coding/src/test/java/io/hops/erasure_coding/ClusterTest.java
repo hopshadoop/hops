@@ -32,10 +32,11 @@ public abstract class ClusterTest extends TestCase {
 
   @Override
   public void setUp() throws Exception {
-    cluster = new MiniDFSCluster.Builder(getConfig()).numDataNodes(numDatanode)
+    Configuration conf = getConfig();
+    cluster = new MiniDFSCluster.Builder(conf).numDataNodes(numDatanode)
         .build();
     cluster.waitActive();
-    fs = cluster.getFileSystem();
+    fs = FileSystem.get(conf);
   }
 
   @Override
