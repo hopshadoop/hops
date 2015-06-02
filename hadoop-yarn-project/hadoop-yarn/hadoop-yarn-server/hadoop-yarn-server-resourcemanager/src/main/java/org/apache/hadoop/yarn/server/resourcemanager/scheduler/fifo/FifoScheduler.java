@@ -95,6 +95,7 @@ import org.apache.hadoop.yarn.util.resource.Resources;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -730,7 +731,7 @@ public class FifoScheduler extends AbstractYarnScheduler
         node = getNode(rmNode.getNodeID());
 
     // Update resource if any change
-    SchedulerUtils.updateResourceIfChanged(node, rmNode, clusterResource, LOG);
+    SchedulerUtils.updateResourceIfChanged(node, rmNode, clusterResource, LOG, transactionState);
     if (transactionState != null) {
       ((TransactionStateImpl) transactionState)
           .updateClusterResource(clusterResource);
@@ -790,10 +791,12 @@ public class FifoScheduler extends AbstractYarnScheduler
       case NODE_ADDED: {
         NodeAddedSchedulerEvent nodeAddedEvent =
             (NodeAddedSchedulerEvent) event;
-        org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode
+        org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.
+                fica.FiCaSchedulerNode
             ficaNode =
-            new org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode(
-                nodeAddedEvent.getAddedRMNode(), usePortForNodeName);
+            new org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.
+                    fica.FiCaSchedulerNode(
+                nodeAddedEvent.getAddedRMNode(), usePortForNodeName, rmContext);
         addNode(nodeAddedEvent.getAddedRMNode(), ficaNode,
             event.getTransactionState());
       }
@@ -1040,14 +1043,14 @@ public class FifoScheduler extends AbstractYarnScheduler
           FiCaSchedulerApp appAttempt =
               new FiCaSchedulerApp(appAttemptId, hopFiCaSchedulerApp.getUser(),
                   DEFAULT_QUEUE, activeUsersManager, this.rmContext);
-          appAttempt.recover(hopFiCaSchedulerApp, state);
+          appAttempt.recover(state);
           app.setCurrentAppAttempt(appAttempt, null);
         }
         applications.put(appId, app);
 
       }
       //recover nodes map
-      List<FiCaSchedulerNode> nodesList = state.getAllFiCaSchedulerNodes();
+      Collection<FiCaSchedulerNode> nodesList = state.getAllFiCaSchedulerNodes().values();
       if (nodesList != null && !nodesList.isEmpty()) {
         for (FiCaSchedulerNode fsnode : nodesList) {
 
@@ -1059,8 +1062,8 @@ public class FifoScheduler extends AbstractYarnScheduler
               ficaNode =
               new org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode(
                   this.rmContext.
-                      getActiveRMNodes().get(nodeId), nodeId, this.rmContext,
-                  fsnode, state);
+                      getActiveRMNodes().get(nodeId), usePortForNodeName, rmContext);
+          ficaNode.recover(state);
 
           nodes.put(nodeId, ficaNode);
         }

@@ -30,6 +30,7 @@ import com.sun.jersey.core.util.MultivaluedMapImpl;
 import com.sun.jersey.guice.spi.container.servlet.GuiceContainer;
 import com.sun.jersey.test.framework.JerseyTest;
 import com.sun.jersey.test.framework.WebAppDescriptor;
+import io.hops.exception.StorageInitializtionException;
 import io.hops.metadata.util.RMStorageFactory;
 import io.hops.metadata.util.RMUtilities;
 import io.hops.metadata.util.YarnAPIStorageFactory;
@@ -97,6 +98,12 @@ public class TestRMWebServicesApps extends JerseyTest {
       try {
         YarnAPIStorageFactory.setConfiguration(conf);
         RMStorageFactory.setConfiguration(conf);
+	        
+        //TOVERIFY do we realy need that here when it is done in the setUp
+        RMUtilities.InitializeDB();
+      } catch (StorageInitializtionException ex) {
+        Logger.getLogger(TestRMWebServicesApps.class.getName()).log(Level.SEVERE, null, ex);
+
       } catch (IOException ex) {
         Logger.getLogger(TestRMWebServicesApps.class.getName()).
             log(Level.SEVERE, null, ex);

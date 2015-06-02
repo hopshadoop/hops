@@ -16,6 +16,8 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager;
 
+import io.hops.ha.common.TransactionState;
+import io.hops.ha.common.TransactionStateImpl;
 import io.hops.metadata.util.RMStorageFactory;
 import io.hops.metadata.util.RMUtilities;
 import io.hops.metadata.util.YarnAPIStorageFactory;
@@ -188,7 +190,8 @@ public class TestResourceManager {
         resourceManager.getRMContext().getActiveRMNodes().get(nm1.getNodeId());
     // Send a heartbeat to kick the tires on the Scheduler
     NodeUpdateSchedulerEvent nodeUpdate =
-        new NodeUpdateSchedulerEvent(node, null);
+ new NodeUpdateSchedulerEvent(node,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     resourceManager.getResourceScheduler().handle(nodeUpdate);
   }
 

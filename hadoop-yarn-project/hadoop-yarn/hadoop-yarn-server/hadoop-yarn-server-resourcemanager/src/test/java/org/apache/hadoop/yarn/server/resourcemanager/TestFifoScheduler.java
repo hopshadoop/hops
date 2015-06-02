@@ -287,17 +287,23 @@ public class TestFifoScheduler {
     RMNode n2 =
         MockNodes.newNodeInfo(0, MockNodes.newResource(2 * GB), 2, "127.0.0.3");
 
-    fs.handle(new NodeAddedSchedulerEvent(n1, null));
-    fs.handle(new NodeAddedSchedulerEvent(n2, null));
-    fs.handle(new NodeUpdateSchedulerEvent(n1, null));
+    fs.handle(new NodeAddedSchedulerEvent(n1, new TransactionStateImpl(-1,
+            TransactionState.TransactionType.RM)));
+    fs.handle(new NodeAddedSchedulerEvent(n2, new TransactionStateImpl(-1,
+            TransactionState.TransactionType.RM)));
+    fs.handle(new NodeUpdateSchedulerEvent(n1, new TransactionStateImpl(-1,
+            TransactionState.TransactionType.RM)));
     Assert.assertEquals(6 * GB, fs.getRootQueueMetrics().getAvailableMB());
 
     // reconnect n1 with downgraded memory
     n1 =
         MockNodes.newNodeInfo(0, MockNodes.newResource(2 * GB), 1, "127.0.0.2");
-    fs.handle(new NodeRemovedSchedulerEvent(n1, null));
-    fs.handle(new NodeAddedSchedulerEvent(n1, null));
-    fs.handle(new NodeUpdateSchedulerEvent(n1, null));
+    fs.handle(new NodeRemovedSchedulerEvent(n1, new TransactionStateImpl(-1,
+            TransactionState.TransactionType.RM)));
+    fs.handle(new NodeAddedSchedulerEvent(n1, new TransactionStateImpl(-1,
+            TransactionState.TransactionType.RM)));
+    fs.handle(new NodeUpdateSchedulerEvent(n1, new TransactionStateImpl(-1,
+            TransactionState.TransactionType.RM)));
 
     Assert.assertEquals(4 * GB, fs.getRootQueueMetrics().getAvailableMB());
   }
@@ -369,7 +375,8 @@ public class TestFifoScheduler {
         new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
 
     // Trigger container assignment
-    fs.handle(new NodeUpdateSchedulerEvent(n3, null));
+    fs.handle(new NodeUpdateSchedulerEvent(n3, new TransactionStateImpl(-1,
+            TransactionState.TransactionType.RM)));
 
     // Get the allocation for the application and verify no allocation on blacklist node
     Allocation allocation1 =
@@ -494,7 +501,8 @@ public class TestFifoScheduler {
         new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
 
     // Trigger container assignment
-    fs.handle(new NodeUpdateSchedulerEvent(n1, null));
+    fs.handle(new NodeUpdateSchedulerEvent(n1, new TransactionStateImpl(-1,
+            TransactionState.TransactionType.RM)));
 
     // Get the allocation for the applications and verify headroom
     Allocation allocation1 =

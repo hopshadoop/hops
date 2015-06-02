@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FSSchedulerApp;
 
 /**
  * Contains scheduler specific information about Applications.
@@ -47,7 +48,7 @@ public class SchedulerApplicationInfo {
       new ArrayList<ApplicationId>();
   private Map<String, FiCaSchedulerAppInfo> fiCaSchedulerAppInfo =
       new HashMap<String, FiCaSchedulerAppInfo>();
-
+  
   public void persist(QueueMetricsDataAccess QMDA) throws StorageException {
     //TODO: The same QueueMetrics (DEFAULT_QUEUE) is persisted with every app. Its extra overhead. We can persist it just once
     persistApplicationIdToAdd(QMDA);
@@ -71,7 +72,7 @@ public class SchedulerApplicationInfo {
           org.apache.hadoop.yarn.server.resourcemanager.scheduler.QueueMetrics
               toAddQM = schedulerApplicationToAdd.getQueue().getMetrics();
           QueueMetrics toAdHopQueueMetrics =
-              new QueueMetrics(HopYarnAPIUtilities.QUEMETRICSID,
+              new QueueMetrics(toAddQM.getQueueName(),
                   toAddQM.getAppsSubmitted(), toAddQM.getAppsRunning(),
                   toAddQM.getAppsPending(), toAddQM.getAppsCompleted(),
                   toAddQM.getAppsKilled(), toAddQM.getAppsFailed(),
@@ -84,7 +85,7 @@ public class SchedulerApplicationInfo {
                   toAddQM.getPendingContainers(), toAddQM.getReservedMB(),
                   toAddQM.getReservedVirtualCores(),
                   toAddQM.getReservedContainers(), toAddQM.getActiveUsers(),
-                  toAddQM.getActiveApps(), 0, toAddQM.getQueueName());
+                  toAddQM.getActiveApps(), 0);
 
           toAddQueueMetricses.add(toAdHopQueueMetrics);
 
@@ -116,7 +117,7 @@ public class SchedulerApplicationInfo {
             .add(new SchedulerApplication(appId.toString(), null, null));
       }
       sappDA.removeAll(applicationsToRemove);
-      //TORECOVER clean the table that depend on this one
+      //TORECOVER OPT clean the table that depend on this one
     }
   }
 
