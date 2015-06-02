@@ -48,7 +48,7 @@ public class FiCaSchedulerNodeInfoToUpdate {
   private Set<String> launchedContainersToRemove;
   private org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer
       reservedRMContainerToRemove;
-  private boolean addRMContainer = false;
+  private boolean updateReservedContainer = false;
   private Map<Integer, org.apache.hadoop.yarn.api.records.Resource>
       toUpdateResources;
 
@@ -75,12 +75,8 @@ public class FiCaSchedulerNodeInfoToUpdate {
     toUpdateResources.put(ficaNodeId, res);
   }
 
-  public boolean isAddRMContainer() {
-    return addRMContainer;
-  }
-
-  public void addRMContainer(boolean remove) {
-    addRMContainer = remove;
+  public void updateReservedContainer() {
+    updateReservedContainer = true;
   }
 
   public void toRemoveRMContainer(
@@ -135,16 +131,7 @@ public class FiCaSchedulerNodeInfoToUpdate {
       LOG.debug("remove container " +
           reservedRMContainerToRemove.getContainer().getId().toString());
       rmcontainerToRemove.add(new RMContainer(
-          reservedRMContainerToRemove.getContainer().getId().toString(),
-          reservedRMContainerToRemove.getApplicationAttemptId().toString(),
-          reservedRMContainerToRemove.getNodeId().toString(),
-          reservedRMContainerToRemove.getUser(),
-          reservedRMContainerToRemove.getStartTime(),
-          reservedRMContainerToRemove.getFinishTime(),
-          reservedRMContainerToRemove.getState().toString(),
-          ((RMContainerImpl) reservedRMContainerToRemove).getContainerState()
-              .toString(), ((RMContainerImpl) reservedRMContainerToRemove)
-          .getContainerExitStatus()));
+          reservedRMContainerToRemove.getContainer().getId().toString()));
       rmcontainerDA.removeAll(rmcontainerToRemove);
     }
   }
@@ -182,26 +169,34 @@ public class FiCaSchedulerNodeInfoToUpdate {
     }
   }
 
-
   public void persistToUpdateFicaSchedulerNode(
-      FiCaSchedulerNodeDataAccess ficaNodeDA,
-      RMContainerDataAccess rmcontainerDA) throws StorageException {
+          FiCaSchedulerNodeDataAccess ficaNodeDA,
+          RMContainerDataAccess rmcontainerDA) throws StorageException {
     if (infoToUpdate != null) {
+      String reservedContainer = infoToUpdate.getReservedContainer()!=null?
+              infoToUpdate.getReservedContainer().toString():null;
+        ficaNodeDA.add(
+                new FiCaSchedulerNode(infoToUpdate.getNodeID().toString(),
+                        infoToUpdate.getNodeName(), infoToUpdate.
+                        getNumContainers(), reservedContainer));
+      if (updateReservedContainer && infoToUpdate.getReservedContainer() != null) {
 
-      ficaNodeDA.add(new FiCaSchedulerNode(infoToUpdate.getNodeID().
-          toString(), infoToUpdate.getNodeName(), infoToUpdate.
-          getNumContainers()));
-
-      if (addRMContainer) {
         rmcontainerDA.add(new RMContainer(
             infoToUpdate.getReservedContainer().getContainerId().toString(),
             infoToUpdate.getReservedContainer().getApplicationAttemptId()
                 .toString(),
             infoToUpdate.getReservedContainer().getNodeId().toString(),
             infoToUpdate.getReservedContainer().getUser(),
+            infoToUpdate.getReservedContainer().getReservedNode().toString(),
+            infoToUpdate.getReservedContainer()
+                .getReservedPriority().getPriority(),
+            infoToUpdate.getReservedContainer().getReservedResource()
+                .getMemory(),
+            infoToUpdate.getReservedContainer().getReservedResource()
+                .getVirtualCores(),
             infoToUpdate.getReservedContainer().getStartTime(),
             infoToUpdate.getReservedContainer().getFinishTime(),
-            infoToUpdate.getReservedContainer().toString(),
+            infoToUpdate.getReservedContainer().getState().toString(),
             ((RMContainerImpl) infoToUpdate.getReservedContainer())
                 .getContainerState().toString(),
             ((RMContainerImpl) infoToUpdate.getReservedContainer())
@@ -210,5 +205,4 @@ public class FiCaSchedulerNodeInfoToUpdate {
       persistRmContainerToRemove(rmcontainerDA);
     }
   }
-
 }

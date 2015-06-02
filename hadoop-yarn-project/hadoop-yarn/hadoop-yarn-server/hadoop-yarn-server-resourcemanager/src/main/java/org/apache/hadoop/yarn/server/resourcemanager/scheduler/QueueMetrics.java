@@ -93,9 +93,9 @@ public class QueueMetrics implements MetricsSource {
   MutableGaugeInt activeUsers;//recovered
   @Metric("# of active applications")
   MutableGaugeInt activeApplications;//recovered
-  private final MutableGaugeInt[] runningTime;//TORECOVER : not recovered yet 
+  private final MutableGaugeInt[] runningTime;//TORECOVER MS: not recovered yet 
   private TimeBucketMetrics<ApplicationId> runBuckets;
-      //TORECOVER : not recovered yet
+      //TORECOVER MS: not recovered yet
 
   static final Logger LOG = LoggerFactory.getLogger(QueueMetrics.class);
   static final MetricsInfo RECORD_INFO =
@@ -106,12 +106,12 @@ public class QueueMetrics implements MetricsSource {
   static final Splitter Q_SPLITTER =
       Splitter.on('.').omitEmptyStrings().trimResults();
 
-  final MetricsRegistry registry;//TORECOVER : not recovered yet 
+  final MetricsRegistry registry;//TORECOVER MS: not recovered yet 
   final String queueName;//recovered
   final QueueMetrics parent;//recovered
   final MetricsSystem metricsSystem;
-      //TORECOVER : not recovered yet (we have to recover what have been stored in the ms)
-  private final Map<String, QueueMetrics> users;//TORECOVER : not recovered yet
+      //TORECOVER MS: not recovered yet (we have to recover what have been stored in the ms)
+  private final Map<String, QueueMetrics> users;//TORECOVER MS: not recovered yet
   private final Configuration conf;//recovered
 
   protected QueueMetrics(MetricsSystem ms, String queueName, Queue parent,

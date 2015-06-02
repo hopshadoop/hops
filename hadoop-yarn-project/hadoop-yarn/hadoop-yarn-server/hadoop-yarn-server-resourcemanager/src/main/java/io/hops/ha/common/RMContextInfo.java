@@ -100,7 +100,6 @@ public class RMContextInfo {
       ArrayList<RMContextActiveNodes> rmctxnodesToRemove =
           new ArrayList<RMContextActiveNodes>();
       for (NodeId activeNodeToRemove : activeNodesToRemove) {
-        LOG.debug("HOP :: remove active node " + activeNodeToRemove.getId());
         rmctxnodesToRemove.add(new RMContextActiveNodes(activeNodeToRemove.
             toString()));
       }
@@ -157,7 +156,7 @@ public class RMContextInfo {
       ArrayList<Resource> toAddResources = new ArrayList<Resource>();
       ArrayList<Node> nodesToAdd = null;
       ArrayList<RMNode> toAddRMNodes = null;
-      ArrayList<RMContextActiveNodes> rmctxnodesToAdd = null;
+      ArrayList<RMContextActiveNodes> rmctxnodesToAdd = new ArrayList<RMContextActiveNodes>();
       //First parse the NodeIds
       for (NodeId key : activeNodesToAdd.keySet()) {
         if (activeNodesToRemove == null || !activeNodesToRemove.remove(key)) {
@@ -199,7 +198,6 @@ public class RMContextInfo {
           //Persist RMCoxtentNodesMap
           RMContextActiveNodes hopCtxNode = new RMContextActiveNodes(val.
               getNodeID().toString());
-          rmctxnodesToAdd = new ArrayList<RMContextActiveNodes>(1);
           rmctxnodesToAdd.add(hopCtxNode);
         }
       }

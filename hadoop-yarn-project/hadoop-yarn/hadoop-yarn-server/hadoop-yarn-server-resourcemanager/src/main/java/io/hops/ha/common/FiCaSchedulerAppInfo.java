@@ -15,24 +15,34 @@
  */
 package io.hops.ha.common;
 
+import com.google.common.collect.HashMultiset;
+import com.google.common.collect.Multiset;
 import io.hops.exception.StorageException;
 import io.hops.metadata.util.RMStorageFactory;
 import io.hops.metadata.yarn.dal.AppSchedulingInfoBlacklistDataAccess;
 import io.hops.metadata.yarn.dal.AppSchedulingInfoDataAccess;
 import io.hops.metadata.yarn.dal.ContainerDataAccess;
+import io.hops.metadata.yarn.dal.FiCaSchedulerAppLastScheduledContainerDataAccess;
 import io.hops.metadata.yarn.dal.FiCaSchedulerAppLiveContainersDataAccess;
 import io.hops.metadata.yarn.dal.FiCaSchedulerAppNewlyAllocatedContainersDataAccess;
+import io.hops.metadata.yarn.dal.FiCaSchedulerAppReservationsDataAccess;
+import io.hops.metadata.yarn.dal.FiCaSchedulerAppSchedulingOpportunitiesDataAccess;
 import io.hops.metadata.yarn.dal.RMContainerDataAccess;
 import io.hops.metadata.yarn.dal.ResourceDataAccess;
 import io.hops.metadata.yarn.dal.ResourceRequestDataAccess;
+import io.hops.metadata.yarn.dal.capacity.FiCaSchedulerAppReservedContainersDataAccess;
 import io.hops.metadata.yarn.entity.AppSchedulingInfo;
 import io.hops.metadata.yarn.entity.AppSchedulingInfoBlacklist;
 import io.hops.metadata.yarn.entity.Container;
+import io.hops.metadata.yarn.entity.FiCaSchedulerAppLastScheduledContainer;
 import io.hops.metadata.yarn.entity.FiCaSchedulerAppLiveContainers;
 import io.hops.metadata.yarn.entity.FiCaSchedulerAppNewlyAllocatedContainers;
+import io.hops.metadata.yarn.entity.FiCaSchedulerAppSchedulingOpportunities;
 import io.hops.metadata.yarn.entity.RMContainer;
 import io.hops.metadata.yarn.entity.Resource;
 import io.hops.metadata.yarn.entity.ResourceRequest;
+import io.hops.metadata.yarn.entity.SchedulerAppReservations;
+import io.hops.metadata.yarn.entity.capacity.FiCaSchedulerAppReservedContainers;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
@@ -47,6 +57,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.hadoop.yarn.api.records.Priority;
 
 /**
  * Contains data structures of FiCaSchedulerApp.
@@ -55,7 +66,7 @@ public class FiCaSchedulerAppInfo {
 
   private static final Log LOG = LogFactory.getLog(FiCaSchedulerAppInfo.class);
   private SchedulerApplicationAttempt fiCaSchedulerAppToAdd;
-  private ApplicationAttemptId applicationAttemptId;
+  protected ApplicationAttemptId applicationAttemptId;
   private Map<ContainerId, org.apache.hadoop.yarn.server.resourcemanager.
       rmcontainer.RMContainer> liveContainersToAdd = new HashMap<ContainerId, org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer>();
   private Map<ContainerId, org.apache.hadoop.yarn.server.resourcemanager.
@@ -79,9 +90,22 @@ public class FiCaSchedulerAppInfo {
   private boolean update = false;
   private boolean remove = false;
 
+  private List<org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer> reservedContainersToAdd;
+  private List<org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer> reservedContainersToRemove;
+
+  private Map<Priority, Long> lastScheduledContainerToAdd;
+
+  Multiset<Priority> schedulingOpportunitiesToAdd;
+  Multiset<Priority> reReservations;
+
   // Not used by fifo scheduler
   public void persist() throws StorageException {
     persistApplicationToAdd();
+    persistReservedContainersToAdd();
+    persistReservedContainersToRemove();
+    persistLastScheduledContainersToAdd();
+    persistSchedulingOpportunitiesToAdd();
+    persistReReservations();
     persistNewlyAllocatedContainersToAdd();
     persistNewlyAllocatedContainersToRemove();
     persistLiveContainersToAdd();
@@ -281,7 +305,8 @@ public class FiCaSchedulerAppInfo {
               .putAll(fiCaSchedulerAppToAdd.getLiveContainersMap());
         }
         if (!fiCaSchedulerAppToAdd.getLastScheduledContainer().isEmpty()) {
-          //TORECOVER (capacity, fair)
+          lastScheduledContainerToAdd.putAll(
+                  fiCaSchedulerAppToAdd.getLastScheduledContainer());
         }
         if (!fiCaSchedulerAppToAdd.getAppSchedulingInfo().getBlackList()
             .isEmpty()) {
@@ -316,21 +341,8 @@ public class FiCaSchedulerAppInfo {
               applicationAttemptId.toString(), key.toString()));
           org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer
               rmContainer = liveContainersToAdd.get(key);
-          RMContainer hopRMContainer =
-              new RMContainer(rmContainer.getContainerId().toString(),
-                  rmContainer.getApplicationAttemptId().toString(),
-                  rmContainer.getNodeId().toString(), rmContainer.getUser(),
-                  //                rmContainer.getReservedNode(),
-                  //                asdfjöldsakj,
-                  rmContainer.getStartTime(), rmContainer.getFinishTime(),
-                  rmContainer.getState().toString(),
-                  //                rmContainer.getReservedNode().getHost(),
-                  //                rmContainer.getReservedNode().getPort(),
-                  ((RMContainerImpl) rmContainer).getContainerState()
-                      .toString(),
-                  ((RMContainerImpl) rmContainer).getContainerExitStatus());
 
-          toAddRMContainers.add(hopRMContainer);
+          toAddRMContainers.add(createRMContainer(rmContainer));
 
           Container hopContainer =
               new Container(rmContainer.getContainerId().toString(),
@@ -388,17 +400,7 @@ public class FiCaSchedulerAppInfo {
         if (newlyAllocatedContainersToRemove == null ||
             !newlyAllocatedContainersToRemove.remove(rmContainer)) {
 
-          RMContainer hopRMContainer =
-              new RMContainer(rmContainer.getContainerId().toString(),
-                  rmContainer.getApplicationAttemptId().toString(),
-                  rmContainer.getNodeId().toString(), rmContainer.getUser(),
-                  rmContainer.getStartTime(), rmContainer.getFinishTime(),
-                  rmContainer.getState().toString(),
-                  ((RMContainerImpl) rmContainer).getContainerState()
-                      .toString(),
-                  ((RMContainerImpl) rmContainer).getContainerExitStatus());
-
-          toAddRMContainers.add(hopRMContainer);
+	    toAddRMContainers.add(createRMContainer(rmContainer));
 
           Container hopContainer =
               new Container(rmContainer.getContainerId().toString(),
@@ -537,5 +539,270 @@ public class FiCaSchedulerAppInfo {
       }
       resourceDA.removeAll(toRemoveResources);
     }
+  }
+
+  public void addReservedContainer(
+          org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer cont) {
+    if (reservedContainersToAdd == null) {
+      reservedContainersToAdd
+              = new ArrayList<org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer>();
+    }
+    reservedContainersToAdd.add(cont);
+  }
+
+  protected void persistReservedContainersToAdd() throws StorageException {
+    if (reservedContainersToAdd != null) {
+      FiCaSchedulerAppReservedContainersDataAccess reservedContDA
+              = (FiCaSchedulerAppReservedContainersDataAccess) RMStorageFactory.
+              getDataAccess(FiCaSchedulerAppReservedContainersDataAccess.class);
+      List<FiCaSchedulerAppReservedContainers> toAddReservedContainers
+              = new ArrayList<FiCaSchedulerAppReservedContainers>();
+
+      RMContainerDataAccess rmcDA = (RMContainerDataAccess) RMStorageFactory.
+              getDataAccess(RMContainerDataAccess.class);
+      List<io.hops.metadata.yarn.entity.RMContainer> toAddRMContainers
+              = new ArrayList<io.hops.metadata.yarn.entity.RMContainer>();
+
+      ContainerDataAccess cDA = (ContainerDataAccess) RMStorageFactory.
+              getDataAccess(ContainerDataAccess.class);
+      List<Container> toAddContainers = new ArrayList<Container>();
+
+      for (org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer rmContainer
+              : reservedContainersToAdd) {
+        //Persist reservedContainers
+        toAddReservedContainers.add(new FiCaSchedulerAppReservedContainers(
+                applicationAttemptId.toString(),
+                rmContainer.getReservedPriority().getPriority(),
+                rmContainer.getReservedNode().toString(),
+                rmContainer.getContainerId().toString()));
+
+        boolean isReserved = (rmContainer.getReservedNode() != null)
+                && (rmContainer.getReservedPriority() != null);
+
+        String reservedNode = isReserved ? rmContainer.getReservedNode().
+                toString() : null;
+        int reservedPriority = isReserved ? rmContainer.getReservedPriority().
+                getPriority() : Integer.MIN_VALUE;
+        int reservedMemory = isReserved ? rmContainer.getReservedResource().
+                getMemory() : 0;
+        int reservedVCores = isReserved ? rmContainer.getReservedResource().
+                getVirtualCores() : 0;
+
+        //Persist rmContainer
+        toAddRMContainers.add(new io.hops.metadata.yarn.entity.RMContainer(
+                rmContainer.getContainerId().toString(),
+                rmContainer.getApplicationAttemptId().toString(),
+                rmContainer.getNodeId().toString(),
+                rmContainer.getUser(),
+                reservedNode,
+                reservedPriority,
+                reservedMemory,
+                reservedVCores,
+                rmContainer.getStartTime(),
+                rmContainer.getFinishTime(),
+                rmContainer.getState().toString(),
+                ((RMContainerImpl) rmContainer).getContainerState().toString(),
+                ((RMContainerImpl) rmContainer).getContainerExitStatus()
+        ));
+
+        LOG.debug("Persist reservedContainer " + applicationAttemptId.toString()
+                + " containerid " + rmContainer.getContainerId().toString());
+
+        //Persist Container
+        Container hopContainer = new Container(rmContainer.getContainerId().
+                toString(),
+                ((ContainerPBImpl) rmContainer.getContainer()).getProto().
+                toByteArray());
+        toAddContainers.add(hopContainer);
+
+      }
+      reservedContDA.addAll(toAddReservedContainers);
+      rmcDA.addAll(toAddRMContainers);
+      cDA.addAll(toAddContainers);
+    }
+  }
+
+  public void removeReservedContainer(
+          org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer cont) {
+    if (reservedContainersToRemove == null) {
+      reservedContainersToRemove
+              = new ArrayList<org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer>();
+    }
+    reservedContainersToRemove.add(cont);
+  }
+
+  protected void persistReservedContainersToRemove() throws StorageException {
+    if (reservedContainersToRemove != null && !reservedContainersToRemove.
+            isEmpty()) {
+      FiCaSchedulerAppReservedContainersDataAccess reservedContDA
+              = (FiCaSchedulerAppReservedContainersDataAccess) RMStorageFactory.
+              getDataAccess(FiCaSchedulerAppReservedContainersDataAccess.class);
+      List<FiCaSchedulerAppReservedContainers> toRemoveReservedContainers
+              = new ArrayList<FiCaSchedulerAppReservedContainers>();
+
+      RMContainerDataAccess rmcDA = (RMContainerDataAccess) RMStorageFactory.
+              getDataAccess(RMContainerDataAccess.class);
+      List<io.hops.metadata.yarn.entity.RMContainer> toRemoveRMContainers
+              = new ArrayList<io.hops.metadata.yarn.entity.RMContainer>();
+
+      ContainerDataAccess cDA = (ContainerDataAccess) RMStorageFactory.
+              getDataAccess(ContainerDataAccess.class);
+
+      for (org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer rmContainer
+              : reservedContainersToRemove) {
+        //Remove reservedContainers
+        toRemoveReservedContainers.add(new FiCaSchedulerAppReservedContainers(
+                applicationAttemptId.toString(),
+                rmContainer.getReservedPriority().getPriority(),
+                rmContainer.getReservedNode().toString(),
+                rmContainer.getContainerId().toString()));
+
+        boolean isReserved = (rmContainer.getReservedNode() != null)
+                && (rmContainer.getReservedPriority() != null);
+
+        String reservedNode = isReserved ? rmContainer.getReservedNode().
+                toString() : null;
+        int reservedPriority = isReserved ? rmContainer.getReservedPriority().
+                getPriority() : Integer.MIN_VALUE;
+        int reservedMemory = isReserved ? rmContainer.getReservedResource().
+                getMemory() : 0;
+        int reservedVCores = isReserved ? rmContainer.getReservedResource().
+                getVirtualCores() : 0;
+
+        //Remove rmContainer
+        toRemoveRMContainers.add(new io.hops.metadata.yarn.entity.RMContainer(
+                rmContainer.getContainerId().toString(),
+                rmContainer.getApplicationAttemptId().toString(),
+                rmContainer.getNodeId().toString(),
+                rmContainer.getUser(),
+                reservedNode,
+                reservedPriority,
+                reservedMemory,
+                reservedVCores,
+                rmContainer.getStartTime(),
+                rmContainer.getFinishTime(),
+                rmContainer.getState().toString(),
+                ((RMContainerImpl) rmContainer).getContainerState().toString(),
+                ((RMContainerImpl) rmContainer).getContainerExitStatus()
+        ));
+
+        LOG.debug("In FairAppInfo " + rmContainer.getContainerId().toString()
+                + " " + rmContainer.getState().toString());
+
+      }
+      reservedContDA.removeAll(toRemoveReservedContainers);
+      rmcDA.removeAll(toRemoveRMContainers);
+    }
+  }
+
+  public void addLastScheduledContainer(Priority p, long time) {
+    if (lastScheduledContainerToAdd == null) {
+      lastScheduledContainerToAdd = new HashMap<Priority, Long>();
+    }
+    lastScheduledContainerToAdd.put(p, time);
+  }
+
+  protected void persistLastScheduledContainersToAdd() throws StorageException {
+    if (lastScheduledContainerToAdd != null) {
+      FiCaSchedulerAppLastScheduledContainerDataAccess lsDA
+              = (FiCaSchedulerAppLastScheduledContainerDataAccess) RMStorageFactory.
+              getDataAccess(
+                      FiCaSchedulerAppLastScheduledContainerDataAccess.class);
+      List<FiCaSchedulerAppLastScheduledContainer> toAddLastScheduledCont
+              = new ArrayList<FiCaSchedulerAppLastScheduledContainer>();
+
+      for (Priority p : lastScheduledContainerToAdd.keySet()) {
+        //Persist lastScheduledContainers
+        toAddLastScheduledCont.add(new FiCaSchedulerAppLastScheduledContainer(
+                applicationAttemptId.toString(), p.getPriority(),
+                lastScheduledContainerToAdd.get(p)));
+      }
+      lsDA.addAll(toAddLastScheduledCont);
+    }
+  }
+
+  public void addSchedulingOppurtunity(Priority p, int count) {
+    if (schedulingOpportunitiesToAdd == null) {
+      schedulingOpportunitiesToAdd = HashMultiset.create();
+    }
+    schedulingOpportunitiesToAdd.setCount(p, count);
+  }
+
+  protected void persistSchedulingOpportunitiesToAdd() throws StorageException {
+    if (schedulingOpportunitiesToAdd != null) {
+      FiCaSchedulerAppSchedulingOpportunitiesDataAccess soDA
+              = (FiCaSchedulerAppSchedulingOpportunitiesDataAccess) RMStorageFactory.
+              getDataAccess(
+                      FiCaSchedulerAppSchedulingOpportunitiesDataAccess.class);
+      List<FiCaSchedulerAppSchedulingOpportunities> toAddSO
+              = new ArrayList<FiCaSchedulerAppSchedulingOpportunities>();
+
+      for (Priority p : schedulingOpportunitiesToAdd.elementSet()) {
+        toAddSO.add(new FiCaSchedulerAppSchedulingOpportunities(
+                applicationAttemptId.toString(), p.
+                getPriority(), schedulingOpportunitiesToAdd.count(p)));
+      }
+      soDA.addAll(toAddSO);
+    }
+  }
+
+  public void addReReservation(Priority p) {
+    if (reReservations == null) {
+      reReservations = HashMultiset.create();
+    }
+    reReservations.add(p);
+  }
+
+  public void resetReReservations(Priority p) {
+    if (reReservations != null) {
+      reReservations.setCount(p, 0);
+    }
+  }
+
+  protected void persistReReservations() throws StorageException {
+    if (reReservations != null) {
+      FiCaSchedulerAppReservationsDataAccess reservationsDA
+              = (FiCaSchedulerAppReservationsDataAccess) RMStorageFactory.
+              getDataAccess(FiCaSchedulerAppReservationsDataAccess.class);
+      List<SchedulerAppReservations> toAddReservations
+              = new ArrayList<SchedulerAppReservations>();
+
+      for (Priority p : reReservations.elementSet()) {
+        toAddReservations.add(new SchedulerAppReservations(applicationAttemptId.
+                toString(), p.
+                getPriority(), reReservations.count(p)));
+      }
+      reservationsDA.addAll(toAddReservations);
+    }
+  }
+
+  private RMContainer createRMContainer(
+          org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer rmContainer) {
+
+    boolean isReserved = (rmContainer.getReservedNode() != null)
+            && (rmContainer.getReservedPriority() != null);
+    String reservedNode = isReserved ? rmContainer.getReservedNode().
+            toString() : null;
+    int reservedPriority = isReserved ? rmContainer.getReservedPriority().
+            getPriority() : Integer.MIN_VALUE;
+    int reservedMemory = isReserved ? rmContainer.getReservedResource().
+            getMemory() : 0;
+    int reservedVCores = isReserved ? rmContainer.getReservedResource().
+            getVirtualCores() : 0;
+
+    RMContainer hopRMContainer = new RMContainer(rmContainer.getContainerId().
+            toString(),
+            rmContainer.getApplicationAttemptId().toString(),
+            rmContainer.getNodeId().toString(), rmContainer.getUser(),
+            reservedNode,
+            reservedPriority,
+            reservedMemory,
+            reservedVCores,
+            rmContainer.getStartTime(), rmContainer.getFinishTime(),
+            rmContainer.getState().toString(),
+            ((RMContainerImpl) rmContainer).getContainerState()
+            .toString(),
+            ((RMContainerImpl) rmContainer).getContainerExitStatus());
+    return hopRMContainer;
   }
 }

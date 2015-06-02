@@ -63,6 +63,7 @@ import org.apache.log4j.Logger;
 import org.codehaus.jackson.JsonFactory;
 import org.codehaus.jackson.map.ObjectMapper;
 import io.hops.metadata.util.RMStorageFactory;
+import io.hops.metadata.util.RMUtilities;
 import io.hops.metadata.util.YarnAPIStorageFactory;
 
 public class SLSRunner {
@@ -119,6 +120,9 @@ public class SLSRunner {
     
     // runner configuration
     conf = new Configuration(false);
+    YarnAPIStorageFactory.setConfiguration(conf);
+    RMStorageFactory.setConfiguration(conf);
+    RMUtilities.InitializeDB();
     conf.addResource("sls-runner.xml");
     // runner
     int poolSize = conf.getInt(SLSConfiguration.RUNNER_POOL_SIZE, 
@@ -156,8 +160,6 @@ public class SLSRunner {
   
   private void startRM() throws IOException, ClassNotFoundException {
     Configuration rmConf = new YarnConfiguration();
-    YarnAPIStorageFactory.setConfiguration(conf);
-    RMStorageFactory.setConfiguration(conf);
     String schedulerClass = rmConf.get(YarnConfiguration.RM_SCHEDULER);
     rmConf.set(SLSConfiguration.RM_SCHEDULER, schedulerClass);
     rmConf.set(YarnConfiguration.RM_SCHEDULER,

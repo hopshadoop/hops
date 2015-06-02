@@ -13,11 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.hadoop.yarn.server.api.protocolrecords;
 
-package io.hops.metadata.api;
+import io.hops.leader_election.node.ActiveNode;
+import io.hops.leader_election.node.SortedActiveNodeList;
 
-public abstract class HopNodeIdAbstract {
-  public abstract int getId();
-
-  public abstract void setId(int id);
+public interface LiveRMsResponse {
+    public SortedActiveNodeList getLiveRMsList();
+    public ActiveNode getLeader();
+    
+    public void setLiveRMsList(SortedActiveNodeList list);
+    
 }

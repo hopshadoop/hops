@@ -24,8 +24,11 @@ import io.hops.metadata.yarn.dal.AppSchedulingInfoDataAccess;
 import io.hops.metadata.yarn.dal.ContainerDataAccess;
 import io.hops.metadata.yarn.dal.ContainerIdToCleanDataAccess;
 import io.hops.metadata.yarn.dal.ContainerStatusDataAccess;
+import io.hops.metadata.yarn.dal.FiCaSchedulerAppLastScheduledContainerDataAccess;
 import io.hops.metadata.yarn.dal.FiCaSchedulerAppLiveContainersDataAccess;
 import io.hops.metadata.yarn.dal.FiCaSchedulerAppNewlyAllocatedContainersDataAccess;
+import io.hops.metadata.yarn.dal.FiCaSchedulerAppReservationsDataAccess;
+import io.hops.metadata.yarn.dal.FiCaSchedulerAppSchedulingOpportunitiesDataAccess;
 import io.hops.metadata.yarn.dal.FiCaSchedulerNodeDataAccess;
 import io.hops.metadata.yarn.dal.FinishedApplicationsDataAccess;
 import io.hops.metadata.yarn.dal.FullRMNodeDataAccess;
@@ -46,7 +49,12 @@ import io.hops.metadata.yarn.dal.ResourceRequestDataAccess;
 import io.hops.metadata.yarn.dal.SchedulerApplicationDataAccess;
 import io.hops.metadata.yarn.dal.UpdatedContainerInfoDataAccess;
 import io.hops.metadata.yarn.dal.YarnVariablesDataAccess;
+import io.hops.metadata.yarn.dal.capacity.CSLeafQueueUserInfoDataAccess;
+import io.hops.metadata.yarn.dal.capacity.CSQueueDataAccess;
+import io.hops.metadata.yarn.dal.capacity.FiCaSchedulerAppReservedContainersDataAccess;
+import io.hops.metadata.yarn.dal.fair.AppSchedulableDataAccess;
 import io.hops.metadata.yarn.dal.fair.FSSchedulerNodeDataAccess;
+import io.hops.metadata.yarn.dal.fair.PreemptionMapDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.AllocateResponseDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.ApplicationAttemptStateDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.ApplicationStateDataAccess;
@@ -62,8 +70,10 @@ import io.hops.metadata.yarn.entity.AppSchedulingInfoBlacklist;
 import io.hops.metadata.yarn.entity.Container;
 import io.hops.metadata.yarn.entity.ContainerId;
 import io.hops.metadata.yarn.entity.ContainerStatus;
+import io.hops.metadata.yarn.entity.FiCaSchedulerAppLastScheduledContainer;
 import io.hops.metadata.yarn.entity.FiCaSchedulerAppLiveContainers;
 import io.hops.metadata.yarn.entity.FiCaSchedulerAppNewlyAllocatedContainers;
+import io.hops.metadata.yarn.entity.FiCaSchedulerAppSchedulingOpportunities;
 import io.hops.metadata.yarn.entity.FiCaSchedulerNode;
 import io.hops.metadata.yarn.entity.FinishedApplications;
 import io.hops.metadata.yarn.entity.JustLaunchedContainers;
@@ -80,10 +90,16 @@ import io.hops.metadata.yarn.entity.RMNode;
 import io.hops.metadata.yarn.entity.RMNodeComps;
 import io.hops.metadata.yarn.entity.Resource;
 import io.hops.metadata.yarn.entity.ResourceRequest;
+import io.hops.metadata.yarn.entity.SchedulerAppReservations;
 import io.hops.metadata.yarn.entity.SchedulerApplication;
 import io.hops.metadata.yarn.entity.UpdatedContainerInfo;
 import io.hops.metadata.yarn.entity.YarnVariables;
 import io.hops.metadata.yarn.entity.appmasterrpc.RPC;
+import io.hops.metadata.yarn.entity.capacity.CSLeafQueueUserInfo;
+import io.hops.metadata.yarn.entity.capacity.CSQueue;
+import io.hops.metadata.yarn.entity.capacity.FiCaSchedulerAppReservedContainers;
+import io.hops.metadata.yarn.entity.fair.FSSchedulerNode;
+import io.hops.metadata.yarn.entity.fair.PreemptionMap;
 import io.hops.metadata.yarn.entity.rmstatestore.AllocateResponse;
 import io.hops.metadata.yarn.entity.rmstatestore.ApplicationAttemptState;
 import io.hops.metadata.yarn.entity.rmstatestore.ApplicationState;
@@ -467,7 +483,7 @@ public class RMUtilities {
         .handle();
   }
 
-  public static List<FiCaSchedulerNode> getAllFiCaSchedulerNodes()
+  public static Map<String, FiCaSchedulerNode> getAllFiCaSchedulerNodes()
       throws IOException {
     LightWeightRequestHandler getFiCaSchedulerNodesHandler =
         new LightWeightRequestHandler(YARNOperationType.TEST) {
@@ -478,12 +494,12 @@ public class RMUtilities {
             FiCaSchedulerNodeDataAccess DA =
                 (FiCaSchedulerNodeDataAccess) RMStorageFactory
                     .getDataAccess(FiCaSchedulerNodeDataAccess.class);
-            List<FiCaSchedulerNode> fiCaSchedulerNodes = DA.getAll();
+            Map<String, FiCaSchedulerNode> fiCaSchedulerNodes = DA.getAll();
             connector.commit();
             return fiCaSchedulerNodes;
           }
         };
-    return (List<FiCaSchedulerNode>) getFiCaSchedulerNodesHandler.handle();
+    return (Map<String, FiCaSchedulerNode>) getFiCaSchedulerNodesHandler.handle();
   }
 
   
@@ -2177,12 +2193,21 @@ public class RMUtilities {
             NextHeartbeatDataAccess nextHeartbeatDA =
                 (NextHeartbeatDataAccess) RMStorageFactory
                     .getDataAccess(NextHeartbeatDataAccess.class);
+            CSQueueDataAccess csQDA = (CSQueueDataAccess) RMStorageFactory.
+                    getDataAccess(CSQueueDataAccess.class);
+            CSLeafQueueUserInfoDataAccess csLQDA
+                    = (CSLeafQueueUserInfoDataAccess) RMStorageFactory.
+                    getDataAccess(CSLeafQueueUserInfoDataAccess.class);
+            AppSchedulableDataAccess appSDA
+                    = (AppSchedulableDataAccess) RMStorageFactory.getDataAccess(
+                            AppSchedulableDataAccess.class);
 
             if (rpcID >= 0) {
               RPC hop = new RPC(rpcID);
               DA.remove(hop);
             }
             //TODO put all of this in ts.persist
+            ts.persistCSQueueInfo(csQDA, csLQDA);
             ts.persistRMNodeToUpdate(rmnodeDA);
             ts.persistRmcontextInfo(rmnodeDA, resourceDA, nodeDA,
                 rmctxInactiveNodesDA);
@@ -2303,5 +2328,141 @@ public class RMUtilities {
       }
     }
     return sb.toString();
+  }
+
+  public static Map<String, List<FiCaSchedulerAppSchedulingOpportunities>> getAllSchedulingOpportunities()
+          throws IOException {
+    LightWeightRequestHandler getSchedulingOpportunitiesHandler
+            = new LightWeightRequestHandler(YARNOperationType.TEST) {
+              @Override
+              public Object performTask() throws StorageException, IOException {
+                connector.beginTransaction();
+                connector.writeLock();
+                FiCaSchedulerAppSchedulingOpportunitiesDataAccess DA
+                = (FiCaSchedulerAppSchedulingOpportunitiesDataAccess) RMStorageFactory.
+                getDataAccess(
+                        FiCaSchedulerAppSchedulingOpportunitiesDataAccess.class);
+                Map<String, List<FiCaSchedulerAppSchedulingOpportunities>> hopSOpp
+                = DA.getAll();
+                connector.commit();
+                return hopSOpp;
+              }
+            };
+    return (Map<String, List<FiCaSchedulerAppSchedulingOpportunities>>) getSchedulingOpportunitiesHandler.
+            handle();
+  }
+
+  public static Map<String, List<FiCaSchedulerAppLastScheduledContainer>> getAllLastScheduledContainers()
+          throws IOException {
+    LightWeightRequestHandler getLastScheduledContainerHandler
+            = new LightWeightRequestHandler(YARNOperationType.TEST) {
+              @Override
+              public Object performTask() throws StorageException, IOException {
+                connector.beginTransaction();
+                connector.writeLock();
+                FiCaSchedulerAppLastScheduledContainerDataAccess DA
+                = (FiCaSchedulerAppLastScheduledContainerDataAccess) RMStorageFactory.
+                getDataAccess(
+                        FiCaSchedulerAppLastScheduledContainerDataAccess.class);
+                Map<String, List<FiCaSchedulerAppLastScheduledContainer>> hopLastScheduledContainers
+                = DA.getAll();
+                connector.commit();
+                return hopLastScheduledContainers;
+              }
+            };
+    return (Map<String, List<FiCaSchedulerAppLastScheduledContainer>>) getLastScheduledContainerHandler.
+            handle();
+  }
+
+  public static Map<String, List<SchedulerAppReservations>> getAllRereservations()
+          throws IOException {
+    LightWeightRequestHandler getReservationsHandler
+            = new LightWeightRequestHandler(YARNOperationType.TEST) {
+              @Override
+              public Object performTask() throws StorageException, IOException {
+                connector.beginTransaction();
+                connector.writeLock();
+                FiCaSchedulerAppReservationsDataAccess DA
+                = (FiCaSchedulerAppReservationsDataAccess) RMStorageFactory.
+                getDataAccess(FiCaSchedulerAppReservationsDataAccess.class);
+                Map<String, List<SchedulerAppReservations>> hopReservationsMap
+                = DA.getAll();
+                connector.commit();
+                return hopReservationsMap;
+              }
+            };
+    return (Map<String, List<SchedulerAppReservations>>) getReservationsHandler.
+            handle();
+  }
+
+  public static Map<String, List<FiCaSchedulerAppReservedContainers>> getAllReservedContainers()
+          throws IOException {
+    LightWeightRequestHandler getReservedContainersHandler
+            = new LightWeightRequestHandler(YARNOperationType.TEST) {
+              @Override
+              public Object performTask() throws StorageException, IOException {
+                connector.beginTransaction();
+                connector.writeLock();
+                FiCaSchedulerAppReservedContainersDataAccess DA
+                = (FiCaSchedulerAppReservedContainersDataAccess) RMStorageFactory.
+                getDataAccess(FiCaSchedulerAppReservedContainersDataAccess.class);
+                Map<String, List<FiCaSchedulerAppReservedContainers>> hopResCont
+                = DA.getAll();
+                connector.commit();
+                return hopResCont;
+              }
+            };
+    return (Map<String, List<FiCaSchedulerAppReservedContainers>>) getReservedContainersHandler.
+            handle();
+  }
+
+  public static List<CSQueue> getAllCSQueues() throws IOException {
+    LightWeightRequestHandler handler = new LightWeightRequestHandler(
+            YARNOperationType.TEST) {
+              @Override
+              public Object performTask() throws StorageException, IOException {
+                connector.readCommitted();
+                CSQueueDataAccess csqDA = (CSQueueDataAccess) RMStorageFactory.
+                getDataAccess(CSQueueDataAccess.class);
+                return csqDA.getAll();
+              }
+            };
+    return (List<CSQueue>) handler.handle();
+  }
+
+  public static List<CSLeafQueueUserInfo> getAllCSLeafQueueUserInfo()
+          throws IOException {
+    LightWeightRequestHandler handler = new LightWeightRequestHandler(
+            YARNOperationType.TEST) {
+              @Override
+              public Object performTask() throws StorageException, IOException {
+                connector.readCommitted();
+                CSLeafQueueUserInfoDataAccess csqLUIDA
+                = (CSLeafQueueUserInfoDataAccess) RMStorageFactory.
+                getDataAccess(CSLeafQueueUserInfoDataAccess.class);
+                return csqLUIDA.findAll();
+              }
+            };
+    return (List<CSLeafQueueUserInfo>) handler.handle();
+  }
+
+  //for testing
+  public static CSQueue getCSQueue(final String queuepath) throws IOException {
+    LightWeightRequestHandler getCSQueueInfoHandler
+            = new LightWeightRequestHandler(YARNOperationType.TEST) {
+              @Override
+              public Object performTask() throws StorageException, IOException {
+                connector.beginTransaction();
+                connector.writeLock();
+                CSQueueDataAccess CSQDA = (CSQueueDataAccess) RMStorageFactory.
+                getDataAccess(CSQueueDataAccess.class);
+                CSQueue found = (CSQueue) CSQDA.findById(queuepath);
+                LOG.debug("HOP :: getCSQueueInfo() - got HopSCSQueueInfo:"
+                        + queuepath);
+                connector.commit();
+                return found;
+              }
+            };
+    return (CSQueue) getCSQueueInfoHandler.handle();
   }
 }

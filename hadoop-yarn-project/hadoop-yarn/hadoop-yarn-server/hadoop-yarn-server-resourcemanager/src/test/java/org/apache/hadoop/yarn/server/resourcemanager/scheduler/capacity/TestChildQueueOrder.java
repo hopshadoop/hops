@@ -131,11 +131,11 @@ public class TestChildQueueOrder {
         final Resource allocatedResource = Resources.createResource(allocation);
         if (queue instanceof ParentQueue) {
           ((ParentQueue) queue)
-              .allocateResource(clusterResource, allocatedResource);
+              .allocateResource(clusterResource, allocatedResource, null);
         } else {
           FiCaSchedulerApp app1 = getMockApplication(0, "");
           ((LeafQueue) queue)
-              .allocateResource(clusterResource, app1, allocatedResource);
+              .allocateResource(clusterResource, app1, allocatedResource, null);
         }
 
         // Next call - nothing

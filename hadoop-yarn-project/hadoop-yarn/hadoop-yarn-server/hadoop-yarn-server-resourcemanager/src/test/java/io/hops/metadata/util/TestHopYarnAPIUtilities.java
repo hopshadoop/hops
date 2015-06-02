@@ -160,7 +160,8 @@ public class TestHopYarnAPIUtilities {
     MockNM nm2 = rm.registerNode("127.0.0.2:5678", 4 * GB);
     Thread.sleep(1000);
     //verify that they are persisted in the db
-    List<FiCaSchedulerNode> dbNodes = RMUtilities.getAllFiCaSchedulerNodes();
+    Map<String,FiCaSchedulerNode> dbNodes = RMUtilities.
+            getAllFiCaSchedulerNodes();
     assertEquals(2, dbNodes.size());
 
     //submit an application of 2GB memory
