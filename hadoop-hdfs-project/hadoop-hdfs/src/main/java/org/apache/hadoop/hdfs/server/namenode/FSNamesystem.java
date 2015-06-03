@@ -20,7 +20,7 @@ package org.apache.hadoop.hdfs.server.namenode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Charsets;
 import com.google.common.collect.Lists;
-import io.hops.common.BlockIdGen;
+import io.hops.common.IDsGeneratorFactory;
 import io.hops.common.IDsMonitor;
 import io.hops.common.INodeUtil;
 import io.hops.erasure_coding.Codec;
@@ -2408,8 +2408,8 @@ public class FSNamesystem
    */
   Block createNewBlock(INodeFile pendingFile)
       throws IOException, StorageException {
-    Block b = new Block(BlockIdGen.getUniqueBlockId(), 0,
-        0); // HOP. previous code was getFSImage().getUniqueBlockId()
+    Block b = new Block(IDsGeneratorFactory.getInstance().getUniqueBlockID()
+        , 0, 0); // HOP. previous code was getFSImage().getUniqueBlockId()
     // Increment the generation stamp for every new block.
     b.setGenerationStampNoPersistance(pendingFile.nextGenerationStamp());
     return b;

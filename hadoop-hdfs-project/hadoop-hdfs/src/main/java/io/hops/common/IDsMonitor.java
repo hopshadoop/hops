@@ -27,11 +27,8 @@ public class IDsMonitor implements Runnable {
   private static final Log LOG = LogFactory.getLog(IDsMonitor.class);
   private static IDsMonitor instance = null;
   private Thread th = null;
-  private int inodeIdsThreshold;
-  private int blockIdsThreshold;
-  private int quotaUpdateIdsThreshold;
-  private int checkInterval;
 
+  private int checkInterval;
   private IDsMonitor() {
   }
 
@@ -43,8 +40,9 @@ public class IDsMonitor implements Runnable {
   }
 
   public void setConfiguration(Configuration conf) {
-    setConfiguration(conf.getInt(DFSConfigKeys.DFS_NAMENODE_INODEID_BATCH_SIZE,
-        DFSConfigKeys.DFS_NAMENODE_INODEID_BATCH_SIZE_DEFAULT),
+    IDsGeneratorFactory.getInstance().setConfiguration(conf.getInt
+            (DFSConfigKeys.DFS_NAMENODE_INODEID_BATCH_SIZE,
+                DFSConfigKeys.DFS_NAMENODE_INODEID_BATCH_SIZE_DEFAULT),
         conf.getInt(DFSConfigKeys.DFS_NAMENODE_BLOCKID_BATCH_SIZE,
             DFSConfigKeys.DFS_NAMENODE_BLOCKID_BATCH_SIZE_DEFAULT),
         conf.getInt(DFSConfigKeys.DFS_NAMENODE_QUOTA_UPDATE_ID_BATCH_SIZE,
@@ -55,25 +53,14 @@ public class IDsMonitor implements Runnable {
             DFSConfigKeys.DFS_NAMENODE_BLOCKID_UPDATE_THRESHOLD_DEFAULT),
         conf.getFloat(
             DFSConfigKeys.DFS_NAMENODE_QUOTA_UPDATE_ID_UPDATE_THRESHOLD,
-            DFSConfigKeys.DFS_NAMENODE_QUOTA_UPDATE_ID_UPDATE_THRESHOLD_DEFAULT),
-        conf.getInt(DFSConfigKeys.DFS_NAMENODE_IDSMONITOR_CHECK_INTERVAL_IN_MS,
-            DFSConfigKeys.DFS_NAMENODE_IDSMONITOR_CHECK_INTERVAL_IN_MS_DEFAULT));
+            DFSConfigKeys.DFS_NAMENODE_QUOTA_UPDATE_ID_UPDATE_THRESHOLD_DEFAULT)
+        );
+
+    checkInterval = conf.getInt(DFSConfigKeys.DFS_NAMENODE_IDSMONITOR_CHECK_INTERVAL_IN_MS,
+        DFSConfigKeys.DFS_NAMENODE_IDSMONITOR_CHECK_INTERVAL_IN_MS_DEFAULT);
   }
 
-  public void setConfiguration(int inodeIdsBatchSize, int blockIdsBatchSize,
-      int quotaUpdateIdsBatchSize, float inodeIdsThreshold,
-      float blockIdsThreshold, float quotaUpdateIdsThreshold,
-      int checkInterval) {
 
-    INodeIdGen.setBatchSize(inodeIdsBatchSize);
-    BlockIdGen.setBatchSize(blockIdsBatchSize);
-    QuotaUpdateIdGen.setBatchSize(quotaUpdateIdsBatchSize);
-    this.inodeIdsThreshold = (int) (inodeIdsThreshold * inodeIdsBatchSize);
-    this.blockIdsThreshold = (int) (blockIdsThreshold * blockIdsBatchSize);
-    this.quotaUpdateIdsThreshold =
-        (int) (quotaUpdateIdsThreshold * quotaUpdateIdsBatchSize);
-    this.checkInterval = checkInterval;
-  }
 
   public void start() {
     getNewIds(); // Avoid race conditions between operations and the first acquisition of ids
@@ -91,17 +78,9 @@ public class IDsMonitor implements Runnable {
 
   private void getNewIds() {
     try {
-      if (INodeIdGen.getMoreIdsIfNeeded(inodeIdsThreshold)) {
-        LOG.debug("get more inode ids " + INodeIdGen.getCQ());
-      }
 
-      if (BlockIdGen.getMoreIdsIfNeeded(blockIdsThreshold)) {
-        LOG.debug("get more block ids " + BlockIdGen.getCQ());
-      }
+      IDsGeneratorFactory.getInstance().getNewIDs();
 
-      if (QuotaUpdateIdGen.getMoreIdsIfNeeded(quotaUpdateIdsThreshold)) {
-        LOG.debug("get more quota update ids " + QuotaUpdateIdGen.getCQ());
-      }
       Thread.sleep(checkInterval);
     } catch (InterruptedException ex) {
       LOG.warn("IDsMonitor interrupted: " + ex);
