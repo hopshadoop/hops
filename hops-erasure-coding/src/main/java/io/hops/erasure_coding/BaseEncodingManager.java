@@ -23,6 +23,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
+import org.apache.hadoop.fs.ErasureCodingFileSystem;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -205,7 +206,7 @@ public abstract class BaseEncodingManager extends EncodingManager {
       Path parityPath, Codec codec, Statistics statistics,
       Progressable reporter, int targetRepl, int metaRepl, boolean copy)
       throws IOException {
-    FileSystem srcFs = sourceFile.getFileSystem(conf);
+    DistributedFileSystem srcFs = Helper.getDFS(conf, sourceFile);
     FileStatus sourceStatus = srcFs.getFileStatus(sourceFile);
 
     // extract block locations from File system
@@ -240,8 +241,8 @@ public abstract class BaseEncodingManager extends EncodingManager {
 
       if (copy) {
         out.close();
-        ((DistributedFileSystem) srcFs).rename(tmpFile, sourceFile,
-            Options.Rename.OVERWRITE, Options.Rename.KEEP_ENCODING_STATUS);
+        srcFs.rename(tmpFile, sourceFile, Options.Rename.OVERWRITE,
+            Options.Rename.KEEP_ENCODING_STATUS);
       } else if (srcFs.setReplication(sourceFile, (short) targetRepl) == false) {
         LOG.info("Error in reducing replication of " + sourceFile + " to " +
             targetRepl);
@@ -306,12 +307,10 @@ public abstract class BaseEncodingManager extends EncodingManager {
         " parity mtime " + outstat.getModificationTime());
   }
 
-  
   public static Decoder.DecoderInputStream unRaidCorruptInputStream(
       Configuration conf, Path srcPath, long blockSize, long corruptOffset,
       long limit) throws IOException {
-    DistributedFileSystem srcFs =
-        (DistributedFileSystem) srcPath.getFileSystem(conf);
+    DistributedFileSystem srcFs = Helper.getDFS(conf, srcPath);
     EncodingStatus encodingStatus =
         srcFs.getEncodingStatus(srcPath.toUri().getPath());
     Decoder decoder = new Decoder(conf,

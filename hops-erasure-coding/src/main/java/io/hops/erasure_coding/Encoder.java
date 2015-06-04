@@ -21,6 +21,7 @@ package io.hops.erasure_coding;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.ErasureCodingFileSystem;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -441,11 +442,13 @@ public class Encoder {
           reporter.progress();
         }
       }
-      sendChecksums((DistributedFileSystem) fs,
-          copyPath == null ? sourceFile : copyPath,
+      DistributedFileSystem dfs =(DistributedFileSystem)
+          (fs instanceof ErasureCodingFileSystem ?
+              ((ErasureCodingFileSystem) fs).getFileSystem() : fs);
+      sendChecksums(dfs, copyPath == null ? sourceFile : copyPath,
           sourceChecksums, stripe, codec.stripeLength);
-      sendChecksums((DistributedFileSystem) fs, parityFile, parityChecksums,
-          stripe, codec.parityLength);
+      sendChecksums(dfs, parityFile, parityChecksums, stripe,
+          codec.parityLength);
     } finally {
       parallelReader.shutdown();
     }

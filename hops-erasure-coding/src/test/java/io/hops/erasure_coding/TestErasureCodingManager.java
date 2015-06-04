@@ -21,6 +21,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
+import org.apache.hadoop.fs.ErasureCodingFileSystem;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -58,6 +59,7 @@ public class TestErasureCodingManager extends ClusterTest {
   private HdfsConfiguration conf;
   private final long seed = 0xDEADBEEFL;
   private final Path testFile = new Path("/test_file");
+  private DistributedFileSystem dfs;
 
   public TestErasureCodingManager() {
     conf = new HdfsConfiguration();
@@ -73,6 +75,8 @@ public class TestErasureCodingManager extends ClusterTest {
     conf.setInt("dfs.blockreport.intervalMsec", 30 * 1000);
     conf.setInt(DFSConfigKeys.REPAIR_DELAY_KEY, 10 * 1000);
     conf.setInt(DFSConfigKeys.PARITY_REPAIR_DELAY_KEY, 10 * 1000);
+    conf.setClass("fs.hdfs.impl", ErasureCodingFileSystem.class,
+        FileSystem.class); // Make sure it works with ecfs
   }
 
   @Override
@@ -86,8 +90,9 @@ public class TestErasureCodingManager extends ClusterTest {
         .numDataNodes(NUMBER_OF_DATANODES).build();
     cluster.waitActive();
 
-    fs = cluster.getFileSystem();
-    FileSystem fs = getFileSystem();
+    fs = FileSystem.get(conf);
+    dfs = (DistributedFileSystem)
+        ((ErasureCodingFileSystem) fs).getFileSystem();
     FileStatus[] files = fs.globStatus(new Path("/*"));
     for (FileStatus file : files) {
       fs.delete(file.getPath(), true);
@@ -96,8 +101,6 @@ public class TestErasureCodingManager extends ClusterTest {
 
   @Test
   public void testEncoding() throws IOException, InterruptedException {
-    DistributedFileSystem dfs = (DistributedFileSystem) getFileSystem();
-
     Codec.initializeCodecs(getConfig());
     EncodingPolicy policy = new EncodingPolicy("src", (short) 1);
     Util.createRandomFile(dfs, testFile, seed, TEST_BLOCK_COUNT,
@@ -123,7 +126,6 @@ public class TestErasureCodingManager extends ClusterTest {
 
   @Test
   public void testLateEncoding() throws IOException {
-    DistributedFileSystem dfs = (DistributedFileSystem) getFileSystem();
     Util.createRandomFile(dfs, testFile, seed, TEST_BLOCK_COUNT,
         DFS_TEST_BLOCK_SIZE);
     EncodingPolicy policy = new EncodingPolicy("src", (short) 1);
@@ -171,8 +173,6 @@ public class TestErasureCodingManager extends ClusterTest {
 
   @Test
   public void testRevoke() throws IOException, InterruptedException {
-    DistributedFileSystem dfs = (DistributedFileSystem) getFileSystem();
-
     Codec.initializeCodecs(getConfig());
     EncodingPolicy policy = new EncodingPolicy("src", (short) 1);
     Util.createRandomFile(dfs, testFile, seed, TEST_BLOCK_COUNT,
@@ -205,8 +205,6 @@ public class TestErasureCodingManager extends ClusterTest {
 
   @Test
   public void testDelete() throws IOException, InterruptedException {
-    DistributedFileSystem dfs = (DistributedFileSystem) getFileSystem();
-
     Codec.initializeCodecs(getConfig());
     EncodingPolicy policy = new EncodingPolicy("src", (short) 1);
     Util.createRandomFile(dfs, testFile, seed, TEST_BLOCK_COUNT,
@@ -234,8 +232,6 @@ public class TestErasureCodingManager extends ClusterTest {
 
   @Test
   public void testSourceRepair() throws IOException, InterruptedException {
-    DistributedFileSystem dfs = (DistributedFileSystem) getFileSystem();
-
     Codec.initializeCodecs(getConfig());
     EncodingPolicy policy = new EncodingPolicy("src", (short) 1);
     Util.createRandomFile(dfs, testFile, seed, TEST_BLOCK_COUNT,
@@ -299,8 +295,6 @@ public class TestErasureCodingManager extends ClusterTest {
 
   @Test
   public void testParityRepair() throws IOException, InterruptedException {
-    DistributedFileSystem dfs = (DistributedFileSystem) getFileSystem();
-
     Codec.initializeCodecs(getConfig());
     EncodingPolicy policy = new EncodingPolicy("src", (short) 1);
     Util.createRandomFile(dfs, testFile, seed, TEST_BLOCK_COUNT,
