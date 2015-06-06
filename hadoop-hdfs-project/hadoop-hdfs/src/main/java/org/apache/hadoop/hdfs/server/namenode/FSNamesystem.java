@@ -44,7 +44,6 @@ import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.metadata.hdfs.entity.ProjectedINode;
 import io.hops.metadata.hdfs.entity.SizeLogEntry;
-import io.hops.metadata.ndb.NdbStorageFactory;
 import io.hops.transaction.EntityManager;
 import io.hops.transaction.handler.EncodingStatusOperationType;
 import io.hops.transaction.handler.HDFSOperationType;
