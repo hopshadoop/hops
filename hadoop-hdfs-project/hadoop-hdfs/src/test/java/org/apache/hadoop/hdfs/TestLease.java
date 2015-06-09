@@ -46,7 +46,9 @@ import org.mockito.Mockito;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.security.PrivilegedExceptionAction;
-
+import org.apache.hadoop.hdfs.server.namenode.TestSubtreeLock;
+import static junit.framework.Assert.assertFalse;
+import static junit.framework.Assert.assertTrue;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
@@ -223,6 +225,8 @@ public class TestLease {
       Path pRenamed = new Path(d, p.getName());
       fs2.mkdirs(d);
       fs2.rename(p, pRenamed);
+      
+      assertFalse("Subtree locks were not cleared properly",TestSubtreeLock.subTreeLocksExists());
       Assert.assertFalse(p + " exists", fs2.exists(p));
       Assert.assertTrue(pRenamed + " not found", fs2.exists(pRenamed));
       Assert.assertFalse("has lease for " + p, hasLease(cluster, p));
@@ -230,10 +234,14 @@ public class TestLease {
           .assertTrue("no lease for " + pRenamed, hasLease(cluster, pRenamed));
       Assert.assertEquals(1, leaseCount(cluster));
 
+      
+      
       // rename the parent dir to a new non-existent dir
       LOG.info("DMS: rename parent dir");
       Path pRenamedAgain = new Path(d2, pRenamed.getName());
       fs2.rename(d, d2);
+      assertFalse("Subtree locks were not cleared properly",TestSubtreeLock.subTreeLocksExists());
+      
       // src gone
       Assert.assertFalse(d + " exists", fs2.exists(d));
       Assert.assertFalse("has lease for " + pRenamed,
@@ -252,7 +260,9 @@ public class TestLease {
       pRenamed = pRenamedAgain;
       pRenamedAgain = new Path(new Path(d, d2.getName()), p.getName());
       fs2.mkdirs(d);
+      assertFalse("Subtree locks were not cleared properly",TestSubtreeLock.subTreeLocksExists());
       fs2.rename(d2, d);
+      
       // src gone
       Assert.assertFalse(d2 + " exists", fs2.exists(d2));
       Assert

@@ -134,6 +134,20 @@ public class INodeDALAdaptor
   public int countAllFiles() throws StorageException {
     return dataAccess.countAllFiles();
   }
+  
+  @Override
+  public boolean hasChildren(int parentId) throws StorageException {
+    return dataAccess.hasChildren(parentId);
+  }
+  
+  //Only for testing
+  @Override
+  public List<org.apache.hadoop.hdfs.server.namenode.INode> allINodes() throws StorageException {
+    List<org.apache.hadoop.hdfs.server.namenode.INode> list =
+        (List) convertDALtoHDFS(
+            dataAccess.allINodes());
+    return list;
+  }
 
   @Override
   public INode convertHDFStoDAL(
@@ -254,5 +268,4 @@ public class INodeDALAdaptor
     }
     return inode;
   }
-
 }

@@ -16,8 +16,19 @@
 package org.apache.hadoop.hdfs.server.namenode;
 
 import io.hops.TestUtil;
+import io.hops.exception.StorageException;
+import io.hops.metadata.HdfsStorageFactory;
+import io.hops.metadata.hdfs.dal.INodeDataAccess;
+import io.hops.metadata.hdfs.dal.OngoingSubTreeOpsDataAccess;
+import io.hops.metadata.hdfs.entity.SubTreeOperation;
+import io.hops.transaction.handler.HDFSOperationType;
+import io.hops.transaction.handler.HopsTransactionalRequestHandler;
+import io.hops.transaction.handler.LightWeightRequestHandler;
 import io.hops.transaction.handler.RequestHandler;
+import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.SubtreeLockedException;
+import io.hops.transaction.lock.TransactionLockTypes;
+import io.hops.transaction.lock.TransactionLocks;
 import junit.framework.TestCase;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -34,6 +45,9 @@ import org.junit.Test;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.List;
+import static junit.framework.Assert.assertFalse;
+import static junit.framework.Assert.assertTrue;
 
 public class TestSubtreeLock extends TestCase {
 
@@ -56,11 +70,11 @@ public class TestSubtreeLock extends TestCase {
       dfs.mkdir(path2, FsPermission.getDefault());
 
       FSNamesystem namesystem = cluster.getNamesystem();
-      namesystem.lockSubtree(path1.toUri().getPath());
+      namesystem.lockSubtree(path1.toUri().getPath(),SubTreeOperation.StoOperationType.NA);
 
       boolean exception = false;
       try {
-        namesystem.lockSubtree(path1.toUri().getPath());
+        namesystem.lockSubtree(path1.toUri().getPath(),SubTreeOperation.StoOperationType.NA);
       } catch (SubtreeLockedException e) {
         exception = true;
       }
@@ -69,7 +83,7 @@ public class TestSubtreeLock extends TestCase {
 
       exception = false;
       try {
-        namesystem.lockSubtree(path2.toUri().getPath());
+        namesystem.lockSubtree(path2.toUri().getPath(),SubTreeOperation.StoOperationType.NA);
       } catch (SubtreeLockedException e) {
         exception = true;
       }
@@ -77,13 +91,47 @@ public class TestSubtreeLock extends TestCase {
           exception);
 
       namesystem.unlockSubtree(path1.toUri().getPath());
-      namesystem.lockSubtree(path2.toUri().getPath());
+      namesystem.lockSubtree(path2.toUri().getPath(),SubTreeOperation.StoOperationType.NA);
     } finally {
       if (cluster != null) {
         cluster.shutdown();
       }
     }
   }
+  
+   @Test
+  public void testSubtreeNestedLocking() throws IOException {
+    MiniDFSCluster cluster = null;
+    try {
+      Configuration conf = new HdfsConfiguration();
+      conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRIES_ON_FAILURE_KEY, 0);
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
+      cluster.waitActive();
+     
+      DistributedFileSystem dfs = cluster.getFileSystem();
+      dfs.mkdirs(new Path("/A/B/C/D/E"), FsPermission.getDefault());
+
+      FSNamesystem namesystem = cluster.getNamesystem();
+      namesystem.lockSubtree("/A/B/C/D/E",SubTreeOperation.StoOperationType.NA);
+
+      boolean exception = false;
+      try {
+        namesystem.lockSubtree("/A/B/C",SubTreeOperation.StoOperationType.NA);
+      } catch (SubtreeLockedException e) {
+        exception = true;
+      }
+      assertTrue("Failed. Took a lock while sub tree was locked", exception);
+      
+      namesystem.unlockSubtree("/A/B/C/D/E");
+
+      assertFalse("Not all subtree locsk are removed",subTreeLocksExists());
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
+
 
   @Test
   public void testFileTree() throws IOException {
@@ -199,11 +247,13 @@ public class TestSubtreeLock extends TestCase {
 
       FSNamesystem namesystem0 = cluster.getNamesystem(0);
       FSNamesystem namesystem1 = cluster.getNamesystem(1);
-      namesystem0.lockSubtree(path1.toUri().getPath());
+      namesystem0.lockSubtree(path1.toUri().getPath(),
+              SubTreeOperation.StoOperationType.NA);
 
       boolean exception = false;
       try {
-        namesystem1.lockSubtree(path1.toUri().getPath());
+        namesystem1.lockSubtree(path1.toUri().getPath(),
+                SubTreeOperation.StoOperationType.NA);
       } catch (SubtreeLockedException e) {
         exception = true;
       }
@@ -212,7 +262,8 @@ public class TestSubtreeLock extends TestCase {
 
       cluster.shutdownNameNode(0);
       Thread.sleep(4000);
-      namesystem1.lockSubtree(path1.toUri().getPath());
+      namesystem1.lockSubtree(path1.toUri().getPath(),
+              SubTreeOperation.StoOperationType.NA);
     } finally {
       if (cluster != null) {
         cluster.shutdown();
@@ -254,7 +305,8 @@ public class TestSubtreeLock extends TestCase {
       dfs.mkdir(path1, FsPermission.getDefault());
       dfs.mkdir(path2, FsPermission.getDefault());
 
-      namesystem.lockSubtree(path1.toUri().getPath());
+      namesystem.lockSubtree(path1.toUri().getPath(),
+              SubTreeOperation.StoOperationType.NA);
       lockKeeper.start();
 
       assertTrue(dfs.delete(path1, true));
@@ -296,6 +348,7 @@ public class TestSubtreeLock extends TestCase {
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
       cluster.waitActive();
       assertFalse(cluster.getFileSystem().delete(new Path("/foo/"), true));
+      assertFalse("Not All subtree locks were removed after operation ",subTreeLocksExists());
     } finally {
       if (cluster != null) {
         cluster.shutdown();
@@ -329,6 +382,8 @@ public class TestSubtreeLock extends TestCase {
       assertFalse(fs.exists(new Path("/foo/bar/foo")));
       assertFalse(fs.exists(new Path("/foo/bar")));
       assertFalse(fs.exists(new Path("/foo")));
+      
+      assertFalse("Not All subtree locks were removed after operation ",subTreeLocksExists());
     } finally {
       if (cluster != null) {
         cluster.shutdown();
@@ -349,6 +404,7 @@ public class TestSubtreeLock extends TestCase {
       TestFileCreation.createFile(fs, new Path("/foo/bar"), 1);
       assertTrue(fs.delete(new Path("/foo/bar"), true));
       assertFalse(fs.exists(new Path("/foo/bar")));
+      assertFalse("Not All subtree locks were removed after operation ",subTreeLocksExists());
     } finally {
       if (cluster != null) {
         cluster.shutdown();
@@ -373,9 +429,11 @@ public class TestSubtreeLock extends TestCase {
           Options.Rename.OVERWRITE);
       assertTrue(fs.exists(new Path("/foo/bar1")));
       assertFalse(fs.exists(new Path("/foo1/bar1")));
+      
+      assertFalse("Not All subtree locks were removed after operation ",subTreeLocksExists());
 
       try {
-        fs.rename(new Path("/foo1/bar1"), new Path("/foo/bar1"),
+        fs.rename(new Path("/foo1/bar"), new Path("/foo/bar1"),
             Options.Rename.OVERWRITE);
         fail();
       } catch (FileNotFoundException e) {
@@ -387,5 +445,219 @@ public class TestSubtreeLock extends TestCase {
         cluster.shutdown();
       }
     }
+  }
+  
+  
+  @Test
+  public void testDepricatedRenameMoveFiles() throws IOException {
+    MiniDFSCluster cluster = null;
+    try {
+      Configuration conf = new HdfsConfiguration();
+      conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRIES_ON_FAILURE_KEY, 0);
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
+      cluster.waitActive();
+      DistributedFileSystem fs = cluster.getFileSystem();
+      
+      TestFileCreation.createFile(fs, new Path("/foo/file1.txt"), 1).close();
+      TestFileCreation.createFile(fs, new Path("/bar/file1.txt"), 1).close();      
+    
+      assertTrue("Rename Failed", fs.rename(new Path("/foo/file1.txt"), new Path("/bar/file2.txt")));
+      
+      assertFalse("Not All subtree locks were removed after operation ",subTreeLocksExists());
+
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
+  
+  @Test
+  public void testDepricatedRenameDirs() throws IOException {
+    MiniDFSCluster cluster = null;
+    try {
+      Configuration conf = new HdfsConfiguration();
+      conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRIES_ON_FAILURE_KEY, 0);
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
+      cluster.waitActive();
+      DistributedFileSystem fs = cluster.getFileSystem();
+      
+      assertTrue(fs.mkdir(new Path("/foo1"), FsPermission.getDefault()));
+      assertTrue(fs.mkdir(new Path("/foo2"), FsPermission.getDefault()));
+      assertTrue(fs.mkdir(new Path("/foo1/dir1"), FsPermission.getDefault()));
+      assertTrue(fs.mkdir(new Path("/foo2/dir2"), FsPermission.getDefault()));
+      assertTrue("Rename Failed",fs.rename(new Path("/foo1/dir1"), new Path("/foo2/dir2")));
+      
+      assertFalse("Not All subtree locks were removed after operation ",subTreeLocksExists());
+
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
+  
+  
+  @Test
+  public void testRenameDirs() throws IOException {
+    MiniDFSCluster cluster = null;
+    try {
+      Configuration conf = new HdfsConfiguration();
+      conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRIES_ON_FAILURE_KEY, 0);
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
+      cluster.waitActive();
+      DistributedFileSystem fs = cluster.getFileSystem();
+      
+      assertTrue(fs.mkdir(new Path("/foo1"), FsPermission.getDefault()));
+      assertTrue(fs.mkdir(new Path("/foo2"), FsPermission.getDefault()));
+      assertTrue(fs.mkdir(new Path("/foo1/dir1"), FsPermission.getDefault()));
+      assertTrue(fs.mkdir(new Path("/foo2/dir2"), FsPermission.getDefault()));
+      
+       boolean isException =false;
+      Exception exception = null;
+      
+      try{
+        fs.rename(new Path("/foo1/dir1"), new Path("/foo2/dir2/dir1"),Options.Rename.NONE); 
+      }catch(Exception e){
+        isException = true;
+        exception = e;
+      }
+      assertFalse("Rename failed. "+exception,isException);
+      assertFalse("Not All subtree locks were removed after operation ",subTreeLocksExists());
+      
+      try {
+        fs.rename(new Path("/foo1"), new Path("/foo2/dir2"), Options.Rename.OVERWRITE);
+      } catch (Exception e) {
+        isException = true;
+        exception = e;
+      }
+      assertTrue("Rename failed. " + exception, isException);
+      assertFalse("Not All subtree locks were removed after operation ", subTreeLocksExists());
+      
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
+  
+  @Test
+  public void testRenameDirs2() throws IOException {
+    MiniDFSCluster cluster = null;
+    try {
+      Configuration conf = new HdfsConfiguration();
+      conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRIES_ON_FAILURE_KEY, 0);
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
+      cluster.waitActive();
+      DistributedFileSystem fs = cluster.getFileSystem();
+      
+      assertTrue(fs.mkdirs(new Path("/foo1/foo2"), FsPermission.getDefault()));
+      assertTrue(fs.mkdirs(new Path("/bar1/bar2"), FsPermission.getDefault()));
+      
+      
+      boolean isException =false;
+      Exception exception = null;
+      
+      try{
+        fs.rename(new Path("/foo1/foo2"), new Path("/bar1/bar2/"), Options.Rename.OVERWRITE); 
+      }catch(Exception e){
+        isException = true;
+        exception = e;
+      }
+      assertFalse("Rename failed. "+exception,isException);
+      assertFalse("Not All subtree locks were removed after operation ",subTreeLocksExists());
+      
+      
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
+  
+  @Test
+  public void testRenameMoveFiles() throws IOException {
+    MiniDFSCluster cluster = null;
+    try {
+      Configuration conf = new HdfsConfiguration();
+      conf.setInt(DFSConfigKeys.DFS_CLIENT_RETRIES_ON_FAILURE_KEY, 0);
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
+      cluster.waitActive();
+      DistributedFileSystem fs = cluster.getFileSystem();
+      
+      TestFileCreation.createFile(fs, new Path("/foo/file1.txt"), 1).close();
+      TestFileCreation.createFile(fs, new Path("/bar/file1.txt"), 1).close();      
+    
+      boolean isException =false;
+      Exception exception = null;
+      
+      try{
+        fs.rename(new Path("/foo/file1.txt"), new Path("/bar/file2.txt"), Options.Rename.NONE);
+      }catch(Exception e){
+        isException = true;
+        exception = e;
+      }
+      assertFalse("Rename failed. "+exception,isException);
+      assertFalse("Not All subtree locks were removed after operation ",subTreeLocksExists());
+      
+      //test overwrite
+      try{
+        fs.rename(new Path("/bar/file1.txt"), new Path("/bar/file2.txt"), Options.Rename.OVERWRITE );
+      }catch(Exception e){
+        isException = true;
+        exception = e;
+      }
+      assertFalse("Rename failed. "+exception,isException);
+      assertFalse("Not All subtree locks were removed after operation ",subTreeLocksExists());
+      
+
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
+  
+  /**
+   * checks if all the sub tree locks are removed and no flags are set
+   */
+  public static boolean subTreeLocksExists() throws IOException{
+        LightWeightRequestHandler subTreeLockChecker =
+        new LightWeightRequestHandler(HDFSOperationType.TEST_SUBTREE_LOCK) {
+          @Override
+          public Object performTask() throws StorageException, IOException {
+            INodeDataAccess ida = (INodeDataAccess) HdfsStorageFactory
+                .getDataAccess(INodeDataAccess.class);
+            
+            OngoingSubTreeOpsDataAccess oda = (OngoingSubTreeOpsDataAccess) 
+                    HdfsStorageFactory.getDataAccess(OngoingSubTreeOpsDataAccess.class);
+            
+            boolean subTreeLockExists = false;
+            List<INode> inodes = ida.allINodes();
+            List<SubTreeOperation> ops = (List<SubTreeOperation>)oda.allOps();
+            
+            if(ops != null && !ops.isEmpty()){
+              subTreeLockExists = true;
+              for(SubTreeOperation op : ops){
+                log.error("On going sub tree operations table contains: \" "+op.getPath()+
+                        "\" NameNode id: "+op.getNameNodeId()+" OpType: "+op.getOpType());
+              }
+            }
+            
+            if(inodes != null && !inodes.isEmpty()){
+               for(INode inode : inodes){
+                if(inode.isSubtreeLocked()){
+                 subTreeLockExists = true;
+                 log.error("INode lock flag is set. Name "+inode.getLocalName()
+                         +" id: "+inode.getId()+" pid: "+inode.getParentId()
+                         +" locked by "+inode.getSubtreeLockOwner());
+                }
+              }
+            }
+
+            return subTreeLockExists;
+          }
+        };
+    return (Boolean)subTreeLockChecker.handle();
   }
 }

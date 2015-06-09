@@ -135,6 +135,7 @@ public class TestHDFSConcat {
     
     // check permissions -try the operation with the "wrong" user
     final UserGroupInformation user1 = UserGroupInformation
+            
         .createUserForTesting("theDoctor", new String[]{"tardis"});
     DistributedFileSystem hdfs =
         (DistributedFileSystem) DFSTestUtil.getFileSystemAs(user1, conf);

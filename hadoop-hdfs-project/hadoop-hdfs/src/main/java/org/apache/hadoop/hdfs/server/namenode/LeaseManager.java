@@ -309,6 +309,31 @@ public class LeaseManager {
   }
 
   //HOP: method arguments changed for bug fix HDFS-4248
+//  void changeLease(String src, String dst)
+//      throws StorageException, TransactionContextException {
+//    if (LOG.isDebugEnabled()) {
+//      LOG.debug(getClass().getSimpleName() + ".changelease: " +
+//          " src=" + src + ", dest=" + dst);
+//    }
+//
+//    final int len = src.length();
+//    for (Map.Entry<LeasePath, Lease> entry : findLeaseWithPrefixPath(src)
+//        .entrySet()) {
+//      final LeasePath oldpath = entry.getKey();
+//      final Lease lease = entry.getValue();
+//      // replace stem of src with new destination
+//      final LeasePath newpath =
+//          new LeasePath(dst + oldpath.getPath().substring(len),
+//              lease.getHolderID());
+//      if (LOG.isDebugEnabled()) {
+//        LOG.debug("changeLease: replacing " + oldpath + " with " + newpath);
+//      }
+//      lease.replacePath(oldpath, newpath);
+//      EntityManager.remove(oldpath);
+//      EntityManager.add(newpath);
+//    }
+//  }
+  
   void changeLease(String src, String dst)
       throws StorageException, TransactionContextException {
     if (LOG.isDebugEnabled()) {
@@ -317,23 +342,28 @@ public class LeaseManager {
     }
 
     final int len = src.length();
-    for (Map.Entry<LeasePath, Lease> entry : findLeaseWithPrefixPath(src)
-        .entrySet()) {
-      final LeasePath oldpath = entry.getKey();
-      final Lease lease = entry.getValue();
-      // replace stem of src with new destination
+    Collection <LeasePath> paths = findLeasePathsWithPrefix(src);
+    Collection <LeasePath> newLPs = new ArrayList<LeasePath>(paths.size());
+    Collection <LeasePath> deletedLPs = new ArrayList<LeasePath>(paths.size());
+    for (final LeasePath oldPath : paths) {
+      final int holderId = oldPath.getHolderId();
       final LeasePath newpath =
-          new LeasePath(dst + oldpath.getPath().substring(len),
-              lease.getHolderID());
+          new LeasePath(dst + oldPath.getPath().substring(len), holderId);
       if (LOG.isDebugEnabled()) {
-        LOG.debug("changeLease: replacing " + oldpath + " with " + newpath);
+        LOG.debug("changeLease: replacing " + oldPath + " with " + newpath);
       }
-      lease.replacePath(oldpath, newpath);
-      EntityManager.remove(oldpath);
-      EntityManager.add(newpath);
+      newLPs.add(newpath);
+      deletedLPs.add(oldPath);
     }
     
+    for(LeasePath newPath: newLPs){
+      EntityManager.add(newPath);
+    }
+    for(LeasePath deletedLP: deletedLPs){
+      EntityManager.remove(deletedLP);
+    }
   }
+  
 
   void removeLeaseWithPrefixPath(String prefix)
       throws StorageException, TransactionContextException {
@@ -377,6 +407,19 @@ public class LeaseManager {
     return entries;
   }
 
+    private Collection<LeasePath> findLeasePathsWithPrefix(String prefix)
+      throws StorageException, TransactionContextException {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(
+          LeaseManager.class.getSimpleName() + ".findLease: prefix=" + prefix);
+    }
+
+    Collection<LeasePath> leasePathSet =
+        EntityManager.findList(LeasePath.Finder.ByPrefix, prefix);
+
+    return leasePathSet;
+  }
+    
   public void setLeasePeriod(long softLimit, long hardLimit) {
     this.softLimit = softLimit;
     this.hardLimit = hardLimit;

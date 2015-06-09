@@ -1276,36 +1276,53 @@ public class TestFileCreation {
     try {
 
       fs.mkdirs(new Path("/dir"));
-      fs.mkdirs(new Path("/test"));
+      
 
-      FSDataOutputStream stm = createFile(fs, new Path("/dir/file1"), 1);
-      writeFile(stm);
-      stm.close();
-
-      fs.rename(new Path("/dir"), new Path("/test"));
-
-
-      fs.mkdirs(new Path("/dir"));
-      stm = createFile(fs, new Path("/dir/file2"), 1);
-      writeFile(stm);
-      stm.close();
-
-      if (!fs.rename(new Path("/dir"), new Path("/test"))) {
-        try {
-          dfs.rename(new Path("/dir"), new Path("/test"),
-              Options.Rename.OVERWRITE);
-          fail("rename should have failed");
-        } catch (Exception e) {
-          // it should fail
-        }
+      int i = 0;
+      for( ; i < 100; i++){
+        FSDataOutputStream stm = createFile(fs, new Path("/dir/file"+i), 1);
+        stm.close();
       }
+      
 
-      RemoteIterator<LocatedFileStatus> itr =
-          fs.listFiles(new Path("/test"), true);
-      while (itr.hasNext()) {
-        LocatedFileStatus status = itr.next();
-        System.out.println("FILE LISTING: " + status.getPath());
-      }
+      fs.rename(new Path("/dir/file"+(i-1)), new Path("/dir/file"+i));
+
+      
+
+    } finally {
+      cluster.shutdown();
+    }
+    
+
+  }
+  
+  @Test
+  public void testRenameDL() throws Exception {
+
+    Configuration conf = new HdfsConfiguration();
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).format(true).build();
+    FileSystem fs = cluster.getFileSystem();
+    DistributedFileSystem dfs = (DistributedFileSystem) FileSystem
+        .newInstance(fs.getUri(), fs.getConf());
+    try {
+
+      Path dir1 = new Path("/A/B/C/D");
+      Path dir2 = new Path("/D");
+      fs.mkdirs(dir1);
+      fs.mkdirs(dir2);
+      
+      
+      fs.rename(dir2, dir1);
+      
+//     Path file1 = new Path("/file");
+//     FSDataOutputStream stm = createFile(fs, file1, 1);
+//     stm.close();
+//     
+//      
+     fs.rename(dir2, new Path("/A/B/C"));
+
+      
 
     } finally {
       cluster.shutdown();

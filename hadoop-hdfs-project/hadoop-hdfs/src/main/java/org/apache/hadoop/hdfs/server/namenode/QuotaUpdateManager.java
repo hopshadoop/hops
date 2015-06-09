@@ -76,6 +76,7 @@ public class QuotaUpdateManager {
   }
 
   public void activate() {
+    LOG.debug("QuotaUpdateMonitor is running");
     updateThread.start();
   }
 
