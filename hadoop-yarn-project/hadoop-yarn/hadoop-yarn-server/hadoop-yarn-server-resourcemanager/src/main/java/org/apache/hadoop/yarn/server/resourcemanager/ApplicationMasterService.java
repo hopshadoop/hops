@@ -279,7 +279,7 @@ public class ApplicationMasterService extends AbstractService
             applicationAttemptId.getApplicationId(), applicationAttemptId);
         transactionState.decCounter("rpc");
         throw new InvalidApplicationMasterRequestException(message);
-        //TORECOVER save request response and resend it if the request is received again after a recover
+        //TORECOVER OPT save request response and resend it if the request is received again after a recover
       }
 
       this.amLivelinessMonitor.receivedPing(applicationAttemptId);

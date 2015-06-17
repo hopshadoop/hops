@@ -69,7 +69,7 @@ public class FairSchedulerNodeInfo {
                 null, null));
       }
 
-      FSSNodeDA.prepare(toAddFSSchedulerNodes, null);
+      FSSNodeDA.addAll(toAddFSSchedulerNodes);
     }
   }
 }

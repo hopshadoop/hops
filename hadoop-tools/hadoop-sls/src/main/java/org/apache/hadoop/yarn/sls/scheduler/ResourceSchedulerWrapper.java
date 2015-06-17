@@ -87,8 +87,10 @@ import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.SlidingWindowReservoir;
 import com.codahale.metrics.Timer;
 import io.hops.ha.common.TransactionState;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.AbstractYarnScheduler;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication;
 
-public class ResourceSchedulerWrapper implements ResourceScheduler,
+public class ResourceSchedulerWrapper extends AbstractYarnScheduler implements ResourceScheduler,
         Configurable {
   private static final String EOL = System.getProperty("line.separator");
   private static final int SAMPLING_SIZE = 60;
@@ -436,6 +438,18 @@ public class ResourceSchedulerWrapper implements ResourceScheduler,
     if (pool != null)  pool.shutdown();
   }
 
+  @Override
+  public synchronized List<Container> getTransferredContainers(
+          ApplicationAttemptId currentAttempt) {
+    return ((AbstractYarnScheduler) scheduler)
+            .getTransferredContainers(currentAttempt);
+  }
+
+  @Override
+  public Map<ApplicationId, SchedulerApplication> getSchedulerApplications() {
+    return ((AbstractYarnScheduler) scheduler).getSchedulerApplications();
+  }
+  
   @SuppressWarnings("unchecked")
   private void initMetrics() throws Exception {
     metrics = new MetricRegistry();

@@ -61,6 +61,8 @@ import org.apache.hadoop.yarn.security.AMRMTokenIdentifier;
 import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppState;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptState;
 import org.apache.hadoop.yarn.util.Records;
 import org.apache.log4j.Logger;
 
@@ -278,9 +280,15 @@ public abstract class AMSimulator extends TaskRunner.Task {
     while(app.getState() != RMAppState.ACCEPTED) {
       Thread.sleep(50);
     }
-
-    appAttemptId = rm.getRMContext().getRMApps().get(appId)
+    // Waiting until application attempt reach LAUNCHED
+    // "Unmanaged AM must register after AM attempt reaches LAUNCHED state"
+    this.appAttemptId = rm.getRMContext().getRMApps().get(appId)
             .getCurrentAppAttempt().getAppAttemptId();
+    RMAppAttempt rmAppAttempt = rm.getRMContext().getRMApps().get(appId)
+            .getCurrentAppAttempt();
+    while (rmAppAttempt.getState() != RMAppAttemptState.LAUNCHED) {
+      Thread.sleep(10);
+    }
   }
 
   private void registerAM()

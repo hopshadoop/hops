@@ -117,8 +117,8 @@ public class RMContextImpl implements RMContext {
   private ContainerAllocationExpirer containerAllocationExpirer; //recovered
   private DelegationTokenRenewer delegationTokenRenewer;//recovered
   private AMRMTokenSecretManager amRMTokenSecretManager;//recovered
-  private RMContainerTokenSecretManager containerTokenSecretManager;//TORECOVER
-  private NMTokenSecretManagerInRM nmTokenSecretManager;//TORECOVER
+  private RMContainerTokenSecretManager containerTokenSecretManager;//recovered
+  private NMTokenSecretManagerInRM nmTokenSecretManager;//recovered
   private ClientToAMTokenSecretManagerInRM clientToAMTokenSecretManager;
       //recovered
   private AdminService adminService;//recovered

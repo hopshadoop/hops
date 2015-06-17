@@ -387,23 +387,23 @@ public class TestFairScheduler {
 
     // Add a node
     RMNode node1 = MockNodes
-        .newNodeInfo(1, Resources.createResource(1024), 1, "127.0.0.1");
-    NodeAddedSchedulerEvent nodeEvent1 =
-        new NodeAddedSchedulerEvent(node1, null);
+            .newNodeInfo(1, Resources.createResource(1024), 1, "127.0.0.1");
+    NodeAddedSchedulerEvent nodeEvent1 = new NodeAddedSchedulerEvent(node1,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent1);
     assertEquals(1024, scheduler.getClusterCapacity().getMemory());
 
     // Add another node
     RMNode node2 =
         MockNodes.newNodeInfo(1, Resources.createResource(512), 2, "127.0.0.2");
-    NodeAddedSchedulerEvent nodeEvent2 =
-        new NodeAddedSchedulerEvent(node2, null);
+    NodeAddedSchedulerEvent nodeEvent2 = new NodeAddedSchedulerEvent(node2,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent2);
     assertEquals(1536, scheduler.getClusterCapacity().getMemory());
 
     // Remove the first node
-    NodeRemovedSchedulerEvent nodeEvent3 =
-        new NodeRemovedSchedulerEvent(node1, null);
+    NodeRemovedSchedulerEvent nodeEvent3 = new NodeRemovedSchedulerEvent(node1,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent3);
     assertEquals(512, scheduler.getClusterCapacity().getMemory());
   }
@@ -413,10 +413,11 @@ public class TestFairScheduler {
     scheduler.reinitialize(conf, resourceManager.getRMContext());
 
     // Add one big node (only care about aggregate capacity)
-    RMNode node1 = MockNodes
-        .newNodeInfo(1, Resources.createResource(10 * 1024), 1, "127.0.0.1");
-    NodeAddedSchedulerEvent nodeEvent1 =
-        new NodeAddedSchedulerEvent(node1, null);
+    RMNode node1 =
+        MockNodes.newNodeInfo(1, Resources.createResource(10 * 1024), 1,
+            "127.0.0.1");
+    NodeAddedSchedulerEvent nodeEvent1 = new NodeAddedSchedulerEvent(node1,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent1);
 
     // Have two queues which want entire cluster capacity
@@ -442,10 +443,11 @@ public class TestFairScheduler {
 
     // Add one big node (only care about aggregate capacity)
     int capacity = 10 * 24;
-    RMNode node1 = MockNodes
-        .newNodeInfo(1, Resources.createResource(capacity), 1, "127.0.0.1");
-    NodeAddedSchedulerEvent nodeEvent1 =
-        new NodeAddedSchedulerEvent(node1, null);
+    RMNode node1 =
+        MockNodes.newNodeInfo(1, Resources.createResource(capacity), 1,
+            "127.0.0.1");
+    NodeAddedSchedulerEvent nodeEvent1 = new NodeAddedSchedulerEvent(node1,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent1);
 
     // Have two queues which want entire cluster capacity
@@ -500,15 +502,15 @@ public class TestFairScheduler {
 
     // Add a node
     RMNode node1 = MockNodes.newNodeInfo(1, Resources.createResource(1024));
-    NodeAddedSchedulerEvent nodeEvent1 =
-        new NodeAddedSchedulerEvent(node1, null);
+    NodeAddedSchedulerEvent nodeEvent1 = new NodeAddedSchedulerEvent(node1,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent1);
 
     // Queue 1 requests full capacity of node
     createSchedulingRequest(1024, "queue1", "user1", 1);
     scheduler.update();
-    NodeUpdateSchedulerEvent updateEvent =
-        new NodeUpdateSchedulerEvent(node1, null);
+    NodeUpdateSchedulerEvent updateEvent = new NodeUpdateSchedulerEvent(node1,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(updateEvent);
 
     // Now queue 2 requests likewise
@@ -521,10 +523,10 @@ public class TestFairScheduler {
     
     // Now another node checks in with capacity
     RMNode node2 = MockNodes.newNodeInfo(1, Resources.createResource(1024));
-    NodeAddedSchedulerEvent nodeEvent2 =
-        new NodeAddedSchedulerEvent(node2, null);
-    NodeUpdateSchedulerEvent updateEvent2 =
-        new NodeUpdateSchedulerEvent(node2, null);
+    NodeAddedSchedulerEvent nodeEvent2 = new NodeAddedSchedulerEvent(node2,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
+    NodeUpdateSchedulerEvent updateEvent2 = new NodeUpdateSchedulerEvent(node2,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent2);
     scheduler.handle(updateEvent2);
 
@@ -543,24 +545,24 @@ public class TestFairScheduler {
 
     // Add a node
     RMNode node1 = MockNodes
-        .newNodeInfo(1, Resources.createResource(1024, 4), 1, "127.0.0.1");
-    NodeAddedSchedulerEvent nodeEvent1 =
-        new NodeAddedSchedulerEvent(node1, null);
+            .newNodeInfo(1, Resources.createResource(1024, 4), 1, "127.0.0.1");
+    NodeAddedSchedulerEvent nodeEvent1 = new NodeAddedSchedulerEvent(node1,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent1);
 
     // Add another node
-    RMNode node2 = MockNodes
-        .newNodeInfo(1, Resources.createResource(512, 2), 2, "127.0.0.2");
-    NodeAddedSchedulerEvent nodeEvent2 =
-        new NodeAddedSchedulerEvent(node2, null);
+    RMNode node2 =
+        MockNodes.newNodeInfo(1, Resources.createResource(512, 2), 2, "127.0.0.2");
+    NodeAddedSchedulerEvent nodeEvent2 = new NodeAddedSchedulerEvent(node2,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent2);
 
     createSchedulingRequest(512, 2, "queue1", "user1", 2);
 
     scheduler.update();
 
-    NodeUpdateSchedulerEvent updateEvent =
-        new NodeUpdateSchedulerEvent(node1, null);
+    NodeUpdateSchedulerEvent updateEvent = new NodeUpdateSchedulerEvent(node1,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(updateEvent);
 
     // Asked for less than increment allocation.
@@ -569,8 +571,8 @@ public class TestFairScheduler {
         scheduler.getQueueManager().getQueue("queue1").
             getResourceUsage().getMemory());
 
-    NodeUpdateSchedulerEvent updateEvent2 =
-        new NodeUpdateSchedulerEvent(node2, null);
+    NodeUpdateSchedulerEvent updateEvent2 = new NodeUpdateSchedulerEvent(node2,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(updateEvent2);
 
     assertEquals(1024, scheduler.getQueueManager().getQueue("queue1").
@@ -594,17 +596,18 @@ public class TestFairScheduler {
     scheduler.reinitialize(conf, resourceManager.getRMContext());
 
     // Add a node
-    RMNode node1 = MockNodes
-        .newNodeInfo(1, Resources.createResource(1024), 1, "127.0.0.1");
-    NodeAddedSchedulerEvent nodeEvent1 =
-        new NodeAddedSchedulerEvent(node1, null);
+    RMNode node1 =
+        MockNodes
+            .newNodeInfo(1, Resources.createResource(1024), 1, "127.0.0.1");
+    NodeAddedSchedulerEvent nodeEvent1 = new NodeAddedSchedulerEvent(node1,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent1);
 
     // Queue 1 requests full capacity of node
     createSchedulingRequest(1024, "queue1", "user1", 1);
     scheduler.update();
-    NodeUpdateSchedulerEvent updateEvent =
-        new NodeUpdateSchedulerEvent(node1, null);
+    NodeUpdateSchedulerEvent updateEvent = new NodeUpdateSchedulerEvent(node1,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     
     scheduler.handle(updateEvent);
 
@@ -625,12 +628,13 @@ public class TestFairScheduler {
         scheduler.getSchedulerApp(attId).getCurrentReservation().getMemory());
 
     // Now another node checks in with capacity
-    RMNode node2 = MockNodes
-        .newNodeInfo(1, Resources.createResource(1024), 2, "127.0.0.2");
-    NodeAddedSchedulerEvent nodeEvent2 =
-        new NodeAddedSchedulerEvent(node2, null);
-    NodeUpdateSchedulerEvent updateEvent2 =
-        new NodeUpdateSchedulerEvent(node2, null);
+    RMNode node2 =
+        MockNodes
+            .newNodeInfo(1, Resources.createResource(1024), 2, "127.0.0.2");
+    NodeAddedSchedulerEvent nodeEvent2 = new NodeAddedSchedulerEvent(node2,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
+    NodeUpdateSchedulerEvent updateEvent2 = new NodeUpdateSchedulerEvent(node2,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent2);
     scheduler.handle(updateEvent2);
 
@@ -667,7 +671,9 @@ public class TestFairScheduler {
             "user1", null);
     scheduler.handle(appAddedEvent);
     AppAttemptAddedSchedulerEvent attempAddedEvent =
-        new AppAttemptAddedSchedulerEvent(appAttemptId, false, null);
+ new AppAttemptAddedSchedulerEvent(appAttemptId, false,
+                    new TransactionStateImpl(-1,
+                            TransactionState.TransactionType.RM));
     scheduler.handle(attempAddedEvent);
     assertEquals(1, scheduler.getQueueManager().getLeafQueue("user1", true)
         .getRunnableAppSchedulables().size());
@@ -695,7 +701,9 @@ public class TestFairScheduler {
             "user2", null);
     scheduler.handle(appAddedEvent);
     AppAttemptAddedSchedulerEvent attempAddedEvent =
-        new AppAttemptAddedSchedulerEvent(appAttemptId, false, null);
+ new AppAttemptAddedSchedulerEvent(appAttemptId, false,
+                    new TransactionStateImpl(-1,
+                            TransactionState.TransactionType.RM));
     scheduler.handle(attempAddedEvent);
     assertEquals(0, scheduler.getQueueManager().getLeafQueue("user1", true)
         .getRunnableAppSchedulables().size());
@@ -715,8 +723,9 @@ public class TestFairScheduler {
     // submit app with empty queue
     ApplicationAttemptId appAttemptId = createAppAttemptId(1, 1);
     AppAddedSchedulerEvent appAddedEvent =
-        new AppAddedSchedulerEvent(appAttemptId.getApplicationId(), "", "user1",
-            null);
+ new AppAddedSchedulerEvent(
+            appAttemptId.getApplicationId(), "", "user1",
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(appAddedEvent);
 
     // submission rejected
@@ -733,10 +742,10 @@ public class TestFairScheduler {
     RMApp rmApp1 = new MockRMApp(0, 0, RMAppState.NEW);
     RMApp rmApp2 = new MockRMApp(1, 1, RMAppState.NEW);
     
-    FSLeafQueue queue1 =
-        scheduler.assignToQueue(rmApp1, "default", "asterix", null);
-    FSLeafQueue queue2 =
-        scheduler.assignToQueue(rmApp2, "notdefault", "obelix", null);
+    FSLeafQueue queue1 = scheduler.assignToQueue(rmApp1, "default", "asterix",
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
+    FSLeafQueue queue2 = scheduler.assignToQueue(rmApp2, "notdefault", "obelix",
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     
     // assert FSLeafQueue's name is the correct name is the one set in the RMApp
     assertEquals(rmApp1.getQueue(), queue1.getName());
@@ -757,9 +766,10 @@ public class TestFairScheduler {
     RMApp rmApp2 = new MockRMApp(1, 1, RMAppState.NEW);
 
     // Trying to assign to non leaf queue would return null
-    assertNull(scheduler.assignToQueue(rmApp1, "root.child1", "tintin", null));
-    assertNotNull(
-        scheduler.assignToQueue(rmApp2, "root.child2", "snowy", null));
+    assertNull(scheduler.assignToQueue(rmApp1, "root.child1", "tintin",
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM)));
+    assertNotNull(scheduler.assignToQueue(rmApp2, "root.child2", "snowy",
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM)));
   }
   
   @Test
@@ -836,10 +846,11 @@ public class TestFairScheduler {
     scheduler.reinitialize(conf, resourceManager.getRMContext());
 
     // Add one big node (only care about aggregate capacity)
-    RMNode node1 = MockNodes
-        .newNodeInfo(1, Resources.createResource(3 * 1024), 1, "127.0.0.1");
-    NodeAddedSchedulerEvent nodeEvent1 =
-        new NodeAddedSchedulerEvent(node1, null);
+    RMNode node1 =
+        MockNodes.newNodeInfo(1, Resources.createResource(3 * 1024), 1,
+            "127.0.0.1");
+    NodeAddedSchedulerEvent nodeEvent1 = new NodeAddedSchedulerEvent(node1,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent1);
 
     createSchedulingRequest(2 * 1024, "queueA", "user1");
@@ -868,17 +879,20 @@ public class TestFairScheduler {
     scheduler.reinitialize(conf, resourceManager.getRMContext());
 
     ApplicationAttemptId id11 = createAppAttemptId(1, 1);
-    scheduler
-        .addApplication(id11.getApplicationId(), "root.queue1", "user1", null);
-    scheduler.addApplicationAttempt(id11, false, null);
+    scheduler.addApplication(id11.getApplicationId(), "root.queue1", "user1",
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
+    scheduler.addApplicationAttempt(id11, false, new TransactionStateImpl(-1,
+            TransactionState.TransactionType.RM));
     ApplicationAttemptId id21 = createAppAttemptId(2, 1);
-    scheduler
-        .addApplication(id21.getApplicationId(), "root.queue2", "user1", null);
-    scheduler.addApplicationAttempt(id21, false, null);
+    scheduler.addApplication(id21.getApplicationId(), "root.queue2", "user1",
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
+    scheduler.addApplicationAttempt(id21, false, new TransactionStateImpl(-1,
+            TransactionState.TransactionType.RM));
     ApplicationAttemptId id22 = createAppAttemptId(2, 2);
-    scheduler
-        .addApplication(id22.getApplicationId(), "root.queue2", "user1", null);
-    scheduler.addApplicationAttempt(id22, false, null);
+    scheduler.addApplication(id22.getApplicationId(), "root.queue2", "user1",
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
+    scheduler.addApplicationAttempt(id22, false, new TransactionStateImpl(-1,
+            TransactionState.TransactionType.RM));
 
     int minReqSize =
         FairSchedulerConfiguration.DEFAULT_RM_SCHEDULER_INCREMENT_ALLOCATION_MB;
@@ -924,13 +938,15 @@ public class TestFairScheduler {
   public void testAppAdditionAndRemoval() throws Exception {
     scheduler.reinitialize(conf, resourceManager.getRMContext());
     ApplicationAttemptId attemptId = createAppAttemptId(1, 1);
-    AppAddedSchedulerEvent appAddedEvent =
-        new AppAddedSchedulerEvent(attemptId.getApplicationId(), "default",
-            "user1", null);
+    AppAddedSchedulerEvent appAddedEvent = new AppAddedSchedulerEvent(attemptId.
+            getApplicationId(), "default",
+            "user1", new TransactionStateImpl(-1,
+                    TransactionState.TransactionType.RM));
     scheduler.handle(appAddedEvent);
-    AppAttemptAddedSchedulerEvent attemptAddedEvent =
-        new AppAttemptAddedSchedulerEvent(createAppAttemptId(1, 1), false,
-            null);
+    AppAttemptAddedSchedulerEvent attemptAddedEvent
+            = new AppAttemptAddedSchedulerEvent(createAppAttemptId(1, 1), false,
+                    new TransactionStateImpl(-1,
+                            TransactionState.TransactionType.RM));
     scheduler.handle(attemptAddedEvent);
 
     // Scheduler should have two queues (the default and the one created for user1)
@@ -940,9 +956,11 @@ public class TestFairScheduler {
     assertEquals(1, scheduler.getQueueManager().getLeafQueue("user1", true)
         .getRunnableAppSchedulables().size());
 
-    AppAttemptRemovedSchedulerEvent appRemovedEvent1 =
-        new AppAttemptRemovedSchedulerEvent(createAppAttemptId(1, 1),
-            RMAppAttemptState.FINISHED, false, null);
+    AppAttemptRemovedSchedulerEvent appRemovedEvent1
+            = new AppAttemptRemovedSchedulerEvent(
+                    createAppAttemptId(1, 1), RMAppAttemptState.FINISHED, false,
+                    new TransactionStateImpl(-1,
+                            TransactionState.TransactionType.RM));
 
     // Now remove app
     scheduler.handle(appRemovedEvent1);
@@ -1039,17 +1057,18 @@ public class TestFairScheduler {
     scheduler.reinitialize(conf, resourceManager.getRMContext());
 
     // Add one big node (only care about aggregate capacity)
-    RMNode node1 = MockNodes
-        .newNodeInfo(1, Resources.createResource(4 * 1024, 4), 1, "127.0.0.1");
-    NodeAddedSchedulerEvent nodeEvent1 =
-        new NodeAddedSchedulerEvent(node1, null);
+    RMNode node1 =
+        MockNodes.newNodeInfo(1, Resources.createResource(4 * 1024, 4), 1,
+            "127.0.0.1");
+    NodeAddedSchedulerEvent nodeEvent1 = new NodeAddedSchedulerEvent(node1,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent1);
 
     // Queue A wants 3 * 1024. Node update gives this all to A
     createSchedulingRequest(3 * 1024, "queueA", "user1");
     scheduler.update();
-    NodeUpdateSchedulerEvent nodeEvent2 =
-        new NodeUpdateSchedulerEvent(node1, null);
+    NodeUpdateSchedulerEvent nodeEvent2 = new NodeUpdateSchedulerEvent(node1,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent2);
 
     // Queue B arrives and wants 1 * 1024
@@ -1097,17 +1116,18 @@ public class TestFairScheduler {
     scheduler.reinitialize(conf, resourceManager.getRMContext());
     
     // Add one big node (only care about aggregate capacity)
-    RMNode node1 = MockNodes
-        .newNodeInfo(1, Resources.createResource(4 * 1024, 4), 1, "127.0.0.1");
-    NodeAddedSchedulerEvent nodeEvent1 =
-        new NodeAddedSchedulerEvent(node1, null);
+    RMNode node1 =
+        MockNodes.newNodeInfo(1, Resources.createResource(4 * 1024, 4), 1,
+            "127.0.0.1");
+    NodeAddedSchedulerEvent nodeEvent1 = new NodeAddedSchedulerEvent(node1,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent1);
 
     // Queue A wants 3 * 1024. Node update gives this all to A
     createSchedulingRequest(3 * 1024, "queueA", "user1");
     scheduler.update();
-    NodeUpdateSchedulerEvent nodeEvent2 =
-        new NodeUpdateSchedulerEvent(node1, null);
+    NodeUpdateSchedulerEvent nodeEvent2 = new NodeUpdateSchedulerEvent(node1,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent2);
 
     // Queue B arrives and wants 1 * 1024
@@ -1171,22 +1191,25 @@ public class TestFairScheduler {
     scheduler.reinitialize(conf, resourceManager.getRMContext());
 
     // Create four nodes
-    RMNode node1 = MockNodes
-        .newNodeInfo(1, Resources.createResource(2 * 1024, 2), 1, "127.0.0.1");
-    NodeAddedSchedulerEvent nodeEvent1 =
-        new NodeAddedSchedulerEvent(node1, null);
+    RMNode node1 =
+        MockNodes.newNodeInfo(1, Resources.createResource(2 * 1024, 2), 1,
+            "127.0.0.1");
+    NodeAddedSchedulerEvent nodeEvent1 = new NodeAddedSchedulerEvent(node1,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent1);
 
-    RMNode node2 = MockNodes
-        .newNodeInfo(1, Resources.createResource(2 * 1024, 2), 2, "127.0.0.2");
-    NodeAddedSchedulerEvent nodeEvent2 =
-        new NodeAddedSchedulerEvent(node2, null);
+    RMNode node2 =
+        MockNodes.newNodeInfo(1, Resources.createResource(2 * 1024, 2), 2,
+            "127.0.0.2");
+    NodeAddedSchedulerEvent nodeEvent2 = new NodeAddedSchedulerEvent(node2,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent2);
 
-    RMNode node3 = MockNodes
-        .newNodeInfo(1, Resources.createResource(2 * 1024, 2), 3, "127.0.0.3");
-    NodeAddedSchedulerEvent nodeEvent3 =
-        new NodeAddedSchedulerEvent(node3, null);
+    RMNode node3 =
+        MockNodes.newNodeInfo(1, Resources.createResource(2 * 1024, 2), 3,
+            "127.0.0.3");
+    NodeAddedSchedulerEvent nodeEvent3 = new NodeAddedSchedulerEvent(node3,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent3);
 
 
@@ -1209,16 +1232,16 @@ public class TestFairScheduler {
 
     // Sufficient node check-ins to fully schedule containers
     for (int i = 0; i < 2; i++) {
-      NodeUpdateSchedulerEvent nodeUpdate1 =
-          new NodeUpdateSchedulerEvent(node1, null);
+      NodeUpdateSchedulerEvent nodeUpdate1 = new NodeUpdateSchedulerEvent(node1,
+              new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
       scheduler.handle(nodeUpdate1);
 
-      NodeUpdateSchedulerEvent nodeUpdate2 =
-          new NodeUpdateSchedulerEvent(node2, null);
+      NodeUpdateSchedulerEvent nodeUpdate2 = new NodeUpdateSchedulerEvent(node2,
+              new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
       scheduler.handle(nodeUpdate2);
 
-      NodeUpdateSchedulerEvent nodeUpdate3 =
-          new NodeUpdateSchedulerEvent(node3, null);
+      NodeUpdateSchedulerEvent nodeUpdate3 = new NodeUpdateSchedulerEvent(node3,
+              new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
       scheduler.handle(nodeUpdate3);
     }
 
@@ -1249,7 +1272,8 @@ public class TestFairScheduler {
     // We should be able to claw back one container from A and B each.
     // Make sure it is lowest priority container.
     scheduler.preemptResources(scheduler.getQueueManager().getLeafQueues(),
-        Resources.createResource(2 * 1024), null);
+            Resources.createResource(2 * 1024), new TransactionStateImpl(-1,
+                    TransactionState.TransactionType.RM));
     assertEquals(1, scheduler.getSchedulerApp(app1).getLiveContainers().size());
     assertEquals(1, scheduler.getSchedulerApp(app2).getLiveContainers().size());
     assertEquals(1, scheduler.getSchedulerApp(app4).getLiveContainers().size());
@@ -1268,7 +1292,8 @@ public class TestFairScheduler {
 
     // Trigger a kill by insisting we want containers back
     scheduler.preemptResources(scheduler.getQueueManager().getLeafQueues(),
-        Resources.createResource(2 * 1024), null);
+            Resources.createResource(2 * 1024), new TransactionStateImpl(-1,
+                    TransactionState.TransactionType.RM));
 
     // At this point the containers should have been killed (since we are not simulating AM)
     assertEquals(0, scheduler.getSchedulerApp(app6).getLiveContainers().size());
@@ -1276,7 +1301,8 @@ public class TestFairScheduler {
 
     // Trigger a kill by insisting we want containers back
     scheduler.preemptResources(scheduler.getQueueManager().getLeafQueues(),
-        Resources.createResource(2 * 1024), null);
+            Resources.createResource(2 * 1024), new TransactionStateImpl(-1,
+                    TransactionState.TransactionType.RM));
 
     // Pretend 15 seconds have passed
     clock.tick(15);
@@ -1284,7 +1310,8 @@ public class TestFairScheduler {
     // We should be able to claw back another container from A and B each.
     // Make sure it is lowest priority container.
     scheduler.preemptResources(scheduler.getQueueManager().getLeafQueues(),
-        Resources.createResource(2 * 1024), null);
+            Resources.createResource(2 * 1024), new TransactionStateImpl(-1,
+                    TransactionState.TransactionType.RM));
     
     assertEquals(1, scheduler.getSchedulerApp(app1).getLiveContainers().size());
     assertEquals(0, scheduler.getSchedulerApp(app2).getLiveContainers().size());
@@ -1295,7 +1322,8 @@ public class TestFairScheduler {
 
     // Now A and B are below fair share, so preemption shouldn't do anything
     scheduler.preemptResources(scheduler.getQueueManager().getLeafQueues(),
-        Resources.createResource(2 * 1024), null);
+            Resources.createResource(2 * 1024), new TransactionStateImpl(-1,
+                    TransactionState.TransactionType.RM));
     assertEquals(1, scheduler.getSchedulerApp(app1).getLiveContainers().size());
     assertEquals(0, scheduler.getSchedulerApp(app2).getLiveContainers().size());
     assertEquals(0, scheduler.getSchedulerApp(app3).getLiveContainers().size());
@@ -1343,22 +1371,25 @@ public class TestFairScheduler {
     scheduler.reinitialize(conf, resourceManager.getRMContext());
 
     // Create four nodes
-    RMNode node1 = MockNodes
-        .newNodeInfo(1, Resources.createResource(2 * 1024, 2), 1, "127.0.0.1");
-    NodeAddedSchedulerEvent nodeEvent1 =
-        new NodeAddedSchedulerEvent(node1, null);
+    RMNode node1 =
+        MockNodes.newNodeInfo(1, Resources.createResource(2 * 1024, 2), 1,
+            "127.0.0.1");
+    NodeAddedSchedulerEvent nodeEvent1 = new NodeAddedSchedulerEvent(node1,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent1);
 
-    RMNode node2 = MockNodes
-        .newNodeInfo(1, Resources.createResource(2 * 1024, 2), 2, "127.0.0.2");
-    NodeAddedSchedulerEvent nodeEvent2 =
-        new NodeAddedSchedulerEvent(node2, null);
+    RMNode node2 =
+        MockNodes.newNodeInfo(1, Resources.createResource(2 * 1024, 2), 2,
+            "127.0.0.2");
+    NodeAddedSchedulerEvent nodeEvent2 = new NodeAddedSchedulerEvent(node2,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent2);
 
-    RMNode node3 = MockNodes
-        .newNodeInfo(1, Resources.createResource(2 * 1024, 2), 3, "127.0.0.3");
-    NodeAddedSchedulerEvent nodeEvent3 =
-        new NodeAddedSchedulerEvent(node3, null);
+    RMNode node3 =
+        MockNodes.newNodeInfo(1, Resources.createResource(2 * 1024, 2), 3,
+            "127.0.0.3");
+    NodeAddedSchedulerEvent nodeEvent3 = new NodeAddedSchedulerEvent(node3,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent3);
 
 
@@ -1381,16 +1412,16 @@ public class TestFairScheduler {
 
     // Sufficient node check-ins to fully schedule containers
     for (int i = 0; i < 2; i++) {
-      NodeUpdateSchedulerEvent nodeUpdate1 =
-          new NodeUpdateSchedulerEvent(node1, null);
+      NodeUpdateSchedulerEvent nodeUpdate1 = new NodeUpdateSchedulerEvent(node1,
+              new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
       scheduler.handle(nodeUpdate1);
 
-      NodeUpdateSchedulerEvent nodeUpdate2 =
-          new NodeUpdateSchedulerEvent(node2, null);
+      NodeUpdateSchedulerEvent nodeUpdate2 = new NodeUpdateSchedulerEvent(node2,
+              new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
       scheduler.handle(nodeUpdate2);
 
-      NodeUpdateSchedulerEvent nodeUpdate3 =
-          new NodeUpdateSchedulerEvent(node3, null);
+      NodeUpdateSchedulerEvent nodeUpdate3 = new NodeUpdateSchedulerEvent(node3,
+              new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
       scheduler.handle(nodeUpdate3);
     }
 
@@ -1443,17 +1474,18 @@ public class TestFairScheduler {
     scheduler.reinitialize(conf, resourceManager.getRMContext());
 
     // Add a node
-    RMNode node1 = MockNodes
-        .newNodeInfo(1, Resources.createResource(1024), 1, "127.0.0.1");
-    NodeAddedSchedulerEvent nodeEvent1 =
-        new NodeAddedSchedulerEvent(node1, null);
+    RMNode node1 =
+        MockNodes
+            .newNodeInfo(1, Resources.createResource(1024), 1, "127.0.0.1");
+    NodeAddedSchedulerEvent nodeEvent1 = new NodeAddedSchedulerEvent(node1,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent1);
 
     // Request full capacity of node
     createSchedulingRequest(1024, "queue1", "user1", 1);
     scheduler.update();
-    NodeUpdateSchedulerEvent updateEvent =
-        new NodeUpdateSchedulerEvent(node1, null);
+    NodeUpdateSchedulerEvent updateEvent = new NodeUpdateSchedulerEvent(node1,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(updateEvent);
 
     ApplicationAttemptId attId1 =
@@ -1470,8 +1502,8 @@ public class TestFairScheduler {
     assertEquals(0,
         scheduler.getSchedulerApp(attId2).getCurrentReservation().getMemory());
   }
-
-  @Test(timeout = 5000)
+ 
+  @Test (timeout = 5000)
   public void testUserMaxRunningApps() throws Exception {
     // Set max running apps
     conf.set(FairSchedulerConfiguration.ALLOCATION_FILE, ALLOC_FILE);
@@ -1488,10 +1520,11 @@ public class TestFairScheduler {
     scheduler.reinitialize(conf, resourceManager.getRMContext());
     
     // Add a node
-    RMNode node1 = MockNodes
-        .newNodeInfo(1, Resources.createResource(8192, 8), 1, "127.0.0.1");
-    NodeAddedSchedulerEvent nodeEvent1 =
-        new NodeAddedSchedulerEvent(node1, null);
+    RMNode node1 =
+        MockNodes
+            .newNodeInfo(1, Resources.createResource(8192, 8), 1, "127.0.0.1");
+    NodeAddedSchedulerEvent nodeEvent1 = new NodeAddedSchedulerEvent(node1,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent1);
     
     // Request for app 1
@@ -1499,8 +1532,8 @@ public class TestFairScheduler {
         createSchedulingRequest(1024, "queue1", "user1", 1);
     
     scheduler.update();
-    NodeUpdateSchedulerEvent updateEvent =
-        new NodeUpdateSchedulerEvent(node1, null);
+    NodeUpdateSchedulerEvent updateEvent = new NodeUpdateSchedulerEvent(node1,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(updateEvent);
     
     // App 1 should be running
@@ -1533,17 +1566,18 @@ public class TestFairScheduler {
     scheduler.reinitialize(conf, resourceManager.getRMContext());
 
     // Add a node
-    RMNode node1 = MockNodes
-        .newNodeInfo(1, Resources.createResource(1024, 4), 1, "127.0.0.1");
-    NodeAddedSchedulerEvent nodeEvent1 =
-        new NodeAddedSchedulerEvent(node1, null);
+    RMNode node1 =
+        MockNodes
+            .newNodeInfo(1, Resources.createResource(1024, 4), 1, "127.0.0.1");
+    NodeAddedSchedulerEvent nodeEvent1 = new NodeAddedSchedulerEvent(node1,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent1);
 
     ApplicationAttemptId attId =
         createSchedulingRequest(1024, 4, "queue1", "user1", 1, 2);
     scheduler.update();
-    NodeUpdateSchedulerEvent updateEvent =
-        new NodeUpdateSchedulerEvent(node1, null);
+    NodeUpdateSchedulerEvent updateEvent = new NodeUpdateSchedulerEvent(node1,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(updateEvent);
     
     FSSchedulerApp app = scheduler.getSchedulerApp(attId);
@@ -1628,21 +1662,24 @@ public class TestFairScheduler {
     assertNull("The application was allowed", app2);
   }
   
-  @Test(timeout = 5000)
+  @Test (timeout = 5000)
   public void testMultipleNodesSingleRackRequest() throws Exception {
     scheduler.reinitialize(conf, resourceManager.getRMContext());
 
-    RMNode node1 = MockNodes
-        .newNodeInfo(1, Resources.createResource(1024), 1, "127.0.0.1");
-    RMNode node2 = MockNodes
-        .newNodeInfo(1, Resources.createResource(1024), 2, "127.0.0.2");
-    RMNode node3 = MockNodes
-        .newNodeInfo(2, Resources.createResource(1024), 3, "127.0.0.3");
-    NodeAddedSchedulerEvent nodeEvent1 =
-        new NodeAddedSchedulerEvent(node1, null);
+    RMNode node1 =
+        MockNodes
+            .newNodeInfo(1, Resources.createResource(1024), 1, "127.0.0.1");
+    RMNode node2 =
+        MockNodes
+            .newNodeInfo(1, Resources.createResource(1024), 2, "127.0.0.2");
+    RMNode node3 =
+        MockNodes
+            .newNodeInfo(2, Resources.createResource(1024), 3, "127.0.0.3");
+    NodeAddedSchedulerEvent nodeEvent1 = new NodeAddedSchedulerEvent(node1,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent1);
-    NodeAddedSchedulerEvent nodeEvent2 =
-        new NodeAddedSchedulerEvent(node2, null);
+    NodeAddedSchedulerEvent nodeEvent2 = new NodeAddedSchedulerEvent(node2,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent2);
     
     ApplicationAttemptId appId =
@@ -1665,8 +1702,8 @@ public class TestFairScheduler {
     
     // node 1 checks in
     scheduler.update();
-    NodeUpdateSchedulerEvent updateEvent1 =
-        new NodeUpdateSchedulerEvent(node1, null);
+    NodeUpdateSchedulerEvent updateEvent1 = new NodeUpdateSchedulerEvent(node1,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(updateEvent1);
     // should assign node local
     assertEquals(1,
@@ -1674,22 +1711,23 @@ public class TestFairScheduler {
 
     // node 2 checks in
     scheduler.update();
-    NodeUpdateSchedulerEvent updateEvent2 =
-        new NodeUpdateSchedulerEvent(node2, null);
+    NodeUpdateSchedulerEvent updateEvent2 = new NodeUpdateSchedulerEvent(node2,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(updateEvent2);
     // should assign rack local
     assertEquals(2,
         scheduler.getSchedulerApp(appId).getLiveContainers().size());
   }
   
-  @Test(timeout = 5000)
+  @Test (timeout = 5000)
   public void testFifoWithinQueue() throws Exception {
     scheduler.reinitialize(conf, resourceManager.getRMContext());
 
-    RMNode node1 = MockNodes
-        .newNodeInfo(1, Resources.createResource(3072, 3), 1, "127.0.0.1");
-    NodeAddedSchedulerEvent nodeEvent1 =
-        new NodeAddedSchedulerEvent(node1, null);
+    RMNode node1 =
+        MockNodes
+            .newNodeInfo(1, Resources.createResource(3072, 3), 1, "127.0.0.1");
+    NodeAddedSchedulerEvent nodeEvent1 = new NodeAddedSchedulerEvent(node1,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent1);
     
     // Even if submitted at exact same time, apps will be deterministically
@@ -1711,8 +1749,8 @@ public class TestFairScheduler {
     // Because tests set assignmultiple to false, each heartbeat assigns a single
     // container.
     
-    NodeUpdateSchedulerEvent updateEvent =
-        new NodeUpdateSchedulerEvent(node1, null);
+    NodeUpdateSchedulerEvent updateEvent = new NodeUpdateSchedulerEvent(node1,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
 
     scheduler.handle(updateEvent);
     assertEquals(1, app1.getLiveContainers().size());
@@ -1732,11 +1770,13 @@ public class TestFairScheduler {
     conf.setBoolean(FairSchedulerConfiguration.ASSIGN_MULTIPLE, true);
     scheduler.reinitialize(conf, resourceManager.getRMContext());
 
-    RMNode node = MockNodes
-        .newNodeInfo(1, Resources.createResource(16384, 16), 0, "127.0.0.1");
-    NodeAddedSchedulerEvent nodeEvent = new NodeAddedSchedulerEvent(node, null);
-    NodeUpdateSchedulerEvent updateEvent =
-        new NodeUpdateSchedulerEvent(node, null);
+    RMNode node =
+        MockNodes.newNodeInfo(1, Resources.createResource(16384, 16), 0,
+            "127.0.0.1");
+    NodeAddedSchedulerEvent nodeEvent = new NodeAddedSchedulerEvent(node,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
+    NodeUpdateSchedulerEvent updateEvent = new NodeUpdateSchedulerEvent(node,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent);
 
     ApplicationAttemptId attId =
@@ -1772,6 +1812,7 @@ public class TestFairScheduler {
    *
    * @throws Exception
    */
+  
   @Test(timeout = 5000)
   public void testAssignContainer() throws Exception {
     scheduler.reinitialize(conf, resourceManager.getRMContext());
@@ -1787,10 +1828,10 @@ public class TestFairScheduler {
     RMNode node2 = MockNodes
         .newNodeInfo(1, Resources.createResource(8192, 8), 2, "127.0.0.2");
 
-    NodeAddedSchedulerEvent nodeEvent1 =
-        new NodeAddedSchedulerEvent(node1, null);
-    NodeAddedSchedulerEvent nodeEvent2 =
-        new NodeAddedSchedulerEvent(node2, null);
+    NodeAddedSchedulerEvent nodeEvent1 = new NodeAddedSchedulerEvent(node1,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
+    NodeAddedSchedulerEvent nodeEvent2 = new NodeAddedSchedulerEvent(node2,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
 
     scheduler.handle(nodeEvent1);
     scheduler.handle(nodeEvent2);
@@ -1813,10 +1854,10 @@ public class TestFairScheduler {
         .setPolicy(SchedulingPolicy.parse("fifo"));
     scheduler.update();
 
-    NodeUpdateSchedulerEvent updateEvent1 =
-        new NodeUpdateSchedulerEvent(node1, null);
-    NodeUpdateSchedulerEvent updateEvent2 =
-        new NodeUpdateSchedulerEvent(node2, null);
+    NodeUpdateSchedulerEvent updateEvent1 = new NodeUpdateSchedulerEvent(node1,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
+    NodeUpdateSchedulerEvent updateEvent2 = new NodeUpdateSchedulerEvent(node2,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
 
     for (int i = 0; i < 8; i++) {
       scheduler.handle(updateEvent1);
@@ -1900,7 +1941,8 @@ public class TestFairScheduler {
 
     ApplicationAttemptId attId =
         ApplicationAttemptId.newInstance(applicationId, this.ATTEMPT_ID++);
-    scheduler.addApplication(attId.getApplicationId(), queue, user, null);
+    scheduler.addApplication(attId.getApplicationId(), queue, user,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
 
     numTries = 0;
     while (application.getFinishTime() == 0 && numTries < MAX_TRIES) {
@@ -1919,17 +1961,18 @@ public class TestFairScheduler {
   public void testReservationThatDoesntFit() throws IOException {
     scheduler.reinitialize(conf, resourceManager.getRMContext());
 
-    RMNode node1 = MockNodes
-        .newNodeInfo(1, Resources.createResource(1024), 1, "127.0.0.1");
-    NodeAddedSchedulerEvent nodeEvent1 =
-        new NodeAddedSchedulerEvent(node1, null);
+    RMNode node1 =
+        MockNodes
+            .newNodeInfo(1, Resources.createResource(1024), 1, "127.0.0.1");
+    NodeAddedSchedulerEvent nodeEvent1 = new NodeAddedSchedulerEvent(node1,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent1);
     
     ApplicationAttemptId attId =
         createSchedulingRequest(2048, "queue1", "user1", 1);
     scheduler.update();
-    NodeUpdateSchedulerEvent updateEvent =
-        new NodeUpdateSchedulerEvent(node1, null);
+    NodeUpdateSchedulerEvent updateEvent = new NodeUpdateSchedulerEvent(node1,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(updateEvent);
     
     FSSchedulerApp app = scheduler.getSchedulerApp(attId);
@@ -1951,9 +1994,10 @@ public class TestFairScheduler {
     assertEquals(0, scheduler.getRootQueueMetrics().getAvailableMB());
     assertEquals(0, scheduler.getRootQueueMetrics().getAvailableVirtualCores());
     
-    RMNode node1 = MockNodes
-        .newNodeInfo(1, Resources.createResource(1024, 4), 1, "127.0.0.1");
-    NodeAddedSchedulerEvent addEvent = new NodeAddedSchedulerEvent(node1, null);
+    RMNode node1 = MockNodes.newNodeInfo(1, Resources.createResource(1024, 4), 1,
+        "127.0.0.1");
+    NodeAddedSchedulerEvent addEvent = new NodeAddedSchedulerEvent(node1,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(addEvent);
     
     assertEquals(1024, scheduler.getRootQueueMetrics().getAvailableMB());
@@ -1962,8 +2006,8 @@ public class TestFairScheduler {
     assertEquals(1024, scheduler.getRootQueueMetrics().getAvailableMB());
     assertEquals(4, scheduler.getRootQueueMetrics().getAvailableVirtualCores());
     
-    NodeRemovedSchedulerEvent removeEvent =
-        new NodeRemovedSchedulerEvent(node1, null);
+    NodeRemovedSchedulerEvent removeEvent = new NodeRemovedSchedulerEvent(node1,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(removeEvent);
     
     assertEquals(0, scheduler.getRootQueueMetrics().getAvailableMB());
@@ -1977,16 +2021,16 @@ public class TestFairScheduler {
   public void testStrictLocality() throws IOException {
     scheduler.reinitialize(conf, resourceManager.getRMContext());
 
-    RMNode node1 = MockNodes
-        .newNodeInfo(1, Resources.createResource(1024), 1, "127.0.0.1");
-    NodeAddedSchedulerEvent nodeEvent1 =
-        new NodeAddedSchedulerEvent(node1, null);
+    RMNode node1 = MockNodes.newNodeInfo(1, Resources.createResource(1024), 1,
+            "127.0.0.1");
+    NodeAddedSchedulerEvent nodeEvent1 = new NodeAddedSchedulerEvent(node1,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent1);
 
-    RMNode node2 = MockNodes
-        .newNodeInfo(1, Resources.createResource(1024), 2, "127.0.0.2");
-    NodeAddedSchedulerEvent nodeEvent2 =
-        new NodeAddedSchedulerEvent(node2, null);
+    RMNode node2 = MockNodes.newNodeInfo(1, Resources.createResource(1024), 2,
+            "127.0.0.2");
+    NodeAddedSchedulerEvent nodeEvent2 = new NodeAddedSchedulerEvent(node2,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent2);
 
     ApplicationAttemptId attId1 =
@@ -2004,10 +2048,12 @@ public class TestFairScheduler {
 
     scheduler.update();
 
-    NodeUpdateSchedulerEvent node1UpdateEvent =
-        new NodeUpdateSchedulerEvent(node1, null);
-    NodeUpdateSchedulerEvent node2UpdateEvent =
-        new NodeUpdateSchedulerEvent(node2, null);
+    NodeUpdateSchedulerEvent node1UpdateEvent = new NodeUpdateSchedulerEvent(
+            node1, new TransactionStateImpl(-1,
+                    TransactionState.TransactionType.RM));
+    NodeUpdateSchedulerEvent node2UpdateEvent = new NodeUpdateSchedulerEvent(
+            node2, new TransactionStateImpl(-1,
+                    TransactionState.TransactionType.RM));
 
     // no matter how many heartbeats, node2 should never get a container
     FSSchedulerApp app = scheduler.getSchedulerApp(attId1);
@@ -2025,16 +2071,16 @@ public class TestFairScheduler {
   public void testCancelStrictLocality() throws IOException {
     scheduler.reinitialize(conf, resourceManager.getRMContext());
 
-    RMNode node1 = MockNodes
-        .newNodeInfo(1, Resources.createResource(1024), 1, "127.0.0.1");
-    NodeAddedSchedulerEvent nodeEvent1 =
-        new NodeAddedSchedulerEvent(node1, null);
+    RMNode node1 = MockNodes.newNodeInfo(1, Resources.createResource(1024), 1,
+            "127.0.0.1");
+    NodeAddedSchedulerEvent nodeEvent1 = new NodeAddedSchedulerEvent(node1,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent1);
 
-    RMNode node2 = MockNodes
-        .newNodeInfo(1, Resources.createResource(1024), 2, "127.0.0.2");
-    NodeAddedSchedulerEvent nodeEvent2 =
-        new NodeAddedSchedulerEvent(node2, null);
+    RMNode node2 = MockNodes.newNodeInfo(1, Resources.createResource(1024), 2,
+            "127.0.0.2");
+    NodeAddedSchedulerEvent nodeEvent2 = new NodeAddedSchedulerEvent(node2,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent2);
 
     ApplicationAttemptId attId1 =
@@ -2052,8 +2098,9 @@ public class TestFairScheduler {
 
     scheduler.update();
 
-    NodeUpdateSchedulerEvent node2UpdateEvent =
-        new NodeUpdateSchedulerEvent(node2, null);
+    NodeUpdateSchedulerEvent node2UpdateEvent = new NodeUpdateSchedulerEvent(
+            node2, new TransactionStateImpl(-1,
+                    TransactionState.TransactionType.RM));
 
     // no matter how many heartbeats, node2 should never get a container
     FSSchedulerApp app = scheduler.getSchedulerApp(attId1);
@@ -2084,12 +2131,12 @@ public class TestFairScheduler {
   public void testReservationsStrictLocality() throws IOException {
     scheduler.reinitialize(conf, resourceManager.getRMContext());
 
-    RMNode node1 = MockNodes
-        .newNodeInfo(1, Resources.createResource(1024), 1, "127.0.0.1");
-    RMNode node2 = MockNodes
-        .newNodeInfo(1, Resources.createResource(1024), 2, "127.0.0.2");
-    NodeAddedSchedulerEvent nodeEvent2 =
-        new NodeAddedSchedulerEvent(node1, null);
+    RMNode node1 = MockNodes.newNodeInfo(1, Resources.createResource(1024), 1,
+            "127.0.0.1");
+    RMNode node2 = MockNodes.newNodeInfo(1, Resources.createResource(1024), 2,
+            "127.0.0.2");
+    NodeAddedSchedulerEvent nodeEvent2 = new NodeAddedSchedulerEvent(node1,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent2);
 
     ApplicationAttemptId attId =
@@ -2108,8 +2155,9 @@ public class TestFairScheduler {
     
     scheduler.update();
 
-    NodeUpdateSchedulerEvent nodeUpdateEvent =
-        new NodeUpdateSchedulerEvent(node1, null);
+    NodeUpdateSchedulerEvent nodeUpdateEvent = new NodeUpdateSchedulerEvent(
+            node1, new TransactionStateImpl(-1,
+                    TransactionState.TransactionType.RM));
     scheduler.handle(nodeUpdateEvent);
     assertEquals(1, app.getLiveContainers().size());
     scheduler.handle(nodeUpdateEvent);
@@ -2130,10 +2178,10 @@ public class TestFairScheduler {
   public void testNoMoreCpuOnNode() throws IOException {
     scheduler.reinitialize(conf, resourceManager.getRMContext());
 
-    RMNode node1 = MockNodes
-        .newNodeInfo(1, Resources.createResource(2048, 1), 1, "127.0.0.1");
-    NodeAddedSchedulerEvent nodeEvent1 =
-        new NodeAddedSchedulerEvent(node1, null);
+    RMNode node1 = MockNodes.newNodeInfo(1, Resources.createResource(2048, 1),
+        1, "127.0.0.1");
+    NodeAddedSchedulerEvent nodeEvent1 = new NodeAddedSchedulerEvent(node1,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent1);
     
     ApplicationAttemptId attId =
@@ -2141,8 +2189,8 @@ public class TestFairScheduler {
     FSSchedulerApp app = scheduler.getSchedulerApp(attId);
     scheduler.update();
 
-    NodeUpdateSchedulerEvent updateEvent =
-        new NodeUpdateSchedulerEvent(node1, null);
+    NodeUpdateSchedulerEvent updateEvent = new NodeUpdateSchedulerEvent(node1,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(updateEvent);
     assertEquals(1, app.getLiveContainers().size());
     scheduler.handle(updateEvent);
@@ -2154,7 +2202,8 @@ public class TestFairScheduler {
     scheduler.reinitialize(conf, resourceManager.getRMContext());
 
     RMNode node = MockNodes.newNodeInfo(1, BuilderUtils.newResource(8192, 5));
-    NodeAddedSchedulerEvent nodeEvent = new NodeAddedSchedulerEvent(node, null);
+    NodeAddedSchedulerEvent nodeEvent = new NodeAddedSchedulerEvent(node,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent);
 
     ApplicationAttemptId appAttId1 =
@@ -2173,8 +2222,8 @@ public class TestFairScheduler {
     // First both apps get a container
     // Then the first gets another container because its dominant share of
     // 2048/8192 is less than the other's of 2/5
-    NodeUpdateSchedulerEvent updateEvent =
-        new NodeUpdateSchedulerEvent(node, null);
+    NodeUpdateSchedulerEvent updateEvent = new NodeUpdateSchedulerEvent(node,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(updateEvent);
     Assert.assertEquals(1, app1.getLiveContainers().size());
     Assert.assertEquals(0, app2.getLiveContainers().size());
@@ -2191,13 +2240,15 @@ public class TestFairScheduler {
   /**
    * Two apps on one queue, one app on another
    */
+  
   @Test
   public void testBasicDRFWithQueues() throws Exception {
     scheduler.reinitialize(conf, resourceManager.getRMContext());
 
-    RMNode node = MockNodes
-        .newNodeInfo(1, BuilderUtils.newResource(8192, 7), 1, "127.0.0.1");
-    NodeAddedSchedulerEvent nodeEvent = new NodeAddedSchedulerEvent(node, null);
+    RMNode node = MockNodes.newNodeInfo(1, BuilderUtils.newResource(8192, 7),
+        1, "127.0.0.1");
+    NodeAddedSchedulerEvent nodeEvent = new NodeAddedSchedulerEvent(node,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent);
 
     ApplicationAttemptId appAttId1 =
@@ -2217,8 +2268,8 @@ public class TestFairScheduler {
     scheduler.getQueueManager().getQueue("queue1").setPolicy(drfPolicy);
     scheduler.update();
 
-    NodeUpdateSchedulerEvent updateEvent =
-        new NodeUpdateSchedulerEvent(node, null);
+    NodeUpdateSchedulerEvent updateEvent = new NodeUpdateSchedulerEvent(node,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(updateEvent);
     Assert.assertEquals(1, app1.getLiveContainers().size());
     scheduler.handle(updateEvent);
@@ -2233,9 +2284,10 @@ public class TestFairScheduler {
   public void testDRFHierarchicalQueues() throws Exception {
     scheduler.reinitialize(conf, resourceManager.getRMContext());
 
-    RMNode node = MockNodes
-        .newNodeInfo(1, BuilderUtils.newResource(12288, 12), 1, "127.0.0.1");
-    NodeAddedSchedulerEvent nodeEvent = new NodeAddedSchedulerEvent(node, null);
+    RMNode node = MockNodes.newNodeInfo(1, BuilderUtils.newResource(12288, 12),
+        1, "127.0.0.1");
+    NodeAddedSchedulerEvent nodeEvent = new NodeAddedSchedulerEvent(node,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent);
 
     ApplicationAttemptId appAttId1 =
@@ -2264,8 +2316,8 @@ public class TestFairScheduler {
         .setPolicy(drfPolicy);
     scheduler.update();
 
-    NodeUpdateSchedulerEvent updateEvent =
-        new NodeUpdateSchedulerEvent(node, null);
+    NodeUpdateSchedulerEvent updateEvent = new NodeUpdateSchedulerEvent(node,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(updateEvent);
     // app1 gets first container because it asked first
     Assert.assertEquals(1, app1.getLiveContainers().size());
@@ -2300,19 +2352,20 @@ public class TestFairScheduler {
 
   @Test(timeout = 30000)
   public void testHostPortNodeName() throws Exception {
-    conf.setBoolean(YarnConfiguration.RM_SCHEDULER_INCLUDE_PORT_IN_NODE_NAME,
-        true);
-    scheduler.reinitialize(conf, resourceManager.getRMContext());
-    RMNode node1 = MockNodes
-        .newNodeInfo(1, Resources.createResource(1024), 1, "127.0.0.1", 1);
-    NodeAddedSchedulerEvent nodeEvent1 =
-        new NodeAddedSchedulerEvent(node1, null);
+    conf.setBoolean(YarnConfiguration
+        .RM_SCHEDULER_INCLUDE_PORT_IN_NODE_NAME, true);
+    scheduler.reinitialize(conf, 
+        resourceManager.getRMContext());
+    RMNode node1 = MockNodes.newNodeInfo(1, Resources.createResource(1024),
+        1, "127.0.0.1", 1);
+    NodeAddedSchedulerEvent nodeEvent1 = new NodeAddedSchedulerEvent(node1,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent1);
 
-    RMNode node2 = MockNodes
-        .newNodeInfo(1, Resources.createResource(1024), 2, "127.0.0.1", 2);
-    NodeAddedSchedulerEvent nodeEvent2 =
-        new NodeAddedSchedulerEvent(node2, null);
+    RMNode node2 = MockNodes.newNodeInfo(1, Resources.createResource(1024),
+        2, "127.0.0.1", 2);
+    NodeAddedSchedulerEvent nodeEvent2 = new NodeAddedSchedulerEvent(node2,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent2);
 
     ApplicationAttemptId attId1 =
@@ -2331,10 +2384,12 @@ public class TestFairScheduler {
 
     scheduler.update();
 
-    NodeUpdateSchedulerEvent node1UpdateEvent =
-        new NodeUpdateSchedulerEvent(node1, null);
-    NodeUpdateSchedulerEvent node2UpdateEvent =
-        new NodeUpdateSchedulerEvent(node2, null);
+    NodeUpdateSchedulerEvent node1UpdateEvent = new NodeUpdateSchedulerEvent(
+            node1, new TransactionStateImpl(-1,
+                    TransactionState.TransactionType.RM));
+    NodeUpdateSchedulerEvent node2UpdateEvent = new NodeUpdateSchedulerEvent(
+            node2, new TransactionStateImpl(-1,
+                    TransactionState.TransactionType.RM));
 
     // no matter how many heartbeats, node2 should never get a container  
     FSSchedulerApp app = scheduler.getSchedulerApp(attId1);
@@ -2408,9 +2463,10 @@ public class TestFairScheduler {
     verifyQueueNumRunnable("queue1", 2, 1);
     
     // Remove app 1 and both app 2 and app 4 should becomes runnable in its place
-    AppAttemptRemovedSchedulerEvent appRemovedEvent1 =
-        new AppAttemptRemovedSchedulerEvent(attId1, RMAppAttemptState.FINISHED,
-            false, null);
+    AppAttemptRemovedSchedulerEvent appRemovedEvent1
+            = new AppAttemptRemovedSchedulerEvent(attId1,
+                    RMAppAttemptState.FINISHED, false, new TransactionStateImpl(
+                            -1, TransactionState.TransactionType.RM));
     scheduler.handle(appRemovedEvent1);
     verifyAppRunnable(attId2, true);
     verifyQueueNumRunnable("queue2", 1, 0);
@@ -2479,9 +2535,10 @@ public class TestFairScheduler {
     
     // Even though the app was removed from sub3, the app from sub2 gets to go
     // because it came in first
-    AppAttemptRemovedSchedulerEvent appRemovedEvent1 =
-        new AppAttemptRemovedSchedulerEvent(attId2, RMAppAttemptState.FINISHED,
-            false, null);
+    AppAttemptRemovedSchedulerEvent appRemovedEvent1
+            = new AppAttemptRemovedSchedulerEvent(attId2,
+                    RMAppAttemptState.FINISHED, false, new TransactionStateImpl(
+                            -1, TransactionState.TransactionType.RM));
     scheduler.handle(appRemovedEvent1);
     verifyAppRunnable(attId4, true);
     verifyQueueNumRunnable("queue1.sub2", 2, 0);
@@ -2489,18 +2546,20 @@ public class TestFairScheduler {
     verifyQueueNumRunnable("queue1.sub3", 0, 1);
 
     // Now test removal of a non-runnable app
-    AppAttemptRemovedSchedulerEvent appRemovedEvent2 =
-        new AppAttemptRemovedSchedulerEvent(attId5, RMAppAttemptState.KILLED,
-            true, null);
+    AppAttemptRemovedSchedulerEvent appRemovedEvent2
+            = new AppAttemptRemovedSchedulerEvent(attId5,
+                    RMAppAttemptState.KILLED, true, new TransactionStateImpl(-1,
+                            TransactionState.TransactionType.RM));
     scheduler.handle(appRemovedEvent2);
     assertEquals(0,
         scheduler.maxRunningEnforcer.usersNonRunnableApps.get("user1").size());
     // verify app gone in queue accounting
     verifyQueueNumRunnable("queue1.sub3", 0, 0);
     // verify it doesn't become runnable when there would be space for it
-    AppAttemptRemovedSchedulerEvent appRemovedEvent3 =
-        new AppAttemptRemovedSchedulerEvent(attId4, RMAppAttemptState.FINISHED,
-            true, null);
+    AppAttemptRemovedSchedulerEvent appRemovedEvent3
+            = new AppAttemptRemovedSchedulerEvent(attId4,
+                    RMAppAttemptState.FINISHED, true, new TransactionStateImpl(
+                            -1, TransactionState.TransactionType.RM));
     scheduler.handle(appRemovedEvent3);
     verifyQueueNumRunnable("queue1.sub2", 1, 0);
     verifyQueueNumRunnable("queue1.sub3", 0, 0);
@@ -2518,15 +2577,17 @@ public class TestFairScheduler {
         fs.isContinuousSchedulingEnabled());
 
     // Add two nodes
-    RMNode node1 = MockNodes
-        .newNodeInfo(1, Resources.createResource(8 * 1024, 8), 1, "127.0.0.1");
-    NodeAddedSchedulerEvent nodeEvent1 =
-        new NodeAddedSchedulerEvent(node1, null);
+    RMNode node1 = MockNodes.newNodeInfo(1, Resources.
+            createResource(8 * 1024, 8), 1,
+            "127.0.0.1");
+    NodeAddedSchedulerEvent nodeEvent1 = new NodeAddedSchedulerEvent(node1,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     fs.handle(nodeEvent1);
-    RMNode node2 = MockNodes
-        .newNodeInfo(1, Resources.createResource(8 * 1024, 8), 2, "127.0.0.2");
-    NodeAddedSchedulerEvent nodeEvent2 =
-        new NodeAddedSchedulerEvent(node2, null);
+    RMNode node2 = MockNodes.newNodeInfo(1, Resources.
+            createResource(8 * 1024, 8), 2,
+            "127.0.0.2");
+    NodeAddedSchedulerEvent nodeEvent2 = new NodeAddedSchedulerEvent(node2,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     fs.handle(nodeEvent2);
 
     // available resource
@@ -2535,10 +2596,11 @@ public class TestFairScheduler {
 
     // send application request
     ApplicationAttemptId appAttemptId =
-        createAppAttemptId(this.APP_ID++, this.ATTEMPT_ID++);
+            createAppAttemptId(this.APP_ID++, this.ATTEMPT_ID++);
     fs.addApplication(appAttemptId.getApplicationId(), "queue11", "user11",
-        null);
-    fs.addApplicationAttempt(appAttemptId, false, null);
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
+    fs.addApplicationAttempt(appAttemptId, false, new TransactionStateImpl(-1,
+            TransactionState.TransactionType.RM));
     List<ResourceRequest> ask = new ArrayList<ResourceRequest>();
     ResourceRequest request =
         createResourceRequest(1024, 1, ResourceRequest.ANY, 1, 1, true);
@@ -2624,6 +2686,7 @@ public class TestFairScheduler {
     assertEquals(2, defaultQueue.getRunnableAppSchedulables().size());
   }
 
+  
   @SuppressWarnings("resource")
   @Test
   public void testBlacklistNodes() throws Exception {
@@ -2631,11 +2694,13 @@ public class TestFairScheduler {
 
     final int GB = 1024;
     String host = "127.0.0.1";
-    RMNode node = MockNodes
-        .newNodeInfo(1, Resources.createResource(16 * GB, 16), 0, host);
-    NodeAddedSchedulerEvent nodeEvent = new NodeAddedSchedulerEvent(node, null);
-    NodeUpdateSchedulerEvent updateEvent =
-        new NodeUpdateSchedulerEvent(node, null);
+    RMNode node =
+        MockNodes.newNodeInfo(1, Resources.createResource(16 * GB, 16),
+            0, host);
+    NodeAddedSchedulerEvent nodeEvent = new NodeAddedSchedulerEvent(node,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
+    NodeUpdateSchedulerEvent updateEvent = new NodeUpdateSchedulerEvent(node,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent);
 
     ApplicationAttemptId appAttemptId =
@@ -2738,9 +2803,10 @@ public class TestFairScheduler {
         createSchedulingRequest(1024, 1, "queue1", "user1", 3);
     ApplicationId appId = appAttId.getApplicationId();
     RMNode node = MockNodes.newNodeInfo(1, Resources.createResource(1024));
-    NodeAddedSchedulerEvent nodeEvent = new NodeAddedSchedulerEvent(node, null);
-    NodeUpdateSchedulerEvent updateEvent =
-        new NodeUpdateSchedulerEvent(node, null);
+    NodeAddedSchedulerEvent nodeEvent = new NodeAddedSchedulerEvent(node,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
+    NodeUpdateSchedulerEvent updateEvent = new NodeUpdateSchedulerEvent(node,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent);
     scheduler.handle(updateEvent);
     
@@ -2840,9 +2906,10 @@ public class TestFairScheduler {
     ApplicationAttemptId appAttId =
         createSchedulingRequest(1024, 1, "queue1", "user1", 3);
     RMNode node = MockNodes.newNodeInfo(1, Resources.createResource(2048, 2));
-    NodeAddedSchedulerEvent nodeEvent = new NodeAddedSchedulerEvent(node, null);
-    NodeUpdateSchedulerEvent updateEvent =
-        new NodeUpdateSchedulerEvent(node, null);
+    NodeAddedSchedulerEvent nodeEvent = new NodeAddedSchedulerEvent(node,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
+    NodeUpdateSchedulerEvent updateEvent = new NodeUpdateSchedulerEvent(node,
+            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent);
     scheduler.handle(updateEvent);
     scheduler.handle(updateEvent);

@@ -130,6 +130,10 @@ public class NDBRMStateStore extends RMStateStore {
     loadLaunchedContainers(rmState);
     loadNewlyAllocatedContainers(rmState);
     loadLiveContainers(rmState);
+    loadSchedulingOpportunities(rmState);
+    loadLastScheduleddContainers(rmState);
+    loadRereservations(rmState);
+    loadReservedContainers(rmState);
     loadResourceRequests(rmState);
     loadBlackLists(rmState);
     loadAllQueueMetrics(rmState);
@@ -147,6 +151,8 @@ public class NDBRMStateStore extends RMStateStore {
     loadAllUpdatedContainerInfos(rmState);
     loadAllContainerStatus(rmState);
     loadAllJustLaunchedContainers(rmState);
+    loadAllCSQueues(rmState);
+    loadAllCSLeafQueueUserInfo(rmState);
     return rmState;
   }
 
@@ -320,7 +326,7 @@ public class NDBRMStateStore extends RMStateStore {
   private void loadLaunchedContainers(RMState rmState) throws IOException {
     rmState.launchedContainers = RMUtilities.getAllLaunchedContainers();
   }
-  
+    
   private void loadNewlyAllocatedContainers(RMState rmState)
       throws IOException {
     rmState.newlyAllocatedContainers =
@@ -329,6 +335,22 @@ public class NDBRMStateStore extends RMStateStore {
   
   private void loadLiveContainers(RMState rmState) throws IOException {
     rmState.liveContainers = RMUtilities.getAllLiveContainers();
+  }
+  
+  private void loadSchedulingOpportunities(RMState rmState) throws IOException {
+    rmState.schedulingOpportunities = RMUtilities.getAllSchedulingOpportunities();
+  }
+
+  private void loadLastScheduleddContainers(RMState rmState) throws IOException {
+    rmState.lastScheduledContainers = RMUtilities.getAllLastScheduledContainers();
+  }
+
+  private void loadRereservations(RMState rmState) throws IOException {
+    rmState.reReservations = RMUtilities.getAllRereservations();
+  }
+
+  private void loadReservedContainers(RMState rmState) throws IOException {
+    rmState.reservedContainers = RMUtilities.getAllReservedContainers();
   }
   
   private void loadResourceRequests(RMState rmState) throws IOException {
@@ -434,7 +456,14 @@ public class NDBRMStateStore extends RMStateStore {
     rmState.allJustLaunchedContainers = RMUtilities.
         getAllJustLaunchedContainers();
   }
-
+  
+  private void loadAllCSQueues(RMState rmState) throws IOException{
+    rmState.allCSQueues = RMUtilities.getAllCSQueues();
+  }
+  
+  private void loadAllCSLeafQueueUserInfo(RMState rmState) throws IOException{
+    rmState.allCSLeafQueueUserInfo = RMUtilities.getAllCSLeafQueueUserInfo();
+  }
   private void loadRMDelegationKeyState(RMState rmState) throws Exception {
     //Retrieve all DelegationKeys from NDB
     List<DelegationKey> delKeys = RMUtilities.getDelegationKeys();

@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler;
 
+import io.hops.ha.common.TransactionState;
+import io.hops.ha.common.TransactionStateImpl;
 import org.apache.commons.logging.Log;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
@@ -158,7 +160,7 @@ public class SchedulerUtils {
    *     Scheduler's log for resource change
    */
   public static void updateResourceIfChanged(SchedulerNode node, RMNode rmNode,
-      Resource clusterResource, Log log) {
+					     Resource clusterResource, Log log, TransactionState ts) {
     Resource oldAvailableResource = node.getAvailableResource();
     Resource newAvailableResource =
         Resources.subtract(rmNode.getTotalCapability(), node.getUsedResource());
@@ -167,9 +169,13 @@ public class SchedulerUtils {
       Resource deltaResource =
           Resources.subtract(newAvailableResource, oldAvailableResource);
       // Reflect resource change to scheduler node.
-      node.applyDeltaOnAvailableResource(deltaResource);
+      node.applyDeltaOnAvailableResource(deltaResource, ts);
       // Reflect resource change to clusterResource.
       Resources.addTo(clusterResource, deltaResource);
+            if (ts != null) {
+      ((TransactionStateImpl) ts)
+          .updateClusterResource(clusterResource);
+    }
       // TODO process resource over-commitment case (allocated containers
       // > total capacity) in different option by getting value of
       // overCommitTimeoutMillis.

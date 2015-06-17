@@ -322,7 +322,7 @@ public class AppSchedulingInfo {
       // once an allocation is done we assume the application is
       // running from scheduler's POV.
       pending =
-          false; //pushde in FiCaSchedulerApp, TORECOVER check if done in FFSchedulerApp (fair)
+          false; //push in FiCaSchedulerApp, TORECOVER FAIR check if done in FFSchedulerApp (fair)
       metrics.runAppAttempt(applicationId, user);
     }
 
@@ -513,11 +513,11 @@ public class AppSchedulingInfo {
           asks.get(org.apache.hadoop.yarn.api.records.ResourceRequest.ANY);
       if (request != null) {
         metrics.decrPendingResources(user, request.getNumContainers(), request
-            .getCapability()); //TORECOVER: this updates to queuemetrics are not pushed
+            .getCapability()); //TORECOVER MS: this updates to queuemetrics are not pushed
       }
     }
     metrics.finishAppAttempt(applicationId, pending,
-        user);//TORECOVER: this updates to queuemetrics are not pushed
+        user);//TORECOVER OPT: this updates to queuemetrics are not pushed
 
     // Clear requests themselves
     clearRequests(transactionState);

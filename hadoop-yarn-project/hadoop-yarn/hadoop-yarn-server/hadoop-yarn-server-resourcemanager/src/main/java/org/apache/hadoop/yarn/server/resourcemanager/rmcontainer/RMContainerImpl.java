@@ -140,9 +140,9 @@ public class RMContainerImpl implements
       //recovered
   private final String user;//recovered
 
-  private Resource reservedResource;//TORECOVER capacity: not recovered yet
-  private NodeId reservedNode;//TORECOVER capacity: not recovered yet
-  private Priority reservedPriority;//TORECOVER capacity: not recovered yet
+  private Resource reservedResource;//recoverd
+  private NodeId reservedNode;//recovered
+  private Priority reservedPriority;//recovered
   private long startTime;//recovered
   private long finishTime;//recovered
   private ContainerStatus finishedStatus;//recovered
@@ -169,7 +169,7 @@ public class RMContainerImpl implements
         .containerStarted(this, transactionState);
   }
 
-
+  //TORECOVER OPT change to implement recoverable
   @Override
   public void recover(RMContainer hopRMContainer) {
     this.startTime = hopRMContainer.getStarttime();
@@ -179,6 +179,15 @@ public class RMContainerImpl implements
 
     if (getState().equals(RMContainerState.ACQUIRED)) {
       this.containerAllocationExpirer.register(containerId);
+    }
+    if (hopRMContainer.getReservedNodeIdID() != null) {
+      this.reservedNode = 
+              NodeId.newInstance(hopRMContainer.getReservedNodeHost(),
+              hopRMContainer.getReservedNodePort());
+      this.reservedResource = 
+              Resource.newInstance(hopRMContainer.getReservedMemory(), 
+              hopRMContainer.getReservedVCores());
+      this.reservedPriority = Priority.newInstance(hopRMContainer.getReservedPriorityID());
     }
     if (hopRMContainer.getFinishedStatusState() != null) {
       this.finishedStatus = ContainerStatus.newInstance(containerId,
