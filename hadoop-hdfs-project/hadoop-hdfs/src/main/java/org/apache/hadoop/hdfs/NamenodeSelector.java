@@ -70,7 +70,7 @@ public class NamenodeSelector extends Thread {
     final private ClientProtocol namenodeRPCHandle;
     final private ActiveNode namenode;
 
-    NamenodeHandle(ClientProtocol proto, ActiveNode an) {
+    public NamenodeHandle(ClientProtocol proto, ActiveNode an) {
       this.namenode = an;
       this.namenodeRPCHandle = proto;
     }
@@ -115,7 +115,7 @@ public class NamenodeSelector extends Thread {
   private final NamenodeSelector.NNSelectionPolicy policy;
   private NamenodeSelector.NamenodeHandle stickyHandle = null; //only used if
   // RANDOM_STICKY policy is used
-  private final Configuration conf;
+  protected final Configuration conf;
   private boolean periodicNNListUpdate = true;
   private final Object wiatObjectForUpdate = new Object();
   private final int namenodeListUpdateTimePeriod;
@@ -136,7 +136,7 @@ public class NamenodeSelector extends Thread {
     this.namenodeListUpdateTimePeriod = -1;
   }
 
-  NamenodeSelector(Configuration conf, URI defaultUri) throws IOException {
+  public NamenodeSelector(Configuration conf, URI defaultUri) throws IOException {
     this.defaultUri = defaultUri;
     this.conf = conf;
 
@@ -498,7 +498,7 @@ public class NamenodeSelector extends Thread {
     }
   }
 
-  private NamenodeSelector.NamenodeHandle getNamenodeHandle(
+  protected NamenodeSelector.NamenodeHandle getNamenodeHandle(
       InetSocketAddress address) {
     for (NamenodeSelector.NamenodeHandle handle : nnList) {
       if (handle.getNamenode().getInetSocketAddress().equals(address)) {
@@ -526,3 +526,4 @@ public class NamenodeSelector extends Thread {
     }
   }
 }
+

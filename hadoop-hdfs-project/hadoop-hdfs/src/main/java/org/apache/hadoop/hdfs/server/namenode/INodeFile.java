@@ -66,7 +66,7 @@ public class INodeFile extends INode implements BlockCollection {
 
   private long header;
   private int generationStamp = (int) GenerationStamp.FIRST_VALID_STAMP;
-  private int size;
+  private long size;
   
 
   public INodeFile(PermissionStatus permissions, BlockInfo[] blklist,
@@ -90,7 +90,7 @@ public class INodeFile extends INode implements BlockCollection {
     setReplicationNoPersistance(other.getBlockReplication());
     setPreferredBlockSizeNoPersistance(other.getPreferredBlockSize());
     setGenerationStampNoPersistence(other.getGenerationStamp());
-    setSize(other.getSize());
+    setSizeNoPersistence(other.getSize());
   }
 
   /**
@@ -242,7 +242,7 @@ public class INodeFile extends INode implements BlockCollection {
    * Compute file size.
    * May or may not include BlockInfoUnderConstruction.
    */
-  long computeFileSize(boolean includesBlockInfoUnderConstruction)
+  public long computeFileSize(boolean includesBlockInfoUnderConstruction)
       throws StorageException, TransactionContextException {
     return computeFileSize(includesBlockInfoUnderConstruction, getBlocks());
   }
@@ -378,17 +378,16 @@ public class INodeFile extends INode implements BlockCollection {
     return generationStamp;
   }
 
-  public int getSize() {
+  public long getSize() {
     return size;
   }
 
-  public void setSize(int size) {
+  public void setSizeNoPersistence(long size) {
     this.size = size;
   }
-
-  public void inrementSize(int increment)
-      throws TransactionContextException, StorageException {
-    this.size += increment;
+  
+  public void recomputeFileSize() throws StorageException, TransactionContextException {
+    setSizeNoPersistence(this.computeFileSize(true));
     save();
   }
 }
