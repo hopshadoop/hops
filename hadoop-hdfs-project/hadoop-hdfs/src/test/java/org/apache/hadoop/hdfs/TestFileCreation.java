@@ -74,6 +74,7 @@ import java.util.logging.Logger;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_KEY;
+import org.apache.hadoop.fs.FileStatus;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_DEFAULT;
@@ -1377,6 +1378,60 @@ public class TestFileCreation {
     }
   }
 
+  
+  
+  @Test
+    public void testFileAndDirListing() throws IOException {
+        Configuration conf = new HdfsConfiguration();
+        final int BYTES_PER_CHECKSUM = 1;
+        final int PACKET_SIZE = BYTES_PER_CHECKSUM;
+        final int BLOCK_SIZE = 1 * PACKET_SIZE;
+        conf.setInt(DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY, BYTES_PER_CHECKSUM);
+        conf.setLong(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE);
+        conf.setInt(DFSConfigKeys.DFS_CLIENT_WRITE_PACKET_SIZE_KEY, PACKET_SIZE);
+
+        MiniDFSCluster cluster =
+                new MiniDFSCluster.Builder(conf).numDataNodes(1).format(true).build();
+        FileSystem fs = cluster.getFileSystem();
+        DistributedFileSystem dfs = (DistributedFileSystem) FileSystem
+                .newInstance(fs.getUri(), fs.getConf());
+        try {
+            final String data = "test";
+
+            Path base = new Path("/f1");
+            dfs.mkdirs(base);
+            dfs.mkdirs(new Path(base, "dir"));
+
+            FSDataOutputStream out = dfs.create(new Path(base, "test"));
+            out.write(data.getBytes());
+            out.close();
+
+
+            FileStatus[] status = dfs.listStatus(base);
+            for (int i = 0; i < status.length; i++) {
+                if (status[i].isFile()) {
+                    assertTrue("File size does not match ", status[i].getLen() == data.getBytes().length);
+                }
+            }
+
+            status = dfs.listStatus(new Path(base, "test"));
+            for (int i = 0; i < status.length; i++) {
+                if (status[i].isFile()) {
+                    assertTrue("File size does not match ", status[i].getLen() == data.getBytes().length);
+                }
+            }
+
+
+        dfs.listLocatedStatus(base);
+        dfs.listLocatedStatus(new Path(base, "test"));
+
+        } catch (Exception e) {
+            fail();
+            e.printStackTrace();
+        } finally {
+            cluster.shutdown();
+        }
+    }
 
   @Test
   public void test2() throws IOException {

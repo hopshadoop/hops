@@ -73,6 +73,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 
 import static org.apache.hadoop.hdfs.server.namenode.FSNamesystem.LOG;
 import static org.apache.hadoop.util.Time.now;
@@ -1203,13 +1204,16 @@ public class FSDirectory implements Closeable {
     INodeFile[] allSrcInodes = new INodeFile[srcs.length];
     int i = 0;
     int totalBlocks = 0;
+    long concatSize = 0;
     for (String src : srcs) {
       INodeFile srcInode = (INodeFile) getINode(src);
       allSrcInodes[i++] = srcInode;
       totalBlocks += srcInode.numBlocks();
+      concatSize += srcInode.getSize();
     }
     List<BlockInfo> oldBlks =
         trgInode.appendBlocks(allSrcInodes, totalBlocks); // copy the blocks
+    trgInode.recomputeFileSize();
     //HOP now the blocks are added to the targed file. copy of the old block infos is returned for snapshot maintenance
     
 
@@ -2577,7 +2581,8 @@ public class FSDirectory implements Closeable {
     long size = 0;     // length is zero for directories
     if (node instanceof INodeFile) {
       INodeFile fileNode = (INodeFile) node;
-      size = fileNode.computeFileSize(true);
+      size = fileNode.getSize();//.computeFileSize(true);
+      //size = fileNode.computeFileSize(true);
     }
     return createFileStatus(path, node, size);
   }

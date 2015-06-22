@@ -174,7 +174,7 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
 
   public static final String DFS_RESOLVING_CACHE_ENABLED = "dfs" +
       ".resolvingcache.enabled";
-  public static final boolean DFS_RESOLVING_CACHE_ENABLED_DEFAULT = false;
+  public static final boolean DFS_RESOLVING_CACHE_ENABLED_DEFAULT = true;
   
   public static final String DFS_MEMCACHE_SERVER =
       "dfs.resolvingcache.memcache.server.address";
