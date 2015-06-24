@@ -17,6 +17,8 @@ package io.hops.metadata.util;
 
 import io.hops.exception.StorageException;
 import io.hops.exception.StorageInitializtionException;
+import io.hops.ha.common.TransactionState;
+import io.hops.ha.common.TransactionStateImpl;
 import io.hops.metadata.yarn.entity.FiCaSchedulerAppLiveContainers;
 import io.hops.metadata.yarn.entity.FiCaSchedulerAppNewlyAllocatedContainers;
 import io.hops.metadata.yarn.entity.FiCaSchedulerNode;
@@ -67,6 +69,16 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
+import org.apache.hadoop.yarn.api.records.QueueACL;
+import org.apache.hadoop.yarn.api.records.QueueInfo;
+import org.apache.hadoop.yarn.api.records.QueueUserACLInfo;
+import org.apache.hadoop.yarn.api.records.impl.pb.ApplicationIdPBImpl;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ActiveUsersManager;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.Queue;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.QueueMetrics;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.LeafQueue;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerApp;
 
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.mock;
@@ -420,6 +432,36 @@ public class TestHopYarnAPIUtilities {
     Thread.sleep(2000);
   }
 
+  //when an application attempt is finished it furst update the schedulerApplication
+  //end then remove the Application, which may cause foreign key exception if the
+  //two actions are not commited in the same order.
+  @Test(timeout = 100000)
+  public void testpersistApplicationIdToRemove() throws IOException {
+    TransactionStateImpl t = new TransactionStateImpl(1,
+            TransactionState.TransactionType.RM);
+
+    ApplicationId appId = ApplicationId.newInstance(0, 1);
+    t.getSchedulerApplicationInfo().setSchedulerApplicationtoAdd(
+            new org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication(
+                    DUMY_QUEUE, ""), appId);
+    ApplicationAttemptId appAttemptId = ApplicationAttemptId.newInstance(appId,
+            1);
+    FiCaSchedulerApp schedulerApp = new FiCaSchedulerApp(appAttemptId, "",
+            DUMY_QUEUE, null, null);
+    t.getSchedulerApplicationInfo().
+            setFiCaSchedulerAppInfo(schedulerApp);
+    RMUtilities.finishRPC(t, 1);
+
+    t = new TransactionStateImpl(2,
+            TransactionState.TransactionType.RM);
+    t.getSchedulerApplicationInfo().setApplicationIdtoRemove(appId);
+
+    t.getSchedulerApplicationInfo().
+            getFiCaSchedulerAppInfo(appAttemptId).
+            updateAppInfo(schedulerApp);
+    RMUtilities.finishRPC(t, 2);
+  }
+
   private static ApplicationId getApplicationId(int id) {
     return ApplicationId.newInstance(123456, id);
   }
@@ -460,4 +502,37 @@ public class TestHopYarnAPIUtilities {
     return submitRequest;
   }
 
+    private final Queue DUMY_QUEUE = new Queue() {
+
+    @Override
+    public String getQueueName() {
+      return "dumy";
+    }
+
+    @Override
+    public QueueMetrics getMetrics() {
+      return QueueMetrics
+              .forQueue("dumy", null, false, conf);
+    }
+
+    @Override
+    public QueueInfo getQueueInfo(boolean includeChildQueues, boolean recursive) {
+      throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
+
+    @Override
+    public List<QueueUserACLInfo> getQueueUserAclInfo(UserGroupInformation user) {
+      throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
+
+    @Override
+    public boolean hasAccess(QueueACL acl, UserGroupInformation user) {
+      throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
+
+    @Override
+    public ActiveUsersManager getActiveUsersManager() {
+      throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
+  };
 }

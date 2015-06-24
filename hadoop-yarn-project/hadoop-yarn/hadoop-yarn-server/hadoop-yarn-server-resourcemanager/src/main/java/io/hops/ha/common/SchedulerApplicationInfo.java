@@ -45,8 +45,8 @@ public class SchedulerApplicationInfo {
       new HashMap<ApplicationId, org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication>();
   private List<ApplicationId> applicationsIdToRemove =
       new ArrayList<ApplicationId>();
-  private Map<String, FiCaSchedulerAppInfo> fiCaSchedulerAppInfo =
-      new HashMap<String, FiCaSchedulerAppInfo>();
+  private Map<String, Map<String, FiCaSchedulerAppInfo>> fiCaSchedulerAppInfo
+          = new HashMap<String, Map<String, FiCaSchedulerAppInfo>>();
 
   public void persist(QueueMetricsDataAccess QMDA) throws StorageException {
     //TODO: The same QueueMetrics (DEFAULT_QUEUE) is persisted with every app. Its extra overhead. We can persist it just once
@@ -112,6 +112,7 @@ public class SchedulerApplicationInfo {
           new ArrayList<SchedulerApplication>();
       for (ApplicationId appId : applicationsIdToRemove) {
         LOG.debug("remove scheduler app " + appId.toString());
+        fiCaSchedulerAppInfo.remove(appId.toString());
         applicationsToRemove
             .add(new SchedulerApplication(appId.toString(), null, null));
       }
@@ -132,25 +133,36 @@ public class SchedulerApplicationInfo {
   }
 
   public FiCaSchedulerAppInfo getFiCaSchedulerAppInfo(
-      ApplicationAttemptId appAttemptId) {
-    if (fiCaSchedulerAppInfo.get(appAttemptId.toString()) == null) {
-      fiCaSchedulerAppInfo
-          .put(appAttemptId.toString(), new FiCaSchedulerAppInfo(appAttemptId));
+       ApplicationAttemptId appAttemptId) {
+    ApplicationId appId = appAttemptId.getApplicationId();
+    if(fiCaSchedulerAppInfo.get(appId.toString())==null){
+      fiCaSchedulerAppInfo.put(appId.toString(), 
+              new HashMap<String, FiCaSchedulerAppInfo>());
     }
-    return fiCaSchedulerAppInfo.get(appAttemptId.toString());
-  }
+    if (fiCaSchedulerAppInfo.get(appId.toString()).
+            get(appAttemptId.toString()) == null) {
+      fiCaSchedulerAppInfo.get(appId.toString())
+           .put(appAttemptId.toString(), new FiCaSchedulerAppInfo(appAttemptId));
+     }
+    return fiCaSchedulerAppInfo.get(appId.toString()).
+            get(appAttemptId.toString());
+   }
 
   private void persistFiCaSchedulerAppInfo() throws StorageException {
-    for (FiCaSchedulerAppInfo appInfo : fiCaSchedulerAppInfo.values()) {
-      appInfo.persist();
+    for (Map<String,FiCaSchedulerAppInfo> map : fiCaSchedulerAppInfo.values()) {
+      for(FiCaSchedulerAppInfo appInfo: map.values()){
+        appInfo.persist();
+      }
     }
   }
-
-  public void setFiCaSchedulerAppInfo(
-      SchedulerApplicationAttempt schedulerApp) {
-    FiCaSchedulerAppInfo ficaInfo = new FiCaSchedulerAppInfo(schedulerApp);
-    fiCaSchedulerAppInfo
-        .put(schedulerApp.getApplicationAttemptId().toString(), ficaInfo);
-  }
-
+      public void setFiCaSchedulerAppInfo(
+       SchedulerApplicationAttempt schedulerApp) {
+    ApplicationId appId = schedulerApp.getApplicationId();
+     FiCaSchedulerAppInfo ficaInfo = new FiCaSchedulerAppInfo(schedulerApp);
+    if(fiCaSchedulerAppInfo.get(appId.toString())==null){
+      fiCaSchedulerAppInfo.put(appId.toString(), new HashMap<String, FiCaSchedulerAppInfo>());
+    }
+    fiCaSchedulerAppInfo.get(appId.toString())
+         .put(schedulerApp.getApplicationAttemptId().toString(), ficaInfo);
+   }
 }
