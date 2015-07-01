@@ -2781,8 +2781,7 @@ public class FSNamesystem
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = getInstance();
             locks.add(lf.getINodeLock(nameNode, INodeLockType.READ,
-                INodeResolveType.PATH, resolveLink, src))
-                .add(lf.getBlockLock());
+                INodeResolveType.PATH, resolveLink, src));
           }
 
           @Override
@@ -2985,7 +2984,7 @@ public class FSNamesystem
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = getInstance();
         locks.add(
-            lf.getINodeLock(nameNode, INodeLockType.READ, INodeResolveType.PATH,
+            lf.getINodeLock(nameNode, INodeLockType.WRITE, INodeResolveType.PATH,
                 src)).add(lf.getLeaseLock(LockType.READ))
             .add(lf.getBlockLock());
       }
@@ -3000,6 +2999,7 @@ public class FSNamesystem
         INodeFileUnderConstruction pendingFile = checkLease(src, clientName);
         if (lastBlockLength > 0) {
           pendingFile.updateLengthOfLastBlock(lastBlockLength);
+          pendingFile.recomputeFileSize();
         }
         dir.persistBlocks(src, pendingFile);
         return null;
@@ -3161,10 +3161,15 @@ public class FSNamesystem
 private void commitOrCompleteLastBlock(
       final INodeFileUnderConstruction fileINode, final Block commitBlock)
       throws IOException {
+    
+    
+    
     if (!blockManager.commitOrCompleteLastBlock(fileINode, commitBlock)) {
       return;
     }
 
+    fileINode.recomputeFileSize();     
+    
     if (dir.isQuotaEnabled()) {
       final long diff = fileINode.getPreferredBlockSize()
           - commitBlock.getNumBytes();
@@ -3175,8 +3180,7 @@ private void commitOrCompleteLastBlock(
           -diff * fileINode.getBlockReplication());
       }
     }
-
-    fileINode.inrementSize((int) (commitBlock.getNumBytes() / 1024));
+    
     try {
       if (fileINode.isPathMetaEnabled()) {
         SizeLogDataAccess da = (SizeLogDataAccess)
@@ -3273,7 +3277,7 @@ private void commitOrCompleteLastBlock(
           // update last block
           storedBlock.setGenerationStamp(newgenerationstamp);
           storedBlock.setNumBytes(newlength);
-
+          iFile.recomputeFileSize();
           // find the DatanodeDescriptor objects
           // There should be no locations in the blockManager till now because the
           // file is underConstruction
@@ -3375,9 +3379,12 @@ private void commitOrCompleteLastBlock(
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = LockFactory.getInstance();
             locks.add(lf.getINodeLock(nameNode, INodeLockType.READ,
-                INodeResolveType.PATH_AND_IMMEDIATE_CHILDREN, src))
+                INodeResolveType.PATH_AND_IMMEDIATE_CHILDREN, src));
+            if(needLocation){
+                locks
                 .add(lf.getBlockLock())
                 .add(lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UC));
+            }
           }
 
           @Override
@@ -4800,7 +4807,7 @@ private void commitOrCompleteLastBlock(
     // Update old block with the new generation stamp and new length
     blockinfo.setGenerationStamp(newBlock.getGenerationStamp());
     blockinfo.setNumBytes(newBlock.getNumBytes());
-
+    pendingFile.recomputeFileSize();
     // find the DatanodeDescriptor objects
     final DatanodeManager dm = getBlockManager().getDatanodeManager();
     DatanodeDescriptor[] descriptors = null;
