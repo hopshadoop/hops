@@ -17,9 +17,11 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
+import com.google.common.net.InetAddresses;
 import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
 import io.hops.leader_election.node.ActiveNode;
+import io.hops.leader_election.node.SortedActiveNodeList;
 import io.hops.merge.HttpConfig2;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.transaction.handler.HDFSOperationType;
@@ -63,6 +65,7 @@ import java.net.URLEncoder;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 
@@ -156,11 +159,21 @@ class NamenodeJspHelper {
         fsn.getFilePathAncestorLockType() +
         "</td></tr>\n  <tr><td class='col1'>" + nn.getActiveNameNodes().size() +
         " NN(s):</td><td>" +
-        getAllActiveNNs(nn.getActiveNameNodes().getActiveNodes()) +
+        getAllActiveNNs(nn.getActiveNameNodes()) +
         "</td></tr>\n</table></div>";
   }
 
-  private static String getAllActiveNNs(List<ActiveNode> list) {
+  private static String getAllActiveNNs(SortedActiveNodeList activeNodeList) {
+    List<ActiveNode> list = activeNodeList.getActiveNodes();
+    String leaderhost = getCanonicalHostName(activeNodeList.getLeader()
+        .getIpAddress());
+    List<String> hosts = new ArrayList<String>();
+    for(ActiveNode node : list){
+      hosts.add(getCanonicalHostName(node.getIpAddress()));
+    }
+
+    Collections.sort(hosts);
+
     StringBuilder sb = new StringBuilder("");
     for (int i = 0; i < list.size(); i++) {
       if (i % 3 == 0) {
@@ -168,13 +181,25 @@ class NamenodeJspHelper {
       }
       sb.append("<a href=\"http://").append(list.get(i).getHttpAddress())
           .append("/dfshealth.jsp\">");
-      sb.append(list.get(i));
+
+      String hostString = hosts.get(i).equals(leaderhost) ? "<b>" +
+          leaderhost + "</b>" : hosts.get(i);
+      sb.append(hostString);
       sb.append("</a>");
       sb.append("\t\t");
     }
     return sb.toString();
   }
 
+  private static String getCanonicalHostName(String ip){
+    String host;
+    try{
+      host = InetAddresses.forString(ip).getCanonicalHostName();
+    }catch (Exception e){
+      host = ip;
+    }
+    return host;
+  }
   /**
    * Generate warning text if there are corrupt files.
    *
@@ -916,3 +941,4 @@ class NamenodeJspHelper {
     }
   }
 }
+

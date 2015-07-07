@@ -771,8 +771,8 @@ public class TestFsck {
                       .getNode(fileName, true);
               final BlockInfo[] blocks = node.getBlocks();
               assertEquals(blocks.length, 1);
-              blocks[0]
-                  .setNumBytes(-1L);  // set the block length to be negative
+              blocks[0].setNumBytes(-1L);  // set the block length to be negative
+              node.recomputeFileSize();
               return null;
             }
           };
