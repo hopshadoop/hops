@@ -95,8 +95,7 @@ public class ReplicaUnderConstructionContext
       ReplicaUnderConstruction replicaUnderConstruction, int inodeId) {
     return new ReplicaUnderConstruction(replicaUnderConstruction.getState(),
         replicaUnderConstruction.getStorageId(),
-        replicaUnderConstruction.getBlockId(), inodeId,
-        replicaUnderConstruction.getIndex());
+        replicaUnderConstruction.getBlockId(), inodeId);
   }
 
   private List<ReplicaUnderConstruction> findByBlockId(

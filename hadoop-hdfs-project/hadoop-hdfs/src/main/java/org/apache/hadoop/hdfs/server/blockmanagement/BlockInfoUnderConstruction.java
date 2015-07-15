@@ -256,7 +256,7 @@ public class BlockInfoUnderConstruction extends BlockInfo {
             .findList(ReplicaUnderConstruction.Finder.ByBlockIdAndINodeId,
                 getBlockId(), getInodeId());
     if (replicas != null) {
-      Collections.sort(replicas, ReplicaUnderConstruction.Order.ByIndex);
+      Collections.sort(replicas, ReplicaUnderConstruction.Order.ByStorageId);
     } else {
       replicas = EMPTY_REPLICAS_ARRAY;
     }
@@ -273,7 +273,7 @@ public class BlockInfoUnderConstruction extends BlockInfo {
     }
     ReplicaUnderConstruction replica =
         new ReplicaUnderConstruction(rState, storageId, getBlockId(),
-            getInodeId(), getExpectedReplicas().size());
+            getInodeId());
     add(replica);
     return replica;
   }

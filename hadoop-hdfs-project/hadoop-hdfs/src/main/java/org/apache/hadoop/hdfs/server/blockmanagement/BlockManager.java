@@ -1994,8 +1994,9 @@ public class BlockManager {
               ReplicaState iState = blksStates[index];
               BlockInfo storedBlock =
                   processReportedBlock(dn, iblk, iState, toAdd, toInvalidate,
-                      toCorrupt, toUC, safeBlocks, firstBlockReport);
-              if (storedBlock != null && storedBlock.findDatanode(dn) >= 0) {
+                      toCorrupt, toUC, safeBlocks, firstBlockReport,
+                      allMachineBlocks.contains(iblk.getBlockId()));
+              if (storedBlock != null) {
                 allMachineBlocks.remove(storedBlock.getBlockId());
               }
             }
@@ -2072,7 +2073,8 @@ public class BlockManager {
       final Collection<BlockInfo> toAdd, final Collection<Block> toInvalidate,
       final Collection<BlockToMarkCorrupt> toCorrupt,
       final Collection<StatefulBlockInfo> toUC, final Set<Long> safeBlocks,
-      final boolean firstBlockReport) throws IOException {
+      final boolean firstBlockReport, final Boolean replicaAlreadyExists)
+      throws IOException {
     
     if (LOG.isDebugEnabled()) {
       LOG.debug("Reported block " + block + " on " + dn + " size " +
@@ -2123,8 +2125,13 @@ public class BlockManager {
     }
 
     //add replica if appropriate
-    if (reportedState == ReplicaState.FINALIZED &&
-        storedBlock.findDatanode(dn) < 0) {
+
+    if (reportedState == ReplicaState.FINALIZED) {
+      if((replicaAlreadyExists == null && storedBlock.hasReplicaIn(dn)) ||
+          (replicaAlreadyExists != null && replicaAlreadyExists)){
+        return storedBlock;
+      }
+
       toAdd.add(storedBlock);
       safeBlocks.remove(block.getBlockId());
     }
@@ -4058,7 +4065,7 @@ public class BlockManager {
       final Collection<BlockToMarkCorrupt> toCorrupt,
       final Collection<StatefulBlockInfo> toUC) throws IOException {
     return processReportedBlock(dn, block, reportedState, toAdd, toInvalidate,
-        toCorrupt, toUC, new HashSet<Long>(), false);
+        toCorrupt, toUC, new HashSet<Long>(), false, null);
   }
 
   public int getTotalCompleteBlocks() throws IOException {

@@ -20,7 +20,7 @@ import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.BlockInfoDataAccess;
 import io.hops.metadata.hdfs.dal.INodeDataAccess;
 import io.hops.metadata.hdfs.dal.ReplicaDataAccess;
-import io.hops.metadata.hdfs.entity.IndexedReplica;
+import io.hops.metadata.hdfs.entity.Replica;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.hadoop.fs.permission.FsPermission;
@@ -131,9 +131,9 @@ public class TestNDBSizer {
 
     System.out.println();
     
-    final List<IndexedReplica> replicas = new LinkedList<IndexedReplica>();
+    final List<Replica> replicas = new LinkedList<Replica>();
     for (int i = 0; i < NUM_REPLICAS; i++) {
-      replicas.add(new IndexedReplica(i, i, i, i));
+      replicas.add(new Replica(i, i, i));
       if (replicas.size() >= BATCH_SIZE) {
         final int j = i;
         new LightWeightRequestHandler(HDFSOperationType.TEST) {
@@ -141,8 +141,8 @@ public class TestNDBSizer {
           public Object performTask() throws StorageException, IOException {
             ReplicaDataAccess rda = (ReplicaDataAccess) HdfsStorageFactory
                 .getDataAccess(ReplicaDataAccess.class);
-            rda.prepare(new LinkedList<IndexedReplica>(), replicas,
-                new LinkedList<IndexedReplica>());
+            rda.prepare(new LinkedList<Replica>(), replicas,
+                new LinkedList<Replica>());
             //StorageFactory.getConnector().commit();
             replicas.clear();
             showProgressBar("Replicas", j, NUM_REPLICAS);

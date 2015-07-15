@@ -22,7 +22,6 @@ import io.hops.common.IDsMonitor;
 import io.hops.exception.StorageException;
 import io.hops.exception.StorageInitializtionException;
 import io.hops.log.NDCWrapper;
-import io.hops.metadata.hdfs.entity.EncodingJob;
 import io.hops.resolvingcache.Cache;
 import io.hops.metadata.adaptor.BlockInfoDALAdaptor;
 import io.hops.metadata.adaptor.INodeAttributeDALAdaptor;
@@ -62,7 +61,7 @@ import io.hops.metadata.hdfs.entity.BlockChecksum;
 import io.hops.metadata.hdfs.entity.CorruptReplica;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
 import io.hops.metadata.hdfs.entity.ExcessReplica;
-import io.hops.metadata.hdfs.entity.IndexedReplica;
+import io.hops.metadata.hdfs.entity.Replica;
 import io.hops.metadata.hdfs.entity.InvalidatedBlock;
 import io.hops.metadata.hdfs.entity.LeasePath;
 import io.hops.metadata.hdfs.entity.MetadataLogEntry;
@@ -234,7 +233,7 @@ public class HdfsStorageFactory {
             new ReplicaUnderConstructionContext(
                 (ReplicaUnderConstructionDataAccess) getDataAccess(
                     ReplicaUnderConstructionDataAccess.class)));
-        entityContexts.put(IndexedReplica.class, new ReplicaContext(
+        entityContexts.put(Replica.class, new ReplicaContext(
             (ReplicaDataAccess) getDataAccess(ReplicaDataAccess.class)));
         entityContexts.put(ExcessReplica.class, new ExcessReplicaContext(
             (ExcessReplicaDataAccess) getDataAccess(
