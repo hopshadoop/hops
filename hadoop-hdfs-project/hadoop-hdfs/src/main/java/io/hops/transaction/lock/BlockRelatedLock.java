@@ -18,7 +18,7 @@ package io.hops.transaction.lock;
 import io.hops.metadata.common.FinderType;
 import io.hops.metadata.hdfs.entity.CorruptReplica;
 import io.hops.metadata.hdfs.entity.ExcessReplica;
-import io.hops.metadata.hdfs.entity.IndexedReplica;
+import io.hops.metadata.hdfs.entity.Replica;
 import io.hops.metadata.hdfs.entity.InvalidatedBlock;
 import io.hops.metadata.hdfs.entity.UnderReplicatedBlock;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
@@ -68,8 +68,8 @@ final class BlockRelatedLock extends LockWithType {
   private FinderType getFinderType(boolean byBlockID) {
     switch (getType()) {
       case Replica:
-        return byBlockID ? IndexedReplica.Finder.ByBlockIdAndINodeId :
-            IndexedReplica.Finder.ByINodeId;
+        return byBlockID ? Replica.Finder.ByBlockIdAndINodeId :
+            Replica.Finder.ByINodeId;
       case CorruptReplica:
         return byBlockID ? CorruptReplica.Finder.ByBlockIdAndINodeId :
             CorruptReplica.Finder.ByINodeId;

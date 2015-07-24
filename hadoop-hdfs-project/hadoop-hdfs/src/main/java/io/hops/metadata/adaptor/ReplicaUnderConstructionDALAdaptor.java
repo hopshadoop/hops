@@ -77,7 +77,7 @@ public class ReplicaUnderConstructionDALAdaptor extends
     if (hdfsClass != null) {
       return new ReplicaUnderConstruction(hdfsClass.getState().ordinal(),
           hdfsClass.getStorageId(), hdfsClass.getBlockId(),
-          hdfsClass.getInodeId(), hdfsClass.getIndex());
+          hdfsClass.getInodeId());
     } else {
       return null;
     }
@@ -89,8 +89,7 @@ public class ReplicaUnderConstructionDALAdaptor extends
     if (dalClass != null) {
       return new org.apache.hadoop.hdfs.server.blockmanagement.ReplicaUnderConstruction(
           HdfsServerConstants.ReplicaState.values()[dalClass.getState()],
-          dalClass.getStorageId(), dalClass.getBlockId(), dalClass.getInodeId(),
-          dalClass.getIndex());
+          dalClass.getStorageId(), dalClass.getBlockId(), dalClass.getInodeId());
     } else {
       return null;
     }
