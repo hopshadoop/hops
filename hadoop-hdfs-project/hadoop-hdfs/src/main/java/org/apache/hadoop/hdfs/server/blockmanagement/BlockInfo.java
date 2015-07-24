@@ -19,8 +19,8 @@ package org.apache.hadoop.hdfs.server.blockmanagement;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.common.FinderType;
-import io.hops.metadata.hdfs.entity.IndexedReplica;
 import io.hops.metadata.hdfs.entity.Replica;
+import io.hops.metadata.hdfs.entity.ReplicaBase;
 import io.hops.transaction.EntityManager;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hdfs.protocol.Block;
@@ -42,8 +42,8 @@ import java.util.List;
 public class BlockInfo extends Block {
   
   public static final BlockInfo[] EMPTY_ARRAY = {};
-  private static final List<IndexedReplica> EMPTY_REPLICAS_ARRAY =
-      new ArrayList<IndexedReplica>();
+  private static final List<Replica> EMPTY_REPLICAS_ARRAY =
+      new ArrayList<Replica>();
 
   public static enum Finder implements FinderType<BlockInfo> {
 
@@ -207,28 +207,28 @@ public class BlockInfo extends Block {
 
   public DatanodeDescriptor[] getDatanodes(DatanodeManager datanodeMgr)
       throws StorageException, TransactionContextException {
-    List<IndexedReplica> replicas = getReplicas(datanodeMgr);
+    List<Replica> replicas = getReplicas(datanodeMgr);
     return getDatanodes(datanodeMgr, replicas);
   }
 
-  List<IndexedReplica> getReplicasNoCheck()
+  List<Replica> getReplicasNoCheck()
       throws StorageException, TransactionContextException {
-    List<IndexedReplica> replicas = (List<IndexedReplica>) EntityManager
-        .findList(IndexedReplica.Finder.ByBlockIdAndINodeId, getBlockId(),
+    List<Replica> replicas = (List<Replica>) EntityManager
+        .findList(Replica.Finder.ByBlockIdAndINodeId, getBlockId(),
             getInodeId());
     if (replicas == null) {
       replicas = EMPTY_REPLICAS_ARRAY;
     } else {
-      Collections.sort(replicas, IndexedReplica.Order.ByIndex);
+      Collections.sort(replicas, Replica.Order.ByStorageId);
     }
     return replicas;
   }
 
-  List<IndexedReplica> getReplicas(DatanodeManager datanodeMgr)
+  List<Replica> getReplicas(DatanodeManager datanodeMgr)
       throws StorageException, TransactionContextException {
-    List<IndexedReplica> replicas = getReplicasNoCheck();
+    List<Replica> replicas = getReplicasNoCheck();
     getDatanodes(datanodeMgr, replicas);
-    Collections.sort(replicas, IndexedReplica.Order.ByIndex);
+    Collections.sort(replicas, Replica.Order.ByStorageId);
     return replicas;
   }
 
@@ -236,18 +236,17 @@ public class BlockInfo extends Block {
   /**
    * Adds new replica for this block.
    */
-  IndexedReplica addReplica(DatanodeDescriptor dn, BlockInfo b)
+  Replica addReplica(DatanodeDescriptor dn, BlockInfo b)
       throws StorageException, TransactionContextException {
-    IndexedReplica replica =
-        new IndexedReplica(getBlockId(), dn.getSId(), b.getInodeId(),
-            getReplicasNoCheck().size());
+    Replica replica =
+        new Replica(dn.getSId(), getBlockId(), b.getInodeId());
     add(replica);
     return replica;
   }
 
   public void removeAllReplicas()
       throws StorageException, TransactionContextException {
-    for (IndexedReplica replica : getReplicasNoCheck()) {
+    for (Replica replica : getReplicasNoCheck()) {
       remove(replica);
     }
   }
@@ -257,46 +256,35 @@ public class BlockInfo extends Block {
    *
    * @return
    */
-  IndexedReplica removeReplica(DatanodeDescriptor dn)
+  Replica removeReplica(DatanodeDescriptor dn)
       throws StorageException, TransactionContextException {
-    List<IndexedReplica> replicas = getReplicasNoCheck();
-    IndexedReplica replica = null;
-    int index = -1;
-    for (int i = 0; i < replicas.size(); i++) {
-      if (replicas.get(i).getStorageId() == dn.getSId()) {
-        index = i;
+    List<Replica> replicas = getReplicasNoCheck();
+    Replica replica = null;
+    for (Replica r : replicas) {
+      if (r.getStorageId() == dn.getSId()) {
+        replica = r;
+        remove(r);
         break;
       }
-    }
-    if (index >= 0) {
-      replica = replicas.remove(index);
-      remove(replica);
-      
-      for (int i = index; i < replicas.size(); i++) {
-        IndexedReplica r1 = replicas.get(i);
-        r1.setIndex(i);
-        save(r1);
-      }
-      
     }
     return replica;
   }
   
   int findDatanode(DatanodeDescriptor dn)
       throws StorageException, TransactionContextException {
-    IndexedReplica replica = EntityManager
-        .find(IndexedReplica.Finder.ByBlockIdAndStorageId, getBlockId(),
+    Replica replica = EntityManager
+        .find(Replica.Finder.ByBlockIdAndStorageId, getBlockId(),
             dn.getSId());
     if (replica == null) {
       return -1;
     }
-    return replica.getIndex();
+    return 1;
   }
 
   boolean hasReplicaIn(DatanodeDescriptor dn)
       throws StorageException, TransactionContextException {
     return EntityManager
-        .find(IndexedReplica.Finder.ByBlockIdAndStorageId, getBlockId(),
+        .find(Replica.Finder.ByBlockIdAndStorageId, getBlockId(),
             dn.getSId()) != null;
   }
 
@@ -382,7 +370,7 @@ public class BlockInfo extends Block {
   }
   
   protected DatanodeDescriptor[] getDatanodes(DatanodeManager datanodeMgr,
-      List<? extends Replica> replicas) {
+      List<? extends ReplicaBase> replicas) {
     int numLocations = replicas.size();
     List<DatanodeDescriptor> list = new ArrayList<DatanodeDescriptor>();
     for (int i = numLocations - 1; i >= 0; i--) {
@@ -398,17 +386,17 @@ public class BlockInfo extends Block {
     return list.toArray(locations);
   }
 
-  protected void add(IndexedReplica replica)
+  protected void add(Replica replica)
       throws StorageException, TransactionContextException {
     EntityManager.add(replica);
   }
   
-  protected void remove(IndexedReplica replica)
+  protected void remove(Replica replica)
       throws StorageException, TransactionContextException {
     EntityManager.remove(replica);
   }
   
-  protected void save(IndexedReplica replica)
+  protected void save(Replica replica)
       throws StorageException, TransactionContextException {
     EntityManager.update(replica);
   }

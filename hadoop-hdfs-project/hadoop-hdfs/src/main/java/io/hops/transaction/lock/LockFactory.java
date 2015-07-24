@@ -274,7 +274,6 @@ public class LockFactory {
   public List<Lock> getBlockReportingLocks(long[] blockIds, int storageId) {
     ArrayList<Lock> list = new ArrayList(3);
     list.add(new BatchedBlockLock(blockIds));
-    list.add(new BatchedBlocksRelatedLock.BatchedReplicasLock(storageId));
     list.add(new BatchedBlocksRelatedLock.BatchedInvalidatedBlocksLock(
         storageId));
     return list;

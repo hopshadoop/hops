@@ -17,7 +17,6 @@ package io.hops.transaction.lock;
 
 import io.hops.common.Pair;
 import io.hops.metadata.common.FinderType;
-import io.hops.metadata.hdfs.entity.IndexedReplica;
 import io.hops.metadata.hdfs.entity.InvalidatedBlock;
 
 import java.io.IOException;
@@ -46,23 +45,11 @@ abstract class BatchedBlocksRelatedLock extends Lock {
     }
   }
 
-  final static class BatchedReplicasLock extends BatchedBlocksRelatedLock {
-
-    public BatchedReplicasLock(int storageId) {
-      super(IndexedReplica.Finder.ByBlockIdsStorageIdsAndINodeIds, storageId);
-    }
-
-    @Override
-    protected Type getType() {
-      return Type.Replica;
-    }
-  }
-
   final static class BatchedInvalidatedBlocksLock
       extends BatchedBlocksRelatedLock {
 
     public BatchedInvalidatedBlocksLock(int storageId) {
-      super(InvalidatedBlock.Finder.ByBlockIdsStorageIdsAndINodeIds, storageId);
+      super(InvalidatedBlock.Finder.ByStorageId, storageId);
     }
 
     @Override

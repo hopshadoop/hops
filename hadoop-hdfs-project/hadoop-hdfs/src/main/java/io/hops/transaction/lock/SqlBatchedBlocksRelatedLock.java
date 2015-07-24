@@ -18,7 +18,7 @@ package io.hops.transaction.lock;
 import io.hops.metadata.common.FinderType;
 import io.hops.metadata.hdfs.entity.CorruptReplica;
 import io.hops.metadata.hdfs.entity.ExcessReplica;
-import io.hops.metadata.hdfs.entity.IndexedReplica;
+import io.hops.metadata.hdfs.entity.Replica;
 import io.hops.metadata.hdfs.entity.InvalidatedBlock;
 import io.hops.metadata.hdfs.entity.UnderReplicatedBlock;
 import org.apache.hadoop.hdfs.server.blockmanagement.PendingBlockInfo;
@@ -47,7 +47,7 @@ final class SqlBatchedBlocksRelatedLock extends LockWithType {
   private FinderType getFinderType() {
     switch (getType()) {
       case Replica:
-        return IndexedReplica.Finder.ByINodeIds;
+        return Replica.Finder.ByINodeIds;
       case CorruptReplica:
         return CorruptReplica.Finder.ByINodeIds;
       case ExcessReplica:

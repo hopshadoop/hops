@@ -16,7 +16,7 @@
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
 import io.hops.metadata.common.FinderType;
-import io.hops.metadata.hdfs.entity.IndexedReplica;
+import io.hops.metadata.hdfs.entity.Replica;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.ReplicaState;
 
@@ -28,7 +28,7 @@ import java.util.Comparator;
  * reported by the data-node. It is not guaranteed, but expected, that
  * data-nodes actually have corresponding replicas.
  */
-public class ReplicaUnderConstruction extends IndexedReplica {
+public class ReplicaUnderConstruction extends Replica {
 
   public static enum Finder implements FinderType<ReplicaUnderConstruction> {
 
@@ -59,24 +59,22 @@ public class ReplicaUnderConstruction extends IndexedReplica {
 
   public static enum Order implements Comparator<ReplicaUnderConstruction> {
 
-    ByIndex() {
+    ByStorageId() {
       @Override
       public int compare(ReplicaUnderConstruction o1,
           ReplicaUnderConstruction o2) {
-        if (o1.getIndex() < o2.getIndex()) {
-          return -1;
-        } else {
-          return 1;
-        }
+        return Integer.valueOf(o1.getStorageId()).compareTo(
+            Integer.valueOf(o2.getStorageId
+                ()));
       }
-    };
+    }
   }
 
   HdfsServerConstants.ReplicaState state;
 
   public ReplicaUnderConstruction(ReplicaState state, int storageId,
-      long blockId, int inodeId, int index) {
-    super(blockId, storageId, inodeId, index);
+      long blockId, int inodeId) {
+    super(storageId, blockId, inodeId);
     this.state = state;
   }
 
