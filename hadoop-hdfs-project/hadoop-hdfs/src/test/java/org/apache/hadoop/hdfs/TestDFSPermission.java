@@ -80,7 +80,6 @@ public class TestDFSPermission {
   private static Random r;
 
   static {
-    try {
       // Initiate the random number generator and logging the seed
       long seed = Time.now();
       r = new Random(seed);
@@ -96,24 +95,22 @@ public class TestDFSPermission {
       u2g_map.put(USER2_NAME, new String[]{GROUP2_NAME, GROUP3_NAME});
       u2g_map.put(USER3_NAME, new String[]{GROUP3_NAME, GROUP4_NAME});
       DFSTestUtil.updateConfWithFakeGroupMapping(conf, u2g_map);
-      
-      // Initiate all four users
-      SUPERUSER = UserGroupInformation.getCurrentUser();
-      USER1 = UserGroupInformation.createUserForTesting(USER1_NAME,
-          new String[]{GROUP1_NAME, GROUP2_NAME});
-      USER2 = UserGroupInformation.createUserForTesting(USER2_NAME,
-          new String[]{GROUP2_NAME, GROUP3_NAME});
-      USER3 = UserGroupInformation.createUserForTesting(USER3_NAME,
-          new String[]{GROUP3_NAME, GROUP4_NAME});
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
+
   }
 
   @Before
   public void setUp() throws IOException {
     cluster = new MiniDFSCluster.Builder(conf).numDataNodes(3).build();
     cluster.waitActive();
+
+    // Initiate all four users
+    SUPERUSER = UserGroupInformation.getCurrentUser();
+    USER1 = UserGroupInformation.createUserForTesting(USER1_NAME,
+        new String[]{GROUP1_NAME, GROUP2_NAME});
+    USER2 = UserGroupInformation.createUserForTesting(USER2_NAME,
+        new String[]{GROUP2_NAME, GROUP3_NAME});
+    USER3 = UserGroupInformation.createUserForTesting(USER3_NAME,
+        new String[]{GROUP3_NAME, GROUP4_NAME});
   }
   
   @After

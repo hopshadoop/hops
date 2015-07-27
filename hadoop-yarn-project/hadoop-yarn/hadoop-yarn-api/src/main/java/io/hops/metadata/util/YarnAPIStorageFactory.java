@@ -21,11 +21,16 @@ import io.hops.StorageConnector;
 import io.hops.exception.StorageInitializtionException;
 import io.hops.metadata.adaptor.YarnVariablesDALAdaptor;
 import io.hops.metadata.common.EntityDataAccess;
+import io.hops.metadata.hdfs.dal.GroupDataAccess;
+import io.hops.metadata.hdfs.dal.UserDataAccess;
+import io.hops.metadata.hdfs.dal.UserGroupDataAccess;
 import io.hops.metadata.yarn.dal.YarnVariablesDataAccess;
+import io.hops.security.UsersGroups;
 import io.hops.transaction.EntityManager;
 import io.hops.transaction.context.ContextInitializer;
 import io.hops.transaction.context.EntityContext;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
 
 import java.io.File;
 import java.io.IOException;
@@ -73,6 +78,17 @@ public class YarnAPIStorageFactory {
     dStorageFactory.setConfiguration(getMetadataClusterConfiguration(conf));
     initDataAccessWrappers();
     EntityManager.addContextInitializer(getContextInitializer());
+    if(conf.getBoolean(CommonConfigurationKeys.HOPS_GROUPS_ENABLE, CommonConfigurationKeys
+        .HOPS_GROUPS_ENABLE_DEFAULT)) {
+      UsersGroups.init(getConnector(), (UserDataAccess) getDataAccess
+          (UserDataAccess.class), (UserGroupDataAccess) getDataAccess
+          (UserGroupDataAccess.class), (GroupDataAccess) getDataAccess
+          (GroupDataAccess.class), conf.getInt(CommonConfigurationKeys
+          .HOPS_GROUPS_UPDATER_ROUND, CommonConfigurationKeys
+          .HOPS_GROUPS_UPDATER_ROUND_DEFAULT), conf.getInt(CommonConfigurationKeys
+          .HOPS_USERS_LRU_THRESHOLD, CommonConfigurationKeys
+          .HOPS_USERS_LRU_THRESHOLD_DEFAULT));
+    }
     isInitialized = true;
   }
 

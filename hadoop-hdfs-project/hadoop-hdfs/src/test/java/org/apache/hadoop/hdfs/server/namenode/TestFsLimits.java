@@ -22,6 +22,7 @@ import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.leader_election.node.SortedActiveNodeListPBImpl;
 import io.hops.metadata.HdfsStorageFactory;
+import io.hops.security.Users;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.lock.LockFactory;
@@ -71,6 +72,7 @@ public class TestFsLimits {
   private void initFS() throws StorageException, IOException {
     HdfsStorageFactory.setConfiguration(conf);
     assert (HdfsStorageFactory.formatStorage());
+    Users.addUserToGroup(perms.getUserName(), perms.getGroupName());
     rootInode = FSDirectory.createRootInode(perms, true);
     inodes = new INode[]{rootInode, null};
     fs = null;
