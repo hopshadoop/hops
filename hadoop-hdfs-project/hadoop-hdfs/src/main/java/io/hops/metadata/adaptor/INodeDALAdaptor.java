@@ -21,6 +21,7 @@ import io.hops.metadata.hdfs.dal.INodeDataAccess;
 import io.hops.metadata.hdfs.entity.INode;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.metadata.hdfs.entity.ProjectedINode;
+import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
@@ -29,8 +30,10 @@ import org.apache.hadoop.hdfs.server.namenode.INodeDirectoryWithQuota;
 import org.apache.hadoop.hdfs.server.namenode.INodeFile;
 import org.apache.hadoop.hdfs.server.namenode.INodeFileUnderConstruction;
 import org.apache.hadoop.hdfs.server.namenode.INodeSymlink;
+import org.apache.hadoop.hdfs.util.MD5FileUtils;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.DataOutputBuffer;
+import org.apache.hadoop.io.MD5Hash;
 
 import java.io.IOException;
 import java.util.Collection;
@@ -160,14 +163,9 @@ public class INodeDALAdaptor
       hopINode.setAccessTime(inode.getAccessTime());
       hopINode.setName(inode.getLocalName());
 
-      DataOutputBuffer permissionString = new DataOutputBuffer();
-      try {
-        inode.getPermissionStatus().write(permissionString);
-      } catch (IOException e) {
-        throw new StorageException(e);
-      }
-
-      hopINode.setPermission(permissionString.getData());
+      hopINode.setUserID(inode.getUserID());
+      hopINode.setGroupID(inode.getGroupID());
+      hopINode.setPermission(inode.getFsPermission().toShort());
       hopINode.setParentId(inode.getParentId());
       hopINode.setId(inode.getId());
 
@@ -193,7 +191,7 @@ public class INodeDALAdaptor
                   .getXferAddr());
         }
         hopINode.setGenerationStamp(((INodeFile) inode).getGenerationStamp());
-        hopINode.setSize(((INodeFile) inode).getSize());
+        hopINode.setFileSize(((INodeFile) inode).getSize());
       }
       if (inode instanceof INodeSymlink) {
         hopINode.setUnderConstruction(false);
@@ -214,15 +212,8 @@ public class INodeDALAdaptor
       INode hopINode) throws StorageException {
     org.apache.hadoop.hdfs.server.namenode.INode inode = null;
     if (hopINode != null) {
-      DataInputBuffer buffer = new DataInputBuffer();
-      buffer.reset(hopINode.getPermission(), hopINode.getPermission().length);
-      PermissionStatus ps = null;
-      try {
-        ps = PermissionStatus.read(buffer);
-      } catch (IOException e) {
-        throw new StorageException(e);
-      }
-
+      PermissionStatus ps = new PermissionStatus(null, null, new FsPermission
+          (hopINode.getPermission()));
       if (hopINode.isDir()) {
         if (hopINode.isDirWithQuota()) {
           inode = new INodeDirectoryWithQuota(hopINode.getName(), ps);
@@ -258,13 +249,17 @@ public class INodeDALAdaptor
         }
         ((INodeFile) inode).setGenerationStampNoPersistence(
             hopINode.getGenerationStamp());
-        ((INodeFile) inode).setSizeNoPersistence(hopINode.getSize());
+        ((INodeFile) inode).setSizeNoPersistence(hopINode.getFileSize());
       }
       inode.setIdNoPersistance(hopINode.getId());
       inode.setLocalNameNoPersistance(hopINode.getName());
       inode.setParentIdNoPersistance(hopINode.getParentId());
       inode.setSubtreeLocked(hopINode.isSubtreeLocked());
       inode.setSubtreeLockOwner(hopINode.getSubtreeLockOwner());
+      inode.setUserIDNoPersistance(hopINode.getUserID());
+      inode.setGroupIDNoPersistance(hopINode.getGroupID());
+      inode.setUserNoPersistance(hopINode.getUserName());
+      inode.setGroupNoPersistance(hopINode.getGroupName());
     }
     return inode;
   }

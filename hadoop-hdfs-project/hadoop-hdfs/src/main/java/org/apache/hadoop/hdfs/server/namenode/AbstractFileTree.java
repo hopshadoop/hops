@@ -17,6 +17,7 @@ package org.apache.hadoop.hdfs.server.namenode;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.SetMultimap;
 import io.hops.common.INodeUtil;
@@ -28,6 +29,7 @@ import io.hops.metadata.hdfs.dal.INodeAttributesDataAccess;
 import io.hops.metadata.hdfs.dal.INodeDataAccess;
 import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.metadata.hdfs.entity.ProjectedINode;
+import io.hops.security.Users;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import io.hops.transaction.lock.SubtreeLockHelper;
@@ -240,8 +242,6 @@ abstract class AbstractFileTree {
           checkAccess(subtreeRoot, subAccess);
         }
 
-        DataOutputBuffer permissions = new DataOutputBuffer();
-        subtreeRoot.getPermissionStatus().write(permissions);
         long size = 0;
         if(subtreeRoot.isFile()){
             size = ((INodeFile)subtreeRoot).getSize();
@@ -249,7 +249,8 @@ abstract class AbstractFileTree {
 
         addSubtreeRoot(
             new ProjectedINode(subtreeRoot.getId(), subtreeRoot.getParentId(),
-                subtreeRoot.getLocalName(), permissions.getData(),
+                subtreeRoot.getLocalName(), subtreeRoot.getFsPermissionShort(),
+                subtreeRoot.getUserID(), subtreeRoot.getGroupID(),
                 subtreeRoot instanceof INodeFile ?
                     ((INodeFile) subtreeRoot).getHeader() : 0,
                 subtreeRoot.isSymlink(),
