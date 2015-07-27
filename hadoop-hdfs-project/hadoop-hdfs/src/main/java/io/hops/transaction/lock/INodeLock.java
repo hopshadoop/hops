@@ -23,6 +23,7 @@ import io.hops.leader_election.node.ActiveNode;
 import io.hops.resolvingcache.Cache;
 import io.hops.resolvingcache.OptimalMemcache;
 import io.hops.resolvingcache.PathMemcache;
+import io.hops.security.Users;
 import org.apache.commons.math3.stat.StatUtils;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DFSUtil;
@@ -367,6 +368,7 @@ class INodeLock extends BaseINodeLock {
         addPathINodesAndUpdateResolvingCache(path, resolvedINodes);
       }
       if (resolvedINodes.size() > 0) {
+
         INode lastINode = resolvedINodes.get(resolvedINodes.size() - 1);
         if (resolveType ==
             TransactionLockTypes.INodeResolveType.PATH_AND_IMMEDIATE_CHILDREN) {

@@ -26,6 +26,7 @@ import io.hops.exception.StorageException;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.INodeDataAccess;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
+import io.hops.security.Users;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.handler.LightWeightRequestHandler;
@@ -48,6 +49,7 @@ import org.apache.hadoop.hdfs.server.namenode.INodeDirectory;
 import org.apache.hadoop.hdfs.server.namenode.INodeFile;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.net.NetworkTopology;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
@@ -59,6 +61,8 @@ import java.util.List;
 import java.util.Map.Entry;
 
 import static io.hops.transaction.lock.LockFactory.BLK;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_KEY;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -91,14 +95,18 @@ public class TestBlockManager {
   private FSNamesystem fsn;
   private BlockManager bm;
 
+  private final String USER = "user";
+  private final String GROUP = "grp";
+
   @Before
   public void setupMockCluster() throws IOException {
     conf = new HdfsConfiguration();
     HdfsStorageFactory.setConfiguration(conf);
-    HdfsStorageFactory.formatStorage();
     conf.set(DFSConfigKeys.NET_TOPOLOGY_SCRIPT_FILE_NAME_KEY,
         "need to set a dummy value here so it assumes a multi-rack cluster");
     fsn = Mockito.mock(FSNamesystem.class);
+    formatStorage();
+    
     bm = new BlockManager(fsn, fsn, conf);
     nodes = ImmutableList
         .of(DFSTestUtil.getDatanodeDescriptor("1.1.1.1", "/rackA"),
@@ -113,7 +121,12 @@ public class TestBlockManager {
     rackA = nodes.subList(0, 3);
     rackB = nodes.subList(3, 6);
   }
-  
+
+  private void formatStorage() throws IOException {
+    HdfsStorageFactory.formatStorage();
+    Users.addUserToGroup(USER, GROUP);
+  }
+
   private void addNodes(Iterable<DatanodeDescriptor> nodesToAdd)
       throws IOException {
     NetworkTopology cluster = bm.getDatanodeManager().getNetworkTopology();
@@ -457,7 +470,7 @@ public class TestBlockManager {
         new LightWeightRequestHandler(HDFSOperationType.TEST) {
           @Override
           public INodeFile performTask() throws IOException {
-            INodeFile file = new INodeFile(new PermissionStatus("user", "grp",
+            INodeFile file = new INodeFile(new PermissionStatus(USER, GROUP,
                 new FsPermission((short) 0777)), null, (short) 3,
                 System.currentTimeMillis(), System.currentTimeMillis(), 1000l);
             file.setLocalNameNoPersistance("hop");
@@ -604,7 +617,7 @@ public class TestBlockManager {
   @Test
   public void testHighestPriReplSrcChosenDespiteMaxReplLimit()
       throws Exception {
-    HdfsStorageFactory.formatStorage();
+    formatStorage();
     bm.maxReplicationStreams = 0;
     bm.replicationStreamsHardLimit = 1;
 

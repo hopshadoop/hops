@@ -39,10 +39,8 @@ import static org.junit.Assert.fail;
 
 public class TestStickyBit {
 
-  static UserGroupInformation user1 = UserGroupInformation
-      .createUserForTesting("theDoctor", new String[]{"tardis"});
-  static UserGroupInformation user2 = UserGroupInformation
-      .createUserForTesting("rose", new String[]{"powellestates"});
+  static UserGroupInformation user1;
+  static UserGroupInformation user2;
   
   /**
    * Ensure that even if a file is in a directory with the sticky bit on,
@@ -160,7 +158,8 @@ public class TestStickyBit {
       Configuration conf = new HdfsConfiguration();
       conf.setBoolean(DFSConfigKeys.DFS_PERMISSIONS_ENABLED_KEY, true);
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(4).build();
-
+      initUsers();
+      
       FileSystem hdfs = cluster.getFileSystem();
 
       assertTrue(hdfs instanceof DistributedFileSystem);
@@ -201,6 +200,8 @@ public class TestStickyBit {
       Configuration conf = new HdfsConfiguration();
       conf.setBoolean(DFSConfigKeys.DFS_PERMISSIONS_ENABLED_KEY, true);
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(4).build();
+      initUsers();
+
       FileSystem hdfs = cluster.getFileSystem();
 
       assertTrue(hdfs instanceof DistributedFileSystem);
@@ -250,6 +251,8 @@ public class TestStickyBit {
       Configuration conf = new HdfsConfiguration();
       conf.setBoolean(DFSConfigKeys.DFS_PERMISSIONS_ENABLED_KEY, true);
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(4).build();
+      initUsers();
+
       FileSystem hdfs = cluster.getFileSystem();
 
       assertTrue(hdfs instanceof DistributedFileSystem);
@@ -299,4 +302,12 @@ public class TestStickyBit {
     o.write("some file contents".getBytes());
     o.close();
   }
+
+  private void initUsers(){
+    user1 = UserGroupInformation
+        .createUserForTesting("theDoctor", new String[]{"tardis"});
+    user2 = UserGroupInformation
+        .createUserForTesting("rose", new String[]{"powellestates"});
+  }
+
 }
