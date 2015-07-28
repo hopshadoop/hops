@@ -596,7 +596,7 @@ public class TestQuota {
     conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE);
     conf.setInt(DFSConfigKeys.DFS_NAMENODE_QUOTA_UPDATE_INTERVAL_KEY, 1000);
     final MiniDFSCluster cluster =
-        new MiniDFSCluster.Builder(conf).numDataNodes(2).build();
+        new MiniDFSCluster.Builder(conf).numDataNodes(5).build();
     final FileSystem fs = cluster.getFileSystem();
     assertTrue("Not a HDFS: " + fs.getUri(),
         fs instanceof DistributedFileSystem);
@@ -737,6 +737,7 @@ public class TestQuota {
       // appending 1 fileLen should succeed
       out.write(new byte[fileLen]);
       out.close();
+      Thread.sleep(5000);
       file2Len += fileLen; // after append
       
       // verify space after append;
@@ -747,12 +748,34 @@ public class TestQuota {
       // Now, appending more than 1 fileLen should result in an error
       out = dfs.append(file2);
       hasException = false;
+      
+      /*
+       * Problem with partial append
+       * How partial append test works
+       * there is room for only two more blocks but the test tries to append three
+       * blocks
+       * Now the file size is maintained in the inode table. When ever there is 
+       * a request for new block (if the quota is not exceeded) then the last 
+       * block is committed and the file size is updated in the indoe table
+       * 
+       * here in the case the case of the third block the last block is committed
+       * the size of the file is updated. However when the quota check fails and the
+       * entire transaction is rolledback along with the changes of the file size
+       * 
+       * This file size is updted only if the file is successfully closed or a 
+       * new block is added. 
+       */
       try {
         // HOP - Write in single blocks and wait to trigger exception
-        for (int i = 0; i < 2 * fileLen; i += BLOCK_SIZE) {
+        for (int i = 0; i < 2 ; i ++) {
           out.write(new byte[BLOCK_SIZE]);
           Thread.sleep(5000);
         }
+        out.close();
+        
+        out = dfs.append(file2);
+        out.write(new byte[BLOCK_SIZE]);
+        Thread.sleep(5000);
         out.close();
       } catch (QuotaExceededException e) {
         hasException = true;

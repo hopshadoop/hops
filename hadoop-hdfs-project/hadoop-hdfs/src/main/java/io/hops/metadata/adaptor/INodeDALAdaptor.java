@@ -65,10 +65,10 @@ public class INodeDALAdaptor
   }
 
   @Override
-  public List<ProjectedINode> findInodesForSubtreeOperationsWithReadLock(
+  public List<ProjectedINode> findInodesForSubtreeOperationsWithWriteLock(
       int parentId) throws StorageException {
     List<ProjectedINode> list =
-        dataAccess.findInodesForSubtreeOperationsWithReadLock(parentId);
+        dataAccess.findInodesForSubtreeOperationsWithWriteLock(parentId);
     Collections.sort(list);
     return list;
   }

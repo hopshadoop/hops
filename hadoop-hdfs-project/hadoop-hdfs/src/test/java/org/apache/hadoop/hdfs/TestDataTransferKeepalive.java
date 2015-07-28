@@ -17,7 +17,19 @@
  */
 package org.apache.hadoop.hdfs;
 
-import com.google.common.io.NullOutputStream;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_MAX_BLOCK_ACQUIRE_FAILURES_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_SOCKET_REUSE_KEEPALIVE_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_SOCKET_WRITE_TIMEOUT_KEY;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import java.io.InputStream;
+import java.io.PrintWriter;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -33,18 +45,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.io.InputStream;
-import java.io.PrintWriter;
-import java.net.InetSocketAddress;
-import java.net.Socket;
-
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_MAX_BLOCK_ACQUIRE_FAILURES_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_SOCKET_REUSE_KEEPALIVE_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_SOCKET_WRITE_TIMEOUT_KEY;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import com.google.common.io.NullOutputStream;
 
 public class TestDataTransferKeepalive {
   Configuration conf = new HdfsConfiguration();
@@ -60,17 +61,21 @@ public class TestDataTransferKeepalive {
   
   @Before
   public void setup() throws Exception {
-    conf.setInt(DFS_DATANODE_SOCKET_REUSE_KEEPALIVE_KEY, KEEPALIVE_TIMEOUT);
-    conf.setInt(DFS_CLIENT_MAX_BLOCK_ACQUIRE_FAILURES_KEY, 0);
+    conf.setInt(DFS_DATANODE_SOCKET_REUSE_KEEPALIVE_KEY,
+        KEEPALIVE_TIMEOUT);
+    conf.setInt(DFS_CLIENT_MAX_BLOCK_ACQUIRE_FAILURES_KEY,
+        0);
     
-    cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
+    cluster = new MiniDFSCluster.Builder(conf)
+      .numDataNodes(1).build();
     fs = cluster.getFileSystem();
-    dfsClient = ((DistributedFileSystem) fs).dfs;
+    dfsClient = ((DistributedFileSystem)fs).dfs;
+    dfsClient.socketCache.clear();
 
     String poolId = cluster.getNamesystem().getBlockPoolId();
     dn = cluster.getDataNodes().get(0);
-    DatanodeRegistration dnReg =
-        DataNodeTestUtils.getDNRegistrationForBP(dn, poolId);
+    DatanodeRegistration dnReg = DataNodeTestUtils.getDNRegistrationForBP(
+        dn, poolId);
     dnAddr = NetUtils.createSocketAddr(dnReg.getXferAddr());
   }
   
@@ -83,9 +88,9 @@ public class TestDataTransferKeepalive {
    * Regression test for HDFS-3357. Check that the datanode is respecting
    * its configured keepalive timeout.
    */
-  @Test(timeout = 30000)
+  @Test(timeout=30000)
   public void testKeepaliveTimeouts() throws Exception {
-    DFSTestUtil.createFile(fs, TEST_FILE, 1L, (short) 1, 0L);
+    DFSTestUtil.createFile(fs, TEST_FILE, 1L, (short)1, 0L);
 
     // Clients that write aren't currently re-used.
     assertEquals(0, dfsClient.socketCache.size());
@@ -115,18 +120,18 @@ public class TestDataTransferKeepalive {
   }
 
   /**
-   * Test for the case where the client beings to read a long block, but
-   * doesn't
-   * read bytes off the stream quickly. The datanode should time out sending
-   * the
+   * Test for the case where the client beings to read a long block, but doesn't
+   * read bytes off the stream quickly. The datanode should time out sending the
    * chunks and the transceiver should die, even if it has a long keepalive.
    */
-  @Test(timeout = 30000)
+  @Test(timeout=30000)
   public void testSlowReader() throws Exception {
     // Restart the DN with a shorter write timeout.
     DataNodeProperties props = cluster.stopDataNode(0);
-    props.conf.setInt(DFS_DATANODE_SOCKET_WRITE_TIMEOUT_KEY, WRITE_TIMEOUT);
-    props.conf.setInt(DFS_DATANODE_SOCKET_REUSE_KEEPALIVE_KEY, 120000);
+    props.conf.setInt(DFS_DATANODE_SOCKET_WRITE_TIMEOUT_KEY,
+        WRITE_TIMEOUT);
+    props.conf.setInt(DFS_DATANODE_SOCKET_REUSE_KEEPALIVE_KEY,
+        120000);
     assertTrue(cluster.restartDataNode(props, true));
     // Wait for heartbeats to avoid a startup race where we
     // try to write the block while the DN is still starting.
@@ -134,7 +139,7 @@ public class TestDataTransferKeepalive {
     
     dn = cluster.getDataNodes().get(0);
     
-    DFSTestUtil.createFile(fs, TEST_FILE, 1024 * 1024 * 8L, (short) 1, 0L);
+    DFSTestUtil.createFile(fs, TEST_FILE, 1024*1024*8L, (short)1, 0L);
     FSDataInputStream stm = fs.open(TEST_FILE);
     try {
       stm.read();
@@ -149,10 +154,10 @@ public class TestDataTransferKeepalive {
     }
   }
   
-  @Test(timeout = 30000)
+  @Test(timeout=30000)
   public void testManyClosedSocketsInCache() throws Exception {
     // Make a small file
-    DFSTestUtil.createFile(fs, TEST_FILE, 1L, (short) 1, 0L);
+    DFSTestUtil.createFile(fs, TEST_FILE, 1L, (short)1, 0L);
 
     // Insert a bunch of dead sockets in the cache, by opening
     // many streams concurrently, reading all of the data,
@@ -169,7 +174,7 @@ public class TestDataTransferKeepalive {
       IOUtils.cleanup(null, stms);
     }
     
-    DFSClient client = ((DistributedFileSystem) fs).dfs;
+    DFSClient client = ((DistributedFileSystem)fs).dfs;
     assertEquals(5, client.socketCache.size());
     
     // Let all the xceivers timeout
@@ -188,8 +193,9 @@ public class TestDataTransferKeepalive {
     // counts as one
     int count = dn.getXceiverCount() - 1;
     if (count != expected) {
-      ReflectionUtils
-          .printThreadInfo(new PrintWriter(System.err), "Thread dumps");
+      ReflectionUtils.printThreadInfo(
+          new PrintWriter(System.err),
+          "Thread dumps");
       fail("Expected " + expected + " xceivers, found " +
           count);
     }
