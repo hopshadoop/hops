@@ -15,34 +15,36 @@
  */
 package io.hops.common;
 
-import io.hops.metadata.HdfsVariables;
-
 import java.io.IOException;
 
-public class INodeIdGen {
-  
-  private static int BATCH_SIZE;
-  private static CountersQueue cQ;
-  
-  public static void setBatchSize(int batchSize) {
-    BATCH_SIZE = batchSize;
+public abstract class IDsGenerator{
+
+  private int batchSize;
+  private int threshold;
+  private CountersQueue cQ;
+
+  IDsGenerator(int batchSize, float threshold){
+    this.batchSize = batchSize;
+    this.threshold = (int)(threshold * batchSize);
     cQ = new CountersQueue();
   }
 
-  public static int getUniqueINodeID() {
-    return (int) cQ.next();
+  public long getUniqueID() {
+    return cQ.next();
   }
 
-  public synchronized static boolean getMoreIdsIfNeeded(int threshold)
+  protected synchronized  boolean getMoreIdsIfNeeded()
       throws IOException {
     if (!cQ.has(threshold)) {
-      cQ.addCounter(HdfsVariables.incrementINodeIdCounter(BATCH_SIZE));
+      cQ.addCounter(incrementCounter(batchSize));
       return true;
     }
     return false;
   }
-  
-  static CountersQueue getCQ() {
+
+  protected CountersQueue getCQ() {
     return cQ;
   }
+
+  abstract CountersQueue.Counter incrementCounter(int inc) throws IOException ;
 }

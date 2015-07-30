@@ -27,6 +27,7 @@ import io.hops.metadata.common.entity.Variable;
 import io.hops.metadata.hdfs.dal.VariableDataAccess;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
+import org.apache.commons.digester.substitution.VariableAttributes;
 import org.apache.commons.io.output.ByteArrayOutputStream;
 import org.apache.hadoop.hdfs.security.token.block.BlockKey;
 import org.apache.hadoop.hdfs.server.common.StorageInfo;
@@ -49,15 +50,7 @@ public class HdfsVariables {
         HDFSOperationType.UPDATE_BLOCK_ID_COUNTER) {
       @Override
       public Object performTask() throws IOException {
-        VariableDataAccess vd = (VariableDataAccess) HdfsStorageFactory
-            .getDataAccess(VariableDataAccess.class);
-        HdfsStorageFactory.getConnector().writeLock();
-        long oldValue =
-            ((LongVariable) vd.getVariable(Variable.Finder.BlockID)).getValue();
-        long newValue = oldValue + increment;
-        vd.setVariable(new LongVariable(Variable.Finder.BlockID, newValue));
-        HdfsStorageFactory.getConnector().readCommitted();
-        return new CountersQueue.Counter(oldValue, newValue);
+        return incrementCounter(Variable.Finder.BlockID, increment);
       }
     }.handle();
   }
@@ -68,23 +61,51 @@ public class HdfsVariables {
         HDFSOperationType.UPDATE_INODE_ID_COUNTER) {
       @Override
       public Object performTask() throws IOException {
-        VariableDataAccess vd = (VariableDataAccess) HdfsStorageFactory
-            .getDataAccess(VariableDataAccess.class);
-        HdfsStorageFactory.getConnector().writeLock();
-        int oldValue =
-            ((IntVariable) vd.getVariable(Variable.Finder.INodeID)).getValue();
-        int newValue = oldValue + increment;
-        vd.setVariable(new IntVariable(Variable.Finder.INodeID, newValue));
-        HdfsStorageFactory.getConnector().readCommitted();
-        return new CountersQueue.Counter(oldValue, newValue);
+        return incrementCounter(Variable.Finder.INodeID, increment);
       }
     }.handle();
+  }
+
+  public static CountersQueue.Counter incrementQuotaUpdateIdCounter(
+      final int increment) throws IOException {
+    return (CountersQueue.Counter) new LightWeightRequestHandler(
+        HDFSOperationType.UPDATE_INODE_ID_COUNTER) {
+      @Override
+      public Object performTask() throws IOException {
+        return incrementCounter(Variable.Finder.QuotaUpdateID, increment);
+      }
+    }.handle();
+  }
+
+  private static CountersQueue.Counter incrementCounter(Variable.Finder
+      finder, int increment)
+      throws StorageException {
+    VariableDataAccess<Variable, Variable.Finder> vd = (VariableDataAccess)
+        HdfsStorageFactory.getDataAccess(VariableDataAccess.class);
+    HdfsStorageFactory.getConnector().writeLock();
+    Variable variable =  vd.getVariable(finder);
+    if(variable instanceof IntVariable){
+      int oldValue = ((IntVariable) vd.getVariable(finder)).getValue();
+      int newValue = oldValue + increment;
+      vd.setVariable(new IntVariable(finder, newValue));
+      HdfsStorageFactory.getConnector().readCommitted();
+      return new CountersQueue.Counter(oldValue, newValue);
+
+    }else if(variable instanceof LongVariable){
+      long oldValue = ((LongVariable) variable).getValue();
+      long newValue = oldValue + increment;
+      vd.setVariable(new LongVariable(finder, newValue));
+      HdfsStorageFactory.getConnector().readCommitted();
+      return new CountersQueue.Counter(oldValue, newValue);
+    }
+    throw new IllegalStateException("Cannot increment Varaible of type " +
+        variable.getClass().getSimpleName());
   }
 
   public static void resetMisReplicatedIndex() throws IOException {
     incrementMisReplicatedIndex(0);
   }
-  
+
   public static Long incrementMisReplicatedIndex(final int increment)
       throws IOException {
     return (Long) new LightWeightRequestHandler(
@@ -149,26 +170,6 @@ public class HdfsVariables {
       }
     }.handle();
     return safemode;
-  }
-  
-  public static CountersQueue.Counter incrementQuotaUpdateIdCounter(
-      final int increment) throws IOException {
-    return (CountersQueue.Counter) new LightWeightRequestHandler(
-        HDFSOperationType.UPDATE_INODE_ID_COUNTER) {
-      @Override
-      public Object performTask() throws IOException {
-        VariableDataAccess vd = (VariableDataAccess) HdfsStorageFactory
-            .getDataAccess(VariableDataAccess.class);
-        HdfsStorageFactory.getConnector().writeLock();
-        int oldValue =
-            ((IntVariable) vd.getVariable(Variable.Finder.QuotaUpdateID))
-                .getValue();
-        int newValue = oldValue + increment;
-        vd.setVariable(
-            new IntVariable(Variable.Finder.QuotaUpdateID, newValue));
-        return new CountersQueue.Counter(oldValue, newValue);
-      }
-    }.handle();
   }
 
   public static void setReplicationIndex(List<Integer> indeces)

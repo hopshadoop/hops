@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
-import io.hops.common.INodeIdGen;
+import io.hops.common.IDsGeneratorFactory;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.hdfs.entity.MetadataLogEntry;
@@ -330,7 +330,7 @@ public class INodeDirectory extends INode {
     }
 
     if (!node.exists()) {
-      Integer inodeID = INodeIdGen.getUniqueINodeID();
+      Integer inodeID = IDsGeneratorFactory.getInstance().getUniqueINodeID();
       node.setIdNoPersistance(inodeID);
       node.setParentNoPersistance(this);
       EntityManager.add(node);
