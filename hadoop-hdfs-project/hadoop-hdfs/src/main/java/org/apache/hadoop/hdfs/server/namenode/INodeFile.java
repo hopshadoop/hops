@@ -254,8 +254,15 @@ public class INodeFile extends INode implements BlockCollection {
     }
     final int last = blocks.length - 1;
     //check if the last block is BlockInfoUnderConstruction
-    long bytes = blocks[last] instanceof BlockInfoUnderConstruction &&
-        !includesBlockInfoUnderConstruction ? 0 : blocks[last].getNumBytes();
+    long bytes = 0;
+    
+    if(blocks[last] instanceof BlockInfoUnderConstruction){
+        if(includesBlockInfoUnderConstruction){
+            bytes = blocks[last].getNumBytes();
+        }
+    }else{
+        bytes = blocks[last].getNumBytes();
+    }
     for (int i = 0; i < last; i++) {
       bytes += blocks[i].getNumBytes();
     }

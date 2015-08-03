@@ -2999,9 +2999,9 @@ public class FSNamesystem
         INodeFileUnderConstruction pendingFile = checkLease(src, clientName);
         if (lastBlockLength > 0) {
           pendingFile.updateLengthOfLastBlock(lastBlockLength);
-          pendingFile.recomputeFileSize();
         }
         dir.persistBlocks(src, pendingFile);
+        pendingFile.recomputeFileSize();
         return null;
       }
     }.handle(this);
@@ -3161,8 +3161,6 @@ public class FSNamesystem
 private void commitOrCompleteLastBlock(
       final INodeFileUnderConstruction fileINode, final Block commitBlock)
       throws IOException {
-    
-    
     
     if (!blockManager.commitOrCompleteLastBlock(fileINode, commitBlock)) {
       return;

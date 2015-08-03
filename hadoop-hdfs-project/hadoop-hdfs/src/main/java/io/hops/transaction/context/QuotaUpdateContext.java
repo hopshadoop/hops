@@ -46,7 +46,7 @@ public class QuotaUpdateContext
   public void update(QuotaUpdate quotaUpdate)
       throws TransactionContextException {
     super.update(quotaUpdate);
-    log("added-quotaUpdate", "id", quotaUpdate.getId());
+    log("added-quotaUpdate", "id", quotaUpdate.getId(), "inodeId", quotaUpdate.getInodeId(), "dsDeltea",quotaUpdate.getDiskspaceDelta(),"nsDelta",quotaUpdate.getNamespaceDelta());
   }
 
   @Override

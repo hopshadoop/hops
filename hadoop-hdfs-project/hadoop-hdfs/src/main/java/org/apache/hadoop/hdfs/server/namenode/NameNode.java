@@ -636,26 +636,28 @@ public class NameNode {
   /**
    * Stop all NameNode threads and wait for all to finish.
    */
-  public void stop() {
-    synchronized (this) {
-      if (stopRequested) {
-        return;
-      }
-      stopRequested = true;
+    public void stop() {
+        synchronized (this) {
+            if (stopRequested) {
+                return;
+            }
+            stopRequested = true;
+        }
+        try {
+            exitActiveServices();
+        } catch (ServiceFailedException e) {
+            LOG.warn("Encountered exception while exiting state ", e);
+        } finally {
+            stopCommonServices();
+            if (metrics != null) {
+                metrics.shutdown();
+            }
+            if (namesystem != null) {
+                namesystem.shutdown();
+            }
+        }
     }
-    try {
-      exitActiveServices();
-    } catch (ServiceFailedException e) {
-      LOG.warn("Encountered exception while exiting state ", e);
-    }
-    stopCommonServices();
-    if (metrics != null) {
-      metrics.shutdown();
-    }
-    if (namesystem != null) {
-      namesystem.shutdown();
-    }
-  }
+  
 
   synchronized boolean isStopRequested() {
     return stopRequested;
@@ -1152,3 +1154,4 @@ public class NameNode {
     }
   }
 }
+
