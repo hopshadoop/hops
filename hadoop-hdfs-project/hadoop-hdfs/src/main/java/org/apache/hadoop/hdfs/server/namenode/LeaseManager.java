@@ -98,7 +98,7 @@ public class LeaseManager {
 
   Lease getLease(String holder)
       throws StorageException, TransactionContextException {
-    return EntityManager.find(Lease.Finder.ByHolder, holder);
+    return EntityManager.find(Lease.Finder.ByHolder, holder, Lease.getHolderId(holder));
   }
   
   SortedSet<Lease> getSortedLeases() throws IOException {
@@ -168,8 +168,9 @@ public class LeaseManager {
       throws StorageException, TransactionContextException {
     Lease lease = getLease(holder);
     if (lease == null) {
-      int holderID = DFSUtil.getRandom().nextInt();
-      lease = new Lease(holder, holderID, now());
+      lease = new Lease(holder, 
+              org.apache.hadoop.hdfs.server.namenode.Lease.getHolderId(holder)
+              , now());
       EntityManager.add(lease);
     } else {
       renewLease(lease);
@@ -234,23 +235,25 @@ public class LeaseManager {
       throws StorageException, TransactionContextException {
     assert newHolder != null : "new lease holder is null";
     if (lease != null) {
-      // Removing lease-path souldn't be persisted in entity-manager since we want to add it to another lease.
-      if (!lease.removePath(new LeasePath(src, lease.getHolderID()))) {
+      LeasePath lp =  new LeasePath(src, lease.getHolderID());
+      if (!lease.removePath(lp)) {
         LOG.error(
             src + " not found in lease.paths (=" + lease.getPaths() + ")");
       }
-
+      EntityManager.remove(lp);
+      
       if (!lease.hasPath() && !lease.getHolder().equals(newHolder)) {
         EntityManager.remove(lease);
 
       }
     }
-
+    
     Lease newLease = getLease(newHolder);
     LeasePath lPath = null;
     if (newLease == null) {
-      int holderID = DFSUtil.getRandom().nextInt();
-      newLease = new Lease(newHolder, holderID, now());
+      newLease = new Lease(newHolder, 
+              org.apache.hadoop.hdfs.server.namenode.Lease.getHolderId(newHolder)
+              , now());
       EntityManager.add(newLease);
       lPath = new LeasePath(src, newLease.getHolderID());
       newLease.addFirstPath(
@@ -526,7 +529,7 @@ public class LeaseManager {
       throws StorageException, TransactionContextException {
     boolean needSync = false;
 
-    Lease oldest = EntityManager.find(Lease.Finder.ByHolder, holder);
+    Lease oldest = EntityManager.find(Lease.Finder.ByHolder, holder, Lease.getHolderId(holder));
 
     if (oldest == null) {
       return needSync;

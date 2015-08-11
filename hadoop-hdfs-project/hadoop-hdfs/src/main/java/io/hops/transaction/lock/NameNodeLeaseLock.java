@@ -33,7 +33,7 @@ final class NameNodeLeaseLock extends Lock {
   @Override
   protected void acquire(TransactionLocks locks) throws IOException {
     nameNodeLease = acquireLock(lockType, Lease.Finder.ByHolder,
-        HdfsServerConstants.NAMENODE_LEASE_HOLDER);
+        HdfsServerConstants.NAMENODE_LEASE_HOLDER, HdfsServerConstants.NAMENODE_LEASE_HOLDER_ID);
   }
 
   @Override

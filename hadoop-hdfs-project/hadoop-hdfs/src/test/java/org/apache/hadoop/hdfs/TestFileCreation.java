@@ -1530,7 +1530,7 @@ public class TestFileCreation {
           @Override
           public Object performTask() throws IOException {
 
-            Lease lease = EntityManager.find(Lease.Finder.ByHolder, holder);
+            Lease lease = EntityManager.find(Lease.Finder.ByHolder, holder, Lease.getHolderId(holder));
             if (lease != null) {
               FSNamesystem.LOG.debug("XXXXXXXXXXX Got the lock " + lockType +
                   "Lease. Holder is: " + lease.getHolder() + " ID: " +
