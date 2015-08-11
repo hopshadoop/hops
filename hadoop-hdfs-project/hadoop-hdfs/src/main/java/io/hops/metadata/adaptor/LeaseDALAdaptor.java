@@ -50,9 +50,9 @@ public class LeaseDALAdaptor
   }
 
   @Override
-  public org.apache.hadoop.hdfs.server.namenode.Lease findByPKey(String holder)
+  public org.apache.hadoop.hdfs.server.namenode.Lease findByPKey(String holder, int holderId)
       throws StorageException {
-    return convertDALtoHDFS(dataAccess.findByPKey(holder));
+    return convertDALtoHDFS(dataAccess.findByPKey(holder,holderId));
   }
 
   @Override
