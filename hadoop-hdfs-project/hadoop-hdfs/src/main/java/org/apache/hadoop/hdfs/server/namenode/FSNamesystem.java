@@ -782,7 +782,76 @@ public class FSNamesystem
   // These methods are called by HadoopFS clients
   //
   /////////////////////////////////////////////////////////
+  /**
+   * Set permissions for an existing file.
+   *
+   * @throws IOException
+   */
+  void setPermissionSTO(final String src, final FsPermission permission)
+      throws AccessControlException, FileNotFoundException, SafeModeException,
+      UnresolvedLinkException, IOException {  
+    
+    boolean txFailed = true;
+    INode inode = null;
+    try {
+      inode = lockSubtreeAndCheckPathPermission(src,
+            true, null, null, null, null, SubTreeOperation.StoOperationType.SET_PERMISSION_STO);
+      final boolean isSto = inode != null;
+      new HopsTransactionalRequestHandler(HDFSOperationType.SUBTREE_SETPERMISSION, src) {
+        @Override
+        public void acquireLock(TransactionLocks locks) throws IOException {
+          LockFactory lf = getInstance();
+          locks.add(lf.getINodeLock(nameNode, INodeLockType.WRITE,
+                  INodeResolveType.PATH,false, true, src)).add(lf.getBlockLock());
+        }
 
+        @Override
+        public Object performTask() throws StorageException, IOException {
+          try {
+            setPermissionSTOInt(src, permission, isSto);
+          } catch (AccessControlException e) {
+            logAuditEvent(false, "setPermission", src);
+            throw e;
+          }
+          return null;
+        }
+      }.handle(this);
+      txFailed = false;
+    } finally {
+      if(txFailed){
+        if(inode!=null){
+        unlockSubtree(src);
+        }
+      }
+    }
+    
+  }
+  
+  private void setPermissionSTOInt(String src, FsPermission permission,boolean isSTO)
+      throws AccessControlException, FileNotFoundException, SafeModeException,
+      UnresolvedLinkException, IOException, StorageException {
+    HdfsFileStatus resultingStat = null;
+    FSPermissionChecker pc = getPermissionChecker();
+    if (isInSafeMode()) {
+      throw new SafeModeException("Cannot set permission for " + src, safeMode);
+    }
+    checkOwner(pc, src);
+    dir.setPermission(src, permission);
+    resultingStat = getAuditFileInfo(src, false);
+    logAuditEvent(true, "setPermission", src, null, resultingStat);
+    
+    //remove sto from 
+    if(isSTO){
+    INode[] nodes = dir.getRootDir().getExistingPathINodes(src, false);
+        INode inode = nodes[nodes.length - 1];
+        if (inode != null && inode.isSubtreeLocked()) {
+          inode.setSubtreeLocked(false);
+          EntityManager.update(inode);
+        }
+    EntityManager.remove(new SubTreeOperation(getSubTreeLockPathPrefix(src)));
+    }
+  }
+  
   /**
    * Set permissions for an existing file.
    *
@@ -826,6 +895,81 @@ public class FSNamesystem
     logAuditEvent(true, "setPermission", src, null, resultingStat);
   }
 
+  /**
+   * Set owner for an existing file.
+   *
+   * @throws IOException
+   */
+  void setOwnerSTO(final String src, final String username, final String group)
+      throws AccessControlException, FileNotFoundException, SafeModeException,
+      UnresolvedLinkException, IOException {
+
+    boolean txFailed = true;
+    INode inode = null;;
+    try{
+    inode = lockSubtreeAndCheckPathPermission(src,
+            true, null, null, null, null, SubTreeOperation.StoOperationType.SET_OWNER_STO);
+    final boolean isSto = inode != null;
+    new HopsTransactionalRequestHandler(HDFSOperationType.SET_OWNER_SUBTREE, src) {
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = getInstance();
+        locks.add(lf.getINodeLock(nameNode, INodeLockType.WRITE,
+            INodeResolveType.PATH, false, true,src)).add(lf.getBlockLock());
+      }
+
+      @Override
+      public Object performTask() throws StorageException, IOException {
+        try {
+          setOwnerSTOInt(src, username, group,isSto);
+        } catch (AccessControlException e) {
+          logAuditEvent(false, "setOwner", src);
+          throw e;
+        }
+        return null;
+      }
+    }.handle(this);
+    txFailed = false;
+    }finally{
+      if(txFailed){
+        if(inode!=null){
+          unlockSubtree(src);
+        }
+      }
+    }
+  }
+  
+  private void setOwnerSTOInt(String src, String username, String group, boolean isSTO)
+      throws AccessControlException, FileNotFoundException, SafeModeException,
+      UnresolvedLinkException, IOException, StorageException {
+    HdfsFileStatus resultingStat = null;
+    FSPermissionChecker pc = getPermissionChecker();
+    if (isInSafeMode()) {
+      throw new SafeModeException("Cannot set owner for " + src, safeMode);
+    }
+    checkOwner(pc, src);
+    if (!pc.isSuperUser()) {
+      if (username != null && !pc.getUser().equals(username)) {
+        throw new AccessControlException("Non-super user cannot change owner");
+      }
+      if (group != null && !pc.containsGroup(group)) {
+        throw new AccessControlException("User does not belong to " + group);
+      }
+    }
+    dir.setOwner(src, username, group);
+    resultingStat = getAuditFileInfo(src, false);
+    logAuditEvent(true, "setOwner", src, null, resultingStat);
+    if(isSTO){
+    INode[] nodes = dir.getRootDir().getExistingPathINodes(src, false);
+        INode inode = nodes[nodes.length - 1];
+        if (inode != null && inode.isSubtreeLocked()) {
+          inode.setSubtreeLocked(false);
+          EntityManager.update(inode);
+        }
+    EntityManager.remove(new SubTreeOperation(getSubTreeLockPathPrefix(src)));
+    }
+  }
+  
   /**
    * Set owner for an existing file.
    *
@@ -2636,7 +2780,7 @@ public class FSNamesystem
           @Override
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = getInstance();
-            locks.add(lf.getINodeLock(nameNode,
+            locks.add(lf.getINodeLock( nameNode,
                 INodeLockType.WRITE_ON_TARGET_AND_PARENT,
                 INodeResolveType.PATH_AND_IMMEDIATE_CHILDREN, false, src))
                 .add(lf.getLeaseLock(LockType.WRITE))
@@ -3376,7 +3520,7 @@ private void commitOrCompleteLastBlock(
           @Override
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = LockFactory.getInstance();
-            locks.add(lf.getINodeLock(nameNode, INodeLockType.READ,
+            locks.add(lf.getINodeLock(true/*skip INodeAttr*/, nameNode, INodeLockType.READ,
                 INodeResolveType.PATH_AND_IMMEDIATE_CHILDREN, src));
             if(needLocation){
                 locks
@@ -5694,6 +5838,9 @@ private void commitOrCompleteLastBlock(
     }
 
     INode subtreeRoot = null;
+    int subtreeRootId = Integer.MIN_VALUE;
+    boolean removeSTOLock = false;
+    
     try {
       PathInformation pathInfo = getPathExistingINodesFromDB(path,
               false, null, null, null, null);
@@ -5707,11 +5854,22 @@ private void commitOrCompleteLastBlock(
             "Cannot clear namespace quota on root.");
       }
 
-      subtreeRoot = lockSubtree(path, SubTreeOperation.StoOperationType.QUOTA_STO);      
-
+      //check if the path is root
+      if(INode.getPathNames(path).length == 0){ // this method return empty array in case of path = "/"
+        subtreeRootId = INodeDirectory.ROOT_ID; // locking root id is not yet properly implemented
+      }else{
+        subtreeRoot = lockSubtree(path, SubTreeOperation.StoOperationType.QUOTA_STO);      
+        if(subtreeRoot == null){
+          // in the mean while the dir has been deleted by someone
+          throw new FileNotFoundException("Directory does not exist: " + path);
+        }
+        subtreeRootId = subtreeRoot.getId();
+        removeSTOLock = true;
+      }
+      
       final AbstractFileTree.IdCollectingCountingFileTree fileTree =
           new AbstractFileTree.IdCollectingCountingFileTree(this,
-              subtreeRoot.getId());
+              subtreeRootId);
       fileTree.buildUp();
       Iterator<Integer> idIterator =
           fileTree.getOrderedIds().descendingIterator();
@@ -5745,7 +5903,7 @@ private void commitOrCompleteLastBlock(
           };
       setQuotaHandler.handle(this);
     } finally {
-      if(subtreeRoot != null){
+      if(removeSTOLock){
         unlockSubtree(path);
       }
     }
@@ -6511,11 +6669,6 @@ private void commitOrCompleteLastBlock(
       final FsAction subAccess,
       final SubTreeOperation.StoOperationType stoType) throws IOException {
     
-//    if(INode.getPathComponents(path).length == 1){
-//      //cannot lock root
-//      return null;
-//    }
-    
     return (INode) new HopsTransactionalRequestHandler(
         HDFSOperationType.SET_SUBTREE_LOCK) {
 
@@ -6544,27 +6697,27 @@ private void commitOrCompleteLastBlock(
           pc.checkPermission(path, dir.getRootDir(), doCheckOwner,
               ancestorAccess, parentAccess, access, subAccess);
         }
-        checkSubTreeLocks(getSubTreeLockPathPrefix(path));
-          
+
         INode[] nodes = dir.getRootDir().getExistingPathINodes(path, false);
         INode inode = nodes[nodes.length - 1];
         if (inode != null && inode.isDirectory() &&
-                !inode.isRoot()) { // Do never lock the fs root
+                !inode.isRoot()) { // never lock the fs root
+          checkSubTreeLocks(getSubTreeLockPathPrefix(path));
           inode.setSubtreeLocked(true);
           inode.setSubtreeLockOwner(getNamenodeId());
           EntityManager.update(inode);
           log.debug("Lock the INode with sub tree lock flag. Path: \""+path+"\" "
                   +" id: "+ inode.getId()
                   +" pid: "+inode.getParentId()+" name: "+inode.getLocalName());
+          
+          EntityManager.update(new SubTreeOperation(getSubTreeLockPathPrefix(path)
+                ,nameNode.getId(),stoType));
+          return inode;
         }else{
           log.error("No componenet was locked in the path using sub tree flag. "
                   + "Path: \""+path+"\"");
+          return null;
         }
-        
-        EntityManager.update(new SubTreeOperation(getSubTreeLockPathPrefix(path)
-                ,nameNode.getId(),stoType));
-        
-        return inode;
       }
     }.handle(this);
   }
@@ -6592,7 +6745,7 @@ private void commitOrCompleteLastBlock(
   private void checkSubTreeLocks(String path) throws TransactionContextException, StorageException{
       List<SubTreeOperation> ops = (List<SubTreeOperation>)
               EntityManager.findList(SubTreeOperation.Finder.ByPathPrefix, 
-              path);
+              path);  // THIS RETURNS ONLY ONE SUBTREE OP IN THE CHILD TREE. INCREASE THE LIMIT IN IMPL LAYER IF NEEDED
       Set<Long> activeNameNodeIds = new HashSet<Long>();
       for(ActiveNode node:nameNode.getActiveNameNodes().getActiveNodes()){
         activeNameNodeIds.add(node.getId());

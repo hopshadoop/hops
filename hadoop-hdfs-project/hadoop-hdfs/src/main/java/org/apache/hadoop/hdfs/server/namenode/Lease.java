@@ -180,7 +180,6 @@ public class Lease implements Comparable<Lease> {
     if (paths == null) {
       paths = EntityManager.findList(LeasePath.Finder.ByHolderId, holderID);
     }
-
     return paths;
   }
 
@@ -192,5 +191,9 @@ public class Lease implements Comparable<Lease> {
       throws StorageException, TransactionContextException {
     getPaths().remove(oldpath);
     getPaths().add(newpath);
+  }
+  
+  public static int getHolderId(String holder){
+      return Math.abs(holder.hashCode());
   }
 }

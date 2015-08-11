@@ -420,13 +420,13 @@ class NameNodeRpcServer implements NamenodeProtocols {
   @Override // ClientProtocol
   public void setPermission(String src, FsPermission permissions)
       throws IOException {
-    namesystem.setPermission(src, permissions);
+    namesystem.setPermissionSTO(src, permissions);
   }
 
   @Override // ClientProtocol
   public void setOwner(String src, String username, String groupname)
       throws IOException {
-    namesystem.setOwner(src, username, groupname);
+    namesystem.setOwnerSTO(src, username, groupname);
   }
 
   @Override // ClientProtocol

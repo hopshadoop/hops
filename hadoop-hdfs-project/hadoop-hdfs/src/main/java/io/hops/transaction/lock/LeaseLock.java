@@ -64,7 +64,7 @@ public final class LeaseLock extends Lock {
     Collections.sort(holders);
     
     for (String h : holders) {
-      Lease lease = acquireLock(lockType, Lease.Finder.ByHolder, h);
+      Lease lease = acquireLock(lockType, Lease.Finder.ByHolder, h, Lease.getHolderId(h));
       if (lease != null) {
         leases.add(lease);
       }

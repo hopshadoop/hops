@@ -30,14 +30,17 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public class LeasePathContext extends BaseEntityContext<String, LeasePath> {
+public class LeasePathContext extends BaseEntityContext
+        <LeasePathContext.LeasePathPK, LeasePath> {
 
   private final LeasePathDataAccess<LeasePath> dataAccess;
-  private final Map<Integer, Set<LeasePath>> holderIdToLeasePath =
+  private final Map<Integer, Set<LeasePath>> hIdToLPsMap =
       new HashMap<Integer, Set<LeasePath>>();
+  private final List<String> nullLPs = new ArrayList<String>();
 
   public LeasePathContext(LeasePathDataAccess<LeasePath> dataAccess) {
     this.dataAccess = dataAccess;
@@ -47,7 +50,7 @@ public class LeasePathContext extends BaseEntityContext<String, LeasePath> {
   public void update(LeasePath hopLeasePath)
       throws TransactionContextException {
     super.update(hopLeasePath);
-    addInternal(hopLeasePath);
+    addToHIdToLPsMap(hopLeasePath);
     log("added-lpath", "path", hopLeasePath.getPath(), "hid",
         hopLeasePath.getHolderId());
   }
@@ -56,8 +59,9 @@ public class LeasePathContext extends BaseEntityContext<String, LeasePath> {
   public void remove(LeasePath hopLeasePath)
       throws TransactionContextException {
     super.remove(hopLeasePath);
-    removeInternal(hopLeasePath);
-    log("removed-lpath", "path", hopLeasePath.getPath());
+    removeFromHIdToLPsMap(hopLeasePath);
+    log("removed-lpath", "path", hopLeasePath.getPath(), 
+            "holderId ", hopLeasePath.getHolderId());
   }
 
   @Override
@@ -66,7 +70,7 @@ public class LeasePathContext extends BaseEntityContext<String, LeasePath> {
     LeasePath.Finder lFinder = (LeasePath.Finder) finder;
     switch (lFinder) {
       case ByPath:
-        return findByPrimaryKey(lFinder, params);
+        return findByPath(lFinder, params);
     }
     throw new RuntimeException(UNSUPPORTED_FINDER);
   }
@@ -93,25 +97,32 @@ public class LeasePathContext extends BaseEntityContext<String, LeasePath> {
   @Override
   public void clear() throws TransactionContextException {
     super.clear();
-    holderIdToLeasePath.clear();
+    hIdToLPsMap.clear();
   }
 
   @Override
-  String getKey(LeasePath hopLeasePath) {
-    return hopLeasePath.getPath();
+  LeasePathPK getKey(LeasePath hopLeasePath) {
+    return new LeasePathPK(hopLeasePath.getPath(), hopLeasePath.getHolderId());
   }
 
-  private LeasePath findByPrimaryKey(LeasePath.Finder lFinder, Object[] params)
+  private LeasePath findByPath(LeasePath.Finder lFinder, Object[] params)
       throws StorageCallPreventedException, StorageException {
     final String path = (String) params[0];
     LeasePath result = null;
-    if (contains(path)) {
-      result = get(path);
+    if (containsInHIdToLPsMap(path)) {
+      result = getLPFromHIdToLPsMap(path);
       hit(lFinder, result, "path", path);
-    } else {
+    }else if(nullLPs.contains(path)){
+      return null;
+    }else {
       aboutToAccessStorage(lFinder, params);
-      result = dataAccess.findByPKey(path);
-      gotFromDB(path, result);
+      result = dataAccess.findByPath(path);
+      if(result != null){
+        gotFromDBInternal(result);
+      }else{
+        nullLPs.add(path);
+      }
+      
       miss(lFinder, result, "path", path);
     }
     return result;
@@ -121,13 +132,13 @@ public class LeasePathContext extends BaseEntityContext<String, LeasePath> {
       Object[] params) throws StorageCallPreventedException, StorageException {
     final int holderId = (Integer) params[0];
     Collection<LeasePath> result = null;
-    if (holderIdToLeasePath.containsKey(holderId)) {
-      result = new ArrayList<LeasePath>(holderIdToLeasePath.get(holderId));
+    if (hIdToLPsMap.containsKey(holderId)) {
+      result = new ArrayList<LeasePath>(hIdToLPsMap.get(holderId));
       hit(lFinder, result, "hid", holderId);
     } else {
       aboutToAccessStorage(lFinder, params);
       result = dataAccess.findByHolderId(holderId);
-      gotFromDB(holderId, result);
+      gotFromDBInternal(holderId, result);
       miss(lFinder, result, "hid", holderId);
     }
     return result;
@@ -140,7 +151,7 @@ public class LeasePathContext extends BaseEntityContext<String, LeasePath> {
     try {
       aboutToAccessStorage(lFinder, params);
       result = dataAccess.findByPrefix(prefix);
-      gotFromDB(result);
+      gotFromDBInternal(result);
       miss(lFinder, result, "prefix", prefix, "numOfLps", result.size());
     } catch (StorageCallPreventedException ex) {
       // This is allowed in querying lease-path by prefix, this is needed in delete operation for example.
@@ -164,56 +175,125 @@ public class LeasePathContext extends BaseEntityContext<String, LeasePath> {
       }
     });
   }
-
-  @Override
-  void gotFromDB(String entityKey, LeasePath leasePath) {
-    super.gotFromDB(entityKey, leasePath);
-    addInternal(leasePath);
+ 
+  void gotFromDBInternal(LeasePath leasePath) {
+    if(leasePath != null){
+        super.gotFromDB(new LeasePathContext.LeasePathPK(leasePath.getPath(),
+            leasePath.getHolderId()), leasePath);
+    addToHIdToLPsMap(leasePath);
+    }
+    
+  }
+  
+  void gotFromDBInternal(Collection<LeasePath> entityList) {
+      if(entityList != null && !entityList.isEmpty()){
+          for(LeasePath lp : entityList){
+          gotFromDBInternal(lp);
+        }
+      }
   }
 
-  @Override
-  void gotFromDB(Collection<LeasePath> entityList) {
-    super.gotFromDB(entityList);
-    addInternal(entityList);
-  }
+  void gotFromDBInternal(Integer holderId, Collection<LeasePath> entityList) {
+    gotFromDBInternal(entityList);
 
-  private void gotFromDB(int holderId, Collection<LeasePath> leasePaths) {
-    gotFromDB(leasePaths);
-    if (leasePaths == null) {
-      addInternal(holderId, null);
+    if (entityList == null || entityList.isEmpty()) {
+      getPathList(holderId).clear();
     }
   }
-
-  private void addInternal(Collection<LeasePath> leasePaths) {
-    if (leasePaths == null) {
-      return;
-    }
-    for (LeasePath leasePath : leasePaths) {
-      addInternal(leasePath);
-    }
-  }
-
-  private void addInternal(LeasePath leasePath) {
-    if (leasePath == null) {
-      return;
-    }
-    addInternal(leasePath.getHolderId(), leasePath);
-  }
-
-  private void addInternal(int holderId, LeasePath leasePath) {
-    Set<LeasePath> hopLeasePaths = holderIdToLeasePath.get(holderId);
+  
+  private Set<LeasePath> getPathList(int holderId) {
+    Set<LeasePath> hopLeasePaths = hIdToLPsMap.get(holderId);
     if (hopLeasePaths == null) {
       hopLeasePaths = new HashSet<LeasePath>();
-      holderIdToLeasePath.put(holderId, hopLeasePaths);
+      hIdToLPsMap.put(holderId, hopLeasePaths);
     }
-    hopLeasePaths.add(leasePath);
+    return hopLeasePaths;
   }
 
-  private void removeInternal(LeasePath hopLeasePath) {
-    Set<LeasePath> hopLeasePaths =
-        holderIdToLeasePath.get(hopLeasePath.getHolderId());
-    if (hopLeasePaths != null) {
-      hopLeasePaths.remove(hopLeasePath);
-    }
+  private void removeFromHIdToLPsMap(LeasePath hopLeasePath) {
+    Set<LeasePath> hopLeasePaths = getPathList(hopLeasePath.getHolderId());
+    hopLeasePaths.remove(hopLeasePath);
   }
+ 
+  private void addToHIdToLPsMap(LeasePath leasePath) {    
+    Set<LeasePath> hopLeasePaths = getPathList(leasePath.getHolderId());
+    hopLeasePaths.add(leasePath);
+  }
+  
+  private boolean containsInHIdToLPsMap(String path){
+    for(int hid : hIdToLPsMap.keySet()){
+      for(LeasePath lp : hIdToLPsMap.get(hid)){
+        if(lp.getPath().equals(path)){
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+  
+  private LeasePath getLPFromHIdToLPsMap(String path) throws StorageException{
+    LeasePath leasePath = null;
+    int lpCount = 0;
+    for(int hid : hIdToLPsMap.keySet()){
+      for(LeasePath lp : hIdToLPsMap.get(hid)){
+        if(lp.getPath().equals(path)){
+          lpCount ++;
+          leasePath = lp;
+        }
+      }
+    }
+    
+    if(lpCount > 1){
+      throw new StorageException("A path can be lease only once at a time");
+    }
+    
+    return leasePath;
+  }
+  
+  class LeasePathPK {
+    
+    private final String path;
+    private final int holderId;
+
+    public LeasePathPK(String path, int holderId) {
+        this.path = path;
+        this.holderId = holderId;
+    }
+
+    public String getPath() {
+        return path;
+    }
+
+    public int getHolderId() {
+        return holderId;
+    }
+
+    @Override
+    public int hashCode() {
+        int hash = 7;
+        hash = 97 * hash + (this.path != null ? this.path.hashCode() : 0);
+        hash = 97 * hash + this.holderId;
+        return hash;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (obj == null) {
+            return false;
+        }
+        if (getClass() != obj.getClass()) {
+            return false;
+        }
+        final io.hops.transaction.context.LeasePathContext.LeasePathPK other 
+                = (io.hops.transaction.context.LeasePathContext.LeasePathPK) obj;
+        if ((this.path == null) ? (other.path != null) : !this.path.equals(other.path)) {
+            return false;
+        }
+        if (this.holderId != other.holderId) {
+            return false;
+        }
+        return true;
+    }
+}
+
 }
