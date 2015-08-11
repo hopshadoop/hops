@@ -46,7 +46,7 @@ final class RenameINodeLock extends INodeLock {
       boolean ignoreLocalSubtreeLocks, long namenodeId,
       Collection<ActiveNode> activeNamenodes, String src, String dst,
       boolean legacyRename) {
-    super(lockType, resolveType, false, ignoreLocalSubtreeLocks, namenodeId,
+    super(lockType, resolveType, false,false, ignoreLocalSubtreeLocks, namenodeId,
         activeNamenodes, src, dst);
     this.legacyRename = legacyRename;
   }
