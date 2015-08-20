@@ -46,11 +46,12 @@ class INodeLock extends BaseINodeLock {
   private final Collection<ActiveNode> activeNamenodes;
   private final boolean ignoreLocalSubtreeLocks;
   private final long namenodeId;
+  private final boolean skipReadingQuotaAttr;
 
 
   INodeLock(TransactionLockTypes.INodeLockType lockType,
       TransactionLockTypes.INodeResolveType resolveType, boolean resolveLink,
-      boolean ignoreLocalSubtreeLocks, long namenodeId,
+      boolean ignoreLocalSubtreeLocks, boolean skipReadingQuotaAttr, long namenodeId,
       Collection<ActiveNode> activeNamenodes, String... paths) {
     super();
     this.lockType = lockType;
@@ -60,18 +61,19 @@ class INodeLock extends BaseINodeLock {
     this.ignoreLocalSubtreeLocks = ignoreLocalSubtreeLocks;
     this.namenodeId = namenodeId;
     this.paths = paths;
+    this.skipReadingQuotaAttr = skipReadingQuotaAttr;
   }
 
   INodeLock(TransactionLockTypes.INodeLockType lockType,
       TransactionLockTypes.INodeResolveType resolveType, boolean resolveLink,
       Collection<ActiveNode> activeNamenodes, String... paths) {
-    this(lockType, resolveType, resolveLink, false, -1, activeNamenodes, paths);
+    this(lockType, resolveType, resolveLink, false, false, -1, activeNamenodes, paths);
   }
 
   INodeLock(TransactionLockTypes.INodeLockType lockType,
       TransactionLockTypes.INodeResolveType resolveType,
       Collection<ActiveNode> activeNamenodes, String... paths) {
-    this(lockType, resolveType, true, false, -1, activeNamenodes, paths);
+    this(lockType, resolveType, true, false, false, -1, activeNamenodes, paths);
   }
 
 
@@ -340,7 +342,9 @@ class INodeLock extends BaseINodeLock {
      */
     Arrays.sort(paths);
     acquireINodeLocks();
-    acquireINodeAttributes();
+    if(!skipReadingQuotaAttr){
+      acquireINodeAttributes();
+    }
   }
   
   protected void acquireINodeLocks() throws IOException {

@@ -255,6 +255,7 @@ public final class HdfsServerConstants {
   }
   
   public static final String NAMENODE_LEASE_HOLDER = "HDFS_NameNode";
+  public static final int NAMENODE_LEASE_HOLDER_ID = 0;
   public static final long NAMENODE_LEASE_RECHECK_INTERVAL = 2000;
 }
 
