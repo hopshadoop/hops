@@ -71,6 +71,7 @@ import java.net.UnknownHostException;
 import java.security.PrivilegedExceptionAction;
 import java.util.EnumSet;
 import java.util.logging.Logger;
+import org.apache.commons.io.FileUtils;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_KEY;
@@ -1440,6 +1441,36 @@ public class TestFileCreation {
     HdfsVariables.enterClusterSafeMode();
     HdfsVariables.resetMisReplicatedIndex();
   }
+  
+  
+  @Test
+    public void testLockUpgrade() throws IOException {
+        Configuration conf = new HdfsConfiguration();
+        final int BYTES_PER_CHECKSUM = 1;
+        final int PACKET_SIZE = BYTES_PER_CHECKSUM;
+        final int BLOCK_SIZE = 1 * PACKET_SIZE;
+        conf.setInt(DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY, BYTES_PER_CHECKSUM);
+        conf.setLong(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE);
+        conf.setInt(DFSConfigKeys.DFS_CLIENT_WRITE_PACKET_SIZE_KEY, PACKET_SIZE);
+
+        MiniDFSCluster cluster =
+                new MiniDFSCluster.Builder(conf).numDataNodes(1).format(true).build();
+        FileSystem fs = cluster.getFileSystem();
+        DistributedFileSystem dfs = (DistributedFileSystem) FileSystem
+                .newInstance(fs.getUri(), fs.getConf());
+        try {
+            fs.mkdirs(new Path("/test"));
+            
+            fs.listStatus(new Path("/test"));
+            TestFileCreation.createFile(fs, new Path("/test/f.txt"),3);
+
+        } catch (Exception e) {
+            fail();
+            e.printStackTrace();
+        } finally {
+            cluster.shutdown();
+        }
+    }
 
   
   static class Writer implements Runnable {
@@ -1530,7 +1561,7 @@ public class TestFileCreation {
           @Override
           public Object performTask() throws IOException {
 
-            Lease lease = EntityManager.find(Lease.Finder.ByHolder, holder);
+            Lease lease = EntityManager.find(Lease.Finder.ByHolder, holder, Lease.getHolderId(holder));
             if (lease != null) {
               FSNamesystem.LOG.debug("XXXXXXXXXXX Got the lock " + lockType +
                   "Lease. Holder is: " + lease.getHolder() + " ID: " +
@@ -1554,4 +1585,39 @@ public class TestFileCreation {
     testHandler.handle();
   }
 
+  
+  @Test
+    public void testListDirPerformance() throws IOException {
+        Configuration conf = new HdfsConfiguration();
+        final int BYTES_PER_CHECKSUM = 1;
+        final int PACKET_SIZE = BYTES_PER_CHECKSUM;
+        final int BLOCK_SIZE = 1 * PACKET_SIZE;
+        conf.setInt(DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY, BYTES_PER_CHECKSUM);
+        conf.setLong(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE);
+        conf.setInt(DFSConfigKeys.DFS_CLIENT_WRITE_PACKET_SIZE_KEY, PACKET_SIZE);
+
+        MiniDFSCluster cluster =
+                new MiniDFSCluster.Builder(conf).numDataNodes(1).format(true).build();
+        FileSystem fs = cluster.getFileSystem();
+        DistributedFileSystem dfs = (DistributedFileSystem) FileSystem
+                .newInstance(fs.getUri(), fs.getConf());
+        try {
+            fs.mkdirs(new Path("/test"));
+            TestFileCreation.createFile(fs, new Path("/test/f.txt"),3);
+            
+            for(int i = 0 ; i < 32 ; i++){
+              fs.mkdirs(new Path("/test/dir"+i));
+            }
+            
+            
+            
+            fs.listLocatedStatus(new Path("/test"));
+
+        } catch (Exception e) {
+            fail();
+            e.printStackTrace();
+        } finally {
+            cluster.shutdown();
+        }
+    }
 }

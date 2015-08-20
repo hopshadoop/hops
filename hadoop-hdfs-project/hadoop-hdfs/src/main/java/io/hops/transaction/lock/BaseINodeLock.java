@@ -105,7 +105,8 @@ public abstract class BaseINodeLock extends Lock {
     }
 
     private List<INode> getPathINodes(String path) {
-      return pathToPathINodes.get(path).pathINodes;
+      PathRelatedINodes pri = pathToPathINodes.get(path);
+      return pri.pathINodes;
     }
 
     private List<INode> getChildINodes(String path) {
