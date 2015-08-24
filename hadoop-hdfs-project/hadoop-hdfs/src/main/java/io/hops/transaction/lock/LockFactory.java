@@ -166,7 +166,7 @@ public class LockFactory {
       TransactionLockTypes.INodeResolveType resolveType, boolean resolveLink,
       boolean ignoreLocalSubtreeLocks, String... paths) {
     return new INodeLock(lockType, resolveType, resolveLink,
-        ignoreLocalSubtreeLocks, nameNode.getId(),
+        ignoreLocalSubtreeLocks, false, nameNode.getId(),
         nameNode.getActiveNameNodes().getActiveNodes(), paths);
   }
 
@@ -182,6 +182,15 @@ public class LockFactory {
       TransactionLockTypes.INodeLockType lockType,
       TransactionLockTypes.INodeResolveType resolveType, String... paths) {
     return new INodeLock(lockType, resolveType,
+        nameNode.getActiveNameNodes().getActiveNodes(), paths);
+  }
+  
+  public Lock getINodeLock(boolean skipReadingQuotaAttr, NameNode nameNode,
+      TransactionLockTypes.INodeLockType lockType,
+      TransactionLockTypes.INodeResolveType resolveType, 
+      String... paths) {
+   return new INodeLock(lockType, resolveType, true,
+        false, skipReadingQuotaAttr, nameNode.getId(),
         nameNode.getActiveNameNodes().getActiveNodes(), paths);
   }
 
