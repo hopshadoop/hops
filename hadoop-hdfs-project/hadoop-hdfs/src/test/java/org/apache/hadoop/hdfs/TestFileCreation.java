@@ -1620,4 +1620,90 @@ public class TestFileCreation {
             cluster.shutdown();
         }
     }
+  
+  @Test
+  public void testFilesWithLotsOfBlocks() throws IOException {
+    MiniDFSCluster cluster = null;
+    try {
+      Configuration conf = new HdfsConfiguration();
+      final int BLOCK_SIZE = 1024;
+      conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE); // 4 byte
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
+      cluster.waitActive();
+
+      DistributedFileSystem dfs = cluster.getFileSystem();
+      
+      FSDataOutputStream out = dfs.create(new Path("/test.file"), (short)3);
+      for(int i = 0; i < 1000; i++){
+        byte data[] = new byte[BLOCK_SIZE];
+        out.write(data);
+      }
+      out.close();
+      
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
+  
+  @Test
+  public void testFileRead() throws IOException {
+    MiniDFSCluster cluster = null;
+    try {
+      Configuration conf = new HdfsConfiguration();
+      final int BLOCK_SIZE = 1024;
+      conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE); // 4 byte
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(0).build();
+      cluster.waitActive();
+
+      DistributedFileSystem dfs = cluster.getFileSystem();
+      
+      dfs.mkdirs(new Path("/dir"), new FsPermission((short)777));
+      
+      dfs.create(new Path("/test.txt"),(short)3).close();
+      
+      dfs.append(new Path("/test.txt")).close();
+      
+      dfs.open(new Path("/test.txt")).close();
+      
+      dfs.getFileStatus(new Path("/test.txt"));
+      
+      dfs.listStatus(new Path("/test.txt"));
+      
+      dfs.setReplication(new Path("/dir"), (short)1);
+
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
+  
+  @Test
+  public void testLS() throws IOException {
+    MiniDFSCluster cluster = null;
+    try {
+      Configuration conf = new HdfsConfiguration();
+      final int BLOCK_SIZE = 1024;
+      conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE); // 4 byte
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(0).build();
+      cluster.waitActive();
+
+      DistributedFileSystem dfs = cluster.getFileSystem();
+      
+      dfs.mkdirs(new Path("/dir"), new FsPermission((short)777));
+      
+      for(int i = 0 ; i < 32 ; i ++){
+        dfs.create(new Path("/dir/file"+i+".txt"),(short)3).close();
+      }
+      
+      dfs.listStatus(new Path("/dir"));
+
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
 }

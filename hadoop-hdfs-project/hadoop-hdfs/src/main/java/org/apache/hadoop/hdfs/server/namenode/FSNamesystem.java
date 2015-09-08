@@ -2924,7 +2924,7 @@ public class FSNamesystem
           @Override
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = getInstance();
-            locks.add(lf.getINodeLock(nameNode, INodeLockType.READ,
+            locks.add(lf.getINodeLock(true/*skip quota*/,nameNode, INodeLockType.READ,
                 INodeResolveType.PATH, resolveLink, src));
           }
 
@@ -6714,7 +6714,7 @@ private void commitOrCompleteLastBlock(
                 ,nameNode.getId(),stoType));
           return inode;
         }else{
-          log.error("No componenet was locked in the path using sub tree flag. "
+          log.info("No componenet was locked in the path using sub tree flag. "
                   + "Path: \""+path+"\"");
           return null;
         }

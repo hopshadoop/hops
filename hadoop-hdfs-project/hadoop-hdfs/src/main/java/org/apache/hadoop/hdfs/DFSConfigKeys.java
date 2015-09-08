@@ -46,7 +46,7 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
       "ndb-config.properties";
 
   public static final String DFS_STORAGE_ANCESTOR_LOCK_TYPE =
-      "dfs.storage.ansestor.lock.type";
+      "dfs.storage.ancestor.lock.type";
   public static final String DFS_STORAGE_ANCESTOR_LOCK_TYPE_DEFAULT =
       "READ_COMMITTED"; // "READ"  | "READ_COMMITTED"
 

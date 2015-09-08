@@ -194,6 +194,6 @@ public class Lease implements Comparable<Lease> {
   }
   
   public static int getHolderId(String holder){
-      return Math.abs(holder.hashCode());
+      return holder.hashCode();
   }
 }
