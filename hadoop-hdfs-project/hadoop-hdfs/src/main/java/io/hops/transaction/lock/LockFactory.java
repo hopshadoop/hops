@@ -193,6 +193,15 @@ public class LockFactory {
         false, skipReadingQuotaAttr, nameNode.getId(),
         nameNode.getActiveNameNodes().getActiveNodes(), paths);
   }
+  
+  public Lock getINodeLock(boolean skipReadingQuotaAttr, NameNode nameNode,
+      TransactionLockTypes.INodeLockType lockType,
+      TransactionLockTypes.INodeResolveType resolveType,  boolean resolveLink,
+      String... paths) {
+   return new INodeLock(lockType, resolveType, resolveLink,
+        false, skipReadingQuotaAttr, nameNode.getId(),
+        nameNode.getActiveNameNodes().getActiveNodes(), paths);
+  }
 
   public Lock getRenameINodeLock(NameNode nameNode,
       TransactionLockTypes.INodeLockType lockType,

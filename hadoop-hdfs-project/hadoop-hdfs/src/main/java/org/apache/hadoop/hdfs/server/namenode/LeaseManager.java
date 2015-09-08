@@ -56,6 +56,7 @@ import java.util.TreeSet;
 
 import static io.hops.transaction.lock.LockFactory.BLK;
 import static io.hops.transaction.lock.LockFactory.getInstance;
+import java.util.Arrays;
 import static org.apache.hadoop.util.Time.now;
 
 /**
@@ -492,12 +493,17 @@ public class LeaseManager {
           public void setUp() throws StorageException {
             String holder = (String) getParams()[0];
             leasePaths = INodeUtil.findPathsByLeaseHolder(holder);
+            if(leasePaths!=null){
+              LOG.debug("Total Paths "+leasePaths.size()+" Paths: "+Arrays.toString(leasePaths.toArray()));
+            }
+            
           }
 
           @Override
           public void acquireLock(TransactionLocks locks) throws IOException {
             String holder = (String) getParams()[0];
             LockFactory lf = getInstance();
+            
             locks.add(
                 lf.getINodeLock(fsnamesystem.getNameNode(), INodeLockType.WRITE,
                     INodeResolveType.PATH,
