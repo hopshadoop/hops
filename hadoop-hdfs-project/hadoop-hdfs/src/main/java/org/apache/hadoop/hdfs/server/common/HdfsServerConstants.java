@@ -51,7 +51,7 @@ public final class HdfsServerConstants {
    */
   static public enum StartupOption {
     FORMAT("-format"),
-    SAFEMODE_FIX("-safeModeFix"),
+    DROP_AND_CREATE_DB("-dropAndCreateDB"),
     CLUSTERID("-clusterid"),
     GENCLUSTERID("-genclusterid"),
     REGULAR("-regular"),
