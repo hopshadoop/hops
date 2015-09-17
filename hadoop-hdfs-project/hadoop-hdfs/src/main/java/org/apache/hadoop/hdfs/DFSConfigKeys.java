@@ -223,7 +223,7 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
 
   public static final String DFS_SUBTREE_EXECUTOR_LIMIT_KEY =
       "dfs.namenode.subtree-executor-limit";
-  public static final int DFS_SUBTREE_EXECUTOR_LIMIT_DEFAULT = 20;
+  public static final int DFS_SUBTREE_EXECUTOR_LIMIT_DEFAULT = 60;
 
   public static final String ERASURE_CODING_CODECS_KEY =
       "dfs.erasure_coding.codecs.json";
