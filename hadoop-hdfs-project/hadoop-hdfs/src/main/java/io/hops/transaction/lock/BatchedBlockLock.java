@@ -20,26 +20,29 @@ import io.hops.common.Pair;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 
 import java.io.IOException;
+import org.apache.commons.lang.ArrayUtils;
 
 final class BatchedBlockLock extends BaseIndividualBlockLock {
 
-  private final long[] blockIds;
+  private long[] blockIds;
   private int[] inodeIds;
+  private final long[] unresolvedBlockIds;
+  
 
-  public BatchedBlockLock(long[] blockIds, int[] inodeIds) {
+  public BatchedBlockLock(long[] blockIds, int[] inodeIds, long[] unresolvedBlockIds) {
     this.blockIds = blockIds;
     this.inodeIds = inodeIds;
-  }
-
-  public BatchedBlockLock(long[] blockIds) {
-    this(blockIds, null);
+    this.unresolvedBlockIds = unresolvedBlockIds;
   }
 
   @Override
   protected void acquire(TransactionLocks locks) throws IOException {
-    if (inodeIds == null) {
-      inodeIds = INodeUtil.resolveINodesFromBlockIds(blockIds);
+    if (unresolvedBlockIds != null && unresolvedBlockIds.length != 0) {
+      int[] inodeIdsForURBlks = INodeUtil.resolveINodesFromBlockIds(unresolvedBlockIds);
+      blockIds = ArrayUtils.addAll(blockIds, unresolvedBlockIds);
+      inodeIds = ArrayUtils.addAll(inodeIds, inodeIdsForURBlks);
     }
+    
     blocks.addAll(acquireLockList(DEFAULT_LOCK_TYPE,
         BlockInfo.Finder.ByBlockIdsAndINodeIds, blockIds, inodeIds));
   }

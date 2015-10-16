@@ -232,8 +232,17 @@ public class NamenodeSelector extends Thread {
    * @throws IOException
    */
   public NamenodeHandle getLeadingNameNode() throws IOException {
-    // The first one is supposed to be the leader. An exception is thrown if none is available.
-    return getAllNameNode().get(0);
+    NamenodeHandle leaderHandle = null; // leader is one with the least id
+    for(NamenodeHandle handle : getAllNameNode()){
+      if(leaderHandle == null){
+        leaderHandle = handle;
+      }
+      
+      if(leaderHandle.getNamenode().getId() > handle.getNamenode().getId()){
+       leaderHandle = handle; 
+      }
+    }
+    return leaderHandle;
   }
 
   /**
