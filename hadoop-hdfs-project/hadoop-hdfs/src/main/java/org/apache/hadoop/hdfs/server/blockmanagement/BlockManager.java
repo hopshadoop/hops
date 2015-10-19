@@ -95,6 +95,12 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static io.hops.transaction.lock.LockFactory.BLK;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_SUBTREE_EXECUTOR_LIMIT_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_SUBTREE_EXECUTOR_LIMIT_KEY;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 
 /**
@@ -1952,74 +1958,85 @@ public class BlockManager {
       processFirstBlockReportHandler.handle(namesystem);
     }
   }
-
+  
   private void reportDiff(final DatanodeDescriptor dn,
-      final BlockListAsLongs newReport, final Collection<BlockInfo> toAdd,
-      // add to DatanodeDescriptor
-      final Collection<Long> toRemove,
-      // remove from DatanodeDescriptor
-      final Collection<Block> toInvalidate,       // should be removed from DN
-      final Collection<BlockToMarkCorrupt> toCorrupt,
-      // add to corrupt replicas list
-      final Collection<StatefulBlockInfo> toUC, final boolean firstBlockReport)
-      throws IOException { // add to under-construction list
-
+          final BlockListAsLongs newReport, final Collection<BlockInfo> toAdd,
+          // add to DatanodeDescriptor
+          final Collection<Long> toRemove,
+          // remove from DatanodeDescriptor
+          final Collection<Block> toInvalidate, // should be removed from DN
+          final Collection<BlockToMarkCorrupt> toCorrupt,
+          // add to corrupt replicas list
+          final Collection<StatefulBlockInfo> toUC, final boolean firstBlockReport)
+          throws IOException { // add to under-construction list
     if (newReport == null) {
       return;
     }
-
+    
     final Set<Long> allMachineBlocks = dn.getAllMachineBlocks();
     final Set<Long> safeBlocks = new HashSet<Long>(allMachineBlocks);
-
-    final HopsTransactionalRequestHandler processReportHandler =
-        new HopsTransactionalRequestHandler(
-            firstBlockReport ? HDFSOperationType.PROCESS_FIRST_BLOCK_REPORT :
-                HDFSOperationType.PROCESS_REPORT) {
-          @Override
-          public void acquireLock(TransactionLocks locks) throws IOException {
-            LockFactory lf = LockFactory.getInstance();
-            long[] partOfreportedBlks = (long[]) getParams()[0];
-            locks.add(
-                lf.getBlockReportingLocks(partOfreportedBlks, dn.getSId()));
-          }
-
-          @Override
-          public Object performTask() throws IOException {
-            Block[] blks = (Block[]) getParams()[1];
-            ReplicaState[] blksStates = (ReplicaState[]) getParams()[2];
-
-            // scan the report and process newly reported blocks
-            for (int index = 0; index < blks.length; index++) {
-              Block iblk = blks[index];
-              ReplicaState iState = blksStates[index];
-              BlockInfo storedBlock =
-                  processReportedBlock(dn, iblk, iState, toAdd, toInvalidate,
-                      toCorrupt, toUC, safeBlocks, firstBlockReport,
-                      allMachineBlocks.contains(iblk.getBlockId()));
-              if (storedBlock != null) {
-                allMachineBlocks.remove(storedBlock.getBlockId());
-              }
-            }
-
-            return null;
-          }
-        };
     
     try {
       final int numOfReportedBlks = newReport.getNumberOfBlocks();
+      final Collection subTasks = new ArrayList<Callable>();
+
       Slicer.slice(numOfReportedBlks, processReportBatchSize,
-          new Slicer.OperationHandler() {
+              new Slicer.OperationHandler() {
+        @Override
+        public void handle(final int startIndex, final int endIndex) throws Exception {
+          Callable subTask = new Callable<Void>() {
             @Override
-            public void handle(int startIndex, int endIndex) throws Exception {
+            public Void call() throws Exception {
               //blksIds, blks, states
               Object[] blksData =
-                  newReport.getBlocksAndIdsAndStates(startIndex, endIndex);
-              processReportHandler
-                  .setParams(blksData[0], blksData[1], blksData[2]);
+                      newReport.getBlocksAndIdsAndStates(startIndex, endIndex);
+              final HopsTransactionalRequestHandler processReportHandler =
+                      new HopsTransactionalRequestHandler(
+                      firstBlockReport ? HDFSOperationType.PROCESS_FIRST_BLOCK_REPORT
+                      : HDFSOperationType.PROCESS_REPORT) {
+               
+                @Override
+                public void acquireLock(TransactionLocks locks) throws IOException {
+                  LockFactory lf = LockFactory.getInstance();
+                  long[] partOfreportedBlks = (long[]) getParams()[0];
+                  locks.add(lf.getBlockReportingLocks(partOfreportedBlks, dn.getSId()));
+                }
+
+                @Override
+                public Object performTask() throws IOException {
+                  Block[] blks = (Block[]) getParams()[1];
+                  ReplicaState[] blksStates = (ReplicaState[]) getParams()[2];
+                  // scan the report and process newly reported blocks
+                  for (int index = 0; index < blks.length; index++) {
+                    Block iblk = blks[index];
+                    ReplicaState iState = blksStates[index];
+                    BlockInfo storedBlock =
+                            processReportedBlock(dn, iblk, iState, toAdd, toInvalidate,
+                            toCorrupt, toUC, safeBlocks, firstBlockReport,
+                            allMachineBlocks.contains(iblk.getBlockId()));
+                    if (storedBlock != null) {
+                      allMachineBlocks.remove(storedBlock.getBlockId());
+                    }
+                  }
+                  return null;
+                }
+              };
+              processReportHandler.setParams(blksData[0], blksData[1], blksData[2]);
               processReportHandler.handle(null);
+              return null;
             }
-          });
-      
+          };
+          subTasks.add(subTask);
+        }
+      });
+
+      try {
+        ((FSNamesystem) namesystem).getExecutorService().invokeAll(subTasks);
+      } catch (Exception e) {
+        LOG.error("Exception was thrown during block report processing", e);
+      }
+
+
       toRemove.addAll(allMachineBlocks);
       if (namesystem.isInStartupSafeMode()) {
         safeBlocks.removeAll(toRemove);
@@ -2080,7 +2097,7 @@ public class BlockManager {
       LOG.debug("Reported block " + block + " on " + dn + " size " +
           block.getNumBytes() + " replicaState = " + reportedState);
     }
-
+    
     // find block by blockId
     BlockInfo storedBlock = blocksMap.getStoredBlock(block);
     if (storedBlock == null) {
@@ -2116,6 +2133,7 @@ public class BlockManager {
       safeBlocks.remove(block.getBlockId());
       return storedBlock;
     }
+    
 
     if (isBlockUnderConstruction(storedBlock, ucState, reportedState)) {
       toUC.add(new StatefulBlockInfo((BlockInfoUnderConstruction) storedBlock,
@@ -2123,9 +2141,8 @@ public class BlockManager {
       safeBlocks.remove(block.getBlockId());
       return storedBlock;
     }
-
+    
     //add replica if appropriate
-
     if (reportedState == ReplicaState.FINALIZED) {
       if((replicaAlreadyExists == null && storedBlock.hasReplicaIn(dn)) ||
           (replicaAlreadyExists != null && replicaAlreadyExists)){
