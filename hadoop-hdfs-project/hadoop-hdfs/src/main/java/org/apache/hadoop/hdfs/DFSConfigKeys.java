@@ -98,7 +98,7 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String DFS_NAMENODE_PROCESS_REPORT_BATCH_SIZE =
       "dfs.namenode.processReport.batchsize";
   public static final int DFS_NAMENODE_PROCESS_REPORT_BATCH_SIZE_DEFAULT =
-      10000;
+      5000;
   
   public static final String DFS_NAMENODE_PROCESS_MISREPLICATED_BATCH_SIZE =
       "dfs.namenode.misreplicated.batchsize";
@@ -223,7 +223,7 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
 
   public static final String DFS_SUBTREE_EXECUTOR_LIMIT_KEY =
       "dfs.namenode.subtree-executor-limit";
-  public static final int DFS_SUBTREE_EXECUTOR_LIMIT_DEFAULT = 60;
+  public static final int DFS_SUBTREE_EXECUTOR_LIMIT_DEFAULT = 80;
 
   public static final String ERASURE_CODING_CODECS_KEY =
       "dfs.erasure_coding.codecs.json";

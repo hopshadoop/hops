@@ -289,11 +289,10 @@ public class LockFactory {
     return lock;
   }
 
-  public List<Lock> getBlockReportingLocks(long[] blockIds, int storageId) {
+  public List<Lock> getBlockReportingLocks(long[] blockIds, int[] inodeIds, long[] unresolvedBlks, int storageId) {
     ArrayList<Lock> list = new ArrayList(3);
-    list.add(new BatchedBlockLock(blockIds));
-    list.add(new BatchedBlocksRelatedLock.BatchedInvalidatedBlocksLock(
-        storageId));
+    list.add(new BatchedBlockLock(blockIds,inodeIds, unresolvedBlks));
+    //list.add(new BatchedBlocksRelatedLock.BatchedInvalidatedBlocksLock(storageId));
     return list;
   }
 
