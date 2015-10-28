@@ -7411,5 +7411,9 @@ private void commitOrCompleteLastBlock(
       return numExistingComp;
     }
   }
+  
+  public ExecutorService getExecutorService(){
+    return subtreeOperationsExecutor;
+  }
 }
 
