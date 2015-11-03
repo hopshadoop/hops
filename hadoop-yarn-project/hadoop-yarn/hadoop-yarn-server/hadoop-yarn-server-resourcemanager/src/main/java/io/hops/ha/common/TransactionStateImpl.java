@@ -69,6 +69,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import static org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore.LOG;
 
@@ -661,8 +663,13 @@ public class TransactionStateImpl extends TransactionState {
       this.ts = ts;
     }
 
+    @Override
     public void run() {
-      RMUtilities.finishRPC(ts, rpcID);
+      try {
+        RMUtilities.finishRPC(ts, rpcID);
+      } catch (IOException ex) {
+        LOG.error(ex,ex);
+      }
     }
   }
 }

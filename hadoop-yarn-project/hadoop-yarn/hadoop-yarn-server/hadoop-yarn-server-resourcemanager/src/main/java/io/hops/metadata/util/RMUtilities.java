@@ -2091,7 +2091,7 @@ public class RMUtilities {
       new HashMap<Integer, TransactionStateImpl>();
   static Lock nextRPCLock = new ReentrantLock();
   
-  public static void finishRPCs(TransactionStateImpl ts, int rpcID) {
+  public static void finishRPCs(TransactionStateImpl ts, int rpcID) throws IOException {
     nextRPCLock.lock();
     LOG.debug("finishing rpc " + rpcID + " " + nextRPC);
     if (rpcID > nextRPC) {
@@ -2113,7 +2113,7 @@ public class RMUtilities {
     }
   }
   
-  public static void finishRPC(final TransactionStateImpl ts, final int rpcID) {
+  public static void finishRPC(final TransactionStateImpl ts, final int rpcID) throws IOException {
 
     LOG.debug("HOP :: finishRPC - START:" + rpcID);
 
@@ -2206,11 +2206,7 @@ public class RMUtilities {
             return null;
           }
         };
-    try {
       setfinishRPCHandler.handle();
-    } catch (IOException ex) {
-      LOG.error("HOP :: Error commiting finishRPC", ex);
-    }
   }
 
   //for testing (todo: move in test class)
