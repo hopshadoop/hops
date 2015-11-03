@@ -34,6 +34,9 @@ import io.hops.metadata.yarn.dal.RMContextInactiveNodesDataAccess;
 import io.hops.metadata.yarn.dal.RMNodeDataAccess;
 import io.hops.metadata.yarn.dal.ResourceDataAccess;
 import io.hops.metadata.yarn.dal.UpdatedContainerInfoDataAccess;
+import io.hops.metadata.yarn.dal.capacity.CSLeafQueueUserInfoDataAccess;
+import io.hops.metadata.yarn.dal.capacity.CSQueueDataAccess;
+import io.hops.metadata.yarn.dal.fair.AppSchedulableDataAccess;
 import io.hops.metadata.yarn.dal.fair.FSSchedulerNodeDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.AllocateResponseDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.ApplicationAttemptStateDataAccess;
@@ -109,7 +112,7 @@ public class TransactionStateImpl extends TransactionState {
       new ArrayList<ApplicationAttemptId>();
   private final HashMap<String, RMContainerImpl> rmContainersToUpdate =
       new HashMap<String, RMContainerImpl>();
-  
+  private final CSQueueInfo csQueueInfo = new CSQueueInfo();
   //PersistedEvent to persist for distributed RT
   private final List<PendingEvent> persistedEventsToAdd =
       new ArrayList<PendingEvent>();
@@ -170,6 +173,16 @@ public class TransactionStateImpl extends TransactionState {
     }
   }
 
+  public CSQueueInfo getCSQueueInfo() {
+    return csQueueInfo;
+  }
+
+  public void persistCSQueueInfo(CSQueueDataAccess CSQDA,
+          CSLeafQueueUserInfoDataAccess csLQUIDA) throws StorageException {
+
+    csQueueInfo.persist(CSQDA, csLQUIDA);
+  }
+  
   public FiCaSchedulerNodeInfoToUpdate getFicaSchedulerNodeInfoToUpdate(
       String nodeId) {
     FiCaSchedulerNodeInfoToUpdate nodeInfo =
@@ -353,13 +366,26 @@ public class TransactionStateImpl extends TransactionState {
       ArrayList<RMContainer> rmcontainerToUpdate = new ArrayList<RMContainer>();
       for (String containerId : rmContainersToUpdate.keySet()) {
         RMContainerImpl rmContainer = rmContainersToUpdate.get(containerId);
-        rmcontainerToUpdate.add(
-            new RMContainer(rmContainer.getContainer().getId().toString(),
+
+        boolean isReserved = (rmContainer.getReservedNode() != null)
+                && (rmContainer.getReservedPriority() != null);
+
+        String reservedNode = isReserved ? rmContainer.getReservedNode().toString() : null;
+        int reservedPriority = isReserved ? rmContainer.getReservedPriority().getPriority() : 0;
+        int reservedMemory = isReserved ? rmContainer.getReservedResource().getMemory() : 0;
+
+        int reservedVCores = isReserved ? rmContainer.getReservedResource().getVirtualCores() : 0;
+
+        rmcontainerToUpdate.add(new RMContainer(rmContainer.getContainer().getId().toString(),
                 rmContainer.getApplicationAttemptId().toString(),
-                rmContainer.getNodeId().toString(), rmContainer.getUser(),
-                //              rmContainer.getReservedNode(),
-                //              Integer.MIN_VALUE,
-                rmContainer.getStartTime(), rmContainer.getFinishTime(),
+                rmContainer.getNodeId().toString(),
+                rmContainer.getUser(),
+                reservedNode,
+                reservedPriority,
+                reservedMemory,
+                reservedVCores,
+                rmContainer.getStartTime(),
+                rmContainer.getFinishTime(),
                 rmContainer.getState().toString(),
                 rmContainer.getContainerState().toString(),
                 rmContainer.getContainerExitStatus()));
@@ -381,7 +407,7 @@ public class TransactionStateImpl extends TransactionState {
       nodeInfo
           .persist(resourceDA, ficaNodeDA, rmcontainerDA, launchedContainersDA);
     }
-    persistFiCaSchedulerNodeToRemove(resourceDA, ficaNodeDA, rmcontainerDA);
+    persistFiCaSchedulerNodeToRemove(resourceDA, ficaNodeDA, rmcontainerDA, launchedContainersDA);
   }
 
   public RMContextInfo getRMContextInfo() {
@@ -479,22 +505,16 @@ public class TransactionStateImpl extends TransactionState {
           clusterResourceToUpdate.getVirtualCores()));
     }
   }
-  
-  private void persistFiCaSchedulerNodeToRemove(ResourceDataAccess resourceDA,
-      FiCaSchedulerNodeDataAccess ficaNodeDA,
-      RMContainerDataAccess rmcontainerDA) throws StorageException {
+
+  private void persistFiCaSchedulerNodeToRemove(ResourceDataAccess resourceDA, FiCaSchedulerNodeDataAccess ficaNodeDA, RMContainerDataAccess rmcontainerDA, LaunchedContainersDataAccess launchedContainersDA) throws StorageException {
     if (!ficaSchedulerNodeInfoToRemove.isEmpty()) {
       ArrayList<FiCaSchedulerNode> toRemoveFiCaSchedulerNodes =
           new ArrayList<FiCaSchedulerNode>();
       ArrayList<Resource> toRemoveResources = new ArrayList<Resource>();
       ArrayList<RMContainer> rmcontainerToRemove = new ArrayList<RMContainer>();
-      ArrayList<LaunchedContainers> toRemoveLaunchedContainers =
-          new ArrayList<LaunchedContainers>();
       for (String nodeId : ficaSchedulerNodeInfoToRemove.keySet()) {
         LOG.debug("remove ficaschedulernodes " + nodeId);
-        toRemoveFiCaSchedulerNodes.add(new FiCaSchedulerNode(nodeId,
-            ficaSchedulerNodeInfoToRemove.get(nodeId).getNodeName(),
-            ficaSchedulerNodeInfoToRemove.get(nodeId).getNumContainers()));
+        toRemoveFiCaSchedulerNodes.add(new FiCaSchedulerNode(nodeId));
         //Remove Resources
         //Set memory and virtualcores to zero as we do not need
         //these values during remove anyway.
@@ -511,17 +531,8 @@ public class TransactionStateImpl extends TransactionState {
             container =
             ficaSchedulerNodeInfoToRemove.get(nodeId).getReservedContainer();
         if (container != null) {
-
           rmcontainerToRemove.add(
-              new RMContainer(container.getContainerId().toString(),
-                  container.getApplicationAttemptId().toString(),
-                  container.getNodeId().toString(), container.getUser(),
-                  //                  rmContainer.getReservedNode(),
-                  //                  Integer.MIN_VALUE,
-                  container.getStartTime(), container.getFinishTime(),
-                  container.getState().toString(),
-                  ((RMContainerImpl) container).getContainerState().toString(),
-                  ((RMContainerImpl) container).getContainerExitStatus()));
+	      new RMContainer(container.getContainerId().toString()));
         }
       }
       resourceDA.removeAll(toRemoveResources);
@@ -547,10 +558,11 @@ public class TransactionStateImpl extends TransactionState {
           
           org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode
               node = ficaSchedulerNodeInfoToAdd.get(nodeId);
-          //Nikos: reservedContainer is not used by fifoScheduler..thats why its null
+          String reservedContainer = node.getReservedContainer() != null ? 
+                  node.getReservedContainer().toString() : null;
           toAddFiCaSchedulerNodes.add(
               new FiCaSchedulerNode(nodeId, node.getNodeName(),
-                  node.getNumContainers()));
+                  node.getNumContainers(), reservedContainer));
           //Add Resources
           if (node.getTotalResource() != null) {
             toAddResources.add(new Resource(nodeId, Resource.TOTAL_CAPABILITY,
@@ -571,20 +583,20 @@ public class TransactionStateImpl extends TransactionState {
           }
           if (node.getReservedContainer() != null) {
             rmcontainerToAdd.add(new RMContainer(
-                node.getReservedContainer().getContainerId().toString(),
-                node.getReservedContainer().getApplicationAttemptId()
+                  node.getReservedContainer().getContainerId().toString(),
+                  node.getReservedContainer().getApplicationAttemptId()
                     .toString(),
-                node.getReservedContainer().getNodeId().toString(),
-                node.getReservedContainer().getUser(),
-                //                  rmContainer.getReservedNode(),
-                //                  Integer.MIN_VALUE,
-                node.getReservedContainer().getStartTime(),
-                node.getReservedContainer().getFinishTime(),
-                node.getReservedContainer().getState().toString(),
-                ((RMContainerImpl) node.getReservedContainer())
-                    .getContainerState().toString(),
-                ((RMContainerImpl) node.getReservedContainer())
-                    .getContainerExitStatus()));
+                  node.getReservedContainer().getNodeId().toString(),
+                  node.getReservedContainer().getUser(),
+                  node.getReservedContainer().getReservedNode().toString(),
+                  node.getReservedContainer().getReservedPriority().getPriority(),
+                  node.getReservedContainer().getReservedResource().getMemory(),
+                  node.getReservedContainer().getReservedResource().getVirtualCores(),
+                  node.getReservedContainer().getStartTime(),
+                  node.getReservedContainer().getFinishTime(),
+                  node.getReservedContainer().getState().toString(),
+                  ((RMContainerImpl) node.getReservedContainer()).getContainerState().toString(),
+                  ((RMContainerImpl) node.getReservedContainer()).getContainerExitStatus()));
           }
           //Add launched containers
           if (node.getRunningContainers() != null) {

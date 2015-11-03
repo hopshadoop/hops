@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.yarn.api.records;
 
-import io.hops.metadata.api.HopNodeIdAbstract;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Stable;
@@ -34,8 +33,7 @@ import org.apache.hadoop.yarn.util.Records;
  */
 @Public
 @Stable
-public abstract class NodeId extends HopNodeIdAbstract
-    implements Comparable<NodeId> {
+public abstract class NodeId implements Comparable<NodeId> {
 
   @Private
   @Unstable

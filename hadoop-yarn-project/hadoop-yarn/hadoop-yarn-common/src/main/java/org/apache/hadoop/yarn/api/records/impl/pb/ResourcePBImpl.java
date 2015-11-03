@@ -29,20 +29,6 @@ import org.apache.hadoop.yarn.proto.YarnProtos.ResourceProtoOrBuilder;
 @Unstable
 public class ResourcePBImpl extends Resource {
 
-
-  private int id = Integer.MIN_VALUE;
-
-  @Override
-  public int getId() {
-    return this.id;
-  }
-
-  @Override
-  public void setId(int id) {
-    this.id = id;
-  }
-
-
   ResourceProto proto = ResourceProto.getDefaultInstance();
   ResourceProto.Builder builder = null;
   boolean viaProto = false;

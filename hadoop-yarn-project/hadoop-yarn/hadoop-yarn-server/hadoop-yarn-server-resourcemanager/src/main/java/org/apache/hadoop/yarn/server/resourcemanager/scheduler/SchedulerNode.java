@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler;
 
+import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.records.NodeId;
@@ -78,7 +79,7 @@ public abstract class SchedulerNode {
    * @param deltaResource
    *     the delta of resource need to apply to node
    */
-  public abstract void applyDeltaOnAvailableResource(Resource deltaResource);
+  public abstract void applyDeltaOnAvailableResource(Resource deltaResource, TransactionState ts);
 
   /**
    * Get total resources on the node.

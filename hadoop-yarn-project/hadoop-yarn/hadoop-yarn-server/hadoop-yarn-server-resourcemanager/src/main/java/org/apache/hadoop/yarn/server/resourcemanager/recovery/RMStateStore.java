@@ -23,8 +23,10 @@ import io.hops.metadata.yarn.entity.AppSchedulingInfo;
 import io.hops.metadata.yarn.entity.AppSchedulingInfoBlacklist;
 import io.hops.metadata.yarn.entity.Container;
 import io.hops.metadata.yarn.entity.ContainerStatus;
+import io.hops.metadata.yarn.entity.FiCaSchedulerAppLastScheduledContainer;
 import io.hops.metadata.yarn.entity.FiCaSchedulerAppLiveContainers;
 import io.hops.metadata.yarn.entity.FiCaSchedulerAppNewlyAllocatedContainers;
+import io.hops.metadata.yarn.entity.FiCaSchedulerAppSchedulingOpportunities;
 import io.hops.metadata.yarn.entity.FiCaSchedulerNode;
 import io.hops.metadata.yarn.entity.JustLaunchedContainers;
 import io.hops.metadata.yarn.entity.LaunchedContainers;
@@ -36,9 +38,15 @@ import io.hops.metadata.yarn.entity.RMContextInactiveNodes;
 import io.hops.metadata.yarn.entity.RMNode;
 import io.hops.metadata.yarn.entity.Resource;
 import io.hops.metadata.yarn.entity.ResourceRequest;
+import io.hops.metadata.yarn.entity.SchedulerAppReservations;
 import io.hops.metadata.yarn.entity.SchedulerApplication;
 import io.hops.metadata.yarn.entity.UpdatedContainerInfo;
 import io.hops.metadata.yarn.entity.appmasterrpc.RPC;
+import io.hops.metadata.yarn.entity.capacity.CSLeafQueueUserInfo;
+import io.hops.metadata.yarn.entity.capacity.CSQueue;
+import io.hops.metadata.yarn.entity.capacity.FiCaSchedulerAppReservedContainers;
+import io.hops.metadata.yarn.entity.fair.FSSchedulerNode;
+import io.hops.metadata.yarn.entity.fair.PreemptionMap;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -375,7 +383,7 @@ import java.util.TreeSet;
     List<RPC> appMasterRPCs;
     Map<String, AppSchedulingInfo> appSchedulingInfos;
     Map<String, SchedulerApplication> schedulerApplications;
-    List<FiCaSchedulerNode> fiCaSchedulerNodes;
+    Map<String, FiCaSchedulerNode> fiCaSchedulerNodes;
     Map<String, List<LaunchedContainers>> launchedContainers;
     Map<String, List<FiCaSchedulerAppNewlyAllocatedContainers>>
         newlyAllocatedContainers;
@@ -383,6 +391,10 @@ import java.util.TreeSet;
     Map<String, List<ResourceRequest>> resourceRequests;
     Map<String, List<AppSchedulingInfoBlacklist>> blackLists;
     List<QueueMetrics> allQueueMetrics;
+    Map<String, List<FiCaSchedulerAppSchedulingOpportunities>> schedulingOpportunities;
+    Map<String, List<FiCaSchedulerAppLastScheduledContainer>> lastScheduledContainers;
+    Map<String, List<FiCaSchedulerAppReservedContainers>> reservedContainers;
+    Map<String, List<SchedulerAppReservations>> reReservations;
     Map<String, NodeHeartbeatResponse> nodeHeartBeatResponses;
     Map<String, Set<ContainerId>> containersToClean;
     Map<String, List<ApplicationId>> finishedApplications;
@@ -398,7 +410,9 @@ import java.util.TreeSet;
     Map<String, ContainerStatus> allContainerStatus;
     Map<String, List<JustLaunchedContainers>> allJustLaunchedContainers;
     Map<String, Boolean> allRMNodeNextHeartbeats;
-
+    List<CSQueue> allCSQueues;
+    List<CSLeafQueueUserInfo> allCSLeafQueueUserInfo;
+    
     public Map<ApplicationId, ApplicationState> getApplicationState() {
       return appState;
     }
@@ -445,7 +459,7 @@ import java.util.TreeSet;
       return schedulerApplications;
     }
 
-    public List<FiCaSchedulerNode> getAllFiCaSchedulerNodes()
+    public Map<String, FiCaSchedulerNode> getAllFiCaSchedulerNodes()
         throws IOException {
       return fiCaSchedulerNodes;
     }
@@ -459,6 +473,26 @@ import java.util.TreeSet;
       }
     }
 
+    public List<FiCaSchedulerAppSchedulingOpportunities> getSchedulingOpportunities(
+            final String ficaId) throws IOException {
+      return schedulingOpportunities.get(ficaId);
+    }
+    
+    public List<FiCaSchedulerAppReservedContainers> getReservedContainers(
+            final String ficaId) throws IOException {
+      return reservedContainers.get(ficaId);
+    }
+    
+    public List<FiCaSchedulerAppLastScheduledContainer> getLastScheduledContainers(
+            final String ficaId) throws IOException {
+      return lastScheduledContainers.get(ficaId);
+    }
+    
+    public List<SchedulerAppReservations> getRereservations(
+            final String ficaId) throws IOException {
+      return reReservations.get(ficaId);
+    }
+    
     public List<FiCaSchedulerAppNewlyAllocatedContainers> getNewlyAllocatedContainers(
         final String ficaId) throws IOException {
       return newlyAllocatedContainers.get(ficaId);
@@ -479,6 +513,14 @@ import java.util.TreeSet;
       return blackLists.get(id);
     }
 
+    public List<CSQueue> getAllCSQueues(){
+      return allCSQueues;
+    }
+    
+    public List<CSLeafQueueUserInfo> getAllCSLeafQueueUserInfo(){
+      return allCSLeafQueueUserInfo;
+    }
+    
     private final Map<NodeId, org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode>
         alreadyRecoveredRMContextActiveNodes =
         new HashMap<NodeId, org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode>();

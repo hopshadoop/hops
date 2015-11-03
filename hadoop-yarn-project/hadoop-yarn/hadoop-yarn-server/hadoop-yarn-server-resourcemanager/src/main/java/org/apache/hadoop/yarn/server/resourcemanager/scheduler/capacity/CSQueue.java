@@ -132,7 +132,7 @@ public interface CSQueue
    * @param usedCapacity
    *     used capacity of the queue
    */
-  public void setUsedCapacity(float usedCapacity);
+    public void setUsedCapacity(float usedCapacity, TransactionState transactionState);
   
   /**
    * Set absolute used capacity of the queue.
@@ -140,7 +140,7 @@ public interface CSQueue
    * @param absUsedCapacity
    *     absolute used capacity of the queue
    */
-  public void setAbsoluteUsedCapacity(float absUsedCapacity);
+  public void setAbsoluteUsedCapacity(float absUsedCapacity, TransactionState transactionState);
 
   /**
    * Get the currently utilized resources in the cluster
@@ -193,7 +193,7 @@ public interface CSQueue
    * Submit an application attempt to the queue.
    */
   public void submitApplicationAttempt(FiCaSchedulerApp application,
-      String userName);
+      String userName, TransactionState transactionState);
 
   /**
    * An application submitted to this queue has finished.
@@ -208,7 +208,7 @@ public interface CSQueue
    * An application attempt submitted to this queue has finished.
    */
   public void finishApplicationAttempt(FiCaSchedulerApp application,
-      String queue);
+      String queue, TransactionState transactionState);
 
   /**
    * Assign containers to applications in the queue or it's children (if any).
@@ -273,7 +273,7 @@ public interface CSQueue
    * @param clusterResource
    *     the current cluster resource
    */
-  public void updateClusterResource(Resource clusterResource);
+    public void updateClusterResource(Resource clusterResource, TransactionState transactionState);
   
   /**
    * Get the {@link ActiveUsersManager} for the queue.

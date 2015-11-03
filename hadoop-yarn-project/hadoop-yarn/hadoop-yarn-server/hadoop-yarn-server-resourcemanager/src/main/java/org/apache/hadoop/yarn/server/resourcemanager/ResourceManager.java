@@ -1110,7 +1110,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
   public ApplicationACLsManager getApplicationACLsManager() {
     return this.applicationACLsManager;
   }
-
+ 
   @Private
   public QueueACLsManager getQueueACLsManager() {
     return this.queueACLsManager;
@@ -1142,6 +1142,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
     } catch (IOException ex) {
       //TODO see what to do with this exceptions
     }
+    LOG.info("Finished recovering");
   }
 
   private UserGroupInformation creatAMRMTokenUGI(RPC rpc) throws IOException {

@@ -840,7 +840,7 @@ public class FairScheduler extends AbstractYarnScheduler {
     FSSchedulerNode node = nodes.get(container.getNodeId());
 
     if (rmContainer.getState() == RMContainerState.RESERVED) {
-      application.unreserve(node, rmContainer.getReservedPriority());
+      application.unreserve(node, rmContainer.getReservedPriority(), transactionState);
       node.unreserveResource(application);
     } else {
       application.containerCompleted(rmContainer, containerStatus, event,
@@ -1004,7 +1004,7 @@ public class FairScheduler extends AbstractYarnScheduler {
     FSSchedulerNode node = nodes.get(nm.getNodeID());
 
     // Update resource if any change
-    SchedulerUtils.updateResourceIfChanged(node, nm, clusterCapacity, LOG);
+    SchedulerUtils.updateResourceIfChanged(node, nm, clusterCapacity, LOG, transactionState);
     
     List<UpdatedContainerInfo> containerInfoList =
         nm.pullContainerUpdates(transactionState);
@@ -1105,7 +1105,7 @@ public class FairScheduler extends AbstractYarnScheduler {
             "Releasing reservation that cannot be satisfied for application " +
                 reservedAppSchedulable.getApp().getApplicationAttemptId() +
                 " on node " + node);
-        reservedAppSchedulable.unreserve(reservedPriority, node);
+        reservedAppSchedulable.unreserve(reservedPriority, node, transactionState);
         reservedAppSchedulable = null;
       } else {
         // Reservation exists; try to fulfill the reservation
@@ -1349,7 +1349,9 @@ public class FairScheduler extends AbstractYarnScheduler {
         Thread schedulingThread = new Thread(new Runnable() {
           @Override
           public void run() {
-            continuousScheduling(null);
+            //TOVERIFY FAIR will we miss some states by doing that
+            continuousScheduling(
+                    new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
           }
         });
         schedulingThread.setName("ContinuousScheduling");

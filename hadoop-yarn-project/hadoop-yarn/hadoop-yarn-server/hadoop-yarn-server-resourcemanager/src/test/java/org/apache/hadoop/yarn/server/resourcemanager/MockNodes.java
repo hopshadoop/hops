@@ -78,6 +78,13 @@ public class MockNodes {
     return rs;
   }
 
+  public static Resource newResourceWithVcores(int mem, int vcores) {
+    Resource rs = recordFactory.newRecordInstance(Resource.class);
+    rs.setMemory(mem);
+    rs.setVirtualCores(vcores);
+    return rs;
+  }
+   
   public static Resource newUsedResource(Resource total) {
     Resource rs = recordFactory.newRecordInstance(Resource.class);
     rs.setMemory((int) (Math.random() * total.getMemory()));
