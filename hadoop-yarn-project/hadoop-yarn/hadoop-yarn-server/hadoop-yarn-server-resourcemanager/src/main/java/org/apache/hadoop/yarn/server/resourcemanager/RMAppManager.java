@@ -317,7 +317,6 @@ public class RMAppManager
       // Dispatcher is not yet started at this time, so these START events
       // enqueued should be guaranteed to be first processed when dispatcher
       // gets started.
-      LOG.debug("handle START for rpc " + transactionState.getId());
       this.rmContext.getDispatcher().getEventHandler().handle(
           new RMAppEvent(applicationId, RMAppEventType.START,
               transactionState));

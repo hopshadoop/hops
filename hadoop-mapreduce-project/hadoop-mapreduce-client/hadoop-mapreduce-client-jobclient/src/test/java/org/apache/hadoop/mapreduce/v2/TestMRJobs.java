@@ -193,6 +193,17 @@ public class TestMRJobs {
     job.setMaxMapAttempts(1); // speed up failures
     job.submit();
     String trackingUrl = job.getTrackingURL();
+    int c = 0;
+    while (trackingUrl.equals("N/A") && c < 10) {
+      try {
+        Thread.sleep(1000);
+        job.getStatus();
+      } catch (InterruptedException e) {
+        LOG.error(e, e);
+      }
+      trackingUrl = job.getTrackingURL();
+      c++;
+    }
     String jobId = job.getJobID().toString();
     boolean succeeded = job.waitForCompletion(true);
     Assert.assertTrue(succeeded);
@@ -268,7 +279,7 @@ public class TestMRJobs {
     }
   }
 
-  @Test (timeout = 60000)
+  @Test (timeout = 6000000)
   public void testRandomWriter() throws IOException, InterruptedException,
       ClassNotFoundException {
     
@@ -291,6 +302,17 @@ public class TestMRJobs {
     job.setMaxMapAttempts(1); // speed up failures
     job.submit();
     String trackingUrl = job.getTrackingURL();
+    int c = 0;
+    while (trackingUrl.equals("N/A") && c < 10) {
+      try {
+        Thread.sleep(1000);
+        job.getStatus();
+      } catch (InterruptedException e) {
+        LOG.error(e, e);
+      }
+      trackingUrl = job.getTrackingURL();
+      c++;
+    }
     String jobId = job.getJobID().toString();
     boolean succeeded = job.waitForCompletion(true);
     Assert.assertTrue(succeeded);
@@ -403,6 +425,17 @@ public class TestMRJobs {
     job.addFileToClassPath(APP_JAR); // The AppMaster jar itself.
     job.submit();
     String trackingUrl = job.getTrackingURL();
+    int c = 0;
+    while (trackingUrl.equals("N/A") && c < 10) {
+      try {
+        Thread.sleep(1000);
+        job.getStatus();
+      } catch (InterruptedException e) {
+        LOG.error(e, e);
+      }
+      trackingUrl = job.getTrackingURL();
+      c++;
+    }
     String jobId = job.getJobID().toString();
     boolean succeeded = job.waitForCompletion(true);
     Assert.assertFalse(succeeded);
@@ -452,6 +485,17 @@ public class TestMRJobs {
         job.addFileToClassPath(APP_JAR); // The AppMaster jar itself.
         job.submit();
         String trackingUrl = job.getTrackingURL();
+        int c = 0;
+        while (trackingUrl.equals("N/A") && c < 10) {
+          try {
+            Thread.sleep(1000);
+            job.getStatus();
+          } catch (InterruptedException e) {
+            LOG.error(e, e);
+          }
+          trackingUrl = job.getTrackingURL();
+          c++;
+        }
         String jobId = job.getJobID().toString();
         job.waitForCompletion(true);
         Assert.assertEquals(JobStatus.State.SUCCEEDED, job.getJobState());
@@ -741,6 +785,17 @@ public class TestMRJobs {
 
     job.submit();
     String trackingUrl = job.getTrackingURL();
+    int c = 0;
+    while (trackingUrl.equals("N/A") && c < 10) {
+      try {
+        Thread.sleep(1000);
+        job.getStatus();
+      } catch (InterruptedException e) {
+        LOG.error(e, e);
+      }
+      trackingUrl = job.getTrackingURL();
+      c++;
+    }
     String jobId = job.getJobID().toString();
     Assert.assertTrue(job.waitForCompletion(false));
     Assert.assertTrue("Tracking URL was " + trackingUrl +
@@ -750,6 +805,7 @@ public class TestMRJobs {
   
   @Test (timeout = 600000)
   public void testDistributedCache() throws Exception {
+    LOG.info("\n\n\nStarting testDistributedCache().");
     // Test with a local (file:///) Job Jar
     Path localJobJarPath = makeJobJarWithLib(TEST_ROOT_DIR.toUri().toString());
     _testDistributedCache(localJobJarPath.toUri().toString());

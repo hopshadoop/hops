@@ -36,6 +36,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Test helper to generate mock nodes
@@ -46,7 +47,7 @@ public class MockNodes {
       RecordFactoryProvider.getRecordFactory(null);
 
   public static List<RMNode> newNodes(int racks, int nodesPerRack,
-      Resource perNode) {
+          Resource perNode) {
     List<RMNode> list = Lists.newArrayList();
     for (int i = 0; i < racks; ++i) {
       for (int j = 0; j < nodesPerRack; ++j) {
@@ -59,9 +60,9 @@ public class MockNodes {
     }
     return list;
   }
-  
+
   public static List<RMNode> deactivatedNodes(int racks, int nodesPerRack,
-      Resource perNode) {
+          Resource perNode) {
     List<RMNode> list = Lists.newArrayList();
     for (int i = 0; i < racks; ++i) {
       for (int j = 0; j < nodesPerRack; ++j) {
@@ -75,6 +76,13 @@ public class MockNodes {
   public static Resource newResource(int mem) {
     Resource rs = recordFactory.newRecordInstance(Resource.class);
     rs.setMemory(mem);
+    return rs;
+  }
+
+  public static Resource newResourceWithVcores(int mem, int vcores) {
+    Resource rs = recordFactory.newRecordInstance(Resource.class);
+    rs.setMemory(mem);
+    rs.setVirtualCores(vcores);
     return rs;
   }
 
@@ -103,9 +111,9 @@ public class MockNodes {
     private NodeState state;
 
     public MockRMNodeImpl(NodeId nodeId, String nodeAddr, String httpAddress,
-        ResourceOption perNode, String rackName, String healthReport,
-        long lastHealthReportTime, int cmdPort, String hostName,
-        NodeState state) {
+            ResourceOption perNode, String rackName, String healthReport,
+            long lastHealthReportTime, int cmdPort, String hostName,
+            NodeState state) {
       this.nodeId = nodeId;
       this.nodeAddr = nodeAddr;
       this.httpAddress = httpAddress;
@@ -180,7 +188,7 @@ public class MockNodes {
 
     @Override
     public void updateNodeHeartbeatResponseForCleanup(
-        NodeHeartbeatResponse response, TransactionState ts) {
+            NodeHeartbeatResponse response, TransactionState ts) {
     }
 
     @Override
@@ -189,13 +197,17 @@ public class MockNodes {
     }
 
     @Override
+    public void setLastNodeHeartBeatResponseId(int id) {
+    }
+    
+    @Override
     public String getNodeManagerVersion() {
       return null;
     }
 
     @Override
     public List<UpdatedContainerInfo> pullContainerUpdates(
-        TransactionState ts) {
+            TransactionState ts) {
       return new ArrayList<UpdatedContainerInfo>();
     }
 
@@ -213,7 +225,7 @@ public class MockNodes {
     public void setResourceOption(ResourceOption resourceOption) {
       this.perNode = resourceOption;
     }
-    
+
     @Override
     public ResourceOption getResourceOption() {
       return this.perNode;
@@ -223,19 +235,29 @@ public class MockNodes {
     public void recover(RMStateStore.RMState state) throws Exception {
       throw new UnsupportedOperationException("Not supported yet.");
     }
-    
-  }
 
-  ;
+    @Override
+    public void setContainersToCleanUp(Set<ContainerId> newSet) {
+    }
+
+    @Override
+    public void setAppsToCleanup(List<ApplicationId> newList) {
+    }
+
+    @Override
+    public void setNextHeartBeat(boolean nextHeartbeat) {
+    }
+
+  };
 
   private static RMNode buildRMNode(int rack, final Resource perNode,
-      NodeState state, String httpAddr) {
+          NodeState state, String httpAddr) {
     return buildRMNode(rack, perNode, state, httpAddr, NODE_ID++, null, 123);
   }
 
   private static RMNode buildRMNode(int rack, final Resource perNode,
-      NodeState state, String httpAddr, int hostnum, String hostName,
-      int port) {
+          NodeState state, String httpAddr, int hostnum, String hostName,
+          int port) {
     final String rackName = "rack" + rack;
     final int nid = hostnum;
     final String nodeAddr = hostName + ":" + nid;
@@ -247,12 +269,12 @@ public class MockNodes {
     final String httpAddress = httpAddr;
     String healthReport = (state == NodeState.UNHEALTHY) ? null : "HealthyMe";
     return new MockRMNodeImpl(nodeID, nodeAddr, httpAddress, ResourceOption
-        .newInstance(perNode, RMNode.OVER_COMMIT_TIMEOUT_MILLIS_DEFAULT),
-        rackName, healthReport, 0, nid, hostName, state);
+            .newInstance(perNode, RMNode.OVER_COMMIT_TIMEOUT_MILLIS_DEFAULT),
+            rackName, healthReport, 0, nid, hostName, state);
   }
 
   public static RMNode nodeInfo(int rack, final Resource perNode,
-      NodeState state) {
+          NodeState state) {
     return buildRMNode(rack, perNode, state, "N/A");
   }
 
@@ -261,20 +283,20 @@ public class MockNodes {
   }
 
   public static RMNode newNodeInfo(int rack, final Resource perNode,
-      int hostnum) {
+          int hostnum) {
     return buildRMNode(rack, perNode, null, "localhost:0", hostnum, null, 123);
-  }
-  
-  public static RMNode newNodeInfo(int rack, final Resource perNode,
-      int hostnum, String hostName) {
-    return buildRMNode(rack, perNode, null, "localhost:0", hostnum, hostName,
-        123);
   }
 
   public static RMNode newNodeInfo(int rack, final Resource perNode,
-      int hostnum, String hostName, int port) {
+          int hostnum, String hostName) {
     return buildRMNode(rack, perNode, null, "localhost:0", hostnum, hostName,
-        port);
+            123);
+  }
+
+  public static RMNode newNodeInfo(int rack, final Resource perNode,
+          int hostnum, String hostName, int port) {
+    return buildRMNode(rack, perNode, null, "localhost:0", hostnum, hostName,
+            port);
   }
 
 }

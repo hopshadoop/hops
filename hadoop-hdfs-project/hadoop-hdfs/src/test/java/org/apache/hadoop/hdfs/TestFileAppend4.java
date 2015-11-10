@@ -114,7 +114,7 @@ public class TestFileAppend4 {
     cluster.setLeasePeriod(1000, HdfsConstants.LEASE_HARDLIMIT_PERIOD);
 
     // Trying recovery
-    int tries = 60;
+    int tries = 120;
     boolean recovered = false;
     FSDataOutputStream out = null;
     while (!recovered && tries-- > 0) {
@@ -128,6 +128,7 @@ public class TestFileAppend4 {
           Thread.sleep(1000);
         } catch (InterruptedException ex) {
           // ignore it and try again
+          LOG.info(e, ex);
         }
       }
     }
@@ -135,7 +136,7 @@ public class TestFileAppend4 {
       out.close();
     }
     if (!recovered) {
-      fail("Recovery should take < 1 min");
+      fail("Recovery should take < 2 min");
     }
     LOG.info("Past out lease recovery");
   }

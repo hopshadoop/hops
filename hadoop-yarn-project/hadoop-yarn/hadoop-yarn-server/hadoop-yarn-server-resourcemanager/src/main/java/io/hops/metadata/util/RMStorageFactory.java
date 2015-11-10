@@ -16,6 +16,7 @@
 package io.hops.metadata.util;
 
 import io.hops.DalDriver;
+import io.hops.DalNdbEventStreaming;
 import io.hops.DalStorageFactory;
 import io.hops.StorageConnector;
 import io.hops.exception.StorageInitializtionException;
@@ -62,10 +63,18 @@ public class RMStorageFactory {
   private static Map<Class, EntityDataAccess> dataAccessAdaptors =
       new HashMap<Class, EntityDataAccess>();
 
+  private static DalNdbEventStreaming dNdbEventStreaming;
   public static StorageConnector getConnector() {
     return dStorageFactory.getConnector();
   }
 
+  public static void kickTheNdbEventStreamingAPI() throws
+          StorageInitializtionException {
+    dNdbEventStreaming = DalDriver.loadHopsNdbEventStreamingLib(
+            YarnAPIStorageFactory.NDB_EVENT_STREAMING_FOR_DISTRIBUTED_SERVICE);
+    dNdbEventStreaming.startHopsNdbEvetAPISession();
+  }
+  
   public static void setConfiguration(Configuration conf)
       throws StorageInitializtionException, IOException {
     if (isInitialized) {

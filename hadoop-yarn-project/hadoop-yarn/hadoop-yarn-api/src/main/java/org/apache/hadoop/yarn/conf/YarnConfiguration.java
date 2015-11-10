@@ -52,7 +52,7 @@ public class YarnConfiguration extends Configuration {
   public static final String CORE_SITE_CONFIGURATION_FILE = "core-site.xml";
   @Private
   public static final List<String> RM_CONFIGURATION_FILES = Collections
-      .unmodifiableList(Arrays
+          .unmodifiableList(Arrays
           .asList(CS_CONFIGURATION_FILE, HADOOP_POLICY_CONFIGURATION_FILE,
               YARN_SITE_CONFIGURATION_FILE, CORE_SITE_CONFIGURATION_FILE));
   @Evolving
@@ -72,7 +72,7 @@ public class YarnConfiguration extends Configuration {
    */
   public static final String DEBUG_NM_DELETE_DELAY_SEC =
       YarnConfiguration.NM_PREFIX + "delete.debug-delay-sec";
-  ////////////////////////////////
+    ////////////////////////////////
   // IPC Configs
   ////////////////////////////////
   public static final String IPC_PREFIX = YARN_PREFIX + "ipc.";
@@ -103,7 +103,7 @@ public class YarnConfiguration extends Configuration {
   public static final String IPC_RPC_IMPL = IPC_PREFIX + "rpc.class";
   public static final String DEFAULT_IPC_RPC_IMPL =
       "org.apache.hadoop.yarn.ipc.HadoopYarnProtoRPC";
-  ////////////////////////////////
+    ////////////////////////////////
   // Resource Manager Configs
   ////////////////////////////////
   public static final String RM_PREFIX = "yarn.resourcemanager.";
@@ -397,14 +397,14 @@ public class YarnConfiguration extends Configuration {
       Collections.unmodifiableList(Arrays
           .asList(RM_ADDRESS, RM_PORT, RM_SCHEDULER_ADDRESS, RM_SCHEDULER_PORT,
               RM_ADMIN_ADDRESS, RM_ADMIN_PORT, RM_RESOURCE_TRACKER_ADDRESS,
-              RM_RESOURCE_TRACKER_PORT, RM_WEBAPP_ADDRESS,
-              RM_GROUP_MEMBERSHIP_ADDRESS, RM_GROUP_MEMBERSHIP_PORT));
+                          RM_RESOURCE_TRACKER_PORT, RM_WEBAPP_ADDRESS,
+                          RM_GROUP_MEMBERSHIP_ADDRESS, RM_GROUP_MEMBERSHIP_PORT));
   private static final List<String> RM_SERVICES_ADDRESS_CONF_KEYS_HTTPS =
       Collections.unmodifiableList(Arrays
           .asList(RM_ADDRESS, RM_PORT, RM_SCHEDULER_ADDRESS, RM_SCHEDULER_PORT,
               RM_ADMIN_ADDRESS, RM_ADMIN_PORT, RM_RESOURCE_TRACKER_ADDRESS,
-              RM_RESOURCE_TRACKER_PORT, RM_WEBAPP_HTTPS_ADDRESS,
-              RM_GROUP_MEMBERSHIP_ADDRESS, RM_GROUP_MEMBERSHIP_PORT));
+                          RM_RESOURCE_TRACKER_PORT, RM_WEBAPP_HTTPS_ADDRESS,
+                          RM_GROUP_MEMBERSHIP_ADDRESS, RM_GROUP_MEMBERSHIP_PORT));
   public static final String AUTO_FAILOVER_PREFIX =
       RM_HA_PREFIX + "automatic-failover.";
   public static final String AUTO_FAILOVER_ENABLED =
@@ -449,7 +449,7 @@ public class YarnConfiguration extends Configuration {
 
   public static final String INITIALIZEDB = RM_HA_PREFIX + "initializedb";
   public static boolean DEFAULT_INITIALIZEDB = false;
-  ////////////////////////////////
+    ////////////////////////////////
   // RM state store configs
   ////////////////////////////////
   /**
@@ -521,7 +521,7 @@ public class YarnConfiguration extends Configuration {
   public static final String RM_NODEMANAGER_MINIMUM_VERSION =
       RM_PREFIX + "nodemanager.minimum.version";
   public static final String DEFAULT_RM_NODEMANAGER_MINIMUM_VERSION = "NONE";
-  ////////////////////////////////
+    ////////////////////////////////
   // Node Manager Configs
   ////////////////////////////////
   /**
@@ -540,11 +540,11 @@ public class YarnConfiguration extends Configuration {
    */
   public static final String NM_ENV_WHITELIST = NM_PREFIX + "env-whitelist";
   public static final String DEFAULT_NM_ENV_WHITELIST = StringUtils.join(",",
-      Arrays.asList(ApplicationConstants.Environment.JAVA_HOME.key(),
-          ApplicationConstants.Environment.HADOOP_COMMON_HOME.key(),
-          ApplicationConstants.Environment.HADOOP_HDFS_HOME.key(),
-          ApplicationConstants.Environment.HADOOP_CONF_DIR.key(),
-          ApplicationConstants.Environment.HADOOP_YARN_HOME.key()));
+          Arrays.asList(ApplicationConstants.Environment.JAVA_HOME.key(),
+                  ApplicationConstants.Environment.HADOOP_COMMON_HOME.key(),
+                  ApplicationConstants.Environment.HADOOP_HDFS_HOME.key(),
+                  ApplicationConstants.Environment.HADOOP_CONF_DIR.key(),
+                  ApplicationConstants.Environment.HADOOP_YARN_HOME.key()));
   /**
    * address of node manager IPC.
    */
@@ -924,7 +924,7 @@ public class YarnConfiguration extends Configuration {
   public static final String NM_WEBAPP_SPNEGO_KEYTAB_FILE_KEY =
       NM_PREFIX + "webapp.spnego-keytab-file";
   public static final String DEFAULT_NM_USER_HOME_DIR = "/home/";
-  ////////////////////////////////
+    ////////////////////////////////
   // Web Proxy Configs
   ////////////////////////////////
   public static final String PROXY_PREFIX = "yarn.web-proxy.";
@@ -1089,12 +1089,12 @@ public class YarnConfiguration extends Configuration {
       YARN_PREFIX + "app.container.log.filesize";
   public static final String YARN_APP_CONTAINER_LOG_BACKUPS =
       YARN_PREFIX + "app.container.log.backups";
-  ////////////////////////////////
+    ////////////////////////////////
   // Timeline Service Configs
   ////////////////////////////////
   public static final String TIMELINE_SERVICE_PREFIX =
       YARN_PREFIX + "timeline-service.";
-  // mark app-history related configs @Private as application history is going
+    // mark app-history related configs @Private as application history is going
   // to be integrated into the timeline service
   @Private
   public static final String APPLICATION_HISTORY_PREFIX =
@@ -1229,7 +1229,7 @@ public class YarnConfiguration extends Configuration {
       TIMELINE_SERVICE_LEVELDB_PREFIX + "ttl-interval-ms";
   public static final long DEFAULT_TIMELINE_SERVICE_LEVELDB_TTL_INTERVAL_MS =
       1000 * 60 * 5;
-  ////////////////////////////////
+    ////////////////////////////////
   // Other Configs
   ////////////////////////////////
   /**
@@ -1286,6 +1286,7 @@ public class YarnConfiguration extends Configuration {
   public static final String YARN_HTTP_POLICY_DEFAULT =
       HttpConfig.Policy.HTTP_ONLY.name();
 
+ //TODO What is this for? does it have to be cleaned
   public static final List<Integer> DEFAULT_RM_PORT_HOP;
   public static final List<String> DEFAULT_RM_ADDRESS_HOP;
   public static final List<Integer> DEFAULT_RM_ADMIN_PORT_HOP;
@@ -1303,16 +1304,6 @@ public class YarnConfiguration extends Configuration {
       new ArrayList<Integer>();
   public static final List<String> DEFAULT_RM_RESOURCE_TRACKER_ADDRESS_HOP;
 
-  //Distributed RT properties
-  public static final String HOPS_DISTRIBUTED_RT_ENABLED =
-      HOPS_RM_PREFIX + "distributed-rt.enable";
-  public static boolean DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED = false;
-  public static String HOPS_PENDING_EVENTS_RETRIEVAL_PERIOD =
-      HOPS_RM_PREFIX + "pending-events.retrieval.period";
-  public static int DEFAULT_HOPS_PENDING_EVENTS_RETRIEVAL_PERIOD = 500;
-  public static String HOPS_PENDING_EVENTS_BATCH =
-      HOPS_RM_PREFIX + "pending-events.batch";
-  public static int DEFAULT_HOPS_PENDING_EVENTS_BATCH = 0;
 
   static {
 
@@ -1341,7 +1332,7 @@ public class YarnConfiguration extends Configuration {
     }
     for (int i = 1; i < NUMBER_OF_RM; i++) {
       RM_RESOURCE_TRACKER_ADDRESS_HOP
-          .add(RM_PREFIX + "resource-tracker.address." + i);
+              .add(RM_PREFIX + "resource-tracker.address." + i);
     }
     for (int i = 0; i < NUMBER_OF_RM; i++) {
       DEFAULT_RM_RESOURCE_TRACKER_ADDRESS_HOP
@@ -1355,6 +1346,42 @@ public class YarnConfiguration extends Configuration {
 
   ;
 
+  //end of TODO What is this for? does it have to be cleaned
+  
+   //Distributed RT properties
+  public static final String HOPS_DISTRIBUTED_RT_ENABLED =
+      HOPS_RM_PREFIX + "distributed-rt.enable";
+  public static boolean DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED = false;
+  public static String HOPS_PENDING_EVENTS_RETRIEVAL_PERIOD =
+      HOPS_RM_PREFIX + "pending-events.retrieval.period";
+  public static int DEFAULT_HOPS_PENDING_EVENTS_RETRIEVAL_PERIOD = 500;
+  public static String HOPS_PENDING_EVENTS_BATCH =
+      HOPS_RM_PREFIX + "pending-events.batch";
+  public static int DEFAULT_HOPS_PENDING_EVENTS_BATCH = 0;
+
+  public static final String HOPS_BATCH_MAX_SIZE = HOPS_RM_PREFIX + "batch.max.size";
+  public static int DEFAULT_HOPS_BATCH_MAX_SIZE = 50;
+
+  public static final String HOPS_BATCH_MAX_DURATION = HOPS_RM_PREFIX + "batch.max.duration";
+  public static int DEFAULT_HOPS_BATCH_MAX_DURATION = 100;
+
+  //NDB event streaming
+  public static boolean DEFAULT_HOPS_NDB_EVENT_STREAMING_ENABLED = false;
+  public static final String HOPS_NDB_EVENT_STREAMING_ENABLED = HOPS_RM_PREFIX
+          + "ndb-event-streaming.enable";
+
+  public static boolean DEFAULT_HOPS_NDB_RT_EVENT_STREAMING_ENABLED = false;
+  public static final String HOPS_NDB_RT_EVENT_STREAMING_ENABLED
+          = HOPS_RM_PREFIX + "ndb-rt-event-streaming.enable";
+
+  public static final String MAX_ALLOCATED_CONTAINERS_PER_REQUEST= HOPS_RM_PREFIX + "max.allocated.containers.per.request";
+  public static int DEFAULT_MAX_ALLOCATED_CONTAINERS_PER_REQUEST = -1;
+  public static final String COMMIT_AND_QUEUE_THRESHOLD = HOPS_RM_PREFIX + "commit.and.queue.threshold";
+  public static int DEFAULT_COMMIT_AND_QUEUE_THRESHOLD=500;
+  public static final String COMMIT_QUEUE_MAX_LENGTH = HOPS_RM_PREFIX + "commit.queue.max.length";
+  public static int DEFAULT_COMMIT_QUEUE_MAX_LENGTH=2;
+  
+  
   public YarnConfiguration() {
     super();
   }
@@ -1388,7 +1415,7 @@ public class YarnConfiguration extends Configuration {
    */
   @Override
   public InetSocketAddress getSocketAddr(String name, String defaultAddress,
-      int defaultPort) {
+          int defaultPort) {
     String address;
     if (HAUtil.isHAEnabled(this) &&
         getServiceAddressConfKeys(this).contains(name)) {
@@ -1411,7 +1438,7 @@ public class YarnConfiguration extends Configuration {
 
   @Override
   public InetSocketAddress updateConnectAddr(String name,
-      InetSocketAddress addr) {
+          InetSocketAddress addr) {
     String prefix = name;
     if (HAUtil.isHAEnabled(this)) {
       prefix = HAUtil.addSuffix(prefix, HAUtil.getRMHAId(this));
@@ -1421,7 +1448,7 @@ public class YarnConfiguration extends Configuration {
 
   @Private
   public static int getRMDefaultPortNumber(String addressPrefix,
-      Configuration conf) {
+          Configuration conf) {
     if (addressPrefix.equals(YarnConfiguration.RM_ADDRESS)) {
       return YarnConfiguration.DEFAULT_RM_PORT;
     } else if (addressPrefix.equals(YarnConfiguration.RM_SCHEDULER_ADDRESS)) {
@@ -1429,15 +1456,15 @@ public class YarnConfiguration extends Configuration {
     } else if (addressPrefix.equals(YarnConfiguration.RM_WEBAPP_ADDRESS)) {
       return YarnConfiguration.DEFAULT_RM_WEBAPP_PORT;
     } else if (addressPrefix
-        .equals(YarnConfiguration.RM_WEBAPP_HTTPS_ADDRESS)) {
+            .equals(YarnConfiguration.RM_WEBAPP_HTTPS_ADDRESS)) {
       return YarnConfiguration.DEFAULT_RM_WEBAPP_HTTPS_PORT;
     } else if (addressPrefix
-        .equals(YarnConfiguration.RM_RESOURCE_TRACKER_ADDRESS)) {
+            .equals(YarnConfiguration.RM_RESOURCE_TRACKER_ADDRESS)) {
       return YarnConfiguration.DEFAULT_RM_RESOURCE_TRACKER_PORT;
     } else if (addressPrefix.equals(YarnConfiguration.RM_ADMIN_ADDRESS)) {
       return YarnConfiguration.DEFAULT_RM_ADMIN_PORT;
     } else if (addressPrefix
-        .equals(YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS)) {
+            .equals(YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS)) {
       return YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_PORT;
     } else {
       throw new HadoopIllegalArgumentException(
@@ -1449,7 +1476,7 @@ public class YarnConfiguration extends Configuration {
 
   public static boolean useHttps(Configuration conf) {
     return HttpConfig.Policy.HTTPS_ONLY == HttpConfig.Policy
-        .fromString(conf.get(YARN_HTTP_POLICY_KEY, YARN_HTTP_POLICY_DEFAULT));
+            .fromString(conf.get(YARN_HTTP_POLICY_KEY, YARN_HTTP_POLICY_DEFAULT));
   }
 
   @Private
@@ -1457,7 +1484,7 @@ public class YarnConfiguration extends Configuration {
     String clusterId = conf.get(YarnConfiguration.RM_CLUSTER_ID);
     if (clusterId == null) {
       throw new HadoopIllegalArgumentException(
-          "Configuration doesn't specify" + YarnConfiguration.RM_CLUSTER_ID);
+              "Configuration doesn't specify" + YarnConfiguration.RM_CLUSTER_ID);
     }
     return clusterId;
   }

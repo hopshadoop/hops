@@ -201,7 +201,7 @@ public class TestDistributedRT {
     //Wait for scheduler to process added node
     retries = 0;
     while (scheduler.getNodes().size() == 1 && retries++ < 20) {
-      Thread.sleep(100);
+      Thread.sleep(1000);
     }
     Assert.assertEquals(2, scheduler.getNodes().size());
     

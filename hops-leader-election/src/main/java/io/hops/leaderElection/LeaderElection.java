@@ -66,6 +66,7 @@ public class LeaderElection extends Thread {
 
   @Override
   public void run() {
+    Thread.currentThread().setPriority(Thread.MAX_PRIORITY);
     while (running) {
       long txStartTime = System.currentTimeMillis();
       long sleepDuration = -1;

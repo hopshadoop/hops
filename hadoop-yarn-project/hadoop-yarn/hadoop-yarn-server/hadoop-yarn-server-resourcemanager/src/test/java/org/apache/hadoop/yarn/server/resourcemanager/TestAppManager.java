@@ -103,22 +103,31 @@ public class TestAppManager {
       map.put(app.getApplicationId(), app);
     }
     Dispatcher rmDispatcher = new AsyncDispatcher();
-    ContainerAllocationExpirer containerAllocationExpirer =
-        new ContainerAllocationExpirer(rmDispatcher);
-    AMLivelinessMonitor amLivelinessMonitor =
-        new AMLivelinessMonitor(rmDispatcher);
-    AMLivelinessMonitor amFinishingMonitor =
-        new AMLivelinessMonitor(rmDispatcher);
     RMApplicationHistoryWriter writer = mock(RMApplicationHistoryWriter.class);
     RMContext context =
-        new RMContextImpl(rmDispatcher, containerAllocationExpirer,
-            amLivelinessMonitor, amFinishingMonitor, null, null, null, writer,
-            null) {
+        new RMContextImpl(rmDispatcher, null,
+            null, null, null, null, null, writer,
+            new YarnConfiguration()) {
           @Override
           public ConcurrentMap<ApplicationId, RMApp> getRMApps() {
             return map;
           }
         };
+    
+    AMLivelinessMonitor amLivelinessMonitor =
+        new AMLivelinessMonitor(rmDispatcher, context);
+    ((RMContextImpl) context).setAMLivelinessMonitor(amLivelinessMonitor);
+    
+     AMLivelinessMonitor amFinishingMonitor =
+        new AMLivelinessMonitor(rmDispatcher, context);
+    ((RMContextImpl) context).setAMFinishingMonitor(amFinishingMonitor);
+    
+    ContainerAllocationExpirer containerAllocationExpirer =
+        new ContainerAllocationExpirer(rmDispatcher, context);
+    ((RMContextImpl) context).setContainerAllocationExpirer(
+            containerAllocationExpirer);
+    
+    
     ((RMContextImpl) context).setStateStore(mock(RMStateStore.class));
     return context;
   }
@@ -184,7 +193,7 @@ public class TestAppManager {
         throws YarnException {
       super.submitApplication(submissionContext, System.currentTimeMillis(),
           user,
-          new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
+          new TransactionStateImpl(TransactionState.TransactionType.RM));
     }
   }
 
