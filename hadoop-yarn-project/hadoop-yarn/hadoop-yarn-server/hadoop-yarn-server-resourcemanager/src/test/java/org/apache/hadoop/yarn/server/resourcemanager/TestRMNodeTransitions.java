@@ -71,6 +71,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.apache.hadoop.yarn.api.records.ContainerState;
 
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
@@ -121,7 +122,7 @@ public class TestRMNodeTransitions {
     RMUtilities.InitializeDB();
 
     rmContext = new RMContextImpl(rmDispatcher, null, null, null,
-        mock(DelegationTokenRenewer.class), null, null, null, null);
+        mock(DelegationTokenRenewer.class), null, null, null, conf);
     NodesListManager nodesListManager = mock(NodesListManager.class);
     HostsFileReader reader = mock(HostsFileReader.class);
     when(nodesListManager.getHostsReader()).thenReturn(reader);
@@ -174,7 +175,7 @@ public class TestRMNodeTransitions {
     doReturn(healthStatus).when(event).getNodeHealthStatus();
     doReturn(response).when(event).getLatestResponse();
     doReturn(RMNodeEventType.STATUS_UPDATE).when(event).getType();
-    doReturn(new TransactionStateImpl(-1, TransactionType.RM)).when(event)
+    doReturn(new TransactionStateImpl( TransactionType.RM)).when(event)
         .getTransactionState();
     return event;
   }
@@ -212,7 +213,7 @@ public class TestRMNodeTransitions {
   public void testContainerUpdate() throws InterruptedException, IOException {
     //Start the node
     node.handle(new RMNodeEvent(null, RMNodeEventType.STARTED,
-        new TransactionStateImpl(10, TransactionType.RM)));
+        new TransactionStateImpl(TransactionType.RM)));
     //If Distributed RT is enabled, this is the only way to let the scheduler
     //pick up the event, the PendingEvent retrieval does not invoke the
     //Mock Scheduler
@@ -220,21 +221,21 @@ public class TestRMNodeTransitions {
     if (yarnconf.getBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED,
         YarnConfiguration.DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED)) {
       scheduler.handle(new NodeAddedSchedulerEvent(node,
-          new TransactionStateImpl(-1, TransactionType.RM)));
+          new TransactionStateImpl( TransactionType.RM)));
     }
     NodeId nodeId = BuilderUtils.newNodeId("localhost:1", 1);
     RMNodeImpl node2 =
         new RMNodeImpl(nodeId, rmContext, "test", 0, 0, null, null, null,
             false);
     node2.handle(new RMNodeEvent(null, RMNodeEventType.STARTED,
-        new TransactionStateImpl(20, TransactionType.RM)));
+        new TransactionStateImpl(TransactionType.RM)));
     //If Distributed RT is enabled, this is the only way to let the scheduler
     //pick up the event, the PendingEvent retrieval does not invoke the
     //Mock Scheduler
     if (yarnconf.getBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED,
         YarnConfiguration.DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED)) {
       scheduler.handle(new NodeAddedSchedulerEvent(node2,
-          new TransactionStateImpl(-1, TransactionType.RM)));
+          new TransactionStateImpl( TransactionType.RM)));
     }
     ContainerId completedContainerIdFromNode1 = BuilderUtils.newContainerId(
         BuilderUtils
@@ -262,6 +263,7 @@ public class TestRMNodeTransitions {
         .getContainerId();
     doReturn(Collections.singletonList(containerStatusFromNode1))
         .when(statusEventFromNode1).getContainers();
+    doReturn(ContainerState.COMPLETE).when(containerStatusFromNode1).getState();
     node.handle(statusEventFromNode1);
     //If Distributed RT is enabled, this is the only way to let the scheduler
     //pick up the event, the PendingEvent retrieval does not invoke the
@@ -269,7 +271,7 @@ public class TestRMNodeTransitions {
     if (yarnconf.getBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED,
         YarnConfiguration.DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED)) {
       scheduler.handle(new NodeUpdateSchedulerEvent(node,
-          new TransactionStateImpl(-1, TransactionType.RM)));
+          new TransactionStateImpl( TransactionType.RM)));
     }
     //ts.decCounter("test");
     Assert.assertEquals(1, completedContainers.size());
@@ -282,12 +284,14 @@ public class TestRMNodeTransitions {
         .getContainerId();
     doReturn(Collections.singletonList(containerStatusFromNode2_1))
         .when(statusEventFromNode2_1).getContainers();
-
+    doReturn(ContainerState.COMPLETE).when(containerStatusFromNode2_1).getState();
+ 
     doReturn(completedContainerIdFromNode2_2).when(containerStatusFromNode2_2)
         .getContainerId();
     doReturn(Collections.singletonList(containerStatusFromNode2_2))
         .when(statusEventFromNode2_2).getContainers();
-
+     doReturn(ContainerState.COMPLETE).when(containerStatusFromNode2_2).getState();
+     
     node2.setNextHeartBeat(false);
     node2.handle(statusEventFromNode2_1);
     //If Distributed RT is enabled, this is the only way to let the scheduler
@@ -296,7 +300,7 @@ public class TestRMNodeTransitions {
     if (yarnconf.getBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED,
         YarnConfiguration.DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED)) {
       scheduler.handle(new NodeUpdateSchedulerEvent(node2,
-          new TransactionStateImpl(-1, TransactionType.RM)));
+          new TransactionStateImpl( TransactionType.RM)));
     }
 
     node2.setNextHeartBeat(true);
@@ -307,7 +311,7 @@ public class TestRMNodeTransitions {
     if (yarnconf.getBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED,
         YarnConfiguration.DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED)) {
       scheduler.handle(new NodeUpdateSchedulerEvent(node2,
-          new TransactionStateImpl(-1, TransactionType.RM)));
+          new TransactionStateImpl( TransactionType.RM)));
     }
     //ts2.decCounter("test");
     Assert.assertEquals(2, completedContainers.size());
@@ -321,7 +325,7 @@ public class TestRMNodeTransitions {
   public void testStatusChange() {
     //Start the node
     node.handle(new RMNodeEvent(null, RMNodeEventType.STARTED,
-        new TransactionStateImpl(10, TransactionType.RM)));
+        new TransactionStateImpl(TransactionType.RM)));
     //Add info to the queue first
     node.setNextHeartBeat(false);
 
@@ -341,17 +345,18 @@ public class TestRMNodeTransitions {
     doReturn(completedContainerId1).when(containerStatus1).getContainerId();
     doReturn(Collections.singletonList(containerStatus1)).when(statusEvent1)
         .getContainers();
-
+    doReturn(ContainerState.COMPLETE).when(containerStatus1).getState();
     doReturn(completedContainerId2).when(containerStatus2).getContainerId();
     doReturn(Collections.singletonList(containerStatus2)).when(statusEvent2)
         .getContainers();
+    doReturn(ContainerState.COMPLETE).when(containerStatus2).getState();
     verify(scheduler, times(1)).handle(any(NodeUpdateSchedulerEvent.class));
     node.handle(statusEvent1);
     node.handle(statusEvent2);
     verify(scheduler, times(1)).handle(any(NodeUpdateSchedulerEvent.class));
     Assert.assertEquals(2, node.getQueueSize());
     node.handle(new RMNodeEvent(node.getNodeID(), RMNodeEventType.EXPIRE,
-        new TransactionStateImpl(-1, TransactionType.RM)));
+        new TransactionStateImpl( TransactionType.RM)));
     Assert.assertEquals(0, node.getQueueSize());
   }
 
@@ -365,7 +370,7 @@ public class TestRMNodeTransitions {
     int initialDecommissioned = cm.getNumDecommisionedNMs();
     int initialRebooted = cm.getNumRebootedNMs();
     node.handle(new RMNodeEvent(node.getNodeID(), RMNodeEventType.EXPIRE,
-        new TransactionStateImpl(-1, TransactionType.RM)));
+        new TransactionStateImpl( TransactionType.RM)));
     Assert
         .assertEquals("Active Nodes", initialActive - 1, cm.getNumActiveNMs());
     Assert.assertEquals("Lost Nodes", initialLost + 1, cm.getNumLostNMs());
@@ -388,7 +393,7 @@ public class TestRMNodeTransitions {
     int initialDecommissioned = cm.getNumDecommisionedNMs();
     int initialRebooted = cm.getNumRebootedNMs();
     node.handle(new RMNodeEvent(node.getNodeID(), RMNodeEventType.EXPIRE,
-        new TransactionStateImpl(-1, TransactionType.RM)));
+        new TransactionStateImpl( TransactionType.RM)));
     Assert.assertEquals("Active Nodes", initialActive, cm.getNumActiveNMs());
     Assert.assertEquals("Lost Nodes", initialLost + 1, cm.getNumLostNMs());
     Assert.assertEquals("Unhealthy Nodes", initialUnhealthy - 1,
@@ -405,7 +410,7 @@ public class TestRMNodeTransitions {
     RMNodeImpl node = getUnhealthyNode();
     verify(scheduler, times(2)).handle(any(NodeRemovedSchedulerEvent.class));
     node.handle(new RMNodeEvent(node.getNodeID(), RMNodeEventType.EXPIRE,
-        new TransactionStateImpl(-1, TransactionType.RM)));
+        new TransactionStateImpl( TransactionType.RM)));
     verify(scheduler, times(2)).handle(any(NodeRemovedSchedulerEvent.class));
     Assert.assertEquals(NodeState.LOST, node.getState());
   }
@@ -420,7 +425,7 @@ public class TestRMNodeTransitions {
     int initialDecommissioned = cm.getNumDecommisionedNMs();
     int initialRebooted = cm.getNumRebootedNMs();
     node.handle(new RMNodeEvent(node.getNodeID(), RMNodeEventType.DECOMMISSION,
-        new TransactionStateImpl(-1, TransactionType.RM)));
+        new TransactionStateImpl( TransactionType.RM)));
     Assert
         .assertEquals("Active Nodes", initialActive - 1, cm.getNumActiveNMs());
     Assert.assertEquals("Lost Nodes", initialLost, cm.getNumLostNMs());
@@ -443,7 +448,7 @@ public class TestRMNodeTransitions {
     int initialDecommissioned = cm.getNumDecommisionedNMs();
     int initialRebooted = cm.getNumRebootedNMs();
     node.handle(new RMNodeEvent(node.getNodeID(), RMNodeEventType.DECOMMISSION,
-        new TransactionStateImpl(-1, TransactionType.RM)));
+        new TransactionStateImpl( TransactionType.RM)));
     Assert.assertEquals("Active Nodes", initialActive, cm.getNumActiveNMs());
     Assert.assertEquals("Lost Nodes", initialLost, cm.getNumLostNMs());
     Assert.assertEquals("Unhealthy Nodes", initialUnhealthy - 1,
@@ -465,7 +470,7 @@ public class TestRMNodeTransitions {
     int initialDecommissioned = cm.getNumDecommisionedNMs();
     int initialRebooted = cm.getNumRebootedNMs();
     node.handle(new RMNodeEvent(node.getNodeID(), RMNodeEventType.REBOOTING,
-        new TransactionStateImpl(-1, TransactionType.RM)));
+        new TransactionStateImpl( TransactionType.RM)));
     Assert
         .assertEquals("Active Nodes", initialActive - 1, cm.getNumActiveNMs());
     Assert.assertEquals("Lost Nodes", initialLost, cm.getNumLostNMs());
@@ -488,7 +493,7 @@ public class TestRMNodeTransitions {
     int initialDecommissioned = cm.getNumDecommisionedNMs();
     int initialRebooted = cm.getNumRebootedNMs();
     node.handle(new RMNodeEvent(node.getNodeID(), RMNodeEventType.REBOOTING,
-        new TransactionStateImpl(-1, TransactionType.RM)));
+        new TransactionStateImpl( TransactionType.RM)));
     Assert.assertEquals("Active Nodes", initialActive, cm.getNumActiveNMs());
     Assert.assertEquals("Lost Nodes", initialLost, cm.getNumLostNMs());
     Assert.assertEquals("Unhealthy Nodes", initialUnhealthy - 1,
@@ -505,7 +510,7 @@ public class TestRMNodeTransitions {
     RMNodeImpl node = getRunningNode();
     NodeId nodeId = node.getNodeID();
 
-    int rpcID = HopYarnAPIUtilities.setYarnVariables(HopYarnAPIUtilities.RPC);
+    int rpcID = HopYarnAPIUtilities.getRPCID();
     byte[] allNMRequestData = new byte[1];
     allNMRequestData[0] = 0xA;
     try {
@@ -515,7 +520,7 @@ public class TestRMNodeTransitions {
       Logger.getLogger(TestRMNodeTransitions.class.getName())
           .log(Level.SEVERE, null, ex);
     }
-    TransactionState ts = new TransactionStateImpl(rpcID, TransactionType.RM);
+    TransactionState ts = new TransactionStateImpl(TransactionType.RM);
 
     // Expire a container
     ContainerId completedContainerId = BuilderUtils.newContainerId(BuilderUtils
@@ -523,10 +528,10 @@ public class TestRMNodeTransitions {
         0);
     node.handle(
         new RMNodeCleanContainerEvent(nodeId, completedContainerId, ts));
-    ts.decCounter("test");
+    ts.decCounter(TransactionState.TransactionType.INIT);
     Assert.assertEquals(1, node.getContainersToCleanUp().size());
 
-    rpcID = HopYarnAPIUtilities.setYarnVariables(HopYarnAPIUtilities.RPC);
+    rpcID = HopYarnAPIUtilities.getRPCID();
     allNMRequestData = new byte[1];
     allNMRequestData[0] = 0xA;
     try {
@@ -536,15 +541,15 @@ public class TestRMNodeTransitions {
       Logger.getLogger(TestRMNodeTransitions.class.getName())
           .log(Level.SEVERE, null, ex);
     }
-    TransactionState ts2 = new TransactionStateImpl(rpcID,
+    TransactionState ts2 = new TransactionStateImpl(
         TransactionType.RM);//TransactionStateRM.newInstance(rpcID);
 
     // Finish an application
     ApplicationId finishedAppId = BuilderUtils.newApplicationId(0, 1);
     node.handle(new RMNodeCleanAppEvent(nodeId, finishedAppId, ts2));
-    ts2.decCounter("test");
+    ts2.decCounter(TransactionState.TransactionType.INIT);
     Assert.assertEquals(1, node.getAppsToCleanup().size());
-    rpcID = HopYarnAPIUtilities.setYarnVariables(HopYarnAPIUtilities.RPC);
+    rpcID = HopYarnAPIUtilities.getRPCID();
     allNMRequestData = new byte[1];
     allNMRequestData[0] = 0xA;
     try {
@@ -554,7 +559,7 @@ public class TestRMNodeTransitions {
       Logger.getLogger(TestRMNodeTransitions.class.getName())
           .log(Level.SEVERE, null, ex);
     }
-    TransactionState ts3 = new TransactionStateImpl(rpcID,
+    TransactionState ts3 = new TransactionStateImpl(
         TransactionType.RM);//TransactionStateRM.newInstance(rpcID);
 
     // Verify status update does not clear containers/apps to cleanup
@@ -565,7 +570,7 @@ public class TestRMNodeTransitions {
         statusEvent.getKeepAliveAppIds(), statusEvent.getLatestResponse(), ts3);
     node.handle(se);
 
-    ts3.decCounter("test");
+    ts3.decCounter(TransactionState.TransactionType.INIT);
 
     Assert.assertEquals(1, node.getContainersToCleanUp().size());
     Assert.assertEquals(1, node.getAppsToCleanup().size());
@@ -585,7 +590,7 @@ public class TestRMNodeTransitions {
     NodeId nodeId = BuilderUtils.newNodeId("localhost", 0);
     Resource capability = Resource.newInstance(4096, 4);
 
-    int rpcID = HopYarnAPIUtilities.setYarnVariables(HopYarnAPIUtilities.RPC);
+    int rpcID = HopYarnAPIUtilities.getRPCID();
     byte[] allNMRequestData = new byte[10];
     try {
       RMUtilities
@@ -594,7 +599,7 @@ public class TestRMNodeTransitions {
       Logger.getLogger(TestRMNodeTransitions.class.getName())
           .log(Level.SEVERE, null, ex);
     }
-    TransactionState ts = new TransactionStateImpl(rpcID,
+    TransactionState ts = new TransactionStateImpl(
         TransactionType.RM);//TransactionStateRM.newInstance(rpcID);
 
     RMNodeImpl node =
@@ -602,7 +607,7 @@ public class TestRMNodeTransitions {
             ResourceOption.newInstance(capability,
                 RMNode.OVER_COMMIT_TIMEOUT_MILLIS_DEFAULT), null, false);
     ((TransactionStateImpl) ts).getRMContextInfo()
-        .toAddActiveRMNode(nodeId, node);
+        .toAddActiveRMNode(nodeId, node, 1);
     node.handle(new RMNodeEvent(node.getNodeID(), RMNodeEventType.STARTED, ts));
     Assert.assertEquals(NodeState.RUNNING, node.getState());
     return node;
@@ -614,7 +619,7 @@ public class TestRMNodeTransitions {
         NodeHealthStatus.newInstance(false, "sick", System.currentTimeMillis());
     node.handle(new RMNodeStatusEvent(node.getNodeID(), status,
         new ArrayList<ContainerStatus>(), null, null,
-        new TransactionStateImpl(-1, TransactionType.RM)));
+        new TransactionStateImpl( TransactionType.RM)));
     Assert.assertEquals(NodeState.UNHEALTHY, node.getState());
     return node;
   }
@@ -663,7 +668,7 @@ public class TestRMNodeTransitions {
     int initialDecommissioned = cm.getNumDecommisionedNMs();
     int initialRebooted = cm.getNumRebootedNMs();
     node.handle(new RMNodeReconnectEvent(node.getNodeID(), node,
-        new TransactionStateImpl(-1, TransactionType.RM)));
+        new TransactionStateImpl( TransactionType.RM)));
     Assert.assertEquals("Active Nodes", initialActive, cm.getNumActiveNMs());
     Assert.assertEquals("Lost Nodes", initialLost, cm.getNumLostNMs());
     Assert.assertEquals("Unhealthy Nodes", initialUnhealthy,

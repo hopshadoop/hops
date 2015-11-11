@@ -83,7 +83,7 @@ public class TestUtils {
     
     // No op 
     ContainerAllocationExpirer cae =
-        new ContainerAllocationExpirer(nullDispatcher);
+        new ContainerAllocationExpirer(nullDispatcher, null);
     
     Configuration conf = new Configuration();
     RMApplicationHistoryWriter writer = mock(RMApplicationHistoryWriter.class);
@@ -164,7 +164,8 @@ public class TestUtils {
     when(rmNode.getHostName()).thenReturn(host);
     when(rmNode.getRackName()).thenReturn(rack);
     
-    FiCaSchedulerNode node = spy(new FiCaSchedulerNode(rmNode, false));
+    FiCaSchedulerNode node = spy(new FiCaSchedulerNode(rmNode, false, 
+            getMockRMContext()));
     LOG.info("node = " + host + " avail=" + node.getAvailableResource());
     return node;
   }

@@ -250,13 +250,13 @@ public class TestSchedulerRecovery {
         mock(NMTokenSecretManagerInRM.class);
     RMContext rmContext = new RMContextImpl(rmDispatcher, null, null, null,
         mock(DelegationTokenRenewer.class), null, containerTokenSecretManager,
-        nmTokenSecretManager, null, null);
+        nmTokenSecretManager, null, null, conf);
     RMNodeImpl node =
         new RMNodeImpl(nodeId, rmContext, nodeId.getHost(), 0, 0, null, null,
             null, conf.getBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED,
             YarnConfiguration.DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED));
 
-    RMStateStore.RMState rmState = stateStore.loadState();
+    RMStateStore.RMState rmState = stateStore.loadState(rmContext);
     node.recover(rmState);
 
     rmContext.recover(rmState);
@@ -278,7 +278,7 @@ public class TestSchedulerRecovery {
             2);
     rmContext = new RMContextImpl(rmDispatcher, null, null, null,
         mock(DelegationTokenRenewer.class), null, containerTokenSecretManager,
-        nmTokenSecretManager, null, null);
+        nmTokenSecretManager, null, null, conf);
     rmContext.recover(rmState);
 
     Thread.sleep(
@@ -304,18 +304,7 @@ public class TestSchedulerRecovery {
     return attId;
   }
 
-  private TransactionState getTransactionState(int id) {
-    TransactionState ts =
-        new TransactionStateImpl(id, TransactionState.TransactionType.RM);
-    byte[] allNMRequestData = new byte[10];
-    try {
-      RMUtilities.persistAppMasterRPC(id, RPC.Type.SubmitApplication,
-          allNMRequestData);
-    } catch (IOException ex) {
-      LOG.error(ex);
-    }
-    return ts;
-  }
+
 
   private static ApplicationId getApplicationId(int id) {
     return ApplicationId.newInstance(123456, id);

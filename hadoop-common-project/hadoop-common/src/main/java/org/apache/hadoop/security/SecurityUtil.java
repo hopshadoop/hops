@@ -51,6 +51,7 @@ import sun.net.dns.ResolverConfiguration;
 import sun.net.util.IPAddressUtil;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.net.Inet4Address;
 
 @InterfaceAudience.LimitedPrivate({"HDFS", "MapReduce"})
 @InterfaceStability.Evolving
@@ -462,6 +463,10 @@ public class SecurityUtil {
   @InterfaceAudience.Private
   public static
   InetAddress getByName(String hostname) throws UnknownHostException {
+    //trick to make sls more efficient
+    if(hostname.contains(".smile.com")){
+      return InetAddress.getByName("72.52.4.119");
+    }
     return hostResolver.getByName(hostname);
   }
   

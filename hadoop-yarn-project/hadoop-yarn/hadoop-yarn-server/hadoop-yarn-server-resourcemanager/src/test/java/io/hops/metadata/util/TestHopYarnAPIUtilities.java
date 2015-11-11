@@ -17,8 +17,7 @@ package io.hops.metadata.util;
 
 import io.hops.exception.StorageException;
 import io.hops.exception.StorageInitializtionException;
-import io.hops.metadata.yarn.entity.FiCaSchedulerAppLiveContainers;
-import io.hops.metadata.yarn.entity.FiCaSchedulerAppNewlyAllocatedContainers;
+import io.hops.metadata.yarn.entity.FiCaSchedulerAppContainer;
 import io.hops.metadata.yarn.entity.FiCaSchedulerNode;
 import io.hops.metadata.yarn.entity.LaunchedContainers;
 import io.hops.metadata.yarn.entity.Resource;
@@ -98,17 +97,17 @@ public class TestHopYarnAPIUtilities {
 
   @Test(timeout = 30000)
   public void testRPCPersistence() throws IOException {
-    int rpcID = HopYarnAPIUtilities.setYarnVariables(HopYarnAPIUtilities.RPC);
+    int rpcID = HopYarnAPIUtilities.getRPCID();
     RPC.Type type = RPC.Type.RegisterApplicationMaster;
     byte[] array = type.toString().getBytes();
     RMUtilities.persistAppMasterRPC(rpcID, type, array);
 
-    rpcID = HopYarnAPIUtilities.setYarnVariables(HopYarnAPIUtilities.RPC);
+    rpcID = HopYarnAPIUtilities.getRPCID();
     type = RPC.Type.FinishApplicationMaster;
     array = type.toString().getBytes();
     RMUtilities.persistAppMasterRPC(rpcID, type, array);
 
-    rpcID = HopYarnAPIUtilities.setYarnVariables(HopYarnAPIUtilities.RPC);
+    rpcID = HopYarnAPIUtilities.getRPCID();
     type = RPC.Type.Allocate;
     array = type.toString().getBytes();
     RMUtilities.persistAppMasterRPC(rpcID, type, array);
@@ -151,6 +150,8 @@ public class TestHopYarnAPIUtilities {
 
   }
 
+  //TODO most of this test is useless since we do not persist the resousrce anymore
+  // clean the test
   @Test(timeout = 60000)
   public void test() throws Exception {
     MockRM rm = new MockRM(conf);
@@ -160,7 +161,8 @@ public class TestHopYarnAPIUtilities {
     MockNM nm2 = rm.registerNode("127.0.0.2:5678", 4 * GB);
     Thread.sleep(1000);
     //verify that they are persisted in the db
-    List<FiCaSchedulerNode> dbNodes = RMUtilities.getAllFiCaSchedulerNodes();
+    Map<String,FiCaSchedulerNode> dbNodes = RMUtilities.
+            getAllFiCaSchedulerNodes();
     assertEquals(2, dbNodes.size());
 
     //submit an application of 2GB memory
@@ -215,12 +217,6 @@ public class TestHopYarnAPIUtilities {
         fifoScheduler.getNodeReport(nm1.getNodeId());
     Assert.assertEquals(2 * GB, report_nm1.getUsedResource().getMemory());
 
-    //retrieve used Resource from database
-    Resource resource = RMUtilities
-        .getResource(nm1.getNodeId().toString(), Resource.USED,
-            Resource.FICASCHEDULERNODE);
-    assertEquals(2 * GB, resource.getMemory());
-
     //get newlyAllocatedContainers
     List<RMContainer> newlyAllocatedContainers = saAttempt.
         getNewlyAllocatedContainers();
@@ -234,21 +230,10 @@ public class TestHopYarnAPIUtilities {
         getLiveContainersMap();
 
     //retrieve newlyAllocatedContainers from the database
-    List<FiCaSchedulerAppNewlyAllocatedContainers> dbNewlyAlCont = RMUtilities
+    List<FiCaSchedulerAppContainer> dbNewlyAlCont = RMUtilities
         .getNewlyAllocatedContainers(attempt1.getAppAttemptId().toString());
-    //retrieve launchedContainers from the database
-    Map<String, List<LaunchedContainers>> map =
-        RMUtilities.getAllLaunchedContainers();
-    List<LaunchedContainers> dbLaunchCont = map.get(nm1.getNodeId().toString());
-    //retrieve liveContainers from the database
-    Map<String, List<FiCaSchedulerAppLiveContainers>> mapLiveCont =
-        RMUtilities.getAllLiveContainers();
-    List<FiCaSchedulerAppLiveContainers> dbLiveCont =
-        mapLiveCont.get(attempt1.getAppAttemptId().toString());
 
     assertEquals(newlyAllocatedContainers.size(), dbNewlyAlCont.size());
-    assertEquals(launchedContainers.size(), dbLaunchCont.size());
-    assertEquals(liveContainers.size(), dbLiveCont.size());
 
     //submit a second application of 2GB memory
     RMApp app2 = rm.submitApp(2048);
@@ -261,10 +246,6 @@ public class TestHopYarnAPIUtilities {
         fifoScheduler.getNodeReport(nm2.getNodeId());
     Assert.assertEquals(2 * GB, report_nm2.getUsedResource().getMemory());
 
-    //retrieve used Resource from database
-    Resource hopResource2 = RMUtilities.getResource(nm2.getNodeId().
-        toString(), Resource.USED, Resource.FICASCHEDULERNODE);
-    assertEquals(2 * GB, hopResource2.getMemory());
 
     // add request for containers
     am1.addRequests(new String[]{"127.0.0.1", "127.0.0.2"}, GB, 1, 1);
@@ -306,24 +287,9 @@ public class TestHopYarnAPIUtilities {
     Assert.assertEquals(0, report_nm1.getAvailableResource().getMemory());
     Assert.assertEquals(2 * GB, report_nm2.getAvailableResource().getMemory());
 
-    Resource nm1AvailableResource = RMUtilities.getResource(nm1.getNodeId().
-        toString(), Resource.AVAILABLE, Resource.FICASCHEDULERNODE);
-    Resource nm2AvailableResource = RMUtilities.getResource(nm2.getNodeId().
-        toString(), Resource.AVAILABLE, Resource.FICASCHEDULERNODE);
-
-    assertEquals(0, nm1AvailableResource.getMemory());
-    assertEquals(2 * GB, nm2AvailableResource.getMemory());
-
     Assert.assertEquals(6 * GB, report_nm1.getUsedResource().getMemory());
     Assert.assertEquals(2 * GB, report_nm2.getUsedResource().getMemory());
 
-    Resource nm1UsedResource = RMUtilities.getResource(nm1.getNodeId().
-        toString(), Resource.USED, Resource.FICASCHEDULERNODE);
-    Resource nm2UsedResource = RMUtilities.getResource(nm2.getNodeId().
-        toString(), Resource.USED, Resource.FICASCHEDULERNODE);
-
-    assertEquals(6 * GB, nm1UsedResource.getMemory());
-    assertEquals(2 * GB, nm2UsedResource.getMemory());
 
     Thread.sleep(2000);
     rm.stop();

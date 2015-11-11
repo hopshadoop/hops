@@ -54,6 +54,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.io.IOException;
+import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 
 public class TestNMExpiry {
   private static final Log LOG = LogFactory.getLog(TestNMExpiry.class);
@@ -63,8 +64,8 @@ public class TestNMExpiry {
   ResourceTrackerService resourceTrackerService;
 
   private class TestNmLivelinessMonitor extends NMLivelinessMonitor {
-    public TestNmLivelinessMonitor(Dispatcher dispatcher) {
-      super(dispatcher);
+    public TestNmLivelinessMonitor(Dispatcher dispatcher, RMContext rmContext) {
+      super(dispatcher, rmContext);
     }
 
     @Override
@@ -89,7 +90,7 @@ public class TestNMExpiry {
     Dispatcher dispatcher = new InlineDispatcher();
     RMContextImpl context =
         new RMContextImpl(dispatcher, null, null, null, null, null, null, null,
-            null);
+            conf);
     groupMembership = new GroupMembershipService(null, context);
     context.setRMGroupMembershipService(groupMembership);
     dispatcher.register(SchedulerEventType.class,
@@ -97,7 +98,7 @@ public class TestNMExpiry {
     dispatcher
         .register(RMNodeEventType.class, new NodeEventDispatcher(context));
     NMLivelinessMonitor nmLivelinessMonitor =
-        new TestNmLivelinessMonitor(dispatcher);
+        new TestNmLivelinessMonitor(dispatcher, context);
     nmLivelinessMonitor.init(conf);
     nmLivelinessMonitor.start();
     NodesListManager nodesListManager = new NodesListManager(context);

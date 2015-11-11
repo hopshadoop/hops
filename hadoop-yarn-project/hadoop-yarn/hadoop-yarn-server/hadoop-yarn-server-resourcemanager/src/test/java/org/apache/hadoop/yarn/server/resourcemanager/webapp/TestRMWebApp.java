@@ -163,7 +163,7 @@ public class TestRMWebApp {
       deactivatedNodesMap.put(node.getHostName(), node);
     }
     return new RMContextImpl(null, null, null, null, null, null, null, null,
-        null) {
+        new YarnConfiguration()) {
       @Override
       public ConcurrentMap<ApplicationId, RMApp> getRMApps() {
         return applicationsMaps;
@@ -205,7 +205,7 @@ public class TestRMWebApp {
     CapacityScheduler cs = new CapacityScheduler();
     cs.setConf(new YarnConfiguration());
     cs.reinitialize(conf, new RMContextImpl(null, null, null, null, null, null,
-        new ClientToAMTokenSecretManagerInRM(), null, conf));
+        new ClientToAMTokenSecretManagerInRM(), null, conf), null);
     return cs;
   }
 
@@ -279,7 +279,7 @@ public class TestRMWebApp {
 
     FifoScheduler fs = new FifoScheduler();
     fs.setConf(new YarnConfiguration());
-    fs.reinitialize(conf, null);
+    fs.reinitialize(conf, null, null);
     return fs;
   }
 

@@ -36,6 +36,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.impl.pb.Ap
 import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
+import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 
 @Private
 @Unstable
@@ -53,7 +54,7 @@ public class MemoryRMStateStore extends RMStateStore {
   }
 
   @Override
-  public synchronized RMState loadState() throws Exception {
+  public synchronized RMState loadState(RMContext rmContext) throws Exception {
     // return a copy of the state to allow for modification of the real state
     RMState returnState = new RMState();
     returnState.appState.putAll(state.appState);

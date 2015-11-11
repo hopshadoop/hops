@@ -16,6 +16,8 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity;
 
+import io.hops.ha.common.TransactionState;
+import io.hops.ha.common.TransactionStateImpl;
 import io.hops.metadata.util.RMStorageFactory;
 import io.hops.metadata.util.RMUtilities;
 import io.hops.metadata.util.YarnAPIStorageFactory;
@@ -109,6 +111,8 @@ public class TestCapacityScheduler {
     RMUtilities.InitializeDB();
     conf.setClass(YarnConfiguration.RM_SCHEDULER, CapacityScheduler.class,
         ResourceScheduler.class);
+    conf.setInt(YarnConfiguration.HOPS_BATCH_MAX_DURATION, 60000);
+    conf.setInt(YarnConfiguration.HOPS_BATCH_MAX_SIZE, 10000);
     resourceManager.init(conf);
     resourceManager.getRMContext().getContainerTokenSecretManager()
         .rollMasterKey();
@@ -131,7 +135,7 @@ public class TestCapacityScheduler {
     conf.setInt(YarnConfiguration.RM_SCHEDULER_MINIMUM_ALLOCATION_MB, 2048);
     conf.setInt(YarnConfiguration.RM_SCHEDULER_MAXIMUM_ALLOCATION_MB, 1024);
     try {
-      scheduler.reinitialize(conf, mockContext);
+      scheduler.reinitialize(conf, mockContext, null);
       fail("Exception is expected because the min memory allocation is" +
           " larger than the max memory allocation.");
     } catch (YarnRuntimeException e) {
@@ -144,7 +148,7 @@ public class TestCapacityScheduler {
     conf.setInt(YarnConfiguration.RM_SCHEDULER_MINIMUM_ALLOCATION_VCORES, 2);
     conf.setInt(YarnConfiguration.RM_SCHEDULER_MAXIMUM_ALLOCATION_VCORES, 1);
     try {
-      scheduler.reinitialize(conf, mockContext);
+      scheduler.reinitialize(conf, mockContext, null);
       fail("Exception is expected because the min vcores allocation is" +
           " larger than the max vcores allocation.");
     } catch (YarnRuntimeException e) {
@@ -163,12 +167,12 @@ public class TestCapacityScheduler {
             resourceManager);
     NodeAddedSchedulerEvent nodeAddEvent1 = new NodeAddedSchedulerEvent(
         resourceManager.getRMContext().getActiveRMNodes().get(nm.getNodeId()),
-        null);
+        new TransactionStateImpl( TransactionState.TransactionType.RM));
     resourceManager.getResourceScheduler().handle(nodeAddEvent1);
     return nm;
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testCapacityScheduler() throws Exception {
 
     LOG.info("--- START: testCapacityScheduler ---");
@@ -298,7 +302,8 @@ public class TestCapacityScheduler {
         resourceManager.getRMContext().getActiveRMNodes().get(nm.getNodeId());
     // Send a heartbeat to kick the tires on the Scheduler
     NodeUpdateSchedulerEvent nodeUpdate =
-        new NodeUpdateSchedulerEvent(node, null);
+ new NodeUpdateSchedulerEvent(node,
+            new TransactionStateImpl( TransactionState.TransactionType.RM));
     resourceManager.getResourceScheduler().handle(nodeUpdate);
   }
 
@@ -328,7 +333,7 @@ public class TestCapacityScheduler {
     LOG.info("Setup top-level queues a and b");
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testMaximumCapacitySetup() {
     float delta = 0.0000001f;
     CapacitySchedulerConfiguration conf = new CapacitySchedulerConfiguration();
@@ -341,19 +346,19 @@ public class TestCapacityScheduler {
         conf.getMaximumCapacity(A), delta);
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testRefreshQueues() throws Exception {
     CapacityScheduler cs = new CapacityScheduler();
     CapacitySchedulerConfiguration conf = new CapacitySchedulerConfiguration();
     setupQueueConfiguration(conf);
     cs.setConf(new YarnConfiguration());
     cs.reinitialize(conf, new RMContextImpl(null, null, null, null, null, null,
-        new ClientToAMTokenSecretManagerInRM(), null, conf));
+        new ClientToAMTokenSecretManagerInRM(), null, conf), null);
     checkQueueCapacities(cs, A_CAPACITY, B_CAPACITY);
 
     conf.setCapacity(A, 80f);
     conf.setCapacity(B, 20f);
-    cs.reinitialize(conf, mockContext);
+    cs.reinitialize(conf, mockContext, null);
     checkQueueCapacities(cs, 80f, 20f);
   }
 
@@ -436,7 +441,7 @@ public class TestCapacityScheduler {
    *
    * @throws IOException
    */
-  @Test(expected = IOException.class)
+  @Test(timeout = 30000, expected = IOException.class)
   public void testParseQueue() throws IOException {
     CapacityScheduler cs = new CapacityScheduler();
     cs.setConf(new YarnConfiguration());
@@ -450,10 +455,10 @@ public class TestCapacityScheduler {
         100.0f);
 
     cs.reinitialize(conf, new RMContextImpl(null, null, null, null, null, null,
-        new ClientToAMTokenSecretManagerInRM(), null, conf));
+        new ClientToAMTokenSecretManagerInRM(), null, conf), null);
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testReconnectedNode() throws Exception {
     CapacitySchedulerConfiguration csConf =
         new CapacitySchedulerConfiguration();
@@ -462,32 +467,36 @@ public class TestCapacityScheduler {
     cs.setConf(new YarnConfiguration());
     cs.reinitialize(csConf,
         new RMContextImpl(null, null, null, null, null, null,
-            new ClientToAMTokenSecretManagerInRM(), null, csConf));
+            new ClientToAMTokenSecretManagerInRM(), null, csConf), null);
 
     RMNode n1 = MockNodes.newNodeInfo(0, MockNodes.newResource(4 * GB), 1);
     RMNode n2 = MockNodes.newNodeInfo(0, MockNodes.newResource(2 * GB), 2);
 
-    cs.handle(new NodeAddedSchedulerEvent(n1, null));
-    cs.handle(new NodeAddedSchedulerEvent(n2, null));
+    cs.handle(new NodeAddedSchedulerEvent(n1, new TransactionStateImpl(
+            TransactionState.TransactionType.RM)));
+    cs.handle(new NodeAddedSchedulerEvent(n2, new TransactionStateImpl(
+            TransactionState.TransactionType.RM)));
 
     Assert.assertEquals(6 * GB, cs.getClusterResources().getMemory());
 
     // reconnect n1 with downgraded memory
     n1 = MockNodes.newNodeInfo(0, MockNodes.newResource(2 * GB), 1);
-    cs.handle(new NodeRemovedSchedulerEvent(n1, null));
-    cs.handle(new NodeAddedSchedulerEvent(n1, null));
+    cs.handle(new NodeRemovedSchedulerEvent(n1, new TransactionStateImpl(
+            TransactionState.TransactionType.RM)));
+    cs.handle(new NodeAddedSchedulerEvent(n1, new TransactionStateImpl(
+            TransactionState.TransactionType.RM)));
 
     Assert.assertEquals(4 * GB, cs.getClusterResources().getMemory());
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testRefreshQueuesWithNewQueue() throws Exception {
     CapacityScheduler cs = new CapacityScheduler();
     CapacitySchedulerConfiguration conf = new CapacitySchedulerConfiguration();
     setupQueueConfiguration(conf);
     cs.setConf(new YarnConfiguration());
     cs.reinitialize(conf, new RMContextImpl(null, null, null, null, null, null,
-        new ClientToAMTokenSecretManagerInRM(), null, conf));
+        new ClientToAMTokenSecretManagerInRM(), null, conf), null);
     checkQueueCapacities(cs, A_CAPACITY, B_CAPACITY);
 
     // Add a new queue b4
@@ -503,7 +512,7 @@ public class TestCapacityScheduler {
       conf.setCapacity(B2, B2_CAPACITY);
       conf.setCapacity(B3, B3_CAPACITY);
       conf.setCapacity(B4, B4_CAPACITY);
-      cs.reinitialize(conf, mockContext);
+      cs.reinitialize(conf, mockContext, null);
       checkQueueCapacities(cs, 80f, 20f);
 
       // Verify parent for B4
@@ -517,7 +526,7 @@ public class TestCapacityScheduler {
     }
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testCapacitySchedulerInfo() throws Exception {
     QueueInfo queueInfo =
         resourceManager.getResourceScheduler().getQueueInfo("a", true, true);
@@ -546,7 +555,7 @@ public class TestCapacityScheduler {
   }
 
   @SuppressWarnings("resource")
-  @Test
+  @Test(timeout = 30000)
   public void testBlackListNodes() throws Exception {
     Configuration conf = new Configuration();
     conf.setClass(YarnConfiguration.RM_SCHEDULER, CapacityScheduler.class,
@@ -558,27 +567,33 @@ public class TestCapacityScheduler {
     String host = "127.0.0.1";
     RMNode node =
         MockNodes.newNodeInfo(0, MockNodes.newResource(4 * GB), 1, host);
-    cs.handle(new NodeAddedSchedulerEvent(node, null));
+    cs.handle(new NodeAddedSchedulerEvent(node, new TransactionStateImpl(
+            TransactionState.TransactionType.RM)));
 
     ApplicationId appId = BuilderUtils.newApplicationId(100, 1);
     ApplicationAttemptId appAttemptId =
         BuilderUtils.newApplicationAttemptId(appId, 1);
     SchedulerEvent addAppEvent =
-        new AppAddedSchedulerEvent(appId, "default", "user", null);
+ new AppAddedSchedulerEvent(appId, "default",
+            "user", new TransactionStateImpl(
+                    TransactionState.TransactionType.RM));
     cs.handle(addAppEvent);
     SchedulerEvent addAttemptEvent =
-        new AppAttemptAddedSchedulerEvent(appAttemptId, false, null);
+ new AppAttemptAddedSchedulerEvent(
+            appAttemptId, false, new TransactionStateImpl(
+                    TransactionState.TransactionType.RM));
     cs.handle(addAttemptEvent);
 
     // Verify the blacklist can be updated independent of requesting containers
     cs.allocate(appAttemptId, Collections.<ResourceRequest>emptyList(),
         Collections.<ContainerId>emptyList(), Collections.singletonList(host),
-        null, null);
+        null, new TransactionStateImpl( TransactionState.TransactionType.RM));
     Assert
         .assertTrue(cs.getApplicationAttempt(appAttemptId).isBlacklisted(host));
     cs.allocate(appAttemptId, Collections.<ResourceRequest>emptyList(),
         Collections.<ContainerId>emptyList(), null,
-        Collections.singletonList(host), null);
+            Collections.singletonList(host), new TransactionStateImpl(
+                    TransactionState.TransactionType.RM));
     Assert.assertFalse(
         cs.getApplicationAttempt(appAttemptId).isBlacklisted(host));
     rm.stop();
@@ -604,7 +619,7 @@ public class TestCapacityScheduler {
     assertTrue(appComparator.compare(app2, app3) < 0);
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testGetAppsInQueue() throws Exception {
     Application application_0 =
         new Application("user_0", "a1", resourceManager);
@@ -637,7 +652,7 @@ public class TestCapacityScheduler {
     Assert.assertNull(scheduler.getAppsInQueue("nonexistentqueue"));
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testAddAndRemoveAppFromCapacityScheduler() throws Exception {
 
     AsyncDispatcher rmDispatcher = new AsyncDispatcher();
@@ -646,7 +661,7 @@ public class TestCapacityScheduler {
     setupQueueConfiguration(conf);
     cs.reinitialize(conf,
         new RMContextImpl(rmDispatcher, null, null, null, null, null,
-            new ClientToAMTokenSecretManagerInRM(), null, conf));
+            new ClientToAMTokenSecretManagerInRM(), null, conf), null);
 
     SchedulerApplication app = TestSchedulerUtils
         .verifyAppAddedAndRemovedFromScheduler(cs.getSchedulerApplications(),
@@ -654,7 +669,7 @@ public class TestCapacityScheduler {
     Assert.assertEquals("a1", app.getQueue().getQueueName());
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testAsyncScheduling() throws Exception {
     Configuration conf = new Configuration();
     conf.setClass(YarnConfiguration.RM_SCHEDULER, CapacityScheduler.class,
@@ -670,12 +685,14 @@ public class TestCapacityScheduler {
       String host = "192.168.1." + i;
       RMNode node =
           MockNodes.newNodeInfo(0, MockNodes.newResource(4 * GB), 1, host);
-      cs.handle(new NodeAddedSchedulerEvent(node, null));
+      cs.handle(new NodeAddedSchedulerEvent(node, new TransactionStateImpl(
+              TransactionState.TransactionType.RM)));
     }
 
     // Now directly exercise the scheduling loop
     for (int i = 0; i < NODES; ++i) {
-      CapacityScheduler.schedule(cs, null);
+      CapacityScheduler.schedule(cs, new TransactionStateImpl(
+              TransactionState.TransactionType.RM));
     }
   }
 

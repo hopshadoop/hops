@@ -19,6 +19,7 @@
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity;
 
 import io.hops.ha.common.TransactionState;
+import io.hops.ha.common.TransactionStateImpl;
 import junit.framework.Assert;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -144,11 +145,15 @@ public class TestParentQueue {
         final Resource allocatedResource = Resources.createResource(allocation);
         if (queue instanceof ParentQueue) {
           ((ParentQueue) queue)
-              .allocateResource(clusterResource, allocatedResource);
+                  .allocateResource(clusterResource, allocatedResource,
+                          new TransactionStateImpl(
+                                  TransactionState.TransactionType.RM));
         } else {
           FiCaSchedulerApp app1 = getMockApplication(0, "");
           ((LeafQueue) queue)
-              .allocateResource(clusterResource, app1, allocatedResource);
+                  .allocateResource(clusterResource, app1, allocatedResource,
+                          new TransactionStateImpl(
+                                  TransactionState.TransactionType.RM));
         }
         
         // Next call - nothing
@@ -200,7 +205,8 @@ public class TestParentQueue {
     
     Map<String, CSQueue> queues = new HashMap<String, CSQueue>();
     CSQueue root = CapacityScheduler.parseQueue(csContext, csConf, null,
-        CapacitySchedulerConfiguration.ROOT, queues, queues, TestUtils.spyHook);
+        CapacitySchedulerConfiguration.ROOT, queues, queues, TestUtils.spyHook,
+        null);
 
     // Setup some nodes
     final int memoryPerNode = 10;
@@ -224,14 +230,16 @@ public class TestParentQueue {
     // Simulate B returning a container on node_0
     stubQueueAllocation(a, clusterResource, node_0, 0 * GB);
     stubQueueAllocation(b, clusterResource, node_0, 1 * GB);
-    root.assignContainers(clusterResource, node_0, null);
+    root.assignContainers(clusterResource, node_0, new TransactionStateImpl(
+            TransactionState.TransactionType.RM));
     verifyQueueMetrics(a, 0 * GB, clusterResource);
     verifyQueueMetrics(b, 1 * GB, clusterResource);
     
     // Now, A should get the scheduling opportunity since A=0G/6G, B=1G/14G
     stubQueueAllocation(a, clusterResource, node_1, 2 * GB);
     stubQueueAllocation(b, clusterResource, node_1, 1 * GB);
-    root.assignContainers(clusterResource, node_1, null);
+    root.assignContainers(clusterResource, node_1, new TransactionStateImpl(
+            TransactionState.TransactionType.RM));
     InOrder allocationOrder = inOrder(a, b);
     allocationOrder.verify(a)
         .assignContainers(eq(clusterResource), any(FiCaSchedulerNode.class),
@@ -246,7 +254,8 @@ public class TestParentQueue {
     // since A has 2/6G while B has 2/14G
     stubQueueAllocation(a, clusterResource, node_0, 1 * GB);
     stubQueueAllocation(b, clusterResource, node_0, 2 * GB);
-    root.assignContainers(clusterResource, node_0, null);
+    root.assignContainers(clusterResource, node_0, new TransactionStateImpl(
+            TransactionState.TransactionType.RM));
     allocationOrder = inOrder(b, a);
     allocationOrder.verify(b)
         .assignContainers(eq(clusterResource), any(FiCaSchedulerNode.class),
@@ -261,7 +270,8 @@ public class TestParentQueue {
     // since A has 3/6G while B has 4/14G
     stubQueueAllocation(a, clusterResource, node_0, 0 * GB);
     stubQueueAllocation(b, clusterResource, node_0, 4 * GB);
-    root.assignContainers(clusterResource, node_0, null);
+    root.assignContainers(clusterResource, node_0, new TransactionStateImpl(
+            TransactionState.TransactionType.RM));
     allocationOrder = inOrder(b, a);
     allocationOrder.verify(b)
         .assignContainers(eq(clusterResource), any(FiCaSchedulerNode.class),
@@ -276,7 +286,8 @@ public class TestParentQueue {
     // since A has 3/6G while B has 8/14G
     stubQueueAllocation(a, clusterResource, node_1, 1 * GB);
     stubQueueAllocation(b, clusterResource, node_1, 1 * GB);
-    root.assignContainers(clusterResource, node_1, null);
+    root.assignContainers(clusterResource, node_1, new TransactionStateImpl(
+            TransactionState.TransactionType.RM));
     allocationOrder = inOrder(a, b);
     allocationOrder.verify(b)
         .assignContainers(eq(clusterResource), any(FiCaSchedulerNode.class),
@@ -302,7 +313,7 @@ public class TestParentQueue {
     try {
       CapacityScheduler.parseQueue(csContext, csConf, null,
           CapacitySchedulerConfiguration.ROOT, queues, queues,
-          TestUtils.spyHook);
+          TestUtils.spyHook, null);
     } catch (IllegalArgumentException ie) {
       exceptionOccured = true;
     }
@@ -316,7 +327,7 @@ public class TestParentQueue {
     try {
       CapacityScheduler.parseQueue(csContext, csConf, null,
           CapacitySchedulerConfiguration.ROOT, queues, queues,
-          TestUtils.spyHook);
+          TestUtils.spyHook, null);
     } catch (IllegalArgumentException ie) {
       exceptionOccured = true;
     }
@@ -330,7 +341,7 @@ public class TestParentQueue {
     try {
       CapacityScheduler.parseQueue(csContext, csConf, null,
           CapacitySchedulerConfiguration.ROOT, queues, queues,
-          TestUtils.spyHook);
+          TestUtils.spyHook, null);
     } catch (IllegalArgumentException ie) {
       exceptionOccured = true;
     }
@@ -406,7 +417,8 @@ public class TestParentQueue {
     
     Map<String, CSQueue> queues = new HashMap<String, CSQueue>();
     CSQueue root = CapacityScheduler.parseQueue(csContext, csConf, null,
-        CapacitySchedulerConfiguration.ROOT, queues, queues, TestUtils.spyHook);
+        CapacitySchedulerConfiguration.ROOT, queues, queues, TestUtils.spyHook, 
+        null);
     
     // Setup some nodes
     final int memoryPerNode = 10;
@@ -443,7 +455,8 @@ public class TestParentQueue {
     stubQueueAllocation(b, clusterResource, node_0, 0 * GB);
     stubQueueAllocation(c, clusterResource, node_0, 1 * GB);
     stubQueueAllocation(d, clusterResource, node_0, 0 * GB);
-    root.assignContainers(clusterResource, node_0, null);
+    root.assignContainers(clusterResource, node_0, new TransactionStateImpl(
+            TransactionState.TransactionType.RM));
     verifyQueueMetrics(a, 0 * GB, clusterResource);
     verifyQueueMetrics(b, 0 * GB, clusterResource);
     verifyQueueMetrics(c, 1 * GB, clusterResource);
@@ -457,7 +470,8 @@ public class TestParentQueue {
     stubQueueAllocation(a, clusterResource, node_1, 0 * GB);
     stubQueueAllocation(b2, clusterResource, node_1, 4 * GB);
     stubQueueAllocation(c, clusterResource, node_1, 0 * GB);
-    root.assignContainers(clusterResource, node_1, null);
+    root.assignContainers(clusterResource, node_1, new TransactionStateImpl(
+            TransactionState.TransactionType.RM));
     verifyQueueMetrics(a, 0 * GB, clusterResource);
     verifyQueueMetrics(b, 4 * GB, clusterResource);
     verifyQueueMetrics(c, 1 * GB, clusterResource);
@@ -470,7 +484,8 @@ public class TestParentQueue {
     stubQueueAllocation(a1, clusterResource, node_0, 1 * GB);
     stubQueueAllocation(b3, clusterResource, node_0, 2 * GB);
     stubQueueAllocation(c, clusterResource, node_0, 2 * GB);
-    root.assignContainers(clusterResource, node_0, null);
+    root.assignContainers(clusterResource, node_0, new TransactionStateImpl(
+            TransactionState.TransactionType.RM));
     InOrder allocationOrder = inOrder(a, c, b);
     allocationOrder.verify(a)
         .assignContainers(eq(clusterResource), any(FiCaSchedulerNode.class),
@@ -501,7 +516,8 @@ public class TestParentQueue {
     stubQueueAllocation(b3, clusterResource, node_2, 1 * GB);
     stubQueueAllocation(b1, clusterResource, node_2, 1 * GB);
     stubQueueAllocation(c, clusterResource, node_2, 1 * GB);
-    root.assignContainers(clusterResource, node_2, null);
+    root.assignContainers(clusterResource, node_2, new TransactionStateImpl(
+            TransactionState.TransactionType.RM));
     allocationOrder = inOrder(a, a2, a1, b, c);
     allocationOrder.verify(a)
         .assignContainers(eq(clusterResource), any(FiCaSchedulerNode.class),
@@ -536,7 +552,8 @@ public class TestParentQueue {
     
     Map<String, CSQueue> queues = new HashMap<String, CSQueue>();
     CapacityScheduler.parseQueue(csContext, csConf, null,
-        CapacitySchedulerConfiguration.ROOT, queues, queues, TestUtils.spyHook);
+        CapacitySchedulerConfiguration.ROOT, queues, queues, TestUtils.spyHook, 
+        null);
   }
   
   @Test(expected = IllegalArgumentException.class)
@@ -552,7 +569,8 @@ public class TestParentQueue {
 
     Map<String, CSQueue> queues = new HashMap<String, CSQueue>();
     CapacityScheduler.parseQueue(csContext, csConf, null,
-        CapacitySchedulerConfiguration.ROOT, queues, queues, TestUtils.spyHook);
+        CapacitySchedulerConfiguration.ROOT, queues, queues, TestUtils.spyHook, 
+        null);
   }
   
   @Test
@@ -574,7 +592,7 @@ public class TestParentQueue {
     try {
       CapacityScheduler.parseQueue(csContext, csConf, null,
           CapacitySchedulerConfiguration.ROOT, queues, queues,
-          TestUtils.spyHook);
+          TestUtils.spyHook, null);
     } catch (IllegalArgumentException e) {
       fail("Failed to create queues with 0 capacity: " + e);
     }
@@ -588,7 +606,8 @@ public class TestParentQueue {
     
     Map<String, CSQueue> queues = new HashMap<String, CSQueue>();
     CSQueue root = CapacityScheduler.parseQueue(csContext, csConf, null,
-        CapacitySchedulerConfiguration.ROOT, queues, queues, TestUtils.spyHook);
+        CapacitySchedulerConfiguration.ROOT, queues, queues, TestUtils.spyHook, 
+        null);
 
     // Setup some nodes
     final int memoryPerNode = 10;
@@ -613,8 +632,9 @@ public class TestParentQueue {
     stubQueueAllocation(a, clusterResource, node_0, 0 * GB,
         NodeType.OFF_SWITCH);
     stubQueueAllocation(b, clusterResource, node_0, 1 * GB,
-        NodeType.OFF_SWITCH);
-    root.assignContainers(clusterResource, node_0, null);
+            NodeType.OFF_SWITCH);
+    root.assignContainers(clusterResource, node_0, new TransactionStateImpl(
+            TransactionState.TransactionType.RM));
     verifyQueueMetrics(a, 0 * GB, clusterResource);
     verifyQueueMetrics(b, 1 * GB, clusterResource);
     
@@ -623,8 +643,9 @@ public class TestParentQueue {
     stubQueueAllocation(a, clusterResource, node_1, 2 * GB,
         NodeType.RACK_LOCAL);
     stubQueueAllocation(b, clusterResource, node_1, 1 * GB,
-        NodeType.OFF_SWITCH);
-    root.assignContainers(clusterResource, node_1, null);
+            NodeType.OFF_SWITCH);
+    root.assignContainers(clusterResource, node_1, new TransactionStateImpl(
+            TransactionState.TransactionType.RM));
     InOrder allocationOrder = inOrder(a, b);
     allocationOrder.verify(a)
         .assignContainers(eq(clusterResource), any(FiCaSchedulerNode.class),
@@ -641,8 +662,9 @@ public class TestParentQueue {
     stubQueueAllocation(a, clusterResource, node_0, 1 * GB,
         NodeType.NODE_LOCAL);
     stubQueueAllocation(b, clusterResource, node_0, 2 * GB,
-        NodeType.OFF_SWITCH);
-    root.assignContainers(clusterResource, node_0, null);
+            NodeType.OFF_SWITCH);
+    root.assignContainers(clusterResource, node_0, new TransactionStateImpl(
+            TransactionState.TransactionType.RM));
     allocationOrder = inOrder(b, a);
     allocationOrder.verify(b)
         .assignContainers(eq(clusterResource), any(FiCaSchedulerNode.class),
@@ -662,7 +684,8 @@ public class TestParentQueue {
     //B3
     Map<String, CSQueue> queues = new HashMap<String, CSQueue>();
     CSQueue root = CapacityScheduler.parseQueue(csContext, csConf, null,
-        CapacitySchedulerConfiguration.ROOT, queues, queues, TestUtils.spyHook);
+        CapacitySchedulerConfiguration.ROOT, queues, queues, TestUtils.spyHook, 
+        null);
 
     // Setup some nodes
     final int memoryPerNode = 10;
@@ -687,8 +710,9 @@ public class TestParentQueue {
     stubQueueAllocation(b2, clusterResource, node_0, 0 * GB,
         NodeType.OFF_SWITCH);
     stubQueueAllocation(b3, clusterResource, node_0, 1 * GB,
-        NodeType.OFF_SWITCH);
-    root.assignContainers(clusterResource, node_0, null);
+            NodeType.OFF_SWITCH);
+    root.assignContainers(clusterResource, node_0, new TransactionStateImpl(
+            TransactionState.TransactionType.RM));
     verifyQueueMetrics(b2, 0 * GB, clusterResource);
     verifyQueueMetrics(b3, 1 * GB, clusterResource);
     
@@ -697,8 +721,9 @@ public class TestParentQueue {
     stubQueueAllocation(b2, clusterResource, node_1, 1 * GB,
         NodeType.RACK_LOCAL);
     stubQueueAllocation(b3, clusterResource, node_1, 1 * GB,
-        NodeType.OFF_SWITCH);
-    root.assignContainers(clusterResource, node_1, null);
+            NodeType.OFF_SWITCH);
+    root.assignContainers(clusterResource, node_1, new TransactionStateImpl(
+            TransactionState.TransactionType.RM));
     InOrder allocationOrder = inOrder(b2, b3);
     allocationOrder.verify(b2)
         .assignContainers(eq(clusterResource), any(FiCaSchedulerNode.class),
@@ -715,8 +740,9 @@ public class TestParentQueue {
     stubQueueAllocation(b2, clusterResource, node_0, 1 * GB,
         NodeType.NODE_LOCAL);
     stubQueueAllocation(b3, clusterResource, node_0, 1 * GB,
-        NodeType.OFF_SWITCH);
-    root.assignContainers(clusterResource, node_0, null);
+            NodeType.OFF_SWITCH);
+    root.assignContainers(clusterResource, node_0, new TransactionStateImpl(
+            TransactionState.TransactionType.RM));
     allocationOrder = inOrder(b3, b2);
     allocationOrder.verify(b3)
         .assignContainers(eq(clusterResource), any(FiCaSchedulerNode.class),
@@ -758,7 +784,8 @@ public class TestParentQueue {
 
     Map<String, CSQueue> queues = new HashMap<String, CSQueue>();
     CSQueue root = CapacityScheduler.parseQueue(csContext, csConf, null,
-        CapacitySchedulerConfiguration.ROOT, queues, queues, TestUtils.spyHook);
+        CapacitySchedulerConfiguration.ROOT, queues, queues, TestUtils.spyHook, 
+        null);
 
     UserGroupInformation user = UserGroupInformation.getCurrentUser();
     // Setup queue configs

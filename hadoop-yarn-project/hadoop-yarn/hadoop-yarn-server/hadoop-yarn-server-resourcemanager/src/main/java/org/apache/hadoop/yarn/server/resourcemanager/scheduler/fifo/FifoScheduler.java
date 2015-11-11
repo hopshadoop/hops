@@ -19,6 +19,7 @@ package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fifo;
 import com.google.common.annotations.VisibleForTesting;
 import io.hops.ha.common.TransactionState;
 import io.hops.ha.common.TransactionStateImpl;
+import io.hops.ha.common.transactionStateWrapper;
 import io.hops.metadata.yarn.entity.AppSchedulingInfo;
 import io.hops.metadata.yarn.entity.FiCaSchedulerNode;
 import io.hops.metadata.yarn.entity.QueueMetrics;
@@ -95,6 +96,7 @@ import org.apache.hadoop.yarn.util.resource.Resources;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -129,6 +131,9 @@ public class FifoScheduler extends AbstractYarnScheduler
       metrics;//recovered
   private final ResourceCalculator resourceCalculator =
       new DefaultResourceCalculator();//recovered
+  
+  private int maxAllocatedContainersPerRequest = -1;
+  
   private final Queue DEFAULT_QUEUE = new Queue() {
     @Override
     public String getQueueName() {
@@ -234,7 +239,8 @@ public class FifoScheduler extends AbstractYarnScheduler
   }
 
   @Override
-  public synchronized void reinitialize(Configuration conf, RMContext rmContext)
+  public synchronized void reinitialize(Configuration conf, RMContext rmContext,
+          TransactionState transactionState)
       throws IOException {
     setConf(conf);
     if (!this.initialized) {
@@ -257,6 +263,9 @@ public class FifoScheduler extends AbstractYarnScheduler
               .forQueue(DEFAULT_QUEUE_NAME, null, false, conf);
       this.activeUsersManager = new ActiveUsersManager(metrics);
       this.initialized = true;
+      this.maxAllocatedContainersPerRequest = this.conf.getInt(
+              YarnConfiguration.MAX_ALLOCATED_CONTAINERS_PER_REQUEST,
+              YarnConfiguration.DEFAULT_MAX_ALLOCATED_CONTAINERS_PER_REQUEST);
     }
   }
 
@@ -370,7 +379,8 @@ public class FifoScheduler extends AbstractYarnScheduler
             DEFAULT_QUEUE, user);
     applications.put(applicationId, application);
     if (transactionState != null) {
-      ((TransactionStateImpl) transactionState).getSchedulerApplicationInfo()
+      ((TransactionStateImpl) transactionState).
+              getSchedulerApplicationInfos(applicationId)
           .setSchedulerApplicationtoAdd(application, applicationId);
     }
     metrics.submitApp(user);
@@ -391,7 +401,7 @@ public class FifoScheduler extends AbstractYarnScheduler
     // TODO: Fix store
     FiCaSchedulerApp schedulerApp =
         new FiCaSchedulerApp(appAttemptId, user, DEFAULT_QUEUE,
-            activeUsersManager, this.rmContext);
+            activeUsersManager, this.rmContext, maxAllocatedContainersPerRequest);
     //Nikos: At this point AppSchedulingInfo is created in SchedulerApplicationAttempt constructor
     if (transferStateFromPreviousAttempt) {
       schedulerApp
@@ -423,7 +433,8 @@ public class FifoScheduler extends AbstractYarnScheduler
     applications.remove(applicationId);
 
     if (transactionState != null) {
-      ((TransactionStateImpl) transactionState).getSchedulerApplicationInfo()
+      ((TransactionStateImpl) transactionState).
+              getSchedulerApplicationInfos(applicationId)
           .setApplicationIdtoRemove(applicationId);
     }
   }
@@ -730,11 +741,9 @@ public class FifoScheduler extends AbstractYarnScheduler
         node = getNode(rmNode.getNodeID());
 
     // Update resource if any change
-    SchedulerUtils.updateResourceIfChanged(node, rmNode, clusterResource, LOG);
-    if (transactionState != null) {
-      ((TransactionStateImpl) transactionState)
-          .updateClusterResource(clusterResource);
-    }
+    SchedulerUtils.updateResourceIfChanged(node, rmNode, clusterResource, LOG,
+            transactionState);
+    
     List<UpdatedContainerInfo> containerInfoList =
         rmNode.pullContainerUpdates(transactionState);
     List<ContainerStatus> newlyLaunchedContainers =
@@ -790,10 +799,12 @@ public class FifoScheduler extends AbstractYarnScheduler
       case NODE_ADDED: {
         NodeAddedSchedulerEvent nodeAddedEvent =
             (NodeAddedSchedulerEvent) event;
-        org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode
+        org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.
+                fica.FiCaSchedulerNode
             ficaNode =
-            new org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode(
-                nodeAddedEvent.getAddedRMNode(), usePortForNodeName);
+            new org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.
+                    fica.FiCaSchedulerNode(
+                nodeAddedEvent.getAddedRMNode(), usePortForNodeName, rmContext);
         addNode(nodeAddedEvent.getAddedRMNode(), ficaNode,
             event.getTransactionState());
       }
@@ -889,7 +900,7 @@ public class FifoScheduler extends AbstractYarnScheduler
       ContainerStatus containerStatus, RMContainerEventType event,
       TransactionState transactionState) {
     if (rmContainer == null) {
-      LOG.info("Null container completed...");
+      LOG.info("Null container completed..." + containerStatus.getContainerId());
       return;
     }
 
@@ -919,8 +930,6 @@ public class FifoScheduler extends AbstractYarnScheduler
 
     // Update total usage
     Resources.subtractFrom(usedResource, container.getResource());
-    ((TransactionStateImpl) transactionState)
-        .updateUsedResource(clusterResource);
     LOG.info("Application attempt " + application.getApplicationAttemptId() +
         " released container " + container.getId() + " on node: " + node +
         " with event: " + event);
@@ -1038,16 +1047,19 @@ public class FifoScheduler extends AbstractYarnScheduler
 
 
           FiCaSchedulerApp appAttempt =
-              new FiCaSchedulerApp(appAttemptId, hopFiCaSchedulerApp.getUser(),
-                  DEFAULT_QUEUE, activeUsersManager, this.rmContext);
-          appAttempt.recover(hopFiCaSchedulerApp, state);
+            new FiCaSchedulerApp(appAttemptId,
+                  hopFiCaSchedulerApp.getUser(),
+                  DEFAULT_QUEUE, activeUsersManager, this.rmContext,
+                  maxAllocatedContainersPerRequest);
+          appAttempt.recover(state);
           app.setCurrentAppAttempt(appAttempt, null);
         }
         applications.put(appId, app);
 
       }
       //recover nodes map
-      List<FiCaSchedulerNode> nodesList = state.getAllFiCaSchedulerNodes();
+      Collection<FiCaSchedulerNode> nodesList = 
+              state.getAllFiCaSchedulerNodes().values();
       if (nodesList != null && !nodesList.isEmpty()) {
         for (FiCaSchedulerNode fsnode : nodesList) {
 
@@ -1059,12 +1071,14 @@ public class FifoScheduler extends AbstractYarnScheduler
               ficaNode =
               new org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode(
                   this.rmContext.
-                      getActiveRMNodes().get(nodeId), nodeId, this.rmContext,
-                  fsnode, state);
+                      getActiveRMNodes().get(nodeId), usePortForNodeName, 
+                      rmContext);
+          ficaNode.recover(state);
 
           nodes.put(nodeId, ficaNode);
         }
       }
+      //TORECOVER recover from nodes
       Resource recovered =
           state.getResource("cluster", Resource.CLUSTER, Resource.AVAILABLE);
       if (recovered != null) {

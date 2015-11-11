@@ -80,7 +80,7 @@ public class TestNMReconnect {
 
     RMContextImpl context =
         new RMContextImpl(dispatcher, null, null, null, null, null, null, null,
-            null);
+            conf);
     groupMembership = new GroupMembershipService(null, context);
     context.setRMGroupMembershipService(groupMembership);
     dispatcher.register(SchedulerEventType.class,
@@ -88,7 +88,7 @@ public class TestNMReconnect {
     dispatcher
         .register(RMNodeEventType.class, new NodeEventDispatcher(context));
     NMLivelinessMonitor nmLivelinessMonitor =
-        new NMLivelinessMonitor(dispatcher);
+        new NMLivelinessMonitor(dispatcher, context);
     nmLivelinessMonitor.init(conf);
     nmLivelinessMonitor.start();
     NodesListManager nodesListManager = new NodesListManager(context);

@@ -20,6 +20,7 @@ package org.apache.hadoop.yarn.server.resourcemanager;
 
 import com.google.common.collect.Sets;
 import io.hops.exception.StorageInitializtionException;
+import io.hops.ha.common.TransactionStateManager;
 import io.hops.metadata.util.RMStorageFactory;
 import io.hops.metadata.util.RMUtilities;
 import io.hops.metadata.util.YarnAPIStorageFactory;
@@ -380,6 +381,8 @@ public class TestClientRMService {
     RMContext rmContext = mock(RMContext.class);
     when(rmContext.getRMApps())
         .thenReturn(new ConcurrentHashMap<ApplicationId, RMApp>());
+    when(rmContext.getTransactionStateManager()).
+            thenReturn(new TransactionStateManager(conf));
     ClientRMService rmService =
         new ClientRMService(rmContext, null, null, null, null, null);
     ApplicationId applicationId =
@@ -896,6 +899,8 @@ public class TestClientRMService {
         .thenReturn(getSchedulerApps(apps));
     ResourceScheduler rs = mock(ResourceScheduler.class);
     when(rmContext.getScheduler()).thenReturn(rs);
+    TransactionStateManager tsm = new TransactionStateManager(conf);
+    when(rmContext.getTransactionStateManager()).thenReturn(tsm);
   }
 
   private ConcurrentHashMap<ApplicationId, RMApp> getRMApps(RMContext rmContext,
