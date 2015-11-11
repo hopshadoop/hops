@@ -36,7 +36,7 @@ import java.io.IOException;
 
 public class TestRMNMSecretKeys {
 
-  @Test(timeout = 30000)
+  @Test(timeout = 60000)
   public void testNMUpdation() throws Exception {
     YarnConfiguration conf = new YarnConfiguration();
     YarnAPIStorageFactory.setConfiguration(conf);

@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair;
 
+import io.hops.ha.common.TransactionState;
+import io.hops.transaction.context.TransactionsStats;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -280,7 +282,7 @@ public class FSSchedulerNode extends SchedulerNode {
   
   @Override
   public synchronized void applyDeltaOnAvailableResource(
-      Resource deltaResource) {
+      Resource deltaResource, TransactionState ts) {
     // we can only adjust available resource if total resource is changed.
     Resources.addTo(this.availableResource, deltaResource);
   }

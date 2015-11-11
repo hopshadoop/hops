@@ -51,51 +51,51 @@ import static org.apache.hadoop.metrics2.lib.Interns.info;
 @Metrics(context = "yarn")
 public class QueueMetrics implements MetricsSource {
   @Metric("# of apps submitted")
-  MutableCounterInt appsSubmitted; //recovered
+  MutableCounterInt appsSubmitted; //TORECOVER
   @Metric("# of running apps")
-  MutableGaugeInt appsRunning;//recovered
+  MutableGaugeInt appsRunning;//TORECOVER
   @Metric("# of pending apps")
-  MutableGaugeInt appsPending;//recovered
+  MutableGaugeInt appsPending;//TORECOVER
   @Metric("# of apps completed")
-  MutableCounterInt appsCompleted;//recovered
+  MutableCounterInt appsCompleted;//TORECOVER
   @Metric("# of apps killed")
-  MutableCounterInt appsKilled;//recovered
+  MutableCounterInt appsKilled;//TORECOVER
   @Metric("# of apps failed")
-  MutableCounterInt appsFailed;//recovered
+  MutableCounterInt appsFailed;//TORECOVER
 
   @Metric("Allocated memory in MB")
-  MutableGaugeInt allocatedMB;//recovered
+  MutableGaugeInt allocatedMB;//TORECOVER
   @Metric("Allocated CPU in virtual cores")
-  MutableGaugeInt allocatedVCores;//recovered
+  MutableGaugeInt allocatedVCores;//TORECOVER
   @Metric("# of allocated containers")
-  MutableGaugeInt allocatedContainers;//recovered
+  MutableGaugeInt allocatedContainers;//TORECOVER
   @Metric("Aggregate # of allocated containers")
-  MutableCounterLong aggregateContainersAllocated;//recovered
+  MutableCounterLong aggregateContainersAllocated;//TORECOVER
   @Metric("Aggregate # of released containers")
-  MutableCounterLong aggregateContainersReleased;//recovered
+  MutableCounterLong aggregateContainersReleased;//TORECOVER
   @Metric("Available memory in MB")
-  MutableGaugeInt availableMB;//recovered
+  MutableGaugeInt availableMB;//TORECOVER
   @Metric("Available CPU in virtual cores")
-  MutableGaugeInt availableVCores;//recovered
+  MutableGaugeInt availableVCores;//TORECOVER
   @Metric("Pending memory allocation in MB")
-  MutableGaugeInt pendingMB;//recovered
+  MutableGaugeInt pendingMB;//TORECOVER
   @Metric("Pending CPU allocation in virtual cores")
-  MutableGaugeInt pendingVCores;//recovered
+  MutableGaugeInt pendingVCores;//TORECOVER
   @Metric("# of pending containers")
-  MutableGaugeInt pendingContainers;//recovered
+  MutableGaugeInt pendingContainers;//TORECOVER
   @Metric("# of reserved memory in MB")
-  MutableGaugeInt reservedMB;//recovered
+  MutableGaugeInt reservedMB;//TORECOVER
   @Metric("Reserved CPU in virtual cores")
-  MutableGaugeInt reservedVCores;//recovered
+  MutableGaugeInt reservedVCores;//TORECOVER
   @Metric("# of reserved containers")
-  MutableGaugeInt reservedContainers;//recovered
+  MutableGaugeInt reservedContainers;//TORECOVER
   @Metric("# of active users")
-  MutableGaugeInt activeUsers;//recovered
+  MutableGaugeInt activeUsers;//TORECOVER
   @Metric("# of active applications")
-  MutableGaugeInt activeApplications;//recovered
-  private final MutableGaugeInt[] runningTime;//TORECOVER : not recovered yet 
+  MutableGaugeInt activeApplications;//TORECOVER
+  private final MutableGaugeInt[] runningTime;//TORECOVER MS: not TORECOVER yet 
   private TimeBucketMetrics<ApplicationId> runBuckets;
-      //TORECOVER : not recovered yet
+      //TORECOVER MS: not TORECOVER yet
 
   static final Logger LOG = LoggerFactory.getLogger(QueueMetrics.class);
   static final MetricsInfo RECORD_INFO =
@@ -106,13 +106,13 @@ public class QueueMetrics implements MetricsSource {
   static final Splitter Q_SPLITTER =
       Splitter.on('.').omitEmptyStrings().trimResults();
 
-  final MetricsRegistry registry;//TORECOVER : not recovered yet 
-  final String queueName;//recovered
-  final QueueMetrics parent;//recovered
+  final MetricsRegistry registry;//TORECOVER MS: not TORECOVER yet 
+  final String queueName;//TORECOVER
+  final QueueMetrics parent;//TORECOVER
   final MetricsSystem metricsSystem;
-      //TORECOVER : not recovered yet (we have to recover what have been stored in the ms)
-  private final Map<String, QueueMetrics> users;//TORECOVER : not recovered yet
-  private final Configuration conf;//recovered
+      //TORECOVER MS: not TORECOVER yet (we have to recover what have been stored in the ms)
+  private final Map<String, QueueMetrics> users;//TORECOVER MS: not TORECOVER yet
+  private final Configuration conf;//TORECOVER
 
   protected QueueMetrics(MetricsSystem ms, String queueName, Queue parent,
       boolean enableUserMetrics, Configuration conf) {
@@ -405,6 +405,7 @@ public class QueueMetrics implements MetricsSource {
 
   public void allocateResources(String user, int containers, Resource res,
       boolean decrPending) {
+    LOG.info("allocate Resource for queue " + queueName + " parent: " + parent);
     allocatedContainers.incr(containers);
     aggregateContainersAllocated.incr(containers);
     allocatedMB.incr(res.getMemory() * containers);

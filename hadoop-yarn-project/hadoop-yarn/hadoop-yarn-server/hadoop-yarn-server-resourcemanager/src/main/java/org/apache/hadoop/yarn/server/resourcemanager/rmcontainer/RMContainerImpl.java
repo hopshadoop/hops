@@ -47,6 +47,7 @@ import java.util.EnumSet;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
+import org.apache.hadoop.yarn.event.AsyncDispatcher;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
 public class RMContainerImpl implements
@@ -140,9 +141,9 @@ public class RMContainerImpl implements
       //recovered
   private final String user;//recovered
 
-  private Resource reservedResource;//TORECOVER capacity: not recovered yet
-  private NodeId reservedNode;//TORECOVER capacity: not recovered yet
-  private Priority reservedPriority;//TORECOVER capacity: not recovered yet
+  private Resource reservedResource;//recoverd
+  private NodeId reservedNode;//recovered
+  private Priority reservedPriority;//recovered
   private long startTime;//recovered
   private long finishTime;//recovered
   private ContainerStatus finishedStatus;//recovered
@@ -169,9 +170,11 @@ public class RMContainerImpl implements
         .containerStarted(this, transactionState);
   }
 
-
+  //TORECOVER OPT change to implement recoverable
   @Override
   public void recover(RMContainer hopRMContainer) {
+    LOG.debug("recovering container " + hopRMContainer.getContainerIdID() + 
+            " in state "+ hopRMContainer.getState());
     this.startTime = hopRMContainer.getStarttime();
     this.stateMachine.setCurrentState(RMContainerState.valueOf(hopRMContainer.
         getState()));
@@ -179,6 +182,16 @@ public class RMContainerImpl implements
 
     if (getState().equals(RMContainerState.ACQUIRED)) {
       this.containerAllocationExpirer.register(containerId);
+    }
+    if (hopRMContainer.getReservedNodeIdID() != null) {
+      this.reservedNode = NodeId.newInstance(hopRMContainer.
+              getReservedNodeHost(),
+              hopRMContainer.getReservedNodePort());
+      this.reservedResource = Resource.newInstance(hopRMContainer.
+              getReservedMemory(),
+              hopRMContainer.getReservedVCores());
+      this.reservedPriority = Priority.newInstance(hopRMContainer.
+              getReservedPriorityID());
     }
     if (hopRMContainer.getFinishedStatusState() != null) {
       this.finishedStatus = ContainerStatus.newInstance(containerId,
@@ -325,18 +338,16 @@ public class RMContainerImpl implements
       RMContainerState oldState = getState();
       try {
         stateMachine.doTransition(event.getType(), event);
-        if (event.getTransactionState() != null) {
-          ((TransactionStateImpl) event.getTransactionState()).
-              addRMContainerToUpdate(this);
+        if(stateMachine.getCurrentState()!=oldState){
+          if (event.getTransactionState() != null) {
+            ((TransactionStateImpl) event.getTransactionState()).
+                addRMContainerToUpdate(this);
+          }
         }
       } catch (InvalidStateTransitonException e) {
         LOG.error("Can't handle this event at current state", e);
         LOG.error("Invalid event " + event.getType() + " on container " +
             this.containerId);
-      }
-      if (oldState != getState()) {
-        LOG.debug(event.getContainerId() + " Container Transitioned from " +
-            oldState + " to " + getState());
       }
     } finally {
       writeLock.unlock();
@@ -365,6 +376,8 @@ public class RMContainerImpl implements
       container.reservedResource = e.getReservedResource();
       container.reservedNode = e.getReservedNode();
       container.reservedPriority = e.getReservedPriority();
+      ((TransactionStateImpl) event.getTransactionState()).
+                addRMContainerToUpdate(container);
     }
   }
 
@@ -418,6 +431,9 @@ public class RMContainerImpl implements
 
       container.rmContext.getRMApplicationHistoryWriter()
           .containerFinished(container, event.getTransactionState());
+      
+      ((TransactionStateImpl) event.getTransactionState()).
+                addRMContainerToUpdate(container);
     }
   }
 
@@ -440,10 +456,13 @@ public class RMContainerImpl implements
     @Override
     public void transition(RMContainerImpl container, RMContainerEvent event) {
 
+      //the container is already unregistred when the contaier is killed by the expirer
+      //plus that cause a deadlock
+      if(event.getType()!=RMContainerEventType.EXPIRE){
       // Unregister from containerAllocationExpirer.
-      container.containerAllocationExpirer
-          .unregister(container.getContainerId());
-
+        container.containerAllocationExpirer
+                .unregister(container.getContainerId());
+      }
       // Inform node
       container.eventHandler.handle(
           new RMNodeCleanContainerEvent(container.nodeId, container.containerId,

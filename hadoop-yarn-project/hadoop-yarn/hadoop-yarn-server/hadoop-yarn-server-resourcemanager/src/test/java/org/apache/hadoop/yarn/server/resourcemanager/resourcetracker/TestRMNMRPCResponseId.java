@@ -89,7 +89,7 @@ public class TestRMNMRPCResponseId {
     context.getNMTokenSecretManager().rollMasterKey();
     resourceTrackerService =
         new ResourceTrackerService(context, nodesListManager,
-            new NMLivelinessMonitor(dispatcher),
+            new NMLivelinessMonitor(dispatcher, context),
             context.getContainerTokenSecretManager(),
             context.getNMTokenSecretManager());
     resourceTrackerService.init(conf);

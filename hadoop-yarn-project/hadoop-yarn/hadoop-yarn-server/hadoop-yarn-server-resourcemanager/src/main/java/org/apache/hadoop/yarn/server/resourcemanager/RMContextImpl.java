@@ -17,6 +17,7 @@
 package org.apache.hadoop.yarn.server.resourcemanager;
 
 import com.google.common.annotations.VisibleForTesting;
+import io.hops.ha.common.TransactionStateManager;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -53,26 +54,13 @@ public class RMContextImpl implements RMContext {
 
 
   private static final Log LOG = LogFactory.getLog(RMContextImpl.class);
-  private int rmId = Integer.MIN_VALUE;
+  private TransactionStateManager transactionStateManager;
+    
   //ResourceTracker client
   public ResourceTracker client;
 
   public ResourceTracker getResClient() {
     return client;
-  }
-
-  public int getRMID() {
-    return rmId;
-  }
-
-  public void setRMID(int rmid) {
-    this.rmId = rmid;
-  }
-
-  private int id = -1;
-
-  public int getId() {
-    return this.id;
   }
 
   @Override
@@ -117,8 +105,8 @@ public class RMContextImpl implements RMContext {
   private ContainerAllocationExpirer containerAllocationExpirer; //recovered
   private DelegationTokenRenewer delegationTokenRenewer;//recovered
   private AMRMTokenSecretManager amRMTokenSecretManager;//recovered
-  private RMContainerTokenSecretManager containerTokenSecretManager;//TORECOVER
-  private NMTokenSecretManagerInRM nmTokenSecretManager;//TORECOVER
+  private RMContainerTokenSecretManager containerTokenSecretManager;//recovered
+  private NMTokenSecretManagerInRM nmTokenSecretManager;//recovered
   private ClientToAMTokenSecretManagerInRM clientToAMTokenSecretManager;
       //recovered
   private AdminService adminService;//recovered
@@ -136,8 +124,10 @@ public class RMContextImpl implements RMContext {
   /**
    * Default constructor. To be used in conjunction with setter methods for
    * individual fields.
+     * @param conf
    */
-  public RMContextImpl() {
+  public RMContextImpl(Configuration conf) {
+    transactionStateManager = new TransactionStateManager(conf);
   }
 
   @VisibleForTesting
@@ -151,8 +141,8 @@ public class RMContextImpl implements RMContext {
       RMContainerTokenSecretManager containerTokenSecretManager,
       NMTokenSecretManagerInRM nmTokenSecretManager,
       ClientToAMTokenSecretManagerInRM clientToAMTokenSecretManager,
-      RMApplicationHistoryWriter rmApplicationHistoryWriter) {
-    this();
+      RMApplicationHistoryWriter rmApplicationHistoryWriter, Configuration conf) {
+    this(conf);
     this.setDispatcher(rmDispatcher);
     this.setContainerAllocationExpirer(containerAllocationExpirer);
     this.setAMLivelinessMonitor(amLivelinessMonitor);
@@ -188,7 +178,7 @@ public class RMContextImpl implements RMContext {
       ClientToAMTokenSecretManagerInRM clientToAMTokenSecretManager,
       RMApplicationHistoryWriter rmApplicationHistoryWriter,
       Configuration conf) {
-    this();
+    this(conf);
     this.setDispatcher(rmDispatcher);
     this.setContainerAllocationExpirer(containerAllocationExpirer);
     this.setAMLivelinessMonitor(amLivelinessMonitor);
@@ -462,5 +452,10 @@ public class RMContextImpl implements RMContext {
   public void setConfigurationProvider(
       ConfigurationProvider configurationProvider) {
     this.configurationProvider = configurationProvider;
+  }
+  
+  @Override
+  public TransactionStateManager getTransactionStateManager() {
+    return transactionStateManager;
   }
 }

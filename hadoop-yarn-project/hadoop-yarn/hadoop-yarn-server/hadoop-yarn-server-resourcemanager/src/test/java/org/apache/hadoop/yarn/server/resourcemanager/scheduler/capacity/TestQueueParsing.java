@@ -43,7 +43,7 @@ public class TestQueueParsing {
     capacityScheduler.setConf(conf);
     capacityScheduler.reinitialize(conf,
         new RMContextImpl(null, null, null, null, null, null,
-            new ClientToAMTokenSecretManagerInRM(), null, conf));
+            new ClientToAMTokenSecretManagerInRM(), null, conf), null);
     
     CSQueue a = capacityScheduler.getQueue("a");
     Assert.assertEquals(0.10, a.getAbsoluteCapacity(), DELTA);
@@ -139,7 +139,7 @@ public class TestQueueParsing {
 
     CapacityScheduler capacityScheduler = new CapacityScheduler();
     capacityScheduler.setConf(new YarnConfiguration());
-    capacityScheduler.reinitialize(conf, null);
+    capacityScheduler.reinitialize(conf, null, null);
   }
   
   public void testMaxCapacity() throws Exception {
@@ -162,7 +162,7 @@ public class TestQueueParsing {
     try {
       capacityScheduler = new CapacityScheduler();
       capacityScheduler.setConf(new YarnConfiguration());
-      capacityScheduler.reinitialize(conf, null);
+      capacityScheduler.reinitialize(conf, null, null);
     } catch (IllegalArgumentException iae) {
       fail = true;
     }
@@ -174,12 +174,12 @@ public class TestQueueParsing {
     // Now this should work
     capacityScheduler = new CapacityScheduler();
     capacityScheduler.setConf(new YarnConfiguration());
-    capacityScheduler.reinitialize(conf, null);
+    capacityScheduler.reinitialize(conf, null, null);
     
     fail = false;
     try {
       LeafQueue a = (LeafQueue) capacityScheduler.getQueue(A);
-      a.setMaxCapacity(45);
+      a.setMaxCapacity(45, null);
     } catch (IllegalArgumentException iae) {
       fail = true;
     }

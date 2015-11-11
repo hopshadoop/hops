@@ -149,10 +149,10 @@ public class TestFifoScheduler {
     RMApplicationHistoryWriter writer = mock(RMApplicationHistoryWriter.class);
     RMContext rmContext =
         new RMContextImpl(dispatcher, null, null, null, null, null, null,
-            writer, null);
+            writer, config);
 
     FifoScheduler schedular = new FifoScheduler();
-    schedular.reinitialize(new Configuration(), rmContext);
+    schedular.reinitialize(new Configuration(), rmContext, null);
     QueueMetrics metrics = schedular.getRootQueueMetrics();
     int beforeAppsSubmitted = metrics.getAppsSubmitted();
 
@@ -161,15 +161,15 @@ public class TestFifoScheduler {
         BuilderUtils.newApplicationAttemptId(appId, 1);
 
     SchedulerEvent appEvent =
-        new AppAddedSchedulerEvent(appId, "queue", "user", null);
+        new AppAddedSchedulerEvent(appId, "queue", "user", new TransactionStateImpl( TransactionState.TransactionType.RM));
     schedular.handle(appEvent);
     SchedulerEvent attemptEvent =
-        new AppAttemptAddedSchedulerEvent(appAttemptId, false, null);
+        new AppAttemptAddedSchedulerEvent(appAttemptId, false, new TransactionStateImpl( TransactionState.TransactionType.RM));
     schedular.handle(attemptEvent);
 
     appAttemptId = BuilderUtils.newApplicationAttemptId(appId, 2);
     SchedulerEvent attemptEvent2 =
-        new AppAttemptAddedSchedulerEvent(appAttemptId, false, null);
+        new AppAttemptAddedSchedulerEvent(appAttemptId, false, new TransactionStateImpl( TransactionState.TransactionType.RM));
     schedular.handle(attemptEvent2);
 
     int afterAppsSubmitted = metrics.getAppsSubmitted();
@@ -190,12 +190,12 @@ public class TestFifoScheduler {
     rmContext.getNMTokenSecretManager().rollMasterKey();
     rmContext.getContainerTokenSecretManager().rollMasterKey();
     FifoScheduler scheduler = new FifoScheduler();
-    scheduler.reinitialize(new Configuration(), rmContext);
+    scheduler.reinitialize(new Configuration(), rmContext, null);
 
     RMNode node0 = MockNodes
         .newNodeInfo(1, Resources.createResource(1024 * 64), 1, "127.0.0.1");
     NodeAddedSchedulerEvent nodeEvent1 =
-        new NodeAddedSchedulerEvent(node0, null);
+        new NodeAddedSchedulerEvent(node0, new TransactionStateImpl( TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent1);
 
     int _appId = 1;
@@ -204,10 +204,10 @@ public class TestFifoScheduler {
         createAppAttemptId(_appId, _appAttemptId);
     AppAddedSchedulerEvent appEvent =
         new AppAddedSchedulerEvent(appAttemptId.getApplicationId(), "queue1",
-            "user1", null);
+            "user1", new TransactionStateImpl( TransactionState.TransactionType.RM));
     scheduler.handle(appEvent);
     AppAttemptAddedSchedulerEvent attemptEvent =
-        new AppAttemptAddedSchedulerEvent(appAttemptId, false, null);
+        new AppAttemptAddedSchedulerEvent(appAttemptId, false, new TransactionStateImpl( TransactionState.TransactionType.RM));
     scheduler.handle(attemptEvent);
 
     int memory = 64;
@@ -226,10 +226,10 @@ public class TestFifoScheduler {
     ask.add(any);
     scheduler
         .allocate(appAttemptId, ask, new ArrayList<ContainerId>(), null, null,
-            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
+            new TransactionStateImpl( TransactionState.TransactionType.RM));
 
     NodeUpdateSchedulerEvent node0Update =
-        new NodeUpdateSchedulerEvent(node0, null);
+        new NodeUpdateSchedulerEvent(node0, new TransactionStateImpl( TransactionState.TransactionType.RM));
 
     // Before the node update event, there are 3 local requests outstanding
     Assert.assertEquals(3, nodeLocal.getNumContainers());
@@ -263,11 +263,11 @@ public class TestFifoScheduler {
         return nodes;
       }
     };
-    scheduler.reinitialize(new Configuration(), rmContext);
+    scheduler.reinitialize(new Configuration(), rmContext, null);
     RMNode node0 = MockNodes
         .newNodeInfo(1, Resources.createResource(2048, 4), 1, "127.0.0.1");
     NodeAddedSchedulerEvent nodeEvent1 =
-        new NodeAddedSchedulerEvent(node0, null);
+        new NodeAddedSchedulerEvent(node0, new TransactionStateImpl( TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent1);
     
     Method method = scheduler.getClass().getDeclaredMethod("getNodes");
@@ -286,7 +286,7 @@ public class TestFifoScheduler {
         getAvailableResource().getMemory(), 2048);
     // now, NM heartbeat comes.
     NodeUpdateSchedulerEvent node0Update =
-        new NodeUpdateSchedulerEvent(node0, null);
+        new NodeUpdateSchedulerEvent(node0, new TransactionStateImpl( TransactionState.TransactionType.RM));
     scheduler.handle(node0Update);
     // SchedulerNode's available resource is changed.
     assertEquals(schedulerNodes.get(node0.getNodeID()).
@@ -300,10 +300,10 @@ public class TestFifoScheduler {
         createAppAttemptId(_appId, _appAttemptId);
     AppAddedSchedulerEvent appEvent =
         new AppAddedSchedulerEvent(appAttemptId.getApplicationId(), "queue1",
-            "user1", null);
+            "user1", new TransactionStateImpl( TransactionState.TransactionType.RM));
     scheduler.handle(appEvent);
     AppAttemptAddedSchedulerEvent attemptEvent =
-        new AppAttemptAddedSchedulerEvent(appAttemptId, false, null);
+        new AppAttemptAddedSchedulerEvent(appAttemptId, false, new TransactionStateImpl( TransactionState.TransactionType.RM));
     scheduler.handle(attemptEvent);
 
     int memory = 1024;
@@ -321,7 +321,7 @@ public class TestFifoScheduler {
     ask.add(any);
     scheduler
         .allocate(appAttemptId, ask, new ArrayList<ContainerId>(), null, null,
-            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
+            new TransactionStateImpl( TransactionState.TransactionType.RM));
 
     // Before the node update event, there are one local request
     Assert.assertEquals(1, nodeLocal.getNumContainers());
@@ -565,29 +565,29 @@ public class TestFifoScheduler {
     String host = "127.0.0.1";
     RMNode node =
         MockNodes.newNodeInfo(0, MockNodes.newResource(4 * GB), 1, host);
-    fs.handle(new NodeAddedSchedulerEvent(node, null));
+    fs.handle(new NodeAddedSchedulerEvent(node, new TransactionStateImpl( TransactionState.TransactionType.RM)));
 
     ApplicationId appId = BuilderUtils.newApplicationId(100, 1);
     ApplicationAttemptId appAttemptId =
         BuilderUtils.newApplicationAttemptId(appId, 1);
     SchedulerEvent appEvent =
-        new AppAddedSchedulerEvent(appId, "default", "user", null);
+        new AppAddedSchedulerEvent(appId, "default", "user", new TransactionStateImpl( TransactionState.TransactionType.RM));
     fs.handle(appEvent);
     SchedulerEvent attemptEvent =
-        new AppAttemptAddedSchedulerEvent(appAttemptId, false, null);
+        new AppAttemptAddedSchedulerEvent(appAttemptId, false, new TransactionStateImpl( TransactionState.TransactionType.RM));
     fs.handle(attemptEvent);
 
     // Verify the blacklist can be updated independent of requesting containers
     fs.allocate(appAttemptId, Collections.<ResourceRequest>emptyList(),
         Collections.<ContainerId>emptyList(), Collections.singletonList(host),
         null,
-        new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
+        new TransactionStateImpl( TransactionState.TransactionType.RM));
     Assert
         .assertTrue(fs.getApplicationAttempt(appAttemptId).isBlacklisted(host));
     fs.allocate(appAttemptId, Collections.<ResourceRequest>emptyList(),
         Collections.<ContainerId>emptyList(), null,
         Collections.singletonList(host),
-        new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
+        new TransactionStateImpl( TransactionState.TransactionType.RM));
     Assert.assertFalse(
         fs.getApplicationAttempt(appAttemptId).isBlacklisted(host));
     rm.stop();

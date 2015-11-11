@@ -155,7 +155,7 @@ public class TestAMRMTokens {
               ContainerState.COMPLETE, "AM Container Finished", 0);
       rm.getRMContext().getDispatcher().getEventHandler().handle(
           new RMAppAttemptContainerFinishedEvent(applicationAttemptId,
-              containerStatus, new TransactionStateImpl(-1,
+              containerStatus, new TransactionStateImpl(
               TransactionState.TransactionType.RM)));
 
       // Now simulate trying to allocate. RPC call itself should throw auth

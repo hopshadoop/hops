@@ -61,20 +61,22 @@ public class YarnAPIStorageFactory {
       "dfs.storage.driver.configfile";
   public static final String DFS_STORAGE_DRIVER_CONFIG_FILE_DEFAULT =
       "ndb-config.properties";
+  public static final String NDB_EVENT_STREAMING_FOR_DISTRIBUTED_SERVICE
+          = "io.hops.metadata.ndb.JniNdbEventStreaming";
 
   public static StorageConnector getConnector() {
     return dStorageFactory.getConnector();
   }
 
   public static void setConfiguration(Configuration conf)
-      throws StorageInitializtionException, IOException {
+          throws StorageInitializtionException, IOException {
     if (isInitialized) {
       return;
     }
     addToClassPath(conf.get(DFS_STORAGE_DRIVER_JAR_FILE,
-        DFS_STORAGE_DRIVER_JAR_FILE_DEFAULT));
+            DFS_STORAGE_DRIVER_JAR_FILE_DEFAULT));
     dStorageFactory = DalDriver.load(
-        conf.get(DFS_STORAGE_DRIVER_CLASS, DFS_STORAGE_DRIVER_CLASS_DEFAULT));
+            conf.get(DFS_STORAGE_DRIVER_CLASS, DFS_STORAGE_DRIVER_CLASS_DEFAULT));
     dStorageFactory.setConfiguration(getMetadataClusterConfiguration(conf));
     initDataAccessWrappers();
     EntityManager.addContextInitializer(getContextInitializer());
@@ -93,20 +95,20 @@ public class YarnAPIStorageFactory {
   }
 
   public static Properties getMetadataClusterConfiguration(Configuration conf)
-      throws IOException {
+          throws IOException {
     String configFile =
         conf.get(YarnAPIStorageFactory.DFS_STORAGE_DRIVER_CONFIG_FILE,
-            YarnAPIStorageFactory.DFS_STORAGE_DRIVER_CONFIG_FILE_DEFAULT);
+                    YarnAPIStorageFactory.DFS_STORAGE_DRIVER_CONFIG_FILE_DEFAULT);
     Properties clusterConf = new Properties();
     InputStream inStream = StorageConnector.class.getClassLoader().
-        getResourceAsStream(configFile);
+            getResourceAsStream(configFile);
     clusterConf.load(inStream);
     return clusterConf;
   }
 
   //[M]: just for testing purposes
   private static void addToClassPath(String s)
-      throws StorageInitializtionException {
+          throws StorageInitializtionException {
     try {
       File f = new File(s);
       URL u = f.toURI().toURL();
@@ -135,8 +137,8 @@ public class YarnAPIStorageFactory {
   private static void initDataAccessWrappers() {
     dataAccessAdaptors.clear();
     dataAccessAdaptors.put(YarnVariablesDataAccess.class,
-        new YarnVariablesDALAdaptor((YarnVariablesDataAccess) getDataAccess(
-            YarnVariablesDataAccess.class)));
+            new YarnVariablesDALAdaptor((YarnVariablesDataAccess) getDataAccess(
+                            YarnVariablesDataAccess.class)));
   }
 
   private static ContextInitializer getContextInitializer() {

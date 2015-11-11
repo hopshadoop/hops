@@ -30,20 +30,6 @@ import org.apache.hadoop.yarn.proto.YarnProtos.NodeIdProto;
 public class NodeIdPBImpl extends NodeId {
 
 
-  private int id = Integer.MIN_VALUE;
-
-
-  @Override
-  public int getId() {
-    return this.id;
-  }
-
-  @Override
-  public void setId(int id) {
-    this.id = id;
-  }
-
-
   NodeIdProto proto = null;
   NodeIdProto.Builder builder = null;
   

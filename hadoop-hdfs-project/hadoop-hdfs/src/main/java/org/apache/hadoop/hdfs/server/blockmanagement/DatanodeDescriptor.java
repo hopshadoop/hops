@@ -21,7 +21,9 @@ import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.BlockInfoDataAccess;
+import io.hops.metadata.hdfs.dal.InvalidateBlockDataAccess;
 import io.hops.metadata.hdfs.dal.ReplicaDataAccess;
+import io.hops.metadata.hdfs.entity.Replica;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -37,6 +39,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 
@@ -349,7 +352,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
         BlockInfoDataAccess da = (BlockInfoDataAccess) HdfsStorageFactory
             .getDataAccess(BlockInfoDataAccess.class);
         HdfsStorageFactory.getConnector().beginTransaction();
-        List<BlockInfo> list = da.findByStorageId(getSId());
+        List<BlockInfo> list = da.findBlockInfosByStorageId(getSId());
         HdfsStorageFactory.getConnector().commit();
         return list;
       }
@@ -357,17 +360,30 @@ public class DatanodeDescriptor extends DatanodeInfo {
     return (List<BlockInfo>) findBlocksHandler.handle();
   }
   
-  public Set<Long> getAllMachineBlocks() throws IOException {
+  public Map<Long,Integer> getAllMachineReplicas() throws IOException {
     LightWeightRequestHandler findBlocksHandler = new LightWeightRequestHandler(
         HDFSOperationType.GET_ALL_MACHINE_BLOCKS_IDS) {
       @Override
       public Object performTask() throws StorageException, IOException {
-        BlockInfoDataAccess da = (BlockInfoDataAccess) HdfsStorageFactory
-            .getDataAccess(BlockInfoDataAccess.class);
-        return da.findByStorageIdOnlyIds(getSId());
+        ReplicaDataAccess da = (ReplicaDataAccess) HdfsStorageFactory
+            .getDataAccess(ReplicaDataAccess.class);
+        return da.findBlockAndInodeIdsByStorageId(getSId());
       }
     };
-    return (Set<Long>) findBlocksHandler.handle();
+    return (Map<Long,Integer>)findBlocksHandler.handle();
+  }
+  
+    public Map<Long,Long> getAllMachineInvalidatedReplicasWithGenStamp() throws IOException {
+    LightWeightRequestHandler findBlocksHandler = new LightWeightRequestHandler(
+        HDFSOperationType.GET_ALL_MACHINE_BLOCKS_IDS) {
+      @Override
+      public Object performTask() throws StorageException, IOException {
+        InvalidateBlockDataAccess da = (InvalidateBlockDataAccess) HdfsStorageFactory
+            .getDataAccess(InvalidateBlockDataAccess.class);
+        return da.findInvalidatedBlockByStorageIdUsingMySQLServer(getSId());
+      }
+    };
+    return (Map<Long,Long>)findBlocksHandler.handle();
   }
   
   /**
