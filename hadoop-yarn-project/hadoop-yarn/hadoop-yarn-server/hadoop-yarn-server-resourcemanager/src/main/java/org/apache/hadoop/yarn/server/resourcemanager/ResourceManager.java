@@ -18,6 +18,7 @@ package org.apache.hadoop.yarn.server.resourcemanager;
 
 import com.google.common.annotations.VisibleForTesting;
 import io.hops.common.GlobalThreadPool;
+import io.hops.ha.common.TransactionStateManager;
 import io.hops.metadata.util.RMStorageFactory;
 import io.hops.metadata.util.YarnAPIStorageFactory;
 import io.hops.metadata.yarn.entity.appmasterrpc.RPC;
@@ -143,6 +144,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
   @VisibleForTesting
   protected RMContextImpl rmContext;//recovered
   private Dispatcher rmDispatcher;
+  private TransactionStateManager transactionStateManager;
   @VisibleForTesting
   protected AdminService adminService;
   protected GroupMembershipService groupMembershipService;
@@ -283,14 +285,17 @@ public class ResourceManager extends CompositeService implements Recoverable {
 
     DefaultMetricsSystem.initialize("ResourceManager");
     JvmMetrics.initSingleton("ResourceManager", null);
-    rmContext.getTransactionStateManager().start();//TODO shouldn't it start in the start method and not in the init one?
   }
 
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
     this.conf = conf;
-    this.rmContext = new RMContextImpl(conf);
+    this.rmContext = new RMContextImpl();
 
+    transactionStateManager = new TransactionStateManager();
+    addIfService(transactionStateManager);
+    rmContext.setTransactionStateManager(transactionStateManager);
+    
     this.configurationProvider =
         ConfigurationProviderFactory.getConfigurationProvider(conf);
     this.configurationProvider.init(this.conf);
@@ -976,7 +981,8 @@ public class ResourceManager extends CompositeService implements Recoverable {
     }
   }
 
-  synchronized void transitionToStandby(boolean initialize) throws Exception {
+  @VisibleForTesting
+  protected synchronized void transitionToStandby(boolean initialize) throws Exception {
     if (rmContext.getHAServiceState() ==
         HAServiceProtocol.HAServiceState.STANDBY) {
       LOG.info("Already in standby state " + groupMembershipService.
@@ -994,6 +1000,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
       }
       if (initialize) {
         resetDispatcher();
+        resetTransactionStateManager();
         createAndInitActiveServices();
       }
     }
@@ -1051,9 +1058,6 @@ public class ResourceManager extends CompositeService implements Recoverable {
     }
     if (configurationProvider != null) {
       configurationProvider.close();
-    }
-    if(rmContext!=null){
-      rmContext.getTransactionStateManager().stop();
     }
     super.serviceStop();
     LOG.info("transition to standby serviceStop");
@@ -1350,6 +1354,16 @@ public class ResourceManager extends CompositeService implements Recoverable {
     rmContext.setDispatcher(rmDispatcher);
   }
 
+  private void resetTransactionStateManager(){
+    TransactionStateManager tsm = new TransactionStateManager();
+    ((Service) tsm).init(conf);
+    ((Service) tsm).start();
+    removeService((Service) transactionStateManager);
+    transactionStateManager = tsm;
+    addIfService(transactionStateManager);
+    rmContext.setTransactionStateManager(transactionStateManager);
+  }
+  
   /**
    * Retrieve RM bind address from configuration
    *

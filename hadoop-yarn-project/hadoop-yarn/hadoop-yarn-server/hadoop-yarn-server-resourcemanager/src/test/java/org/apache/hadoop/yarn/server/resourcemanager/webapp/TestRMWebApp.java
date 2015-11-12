@@ -22,6 +22,7 @@ import com.google.common.collect.Maps;
 import com.google.inject.Binder;
 import com.google.inject.Injector;
 import com.google.inject.Module;
+import io.hops.ha.common.TransactionStateManager;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.NodeId;
@@ -162,8 +163,11 @@ public class TestRMWebApp {
     for (RMNode node : deactivatedNodes) {
       deactivatedNodesMap.put(node.getHostName(), node);
     }
+    TransactionStateManager tsm = new TransactionStateManager();
+    tsm.init(new YarnConfiguration());
+    tsm.start();
     return new RMContextImpl(null, null, null, null, null, null, null, null,
-        new YarnConfiguration()) {
+        new YarnConfiguration(),tsm) {
       @Override
       public ConcurrentMap<ApplicationId, RMApp> getRMApps() {
         return applicationsMaps;
@@ -204,8 +208,11 @@ public class TestRMWebApp {
 
     CapacityScheduler cs = new CapacityScheduler();
     cs.setConf(new YarnConfiguration());
+    TransactionStateManager tsm = new TransactionStateManager();
+    tsm.init(conf);
+    tsm.start();
     cs.reinitialize(conf, new RMContextImpl(null, null, null, null, null, null,
-        new ClientToAMTokenSecretManagerInRM(), null, conf), null);
+        new ClientToAMTokenSecretManagerInRM(), null, conf, tsm), null);
     return cs;
   }
 

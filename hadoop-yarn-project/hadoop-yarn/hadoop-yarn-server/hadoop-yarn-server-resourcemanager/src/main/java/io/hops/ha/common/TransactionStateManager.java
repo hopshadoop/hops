@@ -33,9 +33,10 @@ import java.util.logging.Logger;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 
-public class TransactionStateManager implements Runnable{
+public class TransactionStateManager extends AbstractService{
   private static final Log LOG = LogFactory.getLog(TransactionStateManager.class);
   TransactionState currentTransactionState;
   Lock lock = new ReentrantLock(true);
@@ -51,97 +52,112 @@ public class TransactionStateManager implements Runnable{
   private final ExecutorService executorService =
       Executors.newFixedThreadPool(32);
     
-  public TransactionStateManager(Configuration conf){
+  public TransactionStateManager(){
+    super("TransactionStateManager");
     currentTransactionState = new TransactionStateImpl(
-                TransactionState.TransactionType.RM, 0, true, this);
-    batchMaxSize = conf.getInt(YarnConfiguration.HOPS_BATCH_MAX_SIZE, YarnConfiguration.DEFAULT_HOPS_BATCH_MAX_SIZE);
-    batchMaxDuration = conf.getInt(YarnConfiguration.HOPS_BATCH_MAX_DURATION, YarnConfiguration.DEFAULT_HOPS_BATCH_MAX_DURATION);
-    RMUtilities.setCommitAndQueueLimits(conf);
+            TransactionState.TransactionType.RM, 0, true, this);
   }
   
   @Override
-  public void run() {
-    lock.lock();
-    long commitDuration = 0;
-    long startTime = System.currentTimeMillis();
-    double accumulatedCycleDuration=0;
-    long nbCycles =0;
-    List<Long> duration = new ArrayList<Long>();
-    List<Integer> rpcCount = new ArrayList<Integer>();
-    double accumulatedRPCCount = 0;
-    long t1=0;
-    long t2=0;
-    long t3=0;
-    long t4=0;
-    while(running){
-      try {
-        //create new transactionState
-        currentTransactionState = new TransactionStateImpl(
-                TransactionState.TransactionType.RM, 0, true, this);
-        curentRPCs = new CopyOnWriteArrayList<transactionStateWrapper>();
-        acceptedRPC.set(0);
-        //accept RPCs
-        lock.unlock();
-        commitDuration = System.currentTimeMillis()-startTime;
-        t3= commitDuration;
-//        Thread.sleep(Math.max(0, 10-commitDuration));
-        waitForBatch(Math.max(0, batchMaxDuration-commitDuration));
-        t4= System.currentTimeMillis() - startTime;
-        //stop acception RPCs
+  protected void serviceInit(Configuration conf) throws Exception {
+    batchMaxSize = conf.getInt(YarnConfiguration.HOPS_BATCH_MAX_SIZE,
+            YarnConfiguration.DEFAULT_HOPS_BATCH_MAX_SIZE);
+    batchMaxDuration = conf.getInt(YarnConfiguration.HOPS_BATCH_MAX_DURATION,
+            YarnConfiguration.DEFAULT_HOPS_BATCH_MAX_DURATION);
+    RMUtilities.setCommitAndQueueLimits(conf);
+  }
+  
+  Runnable createThread(final TransactionStateManager tsm) {
+    return new Runnable() {
+      @Override
+      public void run() {
         lock.lock();
-        
-        long cycleDuration = System.currentTimeMillis() - startTime;
-        if (cycleDuration> batchMaxDuration + 10) {
-          LOG.error("Cycle too long: " + cycleDuration + "| " + t1 + ", " + t2
-                  + ", " + t3 + ", " + t4);
-        }
-        nbCycles++;
-        accumulatedCycleDuration+=cycleDuration;
-        duration.add(cycleDuration);
-        rpcCount.add(acceptedRPC.get());
-        accumulatedRPCCount+=acceptedRPC.get();
-        if(duration.size()>39){
-          double avgCycleDuration=accumulatedCycleDuration/nbCycles;
-          LOG.debug("cycle duration: " + avgCycleDuration + " " + duration.toString());
-          double avgRPCCount = accumulatedRPCCount/nbCycles;
-          LOG.debug("rpc count: " + avgRPCCount + " " + rpcCount.toString());
-          duration = new ArrayList<Long>();
-          rpcCount = new ArrayList<Integer>();
-        }
-        
-        startTime = System.currentTimeMillis();
-        //wait for all the accepted RPCs to finish
-        int count = 0;
-        long startWaiting = System.currentTimeMillis();
-        while(currentTransactionState.getCounter() != 0 && running){
-          if(System.currentTimeMillis()-startWaiting>1000){
-            startWaiting = System.currentTimeMillis();
-            count++;
-            LOG.error("waiting too long " + count + " counter: " + currentTransactionState.getCounter());
-            for(transactionStateWrapper w : curentRPCs){
-              if(w.getRPCCounter()>0){
-                LOG.error("rpc not finishing: " + w.getRPCID() + " type: " + w.getRPCType() + ", counter: " + w.getRPCCounter() + " running events: " + w.getRunningEvents());
+        long commitDuration = 0;
+        long startTime = System.currentTimeMillis();
+        double accumulatedCycleDuration = 0;
+        long nbCycles = 0;
+        List<Long> duration = new ArrayList<Long>();
+        List<Integer> rpcCount = new ArrayList<Integer>();
+        double accumulatedRPCCount = 0;
+        long t1 = 0;
+        long t2 = 0;
+        long t3 = 0;
+        long t4 = 0;
+        while (running) {
+          try {
+            //create new transactionState
+            currentTransactionState = new TransactionStateImpl(
+                    TransactionState.TransactionType.RM, 0, true, tsm);
+            curentRPCs = new CopyOnWriteArrayList<transactionStateWrapper>();
+            acceptedRPC.set(0);
+            //accept RPCs
+            lock.unlock();
+            commitDuration = System.currentTimeMillis() - startTime;
+            t3 = commitDuration;
+//        Thread.sleep(Math.max(0, 10-commitDuration));
+            waitForBatch(Math.max(0, batchMaxDuration - commitDuration));
+            t4 = System.currentTimeMillis() - startTime;
+            //stop acception RPCs
+            lock.lock();
+
+            long cycleDuration = System.currentTimeMillis() - startTime;
+            if (cycleDuration > batchMaxDuration + 10) {
+              LOG.error("Cycle too long: " + cycleDuration + "| " + t1 + ", "
+                      + t2
+                      + ", " + t3 + ", " + t4);
+            }
+            nbCycles++;
+            accumulatedCycleDuration += cycleDuration;
+            duration.add(cycleDuration);
+            rpcCount.add(acceptedRPC.get());
+            accumulatedRPCCount += acceptedRPC.get();
+            if (duration.size() > 39) {
+              double avgCycleDuration = accumulatedCycleDuration / nbCycles;
+              LOG.debug("cycle duration: " + avgCycleDuration + " " + duration.
+                      toString());
+              double avgRPCCount = accumulatedRPCCount / nbCycles;
+              LOG.debug("rpc count: " + avgRPCCount + " " + rpcCount.toString());
+              duration = new ArrayList<Long>();
+              rpcCount = new ArrayList<Integer>();
+            }
+
+            startTime = System.currentTimeMillis();
+            //wait for all the accepted RPCs to finish
+            int count = 0;
+            long startWaiting = System.currentTimeMillis();
+            while (currentTransactionState.getCounter() != 0 && running) {
+              if (System.currentTimeMillis() - startWaiting > 1000) {
+                startWaiting = System.currentTimeMillis();
+                count++;
+                LOG.error("waiting too long " + count + " counter: "
+                        + currentTransactionState.getCounter());
+                for (transactionStateWrapper w : curentRPCs) {
+                  if (w.getRPCCounter() > 0) {
+                    LOG.error("rpc not finishing: " + w.getRPCID() + " type: "
+                            + w.getRPCType() + ", counter: " + w.getRPCCounter()
+                            + " running events: " + w.getRunningEvents());
+                  }
+                }
               }
             }
+            if (!running) {
+              break;
+            }
+
+            t1 = System.currentTimeMillis() - startTime;
+            //commit the transactionState
+            currentTransactionState.commit(true);
+            t2 = System.currentTimeMillis() - startTime;
+          } catch (IOException ex) {
+            //TODO we should probably do more than just print
+            LOG.error(ex, ex);
+          } catch (InterruptedException ex) {
+            LOG.error(ex,ex);
           }
         }
-        if(!running){
-          break;
-        }
-        
-        t1= System.currentTimeMillis() - startTime;
-        //commit the transactionState
-        currentTransactionState.commit(true);
-        t2= System.currentTimeMillis() - startTime;
-      } catch (IOException ex) {
-        Logger.getLogger(TransactionStateManager.class.getName()).
-                log(Level.SEVERE, null, ex);
-      } catch (InterruptedException ex) {
-        Logger.getLogger(TransactionStateManager.class.getName()).
-                log(Level.SEVERE, null, ex);
+        LOG.info("TransactionStateManager stoped");
       }
-    }
-    LOG.info("TransactionStateManager stoped");
+    };
   }
   
   public ExecutorService getExecutorService(){
@@ -215,21 +231,35 @@ public class TransactionStateManager implements Runnable{
     }
   }
   
-  public void start(){
-    excutingThread = new Thread(this);
+  
+  protected void serviceStart() throws Exception {
+    super.serviceStart();
+    excutingThread = new Thread(createThread(this));
     excutingThread.setName("transactionStateManager Thread");
     running = true;
     excutingThread.start();
   }
   
-  public void stop() throws InterruptedException{
+
+  
+  @Override
+  protected void serviceStop() throws Exception {
     if (running) {
       running = false;
-      excutingThread.join(10000);
-      executorService.shutdown();
-      executorService.
-              awaitTermination(10, TimeUnit.SECONDS);
+
+      if (excutingThread != null) {
+        excutingThread.interrupt();
+        try {
+          excutingThread.join();
+        } catch (InterruptedException ie) {
+          LOG.warn("Interrupted Exception while stopping", ie);
+        }
+      }
+      
     }
+
+    // stop all the components
+    super.serviceStop();
   }
   
   public boolean blockNonHB(){
@@ -245,5 +275,13 @@ public class TransactionStateManager implements Runnable{
     }
     blockNonHB.notify();
     }
+  }
+  
+  public boolean isFullBatch(){
+     return acceptedRPC.get()>=batchMaxSize;
+  }
+  
+  public boolean isRunning(){
+    return running;
   }
 }

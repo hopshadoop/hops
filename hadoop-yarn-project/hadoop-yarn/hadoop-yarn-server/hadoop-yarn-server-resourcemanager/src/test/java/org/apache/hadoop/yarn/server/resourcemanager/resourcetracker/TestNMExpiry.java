@@ -20,6 +20,7 @@ package org.apache.hadoop.yarn.server.resourcemanager.resourcetracker;
 
 import io.hops.exception.StorageException;
 import io.hops.exception.StorageInitializtionException;
+import io.hops.ha.common.TransactionStateManager;
 import io.hops.metadata.util.RMStorageFactory;
 import io.hops.metadata.util.RMUtilities;
 import io.hops.metadata.util.YarnAPIStorageFactory;
@@ -88,9 +89,12 @@ public class TestNMExpiry {
     RMUtilities.InitializeDB();
     // Dispatcher that processes events inline
     Dispatcher dispatcher = new InlineDispatcher();
+    TransactionStateManager tsm = new TransactionStateManager();
+    tsm.init(conf);
+    tsm.start();
     RMContextImpl context =
         new RMContextImpl(dispatcher, null, null, null, null, null, null, null,
-            conf);
+            conf, tsm);
     groupMembership = new GroupMembershipService(null, context);
     context.setRMGroupMembershipService(groupMembership);
     dispatcher.register(SchedulerEventType.class,
