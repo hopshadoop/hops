@@ -2431,7 +2431,8 @@ public class RMUtilities {
       LOG.error("HOP :: Error commiting finishRPC ", ex);
     }
     long commitAndQueueDuration = System.currentTimeMillis() - startCommit.get(ts);
-       
+    startCommit.remove(ts);
+    
     if(ts.getManager()!=null){
       if(commitAndQueueDuration>commitAndQueueThreshold || getQueueLength()>commitQueueMaxLength){
         if(ts.getManager().blockNonHB()){
