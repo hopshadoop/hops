@@ -92,7 +92,7 @@ public class TransactionStateManager implements Runnable{
         
         long cycleDuration = System.currentTimeMillis() - startTime;
         if (cycleDuration> batchMaxDuration + 10) {
-          LOG.error("Cycle too long: " + cycleDuration + "| " + t1 + ", " + t2
+          LOG.debug("Cycle too long: " + cycleDuration + "| " + t1 + ", " + t2
                   + ", " + t3 + ", " + t4);
         }
         nbCycles++;
