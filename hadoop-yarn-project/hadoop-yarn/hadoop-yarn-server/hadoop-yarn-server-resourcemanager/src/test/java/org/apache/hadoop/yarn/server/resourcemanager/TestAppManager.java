@@ -23,6 +23,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import io.hops.ha.common.TransactionState;
 import io.hops.ha.common.TransactionStateImpl;
+import io.hops.ha.common.TransactionStateManager;
 import junit.framework.Assert;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -104,10 +105,11 @@ public class TestAppManager {
     }
     Dispatcher rmDispatcher = new AsyncDispatcher();
     RMApplicationHistoryWriter writer = mock(RMApplicationHistoryWriter.class);
+    TransactionStateManager tsm = new TransactionStateManager();
     RMContext context =
         new RMContextImpl(rmDispatcher, null,
             null, null, null, null, null, writer,
-            new YarnConfiguration()) {
+            new YarnConfiguration(), tsm) {
           @Override
           public ConcurrentMap<ApplicationId, RMApp> getRMApps() {
             return map;

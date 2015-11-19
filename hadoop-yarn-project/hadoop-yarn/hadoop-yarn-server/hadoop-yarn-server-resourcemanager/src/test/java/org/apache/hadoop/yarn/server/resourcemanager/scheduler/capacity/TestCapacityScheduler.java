@@ -18,6 +18,7 @@ package org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity;
 
 import io.hops.ha.common.TransactionState;
 import io.hops.ha.common.TransactionStateImpl;
+import io.hops.ha.common.TransactionStateManager;
 import io.hops.metadata.util.RMStorageFactory;
 import io.hops.metadata.util.RMUtilities;
 import io.hops.metadata.util.YarnAPIStorageFactory;
@@ -352,8 +353,11 @@ public class TestCapacityScheduler {
     CapacitySchedulerConfiguration conf = new CapacitySchedulerConfiguration();
     setupQueueConfiguration(conf);
     cs.setConf(new YarnConfiguration());
+    TransactionStateManager tsm = new TransactionStateManager();
+    tsm.init(conf);
+    tsm.start();
     cs.reinitialize(conf, new RMContextImpl(null, null, null, null, null, null,
-        new ClientToAMTokenSecretManagerInRM(), null, conf), null);
+        new ClientToAMTokenSecretManagerInRM(), null, conf,tsm), null);
     checkQueueCapacities(cs, A_CAPACITY, B_CAPACITY);
 
     conf.setCapacity(A, 80f);
@@ -453,9 +457,11 @@ public class TestCapacityScheduler {
     conf.setCapacity(CapacitySchedulerConfiguration.ROOT + ".a.a1.b1", 100.0f);
     conf.setUserLimitFactor(CapacitySchedulerConfiguration.ROOT + ".a.a1.b1",
         100.0f);
-
+    TransactionStateManager tsm = new TransactionStateManager();
+    tsm.init(conf);
+    tsm.start();
     cs.reinitialize(conf, new RMContextImpl(null, null, null, null, null, null,
-        new ClientToAMTokenSecretManagerInRM(), null, conf), null);
+        new ClientToAMTokenSecretManagerInRM(), null, conf, tsm), null);
   }
 
   @Test(timeout = 30000)
@@ -465,9 +471,10 @@ public class TestCapacityScheduler {
     setupQueueConfiguration(csConf);
     CapacityScheduler cs = new CapacityScheduler();
     cs.setConf(new YarnConfiguration());
+    TransactionStateManager tsm = new TransactionStateManager();
     cs.reinitialize(csConf,
         new RMContextImpl(null, null, null, null, null, null,
-            new ClientToAMTokenSecretManagerInRM(), null, csConf), null);
+            new ClientToAMTokenSecretManagerInRM(), null, csConf,tsm), null);
 
     RMNode n1 = MockNodes.newNodeInfo(0, MockNodes.newResource(4 * GB), 1);
     RMNode n2 = MockNodes.newNodeInfo(0, MockNodes.newResource(2 * GB), 2);
@@ -495,8 +502,11 @@ public class TestCapacityScheduler {
     CapacitySchedulerConfiguration conf = new CapacitySchedulerConfiguration();
     setupQueueConfiguration(conf);
     cs.setConf(new YarnConfiguration());
+    TransactionStateManager tsm = new TransactionStateManager();
+    tsm.init(new YarnConfiguration());
+    tsm.start();
     cs.reinitialize(conf, new RMContextImpl(null, null, null, null, null, null,
-        new ClientToAMTokenSecretManagerInRM(), null, conf), null);
+        new ClientToAMTokenSecretManagerInRM(), null, conf, tsm), null);
     checkQueueCapacities(cs, A_CAPACITY, B_CAPACITY);
 
     // Add a new queue b4
@@ -659,9 +669,12 @@ public class TestCapacityScheduler {
     CapacityScheduler cs = new CapacityScheduler();
     CapacitySchedulerConfiguration conf = new CapacitySchedulerConfiguration();
     setupQueueConfiguration(conf);
+    TransactionStateManager tsm = new TransactionStateManager();
+    tsm.init(conf);
+    tsm.start();
     cs.reinitialize(conf,
         new RMContextImpl(rmDispatcher, null, null, null, null, null,
-            new ClientToAMTokenSecretManagerInRM(), null, conf), null);
+            new ClientToAMTokenSecretManagerInRM(), null, conf, tsm), null);
 
     SchedulerApplication app = TestSchedulerUtils
         .verifyAppAddedAndRemovedFromScheduler(cs.getSchedulerApplications(),

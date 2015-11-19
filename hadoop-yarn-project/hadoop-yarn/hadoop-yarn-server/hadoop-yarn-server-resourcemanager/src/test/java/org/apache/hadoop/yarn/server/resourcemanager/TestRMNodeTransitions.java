@@ -19,6 +19,7 @@ package org.apache.hadoop.yarn.server.resourcemanager;
 import io.hops.ha.common.TransactionState;
 import io.hops.ha.common.TransactionState.TransactionType;
 import io.hops.ha.common.TransactionStateImpl;
+import io.hops.ha.common.TransactionStateManager;
 import io.hops.metadata.util.HopYarnAPIUtilities;
 import io.hops.metadata.util.RMStorageFactory;
 import io.hops.metadata.util.RMUtilities;
@@ -120,9 +121,11 @@ public class TestRMNodeTransitions {
     conf.setClass(YarnConfiguration.RM_SCHEDULER, FifoScheduler.class,
         ResourceScheduler.class);
     RMUtilities.InitializeDB();
-
+    TransactionStateManager tsm = new TransactionStateManager();
+    tsm.init(conf);
+    tsm.start();
     rmContext = new RMContextImpl(rmDispatcher, null, null, null,
-        mock(DelegationTokenRenewer.class), null, null, null, conf);
+        mock(DelegationTokenRenewer.class), null, null, null, conf, tsm);
     NodesListManager nodesListManager = mock(NodesListManager.class);
     HostsFileReader reader = mock(HostsFileReader.class);
     when(nodesListManager.getHostsReader()).thenReturn(reader);

@@ -126,9 +126,7 @@ public class RMContextImpl implements RMContext {
    * individual fields.
      * @param conf
    */
-  public RMContextImpl(Configuration conf) {
-    transactionStateManager = new TransactionStateManager(conf);
-  }
+  public RMContextImpl() {}
 
   @VisibleForTesting
   // helper constructor for tests
@@ -142,7 +140,6 @@ public class RMContextImpl implements RMContext {
       NMTokenSecretManagerInRM nmTokenSecretManager,
       ClientToAMTokenSecretManagerInRM clientToAMTokenSecretManager,
       RMApplicationHistoryWriter rmApplicationHistoryWriter, Configuration conf) {
-    this(conf);
     this.setDispatcher(rmDispatcher);
     this.setContainerAllocationExpirer(containerAllocationExpirer);
     this.setAMLivelinessMonitor(amLivelinessMonitor);
@@ -177,15 +174,14 @@ public class RMContextImpl implements RMContext {
       AMRMTokenSecretManager appTokenSecretManager,
       ClientToAMTokenSecretManagerInRM clientToAMTokenSecretManager,
       RMApplicationHistoryWriter rmApplicationHistoryWriter,
-      Configuration conf) {
-    this(conf);
+      Configuration conf, TransactionStateManager transactionStateManager) {
     this.setDispatcher(rmDispatcher);
     this.setContainerAllocationExpirer(containerAllocationExpirer);
     this.setAMLivelinessMonitor(amLivelinessMonitor);
     this.setAMFinishingMonitor(amFinishingMonitor);
     this.setDelegationTokenRenewer(delegationTokenRenewer);
     this.setAMRMTokenSecretManager(appTokenSecretManager);
-
+    this.setTransactionStateManager(transactionStateManager);
     if (conf != null) {
       this.setContainerTokenSecretManager(
           new RMContainerTokenSecretManager(conf, this));
@@ -337,6 +333,10 @@ public class RMContextImpl implements RMContext {
     this.rmDispatcher = dispatcher;
   }
 
+  void setTransactionStateManager(TransactionStateManager tsm){
+    this.transactionStateManager = tsm;
+  }
+  
   void setRMAdminService(AdminService adminService) {
     this.adminService = adminService;
   }

@@ -163,13 +163,12 @@ public class TransactionStateImpl extends TransactionState {
   NodeId nodeId = null;
   private TransactionStateManager manager =null;
   
-  //FOR TESTING
    public TransactionStateImpl(TransactionType type) {
     super(1, false);
     this.type = type;
     this.schedulerApplicationInfo =
       new SchedulerApplicationInfo(this);
-    manager = new TransactionStateManager(new YarnConfiguration());
+    manager = new TransactionStateManager();
   }
    
   public TransactionStateImpl(TransactionType type, int initialCounter,

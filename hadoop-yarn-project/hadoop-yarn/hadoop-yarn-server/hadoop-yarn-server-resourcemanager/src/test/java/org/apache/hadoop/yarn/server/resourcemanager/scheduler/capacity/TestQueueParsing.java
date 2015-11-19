@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity;
 
+import io.hops.ha.common.TransactionStateManager;
 import junit.framework.Assert;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -41,9 +42,12 @@ public class TestQueueParsing {
 
     CapacityScheduler capacityScheduler = new CapacityScheduler();
     capacityScheduler.setConf(conf);
+    TransactionStateManager tsm = new TransactionStateManager();
+    tsm.init(conf);
+    tsm.start();
     capacityScheduler.reinitialize(conf,
         new RMContextImpl(null, null, null, null, null, null,
-            new ClientToAMTokenSecretManagerInRM(), null, conf), null);
+            new ClientToAMTokenSecretManagerInRM(), null, conf, tsm), null);
     
     CSQueue a = capacityScheduler.getQueue("a");
     Assert.assertEquals(0.10, a.getAbsoluteCapacity(), DELTA);
