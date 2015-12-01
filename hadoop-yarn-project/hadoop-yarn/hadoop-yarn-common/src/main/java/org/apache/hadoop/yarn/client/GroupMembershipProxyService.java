@@ -59,6 +59,7 @@ public class GroupMembershipProxyService implements Closeable {
     protocol = GroupMembership.class;
     Collection<String> rmIds = HAUtil.getRMHAIds(conf);
     this.rmServiceIds = rmIds.toArray(new String[rmIds.size()]);
+    currentProxyIndex = rmServiceIds.length-1;
     conf.set(YarnConfiguration.RM_HA_ID, rmServiceIds[currentProxyIndex]);
   }
 

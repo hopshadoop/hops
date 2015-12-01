@@ -45,13 +45,13 @@ public class TestFSLeafQueue {
   public void setup() throws IOException {
     FairScheduler scheduler = new FairScheduler();
     Configuration conf = createConfiguration();
+    YarnAPIStorageFactory.setConfiguration(conf);
     // All tests assume only one assignment per node update
     conf.set(FairSchedulerConfiguration.ASSIGN_MULTIPLE, "false");
     ResourceManager resourceManager = new ResourceManager();
     resourceManager.init(conf);
     ((AsyncDispatcher) resourceManager.getRMContext().getDispatcher()).start();
-    scheduler.reinitialize(conf, resourceManager.getRMContext());
-    YarnAPIStorageFactory.setConfiguration(conf);
+    scheduler.reinitialize(conf, resourceManager.getRMContext(), null);
     RMStorageFactory.setConfiguration(conf);
     String queueName = "root.queue1";
     scheduler.allocConf = mock(AllocationConfiguration.class);

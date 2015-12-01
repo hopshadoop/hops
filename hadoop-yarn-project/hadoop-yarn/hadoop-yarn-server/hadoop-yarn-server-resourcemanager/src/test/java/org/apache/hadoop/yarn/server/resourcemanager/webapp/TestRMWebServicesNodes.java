@@ -88,10 +88,12 @@ public class TestRMWebServicesNodes extends JerseyTest {
         bind(GenericExceptionHandler.class);
         YarnConfiguration conf = new YarnConfiguration();
         conf.set(YarnConfiguration.RM_NM_HEARTBEAT_INTERVAL_MS, "4000");
+        conf.setInt(YarnConfiguration.HOPS_BATCH_MAX_DURATION, 60000);
+        conf.setInt(YarnConfiguration.HOPS_BATCH_MAX_SIZE, 10000);
         YarnAPIStorageFactory.setConfiguration(conf);
         RMStorageFactory.setConfiguration(conf);
         RMStorageFactory.getConnector().formatStorage();
-        rm = new MockRM(new Configuration());
+        rm = new MockRM(conf);
         rm.getRMContext().getContainerTokenSecretManager().rollMasterKey();
         rm.getRMContext().getNMTokenSecretManager().rollMasterKey();
         bind(ResourceManager.class).toInstance(rm);
@@ -129,22 +131,22 @@ public class TestRMWebServicesNodes extends JerseyTest {
         .contextPath("jersey-guice-filter").servletPath("/").build());
   }
 
-  @Test
+  @Test (timeout = 60000) 
   public void testNodes() throws JSONException, Exception {
     testNodesHelper("nodes", MediaType.APPLICATION_JSON);
   }
 
-  @Test
+  @Test (timeout = 60000) 
   public void testNodesSlash() throws JSONException, Exception {
     testNodesHelper("nodes/", MediaType.APPLICATION_JSON);
   }
 
-  @Test
+  @Test (timeout = 60000)
   public void testNodesDefault() throws JSONException, Exception {
     testNodesHelper("nodes/", "");
   }
 
-  @Test
+  @Test (timeout = 60000)
   public void testNodesDefaultWithUnHealthyNode()
       throws JSONException, Exception {
 
@@ -165,7 +167,7 @@ public class TestRMWebServicesNodes extends JerseyTest {
         .newInstance(false, "test health report", System.currentTimeMillis());
     node.handle(new RMNodeStatusEvent(nm3.getNodeId(), nodeHealth,
         new ArrayList<ContainerStatus>(), null, null,
-        new TransactionStateImpl(-1, TransactionState.TransactionType.RM)));
+        new TransactionStateImpl( TransactionState.TransactionType.RM)));
     rm.NMwaitForState(nm3.getNodeId(), NodeState.UNHEALTHY);
 
     ClientResponse response =
@@ -182,7 +184,7 @@ public class TestRMWebServicesNodes extends JerseyTest {
     assertEquals("incorrect number of elements", 3, nodeArray.length());
   }
 
-  @Test
+  @Test (timeout = 60000)
   public void testNodesQueryNew() throws JSONException, Exception {
     WebResource r = resource();
     MockNM nm1 = rm.registerNode("h1:1234", 5120);
@@ -208,7 +210,7 @@ public class TestRMWebServicesNodes extends JerseyTest {
     verifyNodeInfo(info, nm2);
   }
 
-  @Test
+  @Test (timeout = 60000)
   public void testNodesQueryStateNone() throws JSONException, Exception {
     WebResource r = resource();
     rm.registerNode("h1:1234", 5120);
@@ -224,7 +226,7 @@ public class TestRMWebServicesNodes extends JerseyTest {
     assertEquals("nodes is not null", JSONObject.NULL, json.get("nodes"));
   }
 
-  @Test
+  @Test (timeout = 60000)
   public void testNodesQueryStateInvalid() throws JSONException, Exception {
     WebResource r = resource();
     rm.registerNode("h1:1234", 5120);
@@ -260,7 +262,7 @@ public class TestRMWebServicesNodes extends JerseyTest {
     }
   }
   
-  @Test
+  @Test (timeout = 60000)
   public void testNodesQueryStateLost() throws JSONException, Exception {
     WebResource r = resource();
     MockNM nm1 = rm.registerNode("h1:1234", 5120);
@@ -295,7 +297,7 @@ public class TestRMWebServicesNodes extends JerseyTest {
     }
   }
   
-  @Test
+  @Test (timeout = 60000)
   public void testSingleNodeQueryStateLost() throws JSONException, Exception {
     WebResource r = resource();
     MockNM nm1 = rm.registerNode("h1:1234", 5120);
@@ -325,7 +327,7 @@ public class TestRMWebServicesNodes extends JerseyTest {
         info.getString("state"));
   }
 
-  @Test
+  @Test (timeout = 60000)
   public void testNodesQueryRunning() throws JSONException, Exception {
     WebResource r = resource();
     MockNM nm1 = rm.registerNode("h1:1234", 5120);
@@ -346,7 +348,7 @@ public class TestRMWebServicesNodes extends JerseyTest {
     assertEquals("incorrect number of elements", 1, nodeArray.length());
   }
 
-  @Test
+  @Test (timeout = 60000)
   public void testNodesQueryHealthyFalse() throws JSONException, Exception {
     WebResource r = resource();
     MockNM nm1 = rm.registerNode("h1:1234", 5120);
@@ -396,21 +398,21 @@ public class TestRMWebServicesNodes extends JerseyTest {
     }
   }
 
-  @Test
+  @Test (timeout = 60000)
   public void testSingleNode() throws JSONException, Exception {
     rm.registerNode("h1:1234", 5120);
     MockNM nm2 = rm.registerNode("h2:1235", 5121);
     testSingleNodeHelper("h2:1235", nm2, MediaType.APPLICATION_JSON);
   }
 
-  @Test
+  @Test (timeout = 60000)
   public void testSingleNodeSlash() throws JSONException, Exception {
     MockNM nm1 = rm.registerNode("h1:1234", 5120);
     rm.registerNode("h2:1235", 5121);
     testSingleNodeHelper("h1:1234/", nm1, MediaType.APPLICATION_JSON);
   }
 
-  @Test
+  @Test (timeout = 60000)
   public void testSingleNodeDefault() throws JSONException, Exception {
     MockNM nm1 = rm.registerNode("h1:1234", 5120);
     rm.registerNode("h2:1235", 5121);
@@ -431,7 +433,7 @@ public class TestRMWebServicesNodes extends JerseyTest {
     verifyNodeInfo(info, nm);
   }
 
-  @Test
+  @Test (timeout = 60000)
   public void testNonexistNode() throws JSONException, Exception {
     rm.registerNode("h1:1234", 5120);
     rm.registerNode("h2:1235", 5121);
@@ -460,7 +462,7 @@ public class TestRMWebServicesNodes extends JerseyTest {
   }
 
   // test that the exception output defaults to JSON
-  @Test
+  @Test (timeout = 60000)
   public void testNonexistNodeDefault() throws JSONException, Exception {
     rm.registerNode("h1:1234", 5120);
     rm.registerNode("h2:1235", 5121);
@@ -487,7 +489,7 @@ public class TestRMWebServicesNodes extends JerseyTest {
   }
 
   // test that the exception output works in XML
-  @Test
+  @Test (timeout = 60000)
   public void testNonexistNodeXML() throws JSONException, Exception {
     rm.registerNode("h1:1234", 5120);
     rm.registerNode("h2:1235", 5121);
@@ -531,7 +533,7 @@ public class TestRMWebServicesNodes extends JerseyTest {
         "org.apache.hadoop.yarn.webapp.NotFoundException".matches(classname));
   }
 
-  @Test
+  @Test (timeout = 60000)
   public void testInvalidNode() throws JSONException, Exception {
     rm.registerNode("h1:1234", 5120);
     rm.registerNode("h2:1235", 5121);
@@ -565,7 +567,7 @@ public class TestRMWebServicesNodes extends JerseyTest {
     }
   }
 
-  @Test
+  @Test (timeout = 60000)
   public void testNodesXML() throws JSONException, Exception {
     rm.start();
     WebResource r = resource();
@@ -589,7 +591,7 @@ public class TestRMWebServicesNodes extends JerseyTest {
     rm.stop();
   }
 
-  @Test
+  @Test (timeout = 60000)
   public void testSingleNodesXML() throws JSONException, Exception {
     rm.start();
     WebResource r = resource();
@@ -613,7 +615,7 @@ public class TestRMWebServicesNodes extends JerseyTest {
     rm.stop();
   }
 
-  @Test
+  @Test (timeout = 60000)
   public void testNodes2XML() throws JSONException, Exception {
     rm.start();
     WebResource r = resource();
@@ -637,7 +639,7 @@ public class TestRMWebServicesNodes extends JerseyTest {
     rm.stop();
   }
   
-  @Test
+  @Test (timeout = 60000)
   public void testQueryAll() throws Exception {
     WebResource r = resource();
     MockNM nm1 = rm.registerNode("h1:1234", 5120);

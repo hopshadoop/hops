@@ -129,7 +129,7 @@ public class PendingEventRetrievalBatch extends PendingEventRetrieval {
       LOG.debug("HOP :: RMNodeWorker:" + id + " - START");
       try {
         //Retrieve RMNode
-        rmNode = convertHopToRMNode(RMUtilities.getRMNodeBatch(id));
+        rmNode = processHopRMNodeComps(RMUtilities.getRMNodeBatch(id));
         LOG.debug("HOP :: RMNodeWorker rmNode:" + rmNode);
       } catch (IOException ex) {
         LOG.error("HOP :: Error retrieving rmNode:" + id, ex);

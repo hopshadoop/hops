@@ -18,6 +18,7 @@ package org.apache.hadoop.yarn.server.resourcemanager;
 
 import com.google.common.annotations.VisibleForTesting;
 import io.hops.common.GlobalThreadPool;
+import io.hops.ha.common.TransactionStateManager;
 import io.hops.metadata.util.RMStorageFactory;
 import io.hops.metadata.util.YarnAPIStorageFactory;
 import io.hops.metadata.yarn.entity.appmasterrpc.RPC;
@@ -116,6 +117,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.security.PrivilegedExceptionAction;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -142,6 +144,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
   @VisibleForTesting
   protected RMContextImpl rmContext;//recovered
   private Dispatcher rmDispatcher;
+  private TransactionStateManager transactionStateManager;
   @VisibleForTesting
   protected AdminService adminService;
   protected GroupMembershipService groupMembershipService;
@@ -208,14 +211,15 @@ public class ResourceManager extends CompositeService implements Recoverable {
    *
    * @throws Exception
    */
-  private void startDistributedRTServices(CompositeService service)
+  private void initDistributedRTServices(CompositeService service)
       throws Exception {
     conf.setBoolean(Dispatcher.DISPATCHER_EXIT_ON_ERROR_KEY, true);
 
     rmSecretManagerService = createRMSecretManagerService();
     service.addService(rmSecretManagerService);
 
-    containerAllocationExpirer = new ContainerAllocationExpirer(rmDispatcher);
+    containerAllocationExpirer = new ContainerAllocationExpirer(rmDispatcher,
+            rmContext);
     service.addService(containerAllocationExpirer);
     rmContext.setContainerAllocationExpirer(containerAllocationExpirer);
 
@@ -281,7 +285,6 @@ public class ResourceManager extends CompositeService implements Recoverable {
 
     DefaultMetricsSystem.initialize("ResourceManager");
     JvmMetrics.initSingleton("ResourceManager", null);
-    
   }
 
   @Override
@@ -289,6 +292,10 @@ public class ResourceManager extends CompositeService implements Recoverable {
     this.conf = conf;
     this.rmContext = new RMContextImpl();
 
+    transactionStateManager = new TransactionStateManager();
+    addIfService(transactionStateManager);
+    rmContext.setTransactionStateManager(transactionStateManager);
+    
     this.configurationProvider =
         ConfigurationProviderFactory.getConfigurationProvider(conf);
     this.configurationProvider.init(this.conf);
@@ -336,8 +343,6 @@ public class ResourceManager extends CompositeService implements Recoverable {
     if (this.rmContext.isHAEnabled()) {
       HAUtil.verifyAndSetConfiguration(this.conf);
     }
-    createAndInitActiveServices();
-
     if (HAUtil.isHAEnabled(conf)) {
       webAppAddress = WebAppUtils.getRMHAWebAppURLWithoutScheme(this.conf);
     } else {
@@ -349,8 +354,9 @@ public class ResourceManager extends CompositeService implements Recoverable {
     //If distributed RT is enabled start the services of the non-leader machines
     if (conf.getBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED,
         YarnConfiguration.DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED)) {
-      startDistributedRTServices(this);
+      initDistributedRTServices(this);
     }
+    createAndInitActiveServices();
     super.serviceInit(this.conf);
   }
 
@@ -399,11 +405,11 @@ public class ResourceManager extends CompositeService implements Recoverable {
   }
 
   private NMLivelinessMonitor createNMLivelinessMonitor() {
-    return new NMLivelinessMonitor(this.rmContext.getDispatcher());
+    return new NMLivelinessMonitor(this.rmContext.getDispatcher(), rmContext);
   }
 
   protected AMLivelinessMonitor createAMLivelinessMonitor() {
-    return new AMLivelinessMonitor(this.rmDispatcher);
+    return new AMLivelinessMonitor(this.rmDispatcher, rmContext);
   }
 
   protected DelegationTokenRenewer createDelegationTokenRenewer() {
@@ -468,7 +474,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
       //that are by-default started by the non-leader machines 
       if (!conf.getBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED,
           YarnConfiguration.DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED)) {
-        startDistributedRTServices(this);
+        initDistributedRTServices(this);
       }
       // Initialize the scheduler
       scheduler = createScheduler();
@@ -488,7 +494,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
 
 
       try {
-        scheduler.reinitialize(conf, rmContext);
+        scheduler.reinitialize(conf, rmContext, null);
       } catch (IOException ioe) {
         throw new RuntimeException("Failed to initialize scheduler", ioe);
       }
@@ -538,7 +544,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
       if (recoveryEnabled) {
         try {
           rmStore.checkVersion();
-          RMState state = rmStore.loadState();
+          RMState state = rmStore.loadState(rmContext);
           recover(state);
         } catch (Exception e) {
           // the Exception from loadState() needs to be handled for
@@ -547,7 +553,6 @@ public class ResourceManager extends CompositeService implements Recoverable {
           throw e;
         }
       }
-
       super.serviceStart();
     }
 
@@ -959,13 +964,25 @@ public class ResourceManager extends CompositeService implements Recoverable {
     //Start periodic retrieval of pending scheduler events
     if (conf.getBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED,
         YarnConfiguration.DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED)) {
-      LOG.debug("HOP :: Starting PendingEvent retrieval thread");
-      retrievalThread = new PendingEventRetrievalBatch(rmContext, conf);
+    if (conf.getBoolean(YarnConfiguration.HOPS_NDB_EVENT_STREAMING_ENABLED,
+              YarnConfiguration.DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED)) {
+        if (!conf.getBoolean(
+                YarnConfiguration.HOPS_NDB_RT_EVENT_STREAMING_ENABLED,
+                YarnConfiguration.DEFAULT_HOPS_NDB_RT_EVENT_STREAMING_ENABLED)) {
+          LOG.info("HOP :: NDB Event streaming is starting now ..");
+          RMStorageFactory.kickTheNdbEventStreamingAPI();
+        }
+        retrievalThread = new NdbEventStreamingProcessor(rmContext, conf);
+      } else {
+        LOG.debug("HOP :: Starting PendingEvent retrieval thread");
+        retrievalThread = new PendingEventRetrievalBatch(rmContext, conf);
+      }
       GlobalThreadPool.getExecutorService().execute(retrievalThread);
     }
   }
 
-  synchronized void transitionToStandby(boolean initialize) throws Exception {
+  @VisibleForTesting
+  protected synchronized void transitionToStandby(boolean initialize) throws Exception {
     if (rmContext.getHAServiceState() ==
         HAServiceProtocol.HAServiceState.STANDBY) {
       LOG.info("Already in standby state " + groupMembershipService.
@@ -983,6 +1000,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
       }
       if (initialize) {
         resetDispatcher();
+        resetTransactionStateManager();
         createAndInitActiveServices();
       }
     }
@@ -1110,7 +1128,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
   public ApplicationACLsManager getApplicationACLsManager() {
     return this.applicationACLsManager;
   }
-
+ 
   @Private
   public QueueACLsManager getQueueACLsManager() {
     return this.queueACLsManager;
@@ -1142,6 +1160,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
     } catch (IOException ex) {
       //TODO see what to do with this exceptions
     }
+    LOG.info("Finished recovering");
   }
 
   private UserGroupInformation creatAMRMTokenUGI(RPC rpc) throws IOException {
@@ -1157,11 +1176,15 @@ public class ResourceManager extends CompositeService implements Recoverable {
 
   protected void recoverRpc(RMState rmState) throws IOException, YarnException {
     List<RPC> rpcList = rmState.getAppMasterRPCs();
+    if(!rpcList.isEmpty()){
+      Collections.sort(rpcList);
+    }
     Exception lastException = null;
+    LOG.debug("recovering rpcs: " + rpcList.size());
     for (final RPC rpc : rpcList) {
       com.google.protobuf.GeneratedMessage proto;
       LOG.debug(
-          "recovering rpc: " + rpc.getId() + " of type: " + rpc.getType());
+          "recovering rpc: " + rpc.getRPCId() + " of type: " + rpc.getType());
       UserGroupInformation ugi;
       try {
         switch (rpc.getType()) {
@@ -1179,7 +1202,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
                     return masterService.registerApplicationMaster(
                         new RegisterApplicationMasterRequestPBImpl(
                             (YarnServiceProtos.RegisterApplicationMasterRequestProto) proto),
-                        rpc.getId());
+                        rpc.getRPCId());
                   }
                 });
             break;
@@ -1197,7 +1220,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
                     return masterService.finishApplicationMaster(
                         new FinishApplicationMasterRequestPBImpl(
                             (YarnServiceProtos.FinishApplicationMasterRequestProto) proto),
-                        rpc.getId());
+                        rpc.getRPCId());
                   }
                 });
             break;
@@ -1212,8 +1235,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
                             getRpc());
                     return masterService.allocate(new AllocateRequestPBImpl(
                             (YarnServiceProtos.AllocateRequestProto) proto),
-                        rpc.
-                            getId());
+                        rpc.getRPCId());
                   }
                 });
             break;
@@ -1231,8 +1253,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
                     return clientRM.submitApplication(
                         new SubmitApplicationRequestPBImpl(
                             (YarnServiceProtos.SubmitApplicationRequestProto) proto),
-                        rpc.
-                            getId());
+                        rpc.getRPCId());
                   }
                 });
             break;
@@ -1249,8 +1270,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
                     return clientRM.forceKillApplication(
                         new KillApplicationRequestPBImpl(
                             (YarnServiceProtos.KillApplicationRequestProto) proto),
-                        rpc.
-                            getId());
+                        rpc.getRPCId());
                   }
                 });
             break;
@@ -1261,7 +1281,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
             resourceTracker.registerNodeManager(
                 new RegisterNodeManagerRequestPBImpl(
                     (YarnServerCommonServiceProtos.RegisterNodeManagerRequestProto) proto),
-                rpc.getId(),
+                rpc.getRPCId(),
                 conf.getBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED,
                     YarnConfiguration.DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED));
             break;
@@ -1270,14 +1290,14 @@ public class ResourceManager extends CompositeService implements Recoverable {
                 parseFrom(rpc.getRpc());
             resourceTracker.nodeHeartbeat(new NodeHeartbeatRequestPBImpl(
                     (YarnServerCommonServiceProtos.NodeHeartbeatRequestProto) proto),
-                rpc.getId());
+                rpc.getRPCId());
             break;
           default:
             LOG.error("RPC type does not exist");
             throw new IOException("RPC type does not exist");
         }
       } catch (Exception ex) {
-        LOG.error("rpc: " + rpc.getId() +
+        LOG.error("rpc: " + rpc.getRPCId() +
             " was not recovered due to the following exception ", ex);
         lastException = ex;
       }
@@ -1334,6 +1354,16 @@ public class ResourceManager extends CompositeService implements Recoverable {
     rmContext.setDispatcher(rmDispatcher);
   }
 
+  private void resetTransactionStateManager(){
+    TransactionStateManager tsm = new TransactionStateManager();
+    ((Service) tsm).init(conf);
+    ((Service) tsm).start();
+    removeService((Service) transactionStateManager);
+    transactionStateManager = tsm;
+    addIfService(transactionStateManager);
+    rmContext.setTransactionStateManager(transactionStateManager);
+  }
+  
   /**
    * Retrieve RM bind address from configuration
    *

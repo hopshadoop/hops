@@ -28,14 +28,18 @@ import org.apache.hadoop.yarn.proto.YarnProtos.ContainerIdProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.ContainerStateProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.ContainerStatusProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.ContainerStatusProtoOrBuilder;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 @Private
 @Unstable
 public class ContainerStatusPBImpl extends ContainerStatus {
+  private static final Log LOG = LogFactory.getLog(ContainerStatusPBImpl.class);
+  
   ContainerStatusProto proto = ContainerStatusProto.getDefaultInstance();
   ContainerStatusProto.Builder builder = null;
   boolean viaProto = false;
-  
+    
   private ContainerId containerId = null;
   
   
@@ -48,7 +52,7 @@ public class ContainerStatusPBImpl extends ContainerStatus {
     viaProto = true;
   }
   
-  public ContainerStatusProto getProto() {
+  public synchronized ContainerStatusProto getProto() {
     mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
     viaProto = true;
@@ -107,7 +111,7 @@ public class ContainerStatusPBImpl extends ContainerStatus {
 
   
   @Override
-  public ContainerState getState() {
+  public synchronized ContainerState getState() {
     ContainerStatusProtoOrBuilder p = viaProto ? proto : builder;
     if (!p.hasState()) {
       return null;
@@ -126,7 +130,7 @@ public class ContainerStatusPBImpl extends ContainerStatus {
   }
 
   @Override
-  public ContainerId getContainerId() {
+  public synchronized ContainerId getContainerId() {
     ContainerStatusProtoOrBuilder p = viaProto ? proto : builder;
     if (this.containerId != null) {
       return this.containerId;
@@ -148,7 +152,7 @@ public class ContainerStatusPBImpl extends ContainerStatus {
   }
 
   @Override
-  public int getExitStatus() {
+  public synchronized int getExitStatus() {
     ContainerStatusProtoOrBuilder p = viaProto ? proto : builder;
     return p.getExitStatus();
   }
@@ -160,7 +164,7 @@ public class ContainerStatusPBImpl extends ContainerStatus {
   }
 
   @Override
-  public String getDiagnostics() {
+  public synchronized String getDiagnostics() {
     ContainerStatusProtoOrBuilder p = viaProto ? proto : builder;
     return (p.getDiagnostics());
   }

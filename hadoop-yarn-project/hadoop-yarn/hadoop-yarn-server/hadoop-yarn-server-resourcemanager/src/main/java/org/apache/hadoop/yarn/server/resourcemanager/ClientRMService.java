@@ -520,7 +520,7 @@ public class ClientRMService extends AbstractService
     
 
     if (rpcID == null) {
-      rpcID = HopYarnAPIUtilities.setYarnVariables(HopYarnAPIUtilities.RPC);
+      rpcID = HopYarnAPIUtilities.getRPCID();
       byte[] submitAppData =
           ((SubmitApplicationRequestPBImpl) request).getProto().toByteArray();
 
@@ -528,15 +528,13 @@ public class ClientRMService extends AbstractService
           .persistAppMasterRPC(rpcID, RPC.Type.SubmitApplication, submitAppData,
               user);
     }
-    TransactionState transactionState =
-        new TransactionStateImpl(rpcID, TransactionState.TransactionType.APP);
-
-
+    TransactionState transactionState = rmContext.getTransactionStateManager().
+            getCurrentTransactionStateNonPriority(rpcID,"submitApplication");
     // Check whether app has already been put into rmContext,
     // If it is, simply return the response
     if (rmContext.getRMApps().get(applicationId) != null) {
       LOG.info("This is an earlier submitted application: " + applicationId);
-      transactionState.decCounter("rpc");
+      transactionState.decCounter(TransactionState.TransactionType.INIT);
       return SubmitApplicationResponse.newInstance();
     }
 
@@ -576,13 +574,13 @@ public class ClientRMService extends AbstractService
           .logFailure(user, AuditConstants.SUBMIT_APP_REQUEST, e.getMessage(),
               "ClientRMService", "Exception in submitting application",
               applicationId);
-      transactionState.decCounter("rpc");
+      transactionState.decCounter(TransactionState.TransactionType.INIT);
       throw e;
     }
 
     SubmitApplicationResponse response =
         recordFactory.newRecordInstance(SubmitApplicationResponse.class);
-    transactionState.decCounter("rpc submitapp return");
+    transactionState.decCounter(TransactionState.TransactionType.INIT);
     return response;
   }
 
@@ -613,24 +611,22 @@ public class ClientRMService extends AbstractService
     
 
     if (rpcID == null) {
-      rpcID = HopYarnAPIUtilities.setYarnVariables(HopYarnAPIUtilities.RPC);
+      rpcID = HopYarnAPIUtilities.getRPCID();
       byte[] forceKillAppData = ((KillApplicationRequestPBImpl) request).
           getProto().toByteArray();
 
       RMUtilities.persistAppMasterRPC(rpcID, RPC.Type.ForceKillApplication,
           forceKillAppData, callerUGI.getUserName());
     }
-    TransactionState transactionState =
-        new TransactionStateImpl(rpcID, TransactionState.TransactionType.APP);
-
-
+    TransactionState transactionState = rmContext.getTransactionStateManager().
+            getCurrentTransactionStateNonPriority(rpcID,"forceKillApplication");
     RMApp application = this.rmContext.getRMApps().get(applicationId);
     if (application == null) {
       RMAuditLogger
           .logFailure(callerUGI.getUserName(), AuditConstants.KILL_APP_REQUEST,
               "UNKNOWN", "ClientRMService",
               "Trying to kill an absent application", applicationId);
-      transactionState.decCounter("rpc");
+      transactionState.decCounter(TransactionState.TransactionType.INIT);
       throw new ApplicationNotFoundException(
           "Trying to kill an absent" + " application " + applicationId);
     }
@@ -641,7 +637,7 @@ public class ClientRMService extends AbstractService
           AuditConstants.KILL_APP_REQUEST, "User doesn't have permissions to " +
               ApplicationAccessType.MODIFY_APP.toString(), "ClientRMService",
           AuditConstants.UNAUTHORIZED_USER, applicationId);
-      transactionState.decCounter("rpc");
+      transactionState.decCounter(TransactionState.TransactionType.INIT);
       throw RPCUtil.getRemoteException(new AccessControlException(
           "User " + callerUGI.getShortUserName() +
               " cannot perform operation " +
@@ -652,7 +648,7 @@ public class ClientRMService extends AbstractService
     if (application.isAppFinalStateStored()) {
       RMAuditLogger.logSuccess(callerUGI.getShortUserName(),
           AuditConstants.KILL_APP_REQUEST, "ClientRMService", applicationId);
-      transactionState.decCounter("rpc");
+      transactionState.decCounter(TransactionState.TransactionType.INIT);
       return KillApplicationResponse.newInstance(true);
     }
 
@@ -660,7 +656,7 @@ public class ClientRMService extends AbstractService
         new RMAppEvent(applicationId, RMAppEventType.KILL, transactionState));
 
     // For UnmanagedAMs, return true so they don't retry
-    transactionState.decCounter("rpc forcekill return");
+    transactionState.decCounter(TransactionState.TransactionType.INIT);
     return KillApplicationResponse.newInstance(
         application.getApplicationSubmissionContext().getUnmanagedAM());
   }

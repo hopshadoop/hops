@@ -43,7 +43,7 @@ import java.util.Set;
  * The secret manager is responsible for generating and accepting the password
  * for each token.
  */
-//TORECOVER all the store action done in this class must be remplaced by transaction state actions (getStateStore)
+//TORECOVER TOKEN all the store action done in this class must be remplaced by transaction state actions (getStateStore)
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public class RMDelegationTokenSecretManager

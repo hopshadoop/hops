@@ -211,7 +211,7 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
       // exist in the db then we should put null in the cache for that id
 
       if (inodeId == null) {
-        throw new IllegalArgumentException("InodeId is not set");
+        throw new IllegalArgumentException(Thread.currentThread().getId()+" InodeId is not set for block "+blockId);
       }
       aboutToAccessStorage(bFinder, params);
       result = dataAccess.findById(blockId, inodeId);

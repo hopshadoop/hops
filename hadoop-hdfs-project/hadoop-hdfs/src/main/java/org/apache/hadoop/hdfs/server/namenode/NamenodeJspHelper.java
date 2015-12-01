@@ -66,8 +66,15 @@ import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 
 import static org.apache.hadoop.hdfs.DFSUtil.percent2String;
 
@@ -155,38 +162,48 @@ class NamenodeJspHelper {
         fsn.getClusterId() +
         "</td></tr>\n  <tr><td class='col1'>Block Pool ID:</td><td>" +
         fsn.getBlockPoolId() +
-        "</td></tr>\n  <tr><td class='col1'>Path Ancestor Lock Type:</td><td>" +
-        fsn.getFilePathAncestorLockType() +
+       // "</td></tr>\n  <tr><td class='col1'>Path Ancestor Lock Type:</td><td>" +
+       // fsn.getFilePathAncestorLockType() +
         "</td></tr>\n  <tr><td class='col1'>" + nn.getActiveNameNodes().size() +
         " NN(s):</td><td>" +
         getAllActiveNNs(nn.getActiveNameNodes()) +
         "</td></tr>\n</table></div>";
   }
+  
+  class LexicographicComparator implements Comparator<ActiveNode> {
+    @Override
+    public int compare(ActiveNode a, ActiveNode b) {
+        return getCanonicalHostName(a.getIpAddress()).compareToIgnoreCase(getCanonicalHostName(a.getIpAddress()));
+    }
+ }
 
   private static String getAllActiveNNs(SortedActiveNodeList activeNodeList) {
     List<ActiveNode> list = activeNodeList.getActiveNodes();
     String leaderhost = getCanonicalHostName(activeNodeList.getLeader()
         .getIpAddress());
-    List<String> hosts = new ArrayList<String>();
+    
+    Map<String, ActiveNode> activeNodes = new HashMap<String, ActiveNode>();
     for(ActiveNode node : list){
-      hosts.add(getCanonicalHostName(node.getIpAddress()));
+      activeNodes.put(getCanonicalHostName(node.getIpAddress()), node);
     }
-
-    Collections.sort(hosts);
-
+    
+    SortedSet<String> keys = new TreeSet<String>(activeNodes.keySet());
     StringBuilder sb = new StringBuilder("");
-    for (int i = 0; i < list.size(); i++) {
+    int i = 0;
+    for(String key : keys){
       if (i % 3 == 0) {
         sb.append("<br>");
       }
-      sb.append("<a href=\"http://").append(list.get(i).getHttpAddress())
-          .append("/dfshealth.jsp\">");
+      String address = activeNodes.get(key).getHttpAddress();
+      
+      sb.append("<a href=\"http://").append(address).append("/dfshealth.jsp\">");
 
-      String hostString = hosts.get(i).equals(leaderhost) ? "<b>" +
-          leaderhost + "</b>" : hosts.get(i);
+      String hostString = key.equals(leaderhost) ? "<b class='col1'>" +
+          key + "  (Leader) </b>" : key;
       sb.append(hostString);
       sb.append("</a>");
       sb.append("\t\t");
+      i++;
     }
     return sb.toString();
   }

@@ -19,11 +19,13 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import java.io.IOException;
+import java.util.Set;
+import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.hadoop.yarn.api.records.ApplicationId;
 
 public abstract class TransactionState {
 
-  
   //TODO: Should we persist this id when the RT crashes and the NM starts 
   //sending HBs to the new RT?
   protected static AtomicInteger pendingEventId = new AtomicInteger(0);
@@ -32,48 +34,58 @@ public abstract class TransactionState {
 
     RM,
     APP,
-    NODE
+    NODE,
+    INIT
   }
 
   private static final Log LOG = LogFactory.getLog(TransactionState.class);
-  private int counter = 1;
-  protected int rpcID;
+  private AtomicInteger counter = new AtomicInteger(0);
+  protected final Set<ApplicationId> appIds = new ConcurrentSkipListSet<ApplicationId>();
+//  private final Lock counterLock = new ReentrantLock(true);
+  private Set<Integer> rpcIds = new ConcurrentSkipListSet<Integer>();
+  private int id=-1;
+  private final boolean batch;
 
-  public TransactionState(int rpcID) {
-    this.rpcID = rpcID;
+  public TransactionState(int initialCounter, boolean batch) {
+
+    counter = new AtomicInteger(initialCounter);
+    this.batch = batch;
   }
 
-  public synchronized void incCounter(Enum type) {
-    counter++;
-    LOG.debug(
-        "counter inc for rpc: " + this.rpcID + " count " + counter + " type: " +
-            type + " classe:" + type.getClass());
+  public int getId(){
+    return id;
+  }
+    public Set<ApplicationId> getAppIds(){
+    return appIds;
   }
 
-  public synchronized void decCounter(Enum type) throws IOException {
-    counter--;
-    LOG.debug(
-        "counter dec for rpc: " + this.rpcID + " count " + counter + " type: " +
-            type + " classe:" + type.getClass());
-    if (counter == 0) {
-      commit();
+  abstract boolean addAppId(ApplicationId appId);
+
+  public void incCounter(Enum type) {
+    counter.incrementAndGet();
+  }
+
+  public void decCounter(Enum type) throws IOException {
+    int value = counter.decrementAndGet();
+    if(!batch && value==0){
+      commit(true);
     }
   }
 
-  public synchronized void decCounter(String type) throws IOException {
-    counter--;
-    LOG.debug(
-        "counter dec for rpc: " + this.rpcID + " count " + counter + " type: " +
-            type);
-    if (counter == 0) {
-      commit();
+  public int getCounter(){
+    return counter.get();
+  }
+
+  public void addRPCId(int rpcId){
+    if(rpcId>=0 && id<0){
+      id = rpcId;
     }
+    rpcIds.add(rpcId);
   }
 
-
-  public int getId() {
-    return rpcID;
+  public Set<Integer> getRPCIds(){
+    return rpcIds;
   }
 
-  abstract void commit() throws IOException;
+  public abstract void commit(boolean first) throws IOException;
 }

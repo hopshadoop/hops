@@ -31,12 +31,14 @@ import io.hops.transaction.handler.RequestHandler;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience;
 
 import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
+@InterfaceAudience.Public
 public class UsersGroups {
 
   private static final Log LOG = LogFactory.getLog(UsersGroups.class);
@@ -46,22 +48,23 @@ public class UsersGroups {
     GET_USER_GROUPS
   }
 
-  private static class GroupsUpdater implements Runnable{
+  private static class GroupsUpdater implements Runnable {
     @Override
     public void run() {
       while (true) {
         Set<String> knownUsers = cached.keySet();
-        for (String user : knownUsers) {
-          try {
-
-            List<String> groups = getGroupsFromDBAndUpdateCached(user);
-            LOG.debug("Update Groups for [" + user+"] groups=" + groups);
-            Thread.sleep(groupUpdateTime * 1000);
-          } catch (IOException e) {
-            LOG.error(e);
-          } catch (InterruptedException e) {
-            LOG.error(e);
+        try {
+          for (String user : knownUsers) {
+            try {
+              List<String> groups = getGroupsFromDBAndUpdateCached(user);
+              LOG.debug("Update Groups for [" + user + "] groups=" + groups);
+            } catch (IOException e) {
+              LOG.error(e);
+            }
           }
+          Thread.sleep(groupUpdateTime * 1000);
+        } catch (InterruptedException e) {
+          LOG.error(e);
         }
       }
     }

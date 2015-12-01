@@ -43,14 +43,14 @@ public class NMTokenSecretManagerInRM extends BaseNMTokenSecretManager {
 
   private static Log LOG = LogFactory.getLog(NMTokenSecretManagerInRM.class);
 
-  private MasterKeyData nextMasterKey;
+  private MasterKeyData nextMasterKey; //TORECOVER?
   private Configuration conf;
   private RMContext rmContext;
   private final Timer timer;
   private final long rollingInterval;
   private final long activationDelay;
   private final ConcurrentHashMap<ApplicationAttemptId, HashSet<NodeId>>
-      appAttemptToNodeKeyMap;
+      appAttemptToNodeKeyMap; //TORECOVER?
 
   public NMTokenSecretManagerInRM(Configuration conf, RMContext rmContext) {
     this.rmContext = rmContext;

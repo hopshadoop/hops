@@ -77,16 +77,16 @@ public class BlockInfoDALAdaptor extends
   }
 
   @Override
-  public List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo> findByStorageId(
+  public List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo> findBlockInfosByStorageId(
       int storageId) throws StorageException {
     return (List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo>) convertDALtoHDFS(
-        dataAccess.findByStorageId(storageId));
+        dataAccess.findBlockInfosByStorageId(storageId));
   }
 
   @Override
-  public Set<Long> findByStorageIdOnlyIds(int storageId)
+  public Set<Long> findINodeIdsByStorageId(int storageId)
       throws StorageException {
-    return dataAccess.findByStorageIdOnlyIds(storageId);
+    return dataAccess.findINodeIdsByStorageId(storageId);
   }
 
   @Override
