@@ -46,4 +46,7 @@ public class ContainerExitStatus {
    * Containers preempted by the framework.
    */
   public static final int PREEMPTED = -102;
+  
+  public static final int UNKNOWN_CONTAINER_EXIT = -200;
+  public static final int CONTAINER_RUNNING_STATE = -201;
 }
