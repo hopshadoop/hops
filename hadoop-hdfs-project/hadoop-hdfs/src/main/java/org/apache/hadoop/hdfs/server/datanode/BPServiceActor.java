@@ -563,9 +563,9 @@ class BPServiceActor implements Runnable {
     return bpNamenode.blockReport(registration, poolId, reports);
   }
 
-  public ActiveNode nextNNForBlkReport() throws IOException {
+  public ActiveNode nextNNForBlkReport(long noOfBlks) throws IOException {
     if (bpNamenode != null) {
-      ActiveNode an = bpNamenode.getNextNamenodeToSendBlockReport();
+      ActiveNode an = bpNamenode.getNextNamenodeToSendBlockReport(noOfBlks);
       return an;
     } else {
       return null;
