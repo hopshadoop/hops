@@ -986,8 +986,8 @@ class NameNodeRpcServer implements NamenodeProtocols {
   }
 
   @Override
-  public ActiveNode getNextNamenodeToSendBlockReport() throws IOException {
-    return nn.getNextNamenodeToSendBlockReport();
+  public ActiveNode getNextNamenodeToSendBlockReport(long noOfBlks) throws IOException {
+    return nn.getNextNamenodeToSendBlockReport(noOfBlks);
   }
   
   @Override
