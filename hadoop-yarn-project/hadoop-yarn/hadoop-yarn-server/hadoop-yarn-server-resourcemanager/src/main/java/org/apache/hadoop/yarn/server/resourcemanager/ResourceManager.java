@@ -965,7 +965,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
                 YarnConfiguration.HOPS_NDB_RT_EVENT_STREAMING_ENABLED,
                 YarnConfiguration.DEFAULT_HOPS_NDB_RT_EVENT_STREAMING_ENABLED)) {
           LOG.info("HOP :: NDB Event streaming is starting now ..");
-          RMStorageFactory.kickTheNdbEventStreamingAPI();
+          RMStorageFactory.kickTheNdbEventStreamingAPI(true, conf);
         }
         retrievalThread = new NdbEventStreamingProcessor(rmContext, conf);
       } else {
