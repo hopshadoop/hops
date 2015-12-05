@@ -120,6 +120,7 @@ public class RMContextImpl implements RMContext {
   private ApplicationMasterService applicationMasterService;//recovered
   private RMApplicationHistoryWriter rmApplicationHistoryWriter;//recovered
   private ConfigurationProvider configurationProvider;//recovered
+  private ContainersLogsService containersLogsService;
 
   /**
    * Default constructor. To be used in conjunction with setter methods for
@@ -319,6 +320,11 @@ public class RMContextImpl implements RMContext {
   public ResourceTrackerService getResourceTrackerService() {
     return resourceTrackerService;
   }
+  
+  @Override
+  public ContainersLogsService getContainersLogsService() {
+      return containersLogsService;
+  }
 
   void setHAEnabled(boolean isHAEnabled) {
     this.isHAEnabled = isHAEnabled;
@@ -416,6 +422,11 @@ public class RMContextImpl implements RMContext {
   void setResourceTrackerService(
       ResourceTrackerService resourceTrackerService) {
     this.resourceTrackerService = resourceTrackerService;
+  }
+  
+  void setContainersLogsService(
+          ContainersLogsService containersLogsService) {
+      this.containersLogsService = containersLogsService;
   }
 
   @Override

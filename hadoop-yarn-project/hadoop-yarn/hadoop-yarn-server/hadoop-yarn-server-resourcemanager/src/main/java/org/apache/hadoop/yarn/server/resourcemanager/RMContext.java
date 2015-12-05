@@ -92,6 +92,8 @@ public interface RMContext extends Recoverable {
   ApplicationMasterService getApplicationMasterService();
 
   ResourceTrackerService getResourceTrackerService();
+  
+  ContainersLogsService getContainersLogsService();
 
   void setClientRMService(ClientRMService clientRMService);
 

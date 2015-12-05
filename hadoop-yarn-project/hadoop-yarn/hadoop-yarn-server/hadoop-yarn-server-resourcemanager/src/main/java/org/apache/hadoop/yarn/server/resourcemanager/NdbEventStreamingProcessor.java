@@ -21,6 +21,7 @@ import io.hops.metadata.yarn.entity.RMNodeComps;
 import io.hops.metadata.yarn.entity.UpdatedContainerInfo;
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -93,6 +94,8 @@ public class NdbEventStreamingProcessor extends PendingEventRetrieval {
         RMNodeComps hopRMNodeCompObject = null;
         hopRMNodeCompObject
                 = (RMNodeComps) NdbEventStreamingReceiver.blockingQueue.take();
+//        hopRMNodeCompObject
+//                = (RMNodeComps) NdbEventStreamingReceiver.blockingQueue.poll(2, TimeUnit.SECONDS);
         if (hopRMNodeCompObject != null) {
           if (LOG.isDebugEnabled()) {
             printHopsRMNodeComps(hopRMNodeCompObject);

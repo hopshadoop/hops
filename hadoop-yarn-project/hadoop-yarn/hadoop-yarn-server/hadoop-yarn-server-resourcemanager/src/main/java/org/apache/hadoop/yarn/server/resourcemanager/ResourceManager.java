@@ -167,6 +167,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
   protected RMAppManager rmAppManager;//recovered
   protected ApplicationACLsManager applicationACLsManager;
   protected QueueACLsManager queueACLsManager;
+  protected ContainersLogsService containersLogsService;
   private WebApp webApp;
   private AppReportFetcher fetcher = null;
   protected ResourceTrackerService resourceTracker;
@@ -343,6 +344,12 @@ public class ResourceManager extends CompositeService implements Recoverable {
     } else {
       webAppAddress = WebAppUtils.getRMWebAppURLWithoutScheme(this.conf);
     }
+    
+    // Add containers logs service
+    containersLogsService = createContainersLogsService();
+    addService(containersLogsService);
+    rmContext.setContainersLogsService(containersLogsService);
+    
 
     this.rmLoginUGI = UserGroupInformation.getCurrentUser();
 
@@ -959,19 +966,19 @@ public class ResourceManager extends CompositeService implements Recoverable {
     //Start periodic retrieval of pending scheduler events
     if (conf.getBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED,
         YarnConfiguration.DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED)) {
-    if (conf.getBoolean(YarnConfiguration.HOPS_NDB_EVENT_STREAMING_ENABLED,
+        if (conf.getBoolean(YarnConfiguration.HOPS_NDB_EVENT_STREAMING_ENABLED,
               YarnConfiguration.DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED)) {
-        if (!conf.getBoolean(
-                YarnConfiguration.HOPS_NDB_RT_EVENT_STREAMING_ENABLED,
-                YarnConfiguration.DEFAULT_HOPS_NDB_RT_EVENT_STREAMING_ENABLED)) {
-          LOG.info("HOP :: NDB Event streaming is starting now ..");
-          RMStorageFactory.kickTheNdbEventStreamingAPI();
+            if (!conf.getBoolean(
+                    YarnConfiguration.HOPS_NDB_RT_EVENT_STREAMING_ENABLED,
+                    YarnConfiguration.DEFAULT_HOPS_NDB_RT_EVENT_STREAMING_ENABLED)) {
+              LOG.info("HOP :: NDB Event streaming is starting now ..");
+              RMStorageFactory.kickTheNdbEventStreamingAPI(true);
+            }
+            retrievalThread = new NdbEventStreamingProcessor(rmContext, conf);
+        } else {
+          LOG.debug("HOP :: Starting PendingEvent retrieval thread");
+          retrievalThread = new PendingEventRetrievalBatch(rmContext, conf);
         }
-        retrievalThread = new NdbEventStreamingProcessor(rmContext, conf);
-      } else {
-        LOG.debug("HOP :: Starting PendingEvent retrieval thread");
-        retrievalThread = new PendingEventRetrievalBatch(rmContext, conf);
-      }
       GlobalThreadPool.getExecutorService().execute(retrievalThread);
     }
   }
@@ -1088,6 +1095,10 @@ public class ResourceManager extends CompositeService implements Recoverable {
 
   protected RMSecretManagerService createRMSecretManagerService() {
     return new RMSecretManagerService(conf, rmContext);
+  }
+  
+  protected ContainersLogsService createContainersLogsService() {
+      return new ContainersLogsService();
   }
 
   @Private

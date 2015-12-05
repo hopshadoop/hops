@@ -376,6 +376,10 @@ public class NdbEventStreamingReceiver {
                     hopFinishedApplicationsList, hopContainersStatusList);
     blockingQueue.put(hopRMNodeBDBObject);
   }
+  
+  public void resetObjects() throws InterruptedException {
+      
+  }
 
   // this two methods are using for multi-thread version from c++ library
   RMNodeComps buildCompositeClass() {

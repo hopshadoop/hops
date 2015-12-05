@@ -171,6 +171,43 @@ public class YarnConfiguration extends Configuration {
       YARN_PREFIX + "scheduler.include-port-in-node-name";
   public static final boolean DEFAULT_RM_SCHEDULER_USE_PORT_FOR_NODE_NAME =
       false;
+  ////////////////////////////////////////
+  // Containers Quotas configuration   //
+  ///////////////////////////////////////
+  /**
+   * Time in ms between container status checks.
+   */
+  public static final String QUOTAS_CONTAINERS_LOGS_MONITOR_INTERVAL = 
+          YARN_PREFIX + "quotas.containers-logs.monitor-interval";
+  public static final int DEFAULT_QUOTAS_CONTAINERS_LOGS_MONITOR_INTERVAL = 
+          1000;
+  /**
+   * Unit of time in ticks that is incremented on each monitor interval.
+   */
+  public static final String QUOTAS_CONTAINERS_LOGS_TICK_INCREMENT = 
+          YARN_PREFIX + "quotas.containers-logs.tick-increment";
+  public static final int DEFAULT_QUOTAS_CONTAINERS_LOGS_TICK_INCREMENT = 1;
+  /**
+   * Enable or disable periodic containers logs checkpoints.
+   */
+  public static final String QUOTAS_CONTAINERS_LOGS_CHECKPOINTS = 
+          YARN_PREFIX + "quotas.containers-logs.checkpoints";
+  public static final boolean DEFAULT_QUOTAS_CONTAINERS_LOGS_CHECKPOINTS = true;
+  /**
+   * Number of ticks between checkpoints.
+   */
+  public static final String QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_TICKS = 
+          YARN_PREFIX + "quotas.containers-logs.checkpoints-ticks";
+  public static final int DEFAULT_QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_TICKS = 
+          1000;
+  /**
+   * If threshold is exceeded writes a warning about increasing monitor interval 
+   * It is obtained by multiplying threshold with monitor interval
+   */
+  public static final String QUOTAS_CONTAINERS_LOGS_ALERT_THRESHOLD = 
+          YARN_PREFIX + "quotas.containers-logs.alert-ratio";
+  public static final double DEFAULT_QUOTAS_CONTAINERS_LOGS_ALERT_THRESHOLD = 
+          0.6;
   /**
    * Enable periodic monitor threads.
    *
@@ -1351,7 +1388,7 @@ public class YarnConfiguration extends Configuration {
    //Distributed RT properties
   public static final String HOPS_DISTRIBUTED_RT_ENABLED =
       HOPS_RM_PREFIX + "distributed-rt.enable";
-  public static boolean DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED = false;
+  public static boolean DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED = true;
   public static String HOPS_PENDING_EVENTS_RETRIEVAL_PERIOD =
       HOPS_RM_PREFIX + "pending-events.retrieval.period";
   public static int DEFAULT_HOPS_PENDING_EVENTS_RETRIEVAL_PERIOD = 500;
@@ -1366,11 +1403,11 @@ public class YarnConfiguration extends Configuration {
   public static int DEFAULT_HOPS_BATCH_MAX_DURATION = 100;
 
   //NDB event streaming
-  public static boolean DEFAULT_HOPS_NDB_EVENT_STREAMING_ENABLED = false;
+  public static boolean DEFAULT_HOPS_NDB_EVENT_STREAMING_ENABLED = true;
   public static final String HOPS_NDB_EVENT_STREAMING_ENABLED = HOPS_RM_PREFIX
           + "ndb-event-streaming.enable";
 
-  public static boolean DEFAULT_HOPS_NDB_RT_EVENT_STREAMING_ENABLED = false;
+  public static boolean DEFAULT_HOPS_NDB_RT_EVENT_STREAMING_ENABLED = true;
   public static final String HOPS_NDB_RT_EVENT_STREAMING_ENABLED
           = HOPS_RM_PREFIX + "ndb-rt-event-streaming.enable";
 

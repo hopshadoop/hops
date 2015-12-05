@@ -15,6 +15,7 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager;
 
+import io.hops.metadata.yarn.entity.ContainerStatus;
 import java.util.List;
 import java.util.Set;
 
@@ -28,15 +29,17 @@ public class StreamingRTComps {
   private final List<org.apache.hadoop.yarn.api.records.ApplicationId> finishedApp;
   private final String nodeId;
   private final boolean nextHeartbeat;
+  private final List<ContainerStatus> hopContainersStatusList;
 
   public StreamingRTComps(
           Set<org.apache.hadoop.yarn.api.records.ContainerId> containersToClean,
           List<org.apache.hadoop.yarn.api.records.ApplicationId> finishedApp,
-          String nodeId, boolean nextHeartbeat) {
+          String nodeId, boolean nextHeartbeat, List<ContainerStatus> hopContainersStatusList) {
     this.containersToClean = containersToClean;
     this.finishedApp = finishedApp;
     this.nodeId = nodeId;
     this.nextHeartbeat = nextHeartbeat;
+    this.hopContainersStatusList = hopContainersStatusList;
   }
 
   public Set<org.apache.hadoop.yarn.api.records.ContainerId> getContainersToClean() {
@@ -53,6 +56,10 @@ public class StreamingRTComps {
 
   public boolean isNextHeartbeat() {
     return nextHeartbeat;
+  }
+  
+  public List<ContainerStatus> getHopContainersStatusList() {
+      return hopContainersStatusList;
   }
 
 }
