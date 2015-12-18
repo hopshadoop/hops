@@ -1342,9 +1342,7 @@ public class YarnConfiguration extends Configuration {
           .add("localhost:" + DEFAULT_RM_ADMIN_PORT_HOP.get(i));
     }
 
-  }
-
-  ;
+  };
 
   //end of TODO What is this for? does it have to be cleaned
   
@@ -1352,6 +1350,17 @@ public class YarnConfiguration extends Configuration {
   public static final String HOPS_DISTRIBUTED_RT_ENABLED =
       HOPS_RM_PREFIX + "distributed-rt.enable";
   public static boolean DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED = false;
+  
+  public static final String EVENT_SHEDULER_CONFIG_PATH = 
+          HOPS_RM_PREFIX + "event.scheduler.config.path";
+  public static final String DEFAULT_EVENT_SHEDULER_CONFIG_PATH = 
+          "etc/hadoop/RM_EventAPIConfig.ini";
+  
+  public static final String EVENT_RT_CONFIG_PATH = 
+          HOPS_RM_PREFIX + "event.rt.config.path";
+  public static final String DEFAULT_EVENT_RT_CONFIG_PATH = 
+          "etc/hadoop/RT_EventAPIConfig.ini";
+  
   public static String HOPS_PENDING_EVENTS_RETRIEVAL_PERIOD =
       HOPS_RM_PREFIX + "pending-events.retrieval.period";
   public static int DEFAULT_HOPS_PENDING_EVENTS_RETRIEVAL_PERIOD = 500;
