@@ -53,6 +53,7 @@ public final class HdfsServerConstants {
   static public enum StartupOption {
     FORMAT("-format"),
     DROP_AND_CREATE_DB("-dropAndCreateDB"),
+    SET_BLOCK_REPORT_PROCESS_SIZE("-setBlkRptProcessSize"),
     CLUSTERID("-clusterid"),
     GENCLUSTERID("-genclusterid"),
     REGULAR("-regular"),
@@ -79,6 +80,9 @@ public final class HdfsServerConstants {
     
     // Used only with recovery option
     private int force = 0;
+    
+    //maximum mumber of blocks processed in block reporting at any given time
+    private long maxBlkReptProcessSize = 0;
 
     private StartupOption(String arg) {
       this.name = arg;
@@ -103,6 +107,14 @@ public final class HdfsServerConstants {
       clusterId = cid;
     }
 
+    public void setMaxBlkRptProcessSize(long maxBlkReptProcessSize){
+      this.maxBlkReptProcessSize = maxBlkReptProcessSize;
+    }
+    
+    public long getMaxBlkRptProcessSize(){
+      return maxBlkReptProcessSize;
+    }
+    
     public String getClusterId() {
       return clusterId;
     }

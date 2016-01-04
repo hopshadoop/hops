@@ -323,10 +323,11 @@ public class DatanodeProtocolClientSideTranslatorPB
   }
 
   @Override
-  public ActiveNode getNextNamenodeToSendBlockReport() throws IOException {
+  public ActiveNode getNextNamenodeToSendBlockReport(long noOfBlks) throws IOException {
 
     NameNodeAddressRequestForBlockReportingProto.Builder request =
         NameNodeAddressRequestForBlockReportingProto.newBuilder();
+    request.setNoOfBlks(noOfBlks);
     try {
       ActiveNodeProtos.ActiveNodeProto response = rpcProxy
           .getNextNamenodeToSendBlockReport(NULL_CONTROLLER, request.build());

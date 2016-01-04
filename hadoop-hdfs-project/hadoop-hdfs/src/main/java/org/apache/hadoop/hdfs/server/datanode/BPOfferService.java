@@ -783,7 +783,7 @@ class BPOfferService implements Runnable {
           new DatanodeStorage(bpRegistration.getStorageID()),
           bReport.getBlockListAsLongs())};
 
-      ActiveNode an = nextNNForBlkReport();
+      ActiveNode an = nextNNForBlkReport(bReport.getNumberOfBlocks());
       if (an != null) {
         blkReportHander = getAnActor(an.getInetSocketAddress());
         if (blkReportHander == null || !blkReportHander.isInitialized()) {
@@ -1047,25 +1047,22 @@ class BPOfferService implements Runnable {
     return null;
   }
 
-  private ActiveNode nextNNForBlkReport() {
+  private ActiveNode nextNNForBlkReport(long noOfBlks) throws IOException {
     if (nnList == null || nnList.isEmpty()) {
       return null;
     }
 
     ActiveNode ann = null;
-    for (ActiveNode leader : nnList) {  // first element is the leader. if it does not work then ask non leader nodes
-      try {
-        BPServiceActor leaderActor =
-            this.getAnActor(leader.getInetSocketAddress());
-        if (leaderActor != null) {
-          ann = leaderActor.nextNNForBlkReport();
-          //no exception
-          if (ann != null) {
-            return ann;
-          }
+    if (nnList.size() > 0) {
+      ActiveNode leader = nnList.get(0);
+      BPServiceActor leaderActor =
+              this.getAnActor(leader.getInetSocketAddress());
+      if (leaderActor != null) {
+        try {
+          ann = leaderActor.nextNNForBlkReport(noOfBlks);
+        } catch (BRLoadBalancingException e) {
+          LOG.warn(e);
         }
-      } catch (IOException e) {
-        continue;
       }
     }
     return ann;
