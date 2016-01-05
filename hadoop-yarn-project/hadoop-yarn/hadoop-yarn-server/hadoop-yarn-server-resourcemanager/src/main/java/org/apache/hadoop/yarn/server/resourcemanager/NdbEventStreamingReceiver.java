@@ -398,7 +398,7 @@ public class NdbEventStreamingReceiver {
           InterruptedException {
     blockingQueue.put(hopCompObject);
   }
-
+ 
   public void resetObjects() {
     hopRMNode = null;
     hopNextHeartbeat = null;

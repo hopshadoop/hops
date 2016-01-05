@@ -177,7 +177,7 @@ public class ResourceTrackerService extends AbstractService
       if (conf.getBoolean(YarnConfiguration.HOPS_NDB_RT_EVENT_STREAMING_ENABLED,
               YarnConfiguration.DEFAULT_HOPS_NDB_RT_EVENT_STREAMING_ENABLED)) {
         LOG.info("streaming porcessor is straring for resource tracker");
-        RMStorageFactory.kickTheNdbEventStreamingAPI(false);
+        RMStorageFactory.kickTheNdbEventStreamingAPI(false, conf);
         new Thread(rtStreamingProcessor).start();
       }
 

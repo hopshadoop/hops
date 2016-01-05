@@ -995,8 +995,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
       if (conf.getBoolean(YarnConfiguration.HOPS_NDB_EVENT_STREAMING_ENABLED,
               YarnConfiguration.DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED)) {
         LOG.info("streaming porcessor is straring for scheduler");
-          RMStorageFactory.kickTheNdbEventStreamingAPI(true);
-//        }
+        RMStorageFactory.kickTheNdbEventStreamingAPI(true, conf);
         eventRetriever = new NdbEventStreamingProcessor(rmContext, conf);
       } else {
         eventRetriever = new PendingEventRetrievalBatch(rmContext, conf);
