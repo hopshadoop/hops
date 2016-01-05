@@ -23,13 +23,12 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -39,7 +38,7 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 public class TransactionStateManager extends AbstractService{
   private static final Log LOG = LogFactory.getLog(TransactionStateManager.class);
   TransactionState currentTransactionState;
-  Lock lock = new ReentrantLock(true);
+  ReadWriteLock lock = new ReentrantReadWriteLock(true);
   AtomicInteger acceptedRPC =new AtomicInteger();
   List<transactionStateWrapper> curentRPCs = new CopyOnWriteArrayList<transactionStateWrapper>();
   int batchMaxSize = 50;
@@ -48,9 +47,6 @@ public class TransactionStateManager extends AbstractService{
   private boolean running = false;
   
   Thread excutingThread;
-  
-  private final ExecutorService executorService =
-      Executors.newFixedThreadPool(32);
     
   public TransactionStateManager(){
     super("TransactionStateManager");
@@ -71,7 +67,7 @@ public class TransactionStateManager extends AbstractService{
     return new Runnable() {
       @Override
       public void run() {
-        lock.lock();
+        lock.writeLock().lock();
         long commitDuration = 0;
         long startTime = System.currentTimeMillis();
         double accumulatedCycleDuration = 0;
@@ -91,14 +87,14 @@ public class TransactionStateManager extends AbstractService{
             curentRPCs = new CopyOnWriteArrayList<transactionStateWrapper>();
             acceptedRPC.set(0);
             //accept RPCs
-            lock.unlock();
+            lock.writeLock().unlock();
             commitDuration = System.currentTimeMillis() - startTime;
             t3 = commitDuration;
 //        Thread.sleep(Math.max(0, 10-commitDuration));
             waitForBatch(Math.max(0, batchMaxDuration - commitDuration));
             t4 = System.currentTimeMillis() - startTime;
             //stop acception RPCs
-            lock.lock();
+            lock.writeLock().lock();
 
             long cycleDuration = System.currentTimeMillis() - startTime;
             if (cycleDuration > batchMaxDuration + 10) {
@@ -160,10 +156,6 @@ public class TransactionStateManager extends AbstractService{
     };
   }
   
-  public ExecutorService getExecutorService(){
-    return executorService;
-  }
-  
   private void waitForBatch(long maxTime) throws InterruptedException {
     long start = System.currentTimeMillis();
     while (running) {
@@ -206,7 +198,7 @@ public class TransactionStateManager extends AbstractService{
     while (true) {
       int accepted = acceptedRPC.incrementAndGet();
       if (priority || accepted < batchMaxSize) {
-        lock.lock();
+        lock.readLock().lock();
         try {
           transactionStateWrapper wrapper = new transactionStateWrapper(
                   (TransactionStateImpl) currentTransactionState,
@@ -218,7 +210,7 @@ public class TransactionStateManager extends AbstractService{
           curentRPCs.add(wrapper);
           return wrapper;
         } finally {
-          lock.unlock();
+          lock.readLock().unlock();
         }
       } else {
         acceptedRPC.decrementAndGet();
@@ -233,6 +225,7 @@ public class TransactionStateManager extends AbstractService{
   
   
   protected void serviceStart() throws Exception {
+    LOG.info("starting TransactionStateManager");
     super.serviceStart();
     excutingThread = new Thread(createThread(this));
     excutingThread.setName("transactionStateManager Thread");
@@ -244,6 +237,7 @@ public class TransactionStateManager extends AbstractService{
   
   @Override
   protected void serviceStop() throws Exception {
+    LOG.info("stoping TransactionStateManager");
     if (running) {
       running = false;
 

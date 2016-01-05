@@ -158,7 +158,7 @@ public class TestRMNodeTransitions {
 
     NodeId nodeId = BuilderUtils.newNodeId("localhost", 0);
     node = new RMNodeImpl(nodeId, rmContext, nodeId.getHost(), 0, 0, null, null,
-        null, false);
+        null);
     nodesListManagerEvent = null;
 
   }
@@ -228,8 +228,7 @@ public class TestRMNodeTransitions {
     }
     NodeId nodeId = BuilderUtils.newNodeId("localhost:1", 1);
     RMNodeImpl node2 =
-        new RMNodeImpl(nodeId, rmContext, "test", 0, 0, null, null, null,
-            false);
+        new RMNodeImpl(nodeId, rmContext, "test", 0, 0, null, null, null);
     node2.handle(new RMNodeEvent(null, RMNodeEventType.STARTED,
         new TransactionStateImpl(TransactionType.RM)));
     //If Distributed RT is enabled, this is the only way to let the scheduler
@@ -608,7 +607,7 @@ public class TestRMNodeTransitions {
     RMNodeImpl node =
         new RMNodeImpl(nodeId, rmContext, nodeId.getHost(), 0, 0, null,
             ResourceOption.newInstance(capability,
-                RMNode.OVER_COMMIT_TIMEOUT_MILLIS_DEFAULT), null, false);
+                RMNode.OVER_COMMIT_TIMEOUT_MILLIS_DEFAULT), null);
     ((TransactionStateImpl) ts).getRMContextInfo()
         .toAddActiveRMNode(nodeId, node, 1);
     node.handle(new RMNodeEvent(node.getNodeID(), RMNodeEventType.STARTED, ts));
@@ -631,7 +630,7 @@ public class TestRMNodeTransitions {
     NodeId nodeId = BuilderUtils.newNodeId("localhost", 0);
     RMNodeImpl node =
         new RMNodeImpl(nodeId, rmContext, nodeId.getHost(), 0, 0, null, null,
-            null, false);
+            null);
     return node;
   }
 

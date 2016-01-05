@@ -253,8 +253,7 @@ public class TestSchedulerRecovery {
         nmTokenSecretManager, null, null, conf);
     RMNodeImpl node =
         new RMNodeImpl(nodeId, rmContext, nodeId.getHost(), 0, 0, null, null,
-            null, conf.getBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED,
-            YarnConfiguration.DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED));
+            null);
 
     RMStateStore.RMState rmState = stateStore.loadState(rmContext);
     node.recover(rmState);

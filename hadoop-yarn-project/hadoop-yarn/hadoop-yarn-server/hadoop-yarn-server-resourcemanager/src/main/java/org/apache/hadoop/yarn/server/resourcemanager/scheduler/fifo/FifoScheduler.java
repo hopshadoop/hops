@@ -735,11 +735,11 @@ public class FifoScheduler extends AbstractYarnScheduler
   }
 
   private synchronized void nodeUpdate(RMNode rmNode,
-      TransactionState transactionState) {
-    LOG.debug("HOP :: nodeUpdate, rmNode:" + rmNode.getNodeID().toString());
+      TransactionState transactionState) {    
     org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode
         node = getNode(rmNode.getNodeID());
-
+    LOG.debug("HOP :: nodeUpdate, rmNode:" + rmNode.getNodeID().toString() + 
+            " node " + node);
     // Update resource if any change
     SchedulerUtils.updateResourceIfChanged(node, rmNode, clusterResource, LOG,
             transactionState);

@@ -64,6 +64,7 @@ import org.junit.Test;
 import io.hops.metadata.yarn.entity.appmasterrpc.RPC;
 import java.util.ArrayList;
 import java.util.Collection;
+import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
 
 public class TestRecoverCapacityScheduler {
 
@@ -94,6 +95,7 @@ public class TestRecoverCapacityScheduler {
 
     conf.setClass(YarnConfiguration.RM_SCHEDULER,
             CapacityScheduler.class, ResourceScheduler.class);
+    conf.setClass(YarnConfiguration.RM_STORE,NDBRMStateStore.class , RMStateStore.class);
   }
 
   private void setupQueueConfigurationReservation(
@@ -188,7 +190,7 @@ public class TestRecoverCapacityScheduler {
     //Check the db
     Thread.sleep(1000);
     Map<String, io.hops.metadata.yarn.entity.FiCaSchedulerNode> dbRmNodes
-            = RMUtilities.getAllFiCaSchedulerNodes();
+            = RMUtilities.getAllFiCaSchedulerNodesFullTransaction();
     assertEquals(1, dbRmNodes.size());
 
     ApplicationId appId_1 = getApplicationId(101);
@@ -327,7 +329,7 @@ public class TestRecoverCapacityScheduler {
     // App 1
     Thread.sleep(1000);
     Map<String, io.hops.metadata.yarn.entity.RMContainer> containers
-            = RMUtilities.getAllRMContainers();
+            = RMUtilities.getAllRMContainersFulTransaction();
     io.hops.metadata.yarn.entity.RMContainer rmContainer = containers.get(
             appRMContainers.get(app_1));
     assertEquals(RMContainerState.KILLED.toString(), rmContainer.getState());
@@ -370,7 +372,7 @@ public class TestRecoverCapacityScheduler {
 
     // Retrieve CSLeafQueueUserInfo from the db and make assertions
     Collection<CSLeafQueueUserInfo> leafQueueUserInfoList = RMUtilities.
-            getAllCSLeafQueueUserInfo().values();
+            getAllCSLeafQueueUserInfoFullTransaction().values();
 
     for (CSLeafQueueUserInfo leafQueueUserInfo : leafQueueUserInfoList) {
       // sri
@@ -389,7 +391,7 @@ public class TestRecoverCapacityScheduler {
     // Test CapacityScheduler node map
     List<io.hops.metadata.yarn.entity.FiCaSchedulerNode> nodeList
             = new ArrayList<io.hops.metadata.yarn.entity.FiCaSchedulerNode>(
-                    RMUtilities.getAllFiCaSchedulerNodes().values());
+                    RMUtilities.getAllFiCaSchedulerNodesFullTransaction().values());
     io.hops.metadata.yarn.entity.FiCaSchedulerNode node = nodeList.get(0);
 
     assertEquals(1, nodeList.size());
@@ -397,7 +399,7 @@ public class TestRecoverCapacityScheduler {
 
     // Test application list
     Map<String, io.hops.metadata.yarn.entity.SchedulerApplication> appMap
-            = RMUtilities.getSchedulerApplications();
+            = RMUtilities.getSchedulerApplicationsFullTransaction();
     assertEquals(2, appMap.size());
 
     for (io.hops.metadata.yarn.entity.SchedulerApplication schedulerApp

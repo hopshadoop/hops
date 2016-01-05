@@ -574,9 +574,10 @@ public class TestResourceTrackerService {
     verify(handler, never()).handle((Event) any());
   }
 
+  DrainDispatcher dispatcher;
   @Test
   public void testReconnectNode() throws Exception {
-    final DrainDispatcher dispatcher = new DrainDispatcher();
+    dispatcher = new DrainDispatcher();
     rm = new MockRM(conf) {
       @Override
       protected EventHandler<SchedulerEvent> createSchedulerEventDispatcher() {
@@ -590,6 +591,7 @@ public class TestResourceTrackerService {
 
       @Override
       protected Dispatcher createDispatcher() {
+        dispatcher = new DrainDispatcher();
         return dispatcher;
       }
     };

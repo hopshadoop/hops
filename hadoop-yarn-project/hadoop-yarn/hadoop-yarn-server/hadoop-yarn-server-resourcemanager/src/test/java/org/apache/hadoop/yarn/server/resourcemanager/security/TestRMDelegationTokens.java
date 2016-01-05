@@ -137,7 +137,7 @@ public class TestRMDelegationTokens {
     rm1.stop();
   }
 
-  @Test(timeout = 15000)
+  @Test(timeout = 150000)
   public void testRemoveExpiredMasterKeyInRMStateStore() throws Exception {
     MemoryRMStateStore memStore = new MemoryRMStateStore();
     memStore.init(conf);

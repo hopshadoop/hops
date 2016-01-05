@@ -133,4 +133,12 @@ public class NdbRtStreamingReceiver {
           InterruptedException {
     blockingRTQueue.put(streamingRTComps);
   }
+
+  public void resetObjects() {
+    containersToCleanSet = null;
+    finishedAppList = null;
+    nodeId = null;
+    nextHeartbeat = false;
+
+  }
 }

@@ -2404,6 +2404,25 @@ public abstract class Server {
           handlers[i].interrupt();
         }
       }
+      for (int i = 0; i < handlerCount; i++) {
+        if (handlers[i] != null) {
+          try {
+            boolean success = false;
+            int nbTry=0;
+            while (!success && nbTry<10) {
+              handlers[i].join(10);
+              if (handlers[i].isAlive()) {
+                LOG.info("server handler not finishing " + i);
+                handlers[i].interrupt();
+              }else{
+                success=true;
+              }
+            }
+          } catch (InterruptedException ex) {
+            LOG.error(ex,ex);
+          }
+        }
+      }
     }
     listener.interrupt();
     listener.doStop();
@@ -2415,6 +2434,7 @@ public abstract class Server {
     if (this.rpcDetailedMetrics != null) {
       this.rpcDetailedMetrics.shutdown();
     }
+    LOG.info("stopped server on " + port);
   }
 
   /** Wait for the server to be stopped.

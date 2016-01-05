@@ -63,7 +63,7 @@ public class NdbRtStreamingProcessor implements Runnable {
   public void run() {
     running = true;
     while (running) {
-      if (!context.getRMGroupMembershipService().isLeader()) {
+      if (!context.getGroupMembershipService().isLeader()) {
         try {
 
           StreamingRTComps streamingRTComps = null;

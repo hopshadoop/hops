@@ -705,8 +705,10 @@ public class ApplicationMasterService extends AbstractService
                         getUser(),
                         attemptId,
                         container);
-        LOG.debug("set allocated nm token for: " + attemptId + ", " + nmToken);
-        allocatedNMTokens.add(nmToken);
+        if (nmToken != null) {
+          LOG.debug("set allocated nm token for: " + attemptId + ", " + nmToken);
+          allocatedNMTokens.add(nmToken);
+        }
       }
       allocateResponse.setNMTokens(allocatedNMTokens);
       LOG.debug(

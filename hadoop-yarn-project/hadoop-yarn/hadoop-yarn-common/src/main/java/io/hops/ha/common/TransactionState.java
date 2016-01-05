@@ -28,7 +28,7 @@ public abstract class TransactionState {
 
   //TODO: Should we persist this id when the RT crashes and the NM starts 
   //sending HBs to the new RT?
-  protected static AtomicInteger pendingEventId = new AtomicInteger(0);
+  protected final static AtomicInteger pendingEventId = new AtomicInteger(0);
 
   public enum TransactionType {
 
@@ -43,7 +43,7 @@ public abstract class TransactionState {
   protected final Set<ApplicationId> appIds = new ConcurrentSkipListSet<ApplicationId>();
 //  private final Lock counterLock = new ReentrantLock(true);
   private Set<Integer> rpcIds = new ConcurrentSkipListSet<Integer>();
-  private int id=-1;
+  private AtomicInteger id=new AtomicInteger(-1);
   private final boolean batch;
 
   public TransactionState(int initialCounter, boolean batch) {
@@ -53,7 +53,7 @@ public abstract class TransactionState {
   }
 
   public int getId(){
-    return id;
+    return id.get();
   }
     public Set<ApplicationId> getAppIds(){
     return appIds;
@@ -77,8 +77,8 @@ public abstract class TransactionState {
   }
 
   public void addRPCId(int rpcId){
-    if(rpcId>=0 && id<0){
-      id = rpcId;
+    if(rpcId>=0){
+      id.compareAndSet(-1, rpcId);
     }
     rpcIds.add(rpcId);
   }

@@ -146,7 +146,8 @@ public class TestClientToAMTokens {
     }
   }
 
-  @Test
+  DrainDispatcher dispatcher;
+  @Test(timeout = 60000)
   public void testClientToAMTokens() throws Exception {
 
     final Configuration conf = new Configuration();
@@ -162,7 +163,7 @@ public class TestClientToAMTokens {
     StartContainersResponse mockResponse = mock(StartContainersResponse.class);
     when(containerManager.startContainers((StartContainersRequest) any()))
         .thenReturn(mockResponse);
-    final DrainDispatcher dispatcher = new DrainDispatcher();
+    dispatcher = new DrainDispatcher();
 
     MockRM rm = new MockRMWithCustomAMLauncher(conf, containerManager) {
       protected ClientRMService createClientRMService() {
@@ -175,6 +176,7 @@ public class TestClientToAMTokens {
 
       @Override
       protected Dispatcher createDispatcher() {
+        dispatcher = new DrainDispatcher();
         return dispatcher;
       }
 

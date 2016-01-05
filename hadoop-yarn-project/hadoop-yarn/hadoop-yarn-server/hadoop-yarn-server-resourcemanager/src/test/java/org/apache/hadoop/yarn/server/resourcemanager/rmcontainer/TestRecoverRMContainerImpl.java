@@ -171,7 +171,7 @@ public class TestRecoverRMContainerImpl {
 
     // Here we are calling databse fetching part and comparing with one we have inserted
     Map<String, io.hops.metadata.yarn.entity.RMContainer> containers
-            = RMUtilities.getAllRMContainers();
+            = RMUtilities.getAllRMContainersFulTransaction();
     io.hops.metadata.yarn.entity.RMContainer recoverRmCont = containers.get(
             rmContainer.getContainerId().toString());
 

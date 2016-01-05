@@ -427,6 +427,7 @@ public class YarnConfiguration extends Configuration {
   public static final String DISTRIBUTED_RM =
       CLIENT_FAILOVER_PREFIX + "distributed";
   public static final Boolean DEFAULT_DISTRIBUTED_RM = false;
+  //TODO this is the same as CLIENT_FAILOVER_PROXY_PROVIDER on of this should be removed
   public static final String DISTRIBUTED_CLIENT_FAILOVER_PROXY_PROVIDER =
       CLIENT_FAILOVER_PREFIX + "proxy-provider";
   public static final String
@@ -1365,6 +1366,7 @@ public class YarnConfiguration extends Configuration {
   public static final String HOPS_BATCH_MAX_DURATION = HOPS_RM_PREFIX + "batch.max.duration";
   public static int DEFAULT_HOPS_BATCH_MAX_DURATION = 100;
 
+  //TODO why do we need two conf ndb-event-streaming.enable and ndb-rt-event-streaming.enable ?
   //NDB event streaming
   public static boolean DEFAULT_HOPS_NDB_EVENT_STREAMING_ENABLED = false;
   public static final String HOPS_NDB_EVENT_STREAMING_ENABLED = HOPS_RM_PREFIX

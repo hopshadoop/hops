@@ -97,6 +97,7 @@ public class RMContextImpl implements RMContext {
       new ConcurrentHashMap<String, RMNode>();
       //recovered, pushed and removed everywhere
   private boolean isHAEnabled; //recovered through configuration file
+  private boolean isDistributedEnabled;
   private HAServiceState haServiceState =
       HAServiceProtocol.HAServiceState.INITIALIZING; //recovered
   private AMLivelinessMonitor amLivelinessMonitor;//recovered
@@ -292,7 +293,7 @@ public class RMContextImpl implements RMContext {
   }
 
   @Override
-  public GroupMembershipService getRMGroupMembershipService() {
+  public GroupMembershipService getGroupMembershipService() {
     return this.groupMembershipService;
   }
 
@@ -320,6 +321,10 @@ public class RMContextImpl implements RMContext {
     this.isHAEnabled = isHAEnabled;
   }
 
+  void setDistributedEnabled(boolean isDistributedEnabled){
+    this.isDistributedEnabled = isDistributedEnabled;
+  }
+  
   void setHAServiceState(HAServiceState haServiceState) {
     synchronized (haServiceState) {
       this.haServiceState = haServiceState;
@@ -423,6 +428,11 @@ public class RMContextImpl implements RMContext {
     return isHAEnabled;
   }
 
+  @Override
+  public boolean isDistributedEnabled(){
+    return isDistributedEnabled;
+  }
+  
   @Override
   public HAServiceState getHAServiceState() {
     synchronized (haServiceState) {
