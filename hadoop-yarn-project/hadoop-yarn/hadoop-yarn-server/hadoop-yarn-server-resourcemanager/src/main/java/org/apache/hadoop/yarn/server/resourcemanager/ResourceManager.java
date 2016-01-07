@@ -345,12 +345,6 @@ public class ResourceManager extends CompositeService implements Recoverable {
       webAppAddress = WebAppUtils.getRMWebAppURLWithoutScheme(this.conf);
     }
     
-    // Add containers logs service
-    containersLogsService = createContainersLogsService();
-    addService(containersLogsService);
-    rmContext.setContainersLogsService(containersLogsService);
-    
-
     this.rmLoginUGI = UserGroupInformation.getCurrentUser();
 
     //If distributed RT is enabled start the services of the non-leader machines
@@ -1009,6 +1003,18 @@ public class ResourceManager extends CompositeService implements Recoverable {
         getHostname());
   }
 
+  synchronized void transitionToLeadingRT(){
+    //create and start containersLogService
+    containersLogsService = createContainersLogsService();
+    rmContext.setContainersLogsService(containersLogsService);
+    containersLogsService.start();
+  }
+  
+  synchronized void transitionToNonLeadingRT(){
+    //stop containersLogService
+    containersLogsService.stop();
+  }
+  
   @Override
   protected void serviceStart() throws Exception {
     try {

@@ -161,6 +161,18 @@ public class LeaderElection extends Thread {
     }
   }
 
+  public synchronized boolean isSecond() {
+    if (context.memberShip.getSortedActiveNodes().get(1).getId()==context.id) {
+      long elapsed_time = System.currentTimeMillis() - context.last_hb_time;
+      if (elapsed_time <
+          (context.time_period * context.max_missed_hb_threshold -
+              DRIFT_CONSTANT)) {
+        return true;
+      } 
+    }
+    return false;
+  }
+  
   public void stopElectionThread() {
     this.interrupt();
     running = false;

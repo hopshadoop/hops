@@ -435,6 +435,11 @@ public class RMContextImpl implements RMContext {
   }
 
   @Override
+  public boolean isLeadingRT(){
+    return groupMembershipService.isLeadingRT();
+  }
+  
+  @Override
   public HAServiceState getHAServiceState() {
     synchronized (haServiceState) {
       LOG.debug(

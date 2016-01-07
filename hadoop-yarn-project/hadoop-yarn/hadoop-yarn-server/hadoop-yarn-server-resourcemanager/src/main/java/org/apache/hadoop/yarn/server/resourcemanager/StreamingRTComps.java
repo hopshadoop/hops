@@ -34,7 +34,8 @@ public class StreamingRTComps {
   public StreamingRTComps(
           Set<org.apache.hadoop.yarn.api.records.ContainerId> containersToClean,
           List<org.apache.hadoop.yarn.api.records.ApplicationId> finishedApp,
-          String nodeId, boolean nextHeartbeat, List<ContainerStatus> hopContainersStatusList) {
+          String nodeId, boolean nextHeartbeat, 
+          List<ContainerStatus> hopContainersStatusList) {
     this.containersToClean = containersToClean;
     this.finishedApp = finishedApp;
     this.nodeId = nodeId;
