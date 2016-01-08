@@ -20,6 +20,7 @@ package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fifo;
 
 import io.hops.ha.common.TransactionState;
 import io.hops.ha.common.TransactionStateImpl;
+import io.hops.ha.common.TransactionStateManager;
 import io.hops.metadata.util.RMStorageFactory;
 import io.hops.metadata.util.RMUtilities;
 import io.hops.metadata.util.YarnAPIStorageFactory;
@@ -147,9 +148,12 @@ public class TestFifoScheduler {
     RMStorageFactory.setConfiguration(config);
     AsyncDispatcher dispatcher = new InlineDispatcher();
     RMApplicationHistoryWriter writer = mock(RMApplicationHistoryWriter.class);
+    TransactionStateManager tsm = new TransactionStateManager();
+    tsm.init(config);
+    tsm.start();
     RMContext rmContext =
         new RMContextImpl(dispatcher, null, null, null, null, null, null,
-            writer, config);
+            writer, config, tsm);
 
     FifoScheduler schedular = new FifoScheduler();
     schedular.reinitialize(new Configuration(), rmContext, null);
@@ -184,9 +188,12 @@ public class TestFifoScheduler {
     YarnAPIStorageFactory.setConfiguration(config);
     RMStorageFactory.setConfiguration(config);
     RMApplicationHistoryWriter writer = mock(RMApplicationHistoryWriter.class);
+    TransactionStateManager tsm = new TransactionStateManager();
+    tsm.init(conf);
+    tsm.start();
     RMContext rmContext =
         new RMContextImpl(dispatcher, null, null, null, null, null, null,
-            writer, conf);
+            writer, conf, tsm);
     rmContext.getNMTokenSecretManager().rollMasterKey();
     rmContext.getContainerTokenSecretManager().rollMasterKey();
     FifoScheduler scheduler = new FifoScheduler();
@@ -252,9 +259,12 @@ public class TestFifoScheduler {
     YarnAPIStorageFactory.setConfiguration(config);
     RMStorageFactory.setConfiguration(config);
     RMApplicationHistoryWriter writer = mock(RMApplicationHistoryWriter.class);
+    TransactionStateManager tsm = new TransactionStateManager();
+    tsm.init(conf);
+    tsm.start();
     RMContext rmContext =
         new RMContextImpl(dispatcher, null, null, null, null, null, null,
-            writer, conf);
+            writer, conf, tsm);
     rmContext.getNMTokenSecretManager().rollMasterKey();
     rmContext.getContainerTokenSecretManager().rollMasterKey();
     FifoScheduler scheduler = new FifoScheduler() {

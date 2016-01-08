@@ -464,6 +464,7 @@ public class YarnConfiguration extends Configuration {
   public static final String DISTRIBUTED_RM =
       CLIENT_FAILOVER_PREFIX + "distributed";
   public static final Boolean DEFAULT_DISTRIBUTED_RM = false;
+  //TODO this is the same as CLIENT_FAILOVER_PROXY_PROVIDER on of this should be removed
   public static final String DISTRIBUTED_CLIENT_FAILOVER_PROXY_PROVIDER =
       CLIENT_FAILOVER_PREFIX + "proxy-provider";
   public static final String
@@ -1379,16 +1380,26 @@ public class YarnConfiguration extends Configuration {
           .add("localhost:" + DEFAULT_RM_ADMIN_PORT_HOP.get(i));
     }
 
-  }
-
-  ;
+  };
 
   //end of TODO What is this for? does it have to be cleaned
   
    //Distributed RT properties
   public static final String HOPS_DISTRIBUTED_RT_ENABLED =
       HOPS_RM_PREFIX + "distributed-rt.enable";
+
   public static boolean DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED = true;
+  
+  public static final String EVENT_SHEDULER_CONFIG_PATH = 
+          HOPS_RM_PREFIX + "event.scheduler.config.path";
+  public static final String DEFAULT_EVENT_SHEDULER_CONFIG_PATH = 
+          "etc/hadoop/RM_EventAPIConfig.ini";
+  
+  public static final String EVENT_RT_CONFIG_PATH = 
+          HOPS_RM_PREFIX + "event.rt.config.path";
+  public static final String DEFAULT_EVENT_RT_CONFIG_PATH = 
+          "etc/hadoop/RT_EventAPIConfig.ini";
+  
   public static String HOPS_PENDING_EVENTS_RETRIEVAL_PERIOD =
       HOPS_RM_PREFIX + "pending-events.retrieval.period";
   public static int DEFAULT_HOPS_PENDING_EVENTS_RETRIEVAL_PERIOD = 500;
@@ -1402,6 +1413,7 @@ public class YarnConfiguration extends Configuration {
   public static final String HOPS_BATCH_MAX_DURATION = HOPS_RM_PREFIX + "batch.max.duration";
   public static int DEFAULT_HOPS_BATCH_MAX_DURATION = 100;
 
+  //TODO why do we need two conf ndb-event-streaming.enable and ndb-rt-event-streaming.enable ?
   //NDB event streaming
   public static boolean DEFAULT_HOPS_NDB_EVENT_STREAMING_ENABLED = true;
   public static final String HOPS_NDB_EVENT_STREAMING_ENABLED = HOPS_RM_PREFIX

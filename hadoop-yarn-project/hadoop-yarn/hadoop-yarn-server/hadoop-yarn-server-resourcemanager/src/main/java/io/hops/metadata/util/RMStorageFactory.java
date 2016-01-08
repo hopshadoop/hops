@@ -55,6 +55,7 @@ import java.net.URLClassLoader;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
 
 public class RMStorageFactory {
 
@@ -68,10 +69,16 @@ public class RMStorageFactory {
     return dStorageFactory.getConnector();
   }
 
-  public static void kickTheNdbEventStreamingAPI(boolean isLeader) throws
+  public static void kickTheNdbEventStreamingAPI(boolean isLeader,
+          Configuration conf) throws
           StorageInitializtionException {
     dNdbEventStreaming = DalDriver.loadHopsNdbEventStreamingLib(
             YarnAPIStorageFactory.NDB_EVENT_STREAMING_FOR_DISTRIBUTED_SERVICE);
+    dNdbEventStreaming.init(conf.get(
+            YarnConfiguration.EVENT_SHEDULER_CONFIG_PATH,
+            YarnConfiguration.DEFAULT_EVENT_SHEDULER_CONFIG_PATH), conf.get(
+                    YarnConfiguration.EVENT_RT_CONFIG_PATH,
+                    YarnConfiguration.DEFAULT_EVENT_RT_CONFIG_PATH));
     dNdbEventStreaming.startHopsNdbEvetAPISession(isLeader);
   }
   

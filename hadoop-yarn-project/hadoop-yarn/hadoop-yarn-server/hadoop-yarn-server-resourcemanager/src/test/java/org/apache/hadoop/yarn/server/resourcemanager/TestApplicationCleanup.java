@@ -142,13 +142,14 @@ public class TestApplicationCleanup {
     rm.stop();
   }
 
+  DrainDispatcher dispatcher;
   @Test
   public void testContainerCleanup() throws Exception {
 
     Logger rootLogger = LogManager.getRootLogger();
     rootLogger.setLevel(Level.DEBUG);
     rootLogger.debug("start testContainerCleanup");
-    final DrainDispatcher dispatcher = new DrainDispatcher();
+    dispatcher = new DrainDispatcher();
     MockRM rm = new MockRM() {
       @Override
       protected EventHandler<SchedulerEvent> createSchedulerEventDispatcher() {
@@ -162,6 +163,7 @@ public class TestApplicationCleanup {
 
       @Override
       protected Dispatcher createDispatcher() {
+        dispatcher = new DrainDispatcher();
         return dispatcher;
       }
     };

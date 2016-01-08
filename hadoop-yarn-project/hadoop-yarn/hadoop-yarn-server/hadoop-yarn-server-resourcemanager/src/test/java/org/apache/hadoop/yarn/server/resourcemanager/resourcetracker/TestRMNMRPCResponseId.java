@@ -20,6 +20,7 @@ package org.apache.hadoop.yarn.server.resourcemanager.resourcetracker;
 
 import io.hops.exception.StorageException;
 import io.hops.exception.StorageInitializtionException;
+import io.hops.ha.common.TransactionStateManager;
 import io.hops.metadata.util.RMStorageFactory;
 import io.hops.metadata.util.YarnAPIStorageFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -75,9 +76,12 @@ public class TestRMNMRPCResponseId {
         ; // ignore
       }
     });
+    TransactionStateManager tsm = new TransactionStateManager();
+    tsm.init(conf);
+    tsm.start();
     RMContextImpl context =
         new RMContextImpl(dispatcher, null, null, null, null, null, null, null,
-            conf);
+            conf, tsm);
     groupMembership = new GroupMembershipService(null, context);
     context.setRMGroupMembershipService(groupMembership);
     dispatcher.register(RMNodeEventType.class,

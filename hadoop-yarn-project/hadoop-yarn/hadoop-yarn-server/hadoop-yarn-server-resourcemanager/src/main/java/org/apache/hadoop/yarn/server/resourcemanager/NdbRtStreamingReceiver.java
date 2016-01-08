@@ -172,13 +172,6 @@ public class NdbRtStreamingReceiver {
     hopContainersStatusList.add(hopContainerStatus);
   }
   
-  public void resetObjects() throws InterruptedException {
-    containersToCleanSet = null;
-    finishedAppList = null;
-    nodeId = null;
-    nextHeartbeat = false;
-    hopContainersStatusList = null;
-  }
 
   // this two methods are using for multi-thread version from c++ library
   StreamingRTComps buildStreamingRTComps() {
@@ -189,5 +182,13 @@ public class NdbRtStreamingReceiver {
   public void onEventMethodMultiThread(StreamingRTComps streamingRTComps) throws
           InterruptedException {
     blockingRTQueue.put(streamingRTComps);
+  }
+  
+  public void resetObjects() {
+    containersToCleanSet = null;
+    finishedAppList = null;
+    nodeId = null;
+    nextHeartbeat = false;
+    hopContainersStatusList = null;
   }
 }

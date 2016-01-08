@@ -43,6 +43,7 @@ import java.util.TimerTask;
  * SecretManager for ContainerTokens. This is RM-specific and rolls the
  * master-keys every so often.
  */
+//TORECOVER TOKEN all the store action done in this class must be remplaced by transaction state actions (getStateStore)
 public class RMContainerTokenSecretManager
     extends BaseContainerTokenSecretManager {
 

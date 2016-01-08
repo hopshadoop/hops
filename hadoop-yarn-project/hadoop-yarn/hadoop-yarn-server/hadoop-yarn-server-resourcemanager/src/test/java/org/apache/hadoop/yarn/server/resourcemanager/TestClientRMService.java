@@ -382,7 +382,7 @@ public class TestClientRMService {
     when(rmContext.getRMApps())
         .thenReturn(new ConcurrentHashMap<ApplicationId, RMApp>());
     when(rmContext.getTransactionStateManager()).
-            thenReturn(new TransactionStateManager(conf));
+            thenReturn(new TransactionStateManager());
     ClientRMService rmService =
         new ClientRMService(rmContext, null, null, null, null, null);
     ApplicationId applicationId =
@@ -899,7 +899,7 @@ public class TestClientRMService {
         .thenReturn(getSchedulerApps(apps));
     ResourceScheduler rs = mock(ResourceScheduler.class);
     when(rmContext.getScheduler()).thenReturn(rs);
-    TransactionStateManager tsm = new TransactionStateManager(conf);
+    TransactionStateManager tsm = new TransactionStateManager();
     when(rmContext.getTransactionStateManager()).thenReturn(tsm);
   }
 

@@ -144,7 +144,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
 
     //Retrieve NodeUpdateQueue
     List<UpdatedContainerInfo> nodeUpdateToRecover = state.
-            getUpdatedContainerInfo(this.nodeId.toString());
+            getUpdatedContainerInfo(this.nodeId.toString(), this);
     this.nodeUpdateQueue.addAll(nodeUpdateToRecover);
     if (!nodeUpdateToRecover.isEmpty()) {
       updatedContainerInfoId = nodeUpdateToRecover.get(nodeUpdateToRecover.
@@ -262,7 +262,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
 
   public RMNodeImpl(NodeId nodeId, RMContext context, String hostName,
           int cmPort, int httpPort, Node node, ResourceOption resourceOption,
-          String nodeManagerVersion, boolean isDistributedRTEnabled) {
+          String nodeManagerVersion) {
     this.nodeId = nodeId;
     this.context = context;
     this.hostName = hostName;
@@ -286,16 +286,16 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
 
     this.nodeUpdateQueue = new ConcurrentLinkedQueue<UpdatedContainerInfo>();
 
-    this.isDistributedRTEnabled = isDistributedRTEnabled;
+    this.isDistributedRTEnabled = context.isDistributedEnabled();
     updatedContainerInfoId = 0;
   }
 
   public RMNodeImpl(NodeId nodeId, RMContext context, String hostName,
           int cmPort, int httpPort, Node node, ResourceOption resourceOption,
           String nodeManagerVersion, String healthReport, long lastHealthReportTime,
-          boolean nextHeartBeat, boolean isDistributedRTEnabled) {
+          boolean nextHeartBeat) {
     this(nodeId, context, hostName, cmPort, httpPort, node, resourceOption,
-            nodeManagerVersion, isDistributedRTEnabled);
+            nodeManagerVersion);
     this.healthReport = healthReport;
     this.lastHealthReportTime = lastHealthReportTime;
     //TORECOVER check if we should recover or not?
@@ -535,13 +535,13 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
       try {
         stateMachine.doTransition(event.getType(), event);
       } catch (InvalidStateTransitonException e) {
-        LOG.error("Can't handle this event at current state", e);
+        LOG.error("Can't handle this event at current state " + nodeId, e);
         LOG.error(
                 "Invalid event " + event.getType() + " on Node  " + this.nodeId);
       }
 
       if (oldState != getState()) {
-        LOG.info(nodeId + " Node Transitioned from " + oldState + " to " +
+        LOG.debug(nodeId + " Node Transitioned from " + oldState + " to " +
             getState());
         if (event.getTransactionState() != null) {
           ((TransactionStateImpl) event.getTransactionState())
@@ -626,7 +626,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
       //If distributedRT is enabled and if HA is disabled or HA is enabled
       // and I am not Leader, persist event
       if (event.getTransactionState() != null && isDistributedRTEnabled &&
-          !rmNode.context.getRMGroupMembershipService().isLeader()) {
+          !rmNode.context.getGroupMembershipService().isLeader()) {
         //Add NodeAddedSchedulerEvent to TransactionState
         LOG.debug("HOP :: Added Pending event to TransactionState");
         ((TransactionStateImpl) event.getTransactionState()).getRMNodeInfo(
@@ -666,7 +666,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
     @Override
     public void transition(RMNodeImpl rmNode, RMNodeEvent event) {
       // Kill containers since node is rejoining.
-      LOG.debug("HOP :: Transition ReconnectNodeTransition");
+      LOG.debug("HOP :: Transition ReconnectNodeTransition " + rmNode.getNodeID());
       LOG.debug("HOP :: nodeUpdateQueue.clear(), size=" +
           rmNode.nodeUpdateQueue.size());
       ((TransactionStateImpl) event.getTransactionState())
@@ -674,7 +674,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
               .toRemoveNodeUpdateQueue(rmNode.nodeUpdateQueue);
       rmNode.nodeUpdateQueue.clear();
       if (isDistributedRTEnabled &&
-          !rmNode.context.getRMGroupMembershipService().isLeader()) {
+          !rmNode.context.getGroupMembershipService().isLeader()) {
         //Add NodeRemovedSchedulerEvent to TransactionState
         LOG.debug("HOP :: Added Pending event to TransactionState");
         ((TransactionStateImpl) event.getTransactionState()).getRMNodeInfo(
@@ -695,7 +695,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
         if (rmNode.getState() != NodeState.UNHEALTHY) {
           // Only add new node if old state is not UNHEALTHY
           if (isDistributedRTEnabled &&
-              !rmNode.context.getRMGroupMembershipService().isLeader()) {
+              !rmNode.context.getGroupMembershipService().isLeader()) {
             //Add NodeAddedSchedulerEvent to TransactionState
             LOG.debug("HOP :: Added Pending event to TransactionState");
             ((TransactionStateImpl) event.getTransactionState()).
@@ -790,7 +790,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
     @Override
     public void transition(RMNodeImpl rmNode, RMNodeEvent event) {
       // Inform the scheduler
-      LOG.debug("HOP :: Transition DeactivateNodeTransition");
+      LOG.debug("HOP :: Transition DeactivateNodeTransition " + rmNode.getNodeID());
       LOG.debug("HOP :: nodeUpdateQueue.clear(), size=" +
           rmNode.nodeUpdateQueue.size());
       ((TransactionStateImpl) event.getTransactionState())
@@ -803,7 +803,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
       NodeState initialState = rmNode.getState();
       if (!initialState.equals(NodeState.UNHEALTHY)) {
         if (isDistributedRTEnabled &&
-            !rmNode.context.getRMGroupMembershipService().isLeader()) {
+            !rmNode.context.getGroupMembershipService().isLeader()) {
           //Add NodeRemovedSchedulerEvent to TransactionState
           LOG.debug("HOP :: Added Pending event to TransactionState");
           ((TransactionStateImpl) event.getTransactionState()).
@@ -875,7 +875,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
         rmNode.nodeUpdateQueue.clear();
         // Inform the scheduler
         if (isDistributedRTEnabled &&
-            !rmNode.context.getRMGroupMembershipService().isLeader()) {
+            !rmNode.context.getGroupMembershipService().isLeader()) {
           //Add NodeRemovedSchedulerEvent to TransactionState
           LOG.debug("HOP :: Added Pending event to TransactionState");
           ((TransactionStateImpl) event.getTransactionState()).
@@ -959,12 +959,19 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
           for(ContainerStatus s : completedContainers){
             containers = containers + ", " + s.getContainerId();
           }
-          LOG.info("adding completed Containers to node " + rmNode.getNodeID() + " " + containers);
+          LOG.debug("adding completed Containers to node " + rmNode.getNodeID() 
+                  + " " + containers);
         }
         UpdatedContainerInfo uci
                 = new UpdatedContainerInfo(newlyLaunchedContainers,
                         completedContainers, rmNode.updatedContainerInfoId++);
-        LOG.debug("HOP :: nodeUpdateQueue.add-" + uci);
+        if(completedContainers.size()>0){
+          LOG.debug(event.getNodeId() + " adding " + completedContainers.size() + 
+                  " completed containers in " + uci.getUpdatedContainerInfoId() + 
+                  " pending event " +
+                  ((TransactionStateImpl) event.getTransactionState()).
+                          getRMNodeInfo(rmNode.nodeId).getPendingId());
+        }
         ((TransactionStateImpl) event.getTransactionState())
                 .getRMNodeInfo(rmNode.nodeId).toAddNodeUpdateQueue(uci);
         rmNode.nodeUpdateQueue.add(uci);
@@ -978,7 +985,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
               + rmNode.nextHeartBeat);
       boolean isDTEnabledRT = false;
       if (isDistributedRTEnabled
-              && !rmNode.context.getRMGroupMembershipService().isLeader()) {
+              && !rmNode.context.getGroupMembershipService().isLeader()) {
         isDTEnabledRT = true;
       }
       if (rmNode.nextHeartBeat) {
@@ -996,7 +1003,9 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
           LOG.debug(
                   "HOP_pending RT adding pending event<SCHEDULER_FINISHED_PROCESSING>"
                   + rmNode.nodeId.toString() + " pending id : " + ((TransactionStateImpl) event.getTransactionState())
-                .getRMNodeInfo(rmNode.nodeId).getPendingId());
+                .getRMNodeInfo(rmNode.nodeId).getPendingId() + 
+                          " hbid " + ((RMNodeStatusEvent)event).
+                                  getLatestResponse().getResponseId());
           
           ((TransactionStateImpl) event.getTransactionState())
                   .getRMNodeInfo(rmNode.nodeId).addPendingEventToAdd(rmNode.
@@ -1015,7 +1024,9 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
                 "HOP_pending RT adding pending event<SCHEDULER_NOT_FINISHED_PROCESSING>"
                 + rmNode.nodeId.toString() + " pending id : " + 
                         ((TransactionStateImpl) event.getTransactionState())
-                .getRMNodeInfo(rmNode.nodeId).getPendingId());
+                .getRMNodeInfo(rmNode.nodeId).getPendingId()+ " hbid " +
+                        ((RMNodeStatusEvent)event).getLatestResponse().
+                                getResponseId());
         ((TransactionStateImpl) event.getTransactionState())
                 .getRMNodeInfo(rmNode.nodeId).addPendingEventToAdd(rmNode.
                         getNodeID().toString(),
@@ -1071,7 +1082,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
 
       if (remoteNodeHealthStatus.getIsNodeHealthy()) {
         if (isDistributedRTEnabled &&
-            !rmNode.context.getRMGroupMembershipService().isLeader()) {
+            !rmNode.context.getGroupMembershipService().isLeader()) {
           //Add NodeAddedSchedulerEvent to TransactionState
           LOG.debug("HOP :: Added Pending event to TransactionState");
           ((TransactionStateImpl) event.getTransactionState()).getRMNodeInfo(

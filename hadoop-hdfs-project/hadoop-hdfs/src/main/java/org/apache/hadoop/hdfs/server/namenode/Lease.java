@@ -187,11 +187,11 @@ public class Lease implements Comparable<Lease> {
     return holder;
   }
 
-  void replacePath(LeasePath oldpath, LeasePath newpath)
-      throws StorageException, TransactionContextException {
-    getPaths().remove(oldpath);
-    getPaths().add(newpath);
-  }
+//  void replacePath(LeasePath oldpath, LeasePath newpath)
+//      throws StorageException, TransactionContextException {
+//    getPaths().remove(oldpath);
+//    getPaths().add(newpath);
+//  }
   
   public static int getHolderId(String holder){
       return holder.hashCode();

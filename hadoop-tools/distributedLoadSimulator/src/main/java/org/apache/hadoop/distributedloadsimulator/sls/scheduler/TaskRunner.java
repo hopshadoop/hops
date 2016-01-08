@@ -87,8 +87,10 @@ public class TaskRunner {
             queue.add(this);          
           }
         } else if (nextRun < endTime) {
+          long start = System.currentTimeMillis();
           middleStep();
-          nextRun = System.currentTimeMillis() + repeatInterval;
+          long duration = System.currentTimeMillis()-start;
+          nextRun = System.currentTimeMillis() + Math.max(repeatInterval-duration,0);
           queue.add(this);
         } else {
           lastStep();

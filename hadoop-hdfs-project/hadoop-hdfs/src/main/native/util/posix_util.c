@@ -18,6 +18,10 @@
 
 #include "util/posix_util.h"
 
+#ifdef __APPLE__
+#include <limits.h>
+#endif
+
 #include <dirent.h>
 #include <errno.h>
 #include <pthread.h>

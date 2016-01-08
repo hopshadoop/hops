@@ -142,7 +142,6 @@ public class TestContainersLogsService {
 
       rm.start();
 
-      RMStorageFactory.kickTheNdbEventStreamingAPI(false);
 
       int sleepTillCheckpoint = monitorInterval * (checkpointTicks + 1);
       Thread.sleep(sleepTillCheckpoint);
