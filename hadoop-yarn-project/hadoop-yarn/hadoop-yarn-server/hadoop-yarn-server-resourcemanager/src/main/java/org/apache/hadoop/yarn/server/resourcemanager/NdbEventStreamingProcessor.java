@@ -15,6 +15,7 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager;
 
+import io.hops.metadata.util.RMUtilities;
 import io.hops.metadata.yarn.entity.ContainerStatus;
 import io.hops.metadata.yarn.entity.JustLaunchedContainers;
 import io.hops.metadata.yarn.entity.RMNodeComps;
@@ -32,8 +33,6 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
  * @author sri
  */
 public class NdbEventStreamingProcessor extends PendingEventRetrieval {
-
-  private RMNode rmNode;
 
   public NdbEventStreamingProcessor(RMContext rmContext, Configuration conf) {
     super(rmContext, conf);
@@ -64,8 +63,10 @@ public class NdbEventStreamingProcessor extends PendingEventRetrieval {
     }
     if (hopRMNodeNDBCompObject.getPendingEvent() != null) {
       LOG.debug("<EvtProcessor> [pendingevent] id : " + hopRMNodeNDBCompObject.
-              getPendingEvent().getRmnodeId() + "| peinding id : "
-              + hopRMNodeNDBCompObject.getPendingEvent().getId());
+              getPendingEvent().getId().getNodeId() + "| peinding id : "
+              + hopRMNodeNDBCompObject.getPendingEvent().getId() +
+              "| type: " + hopRMNodeNDBCompObject.getPendingEvent().getType() +
+              "| status: " + hopRMNodeNDBCompObject.getPendingEvent().getStatus());
     }
     List<UpdatedContainerInfo> hopUpdatedContainerInfo = hopRMNodeNDBCompObject.
             getHopUpdatedContainerInfo();
@@ -84,39 +85,54 @@ public class NdbEventStreamingProcessor extends PendingEventRetrieval {
             "<EvtProcessor_PRINT_END>-------------------------------------------------------------------");
   }
 
-  @Override
-  public void run() {
-    while (active) {
-      try {
-        //first ask him sleep
+  public void start() {
+    if (!active) {
+      active = true;
+      LOG.info("start retriving thread");
+      retrivingThread = new Thread(new RetrivingThread());
+      retrivingThread.start();
+    } else {
+      LOG.error("ndb event retriver is already active");
+    }
+  }
+  
+  private class RetrivingThread implements Runnable {
 
-        RMNodeComps hopRMNodeCompObject = null;
-        hopRMNodeCompObject
-                = (RMNodeComps) NdbEventStreamingReceiver.blockingQueue.take();
-        if (hopRMNodeCompObject != null) {
+    @Override
+    public void run() {
+      while (active) {
+        try {
+          //first ask him sleep
+
+          RMNodeComps hopRMNodeCompObject = null;
+          hopRMNodeCompObject
+                  = (RMNodeComps) NdbEventStreamingReceiver.blockingQueue.take();
+          if (hopRMNodeCompObject != null) {
           if (LOG.isDebugEnabled()) {
             printHopsRMNodeComps(hopRMNodeCompObject);
           }
-          try {
-            rmNode = processHopRMNodeComps(hopRMNodeCompObject);
-            LOG.debug("HOP :: RMNodeWorker rmNode:" + rmNode);
-          } catch (IOException ex) {
-            LOG.error("HOP :: Error retrieving rmNode:" + ex, ex);
-          }
+            RMNode rmNode=null;
+            try {
+              rmNode = RMUtilities.processHopRMNodeCompsForScheduler(hopRMNodeCompObject,
+                      rmContext);
+              LOG.debug("HOP :: RMNodeWorker rmNode:" + rmNode);
+            } catch (IOException ex) {
+              LOG.error("HOP :: Error retrieving rmNode:" + ex, ex);
+            }
 
-          if (rmNode != null) {
-            updateRMContext(rmNode);
-            triggerEvent(rmNode, hopRMNodeCompObject.getPendingEvent());
-          }
+            if (rmNode != null) {
+              updateRMContext(rmNode);
+              triggerEvent(rmNode, hopRMNodeCompObject.getPendingEvent(),false);
+            }
 
+          }
+        } catch (InterruptedException ex) {
+          LOG.error(ex, ex);
         }
-      } catch (InterruptedException ex) {
-        Logger.getLogger(NdbEventStreamingProcessor.class.getName()).log(
-                Level.SEVERE, null, ex);
+
       }
 
     }
-
   }
 
 }

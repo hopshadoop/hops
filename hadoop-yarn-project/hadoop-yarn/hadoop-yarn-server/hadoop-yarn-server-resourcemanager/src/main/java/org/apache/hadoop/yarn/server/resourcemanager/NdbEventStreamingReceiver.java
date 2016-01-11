@@ -31,6 +31,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -40,7 +43,7 @@ import org.apache.commons.logging.LogFactory;
  */
 public class NdbEventStreamingReceiver {
 
-  //TODO move this to configuration .
+  //TODO move this to configuration and rename properly.
   private static final int experimentCapacity = 100000;
 
   public static BlockingQueue blockingQueue = new ArrayBlockingQueue(
@@ -373,7 +376,11 @@ public class NdbEventStreamingReceiver {
                     hopNodeHBResponse, hopResource,
                     hopPendingEvent, hopJustLaunchedContainersList,
                     hopUpdatedContainerInfoList, hopContainerIdsToCleanList,
-                    hopFinishedApplicationsList, hopContainersStatusList);
+                    hopFinishedApplicationsList, hopContainersStatusList,
+                    hopPendingEvent.getId().getNodeId());
+    LOG.debug("put event in queue: " + hopRMNodeBDBObject.getPendingEvent().
+            getId() + " ; " + hopRMNodeBDBObject.getPendingEvent().getId().
+            getNodeId());
     blockingQueue.put(hopRMNodeBDBObject);
   }
 
@@ -383,7 +390,8 @@ public class NdbEventStreamingReceiver {
             hopNodeHBResponse, hopResource,
             hopPendingEvent, hopJustLaunchedContainersList,
             hopUpdatedContainerInfoList, hopContainerIdsToCleanList,
-            hopFinishedApplicationsList, hopContainersStatusList);
+            hopFinishedApplicationsList, hopContainersStatusList,
+            hopPendingEvent.getId().getNodeId());
   }
 
   public void onEventMethodMultiThread(RMNodeComps hopCompObject) throws

@@ -416,7 +416,7 @@ public void agregateFinishedApplicationToRemove(RMNodeInfoAgregate agregate){
   private void generatePendingEventId() {
     //lets start the pending event id from 1
     if(pendingId == -1){
-      this.pendingId = pendingEventId.getAndIncrement() + 1;
+      this.pendingId = pendingEventId.incrementAndGet();
     }
   }
 
@@ -430,15 +430,20 @@ public void agregateFinishedApplicationToRemove(RMNodeInfoAgregate agregate){
   }
 
   public void addPendingEventToAdd(String rmnodeId, int type, int status) {
-    PendingEvent pendingEvent = new PendingEvent(rmnodeId, type, status,
-            getPendingId());
+    PendingEvent pendingEvent;
+    if (this.persistedEventsToAdd.isEmpty()) {
+      pendingEvent = new PendingEvent(rmnodeId, type, status,
+              getPendingId());
+    } else {
+      pendingEvent = new PendingEvent(rmnodeId, type, status,
+              pendingEventId.incrementAndGet());
+    }
     this.persistedEventsToAdd.add(pendingEvent);
   }
 
-  public void addPendingEventToRemove(int id, String rmnodeId, int type,
-          int status) {
+  public void addPendingEventToRemove(PendingEvent pendingEvent) {
     this.persistedEventsToRemove
-            .add(new PendingEvent(rmnodeId, type, status, id));
+            .add(new PendingEvent(pendingEvent));
   }
 
   public void agregatePendingEventsToAdd(RMNodeInfoAgregate agregate) {

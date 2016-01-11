@@ -53,11 +53,12 @@ public class TestRMNMSecretKeys {
     validateRMNMKeyExchange(conf);
   }
 
+  DrainDispatcher dispatcher;
   private void validateRMNMKeyExchange(YarnConfiguration conf)
       throws Exception {
     // Default rolling and activation intervals are large enough, no need to
     // intervene
-    final DrainDispatcher dispatcher = new DrainDispatcher();
+    dispatcher = new DrainDispatcher();
     ResourceManager rm = new ResourceManager() {
 
       @Override
@@ -67,6 +68,7 @@ public class TestRMNMSecretKeys {
 
       @Override
       protected Dispatcher createDispatcher() {
+        dispatcher = new DrainDispatcher();
         return dispatcher;
       }
 

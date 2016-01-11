@@ -405,7 +405,6 @@ public class QueueMetrics implements MetricsSource {
 
   public void allocateResources(String user, int containers, Resource res,
       boolean decrPending) {
-    LOG.info("allocate Resource for queue " + queueName + " parent: " + parent);
     allocatedContainers.incr(containers);
     aggregateContainersAllocated.incr(containers);
     allocatedMB.incr(res.getMemory() * containers);

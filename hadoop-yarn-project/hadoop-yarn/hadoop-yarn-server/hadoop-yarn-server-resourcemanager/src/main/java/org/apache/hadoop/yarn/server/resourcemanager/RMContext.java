@@ -51,6 +51,8 @@ public interface RMContext extends Recoverable {
 
   boolean isHAEnabled();
 
+  boolean isDistributedEnabled();
+  
   HAServiceState getHAServiceState();
 
   RMStateStore getStateStore();
@@ -85,7 +87,7 @@ public interface RMContext extends Recoverable {
 
   AdminService getRMAdminService();
 
-  GroupMembershipService getRMGroupMembershipService();
+  GroupMembershipService getGroupMembershipService();
   
   ClientRMService getClientRMService();
 

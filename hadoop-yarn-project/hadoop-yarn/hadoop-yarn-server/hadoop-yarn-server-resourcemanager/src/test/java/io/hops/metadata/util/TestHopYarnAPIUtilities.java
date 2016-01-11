@@ -162,7 +162,7 @@ public class TestHopYarnAPIUtilities {
     Thread.sleep(1000);
     //verify that they are persisted in the db
     Map<String,FiCaSchedulerNode> dbNodes = RMUtilities.
-            getAllFiCaSchedulerNodes();
+            getAllFiCaSchedulerNodesFullTransaction();
     assertEquals(2, dbNodes.size());
 
     //submit an application of 2GB memory
@@ -199,7 +199,7 @@ public class TestHopYarnAPIUtilities {
             getAllResourceRequests();
     //retrieve requests from the database
     Map<String, List<ResourceRequest>> requests =
-        RMUtilities.getAllResourceRequests();
+        RMUtilities.getAllResourceRequestsFullTransaction();
     List<ResourceRequest> dbReqs = requests.get(attempt1.
         getAppAttemptId().toString());
 
@@ -333,7 +333,7 @@ public class TestHopYarnAPIUtilities {
 
     //test persistance of schedulerapplication
     Map<String, SchedulerApplication> schedulerApplications = RMUtilities.
-        getSchedulerApplications();
+        getSchedulerApplicationsFullTransaction();
     assertEquals("db does not contain good number of schedulerApplications", 2,
         schedulerApplications.size());
 
