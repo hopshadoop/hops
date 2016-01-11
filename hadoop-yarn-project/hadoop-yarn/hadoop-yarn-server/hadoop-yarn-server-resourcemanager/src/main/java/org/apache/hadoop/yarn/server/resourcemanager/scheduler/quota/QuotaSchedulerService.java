@@ -15,39 +15,36 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.quota;
 
-import java.util.Iterator;
-import java.util.Map;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.service.AbstractService;
-import org.apache.hadoop.yarn.util.AbstractLivelinessMonitor;
 
 /**
  *
  * @author rizvi
  */
-public class QuotaSchedulerService extends AbstractService{
+public class QuotaSchedulerService extends AbstractService {
 
-    private Thread quotaSchedulingThread;  
-    private volatile boolean stopped;
-    private static final Log LOG = LogFactory.getLog(QuotaSchedulerService.class);
+  private Thread quotaSchedulingThread;
+  private volatile boolean stopped;
+  private static final Log LOG = LogFactory.getLog(QuotaSchedulerService.class);
 
-    
-    public QuotaSchedulerService(String name) {
-        super(name);
-    }
-    
+  public QuotaSchedulerService(String name) {
+    super(name);
+  }
+
   @Override
   protected void serviceStart() throws Exception {
     assert !stopped : "starting when already stopped";
     LOG.info("Starting a new quota schedular service");
-    quotaSchedulingThread = new Thread(new QuotaScheduler());
+    QuotaScheduler quotqScheduler = new QuotaScheduler();
+    quotqScheduler.recover();
+    quotaSchedulingThread = new Thread(quotqScheduler);
     quotaSchedulingThread.setName("Quota scheduling service");
     quotaSchedulingThread.start();
     super.serviceStart();
   }
-  
-  
+
   @Override
   protected void serviceStop() throws Exception {
     stopped = true;
@@ -58,36 +55,4 @@ public class QuotaSchedulerService extends AbstractService{
     LOG.info("Stopping the quota schedular service.");
   }
 
-  /*
-  private class QuotaSchedular  implements Runnable {
-
-    @Override
-    public void run() {
-      while (!stopped && !Thread.currentThread().isInterrupted()) {
-        synchronized (this) {
-          Iterator<Map.Entry<O, Long>> iterator = running.entrySet().iterator();
-
-          //avoid calculating current time everytime in loop
-          long currentTime = clock.getTime();
-
-          while (iterator.hasNext()) {
-            Map.Entry<O, Long> entry = iterator.next();
-            if (currentTime > entry.getValue() + expireInterval) {
-              iterator.remove();
-              expire(entry.getKey());
-              LOG.info("Expired:" + entry.getKey().toString() +
-                  " Timed out after " + expireInterval / 1000 + " secs");
-            }
-          }
-        }
-        try {
-          Thread.sleep(monitorInterval);
-        } catch (InterruptedException e) {
-          LOG.info(getName() + " thread interrupted");
-          break;
-        }
-      }
-    }
-  }*/    
-    
 }
