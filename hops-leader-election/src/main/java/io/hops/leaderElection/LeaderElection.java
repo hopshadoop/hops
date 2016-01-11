@@ -18,11 +18,13 @@ package io.hops.leaderElection;
 import io.hops.exception.TransientStorageException;
 import io.hops.leaderElection.LeaderElectionRole.Role;
 import io.hops.leaderElection.exception.LeaderElectionForceAbort;
+import io.hops.leader_election.node.ActiveNode;
 import io.hops.leader_election.node.SortedActiveNodeList;
 import io.hops.metadata.election.entity.LeDescriptorFactory;
 import org.apache.log4j.Logger;
 
 import java.io.IOException;
+import java.util.List;
 
 public class LeaderElection extends Thread {
 
@@ -162,7 +164,9 @@ public class LeaderElection extends Thread {
   }
 
   public synchronized boolean isSecond() {
-    if (context.memberShip.getSortedActiveNodes().get(1).getId()==context.id) {
+    List<ActiveNode> activeNodes =context.memberShip.getSortedActiveNodes();
+    if (activeNodes.size()<2 ||
+            context.memberShip.getSortedActiveNodes().get(1).getId()==context.id) {
       long elapsed_time = System.currentTimeMillis() - context.last_hb_time;
       if (elapsed_time <
           (context.time_period * context.max_missed_hb_threshold -

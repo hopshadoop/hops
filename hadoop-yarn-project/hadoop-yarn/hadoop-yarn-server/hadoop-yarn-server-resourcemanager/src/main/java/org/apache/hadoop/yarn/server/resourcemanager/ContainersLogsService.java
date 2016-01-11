@@ -551,4 +551,8 @@ public class ContainersLogsService extends CompositeService {
       }
     }
   }
+  
+  public int getCurrentTick(){
+    return tickCounter.getValue();
+  }
 }

@@ -935,7 +935,7 @@ public static Map<String, List<ResourceRequest>> getAllResourceRequestsFullTrans
       // so first time we are receiving , this will happen when node registers
       if (rmNode == null) {
         org.apache.hadoop.net.Node node = null;
-        if (hopRMNodeFull.getHopRMNode().getNodeId() != null) {
+        if (hopRMNodeFull.getHopNode() != null) {
           node = new NodeBase(hopRMNodeFull.getHopNode().getName(),
                   hopRMNodeFull.
                   getHopNode().getLocation());

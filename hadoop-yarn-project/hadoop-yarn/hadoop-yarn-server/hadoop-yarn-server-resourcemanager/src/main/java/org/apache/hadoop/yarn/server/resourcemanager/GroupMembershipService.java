@@ -187,6 +187,14 @@ public class GroupMembershipService extends CompositeService
     }
   }
 
+  public boolean isAlone(){
+    if(groupMembership.getActiveNamenodes().size()==1){
+      return true;
+    }else{
+      return false;
+    }
+  }
+  
   @Override
   public synchronized void monitorHealth() throws IOException {
     checkAccess("monitorHealth");

@@ -152,7 +152,8 @@ public class RMContextImpl implements RMContext {
     this.setNMTokenSecretManager(nmTokenSecretManager);
     this.setClientToAMTokenSecretManager(clientToAMTokenSecretManager);
     this.setRMApplicationHistoryWriter(rmApplicationHistoryWriter);
-
+    this.setContainersLogsService(new ContainersLogsService());
+    
     RMStateStore nullStore = new NullRMStateStore();
     nullStore.setRMDispatcher(rmDispatcher);
     try {
@@ -184,6 +185,8 @@ public class RMContextImpl implements RMContext {
     this.setDelegationTokenRenewer(delegationTokenRenewer);
     this.setAMRMTokenSecretManager(appTokenSecretManager);
     this.setTransactionStateManager(transactionStateManager);
+    this.setContainersLogsService(new ContainersLogsService());
+    
     if (conf != null) {
       this.setContainerTokenSecretManager(
           new RMContainerTokenSecretManager(conf, this));
@@ -441,6 +444,9 @@ public class RMContextImpl implements RMContext {
 
   @Override
   public boolean isLeadingRT(){
+    if(!isHAEnabled){
+      return true;
+    }
     return groupMembershipService.isLeadingRT();
   }
   

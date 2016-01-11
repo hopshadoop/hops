@@ -301,7 +301,7 @@ public class SLSRunner implements AMNMCommonObject {
     Configuration rmConf = new YarnConfiguration();
 
     rmConf.setBoolean(YarnConfiguration.RM_HA_ENABLED, true);
-    rmConf.setBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED, true);
+    rmConf.setBoolean(YarnConfiguration.DISTRIBUTED_RM, true);
     rmConf.setBoolean(YarnConfiguration.HOPS_NDB_EVENT_STREAMING_ENABLED, true);
     rmConf.setBoolean(YarnConfiguration.HOPS_NDB_RT_EVENT_STREAMING_ENABLED,
             true);

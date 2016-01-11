@@ -74,11 +74,17 @@ public class RMStorageFactory {
           StorageInitializtionException {
     dNdbEventStreaming = DalDriver.loadHopsNdbEventStreamingLib(
             YarnAPIStorageFactory.NDB_EVENT_STREAMING_FOR_DISTRIBUTED_SERVICE);
+    
+    String connectionString = dStorageFactory.getConnector().getClusterConnectString() + ":" + 
+            conf.getInt(YarnConfiguration.HOPS_NDB_EVENT_STREAMING_DB_PORT, YarnConfiguration.DEFAULT_HOPS_NDB_EVENT_STREAMING_DB_PORT);
+    
     dNdbEventStreaming.init(conf.get(
             YarnConfiguration.EVENT_SHEDULER_CONFIG_PATH,
             YarnConfiguration.DEFAULT_EVENT_SHEDULER_CONFIG_PATH), conf.get(
                     YarnConfiguration.EVENT_RT_CONFIG_PATH,
-                    YarnConfiguration.DEFAULT_EVENT_RT_CONFIG_PATH));
+                    YarnConfiguration.DEFAULT_EVENT_RT_CONFIG_PATH),
+            connectionString, dStorageFactory.getConnector().getDatabaseName()
+            );
     dNdbEventStreaming.startHopsNdbEvetAPISession(isLeader);
   }
   

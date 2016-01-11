@@ -1384,12 +1384,7 @@ public class YarnConfiguration extends Configuration {
 
   //end of TODO What is this for? does it have to be cleaned
   
-   //Distributed RT properties
-  public static final String HOPS_DISTRIBUTED_RT_ENABLED =
-      HOPS_RM_PREFIX + "distributed-rt.enable";
-
-  public static boolean DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED = true;
-  
+   //Distributed RT properties  
   public static final String EVENT_SHEDULER_CONFIG_PATH = 
           HOPS_RM_PREFIX + "event.scheduler.config.path";
   public static final String DEFAULT_EVENT_SHEDULER_CONFIG_PATH = 
@@ -1419,6 +1414,10 @@ public class YarnConfiguration extends Configuration {
   public static final String HOPS_NDB_EVENT_STREAMING_ENABLED = HOPS_RM_PREFIX
           + "ndb-event-streaming.enable";
 
+  public static int DEFAULT_HOPS_NDB_EVENT_STREAMING_DB_PORT = 1186;
+  public static final String HOPS_NDB_EVENT_STREAMING_DB_PORT = HOPS_RM_PREFIX
+          + "ndb-event-streaming.db.port";
+  
   public static boolean DEFAULT_HOPS_NDB_RT_EVENT_STREAMING_ENABLED = true;
   public static final String HOPS_NDB_RT_EVENT_STREAMING_ENABLED
           = HOPS_RM_PREFIX + "ndb-rt-event-streaming.enable";

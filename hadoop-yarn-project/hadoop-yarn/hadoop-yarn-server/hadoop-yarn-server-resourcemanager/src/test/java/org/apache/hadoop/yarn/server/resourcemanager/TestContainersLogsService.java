@@ -23,12 +23,14 @@ import io.hops.metadata.util.RMUtilities;
 import io.hops.metadata.util.YarnAPIStorageFactory;
 import io.hops.metadata.yarn.dal.ContainerStatusDataAccess;
 import io.hops.metadata.yarn.dal.ContainersLogsDataAccess;
+import io.hops.metadata.yarn.dal.PendingEventDataAccess;
 import io.hops.metadata.yarn.dal.RMContainerDataAccess;
 import io.hops.metadata.yarn.dal.RMNodeDataAccess;
 import io.hops.metadata.yarn.dal.YarnVariablesDataAccess;
 import io.hops.metadata.yarn.dal.util.YARNOperationType;
 import io.hops.metadata.yarn.entity.ContainerStatus;
 import io.hops.metadata.yarn.entity.ContainersLogs;
+import io.hops.metadata.yarn.entity.PendingEvent;
 import io.hops.metadata.yarn.entity.RMContainer;
 import io.hops.metadata.yarn.entity.RMNode;
 import io.hops.metadata.yarn.entity.YarnVariables;
@@ -41,9 +43,11 @@ import org.junit.Test;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Random;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -65,36 +69,17 @@ public class TestContainersLogsService {
       conf = new YarnConfiguration();
       YarnAPIStorageFactory.setConfiguration(conf);
       RMStorageFactory.setConfiguration(conf);
+      conf.set(YarnConfiguration.EVENT_RT_CONFIG_PATH,
+              "target/test-classes/RT_EventAPIConfig.ini");
+      conf.set(YarnConfiguration.EVENT_SHEDULER_CONFIG_PATH,
+              "target/test-classes/RM_EventAPIConfig.ini");
+      LOG.info("initialize db");
       RMUtilities.InitializeDB();
-      RMStorageFactory.getConnector().formatStorage();
     } catch (StorageInitializtionException ex) {
       LOG.error(null, ex);
     } catch (IOException ex) {
       LOG.error(null, ex);
     }
-  }
-
-//    @Test(timeout=60000)
-  public void testStreaming() throws Exception {
-    conf.setInt(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_MONITOR_INTERVAL, 1000);
-    conf.setInt(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_TICK_INCREMENT, 1);
-    conf.setBoolean(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS, false);
-
-    MockRM rm;
-
-    List<RMNode> rmNodes = generateRMNodesToAdd(10);
-    List<RMContainer> rmContainers = generateRMContainersToAdd(10, 0);
-    List<ContainerStatus> containerStatuses
-            = generateContainersStatusToAdd(rmNodes, rmContainers);
-    populateDB(rmNodes, rmContainers, containerStatuses);
-
-    rm = new MockRM(conf);
-
-    rm.start();
-
-    Thread.sleep(50000000);
-
-    rm.stop();
   }
 
   /**
@@ -119,9 +104,9 @@ public class TestContainersLogsService {
    *
    * @throws Exception
    */
-  @Test(timeout=600000)
+  @Test(timeout=60000)
   public void testCheckpoints() throws Exception {
-    int checkpointTicks = 500;
+    int checkpointTicks = 10;
     int monitorInterval = 1000;
     conf.setInt(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_MONITOR_INTERVAL,
             monitorInterval);
@@ -129,19 +114,17 @@ public class TestContainersLogsService {
     conf.setBoolean(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS, true);
     conf.setInt(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_TICKS,
             checkpointTicks);
-
     MockRM rm = new MockRM(conf);
 
     try {
       // Insert dummy data into necessary tables
       List<RMNode> rmNodes = generateRMNodesToAdd(10);
-      List<RMContainer> rmContainers = generateRMContainersToAdd(10, 0);
-      List<ContainerStatus> containerStatuses
-              = generateContainersStatusToAdd(rmNodes, rmContainers);
+      List<RMContainer> rmContainers = new ArrayList<RMContainer>();
+      List<ContainerStatus> containerStatuses = new ArrayList<ContainerStatus>();
+      generateRMContainersToAdd(10, 0, rmNodes,rmContainers,containerStatuses);
       populateDB(rmNodes, rmContainers, containerStatuses);
 
       rm.start();
-
 
       int sleepTillCheckpoint = monitorInterval * (checkpointTicks + 1);
       Thread.sleep(sleepTillCheckpoint);
@@ -151,7 +134,6 @@ public class TestContainersLogsService {
       for (ContainerStatus cs : containerStatuses) {
         ContainersLogs entry = cl.get(cs.getContainerid());
         Assert.assertNotNull(entry);
-        Assert.assertEquals(0, entry.getStart());
         Assert.assertEquals(checkpointTicks, entry.getStop());
         Assert.assertEquals(ContainersLogs.CONTAINER_RUNNING_STATE, entry.
                 getExitstatus());
@@ -168,7 +150,8 @@ public class TestContainersLogsService {
    *
    * @throws Exception
    */
-  @Test(timeout=60000)
+  //TODO do we need it with the streaming library? (For ex when the node faile?)
+  //@Test(timeout=60000)
   public void testUnknownExitstatusUseCase() throws Exception {
     int monitorInterval = 1000;
     int timeout = 2;
@@ -182,13 +165,13 @@ public class TestContainersLogsService {
     try {
       // Insert dummy data into necessary tables
       List<RMNode> rmNodes = generateRMNodesToAdd(1);
-      List<RMContainer> rmContainers = generateRMContainersToAdd(10, 0);
-      List<ContainerStatus> containerStatuses
-              = generateContainersStatusToAdd(rmNodes, rmContainers);
+      List<RMContainer> rmContainers = new ArrayList<RMContainer>() ;
+      List<ContainerStatus> containerStatuses= new ArrayList<ContainerStatus>();
+      generateRMContainersToAdd(10, 0,rmNodes,rmContainers,containerStatuses);
       populateDB(rmNodes, rmContainers, containerStatuses);
 
       rm.start();
-
+      
       Thread.sleep(monitorInterval * timeout);
 
       // Delete RM node, which should delete container statuses
@@ -202,8 +185,9 @@ public class TestContainersLogsService {
         ContainersLogs entry = cl.get(cs.getContainerid());
         Assert.assertNotNull(entry);
         Assert.assertEquals(0, entry.getStart());
-        Assert.assertTrue((entry.getStop() == timeout) || (entry.getStop()
-                == timeout + 1));
+        Assert.assertTrue("entry stop should be " + timeout + " or +1 but it is "
+                + entry.getStop(), (entry.getStop() == timeout) || (entry.
+                getStop() == timeout + 1));
         Assert.assertEquals(ContainersLogs.UNKNOWN_CONTAINER_EXIT, entry.
                 getExitstatus());
       }
@@ -228,9 +212,9 @@ public class TestContainersLogsService {
 
     // Insert dummy data into necessary tables
     List<RMNode> rmNodes = generateRMNodesToAdd(10);
-    List<RMContainer> rmContainers = generateRMContainersToAdd(10, 0);
-    List<ContainerStatus> containerStatuses
-            = generateContainersStatusToAdd(rmNodes, rmContainers);
+    List<RMContainer> rmContainers = new ArrayList<RMContainer>();
+    List<ContainerStatus> containerStatuses = new ArrayList<ContainerStatus>();
+    generateRMContainersToAdd(10, 0,rmNodes,rmContainers,containerStatuses);
     populateDB(rmNodes, rmContainers, containerStatuses);
 
     // Start RM1
@@ -276,7 +260,7 @@ public class TestContainersLogsService {
    */
   @Test(timeout=60000)
   public void testFullUseCase() throws Exception {
-    int monitorInterval = 1000;
+    int monitorInterval = 2000;
     int checkpointTicks = 10;
     conf.setInt(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_MONITOR_INTERVAL,
             monitorInterval);
@@ -284,29 +268,48 @@ public class TestContainersLogsService {
     conf.setBoolean(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS, true);
     conf.setInt(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_TICKS,
             checkpointTicks);
-
+    conf.setBoolean(YarnConfiguration.DISTRIBUTED_RM, true);
+    
     MockRM rm = new MockRM(conf);
 
     // Insert first batch of dummy containers
     List<RMNode> rmNodes1 = generateRMNodesToAdd(10);
-    List<RMContainer> rmContainers1 = generateRMContainersToAdd(10, 0);
-    List<ContainerStatus> containerStatuses1
-            = generateContainersStatusToAdd(rmNodes1, rmContainers1);
+    List<RMContainer> rmContainers1 = new ArrayList<RMContainer>();
+    List<ContainerStatus> containerStatuses1 = new ArrayList<ContainerStatus>();
+    generateRMContainersToAdd(10, 0, rmNodes1, rmContainers1, containerStatuses1);
+    
     populateDB(rmNodes1, rmContainers1, containerStatuses1);
 
     rm.start();
-
-    Thread.sleep(monitorInterval * 5);
+    
+    Thread.sleep(monitorInterval*5);
 
     // Insert second batch of dummy containers
     List<RMNode> rmNodes2 = new ArrayList<RMNode>();
-    List<RMContainer> rmContainers2 = generateRMContainersToAdd(10, 10);
-    List<ContainerStatus> containerStatuses2
-            = generateContainersStatusToAdd(rmNodes1, rmContainers2);
+    for (RMNode node : rmNodes1){
+      rmNodes2.add(new RMNode(node.getNodeId(), node.getHostName(), node.
+              getCommandPort(), node.getHttpPort(), node.getNodeAddress(), node.
+              getHttpAddress(), node.getHealthReport(),
+              node.getLastHealthReportTime(), node.getCurrentState(), node.
+              getNodemanagerVersion(), node.getOvercommittimeout(), node.
+              getUciId(),
+              pendingId++));
+    }
+    List<RMContainer> rmContainers2 = new ArrayList<RMContainer>();
+    List<ContainerStatus> containerStatuses2 = new ArrayList<ContainerStatus>();
+    generateRMContainersToAdd(10, 10, rmNodes2,rmContainers2,containerStatuses2);
     populateDB(rmNodes2, rmContainers2, containerStatuses2);
-
-    Thread.sleep(monitorInterval * 5);
-
+    
+    //simulating heartbeats forcing the streaming api to deliver events
+    Thread.sleep(monitorInterval+monitorInterval/2);
+    int tick1 = rm.getRMContext().getContainersLogsService().getCurrentTick();
+    int t = 0;
+    while (t < 5) {
+      commitDummyPendingEvent();
+      Thread.sleep(monitorInterval);
+      t++;
+    }
+    
     // Complete half of first and second batch of dummy containers
     List<ContainerStatus> csUpdate1 = new ArrayList<ContainerStatus>();
     for (int i = 0; i < 5; i++) {
@@ -317,7 +320,7 @@ public class TestContainersLogsService {
               null,
               ContainerExitStatus.SUCCESS,
               cs.getRMNodeId(),
-              0);
+              pendingId++);
       csUpdate1.add(csNewStatus);
 
       ContainerStatus cs2 = containerStatuses2.get(i);
@@ -327,12 +330,20 @@ public class TestContainersLogsService {
               null,
               ContainerExitStatus.ABORTED,
               cs2.getRMNodeId(),
-              0);
+              pendingId);
       csUpdate1.add(cs2NewStatus);
     }
     updateContainerStatuses(csUpdate1);
 
-    Thread.sleep(monitorInterval * 5);
+    //simulating heartbeats forcing the streaming api to deliver events
+    Thread.sleep(monitorInterval+monitorInterval/2);
+    int tick2 = rm.getRMContext().getContainersLogsService().getCurrentTick();
+    t = 0;
+    while (t < 5) {
+      commitDummyPendingEvent();
+      Thread.sleep(monitorInterval);
+      t++;
+    }
 
     // Complete second half of second batch of dummy containers
     List<ContainerStatus> csUpdate2 = new ArrayList<ContainerStatus>();
@@ -344,39 +355,45 @@ public class TestContainersLogsService {
               null,
               ContainerExitStatus.SUCCESS,
               cs.getRMNodeId(),
-              0);
+              pendingId++);
       csUpdate2.add(csNewStatus);
     }
     updateContainerStatuses(csUpdate2);
 
-    Thread.sleep(monitorInterval * 5);
+    //simulating heartbeats forcing the streaming api to deliver events
+    Thread.sleep(monitorInterval+monitorInterval/2);
+    int tick3 = rm.getRMContext().getContainersLogsService().getCurrentTick();
+    commitDummyPendingEvent();
+    t = 0;
+    while (t < 5) {
+      commitDummyPendingEvent();
+      Thread.sleep(monitorInterval);
+      t++;
+    }
 
     rm.stop();
 
-    // Check if tick counter is correct
-    YarnVariables tc = getTickCounter();
-    Assert.assertEquals(20, tc.getValue());
-
+ 
     // Check if container logs have correct values
     Map<String, ContainersLogs> cl = getContainersLogs();
     for (int i = 0; i < 5; i++) {
       ContainersLogs entry = cl.get(containerStatuses1.get(i).getContainerid());
       Assert.assertNotNull(entry);
-      Assert.assertEquals(0, entry.getStart());
-      Assert.assertEquals(11, entry.getStop());
+      Assert.assertEquals( 0, entry.getStart());
+      Assert.assertEquals( tick2, entry.getStop());
       Assert.assertEquals(ContainerExitStatus.SUCCESS, entry.getExitstatus());
 
       ContainersLogs entry2 = cl.get(containerStatuses2.get(i).getContainerid());
       Assert.assertNotNull(entry2);
-      Assert.assertEquals(6, entry2.getStart());
-      Assert.assertEquals(11, entry2.getStop());
+      Assert.assertEquals(tick1, entry2.getStart());
+      Assert.assertEquals(tick2, entry2.getStop());
       Assert.assertEquals(ContainerExitStatus.ABORTED, entry2.getExitstatus());
 
       ContainersLogs entry3 = cl.get(containerStatuses2.get(5 + i).
               getContainerid());
       Assert.assertNotNull(entry3);
-      Assert.assertEquals(6, entry3.getStart());
-      Assert.assertEquals(16, entry3.getStop());
+      Assert.assertEquals(tick1, entry3.getStart());
+      Assert.assertEquals(tick3, entry3.getStop());
       Assert.assertEquals(ContainerExitStatus.SUCCESS, entry.getExitstatus());
 
       ContainersLogs entry4 = cl.get(containerStatuses1.get(5 + i).
@@ -402,7 +419,18 @@ public class TestContainersLogsService {
                 public Object performTask() throws IOException {
                   connector.beginTransaction();
                   connector.writeLock();
-
+                  //Insert Pending Event
+                  List<PendingEvent> pendingEventsToAdd = 
+                          new ArrayList<PendingEvent>();
+                  for(RMNode node: rmNodesToAdd){
+                    pendingEventsToAdd.add(new PendingEvent(node.getNodeId(), 0,
+                            0, node.getPendingEventId()));
+                  }
+                  PendingEventDataAccess pendingEventDA =
+                          (PendingEventDataAccess) RMStorageFactory.
+                          getDataAccess(PendingEventDataAccess.class);
+                  pendingEventDA.addAll(pendingEventsToAdd);
+                  
                   // Insert RM nodes
                   RMNodeDataAccess rmNodesDA
                   = (RMNodeDataAccess) RMStorageFactory
@@ -425,7 +453,9 @@ public class TestContainersLogsService {
                   return null;
                 }
               };
+                        LOG.info("populating DB");
       bomb.handle();
+                        LOG.info("populated DB");
     } catch (IOException ex) {
       LOG.warn("Unable to populate DB", ex);
     }
@@ -441,6 +471,19 @@ public class TestContainersLogsService {
                   connector.beginTransaction();
                   connector.writeLock();
 
+                  //Insert Pending Event
+                  List<PendingEvent> pendingEventsToAdd = 
+                          new ArrayList<PendingEvent>();
+                  for(ContainerStatus containerStatus: containerStatusToAdd){
+                    pendingEventsToAdd.add(
+                            new PendingEvent(containerStatus.getRMNodeId(), -1,
+                            0, containerStatus.getPendingEventId()));
+                  }
+                  PendingEventDataAccess pendingEventDA =
+                          (PendingEventDataAccess) RMStorageFactory.
+                          getDataAccess(PendingEventDataAccess.class);
+                  pendingEventDA.addAll(pendingEventsToAdd);
+                  
                   // Update container statuses
                   ContainerStatusDataAccess containerStatusDA
                   = (ContainerStatusDataAccess) RMStorageFactory.getDataAccess(
@@ -457,6 +500,39 @@ public class TestContainersLogsService {
     }
   }
 
+  private void commitDummyPendingEvent() {
+    try {
+      LightWeightRequestHandler bomb = new LightWeightRequestHandler(
+              YARNOperationType.TEST) {
+                @Override
+                public Object performTask() throws IOException {
+                  connector.beginTransaction();
+                  connector.writeLock();
+
+                  //Insert Pending Event
+                  List<PendingEvent> pendingEventsToAdd = 
+                          new ArrayList<PendingEvent>();
+                  
+                    pendingEventsToAdd.add(
+                            new PendingEvent("nodeid", -1,
+                            0, pendingId++));
+                  
+                  PendingEventDataAccess pendingEventDA =
+                          (PendingEventDataAccess) RMStorageFactory.
+                          getDataAccess(PendingEventDataAccess.class);
+                  pendingEventDA.addAll(pendingEventsToAdd);
+                  
+                 
+
+                  connector.commit();
+                  return null;
+                }
+              };
+      bomb.handle();
+    } catch (IOException ex) {
+      LOG.warn("Unable to update container statuses table", ex);
+    }
+  }
   /**
    * Read tick counter from YARN variables table
    *
@@ -556,50 +632,41 @@ public class TestContainersLogsService {
     }
   }
 
-  private List<RMContainer> generateRMContainersToAdd(int nbContainers,
-          int startNo) {
-    List<RMContainer> toAdd = new ArrayList<RMContainer>();
+  private void generateRMContainersToAdd(int nbContainers,
+          int startNo, List<RMNode> rmNodesList, List<RMContainer> rmContainers,
+          List<ContainerStatus> containersStatus) {
     for (int i = startNo; i < (startNo + nbContainers); i++) {
-      RMContainer container = new RMContainer("containerid" + i + "_" + random.
-              nextInt(10), "appAttemptId",
-              "nodeId", "user", "reservedNodeId", i, i, i, i, i,
+      int randRMNode = random.nextInt(rmNodesList.size());
+      RMNode randomRMNode = rmNodesList.get(randRMNode);
+      RMContainer container = new RMContainer("containerid" + i, "appAttemptId",
+              randomRMNode.getNodeId(), "user", "reservedNodeId", i, i, i, i, i,
               "state", "finishedStatusState", i);
-      toAdd.add(container);
+      rmContainers.add(container);
+      
+      ContainerStatus status = new ContainerStatus(
+              container.getContainerIdID(),
+              ContainerState.RUNNING.toString(),
+              null,
+              ContainerExitStatus.SUCCESS,
+              randomRMNode.getNodeId(),
+              randomRMNode.getPendingEventId());
+      containersStatus.add(status);
     }
-    return toAdd;
   }
 
+  int pendingId=0;
   private List<RMNode> generateRMNodesToAdd(int nbNodes) {
     List<RMNode> toAdd = new ArrayList<RMNode>();
     for (int i = 0; i < nbNodes; i++) {
-      RMNode rmNode = new RMNode("nodeid_" + i, "hostName", 1,
-              1, "nodeAddress", "httpAddress", "", 1, "currentState",
-              "version", 1, 1, 0);
+      RMNode rmNode = new RMNode("nodeid_" + i + ":" + 9999, "hostName", 1,
+              1, "nodeAddress", "httpAddress", "", 1, "RUNNING",
+              "version", 1, 1, pendingId++);
       toAdd.add(rmNode);
     }
     return toAdd;
   }
 
-  private List<ContainerStatus> generateContainersStatusToAdd(
-          List<RMNode> rmNodesList,
-          List<RMContainer> rmContainersList) {
-    List<ContainerStatus> toAdd = new ArrayList<ContainerStatus>();
-    for (RMContainer rmContainer : rmContainersList) {
-      // Get random RM nodes for FK
-      int randRMNode = random.nextInt(rmNodesList.size());
-      RMNode randomRMNode = rmNodesList.get(randRMNode);
 
-      ContainerStatus status = new ContainerStatus(
-              rmContainer.getContainerIdID(),
-              ContainerState.RUNNING.toString(),
-              null,
-              ContainerExitStatus.SUCCESS,
-              randomRMNode.getNodeId(),
-              0);
-      toAdd.add(status);
-    }
-    return toAdd;
-  }
 
   private List<ContainerStatus> changeContainerStatuses(
           List<ContainerStatus> containerStatuses,
