@@ -222,20 +222,22 @@ void test_check_user() {
     printf("FAIL: failed check for system user root\n");
     exit(1);
   }
+#if !defined(__MACH__) // macosx do not have user bin
   if (check_user("bin") == NULL) {
     printf("FAIL: failed check for whitelisted system user bin\n");
     exit(1);
   }
+#endif
 }
 
 void test_resolve_config_path() {
   printf("\nTesting resolve_config_path\n");
-  if (strcmp(resolve_config_path("/etc/passwd", NULL), "/etc/passwd") != 0) {
-    printf("FAIL: failed to resolve config_name on an absolute path name: /etc/passwd\n");
+  if (strcmp(resolve_config_path("/bin/ls", NULL), "/bin/ls") != 0) {
+    printf("FAIL: failed to resolve config_name on an absolute path name: /bin/ls\n");
     exit(1);
   }
-  if (strcmp(resolve_config_path("../etc/passwd", "/etc/passwd"), "/etc/passwd") != 0) {
-    printf("FAIL: failed to resolve config_name on a relative path name: ../etc/passwd (relative to /etc/passwd)");
+  if (strcmp(resolve_config_path("../bin/ls", "/bin/ls"), "/bin/ls") != 0) {
+    printf("FAIL: failed to resolve config_name on a relative path name: ../bin/ls (relative to /bin/ls)");
     exit(1);
   }
 }

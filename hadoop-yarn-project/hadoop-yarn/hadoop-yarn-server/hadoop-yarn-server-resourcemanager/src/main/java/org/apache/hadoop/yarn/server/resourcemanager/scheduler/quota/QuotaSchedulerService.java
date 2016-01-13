@@ -29,8 +29,8 @@ public class QuotaSchedulerService extends AbstractService {
   private volatile boolean stopped;
   private static final Log LOG = LogFactory.getLog(QuotaSchedulerService.class);
 
-  public QuotaSchedulerService(String name) {
-    super(name);
+  public QuotaSchedulerService() {
+    super("quota scheduler service");
   }
 
   @Override

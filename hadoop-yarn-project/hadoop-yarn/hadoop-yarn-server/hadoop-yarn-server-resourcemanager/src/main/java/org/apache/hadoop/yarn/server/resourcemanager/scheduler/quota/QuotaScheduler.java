@@ -20,12 +20,12 @@ import io.hops.exception.StorageException;
 import io.hops.exception.StorageInitializtionException;
 import io.hops.metadata.util.RMStorageFactory;
 import io.hops.metadata.util.YarnAPIStorageFactory;
-import io.hops.metadata.yarn.dal.YarnContainersLogsDataAccess;
+import io.hops.metadata.yarn.dal.ContainersLogsDataAccess;
 import io.hops.metadata.yarn.dal.YarnProjectsDailyCostDataAccess;
 import io.hops.metadata.yarn.dal.YarnProjectsQuotaDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.ApplicationStateDataAccess;
 import io.hops.metadata.yarn.dal.util.YARNOperationType;
-import io.hops.metadata.yarn.entity.YarnContainersLogs;
+import io.hops.metadata.yarn.entity.ContainersLogs;
 import io.hops.metadata.yarn.entity.YarnProjectsDailyCost;
 import io.hops.metadata.yarn.entity.YarnProjectsDailyId;
 import io.hops.metadata.yarn.entity.YarnProjectsQuota;
@@ -99,11 +99,11 @@ public class QuotaScheduler implements Runnable {
                             connector.beginTransaction();
                             connector.writeLock();
 
-                            //Get Data  ** YarnContainersLogs **
-                            YarnContainersLogsDataAccess _csDA
-                            = (YarnContainersLogsDataAccess) RMStorageFactory.
-                            getDataAccess(YarnContainersLogsDataAccess.class);
-                            Map<String, YarnContainersLogs> hopYarnContainersLogs
+                            //Get Data  ** ContainersLogs **
+                            ContainersLogsDataAccess _csDA
+                            = (ContainersLogsDataAccess) RMStorageFactory.
+                            getDataAccess(ContainersLogsDataAccess.class);
+                            Map<String, ContainersLogs> hopContainersLogs
                             = _csDA.getAll();
 
                             //Get Data  ** YarnProjectsQuota **
@@ -121,19 +121,19 @@ public class QuotaScheduler implements Runnable {
                             Map<YarnProjectsDailyId, YarnProjectsDailyCost> chargedYarnProjectsDailyCost
                             = new HashMap<YarnProjectsDailyId, YarnProjectsDailyCost>();
                             
-                            List<YarnContainersLogs> toBeRemovedYarnContainersLogs
-                            = new ArrayList<YarnContainersLogs>();
-                            List<YarnContainersLogs> toBeModifiedYarnContainersLogs
-                            = new ArrayList<YarnContainersLogs>();
+                            List<ContainersLogs> toBeRemovedContainersLogs
+                            = new ArrayList<ContainersLogs>();
+                            List<ContainersLogs> toBeModifiedContainersLogs
+                            = new ArrayList<ContainersLogs>();
 
                             // Calculate the quota 
-                            LOG.debug("RIZ:: YarnContainersLogs count : "
-                                    + hopYarnContainersLogs.size());                            
-                            for (YarnContainersLogs _ycl
-                            : hopYarnContainersLogs.values()) {
+                            LOG.debug("RIZ:: ContainersLogs count : "
+                                    + hopContainersLogs.size());                            
+                            for (ContainersLogs _ycl
+                            : hopContainersLogs.values()) {
 
                               // Get ApplicationId from ContainerId
-                              LOG.debug("RIZ:: YarnContainersLogs entry : "
+                              LOG.debug("RIZ:: ContainersLogs entry : "
                                       + _ycl.toString());
                               ContainerId _cId = ConverterUtils.toContainerId(
                                       _ycl.getContainerid());
@@ -157,8 +157,9 @@ public class QuotaScheduler implements Runnable {
                                     applicationStateCache
                                     = new HashMap<String, String>();
                                   }
+                                  _appUser = _appStat.getUser();
                                   applicationStateCache.put(_appId.toString(),
-                                          _appStat.getUser());                                  
+                                          _appUser);          
                                 }
                               }
 
@@ -173,15 +174,15 @@ public class QuotaScheduler implements Runnable {
 
                               // Decide what to do with the charge
                               if (_charge > 0) {
-                                if (_ycl.getState()
+                                if (_ycl.getExitstatus()
                                 == ContainerExitStatus.CONTAINER_RUNNING_STATE) {
                                   //>> Edit log entry + Increase Quota
-                                  toBeModifiedYarnContainersLogs.add(
-                                          new YarnContainersLogs(_ycl.
+                                  toBeModifiedContainersLogs.add(
+                                          new ContainersLogs(_ycl.
                                                   getContainerid(),
-                                                  _ycl.getState(),
                                                   _ycl.getStop(),
-                                                  _ycl.getStop()));
+                                                  _ycl.getStop(),
+                                                  _ycl.getExitstatus()));
                                   //** YarnProjectsQuota charging**
                                   chargeYarnProjectsQuota(
                                           chargedYarnProjectsQuota,
@@ -193,18 +194,18 @@ public class QuotaScheduler implements Runnable {
                                           chargedYarnProjectsDailyCost,
                                           _projectid, _user, _day, _charge);
                                   
-                                } else if (_ycl.getState()
+                                } else if (_ycl.getExitstatus()
                                 == ContainerExitStatus.ABORTED || _ycl.
-                                getState() == ContainerExitStatus.DISKS_FAILED
-                                || _ycl.getState()
+                                getExitstatus()== ContainerExitStatus.DISKS_FAILED
+                                || _ycl.getExitstatus()
                                 == ContainerExitStatus.PREEMPTED) {
                                   //>> Delete log entry
-                                  toBeRemovedYarnContainersLogs.add(
-                                          (YarnContainersLogs) _ycl);                                  
+                                  toBeRemovedContainersLogs.add(
+                                          (ContainersLogs) _ycl);                                  
                                 } else {
                                   //>> Delete log entry + Increase Quota                                   
-                                  toBeRemovedYarnContainersLogs.add(
-                                          (YarnContainersLogs) _ycl);
+                                  toBeRemovedContainersLogs.add(
+                                          (ContainersLogs) _ycl);
                                   //** YarnProjectsQuota charging**
                                   chargeYarnProjectsQuota(
                                           chargedYarnProjectsQuota,
@@ -220,9 +221,9 @@ public class QuotaScheduler implements Runnable {
                               }                              
                             }
 
-                            // Deleta/Modify the ** YarnContainersLogs **
-                            _csDA.removeAll(toBeRemovedYarnContainersLogs);
-                            _csDA.addAll(toBeModifiedYarnContainersLogs);
+                            // Deleta/Modify the ** ContainersLogs **
+                            _csDA.removeAll(toBeRemovedContainersLogs);
+                            _csDA.addAll(toBeModifiedContainersLogs);
 
                             // Show all charged project
                             if (LOG.isDebugEnabled()) {
@@ -251,17 +252,16 @@ public class QuotaScheduler implements Runnable {
                 Thread.currentThread().sleep(1000);
       } catch (InterruptedException ex) {
         //Logger.getLogger(QuotaScheduler.class.getName()).log(Level.SEVERE, null, ex);
-        LOG.info("Schedular thread is exiting with exception" + ex.getMessage());
+        LOG.error("Schedular thread is exiting with exception" + ex.getMessage());
       } catch (StorageInitializtionException ex) {
-        //LOG.error(ex);
+        LOG.error(ex,ex);
       } catch (StorageException ex) {
-        //LOG.error(ex);
+        LOG.error(ex,ex);
       } catch (IOException ex) {
-        Logger.getLogger(QuotaScheduler.class.getName()).log(Level.SEVERE, null,
-                ex);
+        LOG.error(ex,ex);
       }
     }
-    LOG.info("Schedular thread is exiting gracefully");
+    LOG.info("Scheduler thread is exiting gracefully");
   }
   
   Map<YarnProjectsDailyId, YarnProjectsDailyCost> projectsDailyCostCache;  
@@ -270,21 +270,19 @@ public class QuotaScheduler implements Runnable {
   private void chargeYarnProjectsDailyCost(
           Map<YarnProjectsDailyId, YarnProjectsDailyCost> chargedYarnProjectsDailyCost,
           String _projectid, String _user, long _day, long _charge) {
-    
+    LOG.info("Quota: project " + _projectid  + " user " + _user + " has used " + _charge);
     if (cashDay != _day) {
       projectsDailyCostCache
               = new HashMap<YarnProjectsDailyId, YarnProjectsDailyCost>();
+      cashDay = _day;
     }
     
     YarnProjectsDailyId _key = new YarnProjectsDailyId(_projectid, _user, _day);
     YarnProjectsDailyCost _tempPdc
             = projectsDailyCostCache.get(_key);
-    
+
     if (_tempPdc == null) {
-      
-      if (_tempPdc == null) {
-        _tempPdc = new YarnProjectsDailyCost(_projectid, _projectid, _day, 0);
-      }
+      _tempPdc = new YarnProjectsDailyCost(_projectid, _user, _day, 0);
       projectsDailyCostCache.put(_key, _tempPdc);
     }
     
@@ -311,7 +309,7 @@ public class QuotaScheduler implements Runnable {
           Map<String, YarnProjectsQuota> chargedYarnProjectsQuota,
           Map<String, YarnProjectsQuota> hopYarnProjectsQuotaList,
           String _projectid, long _charge) {
-    
+    LOG.info("Quota: project " + _projectid + " has used " + _charge);
     YarnProjectsQuota _tempPq = (YarnProjectsQuota) hopYarnProjectsQuotaList.
             get(_projectid);
     if (_tempPq != null) {

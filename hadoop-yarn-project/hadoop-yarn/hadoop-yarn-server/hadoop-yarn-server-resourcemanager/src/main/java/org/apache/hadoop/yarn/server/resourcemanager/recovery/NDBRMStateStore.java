@@ -15,8 +15,9 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.recovery;
 
+import io.hops.exception.StorageException;
 import io.hops.metadata.util.RMUtilities;
-import io.hops.metadata.yarn.dal.rmstatestore.UpdatedNodeDataAccess;
+import io.hops.metadata.yarn.dal.util.YARNOperationType;
 import io.hops.metadata.yarn.entity.AppSchedulingInfo;
 import io.hops.metadata.yarn.entity.ContainerId;
 import io.hops.metadata.yarn.entity.FinishedApplications;
@@ -25,6 +26,7 @@ import io.hops.metadata.yarn.entity.rmstatestore.UpdatedNode;
 import io.hops.metadata.yarn.entity.rmstatestore.DelegationKey;
 import io.hops.metadata.yarn.entity.rmstatestore.DelegationToken;
 import io.hops.metadata.yarn.entity.rmstatestore.RanNode;
+import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -56,10 +58,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.hadoop.yarn.api.records.NMToken;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
-import org.apache.hadoop.yarn.webapp.hamlet.Hamlet;
 
 /**
  * MySQL Cluster implementation of the RMStateStore abstract class.
@@ -122,47 +122,61 @@ public class NDBRMStateStore extends RMStateStore {
   }
 
   @Override
-  public RMState loadState(RMContext rmContext) throws Exception {
-    RMState rmState = new RMState();
-    // recover DelegationTokenSecretManager
-    loadRMDTSecretManagerState(rmState);
-    // recover RM applications
-    loadRMAppState(rmState);
-    loadNMTokenSecretMamagerCurrentKey(rmState);
-    loadAppSchedulingInfos(rmState);
-    loadAllocateResponses(rmState, rmContext);
-    loadRPCs(rmState);
-    loadSchedulerApplications(rmState);
-    loadFiCaSchedulerNodes(rmState);
-    loadLaunchedContainers(rmState);
-    loadSchedulingOpportunities(rmState);
-    loadLastScheduleddContainers(rmState);
-    loadRereservations(rmState);
-    loadReservedContainers(rmState);
-    loadResourceRequests(rmState);
-    loadBlackLists(rmState);
-    loadAllQueueMetrics(rmState);
-    loadNodeHeartBeatResponses(rmState);
-    loadContainersToClean(rmState);
-    loadFinishedApplications(rmState);
-    loadNodesResources(rmState);
-    loadAllContainers(rmState);
-    loadAllRMContainers(rmState);
-    loadAllRMContextActiveNodes(rmState);
-    loadAllRMNodes(rmState);
-    loadAllRMNodesNextHeartbeat(rmState);
-    loadAllNodes(rmState);
-    loadRMContextInactiveNodes(rmState);
-    loadAllUpdatedContainerInfos(rmState);
-    loadAllContainerStatus(rmState);
-    loadAllJustLaunchedContainers(rmState);
-    loadAllCSQueues(rmState);
-    loadAllCSLeafQueueUserInfo(rmState);
+  public RMState loadState(final RMContext rmContext) throws Exception {
+    final RMState rmState = new RMState();
+
+    LightWeightRequestHandler loadStateHandler = new LightWeightRequestHandler(
+            YARNOperationType.TEST) {
+              @Override
+              public Object performTask() throws StorageException, IOException {
+                connector.beginTransaction();
+                connector.readLock();
+                // recover DelegationTokenSecretManager
+                loadRMDTSecretManagerState(rmState);
+                // recover RM applications
+                loadRMAppState(rmState);
+                loadNMTokenSecretMamagerCurrentKey(rmState);
+                loadAppSchedulingInfos(rmState);
+                loadAllocateResponses(rmState, rmContext);
+                loadRPCs(rmState);
+                loadPendingEvents(rmState);
+                loadSchedulerApplications(rmState);
+                loadFiCaSchedulerNodes(rmState);
+                loadLaunchedContainers(rmState);
+                loadSchedulingOpportunities(rmState);
+                loadLastScheduleddContainers(rmState);
+                loadRereservations(rmState);
+                loadReservedContainers(rmState);
+                loadResourceRequests(rmState);
+                loadBlackLists(rmState);
+                loadAllQueueMetrics(rmState);
+                loadNodeHeartBeatResponses(rmState);
+                loadContainersToClean(rmState);
+                loadFinishedApplications(rmState);
+                loadNodesResources(rmState);
+                loadAllContainers(rmState);
+                loadAllRMContainers(rmState);
+                loadAllRMContextActiveNodes(rmState);
+                loadAllRMNodes(rmState);
+                loadAllRMNodesNextHeartbeat(rmState);
+                loadAllNodes(rmState);
+                loadRMContextInactiveNodes(rmState);
+                loadAllUpdatedContainerInfos(rmState);
+                loadAllContainerStatus(rmState);
+                loadAllJustLaunchedContainers(rmState);
+                loadAllCSQueues(rmState);
+                loadAllCSLeafQueueUserInfo(rmState);
+                LOG.info("loaded rmState");
+                connector.commit();
+                return null;
+              }
+            };
+    loadStateHandler.handle();
     return rmState;
   }
 
-  private synchronized void loadRMDTSecretManagerState(RMState rmState)
-      throws Exception {
+  private synchronized void loadRMDTSecretManagerState(RMState rmState) 
+          throws IOException {
     loadRMDelegationKeyState(rmState);
     loadRMSequentialNumberState(rmState);
     loadRMDelegationTokenState(rmState);
@@ -268,7 +282,8 @@ public class NDBRMStateStore extends RMStateStore {
    * @param rmState
    * @throws Exception
    */
-  private synchronized void loadRMAppState(RMState rmState) throws Exception {
+  private synchronized void loadRMAppState(RMState rmState) 
+          throws IOException  {
     //Retrieve all applicationIds from NDB
     List<io.hops.metadata.yarn.entity.rmstatestore.ApplicationState> appStates =
         RMUtilities.getApplicationStates();
@@ -321,6 +336,10 @@ public class NDBRMStateStore extends RMStateStore {
    
   private void loadRPCs(RMState rmState) throws IOException {
     rmState.appMasterRPCs = RMUtilities.getAppMasterRPCs();
+  }
+  
+  private void loadPendingEvents(RMState rmState) throws IOException{
+    rmState.pendingEvents = RMUtilities.getAllPendingEvents();
   }
   
   private void loadAppSchedulingInfos(RMState rmState) throws IOException {
@@ -471,7 +490,7 @@ public class NDBRMStateStore extends RMStateStore {
   private void loadAllCSLeafQueueUserInfo(RMState rmState) throws IOException{
     rmState.allCSLeafQueueUserInfo = RMUtilities.getAllCSLeafQueueUserInfo();
   }
-  private void loadRMDelegationKeyState(RMState rmState) throws Exception {
+  private void loadRMDelegationKeyState(RMState rmState) throws IOException {
     //Retrieve all DelegationKeys from NDB
     List<DelegationKey> delKeys = RMUtilities.getDelegationKeys();
     if (delKeys != null) {
@@ -499,7 +518,7 @@ public class NDBRMStateStore extends RMStateStore {
    * @param rmState
    * @throws Exception
    */
-  private void loadRMSequentialNumberState(RMState rmState) throws Exception {
+  private void loadRMSequentialNumberState(RMState rmState) throws IOException {
     Integer seqNumber = RMUtilities.getRMSequentialNumber(SEQNUMBER_ID);
     if (seqNumber != null) {
       rmState.rmSecretManagerState.dtSequenceNumber = seqNumber;
@@ -512,7 +531,7 @@ public class NDBRMStateStore extends RMStateStore {
    * @param rmState
    * @throws Exception
    */
-  private void loadRMDelegationTokenState(RMState rmState) throws Exception {
+  private void loadRMDelegationTokenState(RMState rmState) throws IOException {
     //Retrieve all DelegatioTokenIds from NDB
     List<DelegationToken> delTokens = RMUtilities.getDelegationTokens();
     if (delTokens != null) {
@@ -547,7 +566,7 @@ public class NDBRMStateStore extends RMStateStore {
    * @throws Exception
    */
   private void loadApplicationAttemptState(ApplicationState appState,
-      ApplicationId appId) throws Exception {
+      ApplicationId appId) throws IOException {
     if (allHopApplicationAttemptStates == null) {
       allHopApplicationAttemptStates = RMUtilities.
           getAllApplicationAttemptStates();
@@ -604,7 +623,7 @@ public class NDBRMStateStore extends RMStateStore {
           appState.attempts.put(attemptState.getAttemptId(), attemptState);
         }
       }
-      LOG.info("Done Loading applications from NDB state store");
+      LOG.debug("Done Loading applications from NDB state store");
     }
   }
 

@@ -82,13 +82,17 @@ public class transactionStateWrapper extends TransactionStateImpl {
     String key = type.getDeclaringClass().getName()+ "." + type.name();
 
     Queue<Long> queue = handleStarts.get(key);
-    if(queue==null){
-      queue = new LinkedBlockingQueue<Long>();
-      queue.add(System.currentTimeMillis());
-      handleStarts.put(key, queue);
-    }else{
-      queue.add(System.currentTimeMillis());
+    if (queue == null) {
+      synchronized (handleStarts) {
+        queue = handleStarts.get(key);
+        if (queue == null) {
+          queue = new LinkedBlockingQueue<Long>();
+          handleStarts.put(key, queue);
+        }
+      }
     }
+    queue.add(System.currentTimeMillis());
+    
     ts.incCounter(type);
     rpcCounter.incrementAndGet();
   }
@@ -139,28 +143,30 @@ public class transactionStateWrapper extends TransactionStateImpl {
     return rpcType;
   }
   
-  public String getRunningEvents(){
-    int nbStart =0;
-    int nbFinished =0;
-    for(String key: handleStarts.keySet()){
-      for(long val: handleStarts.get(key)){
-        nbStart++;
+  public String getRunningEvents() {
+    int nbRunning = 0;
+    int nbFinished = 0;
+    for (String key : handleStarts.keySet()) {
+      for (long val : handleStarts.get(key)) {
+        nbRunning++;
       }
     }
-    for(String key: handleDurations.keySet()){
-      for(long val: handleDurations.get(key)){
-        nbStart++;
+    for (String key : handleDurations.keySet()) {
+      for (long val : handleDurations.get(key)) {
+        nbFinished++;
       }
     }
-    String result = "nb started events: " + nbStart + " nb finished events " + nbFinished + " still running: ";
-    for(String key: handleStarts.keySet()){
-      if(!handleDurations.containsKey(key)){
-        result = result + ", " +  key;
+    String result = "nb running events: " + nbRunning + " nb finished events "
+            + nbFinished + " still running: ";
+    for (String key : handleStarts.keySet()) {
+      if (handleStarts.get(key).size() > 0) {
+        result = result + ", " + key;
       }
     }
-      result = result + " all: ";
-    for(String key: handleStarts.keySet()){  
-      result = result + ", " + key;
+    result = result + " finished: ";
+    for (String key : handleDurations.keySet()) {
+      result = result + ", " + key + " (" + handleDurations.get(key).size()
+              + ")";
     }
     return result;
   }

@@ -16,6 +16,7 @@
 package io.hops.ha.common;
 
 import io.hops.StorageConnector;
+import io.hops.common.GlobalThreadPool;
 import io.hops.exception.StorageException;
 import io.hops.metadata.util.RMStorageFactory;
 import io.hops.metadata.util.RMUtilities;
@@ -51,6 +52,7 @@ import io.hops.metadata.yarn.entity.LaunchedContainers;
 import io.hops.metadata.yarn.entity.PendingEvent;
 import io.hops.metadata.yarn.entity.RMContainer;
 import io.hops.metadata.yarn.entity.RMNode;
+import io.hops.metadata.yarn.entity.RMNodeToAdd;
 import io.hops.metadata.yarn.entity.Resource;
 import io.hops.metadata.yarn.entity.rmstatestore.AllocateResponse;
 import io.hops.metadata.yarn.entity.rmstatestore.ApplicationAttemptState;
@@ -163,13 +165,12 @@ public class TransactionStateImpl extends TransactionState {
   NodeId nodeId = null;
   private TransactionStateManager manager =null;
   
-  //FOR TESTING
    public TransactionStateImpl(TransactionType type) {
     super(1, false);
     this.type = type;
     this.schedulerApplicationInfo =
       new SchedulerApplicationInfo(this);
-    manager = new TransactionStateManager(new YarnConfiguration());
+    manager = new TransactionStateManager();
   }
    
   public TransactionStateImpl(TransactionType type, int initialCounter,
@@ -188,7 +189,7 @@ public class TransactionStateImpl extends TransactionState {
       RMUtilities.putTransactionStateInQueues(this, rmNodesToUpdate.keySet(), appIds);
       RMUtilities.logPutInCommitingQueue(this);
     }
-    manager.getExecutorService().execute(new RPCFinisher(this));
+    GlobalThreadPool.getExecutorService().execute(new RPCFinisher(this));
   }
 
   public FairSchedulerNodeInfo getFairschedulerNodeInfo() {
@@ -523,7 +524,7 @@ public class TransactionStateImpl extends TransactionState {
               toPersist.getProto().toByteArray(), allocatedContainers, 
       allocateResponse.getAllocateResponse().getResponseId(), completedContainersStatuses));
       if(toPersist.getProto().toByteArray().length>1000){
-        LOG.info("add allocateResponse of size " + toPersist.getProto().toByteArray().length + 
+        LOG.debug("add allocateResponse of size " + toPersist.getProto().toByteArray().length + 
                 " for " + id + " content: " + print(toPersist));
       }
       allocateResponsesToRemove.remove(id);
@@ -697,7 +698,14 @@ public class TransactionStateImpl extends TransactionState {
             rmnodeToAdd.getNodeManagerVersion(), -1,
             ((RMNodeImpl) rmnodeToAdd).getUpdatedContainerInfoId(),
             pendingEventId);
-    this.rmNodesToUpdate.put(rmnodeToAdd.getNodeID().toString(), hopRMNode);
+    
+    RMNodeToAdd hopRMNodeToAdd = getRMContextInfo().getToAddActiveRMNode(rmnodeToAdd.getNodeID());
+    if(hopRMNodeToAdd==null){
+      this.rmNodesToUpdate.put(rmnodeToAdd.getNodeID().toString(),
+              hopRMNode);
+    } else {
+      hopRMNodeToAdd.setRMNode(hopRMNode);
+    }
   }
 
   public Map<String, RMNode> getRMNodesToUpdate(){

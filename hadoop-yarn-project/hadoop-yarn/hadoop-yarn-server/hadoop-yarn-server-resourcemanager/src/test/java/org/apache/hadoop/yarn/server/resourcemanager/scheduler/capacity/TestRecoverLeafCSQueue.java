@@ -275,7 +275,7 @@ public class TestRecoverLeafCSQueue {
             getAbsoluteUsedCapacity(), DELTA);
 
     Collection<CSLeafQueueUserInfo> recoverCSLeafQueueUser = RMUtilities.
-            getAllCSLeafQueueUserInfo().values();
+            getAllCSLeafQueueUserInfoFullTransaction().values();
 
     for (UserInfo userInfo : a.getUsers()) {
 

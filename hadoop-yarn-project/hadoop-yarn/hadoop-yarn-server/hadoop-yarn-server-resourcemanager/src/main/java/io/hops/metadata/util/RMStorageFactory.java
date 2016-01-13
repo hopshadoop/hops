@@ -55,6 +55,7 @@ import java.net.URLClassLoader;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
 
 public class RMStorageFactory {
 
@@ -68,11 +69,23 @@ public class RMStorageFactory {
     return dStorageFactory.getConnector();
   }
 
-  public static void kickTheNdbEventStreamingAPI() throws
+  public static void kickTheNdbEventStreamingAPI(boolean isLeader,
+          Configuration conf) throws
           StorageInitializtionException {
     dNdbEventStreaming = DalDriver.loadHopsNdbEventStreamingLib(
             YarnAPIStorageFactory.NDB_EVENT_STREAMING_FOR_DISTRIBUTED_SERVICE);
-    dNdbEventStreaming.startHopsNdbEvetAPISession();
+    
+    String connectionString = dStorageFactory.getConnector().getClusterConnectString() + ":" + 
+            conf.getInt(YarnConfiguration.HOPS_NDB_EVENT_STREAMING_DB_PORT, YarnConfiguration.DEFAULT_HOPS_NDB_EVENT_STREAMING_DB_PORT);
+    
+    dNdbEventStreaming.init(conf.get(
+            YarnConfiguration.EVENT_SHEDULER_CONFIG_PATH,
+            YarnConfiguration.DEFAULT_EVENT_SHEDULER_CONFIG_PATH), conf.get(
+                    YarnConfiguration.EVENT_RT_CONFIG_PATH,
+                    YarnConfiguration.DEFAULT_EVENT_RT_CONFIG_PATH),
+            connectionString, dStorageFactory.getConnector().getDatabaseName()
+            );
+    dNdbEventStreaming.startHopsNdbEvetAPISession(isLeader);
   }
   
   public static void setConfiguration(Configuration conf)

@@ -24,7 +24,7 @@ import io.hops.metadata.util.YarnAPIStorageFactory;
 import io.hops.metadata.yarn.TablesDef;
 import io.hops.metadata.yarn.dal.ContainerStatusDataAccess;
 import io.hops.metadata.yarn.dal.RMNodeDataAccess;
-import io.hops.metadata.yarn.dal.YarnContainersLogsDataAccess;
+import io.hops.metadata.yarn.dal.ContainersLogsDataAccess;
 import io.hops.metadata.yarn.dal.YarnProjectsDailyCostDataAccess;
 import io.hops.metadata.yarn.dal.YarnProjectsQuotaDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.ApplicationAttemptStateDataAccess;
@@ -32,7 +32,7 @@ import io.hops.metadata.yarn.dal.rmstatestore.ApplicationStateDataAccess;
 import io.hops.metadata.yarn.dal.util.YARNOperationType;
 import io.hops.metadata.yarn.entity.ContainerStatus;
 import io.hops.metadata.yarn.entity.RMNode;
-import io.hops.metadata.yarn.entity.YarnContainersLogs;
+import io.hops.metadata.yarn.entity.ContainersLogs;
 import io.hops.metadata.yarn.entity.YarnProjectsDailyCost;
 import io.hops.metadata.yarn.entity.YarnProjectsQuota;
 import io.hops.metadata.yarn.entity.rmstatestore.ApplicationAttemptState;
@@ -81,7 +81,7 @@ public class TestQuotaSchedulerService {
     RMUtilities.InitializeDB();
   }
 
-  @Test
+
   public void PrepareScenario() throws StorageException, IOException {
     LOG.info("--- START: TestContainerUsage ---");
     LOG.info("--- Checking ContainerStatus ---");
@@ -91,20 +91,6 @@ public class TestQuotaSchedulerService {
       final List<RMNode> hopRMNode = new ArrayList<RMNode>();
       hopRMNode.add(new RMNode("Andromeda3:51028"));
 
-      final List<ContainerStatus> hopContainersStatus
-              = new ArrayList<ContainerStatus>();
-      hopContainersStatus.add(new ContainerStatus(
-              "container_1450009406746_0001_01_000001",
-              TablesDef.ContainerStatusTableDef.STATE_RUNNING, "", -1000,
-              "Andromeda3:51028", 10));
-      hopContainersStatus.add(new ContainerStatus(
-              "container_1450009406746_0001_02_000001",
-              TablesDef.ContainerStatusTableDef.STATE_RUNNING, "", -1000,
-              "Andromeda3:51028", 10));
-      hopContainersStatus.add(new ContainerStatus(
-              "container_1450009406746_0001_03_000001",
-              TablesDef.ContainerStatusTableDef.STATE_RUNNING, "", -1000,
-              "Andromeda3:51028", 10));
 
       final List<ApplicationState> hopApplicationState
               = new ArrayList<ApplicationState>();
@@ -112,25 +98,18 @@ public class TestQuotaSchedulerService {
               "application_1450009406746_0001", new byte[0], "Project07__rizvi",
               "DistributedShell", "FINISHING"));
 
-      final List<ApplicationAttemptState> hopApplicationAttemptState
-              = new ArrayList<ApplicationAttemptState>();
-      hopApplicationAttemptState.add(new ApplicationAttemptState(
-              "application_1450009406746_0001",
-              "appattempt_1450009406746_0001_000001", new byte[0],
-              "Andromeda3/127.0.1.1", -1, null,
-              "http://Andromeda3:44842/proxy/application_1450009406746_0001/A"));
 
-      final List<YarnContainersLogs> hopYarnContainersLogs
-              = new ArrayList<YarnContainersLogs>();
-      hopYarnContainersLogs.add(new YarnContainersLogs(
+      final List<ContainersLogs> hopContainersLogs
+              = new ArrayList<ContainersLogs>();
+      hopContainersLogs.add(new ContainersLogs(
               "container_1450009406746_0001_01_000001",
-              ContainerExitStatus.SUCCESS, 10, 11));
-      hopYarnContainersLogs.add(new YarnContainersLogs(
+              10, 11, ContainerExitStatus.SUCCESS));
+      hopContainersLogs.add(new ContainersLogs(
               "container_1450009406746_0001_02_000001",
-              ContainerExitStatus.ABORTED, 10, 11));
-      hopYarnContainersLogs.add(new YarnContainersLogs(
+              10, 11, ContainerExitStatus.ABORTED));
+      hopContainersLogs.add(new ContainersLogs(
               "container_1450009406746_0001_03_000001",
-              ContainerExitStatus.CONTAINER_RUNNING_STATE, 10, 11));
+              10, 11, ContainerExitStatus.CONTAINER_RUNNING_STATE));
 
       final List<YarnProjectsQuota> hopYarnProjectsQuota
               = new ArrayList<YarnProjectsQuota>();
@@ -154,25 +133,17 @@ public class TestQuotaSchedulerService {
                   getDataAccess(RMNodeDataAccess.class);
           _rmDA.addAll(hopRMNode);
 
-          ContainerStatusDataAccess _csDA
-                  = (ContainerStatusDataAccess) RMStorageFactory.getDataAccess(
-                          ContainerStatusDataAccess.class);
-          _csDA.addAll(hopContainersStatus);
 
           ApplicationStateDataAccess<ApplicationState> _appState
                   = (ApplicationStateDataAccess) RMStorageFactory.getDataAccess(
                           ApplicationStateDataAccess.class);
           _appState.addAll(hopApplicationState);
 
-          ApplicationAttemptStateDataAccess<ApplicationAttemptState> _appAttempt
-                  = (ApplicationAttemptStateDataAccess) RMStorageFactory.
-                  getDataAccess(ApplicationAttemptStateDataAccess.class);
-          _appAttempt.addAll(hopApplicationAttemptState);
 
-          YarnContainersLogsDataAccess<YarnContainersLogs> _clDA
-                  = (YarnContainersLogsDataAccess) RMStorageFactory.
-                  getDataAccess(YarnContainersLogsDataAccess.class);
-          _clDA.addAll(hopYarnContainersLogs);
+          ContainersLogsDataAccess<ContainersLogs> _clDA
+                  = (ContainersLogsDataAccess) RMStorageFactory.
+                  getDataAccess(ContainersLogsDataAccess.class);
+          _clDA.addAll(hopContainersLogs);
 
           YarnProjectsQuotaDataAccess<YarnProjectsQuota> _pqDA
                   = (YarnProjectsQuotaDataAccess) RMStorageFactory.
@@ -234,6 +205,7 @@ public class TestQuotaSchedulerService {
       }
 
     } catch (Exception e) {
+      LOG.error(e, e);
     }
     return false;
   }
@@ -292,13 +264,13 @@ public class TestQuotaSchedulerService {
       PrepareScenario();
 
       // Run the schedulat
-      QuotaSchedulerService qs = new QuotaSchedulerService("SimpleSchedular");
+      QuotaSchedulerService qs = new QuotaSchedulerService();
       qs.serviceStart();
       Thread.currentThread().sleep(9000);
       qs.serviceStop();
 
       Assert.assertTrue(
-              "Schedulars primary operation failed. Inconsistent data in YarnProjectsQuota",
+              "Schedulers primary operation failed. Inconsistent data in YarnProjectsQuota",
               CheckProject());
       Assert.assertTrue(
               "Schedulars primary operation failed. Inconsistent data in YarnProjectsDailyCost",

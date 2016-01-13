@@ -151,15 +151,8 @@ public class ResourceTrackerService extends AbstractService
             YarnConfiguration.RM_NODEMANAGER_MINIMUM_VERSION,
             YarnConfiguration.DEFAULT_RM_NODEMANAGER_MINIMUM_VERSION);
 
-    if (conf.getBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED,
-            YarnConfiguration.DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED)) {
-      if (conf.getBoolean(YarnConfiguration.HOPS_NDB_RT_EVENT_STREAMING_ENABLED,
-              YarnConfiguration.DEFAULT_HOPS_NDB_RT_EVENT_STREAMING_ENABLED)) {
-        LOG.info("Resource tracker streaming porcessor is straring ...");
-        RMStorageFactory.kickTheNdbEventStreamingAPI();
+    if (rmContext.isDistributedEnabled()) {
         rtStreamingProcessor = new NdbRtStreamingProcessor(rmContext);
-        new Thread(rtStreamingProcessor).start();
-      }
 
     }
     super.serviceInit(conf);
@@ -175,6 +168,15 @@ public class ResourceTrackerService extends AbstractService
     LOG.debug(
             "starting ResourceTrackerService server on "
             + resourceTrackerAddress);
+    
+    if (rmContext.isDistributedEnabled() && !rmContext.
+            getGroupMembershipService().isLeader()) {
+        LOG.info("streaming porcessor is straring for resource tracker");
+        RMStorageFactory.kickTheNdbEventStreamingAPI(false, conf);
+        new Thread(rtStreamingProcessor).start();
+
+    }
+    
     this.server = rpc.getServer(ResourceTracker.class, this,
             resourceTrackerAddress, conf,
             null, conf.getInt(
@@ -202,6 +204,8 @@ public class ResourceTrackerService extends AbstractService
 
   @Override
   protected void serviceStop() throws Exception {
+    LOG.info("stopping ResourceTrackerService server on "
+            + resourceTrackerAddress);
     if (this.server != null) {
       this.server.stop();
     }
@@ -264,14 +268,13 @@ public class ResourceTrackerService extends AbstractService
   @Override
   public RegisterNodeManagerResponse registerNodeManager(
           RegisterNodeManagerRequest request) throws YarnException, IOException {
-    return registerNodeManager(request, null,
-            conf.getBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED,
-                    YarnConfiguration.DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED));
+    return registerNodeManager(request, null);
   }
 
   public RegisterNodeManagerResponse registerNodeManager(
-          RegisterNodeManagerRequest request, Integer rpcID,
-          boolean isDistributedRTEnabled) throws YarnException, IOException {
+          RegisterNodeManagerRequest request, Integer rpcID) 
+          throws YarnException, IOException {
+    
     RegisterNodeManagerResponse response = recordFactory.newRecordInstance(
             RegisterNodeManagerResponse.class);
     NodeId nodeId = request.getNodeId();
@@ -354,15 +357,15 @@ public class ResourceTrackerService extends AbstractService
             resolve(host),
             ResourceOption.newInstance(capability,
                     RMNode.OVER_COMMIT_TIMEOUT_MILLIS_DEFAULT),
-            nodeManagerVersion,
-            conf.getBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED,
-                    YarnConfiguration.DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED));
+            nodeManagerVersion);
 
     int pendingEventId = ((TransactionStateImpl) transactionState)
             .getRMNodeInfo(nodeId).getPendingId();
-    if (isDistributedRTEnabled) {
+    //TODO what is this code?! oldNodeExists is always false and there seem to be a lot of code duplication
+    if (rmContext.isDistributedEnabled()) {
       if (!oldNodeExists) {
-        LOG.info("HOP :: Registering new node at: " + host);
+        LOG.info("HOP :: Registering new node at: " + host + " nodeId " +
+                nodeId);
         this.rmContext.getActiveRMNodes().put(nodeId, rmNode);
         ((TransactionStateImpl) transactionState).getRMContextInfo().
                 toAddActiveRMNode(nodeId, rmNode, pendingEventId);
@@ -377,10 +380,9 @@ public class ResourceTrackerService extends AbstractService
         LOG.info("Reconnect from the node at: " + host);
         this.nmLivelinessMonitor.unregister(nodeId);
         load--;
-        if (conf.getBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED,
-                YarnConfiguration.DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED)) {
+        if (rmContext.isDistributedEnabled()) {
           ((TransactionStateImpl) transactionState).getRMContextInfo().
-                  updateLoad(rmContext.getRMGroupMembershipService().
+                  updateLoad(rmContext.getGroupMembershipService().
                           getHostname(), load);
         }
         this.rmContext.getDispatcher().getEventHandler()
@@ -405,10 +407,9 @@ public class ResourceTrackerService extends AbstractService
         LOG.info("Reconnect from the node at: " + host);
         this.nmLivelinessMonitor.unregister(nodeId);
         load--;
-        if (conf.getBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED,
-                YarnConfiguration.DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED)) {
+        if (rmContext.isDistributedEnabled()) {
           ((TransactionStateImpl) transactionState).getRMContextInfo().
-                  updateLoad(rmContext.getRMGroupMembershipService().
+                  updateLoad(rmContext.getGroupMembershipService().
                           getHostname(), load);
         }
         this.rmContext.getDispatcher().getEventHandler()
@@ -422,10 +423,9 @@ public class ResourceTrackerService extends AbstractService
     this.nmTokenSecretManager.removeNodeKey(nodeId);
     this.nmLivelinessMonitor.register(nodeId);
     load++;
-    if (conf.getBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED,
-            YarnConfiguration.DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED)) {
+    if (rmContext.isDistributedEnabled()) {
       ((TransactionStateImpl) transactionState).getRMContextInfo()
-              .updateLoad(rmContext.getRMGroupMembershipService().getHostname(),
+              .updateLoad(rmContext.getGroupMembershipService().getHostname(),
                       load);
     }
     String message = "NodeManager from node " + host + "(cmPort: " + cmPort
@@ -451,8 +451,7 @@ public class ResourceTrackerService extends AbstractService
 
   public NodeHeartbeatResponse nodeHeartbeat(NodeHeartbeatRequest request,
           Integer rpcID) throws YarnException, IOException {
-    //TODO HOPS: If the RMNode is unknown, fetch from NDB first
-    
+
     NodeStatus remoteNodeStatus = request.getNodeStatus();
     NodeId nodeId = remoteNodeStatus.getNodeId();
 
@@ -468,6 +467,14 @@ public class ResourceTrackerService extends AbstractService
      */
     RMNode rmNode = this.rmContext.getActiveRMNodes().get(nodeId);
     // 1. Check if it's a registered node
+    if (rmContext.isDistributedEnabled() && rmNode == null) {
+      LOG.info("never saw this node " + nodeId + " geting it from db");
+      rmNode = RMUtilities.getRMNode(nodeId.toString(), rmContext, conf);
+      if (rmNode != null) {
+        this.rmContext.getActiveRMNodes().put(nodeId, rmNode);
+        this.nmLivelinessMonitor.register(nodeId);
+      }
+    }
     if (rmNode == null) {
       /*
        * node does not exist
@@ -511,6 +518,23 @@ public class ResourceTrackerService extends AbstractService
     // 3. Check if it's a 'fresh' heartbeat i.e. not duplicate heartbeat
     NodeHeartbeatResponse lastNodeHeartbeatResponse = rmNode.
             getLastNodeHeartBeatResponse();
+    if (rmContext.isDistributedEnabled() && 
+            lastNodeHeartbeatResponse.getResponseId() < remoteNodeStatus.
+            getResponseId()) {
+      LOG.info("my view of " + nodeId
+              + " is outdated lastNodeHeartbeatResponse: "
+              + lastNodeHeartbeatResponse.getResponseId()
+              + "hb: " + remoteNodeStatus.getResponseId() + " fetching from db");
+      rmNode = RMUtilities.getRMNode(nodeId.toString(), rmContext, conf);
+      if (rmNode != null) {
+        this.rmContext.getActiveRMNodes().put(nodeId, rmNode);
+        this.nmLivelinessMonitor.register(nodeId);
+      }
+      if (lastNodeHeartbeatResponse.getResponseId() < remoteNodeStatus.
+            getResponseId()) {
+        //TODO recover rpc?
+      }
+    }
     if (remoteNodeStatus.getResponseId() + 1 == lastNodeHeartbeatResponse.
             getResponseId()) {
       LOG.info(
@@ -541,7 +565,6 @@ public class ResourceTrackerService extends AbstractService
                     getResponseId() + 1, NodeAction.NORMAL, null, null, null,
                     null,
                     nextHeartBeatInterval);
-
     rmNode.updateNodeHeartbeatResponseForCleanup(nodeHeartBeatResponse,
             transactionState);
     nodeHeartBeatResponse.setNextheartbeat(((RMNodeImpl) rmNode).

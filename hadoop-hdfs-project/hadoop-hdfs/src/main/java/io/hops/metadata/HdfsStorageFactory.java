@@ -151,7 +151,7 @@ public class HdfsStorageFactory {
             .getBoolean(DFSConfigKeys.DFS_TRANSACTION_STATS_DETAILED_ENABLED,
                 DFSConfigKeys.DFS_TRANSACTION_STATS_DETAILED_ENABLED_DEFAULT));
     if (!isDALInitialized) {
-      HdfsVariables.registerDefaultValues();
+      HdfsVariables.registerDefaultValues(conf);
       addToClassPath(conf.get(DFSConfigKeys.DFS_STORAGE_DRIVER_JAR_FILE,
           DFSConfigKeys.DFS_STORAGE_DRIVER_JAR_FILE_DEFAULT));
       dStorageFactory = DalDriver.load(
