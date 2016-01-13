@@ -170,6 +170,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
   protected RMAppManager rmAppManager;//recovered
   protected ApplicationACLsManager applicationACLsManager;
   protected QueueACLsManager queueACLsManager;
+  protected ContainersLogsService containersLogsService;
   private WebApp webApp;
   private AppReportFetcher fetcher = null;
   protected ResourceTrackerService resourceTracker;
@@ -212,8 +213,8 @@ public class ResourceManager extends CompositeService implements Recoverable {
     this.rmContext = new RMContextImpl();
 
     this.rmContext.setDistributedEnabled(conf.getBoolean(
-            YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED,
-            YarnConfiguration.DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED));
+            YarnConfiguration.DISTRIBUTED_RM,
+            YarnConfiguration.DEFAULT_DISTRIBUTED_RM));
     
     transactionStateManager = new TransactionStateManager();
     addIfService(transactionStateManager);
@@ -271,7 +272,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
     } else {
       webAppAddress = WebAppUtils.getRMWebAppURLWithoutScheme(this.conf);
     }
-
+    
     this.rmLoginUGI = UserGroupInformation.getCurrentUser();
 
     createAndInitSchedulerServices();
@@ -992,14 +993,9 @@ public class ResourceManager extends CompositeService implements Recoverable {
     resetTransactionStateManager();  
     createAndInitSchedulerServices();  
     if (rmContext.isDistributedEnabled()) {
-      if (conf.getBoolean(YarnConfiguration.HOPS_NDB_EVENT_STREAMING_ENABLED,
-              YarnConfiguration.DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED)) {
         LOG.info("streaming porcessor is straring for scheduler");
         RMStorageFactory.kickTheNdbEventStreamingAPI(true, conf);
         eventRetriever = new NdbEventStreamingProcessor(rmContext, conf);
-      } else {
-        eventRetriever = new PendingEventRetrievalBatch(rmContext, conf);
-      }
     }
     // use rmLoginUGI to startActiveServices.
     // in non-secure model, rmLoginUGI will be current UGI
@@ -1054,6 +1050,16 @@ public class ResourceManager extends CompositeService implements Recoverable {
         getHostname());
   }
 
+  synchronized void transitionToLeadingRT(){
+    //create and start containersLogService
+    createAndStartContainersLogsService();
+  }
+  
+  synchronized void transitionToNonLeadingRT(){
+    //stop containersLogService
+    containersLogsService.stop();
+  }
+  
   @Override
   protected void serviceStart() throws Exception {
     try {
@@ -1072,6 +1078,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
     } else {
       LOG.info("HA not enabled");
       transitionToActive();
+      createAndStartContainersLogsService();
     }
 
     startWepApp();
@@ -1110,6 +1117,9 @@ public class ResourceManager extends CompositeService implements Recoverable {
     if (resourceTrackingService != null) {
       resourceTrackingService.stop();
     }
+    if (containersLogsService !=null){
+      containersLogsService.stop();
+    }
     super.serviceStop();
     LOG.info("transition to standby serviceStop");
     transitionToStandby(false);
@@ -1143,6 +1153,13 @@ public class ResourceManager extends CompositeService implements Recoverable {
 
   protected RMSecretManagerService createRMSecretManagerService() {
     return new RMSecretManagerService(conf, rmContext);
+  }
+  
+  protected void createAndStartContainersLogsService() {
+    containersLogsService = new ContainersLogsService();
+    containersLogsService.init(conf);
+    rmContext.setContainersLogsService(containersLogsService);
+    containersLogsService.start();
   }
 
   @Private
@@ -1345,7 +1362,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
                 });
             break;
           case RegisterNM:
-            if (!rmContext.isDistributedEnabled()) {
+            if (!rmContext.isDistributedEnabled() || rmContext.getGroupMembershipService().isAlone()) {
               proto
                       = YarnServerCommonServiceProtos.RegisterNodeManagerRequestProto.
                       parseFrom(rpc.getRpc());
@@ -1356,7 +1373,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
             }
             break;
           case NodeHeartbeat:
-            if (!rmContext.isDistributedEnabled()) {
+            if (!rmContext.isDistributedEnabled() || rmContext.getGroupMembershipService().isAlone()) {
               proto = YarnServerCommonServiceProtos.NodeHeartbeatRequestProto.
                       parseFrom(rpc.getRpc());
               resourceTracker.nodeHeartbeat(new NodeHeartbeatRequestPBImpl(

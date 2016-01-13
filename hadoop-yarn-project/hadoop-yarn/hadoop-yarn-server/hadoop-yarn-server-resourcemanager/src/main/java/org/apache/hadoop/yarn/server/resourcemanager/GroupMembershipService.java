@@ -178,7 +178,23 @@ public class GroupMembershipService extends CompositeService
       return false;
     }
   }
+  
+  public boolean isLeadingRT(){
+    if(groupMembership!=null && groupMembership.isRunning()){
+      return groupMembership.isSecond();
+    }else{
+      return false;
+    }
+  }
 
+  public boolean isAlone(){
+    if(groupMembership.getActiveNamenodes().size()==1){
+      return true;
+    }else{
+      return false;
+    }
+  }
+  
   @Override
   public synchronized void monitorHealth() throws IOException {
     checkAccess("monitorHealth");
@@ -319,7 +335,8 @@ public class GroupMembershipService extends CompositeService
   private class LEnGmMonitor implements Runnable {
 
     Boolean previousLeaderRole = null;
-
+    Boolean previousLeadingRTRole = null;
+    
     @Override
     public void run() {
       try {
@@ -328,7 +345,13 @@ public class GroupMembershipService extends CompositeService
           if (previousLeaderRole == null ||
               currentLeaderRole != previousLeaderRole) {
             previousLeaderRole = currentLeaderRole;
-            switchRole(previousLeaderRole);
+            switchLeaderRole(previousLeaderRole);
+          }
+          boolean currentLeadingRTRole = isLeadingRT();
+          if(previousLeadingRTRole ==null || 
+                  currentLeadingRTRole != previousLeadingRTRole){
+            previousLeadingRTRole = currentLeadingRTRole;
+            switchLeadintRTRole(currentLeadingRTRole);
           }
           Thread.sleep(100L);
         }
@@ -337,13 +360,23 @@ public class GroupMembershipService extends CompositeService
       }
     }
 
-    private void switchRole(boolean role) throws Exception {
+    private void switchLeaderRole(boolean role) throws Exception {
       if (role) {
         LOG.info(groupMembership.getCurrentId() + " switching to active ");
         rm.transitionToActive();
       } else {
         LOG.info(groupMembership.getCurrentId() + " switching to standby ");
         rm.transitionToStandby(true);
+      }
+    }
+    
+    private void switchLeadintRTRole(boolean isLeadingRT) throws Exception {
+      if (isLeadingRT) {
+        LOG.info(groupMembership.getCurrentId() + " switching to leading RT");
+        rm.transitionToLeadingRT();
+      } else {
+        LOG.info(groupMembership.getCurrentId() + " switching to nonleading RT ");
+        rm.transitionToNonLeadingRT();
       }
     }
   }

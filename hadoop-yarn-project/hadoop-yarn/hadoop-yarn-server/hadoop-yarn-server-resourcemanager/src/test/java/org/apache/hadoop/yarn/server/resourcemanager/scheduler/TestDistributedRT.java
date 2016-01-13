@@ -79,7 +79,7 @@ public class TestDistributedRT {
   @Test(timeout = 50000)
   public void testGetRMNodePerformance() throws Exception {
     MockRM rm = new MockRM(conf);
-    conf.setBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED, false);
+    conf.setBoolean(YarnConfiguration.DISTRIBUTED_RM, false);
     rm.start();
     String nodeId = "host1:1234";
     int numOfRetrievals = 500;
@@ -155,7 +155,7 @@ public class TestDistributedRT {
    */
   @Test
   public void testNMRegistration() throws InterruptedException, Exception {
-    conf.setBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED, true);
+    conf.setBoolean(YarnConfiguration.DISTRIBUTED_RM, true);
     conf.setBoolean(YarnConfiguration.RM_HA_ENABLED, true);
     conf.setInt(YarnConfiguration.HOPS_PENDING_EVENTS_RETRIEVAL_PERIOD, 500);
     MockRM rm1 = new MockRM(conf);
@@ -224,7 +224,7 @@ public class TestDistributedRT {
    */
   @Test
   public void testNMHeartbeat() throws InterruptedException, Exception {
-    conf.setBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED, true);
+    conf.setBoolean(YarnConfiguration.DISTRIBUTED_RM, true);
     conf.setBoolean(YarnConfiguration.RM_HA_ENABLED, true);
     conf.setInt(YarnConfiguration.HOPS_PENDING_EVENTS_RETRIEVAL_PERIOD, 500);
     MockRM rm1 = new MockRM(conf);
@@ -313,7 +313,7 @@ public class TestDistributedRT {
   @Test
   public void testConcurrentRegistration()
       throws InterruptedException, Exception {
-    conf.setBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED, true);
+    conf.setBoolean(YarnConfiguration.DISTRIBUTED_RM, true);
     conf.setBoolean(YarnConfiguration.RM_HA_ENABLED, true);
     conf.setInt(YarnConfiguration.HOPS_PENDING_EVENTS_RETRIEVAL_PERIOD, 500);
     MockRM rm1 = new MockRM(conf);

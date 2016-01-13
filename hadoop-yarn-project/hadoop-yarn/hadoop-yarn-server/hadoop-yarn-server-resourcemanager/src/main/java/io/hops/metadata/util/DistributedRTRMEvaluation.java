@@ -36,7 +36,7 @@ public class DistributedRTRMEvaluation {
   public DistributedRTRMEvaluation() throws IOException {
     conf = new YarnConfiguration();
     conf.setBoolean(YarnConfiguration.RM_HA_ENABLED, true);
-    conf.setBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED, true);
+    conf.setBoolean(YarnConfiguration.DISTRIBUTED_RM, true);
     conf.setClass(YarnConfiguration.RM_SCHEDULER, FifoScheduler.class,
         ResourceScheduler.class);
     YarnAPIStorageFactory.setConfiguration(conf);

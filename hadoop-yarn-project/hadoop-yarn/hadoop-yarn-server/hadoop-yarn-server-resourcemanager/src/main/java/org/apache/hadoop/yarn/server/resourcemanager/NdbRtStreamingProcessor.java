@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Set;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import io.hops.metadata.yarn.entity.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 import org.apache.hadoop.yarn.util.ConverterUtils;
@@ -75,14 +76,26 @@ public class NdbRtStreamingProcessor implements Runnable {
               printStreamingRTComps(streamingRTComps);
             }
 
-            NodeId nodeId = ConverterUtils.
-                    toNodeId(streamingRTComps.getNodeId());
-            rmNode = context.getActiveRMNodes().get(nodeId);
-            if (rmNode != null) {
-              rmNode.setContainersToCleanUp(streamingRTComps.
-                      getContainersToClean());
-              rmNode.setAppsToCleanup(streamingRTComps.getFinishedApp());
-              rmNode.setNextHeartBeat(streamingRTComps.isNextHeartbeat());
+            
+            String streamingRTCompsNodeId = streamingRTComps.getNodeId();
+            if(streamingRTCompsNodeId != null) {
+                NodeId nodeId = ConverterUtils.
+                    toNodeId(streamingRTCompsNodeId);
+                rmNode = context.getActiveRMNodes().get(nodeId);
+                if (rmNode != null) {
+                  rmNode.setContainersToCleanUp(streamingRTComps.
+                          getContainersToClean());
+                  rmNode.setAppsToCleanup(streamingRTComps.getFinishedApp());
+                  rmNode.setNextHeartBeat(streamingRTComps.isNextHeartbeat());
+                }
+            }
+            
+            // Processes container statuses for ContainersLogs service
+            List<ContainerStatus> hopContainersStatusList 
+                    = streamingRTComps.getHopContainersStatusList();
+            if(context.isLeadingRT() && hopContainersStatusList.size() > 0) {
+                context.getContainersLogsService()
+                        .insertEvent(hopContainersStatusList);
             }
           }
         } catch (InterruptedException ex) {

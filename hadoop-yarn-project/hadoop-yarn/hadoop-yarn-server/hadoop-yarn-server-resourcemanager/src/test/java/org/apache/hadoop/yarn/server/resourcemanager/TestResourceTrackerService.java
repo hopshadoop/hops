@@ -634,7 +634,7 @@ public class TestResourceTrackerService {
     dispatcher.await();
     response = nm2.nodeHeartbeat(true);
     response = nm2.nodeHeartbeat(true);
-    dispatcher.await(conf.getInt(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED,
+    dispatcher.await(conf.getInt(YarnConfiguration.DISTRIBUTED_RM,
         YarnConfiguration.DEFAULT_HOPS_PENDING_EVENTS_RETRIEVAL_PERIOD) * 2);
     Assert.assertEquals(5120 + 5120, metrics.getAvailableMB());
 

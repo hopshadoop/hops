@@ -383,7 +383,7 @@ public class NdbEventStreamingReceiver {
             getNodeId());
     blockingQueue.put(hopRMNodeBDBObject);
   }
-
+  
   // this two methods are using for multi-thread version from c++ library
   RMNodeComps buildCompositeClass() {
     return new RMNodeComps(hopRMNode, hopNextHeartbeat, hopNode,
