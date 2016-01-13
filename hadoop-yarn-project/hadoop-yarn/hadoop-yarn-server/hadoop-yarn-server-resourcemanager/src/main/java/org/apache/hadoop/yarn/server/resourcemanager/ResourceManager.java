@@ -122,6 +122,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.quota.QuotaSchedulerService;
 
 /**
  * The ResourceManager is the main class that is a set of components. "I am the
@@ -171,6 +172,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
   protected ApplicationACLsManager applicationACLsManager;
   protected QueueACLsManager queueACLsManager;
   protected ContainersLogsService containersLogsService;
+  protected QuotaSchedulerService quotaSchedulerService;
   private WebApp webApp;
   private AppReportFetcher fetcher = null;
   protected ResourceTrackerService resourceTracker;
@@ -1052,12 +1054,13 @@ public class ResourceManager extends CompositeService implements Recoverable {
 
   synchronized void transitionToLeadingRT(){
     //create and start containersLogService
-    createAndStartContainersLogsService();
+    createAndStartQuotaServices();
   }
   
   synchronized void transitionToNonLeadingRT(){
     //stop containersLogService
     containersLogsService.stop();
+    quotaSchedulerService.stop();
   }
   
   @Override
@@ -1078,7 +1081,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
     } else {
       LOG.info("HA not enabled");
       transitionToActive();
-      createAndStartContainersLogsService();
+      createAndStartQuotaServices();
     }
 
     startWepApp();
@@ -1120,6 +1123,9 @@ public class ResourceManager extends CompositeService implements Recoverable {
     if (containersLogsService !=null){
       containersLogsService.stop();
     }
+    if(quotaSchedulerService!=null){
+      quotaSchedulerService.stop();
+    }
     super.serviceStop();
     LOG.info("transition to standby serviceStop");
     transitionToStandby(false);
@@ -1155,11 +1161,14 @@ public class ResourceManager extends CompositeService implements Recoverable {
     return new RMSecretManagerService(conf, rmContext);
   }
   
-  protected void createAndStartContainersLogsService() {
+  protected void createAndStartQuotaServices() {
     containersLogsService = new ContainersLogsService();
+    quotaSchedulerService = new QuotaSchedulerService();
     containersLogsService.init(conf);
+    quotaSchedulerService.init(conf);
     rmContext.setContainersLogsService(containersLogsService);
     containersLogsService.start();
+    quotaSchedulerService.start();
   }
 
   @Private
