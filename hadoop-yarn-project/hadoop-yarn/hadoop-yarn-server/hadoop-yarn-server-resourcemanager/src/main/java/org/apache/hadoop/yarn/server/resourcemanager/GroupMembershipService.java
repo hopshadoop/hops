@@ -356,7 +356,7 @@ public class GroupMembershipService extends CompositeService
           Thread.sleep(100L);
         }
       } catch (Exception ex) {
-        LOG.warn(ex);
+        LOG.error(ex, ex);
       }
     }
 

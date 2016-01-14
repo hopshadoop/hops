@@ -88,6 +88,12 @@ public class RMStorageFactory {
     dNdbEventStreaming.startHopsNdbEvetAPISession(isLeader);
   }
   
+  public static void stopTheNdbEventStreamingAPI() {
+    if(dNdbEventStreaming!=null){
+      dNdbEventStreaming.closeHopsNdbEventAPISession();
+    }
+  }
+  
   public static void setConfiguration(Configuration conf)
       throws StorageInitializtionException, IOException {
     if (isInitialized) {

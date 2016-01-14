@@ -199,7 +199,7 @@ public class YarnConfiguration extends Configuration {
   public static final String QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_TICKS = 
           YARN_PREFIX + "quotas.containers-logs.checkpoints-ticks";
   public static final int DEFAULT_QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_TICKS = 
-          1000;
+          60;
   /**
    * If threshold is exceeded writes a warning about increasing monitor interval 
    * It is obtained by multiplying threshold with monitor interval
@@ -208,6 +208,10 @@ public class YarnConfiguration extends Configuration {
           YARN_PREFIX + "quotas.containers-logs.alert-ratio";
   public static final double DEFAULT_QUOTAS_CONTAINERS_LOGS_ALERT_THRESHOLD = 
           0.6;
+  public static final String QUOTAS_MONITOR_INTERVAL = 
+          YARN_PREFIX + "quotas.containers-logs.monitor-interval";
+  public static final int DEFAULT_QUOTAS_MONITOR_INTERVAL = 
+          1000;
   /**
    * Enable periodic monitor threads.
    *

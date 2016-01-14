@@ -17,6 +17,7 @@ package org.apache.hadoop.yarn.server.resourcemanager.scheduler.quota;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.service.AbstractService;
 
 /**
@@ -26,6 +27,7 @@ import org.apache.hadoop.service.AbstractService;
 public class QuotaSchedulerService extends AbstractService {
 
   private Thread quotaSchedulingThread;
+  QuotaScheduler quotaScheduler;
   private volatile boolean stopped;
   private static final Log LOG = LogFactory.getLog(QuotaSchedulerService.class);
 
@@ -37,9 +39,8 @@ public class QuotaSchedulerService extends AbstractService {
   protected void serviceStart() throws Exception {
     assert !stopped : "starting when already stopped";
     LOG.info("Starting a new quota schedular service");
-    QuotaScheduler quotqScheduler = new QuotaScheduler();
-    quotqScheduler.recover();
-    quotaSchedulingThread = new Thread(quotqScheduler);
+    quotaScheduler.recover();
+    quotaSchedulingThread = new Thread(quotaScheduler);
     quotaSchedulingThread.setName("Quota scheduling service");
     quotaSchedulingThread.start();
     super.serviceStart();
@@ -48,6 +49,9 @@ public class QuotaSchedulerService extends AbstractService {
   @Override
   protected void serviceStop() throws Exception {
     stopped = true;
+    if(quotaScheduler!=null){
+      quotaScheduler.stop();
+    }
     if (quotaSchedulingThread != null) {
       quotaSchedulingThread.interrupt();
     }
@@ -55,4 +59,9 @@ public class QuotaSchedulerService extends AbstractService {
     LOG.info("Stopping the quota schedular service.");
   }
 
+  @Override
+  public void serviceInit(Configuration conf) throws Exception {
+    quotaScheduler = new QuotaScheduler();
+    quotaScheduler.init(conf);
+  }
 }

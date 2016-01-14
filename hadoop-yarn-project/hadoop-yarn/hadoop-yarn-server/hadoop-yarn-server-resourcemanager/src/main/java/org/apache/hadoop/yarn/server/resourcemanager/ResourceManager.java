@@ -189,7 +189,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
    */
 
   private Configuration conf;
-
+  
   private UserGroupInformation rmLoginUGI;
 
   public ResourceManager() {
@@ -1059,8 +1059,12 @@ public class ResourceManager extends CompositeService implements Recoverable {
   
   synchronized void transitionToNonLeadingRT(){
     //stop containersLogService
-    containersLogsService.stop();
-    quotaSchedulerService.stop();
+    if (containersLogsService != null) {
+      containersLogsService.stop();
+    }
+    if (quotaSchedulerService != null) {
+      quotaSchedulerService.stop();
+    }
   }
   
   @Override
@@ -1126,6 +1130,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
     if(quotaSchedulerService!=null){
       quotaSchedulerService.stop();
     }
+    RMStorageFactory.stopTheNdbEventStreamingAPI();
     super.serviceStop();
     LOG.info("transition to standby serviceStop");
     transitionToStandby(false);
