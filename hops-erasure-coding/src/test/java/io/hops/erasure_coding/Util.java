@@ -30,7 +30,8 @@ public class Util {
   public enum Codecs {
     XOR,
     RS,
-    SRC
+    SRC,
+    NRS
   }
 
   public static final String JSON_CODEC_ARRAY = "[\n" +
@@ -65,6 +66,15 @@ public class Util {
       "    \"description\" : \"SimpleRegeneratingCode code\",\n" +
       "    \"simulate_block_fix\" : false\n" +
       "  },\n" +
+      "      {   \n"
+       + "        \"id\"            : \"nrs\",\n"
+            + "        \"parity_dir\"    : \"/raidnrs\",\n"
+            + "        \"stripe_length\" : 10, \n"
+            + "        \"parity_length\" : 4, \n"
+            + "        \"erasure_code\"  : \"io.hops.erasure_coding.NativeReedSolomonCode\",\n"
+            + "        \"priority\"      : 50,\n"
+            + "        \"description\"   : \"Native ReedSolomonCode code\",\n"
+            + "      } \n"+
       "]";
 
   public static void createRandomFile(DistributedFileSystem dfs, Path path,

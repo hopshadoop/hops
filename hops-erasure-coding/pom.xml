@@ -72,4 +72,20 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
+
+<properties>
+    <lib.directory>${project.build.directory}/so/eren</lib.directory>
+</properties>
+
+  <build>
+      <plugins>
+          <plugin>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <groupId>org.apache.maven.plugins</groupId>
+                <configuration>
+                    <argline>-Djava.library.path=${lib.directory}</argline>
+                </configuration>
+          </plugin>
+      </plugins>
+  </build>
 </project>
