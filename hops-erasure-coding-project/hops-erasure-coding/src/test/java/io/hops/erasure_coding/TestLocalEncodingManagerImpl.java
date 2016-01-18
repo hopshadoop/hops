@@ -57,7 +57,7 @@ public class TestLocalEncodingManagerImpl extends ClusterTest {
     return conf;
   }
 
-  @Test
+  @Test(timeout = 60000)
   public void testRaidFiles() throws IOException {
     for(Util.Codecs codec: Util.Codecs.values()){
       testRaidFilesForCodec(codec);

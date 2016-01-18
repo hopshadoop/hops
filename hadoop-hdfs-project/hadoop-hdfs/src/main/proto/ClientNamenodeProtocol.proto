@@ -127,6 +127,21 @@ message SetReplicationResponseProto {
   required bool result = 1;
 }
 
+message SetStoragePolicyRequestProto {
+  required string src = 1;
+  required string policyName = 2;
+}
+
+message SetStoragePolicyResponseProto { // void response
+}
+
+message GetStoragePoliciesRequestProto { // void request
+}
+
+message GetStoragePoliciesResponseProto {
+  repeated BlockStoragePolicyProto policies = 1;
+}
+
 message SetMetaEnabledRequestProto {
   required string src = 1;
   required bool metaEnabled = 2;
@@ -166,6 +181,7 @@ message AddBlockRequestProto {
   required string clientName = 2;
   optional ExtendedBlockProto previous = 3;
   repeated DatanodeInfoProto excludeNodes = 4;
+  repeated string favoredNodes = 5; //the set of datanodes to use for the block
 }
 
 message AddBlockResponseProto {
@@ -179,6 +195,7 @@ message GetAdditionalDatanodeRequestProto {
   repeated DatanodeInfoProto excludes = 4;
   required uint32 numAdditionalNodes = 5;
   required string clientName = 6;
+  repeated string existingStorageUuids = 7;
 }
 
 message GetAdditionalDatanodeResponseProto {
@@ -300,6 +317,19 @@ message GetDatanodeReportRequestProto {
 
 message GetDatanodeReportResponseProto {
   repeated DatanodeInfoProto di = 1;
+}
+
+message GetDatanodeStorageReportRequestProto {
+  required DatanodeReportTypeProto type = 1;
+}
+
+message DatanodeStorageReportProto {
+  required DatanodeInfoProto datanodeInfo = 1;
+  repeated StorageReportProto storageReports = 2;
+}
+
+message GetDatanodeStorageReportResponseProto {
+  repeated DatanodeStorageReportProto datanodeStorageReports = 1;
 }
 
 message GetPreferredBlockSizeRequestProto {
@@ -438,6 +468,7 @@ message UpdatePipelineRequestProto {
   required ExtendedBlockProto oldBlock = 2;
   required ExtendedBlockProto newBlock = 3;
   repeated DatanodeIDProto newNodes = 4;
+  repeated string storageIDs = 5;
 }
 
 message UpdatePipelineResponseProto { // void response
@@ -567,6 +598,8 @@ service ClientNamenodeProtocol {
   rpc create (CreateRequestProto) returns (CreateResponseProto);
   rpc append (AppendRequestProto) returns (AppendResponseProto);
   rpc setReplication (SetReplicationRequestProto) returns (SetReplicationResponseProto);
+  rpc setStoragePolicy(SetStoragePolicyRequestProto) returns(SetStoragePolicyResponseProto);
+  rpc getStoragePolicies(GetStoragePoliciesRequestProto) returns(GetStoragePoliciesResponseProto);
   rpc setMetaEnabled (SetMetaEnabledRequestProto) returns (SetMetaEnabledResponseProto);
   rpc setPermission (SetPermissionRequestProto) returns (SetPermissionResponseProto);
   rpc setOwner (SetOwnerRequestProto) returns (SetOwnerResponseProto);
@@ -585,6 +618,7 @@ service ClientNamenodeProtocol {
   rpc recoverLease (RecoverLeaseRequestProto) returns (RecoverLeaseResponseProto);
   rpc getFsStats (GetFsStatusRequestProto) returns (GetFsStatsResponseProto);
   rpc getDatanodeReport (GetDatanodeReportRequestProto) returns (GetDatanodeReportResponseProto);
+  rpc getDatanodeStorageReport(GetDatanodeStorageReportRequestProto) returns(GetDatanodeStorageReportResponseProto);
   rpc getPreferredBlockSize (GetPreferredBlockSizeRequestProto) returns (GetPreferredBlockSizeResponseProto);
   rpc setSafeMode (SetSafeModeRequestProto) returns (SetSafeModeResponseProto);
   rpc refreshNodes (RefreshNodesRequestProto) returns (RefreshNodesResponseProto);

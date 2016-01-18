@@ -432,12 +432,13 @@ public class UpgradeUtilities {
    */
   public static void createDataNodeVersionFile(File[] parent,
       StorageInfo version, String bpid, String bpidToWrite) throws IOException {
-    DataStorage storage = new DataStorage(version, "doNotCare");
+    DataStorage storage = new DataStorage(version);
 
     File[] versionFiles = new File[parent.length];
     for (int i = 0; i < parent.length; i++) {
       File versionFile = new File(parent[i], "VERSION");
       StorageDirectory sd = new StorageDirectory(parent[i].getParentFile());
+      storage.createStorageID(sd, false);
       storage.writeProperties(versionFile, sd);
       versionFiles[i] = versionFile;
       File bpDir = BlockPoolSliceStorage.getBpRoot(bpid, parent[i]);

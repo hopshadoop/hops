@@ -33,6 +33,7 @@ import org.apache.hadoop.hdfs.server.datanode.DataNodeTestUtils;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
+import org.apache.hadoop.test.PathUtils;
 import org.apache.log4j.Level;
 import org.junit.Test;
 
@@ -104,26 +105,26 @@ public class TestFileCorruption {
    */
   @Test
   public void testLocalFileCorruption() throws Exception {
-    Configuration conf = new HdfsConfiguration();
-    Path file = new Path(System.getProperty("test.build.data"), "corruptFile");
-    FileSystem fs = FileSystem.getLocal(conf);
-    DataOutputStream dos = fs.create(file);
-    dos.writeBytes("original bytes");
-    dos.close();
-    // Now deliberately corrupt the file
-    dos = new DataOutputStream(new FileOutputStream(file.toString()));
-    dos.writeBytes("corruption");
-    dos.close();
-    // Now attempt to read the file
-    DataInputStream dis = fs.open(file, 512);
-    try {
-      System.out.println("A ChecksumException is expected to be logged.");
-      dis.readByte();
-    } catch (ChecksumException ignore) {
-      //expect this exception but let any NPE get thrown
+      Configuration conf = new HdfsConfiguration();
+      Path file = new Path(PathUtils.getTestDirName(getClass()), "corruptFile");
+      FileSystem fs = FileSystem.getLocal(conf);
+      DataOutputStream dos = fs.create(file);
+      dos.writeBytes("original bytes");
+      dos.close();
+      // Now deliberately corrupt the file
+      dos = new DataOutputStream(new FileOutputStream(file.toString()));
+      dos.writeBytes("corruption");
+      dos.close();
+      // Now attempt to read the file
+      DataInputStream dis = fs.open(file, 512);
+      try {
+        System.out.println("A ChecksumException is expected to be logged.");
+        dis.readByte();
+      } catch (ChecksumException ignore) {
+        //expect this exception but let any NPE get thrown
+      }
+      fs.delete(file, true);
     }
-    fs.delete(file, true);
-  }
   
   /**
    * Test the case that a replica is reported corrupt while it is not
@@ -144,48 +145,52 @@ public class TestFileCorruption {
       Configuration conf = new HdfsConfiguration();
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(2).build();
       cluster.waitActive();
-      
+
       FileSystem fs = cluster.getFileSystem();
       final Path FILE_PATH = new Path("/tmp.txt");
       final long FILE_LEN = 1L;
-      DFSTestUtil.createFile(fs, FILE_PATH, FILE_LEN, (short) 2, 1L);
-      
+      DFSTestUtil.createFile(fs, FILE_PATH, FILE_LEN, (short)2, 1L);
+
       // get the block
       final String bpid = cluster.getNamesystem().getBlockPoolId();
       File storageDir = cluster.getInstanceStorageDir(0, 0);
       File dataDir = MiniDFSCluster.getFinalizedDir(storageDir, bpid);
+      assertTrue("Data directory does not exist", dataDir.exists());
       ExtendedBlock blk = getBlock(bpid, dataDir);
       if (blk == null) {
         storageDir = cluster.getInstanceStorageDir(0, 1);
         dataDir = MiniDFSCluster.getFinalizedDir(storageDir, bpid);
         blk = getBlock(bpid, dataDir);
       }
-      assertFalse(blk == null);
+      assertFalse("Data directory does not contain any blocks or there was an "
+          + "IO error", blk==null);
 
       // start a third datanode
       cluster.startDataNodes(conf, 1, true, null, null);
       ArrayList<DataNode> datanodes = cluster.getDataNodes();
       assertEquals(datanodes.size(), 3);
       DataNode dataNode = datanodes.get(2);
-      
+
       // report corrupted block by the third datanode
-      DatanodeRegistration dnR = DataNodeTestUtils
-          .getDNRegistrationForBP(dataNode, blk.getBlockPoolId());
-      FSNamesystem ns = cluster.getNamesystem();
-      cluster.getNamesystem().getBlockManager()
-          .findAndMarkBlockAsCorrupt(blk, new DatanodeInfo(dnR), "TEST");
+      DatanodeRegistration dnR =
+          DataNodeTestUtils.getDNRegistrationForBP(dataNode, blk.getBlockPoolId());
+
+      // Get the storage id of one of the storages on the datanode
+      String storageId = cluster.getNamesystem().getBlockManager()
+          .getDatanodeManager().getDatanode(dataNode.getDatanodeId())
+          .getStorageInfos()[0].getStorageID();
+
+      cluster.getNamesystem().getBlockManager().findAndMarkBlockAsCorrupt(
+          blk, new DatanodeInfo(dnR), storageId, "some test reason");
 
       // open the file
       fs.open(FILE_PATH);
-      
+
       //clean up
       fs.delete(FILE_PATH, false);
     } finally {
-      if (cluster != null) {
-        cluster.shutdown();
-      }
+      if (cluster != null) { cluster.shutdown(); }
     }
-    
   }
   
   private ExtendedBlock getBlock(String bpid, File dataDir) {

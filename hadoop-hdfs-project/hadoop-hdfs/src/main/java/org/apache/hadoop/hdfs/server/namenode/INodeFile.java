@@ -30,6 +30,7 @@ import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockCollection;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoUnderConstruction;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
 import org.apache.hadoop.hdfs.server.common.GenerationStamp;
 
 import java.io.FileNotFoundException;
@@ -56,6 +57,12 @@ public class INodeFile extends INode implements BlockCollection {
     return (INodeFile) inode;
   }
 
+  //Number of bits for Block size
+  static final short BLOCKBITS = 48;
+
+  //Header mask 64-bit representation
+  //Format: [16 bits for replication][48 bits for PreferredBlockSize]
+  static final long HEADERMASK = 0xffffL << BLOCKBITS;
 
   private int generationStamp = (int) GenerationStamp.FIRST_VALID_STAMP;
   private long size;
@@ -99,6 +106,16 @@ public class INodeFile extends INode implements BlockCollection {
   public short getBlockReplication() {
     return getBlockReplication(header);
   }
+
+  @Override
+  public byte getStoragePolicyID() throws TransactionContextException, StorageException {
+    byte id = getLocalStoragePolicyID();
+    if (id == BlockStoragePolicySuite.ID_UNSPECIFIED) {
+      return this.getParent() != null ? this.getParent().getStoragePolicyID() : id;
+    }
+    return id;
+  }
+
 
   /**
    * @return preferred block size (in bytes) of the file.
@@ -382,6 +399,11 @@ public class INodeFile extends INode implements BlockCollection {
   }
   
 
+
+  /** @return the diskspace required for a full block. */
+  final long getBlockDiskspace() {
+    return getPreferredBlockSize() * getBlockReplication();
+  }
 
   void setReplication(short replication)
       throws StorageException, TransactionContextException {

@@ -158,20 +158,23 @@ public class TestDatanodeRegistration {
       }
     }
   }
-  
+
   @Test
   public void testChangeStorageID() throws Exception {
     final String DN_IP_ADDR = "127.0.0.1";
     final String DN_HOSTNAME = "localhost";
     final int DN_XFER_PORT = 12345;
     final int DN_INFO_PORT = 12346;
-    final int DN_IPC_PORT = 12347;
+    final int DN_IPC_PORT = 12348;
     Configuration conf = new HdfsConfiguration();
     MiniDFSCluster cluster = null;
     try {
-      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(0).build();
-      InetSocketAddress addr =
-          new InetSocketAddress("localhost", cluster.getNameNodePort());
+      cluster = new MiniDFSCluster.Builder(conf)
+          .numDataNodes(0)
+          .build();
+      InetSocketAddress addr = new InetSocketAddress(
+          "localhost",
+          cluster.getNameNodePort());
       DFSClient client = new DFSClient(addr, conf);
       NamenodeProtocols rpcServer = cluster.getNameNodeRpc();
 
@@ -228,7 +231,7 @@ public class TestDatanodeRegistration {
       
       DatanodeRegistration mockDnReg = mock(DatanodeRegistration.class);
       doReturn(HdfsConstants.LAYOUT_VERSION).when(mockDnReg).getVersion();
-      doReturn("fake-storage-id").when(mockDnReg).getStorageID();
+      doReturn("fake-storage-id").when(mockDnReg).getDatanodeUuid();
       doReturn(mockStorageInfo).when(mockDnReg).getStorageInfo();
       
       // Should succeed when software versions are the same.
@@ -275,7 +278,7 @@ public class TestDatanodeRegistration {
       
       DatanodeRegistration mockDnReg = mock(DatanodeRegistration.class);
       doReturn(HdfsConstants.LAYOUT_VERSION).when(mockDnReg).getVersion();
-      doReturn("fake-storage-id").when(mockDnReg).getStorageID();
+      doReturn("fake-storage-id").when(mockDnReg).getDatanodeUuid();
       doReturn(mockStorageInfo).when(mockDnReg).getStorageInfo();
       
       // Should succeed when software versions are the same and CTimes are the

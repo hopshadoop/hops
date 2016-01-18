@@ -67,6 +67,12 @@ public interface BlockCollection {
   public short getBlockReplication();
 
   /**
+   * @return the storage policy ID.
+   */
+  public byte getStoragePolicyID() throws TransactionContextException,
+      StorageException;
+
+  /**
    * Get the name of the collection.
    */
   public String getName() throws StorageException, TransactionContextException;

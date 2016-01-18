@@ -20,8 +20,8 @@ package org.apache.hadoop.net;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
-/** A base class that implements interface Node
- * 
+/**
+ * A base class that implements interface Node
  */
 
 @InterfaceAudience.LimitedPrivate({"HDFS", "MapReduce"})

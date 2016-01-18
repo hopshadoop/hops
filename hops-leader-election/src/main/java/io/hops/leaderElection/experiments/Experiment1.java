@@ -55,7 +55,7 @@ public class Experiment1 {
   private int missed_hb_threshold = 2;
   @Option(name = "-ndb_jar", usage = "NDB Implementation Driver JAR Path")
   private String driver_jar =
-      "/home/salman/NetbeanProjects/hop/hops-metadata-dal-impl-ndb/target/hops-metadata-dal-impl-ndb-1.0-SNAPSHOT-jar-with-dependencies.jar";
+      "/home/salman/NetbeanProjects/hop/hops-metadata-dal-impl-ndb/target/hops-metadata-dal-impl-ndb-1.1-SNAPSHOT-jar-with-dependencies.jar";
   @Option(name = "-max_processes", usage = "Max number of processes")
   private int max_processes = 20;
   @Option(name = "-process_join_wait_time",

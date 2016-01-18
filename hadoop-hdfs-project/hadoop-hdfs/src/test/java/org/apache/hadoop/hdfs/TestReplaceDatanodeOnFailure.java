@@ -35,6 +35,9 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.concurrent.TimeoutException;
+import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.util.Time;
 
 /**
  * This class tests that a file need not be closed before its
@@ -114,7 +117,7 @@ public class TestReplaceDatanodeOnFailure {
   /**
    * Test replace datanode on failure.
    */
-  @Test
+ @Test
   public void testReplaceDatanodeOnFailure() throws Exception {
     final Configuration conf = new HdfsConfiguration();
     
@@ -123,68 +126,92 @@ public class TestReplaceDatanodeOnFailure {
 
     final String[] racks = new String[REPLICATION];
     Arrays.fill(racks, RACK0);
-    final MiniDFSCluster cluster =
-        new MiniDFSCluster.Builder(conf).racks(racks).numDataNodes(REPLICATION)
-            .build();
+    final MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf
+        ).racks(racks).numDataNodes(REPLICATION).build();
 
     try {
-      final DistributedFileSystem fs =
-          (DistributedFileSystem) cluster.getFileSystem();
+      cluster.waitActive();
+      final DistributedFileSystem fs = cluster.getFileSystem();
       final Path dir = new Path(DIR);
-      
-      final SlowWriter[] slowwriters = new SlowWriter[10];
-      for (int i = 1; i <= slowwriters.length; i++) {
+      final int NUM_WRITERS = 10;
+      final int FIRST_BATCH = 5;
+      final SlowWriter[] slowwriters = new SlowWriter[NUM_WRITERS];
+      for(int i = 1; i <= slowwriters.length; i++) {
         //create slow writers in different speed
-        slowwriters[i - 1] =
-            new SlowWriter(fs, new Path(dir, "file" + i), i * 200L);
+        slowwriters[i - 1] = new SlowWriter(fs, new Path(dir, "file" + i), i*200L);
       }
 
-      for (SlowWriter s : slowwriters) {
-        s.start();
+      for(int i = 0; i < FIRST_BATCH; i++) {
+        slowwriters[i].start();
       }
 
       // Let slow writers write something.
-      // Some of them are too slow and will be not yet started. 
-      sleepSeconds(1);
+      // Some of them are too slow and will be not yet started.
+      sleepSeconds(3);
 
       //start new datanodes
       cluster.startDataNodes(conf, 2, true, null, new String[]{RACK1, RACK1});
+      cluster.waitActive();
+      // wait for first block reports for up to 10 seconds
+        sleepSeconds(10);
+
       //stop an old datanode
-      cluster.stopDataNode(AppendTestUtil.nextInt(REPLICATION));
-      
-      //Let the slow writer writes a few more seconds
-      //Everyone should have written something.
-      sleepSeconds(5);
+      MiniDFSCluster.DataNodeProperties dnprop = cluster.stopDataNode(
+          AppendTestUtil.nextInt(REPLICATION));
+
+      for(int i = FIRST_BATCH; i < slowwriters.length; i++) {
+        slowwriters[i].start();
+      }
+
+      waitForBlockReplication(slowwriters);
 
       //check replication and interrupt.
-      for (SlowWriter s : slowwriters) {
+      for(SlowWriter s : slowwriters) {
         s.checkReplication();
         s.interruptRunning();
       }
 
       //close files
-      for (SlowWriter s : slowwriters) {
+      for(SlowWriter s : slowwriters) {
         s.joinAndClose();
       }
 
       //Verify the file
       LOG.info("Verify the file");
-      for (SlowWriter slowwriter : slowwriters) {
-        LOG.info(slowwriter.filepath + ": length=" +
-            fs.getFileStatus(slowwriter.filepath).getLen());
+      for(int i = 0; i < slowwriters.length; i++) {
+        LOG.info(slowwriters[i].filepath + ": length="
+            + fs.getFileStatus(slowwriters[i].filepath).getLen());
         FSDataInputStream in = null;
         try {
-          in = fs.open(slowwriter.filepath);
-          for (int j = 0, x; (x = in.read()) != -1; j++) {
+          in = fs.open(slowwriters[i].filepath);
+          for(int j = 0, x; (x = in.read()) != -1; j++) {
             Assert.assertEquals(j, x);
           }
-        } finally {
+        }
+        finally {
           IOUtils.closeStream(in);
         }
       }
     } finally {
-      if (cluster != null) {
-        cluster.shutdown();
+      if (cluster != null) {cluster.shutdown();}
+    }
+  }
+  
+  void waitForBlockReplication(final SlowWriter[] slowwriters) throws
+        TimeoutException, InterruptedException, IOException {
+    long start = Time.now();
+    boolean allFinished = false;
+    while(Time.now()-start< 10000 && ! allFinished){
+      Thread.sleep(1000);
+      allFinished = true;
+      for (SlowWriter s : slowwriters) {
+        if(s.out.getCurrentBlockReplication() < REPLICATION){
+          allFinished = false;
+          break;
+        }
+      }
+      if(allFinished){
+        return;
       }
     }
   }

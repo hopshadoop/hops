@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p/>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p/>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -35,12 +35,14 @@ import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.MiniDFSNNTopology;
+import org.apache.hadoop.hdfs.StorageType;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.RecoveryInProgressException;
 import org.apache.hadoop.hdfs.protocolPB.DatanodeProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.ReplicaState;
 import org.apache.hadoop.hdfs.server.datanode.DataNode.BlockRecord;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.ReplicaOutputStreams;
@@ -69,6 +71,8 @@ import org.mockito.stubbing.Answer;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -122,7 +126,7 @@ public class TestBlockRecovery {
    * @throws IOException
    */
   @Before
-  public void startUp() throws IOException {
+  public void startUp() throws IOException, URISyntaxException {
     conf = new HdfsConfiguration();
     conf.set(DFSConfigKeys.DFS_DATANODE_DATA_DIR_KEY, DATA_DIR);
     conf.set(DFSConfigKeys.DFS_DATANODE_ADDRESS_KEY, "0.0.0.0:0");
@@ -131,11 +135,12 @@ public class TestBlockRecovery {
     conf.setInt(CommonConfigurationKeys.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY, 0);
     FileSystem.setDefaultUri(conf,
         "hdfs://" + NN_ADDR.getHostName() + ":" + NN_ADDR.getPort());
-    ArrayList<File> dirs = new ArrayList<>();
+    ArrayList<StorageLocation> locations = new ArrayList<StorageLocation>();
     File dataDir = new File(DATA_DIR);
     FileUtil.fullyDelete(dataDir);
     dataDir.mkdirs();
-    dirs.add(dataDir);
+    StorageLocation location = StorageLocation.parse(dataDir.getPath());
+    locations.add(location);
     final DatanodeProtocolClientSideTranslatorPB namenode =
         mock(DatanodeProtocolClientSideTranslatorPB.class);
 
@@ -187,7 +192,7 @@ public class TestBlockRecovery {
       }
     });
 
-    dn = new DataNode(conf, dirs, null) {
+    dn = new DataNode(conf, locations, null) {
       @Override
       DatanodeProtocolClientSideTranslatorPB connectToNN(
           InetSocketAddress nnAddr) throws IOException {
@@ -571,7 +576,7 @@ public class TestBlockRecovery {
   }
 
   private final static RecoveringBlock rBlock =
-      new RecoveringBlock(block, null, RECOVERY_ID);
+      new RecoveringBlock(block, DatanodeStorageInfo.EMPTY_ARRAY, RECOVERY_ID);
 
   /**
    * BlockRecoveryFI_09. some/all DNs failed to update replicas.
@@ -606,7 +611,7 @@ public class TestBlockRecovery {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Running " + GenericTestUtils.getMethodName());
     }
-    dn.data.createRbw(block);
+    dn.data.createRbw(StorageType.DEFAULT, block);
     try {
       dn.syncBlock(rBlock, initBlockRecords(dn));
       fail("Sync should fail");
@@ -631,14 +636,14 @@ public class TestBlockRecovery {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Running " + GenericTestUtils.getMethodName());
     }
-    ReplicaInPipelineInterface replicaInfo = dn.data.createRbw(block);
+    ReplicaInPipelineInterface replicaInfo = dn.data.createRbw(StorageType.DEFAULT, block);
     ReplicaOutputStreams streams = null;
     try {
       streams = replicaInfo.createStreams(true,
           DataChecksum.newDataChecksum(DataChecksum.Type.CRC32, 512));
       streams.getChecksumOut().write('a');
       dn.data.initReplicaRecovery(
-          new RecoveringBlock(block, null, RECOVERY_ID + 1));
+          new RecoveringBlock(block, DatanodeStorageInfo.EMPTY_ARRAY, RECOVERY_ID + 1));
       try {
         dn.syncBlock(rBlock, initBlockRecords(dn));
         fail("Sync should fail");

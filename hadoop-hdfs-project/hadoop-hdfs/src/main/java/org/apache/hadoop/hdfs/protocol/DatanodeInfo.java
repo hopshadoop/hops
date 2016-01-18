@@ -109,7 +109,7 @@ public class DatanodeInfo extends DatanodeID implements Node {
       final long dfsUsed, final long remaining, final long blockPoolUsed,
       final long lastUpdate, final int xceiverCount,
       final AdminStates adminState) {
-    this(nodeID.getIpAddr(), nodeID.getHostName(), nodeID.getStorageID(),
+    this(nodeID.getIpAddr(), nodeID.getHostName(), nodeID.getDatanodeUuid(),
         nodeID.getXferPort(), nodeID.getInfoPort(), nodeID.getIpcPort(),
         capacity, dfsUsed, remaining, blockPoolUsed, lastUpdate, xceiverCount,
         location, adminState);
@@ -119,12 +119,12 @@ public class DatanodeInfo extends DatanodeID implements Node {
    * Constructor
    */
   public DatanodeInfo(final String ipAddr, final String hostName,
-      final String storageID, final int xferPort, final int infoPort,
+      final String datanodeUuid, final int xferPort, final int infoPort,
       final int ipcPort, final long capacity, final long dfsUsed,
       final long remaining, final long blockPoolUsed, final long lastUpdate,
       final int xceiverCount, final String networkLocation,
       final AdminStates adminState) {
-    super(ipAddr, hostName, storageID, xferPort, infoPort, ipcPort);
+    super(ipAddr, hostName, datanodeUuid, xferPort, infoPort, ipcPort);
     this.capacity = capacity;
     this.dfsUsed = dfsUsed;
     this.remaining = remaining;
@@ -394,7 +394,7 @@ public class DatanodeInfo extends DatanodeID implements Node {
    * Check if the datanode is in stale state. Here if
    * the namenode has not received heartbeat msg from a
    * datanode for more than staleInterval (default value is
-   * {@link DFSConfigKeys#DFS_NAMENODE_STALE_DATANODE_INTERVAL_MILLI_DEFAULT}),
+   * {@link DFSConfigKeys#DFS_NAMENODE_STALE_DATANODE_INTERVAL_DEFAULT}),
    * the datanode will be treated as stale node.
    *
    * @param staleInterval

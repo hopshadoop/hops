@@ -89,8 +89,8 @@ public class CorruptReplicaContext
 
   @Override
   CorruptReplica cloneEntity(CorruptReplica hopCorruptReplica, int inodeId) {
-    return new CorruptReplica(hopCorruptReplica.getBlockId(),
-        hopCorruptReplica.getStorageId(), inodeId);
+    return new CorruptReplica(hopCorruptReplica.getStorageId(),
+        hopCorruptReplica.getBlockId(), inodeId);
   }
 
   @Override

@@ -47,5 +47,4 @@ public class TestBalancerWithEncryptedTransfer {
   public void testEncryptedBalancer2() throws Exception {
     new TestBalancer().testBalancer2Internal(conf);
   }
-
 }

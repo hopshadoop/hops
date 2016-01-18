@@ -35,6 +35,7 @@ import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockPlacementPolicy;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockPlacementStatus;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.NetworkTopology;
@@ -142,7 +143,7 @@ public class NamenodeFsck {
    *
    * @param conf
    *     configuration (namenode config)
-   * @param nn
+   * @param namenode
    *     namenode that this fsck is going to use
    * @param pmap
    *     key=value[] map passed to the http servlet as url parameters
@@ -381,25 +382,25 @@ public class NamenodeFsck {
             targetFileReplication + " but found " +
             locs.length + " replica(s).");
       }
+
       // verify block placement policy
-      int missingRacks =
-          BlockPlacementPolicy.getInstance(conf, null, networktopology).
-              verifyBlockPlacement(path, lBlk,
-                  Math.min(2, targetFileReplication));
-      if (missingRacks > 0) {
+      BlockPlacementPolicy bpp = BlockPlacementPolicy.getInstance(conf, null,
+          networktopology, namenode.getNamesystem().getBlockManager().getDatanodeManager()
+          .getHost2DatanodeMap());
+      BlockPlacementStatus blockPlacementStatus = bpp
+          .verifyBlockPlacement(path, lBlk, targetFileReplication);
+      if (!blockPlacementStatus.isPlacementPolicySatisfied()) {
         res.numMisReplicatedBlocks++;
         misReplicatedPerFile++;
         if (!showFiles) {
-          if (underReplicatedPerFile == 0) {
+          if(underReplicatedPerFile == 0)
             out.println();
-          }
           out.print(path + ": ");
         }
         out.println(" Replica placement policy is violated for " +
-            block +
-            ". Block should be additionally replicated on " +
-            missingRacks + " more rack(s).");
+            block + ". " + blockPlacementStatus.getErrorDescription());
       }
+
       report.append(i + ". " + blkName + " len=" + block.getNumBytes());
       if (locs.length == 0) {
         report.append(" MISSING!");

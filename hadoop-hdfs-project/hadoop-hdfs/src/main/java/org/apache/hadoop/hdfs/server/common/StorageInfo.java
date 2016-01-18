@@ -37,9 +37,11 @@ import org.apache.hadoop.hdfs.protocol.LayoutVersion;
 import org.apache.hadoop.hdfs.protocol.LayoutVersion.Feature;
 import org.apache.hadoop.net.DNS;
 import org.apache.hadoop.util.Time;
+import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.NodeType;
 
 import java.io.IOException;
 import java.net.UnknownHostException;
+import java.util.Properties;
 import java.util.UUID;
 
 /**
@@ -73,11 +75,11 @@ public class StorageInfo {
     cTime = cT;
 
     blockpoolID = bpid;
-
   }
   
   public StorageInfo(StorageInfo from) {
-    setStorageInfo(from);
+    this(from.layoutVersion, from.namespaceID, from.clusterID, from.cTime,
+        from.getBlockPoolId());
   }
 
   /**
@@ -133,7 +135,6 @@ public class StorageInfo {
   public String toColonSeparatedString() {
     return Joiner.on(":").join(layoutVersion, namespaceID, cTime, clusterID);
   }
-  
 
   public static StorageInfo getStorageInfoFromDB() throws IOException {
     if (storageInfo == null) {
@@ -223,6 +224,25 @@ public class StorageInfo {
   
   public int getDefaultRowId() {
     return this.DEFAULT_ROW_ID;
+  }
+
+  public void setServiceLayoutVersion(int lv) {
+    this.layoutVersion = lv;
+  }
+
+  public int getServiceLayoutVersion() {
+    return HdfsConstants.LAYOUT_VERSION;
+    //    return storageType == NodeType.DATA_NODE ? HdfsConstants.DATANODE_LAYOUT_VERSION
+    //        : HdfsConstants.NAMENODE_LAYOUT_VERSION;
+  }
+
+  protected static String getProperty(Properties props, Storage.StorageDirectory sd,
+      String name) throws InconsistentFSStateException {
+    String property = props.getProperty(name);
+    if (property == null) {
+      throw new InconsistentFSStateException(sd.root, "file has " + name + " missing.");
+    }
+    return property;
   }
 
 }

@@ -21,6 +21,7 @@ import com.google.protobuf.ServiceException;
 import io.hops.leader_election.node.ActiveNode;
 import io.hops.leader_election.node.SortedActiveNodeList;
 import io.hops.leader_election.proto.ActiveNodeProtos;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -171,9 +172,7 @@ public class DatanodeProtocolClientSideTranslatorPB
         .setRegistration(PBHelper.convert(registration))
         .setXmitsInProgress(xmitsInProgress).setXceiverCount(xceiverCount)
         .setFailedVolumes(failedVolumes);
-    for (StorageReport r : reports) {
-      builder.addReports(PBHelper.convert(r));
-    }
+    builder.addAllReports(PBHelper.convertStorageReports(reports));
 
     HeartbeatResponseProto resp;
     try {
@@ -225,7 +224,9 @@ public class DatanodeProtocolClientSideTranslatorPB
     for (StorageReceivedDeletedBlocks storageBlock : receivedAndDeletedBlocks) {
       StorageReceivedDeletedBlocksProto.Builder repBuilder =
           StorageReceivedDeletedBlocksProto.newBuilder();
-      repBuilder.setStorageID(storageBlock.getStorageID());
+      repBuilder.setStorageUuid(storageBlock.getStorage().getStorageID());  // Set for
+      // wire compatibility.
+      repBuilder.setStorage(PBHelper.convert(storageBlock.getStorage()));
       for (ReceivedDeletedBlockInfo rdBlock : storageBlock.getBlocks()) {
         repBuilder.addBlocks(PBHelper.convert(rdBlock));
       }
@@ -288,7 +289,7 @@ public class DatanodeProtocolClientSideTranslatorPB
             .setNewGenStamp(newgenerationstamp).setNewLength(newlength)
             .setCloseFile(closeFile).setDeleteBlock(deleteblock);
     for (int i = 0; i < newtargets.length; i++) {
-      builder.addNewTaragets(PBHelper.convert(newtargets[i]));
+      builder.addNewTargets(PBHelper.convert(newtargets[i]));
       builder.addNewTargetStorages(newtargetstorages[i]);
     }
     CommitBlockSynchronizationRequestProto req = builder.build();

@@ -116,13 +116,9 @@ class BlockPK {
         return false;
       }
 
+      // So it's the same block, now check if it's the same replica
       ReplicaPK replicaPK = (ReplicaPK) o;
-
-      if (storageId != replicaPK.storageId) {
-        return false;
-      }
-
-      return true;
+      return storageId == replicaPK.storageId;
     }
 
     @Override
@@ -149,8 +145,7 @@ class BlockPK {
       return keys;
     }
 
-    static List<ReplicaPK> getKeys(long[] blockIds, int[] inodeIds,
-        int storageId) {
+    static List<ReplicaPK> getKeys(long[] blockIds, int[] inodeIds, int storageId) {
       List<BlockPK.ReplicaPK> keys = new ArrayList<>(blockIds.length);
       for (int i = 0; i < blockIds.length; i++) {
         keys.add(new BlockPK.ReplicaPK(blockIds[i], inodeIds[i], storageId));

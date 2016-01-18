@@ -31,8 +31,10 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
+import org.apache.hadoop.hdfs.StorageType;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.server.namenode.INodeFile;
+import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -102,17 +104,23 @@ public class TestCorruptReplicaInfo {
     }
 
     DatanodeDescriptor dn1 = DFSTestUtil.getLocalDatanodeDescriptor();
+    DatanodeStorage ds1 = new DatanodeStorage("storageid_1",
+        DatanodeStorage.State.NORMAL, StorageType.DEFAULT);
+    DatanodeStorageInfo storage1 = new DatanodeStorageInfo(dn1, ds1);
+
     DatanodeDescriptor dn2 = DFSTestUtil.getLocalDatanodeDescriptor();
+    DatanodeStorage ds2 = new DatanodeStorage("storageid_2",
+        DatanodeStorage.State.NORMAL, StorageType.DEFAULT);
+    DatanodeStorageInfo storage2 = new DatanodeStorageInfo(dn2, ds2);
 
-
-    addToCorruptReplicasMap(crm, getBlock(0), dn1, "TEST");
+    addToCorruptReplicasMap(crm, getBlock(0), storage1, "TEST");
     assertEquals("Number of corrupt blocks not returning correctly", 1,
         crm.size());
-    addToCorruptReplicasMap(crm, getBlock(1), dn1, "TEST");
+    addToCorruptReplicasMap(crm, getBlock(1), storage1, "TEST");
     assertEquals("Number of corrupt blocks not returning correctly", 2,
         crm.size());
 
-    addToCorruptReplicasMap(crm, getBlock(1), dn2, "TEST");
+    addToCorruptReplicasMap(crm, getBlock(1), storage2, "TEST");
     assertEquals("Number of corrupt blocks not returning correctly", 2,
         crm.size());
 
@@ -125,7 +133,7 @@ public class TestCorruptReplicaInfo {
         crm.size());
 
     for (Integer block_id : block_ids) {
-      addToCorruptReplicasMap(crm, getBlock(block_id), dn1, "TEST");
+      addToCorruptReplicasMap(crm, getBlock(block_id), storage1, "TEST");
     }
 
     assertEquals("Number of corrupt blocks not returning correctly",
@@ -145,7 +153,7 @@ public class TestCorruptReplicaInfo {
   }
   
   private void addToCorruptReplicasMap(final CorruptReplicasMap crm,
-      final BlockInfo blk, final DatanodeDescriptor dn, final String reason)
+      final BlockInfo blk, final DatanodeStorageInfo storage, final String reason)
       throws IOException {
     new HopsTransactionalRequestHandler(
         HDFSOperationType.TEST_CORRUPT_REPLICA_INFO) {
@@ -167,7 +175,7 @@ public class TestCorruptReplicaInfo {
       public Object performTask() throws StorageException, IOException {
         blocksMap.addBlockCollection(blk, new INodeFile(new PermissionStatus
             ("n", "n", FsPermission.getDefault()), null, (short)1, 0, 0, 1));
-        crm.addToCorruptReplicasMap(blk, dn, reason);
+        crm.addToCorruptReplicasMap(blk, storage, reason);
         return null;
       }
     }.handle();

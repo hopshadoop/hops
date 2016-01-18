@@ -17,30 +17,30 @@
  */
 package org.apache.hadoop.hdfs.server.datanode.fsdataset.impl;
 
+import com.google.common.collect.Lists;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdfs.StorageType;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsVolumeSpi;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.VolumeChoosingPolicy;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
+import org.apache.hadoop.util.Time;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 class FsVolumeList {
-  /**
-   * Read access to this unmodifiable list is not synchronized.
-   * This list is replaced on modification holding "this" lock.
-   */
-  volatile List<FsVolumeImpl> volumes = null;
+  private final AtomicReference<FsVolumeImpl[]> volumes =
+      new AtomicReference<FsVolumeImpl[]>(new FsVolumeImpl[0]);
 
   private final VolumeChoosingPolicy<FsVolumeImpl> blockChooser;
   private volatile int numFailedVolumes;
 
-  FsVolumeList(List<FsVolumeImpl> volumes, int failedVols,
-      VolumeChoosingPolicy<FsVolumeImpl> blockChooser) {
-    this.volumes = Collections.unmodifiableList(volumes);
+  FsVolumeList(int failedVols, VolumeChoosingPolicy<FsVolumeImpl> blockChooser) {
     this.blockChooser = blockChooser;
     this.numFailedVolumes = failedVols;
   }
@@ -48,23 +48,38 @@ class FsVolumeList {
   int numberOfFailedVolumes() {
     return numFailedVolumes;
   }
+
+  /**
+   * Return an immutable list view of all the volumes.
+   */
+  List<FsVolumeImpl> getVolumes() {
+    return Collections.unmodifiableList(Arrays.asList(volumes.get()));
+  }
   
   /**
-   * Get next volume. Synchronized to ensure {@link #curVolume} is updated
-   * by a single thread and next volume is chosen with no concurrent
-   * update to {@link #volumes}.
+   * Get next volume.
    *
-   * @param blockSize
-   *     free space needed on the volume
+   * @param blockSize free space needed on the volume
+   * @param storageType the desired {@link StorageType}
    * @return next volume to store the block in.
    */
-  synchronized FsVolumeImpl getNextVolume(long blockSize) throws IOException {
-    return blockChooser.chooseVolume(volumes, blockSize);
+  synchronized FsVolumeImpl getNextVolume(StorageType storageType,
+      long blockSize) throws IOException {
+    // Get a snapshot of currently available volumes.
+    final FsVolumeImpl[] curVolumes = volumes.get();
+    final List<FsVolumeImpl> list =
+        new ArrayList<FsVolumeImpl>(curVolumes.length);
+    for(FsVolumeImpl v : curVolumes) {
+      if (v.getStorageType() == storageType) {
+        list.add(v);
+      }
+    }
+    return blockChooser.chooseVolume(list, blockSize);
   }
 
   long getDfsUsed() throws IOException {
     long dfsUsed = 0L;
-    for (FsVolumeImpl v : volumes) {
+    for (FsVolumeImpl v : volumes.get()) {
       dfsUsed += v.getDfsUsed();
     }
     return dfsUsed;
@@ -72,7 +87,7 @@ class FsVolumeList {
 
   long getBlockPoolUsed(String bpid) throws IOException {
     long dfsUsed = 0L;
-    for (FsVolumeImpl v : volumes) {
+    for (FsVolumeImpl v : volumes.get()) {
       dfsUsed += v.getBlockPoolUsed(bpid);
     }
     return dfsUsed;
@@ -80,7 +95,7 @@ class FsVolumeList {
 
   long getCapacity() {
     long capacity = 0L;
-    for (FsVolumeImpl v : volumes) {
+    for (FsVolumeImpl v : volumes.get()) {
       capacity += v.getCapacity();
     }
     return capacity;
@@ -88,20 +103,14 @@ class FsVolumeList {
 
   long getRemaining() throws IOException {
     long remaining = 0L;
-    for (FsVolumeSpi vol : volumes) {
+    for (FsVolumeSpi vol : volumes.get()) {
       remaining += vol.getAvailable();
     }
     return remaining;
   }
 
-  void getVolumeMap(ReplicaMap volumeMap) throws IOException {
-    for (FsVolumeImpl v : volumes) {
-      v.getVolumeMap(volumeMap);
-    }
-  }
-  
   void getVolumeMap(String bpid, ReplicaMap volumeMap) throws IOException {
-    for (FsVolumeImpl v : volumes) {
+    for (FsVolumeImpl v : volumes.get()) {
       v.getVolumeMap(bpid, volumeMap);
     }
   }
@@ -117,9 +126,9 @@ class FsVolumeList {
    */
   synchronized List<FsVolumeImpl> checkDirs() {
     ArrayList<FsVolumeImpl> removedVols = null;
-    
+
     // Make a copy of volumes for performing modification 
-    final List<FsVolumeImpl> volumeList = new ArrayList<>(volumes);
+    final List<FsVolumeImpl> volumeList = getVolumes();
 
     for (Iterator<FsVolumeImpl> i = volumeList.iterator(); i.hasNext(); ) {
       final FsVolumeImpl fsv = i.next();
@@ -131,18 +140,14 @@ class FsVolumeList {
           removedVols = new ArrayList<>(1);
         }
         removedVols.add(fsv);
-        fsv.shutdown();
-        i.remove(); // Remove the volume
+        removeVolume(fsv);
         numFailedVolumes++;
       }
     }
-    
+
     if (removedVols != null && removedVols.size() > 0) {
-      // Replace volume list
-      volumes = Collections.unmodifiableList(volumeList);
-      FsDatasetImpl.LOG.warn(
-          "Completed checkDirs. Removed " + removedVols.size() +
-              " volumes. Current volumes: " + this);
+      FsDatasetImpl.LOG.warn("Completed checkDirs. Removed " + removedVols.size()
+          + " volumes. Current volumes: " + this);
     }
 
     return removedVols;
@@ -150,24 +155,116 @@ class FsVolumeList {
 
   @Override
   public String toString() {
-    return volumes.toString();
+    return Arrays.toString(volumes.get());
   }
 
-
-  void addBlockPool(String bpid, Configuration conf) throws IOException {
-    for (FsVolumeImpl v : volumes) {
-      v.addBlockPool(bpid, conf);
+  /**
+   * Dynamically add new volumes to the existing volumes that this DN manages.
+   * @param newVolume the instance of new FsVolumeImpl.
+   */
+  void addVolume(FsVolumeImpl newVolume) {
+    // Make a copy of volumes to add new volumes.
+    while (true) {
+      final FsVolumeImpl[] curVolumes = volumes.get();
+      final List<FsVolumeImpl> volumeList = Lists.newArrayList(curVolumes);
+      volumeList.add(newVolume);
+      if (volumes.compareAndSet(curVolumes,
+          volumeList.toArray(new FsVolumeImpl[volumeList.size()]))) {
+        break;
+      } else {
+        if (FsDatasetImpl.LOG.isDebugEnabled()) {
+          FsDatasetImpl.LOG.debug(
+              "The volume list has been changed concurrently, " +
+                  "retry to remove volume: " + newVolume);
+        }
+      }
     }
+
+    FsDatasetImpl.LOG.info("Added new volume: " + newVolume.toString());
+  }
+
+  /**
+   * Dynamically remove a volume in the list.
+   * @param target the volume instance to be removed.
+   */
+  private void removeVolume(FsVolumeImpl target) {
+    while (true) {
+      final FsVolumeImpl[] curVolumes = volumes.get();
+      final List<FsVolumeImpl> volumeList = Lists.newArrayList(curVolumes);
+      if (volumeList.remove(target)) {
+        if (volumes.compareAndSet(curVolumes,
+            volumeList.toArray(new FsVolumeImpl[volumeList.size()]))) {
+          target.shutdown();
+          FsDatasetImpl.LOG.info("Removed volume: " + target);
+          break;
+        } else {
+          if (FsDatasetImpl.LOG.isDebugEnabled()) {
+            FsDatasetImpl.LOG.debug(
+                "The volume list has been changed concurrently, " +
+                    "retry to remove volume: " + target);
+          }
+        }
+      } else {
+        if (FsDatasetImpl.LOG.isDebugEnabled()) {
+          FsDatasetImpl.LOG.debug("Volume " + target +
+              " does not exist or is removed by others.");
+        }
+        break;
+      }
+    }
+  }
+
+  void addBlockPool(final String bpid, final Configuration conf) throws IOException {
+    long totalStartTime = Time.monotonicNow();
+
+    final List<IOException> exceptions = Collections.synchronizedList(
+        new ArrayList<IOException>());
+    List<Thread> blockPoolAddingThreads = new ArrayList<Thread>();
+    for (final FsVolumeImpl v : volumes.get()) {
+      Thread t = new Thread() {
+        public void run() {
+          try {
+            FsDatasetImpl.LOG.info("Scanning block pool " + bpid +
+                " on volume " + v + "...");
+            long startTime = Time.monotonicNow();
+            v.addBlockPool(bpid, conf);
+            long timeTaken = Time.monotonicNow() - startTime;
+            FsDatasetImpl.LOG.info("Time taken to scan block pool " + bpid +
+                " on " + v + ": " + timeTaken + "ms");
+          } catch (IOException ioe) {
+            FsDatasetImpl.LOG.info("Caught exception while scanning " + v +
+                ". Will throw later.", ioe);
+            exceptions.add(ioe);
+          }
+        }
+      };
+      blockPoolAddingThreads.add(t);
+      t.start();
+    }
+    for (Thread t : blockPoolAddingThreads) {
+      try {
+        t.join();
+      } catch (InterruptedException ie) {
+        throw new IOException(ie);
+      }
+    }
+    if (!exceptions.isEmpty()) {
+      throw exceptions.get(0);
+    }
+
+    long totalTimeTaken = Time.monotonicNow() - totalStartTime;
+    FsDatasetImpl.LOG.info("Total time to scan all replicas for block pool " +
+        bpid + ": " + totalTimeTaken + "ms");
   }
   
   void removeBlockPool(String bpid) {
-    for (FsVolumeImpl v : volumes) {
+    for (FsVolumeImpl v : volumes.get()) {
       v.shutdownBlockPool(bpid);
     }
   }
 
   void shutdown() {
-    for (FsVolumeImpl volume : volumes) {
+    for (FsVolumeImpl volume : volumes.get()) {
       if (volume != null) {
         volume.shutdown();
       }

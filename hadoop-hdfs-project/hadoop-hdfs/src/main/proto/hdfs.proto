@@ -47,7 +47,9 @@ message ExtendedBlockProto {
 message DatanodeIDProto {
   required string ipAddr = 1; // IP address
   required string hostName = 2; // hostname
-  required string storageID = 3; // unique storage id
+  // UUID assigned to the Datanode. For upgraded clusters this is the same
+  // as the original StorageID of the Datanode.
+  required string datanodeUuid = 3;
   required uint32 xferPort = 4; // data streaming port
   required uint32 infoPort = 5; // info server port
   required uint32 ipcPort = 6; // ipc server port
@@ -79,6 +81,30 @@ message DatanodeInfoProto {
   }
 
   optional AdminState adminState = 10 [default = NORMAL];
+}
+
+/**
+ * Represents a storage available on the datanode
+ */
+message DatanodeStorageProto {
+  enum StorageState {
+    NORMAL = 0;
+    READ_ONLY = 1;
+  }
+
+  required string storageUuid = 1;
+  optional StorageState state = 2 [default = NORMAL];
+  optional StorageTypeProto storageType = 3 [default = DISK];
+}
+
+message StorageReportProto {
+  required string storageUuid = 1 [ deprecated = true ];
+  optional bool failed = 2 [default = false];
+  optional uint64 capacity = 3 [default = 0];
+  optional uint64 dfsUsed = 4 [default = 0];
+  optional uint64 remaining = 5 [default = 0];
+  optional uint64 blockPoolUsed = 6 [default = 0];
+  optional DatanodeStorageProto storage = 7; // supersedes StorageUuid
 }
 
 /**
@@ -117,8 +143,30 @@ message FsPermissionProto {
 enum StorageTypeProto {
   DISK = 1;
   SSD = 2;
-  ARCHIVE = 3;
-  RAM_DISK = 4;
+  RAID5 = 3;
+  ARCHIVE = 4;
+  RAM_DISK = 5;
+}
+
+///**
+// * Block replica storage policy.
+// */
+//message BlockStoragePolicyProto {
+//  required uint32 policyId = 1;
+//  required string name = 2;
+//  // a list of storage types for storing the block replicas when creating a
+//  // block.
+//  required StorageTypesProto creationPolicy = 3;
+//  // A list of storage types for creation fallback storage.
+//  optional StorageTypesProto creationFallbackPolicy = 4;
+//  optional StorageTypesProto replicationFallbackPolicy = 5;
+//}
+
+/**
+ * A list of storage IDs.
+ */
+message StorageUuidsProto {
+  repeated string storageUuids = 1;
 }
 
 /**
@@ -128,15 +176,17 @@ message LocatedBlockProto {
   required ExtendedBlockProto b = 1;
   required uint64 offset = 2; // offset of first byte of block in the file
   repeated DatanodeInfoProto locs = 3; // Locations ordered by proximity to client ip
-  required bool corrupt = 4; // true if all replicas of a block are corrupt, else false
+
+  // true if all replicas of a block are corrupt, else false
   // If block has few corrupt replicas, they are filtered and
   // their locations are not part of this object
-
+  required bool corrupt = 4;
   required hadoop.common.TokenProto blockToken = 5;
   repeated bool isCached = 6 [packed=true]; // if a location in locs is cached
   repeated StorageTypeProto storageTypes = 7;
   repeated string storageIDs = 8;
   optional bytes data = 9;
+  optional uint64 checksum = 10;
 }
 
 message DataEncryptionKeyProto {
@@ -148,6 +198,26 @@ message DataEncryptionKeyProto {
   optional string encryptionAlgorithm = 6;
 }
 
+/**
+ * A list of storage types.
+ */
+message StorageTypesProto {
+  repeated StorageTypeProto storageTypes = 1;
+}
+
+/**
+ * Block replica storage policy.
+ */
+message BlockStoragePolicyProto {
+  required uint32 policyId = 1;
+  required string name = 2;
+  // a list of storage types for storing the block replicas when creating a
+  // block.
+  required StorageTypesProto creationPolicy = 3;
+  // A list of storage types for creation fallback storage.
+  optional StorageTypesProto creationFallbackPolicy = 4;
+  optional StorageTypesProto replicationFallbackPolicy = 5;
+}
 
 /**
  * A set of file blocks and their locations.
@@ -189,6 +259,7 @@ message HdfsFileStatusProto {
   optional LocatedBlocksProto locations = 12; // suppled only if asked by client
   optional uint64 fileId = 13;
   optional bool isFileStoredInDB = 14; // false if not supplied
+  optional uint32 storagePolicy = 15 [default = 0]; // block storage policy id
 }
 
 /**
@@ -231,7 +302,7 @@ message DirectoryListingProto {
  */
 message StorageInfoProto {
   required uint32 layoutVersion = 1; // Layout version of the file system
-  required uint32 namespceID = 2; // File system namespace ID
+  required uint32 namespaceID = 2; // File system namespace ID
   required string clusterID = 3; // ID of the cluster
   required uint64 cTime = 4; // File system creation time
 
@@ -305,8 +376,10 @@ message BlockProto {
  * Block and datanodes where is it located
  */
 message BlockWithLocationsProto {
-  required BlockProto block = 1; // Block
-  repeated string storageIDs = 2; // Datanodes with replicas of the block
+  required BlockProto block = 1;   // Block
+  repeated string datanodeUuids = 2; // Datanodes with replicas of the block
+  repeated string storageUuids = 3;  // Storages with replicas of the block
+  repeated StorageTypeProto storageTypes = 4;
 }
 
 /**

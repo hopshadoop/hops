@@ -23,10 +23,7 @@ import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.hdfs.server.datanode.Replica;
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.NoSuchElementException;
+import java.util.*;
 
 import static org.apache.hadoop.hdfs.server.protocol.BlockReportBlockState.FINALIZED;
 
@@ -102,7 +99,49 @@ public class BlockReport implements Iterable<BlockReportBlock> {
     return reminder >= 0 ? reminder : numBuckets + reminder;
     
   }
-  
+
+  /**
+   * Corrupt the generation stamp of the block with the given index.
+   * Not meant to be used outside of tests.
+   */
+  @VisibleForTesting
+  public BlockReport corruptBlockGSForTesting(final int blockIndex, Random rand) {
+    Builder corruptReportBuilder = builder(buckets.length);
+    int i = 0;
+    for (BlockReportBlock reportedBlock : this){
+      BlockReportBlock toAdd;
+      if (i == blockIndex){
+        toAdd = new BlockReportBlock(reportedBlock.getBlockId(), rand.nextInt(), reportedBlock.getLength(), reportedBlock.getState());
+      } else {
+        toAdd = reportedBlock;
+      }
+      corruptReportBuilder.add(toAdd);
+      i++;
+    }
+    return corruptReportBuilder.build();
+  }
+
+  /**
+   * Corrupt the length of the block with the given index by truncation.
+   * Not meant to be used outside of tests.
+   */
+  @VisibleForTesting
+  public BlockReport corruptBlockLengthForTesting(final int blockIndex, Random rand) {
+    Builder corruptReportBuilder = builder(buckets.length);
+    int i = 0;
+    for (BlockReportBlock reportedBlock : this){
+      BlockReportBlock toAdd;
+      if (i == blockIndex){
+        toAdd = new BlockReportBlock(reportedBlock.getBlockId(), reportedBlock.getGenerationStamp(), rand.nextInt(), reportedBlock.getState());
+      } else {
+        toAdd = reportedBlock;
+      }
+      corruptReportBuilder.add(toAdd);
+      i++;
+    }
+    return corruptReportBuilder.build();
+  }
+
   private static long hashAsFinalized(Block theBlock) {
     return hash(theBlock.getBlockId(), theBlock.getGenerationStamp(),
         theBlock.getNumBytes(), HdfsServerConstants.ReplicaState.FINALIZED
@@ -148,6 +187,34 @@ public class BlockReport implements Iterable<BlockReportBlock> {
       for (int i = 0; i < NUM_BUCKETS; i++) {
         buckets[i] = new ArrayList<>();
       }
+    }
+
+    @VisibleForTesting
+    public Builder add(BlockReportBlock reportBlock){
+      int bucket = bucket(reportBlock.getBlockId(), NUM_BUCKETS);
+      buckets[bucket].add(reportBlock);
+      HdfsServerConstants.ReplicaState replicaState = null;
+      switch (reportBlock.getState()){
+        case FINALIZED:
+          replicaState = HdfsServerConstants.ReplicaState.FINALIZED;
+          break;
+        case RBW:
+          replicaState = HdfsServerConstants.ReplicaState.RBW;
+          break;
+        case RUR:
+          replicaState = HdfsServerConstants.ReplicaState.RUR;
+          break;
+        case RWR:
+          replicaState = HdfsServerConstants.ReplicaState.RWR;
+          break;
+        case TEMPORARY:
+          replicaState = HdfsServerConstants.ReplicaState.TEMPORARY;
+          break;
+      }
+      hashes[bucket] += hash(reportBlock.getBlockId(),reportBlock.getGenerationStamp(),reportBlock.getLength(),
+              replicaState.getValue());
+      blockCounter++;
+      return this;
     }
   
     public Builder add(Replica replica) {

@@ -127,6 +127,13 @@ class ReplicaMap {
       return m.put(replicaInfo.getBlockId(), replicaInfo);
     }
   }
+
+  /**
+   * Add all entries from the given replica map into the local replica map.
+   */
+  void addAll(ReplicaMap other) {
+    map.putAll(other.map);
+  }
   
   /**
    * Remove the replica's meta information from the map that matches
@@ -163,7 +170,7 @@ class ReplicaMap {
    *
    * @param bpid
    *     block pool id
-   * @param the
+   * @param blockId
    *     block id of the replica to be removed
    * @return the removed replica's meta information
    */
@@ -205,8 +212,7 @@ class ReplicaMap {
    * @return a collection of the replicas belonging to the block pool
    */
   Collection<ReplicaInfo> replicas(String bpid) {
-    Map<Long, ReplicaInfo> m = null;
-    m = map.get(bpid);
+    Map<Long, ReplicaInfo> m = map.get(bpid);
     return m != null ? m.values() : null;
   }
 

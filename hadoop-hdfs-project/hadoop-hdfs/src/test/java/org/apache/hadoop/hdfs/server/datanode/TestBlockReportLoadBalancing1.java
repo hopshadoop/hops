@@ -29,7 +29,10 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.*;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
+import org.apache.hadoop.hdfs.DFSTestUtil;
+import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.hadoop.hdfs.MiniDFSNNTopology;
 import org.apache.hadoop.hdfs.server.blockmanagement.BRTrackingService;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeProtocol;
@@ -45,10 +48,6 @@ import org.mockito.invocation.InvocationOnMock;
 
 import static org.junit.Assert.*;
 
-/**
- *
- * @author salman
- */
 public class TestBlockReportLoadBalancing1 {
 
   public static final Log LOG = LogFactory.getLog(TestBlockReportLoadBalancing1.class);

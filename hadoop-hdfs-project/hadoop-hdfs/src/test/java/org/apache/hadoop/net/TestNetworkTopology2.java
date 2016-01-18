@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.net;
 
+import io.hops.metadata.StorageMap;
+import java.io.IOException;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
@@ -48,8 +50,8 @@ public class TestNetworkTopology2 {
         this.id = id;
       }
       @Override
-      public Object call() throws InterruptedException {
-        DatanodeDescriptor d = new DatanodeDescriptor(new DatanodeID("1.1.1.1:"+id));
+      public Object call() throws InterruptedException, IOException {
+        DatanodeDescriptor d = new DatanodeDescriptor(new StorageMap(false), new DatanodeID("1.1.1.1:"+id));
 //        Thread.sleep(rand.nextInt(100));
         invalCluster.add(d);
         return null;

@@ -35,6 +35,12 @@ public interface RollingLogs {
      * Is the iterator iterating the previous?
      */
     public boolean isPrevious();
+
+    /**
+     * Is the last read entry from previous? This should be called after
+     * reading.
+     */
+    public boolean isLastReadFromPrevious();
   }
 
   /**

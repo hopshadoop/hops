@@ -28,6 +28,8 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 /**
  * Created by salman on 2016-03-22.
@@ -1300,6 +1302,9 @@ public class TestSmallFilesCreation {
       }
     }
   }
+  
+  private static final Log LOG =
+      LogFactory.getLog(TestSmallFilesCreation.class);
 
   /**
    * The small files should spill on datanodes disks when the database is full.
@@ -1313,7 +1318,7 @@ public class TestSmallFilesCreation {
    * tests will fails.
    * @throws IOException
    */
-  @Test(timeout = 1800000) // 30 mins
+  @Test(timeout = 900000) // 30 mins
   public void TestWriteMaxSpillToDN() throws IOException {
     MiniDFSCluster cluster = null;
     try {
@@ -1334,6 +1339,7 @@ public class TestSmallFilesCreation {
       int i = 0;
       try{
         for(i = 0; i < count; i++){
+          LOG.info("GAUTIER write file " + i);
           writeFile(dfs, "/file"+i, MAX_SMALL_FILE_SIZE);
         }
       } catch( Exception e){
@@ -1343,6 +1349,7 @@ public class TestSmallFilesCreation {
 
       try{
         for(i = 0; i < count; i++){
+          LOG.info("GAUTIER verify file " + i);
           verifyFile(dfs, "/file"+i, MAX_SMALL_FILE_SIZE);
         }
       } catch( Exception e){

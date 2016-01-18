@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p/>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p/>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.protocolPB;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.CodedInputStream;
@@ -31,8 +32,10 @@ import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FsServerDefaults;
 import org.apache.hadoop.fs.permission.FsAction;
+import org.apache.hadoop.hdfs.StorageType;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.CorruptFileBlocks;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
@@ -61,13 +64,12 @@ import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.BlockCommand
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.BlockRecoveryCommandProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.DatanodeCommandProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.DatanodeRegistrationProto;
-import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.DatanodeStorageProto;
-import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.DatanodeStorageProto.StorageState;
+import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.DatanodeStorageProto;
+import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.DatanodeStorageProto.StorageState;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.FinalizeCommandProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.KeyUpdateCommandProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.ReceivedDeletedBlockInfoProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.RegisterCommandProto;
-import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.BlockKeyProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.BlockProto;
@@ -90,6 +92,7 @@ import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.HdfsFileStatusProto.File
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.LocatedBlockProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.LocatedBlockProto.Builder;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.LocatedBlocksProto;
+import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.StorageTypeProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.NamenodeCommandProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.NamenodeRegistrationProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.NamenodeRegistrationProto.NamenodeRoleProto;
@@ -97,11 +100,13 @@ import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.NamespaceInfoProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.RecoveringBlockProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.ReplicaStateProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.StorageInfoProto;
+import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.StorageReportProto;
 import org.apache.hadoop.hdfs.security.token.block.BlockKey;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.hdfs.security.token.block.DataEncryptionKey;
 import org.apache.hadoop.hdfs.security.token.block.ExportedBlockKeys;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.NamenodeRole;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.ReplicaState;
 import org.apache.hadoop.hdfs.server.common.StorageInfo;
@@ -117,9 +122,10 @@ import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations;
 import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations.BlockWithLocations;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeCommand;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeProtocol;
-import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage.State;
+import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
+import org.apache.hadoop.hdfs.server.protocol.DatanodeStorageReport;
 import org.apache.hadoop.hdfs.server.protocol.FinalizeCommand;
 import org.apache.hadoop.hdfs.server.protocol.KeyUpdateCommand;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeCommand;
@@ -199,14 +205,14 @@ public class PBHelper {
   public static StorageInfoProto convert(StorageInfo info) {
     return StorageInfoProto.newBuilder().setClusterID(info.getClusterID())
         .setCTime(info.getCTime()).setLayoutVersion(info.getLayoutVersion())
-        .setNamespceID(info.getNamespaceID()).setBlockpoolID(
+        .setNamespaceID(info.getNamespaceID()).setBlockpoolID(
             info.getBlockPoolId())                //HOP added this line
         .setDEFAULTROWID(info.getDefaultRowId())
         .build();     //HOP added this line
   }
 
   public static StorageInfo convert(StorageInfoProto info) {
-    return new StorageInfo(info.getLayoutVersion(), info.getNamespceID(),
+    return new StorageInfo(info.getLayoutVersion(), info.getNamespaceID(),
         info.getClusterID(), info.getCTime(), info.getBlockpoolID());
   }
 
@@ -224,14 +230,20 @@ public class PBHelper {
 
   // DatanodeId
   public static DatanodeID convert(DatanodeIDProto dn) {
-    return new DatanodeID(dn.getIpAddr(), dn.getHostName(), dn.getStorageID(),
+    return new DatanodeID(dn.getIpAddr(), dn.getHostName(), dn.getDatanodeUuid(),
         dn.getXferPort(), dn.getInfoPort(), dn.getIpcPort());
   }
 
   public static DatanodeIDProto convert(DatanodeID dn) {
-    return DatanodeIDProto.newBuilder().setIpAddr(dn.getIpAddr())
-        .setHostName(dn.getHostName()).setStorageID(dn.getStorageID())
-        .setXferPort(dn.getXferPort()).setInfoPort(dn.getInfoPort())
+    // For wire compatibility with older versions we transmit the StorageID
+    // which is the same as the DatanodeUuid. Since StorageID is a required
+    // field we pass the empty string if the DatanodeUuid is not yet known.
+    return DatanodeIDProto.newBuilder()
+        .setIpAddr(dn.getIpAddr())
+        .setHostName(dn.getHostName())
+        .setDatanodeUuid(dn.getDatanodeUuid() != null ? dn.getDatanodeUuid() : "")
+        .setXferPort(dn.getXferPort())
+        .setInfoPort(dn.getInfoPort())
         .setIpcPort(dn.getIpcPort()).build();
   }
 
@@ -274,12 +286,20 @@ public class PBHelper {
   public static BlockWithLocationsProto convert(BlockWithLocations blk) {
     return BlockWithLocationsProto.newBuilder()
         .setBlock(convert(blk.getBlock()))
-        .addAllStorageIDs(Arrays.asList(blk.getStorageIDs())).build();
+        .addAllDatanodeUuids(Arrays.asList(blk.getDatanodeUuids()))
+        .addAllStorageUuids(Arrays.asList(blk.getStorageIDs()))
+        .addAllStorageTypes(convertStorageTypes(blk.getStorageTypes()))
+        .build();
   }
 
   public static BlockWithLocations convert(BlockWithLocationsProto b) {
+    final List<String> datanodeUuids = b.getDatanodeUuidsList();
+    final List<String> storageUuids = b.getStorageUuidsList();
+    final List<StorageTypeProto> storageTypes = b.getStorageTypesList();
     return new BlockWithLocations(convert(b.getBlock()),
-        b.getStorageIDsList().toArray(new String[0]));
+        datanodeUuids.toArray(new String[datanodeUuids.size()]),
+        storageUuids.toArray(new String[storageUuids.size()]),
+        convertStorageTypes(storageTypes, storageUuids.size()));
   }
 
   public static BlocksWithLocationsProto convert(BlocksWithLocations blks) {
@@ -350,7 +370,7 @@ public class PBHelper {
 
   public static NamespaceInfo convert(NamespaceInfoProto info) {
     StorageInfoProto storage = info.getStorageInfo();
-    return new NamespaceInfo(storage.getNamespceID(), storage.getClusterID(),
+    return new NamespaceInfo(storage.getNamespaceID(), storage.getClusterID(),
         info.getBlockPoolID(), storage.getCTime(), info.getBuildVersion(),
         info.getSoftwareVersion());
   }
@@ -499,6 +519,41 @@ public class PBHelper {
     return builder.build();
   }
 
+  public static ClientNamenodeProtocolProtos.DatanodeStorageReportProto convertDatanodeStorageReport(
+      DatanodeStorageReport report) {
+    return ClientNamenodeProtocolProtos.DatanodeStorageReportProto.newBuilder()
+        .setDatanodeInfo(convert(report.getDatanodeInfo()))
+        .addAllStorageReports(convertStorageReports(report.getStorageReports()))
+        .build();
+  }
+
+  public static List<ClientNamenodeProtocolProtos.DatanodeStorageReportProto> convertDatanodeStorageReports(
+      DatanodeStorageReport[] reports) {
+    final List<ClientNamenodeProtocolProtos.DatanodeStorageReportProto> protos
+        = new ArrayList<ClientNamenodeProtocolProtos.DatanodeStorageReportProto>(reports.length);
+    for(int i = 0; i < reports.length; i++) {
+      protos.add(convertDatanodeStorageReport(reports[i]));
+    }
+    return protos;
+  }
+
+  public static DatanodeStorageReport convertDatanodeStorageReport(
+      ClientNamenodeProtocolProtos.DatanodeStorageReportProto proto) {
+    return new DatanodeStorageReport(
+        convert(proto.getDatanodeInfo()),
+        convertStorageReports(proto.getStorageReportsList()));
+  }
+
+  public static DatanodeStorageReport[] convertDatanodeStorageReports(
+      List<ClientNamenodeProtocolProtos.DatanodeStorageReportProto> protos) {
+    final DatanodeStorageReport[] reports
+        = new DatanodeStorageReport[protos.size()];
+    for(int i = 0; i < reports.length; i++) {
+      reports[i] = convertDatanodeStorageReport(protos.get(i));
+    }
+    return reports;
+  }
+
   public static AdminStates convert(AdminState adminState) {
     switch (adminState) {
       case DECOMMISSION_INPROGRESS:
@@ -512,17 +567,25 @@ public class PBHelper {
   }
 
   public static LocatedBlockProto convert(LocatedBlock b) {
-    if (b == null) {
-      return null;
-    }
+    if (b == null) return null;
     Builder builder = LocatedBlockProto.newBuilder();
     DatanodeInfo[] locs = b.getLocations();
     for (int i = 0; i < locs.length; i++) {
-      builder.addLocs(i, PBHelper.convert(locs[i]));
+      DatanodeInfo loc = locs[i];
+      builder.addLocs(i, PBHelper.convert(loc));
       //For compatability with newer clients
-      builder.addStorageIDs("HopsFS_Hack_Storage_ID" );
-      builder.addStorageTypes(HdfsProtos.StorageTypeProto.DISK);
       builder.addIsCached(false);
+    }
+
+    StorageType[] storageTypes = b.getStorageTypes();
+    if (storageTypes != null) {
+      for (int i = 0; i < storageTypes.length; ++i) {
+        builder.addStorageTypes(PBHelper.convertStorageType(storageTypes[i]));
+      }
+    }
+    final String[] storageIDs = b.getStorageIDs();
+    if (storageIDs != null) {
+      builder = builder.addAllStorageIDs(Arrays.asList(storageIDs));
     }
 
     builder = builder.setB(PBHelper.convert(b.getBlock()))
@@ -535,16 +598,27 @@ public class PBHelper {
   }
 
   public static LocatedBlock convert(LocatedBlockProto proto) {
-    if (proto == null) {
-      return null;
-    }
+    if (proto == null) return null;
     List<DatanodeInfoProto> locs = proto.getLocsList();
     DatanodeInfo[] targets = new DatanodeInfo[locs.size()];
     for (int i = 0; i < locs.size(); i++) {
       targets[i] = PBHelper.convert(locs.get(i));
     }
+
+    final StorageType[] storageTypes = convertStorageTypes(
+        proto.getStorageTypesList(), locs.size());
+
+    final int storageIDsCount = proto.getStorageIDsCount();
+    final String[] storageIDs;
+    if (storageIDsCount == 0) {
+      storageIDs = null;
+    } else {
+      assert storageIDsCount == locs.size();
+      storageIDs = proto.getStorageIDsList().toArray(new String[storageIDsCount]);
+    }
+
     LocatedBlock lb = new LocatedBlock(PBHelper.convert(proto.getB()), targets,
-        proto.getOffset(), proto.getCorrupt());
+        storageIDs, storageTypes, proto.getOffset(), proto.getCorrupt());
     lb.setBlockToken(PBHelper.convert(proto.getBlockToken()));
     if(proto.getData().size() > 0){
       lb.setData(proto.getData().toByteArray());
@@ -610,9 +684,9 @@ public class PBHelper {
 
   public static DatanodeRegistrationProto convert(
       DatanodeRegistration registration) {
-    DatanodeRegistrationProto.Builder builder =
-        DatanodeRegistrationProto.newBuilder();
-    return builder.setDatanodeID(PBHelper.convert((DatanodeID) registration))
+    DatanodeRegistrationProto.Builder builder = DatanodeRegistrationProto.newBuilder();
+    return builder
+        .setDatanodeID(PBHelper.convert((DatanodeID) registration))
         .setStorageInfo(PBHelper.convert(registration.getStorageInfo()))
         .setKeys(PBHelper.convert(registration.getExportedKeys()))
         .setSoftwareVersion(registration.getSoftwareVersion()).build();
@@ -775,6 +849,29 @@ public class PBHelper {
     for (int i = 0; i < targetList.size(); i++) {
       targets[i] = PBHelper.convert(targetList.get(i));
     }
+
+    StorageType[][] targetStorageTypes = new StorageType[targetList.size()][];
+    List<HdfsProtos.StorageTypesProto> targetStorageTypesList = blkCmd.getTargetStorageTypesList();
+    if (targetStorageTypesList.isEmpty()) { // missing storage types
+      for(int i = 0; i < targetStorageTypes.length; i++) {
+        targetStorageTypes[i] = new StorageType[targets[i].length];
+        Arrays.fill(targetStorageTypes[i], StorageType.DEFAULT);
+      }
+    } else {
+      for(int i = 0; i < targetStorageTypes.length; i++) {
+        List<StorageTypeProto> p = targetStorageTypesList.get(i).getStorageTypesList();
+        targetStorageTypes[i] = p.toArray(new StorageType[p.size()]);
+      }
+    }
+
+    List<HdfsProtos.StorageUuidsProto> targetStorageUuidsList = blkCmd.getTargetStorageUuidsList();
+
+    String[][] targetStorageIDs = new String[targetStorageUuidsList.size()][];
+    for(int i = 0; i < targetStorageIDs.length; i++) {
+      List<String> storageIDs = targetStorageUuidsList.get(i).getStorageUuidsList();
+      targetStorageIDs[i] = storageIDs.toArray(new String[storageIDs.size()]);
+    }
+
     int action = DatanodeProtocol.DNA_UNKNOWN;
     switch (blkCmd.getAction()) {
       case TRANSFER:
@@ -786,8 +883,11 @@ public class PBHelper {
       case SHUTDOWN:
         action = DatanodeProtocol.DNA_SHUTDOWN;
         break;
+      default:
+        throw new AssertionError("Unknown action type: " + blkCmd.getAction());
     }
-    return new BlockCommand(action, blkCmd.getBlockPoolId(), blocks, targets);
+    return new BlockCommand(action, blkCmd.getBlockPoolId(), blocks, targets,
+        targetStorageTypes, targetStorageIDs);
   }
 
   public static DatanodeInfo[] convert(DatanodeInfosProto datanodeInfosProto) {
@@ -1044,15 +1144,22 @@ public class PBHelper {
     if (fs == null) {
       return null;
     }
-    return new HdfsLocatedFileStatus(fs.getFileId(), fs.getLength(),
-        fs.getFileType().equals(FileType.IS_DIR), fs.getBlockReplication(),
-        fs.getBlocksize(), fs.getModificationTime(), fs.getAccessTime(),
-        PBHelper.convert(fs.getPermission()), fs.getOwner(), fs.getGroup(),
-        fs.getFileType().equals(FileType.IS_SYMLINK) ?
-            fs.getSymlink().toByteArray() : null, fs.getPath().toByteArray(),
+    return new HdfsLocatedFileStatus(
+        fs.getFileId(),
+        fs.getLength(),
+        fs.getFileType().equals(FileType.IS_DIR),
+        fs.getBlockReplication(),
+        fs.getBlocksize(),
+        fs.getModificationTime(),
+        fs.getAccessTime(),
+        PBHelper.convert(fs.getPermission()),
+        fs.getOwner(),
+        fs.getGroup(),
+        fs.getFileType().equals(FileType.IS_SYMLINK) ? fs.getSymlink().toByteArray() : null,
+        fs.getPath().toByteArray(),
         fs.hasLocations() ? PBHelper.convert(fs.getLocations()) : null,
-            fs.hasIsFileStoredInDB() ? fs.getIsFileStoredInDB() : false);
-
+        fs.hasIsFileStoredInDB() ? fs.getIsFileStoredInDB() : false,
+        fs.hasStoragePolicy() ? (byte) fs.getStoragePolicy(): BlockStoragePolicySuite.ID_UNSPECIFIED);
   }
 
   public static HdfsFileStatusProto convert(HdfsFileStatus fs) {
@@ -1079,7 +1186,7 @@ public class PBHelper {
         setGroup(fs.getGroup()).
         setPath(ByteString.copyFrom(fs.getLocalNameInBytes())).
         setIsFileStoredInDB(fs.isFileStoredInDB()).
-        setIsFileStoredInDB(fs.isFileStoredInDB());
+        setStoragePolicy(fs.getStoragePolicy());
     if (fs.isSymlink()) {
       builder.setSymlink(ByteString.copyFrom(fs.getSymlinkInBytes()));
     }
@@ -1278,11 +1385,12 @@ public class PBHelper {
 
   public static DatanodeStorageProto convert(DatanodeStorage s) {
     return DatanodeStorageProto.newBuilder()
-        .setState(PBHelper.convert(s.getState())).setStorageID(s.getStorageID())
-        .build();
+        .setState(PBHelper.convertState(s.getState()))
+        .setStorageType(PBHelper.convertStorageType(s.getStorageType()))
+        .setStorageUuid(s.getStorageID()).build();
   }
 
-  private static StorageState convert(State state) {
+  private static StorageState convertState(State state) {
     switch (state) {
       case READ_ONLY:
         return StorageState.READ_ONLY;
@@ -1292,12 +1400,80 @@ public class PBHelper {
     }
   }
 
-  public static DatanodeStorage convert(DatanodeStorageProto s) {
-    return new DatanodeStorage(s.getStorageID(),
-        PBHelper.convert(s.getState()));
+  public static List<StorageTypeProto> convertStorageTypes(
+      StorageType[] types) {
+    return convertStorageTypes(types, 0);
   }
 
-  private static State convert(StorageState state) {
+  public static List<StorageTypeProto> convertStorageTypes(
+      StorageType[] types, int startIdx) {
+    if (types == null) {
+      return null;
+    }
+    final List<StorageTypeProto> protos = new ArrayList<StorageTypeProto>(
+        types.length);
+    for (int i = startIdx; i < types.length; ++i) {
+      protos.add(convertStorageType(types[i]));
+    }
+    return protos;
+  }
+
+  public static StorageTypeProto convertStorageType(StorageType type) {
+    switch(type) {
+      case DISK:
+        return StorageTypeProto.DISK;
+      case SSD:
+        return StorageTypeProto.SSD;
+      case RAID5:
+        return StorageTypeProto.RAID5;
+      case ARCHIVE:
+        return StorageTypeProto.ARCHIVE;
+      default:
+        Preconditions.checkState(
+            false,
+            "Failed to update StorageTypeProto with new StorageType " +
+                type.toString());
+        return StorageTypeProto.DISK;
+    }
+  }
+
+  public static StorageType convertStorageType(StorageTypeProto type) {
+    switch(type) {
+      case DISK:
+        return StorageType.DISK;
+      case SSD:
+        return StorageType.SSD;
+      case RAID5:
+        return StorageType.RAID5;
+      case ARCHIVE:
+        return StorageType.ARCHIVE;
+      default:
+        throw new IllegalStateException(
+            "BUG: StorageTypeProto not found, type=" + type);
+    }
+  }
+
+  public static StorageType[] convertStorageTypes(
+      List<StorageTypeProto> storageTypesList, int expectedSize) {
+    final StorageType[] storageTypes = new StorageType[expectedSize];
+    if (storageTypesList.size() != expectedSize) { // missing storage types
+      Preconditions.checkState(storageTypesList.isEmpty());
+      Arrays.fill(storageTypes, StorageType.DEFAULT);
+    } else {
+      for (int i = 0; i < storageTypes.length; ++i) {
+        storageTypes[i] = convertStorageType(storageTypesList.get(i));
+      }
+    }
+    return storageTypes;
+  }
+
+  public static DatanodeStorage convert(DatanodeStorageProto s) {
+    return new DatanodeStorage(s.getStorageUuid(),
+        PBHelper.convertState(s.getState()),
+        PBHelper.convertStorageType(s.getStorageType()));
+  }
+
+  private static State convertState(StorageState state) {
     switch (state) {
       case READ_ONLY:
         return DatanodeStorage.State.READ_ONLY;
@@ -1311,7 +1487,35 @@ public class PBHelper {
     return StorageReportProto.newBuilder()
         .setBlockPoolUsed(r.getBlockPoolUsed()).setCapacity(r.getCapacity())
         .setDfsUsed(r.getDfsUsed()).setRemaining(r.getRemaining())
-        .setStorageID(r.getStorageID()).build();
+        .setStorageUuid(r.getStorage().getStorageID())
+        .setStorage(convert(r.getStorage())).build();
+  }
+
+  public static StorageReport convert(StorageReportProto p) {
+    return new StorageReport(
+        p.hasStorage() ?
+            convert(p.getStorage()) :
+            new DatanodeStorage(p.getStorageUuid()),
+        p.getFailed(), p.getCapacity(), p.getDfsUsed(), p.getRemaining(),
+        p.getBlockPoolUsed());
+  }
+
+  public static StorageReport[] convertStorageReports(
+      List<StorageReportProto> list) {
+    final StorageReport[] report = new StorageReport[list.size()];
+    for (int i = 0; i < report.length; i++) {
+      report[i] = convert(list.get(i));
+    }
+    return report;
+  }
+
+  public static List<StorageReportProto> convertStorageReports(StorageReport[] storages) {
+    final List<StorageReportProto> protos = new ArrayList<StorageReportProto>(
+        storages.length);
+    for(int i = 0; i < storages.length; i++) {
+      protos.add(convert(storages[i]));
+    }
+    return protos;
   }
 
   public static DataChecksum.Type convert(HdfsProtos.ChecksumTypeProto type) {
@@ -1615,5 +1819,64 @@ public class PBHelper {
         setSpaceConsumed(cs.getSpaceConsumed()).
         setDsQuota(cs.getDsQuota()).
         build();
+  }
+
+  public static BlockStoragePolicy[] convertStoragePolicies(
+      List<HdfsProtos.BlockStoragePolicyProto> policyProtos) {
+    if (policyProtos == null || policyProtos.size() == 0) {
+      return new BlockStoragePolicy[0];
+    }
+    BlockStoragePolicy[] policies = new BlockStoragePolicy[policyProtos.size()];
+    int i = 0;
+    for (HdfsProtos.BlockStoragePolicyProto proto : policyProtos) {
+      policies[i++] = convert(proto);
+    }
+    return policies;
+  }
+
+  public static BlockStoragePolicy convert(HdfsProtos.BlockStoragePolicyProto proto) {
+    List<StorageTypeProto> cList = proto.getCreationPolicy()
+        .getStorageTypesList();
+    StorageType[] creationTypes = convertStorageTypes(cList, cList.size());
+    List<StorageTypeProto> cfList = proto.hasCreationFallbackPolicy() ? proto
+        .getCreationFallbackPolicy().getStorageTypesList() : null;
+    StorageType[] creationFallbackTypes = cfList == null ? StorageType
+        .EMPTY_ARRAY : convertStorageTypes(cfList, cfList.size());
+    List<StorageTypeProto> rfList = proto.hasReplicationFallbackPolicy() ?
+        proto.getReplicationFallbackPolicy().getStorageTypesList() : null;
+    StorageType[] replicationFallbackTypes = rfList == null ? StorageType
+        .EMPTY_ARRAY : convertStorageTypes(rfList, rfList.size());
+    return new BlockStoragePolicy((byte) proto.getPolicyId(), proto.getName(),
+        creationTypes, creationFallbackTypes, replicationFallbackTypes);
+  }
+
+  public static HdfsProtos.BlockStoragePolicyProto convert(BlockStoragePolicy policy) {
+    HdfsProtos.BlockStoragePolicyProto.Builder builder = HdfsProtos.BlockStoragePolicyProto
+        .newBuilder().setPolicyId(policy.getId()).setName(policy.getName());
+    // creation storage types
+    HdfsProtos.StorageTypesProto creationProto = convert(policy.getStorageTypes());
+    Preconditions.checkArgument(creationProto != null);
+    builder.setCreationPolicy(creationProto);
+    // creation fallback
+    HdfsProtos.StorageTypesProto creationFallbackProto = convert(
+        policy.getCreationFallbacks());
+    if (creationFallbackProto != null) {
+      builder.setCreationFallbackPolicy(creationFallbackProto);
+    }
+    // replication fallback
+    HdfsProtos.StorageTypesProto replicationFallbackProto = convert(
+        policy.getReplicationFallbacks());
+    if (replicationFallbackProto != null) {
+      builder.setReplicationFallbackPolicy(replicationFallbackProto);
+    }
+    return builder.build();
+  }
+
+  public static HdfsProtos.StorageTypesProto convert(StorageType[] types) {
+    if (types == null || types.length == 0) {
+      return null;
+    }
+    List<StorageTypeProto> list = convertStorageTypes(types);
+    return HdfsProtos.StorageTypesProto.newBuilder().addAllStorageTypes(list).build();
   }
 }

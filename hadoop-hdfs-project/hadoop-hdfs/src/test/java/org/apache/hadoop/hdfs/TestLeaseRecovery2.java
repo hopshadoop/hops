@@ -95,6 +95,7 @@ public class TestLeaseRecovery2 {
     cluster = new MiniDFSCluster.Builder(conf).numDataNodes(5).build();
     cluster.waitActive();
     dfs = cluster.getFileSystem();
+    DFSTestUtil.createRootFolder();
   }
   
   /**

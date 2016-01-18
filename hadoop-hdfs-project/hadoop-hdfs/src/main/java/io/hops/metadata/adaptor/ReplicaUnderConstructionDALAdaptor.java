@@ -71,6 +71,12 @@ public class ReplicaUnderConstructionDALAdaptor extends
   }
 
   @Override
+  public void removeByBlockIdAndInodeId(long blockId, int inodeId)
+      throws StorageException {
+    dataAccces.removeByBlockIdAndInodeId(blockId, inodeId);
+  }
+
+  @Override
   public ReplicaUnderConstruction convertHDFStoDAL(
       org.apache.hadoop.hdfs.server.blockmanagement.ReplicaUnderConstruction hdfsClass)
       throws StorageException {
@@ -89,12 +95,12 @@ public class ReplicaUnderConstructionDALAdaptor extends
     if (dalClass != null) {
       return new org.apache.hadoop.hdfs.server.blockmanagement.ReplicaUnderConstruction(
           HdfsServerConstants.ReplicaState.values()[dalClass.getState()],
-          dalClass.getStorageId(), dalClass.getBlockId(), dalClass.getInodeId
-          (), dalClass.getBucketId());
+          dalClass.getStorageId(),
+          dalClass.getBlockId(),
+          dalClass.getInodeId(),
+          dalClass.getBucketId());
     } else {
       return null;
     }
-
   }
-
 }

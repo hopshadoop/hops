@@ -106,7 +106,7 @@ public class TestErasureCodingManager extends ClusterTest {
     }
   }
 
-  @Test(timeout = 240000)
+  @Test(timeout = 120000)
   public void testEncoding() throws IOException, InterruptedException {
     Codec.initializeCodecs(getConfig());
     EncodingPolicy policy = new EncodingPolicy("src", (short) 1);
@@ -131,7 +131,7 @@ public class TestErasureCodingManager extends ClusterTest {
     Assert.assertEquals(policy, status.getEncodingPolicy());
   }
 
-  @Test(timeout = 240000)
+  @Test(timeout = 120000)
   public void testLateEncoding() throws IOException {
     Util.createRandomFile(dfs, testFile, seed, TEST_BLOCK_COUNT,
         DFS_TEST_BLOCK_SIZE);
@@ -178,7 +178,7 @@ public class TestErasureCodingManager extends ClusterTest {
     }
   }
 
-  @Test(timeout = 240000)
+  @Test(timeout = 120000)
   public void testRevoke() throws IOException, InterruptedException {
     Codec.initializeCodecs(getConfig());
     EncodingPolicy policy = new EncodingPolicy("src", (short) 1);
@@ -210,7 +210,7 @@ public class TestErasureCodingManager extends ClusterTest {
     Assert.assertEquals(2, dfs.getFileStatus(testFile).getReplication());
   }
 
-  @Test(timeout = 240000)
+  @Test(timeout = 150000)
   public void testDelete() throws IOException, InterruptedException {
     Codec.initializeCodecs(getConfig());
     EncodingPolicy policy = new EncodingPolicy("src", (short) 1);

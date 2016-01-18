@@ -468,8 +468,8 @@ public class TestDFSPermission {
       fs = FileSystem.get(conf);
 
       // set the permission of the root to be world-wide rwx
-      fs.setPermission(new Path("/"), new FsPermission((short) 0777));
-      
+      fs.setPermission(new Path("/"), new FsPermission((short)0777));
+
       // create a directory hierarchy and sets random permission for each inode
       PermissionGenerator ancestorPermissionGenerator =
           new PermissionGenerator(r);
@@ -496,15 +496,15 @@ public class TestDFSPermission {
         filePaths[i] = new Path(parentPaths[i], FILE_NAME + i);
         dirPaths[i] = new Path(parentPaths[i], DIR_NAME + i);
 
-        // makes sure that each inode at the same level 
+        // makes sure that each inode at the same level
         // has a different permission
         ancestorPermissions[i] = ancestorPermissionGenerator.next();
         parentPermissions[i] = dirPermissionGenerator.next();
         permissions[i] = filePermissionGenerator.next();
-        fs.setPermission(ancestorPaths[i],
-            new FsPermission(ancestorPermissions[i]));
-        fs.setPermission(parentPaths[i],
-            new FsPermission(parentPermissions[i]));
+        fs.setPermission(ancestorPaths[i], new FsPermission(
+            ancestorPermissions[i]));
+        fs.setPermission(parentPaths[i], new FsPermission(
+            parentPermissions[i]));
       }
 
       /* file owner */

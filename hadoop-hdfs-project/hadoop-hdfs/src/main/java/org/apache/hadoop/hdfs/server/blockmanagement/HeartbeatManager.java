@@ -24,6 +24,7 @@ import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.server.namenode.Namesystem;
+import org.apache.hadoop.hdfs.server.protocol.StorageReport;
 import org.apache.hadoop.util.Daemon;
 import org.apache.hadoop.util.Time;
 
@@ -159,6 +160,16 @@ class HeartbeatManager implements DatanodeStatistics {
   }
 
   @Override
+  public synchronized int getInServiceXceiverCount() {
+    return stats.nodesInServiceXceiverCount;
+  }
+
+  @Override
+  public int getNumDatanodesInService() {
+    return stats.nodesInService;
+  }
+
+  @Override
   public synchronized long[] getStats() {
     return new long[]{getCapacityTotal(), getCapacityUsed(),
         getCapacityRemaining(), -1L, -1L, -1L, getBlockPoolUsed()};
@@ -174,7 +185,7 @@ class HeartbeatManager implements DatanodeStatistics {
       addDatanode(d);
 
       //update its timestamp
-      d.updateHeartbeat(0L, 0L, 0L, 0L, 0, 0);
+      d.updateHeartbeatState(StorageReport.EMPTY_ARRAY, 0, 0);
     }
   }
 
@@ -183,6 +194,8 @@ class HeartbeatManager implements DatanodeStatistics {
   }
 
   synchronized void addDatanode(final DatanodeDescriptor d) {
+    // update in-service node count
+    stats.add(d);
     datanodes.add(d);
     d.isAlive = true;
   }
@@ -196,11 +209,9 @@ class HeartbeatManager implements DatanodeStatistics {
   }
 
   synchronized void updateHeartbeat(final DatanodeDescriptor node,
-      long capacity, long dfsUsed, long remaining, long blockPoolUsed,
-      int xceiverCount, int failedVolumes) {
+      StorageReport[] reports, int xceiverCount, int failedVolumes) {
     stats.subtract(node);
-    node.updateHeartbeat(capacity, dfsUsed, remaining, blockPoolUsed,
-        xceiverCount, failedVolumes);
+    node.updateHeartbeat(reports, xceiverCount, failedVolumes);
     stats.add(node);
   }
 
@@ -222,6 +233,25 @@ class HeartbeatManager implements DatanodeStatistics {
    * While removing dead datanodes, make sure that only one datanode is marked
    * dead at a time within the synchronized section. Otherwise, a cascading
    * effect causes more datanodes to be declared dead.
+   * Check if there are any failed storage and if so,
+   * Remove all the blocks on the storage. It also covers the following less
+   * common scenarios. After DatanodeStorage is marked FAILED, it is still
+   * possible to receive IBR for this storage.
+   * 1) DN could deliver IBR for failed storage due to its implementation.
+   *    a) DN queues a pending IBR request.
+   *    b) The storage of the block fails.
+   *    c) DN first sends HB, NN will mark the storage FAILED.
+   *    d) DN then sends the pending IBR request.
+   * 2) SBN processes block request from pendingDNMessages.
+   *    It is possible to have messages in pendingDNMessages that refer
+   *    to some failed storage.
+   *    a) SBN receives a IBR and put it in pendingDNMessages.
+   *    b) The storage of the block fails.
+   *    c) Edit log replay get the IBR from pendingDNMessages.
+   * Alternatively, we can resolve these scenarios with the following approaches.
+   * A. Make sure DN don't deliver IBR for failed storage.
+   * B. Remove all blocks in PendingDataNodeMessages for the failed storage
+   *    when we remove all blocks from BlocksMap for that storage.
    */
   void heartbeatCheck() throws IOException {
     final DatanodeManager dm = blockManager.getDatanodeManager();
@@ -234,6 +264,10 @@ class HeartbeatManager implements DatanodeStatistics {
     while (!allAlive) {
       // locate the first dead node.
       DatanodeID dead = null;
+      
+      // locate the first failed storage that isn't on a dead node.
+      DatanodeStorageInfo failedStorage = null;
+
       // check the number of stale nodes
       int numOfStaleNodes = 0;
       synchronized (this) {
@@ -245,20 +279,39 @@ class HeartbeatManager implements DatanodeStatistics {
           if (d.isStale(dm.getStaleInterval())) {
             numOfStaleNodes++;
           }
+          
+                    DatanodeStorageInfo[] storageInfos = d.getStorageInfos();
+          for(DatanodeStorageInfo storageInfo : storageInfos) {
+            
+            if (failedStorage == null &&
+                storageInfo.areBlocksOnFailedStorage() &&
+                d != dead) {
+              failedStorage = storageInfo;
+            }
+
+          }
         }
         
         // Set the number of stale nodes in the DatanodeManager
         dm.setNumStaleNodes(numOfStaleNodes);
       }
 
-      allAlive = dead == null;
-      if (!allAlive) {
+      allAlive = dead == null && failedStorage == null;;
+      if (dead != null) {
         // acquire the fsnamesystem lock, and then remove the dead node.
         if (namesystem.isInSafeMode()) {
           return;
         }
         synchronized (this) {
           dm.removeDeadDatanode(dead);
+        }
+      }
+      if (failedStorage != null) {
+        if (namesystem.isInStartupSafeMode()) {
+          return;
+        }
+        synchronized (this) {
+          blockManager.removeBlocksAssociatedTo(failedStorage);
         }
       }
     }
@@ -282,7 +335,7 @@ class HeartbeatManager implements DatanodeStatistics {
             lastHeartbeatCheck = now;
           }
           if (blockManager.shouldUpdateBlockKey(now -
-              lastBlockKeyUpdate)) { //updeated when leader. blocktokensecretmanager does leader check
+              lastBlockKeyUpdate)) { //updated when leader. blocktokensecretmanager does leader check
             synchronized (HeartbeatManager.this) {
               for (DatanodeDescriptor d : datanodes) {
                 d.needKeyUpdate = true;
@@ -310,8 +363,11 @@ class HeartbeatManager implements DatanodeStatistics {
     private long capacityUsed = 0L;
     private long capacityRemaining = 0L;
     private long blockPoolUsed = 0L;
-    private int xceiverCount = 0;
 
+    private int xceiverCount = 0;
+    private int nodesInServiceXceiverCount = 0;
+
+    private int nodesInService = 0;
     private int expiredHeartbeats = 0;
 
     private void add(final DatanodeDescriptor node) {
@@ -319,6 +375,8 @@ class HeartbeatManager implements DatanodeStatistics {
       blockPoolUsed += node.getBlockPoolUsed();
       xceiverCount += node.getXceiverCount();
       if (!(node.isDecommissionInProgress() || node.isDecommissioned())) {
+        nodesInService++;
+        nodesInServiceXceiverCount += node.getXceiverCount();
         capacityTotal += node.getCapacity();
         capacityRemaining += node.getRemaining();
       } else {
@@ -331,6 +389,8 @@ class HeartbeatManager implements DatanodeStatistics {
       blockPoolUsed -= node.getBlockPoolUsed();
       xceiverCount -= node.getXceiverCount();
       if (!(node.isDecommissionInProgress() || node.isDecommissioned())) {
+        nodesInService--;
+        nodesInServiceXceiverCount -= node.getXceiverCount();
         capacityTotal -= node.getCapacity();
         capacityRemaining -= node.getRemaining();
       } else {

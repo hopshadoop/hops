@@ -29,6 +29,7 @@ import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.datanode.DataNodeTestUtils;
 import org.apache.hadoop.hdfs.server.protocol.BlockReportBlock;
+import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.apache.hadoop.hdfs.tools.DFSAdmin;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.SequenceFile;
@@ -54,12 +55,14 @@ import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.Scanner;
 import java.util.zip.DeflaterOutputStream;
 import java.util.zip.GZIPOutputStream;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
+import org.apache.hadoop.hdfs.server.protocol.BlockReport;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -1404,11 +1407,14 @@ public class TestDFSShell {
     List<File> files = new ArrayList<>();
     List<DataNode> datanodes = cluster.getDataNodes();
     String poolId = cluster.getNamesystem().getBlockPoolId();
-    Iterable<BlockReportBlock>[] blocks = cluster.getAllBlockReports(poolId);
-    for (int i = 0; i < blocks.length; i++) {
+    List<Map<DatanodeStorage, BlockReport>> blocks = cluster.getAllBlockReports(poolId);
+    for(int i = 0; i < blocks.size(); i++) {
       DataNode dn = datanodes.get(i);
-      for (BlockReportBlock b : blocks[i]) {
-        files.add(DataNodeTestUtils.getFile(dn, poolId, b.getBlockId()));
+      Map<DatanodeStorage, BlockReport> map = blocks.get(i);
+      for(Map.Entry<DatanodeStorage, BlockReport> e : map.entrySet()) {
+        for(BlockReportBlock b : e.getValue()) {
+          files.add(DataNodeTestUtils.getFile(dn, poolId, b.getBlockId()));
+        }
       }
     }
     return files;

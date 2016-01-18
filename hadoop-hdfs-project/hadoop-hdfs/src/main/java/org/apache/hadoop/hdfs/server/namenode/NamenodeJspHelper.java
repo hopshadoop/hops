@@ -74,6 +74,7 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 
 import static org.apache.hadoop.hdfs.DFSUtil.percent2String;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 
 class NamenodeJspHelper {
   static String fraction2String(double value) {
@@ -882,7 +883,8 @@ class NamenodeJspHelper {
         }
 
         doc.startTag("replicas");
-        for (DatanodeDescriptor dd : blockManager.datanodeList(block)){
+        for (DatanodeStorageInfo storage : blockManager.storageList(block)){
+          DatanodeDescriptor dd = storage.getDatanodeDescriptor();
           doc.startTag("replica");
           doc.startTag("host_name");
           doc.pcdata(dd.getHostName());

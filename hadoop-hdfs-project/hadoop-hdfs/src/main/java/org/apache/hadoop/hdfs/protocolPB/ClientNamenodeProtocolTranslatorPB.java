@@ -38,6 +38,7 @@ import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.protocol.AlreadyBeingCreatedException;
+import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.CorruptFileBlocks;
 import org.apache.hadoop.hdfs.protocol.DSQuotaExceededException;
@@ -52,6 +53,7 @@ import org.apache.hadoop.hdfs.protocol.LastUpdatedContentSummary;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.protocol.NSQuotaExceededException;
+import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.AbandonBlockRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.AddBlockRequestProto;
@@ -106,6 +108,7 @@ import org.apache.hadoop.hdfs.security.token.block.DataEncryptionKey;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.hdfs.server.namenode.NotReplicatedYetException;
 import org.apache.hadoop.hdfs.server.namenode.SafeModeException;
+import org.apache.hadoop.hdfs.server.protocol.DatanodeStorageReport;
 import org.apache.hadoop.io.EnumSetWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.ProtobufHelper;
@@ -151,6 +154,10 @@ public class ClientNamenodeProtocolTranslatorPB
   private final static GetDataEncryptionKeyRequestProto
       VOID_GET_DATA_ENCRYPTIONKEY_REQUEST =
       GetDataEncryptionKeyRequestProto.newBuilder().build();
+
+  private final static ClientNamenodeProtocolProtos.GetStoragePoliciesRequestProto
+      VOID_GET_STORAGE_POLICIES_REQUEST =
+      ClientNamenodeProtocolProtos.GetStoragePoliciesRequestProto.newBuilder().build();
 
   public ClientNamenodeProtocolTranslatorPB(ClientNamenodeProtocolPB proxy) {
     rpcProxy = proxy;
@@ -304,6 +311,30 @@ public class ClientNamenodeProtocolTranslatorPB
   }
 
   @Override
+  public BlockStoragePolicy[] getStoragePolicies() throws IOException {
+    try {
+      ClientNamenodeProtocolProtos.GetStoragePoliciesResponseProto response = rpcProxy
+          .getStoragePolicies(null, VOID_GET_STORAGE_POLICIES_REQUEST);
+      return PBHelper.convertStoragePolicies(response.getPoliciesList());
+    } catch (ServiceException e) {
+      throw ProtobufHelper.getRemoteException(e);
+    }
+  }
+
+  @Override
+  public void setStoragePolicy(String src, String policyName)
+      throws UnresolvedLinkException, FileNotFoundException,
+      QuotaExceededException, IOException {
+    ClientNamenodeProtocolProtos.SetStoragePolicyRequestProto req = ClientNamenodeProtocolProtos.SetStoragePolicyRequestProto
+        .newBuilder().setSrc(src).setPolicyName(policyName).build();
+    try {
+      rpcProxy.setStoragePolicy(null, req);
+    } catch (ServiceException e) {
+      throw ProtobufHelper.getRemoteException(e);
+    }
+  }
+
+  @Override
   public void setMetaEnabled(String src, boolean metaEnabled)
       throws AccessControlException, FileNotFoundException, SafeModeException,
       UnresolvedLinkException, IOException {
@@ -366,7 +397,7 @@ public class ClientNamenodeProtocolTranslatorPB
 
   @Override
   public LocatedBlock addBlock(String src, String clientName,
-      ExtendedBlock previous, DatanodeInfo[] excludeNodes)
+      ExtendedBlock previous, DatanodeInfo[] excludeNodes, String[] favoredNodes)
       throws AccessControlException, FileNotFoundException,
       NotReplicatedYetException, SafeModeException, UnresolvedLinkException,
       IOException {
@@ -378,6 +409,9 @@ public class ClientNamenodeProtocolTranslatorPB
     if (excludeNodes != null) {
       req.addAllExcludeNodes(PBHelper.convert(excludeNodes));
     }
+    if (favoredNodes != null) {
+      req.addAllFavoredNodes(Arrays.asList(favoredNodes));
+    }
     try {
       return PBHelper.convert(rpcProxy.addBlock(null, req.build()).getBlock());
     } catch (ServiceException e) {
@@ -387,14 +421,16 @@ public class ClientNamenodeProtocolTranslatorPB
 
   @Override
   public LocatedBlock getAdditionalDatanode(String src, ExtendedBlock blk,
-      DatanodeInfo[] existings, DatanodeInfo[] excludes, int numAdditionalNodes,
-      String clientName)
+      DatanodeInfo[] existings, String[] existingStorageIDs,
+      DatanodeInfo[] excludes, int numAdditionalNodes, String clientName)
       throws AccessControlException, FileNotFoundException, SafeModeException,
       UnresolvedLinkException, IOException {
-    GetAdditionalDatanodeRequestProto req =
-        GetAdditionalDatanodeRequestProto.newBuilder().setSrc(src)
+    GetAdditionalDatanodeRequestProto req = GetAdditionalDatanodeRequestProto
+            .newBuilder()
+            .setSrc(src)
             .setBlk(PBHelper.convert(blk))
             .addAllExistings(PBHelper.convert(existings))
+            .addAllExistingStorageUuids(Arrays.asList(existingStorageIDs))
             .addAllExcludes(PBHelper.convert(excludes))
             .setNumAdditionalNodes(numAdditionalNodes).setClientName(clientName)
             .build();
@@ -597,8 +633,22 @@ public class ClientNamenodeProtocolTranslatorPB
   }
 
   @Override
+  public DatanodeStorageReport[] getDatanodeStorageReport(DatanodeReportType type)
+      throws IOException {
+    final ClientNamenodeProtocolProtos.GetDatanodeStorageReportRequestProto req
+        = ClientNamenodeProtocolProtos.GetDatanodeStorageReportRequestProto.newBuilder()
+        .setType(PBHelper.convert(type)).build();
+    try {
+      return PBHelper.convertDatanodeStorageReports(
+          rpcProxy.getDatanodeStorageReport(null, req).getDatanodeStorageReportsList());
+    } catch (ServiceException e) {
+      throw ProtobufHelper.getRemoteException(e);
+    }
+  }
+
+  @Override
   public long getPreferredBlockSize(String filename)
-      throws IOException, UnresolvedLinkException {
+      throws IOException {
     GetPreferredBlockSizeRequestProto req =
         GetPreferredBlockSizeRequestProto.newBuilder().setFilename(filename)
             .build();
@@ -778,12 +828,15 @@ public class ClientNamenodeProtocolTranslatorPB
 
   @Override
   public void updatePipeline(String clientName, ExtendedBlock oldBlock,
-      ExtendedBlock newBlock, DatanodeID[] newNodes) throws IOException {
-    UpdatePipelineRequestProto req =
-        UpdatePipelineRequestProto.newBuilder().setClientName(clientName)
-            .setOldBlock(PBHelper.convert(oldBlock))
-            .setNewBlock(PBHelper.convert(newBlock))
-            .addAllNewNodes(Arrays.asList(PBHelper.convert(newNodes))).build();
+      ExtendedBlock newBlock, DatanodeID[] newNodes, String[] storageIDs)
+      throws IOException {
+    UpdatePipelineRequestProto req = UpdatePipelineRequestProto.newBuilder()
+        .setClientName(clientName)
+        .setOldBlock(PBHelper.convert(oldBlock))
+        .setNewBlock(PBHelper.convert(newBlock))
+        .addAllNewNodes(Arrays.asList(PBHelper.convert(newNodes)))
+        .addAllStorageIDs(storageIDs == null ? null : Arrays.asList(storageIDs))
+        .build();
     try {
       rpcProxy.updatePipeline(null, req);
     } catch (ServiceException e) {

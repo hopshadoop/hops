@@ -17,14 +17,17 @@
  */
 package org.apache.hadoop.hdfs.server.datanode.fsdataset.impl;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.DF;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
+import org.apache.hadoop.hdfs.StorageType;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.server.datanode.DataStorage;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsVolumeSpi;
+import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 
 import java.io.File;
@@ -40,17 +43,23 @@ import java.util.Set;
  * It uses the {@link FsDatasetImpl} object for synchronization.
  */
 @InterfaceAudience.Private
-class FsVolumeImpl implements FsVolumeSpi {
+public class FsVolumeImpl implements FsVolumeSpi {
   private final FsDatasetImpl dataset;
   private final String storageID;
+  private final StorageType storageType;
   private final Map<String, BlockPoolSlice> bpSlices =
       new HashMap<>();
   private final File currentDir;    // <StorageDirectory>/current
   private final DF usage;
   private final long reserved;
+
+  // Capacity configured. This is useful when we want to
+  // limit the visible capacity for tests. If negative, then we just
+  // query from the filesystem.
+  protected volatile long configuredCapacity;
   
   FsVolumeImpl(FsDatasetImpl dataset, String storageID, File currentDir,
-      Configuration conf) throws IOException {
+      Configuration conf, StorageType storageType) throws IOException {
     this.dataset = dataset;
     this.storageID = storageID;
     this.reserved = conf.getLong(DFSConfigKeys.DFS_DATANODE_DU_RESERVED_KEY,
@@ -58,6 +67,8 @@ class FsVolumeImpl implements FsVolumeSpi {
     this.currentDir = currentDir;
     File parent = currentDir.getParentFile();
     this.usage = new DF(parent, conf);
+    this.storageType = storageType;
+    this.configuredCapacity = -1;
   }
   
   File getCurrentDir() {
@@ -94,13 +105,26 @@ class FsVolumeImpl implements FsVolumeSpi {
   /**
    * Calculate the capacity of the filesystem, after removing any
    * reserved capacity.
-   *
-   * @return the unreserved number of bytes left in this filesystem. May be
-   * zero.
+   * @return the unreserved number of bytes left in this filesystem. May be zero.
    */
-  long getCapacity() {
-    long remaining = usage.getCapacity() - reserved;
-    return remaining > 0 ? remaining : 0;
+  @VisibleForTesting
+  public long getCapacity() {
+    if (configuredCapacity < 0) {
+      long remaining = usage.getCapacity() - reserved;
+      return remaining > 0 ? remaining : 0;
+    }
+
+    return configuredCapacity;
+  }
+
+  /**
+   * This function MUST NOT be used outside of tests.
+   *
+   * @param capacity
+   */
+  @VisibleForTesting
+  public void setCapacityForTesting(long capacity) {
+    this.configuredCapacity = capacity;
   }
 
   @Override
@@ -123,6 +147,11 @@ class FsVolumeImpl implements FsVolumeSpi {
       throw new IOException("block pool " + bpid + " is not found");
     }
     return bp;
+  }
+
+  @Override
+  public String getBasePath() {
+    return currentDir.getParent();
   }
 
   @Override
@@ -287,7 +316,17 @@ class FsVolumeImpl implements FsVolumeSpi {
     }
   }
 
-  String getStorageID() {
+  @Override
+  public String getStorageID() {
     return storageID;
+  }
+
+  @Override
+  public StorageType getStorageType() {
+    return storageType;
+  }
+
+  DatanodeStorage toDatanodeStorage() {
+    return new DatanodeStorage(storageID, DatanodeStorage.State.NORMAL, storageType);
   }
 }
