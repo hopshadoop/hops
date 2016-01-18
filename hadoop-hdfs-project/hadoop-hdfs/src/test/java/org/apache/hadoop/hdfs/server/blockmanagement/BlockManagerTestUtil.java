@@ -26,13 +26,18 @@ import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLocks;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
+import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
+import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
+import org.apache.hadoop.hdfs.server.protocol.StorageReport;
 import org.apache.hadoop.util.Daemon;
 import org.junit.Assert;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
@@ -46,11 +51,11 @@ public class BlockManagerTestUtil {
   }
 
   /**
-   * @return the datanode descriptor for the given the given storageID.
+   * @return the datanode descriptor for the given the given dnUuid.
    */
   public static DatanodeDescriptor getDatanode(final FSNamesystem ns,
-      final String storageID) {
-    return ns.getBlockManager().getDatanodeManager().getDatanode(storageID);
+      final String dnUuid) {
+    return ns.getBlockManager().getDatanodeManager().getDatanodeByUuid(dnUuid);
   }
 
 
@@ -104,7 +109,8 @@ public class BlockManagerTestUtil {
     final Collection<DatanodeDescriptor> corruptNodes =
         getCorruptReplicas(blockManager)
             .getNodes(blockManager.blocksMap.getStoredBlock(b));
-    for (DatanodeDescriptor cur : blockManager.blocksMap.nodeList(b)){
+    for (DatanodeStorageInfo storage : blockManager.blocksMap.storageList(b)){
+      DatanodeDescriptor cur = storage.getDatanodeDescriptor();
       if (!cur.isDecommissionInProgress() && !cur.isDecommissioned()) {
         if ((corruptNodes == null) || !corruptNodes.contains(cur)) {
           String rackName = cur.getNetworkLocation();
@@ -211,7 +217,18 @@ public class BlockManagerTestUtil {
         "Must use default policy, got %s", bpp.getClass());
     ((BlockPlacementPolicyDefault) bpp).setPreferLocalNode(prefer);
   }
-  
+
+  public static DatanodeDescriptor getDatanodeDescriptor(String ipAddr,
+      String rackLocation, boolean initializeStorage) throws IOException {
+    return getDatanodeDescriptor(ipAddr, rackLocation,
+        initializeStorage? new DatanodeStorage(DatanodeStorage.generateUuid()): null);
+  }
+
+  public static DatanodeDescriptor getDatanodeDescriptor(String ipAddr,
+      String rackLocation, DatanodeStorage storage) throws IOException {
+    return getDatanodeDescriptor(ipAddr, rackLocation, storage, "host");
+  }
+
   /**
    * Call heartbeat check function of HeartbeatManager
    *
@@ -220,5 +237,47 @@ public class BlockManagerTestUtil {
    */
   public static void checkHeartbeat(BlockManager bm) throws IOException {
     bm.getDatanodeManager().getHeartbeatManager().heartbeatCheck();
+  }
+
+  /**
+   * Call heartbeat check function of HeartbeatManager and get
+   * under replicated blocks count within write lock to make sure
+   * computeDatanodeWork doesn't interfere.
+   * @param bm the BlockManager to manipulate
+   * @return the number of under replicated blocks
+   */
+  public static int checkHeartbeatAndGetUnderReplicatedBlocksCount(BlockManager bm)
+      throws IOException {
+    bm.getDatanodeManager().getHeartbeatManager().heartbeatCheck();
+    return bm.getUnderReplicatedNotMissingBlocks();
+  }
+
+  public static DatanodeStorageInfo updateStorage(DatanodeDescriptor dn,
+      DatanodeStorage s) throws IOException {
+    return dn.updateStorage(s);
+  }
+
+  public static DatanodeDescriptor getDatanodeDescriptor(String ipAddr,
+      String rackLocation, DatanodeStorage storage, String hostname) throws IOException {
+    DatanodeDescriptor dn = DFSTestUtil.getDatanodeDescriptor(ipAddr,
+        DFSConfigKeys.DFS_DATANODE_DEFAULT_PORT, rackLocation, hostname);
+    if (storage != null) {
+      dn.updateStorage(storage);
+    }
+    return dn;
+  }
+
+  public static StorageReport[] getStorageReportsForDatanode(
+      DatanodeDescriptor dnd) {
+    ArrayList<StorageReport> reports = new ArrayList<StorageReport>();
+    for (DatanodeStorageInfo storage : dnd.getStorageInfos()) {
+      DatanodeStorage dns = new DatanodeStorage(
+          storage.getStorageID(), storage.getState(), storage.getStorageType());
+      StorageReport report = new StorageReport(
+          dns ,false, storage.getCapacity(),
+          storage.getDfsUsed(), storage.getRemaining(), storage.getBlockPoolUsed());
+      reports.add(report);
+    }
+    return reports.toArray(StorageReport.EMPTY_ARRAY);
   }
 }

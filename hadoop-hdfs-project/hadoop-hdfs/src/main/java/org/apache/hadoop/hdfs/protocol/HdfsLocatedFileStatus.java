@@ -38,42 +38,36 @@ public class HdfsLocatedFileStatus extends HdfsFileStatus {
   
   /**
    * Constructor
-   *
-   * @param fileId
-   *     id of the file inode
-   * @param length
+   *  @param length
    *     size
    * @param isdir
    *     if this is directory
    * @param block_replication
-   *     the file's replication factor
+ *     the file's replication factor
    * @param blocksize
-   *     the file's block size
+*     the file's block size
    * @param modification_time
-   *     most recent modification time
+*     most recent modification time
    * @param access_time
-   *     most recent access time
+*     most recent access time
    * @param permission
-   *     permission
+*     permission
    * @param owner
-   *     owner
+*     owner
    * @param group
-   *     group
+*     group
    * @param symlink
-   *     symbolic link
+*     symbolic link
    * @param path
-   *     local path name in java UTF8 format
+*     local path name in java UTF8 format
    * @param locations
-   *     block locations
-   * @param isStoredInDB
-   *     is the  data of the file stored in the database?
    */
   public HdfsLocatedFileStatus(long fileId, long length, boolean isdir,
       int block_replication, long blocksize, long modification_time,
       long access_time, FsPermission permission, String owner, String group,
-      byte[] symlink, byte[] path, LocatedBlocks locations, boolean isStoredInDB) {
+      byte[] symlink, byte[] path, LocatedBlocks locations, boolean isStoredInDB, byte storagePolicy) {
     super(fileId, length, isdir, block_replication, blocksize, modification_time,
-        access_time, permission, owner, group, symlink, path, isStoredInDB);
+        access_time, permission, owner, group, symlink, path, isStoredInDB, storagePolicy);
     this.locations = locations;
   }
 

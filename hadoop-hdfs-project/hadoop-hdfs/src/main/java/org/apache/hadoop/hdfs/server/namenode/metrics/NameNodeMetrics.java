@@ -70,14 +70,12 @@ public class NameNodeMetrics {
   MutableCounterLong getLinkTargetOps;
   @Metric
   MutableCounterLong filesInGetListingOps;
+  @Metric("Number of blockReceivedAndDeleted calls")
+  MutableCounterLong blockReceivedAndDeletedOps;
+  @Metric("Number of blockReports from individual storages")
+  MutableCounterLong storageBlockReportOps;
 
-  @Metric("Journal transactions")
-  MutableRate transactions;
-  @Metric("Journal syncs")
-  MutableRate syncs;
   MutableQuantiles[] syncsQuantiles;
-  @Metric("Journal transactions batched in sync")
-  MutableCounterLong transactionsBatchedInSync;
   @Metric("Block report")
   MutableRate blockReport;
   MutableQuantiles[] blockReportQuantiles;
@@ -177,19 +175,12 @@ public class NameNodeMetrics {
     getLinkTargetOps.incr();
   }
 
-  public void addTransaction(long latency) {
-    transactions.add(latency);
+  public void incrBlockReceivedAndDeletedOps() {
+    blockReceivedAndDeletedOps.incr();
   }
 
-  public void incrTransactionsBatchedInSync() {
-    transactionsBatchedInSync.incr();
-  }
-
-  public void addSync(long elapsed) {
-    syncs.add(elapsed);
-    for (MutableQuantiles q : syncsQuantiles) {
-      q.add(elapsed);
-    }
+  public void incrStorageBlockReportOps() {
+    storageBlockReportOps.incr();
   }
 
   public void setFsImageLoadTime(long elapsed) {

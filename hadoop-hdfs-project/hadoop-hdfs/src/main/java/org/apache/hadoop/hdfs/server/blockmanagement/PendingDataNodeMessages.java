@@ -40,12 +40,12 @@ class PendingDataNodeMessages {
 
   static class ReportedBlockInfo {
     private final Block block;
-    private final DatanodeDescriptor dn;
+    private final DatanodeStorageInfo storageInfo;
     private final ReplicaState reportedState;
 
-    ReportedBlockInfo(DatanodeDescriptor dn, Block block,
+    ReportedBlockInfo(DatanodeStorageInfo storageInfo, Block block,
         ReplicaState reportedState) {
-      this.dn = dn;
+      this.storageInfo = storageInfo;
       this.block = block;
       this.reportedState = reportedState;
     }
@@ -54,25 +54,27 @@ class PendingDataNodeMessages {
       return block;
     }
 
-    DatanodeDescriptor getNode() {
-      return dn;
-    }
-
     ReplicaState getReportedState() {
       return reportedState;
     }
 
+    DatanodeStorageInfo getStorageInfo() {
+      return storageInfo;
+    }
+
     @Override
     public String toString() {
-      return "ReportedBlockInfo [block=" + block + ", dn=" + dn +
-          ", reportedState=" + reportedState + "]";
+      return "ReportedBlockInfo [block=" + block + ", dn="
+          + storageInfo.getDatanodeDescriptor()
+          + ", reportedState=" + reportedState + "]";
     }
   }
   
-  void enqueueReportedBlock(DatanodeDescriptor dn, Block block,
+  void enqueueReportedBlock(DatanodeStorageInfo storageInfo, Block block,
       ReplicaState reportedState) {
     block = new Block(block);
-    getBlockQueue(block).add(new ReportedBlockInfo(dn, block, reportedState));
+    getBlockQueue(block).add(
+        new ReportedBlockInfo(storageInfo, block, reportedState));
     count++;
   }
   

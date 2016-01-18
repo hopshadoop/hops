@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p/>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p/>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -19,11 +19,13 @@ package org.apache.hadoop.hdfs.protocol;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.hdfs.StorageType;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 import org.apache.hadoop.security.token.Token;
 
-import java.io.IOException;
 import java.util.Comparator;
+import java.util.HashSet;
 
 /**
  * Associates a block with the Datanodes that contain its replicas
@@ -37,6 +39,10 @@ public class LocatedBlock {
   private ExtendedBlock b;
   private long offset;  // offset of the first byte of the block in the file
   private DatanodeInfo[] locs;
+  // Storage type for each replica, if reported.
+  private StorageType[] storageTypes;
+  // Storage ID for each replica, if reported.
+  private String[] storageIDs;
   // corrupt flag is true if all of the replicas of a block are corrupt.
   // else false. If block has few corrupt replicas, they are filtered and 
   // their locations are not part of this object
@@ -46,16 +52,47 @@ public class LocatedBlock {
 
   private byte[] data = null;
 
+  // Used when there are no locations
+  private static final DatanodeInfo[] EMPTY_LOCS = new DatanodeInfo[0];
+
   public LocatedBlock(ExtendedBlock b, DatanodeInfo[] locs) {
     this(b, locs, -1, false); // startOffset is unknown
   }
 
-  public LocatedBlock(ExtendedBlock b, DatanodeInfo[] locs, long startOffset) {
-    this(b, locs, startOffset, false);
+  public LocatedBlock(ExtendedBlock b, DatanodeInfo[] locs, long startOffset, boolean corrupt) {
+    this(b, locs, null, null, startOffset, corrupt);
   }
 
-  public LocatedBlock(ExtendedBlock b, DatanodeInfo[] locs, long startOffset,
-      boolean corrupt) {
+  public LocatedBlock(ExtendedBlock b, DatanodeStorageInfo[] storages) {
+    this(b, storages, -1, false); // startOffset is unknown
+  }
+
+  public LocatedBlock(ExtendedBlock b, DatanodeInfo[] locs, String[] storageIDs, StorageType[] storageTypes) {
+    this(b, locs, storageIDs, storageTypes, -1, false); // startOffset is unknown
+  }
+
+  public LocatedBlock(ExtendedBlock b, DatanodeStorageInfo[] storages, long startOffset, boolean corrupt) {
+    this(b, DatanodeStorageInfo.toDatanodeInfos(storages),
+        DatanodeStorageInfo.toStorageIDs(storages),
+        DatanodeStorageInfo.toStorageTypes(storages),
+        startOffset, corrupt);
+  }
+
+  public static LocatedBlock createLocatedBlock(ExtendedBlock b,
+      DatanodeStorageInfo[] storages, long startOffset, boolean corrupt) {
+    final DatanodeInfo[] locs = new DatanodeInfo[storages.length];
+    final String[] storageIDs = new String[storages.length];
+    final StorageType[] storageType = new StorageType[storages.length];
+    for(int i = 0; i < storages.length; i++) {
+      locs[i] = storages[i].getDatanodeDescriptor();
+      storageIDs[i] = storages[i].getStorageID();
+      storageType[i] = storages[i].getStorageType();
+    }
+    return new LocatedBlock(b, locs, storageIDs, storageType, startOffset, corrupt);
+  }
+
+  public LocatedBlock(ExtendedBlock b, DatanodeInfo[] locs, String[] storageIDs,
+      StorageType[] storageTypes, long startOffset, boolean corrupt) {
     this.b = b;
     this.offset = startOffset;
     this.corrupt = corrupt;
@@ -64,6 +101,8 @@ public class LocatedBlock {
     } else {
       this.locs = locs;
     }
+    this.storageIDs = storageIDs;
+    this.storageTypes = storageTypes;
     this.data = null;
   }
 
@@ -107,6 +146,14 @@ public class LocatedBlock {
     return blockToken;
   }
 
+  public StorageType[] getStorageTypes() {
+    return storageTypes;
+  }
+
+  public String[] getStorageIDs() {
+    return storageIDs;
+  }
+
   public void setBlockToken(Token<BlockTokenIdentifier> token) {
     this.blockToken = token;
   }
@@ -118,7 +165,15 @@ public class LocatedBlock {
   public DatanodeInfo[] getLocations() {
     return locs;
   }
-  
+
+  public DatanodeInfo[] getUniqueLocations() {
+    HashSet<DatanodeInfo> dns = new HashSet<DatanodeInfo>();
+    for(DatanodeInfo dn : this.locs) {
+      dns.add(dn);
+    }
+    return dns.toArray(new DatanodeInfo[0]);
+  }
+
   public long getStartOffset() {
     return offset;
   }

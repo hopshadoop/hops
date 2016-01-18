@@ -29,6 +29,7 @@ import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockManager;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockManagerTestUtil;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
@@ -49,9 +50,12 @@ import java.net.Socket;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.hadoop.hdfs.server.protocol.BlockReport;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeTrue;
 
 /**
  * Fine-grain testing of block files and locations after volume failure.
@@ -66,7 +70,7 @@ public class TestDataNodeVolumeFailure {
   File dataDir = null;
   File data_fail = null;
   File failedDir = null;
-  
+
   // mapping blocks to Meta files(physical files) and locs(NameNode locations)
   private class BlockLocs {
     public int num_files = 0;
@@ -85,10 +89,17 @@ public class TestDataNodeVolumeFailure {
     conf.setInt(DFSConfigKeys.DFS_DATANODE_FAILED_VOLUMES_TOLERATED_KEY, 1);
     cluster = new MiniDFSCluster.Builder(conf).numDataNodes(dn_num).build();
     cluster.waitActive();
+    dataDir = new File(cluster.getDataDirectory());
   }
 
   @After
   public void tearDown() throws Exception {
+    if (cluster != null) {
+      for (File dir : cluster.getAllInstanceStorageDirs()) {
+        dir.setExecutable(true);
+      }
+    }
+
     if (data_fail != null) {
       data_fail.setWritable(true);
     }
@@ -99,7 +110,7 @@ public class TestDataNodeVolumeFailure {
       cluster.shutdown();
     }
   }
-  
+
   /*
    * Verify the number of blocks and files are correct after volume failure,
    * and that we can replicate to both datanodes even after a single volume
@@ -111,12 +122,12 @@ public class TestDataNodeVolumeFailure {
     dataDir = new File(cluster.getDataDirectory());
     System.out.println("Data dir: is " + dataDir.getPath());
 
-    
+
     // Data dir structure is dataDir/data[1-4]/[current,tmp...]
-    // data1,2 is for datanode 1, data2,3 - datanode2 
+    // data1,2 is for datanode 1, data2,3 - datanode2
     String filename = "/test.txt";
     Path filePath = new Path(filename);
-    
+
     // we use only small number of blocks to avoid creating subdirs in the data dir..
     int filesize = block_size * blocks_num;
     DFSTestUtil.createFile(fs, filePath, filesize, repl, 1L);
@@ -137,37 +148,88 @@ public class TestDataNodeVolumeFailure {
     }
     data_fail.setReadOnly();
     failedDir.setReadOnly();
-    System.out.println(
-        "Deleteing " + failedDir.getPath() + "; exist=" + failedDir.exists());
-    
-    // access all the blocks on the "failed" DataNode, 
-    // we need to make sure that the "failed" volume is being accessed - 
+    System.out.println("Deleting " + failedDir.getPath() + "; exist=" + failedDir.exists());
+
+    // access all the blocks on the "failed" DataNode,
+    // we need to make sure that the "failed" volume is being accessed -
     // and that will cause failure, blocks removal, "emergency" block report
     triggerFailure(filename, filesize);
-    
-    // make sure a block report is sent 
+
+    // make sure a block report is sent
     DataNode dn = cluster.getDataNodes().get(1); //corresponds to dir data3
     String bpid = cluster.getNamesystem().getBlockPoolId();
     DatanodeRegistration dnR = dn.getDNRegistrationForBP(bpid);
-    final StorageBlockReport[] report =
-        {new StorageBlockReport(new DatanodeStorage(dnR.getStorageID()),
-            DataNodeTestUtils.getFSDataset(dn).getBlockReport(bpid))};
-    cluster.getNameNodeRpc().blockReport(dnR, bpid, report);
+
+    Map<DatanodeStorage, BlockReport> perVolumeBlockLists =
+        dn.getFSDataset().getBlockReports(bpid);
+
+    // Send block report
+    StorageBlockReport[] reports =
+        new StorageBlockReport[perVolumeBlockLists.size()];
+
+    int reportIndex = 0;
+    for(Map.Entry<DatanodeStorage, BlockReport> kvPair : perVolumeBlockLists.entrySet()) {
+      DatanodeStorage dnStorage = kvPair.getKey();
+      BlockReport blockList = kvPair.getValue();
+      reports[reportIndex++] =
+          new StorageBlockReport(dnStorage, blockList);
+    }
+
+    cluster.getNameNodeRpc().blockReport(dnR, bpid, reports);
 
     // verify number of blocks and files...
     verify(filename, filesize);
-    
+
     // create another file (with one volume failed).
     System.out.println("creating file test1.txt");
     Path fileName1 = new Path("/test1.txt");
     DFSTestUtil.createFile(fs, fileName1, filesize, repl, 1L);
-    
+
     // should be able to replicate to both nodes (2 DN, repl=2)
     DFSTestUtil.waitReplication(fs, fileName1, repl);
     System.out.println("file " + fileName1.getName() +
         " is created and replicated");
   }
-  
+
+  /**
+   * Test that there are under replication blocks after vol failures
+   */
+  @Test
+  public void testUnderReplicationAfterVolFailure() throws Exception {
+    // This test relies on denying access to data volumes to simulate data volume
+    // failure.  This doesn't work on Windows, because an owner of an object
+    // always has the ability to read and change permissions on the object.
+    assumeTrue(!Path.WINDOWS);
+
+    // Bring up one more datanode
+    cluster.startDataNodes(conf, 1, true, null, null);
+    cluster.waitActive();
+
+    FileSystem fs = cluster.getFileSystem();
+
+    final BlockManager bm = cluster.getNamesystem().getBlockManager();
+
+    Path file1 = new Path("/test1");
+    DFSTestUtil.createFile(fs, file1, 1024, (short)3, 1L);
+    DFSTestUtil.waitReplication(fs, file1, (short)3);
+
+    // Fail the first volume on both datanodes
+    File dn1Vol1 = cluster.getInstanceStorageDir(0, 0);
+    File dn2Vol1 = cluster.getInstanceStorageDir(1, 0);
+    assertTrue("Couldn't chmod local vol", dn1Vol1.setExecutable(false));
+    assertTrue("Couldn't chmod local vol", dn2Vol1.setExecutable(false));
+
+    Path file2 = new Path("/test2");
+    DFSTestUtil.createFile(fs, file2, 1024, (short)3, 1L);
+    DFSTestUtil.waitReplication(fs, file2, (short)3);
+
+    // underReplicatedBlocks are due to failed volumes
+    int underReplicatedBlocks =
+        BlockManagerTestUtil.checkHeartbeatAndGetUnderReplicatedBlocksCount(bm);
+    assertTrue("There is no under replicated block after volume failure",
+        underReplicatedBlocks > 0);
+  }
+
   /**
    * verifies two things:
    * 1. number of locations of each block in the name node
@@ -206,7 +268,7 @@ public class TestDataNodeVolumeFailure {
     FSNamesystem fsn = cluster.getNamesystem();
     // force update of all the metric counts by calling computeDatanodeWork
     BlockManagerTestUtil.getComputedDatanodeWork(fsn.getBlockManager());
-    // get all the counts 
+    // get all the counts
     long underRepl = fsn.getUnderReplicatedBlocks();
     long pendRepl = fsn.getPendingReplicationBlocks();
     long totalRepl = underRepl + pendRepl;
@@ -220,7 +282,7 @@ public class TestDataNodeVolumeFailure {
     assertEquals("Incorrect total block count", totalReal + totalRepl,
         blocks_num * repl);
   }
-  
+
   /**
    * go to each block on the 2nd DataNode until it fails...
    *
@@ -232,7 +294,7 @@ public class TestDataNodeVolumeFailure {
     NamenodeProtocols nn = cluster.getNameNodeRpc();
     List<LocatedBlock> locatedBlocks =
         nn.getBlockLocations(path, 0, size).getLocatedBlocks();
-    
+
     for (LocatedBlock lb : locatedBlocks) {
       DatanodeInfo dinfo = lb.getLocations()[1];
       ExtendedBlock b = lb.getBlock();
@@ -245,7 +307,7 @@ public class TestDataNodeVolumeFailure {
       }
     }
   }
-  
+
   /**
    * simulate failure delete all the block files
    *
@@ -259,12 +321,12 @@ public class TestDataNodeVolumeFailure {
         if (!f.delete()) {
           return false;
         }
-        
+
       }
     }
     return true;
   }
-  
+
   /**
    * try to access a block on a data node. If fails - throws exception
    *
@@ -292,25 +354,19 @@ public class TestDataNodeVolumeFailure {
 
     // nothing - if it fails - it will throw and exception
   }
-  
+
   /**
    * Count datanodes that have copies of the blocks for a file
    * put it into the map
-   *
-   * @param map
-   * @param path
-   * @param size
-   * @return
-   * @throws IOException
    */
   private int countNNBlocks(Map<String, BlockLocs> map, String path, long size)
       throws IOException {
     int total = 0;
-    
+
     NamenodeProtocols nn = cluster.getNameNodeRpc();
     List<LocatedBlock> locatedBlocks =
         nn.getBlockLocations(path, 0, size).getLocatedBlocks();
-    //System.out.println("Number of blocks: " + locatedBlocks.size()); 
+    //System.out.println("Number of blocks: " + locatedBlocks.size());
 
     for (LocatedBlock lb : locatedBlocks) {
       String blockId = "" + lb.getBlock().getBlockId();
@@ -328,7 +384,7 @@ public class TestDataNodeVolumeFailure {
     }
     return total;
   }
-  
+
   /**
    * look for real blocks
    * by counting *.meta files in all the storage dirs

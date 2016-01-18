@@ -150,6 +150,11 @@ public class LockFactory {
     return new BatchedINodeLock(inodeIdentifiers);
   }
 
+  /**
+   * @param lockType the lock to acquire
+   * @param inodeIdentifier the id of the inode
+   * @param readUpPathInodes if true, you'll get locks for the parent inodes too
+   */
   public Lock getIndividualINodeLock(
       TransactionLockTypes.INodeLockType lockType,
       INodeIdentifier inodeIdentifier, boolean readUpPathInodes) {

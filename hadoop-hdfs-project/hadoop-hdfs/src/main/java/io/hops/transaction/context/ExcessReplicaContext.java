@@ -64,7 +64,7 @@ public class ExcessReplicaContext
       throws TransactionContextException, StorageException {
     ExcessReplica.Finder eFinder = (ExcessReplica.Finder) finder;
     switch (eFinder) {
-      case ByBlockIdStorageIdAndINodeId:
+      case ByBlockIdSidAndINodeId:
         return findByPrimaryKey(eFinder, params);
     }
     throw new RuntimeException(UNSUPPORTED_FINDER);
@@ -113,12 +113,12 @@ public class ExcessReplicaContext
     final long blockId = (Long) params[0];
     final int storageId = (Integer) params[1];
     final int inodeId = (Integer) params[2];
-    final BlockPK.ReplicaPK key =
-        new BlockPK.ReplicaPK(blockId, inodeId, storageId);
+    final BlockPK.ReplicaPK key = new BlockPK.ReplicaPK(blockId, inodeId, storageId);
+
     ExcessReplica result = null;
     if (contains(key) || containsByINode(inodeId) || containsByBlock(blockId)) {
       result = get(key);
-      hit(eFinder, result, "bid", blockId, "sid", storageId);
+      hit(eFinder, result, "bid", blockId, "uuid", storageId);
     } else {
       aboutToAccessStorage(eFinder, params);
       result = dataAccess.findByPK(blockId, storageId, inodeId);
@@ -172,6 +172,4 @@ public class ExcessReplicaContext
     miss(eFinder, result, "inodeIds", Arrays.toString(inodeIds));
     return result;
   }
-
-
 }

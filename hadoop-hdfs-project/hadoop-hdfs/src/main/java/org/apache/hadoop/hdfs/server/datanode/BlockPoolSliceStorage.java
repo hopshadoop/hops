@@ -150,7 +150,7 @@ public class BlockPoolSliceStorage extends Storage {
     // During startup some of them can upgrade or roll back
     // while others could be up-to-date for the regular startup.
     for (int idx = 0; idx < getNumStorageDirs(); idx++) {
-      doTransition(getStorageDir(idx), nsInfo, startOpt);
+      doTransition(datanode, getStorageDir(idx), nsInfo, startOpt);
       assert getLayoutVersion() == nsInfo
           .getLayoutVersion() : "Data-node and name-node layout versions must be the same.";
       assert getCTime() == nsInfo
@@ -180,7 +180,7 @@ public class BlockPoolSliceStorage extends Storage {
   /**
    * Format a block pool slice storage.
    *
-   * @param sd
+   * @param bpSdir
    *     the block pool storage
    * @param nsInfo
    *     the name space info
@@ -249,8 +249,6 @@ public class BlockPoolSliceStorage extends Storage {
    * Upgrade if this.LV > LAYOUT_VERSION || this.cTime < namenode.cTime Regular
    * startup if this.LV = LAYOUT_VERSION && this.cTime = namenode.cTime
    *
-   * @param dn
-   *     DataNode to which this storage belongs to
    * @param sd
    *     storage directory <SD>/current/<bpid>
    * @param nsInfo
@@ -259,12 +257,13 @@ public class BlockPoolSliceStorage extends Storage {
    *     startup option
    * @throws IOException
    */
-  private void doTransition(StorageDirectory sd, NamespaceInfo nsInfo,
+  private void doTransition(DataNode dn, StorageDirectory sd, NamespaceInfo
+      nsInfo,
       StartupOption startOpt) throws IOException {
     if (startOpt == StartupOption.ROLLBACK) {
       doRollback(sd, nsInfo); // rollback if applicable
     }
-    
+
     readProperties(sd);
     checkVersionUpgradable(this.layoutVersion);
     assert this.layoutVersion >=
@@ -287,7 +286,7 @@ public class BlockPoolSliceStorage extends Storage {
     }
     if (this.layoutVersion > HdfsConstants.LAYOUT_VERSION ||
         this.cTime < nsInfo.getCTime()) {
-      doUpgrade(sd, nsInfo); // upgrade
+      doUpgrade(dn, sd, nsInfo); // upgrade
       return;
     }
     // layoutVersion == LAYOUT_VERSION && this.cTime > nsInfo.cTime
@@ -297,78 +296,15 @@ public class BlockPoolSliceStorage extends Storage {
             this.getCTime() + " is newer than the namespace state: LV = " +
             nsInfo.getLayoutVersion() + " CTime = " + nsInfo.getCTime());
   }
-
+ 
   /**
-   * Upgrade to any release after 0.22 (0.22 included) release e.g. 0.22 =>
-   * 0.23
-   * Upgrade procedure is as follows:
-   * <ol>
-   * <li>If <SD>/current/<bpid>/previous exists then delete it</li>
-   * <li>Rename <SD>/current/<bpid>/current to
-   * <SD>/current/bpid/current/previous.tmp</li>
-   * <li>Create new <SD>current/<bpid>/current directory</li>
-   * <ol>
-   * <li>Hard links for block files are created from previous.tmp to
-   * current</li>
-   * <li>Save new version file in current directory</li>
-   * </ol>
-   * <li>Rename previous.tmp to previous</li> </ol>
-   *
-   * @param bpSd
-   *     storage directory <SD>/current/<bpid>
-   * @param nsInfo
-   *     Namespace Info from the namenode
-   * @throws IOException
-   *     on error
+   * Upgrading not supported as of now.
    */
-  void doUpgrade(StorageDirectory bpSd, NamespaceInfo nsInfo)
+  void doUpgrade(DataNode datanode, StorageDirectory sd, NamespaceInfo nsInfo)
       throws IOException {
-    // Upgrading is applicable only to release with federation or after
-    if (!LayoutVersion.supports(Feature.FEDERATION, layoutVersion)) {
-      return;
+    throw new IOException("doUpgrade not supported yet.");
     }
-    LOG.info("Upgrading block pool storage directory " + bpSd.getRoot() +
-        ".\n   old LV = " + this.getLayoutVersion() + "; old CTime = " +
-        this.getCTime() + ".\n   new LV = " + nsInfo.getLayoutVersion() +
-        "; new CTime = " + nsInfo.getCTime());
-    // get <SD>/previous directory
-    String dnRoot = getDataNodeStorageRoot(bpSd.getRoot().getCanonicalPath());
-    StorageDirectory dnSdStorage = new StorageDirectory(new File(dnRoot));
-    File dnPrevDir = dnSdStorage.getPreviousDir();
     
-    // If <SD>/previous directory exists delete it
-    if (dnPrevDir.exists()) {
-      deleteDir(dnPrevDir);
-    }
-    File bpCurDir = bpSd.getCurrentDir();
-    File bpPrevDir = bpSd.getPreviousDir();
-    assert bpCurDir.exists() : "BP level current directory must exist.";
-    cleanupDetachDir(new File(bpCurDir, DataStorage.STORAGE_DIR_DETACHED));
-    
-    // 1. Delete <SD>/current/<bpid>/previous dir before upgrading
-    if (bpPrevDir.exists()) {
-      deleteDir(bpPrevDir);
-    }
-    File bpTmpDir = bpSd.getPreviousTmp();
-    assert !bpTmpDir.exists() : "previous.tmp directory must not exist.";
-    
-    // 2. Rename <SD>/curernt/<bpid>/current to <SD>/curernt/<bpid>/previous.tmp
-    rename(bpCurDir, bpTmpDir);
-    
-    // 3. Create new <SD>/current with block files hardlinks and VERSION
-    linkAllBlocks(bpTmpDir, bpCurDir);
-    this.layoutVersion = HdfsConstants.LAYOUT_VERSION;
-    assert this.namespaceID == nsInfo
-        .getNamespaceID() : "Data-node and name-node layout versions must be the same.";
-    this.cTime = nsInfo.getCTime();
-    writeProperties(bpSd);
-    
-    // 4.rename <SD>/curernt/<bpid>/previous.tmp to <SD>/curernt/<bpid>/previous
-    rename(bpTmpDir, bpPrevDir);
-    LOG.info("Upgrade of block pool " + blockpoolID + " at " + bpSd.getRoot() +
-        " is complete");
-  }
-
   /**
    * Cleanup the detachDir.
    * <p/>
@@ -488,30 +424,6 @@ public class BlockPoolSliceStorage extends Storage {
         return "Finalize " + dataDirPath;
       }
     }).start();
-  }
-
-  /**
-   * Hardlink all finalized and RBW blocks in fromDir to toDir
-   *
-   * @param fromDir
-   *     directory where the snapshot is stored
-   * @param toDir
-   *     the current data directory
-   * @throws IOException
-   *     if error occurs during hardlink
-   */
-  private void linkAllBlocks(File fromDir, File toDir) throws IOException {
-    // do the link
-    int diskLayoutVersion = this.getLayoutVersion();
-    // hardlink finalized blocks in tmpDir
-    HardLink hardLink = new HardLink();
-    DataStorage.linkBlocks(new File(fromDir, DataStorage.STORAGE_DIR_FINALIZED),
-        new File(toDir, DataStorage.STORAGE_DIR_FINALIZED), diskLayoutVersion,
-        hardLink);
-    DataStorage.linkBlocks(new File(fromDir, DataStorage.STORAGE_DIR_RBW),
-        new File(toDir, DataStorage.STORAGE_DIR_RBW), diskLayoutVersion,
-        hardLink);
-    LOG.info(hardLink.linkStats.report());
   }
 
   /**

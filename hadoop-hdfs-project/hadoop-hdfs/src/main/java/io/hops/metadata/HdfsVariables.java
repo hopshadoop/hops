@@ -148,7 +148,7 @@ public class HdfsVariables {
         }
 
 
-        throw new IllegalStateException("Cannot increment Varaible of type " +
+        throw new IllegalStateException("Cannot increment Variable of type " +
             variable.getClass().getSimpleName());
       }
     });

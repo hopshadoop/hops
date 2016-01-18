@@ -18,10 +18,12 @@
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
 import com.google.common.base.Joiner;
+import java.io.IOException;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.server.blockmanagement.PendingDataNodeMessages.ReportedBlockInfo;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.ReplicaState;
+import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.junit.Test;
 
 import java.util.Queue;
@@ -39,10 +41,12 @@ public class TestPendingDataNodeMessages {
   private final Block block2Gs1 = new Block(2, 0, 1);
 
   @Test
-  public void testQueues() {
+  public void testQueues() throws IOException {
     DatanodeDescriptor fakeDN = DFSTestUtil.getLocalDatanodeDescriptor();
-    msgs.enqueueReportedBlock(fakeDN, block1Gs1, ReplicaState.FINALIZED);
-    msgs.enqueueReportedBlock(fakeDN, block1Gs2, ReplicaState.FINALIZED);
+    DatanodeStorage storage = new DatanodeStorage("STORAGE_ID");
+    DatanodeStorageInfo storageInfo = new DatanodeStorageInfo(fakeDN, storage);
+    msgs.enqueueReportedBlock(storageInfo, block1Gs1, ReplicaState.FINALIZED);
+    msgs.enqueueReportedBlock(storageInfo, block1Gs2, ReplicaState.FINALIZED);
 
     assertEquals(2, msgs.count());
     

@@ -38,7 +38,7 @@ public interface MutableBlockCollection extends BlockCollection {
    * and set the locations.
    */
   public BlockInfoUnderConstruction setLastBlock(BlockInfo lastBlock,
-      DatanodeDescriptor[] locations) throws IOException, StorageException;
+      DatanodeStorageInfo[] locations) throws IOException, StorageException;
 
   /**
    * Get block at the specified index

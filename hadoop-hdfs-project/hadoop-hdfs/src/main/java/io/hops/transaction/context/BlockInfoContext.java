@@ -25,6 +25,7 @@ import io.hops.metadata.common.FinderType;
 import io.hops.metadata.hdfs.dal.BlockInfoDataAccess;
 import io.hops.metadata.hdfs.entity.INodeCandidatePrimaryKey;
 import io.hops.transaction.lock.TransactionLocks;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 

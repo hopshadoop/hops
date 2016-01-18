@@ -84,8 +84,8 @@ public class TestUnderReplicatedBlocks {
 
             @Override
             public Object performTask() throws StorageException, IOException {
-              DatanodeDescriptor dn =
-                  bm.blocksMap.nodeList(b.getLocalBlock()).get(0);
+              DatanodeStorageInfo storage = bm.blocksMap.storageList(b.getLocalBlock()).get(0);
+              DatanodeDescriptor dn = storage.getDatanodeDescriptor();
               bm.addToInvalidates(b.getLocalBlock(), dn);
 
               bm.blocksMap.removeNode(b.getLocalBlock(), dn);

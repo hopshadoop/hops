@@ -239,6 +239,8 @@ public abstract class Storage extends StorageInfo {
     final boolean useLock;        // flag to enable storage lock
     final StorageDirType dirType; // storage dir type
     FileLock lock;                // storage lock
+
+    private String storageUuid = null;      // Storage directory identifier.
     
     public StorageDirectory(File dir) {
       // default dirType is null
@@ -247,6 +249,14 @@ public abstract class Storage extends StorageInfo {
     
     public StorageDirectory(File dir, StorageDirType dirType) {
       this(dir, dirType, true);
+    }
+
+    public void setStorageUuid(String storageUuid) {
+      this.storageUuid = storageUuid;
+    }
+
+    public String getStorageUuid() {
+      return storageUuid;
     }
     
     /**
@@ -781,7 +791,7 @@ public abstract class Storage extends StorageInfo {
     super();
     this.storageType = type;
   }
-  
+
   protected Storage(NodeType type, StorageInfo storageInfo) {
     super(storageInfo);
     this.storageType = type;
@@ -804,8 +814,23 @@ public abstract class Storage extends StorageInfo {
     return storageDirs.get(0);
   }
   
-  protected void addStorageDir(StorageDirectory sd) {
+  public void addStorageDir(StorageDirectory sd) {
     storageDirs.add(sd);
+  }
+
+  /**
+   * Returns true if the storage directory on the given directory is already
+   * loaded.
+   * @param root the root directory of a {@link StorageDirectory}
+   * @throws IOException if failed to get canonical path.
+   */
+  protected boolean containsStorageDir(File root) throws IOException {
+    for (StorageDirectory sd : storageDirs) {
+      if (sd.getRoot().getCanonicalPath().equals(root.getCanonicalPath())) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
@@ -1078,16 +1103,6 @@ public abstract class Storage extends StorageInfo {
         storage.getClusterID() + "-" +
         Integer.toString(storage.getLayoutVersion()) + "-" +
         Long.toString(storage.getCTime());
-  }
-  
-  String getProperty(Properties props, StorageDirectory sd, String name)
-      throws InconsistentFSStateException {
-    String property = props.getProperty(name);
-    if (property == null) {
-      throw new InconsistentFSStateException(sd.root,
-          "file " + STORAGE_FILE_VERSION + " has " + name + " missing.");
-    }
-    return property;
   }
   
   /**

@@ -210,8 +210,7 @@ public class INodeDirectoryWithQuota extends INodeDirectory {
 
   public static INodeDirectoryWithQuota createRootDir(
       PermissionStatus permissions) throws IOException {
-    INodeDirectoryWithQuota newRootINode =
-        new INodeDirectoryWithQuota(ROOT_NAME, permissions);
+    INodeDirectoryWithQuota newRootINode = new INodeDirectoryWithQuota(ROOT_NAME, permissions);
     newRootINode.setIdNoPersistance(ROOT_ID);
     newRootINode.setParentIdNoPersistance(ROOT_PARENT_ID);
     newRootINode.setPartitionIdNoPersistance(getRootDirPartitionKey());

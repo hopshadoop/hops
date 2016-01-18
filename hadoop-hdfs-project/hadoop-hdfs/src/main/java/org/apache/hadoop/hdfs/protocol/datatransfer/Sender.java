@@ -20,6 +20,7 @@ package org.apache.hadoop.hdfs.protocol.datatransfer;
 import com.google.protobuf.Message;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.hdfs.StorageType;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.ChecksumProto;
@@ -68,8 +69,7 @@ public class Sender implements DataTransferProtocol {
       final Message proto) throws IOException {
     if (LOG.isTraceEnabled()) {
       LOG.trace(
-          "Sending DataTransferOp " + proto.getClass().getSimpleName() + ": " +
-              proto);
+          "Sending DataTransferOp " + proto.getClass().getSimpleName() + ": " + proto);
     }
     op(out, opcode);
     proto.writeDelimitedTo(out);
@@ -93,11 +93,18 @@ public class Sender implements DataTransferProtocol {
 
   @Override
   public void writeBlock(final ExtendedBlock blk,
-      final Token<BlockTokenIdentifier> blockToken, final String clientName,
-      final DatanodeInfo[] targets, final DatanodeInfo source,
-      final BlockConstructionStage stage, final int pipelineSize,
-      final long minBytesRcvd, final long maxBytesRcvd,
-      final long latestGenerationStamp, DataChecksum requestedChecksum)
+      final StorageType storageType,
+      final Token<BlockTokenIdentifier> blockToken,
+      final String clientName,
+      final DatanodeInfo[] targets,
+      final StorageType[] targetStorageTypes,
+      final DatanodeInfo source,
+      final BlockConstructionStage stage,
+      final int pipelineSize,
+      final long minBytesRcvd,
+      final long maxBytesRcvd,
+      final long latestGenerationStamp,
+      DataChecksum requestedChecksum)
       throws IOException {
     ClientOperationHeaderProto header =
         DataTransferProtoUtil.buildClientHeader(blk, clientName, blockToken);
@@ -106,8 +113,11 @@ public class Sender implements DataTransferProtocol {
         DataTransferProtoUtil.toProto(requestedChecksum);
 
     OpWriteBlockProto.Builder proto =
-        OpWriteBlockProto.newBuilder().setHeader(header)
+        OpWriteBlockProto.newBuilder()
+            .setHeader(header)
+            .setStorageType(PBHelper.convertStorageType(storageType))
             .addAllTargets(PBHelper.convert(targets, 1))
+            .addAllTargetStorageTypes(PBHelper.convertStorageTypes(targetStorageTypes, 1))
             .setStage(toProto(stage)).setPipelineSize(pipelineSize)
             .setMinBytesRcvd(minBytesRcvd).setMaxBytesRcvd(maxBytesRcvd)
             .setLatestGenerationStamp(latestGenerationStamp)
@@ -122,22 +132,29 @@ public class Sender implements DataTransferProtocol {
 
   @Override
   public void transferBlock(final ExtendedBlock blk,
-      final Token<BlockTokenIdentifier> blockToken, final String clientName,
-      final DatanodeInfo[] targets) throws IOException {
+      final Token<BlockTokenIdentifier> blockToken,
+      final String clientName,
+      final DatanodeInfo[] targets,
+      final StorageType[] targetStorageTypes) throws IOException {
     
     OpTransferBlockProto proto = OpTransferBlockProto.newBuilder().setHeader(
         DataTransferProtoUtil.buildClientHeader(blk, clientName, blockToken))
-        .addAllTargets(PBHelper.convert(targets)).build();
+        .addAllTargets(PBHelper.convert(targets))
+        .addAllTargetStorageTypes(PBHelper.convertStorageTypes(targetStorageTypes))
+        .build();
 
     send(out, Op.TRANSFER_BLOCK, proto);
   }
 
   @Override
   public void replaceBlock(final ExtendedBlock blk,
-      final Token<BlockTokenIdentifier> blockToken, final String delHint,
+      final StorageType storageType,
+      final Token<BlockTokenIdentifier> blockToken,
+      final String delHint,
       final DatanodeInfo source) throws IOException {
     OpReplaceBlockProto proto = OpReplaceBlockProto.newBuilder()
         .setHeader(DataTransferProtoUtil.buildBaseHeader(blk, blockToken))
+        .setStorageType(PBHelper.convertStorageType(storageType))
         .setDelHint(delHint).setSource(PBHelper.convertDatanodeInfo(source))
         .build();
     

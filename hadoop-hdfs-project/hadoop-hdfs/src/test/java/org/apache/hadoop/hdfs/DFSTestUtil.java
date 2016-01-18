@@ -24,6 +24,9 @@ import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.QuotaUpdateDataAccess;
+import io.hops.metadata.StorageMap;
+import io.hops.metadata.hdfs.dal.INodeAttributesDataAccess;
+import io.hops.metadata.hdfs.dal.INodeDataAccess;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.security.Users;
 import io.hops.transaction.handler.HDFSOperationType;
@@ -37,11 +40,14 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.ContentSummary;
+import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileSystem.Statistics;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.client.HdfsDataInputStream;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
@@ -56,15 +62,23 @@ import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.BlockOpResponseP
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.hdfs.security.token.block.ExportedBlockKeys;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockManagerTestUtil;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeManager;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.StartupOption;
 import org.apache.hadoop.hdfs.server.common.StorageInfo;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.datanode.TestTransferRbw;
+import org.apache.hadoop.hdfs.server.namenode.FSDirectory;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
+import org.apache.hadoop.hdfs.server.namenode.INode;
+import org.apache.hadoop.hdfs.server.namenode.INodeAttributes;
+import org.apache.hadoop.hdfs.server.namenode.INodeDirectory;
+import org.apache.hadoop.hdfs.server.namenode.INodeDirectoryWithQuota;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
+import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.ShellBasedUnixGroupsMapping;
@@ -90,14 +104,19 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
+import static org.apache.hadoop.fs.CreateFlag.CREATE;
+import static org.apache.hadoop.fs.CreateFlag.OVERWRITE;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_KEY;
+import static org.apache.hadoop.hdfs.server.namenode.FSNamesystem.LOG;
 import static org.junit.Assert.assertEquals;
 
 /**
@@ -119,14 +138,14 @@ public class DFSTestUtil {
   /**
    * Creates a new instance of DFSTestUtil
    *
-   * @param testName
-   *     Name of the test from where this utility is used
    * @param nFiles
    *     Number of files to be created
    * @param maxLevels
    *     Maximum number of directory levels
    * @param maxSize
    *     Maximum size for file
+   * @param minSize
+   *     Minimum size for file
    */
   private DFSTestUtil(int nFiles, int maxLevels, int maxSize, int minSize) {
     this.nFiles = nFiles;
@@ -280,6 +299,53 @@ public class DFSTestUtil {
       out = null;
     } finally {
       IOUtils.closeStream(out);
+    }
+  }
+
+  public static void createFile(FileSystem fs, Path fileName, int bufferLen,
+      long fileLen, long blockSize, short replFactor, long seed)
+      throws IOException {
+    createFile(fs, fileName, bufferLen, fileLen, blockSize,
+        replFactor, seed, false);
+  }
+
+  public static void createFile(FileSystem fs, Path fileName,
+      int bufferLen, long fileLen, long blockSize,
+      short replFactor, long seed, boolean flush) throws IOException {
+    assert bufferLen > 0;
+    if (!fs.mkdirs(fileName.getParent())) {
+      throw new IOException("Mkdirs failed to create " +
+          fileName.getParent().toString());
+    }
+    FSDataOutputStream out = null;
+    EnumSet<CreateFlag> createFlags = EnumSet.of(CREATE);
+    createFlags.add(OVERWRITE);
+
+    try {
+      out = fs.create(fileName, FsPermission.getFileDefault(), createFlags,
+          fs.getConf().getInt(CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096),
+          replFactor, blockSize, null);
+
+      if (fileLen > 0) {
+        byte[] toWrite = new byte[bufferLen];
+        Random rb = new Random(seed);
+        long bytesToWrite = fileLen;
+        while (bytesToWrite>0) {
+          rb.nextBytes(toWrite);
+          int bytesToWriteNext = (bufferLen < bytesToWrite) ? bufferLen
+              : (int) bytesToWrite;
+
+          out.write(toWrite, 0, bytesToWriteNext);
+          bytesToWrite -= bytesToWriteNext;
+        }
+        if (flush) {
+          out.hsync();
+        }
+      }
+    } finally {
+      if (out != null) {
+        out.close();
+      }
     }
   }
   
@@ -591,24 +657,25 @@ public class DFSTestUtil {
 
     do {
       correctReplFactor = true;
-      BlockLocation locs[] =
-          fs.getFileBlockLocations(fs.getFileStatus(fileName), 0,
-              Long.MAX_VALUE);
+      BlockLocation locs[] = fs.getFileBlockLocations(
+          fs.getFileStatus(fileName), 0, Long.MAX_VALUE);
       count++;
       for (int j = 0; j < locs.length; j++) {
         String[] hostnames = locs[j].getNames();
         if (hostnames.length != replFactor) {
           correctReplFactor = false;
-          System.out.println("Block " + j + " of file " + fileName +
-              " has replication factor " + hostnames.length + " (desired " +
-              replFactor + "); locations " + Joiner.on(' ').join(hostnames));
+          System.out.println("Block " + j
+              + " of file " + fileName
+              + " has replication factor " + hostnames.length
+              + " (desired " + replFactor + ");"
+              + " locations " + Joiner.on(' ').join(hostnames));
           Thread.sleep(1000);
           break;
         }
       }
       if (correctReplFactor) {
-        System.out.println("All blocks of file " + fileName +
-            " verified to have replication factor " + replFactor);
+        System.out.println("All blocks of file " + fileName
+            + " verified to have replication factor " + replFactor);
       }
     } while (!correctReplFactor && count < ATTEMPTS);
 
@@ -678,10 +745,13 @@ public class DFSTestUtil {
   
   public static ExtendedBlock getFirstBlock(FileSystem fs, Path path)
       throws IOException {
-    HdfsDataInputStream in =
-        (HdfsDataInputStream) ((DistributedFileSystem) fs).open(path);
-    in.readByte();
-    return in.getCurrentBlock();
+    HdfsDataInputStream in = (HdfsDataInputStream) fs.open(path);
+    try {
+      in.readByte();
+      return in.getCurrentBlock();
+    } finally {
+      in.close();
+    }
   }
 
   public static List<LocatedBlock> getAllBlocks(FSDataInputStream in)
@@ -866,7 +936,8 @@ public class DFSTestUtil {
 
     // send the request
     new Sender(out).transferBlock(b, new Token<BlockTokenIdentifier>(),
-        dfsClient.clientName, new DatanodeInfo[]{datanodes[1]});
+        dfsClient.clientName, new DatanodeInfo[]{datanodes[1]},
+        new StorageType[]{StorageType.DEFAULT});
     out.flush();
 
     return BlockOpResponseProto.parseDelimitedFrom(in);
@@ -887,8 +958,17 @@ public class DFSTestUtil {
     return new DatanodeID("127.0.0.1", "localhost", "", port, port, port);
   }
 
-  public static DatanodeDescriptor getLocalDatanodeDescriptor() {
-    return new DatanodeDescriptor(getLocalDatanodeID());
+  public static DatanodeDescriptor getLocalDatanodeDescriptor() throws IOException {
+    return getLocalDatanodeDescriptor(false);
+  }
+
+  public static DatanodeDescriptor getLocalDatanodeDescriptor(boolean initializeStorage) throws IOException {
+    DatanodeDescriptor dn = new DatanodeDescriptor(new StorageMap(false),
+        getLocalDatanodeID());
+    if (initializeStorage) {
+      dn.updateStorage(new DatanodeStorage(DatanodeStorage.generateUuid()));
+    }
+    return dn;
   }
 
   public static DatanodeInfo getLocalDatanodeInfo() {
@@ -903,8 +983,7 @@ public class DFSTestUtil {
     return new DatanodeInfo(getLocalDatanodeID(port));
   }
 
-  public static DatanodeInfo getDatanodeInfo(String ipAddr, String host,
-      int port) {
+  public static DatanodeInfo getDatanodeInfo(String ipAddr, String host, int port) {
     return new DatanodeInfo(new DatanodeID(ipAddr, host, "", port,
         DFSConfigKeys.DFS_DATANODE_HTTP_DEFAULT_PORT,
         DFSConfigKeys.DFS_DATANODE_IPC_DEFAULT_PORT));
@@ -919,6 +998,25 @@ public class DFSTestUtil {
         adminState);
   }
 
+  public static DatanodeDescriptor[] toDatanodeDescriptor(
+      DatanodeStorageInfo[] storages) {
+    DatanodeDescriptor[] datanodes = new DatanodeDescriptor[storages.length];
+    for(int i = 0; i < datanodes.length; i++) {
+      datanodes[i] = storages[i].getDatanodeDescriptor();
+    }
+    return datanodes;
+  }
+
+  public static StorageMap storageMap;
+
+  static {
+     try {
+       storageMap = new StorageMap(false);
+     } catch (IOException ex) {
+       LOG.error(ex);
+     }
+  }
+  
   public static DatanodeDescriptor getDatanodeDescriptor(String ipAddr,
       String rackLocation) {
     return getDatanodeDescriptor(ipAddr,
@@ -927,17 +1025,96 @@ public class DFSTestUtil {
 
   public static DatanodeDescriptor getDatanodeDescriptor(String ipAddr,
       int port, String rackLocation) {
-    DatanodeID dnId = new DatanodeID(ipAddr, "host", "", port,
-        DFSConfigKeys.DFS_DATANODE_HTTP_DEFAULT_PORT,
-        DFSConfigKeys.DFS_DATANODE_IPC_DEFAULT_PORT);
-    return new DatanodeDescriptor(dnId, rackLocation);
-  }
-  
-  public static DatanodeRegistration getLocalDatanodeRegistration() {
-    return new DatanodeRegistration(getLocalDatanodeID(), new StorageInfo(),
-        new ExportedBlockKeys(), VersionInfo.getVersion());
+    return getDatanodeDescriptor(ipAddr, port, rackLocation, "host");
   }
 
+  public static DatanodeDescriptor getDatanodeDescriptor(String ipAddr,
+      int port, String rackLocation, String hostname) {
+    DatanodeID dnId = new DatanodeID(ipAddr, hostname,
+        UUID.randomUUID().toString(), port,
+        DFSConfigKeys.DFS_DATANODE_HTTP_DEFAULT_PORT,
+        DFSConfigKeys.DFS_DATANODE_IPC_DEFAULT_PORT);
+    return new DatanodeDescriptor(storageMap, dnId, rackLocation);
+  }
+
+  public static DatanodeStorageInfo[] createDatanodeStorageInfos(String[] racks) throws IOException {
+    return createDatanodeStorageInfos(racks, null);
+  }
+
+  public static DatanodeStorageInfo[] createDatanodeStorageInfos(String[] racks, String[] hostnames) throws IOException {
+    return createDatanodeStorageInfos(racks.length, racks, hostnames);
+  }
+
+  public static DatanodeStorageInfo[] createDatanodeStorageInfos(
+      int n, String[] racks, String[] hostnames) throws IOException {
+    return createDatanodeStorageInfos(n, racks, hostnames, null);
+  }
+
+  public static DatanodeStorageInfo[] createDatanodeStorageInfos(
+      int n, String[] racks, String[] hostnames, StorageType[] types) throws IOException {
+    DatanodeStorageInfo[] storages = new DatanodeStorageInfo[n];
+    for(int i = storages.length; i > 0; ) {
+      final String storageID = "s" + i;
+      final String ip = i + "." + i + "." + i + "." + i;
+      i--;
+      final String rack = (racks!=null && i < racks.length)? racks[i]: "defaultRack";
+      final String hostname = (hostnames!=null && i < hostnames.length)? hostnames[i]: "host";
+      final StorageType type = (types != null && i < types.length) ? types[i]
+          : StorageType.DEFAULT;
+      storages[i] = createDatanodeStorageInfo(storageID, ip, rack, hostname,
+          type);
+    }
+    return storages;
+  }
+
+  public static DatanodeStorageInfo createDatanodeStorageInfo(
+      String storageID, String ip, String rack, String hostname) throws IOException {
+    return createDatanodeStorageInfo(storageID, ip, rack, hostname,
+        StorageType.DEFAULT);
+  }
+
+  public static DatanodeStorageInfo createDatanodeStorageInfo(
+      String storageID, String ip, String rack, String hostname,
+      StorageType type) throws IOException {
+    final DatanodeStorage storage = new DatanodeStorage(storageID,
+        DatanodeStorage.State.NORMAL, type);
+    final DatanodeDescriptor dn = BlockManagerTestUtil.getDatanodeDescriptor(ip, rack, storage, hostname);
+    return new DatanodeStorageInfo(dn, storage);
+  }
+
+  public static void createRootFolder() throws IOException {
+    LightWeightRequestHandler addRootINode =
+        new LightWeightRequestHandler(HDFSOperationType.SET_ROOT) {
+          @Override
+          public Object performTask() throws IOException {
+            INodeDirectoryWithQuota newRootINode = null;
+            INodeDataAccess da = (INodeDataAccess) HdfsStorageFactory.getDataAccess(INodeDataAccess.class);
+
+            newRootINode = INodeDirectoryWithQuota.createRootDir(
+                new PermissionStatus("user", "grp", new FsPermission((short) 0755)));
+
+            // Set the block storage policy to DEFAULT
+            newRootINode.setBlockStoragePolicyIDNoPersistance(BlockStoragePolicySuite.getDefaultPolicy().getId());
+            List<INode> newINodes = new ArrayList<INode>();
+            newINodes.add(newRootINode);
+            da.prepare(INode.EMPTY_LIST, newINodes, INode.EMPTY_LIST);
+
+            INodeAttributes inodeAttributes =
+                new INodeAttributes(newRootINode.getId(), Long.MAX_VALUE, 1L,
+                    FSDirectory.UNKNOWN_DISK_SPACE, 0L);
+            INodeAttributesDataAccess ida =
+                (INodeAttributesDataAccess) HdfsStorageFactory
+                    .getDataAccess(INodeAttributesDataAccess.class);
+            List<INodeAttributes> attrList = new ArrayList<INodeAttributes>();
+            attrList.add(inodeAttributes);
+            ida.prepare(attrList, null);
+
+            return null;
+          }
+        };
+    addRootINode.handle();
+  }
+  
   public static class Builder {
     private int maxLevels = 3;
     private int maxSize = 8 * 1024;

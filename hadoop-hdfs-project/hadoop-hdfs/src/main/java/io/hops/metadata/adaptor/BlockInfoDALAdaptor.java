@@ -22,6 +22,8 @@ import io.hops.metadata.hdfs.entity.BlockInfo;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoUnderConstruction;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
+import org.apache.hadoop.hdfs.server.namenode.UnsupportedActionException;
+import org.apache.zookeeper.KeeperException;
 
 import java.util.Collection;
 import java.util.List;
@@ -83,6 +85,15 @@ public class BlockInfoDALAdaptor extends
         dataAccess.findBlockInfosByStorageId(storageId));
   }
 
+
+
+  @Override
+  public List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo> findBlockInfosBySids(
+      List<Integer> sids) throws StorageException {
+    return (List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo>) convertDALtoHDFS(
+        dataAccess.findBlockInfosBySids(sids));
+  }
+
   @Override
   public Set<Long> findINodeIdsByStorageId(int storageId)
       throws StorageException {
@@ -94,6 +105,12 @@ public class BlockInfoDALAdaptor extends
       long[] blockIds, int[] inodeIds) throws StorageException {
     return (List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo>) convertDALtoHDFS(
         dataAccess.findByIds(blockIds, inodeIds));
+  }
+
+  @Override
+  public boolean existsOnAnyStorage(long blockId, List<Integer> sids) throws
+      StorageException {
+    return dataAccess.existsOnAnyStorage(blockId, sids);
   }
 
   @Override

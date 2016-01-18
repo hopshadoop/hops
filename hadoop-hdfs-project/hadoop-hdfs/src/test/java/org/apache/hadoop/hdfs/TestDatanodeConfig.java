@@ -17,22 +17,26 @@
  */
 package org.apache.hadoop.hdfs;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.StartupOption;
-import org.apache.hadoop.hdfs.server.datanode.DataNode;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import static org.apache.hadoop.hdfs.server.common.Util.fileAsURI;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+import static org.junit.Assume.assumeTrue;
 
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 
-import static org.apache.hadoop.hdfs.server.common.Util.fileAsURI;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.StartupOption;
+import org.apache.hadoop.hdfs.server.datanode.DataNode;
+import org.apache.hadoop.io.nativeio.NativeIO;
+import org.apache.hadoop.test.GenericTestUtils;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
+import org.junit.Test;
 
 /**
  * Tests if a data-node can startup depending on configuration parameters.
@@ -47,22 +51,24 @@ public class TestDatanodeConfig {
   public static void setUp() throws Exception {
     clearBaseDir();
     Configuration conf = new HdfsConfiguration();
+    conf.setInt(DFSConfigKeys.DFS_DATANODE_HTTPS_PORT_KEY, 0);
+    conf.set(DFSConfigKeys.DFS_DATANODE_ADDRESS_KEY, "localhost:0");
+    conf.set(DFSConfigKeys.DFS_DATANODE_IPC_ADDRESS_KEY, "localhost:0");
+    conf.set(DFSConfigKeys.DFS_DATANODE_HTTP_ADDRESS_KEY, "localhost:0");
     cluster = new MiniDFSCluster.Builder(conf).numDataNodes(0).build();
     cluster.waitActive();
   }
 
   @AfterClass
   public static void tearDown() throws Exception {
-    if (cluster != null) {
+    if(cluster != null)
       cluster.shutdown();
-    }
     clearBaseDir();
   }
 
   private static void clearBaseDir() throws IOException {
-    if (BASE_DIR.exists() && !FileUtil.fullyDelete(BASE_DIR)) {
+    if(BASE_DIR.exists() && ! FileUtil.fullyDelete(BASE_DIR))
       throw new IOException("Cannot clear BASE_DIR " + BASE_DIR);
-    }
   }
 
   /**
@@ -81,23 +87,31 @@ public class TestDatanodeConfig {
     DataNode dn = null;
     try {
       dn = DataNode.createDataNode(new String[]{}, conf);
-    } catch (IOException e) {
+      fail();
+    } catch(Exception e) {
       // expecting exception here
-    }
-    if (dn != null) {
-      dn.shutdown();
+    } finally {
+      if (dn != null) {
+        dn.shutdown();
+      }
     }
     assertNull("Data-node startup should have failed.", dn);
 
     // 2. Test "file:" schema and no schema (path-only). Both should work.
     String dnDir1 = fileAsURI(dataDir).toString() + "1";
-    String dnDir2 =
-        makeURI("file", "localhost", fileAsURI(dataDir).getPath() + "2");
+    String dnDir2 = makeURI("file", "localhost",
+        fileAsURI(dataDir).getPath() + "2");
     String dnDir3 = dataDir.getAbsolutePath() + "3";
     conf.set(DFSConfigKeys.DFS_DATANODE_DATA_DIR_KEY,
         dnDir1 + "," + dnDir2 + "," + dnDir3);
-    cluster.startDataNodes(conf, 1, false, StartupOption.REGULAR, null);
-    assertTrue("Data-node should startup.", cluster.isDataNodeUp());
+    try {
+      cluster.startDataNodes(conf, 1, false, StartupOption.REGULAR, null);
+      assertTrue("Data-node should startup.", cluster.isDataNodeUp());
+    } finally {
+      if (cluster != null) {
+        cluster.shutdownDataNodes();
+      }
+    }
   }
 
   private static String makeURI(String scheme, String host, String path)
@@ -105,7 +119,7 @@ public class TestDatanodeConfig {
     try {
       URI uDir = new URI(scheme, host, path, null);
       return uDir.toString();
-    } catch (URISyntaxException e) {
+    } catch(URISyntaxException e) {
       throw new IOException("Bad URI", e);
     }
   }

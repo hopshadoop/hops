@@ -77,33 +77,37 @@ public class TestDatanodeDescriptor {
     BlocksMap blocksMap = new BlocksMap(null);
     HashBuckets.initialize(DFSConfigKeys.DFS_NUM_BUCKETS_DEFAULT);
 
-    DatanodeDescriptor dd = DFSTestUtil.getLocalDatanodeDescriptor();
-    assertEquals(0, dd.numBlocks());
+    DatanodeDescriptor datanode = DFSTestUtil.getLocalDatanodeDescriptor(true);
+    assertEquals(0, datanode.numBlocks());
     BlockInfo blk = new BlockInfo(new Block(1L), INode.NON_EXISTING_ID);
     BlockInfo blk1 = new BlockInfo(new Block(2L), INode.NON_EXISTING_ID);
+    DatanodeStorageInfo[] storages = datanode.getStorageInfos();
+    assertTrue(storages.length > 0);
+
     // add first block
-    assertTrue(addBlock(blocksMap, dd, blk));
-    assertEquals(1, dd.numBlocks());
+    assertTrue(addBlock(blocksMap, storages[0], blk));
+    assertEquals(1, datanode.numBlocks());
     // remove a non-existent block
-    assertFalse(removeBlock(dd, blk1));
-    assertEquals(1, dd.numBlocks());
+    assertFalse(removeBlock(datanode, blk1));
+    assertEquals(1, datanode.numBlocks());
     // add an existent block
-    assertFalse(addBlock(blocksMap, dd, blk));
-    System.out.println("number of blks are " + dd.numBlocks());
-    assertEquals(1, dd.numBlocks());
+    assertFalse(addBlock(blocksMap, storages[0], blk));
+    System.out.println("number of blks are " + datanode.numBlocks());
+    assertEquals(1, datanode.numBlocks());
     // add second block
-    assertTrue(addBlock(blocksMap, dd, blk1));
-    assertEquals(2, dd.numBlocks());
+    assertTrue(addBlock(blocksMap, storages[0], blk1));
+    assertEquals(2, datanode.numBlocks());
     // remove first block
-    assertTrue(removeBlock(dd, blk));
-    assertEquals(1, dd.numBlocks());
+    assertTrue(removeBlock(datanode, blk));
+    assertEquals(1, datanode.numBlocks());
     // remove second block
-    assertTrue(removeBlock(dd, blk1));
-    assertEquals(0, dd.numBlocks());
+    assertTrue(removeBlock(datanode, blk1));
+    assertEquals(0, datanode.numBlocks());
   }
   
-  private boolean addBlock(final BlocksMap blocksMap, final DatanodeDescriptor
-      dn, final BlockInfo blk)
+  private boolean addBlock(final BlocksMap blocksMap,
+      final DatanodeStorageInfo storage,
+      final BlockInfo blk)
       throws IOException {
     return (Boolean) new HopsTransactionalRequestHandler(
         HDFSOperationType.TEST) {
@@ -125,14 +129,14 @@ public class TestDatanodeDescriptor {
       public Object performTask() throws StorageException, IOException {
         blocksMap.addBlockCollection(blk, new INodeFile(new PermissionStatus
             ("n", "n", FsPermission.getDefault()), null, (short)1, 0, 0, 1));
-        return dn.addBlock(blk);
+        return storage.addBlock(blk);
       }
 
     }.handle();
   }
 
-  private boolean removeBlock(final DatanodeDescriptor dn, final BlockInfo blk)
-      throws IOException {
+  private boolean removeBlock(final DatanodeDescriptor dn,
+      final BlockInfo blk) throws IOException {
     return (Boolean) new HopsTransactionalRequestHandler(
         HDFSOperationType.TEST) {
       INodeIdentifier inodeIdentifier;

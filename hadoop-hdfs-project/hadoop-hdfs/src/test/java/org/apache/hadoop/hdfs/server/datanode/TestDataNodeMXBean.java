@@ -42,28 +42,32 @@ public class TestDataNodeMXBean {
       DataNode datanode = datanodes.get(0);
 
       MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
-      ObjectName mxbeanName =
-          new ObjectName("Hadoop:service=DataNode,name=DataNodeInfo");
+      ObjectName mxbeanName = new ObjectName("Hadoop:service=DataNode,name=DataNodeInfo");
+
       // get attribute "ClusterId"
       String clusterId = (String) mbs.getAttribute(mxbeanName, "ClusterId");
       Assert.assertEquals(datanode.getClusterId(), clusterId);
+
       // get attribute "Version"
       String version = (String) mbs.getAttribute(mxbeanName, "Version");
       Assert.assertEquals(datanode.getVersion(), version);
+
       // get attribute "RpcPort"
       String rpcPort = (String) mbs.getAttribute(mxbeanName, "RpcPort");
       Assert.assertEquals(datanode.getRpcPort(), rpcPort);
+
       // get attribute "HttpPort"
       String httpPort = (String) mbs.getAttribute(mxbeanName, "HttpPort");
       Assert.assertEquals(datanode.getHttpPort(), httpPort);
+
       // get attribute "NamenodeAddresses"
-      String namenodeAddresses =
-          (String) mbs.getAttribute(mxbeanName, "NamenodeAddresses");
+      String namenodeAddresses = (String) mbs.getAttribute(mxbeanName, "NamenodeAddresses");
       Assert.assertEquals(datanode.getNamenodeAddresses(), namenodeAddresses);
+
       // get attribute "getVolumeInfo"
       String volumeInfo = (String) mbs.getAttribute(mxbeanName, "VolumeInfo");
-      Assert.assertEquals(replaceDigits(datanode.getVolumeInfo()),
-          replaceDigits(volumeInfo));
+      Assert.assertEquals(replaceDigits(datanode.getVolumeInfo()), replaceDigits(volumeInfo));
+
       // Ensure mxbean's XceiverCount is same as the DataNode's
       // live value.
       int xceiverCount = (Integer) mbs.getAttribute(mxbeanName, "XceiverCount");

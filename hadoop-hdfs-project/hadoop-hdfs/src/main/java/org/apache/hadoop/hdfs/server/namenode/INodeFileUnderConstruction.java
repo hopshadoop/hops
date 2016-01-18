@@ -28,6 +28,7 @@ import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoUnderConstruction;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 import org.apache.hadoop.hdfs.server.blockmanagement.MutableBlockCollection;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.BlockUCState;
 
@@ -69,6 +70,14 @@ public class INodeFileUnderConstruction extends INodeFile
     this.clientNode = clientNode;
   }
 
+  public INodeFileUnderConstruction(INodeFileUnderConstruction other) throws
+      IOException {
+    super(other);
+
+    this.clientMachine = other.getClientMachine();
+    this.clientNode = other.getClientNode();
+  }
+
   public INodeFileUnderConstruction(byte[] name, short blockReplication,
       long modificationTime, long preferredBlockSize, BlockInfo[] blocks,
       PermissionStatus perm, String clientName, String clientMachine,
@@ -81,7 +90,7 @@ public class INodeFileUnderConstruction extends INodeFile
     this.clientNode = clientNode;
     this.id = inodeId;
     this.parentId = pid;
-    //throw new UnsupportedOperationException("HOP: This constructor should not be used"); // The only reason it is here that it is called in some FSImage Classes that are not deleted. 
+    //throw new UnsupportedOperationException("HOP: This constructor should not be used"); // The only reason it is here that it is called in some FSImage Classes that are not deleted.
   }
 
   //HOP: used instead of INodeFile.convertToUnderConstruction
@@ -133,7 +142,6 @@ public class INodeFileUnderConstruction extends INodeFile
     INodeFile obj = new INodeFile(this);
     obj.setAccessTime(getModificationTime());
     return obj;
-    
   }
   
   /**
@@ -172,7 +180,7 @@ public class INodeFileUnderConstruction extends INodeFile
    */
   @Override
   public BlockInfoUnderConstruction setLastBlock(BlockInfo lastBlock,
-      DatanodeDescriptor[] targets) throws IOException, StorageException {
+      DatanodeStorageInfo[] targets) throws IOException, StorageException {
     if (numBlocks() == 0) {
       throw new IOException("Failed to set last block: File is empty.");
     }

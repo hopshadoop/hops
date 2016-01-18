@@ -29,6 +29,7 @@ import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FsServerDefaults;
 import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.Options.Rename;
+import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.CorruptFileBlocks;
 import org.apache.hadoop.hdfs.protocol.DirectoryListing;
@@ -149,6 +150,10 @@ import java.util.List;
 public class ClientNamenodeProtocolServerSideTranslatorPB
     implements ClientNamenodeProtocolPB {
   final private ClientProtocol server;
+
+  static final ClientNamenodeProtocolProtos.SetStoragePolicyResponseProto
+      VOID_SET_STORAGE_POLICY_RESPONSE =
+      ClientNamenodeProtocolProtos.SetStoragePolicyResponseProto.newBuilder().build();
 
   private static final CreateResponseProto VOID_CREATE_RESPONSE =
       CreateResponseProto.newBuilder().build();
@@ -332,8 +337,9 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
   @Override
   public CreateResponseProto create(RpcController controller,
       CreateRequestProto req) throws ServiceException {
+
     try {
-      HdfsFileStatus result = null;
+      HdfsFileStatus result;
       if (req.hasPolicy()) {
         result = server.create(req.getSrc(), PBHelper.convert(req.getMasked()),
             req.getClientName(), PBHelper.convert(req.getCreateFlag()),
@@ -353,6 +359,7 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
     } catch (IOException e) {
       throw new ServiceException(e);
     }
+
     return VOID_CREATE_RESPONSE;
   }
   
@@ -378,6 +385,38 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
       boolean result =
           server.setReplication(req.getSrc(), (short) req.getReplication());
       return SetReplicationResponseProto.newBuilder().setResult(result).build();
+    } catch (IOException e) {
+      throw new ServiceException(e);
+    }
+  }
+
+  @Override
+  public ClientNamenodeProtocolProtos.SetStoragePolicyResponseProto setStoragePolicy(
+      RpcController controller, ClientNamenodeProtocolProtos.SetStoragePolicyRequestProto request)
+      throws ServiceException {
+    try {
+      server.setStoragePolicy(request.getSrc(), request.getPolicyName());
+    } catch (IOException e) {
+      throw new ServiceException(e);
+    }
+    return VOID_SET_STORAGE_POLICY_RESPONSE;
+  }
+
+  @Override
+  public ClientNamenodeProtocolProtos.GetStoragePoliciesResponseProto getStoragePolicies(
+      RpcController controller, ClientNamenodeProtocolProtos.GetStoragePoliciesRequestProto request)
+      throws ServiceException {
+    try {
+      BlockStoragePolicy[] policies = server.getStoragePolicies();
+      ClientNamenodeProtocolProtos.GetStoragePoliciesResponseProto.Builder builder =
+          ClientNamenodeProtocolProtos.GetStoragePoliciesResponseProto.newBuilder();
+      if (policies == null) {
+        return builder.build();
+      }
+      for (BlockStoragePolicy policy : policies) {
+        builder.addPolicies(PBHelper.convert(policy));
+      }
+      return builder.build();
     } catch (IOException e) {
       throw new ServiceException(e);
     }
@@ -436,13 +475,17 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
   @Override
   public AddBlockResponseProto addBlock(RpcController controller,
       AddBlockRequestProto req) throws ServiceException {
-    
+
     try {
       List<DatanodeInfoProto> excl = req.getExcludeNodesList();
+      List<String> favor = req.getFavoredNodesList();
       LocatedBlock result = server.addBlock(req.getSrc(), req.getClientName(),
           req.hasPrevious() ? PBHelper.convert(req.getPrevious()) : null,
           (excl == null || excl.size() == 0) ? null : PBHelper
-              .convert(excl.toArray(new DatanodeInfoProto[excl.size()])));
+              .convert(excl.toArray(new DatanodeInfoProto[excl.size()])),
+          (favor == null || favor.size() == 0) ? null : favor
+              .toArray(new String[favor.size()]));
+
       return AddBlockResponseProto.newBuilder()
           .setBlock(PBHelper.convert(result)).build();
     } catch (IOException e) {
@@ -456,13 +499,16 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
       throws ServiceException {
     try {
       List<DatanodeInfoProto> existingList = req.getExistingsList();
+      List<String> existingStorageIDsList = req.getExistingStorageUuidsList();
       List<DatanodeInfoProto> excludesList = req.getExcludesList();
       LocatedBlock result = server
           .getAdditionalDatanode(req.getSrc(), PBHelper.convert(req.getBlk()),
-              PBHelper.convert(existingList
-                  .toArray(new DatanodeInfoProto[existingList.size()])),
-              PBHelper.convert(excludesList
-                  .toArray(new DatanodeInfoProto[excludesList.size()])),
+              PBHelper.convert(existingList.toArray(
+                  new DatanodeInfoProto[existingList.size()])),
+              existingStorageIDsList.toArray(
+                  new String[existingStorageIDsList.size()]),
+              PBHelper.convert(excludesList.toArray(
+                  new DatanodeInfoProto[excludesList.size()])),
               req.getNumAdditionalNodes(), req.getClientName());
       return GetAdditionalDatanodeResponseProto.newBuilder()
           .setBlock(PBHelper.convert(result)).build();
@@ -621,6 +667,21 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
       List<? extends DatanodeInfoProto> result = PBHelper
           .convert(server.getDatanodeReport(PBHelper.convert(req.getType())));
       return GetDatanodeReportResponseProto.newBuilder().addAllDi(result)
+          .build();
+    } catch (IOException e) {
+      throw new ServiceException(e);
+    }
+  }
+
+  @Override
+  public ClientNamenodeProtocolProtos.GetDatanodeStorageReportResponseProto getDatanodeStorageReport(
+      RpcController controller, ClientNamenodeProtocolProtos.GetDatanodeStorageReportRequestProto req)
+      throws ServiceException {
+    try {
+      List<ClientNamenodeProtocolProtos.DatanodeStorageReportProto> reports = PBHelper.convertDatanodeStorageReports(
+          server.getDatanodeStorageReport(PBHelper.convert(req.getType())));
+      return ClientNamenodeProtocolProtos.GetDatanodeStorageReportResponseProto.newBuilder()
+          .addAllDatanodeStorageReports(reports)
           .build();
     } catch (IOException e) {
       throw new ServiceException(e);
@@ -810,10 +871,13 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
       UpdatePipelineRequestProto req) throws ServiceException {
     try {
       List<DatanodeIDProto> newNodes = req.getNewNodesList();
+      List<String> newStorageIDs = req.getStorageIDsList();
       server.updatePipeline(req.getClientName(),
           PBHelper.convert(req.getOldBlock()),
-          PBHelper.convert(req.getNewBlock()), PBHelper
-          .convert(newNodes.toArray(new DatanodeIDProto[newNodes.size()])));
+          PBHelper.convert(req.getNewBlock()),
+          PBHelper.convert(
+              newNodes.toArray(new DatanodeIDProto[newNodes.size()])),
+          newStorageIDs.toArray(new String[newStorageIDs.size()]));
       return VOID_UPDATEPIPELINE_RESPONSE;
     } catch (IOException e) {
       throw new ServiceException(e);

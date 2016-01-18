@@ -173,10 +173,6 @@ public class DirectoryScanner implements Runnable {
     private final File blockFile;
     private final FsVolumeSpi volume;
 
-    ScanInfo(long blockId) {
-      this(blockId, null, null, null);
-    }
-
     ScanInfo(long blockId, File blockFile, File metaFile, FsVolumeSpi vol) {
       this.blockId = blockId;
       this.metaFile = metaFile;
@@ -375,8 +371,8 @@ public class DirectoryScanner implements Runnable {
         diffs.put(bpid, diffRecord);
         
         statsRecord.totalBlocks = blockpoolReport.length;
-        List<Block> bl = dataset.getFinalizedBlocks(bpid);
-        Block[] memReport = bl.toArray(new Block[bl.size()]);
+        List<FinalizedReplica> bl = dataset.getFinalizedBlocks(bpid);
+        FinalizedReplica[] memReport = bl.toArray(new FinalizedReplica[bl.size()]);
         Arrays.sort(memReport); // Sort based on blockId
 
         int d = 0; // index for blockpoolReport
@@ -394,7 +390,8 @@ public class DirectoryScanner implements Runnable {
           }
           if (info.getBlockId() > memBlock.getBlockId()) {
             // Block is missing on the disk
-            addDifference(diffRecord, statsRecord, memBlock.getBlockId());
+            addDifference(diffRecord, statsRecord, memBlock.getBlockId(),
+                info.getVolume());
             m++;
             continue;
           }
@@ -414,7 +411,9 @@ public class DirectoryScanner implements Runnable {
           m++;
         }
         while (m < memReport.length) {
-          addDifference(diffRecord, statsRecord, memReport[m++].getBlockId());
+          FinalizedReplica current = memReport[m++];
+          addDifference(diffRecord, statsRecord,
+              current.getBlockId(), current.getVolume());
         }
         while (d < blockpoolReport.length) {
           statsRecord.missingMemoryBlocks++;
@@ -440,10 +439,10 @@ public class DirectoryScanner implements Runnable {
    * Block is not found on the disk
    */
   private void addDifference(LinkedList<ScanInfo> diffRecord, Stats statsRecord,
-      long blockId) {
+      long blockId, FsVolumeSpi vol) {
     statsRecord.missingBlockFile++;
     statsRecord.missingMetaFile++;
-    diffRecord.add(new ScanInfo(blockId));
+    diffRecord.add(new ScanInfo(blockId, null, null, vol));
   }
 
   /**

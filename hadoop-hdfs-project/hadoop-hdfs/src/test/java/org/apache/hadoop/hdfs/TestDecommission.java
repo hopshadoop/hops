@@ -82,19 +82,14 @@ public class TestDecommission {
     excludeFile = new Path(dir, "exclude");
     
     // Setup conf
-    conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_REPLICATION_CONSIDERLOAD_KEY,
-        false);
+    conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_REPLICATION_CONSIDERLOAD_KEY, false);
     conf.set(DFSConfigKeys.DFS_HOSTS, hostsFile.toUri().getPath());
     conf.set(DFSConfigKeys.DFS_HOSTS_EXCLUDE, excludeFile.toUri().getPath());
-    conf.setInt(DFSConfigKeys.DFS_NAMENODE_HEARTBEAT_RECHECK_INTERVAL_KEY,
-        2000);
+    conf.setInt(DFSConfigKeys.DFS_NAMENODE_HEARTBEAT_RECHECK_INTERVAL_KEY, 2000);
     conf.setInt(DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY, HEARTBEAT_INTERVAL);
-    conf.setInt(DFSConfigKeys.DFS_BLOCKREPORT_INTERVAL_MSEC_KEY,
-        BLOCKREPORT_INTERVAL_MSEC);
-    conf.setInt(DFSConfigKeys.DFS_NAMENODE_REPLICATION_PENDING_TIMEOUT_SEC_KEY,
-        4);
-    conf.setInt(DFSConfigKeys.DFS_NAMENODE_REPLICATION_INTERVAL_KEY,
-        NAMENODE_REPLICATION_INTERVAL);
+    conf.setInt(DFSConfigKeys.DFS_BLOCKREPORT_INTERVAL_MSEC_KEY, BLOCKREPORT_INTERVAL_MSEC);
+    conf.setInt(DFSConfigKeys.DFS_NAMENODE_REPLICATION_PENDING_TIMEOUT_SEC_KEY, 4);
+    conf.setInt(DFSConfigKeys.DFS_NAMENODE_REPLICATION_INTERVAL_KEY, NAMENODE_REPLICATION_INTERVAL);
 
     writeConfigFile(hostsFile, null);
     writeConfigFile(excludeFile, null);
@@ -173,8 +168,7 @@ public class TestDecommission {
     // need a raw stream
     assertTrue("Not HDFS:" + fileSys.getUri(),
         fileSys instanceof DistributedFileSystem);
-    HdfsDataInputStream dis =
-        (HdfsDataInputStream) ((DistributedFileSystem) fileSys).open(name);
+    HdfsDataInputStream dis = (HdfsDataInputStream) fileSys.open(name);
     Collection<LocatedBlock> dinfo = dis.getAllBlocks();
     for (LocatedBlock blk : dinfo) { // for each block
       int hasdown = 0;
@@ -318,6 +312,7 @@ public class TestDecommission {
       DFSClient client = getDfsClient(cluster.getNameNode(i), conf);
       validateCluster(client, numDatanodes);
     }
+    DFSTestUtil.createRootFolder();
   }
 
   static void refreshNodes(final FSNamesystem ns, final Configuration conf)
@@ -379,6 +374,8 @@ public class TestDecommission {
       throws IOException {
     LOG.info("Starting test testDecommission");
     startCluster(numNamenodes, numDatanodes, conf);
+
+    DFSTestUtil.createRootFolder();
     
     ArrayList<ArrayList<DatanodeInfo>> namenodeDecomList =
         new ArrayList<>(numNamenodes);
@@ -413,6 +410,7 @@ public class TestDecommission {
     // Restart the cluster and ensure recommissioned datanodes
     // are allowed to register with the namenode
     cluster.shutdown();
+
     startCluster(numNamenodes, numDatanodes, conf);
     cluster.shutdown();
   }

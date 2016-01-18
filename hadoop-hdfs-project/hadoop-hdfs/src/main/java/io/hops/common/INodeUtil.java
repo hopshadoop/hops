@@ -215,6 +215,7 @@ public class INodeUtil {
     try {
       inodeIdentifier = (INodeIdentifier) handler.handle();
     } catch (IOException ex) {
+      LOG.error("Could not resolve iNode from blockId (blockid=" + bid + ")");
       throw new StorageException(ex.getMessage());
     }
     return inodeIdentifier;

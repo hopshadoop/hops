@@ -58,6 +58,7 @@ class FsDatasetAsyncDiskService {
   private static final long THREADS_KEEP_ALIVE_SECONDS = 60;
   
   private final DataNode datanode;
+  private final ThreadGroup threadGroup;
   private Map<File, ThreadPoolExecutor> executors =
       new HashMap<>();
   
@@ -67,43 +68,69 @@ class FsDatasetAsyncDiskService {
    * <p/>
    * The AsyncDiskServices uses one ThreadPool per volume to do the async
    * disk operations.
-   *
-   * @param volumes
-   *     The roots of the data volumes.
    */
-  FsDatasetAsyncDiskService(DataNode datanode, File[] volumes) {
+  FsDatasetAsyncDiskService(DataNode datanode) {
     this.datanode = datanode;
+    this.threadGroup = new ThreadGroup(getClass().getSimpleName());
+  }
 
-    final ThreadGroup threadGroup = new ThreadGroup(getClass().getSimpleName());
-    // Create one ThreadPool per volume
-    for (final File vol : volumes) {
-      ThreadFactory threadFactory = new ThreadFactory() {
-        int counter = 0;
-      
-        @Override
-        public Thread newThread(Runnable r) {
-          int thisIndex;
-          synchronized (this) {
-            thisIndex = counter++;
-          }
-          Thread t = new Thread(threadGroup, r);
-          t.setName("Async disk worker #" + thisIndex +
-              " for volume " + vol);
-          return t;
+  private void addExecutorForVolume(final File volume) {
+    ThreadFactory threadFactory = new ThreadFactory() {
+      int counter = 0;
+
+      @Override
+      public Thread newThread(Runnable r) {
+        int thisIndex;
+        synchronized (this) {
+          thisIndex = counter++;
         }
-      };
-    
-      ThreadPoolExecutor executor =
-          new ThreadPoolExecutor(CORE_THREADS_PER_VOLUME,
-              MAXIMUM_THREADS_PER_VOLUME, THREADS_KEEP_ALIVE_SECONDS,
-              TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>(),
-              threadFactory);
-    
-      // This can reduce the number of running threads
-      executor.allowCoreThreadTimeOut(true);
-      executors.put(vol, executor);
+        Thread t = new Thread(threadGroup, r);
+        t.setName("Async disk worker #" + thisIndex +
+            " for volume " + volume);
+        return t;
+      }
+    };
+
+    ThreadPoolExecutor executor = new ThreadPoolExecutor(
+        CORE_THREADS_PER_VOLUME, MAXIMUM_THREADS_PER_VOLUME,
+        THREADS_KEEP_ALIVE_SECONDS, TimeUnit.SECONDS,
+        new LinkedBlockingQueue<Runnable>(), threadFactory);
+
+    // This can reduce the number of running threads
+    executor.allowCoreThreadTimeOut(true);
+    executors.put(volume, executor);
+  }
+
+  /**
+   * Starts AsyncDiskService for a new volume
+   * @param volume the root of the new data volume.
+   */
+  synchronized void addVolume(File volume) {
+    if (executors == null) {
+      throw new RuntimeException("AsyncDiskService is already shutdown");
     }
-    
+    if (executors.containsKey(volume)) {
+      throw new RuntimeException("Volume " + volume + " already exists.");
+    }
+    addExecutorForVolume(volume);
+  }
+
+  /**
+   * Stops AsyncDiskService for a volume.
+   * @param volume the root of the volume.
+   */
+  synchronized void removeVolume(File volume) {
+    if (executors == null) {
+      throw new RuntimeException("AsyncDiskService is already shutdown");
+    }
+    ThreadPoolExecutor executor = executors.get(volume);
+    if (executor == null) {
+      throw new RuntimeException("Can not find volume " + volume
+          + " to remove.");
+    } else {
+      executor.shutdown();
+      executors.remove(volume);
+    }
   }
   
   synchronized long countPendingDeletions() {
@@ -198,7 +225,7 @@ class FsDatasetAsyncDiskService {
             blockFile + ". Ignored.");
       } else {
         if (block.getLocalBlock().getNumBytes() != BlockCommand.NO_ACK) {
-          datanode.notifyNamenodeDeletedBlock(block);
+          datanode.notifyNamenodeDeletedBlock(block, volume.getStorageID());
         }
         volume.decDfsUsed(block.getBlockPoolId(), dfsBytes);
         LOG.info(

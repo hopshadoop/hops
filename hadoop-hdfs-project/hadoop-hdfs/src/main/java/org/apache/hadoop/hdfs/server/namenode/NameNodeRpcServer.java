@@ -25,6 +25,7 @@ import io.hops.metadata.hdfs.entity.EncodingPolicy;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
 import io.hops.security.Users;
 import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.ContentSummary;
@@ -39,6 +40,7 @@ import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.HDFSPolicyProvider;
+import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
 import org.apache.hadoop.hdfs.protocol.CorruptFileBlocks;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
@@ -65,6 +67,9 @@ import org.apache.hadoop.hdfs.protocolPB.NamenodeProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdfs.security.token.block.DataEncryptionKey;
 import org.apache.hadoop.hdfs.security.token.block.ExportedBlockKeys;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockManager;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 import org.apache.hadoop.hdfs.server.common.IncorrectVersionException;
 import org.apache.hadoop.hdfs.server.common.StorageInfo;
 import org.apache.hadoop.hdfs.server.namenode.metrics.NameNodeMetrics;
@@ -74,6 +79,7 @@ import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeCommand;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeProtocol;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
+import org.apache.hadoop.hdfs.server.protocol.DatanodeStorageReport;
 import org.apache.hadoop.hdfs.server.protocol.FinalizeCommand;
 import org.apache.hadoop.hdfs.server.protocol.HeartbeatResponse;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocols;
@@ -114,6 +120,7 @@ import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_HANDLER_COUNT_DEFAULT;
@@ -416,6 +423,17 @@ class NameNodeRpcServer implements NamenodeProtocols {
     return namesystem.setReplication(src, replication);
   }
 
+  @Override
+  public void setStoragePolicy(String src, String policyName)
+      throws IOException {
+    namesystem.setStoragePolicy(src, policyName);
+  }
+
+  @Override
+  public BlockStoragePolicy[] getStoragePolicies() throws IOException {
+    return namesystem.getStoragePolicies();
+  }
+
   @Override // ClientProtocol
   public void setMetaEnabled(String src, boolean metaEnabled)
       throws AccessControlException, FileNotFoundException, SafeModeException,
@@ -444,21 +462,24 @@ class NameNodeRpcServer implements NamenodeProtocols {
 
   @Override // ClientProtocol
   public LocatedBlock addBlock(String src, String clientName,
-      ExtendedBlock previous, DatanodeInfo[] excludedNodes) throws IOException {
+      ExtendedBlock previous, DatanodeInfo[] excludedNodes, String[] favoredNodes) throws IOException {
 
     if (stateChangeLog.isDebugEnabled()) {
       stateChangeLog.debug(
           "*BLOCK* NameNode.addBlock: file " + src + " for " + clientName);
     }
-    HashMap<Node, Node> excludedNodesSet = null;
+    HashSet<Node> excludedNodesSet = null;
+
     if (excludedNodes != null) {
-      excludedNodesSet = new HashMap<>(excludedNodes.length);
+      excludedNodesSet = new HashSet<>(excludedNodes.length);
       for (Node node : excludedNodes) {
-        excludedNodesSet.put(node, node);
+        excludedNodesSet.add(node);
       }
     }
+    List<String> favoredNodesList = (favoredNodes == null) ? null
+        : Arrays.asList(favoredNodes);
     LocatedBlock locatedBlock = namesystem
-        .getAdditionalBlock(src, clientName, previous, excludedNodesSet);
+        .getAdditionalBlock(src, clientName, previous, excludedNodesSet, favoredNodesList);
     if (locatedBlock != null) {
       metrics.incrAddBlockOps();
     }
@@ -467,27 +488,32 @@ class NameNodeRpcServer implements NamenodeProtocols {
 
   @Override // ClientProtocol
   public LocatedBlock getAdditionalDatanode(final String src,
-      final ExtendedBlock blk, final DatanodeInfo[] existings,
-      final DatanodeInfo[] excludes, final int numAdditionalNodes,
+      final ExtendedBlock blk,
+      final DatanodeInfo[] existings,
+      final String[] existingStorageIDs,
+      final DatanodeInfo[] excludes,
+      final int numAdditionalNodes,
       final String clientName) throws IOException {
     if (LOG.isDebugEnabled()) {
-      LOG.debug("getAdditionalDatanode: src=" + src + ", blk=" + blk +
-          ", existings=" + Arrays.asList(existings) + ", excludes=" +
-          Arrays.asList(excludes) + ", numAdditionalNodes=" +
-          numAdditionalNodes + ", clientName=" + clientName);
+      LOG.debug("getAdditionalDatanode: src=" + src
+          + ", blk=" + blk
+          + ", existings=" + Arrays.asList(existings)
+          + ", excludes=" + Arrays.asList(excludes)
+          + ", numAdditionalNodes=" + numAdditionalNodes
+          + ", clientName=" + clientName);
     }
 
     metrics.incrGetAdditionalDatanodeOps();
 
-    HashMap<Node, Node> excludeSet = null;
+    HashSet<Node> excludeSet = null;
     if (excludes != null) {
-      excludeSet = new HashMap<>(excludes.length);
+      excludeSet = new HashSet<>(excludes.length);
       for (Node node : excludes) {
-        excludeSet.put(node, node);
+        excludeSet.add(node);
       }
     }
-    return namesystem.getAdditionalDatanode(src, blk, existings, excludeSet,
-        numAdditionalNodes, clientName);
+    return namesystem.getAdditionalDatanode(src, blk, existings,
+        existingStorageIDs, excludeSet, numAdditionalNodes, clientName);
   }
 
   /**
@@ -536,8 +562,9 @@ class NameNodeRpcServer implements NamenodeProtocols {
 
   @Override // ClientProtocol
   public void updatePipeline(String clientName, ExtendedBlock oldBlock,
-      ExtendedBlock newBlock, DatanodeID[] newNodes) throws IOException {
-    namesystem.updatePipeline(clientName, oldBlock, newBlock, newNodes);
+      ExtendedBlock newBlock, DatanodeID[] newNodes, String[] newStorageIDs)
+      throws IOException {
+    namesystem.updatePipeline(clientName, oldBlock, newBlock, newNodes, newStorageIDs);
   }
   
   @Override // DatanodeProtocol
@@ -697,6 +724,17 @@ class NameNodeRpcServer implements NamenodeProtocols {
   }
 
   @Override // ClientProtocol
+  public DatanodeStorageReport[] getDatanodeStorageReport(
+      DatanodeReportType type) throws IOException {
+    final DatanodeStorageReport[] reports = namesystem.getDatanodeStorageReport(type);
+    if (reports == null ) {
+      throw new IOException("Failed to get datanode storage report for " + type
+          + " datanodes.");
+    }
+    return reports;
+  }
+
+  @Override // ClientProtocol
   public boolean setSafeMode(SafeModeAction action, boolean isChecked)
       throws IOException {
     return namesystem.setSafeMode(action);
@@ -814,29 +852,36 @@ class NameNodeRpcServer implements NamenodeProtocols {
 
   @Override // DatanodeProtocol
   public HeartbeatResponse sendHeartbeat(DatanodeRegistration nodeReg,
-      StorageReport[] report, int xmitsInProgress, int xceiverCount,
+      StorageReport[] reports, int xmitsInProgress, int xceiverCount,
       int failedVolumes) throws IOException {
     verifyRequest(nodeReg);
-    return namesystem.handleHeartbeat(nodeReg, report[0].getCapacity(),
-        report[0].getDfsUsed(), report[0].getRemaining(),
-        report[0].getBlockPoolUsed(), xceiverCount, xmitsInProgress,
-        failedVolumes);
+
+    return namesystem.handleHeartbeat(nodeReg, reports, xceiverCount, xmitsInProgress, failedVolumes);
   }
 
   @Override // DatanodeProtocol
   public DatanodeCommand blockReport(DatanodeRegistration nodeReg,
       String poolId, StorageBlockReport[] reports) throws IOException {
     verifyRequest(nodeReg);
-    
-    BlockReport blist = reports[0].getReport(); // Assume no federation '0'
     if (blockStateChangeLog.isDebugEnabled()) {
       blockStateChangeLog.debug(
-          "*BLOCK* NameNode.blockReport: " + "from " + nodeReg + " " +
-              blist.getNumBlocks() + " blocks");
+          "*BLOCK* NameNode.blockReport: from " + nodeReg +
+              ", reports.length=" + reports.length);
     }
 
-    namesystem.getBlockManager().processReport(nodeReg, poolId, blist);
-    return new FinalizeCommand(poolId);
+    final BlockManager bm = namesystem.getBlockManager();
+    boolean noStaleStorages = false;
+    for(StorageBlockReport r : reports) {
+      final BlockReport blocks = r.getReport();
+      noStaleStorages =  bm.processReport(nodeReg, r.getStorage(), blocks);
+      metrics.incrStorageBlockReportOps();
+    }
+
+    if(noStaleStorages) {
+      return new FinalizeCommand(poolId);
+    } else {
+      return null;
+    }
   }
 
   @Override // DatanodeProtocol
@@ -844,13 +889,16 @@ class NameNodeRpcServer implements NamenodeProtocols {
       String poolId, StorageReceivedDeletedBlocks[] receivedAndDeletedBlocks)
       throws IOException {
     verifyRequest(nodeReg);
+    metrics.incrBlockReceivedAndDeletedOps();
     if (blockStateChangeLog.isDebugEnabled()) {
       blockStateChangeLog.debug(
           "*BLOCK* NameNode.blockReceivedAndDeleted: " + "from " + nodeReg +
               " " + receivedAndDeletedBlocks.length + " blocks.");
     }
-    namesystem.getBlockManager().processIncrementalBlockReport(nodeReg, poolId,
-        receivedAndDeletedBlocks[0].getBlocks());
+
+    for(StorageReceivedDeletedBlocks r : receivedAndDeletedBlocks) {
+      namesystem.getBlockManager().processIncrementalBlockReport(nodeReg, r);
+    }
   }
   
   @Override // DatanodeProtocol

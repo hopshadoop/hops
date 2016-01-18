@@ -26,6 +26,7 @@ import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.permission.FsAction;
+import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.DirectoryListing;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
@@ -34,6 +35,7 @@ import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifie
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenSecretManager;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockManager;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 import org.apache.hadoop.hdfs.server.common.JspHelper;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocols;
@@ -71,6 +73,7 @@ import org.apache.hadoop.hdfs.web.resources.TokenArgumentParam;
 import org.apache.hadoop.hdfs.web.resources.UriFsPathParam;
 import org.apache.hadoop.hdfs.web.resources.UserParam;
 import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.net.Node;
 import org.apache.hadoop.net.NodeBase;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.SecurityUtil;
@@ -106,6 +109,8 @@ import java.net.URISyntaxException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.List;
+import java.util.Set;
 
 /**
  * Web-hdfs NameNode implementation.
@@ -177,11 +182,11 @@ public class NamenodeWebHdfsMethods {
       final DatanodeDescriptor clientNode =
           bm.getDatanodeManager().getDatanodeByHost(getRemoteAddress());
       if (clientNode != null) {
-        final DatanodeDescriptor[] datanodes = bm.getBlockPlacementPolicy()
-            .chooseTarget(path, 1, clientNode,
-                new ArrayList<DatanodeDescriptor>(), false, null, blocksize);
-        if (datanodes.length > 0) {
-          return datanodes[0];
+        final DatanodeStorageInfo[] storages = bm.chooseTarget4WebHDFS(path,
+            clientNode, null, blocksize);
+
+        if (storages.length > 0) {
+          return storages[0].getDatanodeDescriptor();
         }
       }
     } else if (op == GetOpParam.Op.OPEN ||

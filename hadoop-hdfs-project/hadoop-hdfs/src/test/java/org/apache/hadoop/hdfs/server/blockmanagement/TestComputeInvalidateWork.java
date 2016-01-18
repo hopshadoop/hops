@@ -19,6 +19,7 @@ package org.apache.hadoop.hdfs.server.blockmanagement;
 
 import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
+import io.hops.exception.TransactionContextException;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
@@ -34,6 +35,8 @@ import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.junit.Test;
 
 import java.io.IOException;
+import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
+import org.apache.hadoop.hdfs.protocol.UnregisteredNodeException;
 
 import static org.junit.Assert.assertEquals;
 
@@ -112,9 +115,19 @@ public class TestComputeInvalidateWork {
 
       @Override
       public Object performTask() throws StorageException, IOException {
-        bm.addToInvalidates(block, node);
+        addToInvalidates(block, node, bm);
         return null;
       }
     }.handle(namesystem);
+  }
+  
+    void addToInvalidates(final Block block, final DatanodeInfo datanode, BlockManager bm)
+      throws StorageException, TransactionContextException,
+      UnregisteredNodeException {
+        
+    DatanodeDescriptor dn = bm.getDatanodeManager().getDatanode(datanode);
+    DatanodeStorageInfo storage = dn.getStorageInfos()[0];
+
+    bm.addToInvalidates(block, storage);
   }
 }

@@ -105,7 +105,6 @@ public class NamenodeSelector {
     }
   }
 
-  
   /* List of name nodes */
   private List<NamenodeSelector.NamenodeHandle> nnList =
       new CopyOnWriteArrayList<>();

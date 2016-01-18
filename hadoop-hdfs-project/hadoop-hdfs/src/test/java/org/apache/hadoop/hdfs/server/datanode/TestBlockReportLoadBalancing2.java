@@ -47,6 +47,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.Assert.*;
+import org.junit.Ignore;
 
 /**
  *
@@ -64,6 +65,7 @@ public class TestBlockReportLoadBalancing2 {
   public void shutDownCluster() throws IOException {
   }
 
+  @Ignore
   @Test
   public void TestClusterWithDataNodes()
           throws Exception {

@@ -39,6 +39,7 @@ public class HdfsFileStatus extends FileStatus {
 
   private final long fileId;
   private boolean isFileStoredInDB;
+  private byte storagePolicy;
 
   public static final byte[] EMPTY_NAME = new byte[0];
 
@@ -71,7 +72,7 @@ public class HdfsFileStatus extends FileStatus {
   public HdfsFileStatus(long fileid, long length, boolean isdir, int block_replication,
       long blocksize, long modification_time, long access_time,
       FsPermission permission, String owner, String group, byte[] symlink,
-      byte[] path, boolean isFileStoredInDB) {
+      byte[] path, boolean isFileStoredInDB, byte storagePolicy) {
 
     super(length, isdir, block_replication, blocksize, modification_time,
         access_time, permission, owner, group,
@@ -81,6 +82,7 @@ public class HdfsFileStatus extends FileStatus {
     this.symlink = symlink;
     this.path = path;
     this.isFileStoredInDB = isFileStoredInDB;
+    this.storagePolicy = storagePolicy;
   }
 
   /**
@@ -192,5 +194,10 @@ public class HdfsFileStatus extends FileStatus {
     // fully-qualify path
     setPath(getFullPath(parent).makeQualified(defaultUri, null));
     return this; // API compatibility
+  }
+
+  /** @return the storage policy id */
+  public final byte getStoragePolicy() {
+    return storagePolicy;
   }
 }

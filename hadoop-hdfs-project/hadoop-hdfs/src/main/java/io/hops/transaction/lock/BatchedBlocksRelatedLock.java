@@ -50,7 +50,7 @@ abstract class BatchedBlocksRelatedLock extends Lock {
       extends BatchedBlocksRelatedLock {
 
     public BatchedInvalidatedBlocksLock(int storageId) {
-      super(InvalidatedBlock.Finder.ByStorageId, storageId);
+      super(InvalidatedBlock.Finder.BySid, storageId);
     }
 
     @Override

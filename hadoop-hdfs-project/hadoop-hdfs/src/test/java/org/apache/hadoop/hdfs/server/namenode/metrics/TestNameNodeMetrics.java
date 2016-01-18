@@ -45,6 +45,7 @@ import org.junit.Test;
 
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.util.Map;
 import java.util.Random;
 
 import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
@@ -245,7 +246,7 @@ public class TestNameNodeMetrics {
     LocatedBlock block = NameNodeAdapter
         .getBlockLocations(cluster.getNameNode(), file.toString(), 0, 1).get(0);
     bm.findAndMarkBlockAsCorrupt(block.getBlock(), block.getLocations()[0],
-        "TEST");
+        "STORAGE_ID", "TEST");
 
     updateMetrics();
     MetricsRecordBuilder rb = getMetrics(NS_METRICS);
@@ -287,7 +288,7 @@ public class TestNameNodeMetrics {
     LocatedBlock block = NameNodeAdapter
         .getBlockLocations(cluster.getNameNode(), file.toString(), 0, 1).get(0);
     bm.findAndMarkBlockAsCorrupt(block.getBlock(), block.getLocations()[0],
-        "TEST");
+        "STORAGE_ID", "TEST");
     updateMetrics();
     MetricsRecordBuilder rb = getMetrics(NS_METRICS);
     assertGauge("UnderReplicatedBlocks", 1L, rb);
@@ -404,14 +405,15 @@ public class TestNameNodeMetrics {
   @Test
   public void testSyncAndBlockReportMetric() throws Exception {
     MetricsRecordBuilder rb = getMetrics(NN_METRICS);
-    // We have one sync when the cluster starts up, just opening the journal
     // Each datanode reports in when the cluster comes up
-    assertCounter("BlockReportNumOps", (long) DATANODE_COUNT, rb);
-    
+    assertCounter("BlockReportNumOps",
+        (long)DATANODE_COUNT * cluster.getStoragesPerDatanode(), rb);
+
     // Sleep for an interval+slop to let the percentiles rollover
-    Thread.sleep((PERCENTILES_INTERVAL + 1) * 1000);
-    
+    Thread.sleep((PERCENTILES_INTERVAL+1)*1000);
+
     // Check that the percentiles were updated
+    assertQuantileGauges("Syncs1s", rb);
     assertQuantileGauges("BlockReport1s", rb);
   }
 }

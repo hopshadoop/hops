@@ -266,7 +266,8 @@ abstract class AbstractFileTree {
                 subtreeRoot.isSubtreeLocked(),
                 subtreeRoot.getSubtreeLockOwner(),
                 size,
-                subtreeRoot.getLogicalTime());
+                subtreeRoot.getLogicalTime(),
+                subtreeRoot.getLocalStoragePolicyID());
 
         addSubtreeRoot(pin);
         return subtreeRoot;

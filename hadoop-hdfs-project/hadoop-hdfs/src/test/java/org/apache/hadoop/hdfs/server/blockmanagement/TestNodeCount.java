@@ -102,8 +102,7 @@ public class TestNodeCount {
       
       // check if excessive replica is detected (transient)
       initializeTimeout(TIMEOUT);
-      while (countNodes(block.getLocalBlock(), namesystem).excessReplicas() ==
-          0) {
+      while (countNodes(block.getLocalBlock(), namesystem).excessReplicas() == 0) {
         checkTimeout("excess replicas not detected");
       }
       
@@ -132,15 +131,15 @@ public class TestNodeCount {
                   inodeIdentifier.getInodeId());
               Collection<String> excessDns = bm.excessReplicateMap.get(blkInfo);
               DatanodeDescriptor nonExcessDN = null;
-              for (DatanodeDescriptor dn : bm.blocksMap.nodeList(block
+              for (DatanodeStorageInfo storage : bm.blocksMap.storageList(block
                   .getLocalBlock())){
-                if (!excessDns.contains(dn.getStorageID())) {
+                DatanodeDescriptor dn = storage.getDatanodeDescriptor();
+                if (!excessDns.contains(dn.getDatanodeUuid())) {
                   nonExcessDN = dn;
                 }
               }
               return nonExcessDN;
             }
-
           };
       
       DatanodeDescriptor nonExcessDN =
@@ -173,7 +172,9 @@ public class TestNodeCount {
       }
 
     } finally {
-      cluster.shutdown();
+      if(cluster != null) {
+        cluster.shutdown();
+      }
     }
   }
   

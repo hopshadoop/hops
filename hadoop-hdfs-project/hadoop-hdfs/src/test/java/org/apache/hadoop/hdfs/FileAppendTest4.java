@@ -41,7 +41,7 @@ import java.io.IOException;
  */
 public class FileAppendTest4 {
   public static final Log LOG = LogFactory.getLog(FileAppendTest4.class);
-  
+
   private static final int BYTES_PER_CHECKSUM = 4;
   private static final int PACKET_SIZE = BYTES_PER_CHECKSUM;
   private static final int BLOCK_SIZE = 2 * PACKET_SIZE;
@@ -56,7 +56,7 @@ public class FileAppendTest4 {
     conf.setLong(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE);
     conf.setInt(DFSConfigKeys.DFS_CLIENT_WRITE_PACKET_SIZE_KEY, PACKET_SIZE);
   }
-  
+
   @BeforeClass
   public static void startUp() throws IOException {
     conf = new HdfsConfiguration();
@@ -70,7 +70,7 @@ public class FileAppendTest4 {
   public static void tearDown() {
     cluster.shutdown();
   }
-  
+
   /**
    * Comprehensive test for append
    *
