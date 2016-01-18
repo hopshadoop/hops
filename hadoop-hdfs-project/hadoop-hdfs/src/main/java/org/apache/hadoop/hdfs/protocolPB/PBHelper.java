@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p/>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p/>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.protocolPB;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.CodedInputStream;
@@ -30,6 +31,7 @@ import io.hops.metadata.hdfs.entity.EncodingStatus;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FsServerDefaults;
+import org.apache.hadoop.hdfs.StorageType;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
@@ -85,6 +87,7 @@ import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.HdfsFileStatusProto.File
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.LocatedBlockProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.LocatedBlockProto.Builder;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.LocatedBlocksProto;
+import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.StorageTypeProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.NamenodeCommandProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.NamenodeRegistrationProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.NamenodeRegistrationProto.NamenodeRoleProto;
@@ -503,6 +506,12 @@ public class PBHelper {
     for (int i = 0; i < locs.length; i++) {
       builder.addLocs(i, PBHelper.convert(locs[i]));
     }
+    StorageType[] storageTypes = b.getStorageTypes();
+    if (storageTypes != null) {
+      for (int i = 0; i < storageTypes.length; ++i) {
+        builder.addStorageTypes(PBHelper.convertStorageType(storageTypes[i]));
+      }
+    }
     return builder.setB(PBHelper.convert(b.getBlock()))
         .setBlockToken(PBHelper.convert(b.getBlockToken()))
         .setCorrupt(b.isCorrupt()).setOffset(b.getStartOffset()).build();
@@ -517,8 +526,18 @@ public class PBHelper {
     for (int i = 0; i < locs.size(); i++) {
       targets[i] = PBHelper.convert(locs.get(i));
     }
+    List<StorageTypeProto> storageTypesList = proto.getStorageTypesList();
+    StorageType[] storageTypes = new StorageType[locs.size()];
+    // The media should correspond to targets 1:1. If not then
+    // ignore the media information (left as default).
+    if ((storageTypesList != null) &&
+        (storageTypesList.size() == locs.size())) {
+      for (int i = 0; i < storageTypesList.size(); ++i) {
+        storageTypes[i] = PBHelper.convertType(storageTypesList.get(i));
+      }
+    }
     LocatedBlock lb = new LocatedBlock(PBHelper.convert(proto.getB()), targets,
-        proto.getOffset(), proto.getCorrupt());
+        storageTypes, proto.getOffset(), proto.getCorrupt());
     lb.setBlockToken(PBHelper.convert(proto.getBlockToken()));
     return lb;
   }
@@ -1222,11 +1241,13 @@ public class PBHelper {
 
   public static DatanodeStorageProto convert(DatanodeStorage s) {
     return DatanodeStorageProto.newBuilder()
-        .setState(PBHelper.convert(s.getState())).setStorageID(s.getStorageID())
+        .setState(PBHelper.convertState(s.getState()))
+        .setStorageType(PBHelper.convertStorageType(s.getStorageType()))
+        .setStorageID(s.getStorageID())
         .build();
   }
 
-  private static StorageState convert(State state) {
+  private static StorageState convertState(State state) {
     switch (state) {
       case READ_ONLY:
         return StorageState.READ_ONLY;
@@ -1236,18 +1257,49 @@ public class PBHelper {
     }
   }
 
+  private static StorageTypeProto convertStorageType(StorageType type) {
+    switch(type) {
+      case DISK:
+        return StorageTypeProto.DISK;
+      case SSD:
+        return StorageTypeProto.SSD;
+      default:
+        Preconditions.checkState(
+            false,
+            "Failed to update StorageTypeProto with new StorageType " +
+                type.toString());
+        return StorageTypeProto.DISK;
+    }
+  }
   public static DatanodeStorage convert(DatanodeStorageProto s) {
-    return new DatanodeStorage(s.getStorageID(),
-        PBHelper.convert(s.getState()));
+    if (s.hasStorageType()) {
+      return new DatanodeStorage(s.getStorageID(),
+          PBHelper.convertState(s.getState()),
+          PBHelper.convertType(s.getStorageType()));
+    } else {
+      return new DatanodeStorage(s.getStorageID(),
+          PBHelper.convertState(s.getState()));
+    }
   }
 
-  private static State convert(StorageState state) {
+  private static State convertState(StorageState state) {
     switch (state) {
       case READ_ONLY:
         return DatanodeStorage.State.READ_ONLY;
       case NORMAL:
       default:
         return DatanodeStorage.State.NORMAL;
+    }
+  }
+
+  private static StorageType convertType(StorageTypeProto type) {
+    switch(type) {
+      case DISK:
+        return StorageType.DISK;
+      case SSD:
+        return StorageType.SSD;
+      default:
+        return StorageType.DEFAULT;
     }
   }
 
