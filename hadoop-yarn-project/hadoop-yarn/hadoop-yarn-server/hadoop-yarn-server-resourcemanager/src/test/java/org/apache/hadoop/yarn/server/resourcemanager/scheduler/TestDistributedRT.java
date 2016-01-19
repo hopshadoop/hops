@@ -21,7 +21,10 @@ import io.hops.metadata.util.RMStorageFactory;
 import io.hops.metadata.util.RMUtilities;
 import io.hops.metadata.util.YarnAPIStorageFactory;
 import io.hops.metadata.yarn.TablesDef;
+import io.hops.metadata.yarn.dal.PendingEventDataAccess;
+import io.hops.metadata.yarn.dal.util.YARNOperationType;
 import io.hops.metadata.yarn.entity.PendingEvent;
+import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -57,6 +60,10 @@ public class TestDistributedRT {
     try {
       LOG.info("Setting up Factories");
       conf = new YarnConfiguration();
+      conf.set(YarnConfiguration.EVENT_RT_CONFIG_PATH,
+              "target/test-classes/RT_EventAPIConfig.ini");
+      conf.set(YarnConfiguration.EVENT_SHEDULER_CONFIG_PATH,
+              "target/test-classes/RM_EventAPIConfig.ini");
       YarnAPIStorageFactory.setConfiguration(conf);
       RMStorageFactory.setConfiguration(conf);
       RMUtilities.InitializeDB();
@@ -79,7 +86,7 @@ public class TestDistributedRT {
   @Test(timeout = 50000)
   public void testGetRMNodePerformance() throws Exception {
     MockRM rm = new MockRM(conf);
-    conf.setBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED, false);
+    conf.setBoolean(YarnConfiguration.DISTRIBUTED_RM, false);
     rm.start();
     String nodeId = "host1:1234";
     int numOfRetrievals = 500;
@@ -155,7 +162,7 @@ public class TestDistributedRT {
    */
   @Test
   public void testNMRegistration() throws InterruptedException, Exception {
-    conf.setBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED, true);
+    conf.setBoolean(YarnConfiguration.DISTRIBUTED_RM, true);
     conf.setBoolean(YarnConfiguration.RM_HA_ENABLED, true);
     conf.setInt(YarnConfiguration.HOPS_PENDING_EVENTS_RETRIEVAL_PERIOD, 500);
     MockRM rm1 = new MockRM(conf);
@@ -180,6 +187,7 @@ public class TestDistributedRT {
     int retries = 0;
     while (rmRT.getRMContext().getActiveRMNodes().isEmpty() && retries++ < 20) {
       Thread.sleep(100);
+      commitDummyPendingEvent();
     }
     //Assert that registration was successful
     Assert.assertEquals(1, rmL.getRMContext().getActiveRMNodes().size());
@@ -187,6 +195,7 @@ public class TestDistributedRT {
     retries = 0;
     while (scheduler.getNodes().isEmpty() && retries++ < 20) {
       Thread.sleep(100);
+      commitDummyPendingEvent();
     }
     Assert.assertEquals(1, scheduler.getNodes().size());
     
@@ -196,12 +205,14 @@ public class TestDistributedRT {
     retries = 0;
     while (rmRT.getRMContext().getActiveRMNodes().isEmpty() && retries++ < 20) {
       Thread.sleep(100);
+      commitDummyPendingEvent();
     }
     Assert.assertEquals(1, rmRT.getRMContext().getActiveRMNodes().size());
     //Wait for scheduler to process added node
     retries = 0;
     while (scheduler.getNodes().size() == 1 && retries++ < 20) {
       Thread.sleep(1000);
+      commitDummyPendingEvent();
     }
     Assert.assertEquals(2, scheduler.getNodes().size());
     
@@ -210,6 +221,7 @@ public class TestDistributedRT {
     retries = 0;
     while (scheduler.getNodes().size() == 2 && retries++ < 20) {
       Thread.sleep(100);
+      commitDummyPendingEvent();
     }
     Assert.assertEquals(1, scheduler.getNodes().size());
     rm1.stop();
@@ -224,7 +236,7 @@ public class TestDistributedRT {
    */
   @Test
   public void testNMHeartbeat() throws InterruptedException, Exception {
-    conf.setBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED, true);
+    conf.setBoolean(YarnConfiguration.DISTRIBUTED_RM, true);
     conf.setBoolean(YarnConfiguration.RM_HA_ENABLED, true);
     conf.setInt(YarnConfiguration.HOPS_PENDING_EVENTS_RETRIEVAL_PERIOD, 500);
     MockRM rm1 = new MockRM(conf);
@@ -249,6 +261,7 @@ public class TestDistributedRT {
     int retries = 0;
     while (rmRT.getRMContext().getActiveRMNodes().isEmpty() && retries++ < 20) {
       Thread.sleep(100);
+      commitDummyPendingEvent();
     }
     //Assert that registration was successful
     Assert.assertEquals(1, rmL.getRMContext().getActiveRMNodes().size());
@@ -256,6 +269,7 @@ public class TestDistributedRT {
     retries = 0;
     while (scheduler.getNodes().isEmpty() && retries++ < 20) {
       Thread.sleep(100);
+      commitDummyPendingEvent();
     }
     Assert.assertEquals(1, scheduler.getNodes().size());
     
@@ -265,12 +279,14 @@ public class TestDistributedRT {
     retries = 0;
     while (rmRT.getRMContext().getActiveRMNodes().isEmpty() && retries++ < 20) {
       Thread.sleep(100);
+      commitDummyPendingEvent();
     }
     Assert.assertEquals(1, rmRT.getRMContext().getActiveRMNodes().size());
     //Wait for scheduler to process added node
     retries = 0;
     while (scheduler.getNodes().size() == 1 && retries++ < 20) {
       Thread.sleep(100);
+      commitDummyPendingEvent();
     }
     Assert.assertEquals(2, scheduler.getNodes().size());
     
@@ -289,6 +305,7 @@ public class TestDistributedRT {
     retries = 0;
     while (scheduler.getNodes().size() == 2 && retries++ < 20) {
       Thread.sleep(100);
+      commitDummyPendingEvent();
     }
     Assert.assertEquals(1, scheduler.getNodes().size());
     
@@ -297,6 +314,7 @@ public class TestDistributedRT {
     retries = 0;
     while (scheduler.getNodes().size() == 1 && retries++ < 20) {
       Thread.sleep(100);
+      commitDummyPendingEvent();
     }
     Assert.assertEquals(0, scheduler.getNodes().size());
     rm1.stop();
@@ -313,7 +331,7 @@ public class TestDistributedRT {
   @Test
   public void testConcurrentRegistration()
       throws InterruptedException, Exception {
-    conf.setBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED, true);
+    conf.setBoolean(YarnConfiguration.DISTRIBUTED_RM, true);
     conf.setBoolean(YarnConfiguration.RM_HA_ENABLED, true);
     conf.setInt(YarnConfiguration.HOPS_PENDING_EVENTS_RETRIEVAL_PERIOD, 500);
     MockRM rm1 = new MockRM(conf);
@@ -340,10 +358,47 @@ public class TestDistributedRT {
     int retries = 0;
     while (scheduler.getNodes().isEmpty() && retries++ < 20) {
       Thread.sleep(100);
+      commitDummyPendingEvent();
     }
     Assert.assertEquals(1, scheduler.getNodes().size());
     rm1.stop();
     rm2.stop();
+  }
+  
+  int pendingId=1000;
+  
+   private void commitDummyPendingEvent() {
+    try {
+      LightWeightRequestHandler bomb = new LightWeightRequestHandler(
+              YARNOperationType.TEST) {
+                @Override
+                public Object performTask() throws IOException {
+                  connector.beginTransaction();
+                  connector.writeLock();
+
+                  //Insert Pending Event
+                  List<PendingEvent> pendingEventsToAdd = 
+                          new ArrayList<PendingEvent>();
+                  
+                    pendingEventsToAdd.add(
+                            new PendingEvent("nodeid", -1,
+                            0, pendingId++));
+                  
+                  PendingEventDataAccess pendingEventDA =
+                          (PendingEventDataAccess) RMStorageFactory.
+                          getDataAccess(PendingEventDataAccess.class);
+                  pendingEventDA.addAll(pendingEventsToAdd);
+                  
+                 
+
+                  connector.commit();
+                  return null;
+                }
+              };
+      bomb.handle();
+    } catch (IOException ex) {
+      LOG.warn("Unable to update container statuses table", ex);
+    }
   }
   
 }

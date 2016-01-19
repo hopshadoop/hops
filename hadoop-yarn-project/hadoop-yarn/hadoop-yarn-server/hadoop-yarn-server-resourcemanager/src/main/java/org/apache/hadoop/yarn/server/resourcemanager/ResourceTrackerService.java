@@ -152,10 +152,7 @@ public class ResourceTrackerService extends AbstractService
             YarnConfiguration.DEFAULT_RM_NODEMANAGER_MINIMUM_VERSION);
 
     if (rmContext.isDistributedEnabled()) {
-      if (conf.getBoolean(YarnConfiguration.HOPS_NDB_RT_EVENT_STREAMING_ENABLED,
-              YarnConfiguration.DEFAULT_HOPS_NDB_RT_EVENT_STREAMING_ENABLED)) {
         rtStreamingProcessor = new NdbRtStreamingProcessor(rmContext);
-      }
 
     }
     super.serviceInit(conf);
@@ -174,12 +171,9 @@ public class ResourceTrackerService extends AbstractService
     
     if (rmContext.isDistributedEnabled() && !rmContext.
             getGroupMembershipService().isLeader()) {
-      if (conf.getBoolean(YarnConfiguration.HOPS_NDB_RT_EVENT_STREAMING_ENABLED,
-              YarnConfiguration.DEFAULT_HOPS_NDB_RT_EVENT_STREAMING_ENABLED)) {
         LOG.info("streaming porcessor is straring for resource tracker");
         RMStorageFactory.kickTheNdbEventStreamingAPI(false, conf);
         new Thread(rtStreamingProcessor).start();
-      }
 
     }
     
@@ -367,6 +361,7 @@ public class ResourceTrackerService extends AbstractService
 
     int pendingEventId = ((TransactionStateImpl) transactionState)
             .getRMNodeInfo(nodeId).getPendingId();
+    //TODO what is this code?! oldNodeExists is always false and there seem to be a lot of code duplication
     if (rmContext.isDistributedEnabled()) {
       if (!oldNodeExists) {
         LOG.info("HOP :: Registering new node at: " + host + " nodeId " +

@@ -26,6 +26,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.util.ConverterUtils;
+import io.hops.metadata.yarn.entity.ContainerStatus;
 
 /**
  *
@@ -51,6 +52,7 @@ public class NdbRtStreamingReceiver {
   private int nextHBPendingId = 0;
   private String containerIdToCleanrmnodeid = null;
   private String finishedApplicationrmnodeid = null;
+  private List<ContainerStatus> hopContainersStatusList = null;
 
   NdbRtStreamingReceiver() {
   }
@@ -119,14 +121,62 @@ public class NdbRtStreamingReceiver {
   //This will be called by c++ shared library, libhopsndbevent.so
   public void onEventMethod() throws InterruptedException {
     StreamingRTComps streamingRTComps = new StreamingRTComps(
-            containersToCleanSet, finishedAppList, nodeId, nextHeartbeat);
+            containersToCleanSet, finishedAppList, nodeId, nextHeartbeat, 
+    hopContainersStatusList);
     blockingRTQueue.put(streamingRTComps);
   }
+  
+  //// list building - build container status
+  private String hopContainerStatusContainerid = "";
+  private String hopContainerStatusState = "";
+  private String hopContainerStatusDiagnostics = "";
+  private int hopContainerStatusExitstatus = 0;
+  private String hopContainerStatusRMNodeId = "";
+  private int hopContainerStatusPendingId = 0;
+
+  public void setHopContainerStatusContainerid(
+          String hopContainerStatusContainerid) {
+    this.hopContainerStatusContainerid = hopContainerStatusContainerid;
+  }
+
+  public void setHopContainerStatusState(String hopContainerStatusState) {
+    this.hopContainerStatusState = hopContainerStatusState;
+  }
+
+  public void setHopContainerStatusPendingId(int hopContainerStatusPendingId) {
+    this.hopContainerStatusPendingId = hopContainerStatusPendingId;
+  }
+
+  public void setHopContainerStatusDiagnostics(
+          String hopContainerStatusDiagnostics) {
+    this.hopContainerStatusDiagnostics = hopContainerStatusDiagnostics;
+  }
+
+  public void setHopContainerStatusExitstatus(int hopContainerStatusExitstatus) {
+    this.hopContainerStatusExitstatus = hopContainerStatusExitstatus;
+  }
+
+  public void setHopContainerStatusRMNodeId(String hopContainerStatusRMNodeId) {
+    this.hopContainerStatusRMNodeId = hopContainerStatusRMNodeId;
+  }
+
+  public void buildHopContainerStatus() {
+    hopContainersStatusList = new ArrayList<ContainerStatus>();
+  }
+
+  public void AddHopContainerStatus() {
+    ContainerStatus hopContainerStatus = new ContainerStatus(
+            hopContainerStatusContainerid, hopContainerStatusState,
+            hopContainerStatusDiagnostics, hopContainerStatusExitstatus,
+            hopContainerStatusRMNodeId, hopContainerStatusPendingId);
+    hopContainersStatusList.add(hopContainerStatus);
+  }
+  
 
   // this two methods are using for multi-thread version from c++ library
   StreamingRTComps buildStreamingRTComps() {
     return new StreamingRTComps(containersToCleanSet, finishedAppList, nodeId,
-            nextHeartbeat);
+            nextHeartbeat, hopContainersStatusList);
   }
 
   public void onEventMethodMultiThread(StreamingRTComps streamingRTComps) throws
@@ -139,6 +189,6 @@ public class NdbRtStreamingReceiver {
     finishedAppList = null;
     nodeId = null;
     nextHeartbeat = false;
-
+    hopContainersStatusList = null;
   }
 }
