@@ -209,6 +209,7 @@ public class MRAMSimulator extends AMSimulator {
     }
   }
 
+  Map<String, Long> ContainersStartTimes = new HashMap<String, Long>();
   /**
    * send out request for AM container
    *
@@ -268,6 +269,7 @@ public class MRAMSimulator extends AMSimulator {
           }
         }
         // start AM container
+        ContainersStartTimes.put(container.getId().toString(), System.currentTimeMillis());
         amContainer = container;
         isAMContainerRunning = true;
         applicationMasterWaitTime = System.currentTimeMillis()
@@ -301,6 +303,7 @@ public class MRAMSimulator extends AMSimulator {
         for (ContainerStatus cs : response.getCompletedContainersStatuses()) {
           ContainerId containerId = cs.getContainerId();
           if (cs.getExitStatus() == ContainerExitStatus.SUCCESS) {
+            totalContainersDuration = totalContainersDuration + System.currentTimeMillis() - ContainersStartTimes.get(cs.getContainerId().toString());
             if (assignedMaps.containsKey(containerId)) {
 
               assignedMaps.remove(containerId);
@@ -345,6 +348,7 @@ public class MRAMSimulator extends AMSimulator {
 
       // check allocated containers
       for (Container container : response.getAllocatedContainers()) {
+        ContainersStartTimes.put(container.getId().toString(), System.currentTimeMillis());
         if (!scheduledMaps.isEmpty()) {
           ContainerSimulator cs = scheduledMaps.remove();
           assignedMaps.put(container.getId(), cs);
