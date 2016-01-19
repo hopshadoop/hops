@@ -121,6 +121,7 @@ public class RMContextImpl implements RMContext {
   private ApplicationMasterService applicationMasterService;//recovered
   private RMApplicationHistoryWriter rmApplicationHistoryWriter;//recovered
   private ConfigurationProvider configurationProvider;//recovered
+  private ContainersLogsService containersLogsService;
 
   /**
    * Default constructor. To be used in conjunction with setter methods for
@@ -151,7 +152,8 @@ public class RMContextImpl implements RMContext {
     this.setNMTokenSecretManager(nmTokenSecretManager);
     this.setClientToAMTokenSecretManager(clientToAMTokenSecretManager);
     this.setRMApplicationHistoryWriter(rmApplicationHistoryWriter);
-
+    this.setContainersLogsService(new ContainersLogsService());
+    
     RMStateStore nullStore = new NullRMStateStore();
     nullStore.setRMDispatcher(rmDispatcher);
     try {
@@ -183,6 +185,8 @@ public class RMContextImpl implements RMContext {
     this.setDelegationTokenRenewer(delegationTokenRenewer);
     this.setAMRMTokenSecretManager(appTokenSecretManager);
     this.setTransactionStateManager(transactionStateManager);
+    this.setContainersLogsService(new ContainersLogsService());
+    
     if (conf != null) {
       this.setContainerTokenSecretManager(
           new RMContainerTokenSecretManager(conf, this));
@@ -316,6 +320,11 @@ public class RMContextImpl implements RMContext {
   public ResourceTrackerService getResourceTrackerService() {
     return resourceTrackerService;
   }
+  
+  @Override
+  public ContainersLogsService getContainersLogsService() {
+      return containersLogsService;
+  }
 
   void setHAEnabled(boolean isHAEnabled) {
     this.isHAEnabled = isHAEnabled;
@@ -422,12 +431,25 @@ public class RMContextImpl implements RMContext {
       ResourceTrackerService resourceTrackerService) {
     this.resourceTrackerService = resourceTrackerService;
   }
+  
+  void setContainersLogsService(
+          ContainersLogsService containersLogsService) {
+      this.containersLogsService = containersLogsService;
+  }
 
   @Override
   public boolean isHAEnabled() {
     return isHAEnabled;
   }
 
+  @Override
+  public boolean isLeadingRT(){
+    if(!isHAEnabled){
+      return true;
+    }
+    return groupMembershipService.isLeadingRT();
+  }
+  
   @Override
   public boolean isDistributedEnabled(){
     return isDistributedEnabled;

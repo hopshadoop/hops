@@ -108,23 +108,33 @@ public class NdbEventStreamingProcessor extends PendingEventRetrieval {
           hopRMNodeCompObject
                   = (RMNodeComps) NdbEventStreamingReceiver.blockingQueue.take();
           if (hopRMNodeCompObject != null) {
-          if (LOG.isDebugEnabled()) {
-            printHopsRMNodeComps(hopRMNodeCompObject);
-          }
-            RMNode rmNode=null;
-            try {
-              rmNode = RMUtilities.processHopRMNodeCompsForScheduler(hopRMNodeCompObject,
-                      rmContext);
-              LOG.debug("HOP :: RMNodeWorker rmNode:" + rmNode);
-            } catch (IOException ex) {
-              LOG.error("HOP :: Error retrieving rmNode:" + ex, ex);
+            if (LOG.isDebugEnabled()) {
+              printHopsRMNodeComps(hopRMNodeCompObject);
             }
+            if (rmContext.isDistributedEnabled()) {
+              RMNode rmNode = null;
+              try {
+                rmNode = RMUtilities.processHopRMNodeCompsForScheduler(
+                        hopRMNodeCompObject,
+                        rmContext);
+                LOG.debug("HOP :: RMNodeWorker rmNode:" + rmNode);
 
-            if (rmNode != null) {
-              updateRMContext(rmNode);
-              triggerEvent(rmNode, hopRMNodeCompObject.getPendingEvent(),false);
+                if (rmNode != null) {
+                  updateRMContext(rmNode);
+                  triggerEvent(rmNode, hopRMNodeCompObject.getPendingEvent(),
+                          false);
+                }
+              } catch (Exception ex) {
+                LOG.error("HOP :: Error retrieving rmNode:" + ex, ex);
+              }
             }
-
+            // Processes container statuses for ContainersLogs service
+            List<ContainerStatus> hopContainersStatusList
+                    = hopRMNodeCompObject.getHopContainersStatus();
+            if (rmContext.isLeadingRT() && hopContainersStatusList.size() > 0) {
+              rmContext.getContainersLogsService()
+                      .insertEvent(hopContainersStatusList);
+            }
           }
         } catch (InterruptedException ex) {
           LOG.error(ex, ex);

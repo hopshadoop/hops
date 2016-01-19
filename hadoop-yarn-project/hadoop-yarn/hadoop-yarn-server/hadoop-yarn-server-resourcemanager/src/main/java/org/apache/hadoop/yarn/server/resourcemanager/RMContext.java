@@ -51,6 +51,8 @@ public interface RMContext extends Recoverable {
 
   boolean isHAEnabled();
 
+  boolean isLeadingRT();
+    
   boolean isDistributedEnabled();
   
   HAServiceState getHAServiceState();
@@ -94,7 +96,9 @@ public interface RMContext extends Recoverable {
   ApplicationMasterService getApplicationMasterService();
 
   ResourceTrackerService getResourceTrackerService();
-
+  
+  ContainersLogsService getContainersLogsService();
+  
   void setClientRMService(ClientRMService clientRMService);
 
   RMDelegationTokenSecretManager getRMDelegationTokenSecretManager();

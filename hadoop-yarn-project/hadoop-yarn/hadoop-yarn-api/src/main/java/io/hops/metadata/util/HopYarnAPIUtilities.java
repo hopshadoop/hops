@@ -55,6 +55,7 @@ public class HopYarnAPIUtilities {
   public static final int RMCONTAINERID = 17;
   public static final int PRIORITYID = 18;
   public static final int QUEMETRICSID = 1;
+  public static final int CONTAINERSTICKCOUNTER = 19;
   public final static Map<Integer, Integer> availableIDs =
       new HashMap<Integer, Integer>();
   public static final int AVAILABLE_IDS_INIT_VALUE = 0;
@@ -82,6 +83,7 @@ public class HopYarnAPIUtilities {
     availableIDs.put(APPSCHEDULINGINFO, AVAILABLE_IDS_INIT_VALUE);
     availableIDs.put(RMCONTAINERID, AVAILABLE_IDS_INIT_VALUE);
     availableIDs.put(PRIORITYID, AVAILABLE_IDS_INIT_VALUE);
+    availableIDs.put(CONTAINERSTICKCOUNTER, AVAILABLE_IDS_INIT_VALUE);
   }
 
 

@@ -221,8 +221,8 @@ public class TestRMNodeTransitions {
     //pick up the event, the PendingEvent retrieval does not invoke the
     //Mock Scheduler
     Configuration yarnconf = new YarnConfiguration();
-    if (yarnconf.getBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED,
-        YarnConfiguration.DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED)) {
+    if (yarnconf.getBoolean(YarnConfiguration.DISTRIBUTED_RM,
+        YarnConfiguration.DEFAULT_DISTRIBUTED_RM)) {
       scheduler.handle(new NodeAddedSchedulerEvent(node,
           new TransactionStateImpl( TransactionType.RM)));
     }
@@ -234,8 +234,8 @@ public class TestRMNodeTransitions {
     //If Distributed RT is enabled, this is the only way to let the scheduler
     //pick up the event, the PendingEvent retrieval does not invoke the
     //Mock Scheduler
-    if (yarnconf.getBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED,
-        YarnConfiguration.DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED)) {
+    if (yarnconf.getBoolean(YarnConfiguration.DISTRIBUTED_RM,
+        YarnConfiguration.DEFAULT_DISTRIBUTED_RM)) {
       scheduler.handle(new NodeAddedSchedulerEvent(node2,
           new TransactionStateImpl( TransactionType.RM)));
     }
@@ -270,8 +270,8 @@ public class TestRMNodeTransitions {
     //If Distributed RT is enabled, this is the only way to let the scheduler
     //pick up the event, the PendingEvent retrieval does not invoke the
     //Mock Scheduler
-    if (yarnconf.getBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED,
-        YarnConfiguration.DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED)) {
+    if (yarnconf.getBoolean(YarnConfiguration.DISTRIBUTED_RM,
+        YarnConfiguration.DEFAULT_DISTRIBUTED_RM)) {
       scheduler.handle(new NodeUpdateSchedulerEvent(node,
           new TransactionStateImpl( TransactionType.RM)));
     }
@@ -299,8 +299,8 @@ public class TestRMNodeTransitions {
     //If Distributed RT is enabled, this is the only way to let the scheduler
     //pick up the event, the PendingEvent retrieval does not invoke the
     //Mock Scheduler
-    if (yarnconf.getBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED,
-        YarnConfiguration.DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED)) {
+    if (yarnconf.getBoolean(YarnConfiguration.DISTRIBUTED_RM,
+        YarnConfiguration.DEFAULT_DISTRIBUTED_RM)) {
       scheduler.handle(new NodeUpdateSchedulerEvent(node2,
           new TransactionStateImpl( TransactionType.RM)));
     }
@@ -310,8 +310,8 @@ public class TestRMNodeTransitions {
     //If Distributed RT is enabled, this is the only way to let the scheduler
     //pick up the event, the PendingEvent retrieval does not invoke the
     //Mock Scheduler
-    if (yarnconf.getBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED,
-        YarnConfiguration.DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED)) {
+    if (yarnconf.getBoolean(YarnConfiguration.DISTRIBUTED_RM,
+        YarnConfiguration.DEFAULT_DISTRIBUTED_RM)) {
       scheduler.handle(new NodeUpdateSchedulerEvent(node2,
           new TransactionStateImpl( TransactionType.RM)));
     }
