@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdfs.server.protocol;
 
 import org.apache.hadoop.hdfs.StorageType;
+import java.util.UUID;
 
 /**
  * Class captures information of a storage in Datanode.
@@ -61,6 +62,16 @@ public class DatanodeStorage {
 
   public State getState() {
     return state;
+  }
+
+  /**
+   * Generate new storage ID. The format of this string can be changed
+   * in the future without requiring that old StorageIDs are updated.
+   *
+   * @return unique storage ID
+   */
+  public static String newStorageID() {
+    return "DS-" + UUID.randomUUID();
   }
 
   public StorageType getStorageType() {

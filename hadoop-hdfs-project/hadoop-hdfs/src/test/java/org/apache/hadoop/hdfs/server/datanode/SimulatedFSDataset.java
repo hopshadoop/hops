@@ -51,6 +51,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.UUID;
 
 /**
  * This class implements a simulated FSDataset.
@@ -72,7 +73,7 @@ public class SimulatedFSDataset implements FsDatasetSpi<FsVolumeSpi> {
     @Override
     public SimulatedFSDataset newInstance(DataNode datanode,
         DataStorage storage, Configuration conf) throws IOException {
-      return new SimulatedFSDataset(datanode, storage, conf);
+      return new SimulatedFSDataset(storage, conf);
     }
 
     @Override
@@ -388,13 +389,13 @@ public class SimulatedFSDataset implements FsDatasetSpi<FsVolumeSpi> {
   private final SimulatedStorage storage;
   private final String storageId;
   
-  public SimulatedFSDataset(DataNode datanode, DataStorage storage,
+  public SimulatedFSDataset(DataStorage storage,
       Configuration conf) {
     if (storage != null) {
-      storage.createStorageID(datanode.getXferPort());
+      storage.createStorageID();
       this.storageId = storage.getStorageID();
     } else {
-      this.storageId = "unknownStorageId" + new Random().nextInt();
+      this.storageId = "unknownStorageId" + UUID.randomUUID();
     }
     registerMBean(storageId);
     this.storage = new SimulatedStorage(
