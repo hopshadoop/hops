@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p/>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p/>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -108,6 +108,7 @@ import org.apache.hadoop.security.authorize.AccessControlList;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.util.Daemon;
+import org.apache.hadoop.util.DiskChecker;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 import org.apache.hadoop.util.DiskChecker2;
@@ -277,7 +278,7 @@ public class DataNode extends Configured
   public RPC.Server ipcServer;
 
   private SecureResources secureResources = null;
-  private AbstractList<File> dataDirs;
+  private AbstractList<StorageLocation> dataDirs;
   private Configuration conf;
 
   private final List<String> usersWithLocalPathAccess;
@@ -286,19 +287,11 @@ public class DataNode extends Configured
   private final boolean getHdfsBlockLocationsEnabled;
 
   /**
-   * Create the DataNode given a configuration and an array of dataDirs.
-   * 'dataDirs' is where the blocks are stored.
-   */
-  DataNode(final Configuration conf, final AbstractList<File> dataDirs)
-      throws IOException {
-    this(conf, dataDirs, null);
-  }
-  
-  /**
    * Create the DataNode given a configuration, an array of dataDirs,
    * and a namenode proxy
    */
-  DataNode(final Configuration conf, final AbstractList<File> dataDirs,
+  DataNode(final Configuration conf,
+      final AbstractList<StorageLocation> dataDirs,
       final SecureResources resources) throws IOException {
     super(conf);
 
@@ -347,9 +340,9 @@ public class DataNode extends Configured
     String name = config.get(DFS_DATANODE_HOST_NAME_KEY);
     if (name == null) {
       name = DNS.getDefaultHost(config.get(DFS_DATANODE_DNS_INTERFACE_KEY,
-              DFS_DATANODE_DNS_INTERFACE_DEFAULT), config
-              .get(DFS_DATANODE_DNS_NAMESERVER_KEY,
-                  DFS_DATANODE_DNS_NAMESERVER_DEFAULT));
+          DFS_DATANODE_DNS_INTERFACE_DEFAULT), config
+          .get(DFS_DATANODE_DNS_NAMESERVER_KEY,
+              DFS_DATANODE_DNS_NAMESERVER_DEFAULT));
     }
     return name;
   }
@@ -670,7 +663,7 @@ public class DataNode extends Configured
    *     - only for a non-simulated storage data node
    * @throws IOException
    */
-  void startDataNode(Configuration conf, AbstractList<File> dataDirs,
+  void startDataNode(Configuration conf, AbstractList<StorageLocation> dataDirs,
       // DatanodeProtocol namenode,
       SecureResources resources) throws IOException {
     if (UserGroupInformation.isSecurityEnabled() && resources == null) {
@@ -823,8 +816,8 @@ public class DataNode extends Configured
    * If this is the first block pool to register, this also initializes
    * the datanode-scoped storage.
    *
-   * @param nsInfo
-   *     the handshake response from the NN.
+   * @param bpos
+   *     block pool to initialize and register with the NameNode.
    * @throws IOException
    *     if the NN is inconsistent with the local storage.
    */
@@ -1588,17 +1581,36 @@ public class DataNode extends Configured
       printUsage(System.err);
       return null;
     }
-    Collection<URI> dataDirs = getStorageDirs(conf);
+    Collection<StorageLocation> dataDirs = getStorageLocations(conf);
     UserGroupInformation.setConfiguration(conf);
     SecurityUtil
         .login(conf, DFS_DATANODE_KEYTAB_FILE_KEY, DFS_DATANODE_USER_NAME_KEY);
     return makeInstance(dataDirs, conf, resources);
   }
 
-  static Collection<URI> getStorageDirs(Configuration conf) {
-    Collection<String> dirNames =
-        conf.getTrimmedStringCollection(DFS_DATANODE_DATA_DIR_KEY);
-    return Util.stringCollectionAsURIs(dirNames);
+  static Collection<StorageLocation> parseStorageLocations(
+      Collection<String> rawLocations) {
+    List<StorageLocation> locations =
+        new ArrayList<StorageLocation>(rawLocations.size());
+    for (String locationString : rawLocations) {
+      StorageLocation location;
+      try {
+        location = StorageLocation.parse(locationString);
+      } catch (IOException ioe) {
+        LOG.error("Failed to parse storage location " + locationString);
+        continue;
+      } catch (IllegalArgumentException iae) {
+        LOG.error(iae.toString());
+        continue;
+      }
+      locations.add(location);
+    }
+    return locations;
+  }
+
+  static Collection<StorageLocation> getStorageLocations(Configuration conf) {
+    return parseStorageLocations(
+        conf.getTrimmedStringCollection(DFS_DATANODE_DATA_DIR_KEY));
   }
 
   /**
@@ -1639,6 +1651,21 @@ public class DataNode extends Configured
     }
   }
 
+  // Small wrapper around the DiskChecker class that provides means to mock
+  // DiskChecker static methods and unittest DataNode#getDataDirsFromURIs.
+  static class DataNodeDiskChecker {
+    private final FsPermission expectedPermission;
+
+    public DataNodeDiskChecker(FsPermission expectedPermission) {
+      this.expectedPermission = expectedPermission;
+    }
+
+    public void checkDir(LocalFileSystem localFS, Path path)
+        throws DiskErrorException, IOException {
+      DiskChecker.checkDir(localFS, path, expectedPermission);
+    }
+  }
+
   /**
    * Make an instance of DataNode after ensuring that at least one of the
    * given data directories (and their parent directories, if necessary)
@@ -1655,47 +1682,46 @@ public class DataNode extends Configured
    * no directory from this directory list can be created.
    * @throws IOException
    */
-  static DataNode makeInstance(Collection<URI> dataDirs, Configuration conf,
-      SecureResources resources) throws IOException {
+  static DataNode makeInstance(Collection<StorageLocation> dataDirs,
+      Configuration conf, SecureResources resources) throws IOException {
     LocalFileSystem localFS = FileSystem.getLocal(conf);
     FsPermission permission = new FsPermission(
         conf.get(DFS_DATANODE_DATA_DIR_PERMISSION_KEY,
             DFS_DATANODE_DATA_DIR_PERMISSION_DEFAULT));
-    ArrayList<File> dirs = getDataDirsFromURIs(dataDirs, localFS, permission);
+    DataNodeDiskChecker dataNodeDiskChecker =
+        new DataNodeDiskChecker(permission);
+    AbstractList<StorageLocation> locations =
+        checkStorageLocations(dataDirs, localFS, dataNodeDiskChecker);
     DefaultMetricsSystem.initialize("DataNode");
 
-    assert dirs.size() > 0 : "number of data directories should be > 0";
-    return new DataNode(conf, dirs, resources);
+    assert locations.size() > 0 : "number of data directories should be > 0";
+    return new DataNode(conf, locations, resources);
   }
 
   // DataNode ctor expects AbstractList instead of List or Collection...
-  static ArrayList<File> getDataDirsFromURIs(Collection<URI> dataDirs,
-      LocalFileSystem localFS, FsPermission permission) throws IOException {
-    ArrayList<File> dirs = new ArrayList<File>();
+  static AbstractList<StorageLocation> checkStorageLocations(
+      Collection<StorageLocation> dataDirs,
+      LocalFileSystem localFS, DataNodeDiskChecker dataNodeDiskChecker)
+      throws IOException {
+    ArrayList<StorageLocation> locations = new ArrayList<StorageLocation>();
     StringBuilder invalidDirs = new StringBuilder();
-    for (URI dirURI : dataDirs) {
-      if (!"file".equalsIgnoreCase(dirURI.getScheme())) {
-        LOG.warn("Unsupported URI schema in " + dirURI + ". Ignoring ...");
-        invalidDirs.append("\"").append(dirURI).append("\" ");
-        continue;
-      }
-      // drop any (illegal) authority in the URI for backwards compatibility
-      File dir = new File(dirURI.getPath());
+    for (StorageLocation location : dataDirs) {
+      final URI uri = location.getUri();
       try {
-        DiskChecker2.checkDir(localFS, new Path(dir.toURI()), permission);
-        dirs.add(dir);
+        dataNodeDiskChecker.checkDir(localFS, new Path(uri));
+        locations.add(location);
       } catch (IOException ioe) {
-        LOG.warn("Invalid " + DFS_DATANODE_DATA_DIR_KEY + " " + dir + " : ",
-            ioe);
-        invalidDirs.append("\"").append(dir.getCanonicalPath()).append("\" ");
+        LOG.warn("Invalid " + DFS_DATANODE_DATA_DIR_KEY + " "
+            + location.getFile() + " : ", ioe);
+        invalidDirs.append("\"").append(uri.getPath()).append("\" ");
       }
     }
-    if (dirs.size() == 0) {
-      throw new IOException(
-          "All directories in " + DFS_DATANODE_DATA_DIR_KEY + " are invalid: " +
-              invalidDirs);
+    if (locations.size() == 0) {
+      throw new IOException("All directories in "
+          + DFS_DATANODE_DATA_DIR_KEY + " are invalid: "
+          + invalidDirs);
     }
-    return dirs;
+    return locations;
   }
 
   @Override
