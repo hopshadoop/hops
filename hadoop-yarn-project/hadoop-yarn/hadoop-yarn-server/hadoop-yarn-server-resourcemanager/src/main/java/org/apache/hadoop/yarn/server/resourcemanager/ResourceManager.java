@@ -22,6 +22,8 @@ import io.hops.ha.common.TransactionStateManager;
 import io.hops.metadata.util.RMStorageFactory;
 import io.hops.metadata.util.YarnAPIStorageFactory;
 import io.hops.metadata.yarn.entity.PendingEvent;
+import io.hops.metadata.yarn.entity.appmasterrpc.AllocateRPC;
+import io.hops.metadata.yarn.entity.appmasterrpc.HeartBeatRPC;
 import io.hops.metadata.yarn.entity.appmasterrpc.RPC;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -118,10 +120,25 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.security.PrivilegedExceptionAction;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import org.apache.hadoop.yarn.api.records.ContainerId;
+import org.apache.hadoop.yarn.api.records.ContainerResourceIncreaseRequest;
+import org.apache.hadoop.yarn.api.records.ContainerStatus;
+import org.apache.hadoop.yarn.api.records.ResourceRequest;
+import org.apache.hadoop.yarn.api.records.impl.pb.ContainerResourceIncreaseRequestPBImpl;
+import org.apache.hadoop.yarn.api.records.impl.pb.ContainerStatusPBImpl;
+import org.apache.hadoop.yarn.api.records.impl.pb.NodeIdPBImpl;
+import org.apache.hadoop.yarn.api.records.impl.pb.ResourceBlacklistRequestPBImpl;
+import org.apache.hadoop.yarn.api.records.impl.pb.ResourceRequestPBImpl;
+import org.apache.hadoop.yarn.proto.YarnProtos;
+import org.apache.hadoop.yarn.proto.YarnServerCommonProtos;
+import org.apache.hadoop.yarn.server.api.records.impl.pb.MasterKeyPBImpl;
+import org.apache.hadoop.yarn.server.api.records.impl.pb.NodeHealthStatusPBImpl;
+import org.apache.hadoop.yarn.server.api.records.impl.pb.NodeStatusPBImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.quota.QuotaSchedulerService;
 
 /**
@@ -1275,7 +1292,8 @@ public class ResourceManager extends CompositeService implements Recoverable {
     }
   }
   
-  protected void recoverRpc(RMState rmState) throws IOException, YarnException {
+  protected void recoverRpc(final RMState rmState) throws IOException,
+          YarnException {
     List<RPC> rpcList = rmState.getAppMasterRPCs();
     if(!rpcList.isEmpty()){
       Collections.sort(rpcList);
@@ -1329,16 +1347,55 @@ public class ResourceManager extends CompositeService implements Recoverable {
             ugi = creatAMRMTokenUGI(rpc);
             ugi.doAs(new PrivilegedExceptionAction<AllocateResponse>() {
 
-                  @Override
-                  public AllocateResponse run() throws Exception {
-                    com.google.protobuf.GeneratedMessage proto =
-                        YarnServiceProtos.AllocateRequestProto.parseFrom(rpc.
-                            getRpc());
-                    return masterService.allocate(new AllocateRequestPBImpl(
-                            (YarnServiceProtos.AllocateRequestProto) proto),
-                        rpc.getRPCId());
-                  }
-                });
+              @Override
+              public AllocateResponse run() throws Exception {
+
+                AllocateRequestPBImpl request = new AllocateRequestPBImpl();
+
+                AllocateRPC allocateRPC = rmState.getAllocateRPCs().get(rpc.
+                        getRPCId());
+
+                List<ResourceRequest> askList
+                        = new ArrayList<ResourceRequest>();
+                for (byte[] ask : allocateRPC.getAsk().values()) {
+                  askList.add(new ResourceRequestPBImpl(
+                          YarnProtos.ResourceRequestProto.parseFrom(
+                                  ask)));
+                }
+                request.setAskList(askList);
+
+                List<ContainerResourceIncreaseRequest> incRequestList
+                        = new ArrayList<ContainerResourceIncreaseRequest>();
+                for (byte[] incRequest : allocateRPC.
+                        getResourceIncreaseRequest().values()) {
+                  incRequestList.add(new ContainerResourceIncreaseRequestPBImpl(
+                          YarnProtos.ContainerResourceIncreaseRequestProto.
+                          parseFrom(incRequest)));
+                }
+                request.setIncreaseRequests(incRequestList);
+
+                request.setProgress(allocateRPC.getProgress());
+
+                List<ContainerId> releaseList = new ArrayList<ContainerId>();
+                for (String containerId : allocateRPC.getReleaseList()) {
+                  releaseList.add(ConverterUtils.toContainerId(containerId));
+                }
+                request.setReleaseList(releaseList);
+
+                ResourceBlacklistRequestPBImpl blackListRequest
+                        = new ResourceBlacklistRequestPBImpl();
+
+                blackListRequest.setBlacklistAdditions(allocateRPC.
+                        getBlackListAddition());
+                blackListRequest.setBlacklistRemovals(allocateRPC.
+                        getBlackListRemovals());
+                request.setResourceBlacklistRequest(blackListRequest);
+
+                request.setResponseId(allocateRPC.getResponseId());
+
+                return masterService.allocate(request, rpc.getRPCId());
+              }
+            });
             break;
           case SubmitApplication:
             ugi = UserGroupInformation.createRemoteUser(rpc.getUserId());
@@ -1387,12 +1444,54 @@ public class ResourceManager extends CompositeService implements Recoverable {
             }
             break;
           case NodeHeartbeat:
-            if (!rmContext.isDistributedEnabled() || rmContext.getGroupMembershipService().isAlone()) {
-              proto = YarnServerCommonServiceProtos.NodeHeartbeatRequestProto.
-                      parseFrom(rpc.getRpc());
-              resourceTracker.nodeHeartbeat(new NodeHeartbeatRequestPBImpl(
-                      (YarnServerCommonServiceProtos.NodeHeartbeatRequestProto) proto),
-                      rpc.getRPCId());
+            if (!rmContext.isDistributedEnabled() || rmContext.
+                    getGroupMembershipService().isAlone()) {
+              NodeHeartbeatRequestPBImpl heartBeatRPC
+                      = new NodeHeartbeatRequestPBImpl();
+              HeartBeatRPC hbRPC = rmState.getHeartBeatRPCs().
+                      get(rpc.getRPCId());
+              YarnServerCommonProtos.MasterKeyProto mkProto
+                      = YarnServerCommonProtos.MasterKeyProto.parseFrom(hbRPC.
+                              getLastKnownContainerTokenMasterKey());
+              heartBeatRPC.setLastKnownContainerTokenMasterKey(
+                      new MasterKeyPBImpl(mkProto));
+
+              mkProto = YarnServerCommonProtos.MasterKeyProto.parseFrom(hbRPC.
+                      getLastKnownNMTokenMasterKey());
+              heartBeatRPC.setLastKnownNMTokenMasterKey(new MasterKeyPBImpl(
+                      mkProto));
+
+              NodeStatusPBImpl nodeStatus = new NodeStatusPBImpl();
+
+              List<ContainerStatus> containersStatuses
+                      = new ArrayList<ContainerStatus>();
+              for (byte[] statusBytes
+                      : hbRPC.getContainersStatuses().values()) {
+                YarnProtos.ContainerStatusProto csProto
+                        = YarnProtos.ContainerStatusProto.parseFrom(
+                                statusBytes);
+                containersStatuses.add(new ContainerStatusPBImpl(csProto));
+              }
+              nodeStatus.setContainersStatuses(containersStatuses);
+
+              List<ApplicationId> keepAliveApps = new ArrayList<ApplicationId>();
+              for (String appId : hbRPC.getKeepAliveApplications()) {
+                keepAliveApps.add(ConverterUtils.toApplicationId(appId));
+              }
+              nodeStatus.setKeepAliveApplications(keepAliveApps);
+
+              YarnServerCommonProtos.NodeHealthStatusProto nhProto
+                      = YarnServerCommonProtos.NodeHealthStatusProto.parseFrom(
+                              hbRPC.getNodeHealthStatus());
+              nodeStatus.
+                      setNodeHealthStatus(new NodeHealthStatusPBImpl(nhProto));
+
+              nodeStatus.setNodeId(ConverterUtils.toNodeId(hbRPC.getNodeId()));
+              nodeStatus.setResponseId(hbRPC.getResponseId());
+
+              heartBeatRPC.setNodeStatus(nodeStatus);
+
+              resourceTracker.nodeHeartbeat(heartBeatRPC, rpc.getRPCId());
             }
             break;
           default:

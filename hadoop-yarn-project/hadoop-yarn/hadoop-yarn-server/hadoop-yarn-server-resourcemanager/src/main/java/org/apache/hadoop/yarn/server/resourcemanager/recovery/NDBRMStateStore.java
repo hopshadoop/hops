@@ -22,6 +22,7 @@ import io.hops.metadata.yarn.entity.AppSchedulingInfo;
 import io.hops.metadata.yarn.entity.ContainerId;
 import io.hops.metadata.yarn.entity.FinishedApplications;
 import io.hops.metadata.yarn.entity.NodeHBResponse;
+import io.hops.metadata.yarn.entity.appmasterrpc.HeartBeatRPC;
 import io.hops.metadata.yarn.entity.rmstatestore.UpdatedNode;
 import io.hops.metadata.yarn.entity.rmstatestore.DelegationKey;
 import io.hops.metadata.yarn.entity.rmstatestore.DelegationToken;
@@ -336,6 +337,8 @@ public class NDBRMStateStore extends RMStateStore {
    
   private void loadRPCs(RMState rmState) throws IOException {
     rmState.appMasterRPCs = RMUtilities.getAppMasterRPCs();
+    rmState.heartBeatRPCs = RMUtilities.getHeartBeatRPCs();
+    rmState.allocateRPCs = RMUtilities.getAllocateRPCs();
   }
   
   private void loadPendingEvents(RMState rmState) throws IOException{
