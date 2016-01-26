@@ -324,10 +324,13 @@ public class SchedulerApplicationAttempt implements Recoverable{
             getFiCaSchedulerAppInfo(getApplicationAttemptId()).
             addReservedContainer(rmContainer);
 
-    LOG.info("Application " + getApplicationId() + " reserved container " +
-        rmContainer + " on node " + node + ", currently has " +
-        reservedContainers.size() + " at priority " + priority +
-        "; currentReservation " + currentReservation.getMemory());
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Application attempt " + getApplicationAttemptId()
+              + " reserved container " + rmContainer + " on node " + node
+              + ". This attempt currently has " + reservedContainers.size()
+              + " reserved containers at priority " + priority
+              + "; currentReservation " + currentReservation.getMemory());
+    }
 
     return rmContainer;
   }
