@@ -343,11 +343,7 @@ public class NodeStatusUpdaterImpl extends AbstractService
               ", " + nodeHealthStatus.getHealthReport());
     }
     List<ContainerStatus> containersStatuses = getContainerStatuses();
-    if (LOG.isDebugEnabled()) {
-      LOG.debug(
-          this.nodeId + " sending out status for " + containersStatuses.size() +
-              " containers");
-    }
+
     NodeStatus nodeStatus = NodeStatus
         .newInstance(nodeId, responseId, containersStatuses,
             createKeepAliveApplicationList(), nodeHealthStatus);

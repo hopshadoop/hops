@@ -111,8 +111,6 @@ public class LeafQueue implements CSQueue {
   private final Resource maximumAllocation;     //from config
   private final float minimumAllocationFactor;   //from config
 
-  private RMContainerTokenSecretManager containerTokenSecretManager;  //from config
-
   private Map<String, User> users = new HashMap<String, User>();  //recovered
 
   private final QueueMetrics metrics;  //TORECOVER
@@ -190,7 +188,6 @@ public class LeafQueue implements CSQueue {
     this.minimumAllocationFactor = Resources.ratio(resourceCalculator,
                     Resources.subtract(maximumAllocation, minimumAllocation),
                     maximumAllocation);
-    this.containerTokenSecretManager = cs.getContainerTokenSecretManager();
 
     float capacity =
         (float) cs.getConfiguration().getCapacity(getQueuePath()) / 100;
@@ -622,7 +619,7 @@ public class LeafQueue implements CSQueue {
     return queueName + ": " +
         "capacity=" + capacity + ", " +
         "absoluteCapacity=" + absoluteCapacity + ", " +
-        "usedResources=" + usedResources +
+        "usedResources=" + usedResources + ", " +
         "usedCapacity=" + getUsedCapacity() + ", " +
         "absoluteUsedCapacity=" + getAbsoluteUsedCapacity() + ", " +
         "numApps=" + getNumApplications() + ", " +
@@ -1054,15 +1051,17 @@ public class LeafQueue implements CSQueue {
         .divide(resourceCalculator, clusterResource,
             Resources.add(usedResources, required), clusterResource);
     if (potentialNewCapacity > absoluteMaxCapacity) {
-      LOG.info(getQueueName() +
-          " usedResources: " + usedResources +
-          " clusterResources: " + clusterResource +
-          " currentCapacity " +
-          Resources.divide(resourceCalculator, clusterResource, usedResources,
-              clusterResource) +
-          " required " + required +
-          " potentialNewCapacity: " + potentialNewCapacity + " ( " +
-          " max-capacity: " + absoluteMaxCapacity + ")");
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(getQueueName() +
+                " usedResources: " + usedResources +
+                " clusterResources: " + clusterResource +
+                " currentCapacity " +
+                Resources.divide(resourceCalculator, clusterResource, usedResources,
+                        clusterResource) +
+                " required " + required +
+                " potentialNewCapacity: " + potentialNewCapacity + " ( " +
+                " max-capacity: " + absoluteMaxCapacity + ")");
+      }
       
       ((TransactionStateImpl) transactionState).getCSQueueInfo().addCSQueue(
               this.getQueuePath(), this);
@@ -1400,7 +1399,7 @@ public class LeafQueue implements CSQueue {
     if (LOG.isDebugEnabled()) {
       LOG.debug(
           "assignContainers: node=" + node.getNodeName() + " application=" +
-              application.getApplicationId().getId() + " priority=" +
+              application.getApplicationId() + " priority=" +
               priority.getPriority() + " request=" + request + " type=" + type);
     }
     Resource capability = request.getCapability();
@@ -1452,14 +1451,10 @@ public class LeafQueue implements CSQueue {
           transactionState);
 
       LOG.info("assignedContainer" +
-          " application=" + application.getApplicationId() +
+          " application attempt=" + application.getApplicationAttemptId() +
           " container=" + container +
-          " containerId=" + container.getId() +
           " queue=" + this +
-          " usedCapacity=" + getUsedCapacity() +
-          " absoluteUsedCapacity=" + getAbsoluteUsedCapacity() +
-          " used=" + usedResources +
-          " cluster=" + clusterResource);
+          " clusterResource=" + clusterResource);
 
       return container.getResource();
     } else {
@@ -1468,13 +1463,12 @@ public class LeafQueue implements CSQueue {
               transactionState);
 
       LOG.info("Reserved container " +
-          " application=" + application.getApplicationId() +
+          " application attempt=" + application.getApplicationAttemptId() +
           " resource=" + request.getCapability() +
           " queue=" + this.toString() +
-          " usedCapacity=" + getUsedCapacity() +
-          " absoluteUsedCapacity=" + getAbsoluteUsedCapacity() +
           " used=" + usedResources +
-          " cluster=" + clusterResource);
+          " node=" + node +
+          " clusterResource=" + clusterResource);
 
       return request.getCapability();
     }
