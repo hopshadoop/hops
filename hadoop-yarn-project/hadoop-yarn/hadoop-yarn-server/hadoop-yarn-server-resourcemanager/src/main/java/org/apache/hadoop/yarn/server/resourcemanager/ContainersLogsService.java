@@ -227,7 +227,9 @@ public class ContainersLogsService extends CompositeService {
     for (ContainerStatus cs : latestEvents) {
       ContainersLogs cl;
       boolean updatable = false;
-
+      if(cs.getState().equals(ContainerState.NEW)){
+        continue;
+      }
       if (activeContainers.get(cs.getContainerid()) == null) {
         cl = new ContainersLogs(
                 cs.getContainerid(),
