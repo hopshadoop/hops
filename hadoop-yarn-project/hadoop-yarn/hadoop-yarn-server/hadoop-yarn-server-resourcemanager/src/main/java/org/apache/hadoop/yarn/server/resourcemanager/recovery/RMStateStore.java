@@ -1299,7 +1299,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
               getTransactionState());
         }
       } catch (Exception e) {
-        LOG.error("Error storing app: " + appId, e);
+        LOG.error("Error storing/updating app: " + appId, e);
         notifyStoreOperationFailed(e, event.getTransactionState());
       }
     } else if (
@@ -1355,7 +1355,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
               storedException, event.getTransactionState());
         }
       } catch (Exception e) {
-        LOG.error("Error storing appAttempt: " + attemptState.getAttemptId(),
+        LOG.error("Error storing/updating appAttempt: " + attemptState.getAttemptId(),
             e);
         notifyStoreOperationFailed(e, event.getTransactionState());
       }
