@@ -35,6 +35,7 @@ import org.apache.hadoop.yarn.util.ProcfsBasedProcessTree.ProcessTreeSmapMemInfo
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import static org.junit.Assume.assumeTrue;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -109,19 +110,13 @@ public class TestProcfsBasedProcessTree {
 
   @Before
   public void setup() throws IOException {
+    assumeTrue(Shell.LINUX);
     FileContext.getLocalFSFileContext()
         .delete(new Path(TEST_ROOT_DIR.getAbsolutePath()), true);
   }
 
   @Test(timeout = 30000)
   public void testProcessTree() throws Exception {
-
-    if (!Shell.LINUX) {
-      System.out.println(
-          "ProcfsBasedProcessTree is not available on this system. Not testing");
-      return;
-
-    }
     try {
       Assert.assertTrue(ProcfsBasedProcessTree.isAvailable());
     } catch (Exception e) {
