@@ -75,7 +75,7 @@ public class AppSchedulingInfo {
   private Set<String> blacklist = new HashSet<String>();//recovered
 
   //private final ApplicationStore store;
-  private ActiveUsersManager activeUsersManager;//recovered
+  private ActiveUsersManager activeUsersManager;//TORECOVER
 
   /* Allocated by scheduler */
   boolean pending = true;// for app metrics //recovered
@@ -121,7 +121,7 @@ public class AppSchedulingInfo {
           .get(priority).values()) {
         if (transactionState != null) {
           ((TransactionStateImpl) transactionState)
-              .getSchedulerApplicationInfo().
+              .getSchedulerApplicationInfos(this.applicationId).
               getFiCaSchedulerAppInfo(this.applicationAttemptId).
               setRequestsToRemove(request);
         }
@@ -197,7 +197,7 @@ public class AppSchedulingInfo {
       }
 
       asks.put(resourceName, request);
-      ((TransactionStateImpl) ts).getSchedulerApplicationInfo()
+      ((TransactionStateImpl) ts).getSchedulerApplicationInfos(this.applicationId)
           .getFiCaSchedulerAppInfo(this.applicationAttemptId)
           .setRequestsToAdd(request);
 
@@ -236,7 +236,7 @@ public class AppSchedulingInfo {
     if (blacklistAdditions != null) {
       blacklist.addAll(blacklistAdditions);
       if (ts != null) {
-        ((TransactionStateImpl) ts).getSchedulerApplicationInfo().
+        ((TransactionStateImpl) ts).getSchedulerApplicationInfos(this.applicationId).
             getFiCaSchedulerAppInfo(this.applicationAttemptId).
             setBlacklistToAdd(blacklistAdditions);
       }
@@ -246,7 +246,7 @@ public class AppSchedulingInfo {
     if (blacklistRemovals != null) {
       blacklist.removeAll(blacklistRemovals);
       if (ts != null) {
-        ((TransactionStateImpl) ts).getSchedulerApplicationInfo()
+        ((TransactionStateImpl) ts).getSchedulerApplicationInfos(this.applicationId)
             .getFiCaSchedulerAppInfo(this.applicationAttemptId)
             .setBlacklistToRemove(blacklistRemovals);
       }
@@ -322,7 +322,7 @@ public class AppSchedulingInfo {
       // once an allocation is done we assume the application is
       // running from scheduler's POV.
       pending =
-          false; //pushde in FiCaSchedulerApp, TORECOVER check if done in FFSchedulerApp (fair)
+          false; //push in FiCaSchedulerApp, TORECOVER FAIR check if done in FFSchedulerApp (fair)
       metrics.runAppAttempt(applicationId, user);
     }
 
@@ -349,7 +349,7 @@ public class AppSchedulingInfo {
     nodeLocalRequest.setNumContainers(nodeLocalRequest.getNumContainers() - 1);
     if (nodeLocalRequest.getNumContainers() == 0) {
       if (ts != null) {
-        ((TransactionStateImpl) ts).getSchedulerApplicationInfo()
+        ((TransactionStateImpl) ts).getSchedulerApplicationInfos(this.applicationId)
             .getFiCaSchedulerAppInfo(this.applicationAttemptId).
             setRequestsToRemove(
                 this.requests.get(priority).get(node.getNodeName()));
@@ -358,7 +358,7 @@ public class AppSchedulingInfo {
     } else {
       //update the request in db
       if (ts != null) {
-        ((TransactionStateImpl) ts).getSchedulerApplicationInfo()
+        ((TransactionStateImpl) ts).getSchedulerApplicationInfos(this.applicationId)
             .getFiCaSchedulerAppInfo(this.applicationAttemptId).
             setRequestsToAdd(nodeLocalRequest);
       }
@@ -369,7 +369,7 @@ public class AppSchedulingInfo {
     rackLocalRequest.setNumContainers(rackLocalRequest.getNumContainers() - 1);
     if (rackLocalRequest.getNumContainers() == 0) {
       if (ts != null) {
-        ((TransactionStateImpl) ts).getSchedulerApplicationInfo()
+        ((TransactionStateImpl) ts).getSchedulerApplicationInfos(this.applicationId)
             .getFiCaSchedulerAppInfo(this.applicationAttemptId).
             setRequestsToRemove(
                 this.requests.get(priority).get(node.getRackName()));
@@ -378,7 +378,7 @@ public class AppSchedulingInfo {
     } else {
       //update the request in db
       if (ts != null) {
-        ((TransactionStateImpl) ts).getSchedulerApplicationInfo()
+        ((TransactionStateImpl) ts).getSchedulerApplicationInfos(this.applicationId)
             .getFiCaSchedulerAppInfo(this.applicationAttemptId).
             setRequestsToAdd(rackLocalRequest);
       }
@@ -390,7 +390,7 @@ public class AppSchedulingInfo {
     decrementOutstanding(request);
     if (ts != null) {
       //update the request in db
-      ((TransactionStateImpl) ts).getSchedulerApplicationInfo().
+      ((TransactionStateImpl) ts).getSchedulerApplicationInfos(this.applicationId).
           getFiCaSchedulerAppInfo(this.applicationAttemptId).
           setRequestsToAdd(request);
     }
@@ -411,7 +411,7 @@ public class AppSchedulingInfo {
     rackLocalRequest.setNumContainers(rackLocalRequest.getNumContainers() - 1);
     if (rackLocalRequest.getNumContainers() == 0) {
       if (ts != null) {
-        ((TransactionStateImpl) ts).getSchedulerApplicationInfo()
+        ((TransactionStateImpl) ts).getSchedulerApplicationInfos(this.applicationId)
             .getFiCaSchedulerAppInfo(this.applicationAttemptId).
             setRequestsToRemove(
                 this.requests.get(priority).get(node.getRackName()));
@@ -420,7 +420,7 @@ public class AppSchedulingInfo {
     } else {
       //update request in db
       if (ts != null) {
-        ((TransactionStateImpl) ts).getSchedulerApplicationInfo().
+        ((TransactionStateImpl) ts).getSchedulerApplicationInfos(this.applicationId).
             getFiCaSchedulerAppInfo(this.applicationAttemptId).
             setRequestsToAdd(rackLocalRequest);
       }
@@ -431,7 +431,7 @@ public class AppSchedulingInfo {
             .get(org.apache.hadoop.yarn.api.records.ResourceRequest.ANY);
     decrementOutstanding(request);
     if (ts != null) {
-      ((TransactionStateImpl) ts).getSchedulerApplicationInfo().
+      ((TransactionStateImpl) ts).getSchedulerApplicationInfos(this.applicationId).
           getFiCaSchedulerAppInfo(this.applicationAttemptId).
           setRequestsToAdd(request);
     }
@@ -513,11 +513,11 @@ public class AppSchedulingInfo {
           asks.get(org.apache.hadoop.yarn.api.records.ResourceRequest.ANY);
       if (request != null) {
         metrics.decrPendingResources(user, request.getNumContainers(), request
-            .getCapability()); //TORECOVER: this updates to queuemetrics are not pushed
+            .getCapability()); //TORECOVER MS: this updates to queuemetrics are not pushed
       }
     }
     metrics.finishAppAttempt(applicationId, pending,
-        user);//TORECOVER: this updates to queuemetrics are not pushed
+        user);//TORECOVER OPT: this updates to queuemetrics are not pushed
 
     // Clear requests themselves
     clearRequests(transactionState);

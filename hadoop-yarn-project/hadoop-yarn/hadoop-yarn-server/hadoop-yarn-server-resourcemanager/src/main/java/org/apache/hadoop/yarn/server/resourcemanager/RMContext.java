@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager;
 
+import io.hops.ha.common.TransactionStateManager;
 import org.apache.hadoop.ha.HAServiceProtocol.HAServiceState;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.NodeId;
@@ -50,6 +51,10 @@ public interface RMContext extends Recoverable {
 
   boolean isHAEnabled();
 
+  boolean isLeadingRT();
+    
+  boolean isDistributedEnabled();
+  
   HAServiceState getHAServiceState();
 
   RMStateStore getStateStore();
@@ -84,14 +89,16 @@ public interface RMContext extends Recoverable {
 
   AdminService getRMAdminService();
 
-  GroupMembershipService getRMGroupMembershipService();
+  GroupMembershipService getGroupMembershipService();
   
   ClientRMService getClientRMService();
 
   ApplicationMasterService getApplicationMasterService();
 
   ResourceTrackerService getResourceTrackerService();
-
+  
+  ContainersLogsService getContainersLogsService();
+  
   void setClientRMService(ClientRMService clientRMService);
 
   RMDelegationTokenSecretManager getRMDelegationTokenSecretManager();
@@ -105,4 +112,6 @@ public interface RMContext extends Recoverable {
       RMApplicationHistoryWriter rmApplicationHistoryWriter);
 
   ConfigurationProvider getConfigurationProvider();
+  
+  public TransactionStateManager getTransactionStateManager();
 }

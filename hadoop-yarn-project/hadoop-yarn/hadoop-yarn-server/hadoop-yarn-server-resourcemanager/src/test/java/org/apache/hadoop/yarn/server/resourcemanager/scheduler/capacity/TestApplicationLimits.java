@@ -113,10 +113,10 @@ public class TestApplicationLimits {
     Map<String, CSQueue> queues = new HashMap<String, CSQueue>();
     CSQueue root = CapacityScheduler
         .parseQueue(csContext, csConf, null, "root", queues, queues,
-            TestUtils.spyHook);
+            TestUtils.spyHook, null);
 
     
-    queue = spy(new LeafQueue(csContext, A, root, null));
+    queue = spy(new LeafQueue(csContext, A, root, null, null));
 
     // Stub out ACL checks
     doReturn(true).
@@ -186,7 +186,7 @@ public class TestApplicationLimits {
     Map<String, CSQueue> queues = new HashMap<String, CSQueue>();
     CSQueue root = CapacityScheduler
         .parseQueue(csContext, csConf, null, "root", queues, queues,
-            TestUtils.spyHook);
+            TestUtils.spyHook, null);
 
     LeafQueue queue = (LeafQueue) queues.get(A);
     
@@ -215,7 +215,8 @@ public class TestApplicationLimits {
     
     // Add some nodes to the cluster & test new limits
     clusterResource = Resources.createResource(120 * 16 * GB);
-    root.updateClusterResource(clusterResource);
+    root.updateClusterResource(clusterResource, new TransactionStateImpl(
+            TransactionState.TransactionType.RM));
     expectedMaxActiveApps = Math.max(1,
         (int) Math.ceil(((float) clusterResource.getMemory() / (1 * GB)) *
             csConf.
@@ -260,7 +261,7 @@ public class TestApplicationLimits {
     queues = new HashMap<String, CSQueue>();
     root = CapacityScheduler
         .parseQueue(csContext, csConf, null, "root", queues, queues,
-            TestUtils.spyHook);
+            TestUtils.spyHook, null);
     clusterResource = Resources.createResource(100 * 16 * GB);
 
     queue = (LeafQueue) queues.get(A);
@@ -284,7 +285,7 @@ public class TestApplicationLimits {
     queues = new HashMap<String, CSQueue>();
     root = CapacityScheduler
         .parseQueue(csContext, csConf, null, "root", queues, queues,
-            TestUtils.spyHook);
+            TestUtils.spyHook, null);
 
     queue = (LeafQueue) queues.get(A);
     assertEquals(9999,
@@ -304,74 +305,74 @@ public class TestApplicationLimits {
     int APPLICATION_ID = 0;
     // Submit first application
     FiCaSchedulerApp app_0 = getMockApplication(APPLICATION_ID++, user_0);
-    queue.submitApplicationAttempt(app_0, user_0);
+    queue.submitApplicationAttempt(app_0, user_0, null);
     assertEquals(1, queue.getNumActiveApplications());
     assertEquals(0, queue.getNumPendingApplications());
-    assertEquals(1, queue.getNumActiveApplications(user_0));
-    assertEquals(0, queue.getNumPendingApplications(user_0));
+    assertEquals(1, queue.getNumActiveApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
+    assertEquals(0, queue.getNumPendingApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
 
     // Submit second application
     FiCaSchedulerApp app_1 = getMockApplication(APPLICATION_ID++, user_0);
-    queue.submitApplicationAttempt(app_1, user_0);
+    queue.submitApplicationAttempt(app_1, user_0,null);
     assertEquals(2, queue.getNumActiveApplications());
     assertEquals(0, queue.getNumPendingApplications());
-    assertEquals(2, queue.getNumActiveApplications(user_0));
-    assertEquals(0, queue.getNumPendingApplications(user_0));
+    assertEquals(2, queue.getNumActiveApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
+    assertEquals(0, queue.getNumPendingApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
     
     // Submit third application, should remain pending
     FiCaSchedulerApp app_2 = getMockApplication(APPLICATION_ID++, user_0);
-    queue.submitApplicationAttempt(app_2, user_0);
+    queue.submitApplicationAttempt(app_2, user_0,null);
     assertEquals(2, queue.getNumActiveApplications());
     assertEquals(1, queue.getNumPendingApplications());
-    assertEquals(2, queue.getNumActiveApplications(user_0));
-    assertEquals(1, queue.getNumPendingApplications(user_0));
+    assertEquals(2, queue.getNumActiveApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
+    assertEquals(1, queue.getNumPendingApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
     
     // Finish one application, app_2 should be activated
-    queue.finishApplicationAttempt(app_0, A);
+    queue.finishApplicationAttempt(app_0, A, null);
     assertEquals(2, queue.getNumActiveApplications());
     assertEquals(0, queue.getNumPendingApplications());
-    assertEquals(2, queue.getNumActiveApplications(user_0));
-    assertEquals(0, queue.getNumPendingApplications(user_0));
+    assertEquals(2, queue.getNumActiveApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
+    assertEquals(0, queue.getNumPendingApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
     
     // Submit another one for user_0
     FiCaSchedulerApp app_3 = getMockApplication(APPLICATION_ID++, user_0);
-    queue.submitApplicationAttempt(app_3, user_0);
+    queue.submitApplicationAttempt(app_3, user_0,null);
     assertEquals(2, queue.getNumActiveApplications());
     assertEquals(1, queue.getNumPendingApplications());
-    assertEquals(2, queue.getNumActiveApplications(user_0));
-    assertEquals(1, queue.getNumPendingApplications(user_0));
+    assertEquals(2, queue.getNumActiveApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
+    assertEquals(1, queue.getNumPendingApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
     
     // Change queue limit to be smaller so 2 users can fill it up
     doReturn(3).when(queue).getMaximumActiveApplications();
     
     // Submit first app for user_1
     FiCaSchedulerApp app_4 = getMockApplication(APPLICATION_ID++, user_1);
-    queue.submitApplicationAttempt(app_4, user_1);
+    queue.submitApplicationAttempt(app_4, user_1,null);
     assertEquals(3, queue.getNumActiveApplications());
     assertEquals(1, queue.getNumPendingApplications());
-    assertEquals(2, queue.getNumActiveApplications(user_0));
-    assertEquals(1, queue.getNumPendingApplications(user_0));
-    assertEquals(1, queue.getNumActiveApplications(user_1));
-    assertEquals(0, queue.getNumPendingApplications(user_1));
+    assertEquals(2, queue.getNumActiveApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
+    assertEquals(1, queue.getNumPendingApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
+    assertEquals(1, queue.getNumActiveApplications(user_1, new TransactionStateImpl( TransactionState.TransactionType.RM)));
+    assertEquals(0, queue.getNumPendingApplications(user_1, new TransactionStateImpl( TransactionState.TransactionType.RM)));
 
     // Submit second app for user_1, should block due to queue-limit
     FiCaSchedulerApp app_5 = getMockApplication(APPLICATION_ID++, user_1);
-    queue.submitApplicationAttempt(app_5, user_1);
+    queue.submitApplicationAttempt(app_5, user_1, null);
     assertEquals(3, queue.getNumActiveApplications());
     assertEquals(2, queue.getNumPendingApplications());
-    assertEquals(2, queue.getNumActiveApplications(user_0));
-    assertEquals(1, queue.getNumPendingApplications(user_0));
-    assertEquals(1, queue.getNumActiveApplications(user_1));
-    assertEquals(1, queue.getNumPendingApplications(user_1));
+    assertEquals(2, queue.getNumActiveApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
+    assertEquals(1, queue.getNumPendingApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
+    assertEquals(1, queue.getNumActiveApplications(user_1, new TransactionStateImpl( TransactionState.TransactionType.RM)));
+    assertEquals(1, queue.getNumPendingApplications(user_1, new TransactionStateImpl( TransactionState.TransactionType.RM)));
 
     // Now finish one app of user_1 so app_5 should be activated
-    queue.finishApplicationAttempt(app_4, A);
+    queue.finishApplicationAttempt(app_4, A, null);
     assertEquals(3, queue.getNumActiveApplications());
     assertEquals(1, queue.getNumPendingApplications());
-    assertEquals(2, queue.getNumActiveApplications(user_0));
-    assertEquals(1, queue.getNumPendingApplications(user_0));
-    assertEquals(1, queue.getNumActiveApplications(user_1));
-    assertEquals(0, queue.getNumPendingApplications(user_1));
+    assertEquals(2, queue.getNumActiveApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
+    assertEquals(1, queue.getNumPendingApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
+    assertEquals(1, queue.getNumActiveApplications(user_1, new TransactionStateImpl( TransactionState.TransactionType.RM)));
+    assertEquals(0, queue.getNumPendingApplications(user_1, new TransactionStateImpl( TransactionState.TransactionType.RM)));
   }
 
   @Test
@@ -385,73 +386,73 @@ public class TestApplicationLimits {
 
     // Submit first application
     FiCaSchedulerApp app_0 = getMockApplication(APPLICATION_ID++, user_0);
-    queue.submitApplicationAttempt(app_0, user_0);
+    queue.submitApplicationAttempt(app_0, user_0, null);
     assertEquals(1, queue.getNumActiveApplications());
     assertEquals(0, queue.getNumPendingApplications());
-    assertEquals(1, queue.getNumActiveApplications(user_0));
-    assertEquals(0, queue.getNumPendingApplications(user_0));
+    assertEquals(1, queue.getNumActiveApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
+    assertEquals(0, queue.getNumPendingApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
     assertTrue(queue.activeApplications.contains(app_0));
 
     // Submit second application
     FiCaSchedulerApp app_1 = getMockApplication(APPLICATION_ID++, user_0);
-    queue.submitApplicationAttempt(app_1, user_0);
+    queue.submitApplicationAttempt(app_1, user_0, null);
     assertEquals(2, queue.getNumActiveApplications());
     assertEquals(0, queue.getNumPendingApplications());
-    assertEquals(2, queue.getNumActiveApplications(user_0));
-    assertEquals(0, queue.getNumPendingApplications(user_0));
+    assertEquals(2, queue.getNumActiveApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
+    assertEquals(0, queue.getNumPendingApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
     assertTrue(queue.activeApplications.contains(app_1));
 
     // Submit third application, should remain pending
     FiCaSchedulerApp app_2 = getMockApplication(APPLICATION_ID++, user_0);
-    queue.submitApplicationAttempt(app_2, user_0);
+    queue.submitApplicationAttempt(app_2, user_0, null);
     assertEquals(2, queue.getNumActiveApplications());
     assertEquals(1, queue.getNumPendingApplications());
-    assertEquals(2, queue.getNumActiveApplications(user_0));
-    assertEquals(1, queue.getNumPendingApplications(user_0));
+    assertEquals(2, queue.getNumActiveApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
+    assertEquals(1, queue.getNumPendingApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
     assertTrue(queue.pendingApplications.contains(app_2));
 
     // Submit fourth application, should remain pending
     FiCaSchedulerApp app_3 = getMockApplication(APPLICATION_ID++, user_0);
-    queue.submitApplicationAttempt(app_3, user_0);
+    queue.submitApplicationAttempt(app_3, user_0, null);
     assertEquals(2, queue.getNumActiveApplications());
     assertEquals(2, queue.getNumPendingApplications());
-    assertEquals(2, queue.getNumActiveApplications(user_0));
-    assertEquals(2, queue.getNumPendingApplications(user_0));
+    assertEquals(2, queue.getNumActiveApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
+    assertEquals(2, queue.getNumPendingApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
     assertTrue(queue.pendingApplications.contains(app_3));
 
     // Kill 3rd pending application
-    queue.finishApplicationAttempt(app_2, A);
+    queue.finishApplicationAttempt(app_2, A, null);
     assertEquals(2, queue.getNumActiveApplications());
     assertEquals(1, queue.getNumPendingApplications());
-    assertEquals(2, queue.getNumActiveApplications(user_0));
-    assertEquals(1, queue.getNumPendingApplications(user_0));
+    assertEquals(2, queue.getNumActiveApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
+    assertEquals(1, queue.getNumPendingApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
     assertFalse(queue.pendingApplications.contains(app_2));
     assertFalse(queue.activeApplications.contains(app_2));
 
     // Finish 1st application, app_3 should become active
-    queue.finishApplicationAttempt(app_0, A);
+    queue.finishApplicationAttempt(app_0, A, null);
     assertEquals(2, queue.getNumActiveApplications());
     assertEquals(0, queue.getNumPendingApplications());
-    assertEquals(2, queue.getNumActiveApplications(user_0));
-    assertEquals(0, queue.getNumPendingApplications(user_0));
+    assertEquals(2, queue.getNumActiveApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
+    assertEquals(0, queue.getNumPendingApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
     assertTrue(queue.activeApplications.contains(app_3));
     assertFalse(queue.pendingApplications.contains(app_3));
     assertFalse(queue.activeApplications.contains(app_0));
 
     // Finish 2nd application
-    queue.finishApplicationAttempt(app_1, A);
+    queue.finishApplicationAttempt(app_1, A, null);
     assertEquals(1, queue.getNumActiveApplications());
     assertEquals(0, queue.getNumPendingApplications());
-    assertEquals(1, queue.getNumActiveApplications(user_0));
-    assertEquals(0, queue.getNumPendingApplications(user_0));
+    assertEquals(1, queue.getNumActiveApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
+    assertEquals(0, queue.getNumPendingApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
     assertFalse(queue.activeApplications.contains(app_1));
 
     // Finish 4th application
-    queue.finishApplicationAttempt(app_3, A);
+    queue.finishApplicationAttempt(app_3, A, null);
     assertEquals(0, queue.getNumActiveApplications());
     assertEquals(0, queue.getNumPendingApplications());
-    assertEquals(0, queue.getNumActiveApplications(user_0));
-    assertEquals(0, queue.getNumPendingApplications(user_0));
+    assertEquals(0, queue.getNumActiveApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
+    assertEquals(0, queue.getNumPendingApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
     assertFalse(queue.activeApplications.contains(app_3));
   }
 
@@ -483,7 +484,7 @@ public class TestApplicationLimits {
     Map<String, CSQueue> queues = new HashMap<String, CSQueue>();
     CapacityScheduler
         .parseQueue(csContext, csConf, null, "root", queues, queues,
-            TestUtils.spyHook);
+            TestUtils.spyHook, null);
 
     // Manipulate queue 'a'
     LeafQueue queue = TestLeafQueue.stubLeafQueue((LeafQueue) queues.get(A));
@@ -507,18 +508,19 @@ public class TestApplicationLimits {
         TestUtils.getMockApplicationAttemptId(0, 0);
     FiCaSchedulerApp app_0_0 =
         spy(new FiCaSchedulerApp(appAttemptId_0_0, user_0, queue,
-            queue.getActiveUsersManager(), rmContext));
-    queue.submitApplicationAttempt(app_0_0, user_0);
+            queue.getActiveUsersManager(), rmContext, -1));
+    queue.submitApplicationAttempt(app_0_0, user_0, null);
 
     List<ResourceRequest> app_0_0_requests = new ArrayList<ResourceRequest>();
     app_0_0_requests.add(TestUtils
             .createResourceRequest(ResourceRequest.ANY, 1 * GB, 2, true,
                 priority_1, recordFactory));
     app_0_0.updateResourceRequests(app_0_0_requests,
-        new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
+        new TransactionStateImpl( TransactionState.TransactionType.RM));
 
     // Schedule to compute 
-    queue.assignContainers(clusterResource, node_0, null);
+    queue.assignContainers(clusterResource, node_0, new TransactionStateImpl(
+            TransactionState.TransactionType.RM));
     Resource expectedHeadroom = Resources.createResource(10 * 16 * GB, 1);
     verify(app_0_0)
         .setHeadroom(eq(expectedHeadroom), any(TransactionStateImpl.class));
@@ -528,19 +530,20 @@ public class TestApplicationLimits {
         TestUtils.getMockApplicationAttemptId(1, 0);
     FiCaSchedulerApp app_0_1 =
         spy(new FiCaSchedulerApp(appAttemptId_0_1, user_0, queue,
-            queue.getActiveUsersManager(), rmContext));
-    queue.submitApplicationAttempt(app_0_1, user_0);
+            queue.getActiveUsersManager(), rmContext, -1));
+    queue.submitApplicationAttempt(app_0_1, user_0, null);
     
     List<ResourceRequest> app_0_1_requests = new ArrayList<ResourceRequest>();
     app_0_1_requests.add(TestUtils
             .createResourceRequest(ResourceRequest.ANY, 1 * GB, 2, true,
                 priority_1, recordFactory));
     app_0_1.updateResourceRequests(app_0_1_requests,
-        new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
+        new TransactionStateImpl( TransactionState.TransactionType.RM));
 
     // Schedule to compute 
     queue
-        .assignContainers(clusterResource, node_0, null); // Schedule to compute
+            .assignContainers(clusterResource, node_0, new TransactionStateImpl(
+                             TransactionState.TransactionType.RM)); // Schedule to compute
     verify(app_0_0, times(2))
         .setHeadroom(eq(expectedHeadroom), any(TransactionStateImpl.class));
     verify(app_0_1).setHeadroom(eq(expectedHeadroom),
@@ -551,19 +554,20 @@ public class TestApplicationLimits {
         TestUtils.getMockApplicationAttemptId(2, 0);
     FiCaSchedulerApp app_1_0 =
         spy(new FiCaSchedulerApp(appAttemptId_1_0, user_1, queue,
-            queue.getActiveUsersManager(), rmContext));
-    queue.submitApplicationAttempt(app_1_0, user_1);
+            queue.getActiveUsersManager(), rmContext, -1));
+    queue.submitApplicationAttempt(app_1_0, user_1, null);
 
     List<ResourceRequest> app_1_0_requests = new ArrayList<ResourceRequest>();
     app_1_0_requests.add(TestUtils
             .createResourceRequest(ResourceRequest.ANY, 1 * GB, 2, true,
                 priority_1, recordFactory));
     app_1_0.updateResourceRequests(app_1_0_requests,
-        new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
+        new TransactionStateImpl( TransactionState.TransactionType.RM));
     
     // Schedule to compute 
     queue
-        .assignContainers(clusterResource, node_0, null); // Schedule to compute
+            .assignContainers(clusterResource, node_0, new TransactionStateImpl(
+                             TransactionState.TransactionType.RM)); // Schedule to compute
     expectedHeadroom = Resources.createResource(10 * 16 * GB / 2, 1); // changes
     verify(app_0_0)
         .setHeadroom(eq(expectedHeadroom), any(TransactionStateImpl.class));
@@ -575,7 +579,8 @@ public class TestApplicationLimits {
     // Now reduce cluster size and check for the smaller headroom
     clusterResource = Resources.createResource(90 * 16 * GB);
     queue
-        .assignContainers(clusterResource, node_0, null); // Schedule to compute
+            .assignContainers(clusterResource, node_0, new TransactionStateImpl(
+                             TransactionState.TransactionType.RM)); // Schedule to compute
     expectedHeadroom = Resources.createResource(9 * 16 * GB / 2, 1); // changes
     verify(app_0_0)
         .setHeadroom(eq(expectedHeadroom), any(TransactionStateImpl.class));

@@ -59,11 +59,6 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
       <version>2.11.7</version>
     </dependency>
     <dependency>
-      <groupId>com.googlecode.concurrentlinkedhashmap</groupId>
-      <artifactId>concurrentlinkedhashmap-lru</artifactId>
-      <version>1.4.2</version>
-    </dependency>
-    <dependency>
       <groupId>io.hops</groupId>
       <artifactId>hadoop-annotations</artifactId>
       <scope>provided</scope>

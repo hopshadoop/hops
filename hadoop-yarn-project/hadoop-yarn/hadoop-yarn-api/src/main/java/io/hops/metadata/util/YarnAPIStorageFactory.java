@@ -21,11 +21,16 @@ import io.hops.StorageConnector;
 import io.hops.exception.StorageInitializtionException;
 import io.hops.metadata.adaptor.YarnVariablesDALAdaptor;
 import io.hops.metadata.common.EntityDataAccess;
+import io.hops.metadata.hdfs.dal.GroupDataAccess;
+import io.hops.metadata.hdfs.dal.UserDataAccess;
+import io.hops.metadata.hdfs.dal.UserGroupDataAccess;
 import io.hops.metadata.yarn.dal.YarnVariablesDataAccess;
+import io.hops.security.UsersGroups;
 import io.hops.transaction.EntityManager;
 import io.hops.transaction.context.ContextInitializer;
 import io.hops.transaction.context.EntityContext;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
 
 import java.io.File;
 import java.io.IOException;
@@ -56,41 +61,54 @@ public class YarnAPIStorageFactory {
       "dfs.storage.driver.configfile";
   public static final String DFS_STORAGE_DRIVER_CONFIG_FILE_DEFAULT =
       "ndb-config.properties";
+  public static final String NDB_EVENT_STREAMING_FOR_DISTRIBUTED_SERVICE
+          = "io.hops.metadata.ndb.JniNdbEventStreaming";
 
   public static StorageConnector getConnector() {
     return dStorageFactory.getConnector();
   }
 
   public static void setConfiguration(Configuration conf)
-      throws StorageInitializtionException, IOException {
+          throws StorageInitializtionException, IOException {
     if (isInitialized) {
       return;
     }
     addToClassPath(conf.get(DFS_STORAGE_DRIVER_JAR_FILE,
-        DFS_STORAGE_DRIVER_JAR_FILE_DEFAULT));
+            DFS_STORAGE_DRIVER_JAR_FILE_DEFAULT));
     dStorageFactory = DalDriver.load(
-        conf.get(DFS_STORAGE_DRIVER_CLASS, DFS_STORAGE_DRIVER_CLASS_DEFAULT));
+            conf.get(DFS_STORAGE_DRIVER_CLASS, DFS_STORAGE_DRIVER_CLASS_DEFAULT));
     dStorageFactory.setConfiguration(getMetadataClusterConfiguration(conf));
     initDataAccessWrappers();
     EntityManager.addContextInitializer(getContextInitializer());
+    if(conf.getBoolean(CommonConfigurationKeys.HOPS_GROUPS_ENABLE, CommonConfigurationKeys
+        .HOPS_GROUPS_ENABLE_DEFAULT)) {
+      UsersGroups.init(getConnector(), (UserDataAccess) getDataAccess
+          (UserDataAccess.class), (UserGroupDataAccess) getDataAccess
+          (UserGroupDataAccess.class), (GroupDataAccess) getDataAccess
+          (GroupDataAccess.class), conf.getInt(CommonConfigurationKeys
+          .HOPS_GROUPS_UPDATER_ROUND, CommonConfigurationKeys
+          .HOPS_GROUPS_UPDATER_ROUND_DEFAULT), conf.getInt(CommonConfigurationKeys
+          .HOPS_USERS_LRU_THRESHOLD, CommonConfigurationKeys
+          .HOPS_USERS_LRU_THRESHOLD_DEFAULT));
+    }
     isInitialized = true;
   }
 
   public static Properties getMetadataClusterConfiguration(Configuration conf)
-      throws IOException {
+          throws IOException {
     String configFile =
         conf.get(YarnAPIStorageFactory.DFS_STORAGE_DRIVER_CONFIG_FILE,
-            YarnAPIStorageFactory.DFS_STORAGE_DRIVER_CONFIG_FILE_DEFAULT);
+                    YarnAPIStorageFactory.DFS_STORAGE_DRIVER_CONFIG_FILE_DEFAULT);
     Properties clusterConf = new Properties();
     InputStream inStream = StorageConnector.class.getClassLoader().
-        getResourceAsStream(configFile);
+            getResourceAsStream(configFile);
     clusterConf.load(inStream);
     return clusterConf;
   }
 
   //[M]: just for testing purposes
   private static void addToClassPath(String s)
-      throws StorageInitializtionException {
+          throws StorageInitializtionException {
     try {
       File f = new File(s);
       URL u = f.toURI().toURL();
@@ -119,8 +137,8 @@ public class YarnAPIStorageFactory {
   private static void initDataAccessWrappers() {
     dataAccessAdaptors.clear();
     dataAccessAdaptors.put(YarnVariablesDataAccess.class,
-        new YarnVariablesDALAdaptor((YarnVariablesDataAccess) getDataAccess(
-            YarnVariablesDataAccess.class)));
+            new YarnVariablesDALAdaptor((YarnVariablesDataAccess) getDataAccess(
+                            YarnVariablesDataAccess.class)));
   }
 
   private static ContextInitializer getContextInitializer() {

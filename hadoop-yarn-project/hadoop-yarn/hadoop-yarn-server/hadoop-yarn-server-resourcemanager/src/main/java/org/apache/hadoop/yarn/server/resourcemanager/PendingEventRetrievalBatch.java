@@ -68,45 +68,59 @@ public class PendingEventRetrievalBatch extends PendingEventRetrieval {
     this.writeLock = lock.writeLock();
   }
 
-  @Override
-  public void run() {
-    while (active) {
-      try {
-        long startTime = System.currentTimeMillis();
+  public void start() {
+    if (!active) {
+      active = true;
+      retrivingThread = new Thread(new RetrivingThread());
+      retrivingThread.start();
+    } else {
+      LOG.error("ndb event retriver is already active");
+    }
+  }
+  
+  private class RetrivingThread implements Runnable {
+
+    @Override
+    public void run() {
+      while (active) {
         try {
-          writeLock.lock();
-          //If scheduler just started, retrieve events with status pending 
-          if (firstRetrieval) {
-            pendingEvents.putAll(
-                RMUtilities.getPendingEvents(0, TablesDef.PendingEventTableDef.PENDING));
-            firstRetrieval = false;
-          }
+          long startTime = System.currentTimeMillis();
+          try {
+            writeLock.lock();
+            //If scheduler just started, retrieve events with status pending 
+            if (firstRetrieval) {
+              pendingEvents.putAll(
+                      RMUtilities.getPendingEvents(0,
+                              TablesDef.PendingEventTableDef.PENDING));
+              firstRetrieval = false;
+            }
           //Retrieve all pending events, update their status
-          //to pending and create scheduler events.
-          pendingEvents.putAll(RMUtilities.getAndUpdatePendingEvents(
-              conf.getInt(YarnConfiguration.HOPS_PENDING_EVENTS_BATCH,
-                  YarnConfiguration.DEFAULT_HOPS_PENDING_EVENTS_BATCH),
-              TablesDef.PendingEventTableDef.NEW));
+            //to pending and create scheduler events.
+            pendingEvents.putAll(RMUtilities.getAndUpdatePendingEvents(
+                    conf.getInt(YarnConfiguration.HOPS_PENDING_EVENTS_BATCH,
+                            YarnConfiguration.DEFAULT_HOPS_PENDING_EVENTS_BATCH),
+                    TablesDef.PendingEventTableDef.NEW));
           LOG.debug("HOP :: pending events are:" + pendingEvents.size() + ", " +
               pendingEvents);
-          //Parse all events grouped by RMNode
-          for (String id : pendingEvents.keySet()) {
-            //If this RMNode has not been processed yet
-            if (!pendingNMs.contains(id)) {
-              pendingNMs.add(id);
-              GlobalThreadPool.getExecutorService().
-                  execute(new RMNodeWorker(id));
+            //Parse all events grouped by RMNode
+            for (String id : pendingEvents.keySet()) {
+              //If this RMNode has not been processed yet
+              if (!pendingNMs.contains(id)) {
+                pendingNMs.add(id);
+                GlobalThreadPool.getExecutorService().
+                        execute(new RMNodeWorker(id));
+              }
             }
+          } finally {
+            writeLock.unlock();
           }
-        } finally {
-          writeLock.unlock();
+          Thread.sleep(
+                  Math.max(0, period - (System.currentTimeMillis() - startTime)));
+        } catch (IOException ex) {
+          LOG.error("HOP :: Error while retrieving PendingEvents", ex);
+        } catch (InterruptedException ex) {
+          LOG.error("HOP :: Error while retrieving PendingEvents", ex);
         }
-        Thread.sleep(
-            Math.max(0, period - (System.currentTimeMillis() - startTime)));
-      } catch (IOException ex) {
-        LOG.error("HOP :: Error while retrieving PendingEvents", ex);
-      } catch (InterruptedException ex) {
-        LOG.error("HOP :: Error while retrieving PendingEvents", ex);
       }
     }
   }
@@ -129,7 +143,8 @@ public class PendingEventRetrievalBatch extends PendingEventRetrieval {
       LOG.debug("HOP :: RMNodeWorker:" + id + " - START");
       try {
         //Retrieve RMNode
-        rmNode = convertHopToRMNode(RMUtilities.getRMNodeBatch(id));
+        rmNode = RMUtilities.processHopRMNodeCompsForScheduler(RMUtilities.
+                getRMNodeBatch(id), rmContext);
         LOG.debug("HOP :: RMNodeWorker rmNode:" + rmNode);
       } catch (IOException ex) {
         LOG.error("HOP :: Error retrieving rmNode:" + id, ex);
@@ -144,7 +159,7 @@ public class PendingEventRetrievalBatch extends PendingEventRetrieval {
           ConcurrentSkipListSet<PendingEvent> eventsToRemove = pendingEvents.
               get(id);
           for (PendingEvent pendingEvent : eventsToRemove) {
-            triggerEvent(rmNode, pendingEvent);
+            triggerEvent(rmNode, pendingEvent, false);
           }
           try {
             writeLock.lock();

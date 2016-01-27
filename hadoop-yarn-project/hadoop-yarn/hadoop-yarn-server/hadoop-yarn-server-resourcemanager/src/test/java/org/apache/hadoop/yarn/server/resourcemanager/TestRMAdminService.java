@@ -96,7 +96,7 @@ public class TestRMAdminService {
     fs.delete(tmpDir, true);
     fs.mkdirs(workingPath);
     fs.mkdirs(tmpDir);
-    MockUnixGroupsMapping.init();
+    MockUnixGroupsMapping.resetGroups();
     YarnAPIStorageFactory.setConfiguration(configuration);
     RMStorageFactory.setConfiguration(configuration);
     RMUtilities.InitializeDB();
@@ -371,6 +371,7 @@ public class TestRMAdminService {
     rm = new MockRM(configuration);
     rm.init(configuration);
     rm.start();
+
     try {
       rm.adminService.refreshUserToGroupsMappings(
           RefreshUserToGroupsMappingsRequest.newInstance());
@@ -737,6 +738,9 @@ public class TestRMAdminService {
       Assert.assertTrue(groupAfter.contains("test_group_D") &&
           groupAfter.contains("test_group_E") &&
           groupAfter.contains("test_group_F") && groupAfter.size() == 3);
+
+      // reset the groups to what it were before updating
+      MockUnixGroupsMapping.resetGroups();
     } finally {
       if (resourceManager != null) {
         resourceManager.stop();
@@ -799,7 +803,7 @@ public class TestRMAdminService {
       implements GroupMappingServiceProvider {
 
     @SuppressWarnings("serial")
-    private static List<String> group;
+    private static List<String> group = new ArrayList<String>();
 
     @Override
     public List<String> getGroups(String user) throws IOException {
@@ -821,6 +825,13 @@ public class TestRMAdminService {
       group.add("test_group_D");
       group.add("test_group_E");
       group.add("test_group_F");
+    }
+
+    public static void resetGroups() {
+      group.clear();
+      group.add("test_group_A");
+      group.add("test_group_B");
+      group.add("test_group_C");
     }
 
     public static void init() {

@@ -23,12 +23,14 @@ import io.hops.metadata.yarn.entity.AppSchedulingInfo;
 import io.hops.metadata.yarn.entity.AppSchedulingInfoBlacklist;
 import io.hops.metadata.yarn.entity.Container;
 import io.hops.metadata.yarn.entity.ContainerStatus;
-import io.hops.metadata.yarn.entity.FiCaSchedulerAppLiveContainers;
-import io.hops.metadata.yarn.entity.FiCaSchedulerAppNewlyAllocatedContainers;
+import io.hops.metadata.yarn.entity.FiCaSchedulerAppLastScheduledContainer;
+import io.hops.metadata.yarn.entity.FiCaSchedulerAppContainer;
+import io.hops.metadata.yarn.entity.FiCaSchedulerAppSchedulingOpportunities;
 import io.hops.metadata.yarn.entity.FiCaSchedulerNode;
 import io.hops.metadata.yarn.entity.JustLaunchedContainers;
 import io.hops.metadata.yarn.entity.LaunchedContainers;
 import io.hops.metadata.yarn.entity.Node;
+import io.hops.metadata.yarn.entity.PendingEvent;
 import io.hops.metadata.yarn.entity.QueueMetrics;
 import io.hops.metadata.yarn.entity.RMContainer;
 import io.hops.metadata.yarn.entity.RMContextActiveNodes;
@@ -36,9 +38,15 @@ import io.hops.metadata.yarn.entity.RMContextInactiveNodes;
 import io.hops.metadata.yarn.entity.RMNode;
 import io.hops.metadata.yarn.entity.Resource;
 import io.hops.metadata.yarn.entity.ResourceRequest;
+import io.hops.metadata.yarn.entity.SchedulerAppReservations;
 import io.hops.metadata.yarn.entity.SchedulerApplication;
 import io.hops.metadata.yarn.entity.UpdatedContainerInfo;
 import io.hops.metadata.yarn.entity.appmasterrpc.RPC;
+import io.hops.metadata.yarn.entity.capacity.CSLeafQueueUserInfo;
+import io.hops.metadata.yarn.entity.capacity.CSQueue;
+import io.hops.metadata.yarn.entity.capacity.FiCaSchedulerAppReservedContainers;
+import io.hops.metadata.yarn.entity.fair.FSSchedulerNode;
+import io.hops.metadata.yarn.entity.fair.PreemptionMap;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -102,6 +110,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerState;
 
 @Private
 @Unstable
@@ -123,7 +132,6 @@ import java.util.TreeSet;
   protected static final String DELEGATION_TOKEN_SEQUENCE_NUMBER_PREFIX =
       "RMDTSequenceNumber_";
   protected static final String VERSION_NODE = "RMVersionNode";
-  private static boolean isDistributedRTEnabled;
   
   public static final Log LOG = LogFactory.getLog(RMStateStore.class);
 
@@ -373,16 +381,18 @@ import java.util.TreeSet;
 
     Map<KeyType, MasterKey> secretMamagerKeys;
     List<RPC> appMasterRPCs;
+    List<PendingEvent> pendingEvents;
     Map<String, AppSchedulingInfo> appSchedulingInfos;
     Map<String, SchedulerApplication> schedulerApplications;
-    List<FiCaSchedulerNode> fiCaSchedulerNodes;
+    Map<String, FiCaSchedulerNode> fiCaSchedulerNodes;
     Map<String, List<LaunchedContainers>> launchedContainers;
-    Map<String, List<FiCaSchedulerAppNewlyAllocatedContainers>>
-        newlyAllocatedContainers;
-    Map<String, List<FiCaSchedulerAppLiveContainers>> liveContainers;
     Map<String, List<ResourceRequest>> resourceRequests;
     Map<String, List<AppSchedulingInfoBlacklist>> blackLists;
     List<QueueMetrics> allQueueMetrics;
+    Map<String, List<FiCaSchedulerAppSchedulingOpportunities>> schedulingOpportunities;
+    Map<String, List<FiCaSchedulerAppLastScheduledContainer>> lastScheduledContainers;
+    Map<String, List<FiCaSchedulerAppReservedContainers>> reservedContainers;
+    Map<String, List<SchedulerAppReservations>> reReservations;
     Map<String, NodeHeartbeatResponse> nodeHeartBeatResponses;
     Map<String, Set<ContainerId>> containersToClean;
     Map<String, List<ApplicationId>> finishedApplications;
@@ -398,7 +408,9 @@ import java.util.TreeSet;
     Map<String, ContainerStatus> allContainerStatus;
     Map<String, List<JustLaunchedContainers>> allJustLaunchedContainers;
     Map<String, Boolean> allRMNodeNextHeartbeats;
-
+    Map<String, CSQueue> allCSQueues;
+    Map<String, CSLeafQueueUserInfo> allCSLeafQueueUserInfo;
+    
     public Map<ApplicationId, ApplicationState> getApplicationState() {
       return appState;
     }
@@ -435,6 +447,14 @@ import java.util.TreeSet;
       }
     }
 
+    public List<PendingEvent> getPendingEvents() throws IOException {
+      if (pendingEvents != null) {
+        return pendingEvents;
+      } else {
+        return Collections.EMPTY_LIST;
+      }
+    }
+    
     public AppSchedulingInfo getAppSchedulingInfo(final String appId)
         throws IOException {
       return appSchedulingInfos.get(appId);
@@ -445,7 +465,7 @@ import java.util.TreeSet;
       return schedulerApplications;
     }
 
-    public List<FiCaSchedulerNode> getAllFiCaSchedulerNodes()
+    public Map<String, FiCaSchedulerNode> getAllFiCaSchedulerNodes()
         throws IOException {
       return fiCaSchedulerNodes;
     }
@@ -459,14 +479,57 @@ import java.util.TreeSet;
       }
     }
 
-    public List<FiCaSchedulerAppNewlyAllocatedContainers> getNewlyAllocatedContainers(
+    public List<FiCaSchedulerAppSchedulingOpportunities> getSchedulingOpportunities(
+            final String ficaId) throws IOException {
+      return schedulingOpportunities.get(ficaId);
+    }
+    
+    public List<FiCaSchedulerAppReservedContainers> getReservedContainers(
+            final String ficaId) throws IOException {
+      return reservedContainers.get(ficaId);
+    }
+    
+    public List<FiCaSchedulerAppLastScheduledContainer> getLastScheduledContainers(
+            final String ficaId) throws IOException {
+      return lastScheduledContainers.get(ficaId);
+    }
+    
+    public List<SchedulerAppReservations> getRereservations(
+            final String ficaId) throws IOException {
+      return reReservations.get(ficaId);
+    }
+    
+    public List<String> getNewlyAllocatedContainers(
         final String ficaId) throws IOException {
-      return newlyAllocatedContainers.get(ficaId);
+       List<String> newlyAllocatedContainers = new ArrayList<String>();
+      for(RMContainer rmc: allRMContainers.values()){
+        if(rmc.getApplicationAttemptIdID().equals(ficaId)){
+          if(rmc.getState().equals(RMContainerState.NEW.toString()) ||
+                  rmc.getState().equals(RMContainerState.RESERVED.toString()) ||
+                  rmc.getState().equals(RMContainerState.ALLOCATED.toString())){
+              newlyAllocatedContainers.add(rmc.getContainerIdID());
+          }
+        }
+      }
+      return newlyAllocatedContainers;
     }
 
-    public List<FiCaSchedulerAppLiveContainers> getLiveContainers(
+    //TODO implement in a more efficient way
+    public List<String> getLiveContainers(
         final String ficaId) throws IOException {
-      return liveContainers.get(ficaId);
+      List<String> liveContainers = new ArrayList<String>();
+      for(RMContainer rmc: allRMContainers.values()){
+        if(rmc.getApplicationAttemptIdID().equals(ficaId)){
+          if(!rmc.getState().equals(RMContainerState.COMPLETED.toString()) &&
+                  !rmc.getState().equals(RMContainerState.EXPIRED.toString()) &&
+                  !rmc.getState().equals(RMContainerState.KILLED.toString()) &&
+                  !rmc.getState().equals(RMContainerState.RELEASED.toString())){
+              liveContainers.add(rmc.getContainerIdID());
+          }
+        }
+      }
+      
+    return liveContainers;
     }
 
     public List<ResourceRequest> getResourceRequests(final String id)
@@ -479,6 +542,14 @@ import java.util.TreeSet;
       return blackLists.get(id);
     }
 
+    public Map<String, CSQueue> getAllCSQueues(){
+      return allCSQueues;
+    }
+    
+    public Map<String, CSLeafQueueUserInfo> getAllCSLeafQueueUserInfo(){
+      return allCSLeafQueueUserInfo;
+    }
+    
     private final Map<NodeId, org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode>
         alreadyRecoveredRMContextActiveNodes =
         new HashMap<NodeId, org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode>();
@@ -508,11 +579,19 @@ import java.util.TreeSet;
               node.setLevel(hopNode.getLevel());
             }
             //Get NextHeartbeat
-            boolean nextHeartbeat =
-                allRMNodeNextHeartbeats.get(hopRMContextNode.
+            LOG.debug("nexthb: " + allRMNodeNextHeartbeats
+                    + " hopRMContextNode: " + hopRMContextNode + " getNodeId: "
+                    + hopRMContextNode.
                     getNodeId());
-            LOG.debug("HOP :: RMStateStore-node:" + hopRMContextNode.
-                getNodeId() + ", nextHB:" + nextHeartbeat);
+            boolean nextHeartbeat = false;
+            if (allRMNodeNextHeartbeats.get(hopRMContextNode.getNodeId())
+                    != null) {
+              nextHeartbeat = true;
+            }
+
+            LOG.info("HOP :: RMStateStore-node:" + hopRMContextNode.
+                    getNodeId() + ", state:" + hopRMNode.getCurrentState()
+                    + " resources: " + res);
             org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode rmNode =
                 new RMNodeImpl(nodeId, rmContext, hopRMNode.getHostName(),
                     hopRMNode.getCommandPort(), hopRMNode.getHttpPort(), node,
@@ -523,8 +602,7 @@ import java.util.TreeSet;
                         hopRMNode.getOvercommittimeout()),
                     hopRMNode.getNodemanagerVersion(),
                     hopRMNode.getHealthReport(),
-                    hopRMNode.getLastHealthReportTime(), nextHeartbeat,
-                    isDistributedRTEnabled);
+                    hopRMNode.getLastHealthReportTime(), nextHeartbeat);
 
             ((RMNodeImpl) rmNode).setState(hopRMNode.getCurrentState());
             rmNode.recover(this);
@@ -578,8 +656,7 @@ import java.util.TreeSet;
                         hopRMNode.getOvercommittimeout()),
                     hopRMNode.getNodemanagerVersion(),
                     hopRMNode.getHealthReport(),
-                    hopRMNode.getLastHealthReportTime(), nextHeartbeat,
-                    isDistributedRTEnabled);
+                    hopRMNode.getLastHealthReportTime(), nextHeartbeat);
             ((RMNodeImpl) rmNode).setState(hopRMNode.getCurrentState());
             rmNode.recover(this);
             alreadyRecoveredRMContextInactiveNodes.put(rmNode.getNodeID().
@@ -598,7 +675,7 @@ import java.util.TreeSet;
         new HashMap<ContainerId, org.apache.hadoop.yarn.api.records.ContainerStatus>();
 
     public LinkedList<org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo> getUpdatedContainerInfo(
-        final String rmNodeId) {
+        final String rmNodeId, RMNodeImpl rmNode) {
       LinkedList<org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo>
           updatedContainerInfoQueue =
           new LinkedList<org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo>();
@@ -608,7 +685,7 @@ import java.util.TreeSet;
             allUpdatedContainerInfos.get(rmNodeId);
         if (updatedContainerInfos != null) {
           List<org.apache.hadoop.yarn.api.records.ContainerStatus>
-              newlyAllocated =
+              newlyLaunched =
               new ArrayList<org.apache.hadoop.yarn.api.records.ContainerStatus>();
           List<org.apache.hadoop.yarn.api.records.ContainerStatus> completed =
               new ArrayList<org.apache.hadoop.yarn.api.records.ContainerStatus>();
@@ -648,7 +725,12 @@ import java.util.TreeSet;
               if (containerStatus != null) {
                 if (containerStatus.getState().toString()
                     .equals(TablesDef.ContainerStatusTableDef.STATE_RUNNING)) {
-                  newlyAllocated.add(containerStatus);
+                  if (!rmNode.getJustLaunchedContainers().containsKey(
+                          containerStatus.getContainerId())) {
+                    LOG.debug("add newlyLaunchedContainer " + containerStatus.
+                            getContainerId());
+                    newlyLaunched.add(containerStatus);
+                  }
                 } else if (containerStatus.getState().toString()
                     .equals(TablesDef.ContainerStatusTableDef.STATE_COMPLETED)) {
                   completed.add(containerStatus);
@@ -658,7 +740,7 @@ import java.util.TreeSet;
             org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo
                 uci =
                 new org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo(
-                    newlyAllocated, completed, updatedContainerInfoId);
+                    newlyLaunched, completed, updatedContainerInfoId);
             updatedContainerInfoQueue.add(uci);
           }
         }
@@ -812,9 +894,6 @@ import java.util.TreeSet;
     dispatcher
         .register(RMStateStoreEventType.class, new ForwardingEventHandler());
     dispatcher.setDrainEventsOnStop();
-    isDistributedRTEnabled =
-        conf.getBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED,
-            YarnConfiguration.DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED);
     initInternal(conf);
   }
 
@@ -902,7 +981,7 @@ import java.util.TreeSet;
    * RMState object populated with that state
    * This must not be called on the dispatcher thread
    */
-  public abstract RMState loadState() throws Exception;
+  public abstract RMState loadState(RMContext rmContext) throws Exception;
 
   /**
    * Non-Blocking API

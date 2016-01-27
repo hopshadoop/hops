@@ -34,6 +34,8 @@ import java.util.Collections;
 import java.util.List;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
 import io.hops.ha.common.TransactionState;
+import java.util.Set;
+import static org.apache.hadoop.yarn.sls.SLSRunner.LOG;
 
 public class RMNodeWrapper implements RMNode {
   private RMNode node;
@@ -84,7 +86,12 @@ public class RMNodeWrapper implements RMNode {
   public long getLastHealthReportTime() {
     return node.getLastHealthReportTime();
   }
-
+  
+  @Override
+  public void setLastNodeHeartBeatResponseId(int id) {
+    node.setLastNodeHeartBeatResponseId(id);
+  }
+  
   @Override
   public Resource getTotalCapability() {
     return node.getTotalCapability();
@@ -161,5 +168,16 @@ public class RMNodeWrapper implements RMNode {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
+    @Override
+    public void setContainersToCleanUp(Set<ContainerId> newSet) {
+    }
+
+    @Override
+    public void setAppsToCleanup(List<ApplicationId> newList) {
+    }
+
+    @Override
+    public void setNextHeartBeat(boolean nextHeartbeat) {
+    }
   
 }

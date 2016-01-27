@@ -242,12 +242,8 @@ class FSPermissionChecker {
       return;
     }
 
-    DataInputBuffer buffer = new DataInputBuffer();
-    buffer.reset(inode.getPermission(), inode.getPermission().length);
-    PermissionStatus ps = PermissionStatus.read(buffer);
-    FsPermission mode = ps.getPermission();
-
-    check(inode.getId(), access, mode, ps.getUserName(), ps.getGroupName());
+    check(inode.getId(), access, new FsPermission(inode.getPermission()), inode
+        .getUserName(), inode.getGroupName());
   }
 
   void check(int inodeId, FsAction access, FsPermission mode, String userName,

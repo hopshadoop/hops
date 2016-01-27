@@ -368,7 +368,7 @@ public class TestDelegationTokenRenewer {
     // register the tokens for renewal
     ApplicationId applicationId_0 = BuilderUtils.newApplicationId(0, 0);
     delegationTokenRenewer.addApplicationAsync(applicationId_0, ts, true,
-        new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
+        new TransactionStateImpl( TransactionState.TransactionType.RM));
     waitForEventsToGetProcessed(delegationTokenRenewer);
 
     // first 3 initial renewals + 1 real
@@ -411,10 +411,10 @@ public class TestDelegationTokenRenewer {
 
     ApplicationId applicationId_1 = BuilderUtils.newApplicationId(0, 1);
     delegationTokenRenewer.addApplicationAsync(applicationId_1, ts, true,
-        new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
+        new TransactionStateImpl( TransactionState.TransactionType.RM));
     waitForEventsToGetProcessed(delegationTokenRenewer);
     delegationTokenRenewer.applicationFinished(applicationId_1,
-        new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
+        new TransactionStateImpl( TransactionState.TransactionType.RM));
     waitForEventsToGetProcessed(delegationTokenRenewer);
     numberOfExpectedRenewals = Renewer.counter; // number of renewals so far
     try {
@@ -450,7 +450,7 @@ public class TestDelegationTokenRenewer {
     // register the tokens for renewal
     ApplicationId appId = BuilderUtils.newApplicationId(0, 0);
     delegationTokenRenewer.addApplicationAsync(appId, ts, true,
-        new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
+        new TransactionStateImpl( TransactionState.TransactionType.RM));
     int waitCnt = 20;
     while (waitCnt-- > 0) {
       if (!eventQueue.isEmpty()) {
@@ -496,10 +496,10 @@ public class TestDelegationTokenRenewer {
 
     ApplicationId applicationId_1 = BuilderUtils.newApplicationId(0, 1);
     delegationTokenRenewer.addApplicationAsync(applicationId_1, ts, false,
-        new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
+        new TransactionStateImpl( TransactionState.TransactionType.RM));
     waitForEventsToGetProcessed(delegationTokenRenewer);
     delegationTokenRenewer.applicationFinished(applicationId_1,
-        new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
+        new TransactionStateImpl( TransactionState.TransactionType.RM));
     waitForEventsToGetProcessed(delegationTokenRenewer);
     int numberOfExpectedRenewals = Renewer.counter; // number of renewals so far
     try {
@@ -566,7 +566,7 @@ public class TestDelegationTokenRenewer {
     // register the tokens for renewal
     ApplicationId applicationId_0 = BuilderUtils.newApplicationId(0, 0);
     localDtr.addApplicationAsync(applicationId_0, ts, true,
-        new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
+        new TransactionStateImpl( TransactionState.TransactionType.RM));
     waitForEventsToGetProcessed(localDtr);
     if (!eventQueue.isEmpty()) {
       Event evt = eventQueue.take();
@@ -578,7 +578,7 @@ public class TestDelegationTokenRenewer {
     }
     
     localDtr.applicationFinished(applicationId_0,
-        new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
+        new TransactionStateImpl( TransactionState.TransactionType.RM));
     waitForEventsToGetProcessed(localDtr);
 
     //Token should still be around. Renewal should not fail.
@@ -646,9 +646,9 @@ public class TestDelegationTokenRenewer {
     // register the tokens for renewal
     ApplicationId applicationId_0 = BuilderUtils.newApplicationId(0, 0);
     localDtr.addApplicationAsync(applicationId_0, ts, true,
-        new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
+        new TransactionStateImpl( TransactionState.TransactionType.RM));
     localDtr.applicationFinished(applicationId_0,
-        new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
+        new TransactionStateImpl( TransactionState.TransactionType.RM));
     waitForEventsToGetProcessed(delegationTokenRenewer);
     //Send another keep alive.
     localDtr.updateKeepAliveApplications(
@@ -750,7 +750,7 @@ public class TestDelegationTokenRenewer {
       @Override
       public void run() {
         dtr.addApplicationAsync(mock(ApplicationId.class), creds1, false,
-            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
+            new TransactionStateImpl( TransactionState.TransactionType.RM));
       }
     };
     submitThread.start();
@@ -758,7 +758,7 @@ public class TestDelegationTokenRenewer {
     // wait till 1st submit blocks, then submit another
     startBarrier.await();
     dtr.addApplicationAsync(mock(ApplicationId.class), creds2, false,
-        new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
+        new TransactionStateImpl( TransactionState.TransactionType.RM));
     // signal 1st to complete                                                  
     endBarrier.await();
     submitThread.join();

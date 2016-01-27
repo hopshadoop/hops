@@ -30,6 +30,7 @@ import com.sun.jersey.core.util.MultivaluedMapImpl;
 import com.sun.jersey.guice.spi.container.servlet.GuiceContainer;
 import com.sun.jersey.test.framework.JerseyTest;
 import com.sun.jersey.test.framework.WebAppDescriptor;
+import io.hops.exception.StorageInitializtionException;
 import io.hops.metadata.util.RMStorageFactory;
 import io.hops.metadata.util.RMUtilities;
 import io.hops.metadata.util.YarnAPIStorageFactory;
@@ -97,6 +98,12 @@ public class TestRMWebServicesApps extends JerseyTest {
       try {
         YarnAPIStorageFactory.setConfiguration(conf);
         RMStorageFactory.setConfiguration(conf);
+	        
+        //TOVERIFY do we realy need that here when it is done in the setUp
+        RMUtilities.InitializeDB();
+      } catch (StorageInitializtionException ex) {
+        Logger.getLogger(TestRMWebServicesApps.class.getName()).log(Level.SEVERE, null, ex);
+
       } catch (IOException ex) {
         Logger.getLogger(TestRMWebServicesApps.class.getName()).
             log(Level.SEVERE, null, ex);
@@ -135,7 +142,7 @@ public class TestRMWebServicesApps extends JerseyTest {
         .contextPath("jersey-guice-filter").servletPath("/").build());
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testApps() throws JSONException, Exception {
     rm.start();
     MockNM amNodeManager = rm.registerNode("127.0.0.1:1234", 2048);
@@ -149,7 +156,7 @@ public class TestRMWebServicesApps extends JerseyTest {
     rm.stop();
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testAppsSlash() throws JSONException, Exception {
     rm.start();
     MockNM amNodeManager = rm.registerNode("127.0.0.1:1234", 2048);
@@ -163,7 +170,7 @@ public class TestRMWebServicesApps extends JerseyTest {
     rm.stop();
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testAppsDefault() throws JSONException, Exception {
     rm.start();
     MockNM amNodeManager = rm.registerNode("127.0.0.1:1234", 2048);
@@ -177,7 +184,7 @@ public class TestRMWebServicesApps extends JerseyTest {
     rm.stop();
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testAppsXML() throws JSONException, Exception {
     rm.start();
     MockNM amNodeManager = rm.registerNode("127.0.0.1:1234", 2048);
@@ -206,7 +213,7 @@ public class TestRMWebServicesApps extends JerseyTest {
     rm.stop();
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testAppsXMLMulti() throws JSONException, Exception {
     rm.start();
     MockNM amNodeManager = rm.registerNode("127.0.0.1:1234", 2048);
@@ -255,7 +262,7 @@ public class TestRMWebServicesApps extends JerseyTest {
 
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testAppsQueryState() throws JSONException, Exception {
     rm.start();
     MockNM amNodeManager = rm.registerNode("127.0.0.1:1234", 2048);
@@ -282,7 +289,7 @@ public class TestRMWebServicesApps extends JerseyTest {
     rm.stop();
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testAppsQueryStates() throws JSONException, Exception {
     rm.start();
     MockNM amNodeManager = rm.registerNode("127.0.0.1:1234", 2048);
@@ -335,7 +342,7 @@ public class TestRMWebServicesApps extends JerseyTest {
     rm.stop();
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testAppsQueryStatesComma() throws JSONException, Exception {
     rm.start();
     MockNM amNodeManager = rm.registerNode("127.0.0.1:1234", 2048);
@@ -388,7 +395,7 @@ public class TestRMWebServicesApps extends JerseyTest {
     rm.stop();
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testAppsQueryStatesNone() throws JSONException, Exception {
     rm.start();
     MockNM amNodeManager = rm.registerNode("127.0.0.1:1234", 2048);
@@ -411,7 +418,7 @@ public class TestRMWebServicesApps extends JerseyTest {
     rm.stop();
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testAppsQueryStateNone() throws JSONException, Exception {
     rm.start();
     MockNM amNodeManager = rm.registerNode("127.0.0.1:1234", 2048);
@@ -434,7 +441,7 @@ public class TestRMWebServicesApps extends JerseyTest {
     rm.stop();
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testAppsQueryStatesInvalid() throws JSONException, Exception {
     rm.start();
     MockNM amNodeManager = rm.registerNode("127.0.0.1:1234", 2048);
@@ -473,7 +480,7 @@ public class TestRMWebServicesApps extends JerseyTest {
     }
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testAppsQueryStateInvalid() throws JSONException, Exception {
     rm.start();
     MockNM amNodeManager = rm.registerNode("127.0.0.1:1234", 2048);
@@ -512,7 +519,7 @@ public class TestRMWebServicesApps extends JerseyTest {
     }
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testAppsQueryFinalStatus() throws JSONException, Exception {
     rm.start();
     MockNM amNodeManager = rm.registerNode("127.0.0.1:1234", 2048);
@@ -541,7 +548,7 @@ public class TestRMWebServicesApps extends JerseyTest {
     rm.stop();
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testAppsQueryFinalStatusNone() throws JSONException, Exception {
     rm.start();
     MockNM amNodeManager = rm.registerNode("127.0.0.1:1234", 2048);
@@ -564,7 +571,7 @@ public class TestRMWebServicesApps extends JerseyTest {
     rm.stop();
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testAppsQueryFinalStatusInvalid()
       throws JSONException, Exception {
     rm.start();
@@ -605,7 +612,7 @@ public class TestRMWebServicesApps extends JerseyTest {
     }
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testAppsQueryUser() throws JSONException, Exception {
     rm.start();
     MockNM amNodeManager = rm.registerNode("127.0.0.1:1234", 2048);
@@ -633,7 +640,7 @@ public class TestRMWebServicesApps extends JerseyTest {
     rm.stop();
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testAppsQueryQueue() throws JSONException, Exception {
     rm.start();
     MockNM amNodeManager = rm.registerNode("127.0.0.1:1234", 2048);
@@ -661,7 +668,7 @@ public class TestRMWebServicesApps extends JerseyTest {
     rm.stop();
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testAppsQueryLimit() throws JSONException, Exception {
     rm.start();
     rm.registerNode("127.0.0.1:1234", 2048);
@@ -683,7 +690,7 @@ public class TestRMWebServicesApps extends JerseyTest {
     rm.stop();
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testAppsQueryStartBegin() throws JSONException, Exception {
     rm.start();
     long start = System.currentTimeMillis();
@@ -707,7 +714,7 @@ public class TestRMWebServicesApps extends JerseyTest {
     rm.stop();
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testAppsQueryStartBeginSome() throws JSONException, Exception {
     rm.start();
     rm.registerNode("127.0.0.1:1234", 2048);
@@ -731,7 +738,7 @@ public class TestRMWebServicesApps extends JerseyTest {
     rm.stop();
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testAppsQueryStartEnd() throws JSONException, Exception {
     rm.start();
     rm.registerNode("127.0.0.1:1234", 2048);
@@ -752,7 +759,7 @@ public class TestRMWebServicesApps extends JerseyTest {
     rm.stop();
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testAppsQueryStartBeginEnd() throws JSONException, Exception {
     rm.start();
     rm.registerNode("127.0.0.1:1234", 2048);
@@ -779,7 +786,7 @@ public class TestRMWebServicesApps extends JerseyTest {
     rm.stop();
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testAppsQueryFinishBegin() throws JSONException, Exception {
     rm.start();
     MockNM amNodeManager = rm.registerNode("127.0.0.1:1234", 2048);
@@ -817,7 +824,7 @@ public class TestRMWebServicesApps extends JerseyTest {
     rm.stop();
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testAppsQueryFinishEnd() throws JSONException, Exception {
     rm.start();
     MockNM amNodeManager = rm.registerNode("127.0.0.1:1234", 2048);
@@ -855,7 +862,7 @@ public class TestRMWebServicesApps extends JerseyTest {
     rm.stop();
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testAppsQueryFinishBeginEnd() throws JSONException, Exception {
     rm.start();
     MockNM amNodeManager = rm.registerNode("127.0.0.1:1234", 2048);
@@ -896,7 +903,7 @@ public class TestRMWebServicesApps extends JerseyTest {
     rm.stop();
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testAppsQueryAppTypes() throws JSONException, Exception {
     rm.start();
     MockNM amNodeManager = rm.registerNode("127.0.0.1:1234", 2048);
@@ -1087,7 +1094,7 @@ public class TestRMWebServicesApps extends JerseyTest {
     rm.stop();
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testAppStatistics() throws JSONException, Exception {
     try {
       rm.start();
@@ -1254,7 +1261,7 @@ public class TestRMWebServicesApps extends JerseyTest {
     }
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testSingleApp() throws JSONException, Exception {
     rm.start();
     MockNM amNodeManager = rm.registerNode("127.0.0.1:1234", 2048);
@@ -1269,7 +1276,7 @@ public class TestRMWebServicesApps extends JerseyTest {
     rm.stop();
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testSingleAppsSlash() throws JSONException, Exception {
     rm.start();
     MockNM amNodeManager = rm.registerNode("127.0.0.1:1234", 2048);
@@ -1284,7 +1291,7 @@ public class TestRMWebServicesApps extends JerseyTest {
     rm.stop();
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testSingleAppsDefault() throws JSONException, Exception {
     rm.start();
     MockNM amNodeManager = rm.registerNode("127.0.0.1:1234", 2048);
@@ -1298,7 +1305,7 @@ public class TestRMWebServicesApps extends JerseyTest {
     rm.stop();
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testInvalidApp() throws JSONException, Exception {
     rm.start();
     MockNM amNodeManager = rm.registerNode("127.0.0.1:1234", 2048);
@@ -1338,7 +1345,7 @@ public class TestRMWebServicesApps extends JerseyTest {
     }
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testNonexistApp() throws JSONException, Exception {
     rm.start();
     MockNM amNodeManager = rm.registerNode("127.0.0.1:1234", 2048);
@@ -1392,7 +1399,7 @@ public class TestRMWebServicesApps extends JerseyTest {
     verifyAppInfo(json.getJSONObject("app"), app);
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testSingleAppsXML() throws JSONException, Exception {
     rm.start();
     MockNM amNodeManager = rm.registerNode("127.0.0.1:1234", 2048);
@@ -1511,7 +1518,7 @@ public class TestRMWebServicesApps extends JerseyTest {
     assertEquals("numContainers doesn't match", 1, numContainers);
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testAppAttempts() throws JSONException, Exception {
     rm.start();
     MockNM amNodeManager = rm.registerNode("127.0.0.1:1234", 2048);
@@ -1558,7 +1565,7 @@ public class TestRMWebServicesApps extends JerseyTest {
     rm.stop();
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testAppAttemptsSlash() throws JSONException, Exception {
     rm.start();
     MockNM amNodeManager = rm.registerNode("127.0.0.1:1234", 2048);
@@ -1573,7 +1580,7 @@ public class TestRMWebServicesApps extends JerseyTest {
     rm.stop();
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testAppAttemtpsDefault() throws JSONException, Exception {
     rm.start();
     MockNM amNodeManager = rm.registerNode("127.0.0.1:1234", 2048);
@@ -1587,7 +1594,7 @@ public class TestRMWebServicesApps extends JerseyTest {
     rm.stop();
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testInvalidAppAttempts() throws JSONException, Exception {
     rm.start();
     MockNM amNodeManager = rm.registerNode("127.0.0.1:1234", 2048);
@@ -1627,7 +1634,7 @@ public class TestRMWebServicesApps extends JerseyTest {
     }
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testNonexistAppAttempts() throws JSONException, Exception {
     rm.start();
     MockNM amNodeManager = rm.registerNode("127.0.0.1:1234", 2048);
@@ -1693,7 +1700,7 @@ public class TestRMWebServicesApps extends JerseyTest {
     }
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testAppAttemptsXML() throws JSONException, Exception {
     rm.start();
     String user = "user1";
