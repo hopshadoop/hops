@@ -47,6 +47,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.TestAMAuthorization.MockRMW
 import org.apache.hadoop.yarn.server.resourcemanager.TestAMAuthorization.MyContainerManager;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptState;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.event.RMAppAttemptContainerFinishedEvent;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.apache.hadoop.yarn.util.Records;
@@ -69,6 +70,7 @@ public class TestAMRMTokens {
   private static final Log LOG = LogFactory.getLog(TestAMRMTokens.class);
 
   private final Configuration conf;
+  private static final int maxWaitAttempts = 50;
 
   @Parameters
   public static Collection<Object[]> configs()
@@ -157,6 +159,16 @@ public class TestAMRMTokens {
           new RMAppAttemptContainerFinishedEvent(applicationAttemptId,
               containerStatus, new TransactionStateImpl(
               TransactionState.TransactionType.RM)));
+
+      // Make sure the RMAppAttempt is at Finished State.
+      // Both AMRMToken and ClientToAMToken have been removed.
+      int count = 0;
+      while (attempt.getState() != RMAppAttemptState.FINISHED
+              && count < maxWaitAttempts) {
+        Thread.sleep(100);
+        count++;
+      }
+      Assert.assertTrue(attempt.getState() == RMAppAttemptState.FINISHED);
 
       // Now simulate trying to allocate. RPC call itself should throw auth
       // exception.
