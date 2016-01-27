@@ -23,6 +23,7 @@ import com.google.common.base.Joiner;
 import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
+import io.hops.security.Users;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.lock.LockFactory;
@@ -90,6 +91,8 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.TimeoutException;
 
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_KEY;
 import static org.junit.Assert.assertEquals;
 
 /**
@@ -162,6 +165,13 @@ public class DFSTestUtil {
     }
 
     NameNode.format(conf);
+
+    String fsOwnerShortUserName = UserGroupInformation.getCurrentUser()
+        .getShortUserName();
+    String superGroup = conf.get(DFS_PERMISSIONS_SUPERUSERGROUP_KEY,
+        DFS_PERMISSIONS_SUPERUSERGROUP_DEFAULT);
+
+    Users.addUserToGroup(fsOwnerShortUserName, superGroup);
   }
   
   /**

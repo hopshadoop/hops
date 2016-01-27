@@ -61,13 +61,20 @@ public class NodeHeartbeatResponsePBImpl
     viaProto = true;
   }
   
-  public NodeHeartbeatResponseProto getProto() {
+  public synchronized  NodeHeartbeatResponseProto getProto() {
     mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
     viaProto = true;
     return proto;
   }
 
+  public synchronized byte[] getByteArray(){
+    mergeLocalToProto();
+    proto = viaProto ? proto : builder.build();
+    viaProto = true;
+    return proto.toByteArray();
+  }
+  
   private void mergeLocalToBuilder() {
     if (this.containersToCleanup != null) {
       addContainersToCleanupToProto();
@@ -102,7 +109,7 @@ public class NodeHeartbeatResponsePBImpl
 
   
   @Override
-  public int getResponseId() {
+  public synchronized int getResponseId() {
     NodeHeartbeatResponseProtoOrBuilder p = viaProto ? proto : builder;
     return (p.getResponseId());
   }
@@ -114,7 +121,7 @@ public class NodeHeartbeatResponsePBImpl
   }
 
   @Override
-  public MasterKey getContainerTokenMasterKey() {
+  public synchronized MasterKey getContainerTokenMasterKey() {
     NodeHeartbeatResponseProtoOrBuilder p = viaProto ? proto : builder;
     if (this.containerTokenMasterKey != null) {
       return this.containerTokenMasterKey;
@@ -137,7 +144,7 @@ public class NodeHeartbeatResponsePBImpl
   }
 
   @Override
-  public MasterKey getNMTokenMasterKey() {
+  public synchronized MasterKey getNMTokenMasterKey() {
     NodeHeartbeatResponseProtoOrBuilder p = viaProto ? proto : builder;
     if (this.nmTokenMasterKey != null) {
       return this.nmTokenMasterKey;
@@ -159,7 +166,7 @@ public class NodeHeartbeatResponsePBImpl
   }
 
   @Override
-  public NodeAction getNodeAction() {
+  public synchronized NodeAction getNodeAction() {
     NodeHeartbeatResponseProtoOrBuilder p = viaProto ? proto : builder;
     if (!p.hasNodeAction()) {
       return null;
@@ -178,7 +185,7 @@ public class NodeHeartbeatResponsePBImpl
   }
 
   @Override
-  public String getDiagnosticsMessage() {
+  public synchronized String getDiagnosticsMessage() {
     NodeHeartbeatResponseProtoOrBuilder p = viaProto ? proto : builder;
     if (!p.hasDiagnosticsMessage()) {
       return null;
@@ -202,7 +209,7 @@ public class NodeHeartbeatResponsePBImpl
     return this.containersToCleanup;
   }
 
-  private void initContainersToCleanup() {
+  private synchronized void initContainersToCleanup() {
     if (this.containersToCleanup != null) {
       return;
     }
@@ -267,7 +274,7 @@ public class NodeHeartbeatResponsePBImpl
     return this.applicationsToCleanup;
   }
 
-  private void initApplicationsToCleanup() {
+  private synchronized void initApplicationsToCleanup() {
     if (this.applicationsToCleanup != null) {
       return;
     }
@@ -327,7 +334,7 @@ public class NodeHeartbeatResponsePBImpl
   }
 
   @Override
-  public long getNextHeartBeatInterval() {
+  public synchronized long getNextHeartBeatInterval() {
     NodeHeartbeatResponseProtoOrBuilder p = viaProto ? proto : builder;
     return (p.getNextHeartBeatInterval());
   }
@@ -339,7 +346,7 @@ public class NodeHeartbeatResponsePBImpl
   }
   
   @Override
-  public boolean getNextheartbeat() {
+  public synchronized boolean getNextheartbeat() {
     NodeHeartbeatResponseProtoOrBuilder p = viaProto ? proto : builder;
     return (p.getNextheartbeat());
   }

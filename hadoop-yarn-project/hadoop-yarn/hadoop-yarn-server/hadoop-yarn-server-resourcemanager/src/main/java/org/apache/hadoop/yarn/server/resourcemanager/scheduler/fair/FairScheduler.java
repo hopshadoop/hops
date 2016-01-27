@@ -193,6 +193,8 @@ public class FairScheduler extends AbstractYarnScheduler {
   // heartbeat
   protected int maxAssign; // Max containers to assign per heartbeat
 
+  private int maxAllocatedContainersPerRequest = -1;
+  
   @VisibleForTesting
   final MaxRunningAppsEnforcer maxRunningEnforcer;
 
@@ -680,7 +682,8 @@ public class FairScheduler extends AbstractYarnScheduler {
 
     FSSchedulerApp attempt =
         new FSSchedulerApp(applicationAttemptId, user, queue,
-            new ActiveUsersManager(getRootQueueMetrics()), rmContext);
+            new ActiveUsersManager(getRootQueueMetrics()), rmContext,
+            maxAllocatedContainersPerRequest);
     if (transferStateFromPreviousAttempt) {
       attempt
           .transferStateFromPreviousAttempt(application.getCurrentAppAttempt());
@@ -840,7 +843,8 @@ public class FairScheduler extends AbstractYarnScheduler {
     FSSchedulerNode node = nodes.get(container.getNodeId());
 
     if (rmContainer.getState() == RMContainerState.RESERVED) {
-      application.unreserve(node, rmContainer.getReservedPriority());
+      application.unreserve(node, rmContainer.getReservedPriority(),
+              transactionState);
       node.unreserveResource(application);
     } else {
       application.containerCompleted(rmContainer, containerStatus, event,
@@ -1004,7 +1008,8 @@ public class FairScheduler extends AbstractYarnScheduler {
     FSSchedulerNode node = nodes.get(nm.getNodeID());
 
     // Update resource if any change
-    SchedulerUtils.updateResourceIfChanged(node, nm, clusterCapacity, LOG);
+    SchedulerUtils.updateResourceIfChanged(node, nm, clusterCapacity, LOG,
+            transactionState);
     
     List<UpdatedContainerInfo> containerInfoList =
         nm.pullContainerUpdates(transactionState);
@@ -1105,7 +1110,8 @@ public class FairScheduler extends AbstractYarnScheduler {
             "Releasing reservation that cannot be satisfied for application " +
                 reservedAppSchedulable.getApp().getApplicationAttemptId() +
                 " on node " + node);
-        reservedAppSchedulable.unreserve(reservedPriority, node);
+        reservedAppSchedulable.unreserve(reservedPriority, node, 
+                transactionState);
         reservedAppSchedulable = null;
       } else {
         // Reservation exists; try to fulfill the reservation
@@ -1300,8 +1306,8 @@ public class FairScheduler extends AbstractYarnScheduler {
   }
 
   @Override
-  public synchronized void reinitialize(Configuration conf, RMContext rmContext)
-      throws IOException {
+  public synchronized void reinitialize(Configuration conf, RMContext rmContext,
+          TransactionState transactionState) throws IOException {
     if (!initialized) {
       this.conf = new FairSchedulerConfiguration(conf);
       validateConf(this.conf);
@@ -1321,6 +1327,10 @@ public class FairScheduler extends AbstractYarnScheduler {
       preemptionInterval = this.conf.getPreemptionInterval();
       waitTimeBeforeKill = this.conf.getWaitTimeBeforeKill();
       usePortForNodeName = this.conf.getUsePortForNodeName();
+      
+      this.maxAllocatedContainersPerRequest = this.conf.getInt(
+              YarnConfiguration.MAX_ALLOCATED_CONTAINERS_PER_REQUEST,
+              YarnConfiguration.DEFAULT_MAX_ALLOCATED_CONTAINERS_PER_REQUEST);
       
       rootMetrics = FSQueueMetrics.forQueue("root", null, true, conf);
       this.rmContext = rmContext;
@@ -1349,7 +1359,9 @@ public class FairScheduler extends AbstractYarnScheduler {
         Thread schedulingThread = new Thread(new Runnable() {
           @Override
           public void run() {
-            continuousScheduling(null);
+            //TORECOVER FAIR the actions of this thread are not persisted
+            continuousScheduling(
+                    new TransactionStateImpl(TransactionState.TransactionType.RM));
           }
         });
         schedulingThread.setName("ContinuousScheduling");
@@ -1567,5 +1579,10 @@ public class FairScheduler extends AbstractYarnScheduler {
       }
     }
     return queue1; // names are identical
+  }
+  
+  //FOR TESTING
+  public void stopAllocsLoader(){
+    allocsLoader.stop();
   }
 }

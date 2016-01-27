@@ -274,7 +274,7 @@ public class DatanodeProtocolServerSideTranslatorPB
       NameNodeAddressRequestForBlockReportingProto request)
       throws ServiceException {
     try {
-      ActiveNode response = impl.getNextNamenodeToSendBlockReport();
+      ActiveNode response = impl.getNextNamenodeToSendBlockReport(request.getNoOfBlks());
       ActiveNodeProtos.ActiveNodeProto responseProto =
           PBHelper.convert(response);
       return responseProto;

@@ -40,7 +40,7 @@ public class TestDSFailedAppMaster extends ApplicationMaster {
       if (numAllocatedContainers.get() != 1 ||
           numRequestedContainers.get() != 0) {
         LOG.info("NumAllocatedContainers is " + numAllocatedContainers.get() +
-            " and NumRequestedContainers is " + numAllocatedContainers.get() +
+            " and NumRequestedContainers is " + numRequestedContainers.get() +
             ".Application Master failed. exiting");
         System.exit(200);
       }

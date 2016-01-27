@@ -53,7 +53,7 @@ public class TestFairSchedulerEventLog {
     resourceManager = new ResourceManager();
     resourceManager.init(conf);
     ((AsyncDispatcher) resourceManager.getRMContext().getDispatcher()).start();
-    scheduler.reinitialize(conf, resourceManager.getRMContext());
+    scheduler.reinitialize(conf, resourceManager.getRMContext(), null);
     YarnAPIStorageFactory.setConfiguration(conf);
     RMStorageFactory.setConfiguration(conf);
     RMUtilities.InitializeDB();

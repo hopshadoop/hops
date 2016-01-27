@@ -84,7 +84,7 @@ public class AllocationFileLoaderService extends AbstractService {
   long reloadIntervalMs = ALLOC_RELOAD_INTERVAL_MS;
   
   private Thread reloadThread;
-  private volatile boolean running = true;
+  private volatile boolean running = false;
   
   public AllocationFileLoaderService() {
     this(new SystemClock());
@@ -107,6 +107,7 @@ public class AllocationFileLoaderService extends AbstractService {
     if (allocFile == null) {
       return;
     }
+    running=true;
     reloadThread = new Thread() {
       public void run() {
         while (running) {
@@ -147,9 +148,11 @@ public class AllocationFileLoaderService extends AbstractService {
   
   @Override
   public void stop() {
-    running = false;
-    reloadThread.interrupt();
-    super.stop();
+    if(running){
+      running = false;
+      reloadThread.interrupt();
+      super.stop();
+    }
   }
   
   /**

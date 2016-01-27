@@ -574,9 +574,10 @@ public class TestResourceTrackerService {
     verify(handler, never()).handle((Event) any());
   }
 
+  DrainDispatcher dispatcher;
   @Test
   public void testReconnectNode() throws Exception {
-    final DrainDispatcher dispatcher = new DrainDispatcher();
+    dispatcher = new DrainDispatcher();
     rm = new MockRM(conf) {
       @Override
       protected EventHandler<SchedulerEvent> createSchedulerEventDispatcher() {
@@ -590,6 +591,7 @@ public class TestResourceTrackerService {
 
       @Override
       protected Dispatcher createDispatcher() {
+        dispatcher = new DrainDispatcher();
         return dispatcher;
       }
     };
@@ -632,7 +634,7 @@ public class TestResourceTrackerService {
     dispatcher.await();
     response = nm2.nodeHeartbeat(true);
     response = nm2.nodeHeartbeat(true);
-    dispatcher.await(conf.getInt(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED,
+    dispatcher.await(conf.getInt(YarnConfiguration.DISTRIBUTED_RM,
         YarnConfiguration.DEFAULT_HOPS_PENDING_EVENTS_RETRIEVAL_PERIOD) * 2);
     Assert.assertEquals(5120 + 5120, metrics.getAvailableMB());
 

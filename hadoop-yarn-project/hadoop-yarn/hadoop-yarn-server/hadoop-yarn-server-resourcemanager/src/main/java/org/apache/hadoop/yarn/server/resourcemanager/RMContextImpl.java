@@ -17,6 +17,7 @@
 package org.apache.hadoop.yarn.server.resourcemanager;
 
 import com.google.common.annotations.VisibleForTesting;
+import io.hops.ha.common.TransactionStateManager;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -53,26 +54,13 @@ public class RMContextImpl implements RMContext {
 
 
   private static final Log LOG = LogFactory.getLog(RMContextImpl.class);
-  private int rmId = Integer.MIN_VALUE;
+  private TransactionStateManager transactionStateManager;
+    
   //ResourceTracker client
   public ResourceTracker client;
 
   public ResourceTracker getResClient() {
     return client;
-  }
-
-  public int getRMID() {
-    return rmId;
-  }
-
-  public void setRMID(int rmid) {
-    this.rmId = rmid;
-  }
-
-  private int id = -1;
-
-  public int getId() {
-    return this.id;
   }
 
   @Override
@@ -109,6 +97,7 @@ public class RMContextImpl implements RMContext {
       new ConcurrentHashMap<String, RMNode>();
       //recovered, pushed and removed everywhere
   private boolean isHAEnabled; //recovered through configuration file
+  private boolean isDistributedEnabled;
   private HAServiceState haServiceState =
       HAServiceProtocol.HAServiceState.INITIALIZING; //recovered
   private AMLivelinessMonitor amLivelinessMonitor;//recovered
@@ -117,8 +106,8 @@ public class RMContextImpl implements RMContext {
   private ContainerAllocationExpirer containerAllocationExpirer; //recovered
   private DelegationTokenRenewer delegationTokenRenewer;//recovered
   private AMRMTokenSecretManager amRMTokenSecretManager;//recovered
-  private RMContainerTokenSecretManager containerTokenSecretManager;//TORECOVER
-  private NMTokenSecretManagerInRM nmTokenSecretManager;//TORECOVER
+  private RMContainerTokenSecretManager containerTokenSecretManager;//recovered
+  private NMTokenSecretManagerInRM nmTokenSecretManager;//recovered
   private ClientToAMTokenSecretManagerInRM clientToAMTokenSecretManager;
       //recovered
   private AdminService adminService;//recovered
@@ -132,13 +121,14 @@ public class RMContextImpl implements RMContext {
   private ApplicationMasterService applicationMasterService;//recovered
   private RMApplicationHistoryWriter rmApplicationHistoryWriter;//recovered
   private ConfigurationProvider configurationProvider;//recovered
+  private ContainersLogsService containersLogsService;
 
   /**
    * Default constructor. To be used in conjunction with setter methods for
    * individual fields.
+     * @param conf
    */
-  public RMContextImpl() {
-  }
+  public RMContextImpl() {}
 
   @VisibleForTesting
   // helper constructor for tests
@@ -151,8 +141,7 @@ public class RMContextImpl implements RMContext {
       RMContainerTokenSecretManager containerTokenSecretManager,
       NMTokenSecretManagerInRM nmTokenSecretManager,
       ClientToAMTokenSecretManagerInRM clientToAMTokenSecretManager,
-      RMApplicationHistoryWriter rmApplicationHistoryWriter) {
-    this();
+      RMApplicationHistoryWriter rmApplicationHistoryWriter, Configuration conf) {
     this.setDispatcher(rmDispatcher);
     this.setContainerAllocationExpirer(containerAllocationExpirer);
     this.setAMLivelinessMonitor(amLivelinessMonitor);
@@ -163,7 +152,8 @@ public class RMContextImpl implements RMContext {
     this.setNMTokenSecretManager(nmTokenSecretManager);
     this.setClientToAMTokenSecretManager(clientToAMTokenSecretManager);
     this.setRMApplicationHistoryWriter(rmApplicationHistoryWriter);
-
+    this.setContainersLogsService(new ContainersLogsService());
+    
     RMStateStore nullStore = new NullRMStateStore();
     nullStore.setRMDispatcher(rmDispatcher);
     try {
@@ -187,15 +177,16 @@ public class RMContextImpl implements RMContext {
       AMRMTokenSecretManager appTokenSecretManager,
       ClientToAMTokenSecretManagerInRM clientToAMTokenSecretManager,
       RMApplicationHistoryWriter rmApplicationHistoryWriter,
-      Configuration conf) {
-    this();
+      Configuration conf, TransactionStateManager transactionStateManager) {
     this.setDispatcher(rmDispatcher);
     this.setContainerAllocationExpirer(containerAllocationExpirer);
     this.setAMLivelinessMonitor(amLivelinessMonitor);
     this.setAMFinishingMonitor(amFinishingMonitor);
     this.setDelegationTokenRenewer(delegationTokenRenewer);
     this.setAMRMTokenSecretManager(appTokenSecretManager);
-
+    this.setTransactionStateManager(transactionStateManager);
+    this.setContainersLogsService(new ContainersLogsService());
+    
     if (conf != null) {
       this.setContainerTokenSecretManager(
           new RMContainerTokenSecretManager(conf, this));
@@ -306,7 +297,7 @@ public class RMContextImpl implements RMContext {
   }
 
   @Override
-  public GroupMembershipService getRMGroupMembershipService() {
+  public GroupMembershipService getGroupMembershipService() {
     return this.groupMembershipService;
   }
 
@@ -329,11 +320,20 @@ public class RMContextImpl implements RMContext {
   public ResourceTrackerService getResourceTrackerService() {
     return resourceTrackerService;
   }
+  
+  @Override
+  public ContainersLogsService getContainersLogsService() {
+      return containersLogsService;
+  }
 
   void setHAEnabled(boolean isHAEnabled) {
     this.isHAEnabled = isHAEnabled;
   }
 
+  void setDistributedEnabled(boolean isDistributedEnabled){
+    this.isDistributedEnabled = isDistributedEnabled;
+  }
+  
   void setHAServiceState(HAServiceState haServiceState) {
     synchronized (haServiceState) {
       this.haServiceState = haServiceState;
@@ -347,6 +347,10 @@ public class RMContextImpl implements RMContext {
     this.rmDispatcher = dispatcher;
   }
 
+  void setTransactionStateManager(TransactionStateManager tsm){
+    this.transactionStateManager = tsm;
+  }
+  
   void setRMAdminService(AdminService adminService) {
     this.adminService = adminService;
   }
@@ -427,12 +431,30 @@ public class RMContextImpl implements RMContext {
       ResourceTrackerService resourceTrackerService) {
     this.resourceTrackerService = resourceTrackerService;
   }
+  
+  void setContainersLogsService(
+          ContainersLogsService containersLogsService) {
+      this.containersLogsService = containersLogsService;
+  }
 
   @Override
   public boolean isHAEnabled() {
     return isHAEnabled;
   }
 
+  @Override
+  public boolean isLeadingRT(){
+    if(!isHAEnabled){
+      return true;
+    }
+    return groupMembershipService.isLeadingRT();
+  }
+  
+  @Override
+  public boolean isDistributedEnabled(){
+    return isDistributedEnabled;
+  }
+  
   @Override
   public HAServiceState getHAServiceState() {
     synchronized (haServiceState) {
@@ -462,5 +484,10 @@ public class RMContextImpl implements RMContext {
   public void setConfigurationProvider(
       ConfigurationProvider configurationProvider) {
     this.configurationProvider = configurationProvider;
+  }
+  
+  @Override
+  public TransactionStateManager getTransactionStateManager() {
+    return transactionStateManager;
   }
 }

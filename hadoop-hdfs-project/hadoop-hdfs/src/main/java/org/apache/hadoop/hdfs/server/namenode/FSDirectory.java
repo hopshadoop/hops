@@ -30,6 +30,7 @@ import io.hops.metadata.hdfs.entity.AccessTimeLogEntry;
 import io.hops.metadata.hdfs.entity.INodeCandidatePrimaryKey;
 import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.metadata.hdfs.entity.QuotaUpdate;
+import io.hops.security.Users;
 import io.hops.transaction.EntityManager;
 import io.hops.transaction.context.HdfsTransactionContextMaintenanceCmds;
 import io.hops.transaction.handler.HDFSOperationType;
@@ -1148,14 +1149,12 @@ public class FSDirectory implements Closeable {
   }
 
   void setOwner(String src, String username, String groupname)
-      throws FileNotFoundException, UnresolvedLinkException, StorageException,
-      TransactionContextException {
+      throws IOException {
     unprotectedSetOwner(src, username, groupname);
   }
 
   void unprotectedSetOwner(String src, String username, String groupname)
-      throws FileNotFoundException, UnresolvedLinkException, StorageException,
-      TransactionContextException {
+      throws IOException {
     INode inode = getRootDir().getNode(src, true);
     if (inode == null) {
       throw new FileNotFoundException("File does not exist: " + src);
@@ -1166,6 +1165,7 @@ public class FSDirectory implements Closeable {
     if (groupname != null) {
       inode.setGroup(groupname);
     }
+    Users.addUserToGroup(username, groupname);
   }
 
   /**

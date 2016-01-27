@@ -59,14 +59,22 @@ public class SortedActiveRMList {
 
   public ActiveNode getLeastLoaded() {
     List<ActiveNode> rms = activeNodes.getActiveNodes();
-    ActiveRM result =
-        new ActiveRMPBImpl(((ActiveNodePBImpl) rms.get(0)).getProto());
-    for (ActiveNode node : rms) {
-      ActiveRM rm = new ActiveRMPBImpl(((ActiveNodePBImpl) node).getProto());
-      if (rm.getLoad() < result.getLoad() ||
-          (rm.getLoad() == result.getLoad() && random.nextBoolean())) {
-        result = rm;
+    ActiveNode leader = activeNodes.getLeader();
+    ActiveRM result = null;
+    if (rms.size() > 1) {
+      for (ActiveNode node : rms) {
+        ActiveRM rm = new ActiveRMPBImpl(((ActiveNodePBImpl) node).getProto());
+        if (!rm.getHostname().equals(leader.getHostname())) {
+          if (result == null) {
+            result = rm;
+          } else if (rm.getLoad() < result.getLoad() || (rm.getLoad() == result.
+                  getLoad() && random.nextBoolean())) {
+            result = rm;
+          }
+        }
       }
+    } else {
+      result = new ActiveRMPBImpl(((ActiveNodePBImpl) rms.get(0)).getProto());
     }
     return result;
   }

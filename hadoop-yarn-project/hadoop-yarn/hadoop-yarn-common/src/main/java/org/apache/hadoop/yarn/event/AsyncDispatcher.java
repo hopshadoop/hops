@@ -284,7 +284,7 @@ public class AsyncDispatcher extends AbstractService implements Dispatcher {
 
     void addHandler(EventHandler<Event> handler) {
       listofHandlers.add(handler);
-    }
+      }
 
   }
 }
