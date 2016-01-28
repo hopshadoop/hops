@@ -128,8 +128,8 @@ public class GetApplicationsRequestPBImpl extends GetApplicationsRequest {
     }
 
     if (this.finish != null) {
-      builder.setFinishBegin(start.getMinimumLong());
-      builder.setFinishEnd(start.getMaximumLong());
+      builder.setFinishBegin(finish.getMinimumLong());
+      builder.setFinishEnd(finish.getMaximumLong());
     }
 
     builder.setLimit(limit);
