@@ -20,7 +20,6 @@ package org.apache.hadoop.yarn.server.resourcemanager.webapp;
 
 import com.google.inject.Inject;
 import com.google.inject.servlet.RequestScoped;
-import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CSQueue;
@@ -118,8 +117,7 @@ class CapacitySchedulerPage extends RmView {
                   percent(lqinfo.getAbsoluteCapacity() / 100)).
               _("Absolute Max Capacity:",
                   percent(lqinfo.getAbsoluteMaxCapacity() / 100)).
-              _("Used Resources:", StringEscapeUtils
-                  .escapeHtml(lqinfo.getResourcesUsed().toString())).
+              _("Used Resources:", lqinfo.getResourcesUsed().toString()).
               _("Num Schedulable Applications:",
                   Integer.toString(lqinfo.getNumActiveApplications())).
               _("Num Non-Schedulable Applications:",
