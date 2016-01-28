@@ -548,6 +548,8 @@ import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
   protected void replaceFile(Path srcPath, Path dstPath) throws Exception {
     if (fs.exists(dstPath)) {
       deleteFile(dstPath);
+    } else {
+      LOG.info("File doesn't exist. Skip deleting the file " + dstPath);
     }
     fs.rename(srcPath, dstPath);
   }
