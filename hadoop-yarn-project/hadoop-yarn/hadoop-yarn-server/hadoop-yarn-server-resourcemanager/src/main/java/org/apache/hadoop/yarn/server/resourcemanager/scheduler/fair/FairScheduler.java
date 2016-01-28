@@ -378,70 +378,38 @@ public class FairScheduler extends AbstractYarnScheduler {
     if (Resources
         .greaterThan(RESOURCE_CALCULATOR, clusterCapacity, resToPreempt,
             Resources.none())) {
-      preemptResources(queueMgr.getLeafQueues(), resToPreempt,
-          transactionState);
+      preemptResources(resToPreempt, transactionState);
     }
   }
 
   /**
-   * Preempt a quantity of resources from a list of QueueSchedulables. The
-   * policy for this is to pick apps from queues that are over their fair
-   * share,
-   * but make sure that no queue is placed below its fair share in the process.
-   * We further prioritize preemption by choosing containers with lowest
-   * priority to preempt.
+   * Preempt a quantity of resources. Each round, we start from the root queue,
+   * level-by-level, until choosing a candidate application.
+   * The policy for prioritizing preemption for each queue depends on its
+   * SchedulingPolicy: (1) fairshare/DRF, choose the ChildSchedulable that is
+   * most over its fair share; (2) FIFO, choose the childSchedulable that is
+   * latest launched.
+   * Inside each application, we further prioritize preemption by choosing
+   * containers with lowest priority to preempt.
+   * We make sure that no queue is placed below its fair share in the process.
    */
-  protected void preemptResources(Collection<FSLeafQueue> scheds,
-      Resource toPreempt, TransactionState transactionState) {
-    if (scheds.isEmpty() || Resources.equals(toPreempt, Resources.none())) {
+  protected void preemptResources(Resource toPreempt,
+                                  TransactionState transactionState) {
+    if (Resources.equals(toPreempt, Resources.none())) {
       return;
     }
-
-    Map<RMContainer, FSSchedulerApp> apps =
-        new HashMap<RMContainer, FSSchedulerApp>();
-    Map<RMContainer, FSLeafQueue> queues =
-        new HashMap<RMContainer, FSLeafQueue>();
-
-    // Collect running containers from over-scheduled queues
-    List<RMContainer> runningContainers = new ArrayList<RMContainer>();
-    for (FSLeafQueue sched : scheds) {
-      if (Resources.greaterThan(RESOURCE_CALCULATOR, clusterCapacity,
-          sched.getResourceUsage(), sched.getFairShare())) {
-        for (AppSchedulable as : sched.getRunnableAppSchedulables()) {
-          for (RMContainer c : as.getApp().getLiveContainers()) {
-            runningContainers.add(c);
-            apps.put(c, as.getApp());
-            queues.put(c, sched);
-          }
-        }
-      }
-    }
-
-    // Sort containers into reverse order of priority
-    Collections.sort(runningContainers, new Comparator<RMContainer>() {
-      public int compare(RMContainer c1, RMContainer c2) {
-        int ret = c1.getContainer().getPriority()
-            .compareTo(c2.getContainer().getPriority());
-        if (ret == 0) {
-          return c2.getContainerId().compareTo(c1.getContainerId());
-        }
-        return ret;
-      }
-    });
     
     // Scan down the list of containers we've already warned and kill them
     // if we need to.  Remove any containers from the list that we don't need
     // or that are no longer running.
     Iterator<RMContainer> warnedIter = warnedContainers.iterator();
-    Set<RMContainer> preemptedThisRound = new HashSet<RMContainer>();
     while (warnedIter.hasNext()) {
       RMContainer container = warnedIter.next();
-      if (container.getState() == RMContainerState.RUNNING && Resources
-          .greaterThan(RESOURCE_CALCULATOR, clusterCapacity, toPreempt,
+      if ((container.getState() == RMContainerState.RUNNING ||
+              container.getState() == RMContainerState.ALLOCATED) &&
+           Resources.greaterThan(RESOURCE_CALCULATOR, clusterCapacity, toPreempt,
               Resources.none())) {
-        warnOrKillContainer(container, apps.get(container),
-            queues.get(container), transactionState);
-        preemptedThisRound.add(container);
+        warnOrKillContainer(container, transactionState);
         Resources
             .subtractFrom(toPreempt, container.getContainer().getResource());
       } else {
@@ -449,29 +417,41 @@ public class FairScheduler extends AbstractYarnScheduler {
       }
     }
 
-    // Scan down the rest of the containers until we've preempted enough, making
-    // sure we don't preempt too many from any queue
-    Iterator<RMContainer> runningIter = runningContainers.iterator();
-    while (runningIter.hasNext() && Resources
-        .greaterThan(RESOURCE_CALCULATOR, clusterCapacity, toPreempt,
-            Resources.none())) {
-      RMContainer container = runningIter.next();
-      FSLeafQueue sched = queues.get(container);
-      if (!preemptedThisRound.contains(container) && Resources
-          .greaterThan(RESOURCE_CALCULATOR, clusterCapacity,
-              sched.getResourceUsage(), sched.getFairShare())) {
-        warnOrKillContainer(container, apps.get(container), sched,
-            transactionState);
-        
-        warnedContainers.add(container);
-        Resources
-            .subtractFrom(toPreempt, container.getContainer().getResource());
+    try {
+      // Reset preemptedResource for each app
+      for (FSLeafQueue queue : getQueueManager().getLeafQueues()) {
+        for (AppSchedulable app : queue.getRunnableAppSchedulables()) {
+          app.getApp().resetPreemptedResources();
+        }
+      }
+
+      while (Resources.greaterThan(RESOURCE_CALCULATOR, clusterCapacity,
+              toPreempt, Resources.none())) {
+        RMContainer container =
+                getQueueManager().getRootQueue().preemptContainer();
+        if (container == null) {
+          break;
+        } else {
+          warnOrKillContainer(container, transactionState);
+          warnedContainers.add(container);
+          Resources.subtractFrom(
+                  toPreempt, container.getContainer().getResource());
+        }
+      }
+    } finally {
+      // Clear preemptedResources for each app
+      for (FSLeafQueue queue : getQueueManager().getLeafQueues()) {
+        for (AppSchedulable app : queue.getRunnableAppSchedulables()) {
+          app.getApp().clearPreemptedResources();
+        }
       }
     }
   }
   
-  private void warnOrKillContainer(RMContainer container, FSSchedulerApp app,
-      FSLeafQueue queue, TransactionState transactionState) {
+  private void warnOrKillContainer(RMContainer container, TransactionState transactionState) {
+    ApplicationAttemptId appAttemptId = container.getApplicationAttemptId();
+    FSSchedulerApp app = getSchedulerApp(appAttemptId);
+    FSLeafQueue queue = app.getQueue();
     LOG.info(
         "Preempting container (prio=" + container.getContainer().getPriority() +
             "res=" + container.getContainer().getResource() +
