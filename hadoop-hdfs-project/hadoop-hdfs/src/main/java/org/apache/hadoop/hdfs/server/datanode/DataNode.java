@@ -72,7 +72,6 @@ import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.ReplicaState;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.StartupOption;
 import org.apache.hadoop.hdfs.server.common.JspHelper;
 import org.apache.hadoop.hdfs.server.common.StorageInfo;
-import org.apache.hadoop.hdfs.server.common.Util;
 import org.apache.hadoop.hdfs.server.datanode.SecureDataNodeStarter.SecureResources;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsDatasetSpi;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsVolumeSpi;
@@ -111,11 +110,9 @@ import org.apache.hadoop.util.Daemon;
 import org.apache.hadoop.util.DiskChecker;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
-import org.apache.hadoop.util.DiskChecker2;
 import org.apache.hadoop.util.GenericOptionsParser;
 import org.apache.hadoop.util.ServicePlugin;
 import org.apache.hadoop.util.StringUtils;
-import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.VersionInfo;
 import org.mortbay.util.ajax.JSON;
 
@@ -123,7 +120,6 @@ import java.io.BufferedOutputStream;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -734,13 +730,13 @@ public class DataNode extends Configured
 
     if (storage.getStorageID().equals("")) {
       // This is a fresh datanode, persist the NN-provided storage ID
-      storage.setStorageID(bpRegistration.getStorageID());
+      storage.setStorageID(bpRegistration.getDatanodeUuid());
       storage.writeAll();
-      LOG.info("New storage id " + bpRegistration.getStorageID() +
+      LOG.info("New storage id " + bpRegistration.getDatanodeUuid() +
           " is assigned to data-node " + bpRegistration);
-    } else if (!storage.getStorageID().equals(bpRegistration.getStorageID())) {
+    } else if (!storage.getStorageID().equals(bpRegistration.getDatanodeUuid())) {
       throw new IOException("Inconsistent storage IDs. Name-node returned " +
-          bpRegistration.getStorageID() + ". Expecting " +
+          bpRegistration.getDatanodeUuid() + ". Expecting " +
           storage.getStorageID());
     }
     

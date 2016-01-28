@@ -89,7 +89,7 @@ public class ExcessReplicasMap {
     }
     TreeSet<String> stIds = new TreeSet<String>();
     for (ExcessReplica er : excessReplicas) {
-      stIds.add(datanodeManager.getDatanode(er.getStorageId()).getStorageID());
+      stIds.add(datanodeManager.getDatanode(er.getStorageId()).getDatanodeUuid());
     }
     return stIds;
   }

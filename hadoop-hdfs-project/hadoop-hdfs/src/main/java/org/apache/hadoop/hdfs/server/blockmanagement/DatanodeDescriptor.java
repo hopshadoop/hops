@@ -21,9 +21,7 @@ import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.BlockInfoDataAccess;
-import io.hops.metadata.hdfs.dal.InvalidateBlockDataAccess;
-import io.hops.metadata.hdfs.dal.ReplicaDataAccess;
-import io.hops.metadata.hdfs.entity.Replica;
+import io.hops.metadata.hdfs.dal.StorageDataAccess;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -31,17 +29,19 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
+import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.apache.hadoop.hdfs.util.LightWeightHashSet;
 import org.apache.hadoop.util.Time;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
-import java.util.Set;
 
 /**
  * This class extends the DatanodeInfo class with ephemeral information (eg
@@ -56,6 +56,13 @@ public class DatanodeDescriptor extends DatanodeInfo {
   // If node is not decommissioning, do not use this object for anything.
   public DecommissioningStatus decommissioningStatus =
       new DecommissioningStatus();
+
+  /**
+   * A datanode is a collection of storages. This maps storageID's to their
+   * DataNodeStorageInfo
+   */
+  private final Map<String, DatanodeStorageInfo> storageMap =
+      new HashMap<String, DatanodeStorageInfo>();
   
   /**
    * Block and targets pair
@@ -119,7 +126,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
     }
   }
 
-  private int sid = -1;
+  private String hostID = "";
 
   public boolean isAlive = false;
   public boolean needKeyUpdate = false;
@@ -261,37 +268,49 @@ public class DatanodeDescriptor extends DatanodeInfo {
   }
 
   /**
-   * Add datanode to the block.
-   * Add block to the head of the list of blocks belonging to the data-node.
+   * Add block to the storage. Return true on success.
    */
-  public boolean addBlock(BlockInfo b)
-      throws StorageException, TransactionContextException {
-    if (b.hasReplicaIn(this)) {
-      return false;
+  public boolean addBlock(String storageID, BlockInfo b) {
+    DatanodeStorageInfo s = getStorageInfo(storageID);
+    if(s != null) {
+      return s.addBlock(b);
     }
-    b.addReplica(this, b);
-    return true;
+    return false;
   }
-  
+
+  DatanodeStorageInfo getStorageInfo(String storageID) {
+    return this.storageMap.get(storageID);
+  }
+
+  public Collection<DatanodeStorageInfo> getStorageInfos() {
+    return storageMap.values();
+  }
+
   /**
-   * Remove block from the list of blocks belonging to the data-node.
+   * Remove block from the list of blocks belonging to this data-node.
    * Remove datanode from the block.
    */
   public boolean removeBlock(BlockInfo b)
       throws StorageException, TransactionContextException {
-    if (b.removeReplica(this) != null) {
-      return true;
-    } else {
-      return false;
-    }
+    return this.removeBlock(this.getDatanodeUuid(), b);
   }
 
-  public void setSId(int sid) {
-    this.sid = sid;
+  boolean removeBlock(String storageID, BlockInfo b) throws
+      StorageException, TransactionContextException {
+    DatanodeStorageInfo s = getStorageInfo(storageID);
+    if (s != null) {
+      return s.removeBlock(b);
+    }
+    return false;
   }
-  
-  public int getSId() {
-    return this.sid;
+
+  // TODO when is this set? And how/when do we sync it with NDB?
+  public void setHostID(String id) {
+    this.hostID = id;
+  }
+
+  public String getHostID() {
+    return this.hostID;
   }
 
   public void resetBlocks() {
@@ -313,15 +332,18 @@ public class DatanodeDescriptor extends DatanodeInfo {
   }
 
   public int numBlocks() throws IOException {
-    return (Integer) new LightWeightRequestHandler(
-        HDFSOperationType.COUNT_REPLICAS_ON_NODE) {
-      @Override
-      public Object performTask() throws StorageException, IOException {
-        ReplicaDataAccess da = (ReplicaDataAccess) HdfsStorageFactory
-            .getDataAccess(ReplicaDataAccess.class);
-        return da.countAllReplicasForStorageId(getSId());
-      }
-    }.handle();
+    // TODO: do a count in SQL instead of a for loop (both for
+    // atomicity and for efficiency)
+    // i.e. SELECT COUNT(*) FROM blocks b, storages s
+    //  WHERE s.hostid = <some id> AND s.id = b.storageID
+
+    int blocks = 0;
+
+    for (final DatanodeStorageInfo entry : storageMap.values()) {
+      blocks += entry.numBlocks();
+    }
+
+    return blocks;
   }
 
   /**
@@ -340,6 +362,30 @@ public class DatanodeDescriptor extends DatanodeInfo {
     rollBlocksScheduled(getLastUpdate());
   }
 
+  public Iterator<DatanodeStorageInfo> getStorageIterator() throws IOException {
+    return getAllMachineStorages().iterator();
+  }
+
+  private List<DatanodeStorageInfo> getAllMachineStorages() throws IOException {
+    final String hostID = getHostID();
+
+    LightWeightRequestHandler findStoragesHandler = new LightWeightRequestHandler(
+        HDFSOperationType.GET_ALL_STORAGE_IDS) {
+      @Override
+      public Object performTask() throws StorageException, IOException {
+        StorageDataAccess storages = (StorageDataAccess) HdfsStorageFactory.getDataAccess(StorageDataAccess.class);
+
+        HdfsStorageFactory.getConnector().beginTransaction();
+        List<BlockInfo> list = storages.find(hostID);
+        HdfsStorageFactory.getConnector().commit();
+
+        return list;
+      }
+    };
+    return (List<DatanodeStorageInfo>) findStoragesHandler.handle();
+  }
+
+  // TODO deal with this...
   public Iterator<BlockInfo> getBlockIterator() throws IOException {
     return getAllMachineBlockInfos().iterator();
   }
@@ -349,10 +395,10 @@ public class DatanodeDescriptor extends DatanodeInfo {
         HDFSOperationType.GET_ALL_MACHINE_BLOCKS) {
       @Override
       public Object performTask() throws StorageException, IOException {
-        BlockInfoDataAccess da = (BlockInfoDataAccess) HdfsStorageFactory
-            .getDataAccess(BlockInfoDataAccess.class);
+        BlockInfoDataAccess blocks = (BlockInfoDataAccess) HdfsStorageFactory.getDataAccess(
+            BlockInfoDataAccess.class);
         HdfsStorageFactory.getConnector().beginTransaction();
-        List<BlockInfo> list = da.findBlockInfosByStorageId(getSId());
+        List<BlockInfo> list = blocks.findBlockInfosByHostId(getHostID());
         HdfsStorageFactory.getConnector().commit();
         return list;
       }
@@ -360,31 +406,31 @@ public class DatanodeDescriptor extends DatanodeInfo {
     return (List<BlockInfo>) findBlocksHandler.handle();
   }
   
-  public Map<Long,Integer> getAllMachineReplicas() throws IOException {
-    LightWeightRequestHandler findBlocksHandler = new LightWeightRequestHandler(
-        HDFSOperationType.GET_ALL_MACHINE_BLOCKS_IDS) {
-      @Override
-      public Object performTask() throws StorageException, IOException {
-        ReplicaDataAccess da = (ReplicaDataAccess) HdfsStorageFactory
-            .getDataAccess(ReplicaDataAccess.class);
-        return da.findBlockAndInodeIdsByStorageId(getSId());
-      }
-    };
-    return (Map<Long,Integer>)findBlocksHandler.handle();
-  }
+//  public Map<Long,Integer> getAllMachineReplicas() throws IOException {
+//    LightWeightRequestHandler findBlocksHandler = new LightWeightRequestHandler(
+//        HDFSOperationType.GET_ALL_MACHINE_BLOCKS_IDS) {
+//      @Override
+//      public Object performTask() throws StorageException, IOException {
+//        ReplicaDataAccess da = (ReplicaDataAccess) HdfsStorageFactory
+//            .getDataAccess(ReplicaDataAccess.class);
+//        return da.findBlockAndInodeIdsByStorageId(getSId());
+//      }
+//    };
+//    return (Map<Long,Integer>)findBlocksHandler.handle();
+//  }
   
-    public Map<Long,Long> getAllMachineInvalidatedReplicasWithGenStamp() throws IOException {
-    LightWeightRequestHandler findBlocksHandler = new LightWeightRequestHandler(
-        HDFSOperationType.GET_ALL_MACHINE_BLOCKS_IDS) {
-      @Override
-      public Object performTask() throws StorageException, IOException {
-        InvalidateBlockDataAccess da = (InvalidateBlockDataAccess) HdfsStorageFactory
-            .getDataAccess(InvalidateBlockDataAccess.class);
-        return da.findInvalidatedBlockByStorageIdUsingMySQLServer(getSId());
-      }
-    };
-    return (Map<Long,Long>)findBlocksHandler.handle();
-  }
+//    public Map<Long,Long> getAllMachineInvalidatedReplicasWithGenStamp() throws IOException {
+//    LightWeightRequestHandler findBlocksHandler = new LightWeightRequestHandler(
+//        HDFSOperationType.GET_ALL_MACHINE_BLOCKS_IDS) {
+//      @Override
+//      public Object performTask() throws StorageException, IOException {
+//        InvalidateBlockDataAccess da = (InvalidateBlockDataAccess) HdfsStorageFactory
+//            .getDataAccess(InvalidateBlockDataAccess.class);
+//        return da.findInvalidatedBlockByStorageIdUsingMySQLServer(getSId());
+//      }
+//    };
+//    return (Map<Long,Long>)findBlocksHandler.handle();
+//  }
   
   /**
    * Store block replication work.
@@ -659,5 +705,16 @@ public class DatanodeDescriptor extends DatanodeInfo {
       sb.append(" ").append(recover).append(" blocks to be recovered;");
     }
     return sb.toString();
+  }
+
+  DatanodeStorageInfo updateStorage(DatanodeStorage s) {
+    DatanodeStorageInfo storage = getStorageInfo(s.getStorageID());
+    if (storage == null) {
+      storage = new DatanodeStorageInfo(this, s);
+      storageMap.put(s.getStorageID(), storage);
+    } else {
+      storage.setState(s.getState());
+    }
+    return storage;
   }
 }

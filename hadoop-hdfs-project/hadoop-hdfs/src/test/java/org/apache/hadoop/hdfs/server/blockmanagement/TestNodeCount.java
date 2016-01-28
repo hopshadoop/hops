@@ -137,7 +137,7 @@ public class TestNodeCount {
               DatanodeDescriptor nonExcessDN = null;
               while (iter.hasNext()) {
                 DatanodeDescriptor dn = iter.next();
-                if (!excessDns.contains(dn.getStorageID())) {
+                if (!excessDns.contains(dn.getDatanodeUuid())) {
                   nonExcessDN = dn;
                 }
               }

@@ -236,10 +236,11 @@ public class BlockInfo extends Block {
   /**
    * Adds new replica for this block.
    */
-  Replica addReplica(DatanodeDescriptor dn, BlockInfo b)
+  Replica addReplica(DatanodeStorageInfo storage)
       throws StorageException, TransactionContextException {
+    // TODO check we don't already have a replica on this machine
     Replica replica =
-        new Replica(dn.getSId(), getBlockId(), b.getInodeId());
+        new Replica(storage.getSid(), getBlockId(), getInodeId());
     add(replica);
     return replica;
   }
@@ -256,12 +257,12 @@ public class BlockInfo extends Block {
    *
    * @return
    */
-  Replica removeReplica(DatanodeDescriptor dn)
+  Replica removeReplica(DatanodeStorageInfo storage)
       throws StorageException, TransactionContextException {
     List<Replica> replicas = getReplicasNoCheck();
     Replica replica = null;
     for (Replica r : replicas) {
-      if (r.getStorageId() == dn.getSId()) {
+      if (r.getStorageId() == storage.getSid()) {
         replica = r;
         remove(r);
         break;
@@ -270,22 +271,13 @@ public class BlockInfo extends Block {
     return replica;
   }
   
-  int findDatanode(DatanodeDescriptor dn)
+  boolean isReplicatedOnStorage(DatanodeStorageInfo storage)
       throws StorageException, TransactionContextException {
     Replica replica = EntityManager
         .find(Replica.Finder.ByBlockIdAndStorageId, getBlockId(),
-            dn.getSId());
-    if (replica == null) {
-      return -1;
-    }
-    return 1;
-  }
+            storage.getSid());
 
-  boolean hasReplicaIn(DatanodeDescriptor dn)
-      throws StorageException, TransactionContextException {
-    return EntityManager
-        .find(Replica.Finder.ByBlockIdAndStorageId, getBlockId(),
-            dn.getSId()) != null;
+    return replica != null;
   }
 
   /**
@@ -314,7 +306,7 @@ public class BlockInfo extends Block {
    * @return BlockInfoUnderConstruction - an under construction block.
    */
   public BlockInfoUnderConstruction convertToBlockUnderConstruction(
-      BlockUCState s, DatanodeDescriptor[] targets)
+      BlockUCState s, DatanodeStorageInfo[] targets)
       throws StorageException, TransactionContextException {
     if (isComplete()) {
       return new BlockInfoUnderConstruction(this, this.getInodeId(), s,
@@ -368,7 +360,10 @@ public class BlockInfo extends Block {
     setTimestampNoPersistance(ts);
     save();
   }
-  
+
+  /**
+   * Returns an array of Datanodes where the replicas are stored
+   */
   protected DatanodeDescriptor[] getDatanodes(DatanodeManager datanodeMgr,
       List<? extends ReplicaBase> replicas) {
     int numLocations = replicas.size();

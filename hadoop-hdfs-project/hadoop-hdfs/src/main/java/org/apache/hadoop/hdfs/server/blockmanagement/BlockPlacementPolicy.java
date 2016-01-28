@@ -161,12 +161,13 @@ public abstract class BlockPlacementPolicy {
    * @param moreExistingReplicas
    *     Replica locations of this block that are not
    *     listed in the previous parameter.
-   * @return the replica that is the best candidate for deletion
+   * @return the storage that contains the replica that is the best candidate
+   * for deletion
    */
-  abstract public DatanodeDescriptor chooseReplicaToDelete(
+  abstract public DatanodeStorageInfo chooseReplicaToDelete(
       BlockCollection srcBC, Block block, short replicationFactor,
-      Collection<DatanodeDescriptor> existingReplicas,
-      Collection<DatanodeDescriptor> moreExistingReplicas);
+      Collection<DatanodeStorageInfo> existingReplicas,
+      Collection<DatanodeStorageInfo> moreExistingReplicas);
 
   /**
    * Used to setup a BlockPlacementPolicy object. This should be defined by

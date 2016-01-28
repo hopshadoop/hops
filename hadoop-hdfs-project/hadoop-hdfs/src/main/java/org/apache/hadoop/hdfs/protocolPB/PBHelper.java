@@ -217,7 +217,7 @@ public class PBHelper {
 
   public static DatanodeIDProto convert(DatanodeID dn) {
     return DatanodeIDProto.newBuilder().setIpAddr(dn.getIpAddr())
-        .setHostName(dn.getHostName()).setStorageID(dn.getStorageID())
+        .setHostName(dn.getHostName()).setStorageID(dn.getDatanodeUuid())
         .setXferPort(dn.getXferPort()).setInfoPort(dn.getInfoPort())
         .setIpcPort(dn.getIpcPort()).build();
   }

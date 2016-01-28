@@ -26,6 +26,7 @@ import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLockTypes.LockType;
 import io.hops.transaction.lock.TransactionLocks;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 
 import java.io.IOException;
 import java.util.Collection;
@@ -43,12 +44,12 @@ public class StorageIdMap {
     initialize();
   }
 
-  public void update(DatanodeDescriptor dn) throws IOException {
-    String storageId = dn.getStorageID();
+  public void update(DatanodeStorageInfo s) throws IOException {
+    String storageId = s.getStorageID();
     if (!storageIdtoSId.containsKey(storageId)) {
       getSetSId(storageId);
     }
-    dn.setSId(storageIdtoSId.get(storageId));
+    s.setSid(storageIdtoSId.get(storageId));
   }
 
   public int getSId(String storageId) {

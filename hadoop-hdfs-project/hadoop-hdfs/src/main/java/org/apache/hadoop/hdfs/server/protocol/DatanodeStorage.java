@@ -46,14 +46,14 @@ public class DatanodeStorage {
     this(storageID, State.NORMAL);
   }
 
-  public DatanodeStorage(String sid, State s) {
-    this(sid, s, StorageType.DEFAULT);
+  public DatanodeStorage(String storageID, State state) {
+    this(storageID, state, StorageType.DEFAULT);
   }
 
-  public DatanodeStorage(String sid, State s, StorageType sm) {
-    this.storageID = sid;
-    this.state = s;
-    this.storageType = sm;
+  public DatanodeStorage(String storageID, State state, StorageType type) {
+    this.storageID = storageID;
+    this.state = state;
+    this.storageType = type;
   }
 
   public String getStorageID() {

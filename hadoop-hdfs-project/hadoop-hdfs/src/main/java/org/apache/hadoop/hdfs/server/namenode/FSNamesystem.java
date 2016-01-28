@@ -3436,7 +3436,7 @@ private void commitOrCompleteLastBlock(
             // Otherwise fsck will report these blocks as MISSING, especially if the
             // blocksReceived from Datanodes take a long time to arrive.
             for (int i = 0; i < descriptors.length; i++) {
-              descriptors[i].addBlock(storedBlock);
+              descriptors[i].addBlock(newtargetstorages[i], storedBlock);
             }
           }
           // add pipeline locations into the INodeUnderConstruction
@@ -4805,9 +4805,9 @@ private void commitOrCompleteLastBlock(
       ExtendedBlock blk = blocks[i].getBlock();
       DatanodeInfo[] nodes = blocks[i].getLocations();
       for (int j = 0; j < nodes.length; j++) {
-        DatanodeInfo dn = nodes[j];
-        blockManager
-            .findAndMarkBlockAsCorrupt(blk, dn, "client machine reported it");
+        //TODO: add "storageID to LocatedBlock
+        blockManager.findAndMarkBlockAsCorrupt(blk, nodes[j], "STORAGE_ID",
+            "client machine reported it");
       }
     }
   }

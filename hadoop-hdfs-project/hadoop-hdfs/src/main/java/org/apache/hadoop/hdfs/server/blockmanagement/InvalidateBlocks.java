@@ -32,7 +32,6 @@ import org.apache.hadoop.hdfs.server.namenode.INode;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -97,7 +96,7 @@ class InvalidateBlocks {
   void add(final BlockInfo block, final DatanodeInfo datanode,
       final boolean log) throws StorageException, TransactionContextException {
     InvalidatedBlock invBlk = new InvalidatedBlock(
-        datanodeManager.getDatanode(datanode.getStorageID()).getSId(),
+        datanodeManager.getDatanode(datanode.getDatanodeUuid()).getSId(),
         block.getBlockId(), block.getGenerationStamp(), block.getNumBytes(),
         block.getInodeId());
     if (add(invBlk)) {
@@ -151,7 +150,7 @@ class InvalidateBlocks {
     if (invBlocks != null) {
       for (InvalidatedBlock ib : invBlocks) {
         storageIds
-            .add(datanodeManager.getDatanode(ib.getStorageId()).getStorageID());
+            .add(datanodeManager.getDatanode(ib.getStorageId()).getDatanodeUuid());
       }
     }
     return new ArrayList<String>(storageIds);

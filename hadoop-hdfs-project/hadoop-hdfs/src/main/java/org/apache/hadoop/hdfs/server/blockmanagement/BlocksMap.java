@@ -140,7 +140,7 @@ class BlocksMap {
    * Remove the block from the block map
    * only if it does not belong to any file and data-nodes.
    */
-  boolean removeNode(Block b, DatanodeDescriptor node)
+  boolean removeNode(Block b, DatanodeStorageInfo storage)
       throws StorageException, TransactionContextException {
     BlockInfo info = getStoredBlock(b);
     if (info == null) {
@@ -148,7 +148,7 @@ class BlocksMap {
     }
 
     // remove block from the data-node list and the node from the block info
-    boolean removed = node.removeBlock(info);
+    boolean removed = storage.removeBlock(info);
     return removed;
   }
 

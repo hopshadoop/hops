@@ -711,7 +711,7 @@ class BPOfferService implements Runnable {
     }
     if (receivedAndDeletedBlockArray != null) {
       StorageReceivedDeletedBlocks[] report =
-          {new StorageReceivedDeletedBlocks(bpRegistration.getStorageID(),
+          {new StorageReceivedDeletedBlocks(bpRegistration.getDatanodeUuid(),
               receivedAndDeletedBlockArray)};
       boolean success = false;
       try {
@@ -780,7 +780,7 @@ class BPOfferService implements Runnable {
       // Send block report
       long brSendStartTime = now();
       StorageBlockReport[] report = {new StorageBlockReport(
-          new DatanodeStorage(bpRegistration.getStorageID()),
+          new DatanodeStorage(bpRegistration.getDatanodeUuid()),
           bReport.getBlockListAsLongs())};
 
       ActiveNode an = nextNNForBlkReport(bReport.getNumberOfBlocks());

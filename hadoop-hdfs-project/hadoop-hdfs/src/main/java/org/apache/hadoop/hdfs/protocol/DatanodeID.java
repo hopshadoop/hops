@@ -46,8 +46,15 @@ public class DatanodeID implements Comparable<DatanodeID> {
   private int infoPort;      // info server port
   private int ipcPort;       // IPC server port
 
+  /**
+   * UUID identifying a given datanode. For upgraded Datanodes this is the
+   * same as the StorageID that was previously used by this Datanode.
+   * For newly formatted Datanodes it is a UUID.
+   */
+  private String datanodeUuid = null;
+
   public DatanodeID(DatanodeID from) {
-    this(from.getIpAddr(), from.getHostName(), from.getStorageID(),
+    this(from.getIpAddr(), from.getHostName(), from.getDatanodeUuid(),
         from.getXferPort(), from.getInfoPort(), from.getIpcPort());
     this.peerHostName = from.getPeerHostName();
   }
@@ -176,10 +183,18 @@ public class DatanodeID implements Comparable<DatanodeID> {
   }
 
   /**
-   * @return data storage ID.
+   * @return data node ID.
    */
-  public String getStorageID() {
-    return storageID;
+  public String getDatanodeUuid() {
+    return datanodeUuid;
+  }
+
+  private String checkDatanodeUuid(String uuid) {
+    if (uuid == null || uuid.isEmpty()) {
+      return null;
+    } else {
+      return uuid;
+    }
   }
 
   /**
@@ -212,7 +227,7 @@ public class DatanodeID implements Comparable<DatanodeID> {
       return false;
     }
     return (getXferAddr().equals(((DatanodeID) to).getXferAddr()) &&
-        storageID.equals(((DatanodeID) to).getStorageID()));
+        storageID.equals(((DatanodeID) to).getDatanodeUuid()));
   }
   
   @Override

@@ -609,37 +609,53 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
   }
 
   @Override
-  public DatanodeDescriptor chooseReplicaToDelete(BlockCollection bc,
+  public DatanodeStorageInfo chooseReplicaToDelete(BlockCollection bc,
       Block block, short replicationFactor,
-      Collection<DatanodeDescriptor> first,
-      Collection<DatanodeDescriptor> second) {
+      Collection<DatanodeStorageInfo> first,
+      Collection<DatanodeStorageInfo> second) {
     long oldestHeartbeat =
         now() - heartbeatInterval * tolerateHeartbeatMultiplier;
-    DatanodeDescriptor oldestHeartbeatNode = null;
+    DatanodeStorageInfo oldestHeartbeatStorage = null;
     long minSpace = Long.MAX_VALUE;
-    DatanodeDescriptor minSpaceNode = null;
-
-    // pick replica from the first Set. If first is empty, then pick replicas
-    // from second set.
-    Iterator<DatanodeDescriptor> iter =
-        first.isEmpty() ? second.iterator() : first.iterator();
+    DatanodeStorageInfo minSpaceStorage = null;
 
     // Pick the node with the oldest heartbeat or with the least free space,
     // if all hearbeats are within the tolerable heartbeat interval
-    while (iter.hasNext()) {
-      DatanodeDescriptor node = iter.next();
+    for(DatanodeStorageInfo storage : pickupReplicaSet(first, second)) {
+      final DatanodeDescriptor node = storage.getDatanodeDescriptor();
       long free = node.getRemaining();
       long lastHeartbeat = node.getLastUpdate();
-      if (lastHeartbeat < oldestHeartbeat) {
+      if(lastHeartbeat < oldestHeartbeat) {
         oldestHeartbeat = lastHeartbeat;
-        oldestHeartbeatNode = node;
+        oldestHeartbeatStorage = storage;
       }
       if (minSpace > free) {
         minSpace = free;
-        minSpaceNode = node;
+        minSpaceStorage = storage;
       }
     }
-    return oldestHeartbeatNode != null ? oldestHeartbeatNode : minSpaceNode;
+
+    final DatanodeStorageInfo storage;
+    if (oldestHeartbeatStorage != null) {
+      storage = oldestHeartbeatStorage;
+    } else if (minSpaceStorage != null) {
+      storage = minSpaceStorage;
+    } else {
+      return null;
+    }
+    return storage;
+  }
+
+  /**
+   * Pick up replica node set for deleting replica as over-replicated.
+   * First set contains replica nodes on rack with more than one
+   * replica while second set contains remaining replica nodes.
+   * So pick up first set if not empty. If first is empty, then pick second.
+   */
+  protected Collection<DatanodeStorageInfo> pickupReplicaSet(
+      Collection<DatanodeStorageInfo> first,
+      Collection<DatanodeStorageInfo> second) {
+    return first.isEmpty() ? second : first;
   }
   
   @VisibleForTesting

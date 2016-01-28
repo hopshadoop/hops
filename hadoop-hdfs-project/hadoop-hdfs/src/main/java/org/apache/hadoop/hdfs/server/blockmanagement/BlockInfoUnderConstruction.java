@@ -74,7 +74,7 @@ public class BlockInfoUnderConstruction extends BlockInfo {
    * Create a block that is currently being constructed.
    */
   public BlockInfoUnderConstruction(Block blk, int inodeId, BlockUCState state,
-      DatanodeDescriptor[] targets)
+      DatanodeStorageInfo[] targets)
       throws StorageException, TransactionContextException {
     this(blk, inodeId, state);
     setExpectedLocations(targets);
@@ -101,10 +101,10 @@ public class BlockInfoUnderConstruction extends BlockInfo {
   /**
    * Set expected locations
    */
-  public void setExpectedLocations(DatanodeDescriptor[] targets)
+  public void setExpectedLocations(DatanodeStorageInfo[] targets)
       throws StorageException, TransactionContextException {
-    for (DatanodeDescriptor dn : targets) {
-      addExpectedReplica(dn.getSId(), ReplicaState.RBW);
+    for (DatanodeStorageInfo storage : targets) {
+      addExpectedReplica(storage.getSid(), ReplicaState.RBW);
     }
   }
 
@@ -198,15 +198,15 @@ public class BlockInfoUnderConstruction extends BlockInfo {
     }
   }
 
-  void addReplicaIfNotPresent(DatanodeDescriptor dn, Block block,
+  void addReplicaIfNotPresent(DatanodeStorageInfo storage, Block block,
       ReplicaState rState)
       throws StorageException, TransactionContextException {
     for (ReplicaUnderConstruction r : getExpectedReplicas()) {
-      if (r.getStorageId() == dn.getSId()) {
+      if (r.getStorageId() == storage.getSid()) {
         return;
       }
     }
-    addExpectedReplica(dn.getSId(), rState);
+    addExpectedReplica(storage.getSid(), rState);
   }
 
   @Override // BlockInfo

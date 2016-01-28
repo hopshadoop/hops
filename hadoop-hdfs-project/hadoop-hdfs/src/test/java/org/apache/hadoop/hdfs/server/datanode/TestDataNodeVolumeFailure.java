@@ -150,7 +150,7 @@ public class TestDataNodeVolumeFailure {
     String bpid = cluster.getNamesystem().getBlockPoolId();
     DatanodeRegistration dnR = dn.getDNRegistrationForBP(bpid);
     final StorageBlockReport[] report =
-        {new StorageBlockReport(new DatanodeStorage(dnR.getStorageID()),
+        {new StorageBlockReport(new DatanodeStorage(dnR.getDatanodeUuid()),
             DataNodeTestUtils.getFSDataset(dn).getBlockReport(bpid)
                 .getBlockListAsLongs())};
     cluster.getNameNodeRpc().blockReport(dnR, bpid, report);

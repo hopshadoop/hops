@@ -17,11 +17,14 @@
  */
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
+import io.hops.StorageConnector;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.CorruptReplicaDataAccess;
+import io.hops.metadata.hdfs.dal.StorageDataAccess;
 import io.hops.metadata.hdfs.entity.CorruptReplica;
+import io.hops.metadata.hdfs.entity.Storage;
 import io.hops.transaction.EntityManager;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
@@ -76,8 +79,8 @@ public class CorruptReplicasMap {
     }
     
     if (!nodes.contains(dn)) {
-      addCorruptReplicaToDB(
-          new CorruptReplica(blk.getBlockId(), dn.getSId(), blk.getInodeId()));
+      addCorruptReplicaToDB(new CorruptReplica(blk.getBlockId(), dn.getDatanodeUuid(), blk
+          .getInodeId()));
       NameNode.blockStateChangeLog
           .info("BLOCK NameSystem.addToCorruptReplicasMap: " +
               blk.getBlockName() +
@@ -116,22 +119,22 @@ public class CorruptReplicasMap {
    *
    * @param blk
    *     block to be removed
-   * @param datanode
-   *     datanode where the block is located
+   * @param storage
+   *     storage where the block is located
    * @return true if the removal is successful;
    * false if the replica is not in the map
    */
   boolean removeFromCorruptReplicasMap(BlockInfo blk,
-      DatanodeDescriptor datanode)
+      DatanodeStorageInfo storage)
       throws StorageException, TransactionContextException {
     Collection<DatanodeDescriptor> datanodes = getNodes(blk);
     if (datanodes == null) {
       return false;
     }
 
-    if (datanodes.contains(datanode)) {
+    if (datanodes.contains(storage)) {
       removeCorruptReplicaFromDB(
-          new CorruptReplica(blk.getBlockId(), datanode.getSId(),
+          new CorruptReplica(blk.getBlockId(), storage.getSid(),
               blk.getInodeId()));
       return true;
     } else {
@@ -147,8 +150,7 @@ public class CorruptReplicasMap {
    *     Block for which nodes are requested
    * @return collection of nodes. Null if does not exists
    */
-  Collection<DatanodeDescriptor> getNodes(BlockInfo blk)
-      throws StorageException, TransactionContextException {
+  Collection<DatanodeDescriptor> getNodes(BlockInfo blk) throws StorageException, TransactionContextException {
 
     //HOPS datanodeMgr is null in some tests
     if (datanodeMgr == null) {
@@ -156,16 +158,41 @@ public class CorruptReplicasMap {
     }
     
     Collection<CorruptReplica> corruptReplicas = getCorruptReplicas(blk);
-    Collection<DatanodeDescriptor> dnds = new TreeSet<DatanodeDescriptor>();
+    Collection<DatanodeDescriptor> nodes = new TreeSet<DatanodeDescriptor>();
+
     if (corruptReplicas != null) {
       for (CorruptReplica cr : corruptReplicas) {
-        DatanodeDescriptor dn = datanodeMgr.getDatanode(cr.getStorageId());
-        if (dn != null) {
-          dnds.add(dn);
+        // Get the storage id
+        final int storageId = cr.getStorageId();
+
+        try {
+          // Get the uuid of the host belonging to this storage
+          String datanodeUuid = (String) new LightWeightRequestHandler(
+              HDFSOperationType.GET_STORAGE_INFO) {
+            @Override
+            public Object performTask() throws IOException {
+              StorageConnector conn = HdfsStorageFactory.getConnector();
+              StorageDataAccess storages = (StorageDataAccess) HdfsStorageFactory.getDataAccess(StorageDataAccess.class);
+
+              conn.beginTransaction();
+              Storage s = (Storage) storages.find(storageId);
+              conn.commit();
+              return s.getHostID();
+            }
+          }.handle();
+
+          // Look up which descriptor belongs to this uuid
+          DatanodeDescriptor node = datanodeMgr.getDatanode(datanodeUuid);
+          if (node != null) {
+            nodes.add(node);
+          }
+
+        } catch (IOException e) {
+          e.printStackTrace();
         }
       }
     }
-    return dnds;
+    return nodes;
   }
 
   /**
