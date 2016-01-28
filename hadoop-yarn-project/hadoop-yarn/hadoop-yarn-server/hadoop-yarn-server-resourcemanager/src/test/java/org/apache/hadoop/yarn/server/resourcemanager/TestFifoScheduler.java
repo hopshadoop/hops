@@ -27,13 +27,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.protocolrecords.AllocateResponse;
-import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
-import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.hadoop.yarn.api.records.Container;
-import org.apache.hadoop.yarn.api.records.ContainerId;
-import org.apache.hadoop.yarn.api.records.ContainerState;
-import org.apache.hadoop.yarn.api.records.ContainerStatus;
-import org.apache.hadoop.yarn.api.records.ResourceRequest;
+import org.apache.hadoop.yarn.api.records.*;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
@@ -51,6 +45,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeUpdateS
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.SchedulerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fifo.FifoScheduler;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
+import org.apache.hadoop.yarn.util.resource.Resources;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
@@ -232,6 +227,40 @@ public class TestFifoScheduler {
 
     rm.stop();
     LOG.info("stop test");
+  }
+
+  @Test
+  public void testNodeUpdateBeforeAppAttemptInit() throws Exception {
+    FifoScheduler scheduler = new FifoScheduler();
+    MockRM rm = new MockRM(conf);
+    scheduler.reinitialize(conf, rm.getRMContext(), null);
+
+    RMNode node =
+            MockNodes.newNodeInfo(1,
+                    MockNodes.newResourceWithVcores(1 * GB, 4), 1, "127.0.0.1");
+    scheduler.handle(new NodeAddedSchedulerEvent(node, new TransactionStateImpl(
+            TransactionState.TransactionType.RM)));
+
+    ApplicationId appId = BuilderUtils.newApplicationId(0, 1);
+    SchedulerEvent appEvent =
+            new AppAddedSchedulerEvent(appId, "queue1", "user1", null);
+    scheduler.handle(appEvent);
+
+    NodeUpdateSchedulerEvent updateEvent = new NodeUpdateSchedulerEvent(node,
+            new TransactionStateImpl(TransactionState.TransactionType.RM));
+    try {
+      scheduler.handle(updateEvent);
+    } catch (NullPointerException e) {
+      Assert.fail();
+    }
+
+    ApplicationAttemptId attId =
+            BuilderUtils.newApplicationAttemptId(appId, 1);
+    SchedulerEvent attemptEvent =
+            new AppAttemptAddedSchedulerEvent(attId, false, null);
+    scheduler.handle(attemptEvent);
+
+    rm.stop();
   }
 
   private void testMinimumAllocation(YarnConfiguration conf, int testAlloc)
