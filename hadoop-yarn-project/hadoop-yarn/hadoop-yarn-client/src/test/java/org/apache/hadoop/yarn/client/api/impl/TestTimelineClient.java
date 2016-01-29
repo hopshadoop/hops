@@ -47,7 +47,9 @@ public class TestTimelineClient {
 
   @Before
   public void setup() {
-    client = createTimelineClient(new YarnConfiguration());
+    YarnConfiguration conf = new YarnConfiguration();
+    conf.setBoolean(YarnConfiguration.TIMELINE_SERVICE_ENABLED, true);
+    client = createTimelineClient(conf);
   }
 
   @After
@@ -109,7 +111,7 @@ public class TestTimelineClient {
     }
   }
 
-  @Test
+  @After
   public void testPostEntitiesTimelineServiceNotEnabled() throws Exception {
     YarnConfiguration conf = new YarnConfiguration();
     conf.setBoolean(YarnConfiguration.TIMELINE_SERVICE_ENABLED, false);
@@ -124,7 +126,25 @@ public class TestTimelineClient {
           "putEntities should already return before throwing the exception");
     }
   }
-
+  
+    @Test
+  public void testPostEntitiesTimelineServiceDefaultNotEnabled()
+      throws Exception {
+    YarnConfiguration conf = new YarnConfiguration();
+    // Unset the timeline service's enabled properties.
+    // Make sure default value is pickup up
+    conf.unset(YarnConfiguration.TIMELINE_SERVICE_ENABLED);
+    TimelineClientImpl client = createTimelineClient(conf);
+    mockClientResponse(client, ClientResponse.Status.INTERNAL_SERVER_ERROR,
+        false, false);
+    try {
+      TimelinePutResponse response = client.putEntities(generateEntity());
+      Assert.assertEquals(0, response.getErrors().size());
+    } catch (YarnException e) {
+      Assert.fail("putEntities should already return before throwing the exception");
+    }
+  }
+  
   private static ClientResponse mockClientResponse(TimelineClientImpl client,
       ClientResponse.Status status, boolean hasError, boolean hasRuntimeError) {
     ClientResponse response = mock(ClientResponse.class);
