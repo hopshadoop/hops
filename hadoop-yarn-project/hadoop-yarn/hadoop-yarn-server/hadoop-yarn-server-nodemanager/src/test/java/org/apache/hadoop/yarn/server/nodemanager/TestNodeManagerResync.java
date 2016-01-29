@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.yarn.server.nodemanager;
 
-import junit.framework.Assert;
+import org.junit.Assert;
 import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.UnsupportedFileSystemException;

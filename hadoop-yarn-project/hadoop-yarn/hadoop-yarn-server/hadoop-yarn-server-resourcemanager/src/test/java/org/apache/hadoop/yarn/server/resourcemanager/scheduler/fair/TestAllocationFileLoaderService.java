@@ -31,7 +31,7 @@ import java.io.FileWriter;
 import java.io.PrintWriter;
 import java.util.List;
 
-import static junit.framework.Assert.assertTrue;
+import static org.junit.Assert.*;
 import static org.junit.Assert.assertEquals;
 
 public class TestAllocationFileLoaderService {

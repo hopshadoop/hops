@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.yarn.server.nodemanager.api.protocolrecords.impl.pb;
 
-import junit.framework.Assert;
+import org.junit.Assert;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.DataInputBuffer;
