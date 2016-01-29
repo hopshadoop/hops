@@ -78,6 +78,7 @@ public class TestDistributedShell {
     RMStorageFactory.setConfiguration(conf);
     RMUtilities.InitializeDB();
     conf.set("yarn.log.dir", "target");
+    conf.setBoolean(YarnConfiguration.TIMELINE_SERVICE_ENABLED, true);
     if (yarnCluster == null) {
       yarnCluster =
           new MiniYARNCluster(TestDistributedShell.class.getSimpleName(), 1, 1,
@@ -212,7 +213,7 @@ public class TestDistributedShell {
   public void testDSRestartWithPreviousRunningContainers() throws Exception {
     String[] args =
         {"--jar", APPMASTER_JAR, "--num_containers", "1", "--shell_command",
-            Shell.WINDOWS ? "timeout 8" : "sleep 8", "--master_memory", "512",
+            "sleep 8", "--master_memory", "512",
             "--container_memory", "128",
             "--keep_containers_across_application_attempts"};
 

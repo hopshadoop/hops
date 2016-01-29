@@ -27,12 +27,39 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertFalse;
 
 public class TestInfoBlock {
 
   public static StringWriter sw;
 
   public static PrintWriter pw;
+
+  static final String JAVASCRIPT = "<script>alert('text')</script>";
+  static final String JAVASCRIPT_ESCAPED =
+          "&lt;script&gt;alert('text')&lt;/script&gt;";
+
+  public static class JavaScriptInfoBlock extends InfoBlock{
+    static ResponseInfo resInfo;
+    static {
+      resInfo = new ResponseInfo();
+      resInfo._("User_Name", JAVASCRIPT);
+    }
+
+    @Override
+    public PrintWriter writer() {
+      return TestInfoBlock.pw;
+    }
+
+    JavaScriptInfoBlock(ResponseInfo info) {
+      super(resInfo);
+    }
+
+    public JavaScriptInfoBlock() {
+      super(resInfo);
+    }
+  }
+
 
   public static class MultilineInfoBlock extends InfoBlock {
     
@@ -67,7 +94,6 @@ public class TestInfoBlock {
 
   @Test(timeout = 60000L)
   public void testMultilineInfoBlock() throws Exception {
-
     WebAppTests.testBlock(MultilineInfoBlock.class);
     TestInfoBlock.pw.flush();
     String output = TestInfoBlock.sw.toString().replaceAll(" +", " ");
@@ -79,5 +105,14 @@ public class TestInfoBlock {
         " This is second line.%n </div>%n");
     assertTrue(output.contains(expectedSinglelineData) &&
         output.contains(expectedMultilineData));
+  }
+
+  @Test(timeout=60000L)
+  public void testJavaScriptInfoBlock() throws Exception{
+    WebAppTests.testBlock(JavaScriptInfoBlock.class);
+    TestInfoBlock.pw.flush();
+    String output = TestInfoBlock.sw.toString();
+    assertFalse(output.contains("<script>"));
+    assertTrue(output.contains(JAVASCRIPT_ESCAPED));
   }
 }

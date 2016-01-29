@@ -122,6 +122,25 @@ public class GetApplicationsRequestPBImpl extends GetApplicationsRequest {
     if (this.scope != null) {
       builder.setScope(ProtoUtils.convertToProtoFormat(scope));
     }
+    if (this.start != null) {
+      builder.setStartBegin(start.getMinimumLong());
+      builder.setStartEnd(start.getMaximumLong());
+    }
+
+    if (this.finish != null) {
+      builder.setFinishBegin(finish.getMinimumLong());
+      builder.setFinishEnd(finish.getMaximumLong());
+    }
+
+    builder.setLimit(limit);
+
+    if (this.users != null && !this.users.isEmpty()) {
+      builder.addAllUsers(this.users);
+    }
+
+    if (this.queues != null && !this.queues.isEmpty()) {
+      builder.addAllQueues(this.queues);
+    }
   }
 
   private void addLocalApplicationTypesToProto() {
@@ -330,7 +349,7 @@ public class GetApplicationsRequestPBImpl extends GetApplicationsRequest {
   public LongRange getStartRange() {
     if (this.start == null) {
       GetApplicationsRequestProtoOrBuilder p = viaProto ? proto : builder;
-      if (p.hasStartBegin() || p.hasFinishBegin()) {
+      if (p.hasStartBegin() || p.hasStartEnd()) {
         long begin = p.hasStartBegin() ? p.getStartBegin() : 0L;
         long end = p.hasStartEnd() ? p.getStartEnd() : Long.MAX_VALUE;
         this.start = new LongRange(begin, end);

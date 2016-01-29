@@ -29,6 +29,7 @@ import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.security.client.RMDelegationTokenIdentifier;
 import org.apache.hadoop.yarn.server.api.records.MasterKey;
+import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.RMStateVersion;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.impl.pb.ApplicationAttemptStateDataPBImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.impl.pb.ApplicationStateDataPBImpl;
@@ -36,7 +37,6 @@ import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.impl.pb.Ap
 import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
-import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 
 @Private
 @Unstable
@@ -189,6 +189,9 @@ public class MemoryRMStateStore extends RMStateStore {
     }
     rmDTState.put(rmDTIdentifier, renewDate);
     state.rmSecretManagerState.dtSequenceNumber = latestSequenceNumber;
+      LOG.info("Store RMDT with sequence number "
+              + rmDTIdentifier.getSequenceNumber()
+              + ". And the latest sequence number is " + latestSequenceNumber);
   }
 
   @Override
@@ -197,6 +200,8 @@ public class MemoryRMStateStore extends RMStateStore {
     Map<RMDelegationTokenIdentifier, Long> rmDTState =
         state.rmSecretManagerState.getTokenState();
     rmDTState.remove(rmDTIdentifier);
+      LOG.info("Remove RMDT with sequence number "
+              + rmDTIdentifier.getSequenceNumber());
   }
 
   @Override
@@ -205,7 +210,9 @@ public class MemoryRMStateStore extends RMStateStore {
       int latestSequenceNumber) throws Exception {
     removeRMDelegationTokenState(rmDTIdentifier);
     storeRMDelegationTokenAndSequenceNumberState(rmDTIdentifier, renewDate,
-        latestSequenceNumber);
+            latestSequenceNumber);
+      LOG.info("Update RMDT with sequence number "
+              + rmDTIdentifier.getSequenceNumber());
   }
 
   @Override
@@ -223,12 +230,14 @@ public class MemoryRMStateStore extends RMStateStore {
       throw e;
     }
     state.getRMDTSecretManagerState().getMasterKeyState().add(delegationKey);
-    LOG.info("rmDTMasterKeyState SIZE: " + rmDTMasterKeyState.size());
+      LOG.info("Store RMDT master key with key id: " + delegationKey.getKeyId()
+              + ". Currently rmDTMasterKeyState size: " + rmDTMasterKeyState.size());
   }
 
   @Override
   public synchronized void removeRMDTMasterKeyState(DelegationKey delegationKey)
       throws Exception {
+      LOG.info("Remove RMDT master key with key id: " + delegationKey.getKeyId());
     Set<DelegationKey> rmDTMasterKeyState = state.rmSecretManagerState.
         getMasterKeyState();
     rmDTMasterKeyState.remove(delegationKey);

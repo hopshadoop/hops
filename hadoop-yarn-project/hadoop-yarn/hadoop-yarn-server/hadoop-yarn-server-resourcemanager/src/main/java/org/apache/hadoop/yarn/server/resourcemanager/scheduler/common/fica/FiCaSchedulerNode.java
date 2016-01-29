@@ -296,14 +296,19 @@ public class FiCaSchedulerNode extends SchedulerNode implements Recoverable{
                 this.reservedContainer + " on node " + this);
       }
 
-      LOG.info("Updated reserved container " +
-          reservedContainer.getContainer().getId() + " on node " + this +
-          " for application " + application);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Updated reserved container " +
+                reservedContainer.getContainer().getId() + " on node " + this +
+                " for application attempt " + application.getApplicationAttemptId());
+      }
     } else {
-      LOG.info(
-          "Reserved container " + reservedContainer.getContainer().getId() +
-              " on node " + this + " for application " + application);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Reserved container " + reservedContainer.getContainer().getId() +
+                        " on node " + this +
+                " for application attempt" + application.getApplicationAttemptId());
+      }
     }
+
     this.reservedContainer = reservedContainer;
     //HOP :: Update reservedContainer
     ((TransactionStateImpl) transactionState)

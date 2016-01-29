@@ -1289,7 +1289,7 @@
   <property>
     <description>Store file name for leveldb timeline store.</description>
     <name>yarn.timeline-service.leveldb-timeline-store.path</name>
-    <value>${yarn.log.dir}/timeline</value>
+    <value>${hadoop.tmp.dir}/yarn/timeline</value>
   </property>
 
   <property>
@@ -1356,7 +1356,7 @@
     <name>
       yarn.timeline-service.generic-application-history.fs-history-store.uri
     </name>
-    <value>${hadoop.log.dir}/yarn/system/history</value>
+    <value>${hadoop.tmp.dir}/yarn/timeline/generic-history</value>
   </property>
 
   <property>
