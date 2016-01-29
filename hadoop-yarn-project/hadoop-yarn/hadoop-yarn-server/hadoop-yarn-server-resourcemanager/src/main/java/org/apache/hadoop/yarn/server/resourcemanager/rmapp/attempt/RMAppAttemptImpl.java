@@ -1,4 +1,4 @@
-/**
+    /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements. See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership. The ASF
@@ -396,7 +396,7 @@ public class RMAppAttemptImpl implements RMAppAttempt, Recoverable {
 
   private void setTrackingUrlToRMAppPage() {
     originalTrackingUrl =
-        pjoin(WebAppUtils.getResolvedRMWebAppURLWithoutScheme(conf), "cluster",
+        pjoin(WebAppUtils.getResolvedRMWebAppURLWithScheme(conf), "cluster",
             "app", getAppAttemptId().getApplicationId());
     proxiedTrackingUrl = originalTrackingUrl;
   }
