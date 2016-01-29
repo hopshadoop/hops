@@ -1176,7 +1176,7 @@ public class YarnConfiguration extends Configuration {
    */
   public static final String TIMELINE_SERVICE_ENABLED =
       TIMELINE_SERVICE_PREFIX + "enabled";
-  public static final boolean DEFAULT_TIMELINE_SERVICE_ENABLED = true;
+  public static final boolean DEFAULT_TIMELINE_SERVICE_ENABLED = false;
   /**
    * host:port address for timeline service RPC APIs.
    */
