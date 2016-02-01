@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.yarn.server.api.protocolrecords;
 
-import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.util.Records;
@@ -29,7 +28,7 @@ public abstract class RegisterNodeManagerRequest {
   
   public static RegisterNodeManagerRequest newInstance(NodeId nodeId,
       int httpPort, Resource resource, String nodeManagerVersionId,
-      List<ContainerStatus> containerStatuses) {
+      List<NMContainerStatus> containerStatuses) {
     RegisterNodeManagerRequest request =
         Records.newRecord(RegisterNodeManagerRequest.class);
     request.setHttpPort(httpPort);
@@ -48,7 +47,7 @@ public abstract class RegisterNodeManagerRequest {
 
   public abstract String getNMVersion();
 
-  public abstract List<ContainerStatus> getContainerStatuses();
+  public abstract List<NMContainerStatus> getNMContainerStatuses();
   
   public abstract void setNodeId(NodeId nodeId);
 
@@ -59,5 +58,5 @@ public abstract class RegisterNodeManagerRequest {
   public abstract void setNMVersion(String version);
 
   public abstract void setContainerStatuses(
-      List<ContainerStatus> containerStatuses);
+      List<NMContainerStatus> containerStatuses);
 }

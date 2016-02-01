@@ -38,6 +38,7 @@ import org.apache.hadoop.yarn.event.Dispatcher;
 import org.apache.hadoop.yarn.event.DrainDispatcher;
 import org.apache.hadoop.yarn.event.Event;
 import org.apache.hadoop.yarn.event.EventHandler;
+import org.apache.hadoop.yarn.server.api.protocolrecords.NMContainerStatus;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
 import org.apache.hadoop.yarn.server.api.protocolrecords.RegisterNodeManagerRequest;
 import org.apache.hadoop.yarn.server.api.protocolrecords.RegisterNodeManagerResponse;
@@ -529,32 +530,37 @@ public class TestResourceTrackerService {
     RMApp app = rm.submitApp(1024, true);
 
     // Case 1.1: AppAttemptId is null
-    ContainerStatus status = ContainerStatus.newInstance(ContainerId
-            .newInstance(
-                ApplicationAttemptId.newInstance(app.getApplicationId(), 2), 1),
-        ContainerState.COMPLETE, "Dummy Completed", 0);
-    rm.getResourceTrackerService().handleContainerStatus(status, null);
+    NMContainerStatus report =
+        NMContainerStatus.newInstance(
+          ContainerId.newInstance(
+            ApplicationAttemptId.newInstance(app.getApplicationId(), 2), 1),
+          ContainerState.COMPLETE, Resource.newInstance(1024, 1),
+          "Dummy Completed", 0);
+    rm.getResourceTrackerService().handleNMContainerStatus(report, null);
     verify(handler, never()).handle((Event) any());
 
     // Case 1.2: Master container is null
     RMAppAttemptImpl currentAttempt =
         (RMAppAttemptImpl) app.getCurrentAppAttempt();
     currentAttempt.setMasterContainer(null);
-    status = ContainerStatus.newInstance(
-        ContainerId.newInstance(currentAttempt.getAppAttemptId(), 0),
-        ContainerState.COMPLETE, "Dummy Completed", 0);
-    rm.getResourceTrackerService().handleContainerStatus(status, null);
+    report = NMContainerStatus.newInstance(
+          ContainerId.newInstance(currentAttempt.getAppAttemptId(), 0),
+          ContainerState.COMPLETE, Resource.newInstance(1024, 1),
+          "Dummy Completed", 0);
+    rm.getResourceTrackerService().handleNMContainerStatus(report, null);
     verify(handler, never()).handle((Event) any());
 
     // Case 2: Managed AM
     app = rm.submitApp(1024);
 
     // Case 2.1: AppAttemptId is null
-    status = ContainerStatus.newInstance(ContainerId.newInstance(
+    report = NMContainerStatus.newInstance(
+          ContainerId.newInstance(
             ApplicationAttemptId.newInstance(app.getApplicationId(), 2), 1),
-        ContainerState.COMPLETE, "Dummy Completed", 0);
+          ContainerState.COMPLETE, Resource.newInstance(1024, 1),
+          "Dummy Completed", 0);
     try {
-      rm.getResourceTrackerService().handleContainerStatus(status, null);
+      rm.getResourceTrackerService().handleNMContainerStatus(report, null);
     } catch (Exception e) {
       // expected - ignore
     }
@@ -563,11 +569,12 @@ public class TestResourceTrackerService {
     // Case 2.2: Master container is null
     currentAttempt = (RMAppAttemptImpl) app.getCurrentAppAttempt();
     currentAttempt.setMasterContainer(null);
-    status = ContainerStatus.newInstance(
-        ContainerId.newInstance(currentAttempt.getAppAttemptId(), 0),
-        ContainerState.COMPLETE, "Dummy Completed", 0);
+    report = NMContainerStatus.newInstance(
+      ContainerId.newInstance(currentAttempt.getAppAttemptId(), 0),
+      ContainerState.COMPLETE, Resource.newInstance(1024, 1),
+      "Dummy Completed", 0);
     try {
-      rm.getResourceTrackerService().handleContainerStatus(status, null);
+      rm.getResourceTrackerService().handleNMContainerStatus(report, null);
     } catch (Exception e) {
       // expected - ignore
     }

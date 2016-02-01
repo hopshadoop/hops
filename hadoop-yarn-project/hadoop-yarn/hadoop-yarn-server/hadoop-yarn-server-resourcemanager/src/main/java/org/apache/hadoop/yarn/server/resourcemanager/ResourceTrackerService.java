@@ -47,6 +47,7 @@ import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
 import org.apache.hadoop.yarn.ipc.YarnRPC;
 import org.apache.hadoop.yarn.server.api.ResourceTracker;
+import org.apache.hadoop.yarn.server.api.protocolrecords.NMContainerStatus;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatRequest;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
 import org.apache.hadoop.yarn.server.api.protocolrecords.RegisterNodeManagerRequest;
@@ -219,7 +220,7 @@ public class ResourceTrackerService extends AbstractService
    */
   @SuppressWarnings("unchecked")
   @VisibleForTesting
-  void handleContainerStatus(ContainerStatus containerStatus,
+  void handleNMContainerStatus(NMContainerStatus containerStatus,
           TransactionState transactionState) {
     LOG.debug("HOP :: handleContainerStatus");
     ApplicationAttemptId appAttemptId = containerStatus.getContainerId().
@@ -251,14 +252,18 @@ public class ResourceTrackerService extends AbstractService
     RMAppAttempt rmAppAttempt = rmApp.getRMAppAttempt(appAttemptId);
     Container masterContainer = rmAppAttempt.getMasterContainer();
     if (masterContainer.getId().equals(containerStatus.getContainerId())
-            && containerStatus.getState() == ContainerState.COMPLETE) {
+            && containerStatus.getContainerState() == ContainerState.COMPLETE) {
+      ContainerStatus status =
+          ContainerStatus.newInstance(containerStatus.getContainerId(),
+            containerStatus.getContainerState(), containerStatus.getDiagnostics(),
+            containerStatus.getContainerExitStatus());
       LOG.debug("sending master container finished event " + rmApp.
               getApplicationId());
       //TODO: Persist event if I am not leader
       // sending master container finished event.
       RMAppAttemptContainerFinishedEvent evt
               = new RMAppAttemptContainerFinishedEvent(appAttemptId,
-                      containerStatus,
+                      status,
                       transactionState);
       rmContext.getDispatcher().getEventHandler().handle(evt);
     }
@@ -295,11 +300,11 @@ public class ResourceTrackerService extends AbstractService
     }
     TransactionState transactionState = rmContext.getTransactionStateManager().
             getCurrentTransactionStateNonPriority(rpcID, "registerNodeManager");
-    if (!request.getContainerStatuses().isEmpty()) {
+    if (!request.getNMContainerStatuses().isEmpty()) {
       LOG.info("received container statuses on node manager register :"
-              + request.getContainerStatuses());
-      for (ContainerStatus containerStatus : request.getContainerStatuses()) {
-        handleContainerStatus(containerStatus, transactionState);
+              + request.getNMContainerStatuses());
+      for (NMContainerStatus report : request.getNMContainerStatuses()) {
+        handleNMContainerStatus(report, transactionState);
       }
     }
     if (!minimumNodeManagerVersion.equals("NONE")) {
