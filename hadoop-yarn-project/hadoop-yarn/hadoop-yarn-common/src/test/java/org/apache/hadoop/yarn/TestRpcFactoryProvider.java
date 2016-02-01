@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.yarn;
 
-import junit.framework.Assert;
+import org.junit.Assert;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;

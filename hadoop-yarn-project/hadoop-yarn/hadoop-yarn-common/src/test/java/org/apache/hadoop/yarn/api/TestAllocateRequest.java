@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.yarn.api;
 
-import junit.framework.Assert;
+import org.junit.Assert;
 import org.apache.hadoop.yarn.api.protocolrecords.AllocateRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.AllocateRequestPBImpl;
 import org.apache.hadoop.yarn.api.records.ContainerResourceIncreaseRequest;

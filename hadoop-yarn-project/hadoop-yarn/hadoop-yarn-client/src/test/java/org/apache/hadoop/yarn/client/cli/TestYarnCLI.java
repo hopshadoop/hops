@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.yarn.client.cli;
 
-import junit.framework.Assert;
+import org.junit.Assert;
 import org.apache.commons.cli.Options;
 import org.apache.commons.lang.time.DateFormatUtils;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;

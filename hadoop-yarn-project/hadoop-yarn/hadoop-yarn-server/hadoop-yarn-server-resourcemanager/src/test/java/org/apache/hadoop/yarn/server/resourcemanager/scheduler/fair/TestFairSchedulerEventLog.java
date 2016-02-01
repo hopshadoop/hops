@@ -21,7 +21,7 @@ package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair;
 import io.hops.metadata.util.RMStorageFactory;
 import io.hops.metadata.util.RMUtilities;
 import io.hops.metadata.util.YarnAPIStorageFactory;
-import junit.framework.Assert;
+import org.junit.Assert;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.event.AsyncDispatcher;

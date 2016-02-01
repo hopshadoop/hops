@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.yarn.client.api.impl;
 
-import junit.framework.Assert;
+import org.junit.Assert;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.ApplicationHistoryProtocol;
 import org.apache.hadoop.yarn.api.protocolrecords.GetApplicationAttemptReportRequest;

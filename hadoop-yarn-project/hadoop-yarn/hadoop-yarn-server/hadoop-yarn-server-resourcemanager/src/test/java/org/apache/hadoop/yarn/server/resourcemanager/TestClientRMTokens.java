@@ -20,7 +20,7 @@ package org.apache.hadoop.yarn.server.resourcemanager;
 import io.hops.exception.StorageInitializtionException;
 import io.hops.metadata.util.RMStorageFactory;
 import io.hops.metadata.util.YarnAPIStorageFactory;
-import junit.framework.Assert;
+import org.junit.Assert;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -28,6 +28,7 @@ import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.SecurityUtilTestHelper;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -63,18 +64,11 @@ import java.net.InetSocketAddress;
 import java.security.PrivilegedAction;
 import java.security.PrivilegedExceptionAction;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.reset;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 
 public class TestClientRMTokens {
@@ -253,8 +247,8 @@ public class TestClientRMTokens {
   @Test
   public void testShortCircuitRenewCancel()
       throws IOException, InterruptedException {
-    InetSocketAddress addr =
-        new InetSocketAddress(InetAddress.getLocalHost(), 123);
+      InetSocketAddress addr = NetUtils.createSocketAddr(
+              InetAddress.getLocalHost().getHostName(), 123, null);
     checkShortCircuitRenewCancel(addr, addr, true);
   }
 
@@ -262,16 +256,18 @@ public class TestClientRMTokens {
   public void testShortCircuitRenewCancelWildcardAddress()
       throws IOException, InterruptedException {
     InetSocketAddress rmAddr = new InetSocketAddress(123);
+      InetSocketAddress serviceAddr = NetUtils.createSocketAddr(
+                      InetAddress.getLocalHost().getHostName(), rmAddr.getPort(), null);
     checkShortCircuitRenewCancel(rmAddr,
-        new InetSocketAddress(InetAddress.getLocalHost(), rmAddr.getPort()),
-        true);
+      serviceAddr,
+      true);
   }
 
   @Test
   public void testShortCircuitRenewCancelSameHostDifferentPort()
       throws IOException, InterruptedException {
-    InetSocketAddress rmAddr =
-        new InetSocketAddress(InetAddress.getLocalHost(), 123);
+      InetSocketAddress rmAddr = NetUtils.createSocketAddr(
+              InetAddress.getLocalHost().getHostName(), 123, null);
     checkShortCircuitRenewCancel(rmAddr,
         new InetSocketAddress(rmAddr.getAddress(), rmAddr.getPort() + 1),
         false);
@@ -280,8 +276,8 @@ public class TestClientRMTokens {
   @Test
   public void testShortCircuitRenewCancelDifferentHostSamePort()
       throws IOException, InterruptedException {
-    InetSocketAddress rmAddr =
-        new InetSocketAddress(InetAddress.getLocalHost(), 123);
+      InetSocketAddress rmAddr = NetUtils.createSocketAddr(
+              InetAddress.getLocalHost().getHostName(), 123, null);
     checkShortCircuitRenewCancel(rmAddr,
         new InetSocketAddress("1.1.1.1", rmAddr.getPort()), false);
   }
@@ -289,8 +285,8 @@ public class TestClientRMTokens {
   @Test
   public void testShortCircuitRenewCancelDifferentHostDifferentPort()
       throws IOException, InterruptedException {
-    InetSocketAddress rmAddr =
-        new InetSocketAddress(InetAddress.getLocalHost(), 123);
+      InetSocketAddress rmAddr = NetUtils.createSocketAddr(
+              InetAddress.getLocalHost().getHostName(), 123, null);
     checkShortCircuitRenewCancel(rmAddr,
         new InetSocketAddress("1.1.1.1", rmAddr.getPort() + 1), false);
   }

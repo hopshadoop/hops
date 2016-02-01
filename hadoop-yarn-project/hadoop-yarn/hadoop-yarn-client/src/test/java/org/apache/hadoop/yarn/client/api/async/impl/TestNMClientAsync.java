@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.yarn.client.api.async.impl;
 
-import junit.framework.Assert;
+import org.junit.Assert;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.service.ServiceOperations;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
