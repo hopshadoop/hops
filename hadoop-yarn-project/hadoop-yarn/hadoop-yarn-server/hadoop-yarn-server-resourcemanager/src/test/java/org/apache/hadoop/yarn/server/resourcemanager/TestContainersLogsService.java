@@ -55,6 +55,7 @@ import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
 import org.apache.hadoop.yarn.api.records.ContainerState;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.junit.Assert;
+import org.junit.Ignore;
 
 public class TestContainersLogsService {
 
@@ -258,6 +259,7 @@ public class TestContainersLogsService {
    *
    * @throws Exception
    */
+  @Ignore
   @Test(timeout=60000)
   public void testFullUseCase() throws Exception {
     int monitorInterval = 2000;
