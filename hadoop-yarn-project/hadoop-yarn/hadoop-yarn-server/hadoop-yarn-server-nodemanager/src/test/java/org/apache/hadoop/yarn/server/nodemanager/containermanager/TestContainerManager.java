@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.yarn.server.nodemanager.containermanager;
 
-import junit.framework.Assert;
+import org.junit.Assert;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.Path;

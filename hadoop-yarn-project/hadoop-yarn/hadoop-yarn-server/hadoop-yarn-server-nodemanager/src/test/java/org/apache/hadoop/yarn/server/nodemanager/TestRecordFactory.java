@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.yarn.server.nodemanager;
 
-import junit.framework.Assert;
+import org.junit.Assert;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factories.impl.pb.RecordFactoryPBImpl;

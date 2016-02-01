@@ -19,7 +19,7 @@
 package org.apache.hadoop.yarn.ipc;
 
 import com.google.protobuf.ServiceException;
-import junit.framework.Assert;
+import org.junit.Assert;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.junit.Test;
