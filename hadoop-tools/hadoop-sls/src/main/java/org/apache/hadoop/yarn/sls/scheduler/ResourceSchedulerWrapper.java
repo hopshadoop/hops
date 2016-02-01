@@ -90,8 +90,8 @@ import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.AbstractYarnScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication;
 
-public class ResourceSchedulerWrapper extends AbstractYarnScheduler implements ResourceScheduler,
-        Configurable {
+public class ResourceSchedulerWrapper implements
+        SchedulerWrapper,ResourceScheduler,Configurable {
   private static final String EOL = System.getProperty("line.separator");
   private static final int SAMPLING_SIZE = 60;
   private ScheduledExecutorService pool;
@@ -155,9 +155,8 @@ public class ResourceSchedulerWrapper extends AbstractYarnScheduler implements R
   public void setConf(Configuration conf) {
     this.conf = conf;
     // set scheduler
-    Class<? extends ResourceScheduler> klass =
-            conf.getClass(SLSConfiguration.RM_SCHEDULER, null,
-                    ResourceScheduler.class);
+     Class<? extends ResourceScheduler> klass = conf.getClass(
+        SLSConfiguration.RM_SCHEDULER, null, ResourceScheduler.class);
 
     scheduler = ReflectionUtils.newInstance(klass, conf);
     // start metrics
@@ -439,17 +438,18 @@ public class ResourceSchedulerWrapper extends AbstractYarnScheduler implements R
     if (pool != null)  pool.shutdown();
   }
 
-  @Override
-  public synchronized List<Container> getTransferredContainers(
-          ApplicationAttemptId currentAttempt) {
-    return ((AbstractYarnScheduler) scheduler)
-            .getTransferredContainers(currentAttempt);
-  }
+  //only used with the AbstractYarnScheduler
+//  @Override
+//  public synchronized List<Container> getTransferredContainers(
+//          ApplicationAttemptId currentAttempt) {
+//    return ((AbstractYarnScheduler) scheduler)
+//            .getTransferredContainers(currentAttempt);
+//  }
 
-  @Override
-  public Map<ApplicationId, SchedulerApplication> getSchedulerApplications() {
-    return ((AbstractYarnScheduler) scheduler).getSchedulerApplications();
-  }
+//  @Override
+//  public Map<ApplicationId, SchedulerApplication> getSchedulerApplications() {
+//    return ((AbstractYarnScheduler) scheduler).getSchedulerApplications();
+//  }
   
   @SuppressWarnings("unchecked")
   private void initMetrics() throws Exception {

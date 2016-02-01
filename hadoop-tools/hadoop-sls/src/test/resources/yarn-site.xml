@@ -15,57 +15,69 @@
 -->
 
 <configuration>
-  <property>
-    <name>yarn.resourcemanager.scheduler.class</name>
-    <value>org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FairScheduler</value>
-  </property>
+    <property>
+        <name>yarn.resourcemanager.scheduler.class</name>
+        <value>org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FairScheduler</value>
+        <value>org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FairScheduler</value>
+        <!-- <value>org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler</value> -->
+    </property>
 
-  <property>
-    <description>The address of the RM web application.</description>
-    <name>yarn.resourcemanager.webapp.address</name>
-    <value>localhost:18088</value>
-  </property>
+    <property>
+        <name>yarn.resourcemanager.scheduler.monitor.enable</name>
+        <value>true</value>
+    </property>
 
-  <property>
-    <name>yarn.resourcemanager.resource-tracker.address</name>
-    <value>localhost:18031</value>
-  </property>
+    <property>
+        <name>yarn.resourcemanager.scheduler.monitor.policies</name>
+        <value>org.apache.hadoop.yarn.server.resourcemanager.monitor.capacity.ProportionalCapacityPreemptionPolicy</value>
+    </property>
 
-  <property>
-    <description>The address of the scheduler interface.</description>
-    <name>yarn.resourcemanager.scheduler.address</name>
-    <value>localhost:18030</value>
-  </property>
+    <property>
+        <description>The address of the RM web application.</description>
+        <name>yarn.resourcemanager.webapp.address</name>
+        <value>localhost:18088</value>
+    </property>
 
-  <property>
-    <description>The address of the applications manager interface in the RM.</description>
-    <name>yarn.resourcemanager.address</name>
-    <value>localhost:18032</value>
-  </property>
+    <property>
+        <name>yarn.resourcemanager.resource-tracker.address</name>
+        <value>localhost:18031</value>
+    </property>
 
-  <property>
-    <description>The address of the RM admin interface.</description>
-    <name>yarn.resourcemanager.admin.address</name>
-    <value>localhost:18033</value>
-  </property>
+    <property>
+        <description>The address of the scheduler interface.</description>
+        <name>yarn.resourcemanager.scheduler.address</name>
+        <value>localhost:18030</value>
+    </property>
 
-  <property>
-    <description>Set to false, to avoid ip check</description>
-    <name>hadoop.security.token.service.use_ip</name>
-    <value>false</value>
-  </property>
+    <property>
+        <description>The address of the applications manager interface in the RM.</description>
+        <name>yarn.resourcemanager.address</name>
+        <value>localhost:18032</value>
+    </property>
 
-  <property>
-    <description>Whether to use preemption. Note that preemption is experimental
-    in the current version. Defaults to false.</description>
-    <name>yarn.scheduler.fair.preemption</name>
-    <value>true</value>
-  </property>
+    <property>
+        <description>The address of the RM admin interface.</description>
+        <name>yarn.resourcemanager.admin.address</name>
+        <value>localhost:18033</value>
+    </property>
 
-  <property>
-    <description>Whether to allow multiple container assignments in one
-    heartbeat. Defaults to false.</description>
-    <name>yarn.scheduler.fair.assignmultiple</name>
-    <value>true</value>
-  </property>
+    <property>
+        <description>Set to false, to avoid ip check</description>
+        <name>hadoop.security.token.service.use_ip</name>
+        <value>false</value>
+    </property>
+
+    <property>
+        <description>Whether to use preemption. Note that preemption is experimental
+            in the current version. Defaults to false.</description>
+        <name>yarn.scheduler.fair.preemption</name>
+        <value>true</value>
+    </property>
+
+    <property>
+        <description>Whether to allow multiple container assignments in one
+            heartbeat. Defaults to false.</description>
+        <name>yarn.scheduler.fair.assignmultiple</name>
+        <value>true</value>
+    </property>
 </configuration>

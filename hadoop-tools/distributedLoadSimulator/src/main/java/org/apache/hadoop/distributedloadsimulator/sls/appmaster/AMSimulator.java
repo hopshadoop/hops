@@ -60,7 +60,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
 import org.apache.log4j.Logger;
 
 import org.apache.hadoop.distributedloadsimulator.sls.scheduler.ContainerSimulator;
-import org.apache.hadoop.distributedloadsimulator.sls.scheduler.ResourceSchedulerWrapper;
+import org.apache.hadoop.distributedloadsimulator.sls.scheduler.SchedulerWrapper;
 import org.apache.hadoop.distributedloadsimulator.sls.SLSRunner;
 import org.apache.hadoop.distributedloadsimulator.sls.scheduler.TaskRunner;
 import org.apache.hadoop.distributedloadsimulator.sls.utils.SLSUtils;
@@ -307,10 +307,10 @@ public abstract class AMSimulator extends TaskRunner.Task {
       simulateFinishTimeMS = System.currentTimeMillis()
               - SLSRunner.getApplicationRunner().getStartTimeMS();
       // record job running information
-      ((ResourceSchedulerWrapper) rm.getResourceScheduler())
-              .addAMRuntime(appId,
-                      traceStartTimeMS, traceFinishTimeMS,
-                      simulateStartTimeMS, simulateFinishTimeMS);
+      ((SchedulerWrapper)rm.getResourceScheduler())
+          .addAMRuntime(appId, 
+                       traceStartTimeMS, traceFinishTimeMS, 
+                       simulateStartTimeMS, simulateFinishTimeMS);
     }
     try {
       primaryRemoteConnection.decreseApplicationCount(appId.toString(), false);
@@ -488,8 +488,8 @@ public abstract class AMSimulator extends TaskRunner.Task {
     if (isTracked) {
       // if we are running load simulator alone, rm is null
       if (rm != null) {
-        ((ResourceSchedulerWrapper) rm.getResourceScheduler())
-                .addTrackedApp(appAttemptId, oldAppId);
+        ((SchedulerWrapper) rm.getResourceScheduler())
+               .addTrackedApp(appAttemptId, oldAppId);
       }
     }
   }
@@ -498,8 +498,8 @@ public abstract class AMSimulator extends TaskRunner.Task {
     if (isTracked) {
       // if we are running load simulator alone, rm is null
       if (rm != null) {
-        ((ResourceSchedulerWrapper) rm.getResourceScheduler())
-                .removeTrackedApp(appAttemptId, oldAppId);
+        ((SchedulerWrapper) rm.getResourceScheduler())
+               .removeTrackedApp(appAttemptId, oldAppId);
       }
     }
   }
