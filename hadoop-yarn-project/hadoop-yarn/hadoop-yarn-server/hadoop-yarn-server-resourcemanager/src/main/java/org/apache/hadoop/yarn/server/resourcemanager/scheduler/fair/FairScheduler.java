@@ -164,7 +164,11 @@ public class FairScheduler extends AbstractYarnScheduler {
       RecordFactoryProvider.getRecordFactory(null)
           .newRecordInstance(Resource.class);
 
-  // How often tasks are preempted 
+  // Preemption related variables
+  protected boolean preemptionEnabled;
+  protected  float preemptionUtilizationThreshold;
+
+  // How often tasks are preempted
   protected long preemptionInterval;
   
   // ms to wait before force killing stuff (must be longer than a couple
@@ -174,7 +178,6 @@ public class FairScheduler extends AbstractYarnScheduler {
   // Containers whose AMs have been warned that they will be preempted soon.
   private List<RMContainer> warnedContainers = new ArrayList<RMContainer>();
   
-  protected boolean preemptionEnabled;
   protected boolean sizeBasedWeight; // Give larger weights to larger jobs
   protected WeightAdjuster weightAdjuster; // Can be null for no weight adjuster
   protected boolean continuousSchedulingEnabled;
@@ -359,7 +362,7 @@ public class FairScheduler extends AbstractYarnScheduler {
    */
   protected synchronized void preemptTasksIfNecessary(
       TransactionState transactionState) {
-    if (!preemptionEnabled) {
+    if (!shouldAttemptPreemption()) {
       return;
     }
 
@@ -369,10 +372,9 @@ public class FairScheduler extends AbstractYarnScheduler {
     }
     lastPreemptCheckTime = curTime;
 
-    Resource resToPreempt = Resources.none();
-
+    Resource resToPreempt = Resources.clone(Resources.none());
     for (FSLeafQueue sched : queueMgr.getLeafQueues()) {
-      resToPreempt = Resources.add(resToPreempt, resToPreempt(sched, curTime));
+      Resources.addTo(resToPreempt, resToPreempt(sched, curTime));
     }
     if (Resources
         .greaterThan(RESOURCE_CALCULATOR, clusterCapacity, resToPreempt,
@@ -380,6 +382,22 @@ public class FairScheduler extends AbstractYarnScheduler {
       preemptResources(queueMgr.getLeafQueues(), resToPreempt,
           transactionState);
     }
+  }
+
+  /**
+   * Check if preemption is enabled and the utilization threshold for
+   * preemption is met.
+   *
+   * @return true if preemption should be attempted, false otherwise
+   */
+  private boolean shouldAttemptPreemption() {
+    if (preemptionEnabled) {
+      return (preemptionUtilizationThreshold < Math.max(
+              (float) rootMetrics.getAvailableMB() / clusterCapacity.getMemory(),
+              (float) rootMetrics.getAvailableVirtualCores() /
+                      clusterCapacity.getVirtualCores()));
+      }
+    return false;
   }
 
   /**
@@ -1320,6 +1338,8 @@ public class FairScheduler extends AbstractYarnScheduler {
       nodeLocalityDelayMs = this.conf.getLocalityDelayNodeMs();
       rackLocalityDelayMs = this.conf.getLocalityDelayRackMs();
       preemptionEnabled = this.conf.getPreemptionEnabled();
+      preemptionUtilizationThreshold =
+              this.conf.getPreemptionUtilizationThreshold();
       assignMultiple = this.conf.getAssignMultiple();
       maxAssign = this.conf.getMaxAssign();
       sizeBasedWeight = this.conf.getSizeBasedWeight();
