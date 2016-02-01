@@ -1132,9 +1132,11 @@ public class FairScheduler extends AbstractYarnScheduler {
         reservedAppSchedulable = null;
       } else {
         // Reservation exists; try to fulfill the reservation
-        LOG.info("Trying to fulfill reservation for application " +
-            reservedAppSchedulable.getApp().getApplicationAttemptId() +
-            " on node: " + node);
+        if (LOG.isDebugEnabled()){
+            LOG.debug("Trying to fulfill reservation for application "
+            + reservedAppSchedulable.getApp().getApplicationAttemptId()
+            + "on node: " + node);
+        }
 
         node.getReservedAppSchedulable()
             .assignReservedContainer(node, transactionState);
