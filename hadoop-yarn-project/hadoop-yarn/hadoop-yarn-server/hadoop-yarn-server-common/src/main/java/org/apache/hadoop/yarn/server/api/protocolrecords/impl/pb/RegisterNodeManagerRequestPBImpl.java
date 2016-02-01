@@ -19,21 +19,19 @@
 package org.apache.hadoop.yarn.server.api.protocolrecords.impl.pb;
 
 
-import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.Resource;
-import org.apache.hadoop.yarn.api.records.impl.pb.ContainerStatusPBImpl;
 import org.apache.hadoop.yarn.api.records.impl.pb.NodeIdPBImpl;
 import org.apache.hadoop.yarn.api.records.impl.pb.ResourcePBImpl;
-import org.apache.hadoop.yarn.proto.YarnProtos.ContainerStatusProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.NodeIdProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.ResourceProto;
+import org.apache.hadoop.yarn.proto.YarnServerCommonServiceProtos.NMContainerStatusProto;
 import org.apache.hadoop.yarn.proto.YarnServerCommonServiceProtos.RegisterNodeManagerRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServerCommonServiceProtos.RegisterNodeManagerRequestProtoOrBuilder;
+import org.apache.hadoop.yarn.server.api.protocolrecords.NMContainerStatus;
 import org.apache.hadoop.yarn.server.api.protocolrecords.RegisterNodeManagerRequest;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 
 
@@ -46,7 +44,7 @@ public class RegisterNodeManagerRequestPBImpl
   
   private Resource resource = null;
   private NodeId nodeId = null;
-  private List<ContainerStatus> containerStatuses = null;
+  private List<NMContainerStatus> containerStatuses = null;
   
   public RegisterNodeManagerRequestPBImpl() {
     builder = RegisterNodeManagerRequestProto.newBuilder();
@@ -67,7 +65,7 @@ public class RegisterNodeManagerRequestPBImpl
 
   private void mergeLocalToBuilder() {
     if (this.containerStatuses != null) {
-      addContainerStatusesToProto();
+      addNMContainerStatusesToProto();
     }
     if (this.resource != null) {
       builder.setResource(convertToProtoFormat(this.resource));
@@ -77,7 +75,19 @@ public class RegisterNodeManagerRequestPBImpl
     }
 
   }
+  
+  private synchronized void addNMContainerStatusesToProto() {
+    maybeInitBuilder();
+    builder.clearContainerStatuses();
+    List<NMContainerStatusProto> list =
+        new ArrayList<NMContainerStatusProto>();
+    for (NMContainerStatus status : this.containerStatuses) {
+      list.add(convertToProtoFormat(status));
+    }
+    builder.addAllContainerStatuses(list);
+  }
 
+    
   private void mergeLocalToProto() {
     if (viaProto) {
       maybeInitBuilder();
@@ -155,63 +165,31 @@ public class RegisterNodeManagerRequestPBImpl
   }
 
   @Override
-  public List<ContainerStatus> getContainerStatuses() {
-    initContainerStatuses();
+  public List<NMContainerStatus> getNMContainerStatuses() {
+    initContainerRecoveryReports();
     return containerStatuses;
   }
   
-  private void initContainerStatuses() {
+  private void initContainerRecoveryReports() {
     if (this.containerStatuses != null) {
       return;
     }
     RegisterNodeManagerRequestProtoOrBuilder p = viaProto ? proto : builder;
-    List<ContainerStatusProto> list = p.getContainerStatusesList();
-    this.containerStatuses = new ArrayList<ContainerStatus>();
-    for (ContainerStatusProto c : list) {
+    List<NMContainerStatusProto> list = p.getContainerStatusesList();
+    this.containerStatuses = new ArrayList<NMContainerStatus>();
+    for (NMContainerStatusProto c : list) {
       this.containerStatuses.add(convertFromProtoFormat(c));
     }
   }
 
   @Override
-  public void setContainerStatuses(List<ContainerStatus> containers) {
-    if (containers == null) {
+  public void setContainerStatuses(
+      List<NMContainerStatus> containerReports) {
+    if (containerReports == null) {
       return;
     }
-    initContainerStatuses();
-    this.containerStatuses.addAll(containers);
-  }
-  
-  private void addContainerStatusesToProto() {
-    maybeInitBuilder();
-    builder.clearContainerStatuses();
-    if (containerStatuses == null) {
-      return;
-    }
-    Iterable<ContainerStatusProto> it = new Iterable<ContainerStatusProto>() {
-      
-      @Override
-      public Iterator<ContainerStatusProto> iterator() {
-        return new Iterator<ContainerStatusProto>() {
-          Iterator<ContainerStatus> iter = containerStatuses.iterator();
-          
-          @Override
-          public boolean hasNext() {
-            return iter.hasNext();
-          }
-          
-          @Override
-          public ContainerStatusProto next() {
-            return convertToProtoFormat(iter.next());
-          }
-          
-          @Override
-          public void remove() {
-            throw new UnsupportedOperationException();
-          }
-        };
-      }
-    };
-    builder.addAllContainerStatuses(it);
+    initContainerRecoveryReports();
+    this.containerStatuses.addAll(containerReports);
   }
   
   @Override
@@ -261,11 +239,11 @@ public class RegisterNodeManagerRequestPBImpl
     return ((ResourcePBImpl) t).getProto();
   }
 
-  private ContainerStatusPBImpl convertFromProtoFormat(ContainerStatusProto c) {
-    return new ContainerStatusPBImpl(c);
+  private NMContainerStatusPBImpl convertFromProtoFormat(NMContainerStatusProto c) {
+    return new NMContainerStatusPBImpl(c);
   }
   
-  private ContainerStatusProto convertToProtoFormat(ContainerStatus c) {
-    return ((ContainerStatusPBImpl) c).getProto();
+  private NMContainerStatusProto convertToProtoFormat(NMContainerStatus c) {
+    return ((NMContainerStatusPBImpl)c).getProto();
   }
 }

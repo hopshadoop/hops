@@ -25,6 +25,7 @@ import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import org.apache.hadoop.yarn.server.api.protocolrecords.NMContainerStatus;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatRequest;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
 import org.apache.hadoop.yarn.server.api.protocolrecords.RegisterNodeManagerRequest;
@@ -106,14 +107,14 @@ public class MockNM {
   }
 
   public RegisterNodeManagerResponse registerNode(
-      List<ContainerStatus> containerStatus) throws Exception {
+      List<NMContainerStatus> containerReports) throws Exception{
     RegisterNodeManagerRequest req =
         Records.newRecord(RegisterNodeManagerRequest.class);
     req.setNodeId(nodeId);
     req.setHttpPort(httpPort);
     Resource resource = BuilderUtils.newResource(memory, vCores);
     req.setResource(resource);
-    req.setContainerStatuses(containerStatus);
+    req.setContainerStatuses(containerReports);
     req.setNMVersion(version);
     RegisterNodeManagerResponse registrationResponse = null;
     int retries = 0;
@@ -204,5 +205,12 @@ public class MockNM {
     
     return heartbeatResponse;
   }
+  
+  public int getMemory() {
+    return memory;
+  }
 
+  public int getvCores() {
+    return vCores;
+  }
 }

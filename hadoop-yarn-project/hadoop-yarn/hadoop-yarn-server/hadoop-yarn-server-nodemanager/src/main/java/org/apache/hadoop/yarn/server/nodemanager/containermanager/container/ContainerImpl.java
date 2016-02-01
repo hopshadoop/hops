@@ -35,6 +35,7 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.event.Dispatcher;
 import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.security.ContainerTokenIdentifier;
+import org.apache.hadoop.yarn.server.api.protocolrecords.NMContainerStatus;
 import org.apache.hadoop.yarn.server.nodemanager.ContainerExecutor.ExitCode;
 import org.apache.hadoop.yarn.server.nodemanager.NMAuditLogger;
 import org.apache.hadoop.yarn.server.nodemanager.NMAuditLogger.AuditConstants;
@@ -387,6 +388,17 @@ public class ContainerImpl implements Container {
       return BuilderUtils
           .newContainerStatus(this.containerId, getCurrentState(),
               diagnostics.toString(), exitCode);
+    } finally {
+      this.readLock.unlock();
+    }
+  }
+
+  @Override
+  public NMContainerStatus getNMContainerStatus() {
+    this.readLock.lock();
+    try {
+      return NMContainerStatus.newInstance(this.containerId,
+        getCurrentState(), getResource(), diagnostics.toString(), exitCode);
     } finally {
       this.readLock.unlock();
     }
