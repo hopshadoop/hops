@@ -25,6 +25,7 @@ import io.hops.metadata.yarn.entity.JustLaunchedContainers;
 import io.hops.metadata.yarn.entity.NextHeartbeat;
 import io.hops.metadata.yarn.entity.NodeHBResponse;
 import io.hops.metadata.yarn.entity.PendingEvent;
+import io.hops.metadata.yarn.entity.PendingEventID;
 import io.hops.metadata.yarn.entity.UpdatedContainerInfo;
 import io.hops.metadata.yarn.entity.UpdatedContainerInfoToAdd;
 import org.apache.commons.logging.Log;
@@ -49,8 +50,8 @@ public class RMNodeInfo {
   private static final Log LOG = LogFactory.getLog(RMNodeInfo.class);
   private String rmnodeId = null;
   //PersistedEvent to persist for distributed RT
-  private final ArrayList<PendingEvent> persistedEventsToAdd
-          = new ArrayList<PendingEvent>();
+  private final Map<PendingEventID, PendingEvent> persistedEventsToAdd
+          = new HashMap<PendingEventID, PendingEvent>();
   private final ArrayList<PendingEvent> persistedEventsToRemove
           = new ArrayList<PendingEvent>();
   private Set<org.apache.hadoop.yarn.api.records.ContainerId>
@@ -438,19 +439,23 @@ public void agregateFinishedApplicationToRemove(RMNodeInfoAgregate agregate){
       pendingEvent = new PendingEvent(rmnodeId, type, status,
               pendingEventId.incrementAndGet());
     }
-    this.persistedEventsToAdd.add(pendingEvent);
+    this.persistedEventsToAdd.put(pendingEvent.getId(),pendingEvent);
   }
 
   public void addPendingEventToRemove(PendingEvent pendingEvent) {
     this.persistedEventsToRemove
             .add(new PendingEvent(pendingEvent));
   }
-
+  
+  public  ArrayList<PendingEvent> getPendingEventToRemove(){
+    return  persistedEventsToRemove;
+  }
+  
   public void agregatePendingEventsToAdd(RMNodeInfoAgregate agregate) {
     if (persistedEventsToAdd != null
             && !persistedEventsToAdd.isEmpty()) {
       LOG.debug("agregating pending event to add: " + persistedEventsToAdd.size());
-      agregate.addAllPendingEventsToAdd(persistedEventsToAdd);
+      agregate.addAllPendingEventsToAdd(persistedEventsToAdd.values());
     }
   }
 

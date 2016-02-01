@@ -35,6 +35,7 @@ import io.hops.metadata.yarn.entity.NodeHBResponse;
 import io.hops.metadata.yarn.entity.PendingEvent;
 import io.hops.metadata.yarn.entity.UpdatedContainerInfo;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -82,7 +83,7 @@ public class RMNodeInfoAgregate {
   }
     
   public void addAllPendingEventsToAdd(
-          ArrayList<PendingEvent> toAddPendingEvents) {
+          Collection<PendingEvent> toAddPendingEvents) {
     this.toAddPendingEvents.addAll(toAddPendingEvents);
   }
 
@@ -137,17 +138,29 @@ public class RMNodeInfoAgregate {
           PendingEventDataAccess persistedEventsDA, StorageConnector connector)
           throws StorageException {
     persistContainerStatusToAdd(csDA);
+    connector.flush();
     persistJustLaunchedContainersToAdd(justLaunchedContainersDA);
+    connector.flush();
     persistJustLaunchedContainersToRemove(justLaunchedContainersDA);
+    connector.flush();
     persistContainerToCleanToAdd(cidToCleanDA);
+    connector.flush();
     persistContainerToCleanToRemove(cidToCleanDA);
+    connector.flush();
     persistFinishedApplicationToAdd(faDA);
+    connector.flush();
     persistFinishedApplicationToRemove(faDA);
+    connector.flush();
     persistNodeUpdateQueueToAdd(updatedContainerInfoDA);
+    connector.flush();
     persistNodeUpdateQueueToRemove(updatedContainerInfoDA);
+    connector.flush();
     persistLatestHeartBeatResponseToAdd(hbDA);
+    connector.flush();
     persistNextHeartbeat();
+    connector.flush();
     persistPendingEventsToAdd(persistedEventsDA);
+    connector.flush();
     persistPendingEventsToRemove(persistedEventsDA);
   }
 
