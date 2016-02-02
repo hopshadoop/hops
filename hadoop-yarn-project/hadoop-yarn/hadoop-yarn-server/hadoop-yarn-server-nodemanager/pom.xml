@@ -330,6 +330,7 @@
               <source>
                 <directory>${basedir}/src/main/proto</directory>
                 <includes>
+                  <include>yarn_server_nodemanager_recovery.proto</include>
                   <include>yarn_server_nodemanager_service_protos.proto</include>
                   <include>LocalizationProtocol.proto</include>
                 </includes>
