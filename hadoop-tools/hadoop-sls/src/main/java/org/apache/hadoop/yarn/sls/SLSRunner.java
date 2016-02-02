@@ -40,10 +40,13 @@ import org.apache.hadoop.tools.rumen.LoggedTaskAttempt;
 import org.apache.hadoop.yarn.api.records.NodeState;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler;
 import org.apache.hadoop.yarn.sls.appmaster.AMSimulator;
 import org.apache.hadoop.yarn.sls.conf.SLSConfiguration;
 import org.apache.hadoop.yarn.sls.nodemanager.NMSimulator;
 import org.apache.hadoop.yarn.sls.scheduler.ContainerSimulator;
+import org.apache.hadoop.yarn.sls.scheduler.SLSCapacityScheduler;
+import  org.apache.hadoop.yarn.sls.scheduler.SchedulerWrapper;
 import org.apache.hadoop.yarn.sls.scheduler.ResourceSchedulerWrapper;
 import org.apache.hadoop.yarn.sls.scheduler.TaskRunner;
 
@@ -146,10 +149,10 @@ public class SLSRunner {
     // start application masters
     startAM();
     // set queue & tracked apps information
-    ((ResourceSchedulerWrapper) rm.getResourceScheduler())
-                            .setQueueSet(this.queueAppNumMap.keySet());
-    ((ResourceSchedulerWrapper) rm.getResourceScheduler())
-                            .setTrackedAppSet(this.trackedApps);
+    ((SchedulerWrapper) rm.getResourceScheduler())
+                             .setQueueSet(this.queueAppNumMap.keySet());
+    ((SchedulerWrapper) rm.getResourceScheduler())
+                             .setTrackedAppSet(this.trackedApps);
     // print out simulation info
     printSimulationInfo();
     // blocked until all nodes RUNNING
@@ -161,9 +164,22 @@ public class SLSRunner {
   private void startRM() throws IOException, ClassNotFoundException {
     Configuration rmConf = new YarnConfiguration();
     String schedulerClass = rmConf.get(YarnConfiguration.RM_SCHEDULER);
-    rmConf.set(SLSConfiguration.RM_SCHEDULER, schedulerClass);
-    rmConf.set(YarnConfiguration.RM_SCHEDULER,
-            ResourceSchedulerWrapper.class.getName());
+   
+    
+    // For CapacityScheduler we use a sub-classing instead of wrapping
+    // to allow scheduler-specific invocations from monitors to work
+    // this can be used for other schedulers as well if we care to
+    // exercise/track behaviors that are not common to the scheduler api
+    if(Class.forName(schedulerClass) == CapacityScheduler.class) {
+      rmConf.set(YarnConfiguration.RM_SCHEDULER,
+          SLSCapacityScheduler.class.getName());
+    } else {
+      rmConf.set(YarnConfiguration.RM_SCHEDULER,
+              ResourceSchedulerWrapper.class.getName());
+      rmConf.set(SLSConfiguration.RM_SCHEDULER, schedulerClass);
+    }
+
+    
     rmConf.set(SLSConfiguration.METRICS_OUTPUT_DIR, metricsOutputDir);
     rm = new ResourceManager();
     rm.init(rmConf);
