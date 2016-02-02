@@ -18,6 +18,26 @@
 
 package org.apache.hadoop.yarn.sls.nodemanager;
 
+import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.yarn.api.records.*;
+import org.apache.hadoop.yarn.exceptions.YarnException;
+import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatRequest;
+import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
+import org.apache.hadoop.yarn.server.api.protocolrecords.RegisterNodeManagerRequest;
+import org.apache.hadoop.yarn.server.api.protocolrecords.RegisterNodeManagerResponse;
+import org.apache.hadoop.yarn.server.api.records.MasterKey;
+import org.apache.hadoop.yarn.server.api.records.NodeAction;
+import org.apache.hadoop.yarn.server.api.records.NodeHealthStatus;
+import org.apache.hadoop.yarn.server.api.records.NodeStatus;
+import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
+import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
+import org.apache.hadoop.yarn.server.utils.BuilderUtils;
+import org.apache.hadoop.yarn.sls.scheduler.ContainerSimulator;
+import org.apache.hadoop.yarn.sls.scheduler.TaskRunner;
+import org.apache.hadoop.yarn.sls.utils.SLSUtils;
+import org.apache.hadoop.yarn.util.Records;
+import org.apache.log4j.Logger;
+
 import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
@@ -26,33 +46,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.DelayQueue;
-
-import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.hadoop.yarn.api.records.Container;
-import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
-import org.apache.hadoop.yarn.api.records.ContainerId;
-import org.apache.hadoop.yarn.api.records.ContainerState;
-import org.apache.hadoop.yarn.api.records.ContainerStatus;
-import org.apache.hadoop.yarn.exceptions.YarnException;
-import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatRequest;
-import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
-import org.apache.hadoop.yarn.server.api.protocolrecords
-        .RegisterNodeManagerRequest;
-import org.apache.hadoop.yarn.server.api.protocolrecords
-        .RegisterNodeManagerResponse;
-import org.apache.hadoop.yarn.server.api.records.MasterKey;
-import org.apache.hadoop.yarn.server.api.records.NodeAction;
-import org.apache.hadoop.yarn.server.api.records.NodeHealthStatus;
-import org.apache.hadoop.yarn.server.api.records.NodeStatus;
-import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
-import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
-import org.apache.hadoop.yarn.server.utils.BuilderUtils;
-import org.apache.hadoop.yarn.util.Records;
-import org.apache.log4j.Logger;
-
-import org.apache.hadoop.yarn.sls.scheduler.ContainerSimulator;
-import org.apache.hadoop.yarn.sls.scheduler.TaskRunner;
-import org.apache.hadoop.yarn.sls.utils.SLSUtils;
 
 public class NMSimulator extends TaskRunner.Task {
   // node resource
@@ -103,15 +96,15 @@ public class NMSimulator extends TaskRunner.Task {
   }
 
   @Override
-  public void firstStep() throws YarnException, IOException {
+  public void firstStep() {
     // do nothing
   }
 
   @Override
-  public void middleStep() {
+  public void middleStep() throws Exception {
     // we check the lifetime for each running containers
     ContainerSimulator cs = null;
-    synchronized(completedContainerList) {
+    synchronized (completedContainerList) {
       while ((cs = containerQueue.poll()) != null) {
         runningContainers.remove(cs.getId());
         completedContainerList.add(cs.getId());
@@ -119,52 +112,47 @@ public class NMSimulator extends TaskRunner.Task {
                 cs.getId()));
       }
     }
-    
+
     // send heart beat
     NodeHeartbeatRequest beatRequest =
             Records.newRecord(NodeHeartbeatRequest.class);
     beatRequest.setLastKnownNMTokenMasterKey(masterKey);
     NodeStatus ns = Records.newRecord(NodeStatus.class);
-    
+
     ns.setContainersStatuses(generateContainerStatusList());
     ns.setNodeId(node.getNodeID());
     ns.setKeepAliveApplications(new ArrayList<ApplicationId>());
-    ns.setResponseId(RESPONSE_ID ++);
+    ns.setResponseId(RESPONSE_ID++);
     ns.setNodeHealthStatus(NodeHealthStatus.newInstance(true, "", 0));
     beatRequest.setNodeStatus(ns);
-    try {
-      NodeHeartbeatResponse beatResponse =
-              rm.getResourceTrackerService().nodeHeartbeat(beatRequest);
-      if (! beatResponse.getContainersToCleanup().isEmpty()) {
-        // remove from queue
-        synchronized(releasedContainerList) {
-          for (ContainerId containerId : beatResponse.getContainersToCleanup()){
-            if (amContainerList.contains(containerId)) {
-              // AM container (not killed?, only release)
-              synchronized(amContainerList) {
-                amContainerList.remove(containerId);
-              }
-              LOG.debug(MessageFormat.format("NodeManager {0} releases " +
-                      "an AM ({1}).", node.getNodeID(), containerId));
-            } else {
-              cs = runningContainers.remove(containerId);
-              containerQueue.remove(cs);
-              releasedContainerList.add(containerId);
-              LOG.debug(MessageFormat.format("NodeManager {0} releases a " +
-                      "container ({1}).", node.getNodeID(), containerId));
+    NodeHeartbeatResponse beatResponse =
+            rm.getResourceTrackerService().nodeHeartbeat(beatRequest);
+    if (!beatResponse.getContainersToCleanup().isEmpty()) {
+      // remove from queue
+      synchronized (releasedContainerList) {
+        for (ContainerId containerId : beatResponse.getContainersToCleanup()) {
+          if (amContainerList.contains(containerId)) {
+            // AM container (not killed?, only release)
+            synchronized (amContainerList) {
+              amContainerList.remove(containerId);
             }
+            LOG.debug(MessageFormat.format("NodeManager {0} releases " +
+                    "an AM ({1}).", node.getNodeID(), containerId));
+          } else {
+            cs = runningContainers.remove(containerId);
+            containerQueue.remove(cs);
+            releasedContainerList.add(containerId);
+            LOG.debug(MessageFormat.format("NodeManager {0} releases a " +
+                    "container ({1}).", node.getNodeID(), containerId));
           }
         }
       }
       if (beatResponse.getNodeAction() == NodeAction.SHUTDOWN) {
         lastStep();
       }
-    } catch (YarnException e) {
-      e.printStackTrace();
-    } catch (IOException e) {
-      e.printStackTrace();
     }
   }
+
 
   @Override
   public void lastStep() {
@@ -257,5 +245,20 @@ public class NMSimulator extends TaskRunner.Task {
     synchronized(completedContainerList) {
       completedContainerList.add(containerId);
     }
+  }
+
+  @VisibleForTesting
+  Map<ContainerId, ContainerSimulator> getRunningContainers() {
+    return runningContainers;
+  }
+
+  @VisibleForTesting
+  List<ContainerId> getAMContainers() {
+    return amContainerList;
+  }
+
+  @VisibleForTesting
+  List<ContainerId> getCompletedContainers() {
+    return completedContainerList;
   }
 }

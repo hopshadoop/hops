@@ -18,6 +18,27 @@
 
 package org.apache.hadoop.yarn.sls.appmaster;
 
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.yarn.api.protocolrecords.*;
+import org.apache.hadoop.yarn.api.records.*;
+import org.apache.hadoop.yarn.exceptions.YarnException;
+import org.apache.hadoop.yarn.factories.RecordFactory;
+import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
+import org.apache.hadoop.yarn.security.AMRMTokenIdentifier;
+import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppState;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptState;
+import org.apache.hadoop.yarn.sls.SLSRunner;
+import org.apache.hadoop.yarn.sls.scheduler.ContainerSimulator;
+import org.apache.hadoop.yarn.sls.scheduler.ResourceSchedulerWrapper;
+import org.apache.hadoop.yarn.sls.scheduler.TaskRunner;
+import org.apache.hadoop.yarn.sls.utils.SLSUtils;
+import org.apache.hadoop.yarn.util.Records;
+import org.apache.log4j.Logger;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.PrivilegedExceptionAction;
@@ -28,49 +49,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
-
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.yarn.api.protocolrecords.AllocateRequest;
-import org.apache.hadoop.yarn.api.protocolrecords.AllocateResponse;
-import org.apache.hadoop.yarn.api.protocolrecords
-        .FinishApplicationMasterRequest;
-import org.apache.hadoop.yarn.api.protocolrecords.SubmitApplicationRequest;
-import org.apache.hadoop.yarn.api.protocolrecords.GetNewApplicationRequest;
-import org.apache.hadoop.yarn.api.protocolrecords.GetNewApplicationResponse;
-
-import org.apache.hadoop.yarn.api.protocolrecords
-        .RegisterApplicationMasterRequest;
-import org.apache.hadoop.yarn.api.protocolrecords
-        .RegisterApplicationMasterResponse;
-import org.apache.hadoop.yarn.api.records.ApplicationAccessType;
-import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
-import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.hadoop.yarn.api.records.ApplicationSubmissionContext;
-import org.apache.hadoop.yarn.api.records.ContainerId;
-import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
-import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
-import org.apache.hadoop.yarn.api.records.LocalResource;
-import org.apache.hadoop.yarn.api.records.Priority;
-import org.apache.hadoop.yarn.api.records.Resource;
-import org.apache.hadoop.yarn.api.records.ResourceRequest;
-import org.apache.hadoop.yarn.exceptions.YarnException;
-import org.apache.hadoop.yarn.factories.RecordFactory;
-import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
-import org.apache.hadoop.yarn.security.AMRMTokenIdentifier;
-import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
-import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
-import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppState;
-import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
-import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptState;
-import org.apache.hadoop.yarn.util.Records;
-import org.apache.log4j.Logger;
-
-import org.apache.hadoop.yarn.sls.scheduler.ContainerSimulator;
-import org.apache.hadoop.yarn.sls.scheduler.ResourceSchedulerWrapper;
-import org.apache.hadoop.yarn.sls.SLSRunner;
-import org.apache.hadoop.yarn.sls.scheduler.TaskRunner;
-import org.apache.hadoop.yarn.sls.utils.SLSUtils;
 
 public abstract class AMSimulator extends TaskRunner.Task {
   // resource manager
@@ -131,8 +109,7 @@ public abstract class AMSimulator extends TaskRunner.Task {
    * register with RM
    */
   @Override
-  public void firstStep()
-          throws YarnException, IOException, InterruptedException {
+  public void firstStep() throws Exception {
     simulateStartTimeMS = System.currentTimeMillis() - 
                           SLSRunner.getRunner().getStartTimeMS();
 
@@ -147,8 +124,7 @@ public abstract class AMSimulator extends TaskRunner.Task {
   }
 
   @Override
-  public void middleStep()
-          throws InterruptedException, YarnException, IOException {
+  public void middleStep() throws Exception {
     // process responses in the queue
     processResponseQueue();
     
@@ -160,7 +136,7 @@ public abstract class AMSimulator extends TaskRunner.Task {
   }
 
   @Override
-  public void lastStep() {
+  public void lastStep() throws Exception{
     LOG.info(MessageFormat.format("Application {0} is shutting down.", appId));
     // unregister tracking
     if (isTracked) {
@@ -171,26 +147,20 @@ public abstract class AMSimulator extends TaskRunner.Task {
                   .newRecordInstance(FinishApplicationMasterRequest.class);
     finishAMRequest.setFinalApplicationStatus(FinalApplicationStatus.SUCCEEDED);
 
-    try {
-      UserGroupInformation ugi =
-              UserGroupInformation.createRemoteUser(appAttemptId.toString());
-      Token<AMRMTokenIdentifier> token =
-              rm.getRMContext().getRMApps().get(appAttemptId.getApplicationId())
-                .getRMAppAttempt(appAttemptId).getAMRMToken();
-      ugi.addTokenIdentifier(token.decodeIdentifier());
-      ugi.doAs(new PrivilegedExceptionAction<Object>() {
-        @Override
-        public Object run() throws Exception {
-          rm.getApplicationMasterService()
-                  .finishApplicationMaster(finishAMRequest);
-          return null;
-        }
-      });
-    } catch (IOException e) {
-      e.printStackTrace();
-    } catch (InterruptedException e) {
-      e.printStackTrace();
-    }
+    UserGroupInformation ugi =
+            UserGroupInformation.createRemoteUser(appAttemptId.toString());
+    Token<AMRMTokenIdentifier> token = rm.getRMContext().getRMApps().get(appId)
+            .getRMAppAttempt(appAttemptId).getAMRMToken();
+    ugi.addTokenIdentifier(token.decodeIdentifier());
+    ugi.doAs(new PrivilegedExceptionAction<Object>() {
+
+      @Override
+      public Object run() throws Exception {
+        rm.getApplicationMasterService()
+                .finishApplicationMaster(finishAMRequest);
+      return null;
+      }
+    });
 
     simulateFinishTimeMS = System.currentTimeMillis() -
         SLSRunner.getRunner().getStartTimeMS();
@@ -228,11 +198,9 @@ public abstract class AMSimulator extends TaskRunner.Task {
     return createAllocateRequest(ask, new ArrayList<ContainerId>());
   }
 
-  protected abstract void processResponseQueue()
-          throws InterruptedException, YarnException, IOException;
-  
-  protected abstract void sendContainerRequest()
-          throws YarnException, IOException, InterruptedException;
+  protected abstract void processResponseQueue() throws Exception;
+
+  protected abstract void sendContainerRequest() throws Exception;
   
   protected abstract void checkStop();
   
@@ -278,7 +246,7 @@ public abstract class AMSimulator extends TaskRunner.Task {
     // waiting until application ACCEPTED
     RMApp app = rm.getRMContext().getRMApps().get(appId);
     while(app.getState() != RMAppState.ACCEPTED) {
-      Thread.sleep(50);
+      Thread.sleep(10);
     }
     // Waiting until application attempt reach LAUNCHED
     // "Unmanaged AM must register after AM attempt reaches LAUNCHED state"
@@ -302,9 +270,8 @@ public abstract class AMSimulator extends TaskRunner.Task {
 
     UserGroupInformation ugi =
             UserGroupInformation.createRemoteUser(appAttemptId.toString());
-    Token<AMRMTokenIdentifier> token =
-            rm.getRMContext().getRMApps().get(appAttemptId.getApplicationId())
-                    .getRMAppAttempt(appAttemptId).getAMRMToken();
+    Token<AMRMTokenIdentifier> token = rm.getRMContext().getRMApps().get(appId)
+            .getRMAppAttempt(appAttemptId).getAMRMToken();
     ugi.addTokenIdentifier(token.decodeIdentifier());
 
     ugi.doAs(
