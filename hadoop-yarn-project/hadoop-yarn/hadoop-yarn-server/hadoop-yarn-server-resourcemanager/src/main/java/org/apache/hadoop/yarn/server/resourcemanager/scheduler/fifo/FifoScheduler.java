@@ -371,7 +371,8 @@ public class FifoScheduler extends AbstractYarnScheduler
     return nodes.get(nodeId);
   }
 
-  private synchronized void addApplication(ApplicationId applicationId,
+  @VisibleForTesting
+  public synchronized void addApplication(ApplicationId applicationId,
       String queue, String user, TransactionState transactionState) {
     org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication
         application =
@@ -391,7 +392,8 @@ public class FifoScheduler extends AbstractYarnScheduler
             transactionState));
   }
 
-  private synchronized void addApplicationAttempt(
+  @VisibleForTesting
+  public synchronized void addApplicationAttempt(
       ApplicationAttemptId appAttemptId,
       boolean transferStateFromPreviousAttempt,
       TransactionState transactionState) {

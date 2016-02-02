@@ -823,7 +823,14 @@
   </property>
 
   <property>
-    <description>Whether to enable log aggregation</description>
+        <description>Whether to enable log aggregation. Log aggregation collects
+          each container's logs and moves these logs onto a file-system, for e.g.
+          HDFS, after the application completes. Users can configure
+          "yarn.nodemanager.remote-app-log-dir" and
+          "yarn.nodemanager.remote-app-log-dir-suffix" properties to determine
+          where these logs are moved to. Users can access the logs via Application
+          Timeline Server.
+        </description>
     <name>yarn.log-aggregation-enable</name>
     <value>false</value>
   </property>
@@ -1235,7 +1242,7 @@
       If enabled, clients will put entities and events to the timeline server.
     </description>
     <name>yarn.timeline-service.enabled</name>
-    <value>true</value>
+    <value>false</value>
   </property>
 
   <property>
@@ -1289,7 +1296,7 @@
   <property>
     <description>Store file name for leveldb timeline store.</description>
     <name>yarn.timeline-service.leveldb-timeline-store.path</name>
-    <value>${yarn.log.dir}/timeline</value>
+    <value>${hadoop.tmp.dir}/yarn/timeline</value>
   </property>
 
   <property>
@@ -1356,7 +1363,7 @@
     <name>
       yarn.timeline-service.generic-application-history.fs-history-store.uri
     </name>
-    <value>${hadoop.log.dir}/yarn/system/history</value>
+    <value>${hadoop.tmp.dir}/yarn/timeline/generic-history</value>
   </property>
 
   <property>

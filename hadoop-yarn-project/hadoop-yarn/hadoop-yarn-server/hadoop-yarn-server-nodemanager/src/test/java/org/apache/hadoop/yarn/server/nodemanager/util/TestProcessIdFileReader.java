@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.yarn.server.nodemanager.util;
 
-import junit.framework.Assert;
+import org.junit.Assert;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.util.Shell;
 import org.junit.Test;

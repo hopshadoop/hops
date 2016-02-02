@@ -943,6 +943,7 @@ public class TestNodeStatusUpdater {
       Thread.sleep(500);
     }
     Assert.assertFalse(heartBeatID < 1);
+    Assert.assertTrue(nm.getNMContext().getDecommissioned());
 
     // NM takes a while to reach the STOPPED state.
     waitCount = 0;

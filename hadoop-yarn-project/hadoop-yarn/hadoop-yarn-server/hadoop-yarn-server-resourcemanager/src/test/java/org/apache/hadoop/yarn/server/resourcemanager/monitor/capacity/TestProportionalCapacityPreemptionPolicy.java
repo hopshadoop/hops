@@ -122,6 +122,7 @@ public class TestProportionalCapacityPreemptionPolicy {
     int[][] qData = new int[][]{
         //  /   A   B   C
         {100, 40, 40, 20},  // abs
+        { 100, 100, 100, 100 },  // maxCap
         {100, 0, 60, 40},  // used
         {0, 0, 0, 0},  // pending
         {0, 0, 0, 0},  // reserved
@@ -140,6 +141,7 @@ public class TestProportionalCapacityPreemptionPolicy {
     int[][] qData = new int[][]{
         //  /   A   B   C  D
         {100, 10, 40, 20, 30},  // abs
+        { 100, 100, 100, 100, 100 },  // maxCap
         {100, 30, 60, 10, 0},  // used
         {45, 20, 5, 20, 0},  // pending
         {0, 0, 0, 0, 0},  // reserved
@@ -153,10 +155,31 @@ public class TestProportionalCapacityPreemptionPolicy {
   }
 
   @Test
+  public void testMaxCap() {
+    int[][] qData = new int[][]{
+            //  /   A   B   C
+            { 100, 40, 40, 20 },  // abs
+            { 100, 100, 45, 100 },  // maxCap
+            { 100, 55, 45,  0 },  // used
+            {  20, 10, 10,  0 },  // pending
+            {   0,  0,  0,  0 },  // reserved
+            {   2,  1,  1,  0 },  // apps
+            {  -1,  1,  1,  0 },  // req granularity
+            {   3,  0,  0,  0 },  // subqueues
+    };
+    ProportionalCapacityPreemptionPolicy policy = buildPolicy(qData);
+    policy.editSchedule(null);
+    // despite the imbalance, since B is at maxCap, do not correct
+    verify(mDisp, never()).handle(argThat(new IsPreemptionRequestFor(appA)));
+  }
+
+
+  @Test
   public void testPreemptCycle() {
     int[][] qData = new int[][]{
         //  /   A   B   C
         {100, 40, 40, 20},  // abs
+        { 100, 100, 100, 100 },  // maxCap
         {100, 0, 60, 40},  // used
         {10, 10, 0, 0},  // pending
         {0, 0, 0, 0},  // reserved
@@ -176,6 +199,7 @@ public class TestProportionalCapacityPreemptionPolicy {
     int[][] qData = new int[][]{
         //  /   A   B   C
         {100, 40, 40, 20},  // abs
+        { 100, 100, 100, 100 },  // maxCap
         {100, 0, 60, 40},  // used
         {10, 10, 0, 0},  // pending
         {0, 0, 0, 0},  // reserved
@@ -212,6 +236,7 @@ public class TestProportionalCapacityPreemptionPolicy {
     int[][] qData = new int[][]{
         //  /   A   B   C
         {100, 40, 40, 20},  // abs
+        { 100, 100, 100, 100 },  // maxCap
         {100, 39, 43, 21},  // used
         {10, 10, 0, 0},  // pending
         {0, 0, 0, 0},  // reserved
@@ -231,6 +256,7 @@ public class TestProportionalCapacityPreemptionPolicy {
     int[][] qData = new int[][]{
         //  /   A   B   C
         {100, 40, 40, 20},  // abs
+        { 100, 100, 100, 100 },  // maxCap
         {100, 55, 45, 0},  // used
         {20, 10, 10, 0},  // pending
         {0, 0, 0, 0},  // reserved
@@ -249,6 +275,7 @@ public class TestProportionalCapacityPreemptionPolicy {
     int[][] qData = new int[][]{
         //  /   A   B   C
         {100, 40, 40, 20},  // abs
+        { 100, 100, 100, 100 },  // maxCap
         {100, 55, 45, 0},  // used
         {20, 10, 10, 0},  // pending
         {0, 0, 0, 0},  // reserved
@@ -268,6 +295,7 @@ public class TestProportionalCapacityPreemptionPolicy {
     int[][] qData = new int[][]{
         //  /   A   B   C
         {100, 40, 40, 20},  // abs
+        { 100, 100, 100, 100 },  // maxCap
         {100, 90, 10, 0},  // used
         {80, 10, 20, 50},  // pending
         {0, 0, 0, 0},  // reserved
@@ -287,6 +315,7 @@ public class TestProportionalCapacityPreemptionPolicy {
     int[][] qData = new int[][]{
         //  /    A   B   C    D   E   F
         {200, 100, 50, 50, 100, 10, 90},  // abs
+        { 200, 200, 200, 200, 200, 200, 200 },  // maxCap
         {200, 110, 60, 50, 90, 90, 0},  // used
         {10, 0, 0, 0, 10, 0, 10},  // pending
         {0, 0, 0, 0, 0, 0, 0},  // reserved
@@ -302,10 +331,52 @@ public class TestProportionalCapacityPreemptionPolicy {
   }
 
   @Test
+  public void testZeroGuar() {
+    int[][] qData = new int[][] {
+            //  /    A   B   C    D   E   F
+            { 200, 100, 0, 99, 100, 10, 90 },  // abs
+            { 200, 200, 200, 200, 200, 200, 200 },  // maxCap
+            { 170,  80, 60, 20,  90, 90,  0 },  // used
+            {  10,   0,  0,  0,  10,  0, 10 },  // pending
+            {   0,   0,  0,  0,   0,  0,  0 },  // reserved
+            {   4,   2,  1,  1,   2,  1,  1 },  // apps
+            {  -1,  -1,  1,  1,  -1,  1,  1 },  // req granularity
+            {   2,   2,  0,  0,   2,  0,  0 },  // subqueues
+    };
+    ProportionalCapacityPreemptionPolicy policy = buildPolicy(qData);
+    policy.editSchedule(null);
+    // verify capacity taken from A1, not B1 despite B1 being far over
+    // its absolute guaranteed capacity
+    verify(mDisp, never()).handle(argThat(new IsPreemptionRequestFor(appA)));
+  }
+
+  @Test
+  public void testZeroGuarOverCap() {
+    int[][] qData = new int[][] {
+            //  /    A   B   C    D   E   F
+            { 200, 100, 0, 99, 0, 100, 100 },  // abs
+            { 200, 200, 200, 200, 200, 200, 200 },  // maxCap
+            { 170,  170, 60, 20, 90, 0,  0 },  // used
+            {  85,   50,  30,  10,  10,  20, 20 },  // pending
+            {   0,   0,  0,  0,   0,  0,  0 },  // reserved
+            {   4,   3,  1,  1,   1,  1,  1 },  // apps
+            {  -1,  -1,  1,  1,  1,  -1,  1 },  // req granularity
+            {   2,   3,  0,  0,   0,  1,  0 },  // subqueues
+    };
+    ProportionalCapacityPreemptionPolicy policy = buildPolicy(qData);
+    policy.editSchedule(null);
+    // we verify both that C has priority on B and D (has it has >0 guarantees)
+    // and that B and D are force to share their over capacity fairly (as they
+    // are both zero-guarantees) hence D sees some of its containers preempted
+    verify(mDisp, times(14)).handle(argThat(new IsPreemptionRequestFor(appC)));
+  }
+
+  @Test
   public void testHierarchicalLarge() {
     int[][] qData = new int[][]{
         //  /    A   B   C    D   E   F    G   H   I
-        {400, 200, 60, 140, 100, 70, 30, 100, 10, 90},  // abs
+        { 400, 200, 60, 140, 100, 70, 30, 100, 10, 90  },  // abs
+        { 400, 400, 400, 400, 400, 400, 400, 400, 400, 400, },  // maxCap
         {400, 210, 70, 140, 100, 50, 50, 90, 90, 0},  // used
         {10, 0, 0, 0, 0, 0, 0, 0, 0, 15},  // pending
         {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // reserved
@@ -393,24 +464,25 @@ public class TestProportionalCapacityPreemptionPolicy {
     when(mCS.getRootQueue()).thenReturn(mRoot);
 
     Resource clusterResources =
-        Resource.newInstance(leafAbsCapacities(qData[0], qData[6]), 0);
+        Resource.newInstance(leafAbsCapacities(qData[0], qData[7]), 0);
     when(mCS.getClusterResources()).thenReturn(clusterResources);
     return policy;
   }
 
   ParentQueue buildMockRootQueue(Random r, int[]... queueData) {
     int[] abs = queueData[0];
-    int[] used = queueData[1];
-    int[] pending = queueData[2];
-    int[] reserved = queueData[3];
-    int[] apps = queueData[4];
-    int[] gran = queueData[5];
-    int[] queues = queueData[6];
+    int[] maxCap = queueData[1];
+    int[] used = queueData[2];
+    int[] pending = queueData[3];
+    int[] reserved = queueData[4];
+    int[] apps = queueData[5];
+    int[] gran = queueData[6];
+    int[] queues = queueData[7];
 
-    return mockNested(abs, used, pending, reserved, apps, gran, queues);
+    return mockNested(abs, maxCap, used, pending, reserved, apps, gran, queues);
   }
 
-  ParentQueue mockNested(int[] abs, int[] used, int[] pending, int[] reserved,
+  ParentQueue mockNested(int[] abs, int[] maxCap, int[] used, int[] pending, int[] reserved,
       int[] apps, int[] gran, int[] queues) {
     float tot = leafAbsCapacities(abs, queues);
     Deque<ParentQueue> pqs = new LinkedList<ParentQueue>();
@@ -418,6 +490,8 @@ public class TestProportionalCapacityPreemptionPolicy {
     when(root.getQueueName()).thenReturn("/");
     when(root.getAbsoluteUsedCapacity()).thenReturn(used[0] / tot);
     when(root.getAbsoluteCapacity()).thenReturn(abs[0] / tot);
+    when(root.getAbsoluteMaximumCapacity()).thenReturn(maxCap[0] / tot);
+
     for (int i = 1; i < queues.length; ++i) {
       final CSQueue q;
       final ParentQueue p = pqs.removeLast();
@@ -431,6 +505,7 @@ public class TestProportionalCapacityPreemptionPolicy {
       when(q.getQueueName()).thenReturn(queueName);
       when(q.getAbsoluteUsedCapacity()).thenReturn(used[i] / tot);
       when(q.getAbsoluteCapacity()).thenReturn(abs[i] / tot);
+      when(q.getAbsoluteMaximumCapacity()).thenReturn(maxCap[i] / tot);
     }
     assert 0 == pqs.size();
     return root;

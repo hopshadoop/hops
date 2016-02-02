@@ -19,7 +19,7 @@
 package org.apache.hadoop.yarn.server.applicationhistoryservice.webapp;
 
 import com.google.inject.Injector;
-import junit.framework.Assert;
+import org.junit.Assert;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;

@@ -18,7 +18,6 @@ package org.apache.hadoop.yarn.server.resourcemanager;
 
 import com.google.common.annotations.VisibleForTesting;
 import io.hops.ha.common.TransactionState;
-import io.hops.ha.common.TransactionState.TransactionType;
 import io.hops.ha.common.TransactionStateImpl;
 import io.hops.metadata.util.HopYarnAPIUtilities;
 import io.hops.metadata.util.RMUtilities;
@@ -36,42 +35,20 @@ import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.yarn.api.ApplicationMasterProtocol;
-import org.apache.hadoop.yarn.api.protocolrecords.AllocateRequest;
-import org.apache.hadoop.yarn.api.protocolrecords.AllocateResponse;
-import org.apache.hadoop.yarn.api.protocolrecords.FinishApplicationMasterRequest;
-import org.apache.hadoop.yarn.api.protocolrecords.FinishApplicationMasterResponse;
-import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterRequest;
-import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterResponse;
+import org.apache.hadoop.yarn.api.protocolrecords.*;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.AllocateRequestPBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.FinishApplicationMasterRequestPBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.RegisterApplicationMasterRequestPBImpl;
-import org.apache.hadoop.yarn.api.records.AMCommand;
-import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
-import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.hadoop.yarn.api.records.Container;
-import org.apache.hadoop.yarn.api.records.ContainerId;
-import org.apache.hadoop.yarn.api.records.NMToken;
-import org.apache.hadoop.yarn.api.records.NodeReport;
-import org.apache.hadoop.yarn.api.records.PreemptionContainer;
-import org.apache.hadoop.yarn.api.records.PreemptionContract;
-import org.apache.hadoop.yarn.api.records.PreemptionMessage;
-import org.apache.hadoop.yarn.api.records.PreemptionResourceRequest;
-import org.apache.hadoop.yarn.api.records.Resource;
-import org.apache.hadoop.yarn.api.records.ResourceBlacklistRequest;
-import org.apache.hadoop.yarn.api.records.ResourceRequest;
-import org.apache.hadoop.yarn.api.records.StrictPreemptionContract;
+import org.apache.hadoop.yarn.api.records.*;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
-import org.apache.hadoop.yarn.exceptions.InvalidApplicationMasterRequestException;
-import org.apache.hadoop.yarn.exceptions.InvalidContainerReleaseException;
-import org.apache.hadoop.yarn.exceptions.InvalidResourceBlacklistRequestException;
-import org.apache.hadoop.yarn.exceptions.InvalidResourceRequestException;
-import org.apache.hadoop.yarn.exceptions.YarnException;
+import org.apache.hadoop.yarn.exceptions.*;
 import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
 import org.apache.hadoop.yarn.ipc.RPCUtil;
 import org.apache.hadoop.yarn.ipc.YarnRPC;
 import org.apache.hadoop.yarn.security.AMRMTokenIdentifier;
 import org.apache.hadoop.yarn.server.resourcemanager.RMAuditLogger.AuditConstants;
+import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.AMLivelinessMonitor;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
@@ -90,15 +67,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import org.apache.hadoop.yarn.api.records.ContainerResourceIncreaseRequest;
-import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
 
 @SuppressWarnings("unchecked")
 @Private
@@ -326,9 +297,12 @@ public class ApplicationMasterService extends AbstractService
         List<NMToken> nmTokens = new ArrayList<NMToken>();
         for (Container container : transferredContainers) {
           try {
-            nmTokens.add(rmContext.getNMTokenSecretManager()
-                .createAndGetNMToken(app.getUser(), applicationAttemptId,
-                    container));
+              NMToken token = rmContext.getNMTokenSecretManager()
+                      .createAndGetNMToken(app.getUser(), applicationAttemptId,
+                              container);
+              if (null != token) {
+                  nmTokens.add(token);
+              }
           } catch (IllegalArgumentException e) {
             // if it's a DNS issue, throw UnknowHostException directly and that
             // will be automatically retried by RMProxy in RPC layer.
@@ -518,6 +492,15 @@ public class ApplicationMasterService extends AbstractService
         // get an exception. Might as well throw an exception here.
         transactionState.decCounter(TransactionState.TransactionType.INIT);
         return resync;
+      }
+
+      // filter illegal progress values
+      float filteredProgress = request.getProgress();
+      if (Float.isNaN(filteredProgress) || filteredProgress == Float.NEGATIVE_INFINITY
+              || filteredProgress < 0) {
+        request.setProgress(0);
+      } else if (filteredProgress > 1 || filteredProgress == Float.POSITIVE_INFINITY) {
+        request.setProgress(1);
       }
 
       // Send the status update to the appAttempt.
