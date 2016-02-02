@@ -88,6 +88,7 @@ import org.apache.hadoop.yarn.util.resource.DominantResourceCalculator;
 import org.apache.hadoop.yarn.util.resource.ResourceCalculator;
 import org.apache.hadoop.yarn.util.resource.Resources;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -125,7 +126,6 @@ import java.util.concurrent.ConcurrentHashMap;
 @Unstable
 @SuppressWarnings("unchecked")
 public class FairScheduler extends AbstractYarnScheduler {
-  private boolean initialized;
   private FairSchedulerConfiguration conf;
   private Resource minimumAllocation;
   private Resource maximumAllocation;
@@ -146,6 +146,11 @@ public class FairScheduler extends AbstractYarnScheduler {
 
   // How often fair shares are re-calculated (ms)
   protected long UPDATE_INTERVAL = 500;
+  
+  private Thread updateThread;
+  private Thread schedulingThread;
+  // timeout to join when we stop this service
+  protected final long THREAD_JOIN_TIMEOUT_MS = 1000;
 
   // Aggregate metrics
   FSQueueMetrics rootMetrics;
@@ -205,6 +210,7 @@ public class FairScheduler extends AbstractYarnScheduler {
   AllocationConfiguration allocConf;
   
   public FairScheduler() {
+    super(FairScheduler.class.getName());
     clock = new SystemClock();
     allocsLoader = new AllocationFileLoaderService();
     queueMgr = new QueueManager(this);
@@ -545,7 +551,8 @@ public class FairScheduler extends AbstractYarnScheduler {
     return resToPreempt;
   }
 
-  public RMContainerTokenSecretManager getContainerTokenSecretManager() {
+  public synchronized RMContainerTokenSecretManager 
+      getContainerTokenSecretManager() {
     return rmContext.getContainerTokenSecretManager();
   }
 
@@ -1304,91 +1311,134 @@ public class FairScheduler extends AbstractYarnScheduler {
     // NOT IMPLEMENTED
   }
 
-  @Override
-  public synchronized void reinitialize(Configuration conf, RMContext rmContext,
-          TransactionState transactionState) throws IOException {
-    if (!initialized) {
-      this.conf = new FairSchedulerConfiguration(conf);
-      validateConf(this.conf);
-      minimumAllocation = this.conf.getMinimumAllocation();
-      maximumAllocation = this.conf.getMaximumAllocation();
-      incrAllocation = this.conf.getIncrementAllocation();
-      continuousSchedulingEnabled = this.conf.isContinuousSchedulingEnabled();
-      continuousSchedulingSleepMs = this.conf.getContinuousSchedulingSleepMs();
-      nodeLocalityThreshold = this.conf.getLocalityThresholdNode();
-      rackLocalityThreshold = this.conf.getLocalityThresholdRack();
-      nodeLocalityDelayMs = this.conf.getLocalityDelayNodeMs();
-      rackLocalityDelayMs = this.conf.getLocalityDelayRackMs();
-      preemptionEnabled = this.conf.getPreemptionEnabled();
-      preemptionUtilizationThreshold =
-              this.conf.getPreemptionUtilizationThreshold();
-      assignMultiple = this.conf.getAssignMultiple();
-      maxAssign = this.conf.getMaxAssign();
-      sizeBasedWeight = this.conf.getSizeBasedWeight();
-      preemptionInterval = this.conf.getPreemptionInterval();
-      waitTimeBeforeKill = this.conf.getWaitTimeBeforeKill();
-      usePortForNodeName = this.conf.getUsePortForNodeName();
-      
-      this.maxAllocatedContainersPerRequest = this.conf.getInt(
-              YarnConfiguration.MAX_ALLOCATED_CONTAINERS_PER_REQUEST,
-              YarnConfiguration.DEFAULT_MAX_ALLOCATED_CONTAINERS_PER_REQUEST);
-      
-      rootMetrics = FSQueueMetrics.forQueue("root", null, true, conf);
-      this.rmContext = rmContext;
-      // This stores per-application scheduling information
-      this.applications =
-          new ConcurrentHashMap<ApplicationId, SchedulerApplication>();
-      this.eventLog = new FairSchedulerEventLog();
-      eventLog.init(this.conf);
+  public synchronized void setRMContext(RMContext rmContext) {
+    this.rmContext = rmContext;
+  }
+   
+    private synchronized void initScheduler(Configuration conf)
+      throws IOException {
+    this.conf = new FairSchedulerConfiguration(conf);
+    validateConf(this.conf);
+    minimumAllocation = this.conf.getMinimumAllocation();
+    maximumAllocation = this.conf.getMaximumAllocation();
+    incrAllocation = this.conf.getIncrementAllocation();
+    continuousSchedulingEnabled = this.conf.isContinuousSchedulingEnabled();
+    continuousSchedulingSleepMs =
+        this.conf.getContinuousSchedulingSleepMs();
+    nodeLocalityThreshold = this.conf.getLocalityThresholdNode();
+    rackLocalityThreshold = this.conf.getLocalityThresholdRack();
+   nodeLocalityDelayMs = this.conf.getLocalityDelayNodeMs();
+    rackLocalityDelayMs = this.conf.getLocalityDelayRackMs();
+    preemptionEnabled = this.conf.getPreemptionEnabled();
+    preemptionUtilizationThreshold =
+        this.conf.getPreemptionUtilizationThreshold();
+    assignMultiple = this.conf.getAssignMultiple();
+    maxAssign = this.conf.getMaxAssign();
+    sizeBasedWeight = this.conf.getSizeBasedWeight();
+    preemptionInterval = this.conf.getPreemptionInterval();
+    waitTimeBeforeKill = this.conf.getWaitTimeBeforeKill();
+    usePortForNodeName = this.conf.getUsePortForNodeName();
 
-      initialized = true;
+    rootMetrics = FSQueueMetrics.forQueue("root", null, true, conf);
+    // This stores per-application scheduling information
+    this.applications =
+        new ConcurrentHashMap<ApplicationId,SchedulerApplication>();
+    this.eventLog = new FairSchedulerEventLog();
+    eventLog.init(this.conf);
 
-      allocConf = new AllocationConfiguration(conf);
-      try {
-        queueMgr.initialize(conf);
-      } catch (Exception e) {
-        throw new IOException("Failed to start FairScheduler", e);
-      }
+    allocConf = new AllocationConfiguration(conf);
+    try {
+      queueMgr.initialize(conf);
+    } catch (Exception e) {
+      throw new IOException("Failed to start FairScheduler", e);
+    }
 
-      Thread updateThread = new Thread(new UpdateThread());
-      updateThread.setName("FairSchedulerUpdateThread");
-      updateThread.setDaemon(true);
-      updateThread.start();
+    updateThread = new Thread(new UpdateThread());
+    updateThread.setName("FairSchedulerUpdateThread");
+    updateThread.setDaemon(true);
 
-      if (continuousSchedulingEnabled) {
-        // start continuous scheduling thread
-        Thread schedulingThread = new Thread(new Runnable() {
+       if (continuousSchedulingEnabled) {
+      // start continuous scheduling thread
+      schedulingThread = new Thread(new Runnable() {
           @Override
           public void run() {
             //TORECOVER FAIR the actions of this thread are not persisted
             continuousScheduling(
                     new TransactionStateImpl(TransactionState.TransactionType.RM));
           }
-        });
-        schedulingThread.setName("ContinuousScheduling");
-        schedulingThread.setDaemon(true);
-        schedulingThread.start();
-      }
-      
-      allocsLoader.init(conf);
-      allocsLoader.setReloadListener(new AllocationReloadListener());
-      // If we fail to load allocations file on initialize, we want to fail
-      // immediately.  After a successful load, exceptions on future reloads
-      // will just result in leaving things as they are.
-      try {
-        allocsLoader.reloadAllocations();
-      } catch (Exception e) {
-        throw new IOException("Failed to initialize FairScheduler", e);
-      }
-      allocsLoader.start();
-    } else {
-      try {
-        allocsLoader.reloadAllocations();
-      } catch (Exception e) {
-        LOG.error("Failed to reload allocations file", e);
-      }
+        }
+      );
+      schedulingThread.setName("ContinuousScheduling");
+      schedulingThread.setDaemon(true);
+    }
+
+    allocsLoader.init(conf);
+    allocsLoader.setReloadListener(new AllocationReloadListener());
+    // If we fail to load allocations file on initialize, we want to fail
+    // immediately.  After a successful load, exceptions on future reloads
+    // will just result in leaving things as they are.
+    try {
+      allocsLoader.reloadAllocations();
+    } catch (Exception e) {
+      throw new IOException("Failed to initialize FairScheduler", e);
     }
   }
+
+  private synchronized void startSchedulerThreads() {
+    Preconditions.checkNotNull(updateThread, "updateThread is null");
+    Preconditions.checkNotNull(allocsLoader, "allocsLoader is null");
+    updateThread.start();
+    if (continuousSchedulingEnabled) {
+      Preconditions.checkNotNull(schedulingThread, "schedulingThread is null");
+      schedulingThread.start();
+    }
+    allocsLoader.start();
+  }
+
+  @Override
+  public void serviceInit(Configuration conf) throws Exception {
+    initScheduler(conf);
+    super.serviceInit(conf);
+  }
+
+  @Override
+  public void serviceStart() throws Exception {
+    startSchedulerThreads();
+    super.serviceStart();
+  }
+
+  @Override
+  public void serviceStop() throws Exception {
+    synchronized (this) {
+      if (updateThread != null) {
+        updateThread.interrupt();
+        updateThread.join(THREAD_JOIN_TIMEOUT_MS);
+      }
+       if (continuousSchedulingEnabled) {
+        if (schedulingThread != null) {
+          schedulingThread.interrupt();
+          schedulingThread.join(THREAD_JOIN_TIMEOUT_MS);
+       }
+        
+      }
+       if (allocsLoader != null) {
+        allocsLoader.stop();
+      }
+    }
+
+    super.serviceStop();
+  }
+
+  @Override
+  public synchronized void reinitialize(Configuration conf, RMContext rmContext,
+          TransactionState transactionState)
+      throws IOException {
+    try {
+      allocsLoader.reloadAllocations();
+    } catch (Exception e) {
+      LOG.error("Failed to reload allocations file", e);
+    }
+   }
 
   @Override
   public QueueInfo getQueueInfo(String queueName, boolean includeChildQueues,

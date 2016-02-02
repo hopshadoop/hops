@@ -69,6 +69,8 @@ public class AllocationFileLoaderService extends AbstractService {
    */
   public static final long ALLOC_RELOAD_WAIT_MS = 5 * 1000;
   
+  public static final long THREAD_JOIN_TIMEOUT_MS = 1000;
+  
   private final Clock clock;
 
   private long lastSuccessfulReload;
@@ -150,8 +152,14 @@ public class AllocationFileLoaderService extends AbstractService {
   public void stop() {
     if(running){
       running = false;
+          if (reloadThread != null) {
       reloadThread.interrupt();
-      super.stop();
+      try {
+        reloadThread.join(THREAD_JOIN_TIMEOUT_MS);
+      } catch (InterruptedException e) {
+        LOG.warn("reloadThread fails to join.");
+      }
+    }
     }
   }
   

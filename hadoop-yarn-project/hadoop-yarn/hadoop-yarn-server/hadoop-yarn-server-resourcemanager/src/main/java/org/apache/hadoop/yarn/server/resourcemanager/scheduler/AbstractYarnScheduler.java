@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler;
 
+import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.Container;
@@ -33,7 +34,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
-public abstract class AbstractYarnScheduler implements ResourceScheduler {
+public abstract class AbstractYarnScheduler extends AbstractService 
+    implements ResourceScheduler {
 
   protected RMContext rmContext;
   protected Map<ApplicationId, SchedulerApplication> applications;
@@ -43,6 +45,16 @@ public abstract class AbstractYarnScheduler implements ResourceScheduler {
   protected static final Allocation EMPTY_ALLOCATION =
       new Allocation(EMPTY_CONTAINER_LIST, Resources.createResource(0), null,
           null, null);//recovered
+  
+   /**
+   * Construct the service.
+   *
+   * @param name service name
+   */
+  public AbstractYarnScheduler(String name) {
+    super(name);
+  }
+
 
   public synchronized List<Container> getTransferredContainers(
       ApplicationAttemptId currentAttempt) {
