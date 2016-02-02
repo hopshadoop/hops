@@ -1,11 +1,13 @@
-/*
- * Copyright (C) 2015 hops.io.
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,7 +15,72 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.distributedloadsimulator.sls.scheduler;
+package org.apache.hadoop.yarn.sls.scheduler;
+
+import org.apache.hadoop.util.ShutdownHookManager;
+import org.apache.hadoop.yarn.sls.SLSRunner;
+import org.apache.hadoop.yarn.sls.conf.SLSConfiguration;
+import org.apache.hadoop.yarn.sls.web.SLSWebApp;
+import com.codahale.metrics.Counter;
+import com.codahale.metrics.CsvReporter;
+import com.codahale.metrics.Gauge;
+import com.codahale.metrics.Histogram;
+import com.codahale.metrics.MetricRegistry;
+import com.codahale.metrics.SlidingWindowReservoir;
+import com.codahale.metrics.Timer;
+import io.hops.ha.common.TransactionState;
+
+import org.apache.hadoop.security.AccessControlException;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.conf.Configurable;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.util.ReflectionUtils;
+import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
+import org.apache.hadoop.yarn.api.records.ApplicationId;
+import org.apache.hadoop.yarn.api.records.ApplicationResourceUsageReport;
+import org.apache.hadoop.yarn.api.records.Container;
+import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
+import org.apache.hadoop.yarn.api.records.ContainerId;
+import org.apache.hadoop.yarn.api.records.ContainerStatus;
+import org.apache.hadoop.yarn.api.records.NodeId;
+import org.apache.hadoop.yarn.api.records.QueueInfo;
+import org.apache.hadoop.yarn.api.records.QueueUserACLInfo;
+import org.apache.hadoop.yarn.api.records.QueueACL;
+import org.apache.hadoop.yarn.api.records.Resource;
+import org.apache.hadoop.yarn.api.records.ResourceRequest;
+import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
+import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
+import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
+import org.apache.hadoop.yarn.server.resourcemanager.rmnode
+        .UpdatedContainerInfo;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.Allocation;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.PreemptableResourceScheduler;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.Queue;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.QueueMetrics;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler
+        .ResourceScheduler;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler
+        .SchedulerAppReport;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler
+        .SchedulerNodeReport;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity
+        .CapacityScheduler;
+
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.AppAttemptAddedSchedulerEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.AppAttemptRemovedSchedulerEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event
+        .NodeUpdateSchedulerEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event
+        .SchedulerEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event
+        .SchedulerEventType;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair
+        .FairScheduler;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fifo
+        .FifoScheduler;
+import org.apache.hadoop.yarn.util.resource.Resources;
+import org.apache.log4j.Logger;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -34,64 +101,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.apache.hadoop.conf.Configurable;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.util.ReflectionUtils;
-import org.apache.hadoop.util.ShutdownHookManager;
-import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
-import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.hadoop.yarn.api.records.ApplicationResourceUsageReport;
-import org.apache.hadoop.yarn.api.records.Container;
-import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
-import org.apache.hadoop.yarn.api.records.ContainerId;
-import org.apache.hadoop.yarn.api.records.ContainerStatus;
-import org.apache.hadoop.yarn.api.records.NodeId;
-import org.apache.hadoop.yarn.api.records.QueueACL;
-import org.apache.hadoop.yarn.api.records.QueueInfo;
-import org.apache.hadoop.yarn.api.records.QueueUserACLInfo;
-import org.apache.hadoop.yarn.api.records.Resource;
-import org.apache.hadoop.yarn.api.records.ResourceRequest;
-import org.apache.hadoop.yarn.exceptions.YarnException;
-import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
-import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
-import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
-import org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.Allocation;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.QueueMetrics;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerAppReport;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerNodeReport;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.AppAddedSchedulerEvent;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.AppAttemptRemovedSchedulerEvent;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.AppRemovedSchedulerEvent;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeUpdateSchedulerEvent;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.SchedulerEvent;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.SchedulerEventType;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FairScheduler;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fifo.FifoScheduler;
-import org.apache.hadoop.distributedloadsimulator.sls.SLSRunner;
-import org.apache.hadoop.distributedloadsimulator.sls.conf.SLSConfiguration;
-import org.apache.hadoop.distributedloadsimulator.sls.web.SLSWebApp;
-import org.apache.hadoop.yarn.util.resource.Resources;
-import org.apache.log4j.Logger;
-
-import com.codahale.metrics.Counter;
-import com.codahale.metrics.CsvReporter;
-import com.codahale.metrics.Gauge;
-import com.codahale.metrics.Histogram;
-import com.codahale.metrics.MetricRegistry;
-import com.codahale.metrics.SlidingWindowReservoir;
-import com.codahale.metrics.Timer;
-import io.hops.ha.common.TransactionState;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.AbstractYarnScheduler;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication;
-
-
-    public class ResourceSchedulerWrapper implements
-        SchedulerWrapper,ResourceScheduler,Configurable {
-
+public class SLSCapacityScheduler extends CapacityScheduler implements
+        SchedulerWrapper,Configurable {
   private static final String EOL = System.getProperty("line.separator");
   private static final int SAMPLING_SIZE = 60;
   private ScheduledExecutorService pool;
@@ -109,9 +120,9 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicat
   private Lock queueLock;
 
   private Configuration conf;
-  private ResourceScheduler scheduler;
-  private Map<ApplicationId, String> appQueueMap
-          = new ConcurrentHashMap<ApplicationId, String>();
+ 
+  private Map<ApplicationAttemptId, String> appQueueMap =
+          new ConcurrentHashMap<ApplicationAttemptId, String>();
   private BufferedWriter jobRuntimeLogBW;
 
   // Priority of the ResourceSchedulerWrapper shutdown hook.
@@ -120,8 +131,8 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicat
   // web app
   private SLSWebApp web;
 
-  private Map<ContainerId, Resource> preemptionContainerMap
-          = new ConcurrentHashMap<ContainerId, Resource>();
+  private Map<ContainerId, Resource> preemptionContainerMap =
+          new ConcurrentHashMap<ContainerId, Resource>();
 
   // metrics
   private MetricRegistry metrics;
@@ -130,9 +141,8 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicat
   private String metricsOutputDir;
   private BufferedWriter metricsLogBW;
   private boolean running = false;
-  private static Map<Class, Class> defaultSchedulerMetricsMap
-          = new HashMap<Class, Class>();
-
+  private static Map<Class, Class> defaultSchedulerMetricsMap =
+          new HashMap<Class, Class>();
   static {
     defaultSchedulerMetricsMap.put(FairScheduler.class,
             FairSchedulerMetrics.class);
@@ -145,33 +155,17 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicat
   private Set<String> queueSet;
   private Set<String> trackedAppSet;
 
-  public final Logger LOG = Logger.getLogger(ResourceSchedulerWrapper.class);
+  public final Logger LOG = Logger.getLogger(SLSCapacityScheduler.class);
 
-  public ResourceSchedulerWrapper() {
+  public SLSCapacityScheduler() {
     samplerLock = new ReentrantLock();
     queueLock = new ReentrantLock();
   }
-// only used with the abstractYarnScheduler
-//  @Override
-//  public synchronized List<Container> getTransferredContainers(
-//          ApplicationAttemptId currentAttempt) {
-//    return ((AbstractYarnScheduler) scheduler)
-//            .getTransferredContainers(currentAttempt);
-//  }
-//
-//  @Override
-//  public Map<ApplicationId, SchedulerApplication> getSchedulerApplications() {
-//    return ((AbstractYarnScheduler) scheduler).getSchedulerApplications();
-//  }
 
   @Override
   public void setConf(Configuration conf) {
     this.conf = conf;
-    // set scheduler
-    Class<? extends ResourceScheduler> klass = conf.getClass(
-        SLSConfiguration.RM_SCHEDULER, null, ResourceScheduler.class);
-
-    scheduler = ReflectionUtils.newInstance(klass, conf);
+    super.setConf(conf);
     // start metrics
     metricsON = conf.getBoolean(SLSConfiguration.METRICS_SWITCH, true);
     if (metricsON) {
@@ -186,7 +180,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicat
       @Override
       public void run() {
         try {
-          if (metricsLogBW != null) {
+          if (metricsLogBW != null)  {
             metricsLogBW.write("]");
             metricsLogBW.close();
           }
@@ -203,15 +197,15 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicat
 
   @Override
   public Allocation allocate(ApplicationAttemptId attemptId,
-          List<ResourceRequest> resourceRequests,
-          List<ContainerId> containerIds,
-          List<String> strings, List<String> strings2,
-          TransactionState transactionState) {
+                             List<ResourceRequest> resourceRequests,
+                             List<ContainerId> containerIds,
+                             List<String> strings, List<String> strings2,
+                             TransactionState transactionState) {
     if (metricsON) {
       final Timer.Context context = schedulerAllocateTimer.time();
       Allocation allocation = null;
       try {
-        allocation = scheduler.allocate(attemptId, resourceRequests,
+        allocation = super.allocate(attemptId, resourceRequests,
                 containerIds, strings, strings2, transactionState);
         return allocation;
       } finally {
@@ -225,88 +219,81 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicat
         }
       }
     } else {
-      return scheduler.allocate(attemptId,
-              resourceRequests, containerIds, strings, strings2,
-              transactionState);
+      return super.allocate(attemptId,
+              resourceRequests, containerIds, strings, strings2, transactionState);
     }
   }
 
   @Override
   public void handle(SchedulerEvent schedulerEvent) {
-    // metrics off
-    if (!metricsON) {
-      scheduler.handle(schedulerEvent);
-      return;
-    }
-    if (!running) {
-      running = true;
-    }
+	    // metrics off
+	    if (! metricsON) {
+	      super.handle(schedulerEvent);
+	      return;
+	    }
+	    if(!running)    running = true;
 
-    // metrics on
-    Timer.Context handlerTimer = null;
-    Timer.Context operationTimer = null;
-    //LOG.info("HOP :: ResourceSchedulerWrapper event type  : " + schedulerEvent.getType());
+	    // metrics on
+	    Timer.Context handlerTimer = null;
+	    Timer.Context operationTimer = null;
 
-    NodeUpdateSchedulerEventWrapper eventWrapper;
-    try {
-      //if (schedulerEvent instanceof NodeUpdateSchedulerEvent) {
-      if (schedulerEvent.getType() == SchedulerEventType.NODE_UPDATE
-              && schedulerEvent instanceof NodeUpdateSchedulerEvent) {
-        eventWrapper = new NodeUpdateSchedulerEventWrapper(
-                (NodeUpdateSchedulerEvent) schedulerEvent);
-        schedulerEvent = eventWrapper;
-        updateQueueWithNodeUpdate(eventWrapper);
-        //  LOG.info("HOP :: ResourceSchedulerWrapper  updateQueueWithNodeUpdate is finished ");
-      } else if (schedulerEvent.getType()
-              == SchedulerEventType.APP_ATTEMPT_REMOVED
-              && schedulerEvent instanceof AppAttemptRemovedSchedulerEvent) {
-        // check if having AM Container, update resource usage information
-        AppAttemptRemovedSchedulerEvent appRemoveEvent
-                = (AppAttemptRemovedSchedulerEvent) schedulerEvent;
-        ApplicationAttemptId appAttemptId
-                = appRemoveEvent.getApplicationAttemptID();
-        String queue = appQueueMap.get(appAttemptId.getApplicationId());
-        SchedulerAppReport app = scheduler.getSchedulerAppInfo(appAttemptId);
-        if (!app.getLiveContainers().isEmpty()) {  // have 0 or 1
-          // should have one container which is AM container
-          RMContainer rmc = app.getLiveContainers().iterator().next();
-          updateQueueMetrics(queue,
-                  rmc.getContainer().getResource().getMemory(),
-                  rmc.getContainer().getResource().getVirtualCores());
-        }
-      }
+	    NodeUpdateSchedulerEventWrapper eventWrapper;
+	    try {
+	      //if (schedulerEvent instanceof NodeUpdateSchedulerEvent) {
+	      if (schedulerEvent.getType() == SchedulerEventType.NODE_UPDATE
+	              && schedulerEvent instanceof NodeUpdateSchedulerEvent) {
+	        eventWrapper = new NodeUpdateSchedulerEventWrapper(
+	                (NodeUpdateSchedulerEvent)schedulerEvent);
+	        schedulerEvent = eventWrapper;
+	        updateQueueWithNodeUpdate(eventWrapper);
+	      } else if (schedulerEvent.getType() == SchedulerEventType.APP_ATTEMPT_REMOVED
+	          && schedulerEvent instanceof AppAttemptRemovedSchedulerEvent) {
+	        // check if having AM Container, update resource usage information
+	        AppAttemptRemovedSchedulerEvent appRemoveEvent =
+	            (AppAttemptRemovedSchedulerEvent) schedulerEvent;
+	        ApplicationAttemptId appAttemptId =
+	                appRemoveEvent.getApplicationAttemptID();
+	        String queue = appQueueMap.get(appAttemptId);
+	        SchedulerAppReport app = super.getSchedulerAppInfo(appAttemptId);
+	        if (! app.getLiveContainers().isEmpty()) {  // have 0 or 1
+	          // should have one container which is AM container
+	          RMContainer rmc = app.getLiveContainers().iterator().next();
+	          updateQueueMetrics(queue,
+	                  rmc.getContainer().getResource().getMemory(),
+	                  rmc.getContainer().getResource().getVirtualCores());
+	        }
+	      }
 
-      handlerTimer = schedulerHandleTimer.time();
-      operationTimer = schedulerHandleTimerMap
-              .get(schedulerEvent.getType()).time();
+	      handlerTimer = schedulerHandleTimer.time();
+	      operationTimer = schedulerHandleTimerMap
+	              .get(schedulerEvent.getType()).time();
 
-      scheduler.handle(schedulerEvent);
+	      super.handle(schedulerEvent);
+	    } finally {
+	      if (handlerTimer != null)     handlerTimer.stop();
+	      if (operationTimer != null)   operationTimer.stop();
+	      schedulerHandleCounter.inc();
+	      schedulerHandleCounterMap.get(schedulerEvent.getType()).inc();
 
-    } finally {
-      if (handlerTimer != null) {
-        handlerTimer.stop();
-      }
-      if (operationTimer != null) {
-        operationTimer.stop();
-      }
-      schedulerHandleCounter.inc();
-      schedulerHandleCounterMap.get(schedulerEvent.getType()).inc();
-
-      if (schedulerEvent.getType() == SchedulerEventType.APP_REMOVED
-              && schedulerEvent instanceof AppRemovedSchedulerEvent) {
-//        SLSRunner.decreaseRemainingApps();
-        AppRemovedSchedulerEvent appRemoveEvent
-                = (AppRemovedSchedulerEvent) schedulerEvent;
-        appQueueMap.remove(appRemoveEvent.getApplicationID());
-      } else if (schedulerEvent.getType() == SchedulerEventType.APP_ADDED
-              && schedulerEvent instanceof AppAddedSchedulerEvent) {
-        AppAddedSchedulerEvent appAddEvent
-                = (AppAddedSchedulerEvent) schedulerEvent;
-        String queueName = appAddEvent.getQueue();
-        appQueueMap.put(appAddEvent.getApplicationId(), queueName);
-      }
-
-    }
+	      if (schedulerEvent.getType() == SchedulerEventType.APP_ATTEMPT_REMOVED
+	          && schedulerEvent instanceof AppAttemptRemovedSchedulerEvent) {
+	        SLSRunner.decreaseRemainingApps();
+	        AppAttemptRemovedSchedulerEvent appRemoveEvent =
+	                (AppAttemptRemovedSchedulerEvent) schedulerEvent;
+	        ApplicationAttemptId appAttemptId =
+	                appRemoveEvent.getApplicationAttemptID();
+	        appQueueMap.remove(appRemoveEvent.getApplicationAttemptID());
+	      } else if (schedulerEvent.getType() == SchedulerEventType.APP_ATTEMPT_ADDED
+	          && schedulerEvent instanceof AppAttemptAddedSchedulerEvent) {
+	        AppAttemptAddedSchedulerEvent appAddEvent =
+	                (AppAttemptAddedSchedulerEvent) schedulerEvent;
+                //String queueName=appAddEvent.getQueue();
+                //appAddEvent.getQueue() is not correct, hence below is the correct one.
+	        String queueName = "Queue "+appAddEvent.getApplicationAttemptId();//appAddEvent.getQueue() is not correct
+                
+	        appQueueMap.put(appAddEvent.getApplicationAttemptId(), queueName);
+	      }
+	    }
   }
 
   private void updateQueueWithNodeUpdate(
@@ -316,7 +303,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicat
     for (UpdatedContainerInfo info : containerList) {
       for (ContainerStatus status : info.getCompletedContainers()) {
         ContainerId containerId = status.getContainerId();
-        SchedulerAppReport app = scheduler.getSchedulerAppInfo(
+        SchedulerAppReport app = super.getSchedulerAppInfo(
                 containerId.getApplicationAttemptId());
 
         if (app == null) {
@@ -326,11 +313,9 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicat
           continue;
         }
 
-        String queue
-                = appQueueMap.get(containerId.getApplicationAttemptId()
-                        .getApplicationId());
-        int releasedMemory = 0, releasedVCores = 0;
-        if (status.getExitStatus() == ContainerExitStatus.SUCCESS) {
+        String queue = appQueueMap.get(containerId.getApplicationAttemptId());
+       int releasedMemory = 0, releasedVCores = 0;
+       if (status.getExitStatus() == ContainerExitStatus.SUCCESS) {
           for (RMContainer rmc : app.getLiveContainers()) {
             if (rmc.getContainerId() == containerId) {
               releasedMemory += rmc.getContainer().getResource().getMemory();
@@ -354,13 +339,13 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicat
   }
 
   private void updateQueueWithAllocateRequest(Allocation allocation,
-          ApplicationAttemptId attemptId,
-          List<ResourceRequest> resourceRequests,
-          List<ContainerId> containerIds) throws IOException {
+                        ApplicationAttemptId attemptId,
+                        List<ResourceRequest> resourceRequests,
+                        List<ContainerId> containerIds) throws IOException {
     // update queue information
     Resource pendingResource = Resources.createResource(0, 0);
     Resource allocatedResource = Resources.createResource(0, 0);
-    String queueName = appQueueMap.get(attemptId.getApplicationId());
+    String queueName = appQueueMap.get(attemptId);
     // container requested
     for (ResourceRequest request : resourceRequests) {
       if (request.getResourceName().equals(ResourceRequest.ANY)) {
@@ -375,7 +360,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicat
       Resources.subtractFrom(pendingResource, container.getResource());
     }
     // container released from AM
-    SchedulerAppReport report = scheduler.getSchedulerAppInfo(attemptId);
+    SchedulerAppReport report = super.getSchedulerAppInfo(attemptId);
     for (ContainerId containerId : containerIds) {
       Container container = null;
       for (RMContainer c : report.getLiveContainers()) {
@@ -408,9 +393,9 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicat
     if (allocation.getStrictContainerPreemptions() != null) {
       preemptionContainers.addAll(allocation.getStrictContainerPreemptions());
     }
-    if (!preemptionContainers.isEmpty()) {
+    if (! preemptionContainers.isEmpty()) {
       for (ContainerId containerId : preemptionContainers) {
-        if (!preemptionContainerMap.containsKey(containerId)) {
+        if (! preemptionContainerMap.containsKey(containerId)) {
           Container container = null;
           for (RMContainer c : report.getLiveContainers()) {
             if (c.getContainerId().equals(containerId)) {
@@ -429,24 +414,24 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicat
     // update metrics
     SortedMap<String, Counter> counterMap = metrics.getCounters();
     String names[] = new String[]{
-      "counter.queue." + queueName + ".pending.memory",
-      "counter.queue." + queueName + ".pending.cores",
-      "counter.queue." + queueName + ".allocated.memory",
-      "counter.queue." + queueName + ".allocated.cores"};
+            "counter.queue." + queueName + ".pending.memory",
+            "counter.queue." + queueName + ".pending.cores",
+            "counter.queue." + queueName + ".allocated.memory",
+            "counter.queue." + queueName + ".allocated.cores"};
     int values[] = new int[]{pendingResource.getMemory(),
-      pendingResource.getVirtualCores(),
-      allocatedResource.getMemory(), allocatedResource.getVirtualCores()};
-    for (int i = names.length - 1; i >= 0; i--) {
-      if (!counterMap.containsKey(names[i])) {
+            pendingResource.getVirtualCores(),
+            allocatedResource.getMemory(), allocatedResource.getVirtualCores()};
+    for (int i = names.length - 1; i >= 0; i --) {
+      if (! counterMap.containsKey(names[i])) {
         metrics.counter(names[i]);
         counterMap = metrics.getCounters();
       }
       counterMap.get(names[i]).inc(values[i]);
-    }
+   }
 
     queueLock.lock();
-    try {
-      if (!schedulerMetrics.isTracked(queueName)) {
+  try {
+      if (! schedulerMetrics.isTracked(queueName)) {
         schedulerMetrics.trackQueue(queueName);
       }
     } finally {
@@ -460,9 +445,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicat
       jobRuntimeLogBW.close();
     }
     // shut pool
-    if (pool != null) {
-      pool.shutdown();
-    }
+    if (pool != null)  pool.shutdown();
   }
 
   @SuppressWarnings("unchecked")
@@ -474,13 +457,13 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicat
             SLSConfiguration.METRICS_WEB_ADDRESS_PORT,
             SLSConfiguration.METRICS_WEB_ADDRESS_PORT_DEFAULT);
     // create SchedulerMetrics for current scheduler
-    String schedulerMetricsType = conf.get(scheduler.getClass().getName());
-    Class schedulerMetricsClass = schedulerMetricsType == null
-            ? defaultSchedulerMetricsMap.get(scheduler.getClass())
-            : Class.forName(schedulerMetricsType);
-    schedulerMetrics = (SchedulerMetrics) ReflectionUtils
+    String schedulerMetricsType = conf.get(CapacityScheduler.class.getName());
+    Class schedulerMetricsClass = schedulerMetricsType == null?
+            defaultSchedulerMetricsMap.get(CapacityScheduler.class) :
+            Class.forName(schedulerMetricsType);
+    schedulerMetrics = (SchedulerMetrics)ReflectionUtils
             .newInstance(schedulerMetricsClass, new Configuration());
-    schedulerMetrics.init(scheduler, metrics);
+    schedulerMetrics.init(this, metrics);
 
     // register various metrics
     registerJvmMetrics();
@@ -492,8 +475,9 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicat
     initMetricsCSVOutput();
 
     // start web app to provide real-time tracking
-//    web = new SLSWebApp(this, metricsWebAddressPort);
-//    web.start();
+    web = new SLSWebApp(this, metricsWebAddressPort);
+    web.start();
+
     // a thread to update histogram timer
     pool = new ScheduledThreadPoolExecutor(2);
     pool.scheduleAtFixedRate(new HistogramsRunnable(), 0, 1000,
@@ -506,117 +490,114 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicat
     // application running information
     jobRuntimeLogBW = new BufferedWriter(
             new FileWriter(metricsOutputDir + "/jobruntime.csv"));
-    jobRuntimeLogBW.write("JobID,real_start_time,real_end_time,"
-            + "simulate_start_time,simulate_end_time" + EOL);
+    jobRuntimeLogBW.write("JobID,real_start_time,real_end_time," +
+            "simulate_start_time,simulate_end_time" + EOL);
     jobRuntimeLogBW.flush();
   }
 
   private void registerJvmMetrics() {
     // add JVM gauges
     metrics.register("variable.jvm.free.memory",
-            new Gauge<Long>() {
-              @Override
-              public Long getValue() {
-                return Runtime.getRuntime().freeMemory();
-              }
-            }
+      new Gauge<Long>() {
+        @Override
+        public Long getValue() {
+          return Runtime.getRuntime().freeMemory();
+        }
+      }
     );
     metrics.register("variable.jvm.max.memory",
-            new Gauge<Long>() {
-              @Override
-              public Long getValue() {
-                return Runtime.getRuntime().maxMemory();
-              }
-            }
+      new Gauge<Long>() {
+        @Override
+        public Long getValue() {
+          return Runtime.getRuntime().maxMemory();
+        }
+      }
     );
     metrics.register("variable.jvm.total.memory",
-            new Gauge<Long>() {
-              @Override
-              public Long getValue() {
-                return Runtime.getRuntime().totalMemory();
-              }
-            }
+      new Gauge<Long>() {
+        @Override
+        public Long getValue() {
+          return Runtime.getRuntime().totalMemory();
+        }
+      }
     );
   }
 
   private void registerClusterResourceMetrics() {
     metrics.register("variable.cluster.allocated.memory",
-            new Gauge<Integer>() {
-              @Override
-              public Integer getValue() {
-                if (scheduler == null || scheduler.getRootQueueMetrics() == null) {
-                  return 0;
-                } else {
-                  return scheduler.getRootQueueMetrics().getAllocatedMB();
-                }
-              }
-            }
+      new Gauge<Integer>() {
+        @Override
+        public Integer getValue() {
+          if( getRootQueueMetrics() == null) {
+            return 0;
+          } else {
+            return getRootQueueMetrics().getAllocatedMB();
+          }
+        }
+      }
     );
     metrics.register("variable.cluster.allocated.vcores",
-            new Gauge<Integer>() {
-              @Override
-              public Integer getValue() {
-                if (scheduler == null || scheduler.getRootQueueMetrics() == null) {
-                  return 0;
-                } else {
-                  return scheduler.getRootQueueMetrics().
-                  getAllocatedVirtualCores();
-                }
-              }
-            }
+      new Gauge<Integer>() {
+        @Override
+        public Integer getValue() {
+          if(getRootQueueMetrics() == null) {
+            return 0;
+          } else {
+            return getRootQueueMetrics().getAllocatedVirtualCores();
+          }
+        }
+      }
     );
     metrics.register("variable.cluster.available.memory",
-            new Gauge<Integer>() {
-              @Override
-              public Integer getValue() {
-                if (scheduler == null || scheduler.getRootQueueMetrics() == null) {
-                  return 0;
-                } else {
-                  return scheduler.getRootQueueMetrics().getAvailableMB();
-                }
-              }
-            }
+      new Gauge<Integer>() {
+        @Override
+        public Integer getValue() {
+          if(getRootQueueMetrics() == null) {
+            return 0;
+          } else {
+            return getRootQueueMetrics().getAvailableMB();
+          }
+        }
+      }
     );
     metrics.register("variable.cluster.available.vcores",
-            new Gauge<Integer>() {
-              @Override
-              public Integer getValue() {
-                if (scheduler == null || scheduler.getRootQueueMetrics() == null) {
-                  return 0;
-                } else {
-                  return scheduler.getRootQueueMetrics().
-                  getAvailableVirtualCores();
-                }
-              }
-            }
+      new Gauge<Integer>() {
+        @Override
+        public Integer getValue() {
+          if(getRootQueueMetrics() == null) {
+            return 0;
+          } else {
+            return getRootQueueMetrics().getAvailableVirtualCores();
+          }
+        }
+      }
     );
   }
 
   private void registerContainerAppNumMetrics() {
     metrics.register("variable.running.application",
-            new Gauge<Integer>() {
-              @Override
-              public Integer getValue() {
-                if (scheduler == null || scheduler.getRootQueueMetrics() == null) {
-                  return 0;
-                } else {
-                  return scheduler.getRootQueueMetrics().getAppsRunning();
-                }
-              }
-            }
+      new Gauge<Integer>() {
+        @Override
+        public Integer getValue() {
+          if(getRootQueueMetrics() == null) {
+            return 0;
+          } else {
+            return getRootQueueMetrics().getAppsRunning();
+          }
+        }
+      }
     );
     metrics.register("variable.running.container",
-            new Gauge<Integer>() {
-              @Override
-              public Integer getValue() {
-                if (scheduler == null || scheduler.getRootQueueMetrics() == null) {
-                  return 0;
-                } else {
-                  return scheduler.getRootQueueMetrics().
-                  getAllocatedContainers();
-                }
-              }
-            }
+      new Gauge<Integer>() {
+        @Override
+        public Integer getValue() {
+          if(getRootQueueMetrics() == null) {
+            return 0;
+          } else {
+            return getRootQueueMetrics().getAllocatedContainers();
+          }
+        }
+      }
     );
   }
 
@@ -681,8 +662,8 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicat
             SLSConfiguration.METRICS_RECORD_INTERVAL_MS,
             SLSConfiguration.METRICS_RECORD_INTERVAL_MS_DEFAULT);
     File dir = new File(metricsOutputDir + "/metrics");
-    if (!dir.exists()
-            && !dir.mkdirs()) {
+    if(! dir.exists()
+            && ! dir.mkdirs()) {
       LOG.error("Cannot create directory " + dir.getAbsoluteFile());
     }
     final CsvReporter reporter = CsvReporter.forRegistry(metrics)
@@ -694,7 +675,6 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicat
   }
 
   class HistogramsRunnable implements Runnable {
-
     @Override
     public void run() {
       samplerLock.lock();
@@ -710,9 +690,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicat
   }
 
   class MetricsLogRunnable implements Runnable {
-
     private boolean firstLine = true;
-
     public MetricsLogRunnable() {
       try {
         metricsLogBW = new BufferedWriter(
@@ -725,15 +703,15 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicat
 
     @Override
     public void run() {
-      if (running) {
+      if(running) {
         // all WebApp to get real tracking json
         String metrics = web.generateRealTimeTrackingMetrics();
         // output
         try {
-          if (firstLine) {
+          if(firstLine) {
             metricsLogBW.write(metrics + EOL);
             firstLine = false;
-          } else {
+         } else {
             metricsLogBW.write("," + metrics + EOL);
           }
           metricsLogBW.flush();
@@ -746,8 +724,8 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicat
 
   // the following functions are used by AMSimulator
   public void addAMRuntime(ApplicationId appId,
-          long traceStartTimeMS, long traceEndTimeMS,
-          long simulateStartTimeMS, long simulateEndTimeMS) {
+                           long traceStartTimeMS, long traceEndTimeMS,
+                           long simulateStartTimeMS, long simulateEndTimeMS) {
 
     try {
       // write job runtime information
@@ -760,23 +738,22 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicat
     } catch (IOException e) {
       e.printStackTrace();
     }
-  }
-
+ }
   private void updateQueueMetrics(String queue,
-          int releasedMemory, int releasedVCores) {
-    // update queue counters
+                                 int releasedMemory, int releasedVCores) {
+   // update queue counters
     SortedMap<String, Counter> counterMap = metrics.getCounters();
     if (releasedMemory != 0) {
       String name = "counter.queue." + queue + ".allocated.memory";
-      if (!counterMap.containsKey(name)) {
+      if (! counterMap.containsKey(name)) {
         metrics.counter(name);
         counterMap = metrics.getCounters();
       }
       counterMap.get(name).inc(-releasedMemory);
-    }
+   }
     if (releasedVCores != 0) {
       String name = "counter.queue." + queue + ".allocated.cores";
-      if (!counterMap.containsKey(name)) {
+      if (! counterMap.containsKey(name)) {
         metrics.counter(name);
         counterMap = metrics.getCounters();
       }
@@ -786,13 +763,13 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicat
 
   public void setQueueSet(Set<String> queues) {
     this.queueSet = queues;
-  }
+ }
 
   public Set<String> getQueueSet() {
-    return this.queueSet;
+   return this.queueSet;
   }
 
-  public void setTrackedAppSet(Set<String> apps) {
+ public void setTrackedAppSet(Set<String> apps) {
     this.trackedAppSet = apps;
   }
 
@@ -810,14 +787,14 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicat
 
   // API open to out classes
   public void addTrackedApp(ApplicationAttemptId appAttemptId,
-          String oldAppId) {
+                            String oldAppId) {
     if (metricsON) {
       schedulerMetrics.trackApp(appAttemptId, oldAppId);
     }
   }
 
   public void removeTrackedApp(ApplicationAttemptId appAttemptId,
-          String oldAppId) {
+                               String oldAppId) {
     if (metricsON) {
       schedulerMetrics.untrackApp(appAttemptId, oldAppId);
     }
@@ -828,85 +805,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicat
     return conf;
   }
 
-  @Override
-  public void reinitialize(Configuration entries, RMContext rmContext,
-          TransactionState transactionState)
-          throws IOException {
-    scheduler.reinitialize(entries, rmContext, transactionState);
-  }
 
-  @Override
-  public void recover(RMStateStore.RMState rmState) throws Exception {
-    scheduler.recover(rmState);
-  }
 
-  @Override
-  public QueueInfo getQueueInfo(String s, boolean b, boolean b2)
-          throws IOException {
-    return scheduler.getQueueInfo(s, b, b2);
-  }
 
-  @Override
-  public List<QueueUserACLInfo> getQueueUserAclInfo() {
-    return scheduler.getQueueUserAclInfo();
-  }
-
-  @Override
-  public Resource getMinimumResourceCapability() {
-    return scheduler.getMinimumResourceCapability();
-  }
-
-  @Override
-  public Resource getMaximumResourceCapability() {
-    return scheduler.getMaximumResourceCapability();
-  }
-
-  @Override
-  public int getNumClusterNodes() {
-    return scheduler.getNumClusterNodes();
-  }
-
-  @Override
-  public SchedulerNodeReport getNodeReport(NodeId nodeId) {
-    return scheduler.getNodeReport(nodeId);
-  }
-
-  @Override
-  public SchedulerAppReport getSchedulerAppInfo(
-          ApplicationAttemptId attemptId) {
-    return scheduler.getSchedulerAppInfo(attemptId);
-  }
-
-  @Override
-  public QueueMetrics getRootQueueMetrics() {
-    return scheduler.getRootQueueMetrics();
-  }
-
-  @Override
-  public synchronized boolean checkAccess(UserGroupInformation callerUGI,
-          QueueACL acl, String queueName) {
-    return scheduler.checkAccess(callerUGI, acl, queueName);
-  }
-
-  @Override
-  public ApplicationResourceUsageReport getAppResourceUsageReport(
-          ApplicationAttemptId appAttemptId) {
-    return scheduler.getAppResourceUsageReport(appAttemptId);
-  }
-
-  @Override
-  public List<ApplicationAttemptId> getAppsInQueue(String queue) {
-    return scheduler.getAppsInQueue(queue);
-  }
-
-  @Override
-  public RMContainer getRMContainer(ContainerId containerId) {
-    return null;
-  }
-
-  @Override
-  public String moveApplication(ApplicationId appId, String newQueue)
-          throws YarnException {
-    return scheduler.moveApplication(appId, newQueue);
-  }
 }
