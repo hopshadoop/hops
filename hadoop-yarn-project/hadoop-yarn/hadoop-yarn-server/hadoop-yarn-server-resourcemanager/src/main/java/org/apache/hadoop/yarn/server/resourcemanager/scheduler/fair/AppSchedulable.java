@@ -40,8 +40,10 @@ import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.apache.hadoop.yarn.util.resource.DefaultResourceCalculator;
 import org.apache.hadoop.yarn.util.resource.Resources;
 
+import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Comparator;
 
 @Private
 @Unstable
@@ -58,6 +60,8 @@ public class AppSchedulable extends Schedulable {
   private static final Log LOG = LogFactory.getLog(AppSchedulable.class);
   private FSLeafQueue queue;
   private RMContainerTokenSecretManager containerTokenSecretManager;
+
+  private RMContainerComparator comparator = new RMContainerComparator();
 
   public AppSchedulable(FairScheduler scheduler, FSSchedulerApp app,
       FSLeafQueue queue) {
@@ -108,7 +112,10 @@ public class AppSchedulable extends Schedulable {
 
   @Override
   public Resource getResourceUsage() {
-    return app.getCurrentConsumption();
+    // Here the getPreemptedResources() always return zero, except in
+    // a preemption round
+    return Resources.subtract(app.getCurrentConsumption(),
+            app.getPreemptedResources());
   }
 
 
@@ -393,7 +400,29 @@ public class AppSchedulable extends Schedulable {
       TransactionState transactionState) {
     return assignContainer(node, false, transactionState);
   }
-  
+
+  /**
+   * Preempt a running container according to the priority
+   */
+  @Override
+  public RMContainer preemptContainer() {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("App " + getName() + " is going to preempt a running " +
+          "container");
+    }
+
+    RMContainer toBePreempted = null;
+    for (RMContainer container : app.getLiveContainers()) {
+      if (!app.getPreemptionContainers().contains(container) &&
+              (toBePreempted == null ||
+                comparator.compare(toBePreempted, container)> 0 )) {
+        toBePreempted = container;
+      }
+    }
+
+    return toBePreempted;
+  }
+
   /**
    * Whether this app has containers requests that could be satisfied on the
    * given node, if the node had full space.
@@ -421,5 +450,18 @@ public class AppSchedulable extends Schedulable {
             Resources.lessThanOrEqual(RESOURCE_CALCULATOR, null,
                 anyRequest.getCapability(),
                 node.getRMNode().getTotalCapability());
+  }
+
+  static class RMContainerComparator implements Comparator<RMContainer>,
+          Serializable {
+    @Override
+    public int compare(RMContainer c1, RMContainer c2) {
+      int ret = c1.getContainer().getPriority().compareTo(
+              c2.getContainer().getPriority());
+      if (ret == 0) {
+        return c2.getContainerId().compareTo(c1.getContainerId());
+      }
+      return ret;
+    }
   }
 }
