@@ -62,14 +62,16 @@ public class CorruptReplicasMap {
    *
    * @param blk
    *     Block to be added to CorruptReplicasMap
-   * @param dn
-   *     DatanodeDescriptor which holds the corrupt replica
+   * @param storage
+   *     storage which holds the corrupt replica
    * @param reason
    *     a textual reason (for logging purposes)
    */
-  public void addToCorruptReplicasMap(BlockInfo blk, DatanodeDescriptor dn,
-      String reason) throws StorageException, TransactionContextException {
+  public void addToCorruptReplicasMap(BlockInfo blk, DatanodeStorageInfo
+      storage, String reason) throws StorageException, TransactionContextException {
     Collection<DatanodeDescriptor> nodes = getNodes(blk);
+    Collection<DatanodeStorageInfo> storages = getStorages(blk);
+
     
     String reasonText;
     if (reason != null) {
@@ -78,13 +80,13 @@ public class CorruptReplicasMap {
       reasonText = "";
     }
     
-    if (!nodes.contains(dn)) {
-      addCorruptReplicaToDB(new CorruptReplica(blk.getBlockId(), dn.getDatanodeUuid(), blk
-          .getInodeId()));
+    if (!storages.contains(storage)) {
+      addCorruptReplicaToDB(new CorruptReplica(blk.getBlockId(), storage.getSid(),
+          blk.getInodeId()));
       NameNode.blockStateChangeLog
           .info("BLOCK NameSystem.addToCorruptReplicasMap: " +
               blk.getBlockName() +
-              " added as corrupt on " + dn +
+              " added as corrupt on " + storage +
               " by " + Server.getRemoteIp() +
               reasonText);
     } else {
@@ -92,7 +94,7 @@ public class CorruptReplicasMap {
           .info("BLOCK NameSystem.addToCorruptReplicasMap: " +
               "duplicate requested for " +
               blk.getBlockName() + " to add as corrupt " +
-              "on " + dn +
+              "on " + storage +
               " by " + Server.getRemoteIp() +
               reasonText);
     }
@@ -193,6 +195,36 @@ public class CorruptReplicasMap {
       }
     }
     return nodes;
+  }
+
+  /**
+   * Get Storages which have corrupt replicas of Block
+   *
+   * @param blk
+   *     Block for which nodes are requested
+   * @return collection of storages. Null if does not exists
+   */
+  Collection<DatanodeStorageInfo> getStorages(BlockInfo blk) throws
+      StorageException, TransactionContextException {
+
+    //HOPS datanodeMgr is null in some tests
+    if (datanodeMgr == null) {
+      return new ArrayList<DatanodeStorageInfo>();
+    }
+
+    Collection<CorruptReplica> corruptReplicas = getCorruptReplicas(blk);
+    Collection<DatanodeStorageInfo> storages = new TreeSet<DatanodeStorageInfo>();
+
+    if (corruptReplicas != null) {
+      for (CorruptReplica cr : corruptReplicas) {
+        DatanodeStorageInfo storage = datanodeMgr.getStorage(cr.getStorageId());
+
+        if (storage != null) {
+          storages.add(storage);
+        }
+      }
+    }
+    return storages;
   }
 
   /**

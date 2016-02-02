@@ -181,6 +181,7 @@ public class DatanodeStorageInfo {
   
   @Override
   public String toString() {
-    return "[" + storageType + "]" + storageID + ":" + state;
+    return getDatanodeDescriptor().toString() + "[" + storageType + "]" +
+        storageID + ":" + state;
   }
 }

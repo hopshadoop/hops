@@ -205,7 +205,14 @@ public class BlockInfo extends Block {
     return getReplicas(datanodeMgr).size();
   }
 
-  public DatanodeDescriptor[] getDatanodes(DatanodeManager datanodeMgr)
+  /**
+   * Returns the Storages on which the replicas of this block are stored.
+   * @param datanodeMgr
+   * @return array of storages that store a replica of this block
+   */
+  // TODO is this a correct rewrite, or should this have stayed
+  // DatanodeDescriptor[] ?
+  public DatanodeStorageInfo[] getDatanodes(DatanodeManager datanodeMgr)
       throws StorageException, TransactionContextException {
     List<Replica> replicas = getReplicas(datanodeMgr);
     return getDatanodes(datanodeMgr, replicas);
@@ -364,20 +371,20 @@ public class BlockInfo extends Block {
   /**
    * Returns an array of Datanodes where the replicas are stored
    */
-  protected DatanodeDescriptor[] getDatanodes(DatanodeManager datanodeMgr,
+  protected DatanodeStorageInfo[] getDatanodes(DatanodeManager datanodeMgr,
       List<? extends ReplicaBase> replicas) {
     int numLocations = replicas.size();
-    List<DatanodeDescriptor> list = new ArrayList<DatanodeDescriptor>();
+    List<DatanodeStorageInfo> list = new ArrayList<DatanodeStorageInfo>();
     for (int i = numLocations - 1; i >= 0; i--) {
-      DatanodeDescriptor desc =
-          datanodeMgr.getDatanode(replicas.get(i).getStorageId());
+      DatanodeStorageInfo desc = datanodeMgr.getStorage(replicas.get(i)
+          .getStorageId());
       if (desc != null) {
         list.add(desc);
       } else {
         replicas.remove(i);
       }
     }
-    DatanodeDescriptor[] locations = new DatanodeDescriptor[list.size()];
+    DatanodeStorageInfo[] locations = new DatanodeStorageInfo[list.size()];
     return list.toArray(locations);
   }
 

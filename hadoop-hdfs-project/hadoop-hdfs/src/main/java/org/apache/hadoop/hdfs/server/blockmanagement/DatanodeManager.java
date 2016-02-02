@@ -78,6 +78,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Set;
 import java.util.TreeMap;
@@ -1315,5 +1316,10 @@ public class DatanodeManager {
         .getStorageInfos()) {
       storageIdMap.update(storage);
     }
+  }
+
+  // TODO is this the best place for this?
+  public DatanodeStorageInfo getStorage(int sid) {
+    throw new UnsupportedOperationException("Not implemented yet");
   }
 }
