@@ -31,6 +31,7 @@ import org.apache.hadoop.hdfs.server.namenode.INodeFile;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 
 /**
@@ -210,12 +211,10 @@ public class BlockInfo extends Block {
    * @param datanodeMgr
    * @return array of storages that store a replica of this block
    */
-  // TODO is this a correct rewrite, or should this have stayed
-  // DatanodeDescriptor[] ?
-  public DatanodeStorageInfo[] getDatanodes(DatanodeManager datanodeMgr)
+  public DatanodeStorageInfo[] getStorages(DatanodeManager datanodeMgr)
       throws StorageException, TransactionContextException {
     List<Replica> replicas = getReplicas(datanodeMgr);
-    return getDatanodes(datanodeMgr, replicas);
+    return getStorages(datanodeMgr, replicas);
   }
 
   List<Replica> getReplicasNoCheck()
@@ -369,9 +368,9 @@ public class BlockInfo extends Block {
   }
 
   /**
-   * Returns an array of Datanodes where the replicas are stored
+   * Returns an array of storages where the replicas are stored
    */
-  protected DatanodeStorageInfo[] getDatanodes(DatanodeManager datanodeMgr,
+  protected DatanodeStorageInfo[] getStorages(DatanodeManager datanodeMgr,
       List<? extends ReplicaBase> replicas) {
     int numLocations = replicas.size();
     List<DatanodeStorageInfo> list = new ArrayList<DatanodeStorageInfo>();
@@ -384,8 +383,23 @@ public class BlockInfo extends Block {
         replicas.remove(i);
       }
     }
-    DatanodeStorageInfo[] locations = new DatanodeStorageInfo[list.size()];
-    return list.toArray(locations);
+    DatanodeStorageInfo[] storages = new DatanodeStorageInfo[list.size()];
+    return list.toArray(storages);
+  }
+
+  /**
+   * Returns an array of Datanodes where the replicas are stored
+   */
+  protected DatanodeDescriptor[] getDatanodes(DatanodeManager datanodeMgr,
+      List<? extends ReplicaBase> replicas) {
+    DatanodeStorageInfo[] storages = getStorages(datanodeMgr, replicas);
+    HashSet<DatanodeDescriptor> datanodes = new HashSet<DatanodeDescriptor>();
+
+    for (DatanodeStorageInfo storage : storages) {
+      datanodes.add(storage.getDatanodeDescriptor());
+    }
+
+    return datanodes.toArray(new DatanodeDescriptor[datanodes.size()]);
   }
 
   protected void add(Replica replica)

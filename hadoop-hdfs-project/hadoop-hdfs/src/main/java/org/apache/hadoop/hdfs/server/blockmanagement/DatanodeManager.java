@@ -1322,4 +1322,8 @@ public class DatanodeManager {
   public DatanodeStorageInfo getStorage(int sid) {
     throw new UnsupportedOperationException("Not implemented yet");
   }
+
+  public DatanodeStorageInfo getStorage(String storageId) {
+    return getStorage(this.storageIdMap.getSId(storageId));
+  }
 }

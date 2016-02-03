@@ -198,11 +198,11 @@ public class CorruptReplicasMap {
   }
 
   /**
-   * Get Storages which have corrupt replicas of Block
+   * Get Nodes which have corrupt replicas of Block
    *
    * @param blk
    *     Block for which nodes are requested
-   * @return collection of storages. Null if does not exists
+   * @return collection of nodes. Null if does not exists
    */
   Collection<DatanodeStorageInfo> getStorages(BlockInfo blk) throws
       StorageException, TransactionContextException {
@@ -213,12 +213,13 @@ public class CorruptReplicasMap {
     }
 
     Collection<CorruptReplica> corruptReplicas = getCorruptReplicas(blk);
-    Collection<DatanodeStorageInfo> storages = new TreeSet<DatanodeStorageInfo>();
+    Collection<DatanodeStorageInfo> storages =
+        new TreeSet<DatanodeStorageInfo>();
 
     if (corruptReplicas != null) {
       for (CorruptReplica cr : corruptReplicas) {
+        // Look up which descriptor belongs to this uuid
         DatanodeStorageInfo storage = datanodeMgr.getStorage(cr.getStorageId());
-
         if (storage != null) {
           storages.add(storage);
         }
