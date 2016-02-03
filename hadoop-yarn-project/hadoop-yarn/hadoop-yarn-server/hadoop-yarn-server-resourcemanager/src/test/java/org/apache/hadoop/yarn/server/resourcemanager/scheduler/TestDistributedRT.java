@@ -160,6 +160,7 @@ public class TestDistributedRT {
    * @throws InterruptedException
    * @throws Exception
    */
+  @Ignore
   @Test
   public void testNMRegistration() throws InterruptedException, Exception {
     conf.setBoolean(YarnConfiguration.DISTRIBUTED_RM, true);
@@ -234,6 +235,7 @@ public class TestDistributedRT {
    * @throws InterruptedException
    * @throws Exception
    */
+  @Ignore
   @Test
   public void testNMHeartbeat() throws InterruptedException, Exception {
     conf.setBoolean(YarnConfiguration.DISTRIBUTED_RM, true);
@@ -328,6 +330,7 @@ public class TestDistributedRT {
    * @throws InterruptedException
    * @throws Exception
    */
+  @Ignore
   @Test
   public void testConcurrentRegistration()
       throws InterruptedException, Exception {

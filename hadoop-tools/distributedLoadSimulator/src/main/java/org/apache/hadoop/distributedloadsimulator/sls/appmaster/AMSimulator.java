@@ -683,4 +683,10 @@ public abstract class AMSimulator extends TaskRunner.Task {
       }
     }
   }
+  
+    long totalContainersDuration=0;
+    
+  public long getTotalContainersDuration(){
+    return totalContainersDuration;
+  }
 }
