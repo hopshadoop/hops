@@ -244,7 +244,6 @@ public class TestContainerAllocation {
   // creation failure.
   @Test(timeout = 60000)
   public void testAMContainerAllocationWhenDNSUnavailable() throws Exception {
-    final YarnConfiguration conf = new YarnConfiguration();
     YarnAPIStorageFactory.setConfiguration(conf);
     RMStorageFactory.setConfiguration(conf);
     MockRM rm1 = new MockRM(conf) {
