@@ -20,6 +20,7 @@ package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.records.QueueACL;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.QueuePlacementRule.NestedUserQueue;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.policies.DominantResourceFairnessPolicy;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.policies.FairSharePolicy;
 import org.apache.hadoop.yarn.util.Clock;
@@ -32,7 +33,6 @@ import java.io.PrintWriter;
 import java.util.List;
 
 import static org.junit.Assert.*;
-import static org.junit.Assert.assertEquals;
 
 public class TestAllocationFileLoaderService {
   
@@ -100,9 +100,11 @@ public class TestAllocationFileLoaderService {
     assertEquals(1, rules.size());
     assertEquals(QueuePlacementRule.Default.class, rules.get(0).getClass());
     assertEquals(1, allocConf.getQueueMaxApps("root.queueA"));
-    assertEquals(2, allocConf.getQueueNames().size());
-    assertTrue(allocConf.getQueueNames().contains("root.queueA"));
-    assertTrue(allocConf.getQueueNames().contains("root.queueB"));
+    assertEquals(2, allocConf.getConfiguredQueues().get(FSQueueType.LEAF).size());
+    assertTrue(allocConf.getConfiguredQueues().get(FSQueueType.LEAF)
+        .contains("root.queueA"));
+    assertTrue(allocConf.getConfiguredQueues().get(FSQueueType.LEAF)
+        .contains("root.queueB"));
     
     confHolder.allocConf = null;
     
@@ -115,6 +117,9 @@ public class TestAllocationFileLoaderService {
     out.println("  </queue>");
     out.println("  <queuePlacementPolicy>");
     out.println("    <rule name='specified' />");
+    out.println("    <rule name='nestedUserQueue' >");
+    out.println("         <rule name='primaryGroup' />");
+    out.println("    </rule>");
     out.println("    <rule name='default' />");
     out.println("  </queuePlacementPolicy>");
     out.println("</allocations>");
@@ -132,12 +137,16 @@ public class TestAllocationFileLoaderService {
     allocConf = confHolder.allocConf;
     policy = allocConf.getPlacementPolicy();
     rules = policy.getRules();
-    assertEquals(2, rules.size());
+    assertEquals(3, rules.size());
     assertEquals(QueuePlacementRule.Specified.class, rules.get(0).getClass());
-    assertEquals(QueuePlacementRule.Default.class, rules.get(1).getClass());
+    assertEquals(QueuePlacementRule.NestedUserQueue.class, rules.get(1).getClass());
+    assertEquals(QueuePlacementRule.PrimaryGroup.class,
+            ((NestedUserQueue) (rules.get(1))).nestedRule.getClass());
+    assertEquals(QueuePlacementRule.Default.class, rules.get(2).getClass());
     assertEquals(3, allocConf.getQueueMaxApps("root.queueB"));
-    assertEquals(1, allocConf.getQueueNames().size());
-    assertTrue(allocConf.getQueueNames().contains("root.queueB"));
+    assertEquals(1, allocConf.getConfiguredQueues().get(FSQueueType.LEAF).size());
+    assertTrue(allocConf.getConfiguredQueues().get(FSQueueType.LEAF)
+            .contains("root.queueB"));
   }
   
   @Test
@@ -171,6 +180,14 @@ public class TestAllocationFileLoaderService {
     out.println("<queue name=\"queueE\">");
     out.println("<minSharePreemptionTimeout>60</minSharePreemptionTimeout>");
     out.println("</queue>");
+    //Make queue F a parent queue without configured leaf queues using the 'type' attribute
+    out.println("<queue name=\"queueF\" type=\"parent\" >");
+    out.println("</queue>");
+    //Create hierarchical queues G,H
+    out.println("<queue name=\"queueG\">");
+    out.println("   <queue name=\"queueH\">");
+    out.println("   </queue>");
+    out.println("</queue>");
     // Set default limit of apps per queue to 15
     out.println("<queueMaxAppsDefault>15</queueMaxAppsDefault>");
     // Set default limit of apps per user to 5
@@ -196,7 +213,7 @@ public class TestAllocationFileLoaderService {
     allocLoader.reloadAllocations();
     AllocationConfiguration queueConf = confHolder.allocConf;
     
-    assertEquals(5, queueConf.getQueueNames().size());
+    assertEquals(6, queueConf.getConfiguredQueues().get(FSQueueType.LEAF).size());
     assertEquals(Resources.createResource(0), queueConf
         .getMinResources("root." + YarnConfiguration.DEFAULT_QUEUE_NAME));
     assertEquals(Resources.createResource(0), queueConf
@@ -257,7 +274,15 @@ public class TestAllocationFileLoaderService {
     assertEquals(120000, queueConf.getMinSharePreemptionTimeout("root.queueA"));
     assertEquals(60000, queueConf.getMinSharePreemptionTimeout("root.queueE"));
     assertEquals(300000, queueConf.getFairSharePreemptionTimeout());
-    
+
+    assertTrue(queueConf.getConfiguredQueues()
+            .get(FSQueueType.PARENT)
+            .contains("root.queueF"));
+    assertTrue(queueConf.getConfiguredQueues().get(FSQueueType.PARENT)
+            .contains("root.queueG"));
+    assertTrue(queueConf.getConfiguredQueues().get(FSQueueType.LEAF)
+            .contains("root.queueG.queueH"));
+
     // Verify existing queues have default scheduling policy
     assertEquals(DominantResourceFairnessPolicy.NAME,
         queueConf.getSchedulingPolicy("root").getName());
@@ -323,7 +348,7 @@ public class TestAllocationFileLoaderService {
     allocLoader.reloadAllocations();
     AllocationConfiguration queueConf = confHolder.allocConf;
 
-    assertEquals(5, queueConf.getQueueNames().size());
+    assertEquals(5, queueConf.getConfiguredQueues().get(FSQueueType.LEAF).size());
     assertEquals(Resources.createResource(0), queueConf
         .getMinResources("root." + YarnConfiguration.DEFAULT_QUEUE_NAME));
     assertEquals(Resources.createResource(0), queueConf
