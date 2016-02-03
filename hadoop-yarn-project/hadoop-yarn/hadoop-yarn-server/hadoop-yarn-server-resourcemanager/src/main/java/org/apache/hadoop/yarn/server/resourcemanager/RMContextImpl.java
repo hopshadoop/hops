@@ -49,6 +49,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListSet;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.quota.QuotaService;
 
 public class RMContextImpl implements RMContext {
 
@@ -122,7 +123,8 @@ public class RMContextImpl implements RMContext {
   private RMApplicationHistoryWriter rmApplicationHistoryWriter;//recovered
   private ConfigurationProvider configurationProvider;//recovered
   private ContainersLogsService containersLogsService;
-
+  private QuotaService quotaService;
+  
   /**
    * Default constructor. To be used in conjunction with setter methods for
    * individual fields.
@@ -152,7 +154,8 @@ public class RMContextImpl implements RMContext {
     this.setNMTokenSecretManager(nmTokenSecretManager);
     this.setClientToAMTokenSecretManager(clientToAMTokenSecretManager);
     this.setRMApplicationHistoryWriter(rmApplicationHistoryWriter);
-    this.setContainersLogsService(new ContainersLogsService());
+    this.setContainersLogsService(new ContainersLogsService(this));
+    this.setQuotaService(new QuotaService());
     
     RMStateStore nullStore = new NullRMStateStore();
     nullStore.setRMDispatcher(rmDispatcher);
@@ -185,7 +188,8 @@ public class RMContextImpl implements RMContext {
     this.setDelegationTokenRenewer(delegationTokenRenewer);
     this.setAMRMTokenSecretManager(appTokenSecretManager);
     this.setTransactionStateManager(transactionStateManager);
-    this.setContainersLogsService(new ContainersLogsService());
+    this.setContainersLogsService(new ContainersLogsService(this));
+    this.setQuotaService(new QuotaService());
     
     if (conf != null) {
       this.setContainerTokenSecretManager(
@@ -326,6 +330,11 @@ public class RMContextImpl implements RMContext {
       return containersLogsService;
   }
 
+  @Override
+  public QuotaService getQuotaService() {
+      return quotaService;
+  }
+  
   void setHAEnabled(boolean isHAEnabled) {
     this.isHAEnabled = isHAEnabled;
   }
@@ -437,6 +446,11 @@ public class RMContextImpl implements RMContext {
       this.containersLogsService = containersLogsService;
   }
 
+  void setQuotaService(
+          QuotaService quotaService) {
+      this.quotaService = quotaService;
+  }
+  
   @Override
   public boolean isHAEnabled() {
     return isHAEnabled;

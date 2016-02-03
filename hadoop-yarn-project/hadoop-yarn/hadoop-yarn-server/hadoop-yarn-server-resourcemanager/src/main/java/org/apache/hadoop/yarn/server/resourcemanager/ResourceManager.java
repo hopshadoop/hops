@@ -122,7 +122,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.quota.QuotaSchedulerService;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.quota.QuotaService;
 
 /**
  * The ResourceManager is the main class that is a set of components. "I am the
@@ -172,7 +172,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
   protected ApplicationACLsManager applicationACLsManager;
   protected QueueACLsManager queueACLsManager;
   protected ContainersLogsService containersLogsService;
-  protected QuotaSchedulerService quotaSchedulerService;
+  protected QuotaService quotaService;
   private WebApp webApp;
   private AppReportFetcher fetcher = null;
   protected ResourceTrackerService resourceTracker;
@@ -1062,8 +1062,8 @@ public class ResourceManager extends CompositeService implements Recoverable {
     if (containersLogsService != null) {
       containersLogsService.stop();
     }
-    if (quotaSchedulerService != null) {
-      quotaSchedulerService.stop();
+    if (quotaService != null) {
+      quotaService.stop();
     }
   }
   
@@ -1127,8 +1127,8 @@ public class ResourceManager extends CompositeService implements Recoverable {
     if (containersLogsService !=null){
       containersLogsService.stop();
     }
-    if(quotaSchedulerService!=null){
-      quotaSchedulerService.stop();
+    if(quotaService!=null){
+      quotaService.stop();
     }
     RMStorageFactory.stopTheNdbEventStreamingAPI();
     super.serviceStop();
@@ -1167,13 +1167,14 @@ public class ResourceManager extends CompositeService implements Recoverable {
   }
   
   protected void createAndStartQuotaServices() {
-    containersLogsService = new ContainersLogsService();
-    quotaSchedulerService = new QuotaSchedulerService();
+    containersLogsService = new ContainersLogsService(rmContext);
+    quotaService = new QuotaService();
     containersLogsService.init(conf);
-    quotaSchedulerService.init(conf);
+    quotaService.init(conf);
     rmContext.setContainersLogsService(containersLogsService);
+    rmContext.setQuotaService(quotaService);
     containersLogsService.start();
-    quotaSchedulerService.start();
+    quotaService.start();
   }
 
   @Private

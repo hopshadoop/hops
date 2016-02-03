@@ -208,10 +208,6 @@ public class YarnConfiguration extends Configuration {
           YARN_PREFIX + "quotas.containers-logs.alert-ratio";
   public static final double DEFAULT_QUOTAS_CONTAINERS_LOGS_ALERT_THRESHOLD = 
           0.6;
-  public static final String QUOTAS_MONITOR_INTERVAL = 
-          YARN_PREFIX + "quotas.containers-logs.monitor-interval";
-  public static final int DEFAULT_QUOTAS_MONITOR_INTERVAL = 
-          1000;
   /**
    * Enable periodic monitor threads.
    *

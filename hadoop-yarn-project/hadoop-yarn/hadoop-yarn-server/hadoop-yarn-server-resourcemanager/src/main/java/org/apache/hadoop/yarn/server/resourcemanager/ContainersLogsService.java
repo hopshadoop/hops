@@ -55,7 +55,8 @@ public class ContainersLogsService extends CompositeService {
   private int checkpointInterval; //Time in ticks between checkpoints
   private double alertThreshold;
   private double threshold;
-
+  private final RMContext rMContext;
+  
   ContainerStatusDataAccess containerStatusDA;
   ContainersLogsDataAccess containersLogsDA;
   YarnVariablesDataAccess yarnVariablesDA;
@@ -75,8 +76,9 @@ public class ContainersLogsService extends CompositeService {
   // with events triggered while initializing
   boolean recovered = true;
 
-  public ContainersLogsService() {
+  public ContainersLogsService(RMContext rMContext) {
     super(ContainersLogsService.class.getName());
+    this.rMContext = rMContext;
   }
 
   @Override
@@ -326,7 +328,6 @@ public class ContainersLogsService extends CompositeService {
                             + updateContainers.size());
                     try {
                       containersLogsDA.addAll(updateContainers);
-                      updateContainers.clear();
                     } catch (StorageException ex) {
                       LOG.warn("Unable to update containers logs table", ex);
                     }
@@ -342,6 +343,10 @@ public class ContainersLogsService extends CompositeService {
                 }
               };
       containersLogsHandler.handle();
+      
+      rMContext.getQuotaService().insertEvents(updateContainers);
+      updateContainers.clear();
+    
     } catch (IOException ex) {
       LOG.warn("Unable to update containers logs and tick counter", ex);
     }
