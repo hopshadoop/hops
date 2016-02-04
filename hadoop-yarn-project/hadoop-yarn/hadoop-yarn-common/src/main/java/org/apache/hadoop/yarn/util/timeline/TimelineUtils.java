@@ -20,12 +20,10 @@ package org.apache.hadoop.yarn.util.timeline;
 
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
+import org.apache.hadoop.yarn.webapp.YarnJacksonJaxbJsonProvider;
 import org.codehaus.jackson.JsonGenerationException;
-import org.codehaus.jackson.map.AnnotationIntrospector;
 import org.codehaus.jackson.map.JsonMappingException;
 import org.codehaus.jackson.map.ObjectMapper;
-import org.codehaus.jackson.map.annotate.JsonSerialize.Inclusion;
-import org.codehaus.jackson.xc.JaxbAnnotationIntrospector;
 
 import java.io.IOException;
 
@@ -40,9 +38,7 @@ public class TimelineUtils {
 
   static {
     mapper = new ObjectMapper();
-    AnnotationIntrospector introspector = new JaxbAnnotationIntrospector();
-    mapper.setAnnotationIntrospector(introspector);
-    mapper.setSerializationInclusion(Inclusion.NON_NULL);
+    YarnJacksonJaxbJsonProvider.configObjectMapper(mapper);
   }
 
   /**
