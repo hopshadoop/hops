@@ -369,7 +369,7 @@ class ClusterJspHelper {
       getDeadNodeStatus(statusMap, host,
           getProperty(props, "DeadNodes").asText());
       getDecommissionNodeStatus(statusMap, host,
-          getProperty(props, "DecomNodes").asText();
+          getProperty(props, "DecomNodes").asText());
     }
 
     /**
