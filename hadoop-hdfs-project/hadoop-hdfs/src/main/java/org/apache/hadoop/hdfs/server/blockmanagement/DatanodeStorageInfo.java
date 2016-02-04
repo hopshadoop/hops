@@ -131,7 +131,10 @@ public class DatanodeStorageInfo {
   public boolean addBlock(BlockInfo b) {
     try {
       return b.addReplica(this) != null;
-    } catch (StorageException | TransactionContextException e) {
+    } catch (StorageException e) {
+      // TODO how should we handle these exceptions?
+      e.printStackTrace();
+    } catch (TransactionContextException e) {
       // TODO how should we handle these exceptions?
       e.printStackTrace();
     }
@@ -143,7 +146,10 @@ public class DatanodeStorageInfo {
 //    return b.removeStorage(this);
     try {
       return b.removeReplica(this) != null;
-    } catch (StorageException | TransactionContextException e) {
+    } catch (StorageException e) {
+      // TODO how should we handle these exceptions?
+      e.printStackTrace();
+    } catch (TransactionContextException e) {
       // TODO how should we handle these exceptions?
       e.printStackTrace();
     }
