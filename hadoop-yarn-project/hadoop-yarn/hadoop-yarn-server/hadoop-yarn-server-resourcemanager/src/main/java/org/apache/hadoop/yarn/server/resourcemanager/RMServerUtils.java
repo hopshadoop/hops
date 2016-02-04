@@ -23,6 +23,7 @@ import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.AccessControlList;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
+import org.apache.hadoop.yarn.api.records.ApplicationResourceUsageReport;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.NodeState;
 import org.apache.hadoop.yarn.api.records.Resource;
@@ -38,6 +39,8 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppState;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptState;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerUtils;
+import org.apache.hadoop.yarn.server.utils.BuilderUtils;
+import org.apache.hadoop.yarn.util.resource.Resources;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -220,4 +223,13 @@ public class RMServerUtils {
     }
   }
 
+  /**
+   * Statically defined dummy ApplicationResourceUsageREport.  Used as
+   * a return value when a valid report cannot be found.
+   */
+  public static final ApplicationResourceUsageReport
+    DUMMY_APPLICATION_RESOURCE_USAGE_REPORT =
+      BuilderUtils.newApplicationResourceUsageReport(-1, -1,
+          Resources.createResource(-1, -1), Resources.createResource(-1, -1),
+          Resources.createResource(-1, -1));
 }
