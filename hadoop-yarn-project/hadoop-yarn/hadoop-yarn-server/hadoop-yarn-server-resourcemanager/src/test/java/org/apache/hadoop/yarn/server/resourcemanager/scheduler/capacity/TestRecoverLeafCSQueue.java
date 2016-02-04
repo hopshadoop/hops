@@ -130,7 +130,7 @@ public class TestRecoverLeafCSQueue {
             = CapacityScheduler.parseQueue(csContext, csConf, null,
                     CapacitySchedulerConfiguration.ROOT,
                     queues, queues,
-                    TestUtils.spyHook, null);
+                    TestUtils.spyHook);
 
     cs.reinitialize(csConf, rmContext, null);
     RMStorageFactory.setConfiguration(conf);

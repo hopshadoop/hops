@@ -98,6 +98,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.hadoop.yarn.conf.ConfigurationProvider;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.QueueMetrics;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication;
 import org.apache.hadoop.yarn.util.ConverterUtils;
@@ -1339,6 +1340,7 @@ public class CapacityScheduler extends AbstractYarnScheduler
   private CapacitySchedulerConfiguration loadCapacitySchedulerConfiguration(
           Configuration configuration) throws IOException {
     try {
+        ConfigurationProvider cp =this.rmContext.getConfigurationProvider();
       InputStream CSInputStream = this.rmContext.getConfigurationProvider()
               .getConfigurationInputStream(configuration,
                       YarnConfiguration.CS_CONFIGURATION_FILE);

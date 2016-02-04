@@ -48,6 +48,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.ApplicationMasterService;
 import org.apache.hadoop.yarn.server.resourcemanager.MockNodes;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
+import org.apache.hadoop.yarn.server.resourcemanager.resource.ResourceType;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.MockRMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppEvent;
@@ -66,6 +67,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.AppAttemptR
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeAddedSchedulerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeRemovedSchedulerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeUpdateSchedulerEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.QueuePlacementRule.Default;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.policies.DominantResourceFairnessPolicy;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.policies.FifoPolicy;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
@@ -90,6 +92,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.hadoop.yarn.server.resourcemanager.resource.ResourceType;
+import java.util.*;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -221,7 +224,7 @@ public class TestFairScheduler extends FairSchedulerTestBase {
         FairSchedulerConfiguration.RM_SCHEDULER_INCREMENT_ALLOCATION_VCORES, 2);
     fs.init(conf);
     fs.reinitialize(conf, null, null);
-    Assert.assertEquals(0, fs.getMinimumResourceCapability().getMemory());
+    Assert.assertEquals(256, fs.getMinimumResourceCapability().getMemory());
     Assert.assertEquals(1, fs.getMinimumResourceCapability().getVirtualCores());
     Assert.assertEquals(512, fs.getIncrementResourceCapability().getMemory());
     Assert
@@ -238,6 +241,7 @@ public class TestFairScheduler extends FairSchedulerTestBase {
         512);
     conf.setInt(
         FairSchedulerConfiguration.RM_SCHEDULER_INCREMENT_ALLOCATION_VCORES, 2);
+    fs.init(conf);
     fs.reinitialize(conf, null, null);
     Assert.assertEquals(0, fs.getMinimumResourceCapability().getMemory());
     Assert.assertEquals(0, fs.getMinimumResourceCapability().getVirtualCores());
@@ -280,6 +284,8 @@ public class TestFairScheduler extends FairSchedulerTestBase {
 
   @Test
   public void testSimpleFairShareCalculation() throws IOException {
+    scheduler.init(conf);
+    scheduler.start();  
     scheduler.reinitialize(conf, resourceManager.getRMContext(), null);
 
     // Add one big node (only care about aggregate capacity)
@@ -695,8 +701,11 @@ public class TestFairScheduler extends FairSchedulerTestBase {
     Set<String> queues =
         Sets.newHashSet("root.user1", "root.user3group", "root.user4subgroup1",
             "root.user4subgroup2", "root.user5subgroup2");
+    Map<FSQueueType, Set<String>> configuredQueues = new HashMap<FSQueueType, Set<String>>();
+    configuredQueues.put(FSQueueType.LEAF, queues);
+    configuredQueues.put(FSQueueType.PARENT, new HashSet<String>());
     scheduler.getAllocationConfiguration().placementPolicy =
-        new QueuePlacementPolicy(rules, queues, conf);
+        new QueuePlacementPolicy(rules, configuredQueues, conf);
     appId = createSchedulingRequest(1024, "somequeue", "user1");
     assertEquals("root.somequeue",
         scheduler.getSchedulerApp(appId).getQueueName());
@@ -721,7 +730,7 @@ public class TestFairScheduler extends FairSchedulerTestBase {
     rules.add(new QueuePlacementRule.Specified().initialize(true, null));
     rules.add(new QueuePlacementRule.Default().initialize(true, null));
     scheduler.getAllocationConfiguration().placementPolicy =
-        new QueuePlacementPolicy(rules, queues, conf);
+        new QueuePlacementPolicy(rules, configuredQueues, conf);
     appId = createSchedulingRequest(1024, "somequeue", "user1");
     assertEquals("root.user1", scheduler.getSchedulerApp(appId).getQueueName());
     appId = createSchedulingRequest(1024, "somequeue", "otheruser");
@@ -846,7 +855,7 @@ public class TestFairScheduler extends FairSchedulerTestBase {
 
     // user1,user2 submit their apps to parentq and create user queues
     scheduler.assignToQueue(rmApp1, "root.parentq", "user1", null);
-    scheduler.assignToQueue(rmApp2, "root.parentq", "user2");
+    scheduler.assignToQueue(rmApp2, "root.parentq", "user2", null);
 
     scheduler.update();
 
@@ -863,6 +872,7 @@ public class TestFairScheduler extends FairSchedulerTestBase {
       }
     }
   }
+
   /**
    * Make allocation requests and ensure they are reflected in queue demand.
    */
@@ -1483,6 +1493,8 @@ public class TestFairScheduler extends FairSchedulerTestBase {
   
   @Test(timeout = 5000)
   public void testMultipleContainersWaitingForReservation() throws IOException {
+    scheduler.init(conf);
+    scheduler.start();
     scheduler.reinitialize(conf, resourceManager.getRMContext(), null);
 
     // Add a node
@@ -2762,6 +2774,38 @@ public class TestFairScheduler extends FairSchedulerTestBase {
     assertEquals(2, jerryQueue.getRunnableAppSchedulables().size());
     assertEquals(2, defaultQueue.getRunnableAppSchedulables().size());
   }
+  
+  @Test
+  public void testDefaultRuleInitializesProperlyWhenPolicyNotConfigured()
+      throws IOException {
+    // This test verifies if default rule in queue placement policy
+    // initializes properly when policy is not configured and
+    // undeclared pools is not allowed.
+    conf.set(FairSchedulerConfiguration.ALLOCATION_FILE, ALLOC_FILE);
+    conf.setBoolean(FairSchedulerConfiguration.ALLOW_UNDECLARED_POOLS, false);
+
+    // Create an alloc file with no queue placement policy
+    PrintWriter out = new PrintWriter(new FileWriter(ALLOC_FILE));
+    out.println("<?xml version=\"1.0\"?>");
+    out.println("<allocations>");
+    out.println("</allocations>");
+    out.close();
+
+    scheduler.init(conf);
+    scheduler.start();
+    scheduler.reinitialize(conf, resourceManager.getRMContext(), null);
+
+    List<QueuePlacementRule> rules = scheduler.allocConf.placementPolicy
+        .getRules();
+
+    for (QueuePlacementRule rule : rules) {
+      if (rule instanceof Default) {
+        Default defaultRule = (Default) rule;
+        assertNotNull(defaultRule.defaultQueueName);
+      }
+    }
+  }
+  
 
   @SuppressWarnings("resource")
   @Test

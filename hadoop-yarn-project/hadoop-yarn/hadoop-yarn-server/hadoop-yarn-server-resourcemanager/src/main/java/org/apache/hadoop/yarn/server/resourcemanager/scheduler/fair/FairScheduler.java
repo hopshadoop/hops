@@ -1205,7 +1205,7 @@ public class FairScheduler extends AbstractYarnScheduler {
     rootMetrics.setAvailableResourcesToQueue(Resources
             .subtract(clusterCapacity, rootMetrics.getAllocatedResources()));
   }
-
+  
   @Override
   public QueueMetrics getRootQueueMetrics() {
     return rootMetrics;
@@ -1315,7 +1315,7 @@ public class FairScheduler extends AbstractYarnScheduler {
     this.rmContext = rmContext;
   }
    
-    private synchronized void initScheduler(Configuration conf)
+  private synchronized void initScheduler(Configuration conf)
       throws IOException {
     this.conf = new FairSchedulerConfiguration(conf);
     validateConf(this.conf);

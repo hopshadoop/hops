@@ -234,7 +234,14 @@ public class AllocationFileLoaderService extends AbstractService {
     QueuePlacementPolicy newPlacementPolicy = null;
 
     // Remember all queue names so we can display them on web UI, etc.
-    Set<String> queueNamesInAllocFile = new HashSet<String>();
+    // configuredQueues is segregated based on whether it is a lead queue
+    // or a parent queue. This information is used for creating queues
+    // and also for making queue placement decisions(QueuePlacementRule.java)
+    Map<FSQueueType, Set<String>> configuredQueues =
+            new HashMap<FSQueueType, Set<String>>();
+    for (FSQueueType queueType : FSQueueType.values()) {
+      configuredQueues.put(queueType, new HashSet<String>());
+    }
 
     // Read and parse the allocations file.
     DocumentBuilderFactory docBuilderFactory =
@@ -316,17 +323,17 @@ public class AllocationFileLoaderService extends AbstractService {
       }
       loadQueue(parent, element, minQueueResources, maxQueueResources,
           queueMaxApps, userMaxApps, queueWeights, queuePolicies,
-          minSharePreemptionTimeouts, queueAcls, queueNamesInAllocFile);
+          minSharePreemptionTimeouts, queueAcls, configuredQueues);
     }
     
     // Load placement policy and pass it configured queues
     Configuration conf = getConfig();
     if (placementPolicyElement != null) {
       newPlacementPolicy = QueuePlacementPolicy
-          .fromXml(placementPolicyElement, queueNamesInAllocFile, conf);
+          .fromXml(placementPolicyElement, configuredQueues, conf);
     } else {
       newPlacementPolicy =
-          QueuePlacementPolicy.fromConfiguration(conf, queueNamesInAllocFile);
+          QueuePlacementPolicy.fromConfiguration(conf, configuredQueues);
     }
     
     AllocationConfiguration info =
@@ -335,7 +342,7 @@ public class AllocationFileLoaderService extends AbstractService {
             queueMaxAppsDefault, queuePolicies, defaultSchedPolicy,
             minSharePreemptionTimeouts, queueAcls, fairSharePreemptionTimeout,
             defaultMinSharePreemptionTimeout, newPlacementPolicy,
-            queueNamesInAllocFile);
+            configuredQueues);
     
     lastSuccessfulReload = clock.getTime();
     lastReloadAttemptFailed = false;
@@ -354,7 +361,7 @@ public class AllocationFileLoaderService extends AbstractService {
       Map<String, SchedulingPolicy> queuePolicies,
       Map<String, Long> minSharePreemptionTimeouts,
       Map<String, Map<QueueACL, AccessControlList>> queueAcls,
-      Set<String> queueNamesInAllocFile)
+      Map<FSQueueType, Set<String>> configuredQueues)
       throws AllocationConfigurationException {
     String queueName = element.getAttribute("name");
     if (parentName != null) {
@@ -408,12 +415,19 @@ public class AllocationFileLoaderService extends AbstractService {
           "pool".equals(field.getTagName())) {
         loadQueue(queueName, field, minQueueResources, maxQueueResources,
             queueMaxApps, userMaxApps, queueWeights, queuePolicies,
-            minSharePreemptionTimeouts, queueAcls, queueNamesInAllocFile);
+            minSharePreemptionTimeouts, queueAcls, configuredQueues);
+        configuredQueues.get(FSQueueType.PARENT).add(queueName);
         isLeaf = false;
       }
     }
     if (isLeaf) {
-      queueNamesInAllocFile.add(queueName);
+      // if a leaf in the alloc file is marked as type='parent'
+      // then store it under 'parent'
+      if ("parent".equals(element.getAttribute("type"))) {
+        configuredQueues.get(FSQueueType.PARENT).add(queueName);
+      } else {
+        configuredQueues.get(FSQueueType.LEAF).add(queueName);
+      }
     }
     queueAcls.put(queueName, acls);
     if (maxQueueResources.containsKey(queueName) &&

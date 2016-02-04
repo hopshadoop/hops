@@ -54,8 +54,10 @@ public class TestQueueParsing {
      new ClientToAMTokenSecretManagerInRM(), null, conf);
      rmContext.setContainerTokenSecretManager(
              new RMContainerTokenSecretManager(conf, rmContext));
-     rmContext.setNMTokenSecretManager(new NMTokenSecretManagerInRM(conf, rmContext));
-     
+     rmContext.setNMTokenSecretManager(new NMTokenSecretManagerInRM(conf, rmContext));    
+    capacityScheduler.setRMContext(rmContext);
+    capacityScheduler.init(conf);
+    capacityScheduler.start();
     capacityScheduler.reinitialize(conf,
         new RMContextImpl(null, null, null, null, null, null,
             new ClientToAMTokenSecretManagerInRM(), null, conf, tsm), null);
