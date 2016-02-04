@@ -61,15 +61,15 @@ public abstract class BlockPlacementPolicy {
    *     additional number of replicas wanted.
    * @param writer
    *     the writer's machine, null if not in the cluster.
-   * @param chosenNodes
+   * @param chosenStorages
    *     datanodes that have been chosen as targets.
    * @param blocksize
    *     size of the data to be written.
-   * @return array of DatanodeDescriptor instances chosen as target
+   * @return array of DatanodeStorageInfo instances chosen as target
    * and sorted as a pipeline.
    */
-  abstract DatanodeDescriptor[] chooseTarget(String srcPath, int numOfReplicas,
-      DatanodeDescriptor writer, List<DatanodeDescriptor> chosenNodes,
+  abstract DatanodeStorageInfo[] chooseTarget(String srcPath, int numOfReplicas,
+      DatanodeStorageInfo writer, List<DatanodeStorageInfo> chosenStorages,
       long blocksize);
 
   /**
@@ -83,21 +83,21 @@ public abstract class BlockPlacementPolicy {
    *     additional number of replicas wanted.
    * @param writer
    *     the writer's machine, null if not in the cluster.
-   * @param chosenNodes
-   *     datanodes that have been chosen as targets.
-   * @param returnChosenNodes
-   *     decide if the chosenNodes are returned.
-   * @param excludedNodes
-   *     datanodes that should not be considered as targets.
+   * @param chosenStorages
+   *     storages that have been chosen as targets.
+   * @param returnChosenStorages
+   *     decide if the chosenStorages are returned.
+   * @param excludedStorages
+   *     storages that should not be considered as targets.
    * @param blocksize
    *     size of the data to be written.
-   * @return array of DatanodeDescriptor instances chosen as target
+   * @return array of DatanodeStorageInfo instances chosen as target
    * and sorted as a pipeline.
    */
-  public abstract DatanodeDescriptor[] chooseTarget(String srcPath,
-      int numOfReplicas, DatanodeDescriptor writer,
-      List<DatanodeDescriptor> chosenNodes, boolean returnChosenNodes,
-      HashMap<Node, Node> excludedNodes, long blocksize);
+  public abstract DatanodeStorageInfo[] chooseTarget(String srcPath,
+      int numOfReplicas, DatanodeStorageInfo writer,
+      List<DatanodeStorageInfo> chosenStorages, boolean returnChosenStorages,
+      HashMap<Node, Node> excludedStorages, long blocksize);
 
   /**
    * choose <i>numOfReplicas</i> data nodes for <i>writer</i>
@@ -113,20 +113,20 @@ public abstract class BlockPlacementPolicy {
    *     additional number of replicas wanted.
    * @param writer
    *     the writer's machine, null if not in the cluster.
-   * @param chosenNodes
-   *     datanodes that have been chosen as targets.
+   * @param chosenStorages
+   *     storages that have been chosen as targets.
    * @param blocksize
    *     size of the data to be written.
-   * @return array of DatanodeDescriptor instances chosen as target
+   * @return array of DatanodeStorageInfo instances chosen as target
    * and sorted as a pipeline.
    */
-  DatanodeDescriptor[] chooseTarget(BlockCollection srcBC, int numOfReplicas,
-      DatanodeDescriptor writer, List<DatanodeDescriptor> chosenNodes,
-      HashMap<Node, Node> excludedNodes, long blocksize)
+  DatanodeStorageInfo[] chooseTarget(BlockCollection srcBC, int numOfReplicas,
+      DatanodeStorageInfo writer, List<DatanodeStorageInfo> chosenStorages,
+      HashMap<Node, Node> excludedStorages, long blocksize)
       throws StorageException {
     //HOP: [M] srcPath is not used 
     return chooseTarget(/*srcBC.getName()*/null, numOfReplicas, writer,
-        chosenNodes, false, excludedNodes, blocksize);
+        chosenStorages, false, excludedStorages, blocksize);
   }
 
   /**

@@ -187,7 +187,7 @@ public class BlockInfoUnderConstruction extends BlockInfo {
       int j = (previous + i) % replicas.size();
       ReplicaUnderConstruction replica = replicas.get(j);
       DatanodeDescriptor primary =
-          datanodeMgr.getDatanode(replica.getStorageId());
+          datanodeMgr.getStorage(replica.getStorageId()).getDatanodeDescriptor();
       if (primary.isAlive) {
         primaryNodeIndex = j;
         primary.addBlockToBeRecovered(this);

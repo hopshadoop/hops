@@ -84,6 +84,14 @@ public class BlockInfoDALAdaptor extends
   }
 
   @Override
+  public List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo> findBlockInfosByHostId(
+      String hostId)
+      throws StorageException {
+    return (List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo>) convertDALtoHDFS(
+        dataAccess.findBlockInfosByHostId(hostId));
+  }
+
+  @Override
   public Set<Long> findINodeIdsByStorageId(int storageId)
       throws StorageException {
     return dataAccess.findINodeIdsByStorageId(storageId);

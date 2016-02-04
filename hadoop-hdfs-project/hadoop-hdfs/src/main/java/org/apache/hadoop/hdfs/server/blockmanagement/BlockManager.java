@@ -1326,7 +1326,7 @@ public class BlockManager {
       throws StorageException, IOException {
     int requiredReplication, numEffectiveReplicas;
     List<DatanodeDescriptor> containingNodes, liveReplicaNodes;
-    DatanodeDescriptor srcNode;
+    DatanodeStorageInfo srcStorage;
     BlockCollection bc = null;
     int additionalReplRequired;
 
@@ -1350,10 +1350,10 @@ public class BlockManager {
       containingNodes = new ArrayList<DatanodeDescriptor>();
       liveReplicaNodes = new ArrayList<DatanodeDescriptor>();
       NumberReplicas numReplicas = new NumberReplicas();
-      srcNode = chooseSourceDatanode(blk, containingNodes, liveReplicaNodes,
+      srcStorage = chooseSourceDatanode(blk, containingNodes, liveReplicaNodes,
           numReplicas, priority1);
-      if (srcNode == null) { // block can not be replicated from any node
-        LOG.debug("Block " + blk + " cannot be repl from any node");
+      if (srcStorage == null) { // block can not be replicated from any storage
+        LOG.debug("Block " + blk + " cannot be repl from any storage");
         return scheduledWork;
       }
 
@@ -1379,7 +1379,7 @@ public class BlockManager {
       } else {
         additionalReplRequired = 1; // Needed on a new rack
       }
-      work.add(new ReplicationWork(blk, bc, srcNode, containingNodes,
+      work.add(new ReplicationWork(blk, bc, srcStorage, containingNodes,
           liveReplicaNodes, additionalReplRequired, priority1));
     }
     HashMap<Node, Node> excludedNodes = new HashMap<Node, Node>();
@@ -1395,7 +1395,7 @@ public class BlockManager {
       // It is costly to extract the filename for which chooseTargets is called,
       // so for now we pass in the block collection itself.
       rw.targets = blockplacement
-          .chooseTarget(rw.bc, rw.additionalReplRequired, rw.srcNode,
+          .chooseTarget(rw.bc, rw.additionalReplRequired, rw.srcStorage,
               rw.liveReplicaNodes, excludedNodes, rw.block.getNumBytes());
     }
 
@@ -1442,7 +1442,7 @@ public class BlockManager {
 
         if ((numReplicas.liveReplicas() >= requiredReplication) &&
             (!blockHasEnoughRacks(block))) {
-          if (rw.srcNode.getNetworkLocation()
+          if (rw.srcStorage.getDatanodeDescriptor().getNetworkLocation()
               .equals(targets[0].getNetworkLocation())) {
             //No use continuing, unless a new rack in this case
             continue;
@@ -1450,7 +1450,7 @@ public class BlockManager {
         }
 
         // Add block to the to be replicated list
-        rw.srcNode.addBlockToBeReplicated(block, targets);
+        rw.srcStorage.addBlockToBeReplicated(block, targets);
         scheduledWork++;
 
         for (DatanodeDescriptor dn : targets) {
@@ -1486,7 +1486,7 @@ public class BlockManager {
             targetList.append(targets[k]);
           }
           blockLog.info(
-              "BLOCK* ask " + rw.srcNode + " to replicate " + rw.block +
+              "BLOCK* ask " + rw.srcStorage + " to replicate " + rw.block +
                   " to " + targetList);
         }
       }
@@ -1505,15 +1505,15 @@ public class BlockManager {
    *
    * @throws IOException
    *     if the number of targets < minimum replication.
-   * @see BlockPlacementPolicy#chooseTarget(String, int, DatanodeDescriptor,
+   * @see BlockPlacementPolicy#chooseTarget(String, int, DatanodeStorageInfo,
    * List, boolean, HashMap, long)
    */
-  public DatanodeDescriptor[] chooseTarget(final String src,
+  public DatanodeStorageInfo[] chooseTarget(final String src,
       final int numOfReplicas, final DatanodeDescriptor client,
       final HashMap<Node, Node> excludedNodes, final long blocksize)
       throws IOException {
     // choose targets for the new block to be allocated.
-    final DatanodeDescriptor targets[] = blockplacement
+    final DatanodeStorageInfo[] targets = blockplacement
         .chooseTarget(src, numOfReplicas, client,
             new ArrayList<DatanodeDescriptor>(), false, excludedNodes,
             blocksize);
@@ -1562,11 +1562,11 @@ public class BlockManager {
    * @param priority
    *     integer representing replication priority of the given
    *     block
-   * @return the DatanodeDescriptor of the chosen node from which to replicate
-   * the given block
+   * @return the DatanodeStorageInfo of the chosen storage from which to
+   * replicate the given block
    */
   @VisibleForTesting
-  DatanodeDescriptor chooseSourceDatanode(Block block,
+  DatanodeStorageInfo chooseSourceDatanode(Block block,
       List<DatanodeDescriptor> containingNodes,
       List<DatanodeDescriptor> nodesContainingLiveReplicas,
       NumberReplicas numReplicas, int priority)
@@ -2931,7 +2931,7 @@ public class BlockManager {
         return;
       }
       if (!excessReplicateMap
-          .contains(cur.getDatanodeUuid(), getBlockInfo(block))) {
+          .contains(storage, getBlockInfo(block))) {
         if (!cur.isDecommissionInProgress() && !cur.isDecommissioned()) {
           // exclude corrupt replicas
           if (corruptNodes == null || !corruptNodes.contains(cur)) {
@@ -3054,7 +3054,7 @@ public class BlockManager {
 
   private void addToExcessReplicate(DatanodeStorageInfo storage, Block block)
       throws StorageException, TransactionContextException {
-    if (excessReplicateMap.put(storage.getStorageID(), getBlockInfo(block))) {
+    if (excessReplicateMap.put(storage, getBlockInfo(block))) {
       excessBlocksCount.incrementAndGet();
       if (blockLog.isDebugEnabled()) {
         blockLog.debug(
@@ -3099,7 +3099,7 @@ public class BlockManager {
     // in "excess" there.
     //
     if (excessReplicateMap
-        .remove(storage.getStorageID(), getBlockInfo(block))) {
+        .remove(storage, getBlockInfo(block))) {
       excessBlocksCount.decrementAndGet();
       if (blockLog.isDebugEnabled()) {
         blockLog.debug("BLOCK* removeStoredBlock: " + block +
@@ -3935,7 +3935,7 @@ public class BlockManager {
     private Block block;
     private BlockCollection bc;
 
-    private DatanodeDescriptor srcNode;
+    private DatanodeStorageInfo srcStorage;
     private List<DatanodeDescriptor> containingNodes;
     private List<DatanodeDescriptor> liveReplicaNodes;
     private int additionalReplRequired;
@@ -3944,12 +3944,12 @@ public class BlockManager {
     private int priority;
 
     public ReplicationWork(Block block, BlockCollection bc,
-        DatanodeDescriptor srcNode, List<DatanodeDescriptor> containingNodes,
+        DatanodeStorageInfo srcStorage, List<DatanodeDescriptor> containingNodes,
         List<DatanodeDescriptor> liveReplicaNodes, int additionalReplRequired,
         int priority) {
       this.block = block;
       this.bc = bc;
-      this.srcNode = srcNode;
+      this.srcStorage = srcStorage;
       this.containingNodes = containingNodes;
       this.liveReplicaNodes = liveReplicaNodes;
       this.additionalReplRequired = additionalReplRequired;

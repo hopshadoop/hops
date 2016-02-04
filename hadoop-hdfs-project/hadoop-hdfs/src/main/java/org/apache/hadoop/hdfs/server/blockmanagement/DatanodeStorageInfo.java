@@ -116,6 +116,10 @@ public class DatanodeStorageInfo {
     return this.sid;
   }
 
+  public StorageType getStorageType() {
+    return this.storageType;
+  }
+
   public long getCapacity() {
     return capacity;
   }
