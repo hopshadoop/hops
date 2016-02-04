@@ -232,9 +232,9 @@ public class AppSchedulable extends Schedulable {
    * made, returns an empty resource.
    */
 
-  private Resource assignContainer(FSSchedulerNode node, Priority priority,
-      ResourceRequest request, NodeType type, boolean reserved,
-      TransactionState transactionState) {
+  private Resource assignContainer(FSSchedulerNode node, ResourceRequest request,
+                                   NodeType type, boolean reserved,
+                                   TransactionState transactionState) {
 
     // How much does this request need?
     Resource capability = request.getCapability();
@@ -247,26 +247,26 @@ public class AppSchedulable extends Schedulable {
       container = node.getReservedContainer().getContainer();
     } else {
       container =
-          createContainer(app, node, capability, priority, transactionState);
+          createContainer(app, node, capability, request.getPriority(), transactionState);
     }
 
     // Can we allocate a container on this node?
     if (Resources.fitsIn(capability, available)) {
       // Inform the application of the new container for this request
       RMContainer allocatedContainer =
-          app.allocate(type, node, priority, request, container,
+          app.allocate(type, node, request.getPriority(), request, container,
               transactionState);
       if (allocatedContainer == null) {
         // Did the application need this resource?
         if (reserved) {
-          unreserve(priority, node, transactionState);
+          unreserve(request.getPriority(), node, transactionState);
         }
         return Resources.none();
       }
 
       // If we had previously made a reservation, delete it
       if (reserved) {
-        unreserve(priority, node, transactionState);
+        unreserve(request.getPriority(), node, transactionState);
       }
 
       // Inform the node
@@ -275,7 +275,7 @@ public class AppSchedulable extends Schedulable {
       return container.getResource();
     } else {
       // The desired container won't fit here, so reserve
-      reserve(priority, node, container, reserved, transactionState);
+      reserve(request.getPriority(), node, container, reserved, transactionState);
 
       return FairScheduler.CONTAINER_RESERVED;
     }
@@ -329,7 +329,7 @@ public class AppSchedulable extends Schedulable {
         if (rackLocalRequest != null &&
             rackLocalRequest.getNumContainers() != 0 && localRequest != null &&
             localRequest.getNumContainers() != 0) {
-          return assignContainer(node, priority, localRequest,
+          return assignContainer(node, localRequest,
               NodeType.NODE_LOCAL, reserved, transactionState);
         }
         
@@ -341,7 +341,7 @@ public class AppSchedulable extends Schedulable {
             rackLocalRequest.getNumContainers() != 0 &&
             (allowedLocality.equals(NodeType.RACK_LOCAL) ||
                 allowedLocality.equals(NodeType.OFF_SWITCH))) {
-          return assignContainer(node, priority, rackLocalRequest,
+          return assignContainer(node, rackLocalRequest,
               NodeType.RACK_LOCAL, reserved, transactionState);
         }
 
@@ -354,7 +354,7 @@ public class AppSchedulable extends Schedulable {
         if (offSwitchRequest != null &&
             offSwitchRequest.getNumContainers() != 0 &&
             allowedLocality.equals(NodeType.OFF_SWITCH)) {
-          return assignContainer(node, priority, offSwitchRequest,
+          return assignContainer(node, offSwitchRequest,
               NodeType.OFF_SWITCH, reserved, transactionState);
         }
       }
