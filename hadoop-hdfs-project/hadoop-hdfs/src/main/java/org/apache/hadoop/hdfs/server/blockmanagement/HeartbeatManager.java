@@ -159,6 +159,16 @@ class HeartbeatManager implements DatanodeStatistics {
   }
 
   @Override
+  public synchronized int getInServiceXceiverCount() {
+    return stats.nodesInServiceXceiverCount;
+  }
+
+  @Override
+  public int getNumDatanodesInService() {
+    return stats.nodesInService;
+  }
+
+  @Override
   public synchronized long[] getStats() {
     return new long[]{getCapacityTotal(), getCapacityUsed(),
         getCapacityRemaining(), -1L, -1L, -1L, getBlockPoolUsed()};
@@ -310,8 +320,11 @@ class HeartbeatManager implements DatanodeStatistics {
     private long capacityUsed = 0L;
     private long capacityRemaining = 0L;
     private long blockPoolUsed = 0L;
-    private int xceiverCount = 0;
 
+    private int xceiverCount = 0;
+    private int nodesInServiceXceiverCount = 0;
+
+    private int nodesInService = 0;
     private int expiredHeartbeats = 0;
 
     private void add(final DatanodeDescriptor node) {
@@ -319,6 +332,8 @@ class HeartbeatManager implements DatanodeStatistics {
       blockPoolUsed += node.getBlockPoolUsed();
       xceiverCount += node.getXceiverCount();
       if (!(node.isDecommissionInProgress() || node.isDecommissioned())) {
+        nodesInService++;
+        nodesInServiceXceiverCount += node.getXceiverCount();
         capacityTotal += node.getCapacity();
         capacityRemaining += node.getRemaining();
       } else {
@@ -331,6 +346,8 @@ class HeartbeatManager implements DatanodeStatistics {
       blockPoolUsed -= node.getBlockPoolUsed();
       xceiverCount -= node.getXceiverCount();
       if (!(node.isDecommissionInProgress() || node.isDecommissioned())) {
+        nodesInService--;
+        nodesInServiceXceiverCount -= node.getXceiverCount();
         capacityTotal -= node.getCapacity();
         capacityRemaining -= node.getRemaining();
       } else {

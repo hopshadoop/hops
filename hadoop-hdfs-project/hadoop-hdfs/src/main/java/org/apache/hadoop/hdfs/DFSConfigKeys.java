@@ -20,6 +20,7 @@ package org.apache.hadoop.hdfs;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockPlacementPolicyDefault;
 
 /**
  * This class contains constants for configuration keys used
@@ -697,6 +698,12 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String DFS_BLOCK_ACCESS_TOKEN_LIFETIME_KEY =
       "dfs.block.access.token.lifetime";
   public static final long DFS_BLOCK_ACCESS_TOKEN_LIFETIME_DEFAULT = 600L;
+
+  public static final String DFS_BLOCK_REPLICATOR_CLASSNAME_KEY =
+      "dfs.block.replicator.classname";
+  public static final Class<BlockPlacementPolicyDefault>
+      DFS_BLOCK_REPLICATOR_CLASSNAME_DEFAULT =
+      BlockPlacementPolicyDefault.class;
 
   public static final String DFS_REPLICATION_MAX_KEY = "dfs.replication.max";
   public static final int DFS_REPLICATION_MAX_DEFAULT = 512;

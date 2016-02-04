@@ -41,6 +41,36 @@ import org.apache.hadoop.hdfs.server.protocol.StorageReport;
  * by this class.
  */
 public class DatanodeStorageInfo {
+  public static final DatanodeStorageInfo[] EMPTY_ARRAY = {};
+
+  public static StorageType[] toStorageTypes(DatanodeStorageInfo[] storages) {
+    StorageType[] storageTypes = new StorageType[storages.length];
+    for(int i = 0; i < storageTypes.length; i++) {
+      storageTypes[i] = storages[i].getStorageType();
+    }
+    return storageTypes;
+  }
+
+  static Iterable<StorageType> toStorageTypes(
+      final Iterable<DatanodeStorageInfo> infos) {
+    return new Iterable<StorageType>() {
+      @Override
+      public Iterator<StorageType> iterator() {
+        return new Iterator<StorageType>() {
+          final Iterator<DatanodeStorageInfo> i = infos.iterator();
+          @Override
+          public boolean hasNext() {return i.hasNext();}
+          @Override
+          public StorageType next() {return i.next().getStorageType();}
+          @Override
+          public void remove() {
+            throw new UnsupportedOperationException();
+          }
+        };
+      }
+    };
+  }
+
   private final DatanodeDescriptor dn;
   private final String storageID;
   private final StorageType storageType;

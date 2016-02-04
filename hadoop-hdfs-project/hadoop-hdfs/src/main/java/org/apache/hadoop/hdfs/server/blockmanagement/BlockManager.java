@@ -52,6 +52,7 @@ import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.BlockListAsLongs;
 import org.apache.hadoop.hdfs.protocol.BlockListAsLongs.BlockReportIterator;
+import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
@@ -289,6 +290,10 @@ public class BlockManager {
    * Number of batches to be processed by this namenode at one time
    */
   private final int processMisReplicatedNoOfBatchs;
+
+  /** for block replicas placement */
+  private BlockPlacementPolicy blockplacement;
+  private final BlockStoragePolicySuite storagePolicySuite;
   
   public BlockManager(final Namesystem namesystem, final FSClusterStats stats,
       final Configuration conf) throws IOException {
@@ -1501,33 +1506,54 @@ public class BlockManager {
   }
 
   /**
-   * Choose target datanodes according to the replication policy.
+   * Choose target datanodes for creating a new block.
    *
    * @throws IOException
-   *     if the number of targets < minimum replication.
-   * @see BlockPlacementPolicy#chooseTarget(String, int, DatanodeStorageInfo,
-   * List, boolean, HashMap, long)
+   *           if the number of targets < minimum replication.
+   * @see BlockPlacementPolicy#chooseTarget(String, int, Node,
+   *      Set, long, List)
    */
-  public DatanodeStorageInfo[] chooseTarget(final String src,
-      final int numOfReplicas, final DatanodeDescriptor client,
-      final HashMap<Node, Node> excludedNodes, final long blocksize)
-      throws IOException {
-    // choose targets for the new block to be allocated.
-    final DatanodeStorageInfo[] targets = blockplacement
-        .chooseTarget(src, numOfReplicas, client,
-            new ArrayList<DatanodeDescriptor>(), false, excludedNodes,
-            blocksize);
+  public DatanodeStorageInfo[] chooseTarget4NewBlock(final String src,
+      final int numOfReplicas, final Node client,
+      final Set<Node> excludedNodes,
+      final long blocksize,
+      final List<String> favoredNodes,
+      final byte storagePolicyID) throws IOException {
+    List<DatanodeDescriptor> favoredDatanodeDescriptors =
+        getDatanodeDescriptors(favoredNodes);
+
+    final DatanodeStorageInfo[] targets = blockplacement.chooseTarget(src,
+        numOfReplicas, client, excludedNodes, blocksize,
+        favoredDatanodeDescriptors);
+
     if (targets.length < minReplication) {
-      throw new IOException(
-          "File " + src + " could only be replicated to " + targets.length +
-              " nodes instead of minReplication (=" + minReplication +
-              ").  There are " +
-              getDatanodeManager().getNetworkTopology().getNumOfLeaves() +
-              " datanode(s) running and " +
-              (excludedNodes == null ? "no" : excludedNodes.size()) +
-              " node(s) are excluded in this operation.");
+      throw new IOException("File " + src + " could only be replicated to "
+          + targets.length + " nodes instead of minReplication (="
+          + minReplication + ").  There are "
+          + getDatanodeManager().getNetworkTopology().getNumOfLeaves()
+          + " datanode(s) running and "
+          + (excludedNodes == null? "no": excludedNodes.size())
+          + " node(s) are excluded in this operation.");
     }
     return targets;
+  }
+
+  /**
+   * Get list of datanode descriptors for given list of nodes. Nodes are
+   * hostaddress:port or just hostaddress.
+   */
+  List<DatanodeDescriptor> getDatanodeDescriptors(List<String> nodes) {
+    List<DatanodeDescriptor> datanodeDescriptors = null;
+    if (nodes != null) {
+      datanodeDescriptors = new ArrayList<DatanodeDescriptor>(nodes.size());
+      for (int i = 0; i < nodes.size(); i++) {
+        DatanodeDescriptor node = datanodeManager.getDatanodeDescriptor(nodes.get(i));
+        if (node != null) {
+          datanodeDescriptors.add(node);
+        }
+      }
+    }
+    return datanodeDescriptors;
   }
 
   /**
