@@ -54,12 +54,15 @@ import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
 import org.apache.hadoop.yarn.api.records.ContainerId;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 
 public class QuotaService extends AbstractService {
 
   private Thread quotaSchedulingThread;
   private volatile boolean stopped = false;
+  private long ticksPerCredit = 1;
+  private long minNumberOfTicks = 1;
   private static final Log LOG = LogFactory.getLog(QuotaService.class);
 
   ApplicationStateDataAccess appStatDS
@@ -99,9 +102,13 @@ public class QuotaService extends AbstractService {
 
   @Override
   public void serviceInit(Configuration conf) throws Exception {
+    ticksPerCredit=conf.getInt(YarnConfiguration.QUOTAS_TICKS_PER_CREDIT, 
+            YarnConfiguration.DEFAULT_QUOTAS_TICKS_PER_CREDIT);
+    minNumberOfTicks=conf.getInt(YarnConfiguration.QUOTAS_MIN_TICKS_CHARGE, 
+            YarnConfiguration.DEFAULT_QUOTAS_MIN_TICKS_CHARGE);
   }
 
-  public void insertEvents(List<ContainersLogs> containersLogs) {
+  public void insertEvents(Collection<ContainersLogs> containersLogs) {
     for (ContainersLogs cl : containersLogs) {
       eventContainersLogs.add(cl);
     }
@@ -119,7 +126,7 @@ public class QuotaService extends AbstractService {
           final List<ContainersLogs> hopContainersLogs
                   = new ArrayList<ContainersLogs>();
           Long start = System.currentTimeMillis();
-          long duration=0;
+          long duration = 0;
           ContainersLogs log = null;
           do {
             try {
@@ -127,12 +134,12 @@ public class QuotaService extends AbstractService {
             } catch (InterruptedException ex) {
               LOG.error(ex);
             }
-            if(log!=null){
+            if (log != null) {
               hopContainersLogs.add(log);
             }
-            duration = System.currentTimeMillis()-start;
+            duration = System.currentTimeMillis() - start;
             //TODO put 1000 and 100 in the config file.
-          }while(duration < 1000 && hopContainersLogs.size()<100);
+          } while (duration < 1000 && hopContainersLogs.size() < 100);
 
           start = System.currentTimeMillis();
           computeAndApplyCharge(hopContainersLogs, false);
@@ -183,7 +190,7 @@ public class QuotaService extends AbstractService {
                         = new ArrayList<ContainerCheckPoint>();
 
                         // Calculate the quota 
-                        LOG.info("RIZ:: ContainersLogs count : "
+                        LOG.debug("RIZ:: ContainersLogs count : "
                                 + hopContainersLogs.size());
                         for (ContainersLogs _ycl : hopContainersLogs) {
                           if (!isRecover && recovered.remove(_ycl.
@@ -234,18 +241,18 @@ public class QuotaService extends AbstractService {
                                   + " User : " + _appUser);
 
                           // Calculate the charge
-                          long _charge = _ycl.getStop() - _ycl.
-                          getStart();
+                          long totalTicks = _ycl.getStop() - _ycl.getStart();
 
-                          Long checkpoint = containersCheckPoints.
-                          get(
-                                  _ycl.getContainerid());
-                          if (checkpoint != null) {
-                            _charge = _ycl.getStop() - checkpoint;
+                          Long checkpoint = containersCheckPoints.get(_ycl.
+                                  getContainerid());
+                          if (checkpoint == null) {
+                            checkpoint =  _ycl.getStart();
                           }
-
+                          long currentTicks = _ycl.getStop() - checkpoint;
+                          
+                          
                           // Decide what to do with the charge
-                          if (_charge > 0) {
+                          if (currentTicks > 0) {
                             if (_ycl.getExitstatus()
                             == ContainerExitStatus.CONTAINER_RUNNING_STATE) {
                               //>> Edit log entry + Increase Quota
@@ -264,54 +271,26 @@ public class QuotaService extends AbstractService {
                                       + _projectName
                                       + " for container "
                                       + _ycl.getContainerid()
-                                      + " charge "
-                                      + _charge + "(" + _ycl.
+                                      + " current ticks "
+                                      + currentTicks + "(" + _ycl.
                                       getStart()
                                       + ", " + _ycl.getStop()
                                       + ", "
                                       + checkpoint + ")");
+                              
                               chargeYarnProjectsQuota(
                                       chargedYarnProjectsQuota,
                                       hopYarnProjectsQuotaMap,
-                                      _projectName,
-                                      _charge);
+                                      _projectName, _user,
+                                      currentTicks, _ycl.getContainerid(),
+                                      _ycl.getExitstatus());
 
                               //** YarnProjectsDailyCost charging**
                               chargeYarnProjectsDailyCost(
                                       chargedYarnProjectsDailyCost,
                                       _projectName, _user, _day,
-                                      _charge);
+                                      currentTicks);
 
-                            } else if (_ycl.getExitstatus()
-                            == ContainerExitStatus.ABORTED
-                            || _ycl.
-                            getExitstatus()
-                            == ContainerExitStatus.DISKS_FAILED
-                            || _ycl.getExitstatus()
-                            == ContainerExitStatus.PREEMPTED) {
-                              LOG.warn(
-                                      "Quota: container finished unexpectidely: "
-                                      + _ycl.getContainerid()
-                                      + " exit status " + _ycl.
-                                      getExitstatus()
-                                      + " should have costed "
-                                      + _charge);
-                              //>> Delete log entry
-                              toBeRemovedContainersLogs.add(
-                                      (ContainersLogs) _ycl);
-                              if (isRecover) {
-                                recovered.add(_ycl.getContainerid());
-                              }
-                              if (checkpoint != null) {
-                                toBeRemovedContainerCheckPoint.
-                                add(
-                                        new ContainerCheckPoint(
-                                                _ycl.
-                                                getContainerid(),
-                                                checkpoint));
-                                containersCheckPoints.remove(_ycl.
-                                        getContainerid());
-                              }
                             } else {
                               //>> Delete log entry + Increase Quota                                   
                               toBeRemovedContainersLogs.add(
@@ -319,13 +298,10 @@ public class QuotaService extends AbstractService {
                               if (isRecover) {
                                 recovered.add(_ycl.getContainerid());
                               }
-                              if (checkpoint != null) {
-                                toBeRemovedContainerCheckPoint.
-                                add(
-                                        new ContainerCheckPoint(
-                                                _ycl.
-                                                getContainerid(),
-                                                checkpoint));
+                              if (checkpoint != _ycl.getStart()) {
+                                toBeRemovedContainerCheckPoint.add(
+                                        new ContainerCheckPoint(_ycl.
+                                                getContainerid(), checkpoint));
                                 containersCheckPoints.remove(_ycl.
                                         getContainerid());
                               }
@@ -336,18 +312,19 @@ public class QuotaService extends AbstractService {
                                       + " for container "
                                       + _ycl.getContainerid()
                                       + " charge "
-                                      + _charge);
+                                      + currentTicks);
                               chargeYarnProjectsQuota(
                                       chargedYarnProjectsQuota,
                                       hopYarnProjectsQuotaMap,
-                                      _projectName,
-                                      _charge);
+                                      _projectName, _user,
+                                      currentTicks, _ycl.getContainerid(),
+                                      _ycl.getExitstatus());
 
                               //** YarnProjectsDailyCost charging**
                               chargeYarnProjectsDailyCost(
                                       chargedYarnProjectsDailyCost,
                                       _projectName, _user, _day,
-                                      _charge);
+                                      currentTicks);
 
                             }
                           }
@@ -358,6 +335,7 @@ public class QuotaService extends AbstractService {
                         getDataAccess(
                                 ContainersLogsDataAccess.class);
                         _csDA.removeAll(toBeRemovedContainersLogs);
+
                         //Add and remove Containers checkpoints 
                         ContainersCheckPointsDataAccess ccpDA
                         = (ContainersCheckPointsDataAccess) RMStorageFactory.
@@ -366,6 +344,7 @@ public class QuotaService extends AbstractService {
                         ccpDA.addAll(toBeAddedContainerCheckPoint);
                         ccpDA.removeAll(
                                 toBeRemovedContainerCheckPoint);
+
                         // Show all charged project
                         if (LOG.isDebugEnabled()) {
                           for (YarnProjectsQuota _cpq
@@ -401,9 +380,10 @@ public class QuotaService extends AbstractService {
 
   private void chargeYarnProjectsDailyCost(
           Map<YarnProjectsDailyId, YarnProjectsDailyCost> chargedYarnProjectsDailyCost,
-          String _projectid, String _user, long _day, long _charge) {
-    LOG.info("Quota: project " + _projectid + " user " + _user + " has used "
-            + _charge);
+          String _projectid, String _user, long _day, long ticks) {
+    long charge = computeCharge(ticks);
+    LOG.debug("Quota: project " + _projectid + " user " + _user + " has used "
+            + charge + " credits");
     if (cashDay != _day) {
       projectsDailyCostCache
               = new HashMap<YarnProjectsDailyId, YarnProjectsDailyCost>();
@@ -420,11 +400,47 @@ public class QuotaService extends AbstractService {
     }
 
     YarnProjectsDailyCost _incrementedPdc = new YarnProjectsDailyCost(
-            _projectid, _user, _day, _tempPdc.getCreditsUsed() + (int) _charge);
+            _projectid, _user, _day, _tempPdc.getCreditsUsed() + (int) charge);
     chargedYarnProjectsDailyCost.put(_key, _incrementedPdc);
     projectsDailyCostCache.put(_key, _incrementedPdc);
   }
 
+  private void chargeYarnProjectsQuota(
+          Map<String, YarnProjectsQuota> chargedYarnProjectsQuota,
+          Map<String, YarnProjectsQuota> hopYarnProjectsQuotaList,
+          String _projectid,  String _user, long ticks, String containerId, 
+          int exitStatus) {
+    long charge = computeCharge(ticks);
+    LOG.info("Quota: project " + _projectid + " user " + _user + " has used "
+            + charge
+            + " credits (container: " + containerId + ", exit status: "
+            + exitStatus + ")");
+    YarnProjectsQuota _tempPq = (YarnProjectsQuota) hopYarnProjectsQuotaList.
+            get(_projectid);
+    if (_tempPq != null) {
+      YarnProjectsQuota _modifiedPq = new YarnProjectsQuota(_projectid,
+              _tempPq.getRemainingQuota() - (int) charge,
+              _tempPq.getTotalUsedQuota() + (int) charge);
+
+      chargedYarnProjectsQuota.put(_projectid, _modifiedPq);
+      hopYarnProjectsQuotaList.put(_projectid, _modifiedPq);
+    } else {
+      LOG.error("Project not found: " + _projectid);
+    }
+
+  }
+  
+  private long computeCharge(long ticks){
+    if(ticks<minNumberOfTicks){
+      ticks=minNumberOfTicks;
+    }
+    long charge = ticks/ticksPerCredit;
+    if(ticks%ticksPerCredit!=0){
+      charge++;
+    }
+    return charge;
+  }
+  
   public void recover() {
 
     long _miliSec = System.currentTimeMillis();
@@ -485,23 +501,4 @@ public class QuotaService extends AbstractService {
     }
   }
 
-  private void chargeYarnProjectsQuota(
-          Map<String, YarnProjectsQuota> chargedYarnProjectsQuota,
-          Map<String, YarnProjectsQuota> hopYarnProjectsQuotaList,
-          String _projectid, long _charge) {
-    LOG.info("Quota: project " + _projectid + " has used " + _charge);
-    YarnProjectsQuota _tempPq = (YarnProjectsQuota) hopYarnProjectsQuotaList.
-            get(_projectid);
-    if (_tempPq != null) {
-      YarnProjectsQuota _modifiedPq = new YarnProjectsQuota(_projectid,
-              _tempPq.getRemainingQuota() - (int) _charge,
-              _tempPq.getTotalUsedQuota() + (int) _charge);
-
-      chargedYarnProjectsQuota.put(_projectid, _modifiedPq);
-      hopYarnProjectsQuotaList.put(_projectid, _modifiedPq);
-    } else {
-      LOG.error("Project not found: " + _projectid);
-    }
-
-  }
 }

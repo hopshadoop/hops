@@ -43,11 +43,9 @@ import org.junit.Test;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Random;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -55,7 +53,6 @@ import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
 import org.apache.hadoop.yarn.api.records.ContainerState;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.junit.Assert;
-import org.junit.Ignore;
 
 public class TestContainersLogsService {
 
@@ -92,7 +89,8 @@ public class TestContainersLogsService {
   public void testTickCounterInitialization() throws Exception {
     conf.setInt(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_MONITOR_INTERVAL, 1000);
     conf.setInt(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_TICK_INCREMENT, 1);
-    conf.setBoolean(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS, false);
+    conf.setBoolean(
+            YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_ENABLED, false);
 
     YarnVariables tc = getTickCounter();
 
@@ -112,9 +110,11 @@ public class TestContainersLogsService {
     conf.setInt(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_MONITOR_INTERVAL,
             monitorInterval);
     conf.setInt(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_TICK_INCREMENT, 1);
-    conf.setBoolean(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS, true);
-    conf.setInt(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_TICKS,
-            checkpointTicks);
+    conf.setBoolean(
+            YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_ENABLED, true);
+    conf.setInt(YarnConfiguration.QUOTAS_MIN_TICKS_CHARGE, checkpointTicks);
+    conf.setInt(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_MINTICKS,
+            1);
     MockRM rm = new MockRM(conf);
 
     try {
@@ -159,7 +159,8 @@ public class TestContainersLogsService {
     conf.setInt(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_MONITOR_INTERVAL,
             monitorInterval);
     conf.setInt(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_TICK_INCREMENT, 1);
-    conf.setBoolean(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS, false);
+    conf.setBoolean(
+            YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_ENABLED, false);
 
     MockRM rm = new MockRM(conf);
 
@@ -209,7 +210,8 @@ public class TestContainersLogsService {
     conf.setInt(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_MONITOR_INTERVAL,
             monitorInterval);
     conf.setInt(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_TICK_INCREMENT, 1);
-    conf.setBoolean(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS, false);
+    conf.setBoolean(
+            YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_ENABLED, false);
 
     // Insert dummy data into necessary tables
     List<RMNode> rmNodes = generateRMNodesToAdd(10);
@@ -259,17 +261,17 @@ public class TestContainersLogsService {
    *
    * @throws Exception
    */
-  @Ignore
   @Test(timeout=60000)
   public void testFullUseCase() throws Exception {
     int monitorInterval = 2000;
-    int checkpointTicks = 10;
     conf.setInt(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_MONITOR_INTERVAL,
             monitorInterval);
     conf.setInt(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_TICK_INCREMENT, 1);
-    conf.setBoolean(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS, true);
-    conf.setInt(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_TICKS,
-            checkpointTicks);
+    conf.setBoolean(
+            YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_ENABLED, true);
+    conf.setInt(YarnConfiguration.QUOTAS_MIN_TICKS_CHARGE, 10);
+    conf.setInt(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_MINTICKS,
+            1);
     conf.setBoolean(YarnConfiguration.DISTRIBUTED_RM, true);
     
     MockRM rm = new MockRM(conf);
@@ -640,7 +642,8 @@ public class TestContainersLogsService {
     for (int i = startNo; i < (startNo + nbContainers); i++) {
       int randRMNode = random.nextInt(rmNodesList.size());
       RMNode randomRMNode = rmNodesList.get(randRMNode);
-      RMContainer container = new RMContainer("containerid" + i, "appAttemptId",
+      RMContainer container = new RMContainer(
+              "container_1450009406746_0001_01_00000" + i, "appAttemptId",
               randomRMNode.getNodeId(), "user", "reservedNodeId", i, i, i, i, i,
               "state", "finishedStatusState", i);
       rmContainers.add(container);

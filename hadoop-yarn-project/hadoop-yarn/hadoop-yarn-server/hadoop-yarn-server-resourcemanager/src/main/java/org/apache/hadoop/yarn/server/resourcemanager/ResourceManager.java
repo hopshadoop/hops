@@ -1167,14 +1167,17 @@ public class ResourceManager extends CompositeService implements Recoverable {
   }
   
   protected void createAndStartQuotaServices() {
-    containersLogsService = new ContainersLogsService(rmContext);
-    quotaService = new QuotaService();
-    containersLogsService.init(conf);
-    quotaService.init(conf);
-    rmContext.setContainersLogsService(containersLogsService);
-    rmContext.setQuotaService(quotaService);
-    containersLogsService.start();
-    quotaService.start();
+    if (conf.getBoolean(YarnConfiguration.QUOTAS_ENABLED,
+            YarnConfiguration.DEFAULT_QUOTAS_ENABLED)) {
+      containersLogsService = new ContainersLogsService(rmContext);
+      quotaService = new QuotaService();
+      containersLogsService.init(conf);
+      quotaService.init(conf);
+      rmContext.setContainersLogsService(containersLogsService);
+      rmContext.setQuotaService(quotaService);
+      containersLogsService.start();
+      quotaService.start();
+    }
   }
 
   @Private

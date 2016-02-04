@@ -63,7 +63,8 @@ public class ContainersLogsService extends CompositeService {
 
   Map<String, ContainersLogs> activeContainers
           = new HashMap<String, ContainersLogs>();
-  List<ContainersLogs> updateContainers = new ArrayList<ContainersLogs>();
+  Map<String, ContainersLogs> updateContainers
+          = new HashMap<String, ContainersLogs>();
   LinkedBlockingQueue<ContainerStatus> eventContainers
           = new LinkedBlockingQueue<ContainerStatus>();
 
@@ -96,13 +97,14 @@ public class ContainersLogsService extends CompositeService {
             YarnConfiguration.DEFAULT_QUOTAS_CONTAINERS_LOGS_TICK_INCREMENT
     );
     this.checkpointEnabled = this.conf.getBoolean(
-            YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS,
-            YarnConfiguration.DEFAULT_QUOTAS_CONTAINERS_LOGS_CHECKPOINTS
+            YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_ENABLED,
+            YarnConfiguration.DEFAULT_QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_ENABLED
     );
     this.checkpointInterval = this.conf.getInt(
-            YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_TICKS,
-            YarnConfiguration.DEFAULT_QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_TICKS
-    );
+            YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_MINTICKS,
+            YarnConfiguration.DEFAULT_QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_MINTICKS
+    ) * this.conf.getInt(YarnConfiguration.QUOTAS_MIN_TICKS_CHARGE, 
+            YarnConfiguration.DEFAULT_QUOTAS_MIN_TICKS_CHARGE);
     this.alertThreshold = this.conf.getDouble(
             YarnConfiguration.QUOTAS_CONTAINERS_LOGS_ALERT_THRESHOLD,
             YarnConfiguration.DEFAULT_QUOTAS_CONTAINERS_LOGS_ALERT_THRESHOLD
@@ -207,7 +209,7 @@ public class ContainersLogsService extends CompositeService {
               = activeContainers.entrySet().iterator(); it.hasNext();) {
         ContainersLogs cl = it.next().getValue();
 
-        updateContainers.add(cl);
+        updateContainers.put(cl.getContainerid(),cl);
 
         if (cl.getExitstatus() != ContainersLogs.CONTAINER_RUNNING_STATE) {
           it.remove();
@@ -259,7 +261,7 @@ public class ContainersLogsService extends CompositeService {
       }
 
       if (updatable) {
-        updateContainers.add(cl);
+        updateContainers.put(cl.getContainerid(), cl);
       }
     }
   }
@@ -327,7 +329,7 @@ public class ContainersLogsService extends CompositeService {
                     LOG.debug("CL :: Update containers logs size: "
                             + updateContainers.size());
                     try {
-                      containersLogsDA.addAll(updateContainers);
+                      containersLogsDA.addAll(updateContainers.values());
                     } catch (StorageException ex) {
                       LOG.warn("Unable to update containers logs table", ex);
                     }
@@ -344,7 +346,7 @@ public class ContainersLogsService extends CompositeService {
               };
       containersLogsHandler.handle();
       
-      rMContext.getQuotaService().insertEvents(updateContainers);
+      rMContext.getQuotaService().insertEvents(updateContainers.values());
       updateContainers.clear();
     
     } catch (IOException ex) {
@@ -464,16 +466,19 @@ public class ContainersLogsService extends CompositeService {
     return allContainerStatuses;
   }
 
+  //TODO optimisation
   /**
    * Loop active list and add all found & not completed container statuses to
    * update list. This ensures that whole running time is not lost.
    */
   private void createCheckpoint() {
-    for (Map.Entry<String, ContainersLogs> entry : activeContainers.entrySet()) {
-      ContainersLogs cl = entry.getValue();
-
-      cl.setStop(tickCounter.getValue());
-      updateContainers.add(cl);
+    int tick = tickCounter.getValue();
+    for (ContainersLogs log : activeContainers.values()) {
+      
+      if((tick -log.getStart())%checkpointInterval==0){
+        log.setStop(tickCounter.getValue());
+        updateContainers.put(log.getContainerid(), log);
+      }
     }
   }
 
@@ -493,9 +498,7 @@ public class ContainersLogsService extends CompositeService {
     checkEventContainerStatuses(latestEvents);
 
     // Checkpoint
-    if (checkpointEnabled
-            && (tickCounter.getValue() % checkpointInterval == 0)) {
-      LOG.debug("CL :: Creating checkoint");
+    if (checkpointEnabled) {
       createCheckpoint();
     }
 

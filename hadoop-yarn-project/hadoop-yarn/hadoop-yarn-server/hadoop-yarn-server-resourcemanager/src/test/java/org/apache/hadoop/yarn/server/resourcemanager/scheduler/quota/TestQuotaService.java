@@ -99,7 +99,7 @@ public class TestQuotaService {
               10, 11, ContainerExitStatus.ABORTED));
       hopContainersLogs.add(new ContainersLogs(
               "container_1450009406746_0001_03_000001",
-              10, 11, ContainerExitStatus.CONTAINER_RUNNING_STATE));
+              10, 110, ContainerExitStatus.CONTAINER_RUNNING_STATE));
 
       final List<YarnProjectsQuota> hopYarnProjectsQuota
               = new ArrayList<YarnProjectsQuota>();
@@ -225,16 +225,21 @@ public class TestQuotaService {
 
     // Run the schedulat
     QuotaService qs = new QuotaService();
+    Configuration conf = new YarnConfiguration();
+    conf.setInt(YarnConfiguration.QUOTAS_TICKS_PER_CREDIT, 10);
+    conf.setInt(YarnConfiguration.QUOTAS_MIN_TICKS_CHARGE, 100);
+    qs.init(conf);
     qs.serviceStart();
     Thread.currentThread().sleep(1000);
     qs.serviceStop();
 
-    CheckProject(48,2);
-    CheckProjectDailyCost(2);
+    CheckProject(20,30);
+    CheckProjectDailyCost(30);
 
   }
 
-  @Test(timeout = 6000)
+  @Test
+//        (timeout = 6000)
   public void TestStream() throws Exception {
     int initialCredits = 50;
     int totalCost =0;
@@ -273,6 +278,10 @@ public class TestQuotaService {
     prepareHandler.handle();
 
     QuotaService qs = new QuotaService();
+    Configuration conf = new YarnConfiguration();
+    conf.setInt(YarnConfiguration.QUOTAS_TICKS_PER_CREDIT, 10);
+    conf.setInt(YarnConfiguration.QUOTAS_MIN_TICKS_CHARGE, 10);
+    qs.init(conf);
     qs.serviceStart();
     //add containers
     for (int i = 0; i < 10; i++) {
@@ -293,7 +302,7 @@ public class TestQuotaService {
       for (int j = 0; j < i; j++) {
         logs.add(new ContainersLogs("container_1450009406746_0001_0" + i
                 + "_00000" + j, i, i + 5, ContainerExitStatus.SUCCESS));
-        totalCost+=5;
+        totalCost+=1;
       }
       qs.insertEvents(logs);
     }
@@ -306,7 +315,7 @@ public class TestQuotaService {
         logs.add(new ContainersLogs("container_1450009406746_0001_0" + i
                 + "_00000" + j, i, i + 10,
                 ContainerExitStatus.CONTAINER_RUNNING_STATE));
-        totalCost+=10;
+        totalCost+=1;
       }
       qs.insertEvents(logs);
     }
@@ -318,7 +327,7 @@ public class TestQuotaService {
       for (int j = 0; j < i; j++) {
         logs.add(new ContainersLogs("container_1450009406746_0001_0" + i
                 + "_00000" + j, i, i + 15, ContainerExitStatus.SUCCESS));
-        totalCost+=5;
+        totalCost+=1;
       }
       qs.insertEvents(logs);
     }
@@ -330,10 +339,11 @@ public class TestQuotaService {
       for (int j = 0; j < i; j++) {
         logs.add(new ContainersLogs("container_1450009406746_0001_0" + i
                 + "_00000" + j, i, i + 16, ContainerExitStatus.PREEMPTED));
+        totalCost+=1;
       }
       qs.insertEvents(logs);
     }
-    Thread.sleep(1000);
+    Thread.sleep(2000);
     CheckProject(initialCredits-totalCost, totalCost);
     CheckProjectDailyCost(totalCost);
   }
