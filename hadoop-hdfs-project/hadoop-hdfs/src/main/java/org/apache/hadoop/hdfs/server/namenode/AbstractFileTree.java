@@ -57,6 +57,7 @@ abstract class AbstractFileTree {
   public static final Log LOG = LogFactory.getLog(AbstractFileTree.class);
 
   private final FSNamesystem namesystem;
+  private final FSPermissionChecker fsPermissionChecker;
   private final int subtreeRootId;
   private final List<Future> activeCollectors = new ArrayList<Future>();
   private final FsAction subAccess;
@@ -142,30 +143,30 @@ abstract class AbstractFileTree {
     }
   }
 
-  public AbstractFileTree(FSNamesystem namesystem, int subtreeRootId) {
+  public AbstractFileTree(FSNamesystem namesystem, int subtreeRootId)
+      throws AccessControlException {
     this(namesystem, subtreeRootId, null);
   }
 
   public AbstractFileTree(FSNamesystem namesystem, int subtreeRootId,
-      FsAction subAccess) {
+      FsAction subAccess) throws AccessControlException {
     this.namesystem = namesystem;
+    this.fsPermissionChecker = namesystem.getPermissionChecker();
     this.subtreeRootId = subtreeRootId;
     this.subAccess = subAccess;
   }
 
   private void checkAccess(INode node, FsAction action)
       throws AccessControlException {
-    FSPermissionChecker pc = namesystem.getPermissionChecker();
-    if (!pc.isSuperUser() && node.isDirectory()) {
-      pc.check(node, action);
+    if (!fsPermissionChecker.isSuperUser() && node.isDirectory()) {
+      fsPermissionChecker.check(node, action);
     }
   }
 
   private void checkAccess(ProjectedINode node, FsAction action)
       throws IOException {
-    FSPermissionChecker pc = namesystem.getPermissionChecker();
-    if (!pc.isSuperUser() && node.isDirectory()) {
-      pc.check(node, action);
+    if (!fsPermissionChecker.isSuperUser() && node.isDirectory()) {
+      fsPermissionChecker.check(node, action);
     }
   }
 
@@ -281,7 +282,7 @@ abstract class AbstractFileTree {
   @VisibleForTesting
   static CountingFileTree createCountingFileTreeFromPath(FSNamesystem namesystem,
       String path) throws StorageException, UnresolvedPathException,
-      TransactionContextException {
+      TransactionContextException, AccessControlException {
     LinkedList<INode> nodes = new LinkedList<INode>();
     boolean[] fullyResovled = new boolean[1];
     INodeUtil.resolvePathWithNoTransaction(path, false, nodes, fullyResovled);
@@ -295,12 +296,13 @@ abstract class AbstractFileTree {
     private final AtomicLong diskspaceCount = new AtomicLong(0);
     private final AtomicLong fileSizeSummary = new AtomicLong(0);
 
-    public CountingFileTree(FSNamesystem namesystem, int subtreeRootId) {
+    public CountingFileTree(FSNamesystem namesystem, int subtreeRootId)
+        throws AccessControlException {
       this(namesystem, subtreeRootId, null);
     }
 
     public CountingFileTree(FSNamesystem namesystem, int subtreeRootId,
-        FsAction subAccess) {
+        FsAction subAccess) throws AccessControlException {
       super(namesystem, subtreeRootId, subAccess);
     }
 
@@ -353,12 +355,13 @@ abstract class AbstractFileTree {
     private final AtomicLong namespaceCount = new AtomicLong(0);
     private final AtomicLong diskspaceCount = new AtomicLong(0);
 
-    public QuotaCountingFileTree(FSNamesystem namesystem, int subtreeRootId) {
+    public QuotaCountingFileTree(FSNamesystem namesystem, int subtreeRootId)
+        throws AccessControlException {
       super(namesystem, subtreeRootId);
     }
 
     public QuotaCountingFileTree(FSNamesystem namesystem, int subtreeRootId,
-        FsAction subAccess) {
+        FsAction subAccess) throws AccessControlException {
       super(namesystem, subtreeRootId, subAccess);
     }
 
@@ -421,7 +424,7 @@ abstract class AbstractFileTree {
     private final INode dstDataset;
     public LoggingQuotaCountingFileTree(
         FSNamesystem namesystem, int subtreeRootId, INode srcDataset,
-        INode dstDataset) {
+        INode dstDataset) throws AccessControlException {
       super(namesystem, subtreeRootId);
       this.srcDataset = srcDataset;
       this.dstDataset = dstDataset;
@@ -430,7 +433,7 @@ abstract class AbstractFileTree {
     public LoggingQuotaCountingFileTree(
         FSNamesystem namesystem, int subtreeRootId,
         FsAction subAccess, INode srcDataset,
-        INode dstDataset) {
+        INode dstDataset) throws AccessControlException {
       super(namesystem, subtreeRootId, subAccess);
       this.srcDataset = srcDataset;
       this.dstDataset = dstDataset;
@@ -464,12 +467,13 @@ abstract class AbstractFileTree {
     private final ConcurrentHashMap<Integer, ProjectedINode> inodesById =
         new ConcurrentHashMap<Integer, ProjectedINode>();
 
-    public FileTree(FSNamesystem namesystem, int subtreeRootId) {
+    public FileTree(FSNamesystem namesystem, int subtreeRootId)
+        throws AccessControlException {
       this(namesystem, subtreeRootId, null);
     }
 
     public FileTree(FSNamesystem namesystem, int subtreeRootId,
-        FsAction subAccess) {
+        FsAction subAccess) throws AccessControlException {
       super(namesystem, subtreeRootId, subAccess);
       HashMultimap<Integer, ProjectedINode> parentMap = HashMultimap.create();
       inodesByParent = Multimaps.synchronizedSetMultimap(parentMap);
@@ -541,12 +545,13 @@ abstract class AbstractFileTree {
     private LinkedList<Integer> ids = new LinkedList<Integer>();
     private List<Integer> synchronizedList = Collections.synchronizedList(ids);
 
-    public IdCollectingCountingFileTree(FSNamesystem namesystem, int subtreeRootId) {
+    public IdCollectingCountingFileTree(FSNamesystem namesystem, int subtreeRootId)
+        throws AccessControlException {
       super(namesystem, subtreeRootId);
     }
 
     public IdCollectingCountingFileTree(FSNamesystem namesystem,
-        int subtreeRootId, FsAction subAccess) {
+        int subtreeRootId, FsAction subAccess) throws AccessControlException {
       super(namesystem, subtreeRootId, subAccess);
     }
 
@@ -583,7 +588,7 @@ abstract class AbstractFileTree {
   @VisibleForTesting
   static FileTree createFileTreeFromPath(FSNamesystem namesystem, String path)
       throws StorageException, UnresolvedPathException,
-      TransactionContextException {
+      TransactionContextException, AccessControlException {
     LinkedList<INode> nodes = new LinkedList<INode>();
     boolean[] fullyResovled = new boolean[1];
     INodeUtil.resolvePathWithNoTransaction(path, false, nodes, fullyResovled);
