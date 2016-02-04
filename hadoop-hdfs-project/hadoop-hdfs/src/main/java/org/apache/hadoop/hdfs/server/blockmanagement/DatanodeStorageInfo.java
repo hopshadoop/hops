@@ -20,11 +20,13 @@ package org.apache.hadoop.hdfs.server.blockmanagement;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.BlockInfoDataAccess;
+import io.hops.metadata.hdfs.dal.InvalidateBlockDataAccess;
 import io.hops.metadata.hdfs.dal.ReplicaDataAccess;
 import io.hops.metadata.hdfs.entity.Replica;
 import io.hops.transaction.handler.HDFSOperationType;
@@ -183,5 +185,32 @@ public class DatanodeStorageInfo {
   public String toString() {
     return getDatanodeDescriptor().toString() + "[" + storageType + "]" +
         storageID + ":" + state;
+  }
+
+  public Map<Long, Integer> getAllStorageReplicas() throws IOException {
+    LightWeightRequestHandler findBlocksHandler = new LightWeightRequestHandler(
+        HDFSOperationType.GET_ALL_STORAGE_BLOCKS_IDS) {
+      @Override
+      public Object performTask() throws StorageException, IOException {
+        ReplicaDataAccess da = (ReplicaDataAccess) HdfsStorageFactory
+            .getDataAccess(ReplicaDataAccess.class);
+        return da.findBlockAndInodeIdsByStorageId(getSid());
+      }
+    };
+    return (Map<Long, Integer>) findBlocksHandler.handle();
+  }
+
+  public Map<Long,Long> getAllStorageInvalidatedReplicasWithGenStamp() throws IOException {
+    LightWeightRequestHandler findBlocksHandler = new LightWeightRequestHandler(
+        HDFSOperationType.GET_ALL_STORAGE_BLOCKS_IDS) {
+      @Override
+      public Object performTask() throws StorageException, IOException {
+        InvalidateBlockDataAccess da =
+            (InvalidateBlockDataAccess) HdfsStorageFactory
+                .getDataAccess(InvalidateBlockDataAccess.class);
+        return da.findInvalidatedBlockByStorageIdUsingMySQLServer(getSid());
+      }
+    };
+    return (Map<Long, Long>) findBlocksHandler.handle();
   }
 }

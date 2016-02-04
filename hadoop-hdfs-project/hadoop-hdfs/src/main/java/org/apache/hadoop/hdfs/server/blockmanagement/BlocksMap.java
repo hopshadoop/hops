@@ -148,7 +148,8 @@ class BlocksMap {
     if (storedBlock == null) {
       return null;
     }
-    DatanodeDescriptor[] desc = storedBlock.getDatanodes(datanodeManager);
+    DatanodeDescriptor[] desc = storedBlock.getDatanodes(datanodeManager,
+        storedBlock.getReplicas(datanodeManager));
     if (desc == null) {
       return empty_datanode_list.iterator();
     } else {

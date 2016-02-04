@@ -373,18 +373,17 @@ public class BlockInfo extends Block {
   protected DatanodeStorageInfo[] getStorages(DatanodeManager datanodeMgr,
       List<? extends ReplicaBase> replicas) {
     int numLocations = replicas.size();
-    List<DatanodeStorageInfo> list = new ArrayList<DatanodeStorageInfo>();
+    HashSet<DatanodeStorageInfo> set = new HashSet<DatanodeStorageInfo>();
     for (int i = numLocations - 1; i >= 0; i--) {
-      DatanodeStorageInfo desc = datanodeMgr.getStorage(replicas.get(i)
-          .getStorageId());
+      DatanodeStorageInfo desc = datanodeMgr.getStorage(replicas.get(i).getStorageId());
       if (desc != null) {
-        list.add(desc);
+        set.add(desc);
       } else {
         replicas.remove(i);
       }
     }
-    DatanodeStorageInfo[] storages = new DatanodeStorageInfo[list.size()];
-    return list.toArray(storages);
+    DatanodeStorageInfo[] storages = new DatanodeStorageInfo[set.size()];
+    return set.toArray(storages);
   }
 
   /**

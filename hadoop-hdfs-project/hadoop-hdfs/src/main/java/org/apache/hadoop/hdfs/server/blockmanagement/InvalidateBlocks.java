@@ -193,7 +193,7 @@ class InvalidateBlocks {
     }
     removeInvBlocks(toInvblks);
     // TODO add method to storage -> functionality is now/was in Datanode
-    storage.addBlocksToBeInvalidated(toInvalidate);
+    storage.getDatanodeDescriptor().addBlocksToBeInvalidated(toInvalidate);
     return toInvalidate;
   }
   
