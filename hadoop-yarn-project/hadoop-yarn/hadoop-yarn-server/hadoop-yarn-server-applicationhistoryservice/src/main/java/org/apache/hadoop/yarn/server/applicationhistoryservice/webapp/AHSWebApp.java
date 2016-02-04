@@ -20,6 +20,7 @@ package org.apache.hadoop.yarn.server.applicationhistoryservice.webapp;
 import org.apache.hadoop.yarn.server.api.ApplicationContext;
 import org.apache.hadoop.yarn.server.applicationhistoryservice.ApplicationHistoryManager;
 import org.apache.hadoop.yarn.server.applicationhistoryservice.timeline.TimelineStore;
+import org.apache.hadoop.yarn.server.applicationhistoryservice.timeline.security.TimelineACLsManager;
 import org.apache.hadoop.yarn.webapp.GenericExceptionHandler;
 import org.apache.hadoop.yarn.webapp.WebApp;
 import org.apache.hadoop.yarn.webapp.YarnJacksonJaxbJsonProvider;
@@ -31,11 +32,28 @@ public class AHSWebApp extends WebApp implements YarnWebParams {
 
   private final ApplicationHistoryManager applicationHistoryManager;
   private final TimelineStore timelineStore;
+  private TimelineACLsManager timelineACLsManager;
 
   public AHSWebApp(ApplicationHistoryManager applicationHistoryManager,
       TimelineStore timelineStore) {
     this.applicationHistoryManager = applicationHistoryManager;
     this.timelineStore = timelineStore;
+  }
+
+  public ApplicationHistoryManager getApplicationHistoryManager() {
+    return applicationHistoryManager;
+  }
+
+  public TimelineStore getTimelineStore() {
+    return timelineStore;
+  }
+
+  public TimelineACLsManager getTimelineACLsManager() {
+    return timelineACLsManager;
+  }
+
+  public void setTimelineACLsManager(TimelineACLsManager timelineACLsManager) {
+    this.timelineACLsManager = timelineACLsManager;
   }
 
   @Override
@@ -46,6 +64,7 @@ public class AHSWebApp extends WebApp implements YarnWebParams {
     bind(GenericExceptionHandler.class);
     bind(ApplicationContext.class).toInstance(applicationHistoryManager);
     bind(TimelineStore.class).toInstance(timelineStore);
+    bind(TimelineACLsManager.class).toInstance(timelineACLsManager);
     route("/", AHSController.class);
     route(pajoin("/apps", APP_STATE), AHSController.class);
     route(pajoin("/app", APPLICATION_ID), AHSController.class, "app");

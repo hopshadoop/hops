@@ -36,6 +36,7 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.server.applicationhistoryservice.timeline.LeveldbTimelineStore;
 import org.apache.hadoop.yarn.server.applicationhistoryservice.timeline.TimelineStore;
+import org.apache.hadoop.yarn.server.applicationhistoryservice.timeline.security.TimelineACLsManager;
 import org.apache.hadoop.yarn.server.applicationhistoryservice.webapp.AHSWebApp;
 import org.apache.hadoop.yarn.webapp.WebApp;
 import org.apache.hadoop.yarn.webapp.WebApps;
@@ -54,6 +55,7 @@ public class ApplicationHistoryServer extends CompositeService {
   ApplicationHistoryClientService ahsClientService;
   ApplicationHistoryManager historyManager;
   TimelineStore timelineStore;
+  TimelineACLsManager timelineACLsManager;
   private WebApp webApp;
 
   public ApplicationHistoryServer() {
@@ -68,6 +70,7 @@ public class ApplicationHistoryServer extends CompositeService {
     addService((Service) historyManager);
     timelineStore = createTimelineStore(conf);
     addIfService(timelineStore);
+    timelineACLsManager = createTimelineACLsManager(conf);
     super.serviceInit(conf);
   }
 
@@ -145,8 +148,13 @@ public class ApplicationHistoryServer extends CompositeService {
             LeveldbTimelineStore.class, TimelineStore.class), conf);
   }
 
+  protected TimelineACLsManager createTimelineACLsManager(Configuration conf) {
+    return new TimelineACLsManager(conf);
+  }
+
   protected void startWebApp() {
-    String bindAddress = WebAppUtils.getAHSWebAppURLWithoutScheme(getConfig());
+    Configuration conf = getConfig();
+    String bindAddress = WebAppUtils.getAHSWebAppURLWithoutScheme(conf);
     LOG.info("Instantiating AHSWebApp at " + bindAddress);
     try {
       webApp = WebApps
