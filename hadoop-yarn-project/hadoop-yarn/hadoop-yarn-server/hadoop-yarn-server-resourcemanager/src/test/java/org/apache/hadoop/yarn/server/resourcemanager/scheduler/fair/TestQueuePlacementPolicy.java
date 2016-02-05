@@ -132,7 +132,22 @@ public class TestQueuePlacementPolicy {
     sb.append("</queuePlacementPolicy>");
     parse(sb.toString());
   }
+  
+  public void testDefaultRuleWithQueueAttribute() throws Exception {
+    // This test covers the use case where we would like default rule
+    // to point to a different queue by default rather than root.default
+    configuredQueues.get(FSQueueType.LEAF).add("root.someDefaultQueue");
+    StringBuffer sb = new StringBuffer();
+    sb.append("<queuePlacementPolicy>");
+    sb.append("  <rule name='specified' create='false' />");
+    sb.append("  <rule name='default' queue='root.someDefaultQueue'/>");
+    sb.append("</queuePlacementPolicy>");
 
+    QueuePlacementPolicy policy = parse(sb.toString());
+    assertEquals("root.someDefaultQueue",
+        policy.assignAppToQueue("root.default", "user1"));
+  }
+ 
   @Test
   public void testNestedUserQueueParsingErrors() {
     // No nested rule specified in hierarchical user queue
@@ -311,6 +326,26 @@ public class TestQueuePlacementPolicy {
             policy.assignAppToQueue("root.parent2", "user2"));
   }
 
+  @Test
+  public void testNestedUserQueueDefaultRule() throws Exception {
+    // This test covers the use case where we would like user queues to be
+    // created under a default parent queue
+    configuredQueues.get(FSQueueType.PARENT).add("root.parentq");
+    StringBuffer sb = new StringBuffer();
+    sb.append("<queuePlacementPolicy>");
+    sb.append("  <rule name='specified' create='false' />");
+    sb.append("  <rule name='nestedUserQueue'>");
+    sb.append("       <rule name='default' queue='root.parentq'/>");
+    sb.append("  </rule>");
+    sb.append("  <rule name='default' />");
+    sb.append("</queuePlacementPolicy>");
+
+    QueuePlacementPolicy policy = parse(sb.toString());
+    assertEquals("root.parentq.user1",
+        policy.assignAppToQueue("root.default", "user1"));
+  }
+
+  
   private QueuePlacementPolicy parse(String str) throws Exception {
     // Read and parse the allocations file.
     DocumentBuilderFactory docBuilderFactory =
