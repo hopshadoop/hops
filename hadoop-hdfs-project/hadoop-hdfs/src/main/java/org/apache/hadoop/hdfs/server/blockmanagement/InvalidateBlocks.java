@@ -91,18 +91,21 @@ class InvalidateBlocks {
 
   /**
    * Add a block to the block collection
-   * which will be invalidated on the specified storage.
+   * which will be invalidated on the specified datanode.
    */
-  void add(final BlockInfo block, final DatanodeStorageInfo storage,
+  void add(final BlockInfo block, final DatanodeInfo datanode,
       final boolean log) throws StorageException, TransactionContextException {
-    InvalidatedBlock invBlk = new InvalidatedBlock(storage.getSid(), block
+    // TODO we know the datanode Uuid, but we have to give a storage sid (int)
+    // TODO So; do we do a lookup or what?
+    // TODO -> maybe do a hostUuid field instead of storageid in the table?
+    InvalidatedBlock invBlk = new InvalidatedBlock(datanode.getDatanodeUuid(), block
         .getBlockId(), block.getGenerationStamp(), block.getNumBytes(), block
         .getInodeId());
     if (add(invBlk)) {
       if (log) {
         NameNode.blockStateChangeLog.info(
             "BLOCK* " + getClass().getSimpleName() + ": add " + block + " to " +
-                storage);
+                datanode);
       }
     }
   }

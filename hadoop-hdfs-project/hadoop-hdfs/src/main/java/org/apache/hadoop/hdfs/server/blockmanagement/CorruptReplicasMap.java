@@ -69,7 +69,7 @@ public class CorruptReplicasMap {
    */
   public void addToCorruptReplicasMap(BlockInfo blk, DatanodeStorageInfo
       storage, String reason) throws StorageException, TransactionContextException {
-    Collection<DatanodeDescriptor> nodes = getNodes(blk);
+//    Collection<DatanodeDescriptor> nodes = getNodes(blk);
     Collection<DatanodeStorageInfo> storages = getStorages(blk);
 
     
@@ -83,20 +83,17 @@ public class CorruptReplicasMap {
     if (!storages.contains(storage)) {
       addCorruptReplicaToDB(new CorruptReplica(blk.getBlockId(), storage.getSid(),
           blk.getInodeId()));
+
       NameNode.blockStateChangeLog
           .info("BLOCK NameSystem.addToCorruptReplicasMap: " +
-              blk.getBlockName() +
-              " added as corrupt on " + storage +
-              " by " + Server.getRemoteIp() +
-              reasonText);
+              blk.getBlockName() + " added as corrupt on " + storage +
+              " by " + Server.getRemoteIp() + reasonText);
     } else {
       NameNode.blockStateChangeLog
           .info("BLOCK NameSystem.addToCorruptReplicasMap: " +
-              "duplicate requested for " +
-              blk.getBlockName() + " to add as corrupt " +
-              "on " + storage +
-              " by " + Server.getRemoteIp() +
-              reasonText);
+              "duplicate requested for " + blk.getBlockName() +
+              " to add as corrupt on " + storage +
+              " by " + Server.getRemoteIp() + reasonText);
     }
   }
 

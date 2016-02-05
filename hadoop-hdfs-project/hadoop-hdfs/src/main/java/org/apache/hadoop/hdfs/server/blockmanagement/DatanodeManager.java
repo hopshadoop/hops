@@ -374,7 +374,7 @@ public class DatanodeManager {
   /**
    * Get data node by datanode ID.
    *
-   * @param nodeID
+   * @param nodeID datanode ID
    * @return DatanodeDescriptor or null if the node is not found.
    * @throws UnregisteredNodeException
    */
@@ -396,6 +396,20 @@ public class DatanodeManager {
       throw e;
     }
     return node;
+  }
+
+  public DatanodeStorageInfo[] getDatanodeStorageInfos(
+      DatanodeID[] datanodeID, String[] storageIDs)
+      throws UnregisteredNodeException {
+    if (datanodeID.length == 0) {
+      return null;
+    }
+    final DatanodeStorageInfo[] storages = new DatanodeStorageInfo[datanodeID.length];
+    for(int i = 0; i < datanodeID.length; i++) {
+      final DatanodeDescriptor dd = getDatanode(datanodeID[i]);
+      storages[i] = dd.getStorageInfo(storageIDs[i]);
+    }
+    return storages;
   }
 
   /**
@@ -1250,7 +1264,9 @@ public class DatanodeManager {
     LOG.info("Marking all datandoes as stale");
     synchronized (datanodeMap) {
       for (DatanodeDescriptor dn : datanodeMap.values()) {
-        dn.markStaleAfterFailover();
+        for(DatanodeStorageInfo storage : dn.getStorageInfos()) {
+          storage.markStaleAfterFailover();
+        }
       }
     }
   }
@@ -1325,6 +1341,66 @@ public class DatanodeManager {
   }
 
   /**
+   *  Resolve a node's network location. If the DNS to switch mapping fails
+   *  then this method guarantees default rack location.
+   *  @param node to resolve to network location
+   *  @return network location path
+   */
+  private String resolveNetworkLocationWithFallBackToDefaultLocation (
+      DatanodeID node) {
+    String networkLocation;
+    try {
+      networkLocation = resolveNetworkLocation(node);
+    } catch (UnresolvedTopologyException e) {
+      LOG.error("Unresolved topology mapping. Using " +
+          NetworkTopology.DEFAULT_RACK + " for host " + node.getHostName());
+      networkLocation = NetworkTopology.DEFAULT_RACK;
+    }
+    return networkLocation;
+  }
+
+  /**
+   * Resolve a node's network location. If the DNS to switch mapping fails,
+   * then this method throws UnresolvedTopologyException.
+   * @param node to resolve to network location
+   * @return network location path.
+   * @throws UnresolvedTopologyException if the DNS to switch mapping fails
+   *    to resolve network location.
+   */
+  private String resolveNetworkLocation (DatanodeID node)
+      throws UnresolvedTopologyException {
+    List<String> names = new ArrayList<String>(1);
+    if (dnsToSwitchMapping instanceof CachedDNSToSwitchMapping) {
+      names.add(node.getIpAddr());
+    } else {
+      names.add(node.getHostName());
+    }
+
+    List<String> rName = resolveNetworkLocation(names);
+    String networkLocation;
+    if (rName == null) {
+      LOG.error("The resolve call returned null!");
+      throw new UnresolvedTopologyException(
+          "Unresolved topology mapping for host " + node.getHostName());
+    } else {
+      networkLocation = rName.get(0);
+    }
+    return networkLocation;
+  }
+
+  /**
+   * Resolve network locations for specified hosts
+   *
+   * @param names
+   * @return Network locations if available, Else returns null
+   */
+  public List<String> resolveNetworkLocation(List<String> names) {
+    // resolve its network location
+    List<String> rName = dnsToSwitchMapping.resolve(names);
+    return rName;
+  }
+
+  /**
    * Get a datanode descriptor given corresponding DatanodeUUID
    */
   public DatanodeDescriptor getDatanode(final String datanodeUuid) {
@@ -1358,6 +1434,13 @@ public class DatanodeManager {
         return b.getExpectedLocations(datanodeManager);
       }
     }.handle();
+  }
+
+  /**
+   * @return the datanode descriptor for the host.
+   */
+  public DatanodeDescriptor getDatanodeByXferAddr(String host, int xferPort) {
+    return host2DatanodeMap.getDatanodeByXferAddr(host, xferPort);
   }
   
   // only for testing

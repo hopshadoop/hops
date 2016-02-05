@@ -2113,8 +2113,8 @@ public class FSNamesystem
    * client to "try again later".
    */
   LocatedBlock getAdditionalBlock(final String src, final String clientName,
-      final ExtendedBlock previous, final HashMap<Node, Node> excludedNodes)
-      throws IOException {
+      final ExtendedBlock previous, final HashMap<Node, Node> excludedNodes,
+      final List<String> favoredNodes) throws IOException {
     HopsTransactionalRequestHandler additionalBlockHandler =
         new HopsTransactionalRequestHandler(
             HDFSOperationType.GET_ADDITIONAL_BLOCK, src) {
@@ -2161,13 +2161,9 @@ public class FSNamesystem
 
 
             // choose targets for the new block to be allocated.
-//            final DatanodeDescriptor targets[] = getBlockManager()
-//                .chooseTarget(src, replication, clientNode, excludedNodes,
-//                    blockSize);
             final DatanodeStorageInfo targets[] = getBlockManager().chooseTarget4NewBlock(
                 src, replication, clientNode, excludedNodes, blockSize,
-                favoredNodes,
-                storagePolicyID);
+                favoredNodes);
 
             // Part II.
             // Allocate a new block, add it to the INode and the BlocksMap.
@@ -2542,13 +2538,11 @@ public class FSNamesystem
    *     If addition of block exceeds space quota
    */
   BlockInfo saveAllocatedBlock(String src, INode[] inodes, Block newBlock,
-      DatanodeDescriptor targets[]) throws IOException, StorageException {
+      DatanodeStorageInfo targets[]) throws IOException, StorageException {
     BlockInfo b = dir.addBlock(src, inodes, newBlock, targets);
     NameNode.stateChangeLog.info(
         "BLOCK* allocateBlock: " + src + ". " + getBlockPoolId() + " " + b);
-    for (DatanodeDescriptor dn : targets) {
-      dn.incBlocksScheduled();
-    }
+    DatanodeStorageInfo.incrementBlocksScheduled(targets);
     return b;
   }
 
@@ -3271,7 +3265,7 @@ public class FSNamesystem
             (BlockInfoUnderConstruction) lastBlock;
         // setup the last block locations from the blockManager if not known
         if (uc.getNumExpectedLocations() == 0) {
-          uc.setExpectedLocations(blockManager.getNodes(lastBlock));
+          uc.setExpectedLocations(blockManager.getStorages(lastBlock));
         }
         // start recovery of the last block for this file
         long blockRecoveryId = pendingFile.nextGenerationStamp();
@@ -3359,6 +3353,14 @@ private void commitOrCompleteLastBlock(
       final boolean closeFile, final boolean deleteblock,
       final DatanodeID[] newtargets, final String[] newtargetstorages)
       throws IOException, UnresolvedLinkException {
+    LOG.info("commitBlockSynchronization(lastblock=" + lastblock
+        + ", newgenerationstamp=" + newgenerationstamp
+        + ", newlength=" + newlength
+        + ", newtargets=" + Arrays.asList(newtargets)
+        + ", closeFile=" + closeFile
+        + ", deleteBlock=" + deleteblock
+        + ")");
+
     new HopsTransactionalRequestHandler(
         HDFSOperationType.COMMIT_BLOCK_SYNCHRONIZATION) {
       INodeIdentifier inodeIdentifier;
@@ -3414,8 +3416,7 @@ private void commitOrCompleteLastBlock(
               " for block " + lastblock);
         }
 
-        INodeFileUnderConstruction pendingFile =
-            (INodeFileUnderConstruction) iFile;
+        INodeFileUnderConstruction pendingFile = (INodeFileUnderConstruction) iFile;
 
         if (deleteblock) {
           pendingFile.removeLastBlock(ExtendedBlock.getLocalBlock(lastblock));
@@ -3428,24 +3429,35 @@ private void commitOrCompleteLastBlock(
           // find the DatanodeDescriptor objects
           // There should be no locations in the blockManager till now because the
           // file is underConstruction
-          DatanodeDescriptor[] descriptors = null;
-          if (newtargets.length > 0) {
-            descriptors = new DatanodeDescriptor[newtargets.length];
-            for (int i = 0; i < newtargets.length; i++) {
-              descriptors[i] =
-                  blockManager.getDatanodeManager().getDatanode(newtargets[i]);
+          ArrayList<DatanodeDescriptor> trimmedTargets = new ArrayList<DatanodeDescriptor>(newtargets.length);
+          ArrayList<String> trimmedStorages = new ArrayList<String>(newtargets.length);
+
+          for (int i = 0; i < newtargets.length; i++) {
+            DatanodeDescriptor targetNode = blockManager.getDatanodeManager().getDatanode(newtargets[i]);
+            if (targetNode != null) {
+              trimmedTargets.add(targetNode);
+              trimmedStorages.add(newtargetstorages[i]);
+            } else if (LOG.isDebugEnabled()) {
+              LOG.debug("DatanodeDescriptor (=" + newtargets[i] + ") not found");
             }
           }
-          if ((closeFile) && (descriptors != null)) {
+          if ((closeFile) && !trimmedTargets.isEmpty()) {
             // the file is getting closed. Insert block locations into blockManager.
             // Otherwise fsck will report these blocks as MISSING, especially if the
             // blocksReceived from Datanodes take a long time to arrive.
-            for (int i = 0; i < descriptors.length; i++) {
-              descriptors[i].addBlock(newtargetstorages[i], storedBlock);
+            for (int i = 0; i < trimmedTargets.size(); i++) {
+              DatanodeStorageInfo storageInfo = trimmedTargets.get(i).getStorageInfo(trimmedStorages.get(i));
+              if (storageInfo != null) {
+                storageInfo.addBlock(storedBlock);
+              }
             }
           }
           // add pipeline locations into the INodeUnderConstruction
-          pendingFile.setLastBlock(storedBlock, descriptors);
+          DatanodeStorageInfo[] trimmedStorageInfos =
+              blockManager.getDatanodeManager().getDatanodeStorageInfos(
+                  trimmedTargets.toArray(new DatanodeID[trimmedTargets.size()]),
+                  trimmedStorages.toArray(new String[trimmedStorages.size()]));
+          pendingFile.setLastBlock(storedBlock, trimmedStorageInfos);
         }
 
         src = leaseManager.findPath(pendingFile);
@@ -4809,9 +4821,10 @@ private void commitOrCompleteLastBlock(
     for (int i = 0; i < blocks.length; i++) {
       ExtendedBlock blk = blocks[i].getBlock();
       DatanodeInfo[] nodes = blocks[i].getLocations();
+      String[] storageIDs = blocks[i].getStorageIDs();
       for (int j = 0; j < nodes.length; j++) {
-        //TODO: add "storageID to LocatedBlock
-        blockManager.findAndMarkBlockAsCorrupt(blk, nodes[j], "STORAGE_ID",
+        blockManager.findAndMarkBlockAsCorrupt(blk, nodes[j],
+            storageIDs == null ? null: storageIDs[j],
             "client machine reported it");
       }
     }
@@ -4887,7 +4900,7 @@ private void commitOrCompleteLastBlock(
    *     if any error occurs
    */
   void updatePipeline(final String clientName, final ExtendedBlock oldBlock,
-      final ExtendedBlock newBlock, final DatanodeID[] newNodes)
+      final ExtendedBlock newBlock, final DatanodeID[] newNodes, final String[] newStorageIDs)
       throws IOException {
     new HopsTransactionalRequestHandler(HDFSOperationType.UPDATE_PIPELINE) {
       INodeIdentifier inodeIdentifier;
@@ -4917,23 +4930,27 @@ private void commitOrCompleteLastBlock(
         assert
             newBlock.getBlockId() == oldBlock.getBlockId() :
             newBlock + " and " + oldBlock + " has different block identifier";
-        LOG.info("updatePipeline(block=" + oldBlock + ", newGenerationStamp=" +
-            newBlock.getGenerationStamp() + ", newLength=" +
-            newBlock.getNumBytes() + ", newNodes=" + Arrays.asList(newNodes) +
-            ", clientName=" + clientName + ")");
-        updatePipelineInternal(clientName, oldBlock, newBlock, newNodes);
-        LOG.info(
-            "updatePipeline(" + oldBlock + ") successfully to " + newBlock);
+
+        LOG.info("updatePipeline(block=" + oldBlock
+            + ", newGenerationStamp=" + newBlock.getGenerationStamp()
+            + ", newLength=" + newBlock.getNumBytes()
+            + ", newNodes=" + Arrays.asList(newNodes)
+            + ", clientName=" + clientName
+            + ")");
+
+        updatePipelineInternal(clientName, oldBlock, newBlock, newNodes,
+            newStorageIDs);
+        LOG.info("updatePipeline(" + oldBlock + ") successfully to " + newBlock);
         return null;
       }
     }.handle(this);
   }
 
   /**
-   * @see #updatePipeline(String, ExtendedBlock, ExtendedBlock, DatanodeID[])
+   * @see #updatePipeline(String, ExtendedBlock, ExtendedBlock, DatanodeID[], String[])
    */
   private void updatePipelineInternal(String clientName, ExtendedBlock oldBlock,
-      ExtendedBlock newBlock, DatanodeID[] newNodes)
+      ExtendedBlock newBlock, DatanodeID[] newNodes, String[] newStorageIDs)
       throws IOException, StorageException {
     // check the vadility of the block and lease holder name
     final INodeFileUnderConstruction pendingFile =
@@ -4952,19 +4969,14 @@ private void commitOrCompleteLastBlock(
     }
 
     // Update old block with the new generation stamp and new length
-    blockinfo.setGenerationStamp(newBlock.getGenerationStamp());
     blockinfo.setNumBytes(newBlock.getNumBytes());
+    blockinfo.setGenerationStamp(newBlock.getGenerationStamp());
     pendingFile.recomputeFileSize();
-    // find the DatanodeDescriptor objects
-    final DatanodeManager dm = getBlockManager().getDatanodeManager();
-    DatanodeDescriptor[] descriptors = null;
-    if (newNodes.length > 0) {
-      descriptors = new DatanodeDescriptor[newNodes.length];
-      for (int i = 0; i < newNodes.length; i++) {
-        descriptors[i] = dm.getDatanode(newNodes[i]);
-      }
-    }
-    blockinfo.setExpectedLocations(descriptors);
+
+    // find the DatanodeStorageInfo objects
+    final DatanodeStorageInfo[] storages = blockManager.getDatanodeManager()
+        .getDatanodeStorageInfos(newNodes, newStorageIDs);
+    blockinfo.setExpectedLocations(storages);
   }
 
   // rename was successful. If any part of the renamed subtree had

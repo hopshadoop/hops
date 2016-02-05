@@ -202,6 +202,13 @@ public class DatanodeDescriptor extends DatanodeInfo {
   private boolean disallowed = false;
 
   /**
+   * The number of replication work pending before targets are determined
+   */
+  // TODO HDP_2.6 should we keep this volatile or store in DB? I think
+  // volatile is OK
+  private int PendingReplicationWithoutTargets = 0;
+
+  /**
    * DatanodeDescriptor constructor
    *
    * @param nodeID
@@ -283,7 +290,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
     return false;
   }
 
-  DatanodeStorageInfo getStorageInfo(String storageID) {
+  public DatanodeStorageInfo getStorageInfo(String storageID) {
     return this.storageMap.get(storageID);
   }
 
@@ -400,6 +407,14 @@ public class DatanodeDescriptor extends DatanodeInfo {
   // TODO deal with this...
   public Iterator<BlockInfo> getBlockIterator() throws IOException {
     return getAllMachineBlockInfos().iterator();
+  }
+
+  void incrementPendingReplicationWithoutTargets() {
+    PendingReplicationWithoutTargets++;
+  }
+
+  void decrementPendingReplicationWithoutTargets() {
+    PendingReplicationWithoutTargets--;
   }
 
   private List<BlockInfo> getAllMachineBlockInfos() throws IOException {
