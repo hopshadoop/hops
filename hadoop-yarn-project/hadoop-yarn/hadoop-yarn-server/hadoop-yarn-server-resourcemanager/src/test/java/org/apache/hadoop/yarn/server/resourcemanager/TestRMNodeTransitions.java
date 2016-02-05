@@ -347,16 +347,16 @@ public class TestRMNodeTransitions {
     int initialDecommissioned = cm.getNumDecommisionedNMs();
     int initialRebooted = cm.getNumRebootedNMs();
     node.handle(new RMNodeEvent(node.getNodeID(), RMNodeEventType.EXPIRE,
-        new TransactionStateImpl( TransactionType.RM)));
+            new TransactionStateImpl(TransactionType.RM)));
     Assert
         .assertEquals("Active Nodes", initialActive - 1, cm.getNumActiveNMs());
     Assert.assertEquals("Lost Nodes", initialLost + 1, cm.getNumLostNMs());
     Assert.assertEquals("Unhealthy Nodes", initialUnhealthy,
-        cm.getUnhealthyNMs());
+            cm.getUnhealthyNMs());
     Assert.assertEquals("Decommissioned Nodes", initialDecommissioned,
         cm.getNumDecommisionedNMs());
     Assert.assertEquals("Rebooted Nodes", initialRebooted,
-        cm.getNumRebootedNMs());
+            cm.getNumRebootedNMs());
     Assert.assertEquals(NodeState.LOST, node.getState());
   }
 
@@ -387,7 +387,7 @@ public class TestRMNodeTransitions {
     RMNodeImpl node = getUnhealthyNode();
     verify(scheduler, times(2)).handle(any(NodeRemovedSchedulerEvent.class));
     node.handle(new RMNodeEvent(node.getNodeID(), RMNodeEventType.EXPIRE,
-        new TransactionStateImpl( TransactionType.RM)));
+            new TransactionStateImpl(TransactionType.RM)));
     verify(scheduler, times(2)).handle(any(NodeRemovedSchedulerEvent.class));
     Assert.assertEquals(NodeState.LOST, node.getState());
   }
@@ -407,11 +407,11 @@ public class TestRMNodeTransitions {
         .assertEquals("Active Nodes", initialActive - 1, cm.getNumActiveNMs());
     Assert.assertEquals("Lost Nodes", initialLost, cm.getNumLostNMs());
     Assert.assertEquals("Unhealthy Nodes", initialUnhealthy,
-        cm.getUnhealthyNMs());
+            cm.getUnhealthyNMs());
     Assert.assertEquals("Decommissioned Nodes", initialDecommissioned + 1,
-        cm.getNumDecommisionedNMs());
+            cm.getNumDecommisionedNMs());
     Assert.assertEquals("Rebooted Nodes", initialRebooted,
-        cm.getNumRebootedNMs());
+            cm.getNumRebootedNMs());
     Assert.assertEquals(NodeState.DECOMMISSIONED, node.getState());
   }
 
@@ -564,6 +564,10 @@ public class TestRMNodeTransitions {
   }
 
   private RMNodeImpl getRunningNode() {
+      return getRunningNode(null);
+  }
+
+  private RMNodeImpl getRunningNode(String nmVersion) {
     NodeId nodeId = BuilderUtils.newNodeId("localhost", 0);
     Resource capability = Resource.newInstance(4096, 4);
 
@@ -582,7 +586,7 @@ public class TestRMNodeTransitions {
     RMNodeImpl node =
         new RMNodeImpl(nodeId, rmContext, nodeId.getHost(), 0, 0, null,
             ResourceOption.newInstance(capability,
-                RMNode.OVER_COMMIT_TIMEOUT_MILLIS_DEFAULT), null);
+                RMNode.OVER_COMMIT_TIMEOUT_MILLIS_DEFAULT), nmVersion);
     ((TransactionStateImpl) ts).getRMContextInfo()
         .toAddActiveRMNode(nodeId, node, 1);
     node.handle(new RMNodeEvent(node.getNodeID(), RMNodeEventType.STARTED, ts));
@@ -659,4 +663,16 @@ public class TestRMNodeTransitions {
     Assert.assertEquals(NodesListManagerEventType.NODE_USABLE,
         nodesListManagerEvent.getType());
   }
+
+   @Test
+   public void testReconnnectUpdate() {
+       final String nmVersion1 = "nm version 1";
+       final String nmVersion2 = "nm version 2";
+       RMNodeImpl node = getRunningNode(nmVersion1);
+       Assert.assertEquals(nmVersion1, node.getNodeManagerVersion());
+       RMNodeImpl reconnectingNode = getRunningNode(nmVersion2);
+       node.handle(new RMNodeReconnectEvent(node.getNodeID(), reconnectingNode,
+               new TransactionStateImpl( TransactionType.RM)));
+       Assert.assertEquals(nmVersion2, node.getNodeManagerVersion());
+   }
 }
