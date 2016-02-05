@@ -56,6 +56,7 @@ import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.Options;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler;
 import org.apache.hadoop.distributedloadsimulator.sls.appmaster.AMSimulator;
 import org.apache.hadoop.distributedloadsimulator.sls.appmaster.MRAMSimulator;
 import org.apache.hadoop.yarn.api.records.NodeId;
@@ -72,6 +73,8 @@ import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.distributedloadsimulator.sls.conf.SLSConfiguration;
 import org.apache.hadoop.distributedloadsimulator.sls.nodemanager.NMSimulator;
 import org.apache.hadoop.distributedloadsimulator.sls.scheduler.ContainerSimulator;
+import org.apache.hadoop.distributedloadsimulator.sls.scheduler.SLSCapacityScheduler;
+import org.apache.hadoop.distributedloadsimulator.sls.scheduler.SchedulerWrapper;
 import org.apache.hadoop.distributedloadsimulator.sls.scheduler.ResourceSchedulerWrapper;
 import org.apache.hadoop.distributedloadsimulator.sls.scheduler.TaskRunner;
 import org.apache.hadoop.util.ReflectionUtils;
@@ -287,10 +290,10 @@ public class SLSRunner implements AMNMCommonObject {
       // before start the rm , let rm to read and get to know about number of applications
       startAMFromSLSTraces();
       startRM();
-      ((ResourceSchedulerWrapper) rm.getResourceScheduler())
-              .setQueueSet(this.queueAppNumMap.keySet());
-      ((ResourceSchedulerWrapper) rm.getResourceScheduler())
-              .setTrackedAppSet(this.trackedApps);
+      ((SchedulerWrapper) rm.getResourceScheduler())
+                             .setQueueSet(this.queueAppNumMap.keySet());
+      ((SchedulerWrapper) rm.getResourceScheduler())
+                             .setTrackedAppSet(this.trackedApps);
     }
     printSimulationInfo();
     nodeRunner.start();
@@ -313,9 +316,20 @@ public class SLSRunner implements AMNMCommonObject {
     RMStorageFactory.setConfiguration(rmConf);
 
     String schedulerClass = rmConf.get(YarnConfiguration.RM_SCHEDULER);
-    rmConf.set(SLSConfiguration.RM_SCHEDULER, schedulerClass);
-    rmConf.set(YarnConfiguration.RM_SCHEDULER,
-            ResourceSchedulerWrapper.class.getName());
+         
+    // For CapacityScheduler we use a sub-classing instead of wrapping
+    // to allow scheduler-specific invocations from monitors to work
+    // this can be used for other schedulers as well if we care to
+    // exercise/track behaviors that are not common to the scheduler api
+    if(Class.forName(schedulerClass) == CapacityScheduler.class) {
+      rmConf.set(YarnConfiguration.RM_SCHEDULER,
+          SLSCapacityScheduler.class.getName());
+    } else {
+      rmConf.set(YarnConfiguration.RM_SCHEDULER,
+              ResourceSchedulerWrapper.class.getName());
+      rmConf.set(SLSConfiguration.RM_SCHEDULER, schedulerClass);
+    }
+    
     rmConf.set(SLSConfiguration.METRICS_OUTPUT_DIR, metricsOutputDir);
     rm = new ResourceManager();
     rm.init(rmConf);

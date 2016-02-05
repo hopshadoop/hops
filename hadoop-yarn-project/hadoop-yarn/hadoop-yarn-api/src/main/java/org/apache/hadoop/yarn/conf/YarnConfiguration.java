@@ -966,6 +966,14 @@ public class YarnConfiguration extends Configuration {
   public static final String NM_WEBAPP_SPNEGO_KEYTAB_FILE_KEY =
       NM_PREFIX + "webapp.spnego-keytab-file";
   public static final String DEFAULT_NM_USER_HOME_DIR = "/home/";
+
+  public static final String NM_RECOVERY_PREFIX = NM_PREFIX + "recovery.";
+  public static final String NM_RECOVERY_ENABLED =
+          NM_RECOVERY_PREFIX + "enabled";
+  public static final boolean DEFAULT_NM_RECOVERY_ENABLED = false;
+
+  public static final String NM_RECOVERY_DIR = NM_RECOVERY_PREFIX + "dir";
+
     ////////////////////////////////
   // Web Proxy Configs
   ////////////////////////////////

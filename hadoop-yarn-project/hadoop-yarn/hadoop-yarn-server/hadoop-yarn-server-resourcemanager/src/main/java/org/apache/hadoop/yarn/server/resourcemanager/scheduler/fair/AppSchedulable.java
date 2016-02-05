@@ -40,8 +40,10 @@ import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.apache.hadoop.yarn.util.resource.DefaultResourceCalculator;
 import org.apache.hadoop.yarn.util.resource.Resources;
 
+import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Comparator;
 
 @Private
 @Unstable
@@ -58,6 +60,8 @@ public class AppSchedulable extends Schedulable {
   private static final Log LOG = LogFactory.getLog(AppSchedulable.class);
   private FSLeafQueue queue;
   private RMContainerTokenSecretManager containerTokenSecretManager;
+
+  private RMContainerComparator comparator = new RMContainerComparator();
 
   public AppSchedulable(FairScheduler scheduler, FSSchedulerApp app,
       FSLeafQueue queue) {
@@ -108,7 +112,10 @@ public class AppSchedulable extends Schedulable {
 
   @Override
   public Resource getResourceUsage() {
-    return app.getCurrentConsumption();
+    // Here the getPreemptedResources() always return zero, except in
+    // a preemption round
+    return Resources.subtract(app.getCurrentConsumption(),
+            app.getPreemptedResources());
   }
 
 
@@ -225,9 +232,9 @@ public class AppSchedulable extends Schedulable {
    * made, returns an empty resource.
    */
 
-  private Resource assignContainer(FSSchedulerNode node, Priority priority,
-      ResourceRequest request, NodeType type, boolean reserved,
-      TransactionState transactionState) {
+  private Resource assignContainer(FSSchedulerNode node, ResourceRequest request,
+                                   NodeType type, boolean reserved,
+                                   TransactionState transactionState) {
 
     // How much does this request need?
     Resource capability = request.getCapability();
@@ -240,26 +247,26 @@ public class AppSchedulable extends Schedulable {
       container = node.getReservedContainer().getContainer();
     } else {
       container =
-          createContainer(app, node, capability, priority, transactionState);
+          createContainer(app, node, capability, request.getPriority(), transactionState);
     }
 
     // Can we allocate a container on this node?
     if (Resources.fitsIn(capability, available)) {
       // Inform the application of the new container for this request
       RMContainer allocatedContainer =
-          app.allocate(type, node, priority, request, container,
+          app.allocate(type, node, request.getPriority(), request, container,
               transactionState);
       if (allocatedContainer == null) {
         // Did the application need this resource?
         if (reserved) {
-          unreserve(priority, node, transactionState);
+          unreserve(request.getPriority(), node, transactionState);
         }
         return Resources.none();
       }
 
       // If we had previously made a reservation, delete it
       if (reserved) {
-        unreserve(priority, node, transactionState);
+        unreserve(request.getPriority(), node, transactionState);
       }
 
       // Inform the node
@@ -268,7 +275,7 @@ public class AppSchedulable extends Schedulable {
       return container.getResource();
     } else {
       // The desired container won't fit here, so reserve
-      reserve(priority, node, container, reserved, transactionState);
+      reserve(request.getPriority(), node, container, reserved, transactionState);
 
       return FairScheduler.CONTAINER_RESERVED;
     }
@@ -322,7 +329,7 @@ public class AppSchedulable extends Schedulable {
         if (rackLocalRequest != null &&
             rackLocalRequest.getNumContainers() != 0 && localRequest != null &&
             localRequest.getNumContainers() != 0) {
-          return assignContainer(node, priority, localRequest,
+          return assignContainer(node, localRequest,
               NodeType.NODE_LOCAL, reserved, transactionState);
         }
         
@@ -334,7 +341,7 @@ public class AppSchedulable extends Schedulable {
             rackLocalRequest.getNumContainers() != 0 &&
             (allowedLocality.equals(NodeType.RACK_LOCAL) ||
                 allowedLocality.equals(NodeType.OFF_SWITCH))) {
-          return assignContainer(node, priority, rackLocalRequest,
+          return assignContainer(node, rackLocalRequest,
               NodeType.RACK_LOCAL, reserved, transactionState);
         }
 
@@ -347,7 +354,7 @@ public class AppSchedulable extends Schedulable {
         if (offSwitchRequest != null &&
             offSwitchRequest.getNumContainers() != 0 &&
             allowedLocality.equals(NodeType.OFF_SWITCH)) {
-          return assignContainer(node, priority, offSwitchRequest,
+          return assignContainer(node, offSwitchRequest,
               NodeType.OFF_SWITCH, reserved, transactionState);
         }
       }
@@ -393,7 +400,29 @@ public class AppSchedulable extends Schedulable {
       TransactionState transactionState) {
     return assignContainer(node, false, transactionState);
   }
-  
+
+  /**
+   * Preempt a running container according to the priority
+   */
+  @Override
+  public RMContainer preemptContainer() {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("App " + getName() + " is going to preempt a running " +
+          "container");
+    }
+
+    RMContainer toBePreempted = null;
+    for (RMContainer container : app.getLiveContainers()) {
+      if (!app.getPreemptionContainers().contains(container) &&
+              (toBePreempted == null ||
+                comparator.compare(toBePreempted, container)> 0 )) {
+        toBePreempted = container;
+      }
+    }
+
+    return toBePreempted;
+  }
+
   /**
    * Whether this app has containers requests that could be satisfied on the
    * given node, if the node had full space.
@@ -421,5 +450,18 @@ public class AppSchedulable extends Schedulable {
             Resources.lessThanOrEqual(RESOURCE_CALCULATOR, null,
                 anyRequest.getCapability(),
                 node.getRMNode().getTotalCapability());
+  }
+
+  static class RMContainerComparator implements Comparator<RMContainer>,
+          Serializable {
+    @Override
+    public int compare(RMContainer c1, RMContainer c2) {
+      int ret = c1.getContainer().getPriority().compareTo(
+              c2.getContainer().getPriority());
+      if (ret == 0) {
+        return c2.getContainerId().compareTo(c1.getContainerId());
+      }
+      return ret;
+    }
   }
 }

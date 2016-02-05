@@ -25,6 +25,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.resource.ResourceType;
 import org.apache.hadoop.yarn.server.resourcemanager.resource.ResourceWeights;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.Schedulable;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.SchedulingPolicy;
+import org.apache.hadoop.yarn.util.resource.Resources;
 
 import java.util.Collection;
 import java.util.Comparator;
@@ -68,7 +69,12 @@ public class DominantResourceFairnessPolicy extends SchedulingPolicy {
       ComputeFairShares.computeShares(schedulables, totalResources, type);
     }
   }
-  
+
+  @Override
+  public boolean checkIfUsageOverFairShare(Resource usage, Resource fairShare) {
+    return !Resources.fitsIn(usage, fairShare);
+  }
+
   @Override
   public void initialize(Resource clusterCapacity) {
     comparator.setClusterCapacity(clusterCapacity);

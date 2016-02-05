@@ -48,6 +48,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.ApplicationMasterService;
 import org.apache.hadoop.yarn.server.resourcemanager.MockNodes;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
+import org.apache.hadoop.yarn.server.resourcemanager.resource.ResourceType;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.MockRMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppEvent;
@@ -80,15 +81,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -665,8 +658,11 @@ public class TestFairScheduler extends FairSchedulerTestBase {
     Set<String> queues =
         Sets.newHashSet("root.user1", "root.user3group", "root.user4subgroup1",
             "root.user4subgroup2", "root.user5subgroup2");
+    Map<FSQueueType, Set<String>> configuredQueues = new HashMap<FSQueueType, Set<String>>();
+    configuredQueues.put(FSQueueType.LEAF, queues);
+    configuredQueues.put(FSQueueType.PARENT, new HashSet<String>());
     scheduler.getAllocationConfiguration().placementPolicy =
-        new QueuePlacementPolicy(rules, queues, conf);
+        new QueuePlacementPolicy(rules, configuredQueues, conf);
     appId = createSchedulingRequest(1024, "somequeue", "user1");
     assertEquals("root.somequeue",
         scheduler.getSchedulerApp(appId).getQueueName());
@@ -691,7 +687,7 @@ public class TestFairScheduler extends FairSchedulerTestBase {
     rules.add(new QueuePlacementRule.Specified().initialize(true, null));
     rules.add(new QueuePlacementRule.Default().initialize(true, null));
     scheduler.getAllocationConfiguration().placementPolicy =
-        new QueuePlacementPolicy(rules, queues, conf);
+        new QueuePlacementPolicy(rules, configuredQueues, conf);
     appId = createSchedulingRequest(1024, "somequeue", "user1");
     assertEquals("root.user1", scheduler.getSchedulerApp(appId).getQueueName());
     appId = createSchedulingRequest(1024, "somequeue", "otheruser");
@@ -742,6 +738,90 @@ public class TestFairScheduler extends FairSchedulerTestBase {
         assertEquals(1024, p.getFairShare().getMemory());
       } else if (p.getName().equals("root.queueB")) {
         assertEquals(2048, p.getFairShare().getMemory());
+      }
+    }
+  }
+
+  @Test
+  public void testNestedUserQueue() throws IOException {
+    conf.set(FairSchedulerConfiguration.ALLOCATION_FILE, ALLOC_FILE);
+    conf.setClass(CommonConfigurationKeys.HADOOP_SECURITY_GROUP_MAPPING,
+            SimpleGroupsMapping.class, GroupMappingServiceProvider.class);
+    PrintWriter out = new PrintWriter(new FileWriter(ALLOC_FILE));
+    out.println("<?xml version=\"1.0\"?>");
+    out.println("<allocations>");
+    out.println("<queue name=\"user1group\" type=\"parent\">");
+    out.println("<minResources>1024mb,0vcores</minResources>");
+    out.println("</queue>");
+    out.println("<queuePlacementPolicy>");
+    out.println("<rule name=\"specified\" create=\"false\" />");
+    out.println("<rule name=\"nestedUserQueue\">");
+    out.println("     <rule name=\"primaryGroup\" create=\"false\" />");
+    out.println("</rule>");
+    out.println("<rule name=\"default\" />");
+    out.println("</queuePlacementPolicy>");
+    out.println("</allocations>");
+    out.close();
+
+    scheduler.reinitialize(conf, resourceManager.getRMContext(), null);
+    RMApp rmApp1 = new MockRMApp(0, 0, RMAppState.NEW);
+
+    FSLeafQueue user1Leaf = scheduler.assignToQueue(rmApp1, "root.default",
+            "user1", new TransactionStateImpl(TransactionState.TransactionType.RM));
+
+    assertEquals("root.user1group.user1", user1Leaf.getName());
+  }
+
+  @Test
+  public void testFairShareAndWeightsInNestedUserQueueRule() throws Exception {
+    conf.set(FairSchedulerConfiguration.ALLOCATION_FILE, ALLOC_FILE);
+
+    PrintWriter out = new PrintWriter(new FileWriter(ALLOC_FILE));
+
+    out.println("<?xml version=\"1.0\"?>");
+    out.println("<allocations>");
+    out.println("<queue name=\"parentq\" type=\"parent\">");
+    out.println("<minResources>1024mb,0vcores</minResources>");
+    out.println("</queue>");
+    out.println("<queuePlacementPolicy>");
+    out.println("<rule name=\"nestedUserQueue\">");
+    out.println("     <rule name=\"specified\" create=\"false\" />");
+    out.println("</rule>");
+    out.println("<rule name=\"default\" />");
+    out.println("</queuePlacementPolicy>");
+    out.println("</allocations>");
+    out.close();
+
+    RMApp rmApp1 = new MockRMApp(0, 0, RMAppState.NEW);
+    RMApp rmApp2 = new MockRMApp(1, 1, RMAppState.NEW);
+
+    scheduler.reinitialize(conf, resourceManager.getRMContext(), null);
+
+    int capacity = 16 * 1024;
+    // create node with 16 G
+    RMNode node1 = MockNodes.newNodeInfo(1, Resources.createResource(capacity),
+            1, "127.0.0.1");
+    NodeAddedSchedulerEvent nodeEvent1 = new NodeAddedSchedulerEvent(node1,
+            new TransactionStateImpl(TransactionState.TransactionType.RM));
+    scheduler.handle(nodeEvent1);
+
+    // user1,user2 submit their apps to parentq and create user queues
+    scheduler.assignToQueue(rmApp1, "root.parentq", "user1",
+            new TransactionStateImpl(TransactionState.TransactionType.RM));
+    scheduler.assignToQueue(rmApp2, "root.parentq", "user2",
+            new TransactionStateImpl(TransactionState.TransactionType.RM));
+    scheduler.update();
+
+    Collection<FSLeafQueue> leafQueues = scheduler.getQueueManager()
+            .getLeafQueues();
+
+    for (FSLeafQueue leaf : leafQueues) {
+      if (leaf.getName().equals("root.parentq.user1")
+              || leaf.getName().equals("root.parentq.user2")) {
+        // assert that the fair share is 1/4th node1's capacity
+        assertEquals(capacity / 4, leaf.getFairShare().getMemory());
+        // assert weights are equal for both the user queues
+        assertEquals(1.0, leaf.getWeights().getWeight(ResourceType.MEMORY), 0);
       }
     }
   }
@@ -1039,13 +1119,14 @@ public class TestFairScheduler extends FairSchedulerTestBase {
 
   @Test(timeout = 5000)
   /**
-   * Make sure containers are chosen to be preempted in the correct order. Right
-   * now this means decreasing order of priority.
-   */ public void testChoiceOfPreemptedContainers() throws Exception {
+   * Make sure containers are chosen to be preempted in the correct order.
+   */
+  public void testChoiceOfPreemptedContainers() throws Exception {
     conf.setLong(FairSchedulerConfiguration.PREEMPTION_INTERVAL, 5000);
     conf.setLong(FairSchedulerConfiguration.WAIT_TIME_BEFORE_KILL, 10000);
     conf.set(FairSchedulerConfiguration.ALLOCATION_FILE + ".allocation.file",
         ALLOC_FILE);
+    conf.set(FairSchedulerConfiguration.USER_AS_DEFAULT_QUEUE, "false");
     
     MockClock clock = new MockClock();
     scheduler.setClock(clock);
@@ -1062,7 +1143,7 @@ public class TestFairScheduler extends FairSchedulerTestBase {
     out.println("<queue name=\"queueC\">");
     out.println("<weight>.25</weight>");
     out.println("</queue>");
-    out.println("<queue name=\"queueD\">");
+    out.println("<queue name=\"default\">");
     out.println("<weight>.25</weight>");
     out.println("</queue>");
     out.println("</allocations>");
@@ -1070,149 +1151,140 @@ public class TestFairScheduler extends FairSchedulerTestBase {
     
     scheduler.reinitialize(conf, resourceManager.getRMContext(), null);
 
-    // Create four nodes
+    // Create two nodes
     RMNode node1 = MockNodes
-        .newNodeInfo(1, Resources.createResource(2 * 1024, 2), 1, "127.0.0.1");
+        .newNodeInfo(1, Resources.createResource(4 * 1024, 4), 1, "127.0.0.1");
     NodeAddedSchedulerEvent nodeEvent1 = 
             new NodeAddedSchedulerEvent(node1,
             new TransactionStateImpl( TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent1);
 
     RMNode node2 = MockNodes
-        .newNodeInfo(1, Resources.createResource(2 * 1024, 2), 2, "127.0.0.2");
+        .newNodeInfo(1, Resources.createResource(4 * 1024, 4), 2, "127.0.0.2");
     NodeAddedSchedulerEvent nodeEvent2 =
             new NodeAddedSchedulerEvent(node2,
             new TransactionStateImpl( TransactionState.TransactionType.RM));
     scheduler.handle(nodeEvent2);
 
-    RMNode node3 = MockNodes
-        .newNodeInfo(1, Resources.createResource(2 * 1024, 2), 3, "127.0.0.3");
-    NodeAddedSchedulerEvent nodeEvent3 = 
-            new NodeAddedSchedulerEvent(node3,
-            new TransactionStateImpl( TransactionState.TransactionType.RM));
-    scheduler.handle(nodeEvent3);
-
-
-    // Queue A and B each request three containers
+    // Queue A and B each request two applications
     ApplicationAttemptId app1 =
-        createSchedulingRequest(1 * 1024, "queueA", "user1", 1, 1);
+        createSchedulingRequest(1 * 1024, 1, "queueA", "user1", 1, 1);
+    createSchedulingRequestExistingApplication(1 * 1024, 1, 2, app1);
+
     ApplicationAttemptId app2 =
-        createSchedulingRequest(1 * 1024, "queueA", "user1", 1, 2);
+        createSchedulingRequest(1 * 1024, 1, "queueA", "user1", 1, 3);
+    createSchedulingRequestExistingApplication(1 * 1024, 1, 4, app2);
+
     ApplicationAttemptId app3 =
-        createSchedulingRequest(1 * 1024, "queueA", "user1", 1, 3);
+        createSchedulingRequest(1 * 1024, 1, "queueB", "user1", 1, 1);
+    createSchedulingRequestExistingApplication(1 * 1024, 1, 2, app3);
 
     ApplicationAttemptId app4 =
-        createSchedulingRequest(1 * 1024, "queueB", "user1", 1, 1);
-    ApplicationAttemptId app5 =
-        createSchedulingRequest(1 * 1024, "queueB", "user1", 1, 2);
-    ApplicationAttemptId app6 =
-        createSchedulingRequest(1 * 1024, "queueB", "user1", 1, 3);
+        createSchedulingRequest(1 * 1024, 1, "queueB", "user1", 1, 3);
+    createSchedulingRequestExistingApplication(1 * 1024, 1, 4, app4);
 
     scheduler.update();
 
-    // Sufficient node check-ins to fully schedule containers
-    for (int i = 0; i < 2; i++) {
+    scheduler.getQueueManager().getLeafQueue("queueA", true)
+            .setPolicy(SchedulingPolicy.parse("fifo"));
+    scheduler.getQueueManager().getLeafQueue("queueB", true)
+            .setPolicy(SchedulingPolicy.parse("fair"));
+
       NodeUpdateSchedulerEvent nodeUpdate1 =
               new NodeUpdateSchedulerEvent(node1,
               new TransactionStateImpl( TransactionState.TransactionType.RM));
-      scheduler.handle(nodeUpdate1);
 
       NodeUpdateSchedulerEvent nodeUpdate2 =
               new NodeUpdateSchedulerEvent(node2,
               new TransactionStateImpl( TransactionState.TransactionType.RM));
-      scheduler.handle(nodeUpdate2);
 
-      NodeUpdateSchedulerEvent nodeUpdate3 =
-              new NodeUpdateSchedulerEvent(node3,
-              new TransactionStateImpl( TransactionState.TransactionType.RM));
-      scheduler.handle(nodeUpdate3);
+    for (int i = 0; i < 4; i++) {
+      scheduler.handle(nodeUpdate1);
+      scheduler.handle(nodeUpdate2);
     }
 
-    assertEquals(1, scheduler.getSchedulerApp(app1).getLiveContainers().size());
-    assertEquals(1, scheduler.getSchedulerApp(app2).getLiveContainers().size());
-    assertEquals(1, scheduler.getSchedulerApp(app3).getLiveContainers().size());
-    assertEquals(1, scheduler.getSchedulerApp(app4).getLiveContainers().size());
-    assertEquals(1, scheduler.getSchedulerApp(app5).getLiveContainers().size());
-    assertEquals(1, scheduler.getSchedulerApp(app6).getLiveContainers().size());
-
-    // Now new requests arrive from queues C and D
-    ApplicationAttemptId app7 =
-        createSchedulingRequest(1 * 1024, "queueC", "user1", 1, 1);
-    ApplicationAttemptId app8 =
-        createSchedulingRequest(1 * 1024, "queueC", "user1", 1, 2);
-    ApplicationAttemptId app9 =
-        createSchedulingRequest(1 * 1024, "queueC", "user1", 1, 3);
-
-    ApplicationAttemptId app10 =
-        createSchedulingRequest(1 * 1024, "queueD", "user1", 1, 1);
-    ApplicationAttemptId app11 =
-        createSchedulingRequest(1 * 1024, "queueD", "user1", 1, 2);
-    ApplicationAttemptId app12 =
-        createSchedulingRequest(1 * 1024, "queueD", "user1", 1, 3);
-
+    assertEquals(2, scheduler.getSchedulerApp(app1).getLiveContainers().size());
+    assertEquals(2, scheduler.getSchedulerApp(app2).getLiveContainers().size());
+    assertEquals(2, scheduler.getSchedulerApp(app3).getLiveContainers().size());
+    assertEquals(2, scheduler.getSchedulerApp(app4).getLiveContainers().size());
     scheduler.update();
 
-    // We should be able to claw back one container from A and B each.
-    // Make sure it is lowest priority container.
-    scheduler.preemptResources(scheduler.getQueueManager().getLeafQueues(),
-            Resources.createResource(2 * 1024), new TransactionStateImpl(
-                    TransactionState.TransactionType.RM));
-    assertEquals(1, scheduler.getSchedulerApp(app1).getLiveContainers().size());
-    assertEquals(1, scheduler.getSchedulerApp(app2).getLiveContainers().size());
-    assertEquals(1, scheduler.getSchedulerApp(app4).getLiveContainers().size());
-    assertEquals(1, scheduler.getSchedulerApp(app5).getLiveContainers().size());
-    
-    // First verify we are adding containers to preemption list for the application
-    assertTrue(!Collections
-        .disjoint(scheduler.getSchedulerApp(app3).getLiveContainers(),
-            scheduler.getSchedulerApp(app3).getPreemptionContainers()));
-    assertTrue(!Collections
-        .disjoint(scheduler.getSchedulerApp(app6).getLiveContainers(),
-            scheduler.getSchedulerApp(app6).getPreemptionContainers()));
+    // We should be able to claw back one container from queueA and queueB each.
+    scheduler.preemptResources(Resources.createResource(2 * 1024),
+            new TransactionStateImpl(TransactionState.TransactionType.RM));
+    assertEquals(2, scheduler.getSchedulerApp(app1).getLiveContainers().size());
+    assertEquals(2, scheduler.getSchedulerApp(app3).getLiveContainers().size());
+
+    // First verify we are adding containers to preemption list for the app
+    // For queueA (fifo), app2 is selected
+    // For queueB (fair), app4 is selected
+    assertTrue("App2 should have container to be preempted",
+            !Collections.disjoint(
+                    scheduler.getSchedulerApp(app2).getLiveContainers(),
+                    scheduler.getSchedulerApp(app2).getPreemptionContainers()));
+    assertTrue("App4 should have container to be preempted",
+            !Collections.disjoint(
+                    scheduler.getSchedulerApp(app2).getLiveContainers(),
+                    scheduler.getSchedulerApp(app2).getPreemptionContainers()));
 
     // Pretend 15 seconds have passed
     clock.tick(15);
 
     // Trigger a kill by insisting we want containers back
-    scheduler.preemptResources(scheduler.getQueueManager().getLeafQueues(),
-            Resources.createResource(2 * 1024), new TransactionStateImpl(
-                    TransactionState.TransactionType.RM));
+    scheduler.preemptResources(Resources.createResource(2 * 1024),
+            new TransactionStateImpl(TransactionState.TransactionType.RM));
 
     // At this point the containers should have been killed (since we are not simulating AM)
-    assertEquals(0, scheduler.getSchedulerApp(app6).getLiveContainers().size());
-    assertEquals(0, scheduler.getSchedulerApp(app3).getLiveContainers().size());
+    assertEquals(1, scheduler.getSchedulerApp(app2).getLiveContainers().size());
+    assertEquals(1, scheduler.getSchedulerApp(app4).getLiveContainers().size());
+    // Inside each app, containers are sorted according to their priorities
+    // Containers with priority 4 are preempted for app2 and app4
+    Set<RMContainer> set = new HashSet<RMContainer>();
+    for (RMContainer container :
+            scheduler.getSchedulerApp(app2).getLiveContainers()) {
+      if (container.getAllocatedPriority().getPriority() == 4) {
+        set.add(container);
+      }
+    }
+    for (RMContainer container :
+            scheduler.getSchedulerApp(app4).getLiveContainers()) {
+      if (container.getAllocatedPriority().getPriority() == 4) {
+        set.add(container);
+      }
+    }
+    assertTrue("Containers with priority=4 in app2 and app4 should be preempted.",
+            set.isEmpty());
 
     // Trigger a kill by insisting we want containers back
-    scheduler.preemptResources(scheduler.getQueueManager().getLeafQueues(),
-            Resources.createResource(2 * 1024), new TransactionStateImpl(
-                    TransactionState.TransactionType.RM));
+    scheduler.preemptResources(Resources.createResource(2 * 1024),
+            new TransactionStateImpl(TransactionState.TransactionType.RM));
 
     // Pretend 15 seconds have passed
     clock.tick(15);
 
     // We should be able to claw back another container from A and B each.
-    // Make sure it is lowest priority container.
-    scheduler.preemptResources(scheduler.getQueueManager().getLeafQueues(),
-            Resources.createResource(2 * 1024), new TransactionStateImpl(
-                    TransactionState.TransactionType.RM));
-    
-    assertEquals(1, scheduler.getSchedulerApp(app1).getLiveContainers().size());
+    // For queueA (fifo), continue preempting from app2.
+    // For queueB (fair), even app4 has a lowest priority container with p=4, it
+    // still preempts from app3 as app3 is most over fair share.
+    scheduler.preemptResources(Resources.createResource(2 * 1024),
+            new TransactionStateImpl(TransactionState.TransactionType.RM));
+
+    assertEquals(2, scheduler.getSchedulerApp(app1).getLiveContainers().size());
     assertEquals(0, scheduler.getSchedulerApp(app2).getLiveContainers().size());
-    assertEquals(0, scheduler.getSchedulerApp(app3).getLiveContainers().size());
+    assertEquals(1, scheduler.getSchedulerApp(app3).getLiveContainers().size());
     assertEquals(1, scheduler.getSchedulerApp(app4).getLiveContainers().size());
-    assertEquals(0, scheduler.getSchedulerApp(app5).getLiveContainers().size());
-    assertEquals(0, scheduler.getSchedulerApp(app6).getLiveContainers().size());
 
     // Now A and B are below fair share, so preemption shouldn't do anything
-    scheduler.preemptResources(scheduler.getQueueManager().getLeafQueues(),
-            Resources.createResource(2 * 1024), new TransactionStateImpl(
-                    TransactionState.TransactionType.RM));
-    assertEquals(1, scheduler.getSchedulerApp(app1).getLiveContainers().size());
-    assertEquals(0, scheduler.getSchedulerApp(app2).getLiveContainers().size());
-    assertEquals(0, scheduler.getSchedulerApp(app3).getLiveContainers().size());
-    assertEquals(1, scheduler.getSchedulerApp(app4).getLiveContainers().size());
-    assertEquals(0, scheduler.getSchedulerApp(app5).getLiveContainers().size());
-    assertEquals(0, scheduler.getSchedulerApp(app6).getLiveContainers().size());
+    scheduler.preemptResources(Resources.createResource(2 * 1024),
+            new TransactionStateImpl(TransactionState.TransactionType.RM));
+    assertTrue("App1 should have no container to be preempted",
+            scheduler.getSchedulerApp(app1).getPreemptionContainers().isEmpty());
+    assertTrue("App2 should have no container to be preempted",
+            scheduler.getSchedulerApp(app2).getPreemptionContainers().isEmpty());
+    assertTrue("App3 should have no container to be preempted",
+            scheduler.getSchedulerApp(app3).getPreemptionContainers().isEmpty());
+    assertTrue("App4 should have no container to be preempted",
+            scheduler.getSchedulerApp(app4).getPreemptionContainers().isEmpty());
   }
 
   @Test(timeout = 5000)
