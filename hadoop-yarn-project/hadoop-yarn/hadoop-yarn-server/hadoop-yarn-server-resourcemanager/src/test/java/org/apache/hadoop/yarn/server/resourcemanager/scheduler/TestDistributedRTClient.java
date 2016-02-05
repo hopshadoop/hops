@@ -387,45 +387,6 @@ public class TestDistributedRTClient {
     LOG.info("HOP :: rmNode.uci-" + ((RMNodeImpl) rmNode).getQueue());
   }
 
-  @Ignore
-  @Test
-  public void testHeartBeatValidation()
-      throws IOException, InterruptedException {
-    RMUtilities.InitializeDB();
-    new Thread() {
-      @Override
-      public void run() {
-        for (int i = 0; i < 10000; i++) {
-          try {
-            LOG.info("HOP :: testHeartBeatValidation A - START");
-            RMUtilities.heartbeatNMRPCValidation(RPC.Type.NodeHeartbeat,
-                new byte[]{0x0}, "host:1234", null);
-            LOG.info("HOP :: testHeartBeatValidation A - FINISH");
-          } catch (IOException ex) {
-            Logger.getLogger(TestDistributedRT.class.getName()).
-                log(Level.SEVERE, null, ex);
-          }
-        }
-      }
-    }.start();
-    new Thread() {
-      @Override
-      public void run() {
-        for (int i = 0; i < 10000; i++) {
-          try {
-            LOG.info("HOP :: testHeartBeatValidation B - START");
-            RMUtilities.getRMNode("h1:1234", null, conf);
-            LOG.info("HOP :: testHeartBeatValidation B - FINISH");
-          } catch (IOException ex) {
-            Logger.getLogger(TestDistributedRT.class.getName()).
-                log(Level.SEVERE, null, ex);
-          }
-        }
-      }
-    }.start();
-
-    Thread.sleep(50000);
-  }
 
   private class RTClientWorker implements Runnable {
 

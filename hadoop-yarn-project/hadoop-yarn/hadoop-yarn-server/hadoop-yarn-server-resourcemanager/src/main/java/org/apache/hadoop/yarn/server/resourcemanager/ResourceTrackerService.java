@@ -23,6 +23,7 @@ import io.hops.ha.common.transactionStateWrapper;
 import io.hops.metadata.util.HopYarnAPIUtilities;
 import io.hops.metadata.util.RMStorageFactory;
 import io.hops.metadata.util.RMUtilities;
+import io.hops.metadata.yarn.entity.appmasterrpc.HeartBeatRPC;
 import io.hops.metadata.yarn.entity.appmasterrpc.RPC;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -75,6 +76,15 @@ import org.apache.hadoop.yarn.util.YarnVersionInfo;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import org.apache.commons.lang.StringUtils;
+import org.apache.hadoop.yarn.api.records.ApplicationId;
+import org.apache.hadoop.yarn.api.records.impl.pb.ContainerStatusPBImpl;
+import org.apache.hadoop.yarn.server.api.records.impl.pb.MasterKeyPBImpl;
+import org.apache.hadoop.yarn.server.api.records.impl.pb.NodeHealthStatusPBImpl;
 
 public class ResourceTrackerService extends AbstractService
         implements ResourceTracker {
@@ -494,9 +504,55 @@ public class ResourceTrackerService extends AbstractService
       rpcID = HopYarnAPIUtilities.getRPCID();
       byte[] allHBRequestData = ((NodeHeartbeatRequestPBImpl) request).
               getProto().toByteArray();
+      
+      Map<String, byte[]> containersStatuses = new HashMap<String, byte[]>();
+      for (ContainerStatus status : request.getNodeStatus().
+              getContainersStatuses()) {
+        containersStatuses.put(status.getContainerId().toString(),
+                ((ContainerStatusPBImpl) status).getProto().toByteArray());
+      }
+
+      List<String> keepAliveApplications = new ArrayList<String>();
+      for (ApplicationId appId : request.getNodeStatus().
+              getKeepAliveApplications()) {
+        keepAliveApplications.add(appId.toString());
+      }
+
+      byte[] nodeHealthStatus = ((NodeHealthStatusPBImpl) request.
+              getNodeStatus().getNodeHealthStatus()).getProto().toByteArray();
+      if (nodeHealthStatus.length > 1000) {
+        LOG.warn("Node Health Status too big for node " + request.
+                getNodeStatus().getNodeId() + " truncating it");
+        NodeHealthStatusPBImpl healthStatus = new NodeHealthStatusPBImpl();
+        healthStatus.setIsNodeHealthy(request.getNodeStatus().
+                getNodeHealthStatus().getIsNodeHealthy());
+        healthStatus.setLastHealthReportTime(request.getNodeStatus().
+                getNodeHealthStatus().getLastHealthReportTime());
+        String healthReport = StringUtils.abbreviate(request.getNodeStatus().
+                getNodeHealthStatus().getHealthReport(), 200);
+        healthStatus.setHealthReport(healthReport);
+        nodeHealthStatus = healthStatus.getProto().toByteArray();
+      }
+
+      byte[] lastKnownContainerTokenMasterKey = null;
+      byte[] lastKnownNMTokenMasterKey = null;
+      if (request.getLastKnownContainerTokenMasterKey() != null) {
+        lastKnownContainerTokenMasterKey = ((MasterKeyPBImpl) request.
+                getLastKnownContainerTokenMasterKey()).getProto().toByteArray();
+      }
+      if (request.getLastKnownNMTokenMasterKey() != null) {
+        lastKnownNMTokenMasterKey = ((MasterKeyPBImpl) request.
+                getLastKnownNMTokenMasterKey()).getProto().toByteArray();
+      }
+      HeartBeatRPC rpc = new HeartBeatRPC(request.getNodeStatus().getNodeId().
+              toString(),
+              request.getNodeStatus().getResponseId(), containersStatuses,
+              keepAliveApplications,
+              nodeHealthStatus, lastKnownContainerTokenMasterKey,
+              lastKnownNMTokenMasterKey, rpcID);
+
       RMUtilities
-              .persistAppMasterRPC(rpcID, RPC.Type.NodeHeartbeat,
-                      allHBRequestData);
+              .persistHeartBeatRPC(rpc);
     }
     TransactionState transactionState = rmContext.getTransactionStateManager().
             getCurrentTransactionStatePriority(rpcID, "nodeHeartbeat");

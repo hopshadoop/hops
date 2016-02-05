@@ -41,6 +41,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.service.CompositeService;
 import org.apache.hadoop.yarn.api.records.ContainerState;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.quota.QuotaService;
 
 public class ContainersLogsService extends CompositeService {
 
@@ -345,8 +346,11 @@ public class ContainersLogsService extends CompositeService {
                 }
               };
       containersLogsHandler.handle();
-      
-      rMContext.getQuotaService().insertEvents(updateContainers.values());
+
+      QuotaService quotaService = rMContext.getQuotaService();
+      if(quotaService!=null){
+        quotaService.insertEvents(updateContainers.values());
+      }
       updateContainers.clear();
     
     } catch (IOException ex) {

@@ -115,7 +115,9 @@ public class TestContainersLogsService {
     conf.setInt(YarnConfiguration.QUOTAS_MIN_TICKS_CHARGE, checkpointTicks);
     conf.setInt(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_MINTICKS,
             1);
-    MockRM rm = new MockRM(conf);
+    RMContext rmContext = new RMContextImpl();
+    ContainersLogsService logService = new ContainersLogsService(rmContext);
+    logService.init(conf);
 
     try {
       // Insert dummy data into necessary tables
@@ -125,7 +127,7 @@ public class TestContainersLogsService {
       generateRMContainersToAdd(10, 0, rmNodes,rmContainers,containerStatuses);
       populateDB(rmNodes, rmContainers, containerStatuses);
 
-      rm.start();
+      logService.start();
 
       int sleepTillCheckpoint = monitorInterval * (checkpointTicks + 1);
       Thread.sleep(sleepTillCheckpoint);
@@ -141,7 +143,7 @@ public class TestContainersLogsService {
       }
 
     } finally {
-      rm.stop();
+      logService.stop();
     }
   }
 
@@ -221,10 +223,12 @@ public class TestContainersLogsService {
     populateDB(rmNodes, rmContainers, containerStatuses);
 
     // Start RM1
-    MockRM rm1 = new MockRM(conf);
-    rm1.start();
+    RMContext rmContext = new RMContextImpl();
+    ContainersLogsService logService1 = new ContainersLogsService(rmContext);
+    logService1.init(conf);
+    logService1.start();
     Thread.sleep(monitorInterval * 5);
-    rm1.stop();
+    logService1.stop();
 
     // Change Container Statuses to COMPLETED
     List<ContainerStatus> updatedStatuses = changeContainerStatuses(
@@ -235,14 +239,15 @@ public class TestContainersLogsService {
     updateContainerStatuses(updatedStatuses);
 
     // Start RM2
-    MockRM rm2 = new MockRM(conf);
-    rm2.start();
+    ContainersLogsService logService2 = new ContainersLogsService(rmContext);
+    logService2.init(conf);
+    logService2.start();
     Thread.sleep(monitorInterval * 2);
-    rm2.stop();
+    logService2.stop();
 
     // Check if tick counter is correct
     YarnVariables tc = getTickCounter();
-    Assert.assertEquals(7, tc.getValue());
+    Assert.assertTrue(tc.getValue()>=5);
 
     // Check if container logs have correct values
     Map<String, ContainersLogs> cl = getContainersLogs();
@@ -273,7 +278,8 @@ public class TestContainersLogsService {
     conf.setInt(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_MINTICKS,
             1);
     conf.setBoolean(YarnConfiguration.DISTRIBUTED_RM, true);
-    
+    conf.setBoolean(
+            YarnConfiguration.QUOTAS_ENABLED, true);
     MockRM rm = new MockRM(conf);
 
     // Insert first batch of dummy containers

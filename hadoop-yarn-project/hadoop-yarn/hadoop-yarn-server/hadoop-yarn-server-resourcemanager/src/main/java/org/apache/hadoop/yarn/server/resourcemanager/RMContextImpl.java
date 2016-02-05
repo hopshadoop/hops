@@ -154,8 +154,6 @@ public class RMContextImpl implements RMContext {
     this.setNMTokenSecretManager(nmTokenSecretManager);
     this.setClientToAMTokenSecretManager(clientToAMTokenSecretManager);
     this.setRMApplicationHistoryWriter(rmApplicationHistoryWriter);
-    this.setContainersLogsService(new ContainersLogsService(this));
-    this.setQuotaService(new QuotaService());
     
     RMStateStore nullStore = new NullRMStateStore();
     nullStore.setRMDispatcher(rmDispatcher);
@@ -188,8 +186,6 @@ public class RMContextImpl implements RMContext {
     this.setDelegationTokenRenewer(delegationTokenRenewer);
     this.setAMRMTokenSecretManager(appTokenSecretManager);
     this.setTransactionStateManager(transactionStateManager);
-    this.setContainersLogsService(new ContainersLogsService(this));
-    this.setQuotaService(new QuotaService());
     
     if (conf != null) {
       this.setContainerTokenSecretManager(

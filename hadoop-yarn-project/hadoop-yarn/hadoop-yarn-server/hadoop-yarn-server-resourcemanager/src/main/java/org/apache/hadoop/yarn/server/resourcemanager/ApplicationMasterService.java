@@ -18,10 +18,10 @@ package org.apache.hadoop.yarn.server.resourcemanager;
 
 import com.google.common.annotations.VisibleForTesting;
 import io.hops.ha.common.TransactionState;
-import io.hops.ha.common.TransactionState.TransactionType;
 import io.hops.ha.common.TransactionStateImpl;
 import io.hops.metadata.util.HopYarnAPIUtilities;
 import io.hops.metadata.util.RMUtilities;
+import io.hops.metadata.yarn.entity.appmasterrpc.AllocateRPC;
 import io.hops.metadata.yarn.entity.appmasterrpc.RPC;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -92,12 +92,16 @@ import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import org.apache.hadoop.yarn.api.records.ContainerResourceIncreaseRequest;
+import org.apache.hadoop.yarn.api.records.impl.pb.ContainerResourceIncreaseRequestPBImpl;
+import org.apache.hadoop.yarn.api.records.impl.pb.ResourceRequestPBImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
 
 @SuppressWarnings("unchecked")
@@ -461,18 +465,47 @@ public class ApplicationMasterService extends AbstractService
     if (rpcID == null) {
       rpcID = HopYarnAPIUtilities.getRPCID();
       byte[] allAMRequestData = ((AllocateRequestPBImpl) request).getProto().
-          toByteArray();
-      if(allAMRequestData.length>13000){
-        //TORECOVER persist in a prorper way
-        LOG.error("RPC Too big: " + request.getReleaseList().size() + ", " + request.getAskList().size() + ", " + request.getIncreaseRequests().size());
-        AllocateRequest substitut = AllocateRequest.newInstance(request.getResponseId(),
-                request.getProgress(), new ArrayList<ResourceRequest>(), new ArrayList<ContainerId>(), request.getResourceBlacklistRequest(), new ArrayList<ContainerResourceIncreaseRequest>());
-        allAMRequestData = ((AllocateRequestPBImpl)substitut).getProto().toByteArray();
+              toByteArray();
+
+      List<String> releaseList = new ArrayList<String>();
+      for (ContainerId containerId : request.getReleaseList()) {
+        releaseList.add(containerId.toString());
       }
+
+      Map<String, byte[]> ask = new HashMap<String, byte[]>();
+      for (ResourceRequest resourceRequest : request.getAskList()) {
+        resourceRequest.getCapability();
+
+        ask.put(resourceRequest.getResourceName(),
+                ((ResourceRequestPBImpl) resourceRequest).getProto().
+                toByteArray());
+      }
+
+      Map<String, byte[]> resourceIncreaseRequest
+              = new HashMap<String, byte[]>();
+      for (ContainerResourceIncreaseRequest incRequest : request.
+              getIncreaseRequests()) {
+        resourceIncreaseRequest.put(incRequest.getContainerId().toString(),
+                ((ContainerResourceIncreaseRequestPBImpl) incRequest).getProto().
+                toByteArray());
+      }
+
+      List<String> blackListAddition = new ArrayList<String>();
+      List<String> blackListRemovals = new ArrayList<String>();
+      if (request.getResourceBlacklistRequest() != null) {
+        blackListAddition.addAll(request.getResourceBlacklistRequest().
+                getBlacklistAdditions());
+
+        blackListRemovals.addAll(request.getResourceBlacklistRequest().
+                getBlacklistRemovals());
+      }
+      AllocateRPC rpc = new AllocateRPC(rpcID, request.getResponseId(), request.
+              getProgress(), releaseList, ask, resourceIncreaseRequest,
+              blackListAddition, blackListRemovals);
+
       RMUtilities
-          .persistAppMasterRPC(rpcID, RPC.Type.Allocate, allAMRequestData,
-              appAttemptId.toString());
-      
+              .persistAllocateRPC(rpc, appAttemptId.toString());
+
     }
     TransactionState transactionState = 
            rmContext.getTransactionStateManager().getCurrentTransactionStateNonPriority(rpcID,

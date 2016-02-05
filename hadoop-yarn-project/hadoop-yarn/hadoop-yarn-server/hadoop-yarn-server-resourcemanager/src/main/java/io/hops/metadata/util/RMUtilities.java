@@ -15,7 +15,6 @@
  */
 package io.hops.metadata.util;
 
-import com.google.common.util.concurrent.AtomicDouble;
 import com.google.protobuf.InvalidProtocolBufferException;
 import io.hops.exception.StorageException;
 import io.hops.ha.common.TransactionState;
@@ -50,18 +49,19 @@ import io.hops.metadata.yarn.dal.ResourceDataAccess;
 import io.hops.metadata.yarn.dal.ResourceRequestDataAccess;
 import io.hops.metadata.yarn.dal.SchedulerApplicationDataAccess;
 import io.hops.metadata.yarn.dal.UpdatedContainerInfoDataAccess;
-import io.hops.metadata.yarn.dal.YarnVariablesDataAccess;
 import io.hops.metadata.yarn.dal.capacity.CSLeafQueueUserInfoDataAccess;
 import io.hops.metadata.yarn.dal.capacity.CSQueueDataAccess;
 import io.hops.metadata.yarn.dal.capacity.FiCaSchedulerAppReservedContainersDataAccess;
 import io.hops.metadata.yarn.dal.fair.AppSchedulableDataAccess;
 import io.hops.metadata.yarn.dal.fair.FSSchedulerNodeDataAccess;
+import io.hops.metadata.yarn.dal.rmstatestore.AllocateRPCDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.AllocateResponseDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.AllocatedContainersDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.ApplicationAttemptStateDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.ApplicationStateDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.DelegationKeyDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.DelegationTokenDataAccess;
+import io.hops.metadata.yarn.dal.rmstatestore.HeartBeatRPCDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.RMStateVersionDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.RPCDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.RanNodeDataAccess;
@@ -96,7 +96,8 @@ import io.hops.metadata.yarn.entity.ResourceRequest;
 import io.hops.metadata.yarn.entity.SchedulerAppReservations;
 import io.hops.metadata.yarn.entity.SchedulerApplication;
 import io.hops.metadata.yarn.entity.UpdatedContainerInfo;
-import io.hops.metadata.yarn.entity.YarnVariables;
+import io.hops.metadata.yarn.entity.appmasterrpc.AllocateRPC;
+import io.hops.metadata.yarn.entity.appmasterrpc.HeartBeatRPC;
 import io.hops.metadata.yarn.entity.appmasterrpc.RPC;
 import io.hops.metadata.yarn.entity.capacity.CSLeafQueueUserInfo;
 import io.hops.metadata.yarn.entity.capacity.CSQueue;
@@ -444,6 +445,20 @@ public class RMUtilities {
     return DA.getAll();
   }
 
+  public static Map<Integer, HeartBeatRPC> getHeartBeatRPCs() throws
+          StorageException {
+    HeartBeatRPCDataAccess hbDA = (HeartBeatRPCDataAccess) RMStorageFactory.
+            getDataAccess(HeartBeatRPCDataAccess.class);
+    return hbDA.getAll();
+  }
+  
+  public static Map<Integer, AllocateRPC> getAllocateRPCs() throws
+          StorageException {
+    AllocateRPCDataAccess alDA = (AllocateRPCDataAccess) RMStorageFactory.
+            getDataAccess(AllocateRPCDataAccess.class);
+    return alDA.getAll();
+  }
+  
   public static List<PendingEvent> getAllPendingEvents() throws IOException {
 
     PendingEventDataAccess DA = (PendingEventDataAccess) RMStorageFactory.
@@ -750,131 +765,62 @@ public static Map<String, List<ResourceRequest>> getAllResourceRequestsFullTrans
     setAppMasterRPCHandler.handle();
   }
 
-
-  /**
-   * Checks for pending RMNode RPCs and if the RMNode is active.
-   * If an rpc for a particular RMNode and with the same type already exists
-   * the method returns false. If the RPC does not exist it checks if the
-   * RMNode is in the ActiveNodes table. If so, it returns the retrieved
-   * RMNode.
-   * <p/>
-   *
-   * @param type
-   * @param rpc
-   * @param userId
-   * @return
-   * @throws IOException
-   */
-  public static Map<Integer, Object> registerNMRPCValidation(
-      final RPC.Type type, final byte[] rpc, final String userId)
-      throws IOException {
-    LightWeightRequestHandler registerNMRPCValidationHandler =
-        new LightWeightRequestHandler(YARNOperationType.TEST) {
-          @Override
-          public Object performTask() throws StorageException {
-            connector.beginTransaction();
-            connector.writeLock();
-            Map<Integer, Object> toReturn;
-            //Check if an rpc of the same type for this RMNode already exists
-            RPCDataAccess rpcDA = (RPCDataAccess) RMStorageFactory
+  public static void persistHeartBeatRPC(final HeartBeatRPC rpc) throws
+          IOException {
+    LightWeightRequestHandler heartBeatRPCHandler
+            = new LightWeightRequestHandler(YARNOperationType.TEST) {
+              @Override
+              public Object performTask() throws StorageException {
+                connector.beginTransaction();
+                connector.writeLock();
+                RPCDataAccess DA = (RPCDataAccess) RMStorageFactory
                 .getDataAccess(RPCDataAccess.class);
-            //If it exists, return false
-            if (rpcDA.findByTypeAndUserId(type.toString(), userId) /*||
-                        rpcDA.findByTypeAndUserId(HopRPC.Type.NodeHeartbeat.toString(), userId)*/) {
-              LOG.debug("HOP :: rmnodeRPCValidation() - RPC already exists");
-              connector.commit();
-              return null;
-            } else {
-              LOG.debug("HOP :: rmnodeRPCValidation() rpcIdFound was null");
-              //Get new rpcId and persist it
-              YarnVariablesDataAccess yDA =
-                  (YarnVariablesDataAccess) RMStorageFactory
-                      .getDataAccess(YarnVariablesDataAccess.class);
-              YarnVariables found =
-                  (YarnVariables) yDA.findById(HopYarnAPIUtilities.RPC);
-              int rpcId = Integer.MIN_VALUE;
-              if (found != null) {
-                rpcId = found.getValue();
-                found.setValue(found.getValue() + 1);
-                yDA.add(found);
+                RPC hop = new RPC(rpc.getRpcId(), RPC.Type.NodeHeartbeat, null,
+                        null);
+                DA.add(hop);
+                connector.flush();
+                HeartBeatRPCDataAccess hbDA
+                = (HeartBeatRPCDataAccess) RMStorageFactory.getDataAccess(
+                        HeartBeatRPCDataAccess.class);
+
+                hbDA.add(rpc);
+
+
+                connector.commit();
+                return null;
               }
-              RPC rpcToPersist = new RPC(rpcId, type, rpc, userId);
-              rpcDA.add(rpcToPersist);
-              toReturn = new HashMap<Integer, Object>();
-              toReturn.put(0, rpcId);
-            }
-            //Check if RMNode(userId) is in ActiveRMNodesMap
-            RMContextActiveNodesDataAccess rmDA =
-                (RMContextActiveNodesDataAccess) RMStorageFactory.
-                    getDataAccess(RMContextActiveNodesDataAccess.class);
-
-            RMContextActiveNodes hopActiveRMNode =
-                (RMContextActiveNodes) rmDA.findEntry(userId);
-            if (hopActiveRMNode != null) {
-              toReturn.put(1, true);
-            } else {
-              toReturn.put(1, false);
-            }
-            connector.commit();
-            return toReturn;
-          }
-        };
-    return (Map<Integer, Object>) registerNMRPCValidationHandler.handle();
+            };
+    heartBeatRPCHandler.handle();
   }
+  
+  public static void persistAllocateRPC(final AllocateRPC rpc,
+          final String userId) throws IOException {
+    LightWeightRequestHandler allocateRPCHandler
+            = new LightWeightRequestHandler(YARNOperationType.TEST) {
 
-  /**
-   * Checks for pending heartbeats.
-   *
-   * @param type
-   * @param rpc
-   * @param id
-   * @param rmContext
-   * @return
-   * @throws IOException
-   */
-  public static int heartbeatNMRPCValidation(final RPC.Type type,
-      final byte[] rpc, final String id, final RMContext rmContext)
-      throws IOException {
-    LightWeightRequestHandler heartbeatNMRPCValidationHandler =
-        new LightWeightRequestHandler(YARNOperationType.TEST) {
-          @Override
-          public Object performTask() throws StorageException {
-            LOG.debug("HOP :: heartbeatNMRPCValidation - START");
-            connector.beginTransaction();
-            connector.writeLock();
-            //Check if an rpc of the same type for this RMNode already exists
-            RPCDataAccess rpcDA = (RPCDataAccess) RMStorageFactory
+              @Override
+              public Object performTask() throws IOException {
+                connector.beginTransaction();
+                connector.writeLock();
+                RPCDataAccess DA = (RPCDataAccess) RMStorageFactory
                 .getDataAccess(RPCDataAccess.class);
-            int rpcId = Integer.MIN_VALUE;
-            if (rpcDA.findByTypeAndUserId(type.toString(), id)) {
-              LOG.debug(
-                  "HOP :: heartbeatNMRPCValidation() - RPC already exists");
-              connector.commit();
-              return Integer.MIN_VALUE;
-            } else {
-              //Get new rpcId and persist it
-              YarnVariablesDataAccess yDA =
-                  (YarnVariablesDataAccess) RMStorageFactory
-                      .getDataAccess(YarnVariablesDataAccess.class);
-              YarnVariables found =
-                  (YarnVariables) yDA.findById(HopYarnAPIUtilities.RPC);
-              if (found != null) {
-                rpcId = found.getValue();
-                found.setValue(found.getValue() + 1);
+                RPC hop = new RPC(rpc.getRpcID(), RPC.Type.Allocate, null,
+                        userId);
+                DA.add(hop);
+                connector.flush();
+                AllocateRPCDataAccess aDA
+                = (AllocateRPCDataAccess) RMStorageFactory.getDataAccess(
+                        AllocateRPCDataAccess.class);
 
-                yDA.add(found);
+                aDA.add(rpc);
+
+                connector.commit();
+                return null;
               }
-              RPC rpcToPersist = new RPC(rpcId, type, rpc, id);
-              rpcDA.add(rpcToPersist);
-            }
-            connector.commit();
-            LOG.debug("HOP :: heartbeatNMRPCValidation - FINISH");
-            return rpcId;
-          }
-        };
-    return (Integer) heartbeatNMRPCValidationHandler.handle();
+            };
+    allocateRPCHandler.handle();
   }
-
+  
   public static void updatePendingEvents(final PendingEvent persistedEvent,
       final int action) throws IOException {
     LightWeightRequestHandler updatePendingEventsHandler =
