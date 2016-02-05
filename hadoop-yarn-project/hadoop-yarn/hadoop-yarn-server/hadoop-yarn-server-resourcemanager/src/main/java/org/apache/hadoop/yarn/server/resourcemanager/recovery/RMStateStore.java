@@ -41,6 +41,8 @@ import io.hops.metadata.yarn.entity.ResourceRequest;
 import io.hops.metadata.yarn.entity.SchedulerAppReservations;
 import io.hops.metadata.yarn.entity.SchedulerApplication;
 import io.hops.metadata.yarn.entity.UpdatedContainerInfo;
+import io.hops.metadata.yarn.entity.appmasterrpc.AllocateRPC;
+import io.hops.metadata.yarn.entity.appmasterrpc.HeartBeatRPC;
 import io.hops.metadata.yarn.entity.appmasterrpc.RPC;
 import io.hops.metadata.yarn.entity.capacity.CSLeafQueueUserInfo;
 import io.hops.metadata.yarn.entity.capacity.CSQueue;
@@ -381,6 +383,8 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
 
     Map<KeyType, MasterKey> secretMamagerKeys;
     List<RPC> appMasterRPCs;
+    Map<Integer, HeartBeatRPC> heartBeatRPCs;
+    Map<Integer, AllocateRPC> allocateRPCs;
     List<PendingEvent> pendingEvents;
     Map<String, AppSchedulingInfo> appSchedulingInfos;
     Map<String, SchedulerApplication> schedulerApplications;
@@ -447,6 +451,14 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
       }
     }
 
+    public Map<Integer, HeartBeatRPC> getHeartBeatRPCs(){
+      return heartBeatRPCs;
+    }
+    
+    public Map<Integer, AllocateRPC> getAllocateRPCs(){
+      return allocateRPCs;
+    }
+    
     public List<PendingEvent> getPendingEvents() throws IOException {
       if (pendingEvents != null) {
         return pendingEvents;
