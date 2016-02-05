@@ -63,7 +63,7 @@ function print_usage(){
   echo "where COMMAND is one of:"
   echo "  resourcemanager      run the ResourceManager" 
   echo "  nodemanager          run a nodemanager on each slave" 
-  echo "  historyserver        run the application history server" 
+  echo "  timelineyserver      run the timeline server" 
   echo "  rmadmin              admin tools" 
   echo "  version              print the version"
   echo "  jar <jar>            run a jar file"
@@ -153,7 +153,7 @@ if [ -d "$HADOOP_YARN_HOME/yarn-server/yarn-server-common/target/classes" ]; the
 fi
 if [ -d "$HADOOP_YARN_HOME/yarn-server/yarn-server-resourcemanager/target/classes" ]; then
   CLASSPATH=${CLASSPATH}:$HADOOP_YARN_HOME/yarn-server/yarn-server-resourcemanager/target/classes
-  CLASSPATH=${CLASSPATH}:$HADOOP_YARN_HOME/yarn-server/yarn-server-applicationhistoryservice/target/classes
+  
 fi
 if [ -d "$HADOOP_YARN_HOME/yarn-server/yarn-server-applicationhistoryservice/target/classes" ]; then
   CLASSPATH=${CLASSPATH}:$HADOOP_YARN_HOME/yarn-server/yarn-server-applicationhistoryservice/target/classes
