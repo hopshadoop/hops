@@ -23,6 +23,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.yarn.api.records.LocalResourceType;
 import org.apache.hadoop.yarn.api.records.LocalResourceVisibility;
 import org.apache.hadoop.yarn.server.nodemanager.DeletionService;
+import org.apache.hadoop.yarn.server.nodemanager.recovery.NMNullStateStoreService;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -84,8 +85,8 @@ public class TestResourceRetention {
     ConcurrentMap<LocalResourceRequest, LocalizedResource> trackerResources =
         new ConcurrentHashMap<LocalResourceRequest, LocalizedResource>();
     LocalResourcesTracker ret =
-        spy(new LocalResourcesTrackerImpl(user, null, trackerResources, false,
-            conf));
+        spy(new LocalResourcesTrackerImpl(user, null, null, trackerResources, false,
+            conf, new NMNullStateStoreService()));
     for (int i = 0; i < nRsrcs; ++i) {
       final LocalResourceRequest req =
           new LocalResourceRequest(new Path("file:///" + user + "/rsrc" + i),

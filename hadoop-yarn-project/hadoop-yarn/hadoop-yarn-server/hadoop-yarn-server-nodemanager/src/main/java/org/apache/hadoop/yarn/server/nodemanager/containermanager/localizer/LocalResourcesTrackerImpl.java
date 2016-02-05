@@ -20,7 +20,6 @@ package org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.yarn.api.records.LocalResourceVisibility;
@@ -28,8 +27,17 @@ import org.apache.hadoop.yarn.event.Dispatcher;
 import org.apache.hadoop.yarn.server.nodemanager.DeletionService;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.event.ResourceEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.event.ResourceReleaseEvent;
+import org.apache.hadoop.yarn.api.records.ApplicationId;
+import org.apache.hadoop.yarn.api.records.LocalResource;
+import org.apache.hadoop.yarn.api.records.impl.pb.LocalResourcePBImpl;
+import org.apache.hadoop.yarn.proto.YarnProtos.LocalResourceProto;
+import org.apache.hadoop.yarn.proto.YarnServerNodemanagerRecoveryProtos.LocalizedResourceProto;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.event.ResourceEventType;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.event.ResourceRecoveredEvent;
+import org.apache.hadoop.yarn.server.nodemanager.recovery.NMStateStoreService;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -51,6 +59,7 @@ class LocalResourcesTrackerImpl implements LocalResourcesTracker {
       Pattern.compile(RANDOM_DIR_REGEX);
 
   private final String user;
+  private final ApplicationId appId;
   private final Dispatcher dispatcher;
   private final ConcurrentMap<LocalResourceRequest, LocalizedResource>
       localrsrc;
@@ -76,18 +85,22 @@ class LocalResourcesTrackerImpl implements LocalResourcesTracker {
    * per APPLICATION, USER and PUBLIC cache.
    */
   private AtomicLong uniqueNumberGenerator = new AtomicLong(9);
+  private NMStateStoreService stateStore;
 
-  public LocalResourcesTrackerImpl(String user, Dispatcher dispatcher,
-      boolean useLocalCacheDirectoryManager, Configuration conf) {
-    this(user, dispatcher,
+  public LocalResourcesTrackerImpl(String user, ApplicationId appId,
+      Dispatcher dispatcher, boolean useLocalCacheDirectoryManager,
+      Configuration conf, NMStateStoreService stateStore) {
+    this(user, appId, dispatcher,
         new ConcurrentHashMap<LocalResourceRequest, LocalizedResource>(),
-        useLocalCacheDirectoryManager, conf);
+        useLocalCacheDirectoryManager, conf, stateStore);
   }
 
-  LocalResourcesTrackerImpl(String user, Dispatcher dispatcher,
-      ConcurrentMap<LocalResourceRequest, LocalizedResource> localrsrc,
-      boolean useLocalCacheDirectoryManager, Configuration conf) {
+  LocalResourcesTrackerImpl(String user, ApplicationId appId,
+      Dispatcher dispatcher, ConcurrentMap<LocalResourceRequest,
+      LocalizedResource> localrsrc, boolean useLocalCacheDirectoryManager,
+      Configuration conf, NMStateStoreService stateStore) {
     this.user = user;
+    this.appId = appId;
     this.dispatcher = dispatcher;
     this.localrsrc = localrsrc;
     this.useLocalCacheDirectoryManager = useLocalCacheDirectoryManager;
@@ -98,6 +111,7 @@ class LocalResourcesTrackerImpl implements LocalResourcesTracker {
           new ConcurrentHashMap<LocalResourceRequest, Path>();
     }
     this.conf = conf;
+    this.stateStore = stateStore;
   }
 
   /*
@@ -119,8 +133,7 @@ class LocalResourcesTrackerImpl implements LocalResourcesTracker {
         if (rsrc != null && (!isResourcePresent(rsrc))) {
           LOG.info("Resource " + rsrc.getLocalPath() +
               " is missing, localizing it again");
-          localrsrc.remove(req);
-          decrementFileCountForLocalCacheDirectory(req, rsrc);
+          removeResource(req);
           rsrc = null;
         }
         if (null == rsrc) {
@@ -141,15 +154,101 @@ class LocalResourcesTrackerImpl implements LocalResourcesTracker {
         }
         break;
       case LOCALIZATION_FAILED:
-        decrementFileCountForLocalCacheDirectory(req, null);
       /*
        * If resource localization fails then Localized resource will be
        * removed from local cache.
        */
-        localrsrc.remove(req);
+        removeResource(req);
+        break;
+      case RECOVERED:
+        if (rsrc != null) {
+          LOG.warn("Ignoring attempt to recover existing resource " + rsrc);
+          return;
+        }
+        rsrc = recoverResource(req, (ResourceRecoveredEvent) event);
+        localrsrc.put(req, rsrc);
         break;
     }
+
     rsrc.handle(event);
+
+    if (event.getType() == ResourceEventType.LOCALIZED) {
+      if (rsrc.getLocalPath() != null) {
+        try {
+          stateStore.finishResourceLocalization(user, appId,
+                  buildLocalizedResourceProto(rsrc));
+        } catch (IOException ioe) {
+          LOG.error("Error storing resource state for " + rsrc, ioe);
+        }
+      } else {
+        LOG.warn("Resource " + rsrc + " localized without a location");
+      }
+    }
+  }
+
+  private LocalizedResource recoverResource(LocalResourceRequest req,
+                                            ResourceRecoveredEvent event) {
+    // unique number for a resource is the directory of the resource
+    Path localDir = event.getLocalPath().getParent();
+    long rsrcId = Long.parseLong(localDir.getName());
+
+    // update ID generator to avoid conflicts with the existing resources
+    while (true) {
+      long currentRsrcId = uniqueNumberGenerator.get();
+      long nextRsrcId = Math.max(currentRsrcId, rsrcId);
+      if (uniqueNumberGenerator.compareAndSet(currentRsrcId, nextRsrcId)) {
+        break;
+      }
+    }
+
+    incrementFileCountForLocalCacheDirectory(localDir.getParent());
+
+    return new LocalizedResource(req, dispatcher);
+  }
+
+  private LocalizedResourceProto buildLocalizedResourceProto(
+          LocalizedResource rsrc) {
+    return LocalizedResourceProto.newBuilder()
+            .setResource(buildLocalResourceProto(rsrc.getRequest()))
+            .setLocalPath(rsrc.getLocalPath().toString())
+            .setSize(rsrc.getSize())
+            .build();
+  }
+
+  private LocalResourceProto buildLocalResourceProto(LocalResource lr) {
+    LocalResourcePBImpl lrpb;
+    if (!(lr instanceof LocalResourcePBImpl)) {
+      lr = LocalResource.newInstance(lr.getResource(), lr.getType(),
+              lr.getVisibility(), lr.getSize(), lr.getTimestamp(),
+              lr.getPattern());
+    }
+    lrpb = (LocalResourcePBImpl) lr;
+    return lrpb.getProto();
+  }
+
+  public void incrementFileCountForLocalCacheDirectory(Path cacheDir) {
+    if (useLocalCacheDirectoryManager) {
+      Path cacheRoot = LocalCacheDirectoryManager.getCacheDirectoryRoot(cacheDir);
+      if (cacheRoot != null) {
+        LocalCacheDirectoryManager dir = directoryManagers.get(cacheRoot);
+        if (dir == null) {
+          dir = new LocalCacheDirectoryManager(conf);
+          LocalCacheDirectoryManager otherDir =
+                  directoryManagers.putIfAbsent(cacheRoot, dir);
+          if (otherDir != null) {
+            dir = otherDir;
+          }
+        }
+        if (cacheDir.equals(cacheRoot)) {
+          dir.incrementFileCountForPath("");
+        } else {
+          String dirStr = cacheDir.toUri().getRawPath();
+          String rootStr = cacheRoot.toUri().getRawPath();
+          dir.incrementFileCountForPath(
+                  dirStr.substring(rootStr.length() + 1));
+        }
+      }
+    }
   }
 
   /*
@@ -214,11 +313,6 @@ class LocalResourcesTrackerImpl implements LocalResourcesTracker {
     }
     return ret;
   }
-  
-  @Override
-  public boolean contains(LocalResourceRequest resource) {
-    return localrsrc.containsKey(resource);
-  }
 
   @Override
   public boolean remove(LocalizedResource rem, DeletionService delService) {
@@ -237,13 +331,28 @@ class LocalResourcesTrackerImpl implements LocalResourcesTracker {
           "Attempt to remove resource: " + rsrc + " with non-zero refcount");
       return false;
     } else { // ResourceState is LOCALIZED or INIT
-      localrsrc.remove(rem.getRequest());
       if (ResourceState.LOCALIZED.equals(rsrc.getState())) {
         delService.delete(getUser(), getPathToDelete(rsrc.getLocalPath()));
       }
-      decrementFileCountForLocalCacheDirectory(rem.getRequest(), rsrc);
+      removeResource(rem.getRequest());
       LOG.info("Removed " + rsrc.getLocalPath() + " from localized cache");
       return true;
+    }
+  }
+
+  private void removeResource(LocalResourceRequest req) {
+    LocalizedResource rsrc = localrsrc.remove(req);
+    decrementFileCountForLocalCacheDirectory(req, rsrc);
+    if (rsrc != null) {
+      Path localPath = rsrc.getLocalPath();
+      if (localPath != null) {
+        try {
+          stateStore.removeLocalizedResource(user, appId, localPath);
+        } catch (IOException e) {
+          LOG.error("Unable to remove resource " + rsrc + " from state store",
+                  e);
+        }
+      }
     }
   }
 
@@ -286,6 +395,7 @@ class LocalResourcesTrackerImpl implements LocalResourcesTracker {
   @Override
   public Path getPathForLocalization(LocalResourceRequest req,
       Path localDirPath) {
+    Path rPath = localDirPath;
     if (useLocalCacheDirectoryManager && localDirPath != null) {
 
       if (!directoryManagers.containsKey(localDirPath)) {
@@ -294,7 +404,7 @@ class LocalResourcesTrackerImpl implements LocalResourcesTracker {
       }
       LocalCacheDirectoryManager dir = directoryManagers.get(localDirPath);
 
-      Path rPath = localDirPath;
+      rPath = localDirPath;
       String hierarchicalPath = dir.getRelativePathForLocalization();
       // For most of the scenarios we will get root path only which
       // is an empty string
@@ -302,21 +412,36 @@ class LocalResourcesTrackerImpl implements LocalResourcesTracker {
         rPath = new Path(localDirPath, hierarchicalPath);
       }
       inProgressLocalResourcesMap.put(req, rPath);
-      return rPath;
-    } else {
-      return localDirPath;
     }
+
+  rPath = new Path(rPath,
+          Long.toString(uniqueNumberGenerator.incrementAndGet()));
+    Path localPath = new Path(rPath, req.getPath().getName());
+    LocalizedResource rsrc = localrsrc.get(req);
+    rsrc.setLocalPath(localPath);
+    LocalResource lr = LocalResource.newInstance(req.getResource(),
+            req.getType(), req.getVisibility(), req.getSize(),
+            req.getTimestamp());
+    try {
+      stateStore.startResourceLocalization(user, appId,
+              ((LocalResourcePBImpl) lr).getProto(), localPath);
+    } catch (IOException e) {
+      LOG.error("Unable to record localization start for " + rsrc, e);
+    }
+    return rPath;
   }
 
-  @Override
-  public long nextUniqueNumber() {
-    return uniqueNumberGenerator.incrementAndGet();
-  }
-
-  @VisibleForTesting
-  @Private
   @Override
   public LocalizedResource getLocalizedResource(LocalResourceRequest request) {
     return localrsrc.get(request);
+  }
+
+  @VisibleForTesting
+  LocalCacheDirectoryManager getDirectoryManager(Path localDirPath) {
+    LocalCacheDirectoryManager mgr = null;
+    if (useLocalCacheDirectoryManager) {
+      mgr = directoryManagers.get(localDirPath);
+    }
+    return mgr;
   }
 }

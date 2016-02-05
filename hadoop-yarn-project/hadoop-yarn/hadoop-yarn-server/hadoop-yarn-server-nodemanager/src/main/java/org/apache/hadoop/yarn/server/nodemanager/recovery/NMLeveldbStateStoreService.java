@@ -193,7 +193,7 @@ public class NMLeveldbStateStoreService extends NMStateStoreService {
         return rsrcs;
     }
 
-    private RecoveredUserResources loaduserLocalizedResources(
+    private RecoveredUserResources loadUserLocalizedResources(
             LeveldbIterator iter, String keyPrefix) throws IOException {
         RecoveredUserResources userResources = new RecoveredUserResources();
         while (iter.hasNext()) {

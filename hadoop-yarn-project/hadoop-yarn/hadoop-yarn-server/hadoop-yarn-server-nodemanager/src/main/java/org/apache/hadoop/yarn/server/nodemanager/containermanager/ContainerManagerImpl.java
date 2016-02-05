@@ -98,12 +98,14 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.monitor.Contai
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.monitor.ContainersMonitorEventType;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.monitor.ContainersMonitorImpl;
 import org.apache.hadoop.yarn.server.nodemanager.metrics.NodeManagerMetrics;
+import org.apache.hadoop.yarn.server.nodemanager.recovery.NMStateStoreService;
 import org.apache.hadoop.yarn.server.nodemanager.security.authorize.NMPolicyProvider;
 import org.apache.hadoop.yarn.server.security.ApplicationACLsManager;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -204,18 +206,27 @@ public class ContainerManagerImpl extends CompositeService
   @Override
   public void serviceInit(Configuration conf) throws Exception {
     LogHandler logHandler =
-        createLogHandler(conf, this.context, this.deletionService);
+            createLogHandler(conf, this.context, this.deletionService);
     addIfService(logHandler);
     dispatcher.register(LogHandlerEventType.class, logHandler);
 
     waitForContainersOnShutdownMillis =
-        conf.getLong(YarnConfiguration.NM_SLEEP_DELAY_BEFORE_SIGKILL_MS,
-            YarnConfiguration.DEFAULT_NM_SLEEP_DELAY_BEFORE_SIGKILL_MS) + conf.
-            getLong(YarnConfiguration.NM_PROCESS_KILL_WAIT_MS,
-                YarnConfiguration.DEFAULT_NM_PROCESS_KILL_WAIT_MS) +
-            SHUTDOWN_CLEANUP_SLOP_MS;
+            conf.getLong(YarnConfiguration.NM_SLEEP_DELAY_BEFORE_SIGKILL_MS,
+                    YarnConfiguration.DEFAULT_NM_SLEEP_DELAY_BEFORE_SIGKILL_MS) + conf.
+                    getLong(YarnConfiguration.NM_PROCESS_KILL_WAIT_MS,
+                            YarnConfiguration.DEFAULT_NM_PROCESS_KILL_WAIT_MS) +
+                    SHUTDOWN_CLEANUP_SLOP_MS;
 
     super.serviceInit(conf);
+    recover();
+  }
+
+  private void recover() throws IOException, URISyntaxException {
+    NMStateStoreService stateStore = context.getNMStateStore();
+    if (stateStore.canRecover()) {
+      rsrcLocalizationSrvc.recoverLocalizedResources(
+              stateStore.loadLocalizationState());
+    }
   }
 
   protected LogHandler createLogHandler(Configuration conf, Context context,
@@ -237,7 +248,7 @@ public class ContainerManagerImpl extends CompositeService
   protected ResourceLocalizationService createResourceLocalizationService(
       ContainerExecutor exec, DeletionService deletionContext) {
     return new ResourceLocalizationService(this.dispatcher, exec,
-        deletionContext, dirsHandler);
+        deletionContext, dirsHandler, context.getNMStateStore());
   }
 
   protected ContainersLauncher createContainersLauncher(Context context,
