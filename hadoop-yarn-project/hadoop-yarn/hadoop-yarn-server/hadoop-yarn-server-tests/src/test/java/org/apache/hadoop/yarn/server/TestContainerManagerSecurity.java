@@ -206,8 +206,6 @@ public class TestContainerManagerSecurity extends KerberosSecurityTestcase {
     ApplicationId appId = ApplicationId.newInstance(1, 1);
     ApplicationAttemptId validAppAttemptId =
         ApplicationAttemptId.newInstance(appId, 1);
-    ApplicationAttemptId invalidAppAttemptId =
-        ApplicationAttemptId.newInstance(appId, 2);
     
     ContainerId validContainerId =
         ContainerId.newInstance(validAppAttemptId, 0);
@@ -268,26 +266,15 @@ public class TestContainerManagerSecurity extends KerberosSecurityTestcase {
     Assert.assertTrue(sb.toString().contains(
         testStartContainer(rpc, validAppAttemptId, validNode,
             validContainerToken, invalidNMToken, true)));
-    
-    // using appAttempt-2 token for launching container for appAttempt-1.
-    invalidNMToken = nmTokenSecretManagerRM
-        .createNMToken(invalidAppAttemptId, validNode, user);
-    sb = new StringBuilder("\nNMToken for application attempt : ");
-    sb.append(invalidAppAttemptId.toString())
-        .append(" was used for starting container with container token")
-        .append(" issued for application attempt : ")
-        .append(validAppAttemptId.toString());
-    Assert.assertTrue(testStartContainer(rpc, validAppAttemptId, validNode,
-        validContainerToken, invalidNMToken, true).contains(sb.toString()));
-    
+      
     // using correct tokens. nmtoken for app attempt should get saved.
     conf.setInt(YarnConfiguration.RM_CONTAINER_ALLOC_EXPIRY_INTERVAL_MS,
         4 * 60 * 1000);
     validContainerToken = containerTokenSecretManager
         .createContainerToken(validContainerId, validNode, user, r);
     
-    testStartContainer(rpc, validAppAttemptId, validNode, validContainerToken,
-        validNMToken, false);
+    Assert.assertTrue(testStartContainer(rpc, validAppAttemptId, validNode,
+      validContainerToken, validNMToken, false).isEmpty());
     Assert.assertTrue(nmTokenSecretManagerNM
         .isAppAttemptNMTokenKeyPresent(validAppAttemptId));
     
@@ -331,6 +318,17 @@ public class TestContainerManagerSecurity extends KerberosSecurityTestcase {
         testGetContainer(rpc, validAppAttemptId, validNode, validContainerId,
             validNMToken, false).contains(sb.toString()));
 
+    // using appAttempt-1 NMtoken for launching container for appAttempt-2 should
+    // succeed.
+    ApplicationAttemptId attempt2 = ApplicationAttemptId.newInstance(appId, 2);
+    Token attempt1NMToken =
+        nmTokenSecretManagerRM
+          .createNMToken(validAppAttemptId, validNode, user);
+    org.apache.hadoop.yarn.api.records.Token newContainerToken =
+        containerTokenSecretManager.createContainerToken(
+          ContainerId.newInstance(attempt2, 1), validNode, user, r);
+    Assert.assertTrue(testStartContainer(rpc, attempt2, validNode,
+      newContainerToken, attempt1NMToken, false).isEmpty());
   }
 
   private void waitForContainerToFinishOnNM(ContainerId containerId) {
