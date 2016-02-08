@@ -111,7 +111,7 @@ public class LogCLIHelpers implements Configurable {
         .getRemoteAppLogDir(remoteRootLogDir, appId, user, logDirSuffix);
     RemoteIterator<FileStatus> nodeFiles;
     try {
-      nodeFiles = FileContext.getFileContext().listStatus(remoteAppLogDir);
+      nodeFiles = FileContext.getFileContext(this.conf).listStatus(remoteAppLogDir);
     } catch (FileNotFoundException fnf) {
       System.out.println("Logs not available at " + remoteAppLogDir.toString());
       System.out

@@ -55,11 +55,11 @@ public class AppSchedulable extends Schedulable {
   private FSSchedulerApp app;
   private Resource demand = Resources.createResource(0);
   private long startTime;
-  private static RecordFactory recordFactory =
-      RecordFactoryProvider.getRecordFactory(null);
   private static final Log LOG = LogFactory.getLog(AppSchedulable.class);
   private FSLeafQueue queue;
   private RMContainerTokenSecretManager containerTokenSecretManager;
+  private Priority priority;
+  private ResourceWeights resourceWeights;
 
   private RMContainerComparator comparator = new RMContainerComparator();
 
@@ -71,6 +71,8 @@ public class AppSchedulable extends Schedulable {
     this.queue = queue;
     this.containerTokenSecretManager = scheduler.
         getContainerTokenSecretManager();
+    this.priority = Priority.newInstance(1);
+    this.resourceWeights = new ResourceWeights();
   }
 
   @Override
@@ -80,6 +82,10 @@ public class AppSchedulable extends Schedulable {
 
   public FSSchedulerApp getApp() {
     return app;
+  }
+
+  public ResourceWeights getResourceWeights() {
+      return resourceWeights;
   }
 
   @Override
@@ -145,9 +151,7 @@ public class AppSchedulable extends Schedulable {
   public Priority getPriority() {
     // Right now per-app priorities are not passed to scheduler,
     // so everyone has the same priority.
-    Priority p = recordFactory.newRecordInstance(Priority.class);
-    p.setPriority(1);
-    return p;
+    return priority;
   }
 
   /**
