@@ -41,12 +41,17 @@ public class ClusterMetricsInfo {
   protected long reservedMB;
   protected long availableMB;
   protected long allocatedMB;
+
+  protected long reservedVirtualCores;
+  protected long availableVirtualCores;
+  protected long allocatedVirtualCores;
   
   protected int containersAllocated;
   protected int containersReserved;
   protected int containersPending;
   
   protected long totalMB;
+  protected long totalVirtualCores;
   protected int totalNodes;
   protected int lostNodes;
   protected int unhealthyNodes;
@@ -73,12 +78,17 @@ public class ClusterMetricsInfo {
     this.reservedMB = metrics.getReservedMB();
     this.availableMB = metrics.getAvailableMB();
     this.allocatedMB = metrics.getAllocatedMB();
-    
+
+    this.reservedVirtualCores = metrics.getReservedVirtualCores();
+    this.availableVirtualCores = metrics.getAvailableVirtualCores();
+    this.allocatedVirtualCores = metrics.getAllocatedVirtualCores();
+
     this.containersAllocated = metrics.getAllocatedContainers();
     this.containersPending = metrics.getPendingContainers();
     this.containersReserved = metrics.getReservedContainers();
     
     this.totalMB = availableMB + allocatedMB;
+    this.totalVirtualCores = availableVirtualCores + allocatedVirtualCores;
     this.activeNodes = clusterMetrics.getNumActiveNMs();
     this.lostNodes = clusterMetrics.getNumLostNMs();
     this.unhealthyNodes = clusterMetrics.getUnhealthyNMs();
@@ -125,6 +135,12 @@ public class ClusterMetricsInfo {
     return this.allocatedMB;
   }
 
+  public long getReservedVirtualCores() { return this.reservedVirtualCores; }
+
+  public long getAvailableVirtualCores() { return this.availableVirtualCores; }
+
+  public long getAllocatedVirtualCores() { return this.allocatedVirtualCores; }
+
   public int getContainersAllocated() {
     return this.containersAllocated;
   }
@@ -140,6 +156,8 @@ public class ClusterMetricsInfo {
   public long getTotalMB() {
     return this.totalMB;
   }
+
+  public long getTotalVirtualCores() { return this.totalVirtualCores; }
 
   public int getTotalNodes() {
     return this.totalNodes;
