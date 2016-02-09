@@ -23,7 +23,6 @@ import com.sun.jersey.api.client.config.DefaultClientConfig;
 import io.hops.metadata.util.RMStorageFactory;
 import io.hops.metadata.util.RMUtilities;
 import io.hops.metadata.util.YarnAPIStorageFactory;
-import org.junit.Assert;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -31,6 +30,8 @@ import org.apache.hadoop.ha.HAServiceProtocol;
 import org.apache.hadoop.ha.HAServiceProtocol.HAServiceState;
 import org.apache.hadoop.ha.HAServiceProtocol.StateChangeRequestInfo;
 import org.apache.hadoop.ha.HealthCheckFailedException;
+import org.apache.hadoop.metrics2.MetricsSystem;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.service.AbstractService;
@@ -47,19 +48,13 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fifo.FifoScheduler;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.*;
 
 import javax.ws.rs.core.MediaType;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
 //TODO 1 redo all tests to match with our new solution
 public class TestRMHA {
@@ -97,6 +92,12 @@ public class TestRMHA {
     // Enable webapp to test web-services also
     configuration.setBoolean(MockRM.ENABLE_WEBAPP, true);
     configuration.setBoolean(YarnConfiguration.YARN_ACL_ENABLE, true);
+    ClusterMetrics.destroy();
+    QueueMetrics.clearQueueMetrics();
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    if (ms.getSource("ClusterMetrics") != null) {
+        DefaultMetricsSystem.shutdown();
+    }
     
     YarnAPIStorageFactory.setConfiguration(configuration);
     RMStorageFactory.setConfiguration(configuration);

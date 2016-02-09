@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.yarn.client;
 
-import junit.framework.Assert;
+import org.junit.Assert;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.security.UserGroupInformation;
