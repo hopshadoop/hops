@@ -77,7 +77,7 @@ public class RmView extends TwoColumnLayout {
   
   protected String getAppsTableColumnDefs() {
     StringBuilder sb = new StringBuilder();
-    return sb.append("[\n").append("{'sType':'numeric', 'aTargets': [0]")
+    return sb.append("[\n").append("{'sType':'string', 'aTargets': [0]")
         .append(", 'mRender': parseHadoopID }")
 
         .append("\n, {'sType':'numeric', 'aTargets': [5, 6]")
