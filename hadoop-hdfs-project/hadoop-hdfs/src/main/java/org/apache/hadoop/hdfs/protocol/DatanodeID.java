@@ -41,7 +41,6 @@ public class DatanodeID implements Comparable<DatanodeID> {
   private String ipAddr;     // IP address
   private String hostName;   // hostname claimed by datanode
   private String peerHostName; // hostname from the actual connection
-  private String storageID;  // unique per cluster storageID
   private int xferPort;      // data streaming port
   private int infoPort;      // info server port
   private int ipcPort;       // IPC server port
@@ -66,7 +65,7 @@ public class DatanodeID implements Comparable<DatanodeID> {
    *     IP
    * @param hostName
    *     hostname
-   * @param storageID
+   * @param datanodeUuid
    *     data storage ID
    * @param xferPort
    *     data transfer port
@@ -75,11 +74,11 @@ public class DatanodeID implements Comparable<DatanodeID> {
    * @param ipcPort
    *     ipc server port
    */
-  public DatanodeID(String ipAddr, String hostName, String storageID,
+  public DatanodeID(String ipAddr, String hostName, String datanodeUuid,
       int xferPort, int infoPort, int ipcPort) {
     this.ipAddr = ipAddr;
     this.hostName = hostName;
-    this.storageID = storageID;
+    this.datanodeUuid = datanodeUuid;
     this.xferPort = xferPort;
     this.infoPort = infoPort;
     this.ipcPort = ipcPort;
@@ -91,7 +90,7 @@ public class DatanodeID implements Comparable<DatanodeID> {
     this.ipAddr = ns[0];
     this.xferPort = Integer.parseInt(ns[1]);
     this.hostName = "";
-    this.storageID = "";
+    this.datanodeUuid = "";
     this.infoPort = -1;
     this.ipcPort = -1;
   }
@@ -104,8 +103,8 @@ public class DatanodeID implements Comparable<DatanodeID> {
     this.peerHostName = peerHostName;
   }
   
-  public void setStorageID(String storageID) {
-    this.storageID = storageID;
+  public void setStorageID(String datandodeUuid) {
+    this.datanodeUuid = datandodeUuid;
   }
 
   /**
@@ -227,12 +226,12 @@ public class DatanodeID implements Comparable<DatanodeID> {
       return false;
     }
     return (getXferAddr().equals(((DatanodeID) to).getXferAddr()) &&
-        storageID.equals(((DatanodeID) to).getDatanodeUuid()));
+        datanodeUuid.equals(((DatanodeID) to).getDatanodeUuid()));
   }
   
   @Override
   public int hashCode() {
-    return getXferAddr().hashCode() ^ storageID.hashCode();
+    return getXferAddr().hashCode() ^ datanodeUuid.hashCode();
   }
   
   @Override

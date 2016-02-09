@@ -112,10 +112,14 @@ public class BlockInfoUnderConstruction extends BlockInfo {
    * Create array of expected replica locations (as has been assigned by
    * chooseTargets()).
    */
-  public DatanodeDescriptor[] getExpectedLocations(DatanodeManager datanodeMgr)
+  public DatanodeStorageInfo[] getExpectedStorageLocations(DatanodeManager m)
       throws StorageException, TransactionContextException {
-    List<ReplicaUnderConstruction> rpls = getExpectedReplicas();
-    return getDatanodes(datanodeMgr, rpls);
+    List<ReplicaUnderConstruction> replicas = getExpectedReplicas();
+    DatanodeStorageInfo[] storages = new DatanodeStorageInfo[replicas.size()];
+    for(int i = 0; i < replicas.size(); i++) {
+      storages[i] = replicas.get(i).getExpectedStorageLocation(m);
+    }
+    return storages;
   }
 
   /**

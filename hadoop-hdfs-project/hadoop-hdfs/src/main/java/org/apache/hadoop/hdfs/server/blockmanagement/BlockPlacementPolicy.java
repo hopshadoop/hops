@@ -213,7 +213,7 @@ public abstract class BlockPlacementPolicy {
    * Split data nodes into two sets, one set includes nodes on rack with
    * more than one  replica, the other set contains the remaining nodes.
    *
-   * @param dataNodes datanodes to be split into two sets
+   * @param storages storages to be split into two sets
    * @param rackMap a map from rack to datanodes
    * @param moreThanOne contains nodes on rack with more than one replica
    * @param exactlyOne remains contains the remaining nodes

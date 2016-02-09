@@ -113,6 +113,7 @@ import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_HANDLER_COUNT_DEFAULT;
@@ -435,20 +436,24 @@ class NameNodeRpcServer implements NamenodeProtocols {
   @Override // ClientProtocol
   public LocatedBlock addBlock(String src, String clientName,
       ExtendedBlock previous, DatanodeInfo[] excludedNodes) throws IOException {
+    // TODO add String[] favoredNodes to function signatur (during later JIRA's)
+    String[] favoredNodes = null;
 
     if (stateChangeLog.isDebugEnabled()) {
       stateChangeLog.debug(
           "*BLOCK* NameNode.addBlock: file " + src + " for " + clientName);
     }
-    HashMap<Node, Node> excludedNodesSet = null;
+    HashSet<Node> excludedNodesSet = null;
     if (excludedNodes != null) {
-      excludedNodesSet = new HashMap<Node, Node>(excludedNodes.length);
+      excludedNodesSet = new HashSet<Node>(excludedNodes.length);
       for (Node node : excludedNodes) {
-        excludedNodesSet.put(node, node);
+        excludedNodesSet.add(node);
       }
     }
+    List<String> favoredNodesList = (favoredNodes == null) ? null
+        : Arrays.asList(favoredNodes);
     LocatedBlock locatedBlock = namesystem
-        .getAdditionalBlock(src, clientName, previous, excludedNodesSet);
+        .getAdditionalBlock(src, clientName, previous, excludedNodesSet, favoredNodesList);
     if (locatedBlock != null) {
       metrics.incrAddBlockOps();
     }
@@ -457,27 +462,29 @@ class NameNodeRpcServer implements NamenodeProtocols {
 
   @Override // ClientProtocol
   public LocatedBlock getAdditionalDatanode(final String src,
-      final ExtendedBlock blk, final DatanodeInfo[] existings,
+      final ExtendedBlock blk, final DatanodeInfo[] existings, final String[] existingStorageIDs,
       final DatanodeInfo[] excludes, final int numAdditionalNodes,
       final String clientName) throws IOException {
     if (LOG.isDebugEnabled()) {
-      LOG.debug("getAdditionalDatanode: src=" + src + ", blk=" + blk +
-          ", existings=" + Arrays.asList(existings) + ", excludes=" +
-          Arrays.asList(excludes) + ", numAdditionalNodes=" +
-          numAdditionalNodes + ", clientName=" + clientName);
+      LOG.debug("getAdditionalDatanode: src=" + src
+          + ", blk=" + blk
+          + ", existings=" + Arrays.asList(existings)
+          + ", excludes=" + Arrays.asList(excludes)
+          + ", numAdditionalNodes=" + numAdditionalNodes
+          + ", clientName=" + clientName);
     }
 
     metrics.incrGetAdditionalDatanodeOps();
 
-    HashMap<Node, Node> excludeSet = null;
+    HashSet<Node> excludeSet = null;
     if (excludes != null) {
-      excludeSet = new HashMap<Node, Node>(excludes.length);
+      excludeSet = new HashSet<Node>(excludes.length);
       for (Node node : excludes) {
-        excludeSet.put(node, node);
+        excludeSet.add(node);
       }
     }
-    return namesystem.getAdditionalDatanode(src, blk, existings, excludeSet,
-        numAdditionalNodes, clientName);
+    return namesystem.getAdditionalDatanode(src, blk, existings,
+        existingStorageIDs, excludeSet, numAdditionalNodes, clientName);
   }
 
   /**
@@ -525,8 +532,9 @@ class NameNodeRpcServer implements NamenodeProtocols {
 
   @Override // ClientProtocol
   public void updatePipeline(String clientName, ExtendedBlock oldBlock,
-      ExtendedBlock newBlock, DatanodeID[] newNodes) throws IOException {
-    namesystem.updatePipeline(clientName, oldBlock, newBlock, newNodes);
+      ExtendedBlock newBlock, DatanodeID[] newNodes, String[] newStorageIDs)
+      throws IOException {
+    namesystem.updatePipeline(clientName, oldBlock, newBlock, newNodes, newStorageIDs);
   }
   
   @Override // DatanodeProtocol

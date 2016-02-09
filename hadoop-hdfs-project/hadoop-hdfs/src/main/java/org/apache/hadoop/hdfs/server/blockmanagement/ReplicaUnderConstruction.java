@@ -61,11 +61,8 @@ public class ReplicaUnderConstruction extends Replica {
 
     ByStorageId() {
       @Override
-      public int compare(ReplicaUnderConstruction o1,
-          ReplicaUnderConstruction o2) {
-        return Integer.valueOf(o1.getStorageId()).compareTo(
-            Integer.valueOf(o2.getStorageId
-                ()));
+      public int compare(ReplicaUnderConstruction o1, ReplicaUnderConstruction o2) {
+        return Integer.valueOf(o1.getStorageId()).compareTo(Integer.valueOf(o2.getStorageId()));
       }
     }
   }
@@ -76,6 +73,11 @@ public class ReplicaUnderConstruction extends Replica {
       long blockId, int inodeId) {
     super(storageId, blockId, inodeId);
     this.state = state;
+  }
+
+  public DatanodeStorageInfo getExpectedStorageLocation(DatanodeManager
+      manager) {
+    return manager.getStorage(this.getStorageId());
   }
 
   public ReplicaState getState() {

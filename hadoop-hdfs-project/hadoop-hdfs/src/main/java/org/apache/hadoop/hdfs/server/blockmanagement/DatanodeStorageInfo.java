@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +33,7 @@ import io.hops.metadata.hdfs.entity.Replica;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.hadoop.hdfs.StorageType;
+import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage.State;
 import org.apache.hadoop.hdfs.server.protocol.StorageReport;
@@ -51,8 +53,7 @@ public class DatanodeStorageInfo {
     return storageTypes;
   }
 
-  static Iterable<StorageType> toStorageTypes(
-      final Iterable<DatanodeStorageInfo> infos) {
+  static Iterable<StorageType> toStorageTypes(final Iterable<DatanodeStorageInfo> infos) {
     return new Iterable<StorageType>() {
       @Override
       public Iterator<StorageType> iterator() {
@@ -69,6 +70,27 @@ public class DatanodeStorageInfo {
         };
       }
     };
+  }
+
+  public static String[] toStorageIDs(DatanodeStorageInfo[] storages) {
+    String[] storageIDs = new String[storages.length];
+    for(int i = 0; i < storageIDs.length; i++) {
+      storageIDs[i] = storages[i].getStorageID();
+    }
+    return storageIDs;
+  }
+
+  public static DatanodeInfo[] toDatanodeInfos(DatanodeStorageInfo[] storages) {
+    return toDatanodeInfos(Arrays.asList(storages));
+  }
+
+  public static DatanodeInfo[] toDatanodeInfos(List<DatanodeStorageInfo>
+      storages) {
+    final DatanodeInfo[] datanodes = new DatanodeInfo[storages.size()];
+    for(int i = 0; i < storages.size(); i++) {
+      datanodes[i] = storages.get(i).getDatanodeDescriptor();
+    }
+    return datanodes;
   }
 
   private final DatanodeDescriptor dn;
@@ -297,7 +319,8 @@ public class DatanodeStorageInfo {
         InvalidateBlockDataAccess da =
             (InvalidateBlockDataAccess) HdfsStorageFactory
                 .getDataAccess(InvalidateBlockDataAccess.class);
-        return da.findInvalidatedBlockByStorageIdUsingMySQLServer(getSid());
+        return da.findInvalidatedBlockByDatanodeUuidUsingMySQLServer
+            (getDatanodeDescriptor().getDatanodeUuid());
       }
     };
     return (Map<Long, Long>) findBlocksHandler.handle();

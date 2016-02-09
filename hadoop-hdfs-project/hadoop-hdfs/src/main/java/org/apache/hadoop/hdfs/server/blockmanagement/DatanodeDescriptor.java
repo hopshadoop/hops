@@ -74,9 +74,9 @@ public class DatanodeDescriptor extends DatanodeInfo {
   @InterfaceStability.Evolving
   public static class BlockTargetPair {
     public final Block block;
-    public final DatanodeDescriptor[] targets;
+    public final DatanodeStorageInfo[] targets;
 
-    BlockTargetPair(Block block, DatanodeDescriptor[] targets) {
+    BlockTargetPair(Block block, DatanodeStorageInfo[] targets) {
       this.block = block;
       this.targets = targets;
     }
@@ -128,8 +128,6 @@ public class DatanodeDescriptor extends DatanodeInfo {
       blockq.clear();
     }
   }
-
-  private String hostID = "";
 
   public boolean isAlive = false;
   public boolean needKeyUpdate = false;
@@ -323,15 +321,6 @@ public class DatanodeDescriptor extends DatanodeInfo {
     return false;
   }
 
-  // TODO when is this set? And how/when do we sync it with NDB?
-  public void setHostID(String id) {
-    this.hostID = id;
-  }
-
-  public String getHostID() {
-    return this.hostID;
-  }
-
   public void resetBlocks() {
     setCapacity(0);
     setRemaining(0);
@@ -386,7 +375,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
   }
 
   private List<DatanodeStorageInfo> getAllMachineStorages() throws IOException {
-    final String hostID = getHostID();
+    final String uuid = getDatanodeUuid();
 
     LightWeightRequestHandler findStoragesHandler = new LightWeightRequestHandler(
         HDFSOperationType.GET_ALL_STORAGE_IDS) {
@@ -395,7 +384,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
         StorageDataAccess storages = (StorageDataAccess) HdfsStorageFactory.getDataAccess(StorageDataAccess.class);
 
         HdfsStorageFactory.getConnector().beginTransaction();
-        List<BlockInfo> list = storages.find(hostID);
+        List<BlockInfo> list = storages.findByHostUuid(uuid);
         HdfsStorageFactory.getConnector().commit();
 
         return list;
@@ -425,7 +414,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
         BlockInfoDataAccess blocks = (BlockInfoDataAccess) HdfsStorageFactory.getDataAccess(
             BlockInfoDataAccess.class);
         HdfsStorageFactory.getConnector().beginTransaction();
-        List<BlockInfo> list = blocks.findBlockInfosByHostId(getHostID());
+        List<BlockInfo> list = blocks.findBlockInfosByHostId(getDatanodeUuid());
         HdfsStorageFactory.getConnector().commit();
         return list;
       }
@@ -462,7 +451,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
   /**
    * Store block replication work.
    */
-  void addBlockToBeReplicated(Block block, DatanodeDescriptor[] targets) {
+  void addBlockToBeReplicated(Block block, DatanodeStorageInfo[] targets) {
     assert (block != null && targets != null && targets.length > 0);
     replicateBlocks.offer(new BlockTargetPair(block, targets));
   }

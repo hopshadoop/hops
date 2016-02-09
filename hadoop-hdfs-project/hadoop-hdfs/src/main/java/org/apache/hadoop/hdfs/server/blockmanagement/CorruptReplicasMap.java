@@ -29,6 +29,7 @@ import io.hops.transaction.EntityManager;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.ipc.Server;
 
@@ -62,17 +63,15 @@ public class CorruptReplicasMap {
    *
    * @param blk
    *     Block to be added to CorruptReplicasMap
-   * @param storage
-   *     storage which holds the corrupt replica
+   * @param datanode
+   *     datanode which holds the corrupt replica
    * @param reason
    *     a textual reason (for logging purposes)
    */
-  public void addToCorruptReplicasMap(BlockInfo blk, DatanodeStorageInfo
-      storage, String reason) throws StorageException, TransactionContextException {
-//    Collection<DatanodeDescriptor> nodes = getNodes(blk);
-    Collection<DatanodeStorageInfo> storages = getStorages(blk);
+  public void addToCorruptReplicasMap(BlockInfo blk, DatanodeInfo datanode,
+      String reason) throws StorageException, TransactionContextException {
+    Collection<DatanodeDescriptor> nodes = getNodes(blk);
 
-    
     String reasonText;
     if (reason != null) {
       reasonText = " because " + reason;
@@ -80,19 +79,19 @@ public class CorruptReplicasMap {
       reasonText = "";
     }
     
-    if (!storages.contains(storage)) {
-      addCorruptReplicaToDB(new CorruptReplica(blk.getBlockId(), storage.getSid(),
-          blk.getInodeId()));
+    if (!nodes.contains(datanode)) {
+      addCorruptReplicaToDB(new CorruptReplica(blk.getBlockId(),
+          datanode.getDatanodeUuid(), blk.getInodeId()));
 
       NameNode.blockStateChangeLog
           .info("BLOCK NameSystem.addToCorruptReplicasMap: " +
-              blk.getBlockName() + " added as corrupt on " + storage +
+              blk.getBlockName() + " added as corrupt on " + datanode +
               " by " + Server.getRemoteIp() + reasonText);
     } else {
       NameNode.blockStateChangeLog
           .info("BLOCK NameSystem.addToCorruptReplicasMap: " +
               "duplicate requested for " + blk.getBlockName() +
-              " to add as corrupt on " + storage +
+              " to add as corrupt on " + datanode +
               " by " + Server.getRemoteIp() + reasonText);
     }
   }
@@ -115,26 +114,21 @@ public class CorruptReplicasMap {
 
   /**
    * Remove the block at the given datanode from CorruptBlockMap
-   *
-   * @param blk
-   *     block to be removed
-   * @param storage
-   *     storage where the block is located
+   * @param blk block to be removed
+   * @param datanode datanode where the block is located
    * @return true if the removal is successful;
    * false if the replica is not in the map
    */
-  boolean removeFromCorruptReplicasMap(BlockInfo blk,
-      DatanodeStorageInfo storage)
+  boolean removeFromCorruptReplicasMap(BlockInfo blk, DatanodeDescriptor datanode)
       throws StorageException, TransactionContextException {
     Collection<DatanodeDescriptor> datanodes = getNodes(blk);
     if (datanodes == null) {
       return false;
     }
 
-    if (datanodes.contains(storage)) {
-      removeCorruptReplicaFromDB(
-          new CorruptReplica(blk.getBlockId(), storage.getSid(),
-              blk.getInodeId()));
+    if (datanodes.contains(datanode)) {
+      removeCorruptReplicaFromDB(new CorruptReplica(blk.getBlockId(),
+          datanode.getDatanodeUuid(), blk.getInodeId()));
       return true;
     } else {
       return false;
@@ -150,79 +144,22 @@ public class CorruptReplicasMap {
    * @return collection of nodes. Null if does not exists
    */
   Collection<DatanodeDescriptor> getNodes(BlockInfo blk) throws StorageException, TransactionContextException {
-
-    //HOPS datanodeMgr is null in some tests
+    // HOPS datanodeMgr is null in some tests
     if (datanodeMgr == null) {
       return new ArrayList<DatanodeDescriptor>();
     }
-    
-    Collection<CorruptReplica> corruptReplicas = getCorruptReplicas(blk);
-    Collection<DatanodeDescriptor> nodes = new TreeSet<DatanodeDescriptor>();
 
+    Collection<CorruptReplica> corruptReplicas = getCorruptReplicas(blk);
+    Collection<DatanodeDescriptor> dnds = new TreeSet<DatanodeDescriptor>();
     if (corruptReplicas != null) {
       for (CorruptReplica cr : corruptReplicas) {
-        // Get the storage id
-        final int storageId = cr.getStorageId();
-
-        try {
-          // Get the uuid of the host belonging to this storage
-          String datanodeUuid = (String) new LightWeightRequestHandler(
-              HDFSOperationType.GET_STORAGE_INFO) {
-            @Override
-            public Object performTask() throws IOException {
-              StorageConnector conn = HdfsStorageFactory.getConnector();
-              StorageDataAccess storages = (StorageDataAccess) HdfsStorageFactory.getDataAccess(StorageDataAccess.class);
-
-              conn.beginTransaction();
-              Storage s = (Storage) storages.find(storageId);
-              conn.commit();
-              return s.getHostID();
-            }
-          }.handle();
-
-          // Look up which descriptor belongs to this uuid
-          DatanodeDescriptor node = datanodeMgr.getDatanode(datanodeUuid);
-          if (node != null) {
-            nodes.add(node);
-          }
-
-        } catch (IOException e) {
-          e.printStackTrace();
+        DatanodeDescriptor dn = datanodeMgr.getDatanode(cr.getDatanodeUuid());
+        if (dn != null) {
+          dnds.add(dn);
         }
       }
     }
-    return nodes;
-  }
-
-  /**
-   * Get Nodes which have corrupt replicas of Block
-   *
-   * @param blk
-   *     Block for which nodes are requested
-   * @return collection of nodes. Null if does not exists
-   */
-  Collection<DatanodeStorageInfo> getStorages(BlockInfo blk) throws
-      StorageException, TransactionContextException {
-
-    //HOPS datanodeMgr is null in some tests
-    if (datanodeMgr == null) {
-      return new ArrayList<DatanodeStorageInfo>();
-    }
-
-    Collection<CorruptReplica> corruptReplicas = getCorruptReplicas(blk);
-    Collection<DatanodeStorageInfo> storages =
-        new TreeSet<DatanodeStorageInfo>();
-
-    if (corruptReplicas != null) {
-      for (CorruptReplica cr : corruptReplicas) {
-        // Look up which descriptor belongs to this uuid
-        DatanodeStorageInfo storage = datanodeMgr.getStorage(cr.getStorageId());
-        if (storage != null) {
-          storages.add(storage);
-        }
-      }
-    }
-    return storages;
+    return dnds;
   }
 
   /**

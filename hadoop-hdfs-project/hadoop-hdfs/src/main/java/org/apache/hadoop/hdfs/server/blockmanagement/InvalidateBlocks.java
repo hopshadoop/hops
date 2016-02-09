@@ -70,8 +70,8 @@ class InvalidateBlocks {
   }
 
   /**
-   * @param storage
-   *     the storage to check
+   * @param dn
+   *     the datanode to check
    * @param block
    *     the block to look for
    * @return true if the given storage has the given block listed for
@@ -79,10 +79,10 @@ class InvalidateBlocks {
    * if a block is pending invalidation but with a different generation stamp,
    * returns false.
    */
-  boolean contains(final DatanodeStorageInfo storage, final BlockInfo block)
+  boolean contains(final DatanodeInfo dn, final BlockInfo block)
       throws StorageException, TransactionContextException {
     InvalidatedBlock blkFound = findBlock(block.getBlockId(),
-        storage, block.getInodeId());
+        dn.getDatanodeUuid(), block.getInodeId());
     if (blkFound == null) {
       return false;
     }
@@ -95,12 +95,10 @@ class InvalidateBlocks {
    */
   void add(final BlockInfo block, final DatanodeInfo datanode,
       final boolean log) throws StorageException, TransactionContextException {
-    // TODO we know the datanode Uuid, but we have to give a storage sid (int)
-    // TODO So; do we do a lookup or what?
-    // TODO -> maybe do a hostUuid field instead of storageid in the table?
     InvalidatedBlock invBlk = new InvalidatedBlock(datanode.getDatanodeUuid(), block
         .getBlockId(), block.getGenerationStamp(), block.getNumBytes(), block
         .getInodeId());
+
     if (add(invBlk)) {
       if (log) {
         NameNode.blockStateChangeLog.info(
@@ -113,27 +111,27 @@ class InvalidateBlocks {
   /**
    * Remove a storage from the invalidatesSet
    */
-  void remove(final DatanodeStorageInfo storage) throws IOException {
-    removeInvBlocks(storage);
+  void remove(final DatanodeInfo dn) throws IOException {
+    removeInvBlocks(dn);
   }
 
   /**
    * Remove the block from the specified storage.
    */
-  void remove(final DatanodeStorageInfo storage, final BlockInfo block)
+  void remove(final DatanodeInfo dn, final BlockInfo block)
       throws StorageException, TransactionContextException {
     InvalidatedBlock invBlok = findBlock(block.getBlockId(),
-        storage, block.getInodeId());
+        dn.getDatanodeUuid(), block.getInodeId());
     if (invBlok != null) {
       removeInvalidatedBlockFromDB(
-          new InvalidatedBlock(storage.getSid(),
+          new InvalidatedBlock(dn.getDatanodeUuid(),
               block.getBlockId(), block.getGenerationStamp(),
               block.getNumBytes(), block.getInodeId()));
     }
   }
 
   /**
-   * @return a list of the storage IDs.
+   * @return a list of the datanode Uuids.
    */
   List<String> getStorageIDs() throws IOException {
     LightWeightRequestHandler getAllInvBlocksHandler =
@@ -151,9 +149,7 @@ class InvalidateBlocks {
     HashSet<String> storageIds = new HashSet<String>();
     if (invBlocks != null) {
       for (InvalidatedBlock ib : invBlocks) {
-        storageIds
-            .add(datanodeManager.getStorage(ib.getStorageId())
-                .getDatanodeDescriptor().getDatanodeUuid());
+        storageIds.add(ib.getDatanodeUuid());
       }
     }
     return new ArrayList<String>(storageIds);
@@ -162,24 +158,9 @@ class InvalidateBlocks {
   /**
    * Invalidate work for the storage.
    */
-  int invalidateWork(final DatanodeStorageInfo storage) throws IOException {
-    final List<Block> toInvalidate = invalidateWork(storage.getSid(), storage);
-    if (toInvalidate == null) {
-      return 0;
-    }
-
-    if (NameNode.stateChangeLog.isInfoEnabled()) {
-      NameNode.stateChangeLog.info(
-          "BLOCK* " + getClass().getSimpleName() + ": ask " + storage +
-              " to delete " + toInvalidate);
-    }
-    return toInvalidate.size();
-  }
-
-  private List<Block> invalidateWork(final int storageId,
-      final DatanodeStorageInfo storage) throws IOException {
+  List<Block> invalidateWork(DatanodeDescriptor dn) throws IOException {
     final List<InvalidatedBlock> invBlocks =
-        findInvBlocksbyStorageId(storageId);
+        findInvBlocksbyDatanodeUuid(dn.getDatanodeUuid());
     if (invBlocks == null || invBlocks.isEmpty()) {
       return null;
     }
@@ -195,8 +176,7 @@ class InvalidateBlocks {
       toInvblks.add(invBlock);
     }
     removeInvBlocks(toInvblks);
-    // TODO add method to storage -> functionality is now/was in Datanode
-    storage.getDatanodeDescriptor().addBlocksToBeInvalidated(toInvalidate);
+    dn.addBlocksToBeInvalidated(toInvalidate);
     return toInvalidate;
   }
   
@@ -214,7 +194,7 @@ class InvalidateBlocks {
   }
   
   
-  void add(final Collection<Block> blocks, final DatanodeStorageInfo storage)
+  void add(final Collection<Block> blocks, final DatanodeInfo dn)
       throws IOException {
     new LightWeightRequestHandler(HDFSOperationType.ADD_INV_BLOCKS) {
       @Override
@@ -224,7 +204,7 @@ class InvalidateBlocks {
                 .getDataAccess(InvalidateBlockDataAccess.class);
         List<InvalidatedBlock> invblks = new ArrayList<InvalidatedBlock>();
         for (Block blk : blocks) {
-          invblks.add(new InvalidatedBlock(storage.getSid(), blk.getBlockId(),
+          invblks.add(new InvalidatedBlock(dn.getDatanodeUuid(), blk.getBlockId(),
               blk.getGenerationStamp(), blk.getNumBytes(),
               INode.NON_EXISTING_ID));
         }
@@ -237,7 +217,7 @@ class InvalidateBlocks {
   private boolean add(InvalidatedBlock invBlk)
       throws StorageException, TransactionContextException {
     InvalidatedBlock found =
-        findBlock(invBlk.getBlockId(), invBlk.getStorageId(), invBlk.getInodeId());
+        findBlock(invBlk.getBlockId(), invBlk.getDatanodeUuid(), invBlk.getInodeId());
     if (found == null) {
       addInvalidatedBlockToDB(invBlk);
       return true;
@@ -245,7 +225,7 @@ class InvalidateBlocks {
     return false;
   }
   
-  private List<InvalidatedBlock> findInvBlocksbyStorageId(final int sid)
+  private List<InvalidatedBlock> findInvBlocksbyDatanodeUuid(final String uuid)
       throws IOException {
     return (List<InvalidatedBlock>) new LightWeightRequestHandler(
         HDFSOperationType.GET_INV_BLKS_BY_STORAGEID) {
@@ -254,7 +234,7 @@ class InvalidateBlocks {
         InvalidateBlockDataAccess da =
             (InvalidateBlockDataAccess) HdfsStorageFactory
                 .getDataAccess(InvalidateBlockDataAccess.class);
-        return da.findInvalidatedBlockByStorageId(sid);
+        return da.findInvalidatedBlockByDatanodeUuid(uuid);
       }
     }.handle();
   }
@@ -273,9 +253,8 @@ class InvalidateBlocks {
     }.handle();
   }
   
-  private void removeInvBlocks(final DatanodeStorageInfo storage) throws
+  private void removeInvBlocks(final DatanodeInfo dn) throws
       IOException {
-    final int sid = storage.getSid();
 
     new LightWeightRequestHandler(HDFSOperationType.RM_INV_BLKS) {
       @Override
@@ -283,25 +262,17 @@ class InvalidateBlocks {
         InvalidateBlockDataAccess da =
             (InvalidateBlockDataAccess) HdfsStorageFactory
                 .getDataAccess(InvalidateBlockDataAccess.class);
-        da.removeAllByStorageId(sid);
+        da.removeAllByDatanodeUuid(dn.getDatanodeUuid());
         return null;
       }
     }.handle();
   }
 
-  /**
-   * Same as {@link #findBlock(long, int, int)} but takes a storage as argument.
-   */
-  private InvalidatedBlock findBlock(long blkId, DatanodeStorageInfo storage,
-      int inodeId) throws TransactionContextException, StorageException {
-    return findBlock(blkId, storage.getSid(), inodeId);
-  }
-
-  private InvalidatedBlock findBlock(long blkId, int storageID, int inodeId)
-      throws StorageException, TransactionContextException {
+  private InvalidatedBlock findBlock(long blkId, String datanodeUuid, int
+      inodeId) throws StorageException, TransactionContextException {
     return (InvalidatedBlock) EntityManager
-        .find(InvalidatedBlock.Finder.ByBlockIdStorageIdAndINodeId, blkId,
-            storageID, inodeId);
+        .find(InvalidatedBlock.Finder.ByBlockIdDatanodeUuidAndINodeId, blkId,
+            datanodeUuid, inodeId);
   }
   
   private void addInvalidatedBlockToDB(InvalidatedBlock invBlk)
@@ -318,5 +289,14 @@ class InvalidateBlocks {
       throws StorageException, TransactionContextException {
     return (List<InvalidatedBlock>) EntityManager
         .findList(InvalidatedBlock.Finder.All);
+  }
+
+  public List<DatanodeInfo> getDatanodes(DatanodeManager manager)
+      throws IOException {
+    List<DatanodeInfo> nodes = new ArrayList<DatanodeInfo>();
+    for(String datanodeUuid : getStorageIDs()) {
+      nodes.add(manager.getDatanode(datanodeUuid));
+    }
+    return nodes;
   }
 }

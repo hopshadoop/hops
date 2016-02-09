@@ -24,6 +24,7 @@ import io.hops.transaction.EntityManager;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeManager;
 import org.apache.hadoop.hdfs.util.LightWeightLinkedSet;
@@ -43,7 +44,7 @@ public class ExcessReplicasMap {
   //[M] only needed in TestOverReplicatedBlocks
   public LightWeightLinkedSet<Block> get(String dnUuid) throws IOException {
     Collection<ExcessReplica> excessReplicas =
-        getExcessReplicas(datanodeManager.getDatanode(dnUuid).getSId());
+        getExcessReplicas(dnUuid);
     if (excessReplicas == null) {
       return null;
     }
@@ -58,18 +59,21 @@ public class ExcessReplicasMap {
 
   public boolean put(String dnUuid, BlockInfo excessBlk)
       throws StorageException, TransactionContextException {
-    ExcessReplica er = getExcessReplica(datanodeManager.getDatanode(dnUuid).getSId(), excessBlk);
+    ExcessReplica er = getExcessReplica(dnUuid, excessBlk);
     if (er == null) {
-      addExcessReplicaToDB(new ExcessReplica(datanodeManager.getDatanode(dnUuid).getSId(), excessBlk.getBlockId(), excessBlk.getInodeId()));
+      addExcessReplicaToDB(new ExcessReplica(dnUuid, excessBlk.getBlockId(), excessBlk.getInodeId()));
       return true;
     }
     return false;
   }
 
+  /**
+   * Mark a block on a datanode for removal
+   */
   public boolean remove(String dnUuid, BlockInfo block)
       throws StorageException, TransactionContextException {
     ExcessReplica er =
-        getExcessReplica(datanodeManager.getDatanode(dnUuid).getSId(), block);
+        getExcessReplica(dnUuid, block);
     if (er != null) {
       removeExcessReplicaFromDB(er);
       return true;
@@ -78,6 +82,10 @@ public class ExcessReplicasMap {
     }
   }
 
+  /**
+   * Get the datanode Uuids of all datanodes storing excess replicas of this
+   * block.
+   */
   public Collection<String> get(BlockInfo blk)
       throws StorageException, TransactionContextException {
     Collection<ExcessReplica> excessReplicas = getExcessReplicas(blk);
@@ -86,9 +94,14 @@ public class ExcessReplicasMap {
     }
     TreeSet<String> stIds = new TreeSet<String>();
     for (ExcessReplica er : excessReplicas) {
-      stIds.add(datanodeManager.getDatanode(er.getStorageId()).getStorageID());
+      stIds.add(er.getDatanodeUuid());
     }
     return stIds;
+  }
+
+  public boolean contains(DatanodeInfo dn, BlockInfo blk)
+      throws StorageException, TransactionContextException {
+    return contains(dn.getDatanodeUuid(), blk);
   }
 
   public boolean contains(String dnUuid, BlockInfo blk)
@@ -98,7 +111,7 @@ public class ExcessReplicasMap {
       return false;
     }
     return ers.contains(
-        new ExcessReplica(datanodeManager.getDatanode(dnUuid).getSId(), blk.getBlockId(), blk.getInodeId()));
+        new ExcessReplica(dnUuid, blk.getBlockId(), blk.getInodeId()));
   }
 
   public void clear() throws IOException {
@@ -113,7 +126,7 @@ public class ExcessReplicasMap {
     }.handle();
   }
 
-  private Collection<ExcessReplica> getExcessReplicas(final int dn)
+  private Collection<ExcessReplica> getExcessReplicas(final String uuid)
       throws IOException {
     return (Collection<ExcessReplica>) new LightWeightRequestHandler(
         HDFSOperationType.GET_EXCESS_RELPLICAS_BY_STORAGEID) {
@@ -122,7 +135,7 @@ public class ExcessReplicasMap {
         ExcessReplicaDataAccess da =
             (ExcessReplicaDataAccess) HdfsStorageFactory
                 .getDataAccess(ExcessReplicaDataAccess.class);
-        return da.findExcessReplicaByStorageId(dn);
+        return da.findExcessReplicaByDatanodeUuid(uuid);
       }
     }.handle();
   }
@@ -144,10 +157,10 @@ public class ExcessReplicasMap {
             blk.getInodeId());
   }
 
-  private ExcessReplica getExcessReplica(int dn, BlockInfo block)
+  private ExcessReplica getExcessReplica(String uuid, BlockInfo block)
       throws StorageException, TransactionContextException {
-    return EntityManager.find(ExcessReplica.Finder.ByBlockIdStorageIdAndINodeId,
-        block.getBlockId(), dn, block.getInodeId());
+    return EntityManager.find(ExcessReplica.Finder.ByBlockIdDatanodeUuidAndINodeId,
+        block.getBlockId(), uuid, block.getInodeId());
   }
 }
 

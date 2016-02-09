@@ -2113,7 +2113,7 @@ public class FSNamesystem
    * client to "try again later".
    */
   LocatedBlock getAdditionalBlock(final String src, final String clientName,
-      final ExtendedBlock previous, final HashMap<Node, Node> excludedNodes,
+      final ExtendedBlock previous, final HashSet<Node> excludedNodes,
       final List<String> favoredNodes) throws IOException {
     HopsTransactionalRequestHandler additionalBlockHandler =
         new HopsTransactionalRequestHandler(
@@ -2273,8 +2273,8 @@ public class FSNamesystem
             src + ". Returning previously allocated block " + lastBlockInFile);
         long offset = pendingFile.computeFileSize(true);
         onRetryBlock[0] = makeLocatedBlock(lastBlockInFile,
-            ((BlockInfoUnderConstruction) lastBlockInFile)
-                .getExpectedLocations(getBlockManager().getDatanodeManager()),
+            ((BlockInfoUnderConstruction) lastBlockInFile).getExpectedStorageLocations(
+                getBlockManager().getDatanodeManager()),
             offset);
         return inodes;
       } else {
@@ -2292,23 +2292,21 @@ public class FSNamesystem
     return inodes;
   }
 
-  LocatedBlock makeLocatedBlock(Block blk, DatanodeInfo[] locs, long offset)
+  LocatedBlock makeLocatedBlock(Block blk, DatanodeStorageInfo[] locs, long offset)
       throws IOException {
     LocatedBlock lBlk = new LocatedBlock(getExtendedBlock(blk), locs, offset);
-    getBlockManager()
-        .setBlockToken(lBlk, BlockTokenSecretManager.AccessMode.WRITE);
+    getBlockManager().setBlockToken(lBlk,
+        BlockTokenSecretManager.AccessMode.WRITE);
     return lBlk;
   }
 
   /**
-   * @see NameNodeRpcServer#getAdditionalDatanode(String, ExtendedBlock,
-   * DatanodeInfo[],
-   * DatanodeInfo[], int, String)
+   * @see ClientProtocol#getAdditionalDatanode(String, ExtendedBlock, DatanodeInfo[], String[], DatanodeInfo[], int, String)
    */
   LocatedBlock getAdditionalDatanode(final String src, final ExtendedBlock blk,
-      final DatanodeInfo[] existings, final HashMap<Node, Node> excludes,
-      final int numAdditionalNodes, final String clientName)
-      throws IOException {
+      final DatanodeInfo[] existings, final String[] storageIDs,
+      final HashSet<Node> excludes, final int numAdditionalNodes,
+      final String clientName) throws IOException {
     HopsTransactionalRequestHandler getAdditionalDatanodeHandler =
         new HopsTransactionalRequestHandler(
             HDFSOperationType.GET_ADDITIONAL_DATANODE, src) {
@@ -2327,7 +2325,7 @@ public class FSNamesystem
 
             final DatanodeDescriptor clientnode;
             final long preferredblocksize;
-            final List<DatanodeDescriptor> chosen;
+            final List<DatanodeStorageInfo> chosen;
             //check safe mode
             if (isInSafeMode()) {
               throw new SafeModeException(
@@ -2337,22 +2335,16 @@ public class FSNamesystem
             //check lease
             final INodeFileUnderConstruction file = checkLease(src, clientName);
             //clientnode = file.getClientNode(); HOP
-            clientnode = getBlockManager().getDatanodeManager()
-                .getDatanode(file.getClientNode());
+            clientnode = getBlockManager().getDatanodeManager().getDatanode(
+                file.getClientNode());
             preferredblocksize = file.getPreferredBlockSize();
 
-            //find datanode descriptors
-            chosen = new ArrayList<DatanodeDescriptor>();
-            for (DatanodeInfo d : existings) {
-              final DatanodeDescriptor descriptor =
-                  blockManager.getDatanodeManager().getDatanode(d);
-              if (descriptor != null) {
-                chosen.add(descriptor);
-              }
-            }
+            //find datanode storages
+            final DatanodeManager dm = blockManager.getDatanodeManager();
+            chosen = Arrays.asList(dm.getDatanodeStorageInfos(existings, storageIDs));
 
             // choose new datanodes.
-            final DatanodeInfo[] targets =
+            final DatanodeStorageInfo[] targets =
                 blockManager.getBlockPlacementPolicy()
                     .chooseTarget(src, numAdditionalNodes, clientnode, chosen,
                         true, excludes, preferredblocksize);
@@ -7300,7 +7292,7 @@ private void commitOrCompleteLastBlock(
             Long.MAX_VALUE).getLocatedBlocks());
     Collections.sort(parityLocations, LocatedBlock.blockIdComparator);
 
-    HashMap<Node, Node> excluded = new HashMap<Node, Node>();
+    HashSet<Node> excluded = new HashSet<Node>();
     int stripe =
         isParity ? getStripe(block, parityLocations, codec.getParityLength()) :
             getStripe(block, sourceLocations, codec.getStripeLength());
@@ -7312,7 +7304,7 @@ private void commitOrCompleteLastBlock(
          i++) {
       DatanodeInfo[] nodes = sourceLocations.get(i).getLocations();
       for (DatanodeInfo node : nodes) {
-        excluded.put(node, node);
+        excluded.add(node);
       }
     }
 
@@ -7322,17 +7314,17 @@ private void commitOrCompleteLastBlock(
         && i < index + codec.getParityLength(); i++) {
       DatanodeInfo[] nodes = parityLocations.get(i).getLocations();
       for (DatanodeInfo node : nodes) {
-        excluded.put(node, node);
+        excluded.add(node);
       }
     }
 
     BlockPlacementPolicyDefault placementPolicy = (BlockPlacementPolicyDefault)
         getBlockManager().getBlockPlacementPolicy();
-    List<DatanodeDescriptor> chosenNodes = new LinkedList<DatanodeDescriptor>();
-    DatanodeDescriptor[] descriptors = placementPolicy
+    List<DatanodeStorageInfo> chosenStorages = new LinkedList<DatanodeStorageInfo>();
+    DatanodeStorageInfo[] descriptors = placementPolicy
         .chooseTarget(isParity ? parityPath : sourcePath,
             isParity ? 1 : status.getEncodingPolicy().getTargetReplication(),
-            null, chosenNodes, false, excluded, block.getBlockSize());
+            null, chosenStorages, false, excluded, block.getBlockSize());
     return new LocatedBlock(block.getBlock(), descriptors);
   }
 
