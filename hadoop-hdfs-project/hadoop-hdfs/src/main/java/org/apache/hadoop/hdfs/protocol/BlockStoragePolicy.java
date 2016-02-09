@@ -38,6 +38,13 @@ public class BlockStoragePolicy {
   public static final Logger LOG = LoggerFactory.getLogger(BlockStoragePolicy
       .class);
 
+  public static BlockStoragePolicy DEFAULT = new BlockStoragePolicy((byte) 1,
+      "default",
+      new StorageType[]{StorageType.SSD, StorageType.SSD, StorageType.DISK},
+      new StorageType[]{StorageType.SSD, StorageType.DISK, StorageType.DISK},
+      new StorageType[]{StorageType.DISK, StorageType.DISK, StorageType.DISK},
+      false);
+
   /** A 4-bit policy ID */
   private final byte id;
   /** Policy name */
