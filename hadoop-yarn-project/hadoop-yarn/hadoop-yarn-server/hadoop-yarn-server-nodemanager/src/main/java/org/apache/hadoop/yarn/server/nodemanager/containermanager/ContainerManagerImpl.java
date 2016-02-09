@@ -471,8 +471,8 @@ public class ContainerManagerImpl extends CompositeService
     boolean unauthorized = false;
     StringBuilder messageBuilder =
         new StringBuilder("Unauthorized request to start container. ");
-    if (!nmTokenIdentifier.getApplicationAttemptId()
-        .equals(containerId.getApplicationAttemptId())) {
+    if (!nmTokenIdentifier.getApplicationAttemptId().getApplicationId().equals(
+        containerId.getApplicationAttemptId().getApplicationId())) {
       unauthorized = true;
       messageBuilder.append("\nNMToken for application attempt : ")
           .append(nmTokenIdentifier.getApplicationAttemptId())
@@ -819,22 +819,22 @@ public class ContainerManagerImpl extends CompositeService
      * This will prevent user in knowing another application's containers).
      */
 
-    if ((!identifier.getApplicationAttemptId()
-        .equals(containerId.getApplicationAttemptId())) ||
-        (container != null && !identifier.getApplicationAttemptId().
-            equals(container.getContainerId().getApplicationAttemptId()))) {
+    ApplicationId nmTokenAppId =
+        identifier.getApplicationAttemptId().getApplicationId();
+    if ((!nmTokenAppId.equals(containerId.getApplicationAttemptId().getApplicationId()))
+        || (container != null && !nmTokenAppId.equals(container
+          .getContainerId().getApplicationAttemptId().getApplicationId()))) {
       if (stopRequest) {
         LOG.warn(identifier.getApplicationAttemptId() +
             " attempted to stop non-application container : " +
-            container.getContainerId().toString());
+            container.getContainerId());
         NMAuditLogger.logFailure("UnknownUser", AuditConstants.STOP_CONTAINER,
             "ContainerManagerImpl", "Trying to stop unknown container!",
-            identifier.getApplicationAttemptId().getApplicationId(),
-            container.getContainerId());
+            nmTokenAppId, container.getContainerId());
       } else {
         LOG.warn(identifier.getApplicationAttemptId() +
             " attempted to get status for non-application container : " +
-            container.getContainerId().toString());
+            container.getContainerId());
       }
     }
 
