@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.server.nodemanager.containermanager;
 
+import org.apache.hadoop.yarn.server.nodemanager.recovery.NMNullStateStoreService;
 import org.junit.Assert;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -102,12 +103,11 @@ public abstract class BaseContainerManagerTest {
   protected Context context =
       new NMContext(new NMContainerTokenSecretManager(conf),
           new NMTokenSecretManagerInNM(), null,
-          new ApplicationACLsManager(conf)) {
+          new ApplicationACLsManager(conf),
+          new NMNullStateStoreService()) {
         public int getHttpPort() {
           return HTTP_PORT;
         }
-
-        ;
       };
   protected ContainerExecutor exec;
   protected DeletionService delSrvc;

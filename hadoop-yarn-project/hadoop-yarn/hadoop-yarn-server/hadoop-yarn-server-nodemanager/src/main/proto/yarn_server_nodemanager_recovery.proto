@@ -15,33 +15,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.event;
 
-import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.LocalizedResource;
+option java_package = "org.apache.hadoop.yarn.proto";
+option java_outer_classname = "YarnServerNodemanagerRecoveryProtos";
+option java_generic_services = true;
+option java_generate_equals_and_hash = true;
+package hadoop.yarn;
 
-/**
- * Events delivered to {@link LocalizedResource}. Each of these
- * events is a subclass of {@link ResourceEvent}.
- */
-public enum ResourceEventType {
-  /**
-   * See {@link ResourceRequestEvent}
-   */
-  REQUEST,
-  /**
-   * See {@link ResourceLocalizedEvent}
-   */
-  LOCALIZED,
-  /**
-   * See {@link ResourceReleaseEvent}
-   */
-  RELEASE,
-  /**
-   * See {@link ResourceFailedLocalizationEvent}
-   */
-  LOCALIZATION_FAILED,
-  /**
-   * See {@link ResourceRecoveredEvent}
-   */
-  RECOVERED
+import "yarn_protos.proto";
+
+message LocalizedResourceProto {
+    optional LocalResourceProto resource = 1;
+    optional string localPath = 2;
+    optional int64 size = 3;
 }
