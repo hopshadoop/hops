@@ -116,13 +116,9 @@ class BlockPK {
         return false;
       }
 
+      // So it's the same block, now check if it's the same replica
       ReplicaPK replicaPK = (ReplicaPK) o;
-
-      if (storageId != replicaPK.storageId) {
-        return false;
-      }
-
-      return true;
+      return storageId == replicaPK.storageId;
     }
 
     @Override
@@ -149,13 +145,32 @@ class BlockPK {
       return keys;
     }
 
-    static List<ReplicaPK> getKeys(long[] blockIds, int[] inodeIds,
-        int storageId) {
+    static List<ReplicaPK> getKeys(long[] blockIds, int[] inodeIds, int storageId) {
       List<BlockPK.ReplicaPK> keys = new ArrayList<ReplicaPK>(blockIds.length);
       for (int i = 0; i < blockIds.length; i++) {
         keys.add(new BlockPK.ReplicaPK(blockIds[i], inodeIds[i], storageId));
       }
       return keys;
+    }
+
+    /**
+     * Do a lookup on (datanodeUuid, blockId, inodeId)
+     */
+    static class RBPK extends ReplicaPK {
+      private String datanodeUuid;
+
+      RBPK(long blockId, int inodeId, String datanodeUuid) {
+        super(blockId, inodeId);
+        this.datanodeUuid = datanodeUuid;
+      }
+
+      static List<ReplicaPK> getKeys(long[] blockIds, int[] inodeIds, String datanodeUuid) {
+        List<BlockPK.ReplicaPK> keys = new ArrayList<ReplicaPK>(blockIds.length);
+        for (int i = 0; i < blockIds.length; i++) {
+          keys.add(new BlockPK.ReplicaPK.RBPK(blockIds[i], inodeIds[i], datanodeUuid));
+        }
+        return keys;
+      }
     }
   }
 
