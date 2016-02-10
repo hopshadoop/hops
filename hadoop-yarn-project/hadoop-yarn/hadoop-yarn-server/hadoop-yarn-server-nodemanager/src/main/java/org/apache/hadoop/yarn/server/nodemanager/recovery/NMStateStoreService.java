@@ -25,6 +25,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.proto.YarnProtos.LocalResourceProto;
+import org.apache.hadoop.yarn.proto.YarnServerNodemanagerRecoveryProtos.DeletionServiceDeleteTaskProto;
 import org.apache.hadoop.yarn.proto.YarnServerNodemanagerRecoveryProtos.LocalizedResourceProto;
 
 import java.io.IOException;
@@ -88,6 +89,14 @@ public abstract class NMStateStoreService extends AbstractService {
 
         public Map<String, RecoveredUserResources> getUserResources() {
             return userResources;
+        }
+    }
+
+    public static class RecoveredDeletionServiceState {
+        List<DeletionServiceDeleteTaskProto> tasks;
+
+        public List<DeletionServiceDeleteTaskProto> getTasks() {
+            return tasks;
         }
     }
 
@@ -159,6 +168,15 @@ public abstract class NMStateStoreService extends AbstractService {
                                                  ApplicationId appId,
                                                  Path localPath)
         throws IOException;
+
+    public abstract RecoveredDeletionServiceState loadDeletionServiceState()
+        throws IOException;
+
+    public abstract void storeDeletionTask(int taskId,
+                                           DeletionServiceDeleteTaskProto taskProto)
+        throws IOException;
+
+    public abstract void removeDeletionTask(int taskId) throws IOException;
 
     protected abstract void initStorage(Configuration conf) throws IOException;
 

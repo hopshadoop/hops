@@ -24,6 +24,8 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.proto.YarnProtos.LocalResourceProto;
+import org.apache.hadoop.yarn.proto.YarnServerNodemanagerRecoveryProtos;
+import org.apache.hadoop.yarn.proto.YarnServerNodemanagerRecoveryProtos.DeletionServiceDeleteTaskProto;
 import org.apache.hadoop.yarn.proto.YarnServerNodemanagerRecoveryProtos.LocalizedResourceProto;
 
 // The state store to use when state isn't being stored
@@ -58,6 +60,22 @@ public class NMNullStateStoreService extends NMStateStoreService {
   @Override
   public void removeLocalizedResource(String user, ApplicationId appId,
       Path localPath) throws IOException {
+  }
+
+  @Override
+  public RecoveredDeletionServiceState loadDeletionServiceState()
+    throws IOException {
+    throw new UnsupportedOperationException(
+            "Recovery not supported by this state store");
+  }
+
+  @Override
+  public void storeDeletionTask(int taskId, DeletionServiceDeleteTaskProto taskProto)
+    throws IOException {
+  }
+
+  @Override
+  public void removeDeletionTask(int taskId) throws IOException {
   }
 
   @Override
