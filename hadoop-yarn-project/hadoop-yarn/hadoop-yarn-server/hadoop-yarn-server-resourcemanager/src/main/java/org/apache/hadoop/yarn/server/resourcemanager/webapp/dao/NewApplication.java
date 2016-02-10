@@ -18,44 +18,37 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.webapp.dao;
 
-import org.apache.hadoop.yarn.api.records.Resource;
-
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
+import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
 
-@XmlRootElement
+
+@XmlRootElement(name="NewApplication")
 @XmlAccessorType(XmlAccessType.FIELD)
-public class ResourceInfo {
-  int memory;
-  int vCores;
-  
-  public ResourceInfo() {
-  }
+public class NewApplication {
 
-  public ResourceInfo(Resource res) {
-    memory = res.getMemory();
-    vCores = res.getVirtualCores();
-  }
+@XmlElement(name="application-id")
+String applicationId;
 
-  public int getMemory() {
-    return memory;
-  }
+@XmlElement(name="maximum-resource-capability")
+ResourceInfo maximumResourceCapability;
 
-  public int getvCores() {
-    return vCores;
-  }
-  
-  @Override
-  public String toString() {
-    return "<memory:" + memory + ", vCores:" + vCores + ">";
-  }
+public NewApplication() {
+    applicationId = "";
+    maximumResourceCapability = new ResourceInfo();
+}
 
-  public void setMemory(int memory) {
-    this.memory = memory;
-  }
+public NewApplication(String appId, ResourceInfo maxResources) {
+    applicationId = appId;
+    maximumResourceCapability = maxResources;
+}
 
-  public void setvCores(int vCores) {
-    this.vCores = vCores;
-  }
+public String getApplicationId() {
+    return applicationId;
+}
+
+public ResourceInfo getMaximumResourceCapability() {
+    return maximumResourceCapability;
+}
 }
