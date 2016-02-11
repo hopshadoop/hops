@@ -27,6 +27,7 @@ import java.text.MessageFormat;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.security.authentication.client.AuthenticatedURL;
@@ -77,9 +78,15 @@ public class TimelineAuthenticator extends KerberosAuthenticator {
     }
   }
 
-  private boolean hasDelegationToken(URL url) {
-    return url.getQuery().contains(
-        TimelineAuthenticationConsts.DELEGATION_PARAM + "=");
+  @Private
+  @VisibleForTesting
+  boolean hasDelegationToken(URL url) {
+    if (url.getQuery() == null) {
+      return false;
+    } else {
+      return url.getQuery().contains(
+              TimelineAuthenticationConsts.DELEGATION_PARAM + "=");
+    }
   }
 
   @Override
