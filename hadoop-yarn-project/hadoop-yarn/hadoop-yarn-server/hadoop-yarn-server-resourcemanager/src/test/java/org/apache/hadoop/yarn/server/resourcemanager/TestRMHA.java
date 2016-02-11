@@ -94,10 +94,7 @@ public class TestRMHA {
     configuration.setBoolean(YarnConfiguration.YARN_ACL_ENABLE, true);
     ClusterMetrics.destroy();
     QueueMetrics.clearQueueMetrics();
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    if (ms.getSource("ClusterMetrics") != null) {
-        DefaultMetricsSystem.shutdown();
-    }
+    DefaultMetricsSystem.shutdown();
     
     YarnAPIStorageFactory.setConfiguration(configuration);
     RMStorageFactory.setConfiguration(configuration);
