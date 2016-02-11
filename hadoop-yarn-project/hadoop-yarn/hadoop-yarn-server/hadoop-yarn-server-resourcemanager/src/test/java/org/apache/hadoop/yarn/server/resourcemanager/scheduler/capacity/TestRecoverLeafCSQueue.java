@@ -100,7 +100,8 @@ public class TestRecoverLeafCSQueue {
     setupQueueConfiguration(csConf, newRoot);
     YarnConfiguration conf = new YarnConfiguration();
     cs.setConf(conf);
-
+    cs.setRMContext(rmContext);
+    
     YarnAPIStorageFactory.setConfiguration(conf);
     RMStorageFactory.setConfiguration(conf);
     RMStorageFactory.getConnector().formatStorage();
@@ -131,8 +132,8 @@ public class TestRecoverLeafCSQueue {
                     CapacitySchedulerConfiguration.ROOT,
                     queues, queues,
                     TestUtils.spyHook);
-
-    cs.reinitialize(csConf, rmContext, null);
+    cs.init(conf);
+    cs.start();
     RMStorageFactory.setConfiguration(conf);
     YarnAPIStorageFactory.setConfiguration(conf);
 
