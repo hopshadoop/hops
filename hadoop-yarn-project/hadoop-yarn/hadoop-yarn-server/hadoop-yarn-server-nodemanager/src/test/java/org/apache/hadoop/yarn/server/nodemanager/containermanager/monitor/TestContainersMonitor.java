@@ -84,8 +84,10 @@ public class TestContainersMonitor extends BaseContainerManagerTest {
 
   @Before
   public void setup() throws IOException {
-    conf.setClass(YarnConfiguration.NM_CONTAINER_MON_RESOURCE_CALCULATOR,
-        LinuxResourceCalculatorPlugin.class, ResourceCalculatorPlugin.class);
+    conf.setClass(
+            YarnConfiguration.NM_CONTAINER_MON_RESOURCE_CALCULATOR,
+            LinuxResourceCalculatorPlugin.class, ResourceCalculatorPlugin.class);
+    conf.setBoolean(YarnConfiguration.NM_VMEM_CHECK_ENABLED, true);
     super.setup();
   }
 
