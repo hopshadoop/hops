@@ -47,6 +47,31 @@ public class ContainerExitStatus {
    */
   public static final int PREEMPTED = -102;
   
+  /**
+   * Container terminated because of exceeding allocated virtual memory.
+   */
+  public static final int KILLED_EXCEEDED_VMEM = -103;
+
+  /**
+   * Container terminated because of exceeding allocated physical memory.
+   */
+  public static final int KILLED_EXCEEDED_PMEM = -104;
+
+  /**
+   * Container was terminated by stop request by the app master.
+   */
+  public static final int KILLED_BY_APPMASTER = -105;
+
+  /**
+   * Container was terminated by the resource manager.
+   */
+  public static final int KILLED_BY_RESOURCEMANAGER = -106;
+
+  /**
+   * Container was terminated after the application finished.
+   */
+  public static final int KILLED_AFTER_APP_COMPLETION = -107;
+
   public static final int UNKNOWN_CONTAINER_EXIT = -200;
   public static final int CONTAINER_RUNNING_STATE = -201;
 }

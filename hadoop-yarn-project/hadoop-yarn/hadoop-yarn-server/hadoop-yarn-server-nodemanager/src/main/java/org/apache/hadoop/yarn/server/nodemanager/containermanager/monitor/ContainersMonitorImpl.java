@@ -24,6 +24,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.util.StringUtils.TraditionalBinaryPrefix;
+import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.event.AsyncDispatcher;
@@ -412,6 +413,7 @@ public class ContainersMonitorImpl extends AbstractService
 
             boolean isMemoryOverLimit = false;
             String msg = "";
+            int containerExitStatus = ContainerExitStatus.INVALID;
             if (isVmemCheckEnabled() &&
                 isProcessTreeOverLimit(containerId.toString(), currentVmemUsage,
                     curMemUsageOfAgedProcesses, vmemLimit)) {
@@ -421,6 +423,7 @@ public class ContainersMonitorImpl extends AbstractService
               msg = formatErrorMessage("virtual", currentVmemUsage, vmemLimit,
                   currentPmemUsage, pmemLimit, pId, containerId, pTree);
               isMemoryOverLimit = true;
+              containerExitStatus = ContainerExitStatus.KILLED_EXCEEDED_VMEM;
             } else if (isPmemCheckEnabled() &&
                 isProcessTreeOverLimit(containerId.toString(), currentPmemUsage,
                     curRssMemUsageOfAgedProcesses, pmemLimit)) {
@@ -430,6 +433,7 @@ public class ContainersMonitorImpl extends AbstractService
               msg = formatErrorMessage("physical", currentVmemUsage, vmemLimit,
                   currentPmemUsage, pmemLimit, pId, containerId, pTree);
               isMemoryOverLimit = true;
+              containerExitStatus = ContainerExitStatus.KILLED_EXCEEDED_PMEM;
             }
 
             if (isMemoryOverLimit) {
@@ -444,7 +448,8 @@ public class ContainersMonitorImpl extends AbstractService
               }
               // kill the container
               eventDispatcher.getEventHandler()
-                  .handle(new ContainerKillEvent(containerId, msg));
+                  .handle(new ContainerKillEvent(containerId,
+                          containerExitStatus, msg));
               it.remove();
               LOG.info("Removed ProcessTree with root " + pId);
             } else {
