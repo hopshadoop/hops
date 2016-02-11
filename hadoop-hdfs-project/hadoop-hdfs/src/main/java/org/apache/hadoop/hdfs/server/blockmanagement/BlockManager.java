@@ -1183,13 +1183,18 @@ public class BlockManager {
       return;
     }
 
+    // Lookup which storage we are working on if we didn't know it yet
+    if(storageInfo == null) {
+      storageInfo = b.corrupted.getStorageOnNode(node);
+    }
+
     // Add replica to the storage if it is not already there
     if (storageInfo != null) {
       storageInfo.addBlock(b.stored);
     }
 
     // Add this replica to corruptReplicas Map
-    corruptReplicas.addToCorruptReplicasMap(b.corrupted, node, b.reason);
+    corruptReplicas.addToCorruptReplicasMap(b.corrupted, storageInfo, b.reason);
 
     NumberReplicas numberOfReplicas = countNodes(b.stored);
     boolean hasEnoughLiveReplicas = numberOfReplicas.liveReplicas() >= bc
@@ -1557,8 +1562,7 @@ public class BlockManager {
    *
    * @throws IOException
    *           if the number of targets < minimum replication.
-   * @see BlockPlacementPolicy#chooseTarget(String, int, Node,
-   *      Set, long, List)
+   * @see BlockPlacementPolicy#chooseTarget(String, int, Node, List, boolean, Set, long, BlockStoragePolicy)
    */
   public DatanodeStorageInfo[] chooseTarget4NewBlock(final String src,
       final int numOfReplicas, final Node client,
@@ -1568,9 +1572,10 @@ public class BlockManager {
     List<DatanodeDescriptor> favoredDatanodeDescriptors =
         getDatanodeDescriptors(favoredNodes);
 
+    // TODO HDP_2.6 this is a hardcoded blockstoragepolicy... :-(
     final DatanodeStorageInfo[] targets = blockplacement.chooseTarget(src,
         numOfReplicas, client, excludedNodes, blocksize,
-        favoredDatanodeDescriptors);
+        favoredDatanodeDescriptors, BlockStoragePolicy.DEFAULT);
 
     if (targets.length < minReplication) {
       throw new IOException("File " + src + " could only be replicated to "
@@ -3114,7 +3119,7 @@ public class BlockManager {
       }
 
       nonExcess.remove(cur);
-      addToExcessReplicate(cur.getDatanodeDescriptor(), b);
+      addToExcessReplicate(cur, b);
 
       //
       // The 'excessblocks' tracks blocks until we get confirmation
@@ -3131,13 +3136,17 @@ public class BlockManager {
     }
   }
 
-  private void addToExcessReplicate(DatanodeInfo dn, Block block)
+  private void addToExcessReplicate(DatanodeStorageInfo storage, Block block)
       throws StorageException, TransactionContextException {
-    if (excessReplicateMap.put(dn.getDatanodeUuid(), getBlockInfo(block))) {
+    BlockInfo blockInfo = getBlockInfo(block);
+
+    if (excessReplicateMap.put(
+        storage.getDatanodeDescriptor().getDatanodeUuid(),
+        storage.getSid(), blockInfo)) {
       excessBlocksCount.incrementAndGet();
       if (blockLog.isDebugEnabled()) {
         blockLog.debug(
-            "BLOCK* addToExcessReplicate:" + " (" + dn + ", " + block +
+            "BLOCK* addToExcessReplicate:" + " (" + storage + ", " + block +
                 ") is added to excessReplicateMap");
       }
     }
@@ -4048,7 +4057,7 @@ public class BlockManager {
       try {
         targets = blockplacement.chooseTarget(bc.getName(),
             additionalReplRequired, srcNode, liveReplicaStorages, false,
-            excludedNodes, block.getNumBytes());
+            excludedNodes, block.getNumBytes(, BlockStoragePolicy.DEFAULT));
       } finally {
         srcNode.decrementPendingReplicationWithoutTargets();
       }

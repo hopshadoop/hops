@@ -55,11 +55,11 @@ public abstract class BlockPlacementPolicy {
   }
 
   /**
-   * choose <i>numOfReplicas</i> data nodes for <i>writer</i> 
-   * to re-replicate a block with size <i>blocksize</i> 
+   * choose <i>numOfReplicas</i> data nodes for <i>writer</i>
+   * to re-replicate a block with size <i>blocksize</i>
    * If not, return as many as we can.
    *
-   * @param srcPath the file to which this chooseTargets is being invoked.
+   * @param src the file to which this chooseTargets is being invoked.
    * @param numOfReplicas additional number of replicas wanted.
    * @param writer the writer's machine, null if not in the cluster.
    * @param chosen datanodes that have been chosen as targets.
@@ -69,33 +69,35 @@ public abstract class BlockPlacementPolicy {
    * @return array of DatanodeDescriptor instances chosen as target
    * and sorted as a pipeline.
    */
-  public abstract DatanodeStorageInfo[] chooseTarget(String srcPath,
+  public abstract DatanodeStorageInfo[] chooseTarget(String src,
       int numOfReplicas,
       Node writer,
       List<DatanodeStorageInfo> chosen,
       boolean returnChosenNodes,
       Set<Node> excludedNodes,
-      long blocksize);
-  
+      long blocksize,
+      BlockStoragePolicy storagePolicy);
+
   /**
-   * Same as {@link #chooseTarget(String, int, Node, Set, long, List)}
+   * Same as {@link #chooseTarget(String, int, Node, Set, long, List, BlockStoragePolicy)}
    * with added parameter {@code favoredDatanodes}
    * @param favoredNodes datanodes that should be favored as targets. This
-   *          is only a hint and due to cluster state, namenode may not be 
+   *          is only a hint and due to cluster state, namenode may not be
    *          able to place the blocks on these datanodes.
    */
   DatanodeStorageInfo[] chooseTarget(String src,
       int numOfReplicas, Node writer,
       Set<Node> excludedNodes,
       long blocksize,
-      List<DatanodeDescriptor> favoredNodes) {
+      List<DatanodeDescriptor> favoredNodes,
+      BlockStoragePolicy storagePolicy) {
     // This class does not provide the functionality of placing
     // a block in favored datanodes. The implementations of this class
     // are expected to provide this functionality
 
     return chooseTarget(src, numOfReplicas, writer,
         new ArrayList<DatanodeStorageInfo>(numOfReplicas), false,
-        excludedNodes, blocksize);
+        excludedNodes, blocksize, storagePolicy);
   }
 
   /**

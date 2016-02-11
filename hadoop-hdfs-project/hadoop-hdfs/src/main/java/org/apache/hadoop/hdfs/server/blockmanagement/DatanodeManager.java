@@ -424,7 +424,7 @@ public class DatanodeManager {
       NameNode.stateChangeLog.info(
           "DataNode is dead. Removing all replicas for datanode " + nodeInfo +
               " StorageID " + nodeInfo.getDatanodeUuid() + " index " +
-              nodeInfo.getHostID());
+              nodeInfo.getHostName());
       blockManager.removeBlocksAssociatedTo(nodeInfo);
     }
     networktopology.remove(nodeInfo);
@@ -1289,6 +1289,11 @@ public class DatanodeManager {
     return getClass().getSimpleName() + ": " + host2DatanodeMap;
   }
 
+  /** @return the Host2NodesMap */
+  public Host2NodesMap getHost2DatanodeMap() {
+    return this.host2DatanodeMap;
+  }
+
   /**
    * Given datanode address or host name, returns the DatanodeDescriptor for the
    * same, or if it doesn't find the datanode, it looks for a machine local and
@@ -1431,7 +1436,7 @@ public class DatanodeManager {
 
       @Override
       public Object performTask() throws StorageException, IOException {
-        return b.getExpectedLocations(datanodeManager);
+        return b.getExpectedStorageLocations(datanodeManager);
       }
     }.handle();
   }

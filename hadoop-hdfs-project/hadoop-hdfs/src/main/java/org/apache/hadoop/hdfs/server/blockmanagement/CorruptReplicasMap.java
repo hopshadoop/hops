@@ -63,13 +63,13 @@ public class CorruptReplicasMap {
    *
    * @param blk
    *     Block to be added to CorruptReplicasMap
-   * @param datanode
-   *     datanode which holds the corrupt replica
+   * @param storage
+   *     storage which holds the corrupt replica
    * @param reason
    *     a textual reason (for logging purposes)
    */
-  public void addToCorruptReplicasMap(BlockInfo blk, DatanodeInfo datanode,
-      String reason) throws StorageException, TransactionContextException {
+  public void addToCorruptReplicasMap(BlockInfo blk, DatanodeStorageInfo
+      storage, String reason) throws StorageException, TransactionContextException {
     Collection<DatanodeDescriptor> nodes = getNodes(blk);
 
     String reasonText;
@@ -79,19 +79,20 @@ public class CorruptReplicasMap {
       reasonText = "";
     }
     
-    if (!nodes.contains(datanode)) {
-      addCorruptReplicaToDB(new CorruptReplica(blk.getBlockId(),
-          datanode.getDatanodeUuid(), blk.getInodeId()));
+    if (!nodes.contains(storage.getDatanodeDescriptor())) {
+      addCorruptReplicaToDB(new CorruptReplica(
+          storage.getDatanodeDescriptor().getDatanodeUuid(), storage.getSid(),
+          blk.getBlockId(), blk.getInodeId()));
 
       NameNode.blockStateChangeLog
           .info("BLOCK NameSystem.addToCorruptReplicasMap: " +
-              blk.getBlockName() + " added as corrupt on " + datanode +
+              blk.getBlockName() + " added as corrupt on " + storage +
               " by " + Server.getRemoteIp() + reasonText);
     } else {
       NameNode.blockStateChangeLog
           .info("BLOCK NameSystem.addToCorruptReplicasMap: " +
               "duplicate requested for " + blk.getBlockName() +
-              " to add as corrupt on " + datanode +
+              " to add as corrupt on " + storage +
               " by " + Server.getRemoteIp() + reasonText);
     }
   }
@@ -120,15 +121,14 @@ public class CorruptReplicasMap {
    * false if the replica is not in the map
    */
   boolean removeFromCorruptReplicasMap(BlockInfo blk, DatanodeDescriptor datanode)
-      throws StorageException, TransactionContextException {
+      throws IOException {
     Collection<DatanodeDescriptor> datanodes = getNodes(blk);
     if (datanodes == null) {
       return false;
     }
 
     if (datanodes.contains(datanode)) {
-      removeCorruptReplicaFromDB(new CorruptReplica(blk.getBlockId(),
-          datanode.getDatanodeUuid(), blk.getInodeId()));
+      removeCorruptReplicaFromDB(blk.getBlockId(), datanode.getDatanodeUuid());
       return true;
     } else {
       return false;
@@ -291,5 +291,19 @@ public class CorruptReplicasMap {
   private void removeCorruptReplicaFromDB(CorruptReplica cr)
       throws StorageException, TransactionContextException {
     EntityManager.remove(cr);
+  }
+
+  private void removeCorruptReplicaFromDB(final long blockId, final String datanodeUuid)
+      throws IOException {
+    new LightWeightRequestHandler(HDFSOperationType.REMOVE_CORRUPT_REPLICA) {
+      @Override
+      public Object performTask() throws IOException {
+        CorruptReplicaDataAccess crDa =
+            (CorruptReplicaDataAccess) HdfsStorageFactory
+                .getDataAccess(CorruptReplicaDataAccess.class);
+        crDa.removeByDatanodeUuid(blockId, datanodeUuid);
+        return null;
+      }
+    }.handle();
   }
 }

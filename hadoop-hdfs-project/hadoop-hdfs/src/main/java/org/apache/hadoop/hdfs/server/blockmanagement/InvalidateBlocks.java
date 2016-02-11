@@ -93,17 +93,21 @@ class InvalidateBlocks {
    * Add a block to the block collection
    * which will be invalidated on the specified datanode.
    */
-  void add(final BlockInfo block, final DatanodeInfo datanode,
+  void add(final BlockInfo block, final DatanodeStorageInfo storage,
       final boolean log) throws StorageException, TransactionContextException {
-    InvalidatedBlock invBlk = new InvalidatedBlock(datanode.getDatanodeUuid(), block
-        .getBlockId(), block.getGenerationStamp(), block.getNumBytes(), block
-        .getInodeId());
+    InvalidatedBlock invBlk = new InvalidatedBlock(
+        storage.getDatanodeDescriptor().getDatanodeUuid(),
+        storage.getSid(),
+        block.getBlockId(),
+        block.getGenerationStamp(),
+        block.getNumBytes(),
+        block.getInodeId());
 
     if (add(invBlk)) {
       if (log) {
         NameNode.blockStateChangeLog.info(
             "BLOCK* " + getClass().getSimpleName() + ": add " + block + " to " +
-                datanode);
+                storage);
       }
     }
   }

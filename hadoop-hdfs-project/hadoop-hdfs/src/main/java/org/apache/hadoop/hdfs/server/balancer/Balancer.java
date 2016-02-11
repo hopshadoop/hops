@@ -808,7 +808,7 @@ public class Balancer {
    */
   private static void checkReplicationPolicyCompatibility(Configuration conf)
       throws UnsupportedActionException {
-    if (BlockPlacementPolicy.getInstance(conf, null, null).getClass() !=
+    if (BlockPlacementPolicy.getInstance(conf, null, null, null).getClass() !=
         BlockPlacementPolicyDefault.class) {
       throw new UnsupportedActionException(
           "Balancer without BlockPlacementPolicyDefault");
