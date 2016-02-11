@@ -1089,9 +1089,8 @@ public class FairScheduler extends AbstractYarnScheduler {
       int assignedContainers = 0;
       while (node.getReservedContainer() == null) {
         boolean assignedContainer = false;
-        if (Resources.greaterThan(RESOURCE_CALCULATOR, clusterCapacity,
-            queueMgr.getRootQueue().assignContainer(node, transactionState),
-            Resources.none())) {
+          if (!queueMgr.getRootQueue().assignContainer(node, transactionState).equals(
+                  Resources.none())) {
           assignedContainers++;
           assignedContainer = true;
         }
