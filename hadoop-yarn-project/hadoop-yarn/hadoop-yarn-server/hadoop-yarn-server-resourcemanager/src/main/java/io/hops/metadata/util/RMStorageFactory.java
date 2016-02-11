@@ -65,11 +65,12 @@ public class RMStorageFactory {
       new HashMap<Class, EntityDataAccess>();
 
   private static DalNdbEventStreaming dNdbEventStreaming;
+  private static boolean ndbStreaingRunning = false;
   public static StorageConnector getConnector() {
     return dStorageFactory.getConnector();
   }
 
-  public static void kickTheNdbEventStreamingAPI(boolean isLeader,
+  public static synchronized void kickTheNdbEventStreamingAPI(boolean isLeader,
           Configuration conf) throws
           StorageInitializtionException {
     dNdbEventStreaming = DalDriver.loadHopsNdbEventStreamingLib(
@@ -86,10 +87,12 @@ public class RMStorageFactory {
             connectionString, dStorageFactory.getConnector().getDatabaseName()
             );
     dNdbEventStreaming.startHopsNdbEvetAPISession(isLeader);
+    ndbStreaingRunning = true;
   }
   
-  public static void stopTheNdbEventStreamingAPI() {
-    if(dNdbEventStreaming!=null){
+  public static synchronized void stopTheNdbEventStreamingAPI() {
+    if(ndbStreaingRunning && dNdbEventStreaming!=null){
+      ndbStreaingRunning = false;
       dNdbEventStreaming.closeHopsNdbEventAPISession();
     }
   }

@@ -697,7 +697,6 @@ public class SLSRunner implements AMNMCommonObject {
         LOG.info("Distributed_Simulator_shutting_down_time : " + System.
                 currentTimeMillis());
 
-        System.exit(0);
       }
     }
   }

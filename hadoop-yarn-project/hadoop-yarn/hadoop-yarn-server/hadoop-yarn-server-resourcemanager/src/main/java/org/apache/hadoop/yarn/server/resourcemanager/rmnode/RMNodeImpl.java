@@ -69,6 +69,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
+import org.apache.hadoop.yarn.server.resourcemanager.ContainersLogsService;
 
 /**
  * This class is used to keep track of all the applications/containers running
@@ -996,8 +997,11 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
                             getExitStatus(), "",
                             0));
           }
-          rmNode.context.getContainersLogsService()
-                        .insertEvent(containersToLog);
+          ContainersLogsService logService = rmNode.context.
+                  getContainersLogsService();
+          if (logService != null) {
+            logService.insertEvent(containersToLog);
+          }
         }
       }
 

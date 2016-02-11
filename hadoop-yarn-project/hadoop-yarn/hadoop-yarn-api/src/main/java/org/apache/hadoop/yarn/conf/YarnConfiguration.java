@@ -174,6 +174,10 @@ public class YarnConfiguration extends Configuration {
   ////////////////////////////////////////
   // Containers Quotas configuration   //
   ///////////////////////////////////////
+  public static final String QUOTAS_ENABLED = 
+          YARN_PREFIX + "quotas.enabled";
+  public static final boolean DEFAULT_QUOTAS_ENABLED = false;
+  
   /**
    * Time in ms between container status checks.
    */
@@ -187,19 +191,40 @@ public class YarnConfiguration extends Configuration {
   public static final String QUOTAS_CONTAINERS_LOGS_TICK_INCREMENT = 
           YARN_PREFIX + "quotas.containers-logs.tick-increment";
   public static final int DEFAULT_QUOTAS_CONTAINERS_LOGS_TICK_INCREMENT = 1;
+   
+  /*
+   * the number of ticks corresponding to one credit. If the monitor interval is
+   * 1000 and the tick increment is 1, then seting ticks per credit to 60 means
+   * that 1 credit correspond to one minute of running
+   */
+  public static final String QUOTAS_TICKS_PER_CREDIT = YARN_PREFIX
+          + "quotas.ticks.per.credit";
+  public static final int DEFAULT_QUOTAS_TICKS_PER_CREDIT = 60;
+
+  /*
+   * the minimum of ticks that will be charged, what ever the running time.
+   * If a container run less thant this number of ticks it will still pay for
+   * this number of ticks.
+   */
+  public static final String QUOTAS_MIN_TICKS_CHARGE = YARN_PREFIX
+          + "quotas.min.ticks.charge";
+  public static final int DEFAULT_QUOTAS_MIN_TICKS_CHARGE = 600;
+
   /**
    * Enable or disable periodic containers logs checkpoints.
    */
-  public static final String QUOTAS_CONTAINERS_LOGS_CHECKPOINTS = 
-          YARN_PREFIX + "quotas.containers-logs.checkpoints";
-  public static final boolean DEFAULT_QUOTAS_CONTAINERS_LOGS_CHECKPOINTS = true;
+  public static final String QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_ENABLED
+          = YARN_PREFIX + "quotas.containers-logs.checkpoints.enabled";
+  public static final boolean DEFAULT_QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_ENABLED
+          = true;
   /**
-   * Number of ticks between checkpoints.
+   * Number of minimum ticks between checkpoints.
    */
-  public static final String QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_TICKS = 
-          YARN_PREFIX + "quotas.containers-logs.checkpoints-ticks";
-  public static final int DEFAULT_QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_TICKS = 
-          60;
+  public static final String QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_MINTICKS
+          = YARN_PREFIX + "quotas.containers-logs.checkpoints-minticks";
+  public static final int DEFAULT_QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_MINTICKS
+          = 1;
+
   /**
    * If threshold is exceeded writes a warning about increasing monitor interval 
    * It is obtained by multiplying threshold with monitor interval
@@ -208,10 +233,6 @@ public class YarnConfiguration extends Configuration {
           YARN_PREFIX + "quotas.containers-logs.alert-ratio";
   public static final double DEFAULT_QUOTAS_CONTAINERS_LOGS_ALERT_THRESHOLD = 
           0.6;
-  public static final String QUOTAS_MONITOR_INTERVAL = 
-          YARN_PREFIX + "quotas.containers-logs.monitor-interval";
-  public static final int DEFAULT_QUOTAS_MONITOR_INTERVAL = 
-          1000;
   /**
    * Enable periodic monitor threads.
    *

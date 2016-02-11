@@ -125,13 +125,13 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.quota.QuotaService;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerResourceIncreaseRequest;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.ResourceRequest;
 import org.apache.hadoop.yarn.api.records.impl.pb.ContainerResourceIncreaseRequestPBImpl;
 import org.apache.hadoop.yarn.api.records.impl.pb.ContainerStatusPBImpl;
-import org.apache.hadoop.yarn.api.records.impl.pb.NodeIdPBImpl;
 import org.apache.hadoop.yarn.api.records.impl.pb.ResourceBlacklistRequestPBImpl;
 import org.apache.hadoop.yarn.api.records.impl.pb.ResourceRequestPBImpl;
 import org.apache.hadoop.yarn.proto.YarnProtos;
@@ -139,7 +139,6 @@ import org.apache.hadoop.yarn.proto.YarnServerCommonProtos;
 import org.apache.hadoop.yarn.server.api.records.impl.pb.MasterKeyPBImpl;
 import org.apache.hadoop.yarn.server.api.records.impl.pb.NodeHealthStatusPBImpl;
 import org.apache.hadoop.yarn.server.api.records.impl.pb.NodeStatusPBImpl;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.quota.QuotaSchedulerService;
 
 /**
  * The ResourceManager is the main class that is a set of components. "I am the
@@ -189,7 +188,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
   protected ApplicationACLsManager applicationACLsManager;
   protected QueueACLsManager queueACLsManager;
   protected ContainersLogsService containersLogsService;
-  protected QuotaSchedulerService quotaSchedulerService;
+  protected QuotaService quotaService;
   private WebApp webApp;
   private AppReportFetcher fetcher = null;
   protected ResourceTrackerService resourceTracker;
@@ -1079,8 +1078,8 @@ public class ResourceManager extends CompositeService implements Recoverable {
     if (containersLogsService != null) {
       containersLogsService.stop();
     }
-    if (quotaSchedulerService != null) {
-      quotaSchedulerService.stop();
+    if (quotaService != null) {
+      quotaService.stop();
     }
   }
   
@@ -1144,8 +1143,8 @@ public class ResourceManager extends CompositeService implements Recoverable {
     if (containersLogsService !=null){
       containersLogsService.stop();
     }
-    if(quotaSchedulerService!=null){
-      quotaSchedulerService.stop();
+    if(quotaService!=null){
+      quotaService.stop();
     }
     RMStorageFactory.stopTheNdbEventStreamingAPI();
     super.serviceStop();
@@ -1184,13 +1183,17 @@ public class ResourceManager extends CompositeService implements Recoverable {
   }
   
   protected void createAndStartQuotaServices() {
-    containersLogsService = new ContainersLogsService();
-    quotaSchedulerService = new QuotaSchedulerService();
-    containersLogsService.init(conf);
-    quotaSchedulerService.init(conf);
-    rmContext.setContainersLogsService(containersLogsService);
-    containersLogsService.start();
-    quotaSchedulerService.start();
+    if (conf.getBoolean(YarnConfiguration.QUOTAS_ENABLED,
+            YarnConfiguration.DEFAULT_QUOTAS_ENABLED)) {
+      containersLogsService = new ContainersLogsService(rmContext);
+      quotaService = new QuotaService();
+      containersLogsService.init(conf);
+      quotaService.init(conf);
+      rmContext.setContainersLogsService(containersLogsService);
+      rmContext.setQuotaService(quotaService);
+      containersLogsService.start();
+      quotaService.start();
+    }
   }
 
   @Private
