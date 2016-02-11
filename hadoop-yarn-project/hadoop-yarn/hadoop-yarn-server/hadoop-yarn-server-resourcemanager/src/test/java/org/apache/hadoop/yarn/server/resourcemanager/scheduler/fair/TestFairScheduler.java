@@ -91,6 +91,8 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 public class TestFairScheduler extends FairSchedulerTestBase {
   private final static String ALLOC_FILE =
@@ -430,9 +432,9 @@ public class TestFairScheduler extends FairSchedulerTestBase {
 
     // Asked for less than increment allocation.
     assertEquals(
-        FairSchedulerConfiguration.DEFAULT_RM_SCHEDULER_INCREMENT_ALLOCATION_MB,
-        scheduler.getQueueManager().getQueue("queue1").
-            getResourceUsage().getMemory());
+            FairSchedulerConfiguration.DEFAULT_RM_SCHEDULER_INCREMENT_ALLOCATION_MB,
+            scheduler.getQueueManager().getQueue("queue1").
+                    getResourceUsage().getMemory());
 
     NodeUpdateSchedulerEvent updateEvent2 = 
             new NodeUpdateSchedulerEvent(node2,
@@ -635,10 +637,10 @@ public class TestFairScheduler extends FairSchedulerTestBase {
 
     // Trying to assign to non leaf queue would return null
     assertNull(scheduler.assignToQueue(rmApp1, "root.child1", "tintin",
-            new TransactionStateImpl( TransactionState.TransactionType.RM)));
+            new TransactionStateImpl(TransactionState.TransactionType.RM)));
     assertNotNull(
             scheduler.assignToQueue(rmApp2, "root.child2", "snowy",
-            new TransactionStateImpl( TransactionState.TransactionType.RM)));
+                    new TransactionStateImpl(TransactionState.TransactionType.RM)));
   }
   
   @Test
@@ -837,7 +839,7 @@ public class TestFairScheduler extends FairSchedulerTestBase {
     ApplicationAttemptId id11 = createAppAttemptId(1, 1);
     scheduler
             .addApplication(id11.getApplicationId(), "root.queue1", "user1",
-            new TransactionStateImpl( TransactionState.TransactionType.RM));
+                    new TransactionStateImpl(TransactionState.TransactionType.RM));
     scheduler.addApplicationAttempt(id11, false, new TransactionStateImpl(
             TransactionState.TransactionType.RM));
     ApplicationAttemptId id21 = createAppAttemptId(2, 1);
@@ -862,7 +864,7 @@ public class TestFairScheduler extends FairSchedulerTestBase {
         createResourceRequest(minReqSize * 2, ResourceRequest.ANY, 1, 1, true);
     ask1.add(request1);
     scheduler.allocate(id11, ask1, new ArrayList<ContainerId>(), null, null,
-        new TransactionStateImpl( TransactionState.TransactionType.RM));
+            new TransactionStateImpl(TransactionState.TransactionType.RM));
 
     // Second ask, queue2 requests 1 large + (2 * minReqSize)
     List<ResourceRequest> ask2 = new ArrayList<ResourceRequest>();
@@ -873,7 +875,7 @@ public class TestFairScheduler extends FairSchedulerTestBase {
     ask2.add(request2);
     ask2.add(request3);
     scheduler.allocate(id21, ask2, new ArrayList<ContainerId>(), null, null,
-        new TransactionStateImpl( TransactionState.TransactionType.RM));
+            new TransactionStateImpl(TransactionState.TransactionType.RM));
 
     // Third ask, queue2 requests 1 large
     List<ResourceRequest> ask3 = new ArrayList<ResourceRequest>();
@@ -881,13 +883,13 @@ public class TestFairScheduler extends FairSchedulerTestBase {
         createResourceRequest(2 * minReqSize, ResourceRequest.ANY, 1, 1, true);
     ask3.add(request4);
     scheduler.allocate(id22, ask3, new ArrayList<ContainerId>(), null, null,
-        new TransactionStateImpl( TransactionState.TransactionType.RM));
+            new TransactionStateImpl(TransactionState.TransactionType.RM));
 
     scheduler.update();
 
     assertEquals(2 * minReqSize,
-        scheduler.getQueueManager().getQueue("root.queue1").getDemand()
-            .getMemory());
+            scheduler.getQueueManager().getQueue("root.queue1").getDemand()
+                    .getMemory());
     assertEquals(2 * minReqSize + 2 * minReqSize + (2 * minReqSize),
         scheduler.getQueueManager().getQueue("root.queue2").getDemand()
             .getMemory());
@@ -913,7 +915,7 @@ public class TestFairScheduler extends FairSchedulerTestBase {
 
     // That queue should have one app
     assertEquals(1, scheduler.getQueueManager().getLeafQueue("user1", true)
-        .getRunnableAppSchedulables().size());
+            .getRunnableAppSchedulables().size());
 
     AppAttemptRemovedSchedulerEvent appRemovedEvent1 =
             new AppAttemptRemovedSchedulerEvent(createAppAttemptId(1, 1),
@@ -1606,7 +1608,7 @@ public class TestFairScheduler extends FairSchedulerTestBase {
     out.println("  <queue name=\"queue1\">");
     out.println("    <aclSubmitApps>norealuserhasthisname</aclSubmitApps>");
     out.println(
-        "    <aclAdministerApps>norealuserhasthisname</aclAdministerApps>");
+            "    <aclAdministerApps>norealuserhasthisname</aclAdministerApps>");
     out.println("  </queue>");
     out.println("</queue>");
     out.println("</allocations>");
@@ -1660,7 +1662,7 @@ public class TestFairScheduler extends FairSchedulerTestBase {
     asks.add(createResourceRequest(1024, ResourceRequest.ANY, 1, 2, true));
 
     scheduler.allocate(appId, asks, new ArrayList<ContainerId>(), null, null,
-        new TransactionStateImpl( TransactionState.TransactionType.RM));
+            new TransactionStateImpl(TransactionState.TransactionType.RM));
     
     // node 1 checks in
     scheduler.update();
@@ -1670,7 +1672,7 @@ public class TestFairScheduler extends FairSchedulerTestBase {
     scheduler.handle(updateEvent1);
     // should assign node local
     assertEquals(1,
-        scheduler.getSchedulerApp(appId).getLiveContainers().size());
+            scheduler.getSchedulerApp(appId).getLiveContainers().size());
 
     // node 2 checks in
     scheduler.update();
@@ -1753,14 +1755,14 @@ public class TestFairScheduler extends FairSchedulerTestBase {
     scheduler.update();
     scheduler.handle(updateEvent);
     assertEquals("Incorrect number of containers allocated", 2,
-        app.getLiveContainers().size());
+            app.getLiveContainers().size());
 
     // set maxAssign to -1: all remaining containers should be allocated
     scheduler.maxAssign = -1;
     scheduler.update();
     scheduler.handle(updateEvent);
     assertEquals("Incorrect number of containers allocated", 8,
-        app.getLiveContainers().size());
+            app.getLiveContainers().size());
   }
 
     @Test(timeout = 3000)
@@ -2122,7 +2124,7 @@ public class TestFairScheduler extends FairSchedulerTestBase {
             createResourceRequest(1024, "rack1", 1, 0, true),
             createResourceRequest(1024, ResourceRequest.ANY, 1, 1, true));
     scheduler.allocate(attId1, update, new ArrayList<ContainerId>(), null, null,
-        new TransactionStateImpl( TransactionState.TransactionType.RM));
+            new TransactionStateImpl(TransactionState.TransactionType.RM));
     
     // then node2 should get the container
     scheduler.handle(node2UpdateEvent);
@@ -2175,8 +2177,8 @@ public class TestFairScheduler extends FairSchedulerTestBase {
     rackRequest = createResourceRequest(1024, "rack1", 1, 1, false);
     anyRequest = createResourceRequest(1024, ResourceRequest.ANY, 1, 1, false);
     scheduler.allocate(attId, Arrays.asList(rackRequest, anyRequest),
-        new ArrayList<ContainerId>(), null, null,
-        new TransactionStateImpl( TransactionState.TransactionType.RM));
+            new ArrayList<ContainerId>(), null, null,
+            new TransactionStateImpl(TransactionState.TransactionType.RM));
 
     scheduler.handle(nodeUpdateEvent);
     assertEquals(0, app.getReservedContainers().size());
@@ -2861,9 +2863,9 @@ public class TestFairScheduler extends FairSchedulerTestBase {
     FSSchedulerApp app = scheduler.getSchedulerApp(appAttId);
     assertSame(targetQueue, app.getQueue());
     assertFalse(oldQueue.getRunnableAppSchedulables()
-        .contains(app.getAppSchedulable()));
+            .contains(app.getAppSchedulable()));
     assertTrue(targetQueue.getRunnableAppSchedulables()
-        .contains(app.getAppSchedulable()));
+            .contains(app.getAppSchedulable()));
     assertEquals(Resource.newInstance(0, 0), oldQueue.getResourceUsage());
     assertEquals(Resource.newInstance(1024, 1), targetQueue.getResourceUsage());
     assertEquals(0, oldQueue.getNumRunnableApps());
@@ -2972,4 +2974,62 @@ public class TestFairScheduler extends FairSchedulerTestBase {
         createSchedulingRequest(1024, 1, "queue1", "user1", 3);
     scheduler.moveApplication(appAttId.getApplicationId(), "queue2");
   }
+
+    @Test
+    public void testLowestCommonAncestorForNonRootParent() throws IOException, YarnException {
+        scheduler.reinitialize(conf, resourceManager.getRMContext(), null);
+
+        FSLeafQueue aQueue = mock(FSLeafQueue.class);
+        FSLeafQueue bQueue = mock(FSLeafQueue.class);
+        when(aQueue.getName()).thenReturn("root.queue1.a");
+        when(bQueue.getName()).thenReturn("root.queue1.b");
+
+        QueueManager queueManager = scheduler.getQueueManager();
+        FSParentQueue queue1 = queueManager.getParentQueue("queue1", true);
+        queue1.addChildQueue(aQueue);
+        queue1.addChildQueue(bQueue);
+
+        FSQueue ancestorQueue = scheduler.findLowestCommonAncestorQueue(aQueue, bQueue);
+        assertEquals(ancestorQueue, queue1);
+    }
+
+    @Test
+    public void testLowestCommonAncestorRootParent() throws IOException, YarnException {
+        scheduler.reinitialize(conf, resourceManager.getRMContext(), null);
+
+        FSLeafQueue aQueue = mock(FSLeafQueue.class);
+        FSLeafQueue bQueue = mock(FSLeafQueue.class);
+        when(aQueue.getName()).thenReturn("root.a");
+        when(bQueue.getName()).thenReturn("root.b");
+
+        QueueManager queueManager = scheduler.getQueueManager();
+        FSParentQueue queue1 = queueManager.getParentQueue("root", false);
+        queue1.addChildQueue(aQueue);
+        queue1.addChildQueue(bQueue);
+
+        FSQueue ancestorQueue = scheduler.findLowestCommonAncestorQueue(aQueue, bQueue);
+        assertEquals(ancestorQueue, queue1);
+    }
+
+    @Test
+    public void testLowestCommonAncestorDeeperHierarchy() throws IOException, YarnException {
+        scheduler.reinitialize(conf, resourceManager.getRMContext(), null);
+
+        FSQueue aQueue = mock(FSLeafQueue.class);
+        FSQueue bQueue = mock(FSLeafQueue.class);
+        FSQueue a1Queue = mock(FSLeafQueue.class);
+        FSQueue b1Queue = mock(FSLeafQueue.class);
+        when(a1Queue.getName()).thenReturn("root.queue1.a.a1");
+        when(b1Queue.getName()).thenReturn("root.queue1.b.b1");
+        when(aQueue.getChildQueues()).thenReturn(Arrays.asList(a1Queue));
+        when(bQueue.getChildQueues()).thenReturn(Arrays.asList(b1Queue));
+
+        QueueManager queueManager = scheduler.getQueueManager();
+        FSParentQueue queue1 = queueManager.getParentQueue("queue1", true);
+        queue1.addChildQueue(aQueue);
+        queue1.addChildQueue(bQueue);
+
+        FSQueue ancestorQueue = scheduler.findLowestCommonAncestorQueue(a1Queue, b1Queue);
+        assertEquals(ancestorQueue, queue1);
+    }
 }
