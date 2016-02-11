@@ -115,7 +115,7 @@ public class NodeManager extends CompositeService
   }
 
   protected DeletionService createDeletionService(ContainerExecutor exec) {
-    return new DeletionService(exec);
+    return new DeletionService(exec, nmStore);
   }
 
   protected NMContext createNMContext(
