@@ -123,14 +123,11 @@ class InvalidateBlocks {
    * Remove the block from the specified storage.
    */
   void remove(final DatanodeInfo dn, final BlockInfo block)
-      throws StorageException, TransactionContextException {
+      throws IOException {
     InvalidatedBlock invBlok = findBlock(block.getBlockId(),
         dn.getDatanodeUuid(), block.getInodeId());
     if (invBlok != null) {
-      removeInvalidatedBlockFromDB(
-          new InvalidatedBlock(dn.getDatanodeUuid(),
-              block.getBlockId(), block.getGenerationStamp(),
-              block.getNumBytes(), block.getInodeId()));
+      removeInvalidatedBlockFromDB(block.getBlockId(), dn.getDatanodeUuid());
     }
   }
 
@@ -198,7 +195,7 @@ class InvalidateBlocks {
   }
   
   
-  void add(final Collection<Block> blocks, final DatanodeInfo dn)
+  void add(final Collection<Block> blocks, final DatanodeStorageInfo storage)
       throws IOException {
     new LightWeightRequestHandler(HDFSOperationType.ADD_INV_BLOCKS) {
       @Override
@@ -208,9 +205,9 @@ class InvalidateBlocks {
                 .getDataAccess(InvalidateBlockDataAccess.class);
         List<InvalidatedBlock> invblks = new ArrayList<InvalidatedBlock>();
         for (Block blk : blocks) {
-          invblks.add(new InvalidatedBlock(dn.getDatanodeUuid(), blk.getBlockId(),
-              blk.getGenerationStamp(), blk.getNumBytes(),
-              INode.NON_EXISTING_ID));
+          invblks.add(new InvalidatedBlock(storage.getDatanodeDescriptor()
+              .getDatanodeUuid(), storage.getSid(), blk.getBlockId(),
+              blk.getGenerationStamp(), blk.getNumBytes(), INode.NON_EXISTING_ID));
         }
         da.prepare(Collections.EMPTY_LIST, invblks, Collections.EMPTY_LIST);
         return null;
@@ -283,12 +280,25 @@ class InvalidateBlocks {
       throws StorageException, TransactionContextException {
     EntityManager.add(invBlk);
   }
-  
-  private void removeInvalidatedBlockFromDB(InvalidatedBlock invBlk)
-      throws StorageException, TransactionContextException {
-    EntityManager.remove(invBlk);
+
+  /*
+  Removes (all) replica's of the given block on the given datanode.
+  TODO include the generation timestamp?
+   */
+  private void removeInvalidatedBlockFromDB(final long blockId, final String datanodeUuid)
+      throws IOException {
+    new LightWeightRequestHandler(HDFSOperationType.RM_INV_BLKS) {
+      @Override
+      public Object performTask() throws StorageException, IOException {
+        InvalidateBlockDataAccess da =
+            (InvalidateBlockDataAccess) HdfsStorageFactory
+                .getDataAccess(InvalidateBlockDataAccess.class);
+        da.removeByDatanodeUuid(blockId, datanodeUuid);
+        return null;
+      }
+    }.handle();
   }
-  
+
   private List<InvalidatedBlock> findAllInvalidatedBlocks()
       throws StorageException, TransactionContextException {
     return (List<InvalidatedBlock>) EntityManager

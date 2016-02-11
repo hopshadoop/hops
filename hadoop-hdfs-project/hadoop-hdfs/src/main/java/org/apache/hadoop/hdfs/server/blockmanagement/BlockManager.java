@@ -704,7 +704,7 @@ public class BlockManager {
    * @return the last block locations if the block is partial or null otherwise
    */
   public LocatedBlock convertLastBlockToUnderConstruction(
-      MutableBlockCollection bc) throws IOException, StorageException {
+      MutableBlockCollection bc) throws IOException {
     BlockInfo oldBlock = bc.getLastBlock();
     if (oldBlock == null ||
         bc.getPreferredBlockSize() == oldBlock.getNumBytes()) {
@@ -1077,9 +1077,18 @@ public class BlockManager {
    * datanode and log the operation
    */
   void addToInvalidates(final Block block, final DatanodeInfo datanode)
-      throws StorageException, TransactionContextException {
+      throws StorageException, TransactionContextException,
+      UnregisteredNodeException {
+    DatanodeDescriptor dn = datanodeManager.getDatanode(datanode);
+    DatanodeStorageInfo storage = getBlockInfo(block).getStorageOnNode(dn);
+
+    addToInvalidates(block, storage);
+  }
+
+  void addToInvalidates(Block block, DatanodeStorageInfo storage)
+      throws TransactionContextException, StorageException {
     BlockInfo temp = getBlockInfo(block);
-    invalidateBlocks.add(temp, datanode, true);
+    invalidateBlocks.add(temp, storage, true);
   }
 
   /**
@@ -1095,7 +1104,7 @@ public class BlockManager {
 //    for(DatanodeStorageInfo storage : blocksMap.getStorages(block, DatanodeStorage.State.NORMAL)) {
     for(DatanodeStorageInfo storage : storages) {
       final DatanodeDescriptor node = storage.getDatanodeDescriptor();
-      invalidateBlocks.add(block, node, false);
+      invalidateBlocks.add(block, storage, false);
       datanodes.append(node).append(" ");
     }
     if (datanodes.length() != 0) {
@@ -3130,7 +3139,7 @@ public class BlockManager {
       // should be deleted.  Items are removed from the invalidate list
       // upon giving instructions to the namenode.
       //
-      addToInvalidates(b, cur.getDatanodeDescriptor());
+      addToInvalidates(b, cur);
       blockLog.info("BLOCK* chooseExcessReplicates: " + "(" + cur + ", " + b +
           ") is added to invalidated blocks set");
     }
@@ -4057,7 +4066,7 @@ public class BlockManager {
       try {
         targets = blockplacement.chooseTarget(bc.getName(),
             additionalReplRequired, srcNode, liveReplicaStorages, false,
-            excludedNodes, block.getNumBytes(, BlockStoragePolicy.DEFAULT));
+            excludedNodes, block.getNumBytes(), BlockStoragePolicy.DEFAULT);
       } finally {
         srcNode.decrementPendingReplicationWithoutTargets();
       }
@@ -4319,7 +4328,7 @@ public class BlockManager {
 
   private void addToInvalidates(final Collection<Block> blocks,
       final DatanodeStorageInfo storage) throws IOException {
-    invalidateBlocks.add(blocks, storage.getDatanodeDescriptor());
+    invalidateBlocks.add(blocks, storage);
   }
 
   private void markBlockAsCorruptTx(final BlockToMarkCorrupt b,

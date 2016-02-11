@@ -526,18 +526,30 @@ public class PBHelper {
     for (int i = 0; i < locs.size(); i++) {
       targets[i] = PBHelper.convert(locs.get(i));
     }
-    List<StorageTypeProto> storageTypesList = proto.getStorageTypesList();
-    StorageType[] storageTypes = new StorageType[locs.size()];
-    // The media should correspond to targets 1:1. If not then
-    // ignore the media information (left as default).
-    if ((storageTypesList != null) &&
-        (storageTypesList.size() == locs.size())) {
-      for (int i = 0; i < storageTypesList.size(); ++i) {
-        storageTypes[i] = PBHelper.convertType(storageTypesList.get(i));
-      }
+
+    List<StorageTypeProto> types = proto.getStorageTypesList();
+    final StorageType[] storageTypes = new StorageType[types.size()];
+    for(int i = 0; i < storageTypes.length; i++) {
+      storageTypes[i] = PBHelper.convertType(types.get(i));
     }
-    LocatedBlock lb = new LocatedBlock(PBHelper.convert(proto.getB()), targets,
-        storageTypes, proto.getOffset(), proto.getCorrupt());
+
+    final int storageIDsCount = proto.getStorageIDsCount();
+    final String[] storageIDs;
+    if (storageIDsCount == 0) {
+      storageIDs = null;
+    } else {
+      Preconditions.checkState(storageIDsCount == locs.size());
+      storageIDs = proto.getStorageIDsList().toArray(new String[storageIDsCount]);
+    }
+
+    LocatedBlock lb = new LocatedBlock(
+        PBHelper.convert(proto.getB()),
+        targets,
+        storageIDs,
+        storageTypes,
+        proto.getOffset(),
+        proto.getCorrupt());
+
     lb.setBlockToken(PBHelper.convert(proto.getBlockToken()));
     return lb;
   }
@@ -765,6 +777,32 @@ public class PBHelper {
     for (int i = 0; i < targetList.size(); i++) {
       targets[i] = PBHelper.convert(targetList.get(i));
     }
+
+    StorageType[][] targetStorageTypes = new StorageType[targetList.size()][];
+    List<HdfsProtos.StorageTypesProto> targetStorageTypesList = blkCmd.getTargetStorageTypesList();
+    if (targetStorageTypesList.isEmpty()) { // missing storage types
+      for(int i = 0; i < targetStorageTypes.length; i++) {
+        targetStorageTypes[i] = new StorageType[targets[i].length];
+        Arrays.fill(targetStorageTypes[i], StorageType.DEFAULT);
+      }
+    } else {
+      for(int i = 0; i < targetStorageTypes.length; i++) {
+        List<StorageTypeProto> p = targetStorageTypesList.get(i).getStorageTypesList();
+        targetStorageTypes[i] = new StorageType[targets[i].length];
+        for(int j = 0; i < targetStorageTypes[j].length; j++) {
+          targetStorageTypes[i][j] = convertType(p.get(i));
+        }
+      }
+    }
+
+    List<HdfsProtos.StorageUuidsProto> targetStorageUuidsList = blkCmd.getTargetStorageUuidsList();
+
+    String[][] targetStorageIDs = new String[targetStorageUuidsList.size()][];
+    for(int i = 0; i < targetStorageIDs.length; i++) {
+      List<String> storageIDs = targetStorageUuidsList.get(i).getStorageUuidsList();
+      targetStorageIDs[i] = storageIDs.toArray(new String[storageIDs.size()]);
+    }
+
     int action = DatanodeProtocol.DNA_UNKNOWN;
     switch (blkCmd.getAction()) {
       case TRANSFER:
@@ -776,8 +814,11 @@ public class PBHelper {
       case SHUTDOWN:
         action = DatanodeProtocol.DNA_SHUTDOWN;
         break;
+      default:
+        throw new AssertionError("Unknown action type: " + blkCmd.getAction());
     }
-    return new BlockCommand(action, blkCmd.getBlockPoolId(), blocks, targets);
+    return new BlockCommand(action, blkCmd.getBlockPoolId(), blocks, targets,
+        targetStorageTypes, targetStorageIDs);
   }
 
   public static DatanodeInfo[] convert(DatanodeInfosProto datanodeInfosProto) {
@@ -1255,6 +1296,24 @@ public class PBHelper {
       default:
         return StorageState.NORMAL;
     }
+  }
+
+  public static List<StorageTypeProto> convertStorageTypes(
+      StorageType[] types) {
+    return convertStorageTypes(types, 0);
+  }
+
+  public static List<StorageTypeProto> convertStorageTypes(
+      StorageType[] types, int startIdx) {
+    if (types == null) {
+      return null;
+    }
+    final List<StorageTypeProto> protos = new ArrayList<StorageTypeProto>(
+        types.length);
+    for (int i = startIdx; i < types.length; ++i) {
+      protos.add(convertStorageType(types[i]));
+    }
+    return protos;
   }
 
   private static StorageTypeProto convertStorageType(StorageType type) {

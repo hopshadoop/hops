@@ -58,7 +58,7 @@ public class LocatedBlock {
   }
 
   public LocatedBlock(ExtendedBlock b, DatanodeInfo[] locs, long startOffset, boolean corrupt) {
-    this(b, locs, null, null, startOffset, corrupt, EMPTY_LOCS);
+    this(b, locs, null, null, startOffset, corrupt);
   }
 
   public LocatedBlock(ExtendedBlock b, DatanodeStorageInfo[] storages) {
@@ -70,17 +70,18 @@ public class LocatedBlock {
   }
 
   public LocatedBlock(ExtendedBlock b, DatanodeInfo[] locs, String[] storageIDs, StorageType[] storageTypes) {
-    this(b, locs, storageIDs, storageTypes, -1, false, EMPTY_LOCS);
+    this(b, locs, storageIDs, storageTypes, -1, false);
   }
 
   public LocatedBlock(ExtendedBlock b, DatanodeStorageInfo[] storages, long startOffset, boolean corrupt) {
     this(b, DatanodeStorageInfo.toDatanodeInfos(storages),
         DatanodeStorageInfo.toStorageIDs(storages),
         DatanodeStorageInfo.toStorageTypes(storages),
-        startOffset, corrupt, EMPTY_LOCS); // startOffset is unknown
+        startOffset, corrupt); // startOffset is unknown
   }
 
-  public LocatedBlock(ExtendedBlock b, DatanodeInfo[] locs, String[] storageIDs, StorageType[] storageTypes, long startOffset, boolean corrupt, DatanodeInfo[] cachedLocs) {
+  public LocatedBlock(ExtendedBlock b, DatanodeInfo[] locs, String[] storageIDs,
+      StorageType[] storageTypes, long startOffset, boolean corrupt) {
     this.b = b;
     this.offset = startOffset;
     this.corrupt = corrupt;
