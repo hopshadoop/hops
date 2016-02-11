@@ -100,17 +100,21 @@ public class ExcessReplicasMap {
   }
 
   public boolean contains(DatanodeInfo dn, BlockInfo blk)
-      throws StorageException, TransactionContextException {
+      throws IOException {
     return contains(dn.getDatanodeUuid(), blk);
   }
 
-  public boolean contains(String dnUuid, BlockInfo blk)
-      throws StorageException, TransactionContextException {
-    Collection<ExcessReplica> ers = getExcessReplicas(blk);
-    if (ers == null) {
-      return false;
-    }
-    return ers.contains(new ExcessReplica(dnUuid, blk.getBlockId(), blk.getInodeId()));
+  public boolean contains(final String dnUuid, final BlockInfo blk)
+      throws IOException {
+    return new LightWeightRequestHandler(
+        HDFSOperationType.GET_EXCESS_RELPLICAS_BY_STORAGEID) {
+      @Override
+      public Object performTask() throws StorageException, IOException {
+        ExcessReplicaDataAccess da = (ExcessReplicaDataAccess)
+            HdfsStorageFactory.getDataAccess(ExcessReplicaDataAccess.class);
+        return da.findByPK(blk.getBlockId(), dnUuid, blk.getInodeId());
+      }
+    }.handle() != null;
   }
 
   public void clear() throws IOException {
