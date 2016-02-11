@@ -25,6 +25,8 @@ import org.apache.hadoop.tools.rumen.LoggedTask;
 import org.apache.hadoop.tools.rumen.LoggedTaskAttempt;
 import org.codehaus.jackson.JsonFactory;
 import org.codehaus.jackson.map.ObjectMapper;
+import org.apache.hadoop.classification.InterfaceAudience.Private;
+import org.apache.hadoop.classification.InterfaceStability.Unstable;
 
 import java.io.File;
 import java.io.FileReader;
@@ -36,6 +38,8 @@ import java.util.Map;
 import java.util.List;
 import java.util.Iterator;
 
+@Private
+@Unstable
 public class SLSUtils {
 
   public static String[] getRackHostName(String hostname) {
