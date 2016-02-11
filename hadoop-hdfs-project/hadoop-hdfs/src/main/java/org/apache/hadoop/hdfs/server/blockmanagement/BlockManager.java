@@ -489,7 +489,7 @@ public class BlockManager {
    * form.
    */
   private void dumpBlockMeta(Block block, PrintWriter out)
-      throws StorageException, TransactionContextException {
+      throws IOException {
     List<DatanodeDescriptor> containingNodes =
         new ArrayList<DatanodeDescriptor>();
     List<DatanodeStorageInfo> containingLiveReplicasNodes =
@@ -1656,7 +1656,7 @@ public class BlockManager {
       List<DatanodeDescriptor> containingNodes,
       List<DatanodeStorageInfo> nodesContainingLiveReplicas,
       NumberReplicas numReplicas, int priority)
-      throws StorageException, TransactionContextException {
+      throws IOException {
     containingNodes.clear();
     nodesContainingLiveReplicas.clear();
     DatanodeDescriptor srcNode = null;
@@ -2999,7 +2999,7 @@ public class BlockManager {
       final short replication,
       final DatanodeStorageInfo addedStorage,
       DatanodeStorageInfo delStorageHint)
-      throws StorageException, TransactionContextException {
+      throws IOException {
 
     if (addedStorage == delStorageHint) {
       delStorageHint = null;
