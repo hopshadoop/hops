@@ -25,6 +25,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Options;
+import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.DirectoryListing;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
@@ -181,7 +182,7 @@ public class NamenodeWebHdfsMethods {
       if (clientNode != null) {
         final DatanodeStorageInfo[] storages = bm.getBlockPlacementPolicy()
             .chooseTarget(path, 1, clientNode, new ArrayList<DatanodeStorageInfo>(),
-                false, null, blocksize);
+                false, null, blocksize, BlockStoragePolicy.DEFAULT);
 
         if (storages.length > 0) {
           return storages[0].getDatanodeDescriptor();

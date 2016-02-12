@@ -326,10 +326,14 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
     private DataOutputStream blockStream;
     private DataInputStream blockReplyStream;
     private ResponseProcessor response = null;
+    // list of targets for current block
     private volatile DatanodeInfo[] nodes = null;
-        // list of targets for current block
+    private volatile StorageType[] storageTypes = null;
+    private volatile String[] storageIDs = null;
+
     private ArrayList<DatanodeInfo> excludedNodes =
         new ArrayList<DatanodeInfo>();
+    private String[] favoredNodes;
     volatile boolean hasError = false;
     volatile int errorIndex = -1;
     private BlockConstructionStage stage;  // block construction stage
@@ -421,7 +425,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
       }
 
       // setup pipeline to append to the last block XXX retries??
-      nodes = lastBlock.getLocations();
+      setPipeline(lastBlock);
       errorIndex = -1;   // no errors yet.
       if (nodes.length < 1) {
         throw new IOException("Unable to retrieve blocks locations " +
@@ -429,6 +433,20 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
             "of file " + src);
 
       }
+    }
+
+    private void setPipeline(LocatedBlock lb) {
+      setPipeline(lb.getLocations(), lb.getStorageTypes(), lb.getStorageIDs());
+    }
+    private void setPipeline(DatanodeInfo[] nodes, StorageType[] storageTypes,
+        String[] storageIDs) {
+      this.nodes = nodes;
+      this.storageTypes = storageTypes;
+      this.storageIDs = storageIDs;
+    }
+
+    private void setFavoredNodes(String[] favoredNodes) {
+      this.favoredNodes = favoredNodes;
     }
     
     /**
@@ -449,7 +467,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
       this.setName("DataStreamer for file " + src);
       closeResponder();
       closeStream();
-      nodes = null;
+      setPipeline(null, null, null);
       stage = BlockConstructionStage.PIPELINE_SETUP_CREATE;
     }
     
@@ -521,7 +539,8 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
             if (DFSClient.LOG.isDebugEnabled()) {
               DFSClient.LOG.debug("Allocating new block");
             }
-            nodes = nextBlockOutputStream(src);
+//            nodes = nextBlockOutputStream(src);
+            setPipeline(nextBlockOutputStream());
             initDataStreaming();
           } else if (stage == BlockConstructionStage.PIPELINE_SETUP_APPEND) {
             if (DFSClient.LOG.isDebugEnabled()) {
@@ -925,7 +944,8 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
 
       //get a new datanode
       final DatanodeInfo[] original = nodes;
-      final LocatedBlock lb = dfsClient.getAdditionalDatanode(src, block, nodes,
+      final LocatedBlock lb = dfsClient.getAdditionalDatanode(
+          src, block, nodes, storageIDs,
           failed.toArray(new DatanodeInfo[failed.size()]), 1,
           dfsClient.clientName);
       nodes = lb.getLocations();
@@ -1056,7 +1076,8 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
         ExtendedBlock newBlock =
             new ExtendedBlock(block.getBlockPoolId(), block.getBlockId(),
                 block.getNumBytes(), newGS);
-        dfsClient.updatePipeline(dfsClient.clientName, block, newBlock, nodes);
+        dfsClient.updatePipeline(dfsClient.clientName, block, newBlock,
+            nodes, storageIDs);
         // update client side generation stamp
         block = newBlock;
       }
@@ -1094,7 +1115,13 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
       return nodes;
     }
 
-    private DatanodeInfo[] nextBlockOutputStream(String client)
+    /**
+     * Open a DataOutputStream to a DataNode so that it can be written to.
+     * This happens when a file is created and each time a new block is allocated.
+     * Must get block ID and the IDs of the destinations from the namenode.
+     * Returns the list of target datanodes.
+     */
+    private LocatedBlock nextBlockOutputStream()
         throws IOException {
       LocatedBlock lb = null;
       DatanodeInfo[] nodes = null;
@@ -1204,7 +1231,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
         Collections.addAll(usedNodes, nodes);
       }
 
-      return nodes;
+      return lb;
     }
 
     // connects to the first datanode in the pipeline

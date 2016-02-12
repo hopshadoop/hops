@@ -462,8 +462,11 @@ class NameNodeRpcServer implements NamenodeProtocols {
 
   @Override // ClientProtocol
   public LocatedBlock getAdditionalDatanode(final String src,
-      final ExtendedBlock blk, final DatanodeInfo[] existings, final String[] existingStorageIDs,
-      final DatanodeInfo[] excludes, final int numAdditionalNodes,
+      final ExtendedBlock blk,
+      final DatanodeInfo[] existings,
+      final String[] existingStorageIDs,
+      final DatanodeInfo[] excludes,
+      final int numAdditionalNodes,
       final String clientName) throws IOException {
     if (LOG.isDebugEnabled()) {
       LOG.debug("getAdditionalDatanode: src=" + src

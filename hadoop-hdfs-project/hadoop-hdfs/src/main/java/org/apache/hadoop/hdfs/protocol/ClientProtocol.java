@@ -220,7 +220,7 @@ public interface ClientProtocol {
    *     block replication factor.
    * @param blockSize
    *     maximum block size.
-   * @param codec
+   * @param policy
    *     name of the codec used for erasure coding. Use Codec.NO_ENCODING fo no
    *     encoding
    * @throws AccessControlException
