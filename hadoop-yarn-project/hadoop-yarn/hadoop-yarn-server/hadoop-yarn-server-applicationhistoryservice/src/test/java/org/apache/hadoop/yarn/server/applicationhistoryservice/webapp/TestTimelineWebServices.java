@@ -39,18 +39,12 @@ import org.apache.hadoop.yarn.webapp.YarnJacksonJaxbJsonProvider;
 import org.junit.Assert;
 import org.junit.Test;
 
-import java.io.IOException;
-
 import javax.inject.Singleton;
-import javax.servlet.Filter;
-import javax.servlet.FilterChain;
-import javax.servlet.FilterConfig;
-import javax.servlet.ServletException;
-import javax.servlet.ServletRequest;
-import javax.servlet.ServletResponse;
+import javax.servlet.*;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
 import javax.ws.rs.core.MediaType;
+import java.io.IOException;
 
 import static org.junit.Assert.assertEquals;
 
@@ -79,7 +73,7 @@ public class TestTimelineWebServices extends JerseyTest {
       conf.setBoolean(YarnConfiguration.YARN_ACL_ENABLE, false);
       timelineACLsManager = new TimelineACLsManager(conf);
       bind(TimelineACLsManager.class).toInstance(timelineACLsManager);
-        serve("/*").with(GuiceContainer.class);
+      serve("/*").with(GuiceContainer.class);
       filter("/*").through(TestFilter.class);
     }
 
@@ -425,7 +419,6 @@ public class TestTimelineWebServices extends JerseyTest {
                     .accept(MediaType.APPLICATION_JSON)
                     .type(MediaType.APPLICATION_JSON)
                     .post(ClientResponse.class, entities);
-
             // verify the system data will not be exposed
             // 1. No field specification
             response = r.path("ws").path("v1").path("timeline")
