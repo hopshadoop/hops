@@ -39,5 +39,4 @@ public interface SchedulerWrapper {
 	public void addAMRuntime(ApplicationId appId,
               long traceStartTimeMS, long traceEndTimeMS,
               long simulateStartTimeMS, long simulateEndTimeMS);
-
 }

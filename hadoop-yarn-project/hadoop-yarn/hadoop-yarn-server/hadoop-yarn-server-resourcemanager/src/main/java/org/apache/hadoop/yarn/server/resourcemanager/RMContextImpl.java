@@ -389,12 +389,12 @@ public class RMContextImpl implements RMContext {
     this.amFinishingMonitor = amFinishingMonitor;
   }
 
-  void setContainerTokenSecretManager(
+  public void setContainerTokenSecretManager(
       RMContainerTokenSecretManager containerTokenSecretManager) {
     this.containerTokenSecretManager = containerTokenSecretManager;
   }
 
-  void setNMTokenSecretManager(NMTokenSecretManagerInRM nmTokenSecretManager) {
+  public void setNMTokenSecretManager(NMTokenSecretManagerInRM nmTokenSecretManager) {
     this.nmTokenSecretManager = nmTokenSecretManager;
   }
 

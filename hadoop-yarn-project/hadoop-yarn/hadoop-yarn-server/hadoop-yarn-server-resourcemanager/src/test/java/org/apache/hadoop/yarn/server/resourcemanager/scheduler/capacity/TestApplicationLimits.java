@@ -113,10 +113,10 @@ public class TestApplicationLimits {
     Map<String, CSQueue> queues = new HashMap<String, CSQueue>();
     CSQueue root = CapacityScheduler
         .parseQueue(csContext, csConf, null, "root", queues, queues,
-            TestUtils.spyHook, null);
+            TestUtils.spyHook);
 
     
-    queue = spy(new LeafQueue(csContext, A, root, null, null));
+    queue = spy(new LeafQueue(csContext, A, root, null));
 
     // Stub out ACL checks
     doReturn(true).
@@ -186,7 +186,7 @@ public class TestApplicationLimits {
     Map<String, CSQueue> queues = new HashMap<String, CSQueue>();
     CSQueue root = CapacityScheduler
         .parseQueue(csContext, csConf, null, "root", queues, queues,
-            TestUtils.spyHook, null);
+            TestUtils.spyHook);
 
     LeafQueue queue = (LeafQueue) queues.get(A);
     
@@ -261,7 +261,7 @@ public class TestApplicationLimits {
     queues = new HashMap<String, CSQueue>();
     root = CapacityScheduler
         .parseQueue(csContext, csConf, null, "root", queues, queues,
-            TestUtils.spyHook, null);
+            TestUtils.spyHook);
     clusterResource = Resources.createResource(100 * 16 * GB);
 
     queue = (LeafQueue) queues.get(A);
@@ -285,7 +285,7 @@ public class TestApplicationLimits {
     queues = new HashMap<String, CSQueue>();
     root = CapacityScheduler
         .parseQueue(csContext, csConf, null, "root", queues, queues,
-            TestUtils.spyHook, null);
+            TestUtils.spyHook);
 
     queue = (LeafQueue) queues.get(A);
     assertEquals(9999,
@@ -484,7 +484,7 @@ public class TestApplicationLimits {
     Map<String, CSQueue> queues = new HashMap<String, CSQueue>();
     CapacityScheduler
         .parseQueue(csContext, csConf, null, "root", queues, queues,
-            TestUtils.spyHook, null);
+            TestUtils.spyHook);
 
     // Manipulate queue 'a'
     LeafQueue queue = TestLeafQueue.stubLeafQueue((LeafQueue) queues.get(A));
