@@ -41,6 +41,7 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.server.applicationhistoryservice.timeline.LeveldbTimelineStore;
 import org.apache.hadoop.yarn.server.applicationhistoryservice.timeline.TimelineStore;
+import org.apache.hadoop.yarn.server.applicationhistoryservice.timeline.security.TimelineACLsManager;
 import org.apache.hadoop.yarn.server.applicationhistoryservice.timeline.security.TimelineAuthenticationFilterInitializer;
 import org.apache.hadoop.yarn.server.applicationhistoryservice.timeline.security.TimelineDelegationTokenSecretManagerService;
 import org.apache.hadoop.yarn.server.applicationhistoryservice.webapp.AHSWebApp;
@@ -62,6 +63,7 @@ public class ApplicationHistoryServer extends CompositeService {
   protected ApplicationHistoryManager historyManager;
   protected TimelineStore timelineStore;
   protected TimelineDelegationTokenSecretManagerService secretManagerService;
+  protected TimelineACLsManager timelineACLsManager;
   protected WebApp webApp;
 
   public ApplicationHistoryServer() {
@@ -76,10 +78,12 @@ public class ApplicationHistoryServer extends CompositeService {
     addService((Service) historyManager);
     timelineStore = createTimelineStore(conf);
     addIfService(timelineStore);
+
     secretManagerService = createTimelineDelegationTokenSecretManagerService(conf);
     addService(secretManagerService);
     DefaultMetricsSystem.initialize("ApplicationHistoryServer");
     JvmMetrics.initSingleton("ApplicationHistoryServer", null);
+
     super.serviceInit(conf);
   }
 
@@ -164,6 +168,9 @@ public class ApplicationHistoryServer extends CompositeService {
     createTimelineDelegationTokenSecretManagerService(Configuration conf) {
     return new TimelineDelegationTokenSecretManagerService();
   }
+    protected TimelineACLsManager createTimelineACLsManager(Configuration conf) {
+        return new TimelineACLsManager(conf);
+    }
 
   protected void startWebApp() {
     Configuration conf = getConfig();

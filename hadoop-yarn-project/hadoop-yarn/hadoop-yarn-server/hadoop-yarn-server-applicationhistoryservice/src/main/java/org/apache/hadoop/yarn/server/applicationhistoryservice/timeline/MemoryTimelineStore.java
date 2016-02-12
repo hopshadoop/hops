@@ -21,28 +21,12 @@ package org.apache.hadoop.yarn.server.applicationhistoryservice.timeline;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.service.AbstractService;
-import org.apache.hadoop.yarn.api.records.timeline.TimelineEntities;
-import org.apache.hadoop.yarn.api.records.timeline.TimelineEntity;
-import org.apache.hadoop.yarn.api.records.timeline.TimelineEvent;
-import org.apache.hadoop.yarn.api.records.timeline.TimelineEvents;
+import org.apache.hadoop.yarn.api.records.timeline.*;
 import org.apache.hadoop.yarn.api.records.timeline.TimelineEvents.EventsOfOneEntity;
-import org.apache.hadoop.yarn.api.records.timeline.TimelinePutResponse;
 import org.apache.hadoop.yarn.api.records.timeline.TimelinePutResponse.TimelinePutError;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.PriorityQueue;
-import java.util.Set;
-import java.util.SortedSet;
-import java.util.TreeSet;
 
 /**
  * In-memory implementation of {@link TimelineStore}. This
@@ -315,18 +299,29 @@ public class MemoryTimelineStore extends AbstractService
     entityToReturn.setEntityId(entity.getEntityId());
     entityToReturn.setEntityType(entity.getEntityType());
     entityToReturn.setStartTime(entity.getStartTime());
-    entityToReturn.setEvents(
-        fields.contains(Field.EVENTS) ? entity.getEvents() :
-            fields.contains(Field.LAST_EVENT_ONLY) ?
-                Arrays.asList(entity.getEvents().get(0)) : null);
-    entityToReturn.setRelatedEntities(
-        fields.contains(Field.RELATED_ENTITIES) ? entity.getRelatedEntities() :
-            null);
-    entityToReturn.setPrimaryFilters(
-        fields.contains(Field.PRIMARY_FILTERS) ? entity.getPrimaryFilters() :
-            null);
-    entityToReturn.setOtherInfo(
-        fields.contains(Field.OTHER_INFO) ? entity.getOtherInfo() : null);
+    // Deep copy
+    if (fields.contains(Field.EVENTS)) {
+      entityToReturn.addEvents(entity.getEvents());
+      } else if (fields.contains(Field.LAST_EVENT_ONLY)) {
+      entityToReturn.addEvent(entity.getEvents().get(0));
+    } else {
+      entityToReturn.setEvents(null);
+    }
+    if (fields.contains(Field.RELATED_ENTITIES)) {
+      entityToReturn.addRelatedEntities(entity.getRelatedEntities());
+    } else {
+      entityToReturn.setRelatedEntities(null);
+    }
+    if (fields.contains(Field.PRIMARY_FILTERS)) {
+      entityToReturn.addPrimaryFilters(entity.getPrimaryFilters());
+    } else {
+      entityToReturn.setPrimaryFilters(null);
+    }
+    if (fields.contains(Field.OTHER_INFO)) {
+      entityToReturn.addOtherInfo(entity.getOtherInfo());
+    } else {
+      entityToReturn.setOtherInfo(null);
+    }
     return entityToReturn;
   }
 
