@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.yarn.server.applicationhistoryservice;
 
+import java.io.IOException;
+import java.net.InetSocketAddress;
+
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -25,6 +28,8 @@ import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.source.JvmMetrics;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.service.CompositeService;
 import org.apache.hadoop.service.Service;
 import org.apache.hadoop.util.ExitUtil;
@@ -37,6 +42,8 @@ import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.server.applicationhistoryservice.timeline.LeveldbTimelineStore;
 import org.apache.hadoop.yarn.server.applicationhistoryservice.timeline.TimelineStore;
 import org.apache.hadoop.yarn.server.applicationhistoryservice.timeline.security.TimelineACLsManager;
+import org.apache.hadoop.yarn.server.applicationhistoryservice.timeline.security.TimelineAuthenticationFilterInitializer;
+import org.apache.hadoop.yarn.server.applicationhistoryservice.timeline.security.TimelineDelegationTokenSecretManagerService;
 import org.apache.hadoop.yarn.server.applicationhistoryservice.webapp.AHSWebApp;
 import org.apache.hadoop.yarn.webapp.WebApp;
 import org.apache.hadoop.yarn.webapp.WebApps;
@@ -52,11 +59,12 @@ public class ApplicationHistoryServer extends CompositeService {
   private static final Log LOG =
       LogFactory.getLog(ApplicationHistoryServer.class);
 
-  ApplicationHistoryClientService ahsClientService;
-  ApplicationHistoryManager historyManager;
-  TimelineStore timelineStore;
-  TimelineACLsManager timelineACLsManager;
-  private WebApp webApp;
+  protected ApplicationHistoryClientService ahsClientService;
+  protected ApplicationHistoryManager historyManager;
+  protected TimelineStore timelineStore;
+  protected TimelineDelegationTokenSecretManagerService secretManagerService;
+  protected TimelineACLsManager timelineACLsManager;
+  protected WebApp webApp;
 
   public ApplicationHistoryServer() {
     super(ApplicationHistoryServer.class.getName());
@@ -70,14 +78,22 @@ public class ApplicationHistoryServer extends CompositeService {
     addService((Service) historyManager);
     timelineStore = createTimelineStore(conf);
     addIfService(timelineStore);
-    timelineACLsManager = createTimelineACLsManager(conf);
+
+    secretManagerService = createTimelineDelegationTokenSecretManagerService(conf);
+    addService(secretManagerService);
+    DefaultMetricsSystem.initialize("ApplicationHistoryServer");
+    JvmMetrics.initSingleton("ApplicationHistoryServer", null);
+
     super.serviceInit(conf);
   }
 
   @Override
   protected void serviceStart() throws Exception {
-    DefaultMetricsSystem.initialize("ApplicationHistoryServer");
-    JvmMetrics.initSingleton("ApplicationHistoryServer", null);
+    try {
+      doSecureLogin(getConfig());
+    } catch (IOException ie) {
+      throw new YarnRuntimeException("Failed to login", ie);
+    }
 
     startWebApp();
     super.serviceStart();
@@ -148,23 +164,45 @@ public class ApplicationHistoryServer extends CompositeService {
             LeveldbTimelineStore.class, TimelineStore.class), conf);
   }
 
-  protected TimelineACLsManager createTimelineACLsManager(Configuration conf) {
-    return new TimelineACLsManager(conf);
+  protected TimelineDelegationTokenSecretManagerService
+    createTimelineDelegationTokenSecretManagerService(Configuration conf) {
+    return new TimelineDelegationTokenSecretManagerService();
   }
+    protected TimelineACLsManager createTimelineACLsManager(Configuration conf) {
+        return new TimelineACLsManager(conf);
+    }
 
   protected void startWebApp() {
     Configuration conf = getConfig();
+    // Play trick to make the customized filter will only be loaded by the
+    // timeline server when security is enabled and Kerberos authentication
+    // is used.
+    if (UserGroupInformation.isSecurityEnabled()
+            && conf
+                .get(TimelineAuthenticationFilterInitializer.PREFIX + "type", "")
+                .equals("kerberos")) {
+      String initializers = conf.get("hadoop.http.filter.initializers");
+      initializers =
+              initializers == null || initializers.length() == 0 ? "" : ","
+                + initializers;
+      if (!initializers.contains(
+              TimelineAuthenticationFilterInitializer.class.getName())) {
+        conf.set("hadoop.http.filter.initializers",
+                TimelineAuthenticationFilterInitializer.class.getName()
+                  + initializers);
+      }
+    }
     String bindAddress = WebAppUtils.getAHSWebAppURLWithoutScheme(conf);
     LOG.info("Instantiating AHSWebApp at " + bindAddress);
     try {
+      AHSWebApp ahsWebApp = AHSWebApp.getInstance();
+      ahsWebApp.setApplicationHistoryManager(historyManager);
+      ahsWebApp.setTimelineStore(timelineStore);
+      ahsWebApp.setTimelineDelegationTokenSecretManagerService(secretManagerService);
       webApp = WebApps
           .$for("applicationhistory", ApplicationHistoryClientService.class,
-              ahsClientService, "ws").with(getConfig())
-          .withHttpSpnegoPrincipalKey(
-              YarnConfiguration.TIMELINE_SERVICE_WEBAPP_SPNEGO_USER_NAME_KEY)
-          .withHttpSpnegoKeytabKey(
-              YarnConfiguration.TIMELINE_SERVICE_WEBAPP_SPNEGO_KEYTAB_FILE_KEY)
-          .at(bindAddress).start(new AHSWebApp(historyManager, timelineStore));
+              ahsClientService, "ws")
+          .with(conf).at(bindAddress).start(ahsWebApp);
     } catch (Exception e) {
       String msg = "AHSWebApp failed to start.";
       LOG.error(msg, e);
@@ -179,5 +217,23 @@ public class ApplicationHistoryServer extends CompositeService {
   @VisibleForTesting
   public TimelineStore getTimelineStore() {
     return timelineStore;
+  }
+
+  private void doSecureLogin(Configuration conf) throws IOException {
+    InetSocketAddress socAddr = getBindAddress(conf);
+    SecurityUtil.login(conf, YarnConfiguration.TIMELINE_SERVICE_KEYTAB,
+            YarnConfiguration.TIMELINE_SERVICE_PRINCIPAL, socAddr.getHostName());
+  }
+
+  /**
+   * Retrieve the timeline server bind address from the configuration
+   *
+   * @param conf
+   * @return InetSocketAddress
+   */
+  private static InetSocketAddress getBindAddress(Configuration conf) {
+    return conf.getSocketAddr(YarnConfiguration.TIMELINE_SERVICE_ADDRESS,
+            YarnConfiguration.DEFAULT_TIMELINE_SERVICE_ADDRESS,
+            YarnConfiguration.DEFAULT_TIMELINE_SERVICE_PORT);
   }
 }

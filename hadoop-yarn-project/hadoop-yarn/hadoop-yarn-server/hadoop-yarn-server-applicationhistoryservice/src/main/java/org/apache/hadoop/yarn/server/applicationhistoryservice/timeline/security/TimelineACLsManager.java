@@ -19,6 +19,7 @@
 package org.apache.hadoop.yarn.server.applicationhistoryservice.timeline.security;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.inject.Inject;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -44,10 +45,12 @@ public class TimelineACLsManager {
 
     private boolean aclsEnabled;
 
+    @Inject
     public TimelineACLsManager(Configuration conf) {
         aclsEnabled = conf.getBoolean(YarnConfiguration.YARN_ACL_ENABLE,
                 YarnConfiguration.DEFAULT_YARN_ACL_ENABLE);
     }
+
 
     public boolean checkAccess(UserGroupInformation callerUGI,
                                TimelineEntity entity) throws YarnException, IOException {

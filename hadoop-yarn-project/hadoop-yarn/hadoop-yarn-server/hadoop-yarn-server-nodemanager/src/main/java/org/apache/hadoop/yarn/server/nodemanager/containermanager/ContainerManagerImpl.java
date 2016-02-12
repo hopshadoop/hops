@@ -46,6 +46,7 @@ import org.apache.hadoop.yarn.api.protocolrecords.StartContainersResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.StopContainersRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.StopContainersResponse;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
+import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
 import org.apache.hadoop.yarn.api.records.ContainerState;
@@ -98,12 +99,14 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.monitor.Contai
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.monitor.ContainersMonitorEventType;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.monitor.ContainersMonitorImpl;
 import org.apache.hadoop.yarn.server.nodemanager.metrics.NodeManagerMetrics;
+import org.apache.hadoop.yarn.server.nodemanager.recovery.NMStateStoreService;
 import org.apache.hadoop.yarn.server.nodemanager.security.authorize.NMPolicyProvider;
 import org.apache.hadoop.yarn.server.security.ApplicationACLsManager;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -204,18 +207,27 @@ public class ContainerManagerImpl extends CompositeService
   @Override
   public void serviceInit(Configuration conf) throws Exception {
     LogHandler logHandler =
-        createLogHandler(conf, this.context, this.deletionService);
+            createLogHandler(conf, this.context, this.deletionService);
     addIfService(logHandler);
     dispatcher.register(LogHandlerEventType.class, logHandler);
 
     waitForContainersOnShutdownMillis =
-        conf.getLong(YarnConfiguration.NM_SLEEP_DELAY_BEFORE_SIGKILL_MS,
-            YarnConfiguration.DEFAULT_NM_SLEEP_DELAY_BEFORE_SIGKILL_MS) + conf.
-            getLong(YarnConfiguration.NM_PROCESS_KILL_WAIT_MS,
-                YarnConfiguration.DEFAULT_NM_PROCESS_KILL_WAIT_MS) +
-            SHUTDOWN_CLEANUP_SLOP_MS;
+            conf.getLong(YarnConfiguration.NM_SLEEP_DELAY_BEFORE_SIGKILL_MS,
+                    YarnConfiguration.DEFAULT_NM_SLEEP_DELAY_BEFORE_SIGKILL_MS) + conf.
+                    getLong(YarnConfiguration.NM_PROCESS_KILL_WAIT_MS,
+                            YarnConfiguration.DEFAULT_NM_PROCESS_KILL_WAIT_MS) +
+                    SHUTDOWN_CLEANUP_SLOP_MS;
 
     super.serviceInit(conf);
+    recover();
+  }
+
+  private void recover() throws IOException, URISyntaxException {
+    NMStateStoreService stateStore = context.getNMStateStore();
+    if (stateStore.canRecover()) {
+      rsrcLocalizationSrvc.recoverLocalizedResources(
+              stateStore.loadLocalizationState());
+    }
   }
 
   protected LogHandler createLogHandler(Configuration conf, Context context,
@@ -237,7 +249,7 @@ public class ContainerManagerImpl extends CompositeService
   protected ResourceLocalizationService createResourceLocalizationService(
       ContainerExecutor exec, DeletionService deletionContext) {
     return new ResourceLocalizationService(this.dispatcher, exec,
-        deletionContext, dirsHandler);
+        deletionContext, dirsHandler, context.getNMStateStore());
   }
 
   protected ContainersLauncher createContainersLauncher(Context context,
@@ -460,8 +472,8 @@ public class ContainerManagerImpl extends CompositeService
     boolean unauthorized = false;
     StringBuilder messageBuilder =
         new StringBuilder("Unauthorized request to start container. ");
-    if (!nmTokenIdentifier.getApplicationAttemptId()
-        .equals(containerId.getApplicationAttemptId())) {
+    if (!nmTokenIdentifier.getApplicationAttemptId().getApplicationId().equals(
+        containerId.getApplicationAttemptId().getApplicationId())) {
       unauthorized = true;
       messageBuilder.append("\nNMToken for application attempt : ")
           .append(nmTokenIdentifier.getApplicationAttemptId())
@@ -735,7 +747,8 @@ public class ContainerManagerImpl extends CompositeService
       }
     } else {
       dispatcher.getEventHandler().handle(new ContainerKillEvent(containerID,
-              "Container killed by the ApplicationMaster."));
+              ContainerExitStatus.KILLED_BY_APPMASTER,
+             "Container killed by the ApplicationMaster."));
 
       NMAuditLogger
           .logSuccess(container.getUser(), AuditConstants.STOP_CONTAINER,
@@ -808,22 +821,22 @@ public class ContainerManagerImpl extends CompositeService
      * This will prevent user in knowing another application's containers).
      */
 
-    if ((!identifier.getApplicationAttemptId()
-        .equals(containerId.getApplicationAttemptId())) ||
-        (container != null && !identifier.getApplicationAttemptId().
-            equals(container.getContainerId().getApplicationAttemptId()))) {
+    ApplicationId nmTokenAppId =
+        identifier.getApplicationAttemptId().getApplicationId();
+    if ((!nmTokenAppId.equals(containerId.getApplicationAttemptId().getApplicationId()))
+        || (container != null && !nmTokenAppId.equals(container
+          .getContainerId().getApplicationAttemptId().getApplicationId()))) {
       if (stopRequest) {
         LOG.warn(identifier.getApplicationAttemptId() +
             " attempted to stop non-application container : " +
-            container.getContainerId().toString());
+            container.getContainerId());
         NMAuditLogger.logFailure("UnknownUser", AuditConstants.STOP_CONTAINER,
             "ContainerManagerImpl", "Trying to stop unknown container!",
-            identifier.getApplicationAttemptId().getApplicationId(),
-            container.getContainerId());
+            nmTokenAppId, container.getContainerId());
       } else {
         LOG.warn(identifier.getApplicationAttemptId() +
             " attempted to get status for non-application container : " +
-            container.getContainerId().toString());
+            container.getContainerId());
       }
     }
 
@@ -887,6 +900,7 @@ public class ContainerManagerImpl extends CompositeService
             .getContainersToCleanup()) {
           this.dispatcher.getEventHandler().handle(
               new ContainerKillEvent(container,
+                  ContainerExitStatus.KILLED_BY_RESOURCEMANAGER,
                   "Container Killed by ResourceManager"));
         }
         break;

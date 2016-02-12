@@ -216,7 +216,7 @@ public class FairSchedulerPage extends RmView {
             "    var q = $('.q', data.rslt.obj).first().text();",
             "    if (q == 'root') q = '';",
             "    else q = '^' + q.substr(q.lastIndexOf('.') + 1) + '$';",
-            "    $('#apps').dataTable().fnFilter(q, 3, true);", "  });",
+            "    $('#apps').dataTable().fnFilter(q, 4, true);", "  });",
             "  $('#cs').show();", "});")._().
         _(SchedulerPageUtil.QueueBlockUtil.class);
   }
@@ -244,7 +244,7 @@ public class FairSchedulerPage extends RmView {
     return sb.append("[\n").append("{'sType':'numeric', 'aTargets': [0]")
         .append(", 'mRender': parseHadoopID }")
 
-        .append("\n, {'sType':'numeric', 'aTargets': [5, 6]")
+        .append("\n, {'sType':'numeric', 'aTargets': [6, 7]")
         .append(", 'mRender': renderHadoopDate }")
 
         .append("\n, {'sType':'numeric', bSearchable:false, 'aTargets': [9]")

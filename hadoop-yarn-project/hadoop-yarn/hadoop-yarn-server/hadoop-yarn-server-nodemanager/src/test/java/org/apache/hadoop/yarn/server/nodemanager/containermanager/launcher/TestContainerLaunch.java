@@ -51,12 +51,12 @@ import org.apache.hadoop.yarn.event.Dispatcher;
 import org.apache.hadoop.yarn.event.Event;
 import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.security.ContainerTokenIdentifier;
-import org.apache.hadoop.yarn.server.nodemanager.ContainerExecutor.ExitCode;
 import org.apache.hadoop.yarn.server.nodemanager.DefaultContainerExecutor;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.BaseContainerManagerTest;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Container;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.ContainerEventType;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.ContainerExitEvent;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.launcher.ContainerLaunch.ShellScriptBuilder;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.ContainerLocalizer;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.apache.hadoop.yarn.util.Apps;
@@ -72,6 +72,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -81,7 +82,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThat;
+import static org.junit.Assert.fail;
+import static org.junit.matchers.JUnitMatchers.*;
+import org.junit.Assume;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -582,8 +588,7 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
     ContainerStatus containerStatus =
         containerManager.getContainerStatuses(gcsRequest).getContainerStatuses()
             .get(0);
-    int expectedExitCode = Shell.WINDOWS ? ExitCode.FORCE_KILLED.getExitCode() :
-        ExitCode.TERMINATED.getExitCode();
+    int expectedExitCode = ContainerExitStatus.KILLED_BY_APPMASTER;
     Assert.assertEquals(expectedExitCode, containerStatus.getExitStatus());
 
     // Assert that the process is not alive anymore
@@ -694,7 +699,7 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
     ContainerStatus containerStatus =
         containerManager.getContainerStatuses(gcsRequest).getContainerStatuses()
             .get(0);
-    Assert.assertEquals(ExitCode.FORCE_KILLED.getExitCode(),
+    Assert.assertEquals(ContainerExitStatus.KILLED_BY_APPMASTER,
         containerStatus.getExitStatus());
 
     // Now verify the contents of the file.  Script generates a message when it
@@ -725,18 +730,18 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
     }
   }
 
-  @Test
+  @Test (timeout = 30000)
   public void testDelayedKill() throws Exception {
     internalKillTest(true);
   }
 
-  @Test
+  @Test (timeout = 30000)
   public void testImmediateKill() throws Exception {
     internalKillTest(false);
   }
 
   @SuppressWarnings("rawtypes")
-  @Test
+  @Test (timeout = 10000)
   public void testCallFailureWithNullLocalizedResources() {
     Container container = mock(Container.class);
     when(container.getContainerId()).thenReturn(ContainerId.newInstance(
@@ -774,4 +779,165 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
     return containerToken;
   }
 
+  /**
+   * Test that script exists with non-zero exit code when command fails.
+   * @throws IOException
+   */
+  @Test (timeout = 10000)
+  public void testShellScriptBuilderNonZeroExitCode() throws IOException {
+    ShellScriptBuilder builder = ShellScriptBuilder.create();
+    builder.command(Arrays.asList(new String[] {"unknownCommand"}));
+    File shellFile = Shell.appendScriptExtension(tmpDir, "testShellScriptBuilderError");
+    PrintStream writer = new PrintStream(new FileOutputStream(shellFile));
+    builder.write(writer);
+    writer.close();
+    try {
+      FileUtil.setExecutable(shellFile, true);
+
+      Shell.ShellCommandExecutor shexc = new Shell.ShellCommandExecutor(
+              new String[]{shellFile.getAbsolutePath()}, tmpDir);
+      try {
+        shexc.execute();
+        fail("builder shell command was expected to throw");
+      } catch(IOException e) {
+        // expected
+        System.out.println("Received an expected exception: " + e.getMessage());
+      }
+    } finally {
+      FileUtil.fullyDelete(shellFile);
+    }
+  }
+
+  private static final String expectedMessage = "The command line has a length of";
+
+  @Test (timeout = 10000)
+  public void testWindowsShellScriptBuilderCommand() throws IOException {
+    String callCmd = "@call ";
+
+    // Test is only relevant on Windows
+    Assume.assumeTrue(Shell.WINDOWS);
+
+    // The tests are built on assuming 8191 max command line length
+    assertEquals(8191, Shell.WINDOWS_MAX_SHELL_LENGTH);
+
+    ShellScriptBuilder builder = ShellScriptBuilder.create();
+
+    // Basic tests: less length, exact length, max+1 length
+    builder.command(Arrays.asList(
+            org.apache.commons.lang.StringUtils.repeat("A", 1024)));
+    builder.command(Arrays.asList(
+            org.apache.commons.lang.StringUtils.repeat(
+                    "E", Shell.WINDOWS_MAX_SHELL_LENGTH - callCmd.length())));
+    try {
+      builder.command(Arrays.asList(
+              org.apache.commons.lang.StringUtils.repeat(
+                      "X", Shell.WINDOWS_MAX_SHELL_LENGTH -callCmd.length() + 1)));
+      fail("longCommand was expected to throw");
+    } catch(IOException e) {
+      assertThat(e.getMessage(), containsString(expectedMessage));
+    }
+
+    // Composite tests, from parts: less, exact and +
+    builder.command(Arrays.asList(
+            org.apache.commons.lang.StringUtils.repeat("A", 1024),
+            org.apache.commons.lang.StringUtils.repeat("A", 1024),
+            org.apache.commons.lang.StringUtils.repeat("A", 1024)));
+
+    // buildr.command joins the command parts with an extra space
+    builder.command(Arrays.asList(
+            org.apache.commons.lang.StringUtils.repeat("E", 4095),
+            org.apache.commons.lang.StringUtils.repeat("E", 2047),
+            org.apache.commons.lang.StringUtils.repeat("E", 2047 - callCmd.length())));
+
+    try {
+      builder.command(Arrays.asList(
+              org.apache.commons.lang.StringUtils.repeat("X", 4095),
+              org.apache.commons.lang.StringUtils.repeat("X", 2047),
+              org.apache.commons.lang.StringUtils.repeat("X", 2048 - callCmd.length())));
+      fail("long commands was expected to throw");
+    } catch(IOException e) {
+      assertThat(e.getMessage(), containsString(expectedMessage));
+    }
+  }
+
+  @Test (timeout = 10000)
+  public void testWindowsShellScriptBuilderEnv() throws IOException {
+    // Test is only relevant on Windows
+    Assume.assumeTrue(Shell.WINDOWS);
+
+    // The tests are built on assuming 8191 max command line length
+    assertEquals(8191, Shell.WINDOWS_MAX_SHELL_LENGTH);
+
+    ShellScriptBuilder builder = ShellScriptBuilder.create();
+
+    // test env
+    builder.env("somekey", org.apache.commons.lang.StringUtils.repeat("A", 1024));
+    builder.env("somekey", org.apache.commons.lang.StringUtils.repeat(
+            "A", Shell.WINDOWS_MAX_SHELL_LENGTH - ("@set somekey=").length()));
+    try {
+      builder.env("somekey", org.apache.commons.lang.StringUtils.repeat(
+              "A", Shell.WINDOWS_MAX_SHELL_LENGTH - ("@set somekey=").length()) + 1);
+      fail("long env was expected to throw");
+    } catch(IOException e) {
+      assertThat(e.getMessage(), containsString(expectedMessage));
+    }
+  }
+
+  @Test (timeout = 10000)
+  public void testWindowsShellScriptBuilderMkdir() throws IOException {
+    String mkDirCmd = "@if not exist \"\" mkdir \"\"";
+
+    // Test is only relevant on Windows
+    Assume.assumeTrue(Shell.WINDOWS);
+
+    // The tests are built on assuming 8191 max command line length
+    assertEquals(8191, Shell.WINDOWS_MAX_SHELL_LENGTH);
+
+    ShellScriptBuilder builder = ShellScriptBuilder.create();
+
+    // test mkdir
+    builder.mkdir(new Path(org.apache.commons.lang.StringUtils.repeat("A", 1024)));
+    builder.mkdir(new Path(org.apache.commons.lang.StringUtils.repeat(
+            "E", (Shell.WINDOWS_MAX_SHELL_LENGTH - mkDirCmd.length())/2)));
+    try {
+      builder.mkdir(new Path(org.apache.commons.lang.StringUtils.repeat(
+              "X", (Shell.WINDOWS_MAX_SHELL_LENGTH - mkDirCmd.length())/2 +1)));
+      fail("long mkdir was expected to throw");
+    } catch(IOException e) {
+      assertThat(e.getMessage(), containsString(expectedMessage));
+    }
+  }
+
+  @Test (timeout = 10000)
+  public void testWindowsShellScriptBuilderLink() throws IOException {
+    // Test is only relevant on Windows
+    Assume.assumeTrue(Shell.WINDOWS);
+
+    String linkCmd = "@" +Shell.WINUTILS + " symlink \"\" \"\"";
+
+    // The tests are built on assuming 8191 max command line length
+    assertEquals(8191, Shell.WINDOWS_MAX_SHELL_LENGTH);
+
+    ShellScriptBuilder builder = ShellScriptBuilder.create();
+
+    // test link
+    builder.link(
+            new Path(org.apache.commons.lang.StringUtils.repeat("A", 1024)),
+            new Path(org.apache.commons.lang.StringUtils.repeat("B", 1024)));
+    builder.link(
+            new Path(org.apache.commons.lang.StringUtils.repeat(
+                    "E", (Shell.WINDOWS_MAX_SHELL_LENGTH - linkCmd.length())/2)),
+            new Path(org.apache.commons.lang.StringUtils.repeat(
+                    "F", (Shell.WINDOWS_MAX_SHELL_LENGTH - linkCmd.length())/2)));
+    try {
+      builder.link(
+              new Path(org.apache.commons.lang.StringUtils.repeat(
+                      "X", (Shell.WINDOWS_MAX_SHELL_LENGTH - linkCmd.length())/2 + 1)),
+              new Path(org.apache.commons.lang.StringUtils.repeat(
+                      "Y", (Shell.WINDOWS_MAX_SHELL_LENGTH - linkCmd.length())/2) + 1));
+      fail("long link was expected to throw");
+    } catch(IOException e) {
+      assertThat(e.getMessage(), containsString(expectedMessage));
+    }
+  }
 }

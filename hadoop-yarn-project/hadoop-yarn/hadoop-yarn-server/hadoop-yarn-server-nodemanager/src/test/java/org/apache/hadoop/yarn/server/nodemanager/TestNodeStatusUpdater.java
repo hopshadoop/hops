@@ -61,6 +61,8 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.Ap
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Container;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.ContainerImpl;
 import org.apache.hadoop.yarn.server.nodemanager.metrics.NodeManagerMetrics;
+import org.apache.hadoop.yarn.server.nodemanager.recovery.NMNullStateStoreService;
+import org.apache.hadoop.yarn.server.nodemanager.recovery.NMStateStoreService;
 import org.apache.hadoop.yarn.server.nodemanager.security.NMContainerTokenSecretManager;
 import org.apache.hadoop.yarn.server.nodemanager.security.NMTokenSecretManagerInNM;
 import org.apache.hadoop.yarn.server.security.ApplicationACLsManager;
@@ -1170,8 +1172,9 @@ public class TestNodeStatusUpdater {
 
       @Override
       protected NMContext createNMContext(
-          NMContainerTokenSecretManager containerTokenSecretManager,
-          NMTokenSecretManagerInNM nmTokenSecretManager) {
+              NMContainerTokenSecretManager containerTokenSecretManager,
+              NMTokenSecretManagerInNM nmTokenSecretManager,
+              NMStateStoreService store) {
         return new MyNMContext(containerTokenSecretManager,
             nmTokenSecretManager);
       }
@@ -1279,7 +1282,8 @@ public class TestNodeStatusUpdater {
     public MyNMContext(
         NMContainerTokenSecretManager containerTokenSecretManager,
         NMTokenSecretManagerInNM nmTokenSecretManager) {
-      super(containerTokenSecretManager, nmTokenSecretManager, null, null);
+      super(containerTokenSecretManager, nmTokenSecretManager, null, null,
+              new NMNullStateStoreService());
     }
 
     @Override

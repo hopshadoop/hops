@@ -18,13 +18,16 @@
 
 package org.apache.hadoop.yarn.server.applicationhistoryservice.timeline;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.collections.map.LRUMap;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.WritableComparator;
 import org.apache.hadoop.service.AbstractService;
@@ -64,6 +67,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import static org.apache.hadoop.yarn.server.applicationhistoryservice.timeline.GenericObjectMapper.readReverseOrderedLong;
 import static org.apache.hadoop.yarn.server.applicationhistoryservice.timeline.GenericObjectMapper.writeReverseOrderedLong;
+import com.google.common.annotations.VisibleForTesting;
 
 /**
  * <p>An implementation of an application timeline store backed by leveldb.</p>
@@ -119,7 +123,9 @@ public class LeveldbTimelineStore extends AbstractService
     implements TimelineStore {
   private static final Log LOG = LogFactory.getLog(LeveldbTimelineStore.class);
 
-  private static final String FILENAME = "leveldb-timeline-store.ldb";
+  @Private
+  @VisibleForTesting
+  static final String FILENAME = "leveldb-timeline-store.ldb";
 
   private static final byte[] START_TIME_LOOKUP_PREFIX = "k".getBytes();
   private static final byte[] ENTITY_ENTRY_PREFIX = "e".getBytes();
@@ -133,6 +139,11 @@ public class LeveldbTimelineStore extends AbstractService
       "z".getBytes();
 
   private static final byte[] EMPTY_BYTES = new byte[0];
+
+  @Private
+  @VisibleForTesting
+  static final FsPermission LEVEDB_DIR_UMASK = FsPermission
+          .createImmutable((short) 0700);
 
   private Map<EntityIdentifier, StartAndInsertTime> startTimeWriteCache;
   private Map<EntityIdentifier, Long> startTimeReadCache;
@@ -163,16 +174,23 @@ public class LeveldbTimelineStore extends AbstractService
         conf.getLong(YarnConfiguration.TIMELINE_SERVICE_LEVELDB_READ_CACHE_SIZE,
             YarnConfiguration.DEFAULT_TIMELINE_SERVICE_LEVELDB_READ_CACHE_SIZE));
     JniDBFactory factory = new JniDBFactory();
-    String path = conf.get(YarnConfiguration.TIMELINE_SERVICE_LEVELDB_PATH);
-    File p = new File(path);
-    if (!p.exists()) {
-      if (!p.mkdirs()) {
-        throw new IOException("Couldn't create directory for leveldb " +
-            "timeline store " + path);
+    Path dbPath = new Path(
+            conf.get(YarnConfiguration.TIMELINE_SERVICE_LEVELDB_PATH), FILENAME);
+    FileSystem localFs = null;;
+    try {
+      localFs = FileSystem.getLocal(conf);
+      if (!localFs.exists(dbPath)) {
+        if (!localFs.mkdirs(dbPath)) {
+          throw new IOException("Couldn't create directory for leveldb " +
+                  "timeline store " + dbPath);
+        }
+        localFs.setPermission(dbPath, LEVEDB_DIR_UMASK);
       }
+    } finally {
+      IOUtils.cleanup(LOG, localFs);
     }
-    LOG.info("Using leveldb path " + path);
-    db = factory.open(new File(path, FILENAME), options);
+    LOG.info("Using leveldb path " + dbPath);
+    db = factory.open(new File(dbPath.toString(), FILENAME), options);
     startTimeWriteCache = Collections
         .synchronizedMap(new LRUMap(getStartTimeWriteCacheSize(conf)));
     startTimeReadCache = Collections

@@ -966,6 +966,14 @@ public class YarnConfiguration extends Configuration {
   public static final String NM_WEBAPP_SPNEGO_KEYTAB_FILE_KEY =
       NM_PREFIX + "webapp.spnego-keytab-file";
   public static final String DEFAULT_NM_USER_HOME_DIR = "/home/";
+
+  public static final String NM_RECOVERY_PREFIX = NM_PREFIX + "recovery.";
+  public static final String NM_RECOVERY_ENABLED =
+          NM_RECOVERY_PREFIX + "enabled";
+  public static final boolean DEFAULT_NM_RECOVERY_ENABLED = false;
+
+  public static final String NM_RECOVERY_DIR = NM_RECOVERY_PREFIX + "dir";
+
     ////////////////////////////////
   // Web Proxy Configs
   ////////////////////////////////
@@ -1207,16 +1215,7 @@ public class YarnConfiguration extends Configuration {
   public static final int DEFAULT_TIMELINE_SERVICE_WEBAPP_HTTPS_PORT = 8190;
   public static final String DEFAULT_TIMELINE_SERVICE_WEBAPP_HTTPS_ADDRESS =
       "localhost:" + DEFAULT_TIMELINE_SERVICE_WEBAPP_HTTPS_PORT;
-  /**
-   * The kerberos principal to be used for spnego filter for timeline service.
-   */
-  public static final String TIMELINE_SERVICE_WEBAPP_SPNEGO_USER_NAME_KEY =
-      TIMELINE_SERVICE_PREFIX + "webapp.spnego-principal";
-  /**
-   * The kerberos keytab to be used for spnego filter for timeline service.
-   */
-  public static final String TIMELINE_SERVICE_WEBAPP_SPNEGO_KEYTAB_FILE_KEY =
-      TIMELINE_SERVICE_PREFIX + "webapp.spnego-keytab-file";
+
   /**
    * Timeline service store class
    */
@@ -1271,6 +1270,15 @@ public class YarnConfiguration extends Configuration {
       TIMELINE_SERVICE_LEVELDB_PREFIX + "ttl-interval-ms";
   public static final long DEFAULT_TIMELINE_SERVICE_LEVELDB_TTL_INTERVAL_MS =
       1000 * 60 * 5;
+
+  /** The Kerberos principal for the timeline server.*/
+  public static final String TIMELINE_SERVICE_PRINCIPAL =
+          TIMELINE_SERVICE_PREFIX + "principal";
+
+  /** The kerberos keytab for the timeline server.*/
+  public static final String TIMELINE_SERVICE_KEYTAB =
+          TIMELINE_SERVICE_PREFIX + "keytab";
+
     ////////////////////////////////
   // Other Configs
   ////////////////////////////////

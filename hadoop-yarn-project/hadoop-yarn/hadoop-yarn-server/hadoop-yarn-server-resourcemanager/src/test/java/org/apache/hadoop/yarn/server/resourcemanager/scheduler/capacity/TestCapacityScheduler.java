@@ -70,6 +70,8 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import org.apache.hadoop.yarn.server.resourcemanager.security.NMTokenSecretManagerInRM;
+import org.apache.hadoop.yarn.server.resourcemanager.security.RMContainerTokenSecretManager;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -126,12 +128,15 @@ public class TestCapacityScheduler {
 
   @After
   public void tearDown() throws Exception {
-    resourceManager.stop();
+        if (resourceManager != null) {
+      resourceManager.stop();
+    }
   }
 
   @Test(timeout = 30000)
   public void testConfValidation() throws Exception {
     ResourceScheduler scheduler = new CapacityScheduler();
+    scheduler.setRMContext(resourceManager.getRMContext());
     Configuration conf = new YarnConfiguration();
     conf.setInt(YarnConfiguration.RM_SCHEDULER_MINIMUM_ALLOCATION_MB, 2048);
     conf.setInt(YarnConfiguration.RM_SCHEDULER_MAXIMUM_ALLOCATION_MB, 1024);
@@ -350,12 +355,19 @@ public class TestCapacityScheduler {
   @Test(timeout = 30000)
   public void testRefreshQueues() throws Exception {
     CapacityScheduler cs = new CapacityScheduler();
-    CapacitySchedulerConfiguration conf = new CapacitySchedulerConfiguration();
+    CapacitySchedulerConfiguration conf = new CapacitySchedulerConfiguration();  
+    RMContextImpl rmContext =  new RMContextImpl(null, null, null, null, null,
+        null, new RMContainerTokenSecretManager(conf,mockContext),
+        new NMTokenSecretManagerInRM(conf,mockContext),
+        new ClientToAMTokenSecretManagerInRM(), null, conf);
     setupQueueConfiguration(conf);
     cs.setConf(new YarnConfiguration());
     TransactionStateManager tsm = new TransactionStateManager();
     tsm.init(conf);
     tsm.start();
+    cs.setRMContext(resourceManager.getRMContext());
+    cs.init(conf);
+    cs.start();
     cs.reinitialize(conf, new RMContextImpl(null, null, null, null, null, null,
         new ClientToAMTokenSecretManagerInRM(), null, conf,tsm), null);
     checkQueueCapacities(cs, A_CAPACITY, B_CAPACITY);
@@ -472,6 +484,9 @@ public class TestCapacityScheduler {
     CapacityScheduler cs = new CapacityScheduler();
     cs.setConf(new YarnConfiguration());
     TransactionStateManager tsm = new TransactionStateManager();
+    cs.setRMContext(resourceManager.getRMContext());
+    cs.init(csConf);
+    cs.start();
     cs.reinitialize(csConf,
         new RMContextImpl(null, null, null, null, null, null,
             new ClientToAMTokenSecretManagerInRM(), null, csConf,tsm), null);
@@ -505,6 +520,9 @@ public class TestCapacityScheduler {
     TransactionStateManager tsm = new TransactionStateManager();
     tsm.init(new YarnConfiguration());
     tsm.start();
+    cs.setRMContext(resourceManager.getRMContext());
+    cs.init(conf);
+    cs.start();
     cs.reinitialize(conf, new RMContextImpl(null, null, null, null, null, null,
         new ClientToAMTokenSecretManagerInRM(), null, conf, tsm), null);
     checkQueueCapacities(cs, A_CAPACITY, B_CAPACITY);
@@ -672,6 +690,9 @@ public class TestCapacityScheduler {
     TransactionStateManager tsm = new TransactionStateManager();
     tsm.init(conf);
     tsm.start();
+    cs.setRMContext(resourceManager.getRMContext());
+    cs.init(conf);
+    cs.start();
     cs.reinitialize(conf,
         new RMContextImpl(rmDispatcher, null, null, null, null, null,
             new ClientToAMTokenSecretManagerInRM(), null, conf, tsm), null);

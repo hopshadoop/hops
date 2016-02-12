@@ -1106,6 +1106,7 @@ static int delete_path(const char *full_path,
     FTS* tree = fts_open(paths, FTS_PHYSICAL | FTS_XDEV, NULL);
     FTSENT* entry = NULL;
     int ret = 0;
+    int ret_errno = 0;
 
     if (tree == NULL) {
       fprintf(LOGFILE,
@@ -1123,7 +1124,13 @@ static int delete_path(const char *full_path,
           if (rmdir(entry->fts_accpath) != 0) {
             fprintf(LOGFILE, "Couldn't delete directory %s - %s\n", 
                     entry->fts_path, strerror(errno));
-            exit_code = -1;
+            if (errno == EROFS) {
+              exit_code = -1;
+            }
+            // record the first errno
+            if (errno != ENOENT && ret_errno == 0) {
+              ret_errno = errno;
+            }
           }
         }
         break;
@@ -1135,7 +1142,13 @@ static int delete_path(const char *full_path,
         if (unlink(entry->fts_accpath) != 0) {
           fprintf(LOGFILE, "Couldn't delete file %s - %s\n", entry->fts_path,
                   strerror(errno));
-          exit_code = -1;
+          if (errno == EROFS) {
+            exit_code = -1;
+          }
+          // record the first errno
+          if (errno != ENOENT && ret_errno == 0) {
+            ret_errno = errno;
+          }
         }
         break;
 
@@ -1178,6 +1191,9 @@ static int delete_path(const char *full_path,
       }
     }
     ret = fts_close(tree);
+    if (ret_errno != 0) {
+      exit_code = -1;
+    }
     if (exit_code == 0 && ret != 0) {
       fprintf(LOGFILE, "Error in fts_close while deleting %s\n", full_path);
       exit_code = -1;

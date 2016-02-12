@@ -53,6 +53,7 @@ import org.apache.hadoop.yarn.server.applicationhistoryservice.ApplicationHistor
 import org.apache.hadoop.yarn.server.applicationhistoryservice.MemoryApplicationHistoryStore;
 import org.apache.hadoop.yarn.server.applicationhistoryservice.timeline.MemoryTimelineStore;
 import org.apache.hadoop.yarn.server.applicationhistoryservice.timeline.TimelineStore;
+import org.apache.hadoop.yarn.server.applicationhistoryservice.webapp.AHSWebApp;
 import org.apache.hadoop.yarn.server.nodemanager.Context;
 import org.apache.hadoop.yarn.server.nodemanager.NodeHealthCheckerService;
 import org.apache.hadoop.yarn.server.nodemanager.NodeManager;
@@ -532,11 +533,6 @@ public class MiniYARNCluster extends CompositeService {
       String logDirsString = prepareDirs("log", numLogDirs);
       config.set(YarnConfiguration.NM_LOG_DIRS, logDirsString);
 
-      File remoteLogDir = new File(testWorkDir,
-          MiniYARNCluster.this.getName() + "-remoteLogDir-nm-" + index);
-      remoteLogDir.mkdir();
-      config.set(YarnConfiguration.NM_REMOTE_APP_LOG_DIR,
-          remoteLogDir.getAbsolutePath());
       // By default AM + 2 containers
       config.setInt(YarnConfiguration.NM_PMEM_MB, 4 * 1024);
       config.set(YarnConfiguration.NM_ADDRESS,
@@ -761,6 +757,7 @@ public class MiniYARNCluster extends CompositeService {
       if (appHistoryServer != null) {
         appHistoryServer.stop();
       }
+      AHSWebApp.resetInstance();
       super.serviceStop();
     }
   }

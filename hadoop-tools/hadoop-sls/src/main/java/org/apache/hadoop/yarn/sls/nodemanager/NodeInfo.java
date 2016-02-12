@@ -18,27 +18,22 @@
 
 package org.apache.hadoop.yarn.sls.nodemanager;
 
-import java.util.ArrayList;
-import java.util.List;
-
+import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.net.Node;
-import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
-import org.apache.hadoop.yarn.api.records.ContainerId;
-import org.apache.hadoop.yarn.api.records.ContainerState;
-import org.apache.hadoop.yarn.api.records.ContainerStatus;
-import org.apache.hadoop.yarn.api.records.NodeId;
-import org.apache.hadoop.yarn.api.records.NodeState;
-import org.apache.hadoop.yarn.api.records.Resource;
-import org.apache.hadoop.yarn.api.records.ResourceOption;
+import org.apache.hadoop.yarn.api.records.*;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
-import org.apache.hadoop.yarn.server.resourcemanager.rmnode
-        .UpdatedContainerInfo;
-import io.hops.ha.common.TransactionState;
+import org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo;
+import org.apache.hadoop.classification.InterfaceAudience.Private;
+import org.apache.hadoop.classification.InterfaceStability.Unstable;
+
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 
+@Private
+@Unstable
 public class NodeInfo {
   private static int NODE_ID = 0;
 
@@ -46,6 +41,8 @@ public class NodeInfo {
     return NodeId.newInstance(host, port);
   }
 
+  @Private
+  @Unstable
   private static class FakeRMNodeImpl implements RMNode {
     private NodeId nodeId;
     private String hostName;

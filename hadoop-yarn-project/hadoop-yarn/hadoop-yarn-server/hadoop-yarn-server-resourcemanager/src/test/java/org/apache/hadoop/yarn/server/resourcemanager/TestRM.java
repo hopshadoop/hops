@@ -21,6 +21,8 @@ import io.hops.exception.StorageInitializtionException;
 import io.hops.metadata.util.RMStorageFactory;
 import io.hops.metadata.util.RMUtilities;
 import io.hops.metadata.util.YarnAPIStorageFactory;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.junit.After;
 import org.junit.Assert;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -92,6 +94,13 @@ public class TestRM {
     RMUtilities.InitializeDB();
   }
 
+  @After
+  public void tearDown() {
+    ClusterMetrics.destroy();
+    QueueMetrics.clearQueueMetrics();
+    DefaultMetricsSystem.shutdown();
+  }
+  
   @Test
   public void testGetNewAppId() throws Exception {
     LOG.debug("HOP :: current method-" + RMUtilities.getCallerMethod("TestRM"));

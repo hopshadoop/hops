@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.yarn.client;
 
-import junit.framework.Assert;
+import org.junit.Assert;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.Resource;

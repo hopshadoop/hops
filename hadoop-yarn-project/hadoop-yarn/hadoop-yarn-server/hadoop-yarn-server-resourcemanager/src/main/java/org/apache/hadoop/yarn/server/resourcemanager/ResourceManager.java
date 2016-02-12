@@ -500,6 +500,8 @@ public class ResourceManager extends CompositeService implements Recoverable {
       createAndInitResourceTrackingServices();
       // Initialize the scheduler
       scheduler = createScheduler();
+      scheduler.setRMContext(rmContext);
+      addIfService(scheduler);
       rmContext.setScheduler(scheduler);
 
       schedulerDispatcher = createSchedulerEventDispatcher();
@@ -515,11 +517,6 @@ public class ResourceManager extends CompositeService implements Recoverable {
           new ApplicationAttemptEventDispatcher(rmContext));
 
 
-      try {
-        scheduler.reinitialize(conf, rmContext, null);
-      } catch (IOException ioe) {
-        throw new RuntimeException("Failed to initialize scheduler", ioe);
-      }
 
       // creating monitors that handle preemption
       createPolicyMonitors();

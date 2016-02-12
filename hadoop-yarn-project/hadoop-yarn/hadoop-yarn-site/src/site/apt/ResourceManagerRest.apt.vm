@@ -197,6 +197,14 @@ ResourceManager REST API's.
 *---------------+--------------+-------------------------------+
 | totalMB       | long         | The amount of total memory in MB |
 *---------------+--------------+-------------------------------+
+| reservedVirtualCores    | long         | The number of reserved virtual cores |
+*---------------+--------------+-------------------------------+
+| availableVirtualCores   | long         | The number of available virtual cores |
+*---------------+--------------+-------------------------------+
+| allocatedVirtualCores   | long         | The number of allocated virtual cores |
+*---------------+--------------+-------------------------------+
+| totalVirtualCores       | long         | The total number of virtual cores |
+*---------------+--------------+-------------------------------+
 | containersAllocated | int | The number of containers allocated |
 *---------------+--------------+-------------------------------+
 | containersReserved | int | The number of containers reserved |
@@ -249,10 +257,14 @@ ResourceManager REST API's.
       "reservedMB":0,
       "availableMB":17408,
       "allocatedMB":0,
+      "reservedVirtualCores":0,
+      "availableVirtualCores":7,
+      "allocatedVirtualCores":1,
       "containersAllocated":0,
       "containersReserved":0,
       "containersPending":0,
       "totalMB":17408,
+      "totalVirtualCores":8,
       "totalNodes":1,
       "lostNodes":0,
       "unhealthyNodes":0,
@@ -295,10 +307,14 @@ ResourceManager REST API's.
   <reservedMB>0</reservedMB>
   <availableMB>17408</availableMB>
   <allocatedMB>0</allocatedMB>
+  <reservedVirtualCores>0</reservedVirtualCores>
+  <availableVirtualCores>7</availableVirtualCores>
+  <allocatedVirtualCores>1</allocatedVirtualCores>
   <containersAllocated>0</containersAllocated>
   <containersReserved>0</containersReserved>
   <containersPending>0</containersPending>
   <totalMB>17408</totalMB>
+  <totalVirtualCores>8</totalVirtualCores>
   <totalNodes>1</totalNodes>
   <lostNodes>0</lostNodes>
   <unhealthyNodes>0</unhealthyNodes>
@@ -1566,6 +1582,287 @@ _01_000001</amContainerLogs>
 </app>
 +---+
 
+* Cluster Application State API
+
+  With the application state API, you can query the state of a submitted app as well kill a running app by modifying the state of a running app using a PUT request with the state set to "KILLED". To perform the PUT operation, authentication has to be setup for the RM web services. In addition, you must be authorized to kill the app. Currently you can only change the state to "KILLED"; an attempt to change the state to any other results in a 400 error response. Examples of the unauthorized and bad request errors are below. When you carry out a successful PUT, the iniital response may be a 202. You can confirm that the app is killed by repeating the PUT request until you get a 200, querying the state using the GET method or querying for app information and checking the state. In the examples below, we repeat the PUT request and get a 200 response.
+
+  Please note that in order to kill an app, you must have an authentication filter setup for the HTTP interface. The functionality requires that a username is set in the HttpServletRequest. If no filter is setup, the response will be an "UNAUTHORIZED" response.
+
+** URI
+
+-----
+  * http://<rm http address:port>/ws/v1/cluster/apps/{appid}/state
+-----
+
+** HTTP Operations Supported
+
+------
+  * GET
+  * PUT
+------
+
+** Query Parameters Supported
+
+------
+  None
+------
+
+** Elements of <appstate> object
+
+  When you make a request for the state of an app, the information returned has the following fields
+
+*---------------+--------------+-------------------------------+
+|| Item         || Data Type   || Description                  |
+*---------------+--------------+-------------------------------+
+| state | string  | The application state - can be one of "NEW", "NEW_SAVING", "SUBMITTED", "ACCEPTED", "RUNNING", "FINISHED", "FAILED", "KILLED" |
+*---------------+--------------+--------------------------------+
+
+
+** Response Examples
+
+  <<JSON responses>>
+
+  HTTP Request
+
+-----
+  GET http://<rm http address:port>/ws/v1/cluster/apps/application_1399397633663_0003/state
+-----
+
+  Response Header:
+
++---+
+HTTP/1.1 200 OK
+Content-Type: application/json
+Transfer-Encoding: chunked
+Server: Jetty(6.1.26)
++---+
+
+  Response Body:
+
++---+
+{
+  "state":"ACCEPTED"
+}
++---+
+
+  HTTP Request
+
+-----
+  PUT http://<rm http address:port>/ws/v1/cluster/apps/application_1399397633663_0003/state
+----
+
+  Request Body:
+
++---+
+{
+  "state":"KILLED"
+}
++---+
+
+  Response Header:
+
++---+
+HTTP/1.1 202 Accepted
+Content-Type: application/json
+Transfer-Encoding: chunked
+Location: http://<rm http address:port>/ws/v1/cluster/apps/application_1399397633663_0003
+Server: Jetty(6.1.26)
++---+
+
+  Response Body:
+
++---+
+{
+  "state":"ACCEPTED"
+}
++---+
+
+-----
+  PUT http://<rm http address:port>/ws/v1/cluster/apps/application_1399397633663_0003/state
+----
+
+  Request Body:
+
++---+
+{
+  "state":"KILLED"
+}
++---+
+
+  Response Header:
+
++---+
+HTTP/1.1 200 OK
+Content-Type: application/json
+Transfer-Encoding: chunked
+Server: Jetty(6.1.26)
++---+
+
+  Response Body:
+
++---+
+{
+  "state":"KILLED"
+}
++---+
+
+  <<XML responses>>
+
+  HTTP Request
+
+-----
+  GET http://<rm http address:port>/ws/v1/cluster/apps/application_1399397633663_0003/state
+-----
+
+  Response Header:
+
++---+
+HTTP/1.1 200 OK
+Content-Type: application/xml
+Content-Length: 99
+Server: Jetty(6.1.26)
++---+
+
+  Response Body:
+
++---+
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<appstate>
+  <state>ACCEPTED</state>
+</appstate>
++---+
+
+  HTTP Request
+
+-----
+  PUT http://<rm http address:port>/ws/v1/cluster/apps/application_1399397633663_0003/state
+----
+
+  Request Body:
+
++---+
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<appstate>
+  <state>KILLED</state>
+</appstate>
++---+
+
+  Response Header:
+
++---+
+HTTP/1.1 202 Accepted
+Content-Type: application/json
+Content-Length: 794
+Location: http://<rm http address:port>/ws/v1/cluster/apps/application_1399397633663_0003
+Server: Jetty(6.1.26)
++---+
+
+  Response Body:
+
++---+
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<appstate>
+  <state>ACCEPTED</state>
+</appstate>
++---+
+
+  HTTP Request
+
+-----
+  PUT http://<rm http address:port>/ws/v1/cluster/apps/application_1399397633663_0003/state
+----
+
+  Request Body:
+
++---+
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<appstate>
+  <state>KILLED</state>
+</appstate>
++---+
+
+  Response Header:
+
++---+
+HTTP/1.1 200 OK
+Content-Type: application/xml
+Content-Length: 917
+Server: Jetty(6.1.26)
++---+
+
+  Response Body:
+
++---+
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<appstate>
+  <state>KILLED</state>
+</appstate>
++---+
+
+  <<Unauthorized Error Response>>
+
+  HTTP Request
+
+-----
+  PUT http://<rm http address:port>/ws/v1/cluster/apps/application_1399397633663_0003/state
+----
+
+  Request Body:
+
++---+
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<appstate>
+  <state>KILLED</state>
+</appstate>
++---+
+
+  Response Header:
+
++---+
+HTTP/1.1 403 Unauthorized
+Content-Type: application/json
+Transfer-Encoding: chunked
+Server: Jetty(6.1.26)
++---+
+
+
+  <<Bad Request Error Response>>
+
+  HTTP Request
+
+-----
+  PUT http://<rm http address:port>/ws/v1/cluster/apps/application_1399397633663_0003/state
+----
+
+  Request Body:
+
++---+
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<appstate>
+  <state>RUNNING</state>
+</appstate>
++---+
+
+  Response Header:
+
++---+
+HTTP/1.1 400
+Content-Length: 295
+Content-Type: application/xml
+Server: Jetty(6.1.26)
++---+
+
+  Response Body:
+
++---+
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<RemoteException>
+  <exception>BadRequestException</exception>
+  <message>java.lang.Exception: Only 'KILLED' is allowed as a target state.</message>
+  <javaClassName>org.apache.hadoop.yarn.webapp.BadRequestException</javaClassName>
+</RemoteException>
++---+
+
 * Cluster Application Attempts API
 
   With the application attempts API, you can obtain a collection of resources that represent an application attempt.  When you run a GET operation on this resource, you obtain a collection of App Attempt Objects. 
@@ -1761,8 +2058,10 @@ _01_000001</amContainerLogs>
         "lastHealthUpdate":1324056895432,
         "healthReport":"Healthy",
         "numContainers":0,
-        "usedMemoryMB":0
-        "availMemoryMB":8192
+        "usedMemoryMB":0,
+        "availMemoryMB":8192,
+        "usedVirtualCores":0,
+        "availableVirtualCores":8
       },
       {
         "rack":"\/default-rack",
@@ -1775,7 +2074,9 @@ _01_000001</amContainerLogs>
         "healthReport":"Healthy",
         "numContainers":0,
         "usedMemoryMB":0,
-        "availMemoryMB":8192
+        "availMemoryMB":8192,
+        "usedVirtualCores":0,
+        "availableVirtualCores":8
       }
     ]
   }
@@ -1817,6 +2118,8 @@ _01_000001</amContainerLogs>
     <numContainers>0</numContainers>
     <usedMemoryMB>0</usedMemoryMB>
     <availMemoryMB>5120</availMemoryMB>
+    <usedVirtualCores>0</usedVirtualCores>
+    <availableVirtualCores>8</availableVirtualCores>
   </node>
   <node>
     <rack>/default-rack</rack>
@@ -1830,6 +2133,8 @@ _01_000001</amContainerLogs>
     <numContainers>0</numContainers>
     <usedMemoryMB>0</usedMemoryMB>
     <availMemoryMB>5120</availMemoryMB>
+    <usedVirtualCores>0</usedVirtualCores>
+    <availableVirtualCores>8</availableVirtualCores>
   </node>
 </nodes>
 +---+
@@ -1880,9 +2185,13 @@ _01_000001</amContainerLogs>
 *---------------+--------------+-------------------------------+
 | lastHealthUpdate | long | The last time the node reported its health (in ms since epoch)|
 *---------------+--------------+-------------------------------+
-| usedMemoryMB | long | The total about of memory currently used on the node (in MB)|
+| usedMemoryMB | long | The total amount of memory currently used on the node (in MB)|
 *---------------+--------------+-------------------------------+
 | availMemoryMB | long | The total amount of memory currently available on the node (in MB)|
+*---------------+--------------+-------------------------------+
+| usedVirtualCores | long | The total number of vCores currently used on the node |
+*---------------+--------------+-------------------------------+
+| availableVirtualCores | long | The total number of vCores available on the node |
 *---------------+--------------+-------------------------------+
 | numContainers | int | The total number of containers currently running on the node|
 *---------------+--------------+-------------------------------+
@@ -1922,7 +2231,9 @@ _01_000001</amContainerLogs>
     "healthReport":"Healthy",
     "numContainers":0,
     "usedMemoryMB":0,
-    "availMemoryMB":5120
+    "availMemoryMB":5120,
+    "usedVirtualCores":0,
+    "availableVirtualCores":8
   }
 }
 +---+
@@ -1961,6 +2272,8 @@ _01_000001</amContainerLogs>
   <numContainers>0</numContainers>
   <usedMemoryMB>0</usedMemoryMB>
   <availMemoryMB>5120</availMemoryMB>
+  <usedVirtualCores>0</usedVirtualCores>
+  <availableVirtualCores>5120</availableVirtualCores>
 </node>
 +---+
 
