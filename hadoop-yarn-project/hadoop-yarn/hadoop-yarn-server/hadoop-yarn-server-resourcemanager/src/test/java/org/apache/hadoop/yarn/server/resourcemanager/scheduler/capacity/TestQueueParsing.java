@@ -25,6 +25,8 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContextImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.security.ClientToAMTokenSecretManagerInRM;
+import org.apache.hadoop.yarn.server.resourcemanager.security.NMTokenSecretManagerInRM;
+import org.apache.hadoop.yarn.server.resourcemanager.security.RMContainerTokenSecretManager;
 import org.junit.Test;
 
 public class TestQueueParsing {
@@ -40,11 +42,22 @@ public class TestQueueParsing {
     setupQueueConfiguration(csConf);
     YarnConfiguration conf = new YarnConfiguration(csConf);
 
-    CapacityScheduler capacityScheduler = new CapacityScheduler();
+    CapacityScheduler capacityScheduler = new CapacityScheduler(); 
     capacityScheduler.setConf(conf);
     TransactionStateManager tsm = new TransactionStateManager();
     tsm.init(conf);
     tsm.start();
+    
+    RMContextImpl rmContext = new RMContextImpl(null, null,
+     null, null, null, null, null,
+     null,
+     new ClientToAMTokenSecretManagerInRM(), null, conf);
+     rmContext.setContainerTokenSecretManager(
+             new RMContainerTokenSecretManager(conf, rmContext));
+     rmContext.setNMTokenSecretManager(new NMTokenSecretManagerInRM(conf, rmContext));    
+    capacityScheduler.setRMContext(rmContext);
+    capacityScheduler.init(conf);
+    capacityScheduler.start();
     capacityScheduler.reinitialize(conf,
         new RMContextImpl(null, null, null, null, null, null,
             new ClientToAMTokenSecretManagerInRM(), null, conf, tsm), null);

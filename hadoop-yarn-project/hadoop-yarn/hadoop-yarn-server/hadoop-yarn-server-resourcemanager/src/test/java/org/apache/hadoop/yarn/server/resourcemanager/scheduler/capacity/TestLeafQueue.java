@@ -140,10 +140,12 @@ public class TestLeafQueue {
         .thenReturn(containerTokenSecretManager);
 
     root = CapacityScheduler.parseQueue(csContext, csConf, null,
-        CapacitySchedulerConfiguration.ROOT, queues, queues, TestUtils.spyHook, 
-        null);
+        CapacitySchedulerConfiguration.ROOT, queues, queues, TestUtils.spyHook 
+        );
 
-    cs.reinitialize(csConf, rmContext, null);
+    cs.setRMContext(rmContext);
+    cs.init(csConf);
+    cs.start();
     RMStorageFactory.setConfiguration(conf);
     YarnAPIStorageFactory.setConfiguration(conf);
     
@@ -1772,7 +1774,7 @@ public class TestLeafQueue {
     Map<String, CSQueue> newQueues = new HashMap<String, CSQueue>();
     CSQueue newRoot = CapacityScheduler.parseQueue(csContext, csConf, null,
         CapacitySchedulerConfiguration.ROOT, newQueues, queues,
-        TestUtils.spyHook, null);
+        TestUtils.spyHook);
     queues = newQueues;
     root.reinitialize(newRoot, cs.getClusterResources(), null);
 
@@ -1794,7 +1796,7 @@ public class TestLeafQueue {
     Map<String, CSQueue> newQueues = new HashMap<String, CSQueue>();
     CSQueue newRoot = CapacityScheduler.parseQueue(csContext, csConf, null,
         CapacitySchedulerConfiguration.ROOT, newQueues, queues,
-        TestUtils.spyHook, null);
+        TestUtils.spyHook);
     queues = newQueues;
     root.reinitialize(newRoot, cs.getClusterResources(), null);
 
@@ -2145,13 +2147,13 @@ public class TestLeafQueue {
         new ParentQueue(csContext, CapacitySchedulerConfiguration.ROOT, null,
             null);
     csConf.setCapacity(CapacitySchedulerConfiguration.ROOT + "." + A, 80);
-    LeafQueue a = new LeafQueue(csContext, A, root, null, null);
+    LeafQueue a = new LeafQueue(csContext, A, root, null);
     assertEquals(0.1f, a.getMaxAMResourcePerQueuePercent(), 1e-3f);
     assertEquals(160, a.getMaximumActiveApplications());
     
     csConf.setFloat(CapacitySchedulerConfiguration.
         MAXIMUM_APPLICATION_MASTERS_RESOURCE_PERCENT, 0.2f);
-    LeafQueue newA = new LeafQueue(csContext, A, root, null, null);
+    LeafQueue newA = new LeafQueue(csContext, A, root, null);
     a.reinitialize(newA, clusterResource, null);
     assertEquals(0.2f, a.getMaxAMResourcePerQueuePercent(), 1e-3f);
     assertEquals(320, a.getMaximumActiveApplications());
@@ -2230,5 +2232,8 @@ public class TestLeafQueue {
 
   @After
   public void tearDown() throws Exception {
+      if (cs != null) {
+         cs.stop();
+        }
   }
 }
