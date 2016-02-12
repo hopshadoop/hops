@@ -53,6 +53,7 @@ import org.apache.hadoop.hdfs.security.token.block.ExportedBlockKeys;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockManagerTestUtil;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeManager;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.StartupOption;
 import org.apache.hadoop.hdfs.server.common.StorageInfo;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
@@ -60,6 +61,7 @@ import org.apache.hadoop.hdfs.server.datanode.TestTransferRbw;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
+import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.ShellBasedUnixGroupsMapping;
@@ -89,6 +91,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_DEFAULT;
@@ -914,6 +917,15 @@ public class DFSTestUtil {
         adminState);
   }
 
+  public static DatanodeDescriptor[] toDatanodeDescriptor(
+      DatanodeStorageInfo[] storages) {
+    DatanodeDescriptor[] datanodes = new DatanodeDescriptor[storages.length];
+    for(int i = 0; i < datanodes.length; i++) {
+      datanodes[i] = storages[i].getDatanodeDescriptor();
+    }
+    return datanodes;
+  }
+
   public static DatanodeDescriptor getDatanodeDescriptor(String ipAddr,
       String rackLocation) {
     return getDatanodeDescriptor(ipAddr,
@@ -922,10 +934,65 @@ public class DFSTestUtil {
 
   public static DatanodeDescriptor getDatanodeDescriptor(String ipAddr,
       int port, String rackLocation) {
-    DatanodeID dnId = new DatanodeID(ipAddr, "host", "", port,
+    return getDatanodeDescriptor(ipAddr, port, rackLocation, "host");
+  }
+
+  public static DatanodeDescriptor getDatanodeDescriptor(String ipAddr,
+      int port, String rackLocation, String hostname) {
+    DatanodeID dnId = new DatanodeID(ipAddr, hostname, "", port,
         DFSConfigKeys.DFS_DATANODE_HTTP_DEFAULT_PORT,
         DFSConfigKeys.DFS_DATANODE_IPC_DEFAULT_PORT);
     return new DatanodeDescriptor(dnId, rackLocation);
+  }
+
+  public static DatanodeStorageInfo[] createDatanodeStorageInfos(String[] racks) {
+    return createDatanodeStorageInfos(racks, null);
+  }
+
+  public static DatanodeStorageInfo[] createDatanodeStorageInfos(String[] racks, String[] hostnames) {
+    return createDatanodeStorageInfos(racks.length, racks, hostnames);
+  }
+
+  public static DatanodeStorageInfo[] createDatanodeStorageInfos(int n) {
+    return createDatanodeStorageInfos(n, null, null);
+  }
+
+  public static DatanodeStorageInfo[] createDatanodeStorageInfos(
+      int n, String[] racks, String[] hostnames) {
+    return createDatanodeStorageInfos(n, racks, hostnames, null);
+  }
+
+  public static DatanodeStorageInfo[] createDatanodeStorageInfos(
+      int n, String[] racks, String[] hostnames, StorageType[] types) {
+    DatanodeStorageInfo[] storages = new DatanodeStorageInfo[n];
+    for(int i = storages.length; i > 0; ) {
+      final String storageID = "s" + i;
+      final String ip = i + "." + i + "." + i + "." + i;
+      i--;
+      final String rack = (racks!=null && i < racks.length)? racks[i]: "defaultRack";
+      final String hostname = (hostnames!=null && i < hostnames.length)? hostnames[i]: "host";
+      final StorageType type = (types != null && i < types.length) ? types[i]
+          : StorageType.DEFAULT;
+      storages[i] = createDatanodeStorageInfo(storageID, ip, rack, hostname,
+          type);
+    }
+    return storages;
+  }
+
+  public static DatanodeStorageInfo createDatanodeStorageInfo(
+      String storageID, String ip, String rack, String hostname) {
+    return createDatanodeStorageInfo(storageID, ip, rack, hostname,
+        StorageType.DEFAULT);
+  }
+
+  public static DatanodeStorageInfo createDatanodeStorageInfo(
+      String storageID, String ip, String rack, String hostname,
+      StorageType type) {
+    final DatanodeStorage storage = new DatanodeStorage(storageID,
+        DatanodeStorage.State.NORMAL, type);
+    final DatanodeDescriptor dn = BlockManagerTestUtil.getDatanodeDescriptor(
+        ip, rack, storage, hostname);
+    return BlockManagerTestUtil.newDatanodeStorageInfo(dn, storage);
   }
   
   public static DatanodeRegistration getLocalDatanodeRegistration() {

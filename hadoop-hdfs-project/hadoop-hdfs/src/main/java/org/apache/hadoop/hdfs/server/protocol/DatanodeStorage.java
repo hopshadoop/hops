@@ -29,7 +29,8 @@ public class DatanodeStorage {
    */
   public enum State {
     NORMAL,
-    READ_ONLY
+    READ_ONLY,
+    FAILED
   }
   
   private final String storageID;

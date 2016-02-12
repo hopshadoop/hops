@@ -24,6 +24,8 @@ import io.hops.metadata.hdfs.dal.BlockInfoDataAccess;
 import io.hops.metadata.hdfs.dal.StorageDataAccess;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.hdfs.StorageType;
@@ -31,6 +33,7 @@ import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
+import org.apache.hadoop.hdfs.server.protocol.StorageReport;
 import org.apache.hadoop.hdfs.util.EnumCounters;
 import org.apache.hadoop.hdfs.util.LightWeightHashSet;
 import org.apache.hadoop.util.Time;
@@ -39,11 +42,13 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Set;
 
 /**
  * This class extends the DatanodeInfo class with ephemeral information (eg
@@ -53,6 +58,7 @@ import java.util.Queue;
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class DatanodeDescriptor extends DatanodeInfo {
+  public static final Log LOG = LogFactory.getLog(DatanodeDescriptor.class);
   public static final DatanodeDescriptor[] EMPTY_ARRAY = {};
   
   // Stores status of decommissioning.
@@ -199,6 +205,9 @@ public class DatanodeDescriptor extends DatanodeInfo {
    */
   private boolean disallowed = false;
 
+  // HB processing can use it to tell if it is the first HB since DN restarted
+  private boolean heartbeatedSinceRegistration = false;
+
   /**
    * The number of replication work pending before targets are determined
    */
@@ -213,7 +222,8 @@ public class DatanodeDescriptor extends DatanodeInfo {
    *     id of the data node
    */
   public DatanodeDescriptor(DatanodeID nodeID) {
-    this(nodeID, 0L, 0L, 0L, 0L, 0, 0);
+    super(nodeID);
+    updateHeartbeatState(StorageReport.EMPTY_ARRAY, 0L, 0L, 0, 0);
   }
 
   /**
@@ -225,56 +235,8 @@ public class DatanodeDescriptor extends DatanodeInfo {
    *     location of the data node in network
    */
   public DatanodeDescriptor(DatanodeID nodeID, String networkLocation) {
-    this(nodeID, networkLocation, 0L, 0L, 0L, 0L, 0, 0);
-  }
-  
-  /**
-   * DatanodeDescriptor constructor
-   *
-   * @param nodeID
-   *     id of the data node
-   * @param capacity
-   *     capacity of the data node
-   * @param dfsUsed
-   *     space used by the data node
-   * @param remaining
-   *     remaining capacity of the data node
-   * @param bpused
-   *     space used by the block pool corresponding to this namenode
-   * @param xceiverCount
-   *     # of data transfers at the data node
-   */
-  public DatanodeDescriptor(DatanodeID nodeID, long capacity, long dfsUsed,
-      long remaining, long bpused, int xceiverCount, int failedVolumes) {
-    super(nodeID);
-    updateHeartbeat(capacity, dfsUsed, remaining, bpused, xceiverCount,
-        failedVolumes);
-  }
-
-  /**
-   * DatanodeDescriptor constructor
-   *
-   * @param nodeID
-   *     id of the data node
-   * @param networkLocation
-   *     location of the data node in network
-   * @param capacity
-   *     capacity of the data node, including space used by non-dfs
-   * @param dfsUsed
-   *     the used space by dfs datanode
-   * @param remaining
-   *     remaining capacity of the data node
-   * @param bpused
-   *     space used by the block pool corresponding to this namenode
-   * @param xceiverCount
-   *     # of data transfers at the data node
-   */
-  public DatanodeDescriptor(DatanodeID nodeID, String networkLocation,
-      long capacity, long dfsUsed, long remaining, long bpused,
-      int xceiverCount, int failedVolumes) {
     super(nodeID, networkLocation);
-    updateHeartbeat(capacity, dfsUsed, remaining, bpused, xceiverCount,
-        failedVolumes);
+    updateHeartbeatState(StorageReport.EMPTY_ARRAY, 0L, 0L, 0, 0);
   }
 
   /**
@@ -354,20 +316,128 @@ public class DatanodeDescriptor extends DatanodeInfo {
     return blocks;
   }
 
+  public void updateHeartbeat(StorageReport[] reports, long cacheCapacity,
+      long cacheUsed, int xceiverCount, int volFailures) {
+    updateHeartbeatState(reports, cacheCapacity, cacheUsed, xceiverCount,
+        volFailures);
+    heartbeatedSinceRegistration = true;
+  }
+
   /**
-   * Updates stats from datanode heartbeat.
+   * process datanode heartbeat or stats initialization.
    */
-  public void updateHeartbeat(long capacity, long dfsUsed, long remaining,
-      long blockPoolUsed, int xceiverCount, int volFailures) {
-    setCapacity(capacity);
-    setRemaining(remaining);
-    setBlockPoolUsed(blockPoolUsed);
-    setDfsUsed(dfsUsed);
+  public void updateHeartbeatState(StorageReport[] reports, long cacheCapacity,
+      long cacheUsed, int xceiverCount, int volFailures) {
+    long totalCapacity = 0;
+    long totalRemaining = 0;
+    long totalBlockPoolUsed = 0;
+    long totalDfsUsed = 0;
+    Set<DatanodeStorageInfo> failedStorageInfos = null;
+
+    // Decide if we should check for any missing StorageReport and mark it as
+    // failed. There are different scenarios.
+    // 1. When DN is running, a storage failed. Given the current DN
+    //    implementation doesn't add recovered storage back to its storage list
+    //    until DN restart, we can assume volFailures won't decrease
+    //    during the current DN registration session.
+    //    When volumeFailures == this.volumeFailures, it implies there is no
+    //    state change. No need to check for failed storage. This is an
+    //    optimization.
+    // 2. After DN restarts, volFailures might not increase and it is possible
+    //    we still have new failed storage. For example, admins reduce
+    //    available storages in configuration. Another corner case
+    //    is the failed volumes might change after restart; a) there
+    //    is one good storage A, one restored good storage B, so there is
+    //    one element in storageReports and that is A. b) A failed. c) Before
+    //    DN sends HB to NN to indicate A has failed, DN restarts. d) After DN
+    //    restarts, storageReports has one element which is B.
+    boolean checkFailedStorages = (volFailures > this.volumeFailures) ||
+        !heartbeatedSinceRegistration;
+
+    if (checkFailedStorages) {
+      LOG.info("Number of failed storage changes from "
+          + this.volumeFailures + " to " + volFailures);
+      failedStorageInfos = new HashSet<DatanodeStorageInfo>(
+          storageMap.values());
+    }
+
+    setCacheCapacity(cacheCapacity);
+    setCacheUsed(cacheUsed);
     setXceiverCount(xceiverCount);
     setLastUpdate(Time.now());
     this.volumeFailures = volFailures;
-    this.heartbeatedSinceFailover = true;
+    for (StorageReport report : reports) {
+      DatanodeStorageInfo storage = updateStorage(report.getStorage());
+      if (checkFailedStorages) {
+        failedStorageInfos.remove(storage);
+      }
+
+      storage.receivedHeartbeat(report);
+      totalCapacity += report.getCapacity();
+      totalRemaining += report.getRemaining();
+      totalBlockPoolUsed += report.getBlockPoolUsed();
+      totalDfsUsed += report.getDfsUsed();
+    }
     rollBlocksScheduled(getLastUpdate());
+
+    // Update total metrics for the node.
+    setCapacity(totalCapacity);
+    setRemaining(totalRemaining);
+    setBlockPoolUsed(totalBlockPoolUsed);
+    setDfsUsed(totalDfsUsed);
+    if (checkFailedStorages) {
+      updateFailedStorage(failedStorageInfos);
+    }
+
+    if (storageMap.size() != reports.length) {
+      pruneStorageMap(reports);
+    }
+  }
+
+  /**
+   * Remove stale storages from storageMap. We must not remove any storages
+   * as long as they have associated block replicas.
+   */
+  private void pruneStorageMap(final StorageReport[] reports) {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Number of storages reported in heartbeat=" + reports.length +
+          "; Number of storages in storageMap=" + storageMap.size());
+    }
+
+    HashMap<String, DatanodeStorageInfo> excessStorages;
+
+    synchronized (storageMap) {
+      // Init excessStorages with all known storages.
+      excessStorages = new HashMap<String, DatanodeStorageInfo>(storageMap);
+
+      // Remove storages that the DN reported in the heartbeat.
+      for (final StorageReport report : reports) {
+        excessStorages.remove(report.getStorage().getStorageID());
+      }
+
+      // For each remaining storage, remove it if there are no associated
+      // blocks.
+      for (final DatanodeStorageInfo storageInfo : excessStorages.values()) {
+        if (storageInfo.numBlocks() == 0) {
+          storageMap.remove(storageInfo.getStorageID());
+          LOG.info("Removed storage " + storageInfo + " from DataNode" + this);
+        } else if (LOG.isDebugEnabled()) {
+          // This can occur until all block reports are received.
+          LOG.debug("Deferring removal of stale storage " + storageInfo +
+              " with " + storageInfo.numBlocks() + " blocks");
+        }
+      }
+    }
+  }
+
+  private void updateFailedStorage(
+      Set<DatanodeStorageInfo> failedStorageInfos) {
+    for (DatanodeStorageInfo storageInfo : failedStorageInfos) {
+      if (storageInfo.getState() != DatanodeStorage.State.FAILED) {
+        LOG.info(storageInfo + " failed.");
+        storageInfo.setState(DatanodeStorage.State.FAILED);
+      }
+    }
   }
 
   public Iterator<DatanodeStorageInfo> getStorageIterator() throws IOException {
@@ -421,32 +491,6 @@ public class DatanodeDescriptor extends DatanodeInfo {
     };
     return (List<BlockInfo>) findBlocksHandler.handle();
   }
-  
-//  public Map<Long,Integer> getAllMachineReplicas() throws IOException {
-//    LightWeightRequestHandler findBlocksHandler = new LightWeightRequestHandler(
-//        HDFSOperationType.GET_ALL_MACHINE_BLOCKS_IDS) {
-//      @Override
-//      public Object performTask() throws StorageException, IOException {
-//        ReplicaDataAccess da = (ReplicaDataAccess) HdfsStorageFactory
-//            .getDataAccess(ReplicaDataAccess.class);
-//        return da.findBlockAndInodeIdsByStorageId(getSId());
-//      }
-//    };
-//    return (Map<Long,Integer>)findBlocksHandler.handle();
-//  }
-  
-//    public Map<Long,Long> getAllMachineInvalidatedReplicasWithGenStamp() throws IOException {
-//    LightWeightRequestHandler findBlocksHandler = new LightWeightRequestHandler(
-//        HDFSOperationType.GET_ALL_MACHINE_BLOCKS_IDS) {
-//      @Override
-//      public Object performTask() throws StorageException, IOException {
-//        InvalidateBlockDataAccess da = (InvalidateBlockDataAccess) HdfsStorageFactory
-//            .getDataAccess(InvalidateBlockDataAccess.class);
-//        return da.findInvalidatedBlockByStorageIdUsingMySQLServer(getSId());
-//      }
-//    };
-//    return (Map<Long,Long>)findBlocksHandler.handle();
-//  }
   
   /**
    * Store block replication work.
@@ -696,7 +740,12 @@ public class DatanodeDescriptor extends DatanodeInfo {
   @Override
   public void updateRegInfo(DatanodeID nodeReg) {
     super.updateRegInfo(nodeReg);
-    firstBlockReport = true; // must re-process IBR after re-registration
+
+    // must re-process IBR after re-registration
+    for(DatanodeStorageInfo storage : getStorageInfos()) {
+      storage.setBlockReportCount(0);
+    }
+    heartbeatedSinceRegistration = false;
   }
 
   /**

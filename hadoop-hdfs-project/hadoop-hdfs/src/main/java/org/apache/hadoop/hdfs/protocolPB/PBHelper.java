@@ -1366,7 +1366,7 @@ public class PBHelper {
     return StorageReportProto.newBuilder()
         .setBlockPoolUsed(r.getBlockPoolUsed()).setCapacity(r.getCapacity())
         .setDfsUsed(r.getDfsUsed()).setRemaining(r.getRemaining())
-        .setStorageID(r.getStorageID()).build();
+        .setStorageID(r.getStorage().getStorageID()).build();
   }
 
   public static DataChecksum.Type convert(HdfsProtos.ChecksumTypeProto type) {

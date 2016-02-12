@@ -99,6 +99,7 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
         DFSConfigKeys.DFS_NAMENODE_STALE_DATANODE_INTERVAL_DEFAULT);
   }
 
+  // The srcPath is ignored
   @Override
   public DatanodeStorageInfo[] chooseTarget(String srcPath,
       int numOfReplicas,

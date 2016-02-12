@@ -836,7 +836,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
     final BlockManager bm = namesystem.getBlockManager();
     for(StorageBlockReport r : reports) {
       final BlockListAsLongs blocks = new BlockListAsLongs(r.getBlocks());
-      bm.processReport(nodeReg, r.getStorage(), poolId, blocks);
+      bm.processReport(nodeReg, r.getStorage(), blocks);
     }
 
     DatanodeDescriptor datanode = bm.getDatanodeManager().getDatanode(nodeReg);

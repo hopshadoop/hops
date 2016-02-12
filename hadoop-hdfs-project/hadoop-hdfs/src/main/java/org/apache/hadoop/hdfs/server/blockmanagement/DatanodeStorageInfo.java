@@ -23,6 +23,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+import com.google.common.annotations.VisibleForTesting;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.HdfsStorageFactory;
@@ -99,7 +100,8 @@ public class DatanodeStorageInfo {
   private State state;
   private long capacity;
   private long dfsUsed;
-  private long remaining;
+  private volatile long remaining;
+  private long blockPoolUsed;
   private int sid = -1;
 
   /** The number of block reports received */
@@ -126,6 +128,14 @@ public class DatanodeStorageInfo {
     this.storageID = s.getStorageID();
     this.storageType = s.getStorageType();
     this.state = s.getState();
+  }
+
+  int getBlockReportCount() {
+    return blockReportCount;
+  }
+
+  void setBlockReportCount(int blockReportCount) {
+    this.blockReportCount = blockReportCount;
   }
 
   boolean areBlockContentsStale() {
@@ -226,6 +236,10 @@ public class DatanodeStorageInfo {
     return remaining;
   }
 
+  long getBlockPoolUsed() {
+    return blockPoolUsed;
+  }
+
   public boolean addBlock(BlockInfo b) {
     try {
       return b.addReplica(this) != null;
@@ -279,6 +293,7 @@ public class DatanodeStorageInfo {
     capacity = r.getCapacity();
     dfsUsed = r.getDfsUsed();
     remaining = r.getRemaining();
+    blockPoolUsed = r.getBlockPoolUsed();
   }
 
   public DatanodeDescriptor getDatanodeDescriptor() {
@@ -324,5 +339,14 @@ public class DatanodeStorageInfo {
       }
     };
     return (Map<Long, Long>) findBlocksHandler.handle();
+  }
+
+  @VisibleForTesting
+  public void setUtilizationForTesting(long capacity, long dfsUsed,
+      long remaining, long blockPoolUsed) {
+    this.capacity = capacity;
+    this.dfsUsed = dfsUsed;
+    this.remaining = remaining;
+    this.blockPoolUsed = blockPoolUsed;
   }
 }
