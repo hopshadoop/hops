@@ -1271,10 +1271,9 @@ public class CapacityScheduler extends AbstractYarnScheduler
     if (LOG.isDebugEnabled()) {
       LOG.debug("KILL_CONTAINER: container" + cont.toString());
     }
-    completedContainer(cont, SchedulerUtils
-            .createPreemptedContainerStatus(cont.getContainerId(),
-                "Container being forcibly preempted:" + cont.getContainerId()),
-            RMContainerEventType.KILL, transactionState);
+    completedContainer(cont, SchedulerUtils.createPreemptedContainerStatus(
+      cont.getContainerId(), SchedulerUtils.PREEMPTED_CONTAINER),
+      RMContainerEventType.KILL, transactionState);
   }
 
   @Override
