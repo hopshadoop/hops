@@ -87,6 +87,7 @@ import org.apache.hadoop.yarn.util.resource.ResourceCalculator;
 import org.apache.hadoop.yarn.util.resource.Resources;
 
 import com.google.common.base.Preconditions;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -98,6 +99,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.QueueMetrics;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication;
 import org.apache.hadoop.yarn.util.ConverterUtils;
@@ -196,7 +198,7 @@ public class CapacityScheduler extends AbstractYarnScheduler
   private Resource clusterResource = 
           RecordFactoryProvider.getRecordFactory(null)
                   .newRecordInstance(Resource.class);  // recovered
-  private int numNodeManagers = 0;    //recovered
+  private AtomicInteger numNodeManagers = new AtomicInteger(0);   //recovered
 
   private Resource minimumAllocation;  //from config
   private Resource maximumAllocation;   //from config
@@ -268,9 +270,9 @@ public class CapacityScheduler extends AbstractYarnScheduler
   }
 
   @Override
-  public synchronized int getNumClusterNodes() {
-    return numNodeManagers;
-  }
+  public int getNumClusterNodes() {
+    return numNodeManagers.get();
+   }
 
   @Override
   public synchronized RMContext getRMContext() {
@@ -1036,11 +1038,11 @@ public class CapacityScheduler extends AbstractYarnScheduler
 
     root.updateClusterResource(clusterResource, transactionState);
 
-    ++numNodeManagers;
+    int numNodes = numNodeManagers.incrementAndGet();
     LOG.info("Added node " + nodeManager.getNodeAddress() +
         " clusterResource: " + clusterResource);
 
-    if (scheduleAsynchronously && numNodeManagers == 1) {
+    if (scheduleAsynchronously && numNodes == 1) {
       asyncSchedulerThread.beginSchedule();
     }
   }
@@ -1059,9 +1061,9 @@ public class CapacityScheduler extends AbstractYarnScheduler
               clusterResource);
     }
 
-    --numNodeManagers;
+    int numNodes = numNodeManagers.decrementAndGet();
 
-    if (scheduleAsynchronously && numNodeManagers == 0) {
+    if (scheduleAsynchronously && numNodes == 0) {
       asyncSchedulerThread.suspendSchedule();
     }
 
@@ -1204,7 +1206,7 @@ public class CapacityScheduler extends AbstractYarnScheduler
         ficaNode.recover(state);
         Resources.addTo(clusterResource, ficaNode.getTotalResource());
         nodes.put(nodeId, ficaNode);
-        numNodeManagers++;
+        numNodeManagers.set(numNodeManagers.get()+1); 
       }
 
       //recover csqueues
