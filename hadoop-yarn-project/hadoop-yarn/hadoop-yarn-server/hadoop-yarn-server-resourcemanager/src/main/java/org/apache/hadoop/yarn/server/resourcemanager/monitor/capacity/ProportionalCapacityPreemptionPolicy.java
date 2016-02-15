@@ -174,7 +174,7 @@ public class ProportionalCapacityPreemptionPolicy
   public void editSchedule(TransactionState transactionState) {
     CSQueue root = scheduler.getRootQueue();
     Resource clusterResources =
-        Resources.clone(scheduler.getClusterResources());
+        Resources.clone(scheduler.getClusterResource());
     containerBasedPreemptOrKill(root, clusterResources, transactionState);
   }
 

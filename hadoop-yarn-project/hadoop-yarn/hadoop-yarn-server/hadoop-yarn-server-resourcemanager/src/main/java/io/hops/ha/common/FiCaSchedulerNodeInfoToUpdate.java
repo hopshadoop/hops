@@ -27,6 +27,7 @@ import io.hops.metadata.yarn.entity.Resource;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerImpl;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerNode;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -96,7 +97,7 @@ public class FiCaSchedulerNodeInfoToUpdate {
   }
 
   public void infoToUpdate(
-          org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode node) {
+          SchedulerNode node) {
     String reservedContainer = node.getReservedContainer() != null ? node.
             getReservedContainer().toString() : null;
 

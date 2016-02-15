@@ -465,7 +465,7 @@ public class TestProportionalCapacityPreemptionPolicy {
 
     Resource clusterResources =
         Resource.newInstance(leafAbsCapacities(qData[0], qData[7]), 0);
-    when(mCS.getClusterResources()).thenReturn(clusterResources);
+    when(mCS.getClusterResource()).thenReturn(clusterResources);
     return policy;
   }
 

@@ -74,7 +74,15 @@ public interface YarnScheduler extends EventHandler<SchedulerEvent> {
   @Public
   @Stable
   public List<QueueUserACLInfo> getQueueUserAclInfo();
-  
+
+  /**
+   * Get the whole resource capacity of the cluster.
+   * @return the whole resource capacity of the cluster.
+   */
+  @LimitedPrivate("yarn")
+  @Unstable
+  public Resource getClusterResource();
+
   /**
    * Get minimum allocatable {@link Resource}.
    *

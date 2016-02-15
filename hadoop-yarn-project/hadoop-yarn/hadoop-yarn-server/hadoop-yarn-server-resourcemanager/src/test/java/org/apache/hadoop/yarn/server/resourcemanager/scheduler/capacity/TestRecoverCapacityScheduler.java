@@ -466,7 +466,7 @@ public class TestRecoverCapacityScheduler {
     rm2.start();
     CapacityScheduler scheduler = (CapacityScheduler) rm2.getResourceScheduler();
 
-    Map<ApplicationId, SchedulerApplication> apps = scheduler.
+    Map<ApplicationId, SchedulerApplication<FiCaSchedulerApp>> apps = scheduler.
             getSchedulerApplications();
     assertTrue("app " + application_0.getApplicationId() + " was not recovered",
             apps.containsKey(application_0.getApplicationId()));
