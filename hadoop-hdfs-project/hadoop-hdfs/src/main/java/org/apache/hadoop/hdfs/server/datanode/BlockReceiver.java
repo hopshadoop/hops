@@ -20,6 +20,7 @@ package org.apache.hadoop.hdfs.server.datanode;
 import org.apache.commons.logging.Log;
 import org.apache.hadoop.fs.ChecksumException;
 import org.apache.hadoop.fs.FSOutputSummer;
+import org.apache.hadoop.hdfs.StorageType;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
@@ -122,7 +123,8 @@ class BlockReceiver implements Closeable {
 
   private boolean syncOnClose;
 
-  BlockReceiver(final ExtendedBlock block, final DataInputStream in,
+  BlockReceiver(final ExtendedBlock block, final StorageType storageType,
+      final DataInputStream in,
       final String inAddr, final String myAddr,
       final BlockConstructionStage stage, final long newGs,
       final long minBytesRcvd, final long maxBytesRcvd, final String clientname,
@@ -149,21 +151,21 @@ class BlockReceiver implements Closeable {
 
       if (LOG.isDebugEnabled()) {
         LOG.debug(
-            getClass().getSimpleName() + ": " + block + "\n  isClient  =" +
-                isClient + ", clientname=" + clientname + "\n  isDatanode=" +
-                isDatanode + ", srcDataNode=" + srcDataNode + "\n  inAddr=" +
-                inAddr + ", myAddr=" + myAddr);
+            getClass().getSimpleName() + ": " + block
+                + "\n  isClient  =" + isClient + ", clientname=" + clientname
+                + "\n  isDatanode=" + isDatanode + ", srcDataNode=" + srcDataNode
+                + "\n  inAddr=" + inAddr + ", myAddr=" + myAddr);
       }
 
       //
       // Open local disk out
       //
       if (isDatanode) { //replication or move
-        replicaInfo = datanode.data.createTemporary(block);
+        replicaInfo = datanode.data.createTemporary(storageType, block);
       } else {
         switch (stage) {
           case PIPELINE_SETUP_CREATE:
-            replicaInfo = datanode.data.createRbw(block);
+            replicaInfo = datanode.data.createRbw(storageType, block);
             datanode.notifyNamenodeReceivingBlock(block);
             break;
           case PIPELINE_SETUP_STREAMING_RECOVERY:
@@ -193,7 +195,7 @@ class BlockReceiver implements Closeable {
           case TRANSFER_RBW:
           case TRANSFER_FINALIZED:
             // this is a transfer destination
-            replicaInfo = datanode.data.createTemporary(block);
+            replicaInfo = datanode.data.createTemporary(storageType, block);
             break;
           default:
             throw new IOException("Unsupported stage " + stage +

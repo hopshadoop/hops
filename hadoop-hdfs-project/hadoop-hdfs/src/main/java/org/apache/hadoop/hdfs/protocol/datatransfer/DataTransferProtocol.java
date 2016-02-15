@@ -21,6 +21,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.hdfs.StorageType;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
@@ -95,6 +96,7 @@ public interface DataTransferProtocol {
    *     the latest generation stamp of the block.
    */
   public void writeBlock(final ExtendedBlock blk,
+      final StorageType storageType,
       final Token<BlockTokenIdentifier> blockToken, final String clientName,
       final DatanodeInfo[] targets, final DatanodeInfo source,
       final BlockConstructionStage stage, final int pipelineSize,
@@ -138,6 +140,7 @@ public interface DataTransferProtocol {
    *     the source datanode for receiving the block.
    */
   public void replaceBlock(final ExtendedBlock blk,
+      final StorageType storageType,
       final Token<BlockTokenIdentifier> blockToken, final String delHint,
       final DatanodeInfo source) throws IOException;
 

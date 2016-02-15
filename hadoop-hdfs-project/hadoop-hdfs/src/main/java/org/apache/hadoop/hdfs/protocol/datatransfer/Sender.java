@@ -20,6 +20,7 @@ package org.apache.hadoop.hdfs.protocol.datatransfer;
 import com.google.protobuf.Message;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.hdfs.StorageType;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.ChecksumProto;
@@ -93,6 +94,7 @@ public class Sender implements DataTransferProtocol {
 
   @Override
   public void writeBlock(final ExtendedBlock blk,
+      final StorageType storageType,
       final Token<BlockTokenIdentifier> blockToken, final String clientName,
       final DatanodeInfo[] targets, final DatanodeInfo source,
       final BlockConstructionStage stage, final int pipelineSize,
@@ -106,7 +108,9 @@ public class Sender implements DataTransferProtocol {
         DataTransferProtoUtil.toProto(requestedChecksum);
 
     OpWriteBlockProto.Builder proto =
-        OpWriteBlockProto.newBuilder().setHeader(header)
+        OpWriteBlockProto.newBuilder()
+            .setHeader(header)
+            .setStorageType(PBHelper.convertStorageType(storageType))
             .addAllTargets(PBHelper.convert(targets, 1))
             .setStage(toProto(stage)).setPipelineSize(pipelineSize)
             .setMinBytesRcvd(minBytesRcvd).setMaxBytesRcvd(maxBytesRcvd)
@@ -134,10 +138,12 @@ public class Sender implements DataTransferProtocol {
 
   @Override
   public void replaceBlock(final ExtendedBlock blk,
+      final StorageType storageType,
       final Token<BlockTokenIdentifier> blockToken, final String delHint,
       final DatanodeInfo source) throws IOException {
     OpReplaceBlockProto proto = OpReplaceBlockProto.newBuilder()
         .setHeader(DataTransferProtoUtil.buildBaseHeader(blk, blockToken))
+        .setStorageType(PBHelper.convertStorageType(storageType))
         .setDelHint(delHint).setSource(PBHelper.convertDatanodeInfo(source))
         .build();
     

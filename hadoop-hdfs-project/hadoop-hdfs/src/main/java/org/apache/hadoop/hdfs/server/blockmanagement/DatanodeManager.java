@@ -700,8 +700,10 @@ public class DatanodeManager {
       if (!isNameResolved(dnAddress)) {
         // Reject registration of unresolved datanode to prevent performance
         // impact of repetitive DNS lookups later.
-        LOG.warn("Unresolved datanode registration from " + ip);
-        throw new DisallowedDatanodeException(nodeReg);
+        final String message = "hostname cannot be resolved (ip="
+            + ip + ", hostname=" + hostname + ")";
+        LOG.warn("Unresolved datanode registration: " + message);
+        throw new DisallowedDatanodeException(nodeReg, message);
       }
       // update node registration with the ip and hostname from rpc request
       nodeReg.setIpAddr(ip);
@@ -772,27 +774,17 @@ public class DatanodeManager {
       return;
     }
 
-    // this is a new datanode serving a new data storage
-    if ("".equals(nodeReg.getDatanodeUuid())) {
-      // this data storage has never been registered
-      // it is either empty or was created by pre-storageID version of DFS
-      nodeReg.setStorageID(DatanodeStorage.newStorageID());
-      if (NameNode.stateChangeLog.isDebugEnabled()) {
-        NameNode.stateChangeLog.debug(
-            "BLOCK* NameSystem.registerDatanode: " + "new storageID " +
-                nodeReg.getDatanodeUuid() + " assigned.");
-      }
-    }
     // register new datanode
     DatanodeDescriptor nodeDescr =
         new DatanodeDescriptor(nodeReg, NetworkTopology.DEFAULT_RACK);
 
+    // TODO check if we need this HDP_2.6
     // Update all storages in this datanode
     for(DatanodeStorageInfo storage: getDatanode(nodeDescr.getDatanodeUuid())
         .getStorageInfos()) {
       storageIdMap.update(storage);
     }
-    
+
     resolveNetworkLocation(nodeDescr);
     addDatanode(nodeDescr);
     checkDecommissioning(nodeDescr);

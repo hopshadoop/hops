@@ -98,6 +98,9 @@ message OpWriteBlockProto {
    * The requested checksum mechanism for this block write.
    */
   required ChecksumProto requestedChecksum = 9;
+
+  optional StorageTypeProto storageType = 10 [default = DISK];
+  repeated StorageTypeProto targetStorageTypes = 11;
 }
 
 message OpTransferBlockProto {
@@ -109,6 +112,7 @@ message OpReplaceBlockProto {
   required BaseHeaderProto header = 1;
   required string delHint = 2;
   required DatanodeInfoProto source = 3;
+  optional StorageTypeProto storageType = 4 [default = DISK];
 }
 
 message OpCopyBlockProto {

@@ -1316,7 +1316,7 @@ public class PBHelper {
     return protos;
   }
 
-  private static StorageTypeProto convertStorageType(StorageType type) {
+  public static StorageTypeProto convertStorageType(StorageType type) {
     switch(type) {
       case DISK:
         return StorageTypeProto.DISK;

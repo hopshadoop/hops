@@ -19,6 +19,7 @@ package org.apache.hadoop.hdfs.server.datanode;
 
 import com.google.protobuf.ByteString;
 import org.apache.commons.logging.Log;
+import org.apache.hadoop.hdfs.StorageType;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
@@ -334,6 +335,7 @@ class DataXceiver extends Receiver implements Runnable {
 
   @Override
   public void writeBlock(final ExtendedBlock block,
+      final StorageType storageType,
       final Token<BlockTokenIdentifier> blockToken, final String clientname,
       final DatanodeInfo[] targets, final DatanodeInfo srcDataNode,
       final BlockConstructionStage stage, final int pipelineSize,
@@ -393,7 +395,8 @@ class DataXceiver extends Receiver implements Runnable {
           stage != BlockConstructionStage.PIPELINE_CLOSE_RECOVERY) {
         // open a block receiver
         blockReceiver =
-            new BlockReceiver(block, in, s.getRemoteSocketAddress().toString(),
+            new BlockReceiver(block, storageType, in, s
+                .getRemoteSocketAddress().toString(),
                 s.getLocalSocketAddress().toString(), stage,
                 latestGenerationStamp, minBytesRcvd, maxBytesRcvd, clientname,
                 srcDataNode, datanode, requestedChecksum);
@@ -690,6 +693,7 @@ class DataXceiver extends Receiver implements Runnable {
 
   @Override
   public void replaceBlock(final ExtendedBlock block,
+      final StorageType storageType,
       final Token<BlockTokenIdentifier> blockToken, final String delHint,
       final DatanodeInfo proxySource) throws IOException {
     updateCurrentThreadName("Replacing block " + block + " from " + delHint);
@@ -779,7 +783,7 @@ class DataXceiver extends Receiver implements Runnable {
       DataChecksum remoteChecksum =
           DataTransferProtoUtil.fromProto(checksumInfo.getChecksum());
       // open a block receiver and check if the block does not exist
-      blockReceiver = new BlockReceiver(block, proxyReply,
+      blockReceiver = new BlockReceiver(block, storageType, proxyReply,
           proxySock.getRemoteSocketAddress().toString(),
           proxySock.getLocalSocketAddress().toString(), null, 0, 0, 0, "", null,
           datanode, remoteChecksum);
@@ -832,7 +836,7 @@ class DataXceiver extends Receiver implements Runnable {
   /**
    * Utility function for sending a response.
    *
-   * @param opStatus
+   * @param status
    *     status message to write
    * @param message
    *     message to send to the client or other DN
