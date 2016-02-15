@@ -34,6 +34,7 @@ import org.apache.hadoop.hdfs.server.datanode.fsdataset.impl.FsDatasetFactory;
 import org.apache.hadoop.hdfs.server.datanode.metrics.FSDatasetMBean;
 import org.apache.hadoop.hdfs.server.protocol.BlockRecoveryCommand.RecoveringBlock;
 import org.apache.hadoop.hdfs.server.protocol.ReplicaRecoveryInfo;
+import org.apache.hadoop.hdfs.server.protocol.StorageReport;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 import org.apache.hadoop.util.ReflectionUtils;
 
@@ -93,6 +94,10 @@ public interface FsDatasetSpi<V extends FsVolumeSpi> extends FSDatasetMBean {
    * @return a list of volumes.
    */
   public List<V> getVolumes();
+
+  /** @return one or more storage reports for attached volumes. */
+  public StorageReport[] getStorageReports(String bpid)
+      throws IOException;
 
   /**
    * @return the volume that contains a replica of the block.

@@ -45,11 +45,7 @@ import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.ReportBadBlo
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.ReportBadBlocksResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.StorageBlockReportProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.StorageReceivedDeletedBlocksProto;
-import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.StorageReportProto;
-import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.DatanodeIDProto;
-import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.LocatedBlockProto;
-import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.VersionRequestProto;
-import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.VersionResponseProto;
+import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.*;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeCommand;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeProtocol;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
@@ -105,22 +101,16 @@ public class DatanodeProtocolServerSideTranslatorPB
       HeartbeatRequestProto request) throws ServiceException {
     HeartbeatResponse response;
     try {
-      List<StorageReportProto> list = request.getReportsList();
-      StorageReport[] report = new StorageReport[list.size()];
-      int i = 0;
-      for (StorageReportProto p : list) {
-        report[i++] =
-            new StorageReport(p.getStorageID(), p.getFailed(), p.getCapacity(),
-                p.getDfsUsed(), p.getRemaining(), p.getBlockPoolUsed());
-      }
+      final StorageReport[] report = PBHelper.convertStorageReports(
+          request.getReportsList());
+
       response = impl.sendHeartbeat(PBHelper.convert(request.getRegistration()),
           report, request.getXmitsInProgress(), request.getXceiverCount(),
           request.getFailedVolumes());
     } catch (IOException e) {
       throw new ServiceException(e);
     }
-    HeartbeatResponseProto.Builder builder =
-        HeartbeatResponseProto.newBuilder();
+    HeartbeatResponseProto.Builder builder = HeartbeatResponseProto.newBuilder();
     DatanodeCommand[] cmds = response.getCommands();
     if (cmds != null) {
       for (int i = 0; i < cmds.length; i++) {
@@ -129,6 +119,7 @@ public class DatanodeProtocolServerSideTranslatorPB
         }
       }
     }
+
     return builder.build();
   }
 

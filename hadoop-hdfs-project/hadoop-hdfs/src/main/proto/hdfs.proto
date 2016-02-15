@@ -81,6 +81,15 @@ message DatanodeInfoProto {
   optional AdminState adminState = 10 [default = NORMAL];
 }
 
+message StorageReportProto {
+  required string storageID = 1;
+  optional bool failed = 2 [default = false];
+  optional uint64 capacity = 3 [default = 0];
+  optional uint64 dfsUsed = 4 [default = 0];
+  optional uint64 remaining = 5 [default = 0];
+  optional uint64 blockPoolUsed = 6 [default = 0];
+}
+
 /**
  * Summary of a file or directory
  */

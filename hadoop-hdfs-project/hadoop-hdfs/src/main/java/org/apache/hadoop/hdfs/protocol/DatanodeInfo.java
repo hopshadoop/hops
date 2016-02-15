@@ -44,8 +44,6 @@ public class DatanodeInfo extends DatanodeID implements Node {
   private long dfsUsed;
   private long remaining;
   private long blockPoolUsed;
-  private long cacheCapacity;
-  private long cacheUsed;
   private long lastUpdate;
   private int xceiverCount;
   private String location = NetworkTopology.DEFAULT_RACK;
@@ -85,8 +83,6 @@ public class DatanodeInfo extends DatanodeID implements Node {
     this.dfsUsed = from.getDfsUsed();
     this.remaining = from.getRemaining();
     this.blockPoolUsed = from.getBlockPoolUsed();
-    this.cacheCapacity = from.getCacheCapacity();
-    this.cacheUsed = from.getCacheUsed();
     this.lastUpdate = from.getLastUpdate();
     this.xceiverCount = from.getXceiverCount();
     this.location = from.getNetworkLocation();
@@ -205,34 +201,6 @@ public class DatanodeInfo extends DatanodeID implements Node {
   }
 
   /**
-   * @return Amount of cache capacity in bytes
-   */
-  public long getCacheCapacity() {
-    return cacheCapacity;
-  }
-
-  /**
-   * @return Amount of cache used in bytes
-   */
-  public long getCacheUsed() {
-    return cacheUsed;
-  }
-
-  /**
-   * @return Cache used as a percentage of the datanode's total cache capacity
-   */
-  public float getCacheUsedPercent() {
-    return DFSUtil.getPercentUsed(cacheUsed, cacheCapacity);
-  }
-
-  /**
-   * @return Amount of cache remaining in bytes
-   */
-  public long getCacheRemaining() {
-    return cacheCapacity - cacheUsed;
-  }
-
-  /**
    * The time when this information was accurate.
    */
   public long getLastUpdate() {
@@ -265,16 +233,6 @@ public class DatanodeInfo extends DatanodeID implements Node {
    */
   public void setRemaining(long remaining) {
     this.remaining = remaining;
-  }
-
-  /** Sets cache capacity. */
-  public void setCacheCapacity(long cacheCapacity) {
-    this.cacheCapacity = cacheCapacity;
-  }
-
-  /** Sets cache used. */
-  public void setCacheUsed(long cacheUsed) {
-    this.cacheUsed = cacheUsed;
   }
 
   /**
