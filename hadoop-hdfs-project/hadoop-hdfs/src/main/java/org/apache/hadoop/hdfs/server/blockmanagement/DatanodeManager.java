@@ -58,6 +58,7 @@ import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.apache.hadoop.hdfs.server.protocol.DisallowedDatanodeException;
 import org.apache.hadoop.hdfs.server.protocol.RegisterCommand;
+import org.apache.hadoop.hdfs.server.protocol.StorageReport;
 import org.apache.hadoop.hdfs.util.CyclicIteration;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.net.CachedDNSToSwitchMapping;
@@ -1164,7 +1165,8 @@ public class DatanodeManager {
    * Handle heartbeat from datanodes.
    */
   public DatanodeCommand[] handleHeartbeat(DatanodeRegistration nodeReg,
-      final String blockPoolId, long capacity, long dfsUsed, long remaining,
+      StorageReport[] reports, final String blockPoolId, long capacity, long
+      dfsUsed, long remaining,
       long blockPoolUsed, int xceiverCount, int maxTransfers, int failedVolumes)
       throws IOException {
     synchronized (heartbeatManager) {
@@ -1186,8 +1188,7 @@ public class DatanodeManager {
           return new DatanodeCommand[]{RegisterCommand.REGISTER};
         }
 
-        heartbeatManager.updateHeartbeat(nodeinfo, capacity, dfsUsed, remaining,
-            blockPoolUsed, xceiverCount, failedVolumes);
+        heartbeatManager.updateHeartbeat(nodeinfo, reports, xceiverCount, failedVolumes);
         
         //check lease recovery
         BlockInfoUnderConstruction[] blocks =

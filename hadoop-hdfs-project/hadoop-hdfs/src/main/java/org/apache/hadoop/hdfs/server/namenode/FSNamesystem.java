@@ -120,6 +120,7 @@ import org.apache.hadoop.hdfs.server.protocol.DatanodeCommand;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.hdfs.server.protocol.HeartbeatResponse;
 import org.apache.hadoop.hdfs.server.protocol.NamespaceInfo;
+import org.apache.hadoop.hdfs.server.protocol.StorageReport;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.Server;
@@ -3626,14 +3627,17 @@ private void commitOrCompleteLastBlock(
    * @return an array of datanode commands
    * @throws IOException
    */
-  HeartbeatResponse handleHeartbeat(DatanodeRegistration nodeReg, long capacity,
+  HeartbeatResponse handleHeartbeat(DatanodeRegistration nodeReg,
+      StorageReport[] reports, long capacity,
       long dfsUsed, long remaining, long blockPoolUsed, int xceiverCount,
       int xmitsInProgress, int failedVolumes) throws IOException {
     final int maxTransfer =
         blockManager.getMaxReplicationStreams() - xmitsInProgress;
+
     DatanodeCommand[] cmds = blockManager.getDatanodeManager()
-        .handleHeartbeat(nodeReg, blockPoolId, capacity, dfsUsed, remaining,
-            blockPoolUsed, xceiverCount, maxTransfer, failedVolumes);
+        .handleHeartbeat(nodeReg, reports, blockPoolId, capacity, dfsUsed,
+            remaining, blockPoolUsed, xceiverCount, maxTransfer, failedVolumes);
+
     return new HeartbeatResponse(cmds);
   }
 

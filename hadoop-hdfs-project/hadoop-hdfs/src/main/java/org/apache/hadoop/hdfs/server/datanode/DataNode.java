@@ -141,6 +141,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_ADMIN;
@@ -695,6 +696,25 @@ public class DataNode extends Configured
     // exit without having to explicitly shutdown its thread pool.
     readaheadPool = ReadaheadPool.getInstance();
   }
+
+  public static String generateUuid() {
+    return UUID.randomUUID().toString();
+  }
+
+  /**
+   * Verify that the DatanodeUuid has been initialized. If this is a new
+   * datanode then we generate a new Datanode Uuid and persist it to disk.
+   *
+   * @throws IOException
+   */
+  private synchronized void checkDatanodeUuid() throws IOException {
+    if (storage.getDatanodeUuid() == null) {
+      storage.setDatanodeUuid(generateUuid());
+      storage.writeAll();
+      LOG.info("Generated and persisted new Datanode UUID " +
+          storage.getDatanodeUuid());
+    }
+  }
   
   /**
    * Create a DatanodeRegistration for a specific block pool.
@@ -708,9 +728,11 @@ public class DataNode extends Configured
       // it's null in the case of SimulatedDataSet
       storageInfo = new StorageInfo(nsInfo);
     }
+
     DatanodeID dnId =
         new DatanodeID(streamingAddr.getAddress().getHostAddress(), hostName,
-            getStorageId(), getXferPort(), getInfoPort(), getIpcPort());
+            storage.getDatanodeUuid(), getXferPort(), getInfoPort(), getIpcPort());
+
     return new DatanodeRegistration(dnId, storageInfo, new ExportedBlockKeys(),
         VersionInfo.getVersion());
   }
@@ -728,16 +750,10 @@ public class DataNode extends Configured
       id = bpRegistration;
     }
 
-    if (storage.getStorageID().equals("")) {
-      // This is a fresh datanode, persist the NN-provided storage ID
-      storage.setStorageID(bpRegistration.getDatanodeUuid());
-      storage.writeAll();
-      LOG.info("New storage id " + bpRegistration.getDatanodeUuid() +
-          " is assigned to data-node " + bpRegistration);
-    } else if (!storage.getStorageID().equals(bpRegistration.getDatanodeUuid())) {
-      throw new IOException("Inconsistent storage IDs. Name-node returned " +
-          bpRegistration.getDatanodeUuid() + ". Expecting " +
-          storage.getStorageID());
+    if(!storage.getDatanodeUuid().equals(bpRegistration.getDatanodeUuid())) {
+      throw new IOException("Inconsistent Datanode IDs. Name-node returned "
+          + bpRegistration.getDatanodeUuid()
+          + ". Expecting " + storage.getDatanodeUuid());
     }
     
     registerBlockPoolWithSecretManager(bpRegistration, blockPoolId);
@@ -860,7 +876,7 @@ public class DataNode extends Configured
       }
       final String bpid = nsInfo.getBlockPoolID();
       //read storage info, lock data dirs and transition fs state if necessary
-      storage.recoverTransitionRead(this, bpid, nsInfo, dataDirs, startOpt);
+      storage.recoverTransitionRead(this, nsInfo, dataDirs, startOpt);
       final StorageInfo bpStorage = storage.getBPStorage(bpid);
       LOG.info(
           "Setting up storage: nsid=" + bpStorage.getNamespaceID() + ";bpid=" +
@@ -890,10 +906,6 @@ public class DataNode extends Configured
     return streamingAddr.getPort();
   }
   
-  String getStorageId() {
-    return storage.getStorageID();
-  }
-
   /**
    * @return name useful for logging
    */
@@ -976,11 +988,6 @@ public class DataNode extends Configured
 
   DataNodeMetrics getMetrics() {
     return metrics;
-  }
-  
-  public static void setNewStorageID(DatanodeID dnId) {
-    LOG.info("Datanode is " + dnId);
-    dnId.setStorageID(DatanodeStorage.newStorageID());
   }
   
   /**
@@ -1604,9 +1611,32 @@ public class DataNode extends Configured
     return locations;
   }
 
-  static Collection<StorageLocation> getStorageLocations(Configuration conf) {
-    return parseStorageLocations(
-        conf.getTrimmedStringCollection(DFS_DATANODE_DATA_DIR_KEY));
+  public static List<StorageLocation> getStorageLocations(Configuration conf) {
+    Collection<String> rawLocations =
+        conf.getTrimmedStringCollection(DFS_DATANODE_DATA_DIR_KEY);
+    List<StorageLocation> locations =
+        new ArrayList<StorageLocation>(rawLocations.size());
+
+    for(String locationString : rawLocations) {
+      final StorageLocation location;
+      try {
+        location = StorageLocation.parse(locationString);
+      } catch (IOException ioe) {
+        LOG.error("Failed to initialize storage directory " + locationString
+            + ". Exception details: " + ioe);
+        // Ignore the exception.
+        continue;
+      } catch (SecurityException se) {
+        LOG.error("Failed to initialize storage directory " + locationString
+            + ". Exception details: " + se);
+        // Ignore the exception.
+        continue;
+      }
+
+      locations.add(location);
+    }
+
+    return locations;
   }
 
   /**
@@ -1722,9 +1752,10 @@ public class DataNode extends Configured
 
   @Override
   public String toString() {
-    return "DataNode{data=" + data + ", localName='" + getDisplayName() +
-        "', storageID='" + getStorageId() + "', xmitsInProgress=" +
-        xmitsInProgress.get() + "}";
+    return "DataNode{data=" + data
+        + ", localName='" + getDisplayName()
+        + "', datanodeUuid='" + storage.getDatanodeUuid()
+        + "', xmitsInProgress=" + xmitsInProgress.get() + "}";
   }
 
   private static void printUsage(PrintStream out) {
@@ -2339,8 +2370,12 @@ public class DataNode extends Configured
     return dxcs.balanceThrottler.getBandwidth();
   }
   
-  DNConf getDnConf() {
+  public DNConf getDnConf() {
     return dnConf;
+  }
+
+  public String getDatanodeUuid() {
+    return id == null ? null : id.getDatanodeUuid();
   }
 
   boolean shouldRun() {

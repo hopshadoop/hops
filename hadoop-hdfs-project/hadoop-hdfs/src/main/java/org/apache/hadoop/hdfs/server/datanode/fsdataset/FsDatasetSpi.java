@@ -21,6 +21,7 @@ package org.apache.hadoop.hdfs.server.datanode.fsdataset;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
+import org.apache.hadoop.hdfs.StorageType;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.BlockListAsLongs;
 import org.apache.hadoop.hdfs.protocol.BlockLocalPathInfo;
@@ -202,20 +203,18 @@ public interface FsDatasetSpi<V extends FsVolumeSpi> extends FSDatasetMBean {
    * @throws IOException
    *     if an error occurs
    */
-  public ReplicaInPipelineInterface createTemporary(ExtendedBlock b)
+  public ReplicaInPipelineInterface createTemporary(StorageType storageType, ExtendedBlock b)
       throws IOException;
 
   /**
    * Creates a RBW replica and returns the meta info of the replica
    *
-   * @param b
-   *     block
+   * @param b block
    * @return the meta info of the replica which is being written to
-   * @throws IOException
-   *     if an error occurs
+   * @throws IOException if an error occurs
    */
-  public ReplicaInPipelineInterface createRbw(ExtendedBlock b)
-      throws IOException;
+  public ReplicaInPipelineInterface createRbw(StorageType storageType,
+      ExtendedBlock b) throws IOException;
 
   /**
    * Recovers a RBW replica and returns the meta info of the replica

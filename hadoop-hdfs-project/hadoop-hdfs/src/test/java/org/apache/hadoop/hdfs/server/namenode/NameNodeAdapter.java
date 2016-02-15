@@ -29,6 +29,7 @@ import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenSecretManager;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockManagerTestUtil;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem.SafeModeInfo;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
@@ -100,7 +101,9 @@ public class NameNodeAdapter {
       DatanodeDescriptor dd, FSNamesystem namesystem)
       throws IOException, StorageException {
     return namesystem
-        .handleHeartbeat(nodeReg, dd.getCapacity(), dd.getDfsUsed(),
+        .handleHeartbeat(nodeReg,
+            BlockManagerTestUtil.getStorageReportsForDatanode(dd),
+            dd.getCapacity(), dd.getDfsUsed(),
             dd.getRemaining(), dd.getBlockPoolUsed(), 0, 0, 0);
   }
 

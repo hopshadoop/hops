@@ -814,13 +814,23 @@ class NameNodeRpcServer implements NamenodeProtocols {
 
   @Override // DatanodeProtocol
   public HeartbeatResponse sendHeartbeat(DatanodeRegistration nodeReg,
-      StorageReport[] report, int xmitsInProgress, int xceiverCount,
+      StorageReport[] reports, int xmitsInProgress, int xceiverCount,
       int failedVolumes) throws IOException {
     verifyRequest(nodeReg);
-    return namesystem.handleHeartbeat(nodeReg, report[0].getCapacity(),
-        report[0].getDfsUsed(), report[0].getRemaining(),
-        report[0].getBlockPoolUsed(), xceiverCount, xmitsInProgress,
-        failedVolumes);
+
+    long capacity = 0;
+    long dfsUsed = 0;
+    long remaining = 0;
+    long bpUsed = 0;
+    for (StorageReport r : reports) {
+      capacity += r.getCapacity();
+      dfsUsed += r.getDfsUsed();
+      remaining += r.getRemaining();
+      bpUsed += r.getBlockPoolUsed();
+    }
+
+    return namesystem.handleHeartbeat(nodeReg, reports, capacity, dfsUsed,
+        remaining, bpUsed, xceiverCount, xmitsInProgress, failedVolumes);
   }
 
   @Override // DatanodeProtocol
