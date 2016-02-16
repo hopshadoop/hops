@@ -153,7 +153,10 @@ public class LeafQueue implements CSQueue {
       applicationAttemptMap.
               put(appAttempt.getApplicationAttemptId(), appAttempt);
 
-      if (appAttempt.isPending()) {
+      Set<String> csLeafQueuePendingApps = state.getCSLeafQueuePendingApps(this.
+              getQueuePath());
+      if (csLeafQueuePendingApps != null && csLeafQueuePendingApps.contains(
+              appAttempt.getApplicationAttemptId().toString())) {
         pendingApplications.add(appAttempt);
       } else {
         activeApplications.add(appAttempt);
@@ -813,6 +816,10 @@ public class LeafQueue implements CSQueue {
         user.activateApplication(application.getUser(), transactionState);
         activeApplications.add(application);
         i.remove();
+        if (transactionState != null) {
+          ((TransactionStateImpl) transactionState).getCSQueueInfo().
+                  removeCSLeafPendingApp(application);
+        }
         LOG.info("Application " + application.getApplicationId() +
             " from user: " + application.getUser() +
             " activated in queue: " + getQueueName());
@@ -825,6 +832,10 @@ public class LeafQueue implements CSQueue {
     // Accept 
     user.submitApplication(application.getUser(), transactionState);
     pendingApplications.add(application);
+    if (transactionState != null) {
+      ((TransactionStateImpl) transactionState).getCSQueueInfo().
+              addCSLeafPendingApp(application, this.getQueuePath());
+    }
     applicationAttemptMap
         .put(application.getApplicationAttemptId(), application);
 
@@ -865,6 +876,10 @@ public class LeafQueue implements CSQueue {
     boolean wasActive = activeApplications.remove(application);
     if (!wasActive) {
       pendingApplications.remove(application);
+      if (transactionState != null) {
+        ((TransactionStateImpl) transactionState).getCSQueueInfo().
+                removeCSLeafPendingApp(application);
+      }
     }
     applicationAttemptMap.remove(application.getApplicationAttemptId());
 

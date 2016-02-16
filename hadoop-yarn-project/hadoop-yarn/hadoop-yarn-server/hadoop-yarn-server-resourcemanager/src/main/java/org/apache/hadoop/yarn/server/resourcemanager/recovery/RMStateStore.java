@@ -386,7 +386,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
     Map<Integer, HeartBeatRPC> heartBeatRPCs;
     Map<Integer, AllocateRPC> allocateRPCs;
     List<PendingEvent> pendingEvents;
-    Map<String, AppSchedulingInfo> appSchedulingInfos;
+    Map<String, Map<String, AppSchedulingInfo>> appSchedulingInfos;
     Map<String, SchedulerApplication> schedulerApplications;
     Map<String, FiCaSchedulerNode> fiCaSchedulerNodes;
     Map<String, List<LaunchedContainers>> launchedContainers;
@@ -401,6 +401,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
     Map<String, Set<ContainerId>> containersToClean;
     Map<String, List<ApplicationId>> finishedApplications;
     Map<String, Map<Integer, Map<Integer, Resource>>> nodesResources;
+    Map<String, Set<String>> csLeafQueuesPendingApps;
     Map<String, Container> allContainers;
     Map<String, RMContainer> allRMContainers;
     List<RMContextActiveNodes> allRMContextActiveNodes;
@@ -467,8 +468,9 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
       }
     }
     
-    public AppSchedulingInfo getAppSchedulingInfo(final String appId)
-        throws IOException {
+    public Map<String, AppSchedulingInfo> getAppSchedulingInfo(
+            final String appId)
+            throws IOException {
       return appSchedulingInfos.get(appId);
     }
 
@@ -881,6 +883,14 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
           nodesResources.get(id).get(type) != null) {
         return nodesResources.get(id).get(type).get(parent);
       } else {
+        return null;
+      }
+    }
+    
+    public Set<String> getCSLeafQueuePendingApps(String path){
+      if(csLeafQueuesPendingApps!=null){
+        return csLeafQueuesPendingApps.get(path);
+      }else{
         return null;
       }
     }

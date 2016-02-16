@@ -593,8 +593,8 @@ public class CapacityScheduler extends AbstractYarnScheduler
 
     if (transactionState != null) {
       ((TransactionStateImpl) transactionState).getSchedulerApplicationInfos(
-              applicationAttemptId.getApplicationId()).
-              setFiCaSchedulerAppInfo(attempt);
+              applicationAttemptId.getApplicationId()).getFiCaSchedulerAppInfo(
+                      attempt.getApplicationAttemptId()).createFull(attempt);
     }
 
     queue.submitApplicationAttempt(attempt, application.getUser(),
@@ -1200,19 +1200,19 @@ public class CapacityScheduler extends AbstractYarnScheduler
         //construct appliactionId - key of applications map
         ApplicationId appId = ConverterUtils.toApplicationId(fsapp.getAppid());
 
-        //retrieve HopApplicationAttemptId for this specific appId
-        AppSchedulingInfo hopFiCaSchedulerApp = state.getAppSchedulingInfo(
-                fsapp.getAppid());
+        //construct SchedulerAppliaction
+        org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication app
+                = new org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication(
+                        getQueue(fsapp.getQueuename()), fsapp.
+                        getUser());
 
-        if (hopFiCaSchedulerApp != null) {
-          //construct SchedulerAppliaction
-          org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication app
-                  = new org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication(
-                          getQueue(hopFiCaSchedulerApp.getQueuename()), fsapp.
-                          getUser());
+        //recover application attempts
+        for (AppSchedulingInfo hopFiCaSchedulerApp : state.getAppSchedulingInfo(
+                fsapp.getAppid()).values()) {
           //construct ApplicationAttemptId
           ApplicationAttemptId appAttemptId = ConverterUtils.
-                  toApplicationAttemptId(hopFiCaSchedulerApp.getSchedulerAppId());
+                  toApplicationAttemptId(hopFiCaSchedulerApp.
+                          getSchedulerAppId());
 
           FiCaSchedulerApp appAttempt = new FiCaSchedulerApp(appAttemptId,
                   hopFiCaSchedulerApp.getUser(), getQueue(hopFiCaSchedulerApp.
@@ -1226,9 +1226,8 @@ public class CapacityScheduler extends AbstractYarnScheduler
                   getQueuename());
 
           queue.recoverApp(appAttempt, state);
-
-          applications.put(appId, app);
         }
+        applications.put(appId, app);
       }
     } catch (IOException ex) {
 
