@@ -136,8 +136,7 @@ public class MRAMSimulator extends AMSimulator {
   }
 
   @Override
-  public void firstStep()
-          throws YarnException, IOException, InterruptedException {
+  public void firstStep() throws Exception {
     super.firstStep();
     
     requestAMContainer();
@@ -381,7 +380,7 @@ public class MRAMSimulator extends AMSimulator {
   }
 
   @Override
-  public void lastStep() {
+  public void lastStep() throws Exception {
     super.lastStep();
 
     // clear data structures

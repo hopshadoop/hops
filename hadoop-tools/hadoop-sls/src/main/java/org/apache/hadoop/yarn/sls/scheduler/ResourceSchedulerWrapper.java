@@ -31,12 +31,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.AbstractYarnScheduler;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.Allocation;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.QueueMetrics;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerAppReport;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerNodeReport;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.*;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.*;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FairScheduler;
@@ -414,18 +409,17 @@ public class ResourceSchedulerWrapper
     if (pool != null)  pool.shutdown();
   }
 
-  //only used with the AbstractYarnScheduler
-//  @Override
-//  public synchronized List<Container> getTransferredContainers(
-//          ApplicationAttemptId currentAttempt) {
-//    return ((AbstractYarnScheduler) scheduler)
-//            .getTransferredContainers(currentAttempt);
-//  }
+  @Override
+  public synchronized List<Container> getTransferredContainers(
+          ApplicationAttemptId currentAttempt) {
+    return ((AbstractYarnScheduler) scheduler)
+            .getTransferredContainers(currentAttempt);
+  }
 
-//  @Override
-//  public Map<ApplicationId, SchedulerApplication> getSchedulerApplications() {
-//    return ((AbstractYarnScheduler) scheduler).getSchedulerApplications();
-//  }
+  @Override
+  public Map<ApplicationId, SchedulerApplication> getSchedulerApplications() {
+    return ((AbstractYarnScheduler) scheduler).getSchedulerApplications();
+  }
   
   @SuppressWarnings("unchecked")
   private void initMetrics() throws Exception {
@@ -706,16 +700,18 @@ public class ResourceSchedulerWrapper
                            long traceStartTimeMS, long traceEndTimeMS,
                            long simulateStartTimeMS, long simulateEndTimeMS) {
 
-    try {
-      // write job runtime information
-      StringBuilder sb = new StringBuilder();
-      sb.append(appId).append(",").append(traceStartTimeMS).append(",")
-              .append(traceEndTimeMS).append(",").append(simulateStartTimeMS)
-              .append(",").append(simulateEndTimeMS);
-      jobRuntimeLogBW.write(sb.toString() + EOL);
-      jobRuntimeLogBW.flush();
-    } catch (IOException e) {
-      e.printStackTrace();
+    if (metricsON){
+      try{
+        // Write job runtime information
+        StringBuffer sb = new StringBuffer();
+        sb.append(appId).append(",").append(traceStartTimeMS).append(",")
+                .append(traceEndTimeMS).append(",").append(simulateStartTimeMS)
+                .append(",").append(simulateEndTimeMS);
+        jobRuntimeLogBW.write(sb.toString() + EOL);
+        jobRuntimeLogBW.flush();
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
     }
   }
 
