@@ -570,4 +570,8 @@ public class MockRM extends ResourceManager {
         .getApplicationReport(GetApplicationReportRequest.newInstance(appId));
     return response.getApplicationReport();
   }
+  
+  public RMSchedulerServices getRMActiveService() {
+    return schedulerServices;
+  }
 }

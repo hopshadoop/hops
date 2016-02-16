@@ -484,7 +484,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
    * RMSchedulerServices handles all the services run by the Scheduler node.
    */
   @Private
-  class RMSchedulerServices extends CompositeService {
+  public class RMSchedulerServices extends CompositeService {
 
     private EventHandler<SchedulerEvent> schedulerDispatcher;
     private ApplicationMasterLauncher applicationMasterLauncher;
@@ -621,11 +621,9 @@ public class ResourceManager extends CompositeService implements Recoverable {
                   (PreemptableResourceScheduler) scheduler));
           for (SchedulingEditPolicy policy : policies) {
             LOG.info("LOADING SchedulingEditPolicy:" + policy.getPolicyName());
-            policy.init(conf, rmContext.getDispatcher().getEventHandler(),
-                (PreemptableResourceScheduler) scheduler);
             // periodically check whether we need to take action to guarantee
             // constraints
-            SchedulingMonitor mon = new SchedulingMonitor(policy);
+            SchedulingMonitor mon = new SchedulingMonitor(rmContext, policy);
             addService(mon);
           }
         } else {
