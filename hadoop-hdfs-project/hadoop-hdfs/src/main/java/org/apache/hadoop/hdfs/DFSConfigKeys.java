@@ -150,7 +150,7 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final int DFS_NAME_SPACE_ID_DEFAULT = 911; // :)
   
   public static final String DFS_CLIENT_RETRIES_ON_FAILURE_KEY =
-      "dfs.clinet.max.retires.on.failure";
+      "dfs.client.max.retries.on.failure";
   public static final int DFS_CLIENT_RETRIES_ON_FAILURE_DEFAULT = 2;
       //min value is 0. Better set it >= 1
   
