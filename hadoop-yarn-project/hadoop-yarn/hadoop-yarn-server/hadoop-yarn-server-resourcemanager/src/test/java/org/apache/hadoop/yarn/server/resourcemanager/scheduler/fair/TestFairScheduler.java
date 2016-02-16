@@ -2580,6 +2580,8 @@ public class TestFairScheduler extends FairSchedulerTestBase {
     out.println("</allocations>");
     out.close();
 
+    scheduler.init(conf);
+    scheduler.start();
     scheduler.reinitialize(conf, resourceManager.getRMContext(), null);
 
     RMNode node =
