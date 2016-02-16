@@ -88,16 +88,6 @@ public class BlockStoragePolicy {
     final List<StorageType> types = new LinkedList<StorageType>();
     int i = 0, j = 0;
 
-//    We don't have transient storage types (like RAMdisk) (yet)
-//    // Do not return transient storage types. We will not have accurate
-//    // usage information for transient types.
-//    for (;i < replication && j < storageTypes.length; ++j) {
-//      if (!storageTypes[j].isTransient()) {
-//        types.add(storageTypes[j]);
-//        ++i;
-//      }
-//    }
-
     final StorageType last = storageTypes[storageTypes.length - 1];
 //    if (!last.isTransient()) {
       for (; i < replication; i++) {

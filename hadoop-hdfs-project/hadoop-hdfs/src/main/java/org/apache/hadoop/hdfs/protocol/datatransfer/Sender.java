@@ -139,7 +139,8 @@ public class Sender implements DataTransferProtocol {
   @Override
   public void replaceBlock(final ExtendedBlock blk,
       final StorageType storageType,
-      final Token<BlockTokenIdentifier> blockToken, final String delHint,
+      final Token<BlockTokenIdentifier> blockToken,
+      final String delHint,
       final DatanodeInfo source) throws IOException {
     OpReplaceBlockProto proto = OpReplaceBlockProto.newBuilder()
         .setHeader(DataTransferProtoUtil.buildBaseHeader(blk, blockToken))

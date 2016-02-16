@@ -1330,6 +1330,19 @@ public class PBHelper {
         return StorageTypeProto.DISK;
     }
   }
+
+  public static StorageType convertStorageType(StorageTypeProto type) {
+    switch(type) {
+      case DISK:
+        return StorageType.DISK;
+      case SSD:
+        return StorageType.SSD;
+      default:
+        throw new IllegalStateException(
+            "BUG: StorageTypeProto not found, type=" + type);
+    }
+  }
+
   public static DatanodeStorage convert(DatanodeStorageProto s) {
     if (s.hasStorageType()) {
       return new DatanodeStorage(s.getStorageID(),

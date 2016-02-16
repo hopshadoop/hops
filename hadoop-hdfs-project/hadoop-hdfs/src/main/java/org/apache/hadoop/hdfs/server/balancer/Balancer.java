@@ -25,7 +25,9 @@ import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
+import org.apache.hadoop.hdfs.StorageType;
 import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
@@ -376,7 +378,12 @@ public class Balancer {
       final ExtendedBlock eb =
           new ExtendedBlock(nnc.blockpoolID, block.getBlock());
       final Token<BlockTokenIdentifier> accessToken = nnc.getAccessToken(eb);
-      new Sender(out).replaceBlock(eb, accessToken, source.getStorageID(),
+
+      // TODO HDP_2.6 FIX ME
+      // This should not be a static type:
+      StorageType type = StorageType.DEFAULT;
+
+      new Sender(out).replaceBlock(eb, type, accessToken, source.getStorageID(),
           proxySource.getDatanode());
     }
     
