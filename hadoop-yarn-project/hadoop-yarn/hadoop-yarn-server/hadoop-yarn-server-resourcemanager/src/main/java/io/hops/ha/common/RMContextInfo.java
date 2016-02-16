@@ -127,6 +127,10 @@ public class RMContextInfo {
     }
   }
 
+  public RMNodeToAdd getToAddActiveRMNode(NodeId nodeId){
+    return activeNodesToAdd.get(nodeId);
+  }
+  
   public void persistActiveNodeToRemove() throws StorageException {
     if (!activeNodesToRemove.isEmpty()) {
       ArrayList<RMContextActiveNodes> rmctxnodesToRemove =
@@ -177,6 +181,7 @@ public class RMContextInfo {
         toAddRMNodes.add(val.getRmNode());
         rmctxnodesToAdd.add(val.getHopCtxNode());
       }
+      //TODO change do add all the rmnode at the same place
       rmnodeDA.addAll(toAddRMNodes);
       resourceDA.addAll(toAddResources);
       nodeDA.addAll(nodesToAdd);

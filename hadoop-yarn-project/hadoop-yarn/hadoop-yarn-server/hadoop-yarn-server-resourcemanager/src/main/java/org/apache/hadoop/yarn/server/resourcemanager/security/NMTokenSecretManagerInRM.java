@@ -38,7 +38,7 @@ import java.util.Iterator;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
-
+//TORECOVER TOKEN all the store action done in this class must be remplaced by transaction state actions (getStateStore)
 public class NMTokenSecretManagerInRM extends BaseNMTokenSecretManager {
 
   private static Log LOG = LogFactory.getLog(NMTokenSecretManagerInRM.class);

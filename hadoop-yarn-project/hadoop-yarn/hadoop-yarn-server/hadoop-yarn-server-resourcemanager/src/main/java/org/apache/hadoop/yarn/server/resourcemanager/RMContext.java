@@ -41,6 +41,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.security.RMDelegationTokenS
 
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListSet;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.quota.QuotaService;
 
 /**
  * Context of the ResourceManager.
@@ -51,6 +52,10 @@ public interface RMContext extends Recoverable {
 
   boolean isHAEnabled();
 
+  boolean isLeadingRT();
+    
+  boolean isDistributedEnabled();
+  
   HAServiceState getHAServiceState();
 
   RMStateStore getStateStore();
@@ -85,14 +90,18 @@ public interface RMContext extends Recoverable {
 
   AdminService getRMAdminService();
 
-  GroupMembershipService getRMGroupMembershipService();
+  GroupMembershipService getGroupMembershipService();
   
   ClientRMService getClientRMService();
 
   ApplicationMasterService getApplicationMasterService();
 
   ResourceTrackerService getResourceTrackerService();
-
+  
+  ContainersLogsService getContainersLogsService();
+  
+  QuotaService getQuotaService();
+  
   void setClientRMService(ClientRMService clientRMService);
 
   RMDelegationTokenSecretManager getRMDelegationTokenSecretManager();

@@ -15,7 +15,6 @@
  */
 package io.hops.metadata.util;
 
-import com.google.common.util.concurrent.AtomicDouble;
 import com.google.protobuf.InvalidProtocolBufferException;
 import io.hops.exception.StorageException;
 import io.hops.ha.common.TransactionState;
@@ -50,18 +49,19 @@ import io.hops.metadata.yarn.dal.ResourceDataAccess;
 import io.hops.metadata.yarn.dal.ResourceRequestDataAccess;
 import io.hops.metadata.yarn.dal.SchedulerApplicationDataAccess;
 import io.hops.metadata.yarn.dal.UpdatedContainerInfoDataAccess;
-import io.hops.metadata.yarn.dal.YarnVariablesDataAccess;
 import io.hops.metadata.yarn.dal.capacity.CSLeafQueueUserInfoDataAccess;
 import io.hops.metadata.yarn.dal.capacity.CSQueueDataAccess;
 import io.hops.metadata.yarn.dal.capacity.FiCaSchedulerAppReservedContainersDataAccess;
 import io.hops.metadata.yarn.dal.fair.AppSchedulableDataAccess;
 import io.hops.metadata.yarn.dal.fair.FSSchedulerNodeDataAccess;
+import io.hops.metadata.yarn.dal.rmstatestore.AllocateRPCDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.AllocateResponseDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.AllocatedContainersDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.ApplicationAttemptStateDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.ApplicationStateDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.DelegationKeyDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.DelegationTokenDataAccess;
+import io.hops.metadata.yarn.dal.rmstatestore.HeartBeatRPCDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.RMStateVersionDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.RPCDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.RanNodeDataAccess;
@@ -96,7 +96,8 @@ import io.hops.metadata.yarn.entity.ResourceRequest;
 import io.hops.metadata.yarn.entity.SchedulerAppReservations;
 import io.hops.metadata.yarn.entity.SchedulerApplication;
 import io.hops.metadata.yarn.entity.UpdatedContainerInfo;
-import io.hops.metadata.yarn.entity.YarnVariables;
+import io.hops.metadata.yarn.entity.appmasterrpc.AllocateRPC;
+import io.hops.metadata.yarn.entity.appmasterrpc.HeartBeatRPC;
 import io.hops.metadata.yarn.entity.appmasterrpc.RPC;
 import io.hops.metadata.yarn.entity.capacity.CSLeafQueueUserInfo;
 import io.hops.metadata.yarn.entity.capacity.CSQueue;
@@ -166,8 +167,10 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.yarn.api.records.impl.pb.ContainerPBImpl;
 import org.apache.hadoop.yarn.proto.YarnProtos;
+import static org.apache.hadoop.yarn.server.resourcemanager.ResourceTrackerService.resolve;
 
 public class RMUtilities {
 
@@ -237,22 +240,13 @@ public class RMUtilities {
    * @throws IOException
    */
   public static List<ApplicationState> getApplicationStates()
-      throws IOException {
-    LightWeightRequestHandler getApplicationStateHandler =
-        new LightWeightRequestHandler(YARNOperationType.TEST) {
-          @Override
-          public Object performTask() throws StorageException {
-            connector.beginTransaction();
-            connector.writeLock();
-            ApplicationStateDataAccess DA =
-                (ApplicationStateDataAccess) RMStorageFactory
-                    .getDataAccess(ApplicationStateDataAccess.class);
-            List<ApplicationState> appStates = DA.getAll();
-            connector.commit();
-            return appStates;
-          }
-        };
-    return (List<ApplicationState>) getApplicationStateHandler.handle();
+          throws IOException {
+
+    ApplicationStateDataAccess DA
+            = (ApplicationStateDataAccess) RMStorageFactory
+            .getDataAccess(ApplicationStateDataAccess.class);
+    return DA.getAll();
+
   }
 
   /**
@@ -357,74 +351,51 @@ public class RMUtilities {
   }
 
   public static Map<RMStateStore.KeyType, MasterKey> getSecretMamagerKeys()
-      throws IOException {
-    LightWeightRequestHandler getNMTokenSecretMamagerCurrentKeyHandler =
-        new LightWeightRequestHandler(YARNOperationType.TEST) {
-          @Override
-          public Object performTask()
-              throws StorageException, InvalidProtocolBufferException {
-            connector.beginTransaction();
-            connector.writeLock();
-            SecretMamagerKeysDataAccess DA =
-                (SecretMamagerKeysDataAccess) RMStorageFactory
-                    .getDataAccess(SecretMamagerKeysDataAccess.class);
-            List<SecretMamagerKey> hopKeys =
-                (List<SecretMamagerKey>) DA.getAll();
-            connector.commit();
-            Map<RMStateStore.KeyType, MasterKey> keys =
-                new EnumMap<RMStateStore.KeyType, MasterKey>(
+          throws IOException {
+
+    SecretMamagerKeysDataAccess DA
+            = (SecretMamagerKeysDataAccess) RMStorageFactory
+            .getDataAccess(SecretMamagerKeysDataAccess.class);
+    List<SecretMamagerKey> hopKeys = (List<SecretMamagerKey>) DA.getAll();
+    Map<RMStateStore.KeyType, MasterKey> keys
+            = new EnumMap<RMStateStore.KeyType, MasterKey>(
                     RMStateStore.KeyType.class);
-            MasterKey key;
-            if (hopKeys != null) {
-              for (SecretMamagerKey hopKey : hopKeys) {
-                key = new MasterKeyPBImpl(YarnServerCommonProtos.MasterKeyProto
-                    .parseFrom(hopKey.getKey()));
-                keys.put(RMStateStore.KeyType.valueOf(hopKey.getKeyType()),
-                    key);
-              }
-            }
-            return keys;
-          }
-        };
-    return (Map<RMStateStore.KeyType, MasterKey>) getNMTokenSecretMamagerCurrentKeyHandler
-        .handle();
+    MasterKey key;
+    if (hopKeys != null) {
+      for (SecretMamagerKey hopKey : hopKeys) {
+        key = new MasterKeyPBImpl(YarnServerCommonProtos.MasterKeyProto
+                .parseFrom(hopKey.getKey()));
+        keys.put(RMStateStore.KeyType.valueOf(hopKey.getKeyType()),
+                key);
+      }
+    }
+    return keys;
+
   }
   
-  public static Map<ApplicationAttemptId, org.apache.hadoop.yarn.api.protocolrecords.AllocateResponse> getAllocateResponses(final RMContext rmContext)
-      throws IOException {
-    LightWeightRequestHandler allocateResponsesHandler =
-        new LightWeightRequestHandler(YARNOperationType.TEST) {
-
-          @Override
-          public Object performTask() throws IOException {
-            connector.beginTransaction();
-            connector.writeLock();
-            AllocateResponseDataAccess da =
-                (AllocateResponseDataAccess) RMStorageFactory
-                    .getDataAccess(AllocateResponseDataAccess.class);
-            Map<String, AllocateResponse> hopAllocateResponses =
-                (Map<String, AllocateResponse>) da.getAll();
-            connector.commit();
-            Map<ApplicationAttemptId, org.apache.hadoop.yarn.api.protocolrecords.AllocateResponse>
-                allocateResponses =
-                new HashMap<ApplicationAttemptId, org.apache.hadoop.yarn.api.protocolrecords.AllocateResponse>();
-            if (hopAllocateResponses != null) {
-              for (AllocateResponse hopAllocateResponse : hopAllocateResponses.values()) {
-                org.apache.hadoop.yarn.api.protocolrecords.AllocateResponse
-                    allocateResponse = new AllocateResponsePBImpl(
-                    YarnServiceProtos.AllocateResponseProto
+  public static Map<ApplicationAttemptId, org.apache.hadoop.yarn.api.protocolrecords.AllocateResponse> getAllocateResponses(
+          final RMContext rmContext)
+          throws IOException {
+    AllocateResponseDataAccess da
+            = (AllocateResponseDataAccess) RMStorageFactory
+            .getDataAccess(AllocateResponseDataAccess.class);
+    Map<String, AllocateResponse> hopAllocateResponses
+            = (Map<String, AllocateResponse>) da.getAll();
+    Map<ApplicationAttemptId, org.apache.hadoop.yarn.api.protocolrecords.AllocateResponse> allocateResponses
+            = new HashMap<ApplicationAttemptId, org.apache.hadoop.yarn.api.protocolrecords.AllocateResponse>();
+    if (hopAllocateResponses != null) {
+      for (AllocateResponse hopAllocateResponse : hopAllocateResponses.values()) {
+        org.apache.hadoop.yarn.api.protocolrecords.AllocateResponse allocateResponse
+                = new AllocateResponsePBImpl(
+                        YarnServiceProtos.AllocateResponseProto
                         .parseFrom(hopAllocateResponse.getAllocateResponse()));
-                allocateResponses.put(ConverterUtils.toApplicationAttemptId(
-                    hopAllocateResponse.getApplicationattemptid()),
-                    allocateResponse);
-              }
-            }
-            setAllocatedContainers(allocateResponses);
-            return allocateResponses;
-          }
-        };
-    return (Map<ApplicationAttemptId, org.apache.hadoop.yarn.api.protocolrecords.AllocateResponse>) allocateResponsesHandler
-        .handle();
+        allocateResponses.put(ConverterUtils.toApplicationAttemptId(
+                hopAllocateResponse.getApplicationattemptid()),
+                allocateResponse);
+      }
+    }
+    setAllocatedContainers(allocateResponses);
+    return allocateResponses;
   }
 
   private static void setAllocatedContainers(
@@ -456,22 +427,10 @@ public class RMUtilities {
     
   private static Map<String, List<String>> getAllAllocatedContainers() throws
           IOException {
-    LightWeightRequestHandler getAllocatedContainers
-            = new LightWeightRequestHandler(YARNOperationType.TEST) {
-
-              @Override
-              public Object performTask() throws IOException {
-                connector.beginTransaction();
-                connector.writeLock();
-                AllocatedContainersDataAccess da
-                = (AllocatedContainersDataAccess) RMStorageFactory.
-                getDataAccess(AllocatedContainersDataAccess.class);
-                Map<String, List<String>> allocatedContainersId = da.getAll();
-                connector.commit();
-                return allocatedContainersId;
-              }
-            };
-    return (Map<String, List<String>>) getAllocatedContainers.handle();
+    AllocatedContainersDataAccess da
+            = (AllocatedContainersDataAccess) RMStorageFactory.
+            getDataAccess(AllocatedContainersDataAccess.class);
+    return da.getAll();
   }
       
   /**
@@ -481,44 +440,51 @@ public class RMUtilities {
    * @throws IOException
    */
   public static List<RPC> getAppMasterRPCs() throws IOException {
-    LightWeightRequestHandler getAppMasterRPCHandler =
-        new LightWeightRequestHandler(YARNOperationType.TEST) {
-          @Override
-          public Object performTask() throws StorageException {
-            connector.beginTransaction();
-            connector.writeLock();
-            RPCDataAccess DA = (RPCDataAccess) RMStorageFactory
-                .getDataAccess(RPCDataAccess.class);
-            List<RPC> appMasterRPCs = DA.getAll();
-            connector.commit();
-            return appMasterRPCs;
-          }
-        };
-    return (List<RPC>) getAppMasterRPCHandler.handle();
+    RPCDataAccess DA = (RPCDataAccess) RMStorageFactory
+            .getDataAccess(RPCDataAccess.class);
+    return DA.getAll();
   }
 
-  public static List<AppSchedulingInfo> getAppSchedulingInfos()
-      throws IOException {
-    LightWeightRequestHandler handler =
-        new LightWeightRequestHandler(YARNOperationType.TEST) {
+  public static Map<Integer, HeartBeatRPC> getHeartBeatRPCs() throws
+          StorageException {
+    HeartBeatRPCDataAccess hbDA = (HeartBeatRPCDataAccess) RMStorageFactory.
+            getDataAccess(HeartBeatRPCDataAccess.class);
+    return hbDA.getAll();
+  }
+  
+  public static Map<Integer, AllocateRPC> getAllocateRPCs() throws
+          StorageException {
+    AllocateRPCDataAccess alDA = (AllocateRPCDataAccess) RMStorageFactory.
+            getDataAccess(AllocateRPCDataAccess.class);
+    return alDA.getAll();
+  }
+  
+  public static List<PendingEvent> getAllPendingEvents() throws IOException {
 
-          @Override
-          public Object performTask() throws IOException {
-            //        connector.readCommitted();
-            connector.beginTransaction();
-            connector.writeLock();
-            AppSchedulingInfoDataAccess dA =
-                (AppSchedulingInfoDataAccess) RMStorageFactory
-                    .getDataAccess(AppSchedulingInfoDataAccess.class);
-            List<AppSchedulingInfo> result = dA.findAll();
-            connector.commit();
-            return result;
-          }
-        };
-    return (List<AppSchedulingInfo>) handler.handle();
+    PendingEventDataAccess DA = (PendingEventDataAccess) RMStorageFactory.
+            getDataAccess(PendingEventDataAccess.class);
+    return DA.getAll();
+
+  }
+  
+  public static List<AppSchedulingInfo> getAppSchedulingInfos()
+          throws IOException {
+    AppSchedulingInfoDataAccess dA
+            = (AppSchedulingInfoDataAccess) RMStorageFactory
+            .getDataAccess(AppSchedulingInfoDataAccess.class);
+    return dA.findAll();
   }
   
   public static Map<String, SchedulerApplication> getSchedulerApplications()
+      throws IOException {
+            SchedulerApplicationDataAccess DA =
+                (SchedulerApplicationDataAccess) RMStorageFactory
+                    .getDataAccess(SchedulerApplicationDataAccess.class);
+            return DA.getAll();
+          
+  }
+
+    public static Map<String, SchedulerApplication> getSchedulerApplicationsFullTransaction()
       throws IOException {
     LightWeightRequestHandler getSchedulerApplicationHandler =
         new LightWeightRequestHandler(YARNOperationType.TEST) {
@@ -538,8 +504,18 @@ public class RMUtilities {
     return (Map<String, SchedulerApplication>) getSchedulerApplicationHandler
         .handle();
   }
-
+    
   public static Map<String, FiCaSchedulerNode> getAllFiCaSchedulerNodes()
+          throws IOException {
+
+    FiCaSchedulerNodeDataAccess DA
+            = (FiCaSchedulerNodeDataAccess) RMStorageFactory
+            .getDataAccess(FiCaSchedulerNodeDataAccess.class);
+    return DA.getAll();
+
+  }
+
+    public static Map<String, FiCaSchedulerNode> getAllFiCaSchedulerNodesFullTransaction()
       throws IOException {
     LightWeightRequestHandler getFiCaSchedulerNodesHandler =
         new LightWeightRequestHandler(YARNOperationType.TEST) {
@@ -557,27 +533,14 @@ public class RMUtilities {
         };
     return (Map<String, FiCaSchedulerNode>) getFiCaSchedulerNodesHandler.handle();
   }
-
-  
+    
   public static Map<String, List<LaunchedContainers>> getAllLaunchedContainers()
-      throws IOException {
-    LightWeightRequestHandler getLaunchedContainersHandler =
-        new LightWeightRequestHandler(YARNOperationType.TEST) {
-          @Override
-          public Object performTask() throws StorageException {
-            connector.beginTransaction();
-            connector.writeLock();
-            LaunchedContainersDataAccess DA =
-                (LaunchedContainersDataAccess) RMStorageFactory
-                    .getDataAccess(LaunchedContainersDataAccess.class);
-            Map<String, List<LaunchedContainers>> hopLaunchedContainers =
-                DA.getAll();
-            connector.commit();
-            return hopLaunchedContainers;
-          }
-        };
-    return (Map<String, List<LaunchedContainers>>) getLaunchedContainersHandler.
-        handle();
+          throws IOException {
+
+    LaunchedContainersDataAccess DA
+            = (LaunchedContainersDataAccess) RMStorageFactory
+            .getDataAccess(LaunchedContainersDataAccess.class);
+    return DA.getAll();
   }
 
   //For testing TODO move to test
@@ -653,6 +616,14 @@ public class RMUtilities {
   
 
   public static Map<String, List<ResourceRequest>> getAllResourceRequests()
+          throws IOException {
+
+    ResourceRequestDataAccess DA = (ResourceRequestDataAccess) RMStorageFactory
+            .getDataAccess(ResourceRequestDataAccess.class);
+    return DA.getAll();
+  }
+  
+public static Map<String, List<ResourceRequest>> getAllResourceRequestsFullTransaction()
       throws IOException {
     LightWeightRequestHandler getResourceRequestsHandler =
         new LightWeightRequestHandler(YARNOperationType.TEST) {
@@ -672,27 +643,13 @@ public class RMUtilities {
     return (Map<String, List<ResourceRequest>>) getResourceRequestsHandler
         .handle();
   }
-  
 
   public static Map<String, List<AppSchedulingInfoBlacklist>> getAllBlackLists()
-      throws IOException {
-    LightWeightRequestHandler getBlackListHandler =
-        new LightWeightRequestHandler(YARNOperationType.TEST) {
-          @Override
-          public Object performTask() throws StorageException {
-            connector.beginTransaction();
-            connector.writeLock();
-            AppSchedulingInfoBlacklistDataAccess DA =
-                (AppSchedulingInfoBlacklistDataAccess) RMStorageFactory
-                    .getDataAccess(AppSchedulingInfoBlacklistDataAccess.class);
-            Map<String, List<AppSchedulingInfoBlacklist>> hopBlackList =
-                DA.getAll();
-            connector.commit();
-            return hopBlackList;
-          }
-        };
-    return (Map<String, List<AppSchedulingInfoBlacklist>>) getBlackListHandler
-        .handle();
+          throws IOException {
+    AppSchedulingInfoBlacklistDataAccess DA
+            = (AppSchedulingInfoBlacklistDataAccess) RMStorageFactory
+            .getDataAccess(AppSchedulingInfoBlacklistDataAccess.class);
+    return DA.getAll();
   }
 
   /**
@@ -703,25 +660,17 @@ public class RMUtilities {
    * @throws IOException
    */
   public static Integer getRMSequentialNumber(final int id) throws IOException {
-    LightWeightRequestHandler getSequentialNumberHandler =
-        new LightWeightRequestHandler(YARNOperationType.TEST) {
-          @Override
-          public Object performTask() throws IOException {
-            connector.beginTransaction();
-            connector.writeLock();
-            SequenceNumberDataAccess DA =
-                (SequenceNumberDataAccess) RMStorageFactory
-                    .getDataAccess(SequenceNumberDataAccess.class);
-            SequenceNumber hseqNumber = (SequenceNumber) DA.findById(id);
-            Integer seqNumber = null;
-            if (hseqNumber != null) {
-              seqNumber = hseqNumber.getSequencenumber();
-            }
-            connector.commit();
-            return seqNumber;
-          }
-        };
-    return (Integer) getSequentialNumberHandler.handle();
+
+    SequenceNumberDataAccess DA = (SequenceNumberDataAccess) RMStorageFactory
+            .getDataAccess(SequenceNumberDataAccess.class);
+    SequenceNumber hseqNumber = (SequenceNumber) DA.findById(id);
+    Integer seqNumber = null;
+    if (hseqNumber != null) {
+      seqNumber = hseqNumber.getSequencenumber();
+    }
+
+    return seqNumber;
+
   }
 
   /**
@@ -731,21 +680,11 @@ public class RMUtilities {
    * @throws IOException
    */
   public static List<DelegationToken> getDelegationTokens() throws IOException {
-    LightWeightRequestHandler getDelegationTokenHandler =
-        new LightWeightRequestHandler(YARNOperationType.TEST) {
-          @Override
-          public Object performTask() throws StorageException {
-            connector.beginTransaction();
-            connector.writeLock();
-            DelegationTokenDataAccess DA =
-                (DelegationTokenDataAccess) RMStorageFactory
-                    .getDataAccess(DelegationTokenDataAccess.class);
-            List<DelegationToken> delTokens = DA.getAll();
-            connector.commit();
-            return delTokens;
-          }
-        };
-    return (List<DelegationToken>) getDelegationTokenHandler.handle();
+
+    DelegationTokenDataAccess DA = (DelegationTokenDataAccess) RMStorageFactory
+            .getDataAccess(DelegationTokenDataAccess.class);
+    return DA.getAll();
+
   }
 
   /**
@@ -755,21 +694,11 @@ public class RMUtilities {
    * @throws IOException
    */
   public static List<DelegationKey> getDelegationKeys() throws IOException {
-    LightWeightRequestHandler getDelegationKeyHandler =
-        new LightWeightRequestHandler(YARNOperationType.TEST) {
-          @Override
-          public Object performTask() throws StorageException {
-            connector.beginTransaction();
-            connector.writeLock();
-            DelegationKeyDataAccess DA =
-                (DelegationKeyDataAccess) RMStorageFactory
-                    .getDataAccess(DelegationKeyDataAccess.class);
-            List<DelegationKey> delKeys = DA.getAll();
-            connector.commit();
-            return delKeys;
-          }
-        };
-    return (List<DelegationKey>) getDelegationKeyHandler.handle();
+
+    DelegationKeyDataAccess DA = (DelegationKeyDataAccess) RMStorageFactory
+            .getDataAccess(DelegationKeyDataAccess.class);
+    return DA.getAll();
+
   }
 
   /**
@@ -836,131 +765,62 @@ public class RMUtilities {
     setAppMasterRPCHandler.handle();
   }
 
-
-  /**
-   * Checks for pending RMNode RPCs and if the RMNode is active.
-   * If an rpc for a particular RMNode and with the same type already exists
-   * the method returns false. If the RPC does not exist it checks if the
-   * RMNode is in the ActiveNodes table. If so, it returns the retrieved
-   * RMNode.
-   * <p/>
-   *
-   * @param type
-   * @param rpc
-   * @param userId
-   * @return
-   * @throws IOException
-   */
-  public static Map<Integer, Object> registerNMRPCValidation(
-      final RPC.Type type, final byte[] rpc, final String userId)
-      throws IOException {
-    LightWeightRequestHandler registerNMRPCValidationHandler =
-        new LightWeightRequestHandler(YARNOperationType.TEST) {
-          @Override
-          public Object performTask() throws StorageException {
-            connector.beginTransaction();
-            connector.writeLock();
-            Map<Integer, Object> toReturn;
-            //Check if an rpc of the same type for this RMNode already exists
-            RPCDataAccess rpcDA = (RPCDataAccess) RMStorageFactory
+  public static void persistHeartBeatRPC(final HeartBeatRPC rpc) throws
+          IOException {
+    LightWeightRequestHandler heartBeatRPCHandler
+            = new LightWeightRequestHandler(YARNOperationType.TEST) {
+              @Override
+              public Object performTask() throws StorageException {
+                connector.beginTransaction();
+                connector.writeLock();
+                RPCDataAccess DA = (RPCDataAccess) RMStorageFactory
                 .getDataAccess(RPCDataAccess.class);
-            //If it exists, return false
-            if (rpcDA.findByTypeAndUserId(type.toString(), userId) /*||
-                        rpcDA.findByTypeAndUserId(HopRPC.Type.NodeHeartbeat.toString(), userId)*/) {
-              LOG.debug("HOP :: rmnodeRPCValidation() - RPC already exists");
-              connector.commit();
-              return null;
-            } else {
-              LOG.debug("HOP :: rmnodeRPCValidation() rpcIdFound was null");
-              //Get new rpcId and persist it
-              YarnVariablesDataAccess yDA =
-                  (YarnVariablesDataAccess) RMStorageFactory
-                      .getDataAccess(YarnVariablesDataAccess.class);
-              YarnVariables found =
-                  (YarnVariables) yDA.findById(HopYarnAPIUtilities.RPC);
-              int rpcId = Integer.MIN_VALUE;
-              if (found != null) {
-                rpcId = found.getValue();
-                found.setValue(found.getValue() + 1);
-                yDA.add(found);
+                RPC hop = new RPC(rpc.getRpcId(), RPC.Type.NodeHeartbeat, null,
+                        null);
+                DA.add(hop);
+                connector.flush();
+                HeartBeatRPCDataAccess hbDA
+                = (HeartBeatRPCDataAccess) RMStorageFactory.getDataAccess(
+                        HeartBeatRPCDataAccess.class);
+
+                hbDA.add(rpc);
+
+
+                connector.commit();
+                return null;
               }
-              RPC rpcToPersist = new RPC(rpcId, type, rpc, userId);
-              rpcDA.add(rpcToPersist);
-              toReturn = new HashMap<Integer, Object>();
-              toReturn.put(0, rpcId);
-            }
-            //Check if RMNode(userId) is in ActiveRMNodesMap
-            RMContextActiveNodesDataAccess rmDA =
-                (RMContextActiveNodesDataAccess) RMStorageFactory.
-                    getDataAccess(RMContextActiveNodesDataAccess.class);
-
-            RMContextActiveNodes hopActiveRMNode =
-                (RMContextActiveNodes) rmDA.findEntry(userId);
-            if (hopActiveRMNode != null) {
-              toReturn.put(1, true);
-            } else {
-              toReturn.put(1, false);
-            }
-            connector.commit();
-            return toReturn;
-          }
-        };
-    return (Map<Integer, Object>) registerNMRPCValidationHandler.handle();
+            };
+    heartBeatRPCHandler.handle();
   }
+  
+  public static void persistAllocateRPC(final AllocateRPC rpc,
+          final String userId) throws IOException {
+    LightWeightRequestHandler allocateRPCHandler
+            = new LightWeightRequestHandler(YARNOperationType.TEST) {
 
-  /**
-   * Checks for pending heartbeats.
-   *
-   * @param type
-   * @param rpc
-   * @param id
-   * @param rmContext
-   * @return
-   * @throws IOException
-   */
-  public static int heartbeatNMRPCValidation(final RPC.Type type,
-      final byte[] rpc, final String id, final RMContext rmContext)
-      throws IOException {
-    LightWeightRequestHandler heartbeatNMRPCValidationHandler =
-        new LightWeightRequestHandler(YARNOperationType.TEST) {
-          @Override
-          public Object performTask() throws StorageException {
-            LOG.debug("HOP :: heartbeatNMRPCValidation - START");
-            connector.beginTransaction();
-            connector.writeLock();
-            //Check if an rpc of the same type for this RMNode already exists
-            RPCDataAccess rpcDA = (RPCDataAccess) RMStorageFactory
+              @Override
+              public Object performTask() throws IOException {
+                connector.beginTransaction();
+                connector.writeLock();
+                RPCDataAccess DA = (RPCDataAccess) RMStorageFactory
                 .getDataAccess(RPCDataAccess.class);
-            int rpcId = Integer.MIN_VALUE;
-            if (rpcDA.findByTypeAndUserId(type.toString(), id)) {
-              LOG.debug(
-                  "HOP :: heartbeatNMRPCValidation() - RPC already exists");
-              connector.commit();
-              return Integer.MIN_VALUE;
-            } else {
-              //Get new rpcId and persist it
-              YarnVariablesDataAccess yDA =
-                  (YarnVariablesDataAccess) RMStorageFactory
-                      .getDataAccess(YarnVariablesDataAccess.class);
-              YarnVariables found =
-                  (YarnVariables) yDA.findById(HopYarnAPIUtilities.RPC);
-              if (found != null) {
-                rpcId = found.getValue();
-                found.setValue(found.getValue() + 1);
+                RPC hop = new RPC(rpc.getRpcID(), RPC.Type.Allocate, null,
+                        userId);
+                DA.add(hop);
+                connector.flush();
+                AllocateRPCDataAccess aDA
+                = (AllocateRPCDataAccess) RMStorageFactory.getDataAccess(
+                        AllocateRPCDataAccess.class);
 
-                yDA.add(found);
+                aDA.add(rpc);
+
+                connector.commit();
+                return null;
               }
-              RPC rpcToPersist = new RPC(rpcId, type, rpc, id);
-              rpcDA.add(rpcToPersist);
-            }
-            connector.commit();
-            LOG.debug("HOP :: heartbeatNMRPCValidation - FINISH");
-            return rpcId;
-          }
-        };
-    return (Integer) heartbeatNMRPCValidationHandler.handle();
+            };
+    allocateRPCHandler.handle();
   }
-
+  
   public static void updatePendingEvents(final PendingEvent persistedEvent,
       final int action) throws IOException {
     LightWeightRequestHandler updatePendingEventsHandler =
@@ -1008,6 +868,140 @@ public class RMUtilities {
     return (RMNodeComps) getRMNodeBatchHandler.handle();
   }
   
+  public static org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode processHopRMNodeCompsForScheduler(
+          RMNodeComps hopRMNodeFull,
+          RMContext rmContext) throws
+          InvalidProtocolBufferException {
+    NodeId nodeId;
+    org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode rmNode = null;
+    if (hopRMNodeFull != null) {
+      nodeId = ConverterUtils.toNodeId(hopRMNodeFull.getRMNodeId());
+
+      rmNode = rmContext.getActiveRMNodes().get(nodeId);
+      // so first time we are receiving , this will happen when node registers
+      if (rmNode == null) {
+        org.apache.hadoop.net.Node node = null;
+        if (hopRMNodeFull.getHopNode() != null) {
+          node = new NodeBase(hopRMNodeFull.getHopNode().getName(),
+                  hopRMNodeFull.
+                  getHopNode().getLocation());
+          if (hopRMNodeFull.getHopNode().getParent() != null) {
+            node.setParent(new NodeBase(hopRMNodeFull.getHopNode().getParent()));
+          }
+          node.setLevel(hopRMNodeFull.getHopNode().getLevel());
+        }
+        //Retrieve nextHeartbeat
+        boolean nextHeartbeat = true;
+        //Create Resource
+        ResourceOption resourceOption = null;
+        if (hopRMNodeFull.getHopResource() != null) {
+          resourceOption = ResourceOption
+                  .newInstance(org.apache.hadoop.yarn.api.records.Resource.
+                          newInstance(hopRMNodeFull.getHopResource().
+                                  getMemory(),
+                                  hopRMNodeFull.getHopResource().
+                                  getVirtualCores()),
+                          hopRMNodeFull.getHopRMNode().getOvercommittimeout());
+        }
+        //Create RMNode from HopRMNode
+        rmNode = new RMNodeImpl(nodeId, rmContext,
+                hopRMNodeFull.getHopRMNode().getHostName(),
+                hopRMNodeFull.getHopRMNode().getCommandPort(),
+                hopRMNodeFull.getHopRMNode().getHttpPort(),
+                resolve(hopRMNodeFull.getHopRMNode().getHostName()),
+                resourceOption,
+                hopRMNodeFull.getHopRMNode().getNodemanagerVersion(),
+                hopRMNodeFull.getHopRMNode().getHealthReport(),
+                hopRMNodeFull.getHopRMNode().getLastHealthReportTime(),
+                nextHeartbeat);
+
+        //This is  to force java to put the host in cash 
+        //for quick loop-up in scheduler container allocation  
+        NetUtils.createSocketAddrForHost(nodeId.getHost(), nodeId.
+                getPort());
+      }
+      // now we update the rmnode
+      if (hopRMNodeFull.getHopRMNode() != null) {
+        ((RMNodeImpl) rmNode).setState(hopRMNodeFull.getHopRMNode().
+                getCurrentState());
+      }
+      if (hopRMNodeFull.getHopUpdatedContainerInfo() != null) {
+        List<UpdatedContainerInfo> hopUpdatedContainerInfoList
+                = hopRMNodeFull.getHopUpdatedContainerInfo();
+        if (hopUpdatedContainerInfoList != null && !hopUpdatedContainerInfoList.
+                isEmpty()) {
+          ConcurrentLinkedQueue<org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo> updatedContainerInfoQueue
+                  = new ConcurrentLinkedQueue<org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo>();
+          Map<Integer, org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo> ucis
+                  = new HashMap<Integer, org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo>();
+          LOG.debug(hopRMNodeFull.getRMNodeId() + " geting ucis "
+                  + hopUpdatedContainerInfoList.size() + " pending event "
+                  + hopRMNodeFull.getPendingEvent().getId().getEventId());
+          for (UpdatedContainerInfo hopUCI : hopUpdatedContainerInfoList) {
+            if (!ucis.containsKey(hopUCI.getUpdatedContainerInfoId())) {
+              ucis.put(hopUCI.getUpdatedContainerInfoId(),
+                      new org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo(
+                              new ArrayList<org.apache.hadoop.yarn.api.records.ContainerStatus>(),
+                              new ArrayList<org.apache.hadoop.yarn.api.records.ContainerStatus>(),
+                              hopUCI.getUpdatedContainerInfoId()));
+            }
+
+            org.apache.hadoop.yarn.api.records.ContainerId cid = ConverterUtils.
+                    toContainerId(hopUCI.
+                            getContainerId());
+            ContainerStatus hopContainerStatus = hopRMNodeFull.
+                    getHopContainersStatusMap().get(hopUCI.getContainerId());
+            org.apache.hadoop.yarn.api.records.ContainerStatus conStatus
+                    = org.apache.hadoop.yarn.api.records.ContainerStatus.
+                    newInstance(cid,
+                            ContainerState.
+                            valueOf(hopContainerStatus.getState()),
+                            hopContainerStatus.getDiagnostics(),
+                            hopContainerStatus.getExitstatus());
+            //Check ContainerStatus state to add it to appropriate list
+            if (conStatus != null) {
+              LOG.debug("add uci for container " + conStatus.getContainerId()
+                      + " status " + conStatus.getState());
+              if (conStatus.getState().equals(ContainerState.RUNNING)) {
+                ucis.get(hopUCI.getUpdatedContainerInfoId()).
+                        getNewlyLaunchedContainers().add(conStatus);
+              } else if (conStatus.getState().equals(ContainerState.COMPLETE)) {
+                ucis.get(hopUCI.getUpdatedContainerInfoId()).
+                        getCompletedContainers().add(conStatus);
+              }
+            }
+          }
+          int maxUciId = 0;
+          for (org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo uci
+                  : ucis.values()) {
+            if (uci.getCompletedContainers().size() > 0) {
+              LOG.debug(rmNode.getNodeID()
+                      + " add completed containers to uci queue uci " + uci.
+                      getUpdatedContainerInfoId());
+            }
+            updatedContainerInfoQueue.add(uci);
+            if (uci.getUpdatedContainerInfoId() > maxUciId) {
+              maxUciId = uci.getUpdatedContainerInfoId();
+            }
+          }
+
+          ((RMNodeImpl) rmNode).setUpdatedContainerInfoId(maxUciId);
+          ((RMNodeImpl) rmNode).setUpdatedContainerInfo(
+                  updatedContainerInfoQueue);
+        } else {
+          LOG.debug(hopRMNodeFull.getRMNodeId()
+                  + " hopUpdatedContainerInfoList = null || hopUpdatedContainerInfoList.isEmpty() "
+                  + hopRMNodeFull.getPendingEvent().getId().getEventId());
+        }
+      } else {
+        LOG.debug(hopRMNodeFull.getRMNodeId()
+                + " hopRMNodeFull.getHopUpdatedContainerInfo()=null "
+                + hopRMNodeFull.getPendingEvent().getId().getEventId());
+      }
+    }
+    return rmNode;
+  }
+    
   public static org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode getRMNode(
       final String id, final RMContext context, final Configuration conf)
       throws IOException {
@@ -1060,9 +1054,7 @@ public class RMUtilities {
                   hopRMNode.getCommandPort(), hopRMNode.getHttpPort(), node,
                   resourceOption, hopRMNode.getNodemanagerVersion(),
                   hopRMNode.getHealthReport(),
-                  hopRMNode.getLastHealthReportTime(), nextHeartbeat,
-                  conf.getBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED,
-                      YarnConfiguration.DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED));
+                  hopRMNode.getLastHealthReportTime(), nextHeartbeat);
 
               ((RMNodeImpl) rmNode).setState(hopRMNode.getCurrentState());
               // *** Recover maps/lists of RMNode ***
@@ -1231,21 +1223,10 @@ public class RMUtilities {
    * @throws IOException
    */
   public static Map<String, Boolean> getAllNextHeartbeats() throws IOException {
-    LightWeightRequestHandler getAllNextHeartbeatsHandler =
-        new LightWeightRequestHandler(YARNOperationType.TEST) {
-          @Override
-          public Object performTask() throws StorageException {
-            connector.beginTransaction();
-            connector.writeLock();
-            NextHeartbeatDataAccess nextHBDA =
-                (NextHeartbeatDataAccess) RMStorageFactory.
-                    getDataAccess(NextHeartbeatDataAccess.class);
-            Map<String, Boolean> allNextHeartbeats = nextHBDA.getAll();
-            connector.commit();
-            return allNextHeartbeats;
-          }
-        };
-    return (Map<String, Boolean>) getAllNextHeartbeatsHandler.handle();
+    NextHeartbeatDataAccess nextHBDA
+            = (NextHeartbeatDataAccess) RMStorageFactory.
+            getDataAccess(NextHeartbeatDataAccess.class);
+    return nextHBDA.getAll();
   }
   
   /**
@@ -1330,11 +1311,12 @@ public class RMUtilities {
               pendingEvents = DA.getAll(status);
               if (pendingEvents != null && !pendingEvents.isEmpty()) {
                 for (PendingEvent hop : pendingEvents) {
-                  if (!pendingEventsByRMNode.containsKey(hop.getRmnodeId())) {
-                    pendingEventsByRMNode.put(hop.getRmnodeId(),
-                        new ConcurrentSkipListSet<PendingEvent>());
+                  if (!pendingEventsByRMNode.
+                          containsKey(hop.getId().getNodeId())) {
+                    pendingEventsByRMNode.put(hop.getId().getNodeId(),
+                            new ConcurrentSkipListSet<PendingEvent>());
                   }
-                  pendingEventsByRMNode.get(hop.getRmnodeId()).add(hop);
+                  pendingEventsByRMNode.get(hop.getId().getNodeId()).add(hop);
                 }
               }
             }
@@ -1381,14 +1363,17 @@ public class RMUtilities {
                     new ArrayList<PendingEvent>();
 
                 for (PendingEvent hop : pendingEvents) {
-                  if (!pendingEventsByRMNode.containsKey(hop.getRmnodeId())) {
-                    pendingEventsByRMNode.put(hop.getRmnodeId(),
-                        new ConcurrentSkipListSet<PendingEvent>());
+                  if (!pendingEventsByRMNode.
+                          containsKey(hop.getId().getNodeId())) {
+                    pendingEventsByRMNode.put(hop.getId().getNodeId(),
+                            new ConcurrentSkipListSet<PendingEvent>());
                   }
-                  pendingEventsByRMNode.get(hop.getRmnodeId()).add(hop);
+                  pendingEventsByRMNode.get(hop.getId().getNodeId()).add(hop);
                   PendingEvent pending =
-                      new PendingEvent(hop.getRmnodeId(), hop.getType(),
-                          TablesDef.PendingEventTableDef.PENDING, hop.getId());
+                    new PendingEvent(hop.getId().
+                          getNodeId(), hop.getType(),
+                          TablesDef.PendingEventTableDef.PENDING, hop.getId().
+                          getEventId());
                   pendingEventsModified.add(pending);
                 }
                 DA.addAll(pendingEventsModified);
@@ -1535,63 +1520,27 @@ public class RMUtilities {
    * @throws IOException
    */
   public static Map<String, List<ApplicationAttemptState>> getAllApplicationAttemptStates()
-      throws IOException {
-    LightWeightRequestHandler getApplicationAttemptIdsByApplicationIdHandler =
-        new LightWeightRequestHandler(YARNOperationType.TEST) {
-          @Override
-          public Object performTask() throws StorageException {
-            connector.beginTransaction();
-            connector.writeLock();
-            ApplicationAttemptStateDataAccess DA =
-                (ApplicationAttemptStateDataAccess) RMStorageFactory
-                    .getDataAccess(ApplicationAttemptStateDataAccess.class);
-            Map<String, List<ApplicationAttemptState>> attempts = DA.getAll();
-            connector.commit();
-            return attempts;
-          }
-        };
-    return (Map<String, List<ApplicationAttemptState>>) getApplicationAttemptIdsByApplicationIdHandler
-        .handle();
+          throws IOException {
+    ApplicationAttemptStateDataAccess DA
+            = (ApplicationAttemptStateDataAccess) RMStorageFactory
+            .getDataAccess(ApplicationAttemptStateDataAccess.class);
+    return DA.getAll();
   }
 
-    public static Map<String, List<RanNode>> getAllRanNodes()
-      throws IOException {
-    LightWeightRequestHandler getRanNodeHandler =
-        new LightWeightRequestHandler(YARNOperationType.TEST) {
-          @Override
-          public Object performTask() throws StorageException {
-            connector.beginTransaction();
-            connector.writeLock();
-            RanNodeDataAccess DA =
-                (RanNodeDataAccess) RMStorageFactory
-                    .getDataAccess(RanNodeDataAccess.class);
-            Map<String, List<RanNode>> attempts = DA.getAll();
-            connector.commit();
-            return attempts;
-          }
-        };
-    return (Map<String, List<RanNode>>) getRanNodeHandler
-        .handle();
+   public static Map<String, List<RanNode>> getAllRanNodes()
+          throws IOException {
+    RanNodeDataAccess DA = (RanNodeDataAccess) RMStorageFactory
+            .getDataAccess(RanNodeDataAccess.class);
+    return DA.getAll();
   }
     
-      public static Map<String, List<UpdatedNode>> getAllUpdatedNodes()
-      throws IOException {
-    LightWeightRequestHandler getUpdatedNodeHandler =
-        new LightWeightRequestHandler(YARNOperationType.TEST) {
-          @Override
-          public Object performTask() throws StorageException {
-            connector.beginTransaction();
-            connector.writeLock();
-            UpdatedNodeDataAccess DA =
-                (UpdatedNodeDataAccess) RMStorageFactory
-                    .getDataAccess(UpdatedNodeDataAccess.class);
-            Map<String, List<UpdatedNode>> attempts = DA.getAll();
-            connector.commit();
-            return attempts;
-          }
-        };
-    return (Map<String, List<UpdatedNode>>) getUpdatedNodeHandler
-        .handle();
+  public static Map<String, List<UpdatedNode>> getAllUpdatedNodes()
+          throws IOException {
+
+    UpdatedNodeDataAccess DA = (UpdatedNodeDataAccess) RMStorageFactory
+            .getDataAccess(UpdatedNodeDataAccess.class);
+    return DA.getAll();
+
   }
       
   /**
@@ -1734,86 +1683,33 @@ public class RMUtilities {
 
   
   public static List<RMContextActiveNodes> getAllRMContextActiveNodes()
-      throws IOException {
-    LightWeightRequestHandler getAllRMContextActiveNodesHandler =
-        new LightWeightRequestHandler(YARNOperationType.TEST) {
-
-          @Override
-          public Object performTask() throws IOException {
-            connector.beginTransaction();
-            connector.writeLock();
-            RMContextActiveNodesDataAccess rmctxnodesDA =
-                (RMContextActiveNodesDataAccess) RMStorageFactory.
-                    getDataAccess(RMContextActiveNodesDataAccess.class);
-            List<RMContextActiveNodes> hopRMContextNodes = rmctxnodesDA.
-                findAll();
-            connector.commit();
-            return hopRMContextNodes;
-          }
-        };
-    return (List<RMContextActiveNodes>) getAllRMContextActiveNodesHandler.
-        handle();
+          throws IOException {
+    RMContextActiveNodesDataAccess rmctxnodesDA
+            = (RMContextActiveNodesDataAccess) RMStorageFactory.
+            getDataAccess(RMContextActiveNodesDataAccess.class);
+    return rmctxnodesDA.
+            findAll();
   }
   
   public static Map<String, RMNode> getAllRMNodes() throws IOException {
-    LightWeightRequestHandler getAllRMNodesHandler =
-        new LightWeightRequestHandler(YARNOperationType.TEST) {
-
-          @Override
-          public Object performTask() throws IOException {
-            connector.beginTransaction();
-            connector.writeLock();
-            RMNodeDataAccess rmDA = (RMNodeDataAccess) RMStorageFactory.
-                getDataAccess(RMNodeDataAccess.class);
-            Map<String, RMNode> rmNodes = rmDA.
-                getAll();
-            connector.commit();
-            return rmNodes;
-          }
-        };
-    return (Map<String, RMNode>) getAllRMNodesHandler.handle();
+    RMNodeDataAccess rmDA = (RMNodeDataAccess) RMStorageFactory.
+            getDataAccess(RMNodeDataAccess.class);
+    return rmDA.getAll();
   }
   
   public static Map<String, Node> getAllNodes() throws IOException {
-    LightWeightRequestHandler getAllNodesHandler =
-        new LightWeightRequestHandler(YARNOperationType.TEST) {
-
-          @Override
-          public Object performTask() throws IOException {
-            connector.beginTransaction();
-            connector.writeLock();
-            NodeDataAccess nodeDA = (NodeDataAccess) RMStorageFactory
-                .getDataAccess(NodeDataAccess.class);
-            Map<String, Node> rmNodes = nodeDA.
-                getAll();
-            connector.commit();
-            return rmNodes;
-          }
-        };
-    return (Map<String, Node>) getAllNodesHandler.handle();
+    NodeDataAccess nodeDA = (NodeDataAccess) RMStorageFactory
+            .getDataAccess(NodeDataAccess.class);
+    return nodeDA.getAll();
   }
 
   
   public static List<RMContextInactiveNodes> getAllRMContextInactiveNodes()
-      throws IOException {
-    LightWeightRequestHandler getAllRMContextInactiveNodesHandler =
-        new LightWeightRequestHandler(YARNOperationType.TEST) {
-
-          @Override
-          public Object performTask() throws IOException {
-            connector.beginTransaction();
-            connector.writeLock();
-            RMContextInactiveNodesDataAccess rmctxInactiveNodesDA =
-                (RMContextInactiveNodesDataAccess) RMStorageFactory.
-                    getDataAccess(RMContextInactiveNodesDataAccess.class);
-            List<RMContextInactiveNodes> hopRMContextInactiveNodes =
-                rmctxInactiveNodesDA.findAll();
-            connector.commit();
-            return hopRMContextInactiveNodes;
-          }
-        };
-    return (List<RMContextInactiveNodes>) getAllRMContextInactiveNodesHandler.
-        handle();
+          throws IOException {
+    RMContextInactiveNodesDataAccess rmctxInactiveNodesDA
+            = (RMContextInactiveNodesDataAccess) RMStorageFactory.
+            getDataAccess(RMContextInactiveNodesDataAccess.class);
+    return rmctxInactiveNodesDA.findAll();
   }
 
   
@@ -1893,10 +1789,7 @@ public class RMUtilities {
                         hopRMNode.getOvercommittimeout()),
                         hopRMNode.getNodemanagerVersion(),
                         hopRMNode.getHealthReport(),
-                        hopRMNode.getLastHealthReportTime(), nextHeartbeat,
-                        conf.getBoolean(
-                            YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED,
-                            YarnConfiguration.DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED));
+                        hopRMNode.getLastHealthReportTime(), nextHeartbeat);
                 ((RMNodeImpl) rmNode).setState(hopRMNode.getCurrentState());
                 alreadyRecoveredRMContextInactiveNodes
                     .put(rmNode.getNodeID().getHost(), rmNode);
@@ -1929,91 +1822,38 @@ public class RMUtilities {
   }
 
   public static Map<String, Map<Integer, List<UpdatedContainerInfo>>> getAllUpdatedContainerInfos()
-      throws IOException {
-    LightWeightRequestHandler getAllUpdatedContainerInfosHandler =
-        new LightWeightRequestHandler(YARNOperationType.TEST) {
-
-          @Override
-          public Object performTask() throws IOException {
-            connector.beginTransaction();
-            connector.writeLock();
-            UpdatedContainerInfoDataAccess uciDA =
-                (UpdatedContainerInfoDataAccess) RMStorageFactory.
-                    getDataAccess(UpdatedContainerInfoDataAccess.class);
-            Map<String, Map<Integer, List<UpdatedContainerInfo>>>
-                allUpdatedContainerInfos = uciDA.getAll();
-            connector.commit();
-            return allUpdatedContainerInfos;
-          }
-        };
-    return (Map<String, Map<Integer, List<UpdatedContainerInfo>>>) getAllUpdatedContainerInfosHandler
-        .
-            handle();
+          throws IOException {
+    UpdatedContainerInfoDataAccess uciDA
+            = (UpdatedContainerInfoDataAccess) RMStorageFactory.
+            getDataAccess(UpdatedContainerInfoDataAccess.class);
+    return uciDA.getAll();
   }
   
   public static Map<String, ContainerStatus> getAllContainerStatus()
-      throws IOException {
-    LightWeightRequestHandler getAllContainerStatusHandler =
-        new LightWeightRequestHandler(YARNOperationType.TEST) {
-
-          @Override
-          public Object performTask() throws IOException {
-            connector.beginTransaction();
-            connector.writeLock();
-            ContainerStatusDataAccess csDA =
-                (ContainerStatusDataAccess) YarnAPIStorageFactory.
-                    getDataAccess(ContainerStatusDataAccess.class);
-            Map<String, ContainerStatus> allContainerStatus = csDA.getAll();
-            connector.commit();
-            return allContainerStatus;
-          }
-        };
-    return (Map<String, ContainerStatus>) getAllContainerStatusHandler.
-        handle();
+          throws IOException {
+    ContainerStatusDataAccess csDA
+            = (ContainerStatusDataAccess) YarnAPIStorageFactory.
+            getDataAccess(ContainerStatusDataAccess.class);
+    return csDA.getAll();
   }
   
 
   public static Map<String, NodeHBResponse> getAllNodeHeartBeatResponse()
-      throws IOException {
-    LightWeightRequestHandler getNodeHeartBeatResponseHandler =
-        new LightWeightRequestHandler(YARNOperationType.TEST) {
-          @Override
-          public Object performTask() throws StorageException {
-            connector.beginTransaction();
-            connector.writeLock();
+          throws IOException {
 
-            NodeHBResponseDataAccess DA =
-                (NodeHBResponseDataAccess) RMStorageFactory
-                    .getDataAccess(NodeHBResponseDataAccess.class);
-            Map<String, NodeHBResponse> hop = DA.getAll();
-            connector.commit();
-            return hop;
-          }
-        };
-    
-    return (Map<String, NodeHBResponse>) getNodeHeartBeatResponseHandler
-        .handle();
+    NodeHBResponseDataAccess DA = (NodeHBResponseDataAccess) RMStorageFactory
+            .getDataAccess(NodeHBResponseDataAccess.class);
+    return DA.getAll();
+
   }
 
 
   public static Map<String, Set<ContainerId>> getAllContainersToClean()
-      throws IOException {
-    LightWeightRequestHandler getContainersToCleanHandler =
-        new LightWeightRequestHandler(YARNOperationType.TEST) {
-          @Override
-          public Object performTask() throws StorageException {
-            connector.beginTransaction();
-            connector.writeLock();
-            ContainerIdToCleanDataAccess tocleanDA =
-                (ContainerIdToCleanDataAccess) YarnAPIStorageFactory.
-                    getDataAccess(ContainerIdToCleanDataAccess.class);
-            Map<String, Set<ContainerId>> hopContainerIdToClean =
-                tocleanDA.getAll();
-            connector.commit();
-            return hopContainerIdToClean;
-          }
-        };
-    return (Map<String, Set<ContainerId>>) getContainersToCleanHandler.handle();
+          throws IOException {
+    ContainerIdToCleanDataAccess tocleanDA
+            = (ContainerIdToCleanDataAccess) YarnAPIStorageFactory.
+            getDataAccess(ContainerIdToCleanDataAccess.class);
+    return tocleanDA.getAll();
   }
 
   /**
@@ -2079,53 +1919,30 @@ public class RMUtilities {
   
   
   public static Map<String, List<FinishedApplications>> getAllFinishedApplications()
-      throws IOException {
-    LightWeightRequestHandler getFinishedApplicationsHandler =
-        new LightWeightRequestHandler(YARNOperationType.TEST) {
-          @Override
-          public Object performTask() throws StorageException {
-            connector.beginTransaction();
-            connector.writeLock();
-            FinishedApplicationsDataAccess finishedAppsDA =
-                (FinishedApplicationsDataAccess) RMStorageFactory.
-                    getDataAccess(FinishedApplicationsDataAccess.class);
-            Map<String, List<FinishedApplications>> hopFinishedApps =
-                finishedAppsDA.getAll();
-
-            connector.commit();
-            return hopFinishedApps;
-          }
-        };
-    return (Map<String, List<FinishedApplications>>) 
-            getFinishedApplicationsHandler.handle();
+          throws IOException {
+    FinishedApplicationsDataAccess finishedAppsDA
+            = (FinishedApplicationsDataAccess) RMStorageFactory.
+            getDataAccess(FinishedApplicationsDataAccess.class);
+    return finishedAppsDA.getAll();
   }
   
   public static Map<String, List<JustLaunchedContainers>> getAllJustLaunchedContainers()
-      throws IOException {
-    LightWeightRequestHandler getAllJustLaunchedContainersHandler =
-        new LightWeightRequestHandler(YARNOperationType.TEST) {
-
-          @Override
-          public Object performTask() throws IOException {
-            connector.beginTransaction();
-            connector.writeLock();
-            JustLaunchedContainersDataAccess jlcDA =
-                (JustLaunchedContainersDataAccess) YarnAPIStorageFactory.
-                    getDataAccess(JustLaunchedContainersDataAccess.class);
-            Map<String, List<JustLaunchedContainers>> justLaunchedContainers =
-                jlcDA.getAll();
-            connector.commit();
-            return justLaunchedContainers;
-          }
-        };
-
-    return (Map<String, List<JustLaunchedContainers>>) getAllJustLaunchedContainersHandler
-        .
-            handle();
+          throws IOException {
+    JustLaunchedContainersDataAccess jlcDA
+            = (JustLaunchedContainersDataAccess) YarnAPIStorageFactory.
+            getDataAccess(JustLaunchedContainersDataAccess.class);
+    return jlcDA.getAll();
   }
   
 
   public static Map<String, RMContainer> getAllRMContainers()
+          throws IOException {
+    RMContainerDataAccess DA = (RMContainerDataAccess) RMStorageFactory
+            .getDataAccess(RMContainerDataAccess.class);
+    return DA.getAll();
+  }
+  
+  public static Map<String, RMContainer> getAllRMContainersFulTransaction()
       throws IOException {
 
     LightWeightRequestHandler getRMContainerHandler =
@@ -2145,38 +1962,17 @@ public class RMUtilities {
     return (Map<String, RMContainer>) getRMContainerHandler.handle();
   }
   
-
   public static Map<String, Container> getAllContainers() throws IOException {
-    LightWeightRequestHandler getContainerHandler =
-        new LightWeightRequestHandler(YARNOperationType.TEST) {
-          @Override
-          public Object performTask() throws IOException {
-            connector.beginTransaction();
-            connector.writeLock();
-            ContainerDataAccess DA = (ContainerDataAccess) RMStorageFactory.
-                getDataAccess(ContainerDataAccess.class);
-            Map<String, Container> found = DA.getAll();
-            connector.commit();
-            return found;
-          }
-        };
-    return (Map<String, Container>) getContainerHandler.handle();
+    ContainerDataAccess DA = (ContainerDataAccess) RMStorageFactory.
+            getDataAccess(ContainerDataAccess.class);
+    return DA.getAll();
   }
   
   
   public static List<QueueMetrics> getAllQueueMetrics() throws IOException {
-    LightWeightRequestHandler handler =
-        new LightWeightRequestHandler(YARNOperationType.TEST) {
-          @Override
-          public Object performTask() throws IOException {
-            connector.readCommitted();
-            QueueMetricsDataAccess qDA =
-                (QueueMetricsDataAccess) RMStorageFactory
-                    .getDataAccess(QueueMetricsDataAccess.class);
-            return qDA.findAll();
-          }
-        };
-    return (List<QueueMetrics>) handler.handle();
+    QueueMetricsDataAccess qDA = (QueueMetricsDataAccess) RMStorageFactory
+            .getDataAccess(QueueMetricsDataAccess.class);
+    return qDA.findAll();
   }
 
   static Map<String, Queue<TransactionState>> transactionStateForRMNode = 
@@ -2408,17 +2204,25 @@ public class RMUtilities {
                 rpcToRemove.add(hop);
               }
              DA.removeAll(rpcToRemove);
+             connector.flush();
 //            //TODO put all of this in ts.persist
-            ts.persistCSQueueInfo(csQDA, csLQDA);
-            ts.persistRMNodeToUpdate(rmnodeDA);
-            ts.persistRmcontextInfo(rmnodeDA, resourceDA, nodeDA,
+             ts.persistRmcontextInfo(rmnodeDA, resourceDA, nodeDA,
                 rmctxInactiveNodesDA);
+             connector.flush();
+            ts.persistCSQueueInfo(csQDA, csLQDA);
+            connector.flush();
+            ts.persistRMNodeToUpdate(rmnodeDA);
+            connector.flush();
             ts.persistRMNodeInfo(hbDA, cidToCleanDA, justLaunchedContainersDA,
                 updatedContainerInfoDA, faDA, csDA,persistedEventDA, connector);
+            connector.flush();
             ts.persist();
+            connector.flush();
             ts.persistFicaSchedulerNodeInfo(resourceDA, ficaNodeDA,
                 rmcontainerDA, launchedContainersDA);
+            connector.flush();
             ts.persistFairSchedulerNodeInfo(FSSNodeDA);
+            connector.flush();
             ts.persistSchedulerApplicationInfo(QMDA, connector);
             connector.commit();
             return null;
@@ -2469,25 +2273,10 @@ public class RMUtilities {
   }
 
   public static Map<String, Map<Integer, Map<Integer, Resource>>> getAllNodesResources()
-      throws IOException {
-    LightWeightRequestHandler getResourceHandler =
-        new LightWeightRequestHandler(YARNOperationType.TEST) {
-          @Override
-          public Object performTask() throws StorageException {
-            connector.beginTransaction();
-            connector.readCommitted();
-            ResourceDataAccess DA = (ResourceDataAccess) YarnAPIStorageFactory
-                .getDataAccess(ResourceDataAccess.class);
-            Map<String, Map<Integer, Map<Integer, Resource>>> res = DA.
-                getAll();
-            connector.commit();
-            return res;
-          }
-        };
-
-    return (Map<String, Map<Integer, Map<Integer, Resource>>>) getResourceHandler
-        .
-            handle();
+          throws IOException {
+    ResourceDataAccess DA = (ResourceDataAccess) YarnAPIStorageFactory
+            .getDataAccess(ResourceDataAccess.class);
+    return DA.getAll();
   }
   
   public static Map<String, Load> getAllLoads() throws IOException {
@@ -2542,105 +2331,56 @@ public class RMUtilities {
 
   public static Map<String, List<FiCaSchedulerAppSchedulingOpportunities>> getAllSchedulingOpportunities()
           throws IOException {
-    LightWeightRequestHandler getSchedulingOpportunitiesHandler
-            = new LightWeightRequestHandler(YARNOperationType.TEST) {
-              @Override
-              public Object performTask() throws StorageException, IOException {
-                connector.beginTransaction();
-                connector.writeLock();
-                FiCaSchedulerAppSchedulingOpportunitiesDataAccess DA
-                = (FiCaSchedulerAppSchedulingOpportunitiesDataAccess) RMStorageFactory.
-                getDataAccess(
-                        FiCaSchedulerAppSchedulingOpportunitiesDataAccess.class);
-                Map<String, List<FiCaSchedulerAppSchedulingOpportunities>> hopSOpp
-                = DA.getAll();
-                connector.commit();
-                return hopSOpp;
-              }
-            };
-    return (Map<String, List<FiCaSchedulerAppSchedulingOpportunities>>) getSchedulingOpportunitiesHandler.
-            handle();
+
+    FiCaSchedulerAppSchedulingOpportunitiesDataAccess DA
+            = (FiCaSchedulerAppSchedulingOpportunitiesDataAccess) RMStorageFactory.
+            getDataAccess(
+                    FiCaSchedulerAppSchedulingOpportunitiesDataAccess.class);
+    return DA.getAll();
+
   }
 
   public static Map<String, List<FiCaSchedulerAppLastScheduledContainer>> getAllLastScheduledContainers()
           throws IOException {
-    LightWeightRequestHandler getLastScheduledContainerHandler
-            = new LightWeightRequestHandler(YARNOperationType.TEST) {
-              @Override
-              public Object performTask() throws StorageException, IOException {
-                connector.beginTransaction();
-                connector.writeLock();
-                FiCaSchedulerAppLastScheduledContainerDataAccess DA
-                = (FiCaSchedulerAppLastScheduledContainerDataAccess) RMStorageFactory.
-                getDataAccess(
-                        FiCaSchedulerAppLastScheduledContainerDataAccess.class);
-                Map<String, List<FiCaSchedulerAppLastScheduledContainer>> hopLastScheduledContainers
-                = DA.getAll();
-                connector.commit();
-                return hopLastScheduledContainers;
-              }
-            };
-    return (Map<String, List<FiCaSchedulerAppLastScheduledContainer>>) getLastScheduledContainerHandler.
-            handle();
+
+    FiCaSchedulerAppLastScheduledContainerDataAccess DA
+            = (FiCaSchedulerAppLastScheduledContainerDataAccess) RMStorageFactory.
+            getDataAccess(
+                    FiCaSchedulerAppLastScheduledContainerDataAccess.class);
+    return DA.getAll();
   }
 
   public static Map<String, List<SchedulerAppReservations>> getAllRereservations()
           throws IOException {
-    LightWeightRequestHandler getReservationsHandler
-            = new LightWeightRequestHandler(YARNOperationType.TEST) {
-              @Override
-              public Object performTask() throws StorageException, IOException {
-                connector.beginTransaction();
-                connector.writeLock();
-                FiCaSchedulerAppReservationsDataAccess DA
-                = (FiCaSchedulerAppReservationsDataAccess) RMStorageFactory.
-                getDataAccess(FiCaSchedulerAppReservationsDataAccess.class);
-                Map<String, List<SchedulerAppReservations>> hopReservationsMap
-                = DA.getAll();
-                connector.commit();
-                return hopReservationsMap;
-              }
-            };
-    return (Map<String, List<SchedulerAppReservations>>) getReservationsHandler.
-            handle();
+    FiCaSchedulerAppReservationsDataAccess DA
+            = (FiCaSchedulerAppReservationsDataAccess) RMStorageFactory.
+            getDataAccess(FiCaSchedulerAppReservationsDataAccess.class);
+    return DA.getAll();
   }
 
   public static Map<String, List<FiCaSchedulerAppReservedContainers>> getAllReservedContainers()
           throws IOException {
-    LightWeightRequestHandler getReservedContainersHandler
-            = new LightWeightRequestHandler(YARNOperationType.TEST) {
-              @Override
-              public Object performTask() throws StorageException, IOException {
-                connector.beginTransaction();
-                connector.writeLock();
-                FiCaSchedulerAppReservedContainersDataAccess DA
-                = (FiCaSchedulerAppReservedContainersDataAccess) RMStorageFactory.
-                getDataAccess(FiCaSchedulerAppReservedContainersDataAccess.class);
-                Map<String, List<FiCaSchedulerAppReservedContainers>> hopResCont
-                = DA.getAll();
-                connector.commit();
-                return hopResCont;
-              }
-            };
-    return (Map<String, List<FiCaSchedulerAppReservedContainers>>) getReservedContainersHandler.
-            handle();
+    FiCaSchedulerAppReservedContainersDataAccess DA
+            = (FiCaSchedulerAppReservedContainersDataAccess) RMStorageFactory.
+            getDataAccess(FiCaSchedulerAppReservedContainersDataAccess.class);
+    return DA.getAll();
   }
 
   public static Map<String, CSQueue> getAllCSQueues() throws IOException {
-    LightWeightRequestHandler handler = new LightWeightRequestHandler(
-            YARNOperationType.TEST) {
-              @Override
-              public Object performTask() throws StorageException, IOException {
-                connector.readCommitted();
-                CSQueueDataAccess csqDA = (CSQueueDataAccess) RMStorageFactory.
-                getDataAccess(CSQueueDataAccess.class);
-                return csqDA.getAll();
-              }
-            };
-    return (Map<String, CSQueue>) handler.handle();
+    CSQueueDataAccess csqDA = (CSQueueDataAccess) RMStorageFactory.
+            getDataAccess(CSQueueDataAccess.class);
+    return csqDA.getAll();
   }
 
   public static Map<String, CSLeafQueueUserInfo> getAllCSLeafQueueUserInfo()
+          throws IOException {
+    CSLeafQueueUserInfoDataAccess csqLUIDA
+            = (CSLeafQueueUserInfoDataAccess) RMStorageFactory.
+            getDataAccess(CSLeafQueueUserInfoDataAccess.class);
+    return csqLUIDA.findAll();
+  }
+
+  public static Map<String, CSLeafQueueUserInfo> getAllCSLeafQueueUserInfoFullTransaction()
           throws IOException {
     LightWeightRequestHandler handler = new LightWeightRequestHandler(
             YARNOperationType.TEST) {
@@ -2655,7 +2395,7 @@ public class RMUtilities {
             };
     return (Map<String, CSLeafQueueUserInfo>) handler.handle();
   }
-
+   
   //for testing
   public static CSQueue getCSQueue(final String queuepath) throws IOException {
     LightWeightRequestHandler getCSQueueInfoHandler

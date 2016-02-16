@@ -65,21 +65,36 @@ public class RMStorageFactory {
       new HashMap<Class, EntityDataAccess>();
 
   private static DalNdbEventStreaming dNdbEventStreaming;
+  private static boolean ndbStreaingRunning = false;
   public static StorageConnector getConnector() {
     return dStorageFactory.getConnector();
   }
 
-  public static void kickTheNdbEventStreamingAPI(boolean isLeader,
+  public static synchronized void kickTheNdbEventStreamingAPI(boolean isLeader,
           Configuration conf) throws
           StorageInitializtionException {
     dNdbEventStreaming = DalDriver.loadHopsNdbEventStreamingLib(
             YarnAPIStorageFactory.NDB_EVENT_STREAMING_FOR_DISTRIBUTED_SERVICE);
+    
+    String connectionString = dStorageFactory.getConnector().getClusterConnectString() + ":" + 
+            conf.getInt(YarnConfiguration.HOPS_NDB_EVENT_STREAMING_DB_PORT, YarnConfiguration.DEFAULT_HOPS_NDB_EVENT_STREAMING_DB_PORT);
+    
     dNdbEventStreaming.init(conf.get(
             YarnConfiguration.EVENT_SHEDULER_CONFIG_PATH,
             YarnConfiguration.DEFAULT_EVENT_SHEDULER_CONFIG_PATH), conf.get(
                     YarnConfiguration.EVENT_RT_CONFIG_PATH,
-                    YarnConfiguration.DEFAULT_EVENT_RT_CONFIG_PATH));
+                    YarnConfiguration.DEFAULT_EVENT_RT_CONFIG_PATH),
+            connectionString, dStorageFactory.getConnector().getDatabaseName()
+            );
     dNdbEventStreaming.startHopsNdbEvetAPISession(isLeader);
+    ndbStreaingRunning = true;
+  }
+  
+  public static synchronized void stopTheNdbEventStreamingAPI() {
+    if(ndbStreaingRunning && dNdbEventStreaming!=null){
+      ndbStreaingRunning = false;
+      dNdbEventStreaming.closeHopsNdbEventAPISession();
+    }
   }
   
   public static void setConfiguration(Configuration conf)

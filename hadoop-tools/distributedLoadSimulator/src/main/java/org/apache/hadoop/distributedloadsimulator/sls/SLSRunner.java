@@ -21,6 +21,10 @@ package org.apache.hadoop.distributedloadsimulator.sls;
  */
 import io.hops.metadata.util.RMStorageFactory;
 import io.hops.metadata.util.YarnAPIStorageFactory;
+import io.hops.metadata.yarn.dal.YarnProjectsQuotaDataAccess;
+import io.hops.metadata.yarn.dal.util.YARNOperationType;
+import io.hops.metadata.yarn.entity.YarnProjectsQuota;
+import io.hops.transaction.handler.LightWeightRequestHandler;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileReader;
@@ -34,7 +38,6 @@ import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
 import java.text.MessageFormat;
-import java.util.ArrayList;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Set;
@@ -48,7 +51,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.Lock;
 import java.util.logging.Level;
 
 import org.apache.commons.cli.CommandLine;
@@ -57,12 +59,9 @@ import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.Options;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.distributedloadsimulator.sls.appmaster.AMSimulator;
-import org.apache.hadoop.distributedloadsimulator.sls.appmaster.MRAMSimulator;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnException;
-import org.apache.hadoop.yarn.factories.impl.pb.RpcClientFactoryPBImpl;
-import org.apache.hadoop.yarn.server.api.ResourceTracker;
 import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
 import org.apache.hadoop.distributedloadsimulator.sls.utils.SLSUtils;
 import org.apache.log4j.Logger;
@@ -71,11 +70,9 @@ import org.codehaus.jackson.map.ObjectMapper;
 import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.distributedloadsimulator.sls.conf.SLSConfiguration;
 import org.apache.hadoop.distributedloadsimulator.sls.nodemanager.NMSimulator;
-import org.apache.hadoop.distributedloadsimulator.sls.scheduler.ContainerSimulator;
 import org.apache.hadoop.distributedloadsimulator.sls.scheduler.ResourceSchedulerWrapper;
 import org.apache.hadoop.distributedloadsimulator.sls.scheduler.TaskRunner;
 import org.apache.hadoop.util.ReflectionUtils;
-import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.client.api.YarnClient;
 import org.apache.hadoop.yarn.server.resourcemanager.resource.Priority;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
@@ -124,10 +121,7 @@ public class SLSRunner implements AMNMCommonObject {
   // logger
   public final static Logger LOG = Logger.getLogger(SLSRunner.class);
 
-  private final String rmAddress;
   private int numberOfRT = 0;
-  private final String[] rtAddresses = new String[5]; // this is kind of fixed,
-  ResourceTracker[] resourceTrackers = new ResourceTracker[5];
 
   private int totalJobRunningTimeSec = 0;
   protected YarnClient rmClient;
@@ -158,15 +152,12 @@ public class SLSRunner implements AMNMCommonObject {
     distributedmode = distributedMode;
     this.loadsimulatormode = loadSimMode;
     if (resourceTrackerAddress.split(",").length == 1) { // so we only have one RT
-      this.rtAddresses[0] = resourceTrackerAddress;
       this.numberOfRT = 1;
     } else {
       for (int i = 0; i < resourceTrackerAddress.split(",").length; ++i) {
-        rtAddresses[i] = resourceTrackerAddress.split(",")[i];
       }
       this.numberOfRT = resourceTrackerAddress.split(",").length;
     }
-    this.rmAddress = resourceManagerAddress;
     this.inputTraces = inputTraces.clone();
     this.nodeFile = nodeFile;
     this.trackedApps = trackedApps;
@@ -181,6 +172,8 @@ public class SLSRunner implements AMNMCommonObject {
 
     // runner configuration
     conf = new Configuration();
+    YarnAPIStorageFactory.setConfiguration(conf);
+    RMStorageFactory.setConfiguration(conf);
     conf.addResource("sls-runner.xml");
     // runner
     int poolSize = conf.getInt(SLSConfiguration.NM_RUNNER_POOL_SIZE,
@@ -206,7 +199,6 @@ public class SLSRunner implements AMNMCommonObject {
 
   public void initializeYarnClientForAMSimulation() {
     YarnConfiguration yarnConf = new YarnConfiguration();
-    yarnConf.setStrings(YarnConfiguration.RM_ADDRESS, rmAddress);
     rmClient = YarnClient.createYarnClient();
     rmClient.init(yarnConf);
     rmClient.start();
@@ -308,7 +300,7 @@ public class SLSRunner implements AMNMCommonObject {
     Configuration rmConf = new YarnConfiguration();
 
     rmConf.setBoolean(YarnConfiguration.RM_HA_ENABLED, true);
-    rmConf.setBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED, true);
+    rmConf.setBoolean(YarnConfiguration.DISTRIBUTED_RM, true);
     rmConf.setBoolean(YarnConfiguration.HOPS_NDB_EVENT_STREAMING_ENABLED, true);
     rmConf.setBoolean(YarnConfiguration.HOPS_NDB_RT_EVENT_STREAMING_ENABLED,
             true);
@@ -350,7 +342,8 @@ public class SLSRunner implements AMNMCommonObject {
 
   }
 
-  private void startNM() throws YarnException, IOException {
+  private void startNM() throws YarnException, IOException, 
+          ClassNotFoundException {
     // nm configuration
     // 38GB
     nmMemoryMB = conf.getInt(SLSConfiguration.NM_MEMORY_MB,
@@ -371,18 +364,8 @@ public class SLSRunner implements AMNMCommonObject {
       nodeSet.addAll(SLSUtils.parseNodesFromNodeFile(nodeFile));
     }
 
-    Configuration rtConf = new YarnConfiguration();
-    int rtPort = rtConf.getPort(YarnConfiguration.RM_RESOURCE_TRACKER_PORT,
-            YarnConfiguration.DEFAULT_RM_RESOURCE_TRACKER_PORT);
 
     for (int i = 0; i < numberOfRT; ++i) {
-      rtConf.setStrings(YarnConfiguration.RM_RESOURCE_TRACKER_ADDRESS,
-              rtAddresses[i]);
-      resourceTrackers[i] = (ResourceTracker) RpcClientFactoryPBImpl.get().
-              getClient(ResourceTracker.class, 1, rtConf.getSocketAddr(
-                              YarnConfiguration.RM_RESOURCE_TRACKER_ADDRESS,
-                              YarnConfiguration.DEFAULT_RM_RESOURCE_TRACKER_ADDRESS,
-                              rtPort), rtConf);
     }
     // create NM simulators
     int counter = 0;
@@ -395,8 +378,8 @@ public class SLSRunner implements AMNMCommonObject {
       NMSimulator nm = new NMSimulator();
       nm.init(hostName, nmMemoryMB, nmVCores,
               random.nextInt(nmHeartbeatInterval), nmHeartbeatInterval, rm,
-              resourceTrackers[counter % numberOfRT]);
-
+               conf);
+      LOG.info("Inited nm: " + hostName + " (" + counter + ")");
       nmMap.put(nm.getNode().getNodeID(), nm);
       nodeRunner.schedule(nm);
       rackSet.add(nm.getNode().getRackName());
@@ -714,7 +697,6 @@ public class SLSRunner implements AMNMCommonObject {
         LOG.info("Distributed_Simulator_shutting_down_time : " + System.
                 currentTimeMillis());
 
-        System.exit(0);
       }
     }
   }
@@ -807,19 +789,54 @@ public class SLSRunner implements AMNMCommonObject {
     float avgClusterUsage = totalClusterUsage / counter;
 
     try {
+      
+      LightWeightRequestHandler logsHandler
+              = new LightWeightRequestHandler(
+                      YARNOperationType.TEST) {
+                        @Override
+                        public Object performTask() throws IOException {
+                          connector.beginTransaction();
+                          connector.writeLock();
+                          YarnProjectsQuotaDataAccess _pqDA
+                                    = (YarnProjectsQuotaDataAccess) RMStorageFactory.
+                                    getDataAccess(
+                                            YarnProjectsQuotaDataAccess.class);
+                                    Map<String, YarnProjectsQuota> hopYarnProjectsQuotaMap
+                                    = _pqDA.getAll();
+                            connector.commit();
+                            return hopYarnProjectsQuotaMap;
+                          
+                        }
+                      };
+              final Map<String, YarnProjectsQuota> hopContainersLogs
+                        = (Map<String, YarnProjectsQuota>) logsHandler.handle();
+              long totalQuota=0;
+      for(YarnProjectsQuota quota: hopContainersLogs.values()){
+        totalQuota+=quota.getTotalUsedQuota();
+      }
+      long quotaDifNodeManagers = totalQuota-totalClusterUsageFromStart;
+      float quotaErrorNodeManagers = (float) quotaDifNodeManagers/totalClusterUsageFromStart;
+      
+      long totalClusterUsageAm = 0;
+      for(AMSimulator am: amMap.values()){
+        totalClusterUsageAm = totalClusterUsageAm + (am.getTotalContainersDuration()/1000);
+      }
+      long quotaDifAm = totalQuota-totalClusterUsageAm;
+      float quotaErrorAm = (float) quotaDifAm/totalClusterUsageAm;
+      
       File file = new File("simulationsDuration");
       if (!file.exists()) {
         file.createNewFile();
       }
       FileWriter fileWritter = new FileWriter(file.getName(), true);
       BufferedWriter bufferWritter = new BufferedWriter(fileWritter);
-      bufferWritter.write(simulationDuration + " \t" + rtHBRatio + " ("
-              + rtHbDetail + ")" + " \t"
-              + scHBRatio + " (" + scHbDetail + ")" + " \t"
-              + avgApplicationWaitTime + " \t"
-              + avgContainerAllocationWaitTime + " \t" + avgContainerStartTime
-              + " \t" + nbContainers + " \t" + avgClusterUsage + " \t"
-              + appNotAllocated.get() + " \n");
+      bufferWritter.write(simulationDuration + "\t" + rtHBRatio +/* " ("
+              + rtHbDetail + ")" +*/ "\t"
+              + scHBRatio + /*" (" + scHbDetail + ")" +*/ "\t"
+              + avgApplicationWaitTime + "\t"
+              + avgContainerAllocationWaitTime + "\t" + avgContainerStartTime
+              + "\t" + nbContainers + "\t" + avgClusterUsage + "\t" + 
+               quotaErrorNodeManagers + "\t" + quotaErrorAm + "\n");
       bufferWritter.close();
 
       file = new File("clusterUsageDetail");
@@ -960,7 +977,8 @@ public class SLSRunner implements AMNMCommonObject {
 
   Queue<Integer> clusterUsages = new LinkedBlockingQueue<Integer>();
   float lastClusterUsage = 0;
-
+  long totalClusterUsageFromStart = 0;
+  
   private class Measurer implements Runnable {
 
     final long xpDuration;
@@ -974,10 +992,21 @@ public class SLSRunner implements AMNMCommonObject {
     public void run() {
       try {
         LOG.info("Measurer sleep for warmup: " + xpDuration / 4);
+        long start = System.currentTimeMillis();
+        while (System.currentTimeMillis() - start < xpDuration / 4) {
+          long startLoop = System.currentTimeMillis();
+          int clusterUsage = 0;
+          for (NMSimulator nm : nmMap.values()) {
+            clusterUsage += nm.getUsedResources();
+          }
+          totalClusterUsageFromStart += clusterUsage;
+          Thread.sleep(1000 - (System.currentTimeMillis() - startLoop));
+        }
         Thread.sleep(xpDuration / 4);
+        
         LOG.info("Measurer start measures for " + xpDuration / 2);
         runner.startMeasures();
-        long start = System.currentTimeMillis();
+        start = System.currentTimeMillis();
         while (System.currentTimeMillis() - start < xpDuration / 2) {
           long startLoop = System.currentTimeMillis();
           int clusterUsage = 0;
@@ -985,10 +1014,11 @@ public class SLSRunner implements AMNMCommonObject {
             clusterUsage += nm.getUsedResources();
           }
           clusterUsages.add(clusterUsage);
+                    totalClusterUsageFromStart += clusterUsage;
           Integer clusterCapacity = nmMap.size() * nmMemoryMB
                   / containerMemoryMB;
           lastClusterUsage = (float) clusterUsage / clusterCapacity;
-          Thread.sleep(5000 - (System.currentTimeMillis() - startLoop));
+          Thread.sleep(1000 - (System.currentTimeMillis() - startLoop));
         }
         LOG.info("Measurer finish measures");
         runner.finishSimulation();

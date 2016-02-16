@@ -30,6 +30,7 @@ import io.hops.metadata.yarn.entity.FiCaSchedulerNode;
 import io.hops.metadata.yarn.entity.JustLaunchedContainers;
 import io.hops.metadata.yarn.entity.LaunchedContainers;
 import io.hops.metadata.yarn.entity.Node;
+import io.hops.metadata.yarn.entity.PendingEvent;
 import io.hops.metadata.yarn.entity.QueueMetrics;
 import io.hops.metadata.yarn.entity.RMContainer;
 import io.hops.metadata.yarn.entity.RMContextActiveNodes;
@@ -40,6 +41,8 @@ import io.hops.metadata.yarn.entity.ResourceRequest;
 import io.hops.metadata.yarn.entity.SchedulerAppReservations;
 import io.hops.metadata.yarn.entity.SchedulerApplication;
 import io.hops.metadata.yarn.entity.UpdatedContainerInfo;
+import io.hops.metadata.yarn.entity.appmasterrpc.AllocateRPC;
+import io.hops.metadata.yarn.entity.appmasterrpc.HeartBeatRPC;
 import io.hops.metadata.yarn.entity.appmasterrpc.RPC;
 import io.hops.metadata.yarn.entity.capacity.CSLeafQueueUserInfo;
 import io.hops.metadata.yarn.entity.capacity.CSQueue;
@@ -131,7 +134,6 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
   protected static final String DELEGATION_TOKEN_SEQUENCE_NUMBER_PREFIX =
       "RMDTSequenceNumber_";
   protected static final String VERSION_NODE = "RMVersionNode";
-  private static boolean isDistributedRTEnabled;
   
   public static final Log LOG = LogFactory.getLog(RMStateStore.class);
 
@@ -381,6 +383,9 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
 
     Map<KeyType, MasterKey> secretMamagerKeys;
     List<RPC> appMasterRPCs;
+    Map<Integer, HeartBeatRPC> heartBeatRPCs;
+    Map<Integer, AllocateRPC> allocateRPCs;
+    List<PendingEvent> pendingEvents;
     Map<String, AppSchedulingInfo> appSchedulingInfos;
     Map<String, SchedulerApplication> schedulerApplications;
     Map<String, FiCaSchedulerNode> fiCaSchedulerNodes;
@@ -446,6 +451,22 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
       }
     }
 
+    public Map<Integer, HeartBeatRPC> getHeartBeatRPCs(){
+      return heartBeatRPCs;
+    }
+    
+    public Map<Integer, AllocateRPC> getAllocateRPCs(){
+      return allocateRPCs;
+    }
+    
+    public List<PendingEvent> getPendingEvents() throws IOException {
+      if (pendingEvents != null) {
+        return pendingEvents;
+      } else {
+        return Collections.EMPTY_LIST;
+      }
+    }
+    
     public AppSchedulingInfo getAppSchedulingInfo(final String appId)
         throws IOException {
       return appSchedulingInfos.get(appId);
@@ -570,11 +591,19 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
               node.setLevel(hopNode.getLevel());
             }
             //Get NextHeartbeat
-            boolean nextHeartbeat =
-                allRMNodeNextHeartbeats.get(hopRMContextNode.
+            LOG.debug("nexthb: " + allRMNodeNextHeartbeats
+                    + " hopRMContextNode: " + hopRMContextNode + " getNodeId: "
+                    + hopRMContextNode.
                     getNodeId());
-            LOG.debug("HOP :: RMStateStore-node:" + hopRMContextNode.
-                getNodeId() + ", nextHB:" + nextHeartbeat);
+            boolean nextHeartbeat = false;
+            if (allRMNodeNextHeartbeats.get(hopRMContextNode.getNodeId())
+                    != null) {
+              nextHeartbeat = true;
+            }
+
+            LOG.info("HOP :: RMStateStore-node:" + hopRMContextNode.
+                    getNodeId() + ", state:" + hopRMNode.getCurrentState()
+                    + " resources: " + res);
             org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode rmNode =
                 new RMNodeImpl(nodeId, rmContext, hopRMNode.getHostName(),
                     hopRMNode.getCommandPort(), hopRMNode.getHttpPort(), node,
@@ -585,8 +614,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
                         hopRMNode.getOvercommittimeout()),
                     hopRMNode.getNodemanagerVersion(),
                     hopRMNode.getHealthReport(),
-                    hopRMNode.getLastHealthReportTime(), nextHeartbeat,
-                    isDistributedRTEnabled);
+                    hopRMNode.getLastHealthReportTime(), nextHeartbeat);
 
             ((RMNodeImpl) rmNode).setState(hopRMNode.getCurrentState());
             rmNode.recover(this);
@@ -640,8 +668,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
                         hopRMNode.getOvercommittimeout()),
                     hopRMNode.getNodemanagerVersion(),
                     hopRMNode.getHealthReport(),
-                    hopRMNode.getLastHealthReportTime(), nextHeartbeat,
-                    isDistributedRTEnabled);
+                    hopRMNode.getLastHealthReportTime(), nextHeartbeat);
             ((RMNodeImpl) rmNode).setState(hopRMNode.getCurrentState());
             rmNode.recover(this);
             alreadyRecoveredRMContextInactiveNodes.put(rmNode.getNodeID().
@@ -660,7 +687,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
         new HashMap<ContainerId, org.apache.hadoop.yarn.api.records.ContainerStatus>();
 
     public LinkedList<org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo> getUpdatedContainerInfo(
-        final String rmNodeId) {
+        final String rmNodeId, RMNodeImpl rmNode) {
       LinkedList<org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo>
           updatedContainerInfoQueue =
           new LinkedList<org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo>();
@@ -670,7 +697,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
             allUpdatedContainerInfos.get(rmNodeId);
         if (updatedContainerInfos != null) {
           List<org.apache.hadoop.yarn.api.records.ContainerStatus>
-              newlyAllocated =
+              newlyLaunched =
               new ArrayList<org.apache.hadoop.yarn.api.records.ContainerStatus>();
           List<org.apache.hadoop.yarn.api.records.ContainerStatus> completed =
               new ArrayList<org.apache.hadoop.yarn.api.records.ContainerStatus>();
@@ -710,7 +737,12 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
               if (containerStatus != null) {
                 if (containerStatus.getState().toString()
                     .equals(TablesDef.ContainerStatusTableDef.STATE_RUNNING)) {
-                  newlyAllocated.add(containerStatus);
+                  if (!rmNode.getJustLaunchedContainers().containsKey(
+                          containerStatus.getContainerId())) {
+                    LOG.debug("add newlyLaunchedContainer " + containerStatus.
+                            getContainerId());
+                    newlyLaunched.add(containerStatus);
+                  }
                 } else if (containerStatus.getState().toString()
                     .equals(TablesDef.ContainerStatusTableDef.STATE_COMPLETED)) {
                   completed.add(containerStatus);
@@ -720,7 +752,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
             org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo
                 uci =
                 new org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo(
-                    newlyAllocated, completed, updatedContainerInfoId);
+                    newlyLaunched, completed, updatedContainerInfoId);
             updatedContainerInfoQueue.add(uci);
           }
         }
@@ -874,9 +906,6 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
     dispatcher
         .register(RMStateStoreEventType.class, new ForwardingEventHandler());
     dispatcher.setDrainEventsOnStop();
-    isDistributedRTEnabled =
-        conf.getBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED,
-            YarnConfiguration.DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED);
     initInternal(conf);
   }
 
