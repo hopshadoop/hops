@@ -106,6 +106,7 @@ message OpWriteBlockProto {
 message OpTransferBlockProto {
   required ClientOperationHeaderProto header = 1;
   repeated DatanodeInfoProto targets = 2;
+  repeated StorageTypeProto targetStorageTypes = 3;
 }
 
 message OpReplaceBlockProto {

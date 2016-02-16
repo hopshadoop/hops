@@ -336,11 +336,17 @@ class DataXceiver extends Receiver implements Runnable {
   @Override
   public void writeBlock(final ExtendedBlock block,
       final StorageType storageType,
-      final Token<BlockTokenIdentifier> blockToken, final String clientname,
-      final DatanodeInfo[] targets, final DatanodeInfo srcDataNode,
-      final BlockConstructionStage stage, final int pipelineSize,
-      final long minBytesRcvd, final long maxBytesRcvd,
-      final long latestGenerationStamp, DataChecksum requestedChecksum)
+      final Token<BlockTokenIdentifier> blockToken,
+      final String clientname,
+      final DatanodeInfo[] targets,
+      final StorageType[] targetStorageTypes,
+      final DatanodeInfo srcDataNode,
+      final BlockConstructionStage stage,
+      final int pipelineSize,
+      final long minBytesRcvd,
+      final long maxBytesRcvd,
+      final long latestGenerationStamp,
+      DataChecksum requestedChecksum)
       throws IOException {
     previousOpClientName = clientname;
     updateCurrentThreadName("Receiving block " + block);
@@ -443,8 +449,9 @@ class DataXceiver extends Receiver implements Runnable {
           mirrorIn = new DataInputStream(unbufMirrorIn);
 
           new Sender(mirrorOut)
-              .writeBlock(originalBlock, blockToken, clientname, targets,
-                  srcDataNode, stage, pipelineSize, minBytesRcvd, maxBytesRcvd,
+              .writeBlock(originalBlock, targetStorageTypes[0], blockToken,
+                  clientname, targets, targetStorageTypes, srcDataNode, stage,
+                  pipelineSize, minBytesRcvd, maxBytesRcvd,
                   latestGenerationStamp, requestedChecksum);
 
           mirrorOut.flush();
@@ -553,8 +560,10 @@ class DataXceiver extends Receiver implements Runnable {
 
   @Override
   public void transferBlock(final ExtendedBlock blk,
-      final Token<BlockTokenIdentifier> blockToken, final String clientName,
-      final DatanodeInfo[] targets) throws IOException {
+      final Token<BlockTokenIdentifier> blockToken,
+      final String clientName,
+      final DatanodeInfo[] targets,
+      final StorageType[] targetStorageTypes) throws IOException {
     checkAccess(null, true, blk, blockToken, Op.TRANSFER_BLOCK,
         BlockTokenSecretManager.AccessMode.COPY);
     previousOpClientName = clientName;
@@ -562,7 +571,8 @@ class DataXceiver extends Receiver implements Runnable {
 
     final DataOutputStream out = new DataOutputStream(getOutputStream());
     try {
-      datanode.transferReplicaForPipelineRecovery(blk, targets, clientName);
+      datanode.transferReplicaForPipelineRecovery(blk, targets,
+          targetStorageTypes, clientName);
       writeResponse(Status.SUCCESS, null, out);
     } finally {
       IOUtils.closeStream(out);

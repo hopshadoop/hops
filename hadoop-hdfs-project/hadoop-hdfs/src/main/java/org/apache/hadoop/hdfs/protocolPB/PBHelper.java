@@ -1343,6 +1343,20 @@ public class PBHelper {
     }
   }
 
+  public static StorageType[] convertStorageTypes(
+      List<StorageTypeProto> storageTypesList, int expectedSize) {
+    final StorageType[] storageTypes = new StorageType[expectedSize];
+    if (storageTypesList.size() != expectedSize) { // missing storage types
+      Preconditions.checkState(storageTypesList.isEmpty());
+      Arrays.fill(storageTypes, StorageType.DEFAULT);
+    } else {
+      for (int i = 0; i < storageTypes.length; ++i) {
+        storageTypes[i] = convertStorageType(storageTypesList.get(i));
+      }
+    }
+    return storageTypes;
+  }
+
   public static DatanodeStorage convert(DatanodeStorageProto s) {
     if (s.hasStorageType()) {
       return new DatanodeStorage(s.getStorageID(),

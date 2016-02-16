@@ -97,11 +97,17 @@ public interface DataTransferProtocol {
    */
   public void writeBlock(final ExtendedBlock blk,
       final StorageType storageType,
-      final Token<BlockTokenIdentifier> blockToken, final String clientName,
-      final DatanodeInfo[] targets, final DatanodeInfo source,
-      final BlockConstructionStage stage, final int pipelineSize,
-      final long minBytesRcvd, final long maxBytesRcvd,
-      final long latestGenerationStamp, final DataChecksum requestedChecksum)
+      final Token<BlockTokenIdentifier> blockToken,
+      final String clientName,
+      final DatanodeInfo[] targets,
+      final StorageType[] targetStorageTypes,
+      final DatanodeInfo source,
+      final BlockConstructionStage stage,
+      final int pipelineSize,
+      final long minBytesRcvd,
+      final long maxBytesRcvd,
+      final long latestGenerationStamp,
+      final DataChecksum requestedChecksum)
       throws IOException;
 
   /**
@@ -120,8 +126,10 @@ public interface DataTransferProtocol {
    *     target datanodes.
    */
   public void transferBlock(final ExtendedBlock blk,
-      final Token<BlockTokenIdentifier> blockToken, final String clientName,
-      final DatanodeInfo[] targets) throws IOException;
+      final Token<BlockTokenIdentifier> blockToken,
+      final String clientName,
+      final DatanodeInfo[] targets,
+      final StorageType[] targetStorageTypes) throws IOException;
 
   /**
    * Receive a block from a source datanode
