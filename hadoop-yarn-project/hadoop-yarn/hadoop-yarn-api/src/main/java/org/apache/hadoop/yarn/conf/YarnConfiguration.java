@@ -992,7 +992,7 @@ public class YarnConfiguration extends Configuration {
   public static final String PROXY_ADDRESS = PROXY_PREFIX + "address";
   public static final int DEFAULT_PROXY_PORT = 9099;
   public static final String DEFAULT_PROXY_ADDRESS =
-      "localhost:" + DEFAULT_RM_PORT;
+      "localhost:" + DEFAULT_PROXY_PORT;
   /**
    * YARN Service Level Authorization
    */
