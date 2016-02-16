@@ -132,8 +132,10 @@ public class TestBlockManager {
     // construct network topology
     for (DatanodeDescriptor dn : nodesToAdd) {
       cluster.add(dn);
-      dn.updateHeartbeat(2 * HdfsConstants.MIN_BLOCKS_FOR_WRITE * BLOCK_SIZE,
-          0L, 2 * HdfsConstants.MIN_BLOCKS_FOR_WRITE * BLOCK_SIZE, 0L, 0, 0);
+      dn.getStorageInfos()[0].setUtilizationForTesting(
+          2 * HdfsConstants.MIN_BLOCKS_FOR_WRITE*BLOCK_SIZE, 0L,
+          2 * HdfsConstants.MIN_BLOCKS_FOR_WRITE*BLOCK_SIZE, 0L);
+      dn.updateHeartbeat(BlockManagerTestUtil.getStorageReportsForDatanode(dn), 0, 0);
       bm.getDatanodeManager().checkIfClusterIsNowMultiRack(dn);
       bm.getDatanodeManager().addDnToStorageMapInDB(dn);
       bm.getDatanodeManager().addDatanode(dn);

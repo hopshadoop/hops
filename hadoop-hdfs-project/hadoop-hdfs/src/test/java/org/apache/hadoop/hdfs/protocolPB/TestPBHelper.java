@@ -492,22 +492,30 @@ public class TestPBHelper {
   @Test
   public void testConvertBlockCommand() {
     Block[] blocks = new Block[]{new Block(21), new Block(22)};
-    DatanodeInfo[][] dnInfos =
-        new DatanodeInfo[][]{new DatanodeInfo[1], new DatanodeInfo[2]};
+    DatanodeInfo[][] dnInfos = new DatanodeInfo[][]{new DatanodeInfo[1], new DatanodeInfo[2]};
+    StorageType[][] types = new StorageType[][]{new StorageType[1], new StorageType[2]};
+    String[][] storageIds = {{"storage1"}, {"storage2", "storage3"}};
     dnInfos[0][0] = DFSTestUtil.getLocalDatanodeInfo();
     dnInfos[1][0] = DFSTestUtil.getLocalDatanodeInfo();
     dnInfos[1][1] = DFSTestUtil.getLocalDatanodeInfo();
-    BlockCommand bc =
-        new BlockCommand(DatanodeProtocol.DNA_TRANSFER, "bp1", blocks, dnInfos);
+    BlockCommand bc = new BlockCommand(DatanodeProtocol.DNA_TRANSFER, "bp1",
+        blocks, dnInfos, types, storageIds);
+
+    // Convert to proto and back again
     BlockCommandProto bcProto = PBHelper.convert(bc);
     BlockCommand bc2 = PBHelper.convert(bcProto);
+
     assertEquals(bc.getAction(), bc2.getAction());
     assertEquals(bc.getBlocks().length, bc2.getBlocks().length);
+
     Block[] blocks2 = bc2.getBlocks();
     for (int i = 0; i < blocks.length; i++) {
       assertEquals(blocks[i], blocks2[i]);
     }
+
     DatanodeInfo[][] dnInfos2 = bc2.getTargets();
+    StorageType[][] types2 = bc2.getTargetStorageTypes();
+    String[][] storageIds2 = bc2.getTargetStorageIDs();
     assertEquals(dnInfos.length, dnInfos2.length);
     for (int i = 0; i < dnInfos.length; i++) {
       DatanodeInfo[] d1 = dnInfos[i];
@@ -515,6 +523,9 @@ public class TestPBHelper {
       assertEquals(d1.length, d2.length);
       for (int j = 0; j < d1.length; j++) {
         compare(d1[j], d2[j]);
+
+        assertEquals(types[i][j], types2[i][j]);
+        assertEquals(storageIds[i][j], storageIds2[i][j]);
       }
     }
   }

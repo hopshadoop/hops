@@ -42,6 +42,8 @@ import org.mockito.stubbing.Answer;
 import java.lang.reflect.Field;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.doAnswer;
@@ -127,9 +129,9 @@ public class TestAddBlockRetry {
         }
         return ret;
       }
-    }).when(spyBM).chooseTarget(Mockito.anyString(), Mockito.anyInt(),
-        Mockito.<DatanodeDescriptor>any(), Mockito.<HashMap<Node, Node>>any(),
-        Mockito.anyLong());
+    }).when(spyBM).chooseTarget4NewBlock(Mockito.anyString(), Mockito.anyInt(),
+        Mockito.<DatanodeDescriptor>any(), Mockito.<HashSet<Node>>any(),
+        Mockito.anyLong(), Mockito.<List<String>>any());
 
     // create file
     nn.create(src, FsPermission.getFileDefault(), "clientName",

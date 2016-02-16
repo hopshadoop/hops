@@ -188,9 +188,7 @@ public class TestDataTransferProtocol {
       long newGS, String description, Boolean eofExcepted) throws IOException {
     sendBuf.reset();
     recvBuf.reset();
-    sender.writeBlock(block, BlockTokenSecretManager.DUMMY_TOKEN, "cl",
-        new DatanodeInfo[1], null, stage, 0, block.getNumBytes(),
-        block.getNumBytes(), newGS, DEFAULT_CHECKSUM);
+    writeBlock(block, stage, newGS, DEFAULT_CHECKSUM);
     if (eofExcepted) {
       sendResponse(Status.ERROR, null, null, recvOut);
       sendRecvData(description, true);
@@ -384,20 +382,14 @@ public class TestDataTransferProtocol {
       DataChecksum badChecksum = Mockito.spy(DEFAULT_CHECKSUM);
       Mockito.doReturn(-1).when(badChecksum).getBytesPerChecksum();
 
-      sender.writeBlock(new ExtendedBlock(poolId, newBlockId),
-          BlockTokenSecretManager.DUMMY_TOKEN, "cl", new DatanodeInfo[1], null,
-          BlockConstructionStage.PIPELINE_SETUP_CREATE, 0, 0L, 0L, 0L,
-          badChecksum);
+      writeBlock(poolId, newBlockId, badChecksum);
       recvBuf.reset();
       sendResponse(Status.ERROR, null, null, recvOut);
       sendRecvData("wrong bytesPerChecksum while writing", true);
 
       sendBuf.reset();
       recvBuf.reset();
-      sender.writeBlock(new ExtendedBlock(poolId, ++newBlockId),
-          BlockTokenSecretManager.DUMMY_TOKEN, "cl", new DatanodeInfo[1], null,
-          BlockConstructionStage.PIPELINE_SETUP_CREATE, 0, 0L, 0L, 0L,
-          DEFAULT_CHECKSUM);
+      writeBlock(poolId, ++newBlockId, DEFAULT_CHECKSUM);
 
       PacketHeader hdr = new PacketHeader(4,     // size of packet
           0,     // offset in block,
@@ -415,10 +407,7 @@ public class TestDataTransferProtocol {
       // test for writing a valid zero size block
       sendBuf.reset();
       recvBuf.reset();
-      sender.writeBlock(new ExtendedBlock(poolId, ++newBlockId),
-          BlockTokenSecretManager.DUMMY_TOKEN, "cl", new DatanodeInfo[1], null,
-          BlockConstructionStage.PIPELINE_SETUP_CREATE, 0, 0L, 0L, 0L,
-          DEFAULT_CHECKSUM);
+      writeBlock(poolId, ++newBlockId, DEFAULT_CHECKSUM);
 
       hdr = new PacketHeader(8,     // size of packet
           0,     // OffsetInBlock
@@ -525,5 +514,19 @@ public class TestDataTransferProtocol {
 
     assertTrue(hdr.sanityCheck(99));
     assertFalse(hdr.sanityCheck(100));
+  }
+
+  void writeBlock(String poolId, long blockId, DataChecksum checksum) throws IOException {
+    writeBlock(new ExtendedBlock(poolId, blockId),
+        BlockConstructionStage.PIPELINE_SETUP_CREATE, 0L, checksum);
+  }
+
+  void writeBlock(ExtendedBlock block, BlockConstructionStage stage,
+      long newGS, DataChecksum checksum) throws IOException {
+    sender.writeBlock(block, StorageType.DEFAULT,
+        BlockTokenSecretManager.DUMMY_TOKEN, "cl",
+        new DatanodeInfo[1], new StorageType[1], null, stage,
+        0, block.getNumBytes(), block.getNumBytes(), newGS,
+        checksum);
   }
 }

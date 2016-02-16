@@ -245,7 +245,7 @@ public class TestNameNodeMetrics {
     LocatedBlock block = NameNodeAdapter
         .getBlockLocations(cluster.getNameNode(), file.toString(), 0, 1).get(0);
     bm.findAndMarkBlockAsCorrupt(block.getBlock(), block.getLocations()[0],
-        "TEST");
+        "STORAGE_ID", "TEST");
 
     updateMetrics();
     MetricsRecordBuilder rb = getMetrics(NS_METRICS);
@@ -287,7 +287,7 @@ public class TestNameNodeMetrics {
     LocatedBlock block = NameNodeAdapter
         .getBlockLocations(cluster.getNameNode(), file.toString(), 0, 1).get(0);
     bm.findAndMarkBlockAsCorrupt(block.getBlock(), block.getLocations()[0],
-        "TEST");
+        "STORAGE_ID", "TEST");
     updateMetrics();
     MetricsRecordBuilder rb = getMetrics(NS_METRICS);
     assertGauge("UnderReplicatedBlocks", 1L, rb);

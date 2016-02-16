@@ -40,15 +40,12 @@ class PendingDataNodeMessages {
 
   static class ReportedBlockInfo {
     private final Block block;
-    private final DatanodeDescriptor dn;
-    /** The ID of the storage described by this report */
-    private final String storageID;
+    private final DatanodeStorageInfo storageInfo;
     private final ReplicaState reportedState;
 
-    ReportedBlockInfo(DatanodeDescriptor dn, String storageID, Block block,
+    ReportedBlockInfo(DatanodeStorageInfo storageInfo, Block block,
         ReplicaState reportedState) {
-      this.dn = dn;
-      this.storageID = storageID;
+      this.storageInfo = storageInfo;
       this.block = block;
       this.reportedState = reportedState;
     }
@@ -57,30 +54,27 @@ class PendingDataNodeMessages {
       return block;
     }
 
-    DatanodeDescriptor getNode() {
-      return dn;
-    }
-
-    String getStorageID() {
-      return storageID;
-    }
-
     ReplicaState getReportedState() {
       return reportedState;
     }
 
+    DatanodeStorageInfo getStorageInfo() {
+      return storageInfo;
+    }
+
     @Override
     public String toString() {
-      return "ReportedBlockInfo [block=" + block + ", dn=" + dn +
-          ", reportedState=" + reportedState + "]";
+      return "ReportedBlockInfo [block=" + block + ", dn="
+          + storageInfo.getDatanodeDescriptor()
+          + ", reportedState=" + reportedState + "]";
     }
   }
   
-  void enqueueReportedBlock(DatanodeDescriptor dn, String storageID, Block
-      block, ReplicaState reportedState) {
+  void enqueueReportedBlock(DatanodeStorageInfo storageInfo, Block block,
+      ReplicaState reportedState) {
     block = new Block(block);
-    getBlockQueue(block).add(new ReportedBlockInfo(dn, storageID, block,
-        reportedState));
+    getBlockQueue(block).add(
+        new ReportedBlockInfo(storageInfo, block, reportedState));
     count++;
   }
   

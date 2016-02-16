@@ -142,8 +142,9 @@ public class TestDeadDatanode {
 
     // Ensure heartbeat from dead datanode is rejected with a command
     // that asks datanode to register again
-    StorageReport[] rep =
-        {new StorageReport(reg.getDatanodeUuid(), false, 0, 0, 0, 0)};
+    StorageReport[] rep = {
+        new StorageReport(new DatanodeStorage(reg.getDatanodeUuid()),
+        false, 0, 0, 0, 0) };
     DatanodeCommand[] cmd = dnp.sendHeartbeat(reg, rep, 0, 0, 0).getCommands();
     assertEquals(1, cmd.length);
     assertEquals(cmd[0].getAction(), RegisterCommand.REGISTER.getAction());

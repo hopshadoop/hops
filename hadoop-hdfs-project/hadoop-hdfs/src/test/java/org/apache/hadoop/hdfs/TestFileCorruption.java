@@ -173,7 +173,7 @@ public class TestFileCorruption {
           .getDNRegistrationForBP(dataNode, blk.getBlockPoolId());
       FSNamesystem ns = cluster.getNamesystem();
       cluster.getNamesystem().getBlockManager()
-          .findAndMarkBlockAsCorrupt(blk, new DatanodeInfo(dnR), "TEST");
+          .findAndMarkBlockAsCorrupt(blk, new DatanodeInfo(dnR), "TEST", "STORAGE_ID");
 
       // open the file
       fs.open(FILE_PATH);
