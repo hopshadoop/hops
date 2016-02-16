@@ -977,7 +977,7 @@ public class ClientRMService extends AbstractService
               protoToken.getPassword().array(), new Text(protoToken.getKind()),
               new Text(protoToken.getService()));
 
-      String user = getRenewerForToken(token);
+      String user = UserGroupInformation.getCurrentUser().getUserName();
       rmDTSecretManager.cancelToken(token, user);
       return Records.newRecord(CancelDelegationTokenResponse.class);
     } catch (IOException e) {

@@ -409,8 +409,7 @@ public class ApplicationAttemptStateDataPBImpl
   @Override
   public int getAMContainerExitStatus() {
     ApplicationAttemptStateDataProtoOrBuilder p = viaProto ? proto : builder;
-    int exitStatus = p.getAmContainerExitStatus();
-    return exitStatus;
+    return p.getAmContainerExitStatus();
   }
 
   @Override

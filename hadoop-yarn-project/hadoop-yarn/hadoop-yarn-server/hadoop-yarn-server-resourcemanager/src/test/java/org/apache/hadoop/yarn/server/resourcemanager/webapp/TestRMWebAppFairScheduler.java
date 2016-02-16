@@ -108,7 +108,7 @@ public class TestRMWebAppFairScheduler {
         RMContext rmContext = new RMContextImpl(null, null, null, null, null,
                 null, new RMContainerTokenSecretManager(conf, null), null,
                 new ClientToAMTokenSecretManagerInRM(), null, conf);
-        fs.reinitialize(conf, rmContext, null);
+        fs.init(conf);
         return fs;
     }
 }

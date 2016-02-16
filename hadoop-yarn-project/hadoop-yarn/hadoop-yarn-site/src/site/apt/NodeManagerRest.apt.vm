@@ -64,6 +64,8 @@ NodeManager REST API's.
 *---------------+--------------+-------------------------------+
 | totalVmemAllocatedContainersMB | long         | The amount of virtual memory allocated for use by containers in MB |
 *---------------+--------------+-------------------------------+
+| totalVCoresAllocatedContainers | long         | The number of virtual cores allocated for use by containers |
+*---------------+--------------+-------------------------------+
 | lastNodeUpdateTime | long         | The last timestamp at which the health report was received (in ms since epoch)|
 *---------------+--------------+-------------------------------+
 | healthReport | string  | The diagnostic health report of the node |
@@ -111,6 +113,7 @@ NodeManager REST API's.
       "nodeManagerBuildVersion" : "0.23.1-SNAPSHOT from 1228355 by user1 source checksum 20647f76c36430e888cc7204826a445c",
       "lastNodeUpdateTime" : 1326222266126,
       "totalVmemAllocatedContainersMB" : 17203,
+      "totalVCoresAllocatedContainers" : 8,
       "nodeHealthy" : true,
       "healthReport" : "",
       "totalPmemAllocatedContainersMB" : 8192,
@@ -150,6 +153,7 @@ NodeManager REST API's.
   <healthReport/>
   <totalVmemAllocatedContainersMB>17203</totalVmemAllocatedContainersMB>
   <totalPmemAllocatedContainersMB>8192</totalPmemAllocatedContainersMB>
+  <totalVCoresAllocatedContainers>8</totalVCoresAllocatedContainers>
   <lastNodeUpdateTime>1326222386134</lastNodeUpdateTime>
   <nodeHealthy>true</nodeHealthy>
   <nodeManagerVersion>0.23.1-SNAPSHOT</nodeManagerVersion>
@@ -448,6 +452,7 @@ NodeManager REST API's.
          {
             "nodeId" : "host.domain.com:8041",
             "totalMemoryNeededMB" : 2048,
+            "totalVCoresNeeded" : 1,
             "state" : "RUNNING",
             "diagnostics" : "",
             "containerLogsLink" : "http://host.domain.com:8042/node/containerlogs/container_1326121700862_0006_01_000001/user1",
@@ -458,6 +463,7 @@ NodeManager REST API's.
          {
             "nodeId" : "host.domain.com:8041",
             "totalMemoryNeededMB" : 2048,
+            "totalVCoresNeeded" : 2,
             "state" : "RUNNING",
             "diagnostics" : "",
             "containerLogsLink" : "http://host.domain.com:8042/node/containerlogs/container_1326121700862_0006_01_000003/user1",
@@ -500,6 +506,7 @@ NodeManager REST API's.
     <diagnostics/>
     <user>user1</user>
     <totalMemoryNeededMB>2048</totalMemoryNeededMB>
+    <totalVCoresNeeded>1</totalVCoresNeeded>
     <containerLogsLink>http://host.domain.com:8042/node/containerlogs/container_1326121700862_0006_01_000001/user1</containerLogsLink>
     <nodeId>host.domain.com:8041</nodeId>
   </container>
@@ -510,6 +517,7 @@ NodeManager REST API's.
     <diagnostics>Container killed by the ApplicationMaster.</diagnostics>
     <user>user1</user>
     <totalMemoryNeededMB>2048</totalMemoryNeededMB>
+    <totalVCoresNeeded>2</totalVCoresNeeded>
     <containerLogsLink>http://host.domain.com:8042/node/containerlogs/container_1326121700862_0006_01_000003/user1</containerLogsLink>
     <nodeId>host.domain.com:8041</nodeId>
   </container>
@@ -562,6 +570,8 @@ NodeManager REST API's.
 *---------------+--------------+-------------------------------+
 | totalMemoryNeededMB | long | Total amout of memory needed by the container (in MB) |
 *---------------+--------------+-------------------------------+
+| totalVCoresNeeded | long | Total number of virtual cores needed by the container |
+*---------------+--------------+-------------------------------+
 
 ** Response Examples
 
@@ -589,6 +599,7 @@ NodeManager REST API's.
    "container" : {
       "nodeId" : "host.domain.com:8041",
       "totalMemoryNeededMB" : 2048,
+      "totalVCoresNeeded" : 1,
       "state" : "RUNNING",
       "diagnostics" : "",
       "containerLogsLink" : "http://host.domain.com:8042/node/containerlogs/container_1326121700862_0007_01_000001/user1",
@@ -628,6 +639,7 @@ NodeManager REST API's.
   <diagnostics/>
   <user>user1</user>
   <totalMemoryNeededMB>2048</totalMemoryNeededMB>
+  <totalVCoresNeeded>1</totalVCoresNeeded>
   <containerLogsLink>http://host.domain.com:8042/node/containerlogs/container_1326121700862_0007_01_000001/user1</containerLogsLink>
   <nodeId>host.domain.com:8041</nodeId>
 </container>

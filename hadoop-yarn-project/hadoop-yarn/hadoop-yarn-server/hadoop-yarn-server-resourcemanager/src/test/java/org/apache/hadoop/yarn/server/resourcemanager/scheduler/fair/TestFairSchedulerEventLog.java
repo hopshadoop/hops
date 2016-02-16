@@ -53,6 +53,8 @@ public class TestFairSchedulerEventLog {
     resourceManager = new ResourceManager();
     resourceManager.init(conf);
     ((AsyncDispatcher) resourceManager.getRMContext().getDispatcher()).start();
+    scheduler.init(conf);
+    scheduler.start();
     scheduler.reinitialize(conf, resourceManager.getRMContext(), null);
     YarnAPIStorageFactory.setConfiguration(conf);
     RMStorageFactory.setConfiguration(conf);
@@ -74,7 +76,13 @@ public class TestFairSchedulerEventLog {
   public void tearDown() {
     logFile.delete();
     logFile.getParentFile().delete(); // fairscheduler/
-    scheduler = null;
-    resourceManager = null;
+    if (scheduler != null) {
+      scheduler.stop();
+      scheduler = null;
+    }
+    if (resourceManager != null) {
+      resourceManager.stop();
+      resourceManager = null;
+    }
   }
 }

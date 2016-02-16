@@ -21,6 +21,8 @@ import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.Options;
+import org.apache.hadoop.classification.InterfaceAudience.Private;
+import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.codehaus.jackson.JsonFactory;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.map.ObjectWriter;
@@ -42,6 +44,8 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
+@Private
+@Unstable
 public class RumenToSLSConverter {
   private static final String EOL = System.getProperty("line.separator");
 
@@ -120,7 +124,7 @@ public class RumenToSLSConverter {
       Writer output = new FileWriter(outputFile);
       try {
         ObjectMapper mapper = new ObjectMapper();
-        ObjectWriter writer = mapper.defaultPrettyPrintingWriter();
+        ObjectWriter writer = mapper.writerWithDefaultPrettyPrinter();
         Iterator<Map> i = mapper.readValues(
                 new JsonFactory().createJsonParser(input), Map.class);
         while (i.hasNext()) {
@@ -141,7 +145,7 @@ public class RumenToSLSConverter {
     Writer output = new FileWriter(outputFile);
     try {
       ObjectMapper mapper = new ObjectMapper();
-      ObjectWriter writer = mapper.defaultPrettyPrintingWriter();
+      ObjectWriter writer = mapper.writerWithDefaultPrettyPrinter();
       for (Map.Entry<String, Set<String>> entry : rackNodeMap.entrySet()) {
         Map rack = new LinkedHashMap();
         rack.put("rack", entry.getKey());

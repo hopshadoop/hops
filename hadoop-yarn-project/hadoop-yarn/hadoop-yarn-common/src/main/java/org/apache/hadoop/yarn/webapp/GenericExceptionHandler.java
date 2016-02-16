@@ -25,10 +25,12 @@ import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.security.authorize.AuthorizationException;
 
 import javax.servlet.http.HttpServletResponse;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.ExceptionMapper;
 import javax.ws.rs.ext.Provider;
+import javax.xml.bind.UnmarshalException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 
@@ -84,7 +86,10 @@ public class GenericExceptionHandler implements ExceptionMapper<Exception> {
       s = Response.Status.BAD_REQUEST;
     } else if (e instanceof NumberFormatException) {
       s = Response.Status.BAD_REQUEST;
-    } else if (e instanceof BadRequestException) {
+    }else if (e instanceof WebApplicationException
+            && e.getCause() instanceof UnmarshalException) {
+      s = Response.Status.BAD_REQUEST;
+    }else if (e instanceof BadRequestException) {
       s = Response.Status.BAD_REQUEST;
     } else {
       LOG.warn("INTERNAL_SERVER_ERROR", e);

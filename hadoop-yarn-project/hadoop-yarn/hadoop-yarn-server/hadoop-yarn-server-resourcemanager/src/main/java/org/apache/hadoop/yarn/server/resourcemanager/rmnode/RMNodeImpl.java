@@ -19,8 +19,6 @@ package org.apache.hadoop.yarn.server.resourcemanager.rmnode;
 import com.google.common.annotations.VisibleForTesting;
 import io.hops.ha.common.TransactionState;
 import io.hops.ha.common.TransactionStateImpl;
-import io.hops.ha.common.transactionStateWrapper;
-import io.hops.metadata.util.RMUtilities;
 import io.hops.metadata.yarn.TablesDef;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -29,14 +27,7 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.Node;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.hadoop.yarn.api.records.ContainerId;
-import org.apache.hadoop.yarn.api.records.ContainerState;
-import org.apache.hadoop.yarn.api.records.ContainerStatus;
-import org.apache.hadoop.yarn.api.records.NodeId;
-import org.apache.hadoop.yarn.api.records.NodeState;
-import org.apache.hadoop.yarn.api.records.Resource;
-import org.apache.hadoop.yarn.api.records.ResourceOption;
+import org.apache.hadoop.yarn.api.records.*;
 import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
@@ -51,20 +42,9 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeAddedSc
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeRemovedSchedulerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeUpdateSchedulerEvent;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils.ContainerIdComparator;
-import org.apache.hadoop.yarn.state.InvalidStateTransitonException;
-import org.apache.hadoop.yarn.state.MultipleArcTransition;
-import org.apache.hadoop.yarn.state.SingleArcTransition;
-import org.apache.hadoop.yarn.state.StateMachine;
-import org.apache.hadoop.yarn.state.StateMachineFactory;
+import org.apache.hadoop.yarn.state.*;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
@@ -183,7 +163,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
   private final Node node; //recovered
   private String healthReport; //recovered
   private long lastHealthReportTime; //recovered
-  private final String nodeManagerVersion; //recovered
+  private String nodeManagerVersion; //recovered
 
 
   /*
@@ -684,6 +664,11 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
       }
 
       RMNode newNode = ((RMNodeReconnectEvent) event).getReconnectedNode();
+      rmNode.nodeManagerVersion = newNode.getNodeManagerVersion();
+      if (event.getTransactionState() != null) {
+            ((TransactionStateImpl) event.getTransactionState())
+                    .toUpdateRMNode(rmNode);
+      }
       if (rmNode.getTotalCapability().equals(newNode.getTotalCapability()) &&
           rmNode.getHttpPort() == newNode.getHttpPort()) {
         // Reset heartbeat ID since node just restarted.

@@ -69,6 +69,8 @@ public class AllocationFileLoaderService extends AbstractService {
    */
   public static final long ALLOC_RELOAD_WAIT_MS = 5 * 1000;
   
+  public static final long THREAD_JOIN_TIMEOUT_MS = 1000;
+  
   private final Clock clock;
 
   private long lastSuccessfulReload;
@@ -97,61 +99,71 @@ public class AllocationFileLoaderService extends AbstractService {
   }
   
   @Override
-  public void init(Configuration conf) {
+  public void serviceInit(Configuration conf) throws Exception {
     this.allocFile = getAllocationFile(conf);
-    super.init(conf);
-  }
-  
-  @Override
-  public void start() {
-    if (allocFile == null) {
-      return;
-    }
-    running=true;
-    reloadThread = new Thread() {
-      public void run() {
-        while (running) {
-          long time = clock.getTime();
-          long lastModified = allocFile.lastModified();
-          if (lastModified > lastSuccessfulReload &&
-              time > lastModified + ALLOC_RELOAD_WAIT_MS) {
-            try {
-              reloadAllocations();
-            } catch (Exception ex) {
+    if (allocFile != null) {
+      running = true;
+      reloadThread = new Thread() {
+        @Override
+        public void run() {
+          while (running) {
+            long time = clock.getTime();
+            long lastModified = allocFile.lastModified();
+            if (lastModified > lastSuccessfulReload &&
+                    time > lastModified + ALLOC_RELOAD_WAIT_MS) {
+              try {
+                reloadAllocations();
+              } catch (Exception ex) {
+                if (!lastReloadAttemptFailed) {
+                  LOG.error("Failed to reload fair scheduler config file - " +
+                          "will use existing allocations.", ex);
+                }
+                lastReloadAttemptFailed = true;
+              }
+            } else if (lastModified == 0l) {
               if (!lastReloadAttemptFailed) {
-                LOG.error("Failed to reload fair scheduler config file - " +
-                    "will use existing allocations.", ex);
+                LOG.warn("Failed to reload fair scheduler config file because" +
+                        " last modified returned 0. File exists: "
+                        + allocFile.exists());
               }
               lastReloadAttemptFailed = true;
             }
-          } else if (lastModified == 0l) {
-            if (!lastReloadAttemptFailed) {
-              LOG.warn("Failed to reload fair scheduler config file because" +
-                  " last modified returned 0. File exists: " +
-                  allocFile.exists());
+            try {
+              Thread.sleep(reloadIntervalMs);
+            } catch (InterruptedException ex) {
+              LOG.info(
+                      "Interrupted while waiting to reload alloc configuration");
             }
-            lastReloadAttemptFailed = true;
-          }
-          try {
-            Thread.sleep(reloadIntervalMs);
-          } catch (InterruptedException ex) {
-            LOG.info("Interrupted while waiting to reload alloc configuration");
           }
         }
-      }
-    };
-    reloadThread.setName("AllocationFileReloader");
-    reloadThread.setDaemon(true);
-    reloadThread.start();
-    super.start();
+      };
+      reloadThread.setName("AllocationFileReloader");
+      reloadThread.setDaemon(true);
+    }
+    super.serviceInit(conf);
   }
-  
+
   @Override
-  public void stop() {
-    if(running){
+  public void serviceStart() throws Exception {
+    if (reloadThread != null) {
+      reloadThread.start();
+    }
+    super.serviceStart();
+  }
+
+  @Override
+  public void serviceStop() throws Exception {
+    if(running) {
       running = false;
-      reloadThread.interrupt();
-      super.stop();
+      if (reloadThread != null) {
+        reloadThread.interrupt();
+        try {
+          reloadThread.join(THREAD_JOIN_TIMEOUT_MS);
+        } catch (InterruptedException e) {
+          LOG.warn("reloadThread fails to join.");
+        }
+      }
+      super.serviceStop();
     }
   }
   

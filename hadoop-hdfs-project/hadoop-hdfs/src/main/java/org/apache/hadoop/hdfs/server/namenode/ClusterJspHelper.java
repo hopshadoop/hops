@@ -348,8 +348,8 @@ class ClusterJspHelper {
       nn.missingBlocksCount =
           getProperty(props, "NumberOfMissingBlocks").getLongValue();
       nn.httpAddress = httpAddress;
-      getLiveNodeCount(getProperty(props, "LiveNodes").getValueAsText(), nn);
-      getDeadNodeCount(getProperty(props, "DeadNodes").getValueAsText(), nn);
+      getLiveNodeCount(getProperty(props, "LiveNodes").asText(), nn);
+      getDeadNodeCount(getProperty(props, "DeadNodes").asText(), nn);
       return nn;
     }
     
@@ -365,11 +365,11 @@ class ClusterJspHelper {
         Map<String, Map<String, String>> statusMap, String props)
         throws IOException, MalformedObjectNameException {
       getLiveNodeStatus(statusMap, host,
-          getProperty(props, "LiveNodes").getValueAsText());
+          getProperty(props, "LiveNodes").asText());
       getDeadNodeStatus(statusMap, host,
-          getProperty(props, "DeadNodes").getValueAsText());
+          getProperty(props, "DeadNodes").asText());
       getDecommissionNodeStatus(statusMap, host,
-          getProperty(props, "DecomNodes").getValueAsText());
+          getProperty(props, "DecomNodes").asText());
     }
 
     /**

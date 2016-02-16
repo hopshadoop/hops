@@ -86,6 +86,8 @@ import org.apache.hadoop.yarn.server.utils.Lock;
 import org.apache.hadoop.yarn.util.resource.ResourceCalculator;
 import org.apache.hadoop.yarn.util.resource.Resources;
 
+import com.google.common.base.Preconditions;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -97,6 +99,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.QueueMetrics;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication;
 import org.apache.hadoop.yarn.util.ConverterUtils;
@@ -111,6 +114,8 @@ public class CapacityScheduler extends AbstractYarnScheduler
   private static final Log LOG = LogFactory.getLog(CapacityScheduler.class);
 
   private CSQueue root;
+    // timeout to join when we stop this service
+  protected final long THREAD_JOIN_TIMEOUT_MS = 1000;
 
   static final Comparator<CSQueue> queueComparator = new Comparator<CSQueue>() {
     @Override
@@ -193,12 +198,11 @@ public class CapacityScheduler extends AbstractYarnScheduler
   private Resource clusterResource = 
           RecordFactoryProvider.getRecordFactory(null)
                   .newRecordInstance(Resource.class);  // recovered
-  private int numNodeManagers = 0;    //recovered
+  private AtomicInteger numNodeManagers = new AtomicInteger(0);   //recovered
 
   private Resource minimumAllocation;  //from config
   private Resource maximumAllocation;   //from config
 
-  private boolean initialized = false;
 
   private ResourceCalculator calculator;  //from config
   private boolean usePortForNodeName;   //from config
@@ -217,7 +221,8 @@ public class CapacityScheduler extends AbstractYarnScheduler
 
   private int maxAllocatedContainersPerRequest = -1;
   
-  public CapacityScheduler() {
+    public CapacityScheduler() {
+    super(CapacityScheduler.class.getName());
   }
 
   @Override
@@ -265,12 +270,12 @@ public class CapacityScheduler extends AbstractYarnScheduler
   }
 
   @Override
-  public synchronized int getNumClusterNodes() {
-    return numNodeManagers;
-  }
+  public int getNumClusterNodes() {
+    return numNodeManagers.get();
+   }
 
   @Override
-  public RMContext getRMContext() {
+  public synchronized RMContext getRMContext() {
     return this.rmContext;
   }
 
@@ -278,57 +283,90 @@ public class CapacityScheduler extends AbstractYarnScheduler
   public Resource getClusterResources() {
     return clusterResource;
   }
+//TransactionState transactionState
+ @Override
+   public synchronized void setRMContext(RMContext rmContext) {
+    this.rmContext = rmContext;
+  }
+
+  private synchronized void initScheduler(Configuration configuration) throws
+      IOException {
+    this.conf = loadCapacitySchedulerConfiguration(configuration);
+    validateConf(this.conf);
+    this.minimumAllocation = this.conf.getMinimumAllocation();
+    this.maximumAllocation = this.conf.getMaximumAllocation();
+    this.calculator = this.conf.getResourceCalculator();
+    this.usePortForNodeName = this.conf.getUsePortForNodeName();
+    this.applications =
+        new ConcurrentHashMap<ApplicationId,
+            SchedulerApplication>();
+
+    initializeQueues(this.conf);
+
+    scheduleAsynchronously = this.conf.getScheduleAynschronously();
+    asyncScheduleInterval =
+        this.conf.getLong(ASYNC_SCHEDULER_INTERVAL,
+            DEFAULT_ASYNC_SCHEDULER_INTERVAL);
+    if (scheduleAsynchronously) {
+      asyncSchedulerThread = new AsyncScheduleThread(this);
+    }
+
+    LOG.info("Initialized CapacityScheduler with " +
+        "calculator=" + getResourceCalculator().getClass() + ", " +
+        "minimumAllocation=<" + getMinimumResourceCapability() + ">, " +
+        "maximumAllocation=<" + getMaximumResourceCapability() + ">, " +
+        "asynchronousScheduling=" + scheduleAsynchronously + ", " +
+        "asyncScheduleInterval=" + asyncScheduleInterval + "ms");
+  }
+
+  private synchronized void startSchedulerThreads() {
+    if (scheduleAsynchronously) {
+      Preconditions.checkNotNull(asyncSchedulerThread,
+          "asyncSchedulerThread is null");
+      asyncSchedulerThread.start();
+    }
+  }
 
   @Override
-  public synchronized void reinitialize(Configuration conf, RMContext rmContext,
-          TransactionState transactionState)
-      throws IOException {
+  public void serviceInit(Configuration conf) throws Exception {
     Configuration configuration = new Configuration(conf);
-    if (!initialized) {
-      this.rmContext = rmContext;
-      this.conf = loadCapacitySchedulerConfiguration(configuration);
-      validateConf(this.conf);
-      this.minimumAllocation = this.conf.getMinimumAllocation();
-      this.maximumAllocation = this.conf.getMaximumAllocation();
-      this.calculator = this.conf.getResourceCalculator();
-      this.usePortForNodeName = this.conf.getUsePortForNodeName();
-      this.applications = 
-              new ConcurrentHashMap<ApplicationId, SchedulerApplication>();
-      
-      this.maxAllocatedContainersPerRequest = this.conf.getInt(
-              YarnConfiguration.MAX_ALLOCATED_CONTAINERS_PER_REQUEST,
-              YarnConfiguration.DEFAULT_MAX_ALLOCATED_CONTAINERS_PER_REQUEST);
-      
-      initializeQueues(this.conf, transactionState);
+    initScheduler(configuration);
+    super.serviceInit(conf);
+  }
 
-      scheduleAsynchronously = this.conf.getScheduleAynschronously();
-      asyncScheduleInterval = this.conf
-          .getLong(ASYNC_SCHEDULER_INTERVAL, DEFAULT_ASYNC_SCHEDULER_INTERVAL);
-      if (scheduleAsynchronously) {
-        asyncSchedulerThread = new AsyncScheduleThread(this);
-        asyncSchedulerThread.start();
-      }
+  @Override
+  public void serviceStart() throws Exception {
+    startSchedulerThreads();
+    super.serviceStart();
+  }
 
-      initialized = true;
-      LOG.info("Initialized CapacityScheduler with " +
-          "calculator=" + getResourceCalculator().getClass() + ", " +
-          "minimumAllocation=<" + getMinimumResourceCapability() + ">, " +
-          "maximumAllocation=<" + getMaximumResourceCapability() + ">, " +
-          "asynchronousScheduling=" + scheduleAsynchronously + ", " +
-          "asyncScheduleInterval=" + asyncScheduleInterval + "ms");
-
-    } else {
-      CapacitySchedulerConfiguration oldConf = this.conf;
-      this.conf = loadCapacitySchedulerConfiguration(configuration);
-      validateConf(this.conf);
-      try {
-        LOG.info("Re-initializing queues...");
-        reinitializeQueues(this.conf, transactionState);
-      } catch (Throwable t) {
-        this.conf = oldConf;
-        throw new IOException("Failed to re-init queues", t);
+  @Override
+  public void serviceStop() throws Exception {
+    synchronized (this) {
+      if (scheduleAsynchronously && asyncSchedulerThread != null) {
+        asyncSchedulerThread.interrupt();
+        asyncSchedulerThread.join(THREAD_JOIN_TIMEOUT_MS);
       }
     }
+      super.serviceStop();
+  }
+
+  @Override
+  public synchronized void
+  reinitialize(Configuration conf, RMContext rmContext, TransactionState transactionState)
+          throws IOException {
+    Configuration configuration = new Configuration(conf);
+    CapacitySchedulerConfiguration oldConf = this.conf;
+    this.conf = loadCapacitySchedulerConfiguration(configuration);
+    validateConf(this.conf);
+    try {
+      LOG.info("Re-initializing queues...");
+      reinitializeQueues(this.conf, transactionState);
+    } catch (Throwable t) {
+      this.conf = oldConf;
+      throw new IOException("Failed to re-init queues", t);
+    }  
+    
   }
 
   long getAsyncScheduleInterval() {
@@ -411,12 +449,11 @@ public class CapacityScheduler extends AbstractYarnScheduler
   private static final QueueHook noop = new QueueHook();
 
   @Lock(CapacityScheduler.class)
-  private void initializeQueues(CapacitySchedulerConfiguration conf, 
-          TransactionState transactionState)
+  private void initializeQueues(CapacitySchedulerConfiguration conf)
           throws IOException {
 
     root = parseQueue(this, conf, null, CapacitySchedulerConfiguration.ROOT,
-                    queues, queues, noop, transactionState);
+                    queues, queues, noop);
     LOG.info("Initialized root queue " + root);
   }
 
@@ -428,7 +465,7 @@ public class CapacityScheduler extends AbstractYarnScheduler
     Map<String, CSQueue> newQueues = new HashMap<String, CSQueue>();
     CSQueue newRoot =
         parseQueue(this, conf, null, CapacitySchedulerConfiguration.ROOT,
-                    newQueues, queues, noop, transactionState);
+                    newQueues, queues, noop);
 
     // Ensure all existing queues are still present
     validateExistingQueues(queues, newQueues);
@@ -481,7 +518,7 @@ public class CapacityScheduler extends AbstractYarnScheduler
   static CSQueue parseQueue(CapacitySchedulerContext csContext,
       CapacitySchedulerConfiguration conf, CSQueue parent, String queueName,
       Map<String, CSQueue> queues, Map<String, CSQueue> oldQueues,
-          QueueHook hook, TransactionState transactionState) throws IOException {
+          QueueHook hook) throws IOException {
     CSQueue queue;
     String[] childQueueNames = conf.getQueues((parent == null) ? queueName :
         (parent.getQueuePath() + "." + queueName));
@@ -491,8 +528,7 @@ public class CapacityScheduler extends AbstractYarnScheduler
                 "Queue configuration missing child queue names for " + queueName);
       }
       queue =
-          new LeafQueue(csContext, queueName, parent, oldQueues.get(queueName),
-          transactionState);
+          new LeafQueue(csContext, queueName, parent, oldQueues.get(queueName));
 
       // Used only for unit tests
       queue = hook.hook(queue);
@@ -507,7 +543,7 @@ public class CapacityScheduler extends AbstractYarnScheduler
       for (String childQueueName : childQueueNames) {
         CSQueue childQueue =
             parseQueue(csContext, conf, queue, childQueueName, queues,
-                oldQueues, hook, transactionState);
+                oldQueues, hook);
         childQueues.add(childQueue);
       }
       parentQueue.setChildQueues(childQueues);
@@ -1002,11 +1038,11 @@ public class CapacityScheduler extends AbstractYarnScheduler
 
     root.updateClusterResource(clusterResource, transactionState);
 
-    ++numNodeManagers;
+    int numNodes = numNodeManagers.incrementAndGet();
     LOG.info("Added node " + nodeManager.getNodeAddress() +
         " clusterResource: " + clusterResource);
 
-    if (scheduleAsynchronously && numNodeManagers == 1) {
+    if (scheduleAsynchronously && numNodes == 1) {
       asyncSchedulerThread.beginSchedule();
     }
   }
@@ -1025,9 +1061,9 @@ public class CapacityScheduler extends AbstractYarnScheduler
               clusterResource);
     }
 
-    --numNodeManagers;
+    int numNodes = numNodeManagers.decrementAndGet();
 
-    if (scheduleAsynchronously && numNodeManagers == 0) {
+    if (scheduleAsynchronously && numNodes == 0) {
       asyncSchedulerThread.suspendSchedule();
     }
 
@@ -1170,7 +1206,7 @@ public class CapacityScheduler extends AbstractYarnScheduler
         ficaNode.recover(state);
         Resources.addTo(clusterResource, ficaNode.getTotalResource());
         nodes.put(nodeId, ficaNode);
-        numNodeManagers++;
+        numNodeManagers.set(numNodeManagers.get()+1); 
       }
 
       //recover csqueues

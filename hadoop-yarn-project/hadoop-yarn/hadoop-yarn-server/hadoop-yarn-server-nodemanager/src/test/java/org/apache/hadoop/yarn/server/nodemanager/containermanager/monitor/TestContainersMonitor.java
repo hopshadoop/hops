@@ -43,7 +43,6 @@ import org.apache.hadoop.yarn.event.AsyncDispatcher;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.security.ContainerTokenIdentifier;
 import org.apache.hadoop.yarn.server.nodemanager.ContainerExecutor;
-import org.apache.hadoop.yarn.server.nodemanager.ContainerExecutor.ExitCode;
 import org.apache.hadoop.yarn.server.nodemanager.ContainerExecutor.Signal;
 import org.apache.hadoop.yarn.server.nodemanager.Context;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.BaseContainerManagerTest;
@@ -67,6 +66,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -84,8 +84,10 @@ public class TestContainersMonitor extends BaseContainerManagerTest {
 
   @Before
   public void setup() throws IOException {
-    conf.setClass(YarnConfiguration.NM_CONTAINER_MON_RESOURCE_CALCULATOR,
-        LinuxResourceCalculatorPlugin.class, ResourceCalculatorPlugin.class);
+    conf.setClass(
+            YarnConfiguration.NM_CONTAINER_MON_RESOURCE_CALCULATOR,
+            LinuxResourceCalculatorPlugin.class, ResourceCalculatorPlugin.class);
+    conf.setBoolean(YarnConfiguration.NM_VMEM_CHECK_ENABLED, true);
     super.setup();
   }
 
@@ -268,7 +270,7 @@ public class TestContainersMonitor extends BaseContainerManagerTest {
     ContainerStatus containerStatus =
         containerManager.getContainerStatuses(gcsRequest).getContainerStatuses()
             .get(0);
-    Assert.assertEquals(ExitCode.TERMINATED.getExitCode(),
+    Assert.assertEquals(ContainerExitStatus.KILLED_EXCEEDED_VMEM,
         containerStatus.getExitStatus());
     String expectedMsgPattern =
         "Container \\[pid=" + pid + ",containerID=" + cId +
