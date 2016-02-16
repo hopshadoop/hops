@@ -18,25 +18,22 @@
 
 package org.apache.hadoop.yarn.sls.scheduler;
 
+import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.net.Node;
-import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.hadoop.yarn.api.records.ContainerId;
-import org.apache.hadoop.yarn.api.records.NodeId;
-import org.apache.hadoop.yarn.api.records.NodeState;
-import org.apache.hadoop.yarn.api.records.Resource;
-import org.apache.hadoop.yarn.api.records.ResourceOption;
+import org.apache.hadoop.yarn.api.records.*;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
+import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
-import org.apache.hadoop.yarn.server.resourcemanager.rmnode
-        .UpdatedContainerInfo;
+import org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo;
+import org.apache.hadoop.classification.InterfaceAudience.Private;
+import org.apache.hadoop.classification.InterfaceStability.Unstable;
 
 import java.util.Collections;
 import java.util.List;
-import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
-import io.hops.ha.common.TransactionState;
 import java.util.Set;
-import static org.apache.hadoop.yarn.sls.SLSRunner.LOG;
 
+@Private
+@Unstable
 public class RMNodeWrapper implements RMNode {
   private RMNode node;
   private List<UpdatedContainerInfo> updates;

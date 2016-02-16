@@ -209,9 +209,12 @@ public class ProportionalCapacityPreemptionPolicy
     Map<ApplicationAttemptId, Set<RMContainer>> toPreempt =
         getContainersToPreempt(queues, clusterResources, transactionState);
 
-    logToCSV(queues);
+    if (LOG.isDebugEnabled()) {
+        logToCSV(queues);
+    }
 
-    // if we are in observeOnly mode return before any action is taken
+
+      // if we are in observeOnly mode return before any action is taken
     if (observeOnly) {
       return;
     }
@@ -630,7 +633,7 @@ public class ProportionalCapacityPreemptionPolicy
       sb.append(", ");
       tq.appendLogString(sb);
     }
-    LOG.info(sb.toString());
+    LOG.debug(sb.toString());
   }
 
   /**

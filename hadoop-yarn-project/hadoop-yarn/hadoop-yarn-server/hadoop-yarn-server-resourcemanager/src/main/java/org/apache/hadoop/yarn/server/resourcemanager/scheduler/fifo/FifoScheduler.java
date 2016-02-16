@@ -22,9 +22,7 @@ import io.hops.ha.common.TransactionStateImpl;
 import io.hops.ha.common.transactionStateWrapper;
 import io.hops.metadata.yarn.entity.AppSchedulingInfo;
 import io.hops.metadata.yarn.entity.FiCaSchedulerNode;
-import io.hops.metadata.yarn.entity.QueueMetrics;
 import io.hops.metadata.yarn.entity.Resource;
-import io.hops.metadata.yarn.entity.SchedulerApplication;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.LimitedPrivate;
@@ -86,6 +84,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeAddedSc
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeRemovedSchedulerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeUpdateSchedulerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.SchedulerEvent;
+
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.apache.hadoop.yarn.server.utils.Lock;
 import org.apache.hadoop.yarn.util.ConverterUtils;
@@ -103,6 +102,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.QueueMetrics;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication;
 
 @LimitedPrivate("yarn")
 @Evolving
@@ -119,7 +120,6 @@ public class FifoScheduler extends AbstractYarnScheduler
       nodes =
       new ConcurrentHashMap<NodeId, org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode>();
       //recovered
-  private boolean initialized;//recovered
   private org.apache.hadoop.yarn.api.records.Resource minimumAllocation;
       //recovered
   private org.apache.hadoop.yarn.api.records.Resource maximumAllocation;
@@ -127,8 +127,7 @@ public class FifoScheduler extends AbstractYarnScheduler
   private boolean usePortForNodeName;//recovered
   private ActiveUsersManager activeUsersManager;//recovered
   private static final String DEFAULT_QUEUE_NAME = "default";//recovered
-  private org.apache.hadoop.yarn.server.resourcemanager.scheduler.QueueMetrics
-      metrics;//recovered
+  private QueueMetrics metrics;//recovered
   private final ResourceCalculator resourceCalculator =
       new DefaultResourceCalculator();//recovered
   
@@ -192,10 +191,56 @@ public class FifoScheduler extends AbstractYarnScheduler
       return activeUsersManager;
     }
   }; // recovered
+ 
+ public FifoScheduler() {
+    super(FifoScheduler.class.getName());
+  }
+
+  private synchronized void initScheduler(Configuration conf) {
+    validateConf(conf);
+    //Use ConcurrentSkipListMap because applications need to be ordered
+    this.applications =
+        new ConcurrentSkipListMap<ApplicationId, SchedulerApplication >();
+    this.minimumAllocation =
+        Resources.createResource(conf.getInt(
+            YarnConfiguration.RM_SCHEDULER_MINIMUM_ALLOCATION_MB,
+            YarnConfiguration.DEFAULT_RM_SCHEDULER_MINIMUM_ALLOCATION_MB));
+    this.maximumAllocation =
+        Resources.createResource(conf.getInt(
+            YarnConfiguration.RM_SCHEDULER_MAXIMUM_ALLOCATION_MB,
+            YarnConfiguration.DEFAULT_RM_SCHEDULER_MAXIMUM_ALLOCATION_MB));
+    this.usePortForNodeName = conf.getBoolean(
+        YarnConfiguration.RM_SCHEDULER_INCLUDE_PORT_IN_NODE_NAME,
+        YarnConfiguration.DEFAULT_RM_SCHEDULER_USE_PORT_FOR_NODE_NAME);
+    this.metrics = QueueMetrics.forQueue(DEFAULT_QUEUE_NAME, null, false,
+        conf);
+    this.activeUsersManager = new ActiveUsersManager(metrics);
+  }
+
+  @Override
+  public void serviceInit(Configuration conf) throws Exception {
+    initScheduler(conf);
+    super.serviceInit(conf);
+  }
+
+  @Override
+  public void serviceStart() throws Exception {
+    super.serviceStart();
+  }
+
+  @Override
+  public void serviceStop() throws Exception {
+    super.serviceStop();
+  }
+
 
   @Override
   public synchronized void setConf(Configuration conf) {
     this.conf = conf;
+  }
+  
+  public synchronized void setRMContext(RMContext rmContext) {
+    this.rmContext = rmContext;
   }
 
   private void validateConf(Configuration conf) {
@@ -243,30 +288,6 @@ public class FifoScheduler extends AbstractYarnScheduler
           TransactionState transactionState)
       throws IOException {
     setConf(conf);
-    if (!this.initialized) {
-      validateConf(conf);
-      this.rmContext = rmContext;
-      //Use ConcurrentSkipListMap because applications need to be ordered
-      this.applications = new ConcurrentSkipListMap<ApplicationId,
-          org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication>();
-      this.minimumAllocation = Resources.createResource(
-          conf.getInt(YarnConfiguration.RM_SCHEDULER_MINIMUM_ALLOCATION_MB,
-              YarnConfiguration.DEFAULT_RM_SCHEDULER_MINIMUM_ALLOCATION_MB));
-      this.maximumAllocation = Resources.createResource(
-          conf.getInt(YarnConfiguration.RM_SCHEDULER_MAXIMUM_ALLOCATION_MB,
-              YarnConfiguration.DEFAULT_RM_SCHEDULER_MAXIMUM_ALLOCATION_MB));
-      this.usePortForNodeName = conf.getBoolean(
-          YarnConfiguration.RM_SCHEDULER_INCLUDE_PORT_IN_NODE_NAME,
-          YarnConfiguration.DEFAULT_RM_SCHEDULER_USE_PORT_FOR_NODE_NAME);
-      this.metrics =
-          org.apache.hadoop.yarn.server.resourcemanager.scheduler.QueueMetrics
-              .forQueue(DEFAULT_QUEUE_NAME, null, false, conf);
-      this.activeUsersManager = new ActiveUsersManager(metrics);
-      this.initialized = true;
-      this.maxAllocatedContainersPerRequest = this.conf.getInt(
-              YarnConfiguration.MAX_ALLOCATED_CONTAINERS_PER_REQUEST,
-              YarnConfiguration.DEFAULT_MAX_ALLOCATED_CONTAINERS_PER_REQUEST);
-    }
   }
 
   @Override
@@ -1009,7 +1030,8 @@ public class FifoScheduler extends AbstractYarnScheduler
   public void recover(RMState state) {
     try {
       // recover queuemetrics
-      List<QueueMetrics> recoverQueueMetrics = state.getAllQueueMetrics();
+      List<io.hops.metadata.yarn.entity.QueueMetrics> 
+              recoverQueueMetrics = state.getAllQueueMetrics();
       if (recoverQueueMetrics != null) {
         if (recoverQueueMetrics.size() > 1) {
           throw new UnsupportedOperationException(
@@ -1024,14 +1046,14 @@ public class FifoScheduler extends AbstractYarnScheduler
         }
       }
       //recover applications map
-      Map<String, SchedulerApplication> appsList =
+      Map<String, io.hops.metadata.yarn.entity.SchedulerApplication> appsList =
           state.getSchedulerApplications();
-      for (SchedulerApplication fsapp : appsList.values()) {
+      for (io.hops.metadata.yarn.entity.SchedulerApplication fsapp : appsList.values()) {
         //construct appliactionId - key of applications map
         ApplicationId appId = ConverterUtils.toApplicationId(fsapp.getAppid());
 
         //retrieve HopSchedulerApplication
-        SchedulerApplication hopSchedulerApplication =
+          io.hops.metadata.yarn.entity.SchedulerApplication hopSchedulerApplication =
             state.getSchedulerApplication(fsapp.getAppid());
         //construct SchedulerAppliaction
         org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication

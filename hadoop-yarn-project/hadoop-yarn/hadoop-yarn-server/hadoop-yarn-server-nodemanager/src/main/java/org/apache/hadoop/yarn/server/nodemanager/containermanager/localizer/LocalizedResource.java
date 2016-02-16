@@ -30,6 +30,7 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.even
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.event.ResourceEventType;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.event.ResourceFailedLocalizationEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.event.ResourceLocalizedEvent;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.event.ResourceRecoveredEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.event.ResourceReleaseEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.event.ResourceRequestEvent;
 import org.apache.hadoop.yarn.state.InvalidStateTransitonException;
@@ -53,8 +54,8 @@ public class LocalizedResource implements EventHandler<ResourceEvent> {
 
   private static final Log LOG = LogFactory.getLog(LocalizedResource.class);
 
-  Path localPath;
-  long size = -1;
+  volatile Path localPath;
+  volatile long size = -1;
   final LocalResourceRequest rsrc;
   final Dispatcher dispatcher;
   final StateMachine<ResourceState, ResourceEventType, ResourceEvent>
@@ -75,6 +76,8 @@ public class LocalizedResource implements EventHandler<ResourceEvent> {
           // From INIT (ref == 0, awaiting req)
           .addTransition(ResourceState.INIT, ResourceState.DOWNLOADING,
               ResourceEventType.REQUEST, new FetchResourceTransition())
+          .addTransition(ResourceState.INIT, ResourceState.LOCALIZED,
+                  ResourceEventType.RECOVERED, new RecoveredTransition())
 
               // From DOWNLOADING (ref > 0, may be localizing)
           .addTransition(ResourceState.DOWNLOADING, ResourceState.DOWNLOADING,
@@ -156,6 +159,10 @@ public class LocalizedResource implements EventHandler<ResourceEvent> {
     return localPath;
   }
 
+  public void setLocalPath(Path localPath) {
+    this.localPath = Path.getPathWithoutSchemeAndAuthority(localPath);
+  }
+
   public long getTimestamp() {
     return timestamp.get();
   }
@@ -233,7 +240,8 @@ public class LocalizedResource implements EventHandler<ResourceEvent> {
     @Override
     public void transition(LocalizedResource rsrc, ResourceEvent event) {
       ResourceLocalizedEvent locEvent = (ResourceLocalizedEvent) event;
-      rsrc.localPath = locEvent.getLocation();
+      rsrc.localPath =
+              Path.getPathWithoutSchemeAndAuthority(locEvent.getLocation());
       rsrc.size = locEvent.getSize();
       for (ContainerId container : rsrc.ref) {
         rsrc.dispatcher.getEventHandler().handle(
@@ -288,6 +296,15 @@ public class LocalizedResource implements EventHandler<ResourceEvent> {
       // Note: assumes that localizing container must succeed or fail
       ResourceReleaseEvent relEvent = (ResourceReleaseEvent) event;
       rsrc.release(relEvent.getContainer());
+    }
+  }
+
+  private static class RecoveredTransition extends ResourceTransition {
+    @Override
+    public void transition(LocalizedResource rsrc, ResourceEvent event) {
+      ResourceRecoveredEvent recoveredEvent = (ResourceRecoveredEvent) event;
+      rsrc.localPath = recoveredEvent.getLocalPath();
+      rsrc.size = recoveredEvent.getSize();
     }
   }
 }

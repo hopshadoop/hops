@@ -21,6 +21,8 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileContext;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.yarn.api.records.timeline.TimelineEntities;
@@ -41,6 +43,7 @@ import java.util.Set;
 
 import static org.apache.hadoop.yarn.server.applicationhistoryservice.timeline.GenericObjectMapper.writeReverseOrderedLong;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
@@ -51,7 +54,7 @@ public class TestLeveldbTimelineStore extends TimelineStoreTestUtils {
   @Before
   public void setup() throws Exception {
     fsContext = FileContext.getLocalFSFileContext();
-    Configuration conf = new Configuration();
+    Configuration conf = new YarnConfiguration();
     fsPath = new File("target", this.getClass().getSimpleName() + "-tmpDir")
         .getAbsoluteFile();
     fsContext.delete(new Path(fsPath.getAbsolutePath()), true);
@@ -71,6 +74,15 @@ public class TestLeveldbTimelineStore extends TimelineStoreTestUtils {
     fsContext.delete(new Path(fsPath.getAbsolutePath()), true);
   }
 
+  @Test
+  public void testRootDirPermission() throws IOException {
+    FileSystem fs = FileSystem.getLocal(new YarnConfiguration());
+    FileStatus file = fs.getFileStatus(
+            new Path(fsPath.getAbsolutePath(), LeveldbTimelineStore.FILENAME));
+    assertNotNull(file);
+    assertEquals(LeveldbTimelineStore.LEVEDB_DIR_UMASK, file.getPermission());
+  }
+  
   @Test
   public void testGetSingleEntity() throws IOException {
     super.testGetSingleEntity();

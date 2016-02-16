@@ -50,4 +50,12 @@ public class ResourceInfo {
   public String toString() {
     return "<memory:" + memory + ", vCores:" + vCores + ">";
   }
+
+  public void setMemory(int memory) {
+    this.memory = memory;
+  }
+
+  public void setvCores(int vCores) {
+    this.vCores = vCores;
+  }
 }

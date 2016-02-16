@@ -203,7 +203,7 @@ public class TestRecoverParentCSQueue {
     CSQueue root
             = CapacityScheduler.parseQueue(csContext, csConf, null,
                     CapacitySchedulerConfiguration.ROOT, queues, queues,
-                    TestUtils.spyHook, null);
+                    TestUtils.spyHook);
 
     // Setup some nodes
     final int memoryPerNode = 10;

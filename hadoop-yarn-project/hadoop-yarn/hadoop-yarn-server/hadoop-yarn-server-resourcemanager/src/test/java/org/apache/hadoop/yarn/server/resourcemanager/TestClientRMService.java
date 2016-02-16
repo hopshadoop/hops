@@ -24,6 +24,9 @@ import io.hops.ha.common.TransactionStateManager;
 import io.hops.metadata.util.RMStorageFactory;
 import io.hops.metadata.util.RMUtilities;
 import io.hops.metadata.util.YarnAPIStorageFactory;
+import org.apache.hadoop.security.authentication.util.KerberosName;
+import org.apache.hadoop.security.token.TokenIdentifier;
+import org.apache.hadoop.yarn.api.protocolrecords.*;
 import org.junit.Assert;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -33,26 +36,6 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.yarn.MockApps;
 import org.apache.hadoop.yarn.api.ApplicationClientProtocol;
-import org.apache.hadoop.yarn.api.protocolrecords.ApplicationsRequestScope;
-import org.apache.hadoop.yarn.api.protocolrecords.GetApplicationAttemptReportRequest;
-import org.apache.hadoop.yarn.api.protocolrecords.GetApplicationAttemptReportResponse;
-import org.apache.hadoop.yarn.api.protocolrecords.GetApplicationAttemptsRequest;
-import org.apache.hadoop.yarn.api.protocolrecords.GetApplicationAttemptsResponse;
-import org.apache.hadoop.yarn.api.protocolrecords.GetApplicationReportRequest;
-import org.apache.hadoop.yarn.api.protocolrecords.GetApplicationsRequest;
-import org.apache.hadoop.yarn.api.protocolrecords.GetApplicationsResponse;
-import org.apache.hadoop.yarn.api.protocolrecords.GetClusterNodesRequest;
-import org.apache.hadoop.yarn.api.protocolrecords.GetContainerReportRequest;
-import org.apache.hadoop.yarn.api.protocolrecords.GetContainerReportResponse;
-import org.apache.hadoop.yarn.api.protocolrecords.GetContainersRequest;
-import org.apache.hadoop.yarn.api.protocolrecords.GetContainersResponse;
-import org.apache.hadoop.yarn.api.protocolrecords.GetQueueInfoRequest;
-import org.apache.hadoop.yarn.api.protocolrecords.GetQueueInfoResponse;
-import org.apache.hadoop.yarn.api.protocolrecords.KillApplicationRequest;
-import org.apache.hadoop.yarn.api.protocolrecords.KillApplicationResponse;
-import org.apache.hadoop.yarn.api.protocolrecords.MoveApplicationAcrossQueuesRequest;
-import org.apache.hadoop.yarn.api.protocolrecords.RenewDelegationTokenRequest;
-import org.apache.hadoop.yarn.api.protocolrecords.SubmitApplicationRequest;
 import org.apache.hadoop.yarn.api.records.ApplicationAccessType;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -146,6 +129,10 @@ public class TestClientRMService {
   
   private final static String QUEUE_1 = "Q-1";
   private final static String QUEUE_2 = "Q-2";
+  private final static String kerberosRule = "RULE:[1:$1@$0](.*@EXAMPLE.COM)s/@.*//\nDEFAULT";
+  static {
+    KerberosName.setRules(kerberosRule);
+  }
   
   private YarnConfiguration conf;
   
@@ -514,6 +501,17 @@ public class TestClientRMService {
       UserGroupInformation.createRemoteUser("owner");
   private static final UserGroupInformation other =
       UserGroupInformation.createRemoteUser("other");
+  private static final UserGroupInformation tester =
+          UserGroupInformation.createRemoteUser("tester");
+  private static final String testerPrincipal = "tester@EXAMPLE.COM";
+  private static final String ownerPrincipal = "owner@EXAMPLE.COM";
+  private static final String otherPrincipal = "other@EXAMPLE.COM";
+  private static final UserGroupInformation testerKerb =
+          UserGroupInformation.createRemoteUser(testerPrincipal);
+  private static final UserGroupInformation ownerKerb =
+          UserGroupInformation.createRemoteUser(ownerPrincipal);
+  private static final UserGroupInformation otherKerb =
+          UserGroupInformation.createRemoteUser(otherPrincipal);
   
   @Test
   public void testTokenRenewalByOwner() throws Exception {
@@ -581,6 +579,148 @@ public class TestClientRMService {
     ClientRMService rmService =
         new ClientRMService(rmContext, null, null, null, null, dtsm);
     rmService.renewDelegationToken(request);
+  }
+
+  @Test
+  public void testTokenCancellationByOwner() throws Exception {
+    // two tests required - one with the kerberos name
+    // and with a short name
+    RMContext rmContext = mock(RMContext.class);
+    final ClientRMService rmService =
+            new ClientRMService(rmContext, null, null, null, null, dtsm);
+    testerKerb.doAs(new PrivilegedExceptionAction<Void>() {
+      @Override
+      public Void run() throws Exception {
+        checkTokenCancellation(rmService, testerKerb, other);
+        return null;
+      }
+    });
+    owner.doAs(new PrivilegedExceptionAction<Void>() {
+      @Override
+      public Void run() throws Exception {
+        checkTokenCancellation(owner, other);
+        return null;
+      }
+    });
+  }
+
+  @Test
+  public void testTokenCancellationByRenewer() throws Exception {
+    // two tests required - one with the kerberos name
+    // and with a short name
+    RMContext rmContext = mock(RMContext.class);
+    final ClientRMService rmService =
+            new ClientRMService(rmContext, null, null, null, null, dtsm);
+    testerKerb.doAs(new PrivilegedExceptionAction<Void>() {
+      @Override
+      public Void run() throws Exception {
+        checkTokenCancellation(rmService, owner, testerKerb);
+        return null;
+      }
+    });
+    other.doAs(new PrivilegedExceptionAction<Void>() {
+      @Override
+      public Void run() throws Exception {
+        checkTokenCancellation(owner, other);
+        return null;
+      }
+    });
+  }
+
+  @Test
+  public void testTokenCancellationByWrongUser() {
+    // two sets to test -
+    // 1. try to cancel tokens of short and kerberos users as a kerberos UGI
+    // 2. try to cancel tokens of short and kerberos users as a simple auth UGI
+
+    RMContext rmContext = mock(RMContext.class);
+    final ClientRMService rmService =
+            new ClientRMService(rmContext, null, null, null, null, dtsm);
+    UserGroupInformation[] kerbTestOwners =
+            { owner, other, tester, ownerKerb, otherKerb };
+    UserGroupInformation[] kerbTestRenewers =
+            { owner, other, ownerKerb, otherKerb };
+    for (final UserGroupInformation tokOwner : kerbTestOwners) {
+      for (final UserGroupInformation tokRenewer : kerbTestRenewers) {
+        try {
+          testerKerb.doAs(new PrivilegedExceptionAction<Void>() {
+            @Override
+            public Void run() throws Exception {
+              try {
+                checkTokenCancellation(rmService, tokOwner, tokRenewer);
+                Assert.fail("We should not reach here; token owner = "
+                        + tokOwner.getUserName() + ", renewer = "
+                        + tokRenewer.getUserName());
+                return null;
+              } catch (YarnException e) {
+                Assert.assertTrue(e.getMessage().contains(
+                        testerKerb.getUserName()
+                          + " is not authorized to cancel the token"));
+                return null;
+              }
+            }
+          });
+        } catch (Exception e) {
+          Assert.fail("Unexpected exception; " + e.getMessage());
+        }
+      }
+    }
+
+    UserGroupInformation[] simpleTestOwners =
+            { owner, other, ownerKerb, otherKerb, testerKerb };
+    UserGroupInformation[] simpleTestRenewers =
+            { owner, other, ownerKerb, otherKerb };
+    for (final UserGroupInformation tokOwner : simpleTestOwners) {
+      for (final UserGroupInformation tokRenewer : simpleTestRenewers) {
+        try {
+          tester.doAs(new PrivilegedExceptionAction<Void>() {
+            @Override
+            public Void run() throws Exception {
+              try {
+                checkTokenCancellation(tokOwner, tokRenewer);
+                Assert.fail("We should not reach here; token owner = "
+                  + tokOwner.getUserName() + ", renewer = "
+                  + tokRenewer.getUserName());
+                return null;
+              } catch (YarnException ex) {
+                Assert.assertTrue(ex.getMessage().contains(
+                        tester.getUserName()
+                          + " is not authorized to cancel the token"));
+                return null;
+              }
+            }
+          });
+        } catch (Exception e) {
+          Assert.fail("Unexpected exception; " + e.getMessage());
+        }
+      }
+    }
+  }
+
+  private void checkTokenCancellation(UserGroupInformation owner,
+                                      UserGroupInformation renewer)
+    throws IOException, YarnException {
+    RMContext rmContext = mock(RMContext.class);
+    final ClientRMService rmService =
+            new ClientRMService(rmContext, null, null, null, null, dtsm);
+    checkTokenCancellation(rmService, owner, renewer);
+  }
+
+  private void checkTokenCancellation(ClientRMService rmService,
+     UserGroupInformation owner, UserGroupInformation renewer)
+    throws IOException, YarnException {
+    RMDelegationTokenIdentifier tokenIdentifier =
+            new RMDelegationTokenIdentifier(new Text(owner.getUserName()),
+                    new Text(renewer.getUserName()), null);
+    Token<?> token =
+            new Token<RMDelegationTokenIdentifier>(tokenIdentifier, dtsm);
+    org.apache.hadoop.yarn.api.records.Token dToken =
+            BuilderUtils.newDelegationToken(token.getIdentifier(), token.getKind().toString(),
+                    token.getPassword(), token.getService().toString());
+    CancelDelegationTokenRequest request =
+            Records.newRecord(CancelDelegationTokenRequest.class);
+    request.setDelegationToken(dToken);
+    rmService.cancelDelegationToken(request);
   }
 
   @Test(timeout = 30000)
@@ -710,6 +850,7 @@ public class TestClientRMService {
     List<String> tags = Arrays.asList("Tag1", "Tag2", "Tag3");
 
     // Submit applications
+    long[] submitTimeMillis = new long[3];
     for (int i = 0; i < appIds.length; i++) {
       ApplicationId appId = appIds[i];
       when(mockAclsManager.checkAccess(UserGroupInformation.getCurrentUser(),
@@ -718,6 +859,7 @@ public class TestClientRMService {
           mockSubmitAppRequest(appId, appNames[i], queues[i % queues.length],
               new HashSet<String>(tags.subList(0, i + 1)));
       rmService.submitApplication(submitRequest);
+      submitTimeMillis[i] = System.currentTimeMillis();
     }
 
     // Test different cases of ClientRMService#getApplications()
@@ -729,6 +871,24 @@ public class TestClientRMService {
     request.setLimit(1L);
     assertEquals("Failed to limit applications", 1,
         rmService.getApplications(request).getApplicationList().size());
+    
+    // Check start range
+    request = GetApplicationsRequest.newInstance();
+    request.setStartRange(submitTimeMillis[0], System.currentTimeMillis());
+    
+    // 2 applications are submitted after first timeMills
+    assertEquals("Incorrect number of matching start range", 
+        2, rmService.getApplications(request).getApplicationList().size());
+    
+    // 1 application is submitted after the second timeMills
+    request.setStartRange(submitTimeMillis[1], System.currentTimeMillis());
+    assertEquals("Incorrect number of matching start range", 
+        1, rmService.getApplications(request).getApplicationList().size());
+    
+    // no application is submitted after the third timeMills
+    request.setStartRange(submitTimeMillis[2], System.currentTimeMillis());
+    assertEquals("Incorrect number of matching start range", 
+        0, rmService.getApplications(request).getApplicationList().size());
 
     // Check queue
     request = GetApplicationsRequest.newInstance();

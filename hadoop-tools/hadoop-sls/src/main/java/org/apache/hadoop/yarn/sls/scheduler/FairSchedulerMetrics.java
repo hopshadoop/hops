@@ -24,10 +24,14 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FSQueue;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair
         .FairScheduler;
+import org.apache.hadoop.classification.InterfaceAudience.Private;
+import org.apache.hadoop.classification.InterfaceStability.Unstable;
 
 import com.codahale.metrics.Gauge;
 import org.apache.hadoop.yarn.sls.SLSRunner;
 
+@Private
+@Unstable
 public class FairSchedulerMetrics extends SchedulerMetrics {
 
   private int totalMemoryMB = Integer.MAX_VALUE;

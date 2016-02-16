@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager;
 
+
 import io.hops.exception.StorageInitializtionException;
 import io.hops.ha.common.TransactionState;
 import io.hops.ha.common.TransactionStateImpl;
@@ -75,12 +76,12 @@ public class TestFifoScheduler {
   @Test(timeout = 30000)
   public void testConfValidation() throws Exception {
     LOG.info("start test");
-    ResourceScheduler scheduler = new FifoScheduler();
+    FifoScheduler scheduler = new FifoScheduler();
     Configuration conf = new YarnConfiguration();
     conf.setInt(YarnConfiguration.RM_SCHEDULER_MINIMUM_ALLOCATION_MB, 2048);
     conf.setInt(YarnConfiguration.RM_SCHEDULER_MAXIMUM_ALLOCATION_MB, 1024);
     try {
-      scheduler.reinitialize(conf, null, null);
+      scheduler.serviceInit(conf);
       fail("Exception is expected because the min memory allocation is" +
           " larger than the max memory allocation.");
     } catch (YarnRuntimeException e) {
@@ -227,6 +228,9 @@ public class TestFifoScheduler {
   public void testNodeUpdateBeforeAppAttemptInit() throws Exception {
     FifoScheduler scheduler = new FifoScheduler();
     MockRM rm = new MockRM(conf);
+    scheduler.setRMContext(rm.getRMContext());
+    scheduler.init(conf);
+    scheduler.start();
     scheduler.reinitialize(conf, rm.getRMContext(), null);
 
     RMNode node =
@@ -314,6 +318,8 @@ public class TestFifoScheduler {
     conf.setQueues("default", new String[]{"default"});
     conf.setCapacity("default", 100);
     FifoScheduler fs = new FifoScheduler();
+    fs.init(conf);
+    fs.start();
     fs.reinitialize(conf, null, null);
 
     RMNode n1 =
@@ -340,6 +346,7 @@ public class TestFifoScheduler {
             TransactionState.TransactionType.RM)));
 
     Assert.assertEquals(4 * GB, fs.getRootQueueMetrics().getAvailableMB());
+    fs.stop();
     LOG.info("stop test");
   }
 

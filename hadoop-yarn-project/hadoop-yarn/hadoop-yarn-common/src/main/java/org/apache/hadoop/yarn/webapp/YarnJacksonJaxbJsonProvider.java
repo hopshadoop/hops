@@ -48,10 +48,13 @@ public class YarnJacksonJaxbJsonProvider extends JacksonJaxbJsonProvider {
   @Override
   public ObjectMapper locateMapper(Class<?> type, MediaType mediaType) {
     ObjectMapper mapper = super.locateMapper(type, mediaType);
+    configObjectMapper(mapper);
+    return mapper;
+  }
+
+  public static void configObjectMapper(ObjectMapper mapper) {
     AnnotationIntrospector introspector = new JaxbAnnotationIntrospector();
     mapper.setAnnotationIntrospector(introspector);
-    mapper.getSerializationConfig()
-        .setSerializationInclusion(Inclusion.NON_NULL);
-    return mapper;
+    mapper.setSerializationInclusion(Inclusion.NON_NULL);
   }
 }
