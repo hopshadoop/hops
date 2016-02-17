@@ -880,9 +880,15 @@ public class DataNode extends Configured
       storage.recoverTransitionRead(this, nsInfo, dataDirs, startOpt);
       final StorageInfo bpStorage = storage.getBPStorage(bpid);
       LOG.info(
-          "Setting up storage: nsid=" + bpStorage.getNamespaceID() + ";bpid=" +
-              bpid + ";lv=" + storage.getLayoutVersion() + ";nsInfo=" + nsInfo);
+          "Setting up storage: "
+              + "nsid=" + bpStorage.getNamespaceID()
+              + ";bpid=" + bpid
+              + ";lv=" + storage.getLayoutVersion()
+              + ";nsInfo=" + nsInfo);
     }
+
+    // If this is a newly formatted DataNode then assign a new DatanodeUuid.
+    checkDatanodeUuid();
 
     synchronized (this) {
       if (data == null) {

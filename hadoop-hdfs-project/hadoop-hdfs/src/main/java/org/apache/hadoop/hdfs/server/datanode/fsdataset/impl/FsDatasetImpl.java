@@ -240,11 +240,11 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
             conf);
 
     volumes = new FsVolumeList(volsFailed, blockChooserImpl);
+    asyncDiskService = new FsDatasetAsyncDiskService(datanode);
+
     for (int idx = 0; idx < storage.getNumStorageDirs(); idx++) {
       addVolume(dataLocations, storage.getStorageDir(idx));
     }
-
-    asyncDiskService = new FsDatasetAsyncDiskService(datanode);
 
     registerMBean(datanode.getDatanodeUuid());
   }

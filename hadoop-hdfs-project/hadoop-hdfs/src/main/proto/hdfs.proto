@@ -47,7 +47,9 @@ message ExtendedBlockProto {
 message DatanodeIDProto {
   required string ipAddr = 1; // IP address
   required string hostName = 2; // hostname
-  required string storageID = 3; // unique storage id
+  // UUID assigned to the Datanode. For upgraded clusters this is the same
+  // as the original StorageID of the Datanode.
+  required string datanodeUuid = 3;
   required uint32 xferPort = 4; // data streaming port
   required uint32 infoPort = 5; // info server port
   required uint32 ipcPort = 6; // ipc server port

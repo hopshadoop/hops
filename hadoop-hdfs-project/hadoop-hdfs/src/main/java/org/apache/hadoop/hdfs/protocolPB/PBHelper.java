@@ -211,14 +211,17 @@ public class PBHelper {
 
   // DatanodeId
   public static DatanodeID convert(DatanodeIDProto dn) {
-    return new DatanodeID(dn.getIpAddr(), dn.getHostName(), dn.getStorageID(),
+    return new DatanodeID(dn.getIpAddr(), dn.getHostName(), dn.getDatanodeUuid(),
         dn.getXferPort(), dn.getInfoPort(), dn.getIpcPort());
   }
 
   public static DatanodeIDProto convert(DatanodeID dn) {
-    return DatanodeIDProto.newBuilder().setIpAddr(dn.getIpAddr())
-        .setHostName(dn.getHostName()).setStorageID(dn.getDatanodeUuid())
-        .setXferPort(dn.getXferPort()).setInfoPort(dn.getInfoPort())
+    return DatanodeIDProto.newBuilder()
+        .setIpAddr(dn.getIpAddr())
+        .setHostName(dn.getHostName())
+        .setDatanodeUuid(dn.getDatanodeUuid())
+        .setXferPort(dn.getXferPort())
+        .setInfoPort(dn.getInfoPort())
         .setIpcPort(dn.getIpcPort()).build();
   }
 
@@ -612,9 +615,9 @@ public class PBHelper {
   
   public static DatanodeRegistrationProto convert(
       DatanodeRegistration registration) {
-    DatanodeRegistrationProto.Builder builder =
-        DatanodeRegistrationProto.newBuilder();
-    return builder.setDatanodeID(PBHelper.convert((DatanodeID) registration))
+    DatanodeRegistrationProto.Builder builder = DatanodeRegistrationProto.newBuilder();
+    return builder
+        .setDatanodeID(PBHelper.convert((DatanodeID) registration))
         .setStorageInfo(PBHelper.convert(registration.getStorageInfo()))
         .setKeys(PBHelper.convert(registration.getExportedKeys()))
         .setSoftwareVersion(registration.getSoftwareVersion()).build();

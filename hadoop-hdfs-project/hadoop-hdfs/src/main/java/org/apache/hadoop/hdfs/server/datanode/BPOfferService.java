@@ -387,8 +387,7 @@ class BPOfferService implements Runnable {
   }
 
   synchronized DatanodeRegistration createRegistration() {
-    Preconditions.checkState(bpNSInfo != null,
-        "getRegistration() can only be called after initial handshake");
+    Preconditions.checkState(bpNSInfo != null, "getRegistration() can only be called after initial handshake");
     return dn.createBPRegistration(bpNSInfo);
   }
 
