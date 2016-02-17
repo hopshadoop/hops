@@ -19,6 +19,8 @@
 package org.apache.hadoop.yarn.server.applicationhistoryservice.timeline;
 
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import org.apache.hadoop.yarn.server.applicationhistoryservice.timeline.MemoryTimelineStore;
+import org.apache.hadoop.yarn.server.applicationhistoryservice.timeline.TimelineStore;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;

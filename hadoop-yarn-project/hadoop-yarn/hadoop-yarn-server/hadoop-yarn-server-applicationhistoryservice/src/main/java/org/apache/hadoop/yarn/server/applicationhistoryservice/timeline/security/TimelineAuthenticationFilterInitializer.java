@@ -18,18 +18,19 @@
 
 package org.apache.hadoop.yarn.server.applicationhistoryservice.timeline.security;
 
-import java.io.FileReader;
-import java.io.IOException;
-import java.io.Reader;
-import java.util.HashMap;
-import java.util.Map;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.http.FilterContainer;
 import org.apache.hadoop.http.FilterInitializer;
 import org.apache.hadoop.http.HttpServer2;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.security.SecurityUtil;
+import org.apache.hadoop.yarn.server.applicationhistoryservice.timeline.security.TimelineAuthenticationFilter;
+
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.Reader;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * <p>
@@ -46,85 +47,85 @@ import org.apache.hadoop.security.SecurityUtil;
  */
 public class TimelineAuthenticationFilterInitializer extends FilterInitializer {
 
-  /**
-   * The configuration prefix of timeline Kerberos + DT authentication
-   */
-  public static final String PREFIX = "yarn.timeline-service.http.authentication.";
+    /**
+     * The configuration prefix of timeline Kerberos + DT authentication
+     */
+    public static final String PREFIX = "yarn.timeline-service.http.authentication.";
 
-  private static final String SIGNATURE_SECRET_FILE =
-      TimelineAuthenticationFilter.SIGNATURE_SECRET + ".file";
+    private static final String SIGNATURE_SECRET_FILE =
+            TimelineAuthenticationFilter.SIGNATURE_SECRET + ".file";
 
-  /**
-   * <p>
-   * Initializes {@link TimelineAuthenticationFilter}
-   * <p/>
-   * <p>
-   * Propagates to {@link TimelineAuthenticationFilter} configuration all YARN
-   * configuration properties prefixed with
-   * "yarn.timeline-service.authentication."
-   * </p>
-   * 
-   * @param container
-   *          The filter container
-   * @param conf
-   *          Configuration for run-time parameters
-   */
-  @Override
-  public void initFilter(FilterContainer container, Configuration conf) {
-    Map<String, String> filterConfig = new HashMap<String, String>();
+    /**
+     * <p>
+     * Initializes {@link TimelineAuthenticationFilter}
+     * <p/>
+     * <p>
+     * Propagates to {@link TimelineAuthenticationFilter} configuration all YARN
+     * configuration properties prefixed with
+     * "yarn.timeline-service.authentication."
+     * </p>
+     *
+     * @param container
+     *          The filter container
+     * @param conf
+     *          Configuration for run-time parameters
+     */
+    @Override
+    public void initFilter(FilterContainer container, Configuration conf) {
+        Map<String, String> filterConfig = new HashMap<String, String>();
 
-    // setting the cookie path to root '/' so it is used for all resources.
-    filterConfig.put(TimelineAuthenticationFilter.COOKIE_PATH, "/");
+        // setting the cookie path to root '/' so it is used for all resources.
+        filterConfig.put(TimelineAuthenticationFilter.COOKIE_PATH, "/");
 
-    for (Map.Entry<String, String> entry : conf) {
-      String name = entry.getKey();
-      if (name.startsWith(PREFIX)) {
-        String value = conf.get(name);
-        name = name.substring(PREFIX.length());
-        filterConfig.put(name, value);
-      }
-    }
-
-    String signatureSecretFile = filterConfig.get(SIGNATURE_SECRET_FILE);
-    if (signatureSecretFile != null) {
-      Reader reader = null;
-      try {
-        StringBuilder secret = new StringBuilder();
-        reader = new FileReader(signatureSecretFile);
-        int c = reader.read();
-        while (c > -1) {
-          secret.append((char) c);
-          c = reader.read();
+        for (Map.Entry<String, String> entry : conf) {
+            String name = entry.getKey();
+            if (name.startsWith(PREFIX)) {
+                String value = conf.get(name);
+                name = name.substring(PREFIX.length());
+                filterConfig.put(name, value);
+            }
         }
-        filterConfig
-            .put(TimelineAuthenticationFilter.SIGNATURE_SECRET,
-                secret.toString());
-      } catch (IOException ex) {
-        throw new RuntimeException(
-            "Could not read HTTP signature secret file: "
-                + signatureSecretFile);
-      } finally {
-        IOUtils.closeStream(reader);
-      }
-    }
 
-    // Resolve _HOST into bind address
-    String bindAddress = conf.get(HttpServer2.BIND_ADDRESS);
-    String principal =
-        filterConfig.get(TimelineClientAuthenticationService.PRINCIPAL);
-    if (principal != null) {
-      try {
-        principal = SecurityUtil.getServerPrincipal(principal, bindAddress);
-      } catch (IOException ex) {
-        throw new RuntimeException(
-            "Could not resolve Kerberos principal name: " + ex.toString(), ex);
-      }
-      filterConfig.put(TimelineClientAuthenticationService.PRINCIPAL,
-          principal);
-    }
+        String signatureSecretFile = filterConfig.get(SIGNATURE_SECRET_FILE);
+        if (signatureSecretFile != null) {
+            Reader reader = null;
+            try {
+                StringBuilder secret = new StringBuilder();
+                reader = new FileReader(signatureSecretFile);
+                int c = reader.read();
+                while (c > -1) {
+                    secret.append((char) c);
+                    c = reader.read();
+                }
+                filterConfig
+                        .put(TimelineAuthenticationFilter.SIGNATURE_SECRET,
+                                secret.toString());
+            } catch (IOException ex) {
+                throw new RuntimeException(
+                        "Could not read HTTP signature secret file: "
+                                + signatureSecretFile);
+            } finally {
+                IOUtils.closeStream(reader);
+            }
+        }
 
-    container.addGlobalFilter("Timeline Authentication Filter",
-        TimelineAuthenticationFilter.class.getName(),
-        filterConfig);
-  }
+        // Resolve _HOST into bind address
+        String bindAddress = conf.get(HttpServer2.BIND_ADDRESS);
+        String principal =
+                filterConfig.get(TimelineClientAuthenticationService.PRINCIPAL);
+        if (principal != null) {
+            try {
+                principal = SecurityUtil.getServerPrincipal(principal, bindAddress);
+            } catch (IOException ex) {
+                throw new RuntimeException(
+                        "Could not resolve Kerberos principal name: " + ex.toString(), ex);
+            }
+            filterConfig.put(TimelineClientAuthenticationService.PRINCIPAL,
+                    principal);
+        }
+
+        container.addGlobalFilter("Timeline Authentication Filter",
+                TimelineAuthenticationFilter.class.getName(),
+                filterConfig);
+    }
 }

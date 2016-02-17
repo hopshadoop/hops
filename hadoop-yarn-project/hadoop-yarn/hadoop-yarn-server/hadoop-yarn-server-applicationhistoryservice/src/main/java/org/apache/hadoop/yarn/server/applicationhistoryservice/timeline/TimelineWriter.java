@@ -32,15 +32,15 @@ import java.io.IOException;
 @InterfaceStability.Unstable
 public interface TimelineWriter {
 
-  /**
-   * Stores entity information to the timeline store. Any errors occurring for
-   * individual put request objects will be reported in the response.
-   *
-   * @param data
-   *     An {@link TimelineEntities} object.
-   * @return An {@link TimelinePutResponse} object.
-   * @throws IOException
-   */
-  TimelinePutResponse put(TimelineEntities data) throws IOException;
+    /**
+     * Stores entity information to the timeline store. Any errors occurring for
+     * individual put request objects will be reported in the response.
+     *
+     * @param data
+     *          An {@link TimelineEntities} object.
+     * @return An {@link TimelinePutResponse} object.
+     * @throws IOException
+     */
+    TimelinePutResponse put(TimelineEntities data) throws IOException;
 
 }

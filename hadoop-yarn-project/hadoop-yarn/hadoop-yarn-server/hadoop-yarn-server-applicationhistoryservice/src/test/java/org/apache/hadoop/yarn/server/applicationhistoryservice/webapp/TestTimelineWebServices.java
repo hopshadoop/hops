@@ -54,292 +54,303 @@ import static org.junit.Assert.assertEquals;
 
 public class TestTimelineWebServices extends JerseyTest {
 
-  private static TimelineStore store;
-  private static TimelineACLsManager timelineACLsManager;
-  private static AdminACLsManager adminACLsManager;
-  private static String remoteUser;
-  private long beforeTime;
+    private static TimelineStore store;
+    private static TimelineACLsManager timelineACLsManager;
+    private static AdminACLsManager adminACLsManager;
+    private static String remoteUser;
+    private long beforeTime;
 
-  private Injector injector = Guice.createInjector(new ServletModule() {
+    private Injector injector = Guice.createInjector(new ServletModule() {
 
-    @Override
-    protected void configureServlets() {
-      bind(YarnJacksonJaxbJsonProvider.class);
-      bind(TimelineWebServices.class);
-      bind(GenericExceptionHandler.class);
-      try {
-        store = mockTimelineStore();
-      } catch (Exception e) {
-        Assert.fail();
-      }
-      bind(TimelineStore.class).toInstance(store);
-      Configuration conf = new YarnConfiguration();
-      conf.setBoolean(YarnConfiguration.YARN_ACL_ENABLE, false);
-      timelineACLsManager = new TimelineACLsManager(conf);
-      conf.setBoolean(YarnConfiguration.YARN_ACL_ENABLE, true);
-      conf.set(YarnConfiguration.YARN_ADMIN_ACL, "admin");
-      adminACLsManager = new AdminACLsManager(conf);
-      bind(TimelineACLsManager.class).toInstance(timelineACLsManager);
-      serve("/*").with(GuiceContainer.class);
-      filter("/*").through(TestFilter.class);
+        @Override
+        protected void configureServlets() {
+            bind(YarnJacksonJaxbJsonProvider.class);
+            bind(TimelineWebServices.class);
+            bind(GenericExceptionHandler.class);
+            try{
+                store = mockTimelineStore();
+            } catch (Exception e) {
+                Assert.fail();
+            }
+            bind(TimelineStore.class).toInstance(store);
+            Configuration conf = new YarnConfiguration();
+            conf.setBoolean(YarnConfiguration.YARN_ACL_ENABLE, false);
+            timelineACLsManager = new TimelineACLsManager(conf);
+            conf.setBoolean(YarnConfiguration.YARN_ACL_ENABLE, true);
+            conf.set(YarnConfiguration.YARN_ADMIN_ACL, "admin");
+            adminACLsManager = new AdminACLsManager(conf);
+            bind(TimelineACLsManager.class).toInstance(timelineACLsManager);
+            serve("/*").with(GuiceContainer.class);
+            filter("/*").through(TestFilter.class);
+        }
+
+    });
+
+    public class GuiceServletConfig extends GuiceServletContextListener {
+
+        @Override
+        protected Injector getInjector() {
+            return injector;
+        }
     }
 
-  });
-
-  public class GuiceServletConfig extends GuiceServletContextListener {
-
-    @Override
-    protected Injector getInjector() {
-      return injector;
+    private TimelineStore mockTimelineStore()
+            throws Exception {
+        beforeTime = System.currentTimeMillis() - 1;
+        TestMemoryTimelineStore store =
+                new TestMemoryTimelineStore();
+        store.setup();
+        return store.getTimelineStore();
     }
-  }
 
-  private TimelineStore mockTimelineStore() throws Exception {
-    beforeTime = System.currentTimeMillis() - 1;
-    TestMemoryTimelineStore store = new TestMemoryTimelineStore();
-    store.setup();
-    return store.getTimelineStore();
-  }
+    public TestTimelineWebServices() {
+        super(new WebAppDescriptor.Builder(
+                "org.apache.hadoop.yarn.server.applicationhistoryservice.webapp")
+                .contextListenerClass(GuiceServletConfig.class)
+                .filterClass(com.google.inject.servlet.GuiceFilter.class)
+                .contextPath("jersey-guice-filter")
+                .servletPath("/")
+                .clientConfig(new DefaultClientConfig(YarnJacksonJaxbJsonProvider.class))
+                .build());
+    }
 
-  public TestTimelineWebServices() {
-    super(new WebAppDescriptor.Builder(
-        "org.apache.hadoop.yarn.server.applicationhistoryservice.webapp")
-        .contextListenerClass(GuiceServletConfig.class)
-        .filterClass(com.google.inject.servlet.GuiceFilter.class)
-        .contextPath("jersey-guice-filter").servletPath("/").clientConfig(
-            new DefaultClientConfig(YarnJacksonJaxbJsonProvider.class))
-        .build());
-  }
+    @Test
+    public void testAbout() throws Exception {
+        WebResource r = resource();
+        ClientResponse response = r.path("ws").path("v1").path("timeline")
+                .accept(MediaType.APPLICATION_JSON)
+                .get(ClientResponse.class);
+        assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
+        TimelineWebServices.AboutInfo about =
+                response.getEntity(TimelineWebServices.AboutInfo.class);
+        Assert.assertNotNull(about);
+        Assert.assertEquals("Timeline API", about.getAbout());
+    }
 
-  @Test
-  public void testAbout() throws Exception {
-    WebResource r = resource();
-    ClientResponse response = r.path("ws").path("v1").path("timeline")
-        .accept(MediaType.APPLICATION_JSON).get(ClientResponse.class);
-    assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
-    TimelineWebServices.AboutInfo about =
-        response.getEntity(TimelineWebServices.AboutInfo.class);
-    Assert.assertNotNull(about);
-    Assert.assertEquals("Timeline API", about.getAbout());
-  }
+    private static void verifyEntities(TimelineEntities entities) {
+        Assert.assertNotNull(entities);
+        Assert.assertEquals(2, entities.getEntities().size());
+        TimelineEntity entity1 = entities.getEntities().get(0);
+        Assert.assertNotNull(entity1);
+        Assert.assertEquals("id_1", entity1.getEntityId());
+        Assert.assertEquals("type_1", entity1.getEntityType());
+        Assert.assertEquals(123l, entity1.getStartTime().longValue());
+        Assert.assertEquals(2, entity1.getEvents().size());
+        Assert.assertEquals(4, entity1.getPrimaryFilters().size());
+        Assert.assertEquals(4, entity1.getOtherInfo().size());
+        TimelineEntity entity2 = entities.getEntities().get(1);
+        Assert.assertNotNull(entity2);
+        Assert.assertEquals("id_2", entity2.getEntityId());
+        Assert.assertEquals("type_1", entity2.getEntityType());
+        Assert.assertEquals(123l, entity2.getStartTime().longValue());
+        Assert.assertEquals(2, entity2.getEvents().size());
+        Assert.assertEquals(4, entity2.getPrimaryFilters().size());
+        Assert.assertEquals(4, entity2.getOtherInfo().size());
+    }
 
-  private static void verifyEntities(TimelineEntities entities) {
-    Assert.assertNotNull(entities);
-    Assert.assertEquals(2, entities.getEntities().size());
-    TimelineEntity entity1 = entities.getEntities().get(0);
-    Assert.assertNotNull(entity1);
-    Assert.assertEquals("id_1", entity1.getEntityId());
-    Assert.assertEquals("type_1", entity1.getEntityType());
-    Assert.assertEquals(123l, entity1.getStartTime().longValue());
-    Assert.assertEquals(2, entity1.getEvents().size());
-    Assert.assertEquals(4, entity1.getPrimaryFilters().size());
-    Assert.assertEquals(4, entity1.getOtherInfo().size());
-    TimelineEntity entity2 = entities.getEntities().get(1);
-    Assert.assertNotNull(entity2);
-    Assert.assertEquals("id_2", entity2.getEntityId());
-    Assert.assertEquals("type_1", entity2.getEntityType());
-    Assert.assertEquals(123l, entity2.getStartTime().longValue());
-    Assert.assertEquals(2, entity2.getEvents().size());
-    Assert.assertEquals(4, entity2.getPrimaryFilters().size());
-    Assert.assertEquals(4, entity2.getOtherInfo().size());
-  }
+    @Test
+    public void testGetEntities() throws Exception {
+        WebResource r = resource();
+        ClientResponse response = r.path("ws").path("v1").path("timeline")
+                .path("type_1")
+                .accept(MediaType.APPLICATION_JSON)
+                .get(ClientResponse.class);
+        assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
+        verifyEntities(response.getEntity(TimelineEntities.class));
+    }
 
-  @Test
-  public void testGetEntities() throws Exception {
-    WebResource r = resource();
-    ClientResponse response =
-        r.path("ws").path("v1").path("timeline").path("type_1")
-            .accept(MediaType.APPLICATION_JSON).get(ClientResponse.class);
-    assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
-    verifyEntities(response.getEntity(TimelineEntities.class));
-  }
+    @Test
+    public void testFromId() throws Exception {
+        WebResource r = resource();
+        ClientResponse response = r.path("ws").path("v1").path("timeline")
+                .path("type_1").queryParam("fromId", "id_2")
+                .accept(MediaType.APPLICATION_JSON)
+                .get(ClientResponse.class);
+        assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
+        assertEquals(1, response.getEntity(TimelineEntities.class).getEntities()
+                .size());
 
-  @Test
-  public void testFromId() throws Exception {
-    WebResource r = resource();
-    ClientResponse response =
-        r.path("ws").path("v1").path("timeline").path("type_1")
-            .queryParam("fromId", "id_2").accept(MediaType.APPLICATION_JSON)
-            .get(ClientResponse.class);
-    assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
-    assertEquals(1,
-        response.getEntity(TimelineEntities.class).getEntities().size());
+        response = r.path("ws").path("v1").path("timeline")
+                .path("type_1").queryParam("fromId", "id_1")
+                .accept(MediaType.APPLICATION_JSON)
+                .get(ClientResponse.class);
+        assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
+        assertEquals(2, response.getEntity(TimelineEntities.class).getEntities()
+                .size());
+    }
 
-    response = r.path("ws").path("v1").path("timeline").path("type_1")
-        .queryParam("fromId", "id_1").accept(MediaType.APPLICATION_JSON)
-        .get(ClientResponse.class);
-    assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
-    assertEquals(2,
-        response.getEntity(TimelineEntities.class).getEntities().size());
-  }
+    @Test
+    public void testFromTs() throws Exception {
+        WebResource r = resource();
+        ClientResponse response = r.path("ws").path("v1").path("timeline")
+                .path("type_1").queryParam("fromTs", Long.toString(beforeTime))
+                .accept(MediaType.APPLICATION_JSON)
+                .get(ClientResponse.class);
+        assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
+        assertEquals(0, response.getEntity(TimelineEntities.class).getEntities()
+                .size());
 
-  @Test
-  public void testFromTs() throws Exception {
-    WebResource r = resource();
-    ClientResponse response =
-        r.path("ws").path("v1").path("timeline").path("type_1")
-            .queryParam("fromTs", Long.toString(beforeTime))
-            .accept(MediaType.APPLICATION_JSON).get(ClientResponse.class);
-    assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
-    assertEquals(0,
-        response.getEntity(TimelineEntities.class).getEntities().size());
+        response = r.path("ws").path("v1").path("timeline")
+                .path("type_1").queryParam("fromTs", Long.toString(
+                        System.currentTimeMillis()))
+                .accept(MediaType.APPLICATION_JSON)
+                .get(ClientResponse.class);
+        assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
+        assertEquals(2, response.getEntity(TimelineEntities.class).getEntities()
+                .size());
+    }
 
-    response = r.path("ws").path("v1").path("timeline").path("type_1")
-        .queryParam("fromTs", Long.toString(System.currentTimeMillis()))
-        .accept(MediaType.APPLICATION_JSON).get(ClientResponse.class);
-    assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
-    assertEquals(2,
-        response.getEntity(TimelineEntities.class).getEntities().size());
-  }
+    @Test
+    public void testPrimaryFilterString() {
+        WebResource r = resource();
+        ClientResponse response = r.path("ws").path("v1").path("timeline")
+                .path("type_1").queryParam("primaryFilter", "user:username")
+                .accept(MediaType.APPLICATION_JSON)
+                .get(ClientResponse.class);
+        assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
+        verifyEntities(response.getEntity(TimelineEntities.class));
+    }
 
-  @Test
-  public void testPrimaryFilterString() {
-    WebResource r = resource();
-    ClientResponse response =
-        r.path("ws").path("v1").path("timeline").path("type_1")
-            .queryParam("primaryFilter", "user:username")
-            .accept(MediaType.APPLICATION_JSON).get(ClientResponse.class);
-    assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
-    verifyEntities(response.getEntity(TimelineEntities.class));
-  }
+    @Test
+    public void testPrimaryFilterInteger() {
+        WebResource r = resource();
+        ClientResponse response = r.path("ws").path("v1").path("timeline")
+                .path("type_1").queryParam("primaryFilter",
+                        "appname:" + Integer.toString(Integer.MAX_VALUE))
+                .accept(MediaType.APPLICATION_JSON)
+                .get(ClientResponse.class);
+        assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
+        verifyEntities(response.getEntity(TimelineEntities.class));
+    }
 
-  @Test
-  public void testPrimaryFilterInteger() {
-    WebResource r = resource();
-    ClientResponse response =
-        r.path("ws").path("v1").path("timeline").path("type_1")
-            .queryParam("primaryFilter",
-                "appname:" + Integer.toString(Integer.MAX_VALUE))
-            .accept(MediaType.APPLICATION_JSON).get(ClientResponse.class);
-    assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
-    verifyEntities(response.getEntity(TimelineEntities.class));
-  }
+    @Test
+    public void testPrimaryFilterLong() {
+        WebResource r = resource();
+        ClientResponse response = r.path("ws").path("v1").path("timeline")
+                .path("type_1").queryParam("primaryFilter",
+                        "long:" + Long.toString((long)Integer.MAX_VALUE + 1l))
+                .accept(MediaType.APPLICATION_JSON)
+                .get(ClientResponse.class);
+        assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
+        verifyEntities(response.getEntity(TimelineEntities.class));
+    }
 
-  @Test
-  public void testPrimaryFilterLong() {
-    WebResource r = resource();
-    ClientResponse response =
-        r.path("ws").path("v1").path("timeline").path("type_1")
-            .queryParam("primaryFilter",
-                "long:" + Long.toString((long) Integer.MAX_VALUE + 1l))
-            .accept(MediaType.APPLICATION_JSON).get(ClientResponse.class);
-    assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
-    verifyEntities(response.getEntity(TimelineEntities.class));
-  }
+    @Test
+    public void testPrimaryFilterNumericString() {
+        // without quotes, 123abc is interpreted as the number 123,
+        // which finds no entities
+        WebResource r = resource();
+        ClientResponse response = r.path("ws").path("v1").path("timeline")
+                .path("type_1").queryParam("primaryFilter", "other:123abc")
+                .accept(MediaType.APPLICATION_JSON)
+                .get(ClientResponse.class);
+        assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
+        assertEquals(0, response.getEntity(TimelineEntities.class).getEntities()
+                .size());
+    }
 
-  @Test
-  public void testPrimaryFilterNumericString() {
-    // without quotes, 123abc is interpreted as the number 123,
-    // which finds no entities
-    WebResource r = resource();
-    ClientResponse response =
-        r.path("ws").path("v1").path("timeline").path("type_1")
-            .queryParam("primaryFilter", "other:123abc")
-            .accept(MediaType.APPLICATION_JSON).get(ClientResponse.class);
-    assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
-    assertEquals(0,
-        response.getEntity(TimelineEntities.class).getEntities().size());
-  }
+    @Test
+    public void testPrimaryFilterNumericStringWithQuotes() {
+        WebResource r = resource();
+        ClientResponse response = r.path("ws").path("v1").path("timeline")
+                .path("type_1").queryParam("primaryFilter", "other:\"123abc\"")
+                .accept(MediaType.APPLICATION_JSON)
+                .get(ClientResponse.class);
+        assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
+        verifyEntities(response.getEntity(TimelineEntities.class));
+    }
 
-  @Test
-  public void testPrimaryFilterNumericStringWithQuotes() {
-    WebResource r = resource();
-    ClientResponse response =
-        r.path("ws").path("v1").path("timeline").path("type_1")
-            .queryParam("primaryFilter", "other:\"123abc\"")
-            .accept(MediaType.APPLICATION_JSON).get(ClientResponse.class);
-    assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
-    verifyEntities(response.getEntity(TimelineEntities.class));
-  }
+    @Test
+    public void testSecondaryFilters() {
+        WebResource r = resource();
+        ClientResponse response = r.path("ws").path("v1").path("timeline")
+                .path("type_1")
+                .queryParam("secondaryFilter",
+                        "user:username,appname:" + Integer.toString(Integer.MAX_VALUE))
+                .accept(MediaType.APPLICATION_JSON)
+                .get(ClientResponse.class);
+        assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
+        verifyEntities(response.getEntity(TimelineEntities.class));
+    }
 
-  @Test
-  public void testSecondaryFilters() {
-    WebResource r = resource();
-    ClientResponse response =
-        r.path("ws").path("v1").path("timeline").path("type_1")
-            .queryParam("secondaryFilter",
-                "user:username,appname:" + Integer.toString(Integer.MAX_VALUE))
-            .accept(MediaType.APPLICATION_JSON).get(ClientResponse.class);
-    assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
-    verifyEntities(response.getEntity(TimelineEntities.class));
-  }
+    @Test
+    public void testGetEntity() throws Exception {
+        WebResource r = resource();
+        ClientResponse response = r.path("ws").path("v1").path("timeline")
+                .path("type_1").path("id_1")
+                .accept(MediaType.APPLICATION_JSON)
+                .get(ClientResponse.class);
+        assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
+        TimelineEntity entity = response.getEntity(TimelineEntity.class);
+        Assert.assertNotNull(entity);
+        Assert.assertEquals("id_1", entity.getEntityId());
+        Assert.assertEquals("type_1", entity.getEntityType());
+        Assert.assertEquals(123l, entity.getStartTime().longValue());
+        Assert.assertEquals(2, entity.getEvents().size());
+        Assert.assertEquals(4, entity.getPrimaryFilters().size());
+        Assert.assertEquals(4, entity.getOtherInfo().size());
+    }
 
-  @Test
-  public void testGetEntity() throws Exception {
-    WebResource r = resource();
-    ClientResponse response =
-        r.path("ws").path("v1").path("timeline").path("type_1").path("id_1")
-            .accept(MediaType.APPLICATION_JSON).get(ClientResponse.class);
-    assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
-    TimelineEntity entity = response.getEntity(TimelineEntity.class);
-    Assert.assertNotNull(entity);
-    Assert.assertEquals("id_1", entity.getEntityId());
-    Assert.assertEquals("type_1", entity.getEntityType());
-    Assert.assertEquals(123l, entity.getStartTime().longValue());
-    Assert.assertEquals(2, entity.getEvents().size());
-    Assert.assertEquals(4, entity.getPrimaryFilters().size());
-    Assert.assertEquals(4, entity.getOtherInfo().size());
-  }
+    @Test
+    public void testGetEntityFields1() throws Exception {
+        WebResource r = resource();
+        ClientResponse response = r.path("ws").path("v1").path("timeline")
+                .path("type_1").path("id_1").queryParam("fields", "events,otherinfo")
+                .accept(MediaType.APPLICATION_JSON)
+                .get(ClientResponse.class);
+        assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
+        TimelineEntity entity = response.getEntity(TimelineEntity.class);
+        Assert.assertNotNull(entity);
+        Assert.assertEquals("id_1", entity.getEntityId());
+        Assert.assertEquals("type_1", entity.getEntityType());
+        Assert.assertEquals(123l, entity.getStartTime().longValue());
+        Assert.assertEquals(2, entity.getEvents().size());
+        Assert.assertEquals(0, entity.getPrimaryFilters().size());
+        Assert.assertEquals(4, entity.getOtherInfo().size());
+    }
 
-  @Test
-  public void testGetEntityFields1() throws Exception {
-    WebResource r = resource();
-    ClientResponse response =
-        r.path("ws").path("v1").path("timeline").path("type_1").path("id_1")
-            .queryParam("fields", "events,otherinfo")
-            .accept(MediaType.APPLICATION_JSON).get(ClientResponse.class);
-    assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
-    TimelineEntity entity = response.getEntity(TimelineEntity.class);
-    Assert.assertNotNull(entity);
-    Assert.assertEquals("id_1", entity.getEntityId());
-    Assert.assertEquals("type_1", entity.getEntityType());
-    Assert.assertEquals(123l, entity.getStartTime().longValue());
-    Assert.assertEquals(2, entity.getEvents().size());
-    Assert.assertEquals(0, entity.getPrimaryFilters().size());
-    Assert.assertEquals(4, entity.getOtherInfo().size());
-  }
+    @Test
+    public void testGetEntityFields2() throws Exception {
+        WebResource r = resource();
+        ClientResponse response = r.path("ws").path("v1").path("timeline")
+                .path("type_1").path("id_1").queryParam("fields", "lasteventonly," +
+                        "primaryfilters,relatedentities")
+                .accept(MediaType.APPLICATION_JSON)
+                .get(ClientResponse.class);
+        assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
+        TimelineEntity entity = response.getEntity(TimelineEntity.class);
+        Assert.assertNotNull(entity);
+        Assert.assertEquals("id_1", entity.getEntityId());
+        Assert.assertEquals("type_1", entity.getEntityType());
+        Assert.assertEquals(123l, entity.getStartTime().longValue());
+        Assert.assertEquals(1, entity.getEvents().size());
+        Assert.assertEquals(4, entity.getPrimaryFilters().size());
+        Assert.assertEquals(0, entity.getOtherInfo().size());
+    }
 
-  @Test
-  public void testGetEntityFields2() throws Exception {
-    WebResource r = resource();
-    ClientResponse response =
-        r.path("ws").path("v1").path("timeline").path("type_1").path("id_1")
-            .queryParam("fields",
-                "lasteventonly," + "primaryfilters,relatedentities")
-            .accept(MediaType.APPLICATION_JSON).get(ClientResponse.class);
-    assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
-    TimelineEntity entity = response.getEntity(TimelineEntity.class);
-    Assert.assertNotNull(entity);
-    Assert.assertEquals("id_1", entity.getEntityId());
-    Assert.assertEquals("type_1", entity.getEntityType());
-    Assert.assertEquals(123l, entity.getStartTime().longValue());
-    Assert.assertEquals(1, entity.getEvents().size());
-    Assert.assertEquals(4, entity.getPrimaryFilters().size());
-    Assert.assertEquals(0, entity.getOtherInfo().size());
-  }
-
-  @Test
-  public void testGetEvents() throws Exception {
-    WebResource r = resource();
-    ClientResponse response =
-        r.path("ws").path("v1").path("timeline").path("type_1").path("events")
-            .queryParam("entityId", "id_1").accept(MediaType.APPLICATION_JSON)
-            .get(ClientResponse.class);
-    assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
-    TimelineEvents events = response.getEntity(TimelineEvents.class);
-    Assert.assertNotNull(events);
-    Assert.assertEquals(1, events.getAllEvents().size());
-    TimelineEvents.EventsOfOneEntity partEvents = events.getAllEvents().get(0);
-    Assert.assertEquals(2, partEvents.getEvents().size());
-    TimelineEvent event1 = partEvents.getEvents().get(0);
-    Assert.assertEquals(456l, event1.getTimestamp());
-    Assert.assertEquals("end_event", event1.getEventType());
-    Assert.assertEquals(1, event1.getEventInfo().size());
-    TimelineEvent event2 = partEvents.getEvents().get(1);
-    Assert.assertEquals(123l, event2.getTimestamp());
-    Assert.assertEquals("start_event", event2.getEventType());
-    Assert.assertEquals(0, event2.getEventInfo().size());
-  }
+    @Test
+    public void testGetEvents() throws Exception {
+        WebResource r = resource();
+        ClientResponse response = r.path("ws").path("v1").path("timeline")
+                .path("type_1").path("events")
+                .queryParam("entityId", "id_1")
+                .accept(MediaType.APPLICATION_JSON)
+                .get(ClientResponse.class);
+        assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
+        TimelineEvents events = response.getEntity(TimelineEvents.class);
+        Assert.assertNotNull(events);
+        Assert.assertEquals(1, events.getAllEvents().size());
+        TimelineEvents.EventsOfOneEntity partEvents = events.getAllEvents().get(0);
+        Assert.assertEquals(2, partEvents.getEvents().size());
+        TimelineEvent event1 = partEvents.getEvents().get(0);
+        Assert.assertEquals(456l, event1.getTimestamp());
+        Assert.assertEquals("end_event", event1.getEventType());
+        Assert.assertEquals(1, event1.getEventInfo().size());
+        TimelineEvent event2 = partEvents.getEvents().get(1);
+        Assert.assertEquals(123l, event2.getTimestamp());
+        Assert.assertEquals("start_event", event2.getEventType());
+        Assert.assertEquals(0, event2.getEventInfo().size());
+    }
 
     @Test
     public void testPostEntitiesWithPrimaryFilter() throws Exception {
@@ -357,47 +368,46 @@ public class TestTimelineWebServices extends JerseyTest {
                 .accept(MediaType.APPLICATION_JSON)
                 .type(MediaType.APPLICATION_JSON)
                 .post(ClientResponse.class, entities);
-        TimelinePutResponse putResponse = response.getEntity(TimelinePutResponse.class);
-        Assert.assertEquals(1, putResponse.getErrors().size());
-        List<TimelinePutError> errors = putResponse.getErrors();
-        Assert.assertEquals(TimelinePutError.SYSTEM_FILTER_CONFLICT,
+        TimelinePutResponse putResposne = response.getEntity(TimelinePutResponse.class);
+        Assert.assertEquals(1, putResposne.getErrors().size());
+        List<TimelinePutError> errors = putResposne.getErrors();
+        Assert.assertEquals(TimelinePutResponse.TimelinePutError.SYSTEM_FILTER_CONFLICT,
                 errors.get(0).getErrorCode());
     }
 
-  @Test
-  public void testPostEntities() throws Exception {
-    TimelineEntities entities = new TimelineEntities();
-    TimelineEntity entity = new TimelineEntity();
-    entity.setEntityId("test id 1");
-    entity.setEntityType("test type 1");
-    entity.setStartTime(System.currentTimeMillis());
-    entities.addEntity(entity);
-    WebResource r = resource();
-    ClientResponse response = r.path("ws").path("v1").path("timeline")
-        .accept(MediaType.APPLICATION_JSON).type(MediaType.APPLICATION_JSON)
-        .post(ClientResponse.class, entities);
-    assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
-    TimelinePutResponse putResposne =
-        response.getEntity(TimelinePutResponse.class);
-    Assert.assertNotNull(putResposne);
-    Assert.assertEquals(0, putResposne.getErrors().size());
-    // verify the entity exists in the store
-    response = r.path("ws").path("v1").path("timeline")
-            .path("test type 1").path("test id 1")
-            .accept(MediaType.APPLICATION_JSON)
-            .get(ClientResponse.class);
-    assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
-    entity = response.getEntity(TimelineEntity.class);
-    Assert.assertNotNull(entity);
-    Assert.assertEquals("test id 1", entity.getEntityId());
-    Assert.assertEquals("test type 1", entity.getEntityType());
-
-  }
+    @Test
+    public void testPostEntities() throws Exception {
+        TimelineEntities entities = new TimelineEntities();
+        TimelineEntity entity = new TimelineEntity();
+        entity.setEntityId("test id 1");
+        entity.setEntityType("test type 1");
+        entity.setStartTime(System.currentTimeMillis());
+        entities.addEntity(entity);
+        WebResource r = resource();
+        ClientResponse response = r.path("ws").path("v1").path("timeline")
+                .accept(MediaType.APPLICATION_JSON)
+                .type(MediaType.APPLICATION_JSON)
+                .post(ClientResponse.class, entities);
+        assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
+        TimelinePutResponse putResposne = response.getEntity(TimelinePutResponse.class);
+        Assert.assertNotNull(putResposne);
+        Assert.assertEquals(0, putResposne.getErrors().size());
+        // verify the entity exists in the store
+        response = r.path("ws").path("v1").path("timeline")
+                .path("test type 1").path("test id 1")
+                .accept(MediaType.APPLICATION_JSON)
+                .get(ClientResponse.class);
+        assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
+        entity = response.getEntity(TimelineEntity.class);
+        Assert.assertNotNull(entity);
+        Assert.assertEquals("test id 1", entity.getEntityId());
+        Assert.assertEquals("test type 1", entity.getEntityType());
+    }
 
     @Test
     public void testPostEntitiesWithYarnACLsEnabled() throws Exception {
         AdminACLsManager oldAdminACLsManager =
-            timelineACLsManager.setAdminACLsManager(adminACLsManager);
+                timelineACLsManager.setAdminACLsManager(adminACLsManager);
         remoteUser = "tester";
         try {
             TimelineEntities entities = new TimelineEntities();
@@ -437,7 +447,7 @@ public class TestTimelineWebServices extends JerseyTest {
     @Test
     public void testGetEntityWithYarnACLsEnabled() throws Exception {
         AdminACLsManager oldAdminACLsManager =
-            timelineACLsManager.setAdminACLsManager(adminACLsManager);
+                timelineACLsManager.setAdminACLsManager(adminACLsManager);
         remoteUser = "tester";
         try {
             TimelineEntities entities = new TimelineEntities();
@@ -500,7 +510,7 @@ public class TestTimelineWebServices extends JerseyTest {
     @Test
     public void testGetEntitiesWithYarnACLsEnabled() {
         AdminACLsManager oldAdminACLsManager =
-            timelineACLsManager.setAdminACLsManager(adminACLsManager);
+                timelineACLsManager.setAdminACLsManager(adminACLsManager);
         remoteUser = "tester";
         try {
             TimelineEntities entities = new TimelineEntities();
@@ -532,7 +542,6 @@ public class TestTimelineWebServices extends JerseyTest {
                     .path("test type 4")
                     .accept(MediaType.APPLICATION_JSON)
                     .get(ClientResponse.class);
-
             assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
             entities = response.getEntity(TimelineEntities.class);
             assertEquals(1, entities.getEntities().size());
@@ -547,7 +556,7 @@ public class TestTimelineWebServices extends JerseyTest {
     @Test
     public void testGetEventsWithYarnACLsEnabled() {
         AdminACLsManager oldAdminACLsManager =
-            timelineACLsManager.setAdminACLsManager(adminACLsManager);
+                timelineACLsManager.setAdminACLsManager(adminACLsManager);
         remoteUser = "tester";
         try {
             TimelineEntities entities = new TimelineEntities();
@@ -583,11 +592,11 @@ public class TestTimelineWebServices extends JerseyTest {
                     .type(MediaType.APPLICATION_JSON)
                     .post(ClientResponse.class, entities);
 
-             response = r.path("ws").path("v1").path("timeline")
-                     .path("test type 5").path("events")
-                     .queryParam("entityId", "test id 5,test id 6")
-                     .accept(MediaType.APPLICATION_JSON)
-                     .get(ClientResponse.class);
+            response = r.path("ws").path("v1").path("timeline")
+                    .path("test type 5").path("events")
+                    .queryParam("entityId", "test id 5,test id 6")
+                    .accept(MediaType.APPLICATION_JSON)
+                    .get(ClientResponse.class);
             assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
             TimelineEvents events = response.getEntity(TimelineEvents.class);
             assertEquals(1, events.getAllEvents().size());
@@ -601,35 +610,36 @@ public class TestTimelineWebServices extends JerseyTest {
     @Singleton
     private static class TestFilter implements Filter {
 
-    @Override
-    public void init(FilterConfig filterConfig) throws ServletException {
-    }
+        @Override
+        public void init(FilterConfig filterConfig) throws ServletException {
+        }
 
-    @Override
-    public void doFilter(ServletRequest request, ServletResponse response,
-                         FilterChain chain) throws IOException, ServletException {
-    if (request instanceof HttpServletRequest) {
-        request =
-                new TestHttpServletRequestWrapper((HttpServletRequest) request);
-    }
-    chain.doFilter(request, response);
-    }
+        @Override
+        public void doFilter(ServletRequest request, ServletResponse response,
+                             FilterChain chain) throws IOException, ServletException {
+            if (request instanceof HttpServletRequest) {
+                request =
+                        new TestHttpServletRequestWrapper((HttpServletRequest) request);
+            }
+            chain.doFilter(request, response);
+        }
 
-    @Override
-    public void destroy() {
+        @Override
+        public void destroy() {
+        }
 
-    }
     }
 
     private static class TestHttpServletRequestWrapper extends HttpServletRequestWrapper {
+
         public TestHttpServletRequestWrapper(HttpServletRequest request) {
             super(request);
         }
 
-    @Override
-    public String getRemoteUser() {
-        return TestTimelineWebServices.remoteUser;
-    }
+        @Override
+        public String getRemoteUser() {
+            return TestTimelineWebServices.remoteUser;
+        }
 
     }
 }

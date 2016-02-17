@@ -31,18 +31,18 @@ import org.apache.hadoop.security.authentication.server.AuthenticationFilter;
 @Unstable
 public class TimelineAuthenticationFilter extends AuthenticationFilter {
 
-  @Override
-  protected Properties getConfiguration(String configPrefix,
-      FilterConfig filterConfig) throws ServletException {
-    // In yarn-site.xml, we can simply set type to "kerberos". However, we need
-    // to replace the name here to use the customized Kerberos + DT service
-    // instead of the standard Kerberos handler.
-    Properties properties = super.getConfiguration(configPrefix, filterConfig);
-    if (properties.getProperty(AUTH_TYPE).equals("kerberos")) {
-      properties.setProperty(
-          AUTH_TYPE, TimelineClientAuthenticationService.class.getName());
+    @Override
+    protected Properties getConfiguration(String configPrefix,
+                                          FilterConfig filterConfig) throws ServletException {
+        // In yarn-site.xml, we can simply set type to "kerberos". However, we need
+        // to replace the name here to use the customized Kerberos + DT service
+        // instead of the standard Kerberos handler.
+        Properties properties = super.getConfiguration(configPrefix, filterConfig);
+        if (properties.getProperty(AUTH_TYPE).equals("kerberos")) {
+            properties.setProperty(
+                    AUTH_TYPE, TimelineClientAuthenticationService.class.getName());
+        }
+        return properties;
     }
-    return properties;
-  }
 
 }

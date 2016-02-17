@@ -27,35 +27,33 @@ import org.apache.hadoop.classification.InterfaceStability;
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public class NameValuePair {
-  String name;
-  Object value;
+    String name;
+    Object value;
 
-  public NameValuePair(String name, Object value) {
-    this.name = name;
-    this.value = value;
-  }
+    public NameValuePair(String name, Object value) {
+        this.name = name;
+        this.value = value;
+    }
 
-  /**
-   * Get the name.
-   *
-   * @return The name.
-   */
-  public String getName() {
+    /**
+     * Get the name.
+     * @return The name.
+     */
+    public String getName() {
 
-    return name;
-  }
+        return name;
+    }
 
-  /**
-   * Get the value.
-   *
-   * @return The value.
-   */
-  public Object getValue() {
-    return value;
-  }
+    /**
+     * Get the value.
+     * @return The value.
+     */
+    public Object getValue() {
+        return value;
+    }
 
-  @Override
-  public String toString() {
-    return "{ name: " + name + ", value: " + value + " }";
-  }
+    @Override
+    public String toString() {
+        return "{ name: " + name + ", value: " + value + " }";
+    }
 }
