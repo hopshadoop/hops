@@ -59,6 +59,7 @@ public class FiCaSchedulerAppInfo {
   private AppSchedulingInfo fiCaSchedulerAppToAdd;
   private Map<Integer, Resource> resourcesToUpdate
           = new HashMap<Integer, Resource>();
+  private boolean create = false;
   
   protected ApplicationAttemptId applicationAttemptId;
   private Map<ContainerId, ToPersistContainersInfo> liveContainersToAdd
@@ -120,10 +121,12 @@ public class FiCaSchedulerAppInfo {
     this.applicationAttemptId = applicationAttemptId;
   }
 
-  public FiCaSchedulerAppInfo(SchedulerApplicationAttempt schedulerApp,
-          TransactionStateImpl transactionState) {
-    this.transactionState = transactionState;
-    this.applicationAttemptId = schedulerApp.getApplicationAttemptId();
+  public void createFull(SchedulerApplicationAttempt schedulerApp){
+    this.create = true;
+    updateFull(schedulerApp);
+  }
+  
+  public void updateFull(SchedulerApplicationAttempt schedulerApp) {
     fiCaSchedulerAppToAdd = new AppSchedulingInfo(applicationAttemptId.
             toString(),
             applicationAttemptId.getApplicationId().toString(),
@@ -468,7 +471,7 @@ public class FiCaSchedulerAppInfo {
   }
 
   public void remove(SchedulerApplicationAttempt schedulerApp) {
-    if (fiCaSchedulerAppToAdd == null) {
+    if (fiCaSchedulerAppToAdd == null || !create) {
       remove = true;
       fiCaSchedulerAppToAdd = new AppSchedulingInfo(applicationAttemptId.
               toString());

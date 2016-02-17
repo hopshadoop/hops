@@ -18,7 +18,9 @@ package io.hops.ha.common;
 import io.hops.exception.StorageException;
 import io.hops.metadata.util.RMStorageFactory;
 import io.hops.metadata.yarn.dal.capacity.CSLeafQueueUserInfoDataAccess;
+import io.hops.metadata.yarn.dal.capacity.CSLeafQueuesPendingAppsDataAccess;
 import io.hops.metadata.yarn.dal.capacity.CSQueueDataAccess;
+import io.hops.metadata.yarn.entity.capacity.LeafQueuePendingApp;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -29,6 +31,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CSQueue;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.LeafQueue;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerApp;
 
 public class CSQueueInfo {
 
@@ -84,12 +87,18 @@ public class CSQueueInfo {
   private Map<String, CSLeafQueueUserInfo> csLeafQueueUserInfoToAdd =
           new HashMap<String, CSLeafQueueUserInfo>();
   private Set<String> usersToRemove = new HashSet<String>();
+  private Map<String, LeafQueuePendingApp> csLeafQueuePendingAppToAdd
+          = new HashMap<String, LeafQueuePendingApp>();
+  private Map<String, LeafQueuePendingApp> csLeafQueuePendingAppToRemove
+          = new HashMap<String, LeafQueuePendingApp>();
 
   public void persist(CSQueueDataAccess csQDA,
           CSLeafQueueUserInfoDataAccess csLeafQUI) throws StorageException {
     persistCSQueueInfoToAdd(csQDA);
     persistCSLeafQueueInfoToAdd(csLeafQUI);
     persistCSLeafQueueUsersToRemove();
+    persistCSLeafQueuesPendingAppToAdd();
+    persistCSLeafQueuesPendingAppToRemove();
   }
 
   private void persistCSQueueInfoToAdd(CSQueueDataAccess QMDA) throws
@@ -187,4 +196,42 @@ public class CSQueueInfo {
     return userInfo;
   }
 
+  public void addCSLeafPendingApp(FiCaSchedulerApp application, String queuePath) {
+    csLeafQueuePendingAppToAdd.put(application.getApplicationAttemptId().
+            toString(),
+            new LeafQueuePendingApp(application.getApplicationAttemptId().
+                    toString(),
+                    queuePath));
+  }
+
+  public void removeCSLeafPendingApp(FiCaSchedulerApp application) {
+    if (csLeafQueuePendingAppToAdd.remove(application.getApplicationAttemptId().
+            toString())
+            == null) {
+      csLeafQueuePendingAppToRemove.put(application.getApplicationAttemptId().
+              toString(),
+              new LeafQueuePendingApp(application.getApplicationAttemptId().
+                      toString()));
+    }
+  }
+
+  private void persistCSLeafQueuesPendingAppToAdd() throws StorageException {
+    if (!csLeafQueuePendingAppToAdd.isEmpty()) {
+      CSLeafQueuesPendingAppsDataAccess DA
+              = (CSLeafQueuesPendingAppsDataAccess) RMStorageFactory.
+              getDataAccess(
+                      CSLeafQueuesPendingAppsDataAccess.class);
+      DA.addAll(csLeafQueuePendingAppToAdd.values());
+    }
+  }
+
+  private void persistCSLeafQueuesPendingAppToRemove() throws StorageException {
+    if (!csLeafQueuePendingAppToRemove.isEmpty()) {
+      CSLeafQueuesPendingAppsDataAccess DA
+              = (CSLeafQueuesPendingAppsDataAccess) RMStorageFactory.
+              getDataAccess(
+                      CSLeafQueuesPendingAppsDataAccess.class);
+      DA.removeAll(csLeafQueuePendingAppToRemove.values());
+    }
+  }
 }

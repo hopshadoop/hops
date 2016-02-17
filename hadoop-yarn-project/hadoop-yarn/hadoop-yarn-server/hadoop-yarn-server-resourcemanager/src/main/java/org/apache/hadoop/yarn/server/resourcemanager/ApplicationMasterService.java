@@ -734,7 +734,8 @@ public class ApplicationMasterService extends AbstractService
               getAllocatedContainers()) {
         NMToken nmToken = rmContext.getNMTokenSecretManager()
                 .createAndGetNMToken(state.getAppSchedulingInfo(
-                                attemptId.getApplicationId().toString()).
+                                attemptId.getApplicationId().toString()).get(
+                                attemptId.toString()).
                         getUser(),
                         attemptId,
                         container);

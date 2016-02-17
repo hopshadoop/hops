@@ -300,7 +300,8 @@ public class SchedulerApplicationAttempt implements Recoverable{
       resetReReservations(priority, transactionState);
     } else {
       ((TransactionStateImpl) transactionState).getSchedulerApplicationInfos(
-              this.appSchedulingInfo.applicationId).setFiCaSchedulerAppInfo(this);
+              this.appSchedulingInfo.applicationId).getFiCaSchedulerAppInfo(this.getApplicationAttemptId()).updateFull(this);
+              
       // Note down the re-reservation
       addReReservation(priority, transactionState);
     }
@@ -418,8 +419,10 @@ public class SchedulerApplicationAttempt implements Recoverable{
 
   public void recover(RMStateStore.RMState state) throws IOException{
     io.hops.metadata.yarn.entity.AppSchedulingInfo hopInfo =
-            state.getAppSchedulingInfo(
-                    appSchedulingInfo.applicationId.toString());
+            state.
+            getAppSchedulingInfo(
+                    appSchedulingInfo.applicationId.toString()).get(this.
+                    getApplicationAttemptId().toString());
     this.appSchedulingInfo.recover(hopInfo, state);
     ApplicationAttemptId applicationAttemptId =
         this.appSchedulingInfo.getApplicationAttemptId();

@@ -50,6 +50,7 @@ import io.hops.metadata.yarn.dal.ResourceRequestDataAccess;
 import io.hops.metadata.yarn.dal.SchedulerApplicationDataAccess;
 import io.hops.metadata.yarn.dal.UpdatedContainerInfoDataAccess;
 import io.hops.metadata.yarn.dal.capacity.CSLeafQueueUserInfoDataAccess;
+import io.hops.metadata.yarn.dal.capacity.CSLeafQueuesPendingAppsDataAccess;
 import io.hops.metadata.yarn.dal.capacity.CSQueueDataAccess;
 import io.hops.metadata.yarn.dal.capacity.FiCaSchedulerAppReservedContainersDataAccess;
 import io.hops.metadata.yarn.dal.fair.AppSchedulableDataAccess;
@@ -644,6 +645,14 @@ public static Map<String, List<ResourceRequest>> getAllResourceRequestsFullTrans
         .handle();
   }
 
+  public static Map<String, Set<String>> getCSLeafQueuesPendingApps()
+          throws IOException {
+    CSLeafQueuesPendingAppsDataAccess DA
+            = (CSLeafQueuesPendingAppsDataAccess) YarnAPIStorageFactory
+            .getDataAccess(CSLeafQueuesPendingAppsDataAccess.class);
+    return DA.getAll();
+  }
+  
   public static Map<String, List<AppSchedulingInfoBlacklist>> getAllBlackLists()
           throws IOException {
     AppSchedulingInfoBlacklistDataAccess DA

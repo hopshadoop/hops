@@ -1029,30 +1029,32 @@ public class FifoScheduler extends AbstractYarnScheduler
         ApplicationId appId = ConverterUtils.toApplicationId(fsapp.getAppid());
 
         //retrieve HopSchedulerApplication
-        SchedulerApplication hopSchedulerApplication =
-            state.getSchedulerApplication(fsapp.getAppid());
+        SchedulerApplication hopSchedulerApplication = state.
+                getSchedulerApplication(fsapp.getAppid());
         //construct SchedulerAppliaction
-        org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication
-            app =
-            new org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication(
-                DEFAULT_QUEUE, hopSchedulerApplication.getUser());
+        org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication app
+                = new org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication(
+                        DEFAULT_QUEUE, hopSchedulerApplication.getUser());
 
         //retrieve HopApplicationAttemptId for this specific appId
-        AppSchedulingInfo hopFiCaSchedulerApp =
-            state.getAppSchedulingInfo(fsapp.getAppid());
-        if (hopFiCaSchedulerApp != null) {
-          //construct ApplicationAttemptId
-          ApplicationAttemptId appAttemptId = ConverterUtils
-              .toApplicationAttemptId(hopFiCaSchedulerApp.getSchedulerAppId());
-
-
-          FiCaSchedulerApp appAttempt =
-            new FiCaSchedulerApp(appAttemptId,
-                  hopFiCaSchedulerApp.getUser(),
-                  DEFAULT_QUEUE, activeUsersManager, this.rmContext,
-                  maxAllocatedContainersPerRequest);
-          appAttempt.recover(state);
-          app.setCurrentAppAttempt(appAttempt, null);
+        for (AppSchedulingInfo hopFiCaSchedulerApp : state.getAppSchedulingInfo(
+                fsapp.getAppid()).values()) {
+          if (hopFiCaSchedulerApp != null) {
+            //construct ApplicationAttemptId
+            ApplicationAttemptId appAttemptId = ConverterUtils
+                    .toApplicationAttemptId(hopFiCaSchedulerApp.
+                            getSchedulerAppId());
+            if (app.getCurrentAppAttempt() == null
+                    || app.getCurrentAppAttempt().getApplicationAttemptId().
+                    compareTo(appAttemptId) < 0) {
+              FiCaSchedulerApp appAttempt = new FiCaSchedulerApp(appAttemptId,
+                      hopFiCaSchedulerApp.getUser(),
+                      DEFAULT_QUEUE, activeUsersManager, this.rmContext,
+                      maxAllocatedContainersPerRequest);
+              appAttempt.recover(state);
+              app.setCurrentAppAttempt(appAttempt, null);
+            }
+          }
         }
         applications.put(appId, app);
 

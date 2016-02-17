@@ -380,9 +380,12 @@ public class NDBRMStateStore extends RMStateStore {
   private void loadAppSchedulingInfos(RMState rmState) throws IOException {
     List<AppSchedulingInfo> appSchedulingInfosList =
         RMUtilities.getAppSchedulingInfos();
-    rmState.appSchedulingInfos = new HashMap<String, AppSchedulingInfo>();
+    rmState.appSchedulingInfos = new HashMap<String, Map<String,AppSchedulingInfo>>();
     for (AppSchedulingInfo info : appSchedulingInfosList) {
-      rmState.appSchedulingInfos.put(info.getAppId(), info);
+      if(rmState.appSchedulingInfos.get(info.getAppId())==null){
+        rmState.appSchedulingInfos.put(info.getAppId(), new HashMap<String, AppSchedulingInfo>());
+      }
+      rmState.appSchedulingInfos.get(info.getAppId()).put(info.getSchedulerAppId(), info);
     }
   }
   
@@ -424,6 +427,10 @@ public class NDBRMStateStore extends RMStateStore {
   
   private void loadAllQueueMetrics(RMState rmState) throws IOException {
     rmState.allQueueMetrics = RMUtilities.getAllQueueMetrics();
+  }
+  
+  private void loadCSLeafQueuesPendingApps(RMState rmState) throws IOException{
+    rmState.csLeafQueuesPendingApps = RMUtilities.getCSLeafQueuesPendingApps();
   }
   
   private void loadNodeHeartBeatResponses(RMState rmState) throws IOException {
