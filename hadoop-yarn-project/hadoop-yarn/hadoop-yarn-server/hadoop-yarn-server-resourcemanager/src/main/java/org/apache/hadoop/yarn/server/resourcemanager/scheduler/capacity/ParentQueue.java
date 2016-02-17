@@ -156,7 +156,7 @@ public class ParentQueue implements CSQueue {
     this.queueInfo.setQueueName(queueName);
     this.queueInfo.setChildQueues(new ArrayList<QueueInfo>());
 
-    setupQueueConfigs(cs.getClusterResources(), capacity, absoluteCapacity,
+    setupQueueConfigs(cs.getClusterResource(), capacity, absoluteCapacity,
             maximumCapacity, absoluteMaxCapacity, state, acls);
 
     this.queueComparator = cs.getQueueComparator();
