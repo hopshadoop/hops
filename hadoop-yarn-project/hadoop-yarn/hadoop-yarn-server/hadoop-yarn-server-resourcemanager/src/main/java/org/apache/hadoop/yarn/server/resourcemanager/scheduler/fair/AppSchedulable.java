@@ -276,6 +276,12 @@ public class AppSchedulable extends Schedulable {
       // Inform the node
       node.allocateContainer(app.getApplicationId(), allocatedContainer);
 
+      // If this container is used to run AM, update the leaf queue's AM usage
+      if (app.getLiveContainers().size() == 1 &&
+              !app.getUnmanagedAM()) {
+        queue.addAMResourceUsage(container.getResource());
+      }
+
       return container.getResource();
     } else {
       // The desired container won't fit here, so reserve
@@ -306,6 +312,14 @@ public class AppSchedulable extends Schedulable {
         }
         
         app.addSchedulingOpportunity(priority, transactionState);
+
+        // Check the AM resource usage for the leaf queue
+        if (app.getLiveContainers().size() == 0 &&
+                !app.getUnmanagedAM()) {
+          if (!queue.canRunAppAM(app.getAMResource())) {
+            return Resources.none();
+          }
+        }
 
         ResourceRequest rackLocalRequest =
             app.getResourceRequest(priority, node.getRackName());

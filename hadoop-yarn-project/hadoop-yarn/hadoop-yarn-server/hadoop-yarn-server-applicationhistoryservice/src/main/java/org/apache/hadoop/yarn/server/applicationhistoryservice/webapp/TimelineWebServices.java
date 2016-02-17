@@ -348,8 +348,9 @@ public class TimelineWebServices {
             new EntityIdentifier(entity.getEntityId(), entity.getEntityType());
 
             // check if there is existing entity
+        TimelineEntity existingEntity = null;
             try {
-                TimelineEntity existingEntity =
+                existingEntity =
                         store.getEntity(entityID.getId(), entityID.getType(),
                                 EnumSet.of(Field.PRIMARY_FILTERS));
                 if (existingEntity != null
@@ -371,10 +372,14 @@ public class TimelineWebServices {
                 continue;
             }
 
-          // inject owner information for the access check
+          // inject owner information for the access check if this is the first
+          // time to post the entity, in case it's the admin who is updating
+          // the timeline data.
           try {
+            if (existingEntity == null) {
               injectOwnerInfo(entity,
-                      callerUGI == null ? "" : callerUGI.getShortUserName());
+                  callerUGI == null ? "" : callerUGI.getShortUserName());
+          }
           } catch (YarnException e) {
 
           // Skip the entity which messes up the primary filter and record the
@@ -519,7 +524,7 @@ public class TimelineWebServices {
                                       String owner) throws YarnException {
       if (timelineEntity.getPrimaryFilters() != null &&
               timelineEntity.getPrimaryFilters().containsKey(
-                      TimelineStore.SystemFilter.ENTITY_OWNER)) {
+                      TimelineStore.SystemFilter.ENTITY_OWNER.toString())) {
           throw new YarnException(
                   "User should not use the timeline system filter key: "
                           + TimelineStore.SystemFilter.ENTITY_OWNER);

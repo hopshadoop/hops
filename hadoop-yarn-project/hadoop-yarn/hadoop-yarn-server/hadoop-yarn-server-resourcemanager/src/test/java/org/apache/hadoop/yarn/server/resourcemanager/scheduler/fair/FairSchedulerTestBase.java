@@ -20,16 +20,17 @@ package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair;
 import io.hops.ha.common.TransactionState;
 import io.hops.ha.common.TransactionStateImpl;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
-import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.hadoop.yarn.api.records.ContainerId;
-import org.apache.hadoop.yarn.api.records.Priority;
-import org.apache.hadoop.yarn.api.records.ResourceRequest;
+import org.apache.hadoop.yarn.api.records.*;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
+import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.AppAddedSchedulerEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.AppAttemptAddedSchedulerEvent;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.apache.hadoop.yarn.util.Clock;
 
@@ -172,5 +173,23 @@ public class FairSchedulerTestBase {
         ask.add(request);
         scheduler.allocate(attId, ask,  new ArrayList<ContainerId>(), null, null,
                 new TransactionStateImpl(TransactionState.TransactionType.RM));
+    }
+
+    protected void createApplicationWithAMResource(ApplicationAttemptId attId,
+        String queue, String user, Resource amResource) {
+        RMContext rmContext = resourceManager.getRMContext();
+        RMApp rmApp = new RMAppImpl(attId.getApplicationId(), rmContext, conf,
+                null, null, null, ApplicationSubmissionContext.newInstance(null, null,
+                null, null, null, false, false, 0, amResource, null), null, null,
+                0, null, null, null);
+        rmContext.getRMApps().put(attId.getApplicationId(), rmApp);
+        AppAddedSchedulerEvent appAddedSchedulerEvent = new AppAddedSchedulerEvent(
+                attId.getApplicationId(), queue, user,
+                new TransactionStateImpl(TransactionState.TransactionType.RM));
+        scheduler.handle(appAddedSchedulerEvent);
+        AppAttemptAddedSchedulerEvent attemptAddedEvent =
+                new AppAttemptAddedSchedulerEvent(attId, false,
+                        new TransactionStateImpl(TransactionState.TransactionType.RM));
+        scheduler.handle(attemptAddedEvent);
     }
 }

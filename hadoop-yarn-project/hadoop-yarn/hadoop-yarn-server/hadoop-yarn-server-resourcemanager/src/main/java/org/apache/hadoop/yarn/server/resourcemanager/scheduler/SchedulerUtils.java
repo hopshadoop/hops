@@ -169,7 +169,7 @@ public class SchedulerUtils {
       Resource deltaResource =
           Resources.subtract(newAvailableResource, oldAvailableResource);
       // Reflect resource change to scheduler node.
-      node.applyDeltaOnAvailableResource(deltaResource, ts);
+      node.applyDeltaOnAvailableResource(deltaResource);
       // Reflect resource change to clusterResource.
       Resources.addTo(clusterResource, deltaResource);
       // TODO process resource over-commitment case (allocated containers
