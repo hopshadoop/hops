@@ -775,15 +775,14 @@ public class DatanodeManager {
     }
 
     // register new datanode
-    DatanodeDescriptor nodeDescr =
-        new DatanodeDescriptor(nodeReg, NetworkTopology.DEFAULT_RACK);
+    DatanodeDescriptor nodeDescr = new DatanodeDescriptor(nodeReg, NetworkTopology.DEFAULT_RACK);
 
     // TODO check if we need this HDP_2.6
     // Update all storages in this datanode
-    for(DatanodeStorageInfo storage: getDatanode(nodeDescr.getDatanodeUuid())
-        .getStorageInfos()) {
-      storageIdMap.update(storage);
-    }
+//    for(DatanodeStorageInfo storage: getDatanode(nodeDescr.getDatanodeUuid())
+//        .getStorageInfos()) {
+//      storageIdMap.update(storage);
+//    }
 
     resolveNetworkLocation(nodeDescr);
     addDatanode(nodeDescr);
@@ -1402,6 +1401,10 @@ public class DatanodeManager {
    * Get a datanode descriptor given corresponding DatanodeUUID
    */
   public DatanodeDescriptor getDatanode(final String datanodeUuid) {
+    if (datanodeUuid == null) {
+      return null;
+    }
+
     return datanodeMap.get(datanodeUuid);
   }
   

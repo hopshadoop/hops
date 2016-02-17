@@ -303,6 +303,9 @@ public class BlockManager {
     excessReplicateMap = new ExcessReplicasMap(datanodeManager);
     
     blocksMap = new BlocksMap(datanodeManager);
+    blockplacement = BlockPlacementPolicy.getInstance(
+        conf, stats, datanodeManager.getNetworkTopology(),
+        datanodeManager.getHost2DatanodeMap());
     pendingReplications = new PendingReplicationBlocks(conf.getInt(
         DFSConfigKeys.DFS_NAMENODE_REPLICATION_PENDING_TIMEOUT_SEC_KEY,
         DFSConfigKeys.DFS_NAMENODE_REPLICATION_PENDING_TIMEOUT_SEC_DEFAULT) *
@@ -1582,9 +1585,10 @@ public class BlockManager {
         getDatanodeDescriptors(favoredNodes);
 
     // TODO HDP_2.6 this is a hardcoded blockstoragepolicy... :-(
+    BlockStoragePolicy policy = BlockStoragePolicy.DEFAULT;
     final DatanodeStorageInfo[] targets = blockplacement.chooseTarget(src,
         numOfReplicas, client, excludedNodes, blocksize,
-        favoredDatanodeDescriptors, BlockStoragePolicy.DEFAULT);
+        favoredDatanodeDescriptors, policy);
 
     if (targets.length < minReplication) {
       throw new IOException("File " + src + " could only be replicated to "
@@ -1812,22 +1816,24 @@ public class BlockManager {
    * Update the (storage-->block list) and (block-->storage list) maps.
    */
   public void processReport(final DatanodeID nodeID,
-      final DatanodeStorage dnStorage,
+      final DatanodeStorage storage,
       final BlockListAsLongs newReport) throws IOException {
 
     final long startTime = Time.now(); //after acquiring write lock
-    final DatanodeStorageInfo storage = datanodeManager.getStorage(
-        dnStorage.getStorageID());
 
-    if(storage == null) {
-      throw new IOException("ProcessReport from dead or unregistered storage " +
-          "" + dnStorage.getStorageID());
-    }
-
-    final DatanodeDescriptor node = storage.getDatanodeDescriptor();
+    DatanodeDescriptor node = datanodeManager.getDatanode(nodeID);
     if (node == null || !node.isAlive) {
       throw new IOException(
           "ProcessReport from dead or unregistered node: " + nodeID);
+    }
+
+    // To minimize startup time, we discard any second (or later) block reports
+    // that we receive while still in startup phase.
+    DatanodeStorageInfo storageInfo = node.getStorageInfo(storage.getStorageID());
+
+    if (storageInfo == null) {
+      // We handle this for backwards compatibility.
+      storageInfo = node.updateStorage(storage);
     }
 
     // To minimize startup time, we discard any second (or later) block reports
@@ -1837,16 +1843,10 @@ public class BlockManager {
           "discarded non-initial block report from " + nodeID +
           " because namenode still in startup phase");
       return;
-    }
-
-    // Get the storageinfo object that we are updating in this processreport
-    DatanodeDescriptor datanode = datanodeManager.getDatanode(nodeID);
-    DatanodeStorageInfo storageInfo = datanode.getStorageInfo(storage.getStorageID());
-
-    if (node.numBlocks() == 0) {
+    } else if (node.isFirstBlockReport()) {
       // The first block report can be processed a lot more efficiently than
       // ordinary block reports.  This shortens restart times.
-      processFirstBlockReport(storage, newReport);
+      processFirstBlockReport(storageInfo, newReport);
     } else {
       processReport(node, storageInfo, newReport);
     }
