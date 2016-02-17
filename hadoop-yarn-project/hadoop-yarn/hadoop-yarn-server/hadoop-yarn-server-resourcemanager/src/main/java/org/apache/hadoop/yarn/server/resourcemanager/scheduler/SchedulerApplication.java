@@ -25,11 +25,11 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppState;
 
 @Private
 @Unstable
-public class SchedulerApplication {
+public class SchedulerApplication<T extends SchedulerApplicationAttempt> {
 
   private Queue queue;//recovered
   private final String user;//recovered
-  private SchedulerApplicationAttempt currentAttempt;
+  private T currentAttempt;
       //recovered in fifoscheduler
 
   public SchedulerApplication(Queue queue, String user) {
@@ -49,11 +49,11 @@ public class SchedulerApplication {
     return user;
   }
 
-  public SchedulerApplicationAttempt getCurrentAppAttempt() {
+  public T getCurrentAppAttempt() {
     return currentAttempt;
   }
 
-  public void setCurrentAppAttempt(SchedulerApplicationAttempt currentAttempt,
+  public void setCurrentAppAttempt(T currentAttempt,
       TransactionState ts) {
     if (this.currentAttempt != null && ts != null) {
       ((TransactionStateImpl) ts).getSchedulerApplicationInfos(

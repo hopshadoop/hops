@@ -19,7 +19,6 @@ package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fifo;
 import com.google.common.annotations.VisibleForTesting;
 import io.hops.ha.common.TransactionState;
 import io.hops.ha.common.TransactionStateImpl;
-import io.hops.ha.common.transactionStateWrapper;
 import io.hops.metadata.yarn.entity.AppSchedulingInfo;
 import io.hops.metadata.yarn.entity.FiCaSchedulerNode;
 import io.hops.metadata.yarn.entity.Resource;
@@ -33,7 +32,6 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.AccessControlList;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.hadoop.yarn.api.records.ApplicationResourceUsageReport;
 import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
@@ -69,10 +67,8 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ActiveUsersManage
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.Allocation;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.NodeType;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.Queue;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerAppReport;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerAppUtils;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicationAttempt.ContainersAndNMTokensAllocation;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerNodeReport;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerUtils;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerApp;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.AppAddedSchedulerEvent;
@@ -100,7 +96,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.QueueMetrics;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication;
@@ -108,7 +103,9 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicat
 @LimitedPrivate("yarn")
 @Evolving
 @SuppressWarnings("unchecked")
-public class FifoScheduler extends AbstractYarnScheduler
+public class FifoScheduler extends
+        AbstractYarnScheduler<FiCaSchedulerApp, org.apache.hadoop.yarn.server.resourcemanager
+                .scheduler.common.fica.FiCaSchedulerNode>
     implements Configurable {
 
   private static final Log LOG = LogFactory.getLog(FifoScheduler.class);
@@ -116,14 +113,8 @@ public class FifoScheduler extends AbstractYarnScheduler
   private static final RecordFactory recordFactory =
       RecordFactoryProvider.getRecordFactory(null);//recovered
   Configuration conf;//recovered
-  protected Map<NodeId, org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode>
-      nodes =
-      new ConcurrentHashMap<NodeId, org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode>();
-      //recovered
-  private org.apache.hadoop.yarn.api.records.Resource minimumAllocation;
-      //recovered
-  private org.apache.hadoop.yarn.api.records.Resource maximumAllocation;
-      //recovered
+
+    //recovered
   private boolean usePortForNodeName;//recovered
   private ActiveUsersManager activeUsersManager;//recovered
   private static final String DEFAULT_QUEUE_NAME = "default";//recovered
@@ -200,7 +191,7 @@ public class FifoScheduler extends AbstractYarnScheduler
     validateConf(conf);
     //Use ConcurrentSkipListMap because applications need to be ordered
     this.applications =
-        new ConcurrentSkipListMap<ApplicationId, SchedulerApplication >();
+        new ConcurrentSkipListMap<ApplicationId, SchedulerApplication<FiCaSchedulerApp>>();
     this.minimumAllocation =
         Resources.createResource(conf.getInt(
             YarnConfiguration.RM_SCHEDULER_MINIMUM_ALLOCATION_MB,
@@ -269,18 +260,8 @@ public class FifoScheduler extends AbstractYarnScheduler
   }
 
   @Override
-  public org.apache.hadoop.yarn.api.records.Resource getMinimumResourceCapability() {
-    return minimumAllocation;
-  }
-
-  @Override
   public int getNumClusterNodes() {
     return nodes.size();
-  }
-
-  @Override
-  public org.apache.hadoop.yarn.api.records.Resource getMaximumResourceCapability() {
-    return maximumAllocation;
   }
 
   @Override
@@ -362,31 +343,6 @@ public class FifoScheduler extends AbstractYarnScheduler
     }
   }
 
-  @VisibleForTesting
-  FiCaSchedulerApp getApplicationAttempt(
-      ApplicationAttemptId applicationAttemptId) {
-    org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication
-        app = applications.get(applicationAttemptId.getApplicationId());
-    if (app != null) {
-      return (FiCaSchedulerApp) app.getCurrentAppAttempt();
-    }
-    return null;
-  }
-
-  @Override
-  public SchedulerAppReport getSchedulerAppInfo(
-      ApplicationAttemptId applicationAttemptId) {
-    FiCaSchedulerApp app = getApplicationAttempt(applicationAttemptId);
-    return app == null ? null : new SchedulerAppReport(app);
-  }
-
-  @Override
-  public ApplicationResourceUsageReport getAppResourceUsageReport(
-      ApplicationAttemptId applicationAttemptId) {
-    FiCaSchedulerApp app = getApplicationAttempt(applicationAttemptId);
-    return app == null ? null : app.getResourceUsageReport();
-  }
-
   private org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode getNode(
       NodeId nodeId) {
     return nodes.get(nodeId);
@@ -395,9 +351,9 @@ public class FifoScheduler extends AbstractYarnScheduler
   @VisibleForTesting
   public synchronized void addApplication(ApplicationId applicationId,
       String queue, String user, TransactionState transactionState) {
-    org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication
+    org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication<FiCaSchedulerApp>
         application =
-        new org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication(
+        new org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication<FiCaSchedulerApp>(
             DEFAULT_QUEUE, user);
     applications.put(applicationId, application);
     if (transactionState != null) {
@@ -418,7 +374,7 @@ public class FifoScheduler extends AbstractYarnScheduler
       ApplicationAttemptId appAttemptId,
       boolean transferStateFromPreviousAttempt,
       TransactionState transactionState) {
-    org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication
+    org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication<FiCaSchedulerApp>
         application = applications.get(appAttemptId.getApplicationId());
     String user = application.getUser();
     // TODO: Fix store
@@ -442,7 +398,7 @@ public class FifoScheduler extends AbstractYarnScheduler
 
   private synchronized void doneApplication(ApplicationId applicationId,
       RMAppState finalState, TransactionState transactionState) {
-    org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication
+    org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication<FiCaSchedulerApp>
         application = applications.get(applicationId);
     if (application == null) {
       LOG.warn("Couldn't find application " + applicationId);
@@ -467,7 +423,7 @@ public class FifoScheduler extends AbstractYarnScheduler
       RMAppAttemptState rmAppAttemptFinalState, boolean keepContainers,
       TransactionState transactionState) throws IOException {
     FiCaSchedulerApp attempt = getApplicationAttempt(applicationAttemptId);
-    org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication
+    org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication<FiCaSchedulerApp>
         application = applications.get(applicationAttemptId.getApplicationId());
     if (application == null || attempt == null) {
       throw new IOException(
@@ -507,13 +463,14 @@ public class FifoScheduler extends AbstractYarnScheduler
             " #applications=" + applications.size());
 
     // Try to assign containers to applications in fifo order
-    for (Map.Entry<ApplicationId, org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication> e : applications
+    for (Map.Entry<ApplicationId, org.apache.hadoop.yarn.server.resourcemanager
+            .scheduler.SchedulerApplication<FiCaSchedulerApp>> e : applications
         .entrySet()) {
-      FiCaSchedulerApp application =
-          (FiCaSchedulerApp) e.getValue().getCurrentAppAttempt();
+      FiCaSchedulerApp application = e.getValue().getCurrentAppAttempt();
       if (application == null) {
         continue;
       }
+
       LOG.debug("pre-assignContainers");
       application.showRequests();
       synchronized (application) {
@@ -551,7 +508,8 @@ public class FifoScheduler extends AbstractYarnScheduler
 
     // Update the applications' headroom to correctly take into
     // account the containers assigned in this update.
-    for (org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication application : applications
+    for (org.apache.hadoop.yarn.server.resourcemanager.scheduler
+            .SchedulerApplication<FiCaSchedulerApp> application : applications
         .values()) {
       FiCaSchedulerApp attempt =
           (FiCaSchedulerApp) application.getCurrentAppAttempt();
@@ -959,14 +917,10 @@ public class FifoScheduler extends AbstractYarnScheduler
 
   }
 
-  private org.apache.hadoop.yarn.api.records.Resource clusterResource =
-      recordFactory
-          .newRecordInstance(org.apache.hadoop.yarn.api.records.Resource.class);
       //recovered
   private org.apache.hadoop.yarn.api.records.Resource usedResource =
       recordFactory
           .newRecordInstance(org.apache.hadoop.yarn.api.records.Resource.class);
-      //recovered
 
   private synchronized void removeNode(RMNode nodeInfo,
       TransactionState transactionState) {
@@ -1126,27 +1080,9 @@ public class FifoScheduler extends AbstractYarnScheduler
   }
 
   @Override
-  public synchronized SchedulerNodeReport getNodeReport(NodeId nodeId) {
-    org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode
-        node = getNode(nodeId);
-    return node == null ? null : new SchedulerNodeReport(node);
-  }
-
-  @Override
   public RMContainer getRMContainer(ContainerId containerId) {
     FiCaSchedulerApp attempt = getCurrentAttemptForContainer(containerId);
     return (attempt == null) ? null : attempt.getRMContainer(containerId);
-  }
-
-  private FiCaSchedulerApp getCurrentAttemptForContainer(
-      ContainerId containerId) {
-    org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication
-        app = applications
-        .get(containerId.getApplicationAttemptId().getApplicationId());
-    if (app != null) {
-      return (FiCaSchedulerApp) app.getCurrentAppAttempt();
-    }
-    return null;
   }
 
   @Override
@@ -1166,7 +1102,8 @@ public class FifoScheduler extends AbstractYarnScheduler
     if (queueName.equals(DEFAULT_QUEUE.getQueueName())) {
       List<ApplicationAttemptId> attempts =
           new ArrayList<ApplicationAttemptId>(applications.size());
-      for (org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication app : applications
+      for (org.apache.hadoop.yarn.server.resourcemanager.scheduler
+              .SchedulerApplication<FiCaSchedulerApp> app : applications
           .values()) {
         attempts.add(app.getCurrentAppAttempt().getApplicationAttemptId());
       }

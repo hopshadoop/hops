@@ -35,6 +35,7 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ApplicationResourceUsageReport;
+import org.apache.hadoop.yarn.api.records.ApplicationSubmissionContext;
 import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.NMToken;
@@ -93,6 +94,10 @@ public class SchedulerApplicationAttempt implements Recoverable{
       org.apache.hadoop.yarn.api.records.Resource.newInstance(0, 0);//recovered
   protected org.apache.hadoop.yarn.api.records.Resource currentConsumption =
       org.apache.hadoop.yarn.api.records.Resource.newInstance(0, 0);//recovered
+
+  private org.apache.hadoop.yarn.api.records.Resource amResource;
+  private boolean unmanagedAM = true;
+
   protected List<RMContainer> newlyAllocatedContainers =
       new ArrayList<RMContainer>();//recovered
   /**
@@ -119,6 +124,18 @@ public class SchedulerApplicationAttempt implements Recoverable{
             applicationAttemptId, user, queue, activeUsersManager);
     this.queue = queue;
     this.maxAllocatedContainersPerRequest = maxAllocatedContainersPerRequest;
+
+    if (rmContext != null && rmContext.getRMApps() != null &&
+            rmContext.getRMApps()
+            .containsKey(applicationAttemptId.getApplicationId())) {
+      ApplicationSubmissionContext appSubmissionContext =
+              rmContext.getRMApps().get(applicationAttemptId.getApplicationId())
+              .getApplicationSubmissionContext();
+      if (appSubmissionContext != null) {
+        amResource = appSubmissionContext.getResource();
+        unmanagedAM = appSubmissionContext.getUnmanagedAM();
+      }
+    }
   }
 
   /**
@@ -194,6 +211,14 @@ public class SchedulerApplicationAttempt implements Recoverable{
 
   public String getQueueName() {
     return appSchedulingInfo.getQueueName();
+  }
+
+  public org.apache.hadoop.yarn.api.records.Resource getAMResource() {
+    return amResource;
+  }
+
+  public boolean getUnmanagedAM() {
+    return unmanagedAM;
   }
 
   public synchronized RMContainer getRMContainer(ContainerId id) {

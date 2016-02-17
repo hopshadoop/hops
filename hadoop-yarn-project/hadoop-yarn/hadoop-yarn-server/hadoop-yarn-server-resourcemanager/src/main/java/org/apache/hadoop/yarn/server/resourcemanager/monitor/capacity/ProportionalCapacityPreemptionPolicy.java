@@ -169,12 +169,16 @@ public class ProportionalCapacityPreemptionPolicy
     observeOnly = config.getBoolean(OBSERVE_ONLY, false);
     rc = scheduler.getResourceCalculator();
   }
-
+  
+  @VisibleForTesting
+  public ResourceCalculator getResourceCalculator() {
+    return rc;
+  }
   @Override
   public void editSchedule(TransactionState transactionState) {
     CSQueue root = scheduler.getRootQueue();
     Resource clusterResources =
-        Resources.clone(scheduler.getClusterResources());
+        Resources.clone(scheduler.getClusterResource());
     containerBasedPreemptOrKill(root, clusterResources, transactionState);
   }
 

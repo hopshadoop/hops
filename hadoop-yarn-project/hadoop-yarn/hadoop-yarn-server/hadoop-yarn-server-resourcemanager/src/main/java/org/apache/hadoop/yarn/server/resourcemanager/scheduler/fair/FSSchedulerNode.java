@@ -19,7 +19,6 @@
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair;
 
 import io.hops.ha.common.TransactionState;
-import io.hops.transaction.context.TransactionsStats;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -27,21 +26,12 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.Container;
-import org.apache.hadoop.yarn.api.records.ContainerId;
-import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.Resource;
-import org.apache.hadoop.yarn.factories.RecordFactory;
-import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicationAttempt;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerNode;
-import org.apache.hadoop.yarn.util.resource.Resources;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 @Private
 @Unstable
@@ -49,214 +39,89 @@ public class FSSchedulerNode extends SchedulerNode {
 
   private static final Log LOG = LogFactory.getLog(FSSchedulerNode.class);
 
-  private static final RecordFactory recordFactory =
-      RecordFactoryProvider.getRecordFactory(null);
-
-  private Resource availableResource;
-  private Resource usedResource =
-      recordFactory.newRecordInstance(Resource.class);
-  private Resource totalResourceCapability;
-
-  private volatile int numContainers;
-
-  private RMContainer reservedContainer;
   private AppSchedulable reservedAppSchedulable;
-  
-  /* set of containers that are allocated containers */
-  private final Map<ContainerId, RMContainer> launchedContainers =
-      new HashMap<ContainerId, RMContainer>();
-  
-  private final RMNode rmNode;
-  private final String nodeName;
 
   public FSSchedulerNode(RMNode node, boolean usePortForNodeName) {
-    this.rmNode = node;
-    this.availableResource = Resources.clone(node.getTotalCapability());
-    totalResourceCapability = Resource
-        .newInstance(node.getTotalCapability().getMemory(),
-            node.getTotalCapability().getVirtualCores());
-    if (usePortForNodeName) {
-      nodeName = rmNode.getHostName() + ":" + node.getNodeID().getPort();
-    } else {
-      nodeName = rmNode.getHostName();
-    }
+    super(node, usePortForNodeName);
   }
 
-  public RMNode getRMNode() {
-    return rmNode;
-  }
-
-  public NodeId getNodeID() {
-    return rmNode.getNodeID();
-  }
-
-  public String getHttpAddress() {
-    return rmNode.getHttpAddress();
-  }
-
-  @Override
-  public String getNodeName() {
-    return nodeName;
-  }
-
-  @Override
-  public String getRackName() {
-    return rmNode.getRackName();
-  }
-
-  /**
-   * The Scheduler has allocated containers on this node to the
-   * given application.
-   *
-   * @param applicationId
-   *     application
-   * @param rmContainer
-   *     allocated container
-   */
+  // Until we implement RECOVERY for Fair Scheduler
+  // Normally FSSchedulerNode and FiCaSchedulerNode should use the same
+  // signature for allocateContainer inherited from SchedulerNode,
+  // but FSSchedulerNode currently does not support recovery
   public synchronized void allocateContainer(ApplicationId applicationId,
-      RMContainer rmContainer) {
-    Container container = rmContainer.getContainer();
-    deductAvailableResource(container.getResource());
-    ++numContainers;
-    
-    launchedContainers.put(container.getId(), rmContainer);
-
-    LOG.info("Assigned container " + container.getId() +
-        " of capacity " + container.getResource() + " on host " +
-        rmNode.getNodeAddress() +
-        ", which currently has " + numContainers + " containers, " +
-        getUsedResource() + " used and " +
-        getAvailableResource() + " available");
+                                             RMContainer rmContainer) {
+    allocateContainer(applicationId, rmContainer, null);
   }
 
-  @Override
-  public synchronized Resource getAvailableResource() {
-    return availableResource;
-  }
-
-  @Override
-  public synchronized Resource getUsedResource() {
-    return usedResource;
-  }
-
-  private synchronized boolean isValidContainer(Container c) {
-    if (launchedContainers.containsKey(c.getId())) {
-      return true;
-    }
-    return false;
-  }
-
-  private synchronized void updateResource(Container container) {
-    addAvailableResource(container.getResource());
-    --numContainers;
-  }
-  
-  /**
-   * Release an allocated container on this node.
-   *
-   * @param container
-   *     container to be released
-   */
+  // Until we implement RECOVERY for Fair Scheduler
+  // Normally FSSchedulerNode and FiCaSchedulerNode should use the same
+  // signature for releaseContainer inherited from SchedulerNode,
+  // but FSSchedulerNode currently does not support recovery
   public synchronized void releaseContainer(Container container) {
-    if (!isValidContainer(container)) {
-      LOG.error("Invalid container released " + container);
-      return;
-    }
-
-    /* remove the containers from the nodemanger */
-    launchedContainers.remove(container.getId());
-    updateResource(container);
-
-    LOG.info("Released container " + container.getId() +
-        " of capacity " + container.getResource() + " on host " +
-        rmNode.getNodeAddress() +
-        ", which currently has " + numContainers + " containers, " +
-        getUsedResource() + " used and " + getAvailableResource() +
-        " available" + ", release resources=" + true);
+    releaseContainer(container, null);
   }
 
-
-  private synchronized void addAvailableResource(Resource resource) {
-    if (resource == null) {
-      LOG.error("Invalid resource addition of null resource for " +
-          rmNode.getNodeAddress());
-      return;
-    }
-    Resources.addTo(availableResource, resource);
-    Resources.subtractFrom(usedResource, resource);
+  // Until we implement RECOVERY for Fair Scheduler
+  // Normally FSSchedulerNode and FiCaSchedulerNode should use the same
+  // signature for reserveResource inherited from SchedulerNode,
+  // but FSSchedulerNode currently does not support recovery
+  public synchronized void reserveResource(SchedulerApplicationAttempt application,
+                                           Priority priority, RMContainer container) {
+    reserveResource(application, priority, container, null);
   }
 
   @Override
-  public Resource getTotalResource() {
-    return this.totalResourceCapability;
-  }
-
-  private synchronized void deductAvailableResource(Resource resource) {
-    if (resource == null) {
-      LOG.error(
-          "Invalid deduction of null resource for " + rmNode.getNodeAddress());
-      return;
-    }
-    Resources.subtractFrom(availableResource, resource);
-    Resources.addTo(usedResource, resource);
-  }
-
-  @Override
-  public String toString() {
-    return "host: " + rmNode.getNodeAddress() + " #containers=" +
-        getNumContainers() +
-        " available=" + getAvailableResource() +
-        " used=" + getUsedResource();
-  }
-
-  @Override
-  public int getNumContainers() {
-    return numContainers;
-  }
-
-  public synchronized List<RMContainer> getRunningContainers() {
-    return new ArrayList<RMContainer>(launchedContainers.values());
-  }
-
-  public synchronized void reserveResource(FSSchedulerApp application,
-      Priority priority, RMContainer reservedContainer) {
+  public synchronized void reserveResource(SchedulerApplicationAttempt application,
+      Priority priority, RMContainer container, TransactionState transactionState) {
     // Check if it's already reserved
-    if (this.reservedContainer != null) {
+    RMContainer reservedContainer = getReservedContainer();
+    if (reservedContainer != null) {
       // Sanity check
-      if (!reservedContainer.getContainer().getNodeId().equals(getNodeID())) {
+      if (!container.getContainer().getNodeId().equals(getNodeID())) {
         throw new IllegalStateException("Trying to reserve" +
-            " container " + reservedContainer +
-            " on node " + reservedContainer.getReservedNode() +
-            " when currently" + " reserved resource " + this.reservedContainer +
-            " on node " + this.reservedContainer.getReservedNode());
+            " container " + container +
+            " on node " + container.getReservedNode() +
+            " when currently" + " reserved resource " + reservedContainer +
+            " on node " + reservedContainer.getReservedNode());
       }
       
       // Cannot reserve more than one application on a given node!
-      if (!this.reservedContainer.getContainer().getId()
+      if (!reservedContainer.getContainer().getId()
           .getApplicationAttemptId().equals(
-              reservedContainer.getContainer().getId()
+              container.getContainer().getId()
                   .getApplicationAttemptId())) {
         throw new IllegalStateException("Trying to reserve" +
-            " container " + reservedContainer +
+            " container " + container +
             " for application " + application.getApplicationId() +
             " when currently" +
-            " reserved container " + this.reservedContainer +
+            " reserved container " + reservedContainer +
             " on node " + this);
       }
 
       LOG.info("Updated reserved container " +
-          reservedContainer.getContainer().getId() + " on node " +
+          container.getContainer().getId() + " on node " +
           this + " for application " + application);
     } else {
       LOG.info(
-          "Reserved container " + reservedContainer.getContainer().getId() +
+          "Reserved container " + container.getContainer().getId() +
               " on node " + this + " for application " + application);
     }
-    this.reservedContainer = reservedContainer;
-    this.reservedAppSchedulable = application.getAppSchedulable();
+    setReservedContainer(container, transactionState);
+    this.reservedAppSchedulable = ((FSSchedulerApp) application).getAppSchedulable();
   }
 
-  public synchronized void unreserveResource(FSSchedulerApp application) {
+  // Until we implement RECOVERY for Fair Scheduler
+  // Normally FSSchedulerNode and FiCaSchedulerNode should use the same
+  // signature for unreserveResource inherited from SchedulerNode,
+  // but FSSchedulerNode currently does not support recovery
+  public synchronized void unreserveResource(SchedulerApplicationAttempt application) {
+    unreserveResource(application, null);
+  }
+
+  @Override
+  public synchronized void unreserveResource(SchedulerApplicationAttempt application,
+                                             TransactionState transactionState) {
     // Cannot unreserve for wrong application...
     ApplicationAttemptId reservedApplication =
         reservedContainer.getContainer().getId().getApplicationAttemptId();
@@ -268,23 +133,19 @@ public class FSSchedulerNode extends SchedulerNode {
           " on node " + this);
     }
     
-    this.reservedContainer = null;
+    setReservedContainer(null, transactionState);
     this.reservedAppSchedulable = null;
-  }
-
-  public synchronized RMContainer getReservedContainer() {
-    return reservedContainer;
   }
 
   public synchronized AppSchedulable getReservedAppSchedulable() {
     return reservedAppSchedulable;
   }
-  
-  @Override
-  public synchronized void applyDeltaOnAvailableResource(
-      Resource deltaResource, TransactionState ts) {
-    // we can only adjust available resource if total resource is changed.
-    Resources.addTo(this.availableResource, deltaResource);
+
+  // Until we implement RECOVERY for Fair Scheduler
+  // Normally FSSchedulerNode and FiCaSchedulerNode should use the same
+  // signature for applyDeltaOnAvailableResource inherited from SchedulerNode,
+  // but FSSchedulerNode currently does not support recovery
+  public synchronized void applyDeltaOnAvailableResource(Resource deltaResource) {
+    applyDeltaOnAvailableResource(deltaResource);
   }
-  
 }

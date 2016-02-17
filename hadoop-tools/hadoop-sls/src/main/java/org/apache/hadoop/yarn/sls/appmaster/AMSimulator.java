@@ -113,8 +113,7 @@ public abstract class AMSimulator extends TaskRunner.Task {
    * register with RM
    */
   @Override
-  public void firstStep()
-          throws YarnException, IOException, InterruptedException {
+  public void firstStep() throws Exception {
     simulateStartTimeMS = System.currentTimeMillis() - 
                           SLSRunner.getRunner().getStartTimeMS();
 
@@ -129,8 +128,7 @@ public abstract class AMSimulator extends TaskRunner.Task {
   }
 
   @Override
-  public void middleStep()
-          throws InterruptedException, YarnException, IOException {
+  public void middleStep() throws Exception {
     // process responses in the queue
     processResponseQueue();
     
@@ -142,7 +140,7 @@ public abstract class AMSimulator extends TaskRunner.Task {
   }
 
   @Override
-  public void lastStep() {
+  public void lastStep() throws Exception{
     LOG.info(MessageFormat.format("Application {0} is shutting down.", appId));
     // unregister tracking
     if (isTracked) {
@@ -153,26 +151,20 @@ public abstract class AMSimulator extends TaskRunner.Task {
                   .newRecordInstance(FinishApplicationMasterRequest.class);
     finishAMRequest.setFinalApplicationStatus(FinalApplicationStatus.SUCCEEDED);
 
-    try {
-      UserGroupInformation ugi =
-              UserGroupInformation.createRemoteUser(appAttemptId.toString());
-      Token<AMRMTokenIdentifier> token =
-              rm.getRMContext().getRMApps().get(appAttemptId.getApplicationId())
-                .getRMAppAttempt(appAttemptId).getAMRMToken();
-      ugi.addTokenIdentifier(token.decodeIdentifier());
-      ugi.doAs(new PrivilegedExceptionAction<Object>() {
-        @Override
-        public Object run() throws Exception {
-          rm.getApplicationMasterService()
-                  .finishApplicationMaster(finishAMRequest);
-          return null;
-        }
-      });
-    } catch (IOException e) {
-      e.printStackTrace();
-    } catch (InterruptedException e) {
-      e.printStackTrace();
-    }
+    UserGroupInformation ugi =
+            UserGroupInformation.createRemoteUser(appAttemptId.toString());
+    Token<AMRMTokenIdentifier> token = rm.getRMContext().getRMApps().get(appId)
+            .getRMAppAttempt(appAttemptId).getAMRMToken();
+    ugi.addTokenIdentifier(token.decodeIdentifier());
+    ugi.doAs(new PrivilegedExceptionAction<Object>() {
+
+      @Override
+      public Object run() throws Exception {
+        rm.getApplicationMasterService()
+                .finishApplicationMaster(finishAMRequest);
+      return null;
+      }
+    });
 
     simulateFinishTimeMS = System.currentTimeMillis() -
         SLSRunner.getRunner().getStartTimeMS();
@@ -210,11 +202,9 @@ public abstract class AMSimulator extends TaskRunner.Task {
     return createAllocateRequest(ask, new ArrayList<ContainerId>());
   }
 
-  protected abstract void processResponseQueue()
-          throws InterruptedException, YarnException, IOException;
-  
-  protected abstract void sendContainerRequest()
-          throws YarnException, IOException, InterruptedException;
+  protected abstract void processResponseQueue() throws Exception;
+
+  protected abstract void sendContainerRequest() throws Exception;
   
   protected abstract void checkStop();
   
@@ -260,7 +250,7 @@ public abstract class AMSimulator extends TaskRunner.Task {
     // waiting until application ACCEPTED
     RMApp app = rm.getRMContext().getRMApps().get(appId);
     while(app.getState() != RMAppState.ACCEPTED) {
-      Thread.sleep(50);
+      Thread.sleep(10);
     }
     // Waiting until application attempt reach LAUNCHED
     // "Unmanaged AM must register after AM attempt reaches LAUNCHED state"
@@ -284,9 +274,8 @@ public abstract class AMSimulator extends TaskRunner.Task {
 
     UserGroupInformation ugi =
             UserGroupInformation.createRemoteUser(appAttemptId.toString());
-    Token<AMRMTokenIdentifier> token =
-            rm.getRMContext().getRMApps().get(appAttemptId.getApplicationId())
-                    .getRMAppAttempt(appAttemptId).getAMRMToken();
+    Token<AMRMTokenIdentifier> token = rm.getRMContext().getRMApps().get(appId)
+            .getRMAppAttempt(appAttemptId).getAMRMToken();
     ugi.addTokenIdentifier(token.decodeIdentifier());
 
     ugi.doAs(

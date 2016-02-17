@@ -239,6 +239,12 @@ Allocation file format
 
    * maxRunningApps: limit the number of apps from the queue to run at once
 
+   * maxAMShare: limit the resource share from the leaf queue that can be used
+     to run application master. maxAMShare * queue_fair_share is the maximum
+     resources that can be used by AMs in that leaf queue. Default value is
+     1.0f, which means AMs in that leaf queue can take up to 100% resources of
+     fair share.
+
    * weight: to share the cluster non-proportionally with other queues. Weights
      default to 1, and a queue with weight 2 should receive approximately twice
      as many resources as a queue with the default weight.
@@ -280,6 +286,9 @@ Allocation file format
 
  * <<A queueMaxAppsDefault element>>, which sets the default running app limit
    for queues; overriden by maxRunningApps element in each queue.
+
+ * <<A queueMaxAMShareDefault element>>, which sets the default AM resource
+   limit for the queue; overriden by maxAMShare element in each queue.
 
  * <<A defaultQueueSchedulingPolicy element>>, which sets the default scheduling
    policy for queues; overriden by the schedulingPolicy element in each queue
@@ -330,6 +339,7 @@ Allocation file format
     <minResources>10000 mb,0vcores</minResources>
     <maxResources>90000 mb,0vcores</maxResources>
     <maxRunningApps>50</maxRunningApps>
+    <maxAMShare>0.1</maxAMShare>
     <weight>2.0</weight>
     <schedulingPolicy>fair</schedulingPolicy>
     <queue name="sample_sub_queue">
@@ -338,6 +348,8 @@ Allocation file format
     </queue>
   </queue>
 
+  <queueMaxAMShareDefault>0.5</queueMaxAMShareDefault>
+  
   <!-- Queue ‘secondary_group_queue’ is a parent queue and may have
        user queues under it -->
   <queue name=“secondary_group_queue” type=“parent”>
