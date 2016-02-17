@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.monitor.capacity;
 
+import io.hops.ha.common.TransactionState;
+import io.hops.ha.common.TransactionStateImpl;
 import static org.apache.hadoop.yarn.server.resourcemanager.monitor.capacity.ProportionalCapacityPreemptionPolicy.MAX_IGNORED_OVER_CAPACITY;
 import static org.apache.hadoop.yarn.server.resourcemanager.monitor.capacity.ProportionalCapacityPreemptionPolicy.MONITORING_INTERVAL;
 import static org.apache.hadoop.yarn.server.resourcemanager.monitor.capacity.ProportionalCapacityPreemptionPolicy.NATURAL_TERMINATION_FACTOR;
@@ -80,6 +82,8 @@ public class TestProportionalCapacityPreemptionPolicy {
   static final long TS = 3141592653L;
 
   int appAlloc = 0;
+  boolean setAMContainer = false;
+  float setAMResourcePercent = 0.0f;
   Random rand = null;
   Clock mClock = null;
   Configuration conf = null;
@@ -465,6 +469,111 @@ public class TestProportionalCapacityPreemptionPolicy {
     
     fail("Failed to find SchedulingMonitor service, please check what happened");
   }
+  
+  @Test
+  public void testSkipAMContainer() {
+    int[][] qData = new int[][] {
+        //  /   A   B
+        { 100, 50, 50 }, // abs
+        { 100, 100, 100 }, // maxcap
+        { 100, 100, 0 }, // used
+        { 70, 20, 50 }, // pending
+        { 0, 0, 0 }, // reserved
+        { 5, 4, 1 }, // apps
+        { -1, 1, 1 }, // req granularity
+        { 2, 0, 0 }, // subqueues
+    };
+    setAMContainer = true;
+    ProportionalCapacityPreemptionPolicy policy = buildPolicy(qData);
+    policy.editSchedule(
+            new TransactionStateImpl(TransactionState.TransactionType.RM));
+    
+    // By skipping AM Container, all other 24 containers of appD will be
+    // preempted
+    verify(mDisp, times(24)).handle(argThat(new IsPreemptionRequestFor(appD)));
+
+    // By skipping AM Container, all other 24 containers of appC will be
+    // preempted
+    verify(mDisp, times(24)).handle(argThat(new IsPreemptionRequestFor(appC)));
+
+    // Since AM containers of appC and appD are saved, 2 containers from appB
+    // has to be preempted.
+    verify(mDisp, times(2)).handle(argThat(new IsPreemptionRequestFor(appB)));
+    setAMContainer = false;
+  }
+  
+   @Test
+  public void testPreemptSkippedAMContainers() {
+    int[][] qData = new int[][] {
+        //  /   A   B
+        { 100, 10, 90 }, // abs
+        { 100, 100, 100 }, // maxcap
+        { 100, 100, 0 }, // used
+        { 70, 20, 90 }, // pending
+        { 0, 0, 0 }, // reserved
+        { 5, 4, 1 }, // apps
+        { -1, 5, 5 }, // req granularity
+        { 2, 0, 0 }, // subqueues
+    };
+    setAMContainer = true;
+    ProportionalCapacityPreemptionPolicy policy = buildPolicy(qData);
+    policy.editSchedule(
+            new TransactionStateImpl(TransactionState.TransactionType.RM));
+   
+    // All 5 containers of appD will be preempted including AM container.
+    verify(mDisp, times(5)).handle(argThat(new IsPreemptionRequestFor(appD)));
+
+    // All 5 containers of appC will be preempted including AM container.
+    verify(mDisp, times(5)).handle(argThat(new IsPreemptionRequestFor(appC)));
+    
+    // By skipping AM Container, all other 4 containers of appB will be
+    // preempted
+   verify(mDisp, times(4)).handle(argThat(new IsPreemptionRequestFor(appB)));
+
+    // By skipping AM Container, all other 4 containers of appA will be
+   // preempted
+    verify(mDisp, times(4)).handle(argThat(new IsPreemptionRequestFor(appA)));
+    setAMContainer = false;
+  }
+  
+  @Test
+  public void testAMResourcePercentForSkippedAMContainers() {
+    int[][] qData = new int[][] {
+        //  /   A   B
+        { 100, 10, 90 }, // abs
+        { 100, 100, 100 }, // maxcap
+        { 100, 100, 0 }, // used
+        { 70, 20, 90 }, // pending
+        { 0, 0, 0 }, // reserved
+        { 5, 4, 1 }, // apps
+        { -1, 5, 5 }, // req granularity
+        { 2, 0, 0 }, // subqueues
+    };
+    setAMContainer = true;
+    setAMResourcePercent = 0.5f;
+    ProportionalCapacityPreemptionPolicy policy = buildPolicy(qData);
+    policy.editSchedule(
+            new TransactionStateImpl(TransactionState.TransactionType.RM));
+    
+    // AMResoucePercent is 50% of cluster and maxAMCapacity will be 5Gb.
+    // Total used AM container size is 20GB, hence 2 AM container has
+    // to be preempted as Queue Capacity is 10Gb.
+    verify(mDisp, times(5)).handle(argThat(new IsPreemptionRequestFor(appD)));
+
+    // Including AM Container, all other 4 containers of appC will be
+    // preempted
+    verify(mDisp, times(5)).handle(argThat(new IsPreemptionRequestFor(appC)));
+    
+    // By skipping AM Container, all other 4 containers of appB will be
+    // preempted
+    verify(mDisp, times(4)).handle(argThat(new IsPreemptionRequestFor(appB)));
+
+    // By skipping AM Container, all other 4 containers of appA will be
+    // preempted
+    verify(mDisp, times(4)).handle(argThat(new IsPreemptionRequestFor(appA)));
+    setAMContainer = false;
+  }
+
   static class IsPreemptionRequestFor
       extends ArgumentMatcher<ContainerPreemptEvent> {
     private final ApplicationAttemptId appAttId;
@@ -585,6 +694,9 @@ public class TestProportionalCapacityPreemptionPolicy {
       }
     }
     when(lq.getApplications()).thenReturn(qApps);
+    if(setAMResourcePercent != 0.0f){
+      when(lq.getMaxAMResourcePerQueuePercent()).thenReturn(setAMResourcePercent);
+    }
     p.getChildQueues().add(lq);
     return lq;
   }
@@ -609,7 +721,11 @@ public class TestProportionalCapacityPreemptionPolicy {
 
     List<RMContainer> cLive = new ArrayList<RMContainer>();
     for (int i = 0; i < used; i += gran) {
-      cLive.add(mockContainer(appAttId, cAlloc, unit, 1));
+      if(setAMContainer && i == 0){
+        cLive.add(mockContainer(appAttId, cAlloc, unit, 0));
+      }else{
+        cLive.add(mockContainer(appAttId, cAlloc, unit, 1));
+      }
       ++cAlloc;
     }
     when(app.getLiveContainers()).thenReturn(cLive);
@@ -625,6 +741,10 @@ public class TestProportionalCapacityPreemptionPolicy {
     RMContainer mC = mock(RMContainer.class);
     when(mC.getContainerId()).thenReturn(cId);
     when(mC.getContainer()).thenReturn(c);
+    when(mC.getApplicationAttemptId()).thenReturn(appAttId);
+    if(0 == priority){
+      when(mC.isAMContainer()).thenReturn(true);
+    }
     return mC;
   }
 
