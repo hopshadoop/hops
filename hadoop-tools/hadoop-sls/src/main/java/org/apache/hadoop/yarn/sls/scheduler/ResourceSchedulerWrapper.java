@@ -31,12 +31,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.AbstractYarnScheduler;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.Allocation;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.QueueMetrics;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerAppReport;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerNodeReport;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.*;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.*;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FairScheduler;
@@ -48,6 +43,7 @@ import org.apache.hadoop.yarn.util.resource.Resources;
 import org.apache.log4j.Logger;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
+import org.apache.hadoop.classification.InterfaceAudience.LimitedPrivate;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -64,7 +60,7 @@ import java.util.concurrent.locks.ReentrantLock;
 @Private
 @Unstable
 public class ResourceSchedulerWrapper
-        extends AbstractYarnScheduler
+        extends AbstractYarnScheduler<SchedulerApplicationAttempt, SchedulerNode>
         implements ResourceScheduler, Configurable, SchedulerWrapper {
   private static final String EOL = System.getProperty("line.separator");
   private static final int SAMPLING_SIZE = 60;
@@ -414,18 +410,18 @@ public class ResourceSchedulerWrapper
     if (pool != null)  pool.shutdown();
   }
 
-  //only used with the AbstractYarnScheduler
-//  @Override
-//  public synchronized List<Container> getTransferredContainers(
-//          ApplicationAttemptId currentAttempt) {
-//    return ((AbstractYarnScheduler) scheduler)
-//            .getTransferredContainers(currentAttempt);
-//  }
+  @Override
+  public synchronized List<Container> getTransferredContainers(
+          ApplicationAttemptId currentAttempt) {
+    return ((AbstractYarnScheduler) scheduler)
+            .getTransferredContainers(currentAttempt);
+  }
 
-//  @Override
-//  public Map<ApplicationId, SchedulerApplication> getSchedulerApplications() {
-//    return ((AbstractYarnScheduler) scheduler).getSchedulerApplications();
-//  }
+  @Override
+  public Map<ApplicationId, SchedulerApplication<SchedulerApplicationAttempt>> 
+        getSchedulerApplications() {
+    return ((AbstractYarnScheduler) scheduler).getSchedulerApplications();
+  }
   
   @SuppressWarnings("unchecked")
   private void initMetrics() throws Exception {
@@ -706,16 +702,18 @@ public class ResourceSchedulerWrapper
                            long traceStartTimeMS, long traceEndTimeMS,
                            long simulateStartTimeMS, long simulateEndTimeMS) {
 
-    try {
-      // write job runtime information
-      StringBuilder sb = new StringBuilder();
-      sb.append(appId).append(",").append(traceStartTimeMS).append(",")
-              .append(traceEndTimeMS).append(",").append(simulateStartTimeMS)
-              .append(",").append(simulateEndTimeMS);
-      jobRuntimeLogBW.write(sb.toString() + EOL);
-      jobRuntimeLogBW.flush();
-    } catch (IOException e) {
-      e.printStackTrace();
+    if (metricsON){
+      try{
+        // Write job runtime information
+        StringBuffer sb = new StringBuffer();
+        sb.append(appId).append(",").append(traceStartTimeMS).append(",")
+                .append(traceEndTimeMS).append(",").append(simulateStartTimeMS)
+                .append(",").append(simulateEndTimeMS);
+        jobRuntimeLogBW.write(sb.toString() + EOL);
+        jobRuntimeLogBW.flush();
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
     }
   }
 
@@ -787,7 +785,7 @@ public class ResourceSchedulerWrapper
   @SuppressWarnings("unchecked")
   @Override
   public void serviceInit(Configuration conf) throws Exception {
-    ((AbstractYarnScheduler)
+    ((AbstractYarnScheduler<SchedulerApplicationAttempt, SchedulerNode>)
         scheduler).init(conf);
     super.serviceInit(conf);
   }
@@ -795,7 +793,7 @@ public class ResourceSchedulerWrapper
   @SuppressWarnings("unchecked")
   @Override
   public void serviceStart() throws Exception {
-    ((AbstractYarnScheduler)
+    ((AbstractYarnScheduler<SchedulerApplicationAttempt, SchedulerNode>)
         scheduler).start();
     super.serviceStart();
   }
@@ -803,7 +801,7 @@ public class ResourceSchedulerWrapper
   @SuppressWarnings("unchecked")
   @Override
   public void serviceStop() throws Exception {
-   ((AbstractYarnScheduler)
+   ((AbstractYarnScheduler<SchedulerApplicationAttempt, SchedulerNode>)
         scheduler).stop();
     super.serviceStop();
   }
@@ -817,8 +815,6 @@ public class ResourceSchedulerWrapper
   public void reinitialize(Configuration conf, RMContext rmContext, TransactionState transactionState)
       throws IOException {
     scheduler.reinitialize(conf, rmContext, transactionState);
-    
-    
   }
 
   @Override
@@ -894,6 +890,13 @@ public class ResourceSchedulerWrapper
   public String moveApplication(ApplicationId appId, String newQueue)
       throws YarnException {
     return scheduler.moveApplication(appId, newQueue);
+  }
+
+  @Override
+  @LimitedPrivate("yarn")
+  @Unstable
+  public Resource getClusterResource() {
+    return null;
   }
 }
 

@@ -64,7 +64,6 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.QueueMetrics;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerAppUtils;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerApp;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode;
-import org.apache.hadoop.yarn.server.resourcemanager.security.RMContainerTokenSecretManager;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.apache.hadoop.yarn.server.utils.Lock;
 import org.apache.hadoop.yarn.server.utils.Lock.NoLock;
@@ -215,11 +214,11 @@ public class LeafQueue implements CSQueue {
             .getMaximumApplicationMasterResourcePerQueuePercent(getQueuePath());
     int maxActiveApplications = CSQueueUtils
         .computeMaxActiveApplications(resourceCalculator,
-                    cs.getClusterResources(), this.minimumAllocation,
+                    cs.getClusterResource(), this.minimumAllocation,
                     maxAMResourcePerQueuePercent, absoluteMaxCapacity);
     this.maxActiveAppsUsingAbsCap = CSQueueUtils
         .computeMaxActiveApplications(resourceCalculator,
-                    cs.getClusterResources(), this.minimumAllocation,
+                    cs.getClusterResource(), this.minimumAllocation,
                     maxAMResourcePerQueuePercent, absoluteCapacity);
     int maxActiveApplicationsPerUser = CSQueueUtils
         .computeMaxActiveApplicationsPerUser(maxActiveAppsUsingAbsCap,
@@ -234,7 +233,7 @@ public class LeafQueue implements CSQueue {
     Map<QueueACL, AccessControlList> acls =
         cs.getConfiguration().getAcls(getQueuePath());
 
-    setupQueueConfigs(cs.getClusterResources(), capacity, absoluteCapacity,
+    setupQueueConfigs(cs.getClusterResource(), capacity, absoluteCapacity,
         maximumCapacity, absoluteMaxCapacity, userLimit, userLimitFactor,
         maxApplications, maxAMResourcePerQueuePercent, maxApplicationsPerUser,
         maxActiveApplications, maxActiveApplicationsPerUser, state, acls,

@@ -329,6 +329,16 @@ public class YarnConfiguration extends Configuration {
   public static final String RM_WEBAPP_SPNEGO_KEYTAB_FILE_KEY =
       RM_PREFIX + "webapp.spnego-keytab-file";
   /**
+   * Flag to enable override of the default kerberos authentication filter with
+   * the RM authentication filter to allow authentication using delegation
+   * tokens(fallback to kerberos if the tokens are missing). Only applicable
+   * when the http authentication type is kerberos.
+   */
+  public static final String RM_WEBAPP_DELEGATION_TOKEN_AUTH_FILTER = RM_PREFIX
+      + "webapp.delegation-token-auth-filter.enabled";
+  public static final boolean DEFAULT_RM_WEBAPP_DELEGATION_TOKEN_AUTH_FILTER =
+      true; 
+  /**
    * How long to wait until a container is considered dead.
    */
   public static final String RM_CONTAINER_ALLOC_EXPIRY_INTERVAL_MS =
@@ -992,7 +1002,7 @@ public class YarnConfiguration extends Configuration {
   public static final String PROXY_ADDRESS = PROXY_PREFIX + "address";
   public static final int DEFAULT_PROXY_PORT = 9099;
   public static final String DEFAULT_PROXY_ADDRESS =
-      "localhost:" + DEFAULT_RM_PORT;
+      "localhost:" + DEFAULT_PROXY_PORT;
   /**
    * YARN Service Level Authorization
    */

@@ -92,8 +92,8 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.AbstractYarnSched
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication;
 
 
-   public class ResourceSchedulerWrapper
-        extends AbstractYarnScheduler
+  public class ResourceSchedulerWrapper
+        extends AbstractYarnScheduler<SchedulerApplicationAttempt, SchedulerNode>
         implements ResourceScheduler, Configurable {
 
   private static final String EOL = System.getProperty("line.separator");
