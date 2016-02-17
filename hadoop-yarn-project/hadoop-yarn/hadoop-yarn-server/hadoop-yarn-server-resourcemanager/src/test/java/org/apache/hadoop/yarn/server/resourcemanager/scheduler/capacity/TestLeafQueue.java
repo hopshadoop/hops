@@ -125,7 +125,7 @@ public class TestLeafQueue {
         thenReturn(Resources.createResource(GB, 1));
     when(csContext.getMaximumResourceCapability()).
         thenReturn(Resources.createResource(16 * GB, 32));
-    when(csContext.getClusterResources()).
+    when(csContext.getClusterResource()).
         thenReturn(Resources.createResource(100 * 16 * GB, 100 * 32));
     when(csContext.getApplicationComparator()).
         thenReturn(CapacityScheduler.applicationComparator);
@@ -1776,7 +1776,7 @@ public class TestLeafQueue {
         CapacitySchedulerConfiguration.ROOT, newQueues, queues,
         TestUtils.spyHook);
     queues = newQueues;
-    root.reinitialize(newRoot, cs.getClusterResources(), null);
+    root.reinitialize(newRoot, cs.getClusterResource(), null);
 
     // after reinitialization
     assertEquals(3, e.activeApplications.size());
@@ -1798,7 +1798,7 @@ public class TestLeafQueue {
         CapacitySchedulerConfiguration.ROOT, newQueues, queues,
         TestUtils.spyHook);
     queues = newQueues;
-    root.reinitialize(newRoot, cs.getClusterResources(), null);
+    root.reinitialize(newRoot, cs.getClusterResource(), null);
 
     // after reinitialization
     assertEquals(60, e.getNodeLocalityDelay());
@@ -2222,7 +2222,7 @@ public class TestLeafQueue {
     when(csContext.getConfiguration()).thenReturn(csConf);
     when(csContext.getConf()).thenReturn(new YarnConfiguration());
     when(csContext.getResourceCalculator()).thenReturn(resourceCalculator);
-    when(csContext.getClusterResources()).thenReturn(clusterResource);
+    when(csContext.getClusterResource()).thenReturn(clusterResource);
     when(csContext.getMinimumResourceCapability())
         .thenReturn(Resources.createResource(GB, 1));
     when(csContext.getMaximumResourceCapability())
