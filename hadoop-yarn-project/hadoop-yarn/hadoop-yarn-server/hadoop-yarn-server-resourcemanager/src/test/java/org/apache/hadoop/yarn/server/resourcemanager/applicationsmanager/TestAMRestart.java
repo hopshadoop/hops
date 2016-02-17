@@ -21,17 +21,11 @@ package org.apache.hadoop.yarn.server.resourcemanager.applicationsmanager;
 import io.hops.metadata.util.RMStorageFactory;
 import io.hops.metadata.util.RMUtilities;
 import io.hops.metadata.util.YarnAPIStorageFactory;
+import org.apache.hadoop.yarn.api.records.*;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.AbstractYarnScheduler;
 import org.junit.Assert;
 import org.apache.hadoop.yarn.api.protocolrecords.AllocateResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterResponse;
-import org.apache.hadoop.yarn.api.records.ApplicationAccessType;
-import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
-import org.apache.hadoop.yarn.api.records.Container;
-import org.apache.hadoop.yarn.api.records.ContainerId;
-import org.apache.hadoop.yarn.api.records.ContainerState;
-import org.apache.hadoop.yarn.api.records.ContainerStatus;
-import org.apache.hadoop.yarn.api.records.NMToken;
-import org.apache.hadoop.yarn.api.records.ResourceRequest;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.resourcemanager.MockAM;
 import org.apache.hadoop.yarn.server.resourcemanager.MockNM;
@@ -42,7 +36,6 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptState;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerState;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicationAttempt;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -60,6 +53,7 @@ public class TestAMRestart {
     YarnAPIStorageFactory.setConfiguration(conf);
     RMStorageFactory.setConfiguration(conf);
     conf.setInt(YarnConfiguration.RM_AM_MAX_ATTEMPTS, 2);
+
     RMUtilities.InitializeDB();
     MockRM rm1 = new MockRM(conf);
     try {
@@ -133,9 +127,9 @@ public class TestAMRestart {
           ContainerId.newInstance(am1.getApplicationAttemptId(), 6);
       nm1.nodeHeartbeat(true);
       SchedulerApplicationAttempt schedulerAttempt =
-          ((CapacityScheduler) rm1.getResourceScheduler())
+          ((AbstractYarnScheduler) rm1.getResourceScheduler())
               .getCurrentAttemptForContainer(containerId6);
-      while (schedulerAttempt.getReservedContainers().size() == 0) {
+      while (schedulerAttempt.getReservedContainers().isEmpty()) {
         System.out.println(
             "Waiting for container " + containerId6 + " to be reserved.");
         nm1.nodeHeartbeat(true);
@@ -234,7 +228,7 @@ public class TestAMRestart {
 
       // record the scheduler attempt for testing.
       SchedulerApplicationAttempt schedulerNewAttempt =
-          ((CapacityScheduler) rm1.getResourceScheduler())
+          ((AbstractYarnScheduler) rm1.getResourceScheduler())
               .getCurrentAttemptForContainer(containerId2);
       // finish this application
       MockRM.finishAMAndVerifyAppState(app1, rm1, nm1, am2);
