@@ -615,6 +615,7 @@ public class NDBRMStateStore extends RMStateStore {
                   attemptStateData.getFinalTrackingUrl(),
                   attemptStateData.getDiagnostics(),
                   attemptStateData.getFinalApplicationStatus(),
+                  attemptStateData.getAMContainerExitStatus(),
                   attemptStateData.getProgress(), attemptStateData.getHost(),
                   attemptStateData.getRpcPort(), 
                   attemptRanNodes,

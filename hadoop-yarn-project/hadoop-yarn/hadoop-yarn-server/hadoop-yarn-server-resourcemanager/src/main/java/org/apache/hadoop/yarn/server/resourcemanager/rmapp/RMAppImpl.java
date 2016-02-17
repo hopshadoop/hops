@@ -67,7 +67,6 @@ import org.apache.hadoop.yarn.state.MultipleArcTransition;
 import org.apache.hadoop.yarn.state.SingleArcTransition;
 import org.apache.hadoop.yarn.state.StateMachine;
 import org.apache.hadoop.yarn.state.StateMachineFactory;
-import org.apache.hadoop.yarn.util.resource.Resources;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -636,7 +635,12 @@ public class RMAppImpl implements RMApp, Recoverable {
         ApplicationAttemptId.newInstance(applicationId, attempts.size() + 1);
     RMAppAttempt attempt =
         new RMAppAttemptImpl(appAttemptId, rmContext, scheduler, masterService,
-            submissionContext, conf, maxAppAttempts == attempts.size());
+          submissionContext, conf,
+          // The newly created attempt maybe last attempt if (number of
+          // previously NonPreempted attempts + 1) equal to the max-attempt
+          // limit.
+          maxAppAttempts == (getNumNonPreemptedAppAttempts() + 1));
+
     attempts.put(appAttemptId, attempt);
     if (ts != null) {
       ((TransactionStateImpl) ts).addAppAttempt(attempt);
@@ -748,7 +752,7 @@ public class RMAppImpl implements RMApp, Recoverable {
       msg = "Unmanaged application " + this.getApplicationId() +
           " failed due to " + failedEvent.getDiagnostics() +
           ". Failing the application.";
-    } else if (this.attempts.size() >= this.maxAppAttempts) {
+    } else if (getNumNonPreemptedAppAttempts() >= this.maxAppAttempts) {
       msg = "Application " + this.getApplicationId() + " failed " +
           this.maxAppAttempts + " times due to " +
           failedEvent.getDiagnostics() + ". Failing the application.";
@@ -894,6 +898,19 @@ public class RMAppImpl implements RMApp, Recoverable {
     ;
 
   }
+  
+  private int getNumNonPreemptedAppAttempts() {
+    int completedAttempts = 0;
+    // Do not count AM preemption as attempt failure.
+    for (RMAppAttempt attempt : attempts.values()) {
+      if (!attempt.isPreempted()) {
+        completedAttempts++;
+      }
+    }
+    return completedAttempts;
+  }
+
+  
 
   private static final class AttemptFailedTransition
       implements MultipleArcTransition<RMAppImpl, RMAppEvent, RMAppState> {
@@ -907,7 +924,7 @@ public class RMAppImpl implements RMApp, Recoverable {
     @Override
     public RMAppState transition(RMAppImpl app, RMAppEvent event) {
       if (!app.submissionContext.getUnmanagedAM() &&
-          app.attempts.size() < app.maxAppAttempts) {
+          app.getNumNonPreemptedAppAttempts() < app.maxAppAttempts) {
         boolean transferStateFromPreviousAttempt;
         RMAppFailedAttemptEvent failedEvent = (RMAppFailedAttemptEvent) event;
         transferStateFromPreviousAttempt =
