@@ -156,6 +156,7 @@ public class NDBRMStateStore extends RMStateStore {
                 loadNodesResources(rmState);
                 loadAllContainers(rmState);
                 loadAllRMContainers(rmState);
+                loadAllResourceRequestsOfContainer(rmState);
                 loadAllRMContextActiveNodes(rmState);
                 loadAllRMNodes(rmState);
                 loadAllRMNodesNextHeartbeat(rmState);
@@ -447,6 +448,10 @@ public class NDBRMStateStore extends RMStateStore {
     rmState.allRMContainers = RMUtilities.getAllRMContainers();
   }
   
+  private void loadAllResourceRequestsOfContainer(RMState rmState) throws IOException{
+    rmState.resourceRequestsOfContainer=RMUtilities.getAllResourceRequestsOfContainer();
+  }
+   
   private void loadAllRMContextActiveNodes(RMState rmState) throws IOException {
     rmState.allRMContextActiveNodes = RMUtilities.getAllRMContextActiveNodes();
   }

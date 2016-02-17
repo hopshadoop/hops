@@ -151,10 +151,11 @@ public class AppSchedulingInfo {
    *
    * @param requests
    *     resources to be acquired
+   * * @param recoverPreemptedRequest recover Resource Request on preemption
    */
   synchronized public void updateResourceRequests(
       List<org.apache.hadoop.yarn.api.records.ResourceRequest> requests,
-      TransactionState ts) {
+      boolean recoverPreemptedRequest, TransactionState ts) {
     QueueMetrics metrics = queue.getMetrics();
 
     // Update resource requests
@@ -192,8 +193,13 @@ public class AppSchedulingInfo {
         this.requests.put(priority, asks);
         this.priorities.add(priority);
 
-      } else if (updatePendingResources) {
-        lastRequest = asks.get(resourceName);
+      } 
+      lastRequest = asks.get(resourceName);
+ 
+      if (recoverPreemptedRequest && lastRequest != null) {
+        // Increment the number of containers to 1, as it is recovering a
+        // single container.
+        request.setNumContainers(lastRequest.getNumContainers() + 1);
       }
 
       asks.put(resourceName, request);
@@ -306,16 +312,20 @@ public class AppSchedulingInfo {
    *     the containers allocated.
    * @param ts
    */
-  synchronized public void allocate(NodeType type, SchedulerNode node,
-      Priority priority,
+  synchronized public List<org.apache.hadoop.yarn.api.records.ResourceRequest>
+         allocate(NodeType type, SchedulerNode node, Priority priority,
       org.apache.hadoop.yarn.api.records.ResourceRequest request,
       Container container, TransactionState ts) {
+    List<org.apache.hadoop.yarn.api.records.ResourceRequest> resourceRequests =
+            new ArrayList<org.apache.hadoop.yarn.api.records.ResourceRequest>();
     if (type == NodeType.NODE_LOCAL) {
-      allocateNodeLocal(node, priority, request, container, ts);
+      allocateNodeLocal(node, priority, request, container, resourceRequests, 
+              ts);
     } else if (type == NodeType.RACK_LOCAL) {
-      allocateRackLocal(node, priority, request, container, ts);
+      allocateRackLocal(node, priority, request, container, resourceRequests, 
+              ts);
     } else {
-      allocateOffSwitch(request);
+      allocateOffSwitch(request, resourceRequests);
     }
     QueueMetrics metrics = queue.getMetrics();
     if (pending) {
@@ -332,6 +342,7 @@ public class AppSchedulingInfo {
           " user=" + user + " resource=" + request.getCapability());
     }
     metrics.allocateResources(user, 1, request.getCapability(), true);
+    return resourceRequests;
   }
 
   /**
@@ -344,7 +355,9 @@ public class AppSchedulingInfo {
   synchronized private void allocateNodeLocal(SchedulerNode node,
       Priority priority,
       org.apache.hadoop.yarn.api.records.ResourceRequest nodeLocalRequest,
-      Container container, TransactionState ts) {
+      Container container,
+      List<org.apache.hadoop.yarn.api.records.ResourceRequest> resourceRequests,
+          TransactionState ts) {
     // Update future requirements
     nodeLocalRequest.setNumContainers(nodeLocalRequest.getNumContainers() - 1);
     if (nodeLocalRequest.getNumContainers() == 0) {
@@ -384,16 +397,22 @@ public class AppSchedulingInfo {
       }
     }
 
-    org.apache.hadoop.yarn.api.records.ResourceRequest request =
+    org.apache.hadoop.yarn.api.records.ResourceRequest offRackRequest =
         requests.get(priority)
             .get(org.apache.hadoop.yarn.api.records.ResourceRequest.ANY);
-    decrementOutstanding(request);
+    decrementOutstanding(offRackRequest);
+
     if (ts != null) {
       //update the request in db
       ((TransactionStateImpl) ts).getSchedulerApplicationInfos(this.applicationId).
           getFiCaSchedulerAppInfo(this.applicationAttemptId).
-          setRequestsToAdd(request);
+          setRequestsToAdd(offRackRequest);
     }
+    
+    // Update cloned NodeLocal, RackLocal and OffRack requests for recovery
+    resourceRequests.add(cloneResourceRequest(nodeLocalRequest));
+    resourceRequests.add(cloneResourceRequest(rackLocalRequest));
+    resourceRequests.add(cloneResourceRequest(offRackRequest));
   }
 
   /**
@@ -406,7 +425,9 @@ public class AppSchedulingInfo {
   synchronized private void allocateRackLocal(SchedulerNode node,
       Priority priority,
       org.apache.hadoop.yarn.api.records.ResourceRequest rackLocalRequest,
-      Container container, TransactionState ts) {
+      Container container,
+      List<org.apache.hadoop.yarn.api.records.ResourceRequest> resourceRequests,
+      TransactionState ts) {
     // Update future requirements
     rackLocalRequest.setNumContainers(rackLocalRequest.getNumContainers() - 1);
     if (rackLocalRequest.getNumContainers() == 0) {
@@ -426,14 +447,18 @@ public class AppSchedulingInfo {
       }
     }
 
-    org.apache.hadoop.yarn.api.records.ResourceRequest request =
+    org.apache.hadoop.yarn.api.records.ResourceRequest offRackRequest =
         requests.get(priority)
             .get(org.apache.hadoop.yarn.api.records.ResourceRequest.ANY);
-    decrementOutstanding(request);
+    decrementOutstanding(offRackRequest);
+
+    // Update cloned RackLocal and OffRack requests for recovery
+    resourceRequests.add(cloneResourceRequest(rackLocalRequest));
+    resourceRequests.add(cloneResourceRequest(offRackRequest));
     if (ts != null) {
       ((TransactionStateImpl) ts).getSchedulerApplicationInfos(this.applicationId).
           getFiCaSchedulerAppInfo(this.applicationAttemptId).
-          setRequestsToAdd(request);
+          setRequestsToAdd(offRackRequest);
     }
   }
 
@@ -445,9 +470,13 @@ public class AppSchedulingInfo {
    *     resources allocated to the application
    */
   synchronized private void allocateOffSwitch(
-      org.apache.hadoop.yarn.api.records.ResourceRequest offSwitchRequest) {
+      org.apache.hadoop.yarn.api.records.ResourceRequest offSwitchRequest,
+      List<org.apache.hadoop.yarn.api.records.ResourceRequest> resourceRequests)
+  {
     // Update future requirements
     decrementOutstanding(offSwitchRequest);
+    // Update cloned RackLocal and OffRack requests for recovery
+    resourceRequests.add(cloneResourceRequest(offSwitchRequest));
   }
 
   synchronized private void decrementOutstanding(
@@ -462,6 +491,15 @@ public class AppSchedulingInfo {
     if (numOffSwitchContainers == 0) {
       checkForDeactivation();
     }
+  }
+  
+  public org.apache.hadoop.yarn.api.records.ResourceRequest cloneResourceRequest(
+                 org.apache.hadoop.yarn.api.records.ResourceRequest request) {
+    org.apache.hadoop.yarn.api.records.ResourceRequest newRequest = 
+            org.apache.hadoop.yarn.api.records.ResourceRequest.newInstance(
+        request.getPriority(), request.getResourceName(),
+        request.getCapability(), 1, request.getRelaxLocality());
+    return newRequest;
   }
 
   synchronized private void checkForDeactivation() {

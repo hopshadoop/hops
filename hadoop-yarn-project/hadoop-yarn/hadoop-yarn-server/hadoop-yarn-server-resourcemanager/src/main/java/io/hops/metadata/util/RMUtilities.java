@@ -48,6 +48,7 @@ import io.hops.metadata.yarn.dal.RMLoadDataAccess;
 import io.hops.metadata.yarn.dal.RMNodeDataAccess;
 import io.hops.metadata.yarn.dal.ResourceDataAccess;
 import io.hops.metadata.yarn.dal.ResourceRequestDataAccess;
+import io.hops.metadata.yarn.dal.ResourceRequestOfContainerDataAccess;
 import io.hops.metadata.yarn.dal.SchedulerApplicationDataAccess;
 import io.hops.metadata.yarn.dal.UpdatedContainerInfoDataAccess;
 import io.hops.metadata.yarn.dal.YarnVariablesDataAccess;
@@ -607,6 +608,14 @@ public class RMUtilities {
             .getDataAccess(ResourceRequestDataAccess.class);
     return DA.getAll();
   }
+  
+ public static Map<String, List<ResourceRequest>> getAllResourceRequestsOfContainer()
+          throws IOException {
+
+    ResourceRequestOfContainerDataAccess DA = (ResourceRequestOfContainerDataAccess) RMStorageFactory
+            .getDataAccess(ResourceRequestOfContainerDataAccess.class);
+    return DA.getAll();
+  }  
   
 public static Map<String, List<ResourceRequest>> getAllResourceRequestsFullTransaction()
       throws IOException {
@@ -1994,7 +2003,7 @@ public static Map<String, List<ResourceRequest>> getAllResourceRequestsFullTrans
     RMContainerDataAccess DA = (RMContainerDataAccess) RMStorageFactory
             .getDataAccess(RMContainerDataAccess.class);
     return DA.getAll();
-  }
+  } 
   
   public static Map<String, RMContainer> getAllRMContainersFulTransaction()
       throws IOException {
@@ -2249,7 +2258,6 @@ public static Map<String, List<ResourceRequest>> getAllResourceRequestsFullTrans
             AppSchedulableDataAccess appSDA
                     = (AppSchedulableDataAccess) RMStorageFactory.getDataAccess(
                             AppSchedulableDataAccess.class);
-
             
               Set<Integer> rpcIdsToRemove = ts.getRPCIds();
               List<RPC> rpcToRemove = new ArrayList<RPC>();

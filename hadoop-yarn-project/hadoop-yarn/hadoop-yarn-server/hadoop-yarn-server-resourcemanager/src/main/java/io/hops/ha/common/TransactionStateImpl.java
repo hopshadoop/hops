@@ -35,6 +35,8 @@ import io.hops.metadata.yarn.dal.RMContainerDataAccess;
 import io.hops.metadata.yarn.dal.RMContextInactiveNodesDataAccess;
 import io.hops.metadata.yarn.dal.RMNodeDataAccess;
 import io.hops.metadata.yarn.dal.ResourceDataAccess;
+import io.hops.metadata.yarn.dal.ResourceRequestDataAccess;
+import io.hops.metadata.yarn.dal.ResourceRequestOfContainerDataAccess;
 import io.hops.metadata.yarn.dal.UpdatedContainerInfoDataAccess;
 import io.hops.metadata.yarn.dal.capacity.CSLeafQueueUserInfoDataAccess;
 import io.hops.metadata.yarn.dal.capacity.CSQueueDataAccess;
@@ -91,8 +93,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
+import org.apache.hadoop.yarn.api.records.ResourceRequest;
 import org.apache.hadoop.yarn.api.records.impl.pb.ContainerPBImpl;
 import org.apache.hadoop.yarn.api.records.impl.pb.ContainerStatusPBImpl;
+import org.apache.hadoop.yarn.api.records.impl.pb.ResourceRequestPBImpl;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 
 import static org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore.LOG;
@@ -122,6 +126,12 @@ public class TransactionStateImpl extends TransactionState {
       new ConcurrentHashMap<String, RMContainer>();
   private final Queue<io.hops.metadata.yarn.entity.Container> toAddContainers =
           new ConcurrentLinkedQueue<io.hops.metadata.yarn.entity.Container>();
+  private final Set<io.hops.metadata.yarn.entity.ResourceRequest>
+      resourceRequestOfContainerToAdd =
+      new HashSet<io.hops.metadata.yarn.entity.ResourceRequest>();
+  private final Set<io.hops.metadata.yarn.entity.ResourceRequest>
+      resourceRequestOfContainerToRemove =
+      new HashSet<io.hops.metadata.yarn.entity.ResourceRequest>();  
   private final CSQueueInfo csQueueInfo = new CSQueueInfo();
   
   //APP
@@ -222,6 +232,8 @@ public class TransactionStateImpl extends TransactionState {
     persistAllocateResponsesToRemove();
     persistRMContainerToUpdate();
     persistContainers();
+    persistResourceRequestOfContainer();
+    persistResourceRequestsOfContainerToRemove();
     //TODO rebuild cluster resource from node resources
 //    persistClusterResourceToUpdate();
 //    persistUsedResourceToUpdate();
@@ -600,7 +612,28 @@ public class TransactionStateImpl extends TransactionState {
                     getContainerId().
                     toString(),
                     getRMContainerBytes(rmContainer.getContainer()));
-    toAddContainers.add(hopContainer);
+    toAddContainers.add(hopContainer);        
+  }
+  
+  public void addResourceRequestsOfContainer(List<ResourceRequest> resourceRequestToAdd,
+          String containerId){
+      for (ResourceRequest rq : resourceRequestToAdd) {
+          io.hops.metadata.yarn.entity.ResourceRequest resourceRequest=
+                  new io.hops.metadata.yarn.entity.ResourceRequest(containerId,
+                          rq.getResourceName(),
+                          ((ResourceRequestPBImpl) rq).getProto().toByteArray());
+          resourceRequestOfContainerToRemove.remove(resourceRequest);
+          resourceRequestOfContainerToAdd.add(resourceRequest);
+      }     
+  }
+  
+  protected void persistResourceRequestOfContainer() throws StorageException {
+    if (!resourceRequestOfContainerToAdd.isEmpty()) {
+      ResourceRequestOfContainerDataAccess rDA = 
+              (ResourceRequestOfContainerDataAccess) RMStorageFactory
+              .getDataAccess(ResourceRequestOfContainerDataAccess.class);
+      rDA.addAll(resourceRequestOfContainerToAdd); 
+    }
   }
   
   protected void persistContainers() throws StorageException {
@@ -608,6 +641,28 @@ public class TransactionStateImpl extends TransactionState {
       ContainerDataAccess cDA = (ContainerDataAccess) RMStorageFactory.
               getDataAccess(ContainerDataAccess.class);
       cDA.addAll(toAddContainers);
+    }
+  }
+  
+  public void addResourceRequestsOfContainerToRemove(List<ResourceRequest> resourceRequestToRemove,
+          String containerId) {
+      for (ResourceRequest rq : resourceRequestToRemove) {
+          io.hops.metadata.yarn.entity.ResourceRequest resourceRequest=
+                  new io.hops.metadata.yarn.entity.ResourceRequest(containerId,
+                          rq.getResourceName(),
+                          ((ResourceRequestPBImpl) rq).getProto().toByteArray());
+              if(!resourceRequestOfContainerToAdd.remove(resourceRequest)){
+                  resourceRequestOfContainerToRemove.add(resourceRequest);
+              }        
+      }
+  }
+ 
+  protected void persistResourceRequestsOfContainerToRemove() throws StorageException {
+    if (!resourceRequestOfContainerToRemove.isEmpty()) {
+      ResourceRequestOfContainerDataAccess rDA  =
+              (ResourceRequestOfContainerDataAccess) RMStorageFactory
+                    .getDataAccess(ResourceRequestOfContainerDataAccess.class);
+      rDA.removeAll(resourceRequestOfContainerToRemove);
     }
   }
   

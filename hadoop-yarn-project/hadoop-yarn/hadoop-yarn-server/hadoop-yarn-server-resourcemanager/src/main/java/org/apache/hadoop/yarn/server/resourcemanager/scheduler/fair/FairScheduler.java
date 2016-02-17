@@ -405,7 +405,7 @@ public class FairScheduler extends
     }
   }
   
-  private void warnOrKillContainer(RMContainer container, TransactionState transactionState) {
+  protected void warnOrKillContainer(RMContainer container, TransactionState transactionState) {
     ApplicationAttemptId appAttemptId = container.getApplicationAttemptId();
     FSSchedulerApp app = getSchedulerApp(appAttemptId);
     FSLeafQueue queue = app.getQueue();
@@ -424,6 +424,7 @@ public class FairScheduler extends
             .createPreemptedContainerStatus(container.getContainerId(),
                 SchedulerUtils.PREEMPTED_CONTAINER);
 
+        recoverResourceRequestForContainer(container, transactionState);
         // TODO: Not sure if this ever actually adds this to the list of cleanup
         // containers on the RMNode (see SchedulerNode.releaseContainer()).
         completedContainer(container, status, RMContainerEventType.KILL,

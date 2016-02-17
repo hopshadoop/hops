@@ -110,6 +110,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import org.apache.hadoop.yarn.api.records.Priority;
+import org.apache.hadoop.yarn.api.records.impl.pb.ResourceRequestPBImpl;
+import org.apache.hadoop.yarn.proto.YarnProtos.ResourceRequestProto;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerState;
 
 @Private
@@ -387,6 +390,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
     Map<String, FiCaSchedulerNode> fiCaSchedulerNodes;
     Map<String, List<LaunchedContainers>> launchedContainers;
     Map<String, List<ResourceRequest>> resourceRequests;
+    Map<String, List<ResourceRequest>> resourceRequestsOfContainer;
     Map<String, List<AppSchedulingInfoBlacklist>> blackLists;
     List<QueueMetrics> allQueueMetrics;
     Map<String, List<FiCaSchedulerAppSchedulingOpportunities>> schedulingOpportunities;
@@ -536,7 +540,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
         throws IOException {
       return resourceRequests.get(id);
     }
-
+ 
     public List<AppSchedulingInfoBlacklist> getBlackList(final String id)
         throws IOException {
       return blackLists.get(id);
@@ -828,7 +832,24 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
             getId().getApplicationAttemptId(),
             ConverterUtils.toNodeId(hopRMContainer.getNodeIdID()),
             hopRMContainer.getUser(), rmContext, null);
-        rmContainer.recover(hopRMContainer);
+        
+         //construct ResourceRequest
+        List<org.apache.hadoop.yarn.api.records.ResourceRequest> requests=null;
+        
+        List<ResourceRequest> resourceRequestlist = resourceRequestsOfContainer
+                  .get(hopRMContainer.getContainerIdID());
+
+          if (resourceRequestlist != null && !resourceRequestlist.isEmpty()) {
+              requests = new ArrayList<org.apache.hadoop.yarn.api.records.ResourceRequest>();
+              for (ResourceRequest hop : resourceRequestlist) {
+                  ResourceRequestPBImpl resourceRequest
+                          = new ResourceRequestPBImpl(ResourceRequestProto
+                                  .parseFrom(hop.getResourcerequeststate()));
+                  requests.add(resourceRequest);
+              }
+          }
+                
+        rmContainer.recover(hopRMContainer, requests); 
         alreadyRecoveredRMContainers.put(id, rmContainer);
         return rmContainer;
       } else {

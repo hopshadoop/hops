@@ -45,6 +45,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicat
 import org.apache.hadoop.yarn.util.resource.Resources;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -85,6 +86,9 @@ public class FSSchedulerApp extends SchedulerApplicationAttempt {
     Container container = rmContainer.getContainer();
     ContainerId containerId = container.getId();
     
+    // Remove from the list of newly allocated containers if found
+    newlyAllocatedContainers.remove(rmContainer);
+
     // Inform the container
     rmContainer.handle(
         new RMContainerFinishedEvent(containerId, containerStatus, event,
@@ -292,9 +296,13 @@ public class FSSchedulerApp extends SchedulerApplicationAttempt {
     liveContainers.put(container.getId(), rmContainer);
 
     // Update consumption and track allocations
-    appSchedulingInfo
-        .allocate(type, node, priority, request, container, transactionState);
+    List<ResourceRequest> resourceRequestList = appSchedulingInfo.allocate(
+        type, node, priority, request, container, transactionState);
     Resources.addTo(currentConsumption, container.getResource());
+
+    // Update resource requests related to "request" and store in RMContainer
+    ((RMContainerImpl) rmContainer).setResourceRequests(resourceRequestList,
+            transactionState);
 
     // Inform the container
     rmContainer.handle(
