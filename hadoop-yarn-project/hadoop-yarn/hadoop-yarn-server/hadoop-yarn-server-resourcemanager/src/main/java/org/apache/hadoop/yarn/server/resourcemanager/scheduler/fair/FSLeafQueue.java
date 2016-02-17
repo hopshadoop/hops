@@ -93,7 +93,7 @@ public class FSLeafQueue extends FSQueue {
   public boolean removeApp(FSSchedulerApp app) {
     if (runnableAppScheds.remove(app.getAppSchedulable())) {
       // Update AM resource usage
-      if (app.getAMResource() != null) {
+      if (app.isAmRunning() && app.getAMResource() != null) {
         Resources.subtractFrom(amResourceUsage, app.getAMResource());
       }
       return true;
@@ -153,6 +153,10 @@ public class FSLeafQueue extends FSQueue {
       Resources.addTo(usage, app.getResourceUsage());
     }
     return usage;
+  }
+
+  public Resource getAmResourceUsage(){
+    return amResourceUsage;
   }
 
   @Override
