@@ -65,6 +65,7 @@ import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ApplicationSubmissionContext;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerState;
+import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
 import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.ResourceOption;
@@ -159,20 +160,21 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
     RMAppAttemptState state;
     String finalTrackingUrl = "N/A";
     String diagnostics;
+    int exitStatus = ContainerExitStatus.INVALID;
     FinalApplicationStatus amUnregisteredFinalStatus;
 
     public ApplicationAttemptState(ApplicationAttemptId attemptId,
         org.apache.hadoop.yarn.api.records.Container masterContainer,
         Credentials appAttemptCredentials, long startTime) {
       this(attemptId, masterContainer, appAttemptCredentials, startTime, null,
-          null, "", null, 0, "N/A", -1, null, null);
+          null, "", null, ContainerExitStatus.INVALID, 0, "N/A", -1, null, null);
     }
 
     public ApplicationAttemptState(ApplicationAttemptId attemptId,
         org.apache.hadoop.yarn.api.records.Container masterContainer,
         Credentials appAttemptCredentials, long startTime,
         RMAppAttemptState state, String finalTrackingUrl, String diagnostics,
-        FinalApplicationStatus amUnregisteredFinalStatus, float progress,
+        FinalApplicationStatus amUnregisteredFinalStatus, int exitStatus, float progress,
         String host, int rpcPort, Set<NodeId> ranNodes,
         List<org.apache.hadoop.yarn.api.records.ContainerStatus> justFinishedContainers) {
       this.attemptId = attemptId;
@@ -184,6 +186,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
       this.finalTrackingUrl = finalTrackingUrl;
       this.diagnostics = diagnostics == null ? "" : diagnostics;
       this.amUnregisteredFinalStatus = amUnregisteredFinalStatus;
+      this.exitStatus = exitStatus;
       this.host = host;
       this.rpcPort = rpcPort;
       this.ranNodes = ranNodes;
@@ -243,6 +246,10 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
 
     public FinalApplicationStatus getFinalApplicationStatus() {
       return amUnregisteredFinalStatus;
+    }
+
+    public int getAMContainerExitStatus(){
+      return this.exitStatus;
     }
   }
 
@@ -1334,6 +1341,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
                         attemptState.getFinalTrackingUrl(),
                         attemptState.getDiagnostics(),
                         attemptState.getFinalApplicationStatus(),
+                        attemptState.getAMContainerExitStatus(),
                         attemptState.getRanNodes(),
                         attemptState.getJustFinishedContainers(),
                         attemptState.getProgress(), attemptState.getHost(),
