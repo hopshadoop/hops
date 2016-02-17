@@ -53,6 +53,7 @@ import org.apache.hadoop.yarn.util.resource.Resources;
 
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.Recoverable;
@@ -92,6 +93,10 @@ public class FiCaSchedulerApp extends SchedulerApplicationAttempt
     if (null == liveContainers.remove(rmContainer.getContainerId())) {
       return false;
     }
+    
+    // Remove from the list of newly allocated containers if found
+    newlyAllocatedContainers.remove(rmContainer);
+    
     Container container = rmContainer.getContainer();
     ContainerId containerId = container.getId();
 
@@ -148,9 +153,12 @@ public class FiCaSchedulerApp extends SchedulerApplicationAttempt
     
 
     // Update consumption and track allocations
-    appSchedulingInfo
-        .allocate(type, node, priority, request, container, transactionState);
+    List<ResourceRequest> resourceRequestList = appSchedulingInfo.
+            allocate(type, node, priority, request, container, transactionState)    ;
     Resources.addTo(currentConsumption, container.getResource());
+    
+    // Update resource requests related to "request" and store in RMContainer 
+    ((RMContainerImpl)rmContainer).setResourceRequests(resourceRequestList);
     //HOP : Update Resources
     if (transactionState != null) {
       ((TransactionStateImpl) transactionState).addRMContainerToAdd(

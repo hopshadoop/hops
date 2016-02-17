@@ -262,7 +262,14 @@ public class SchedulerApplicationAttempt implements Recoverable{
   public synchronized void updateResourceRequests(
       List<ResourceRequest> requests, TransactionState ts) {
     if (!isStopped) {
-      appSchedulingInfo.updateResourceRequests(requests, ts);
+      appSchedulingInfo.updateResourceRequests(requests, false, ts);
+    }
+  }
+
+  public synchronized void recoverResourceRequests(
+      List<ResourceRequest> requests, TransactionState ts) {
+    if (!isStopped) {
+      appSchedulingInfo.updateResourceRequests(requests, true, ts);
     }
   }
 
