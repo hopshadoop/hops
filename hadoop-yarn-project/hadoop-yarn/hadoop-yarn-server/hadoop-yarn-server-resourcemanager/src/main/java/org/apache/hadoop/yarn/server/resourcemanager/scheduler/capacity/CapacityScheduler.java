@@ -1238,6 +1238,7 @@ public class CapacityScheduler extends
     if (LOG.isDebugEnabled()) {
       LOG.debug("KILL_CONTAINER: container" + cont.toString());
     }
+    recoverResourceRequestForContainer(cont, transactionState);
     completedContainer(cont, SchedulerUtils
             .createPreemptedContainerStatus(cont.getContainerId(),
                 "Container being forcibly preempted:" + cont.getContainerId()),

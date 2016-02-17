@@ -37,6 +37,9 @@ import org.apache.hadoop.yarn.util.Clock;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 public class FairSchedulerTestBase {
     protected static class MockClock implements Clock {
@@ -152,7 +155,28 @@ public class FairSchedulerTestBase {
                 new TransactionStateImpl(TransactionState.TransactionType.RM));
         return id;
     }
-
+  
+    protected ApplicationAttemptId createSchedulingRequest(String queueId,
+      String userId, List<ResourceRequest> ask) {
+    ApplicationAttemptId id = createAppAttemptId(this.APP_ID++,
+        this.ATTEMPT_ID++);
+    scheduler.addApplication(id.getApplicationId(), queueId, userId,
+            new TransactionStateImpl(TransactionState.TransactionType.RM));
+    // This conditional is for testAclSubmitApplication where app is rejected
+    // and no app is added.
+    if (scheduler.getSchedulerApplications().containsKey(id.getApplicationId())) {
+      scheduler.addApplicationAttempt(id, false,
+              new TransactionStateImpl(TransactionState.TransactionType.RM));
+    }
+    scheduler.allocate(id, ask, new ArrayList<ContainerId>(), null, null,
+            new TransactionStateImpl(TransactionState.TransactionType.RM));
+    RMApp rmApp = mock(RMApp.class);
+    RMAppAttempt rmAppAttempt = mock(RMAppAttempt.class);
+    when(rmApp.getCurrentAppAttempt()).thenReturn(rmAppAttempt);
+    resourceManager.getRMContext().getRMApps()
+        .put(id.getApplicationId(), rmApp);
+    return id;
+  }
     protected void createSchedulingRequestExistingApplication(
             int memory, int priority, ApplicationAttemptId attId) {
         ResourceRequest request = createResourceRequest(memory, ResourceRequest.ANY,
