@@ -18,23 +18,20 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.webapp;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.StringReader;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Properties;
-import java.util.concurrent.Callable;
-
-import javax.servlet.FilterConfig;
-import javax.servlet.ServletException;
-import javax.ws.rs.core.MediaType;
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
-
+import com.google.inject.Guice;
+import com.google.inject.Injector;
+import com.google.inject.Singleton;
+import com.google.inject.servlet.GuiceServletContextListener;
+import com.google.inject.servlet.ServletModule;
+import com.sun.jersey.api.client.ClientResponse;
+import com.sun.jersey.api.client.ClientResponse.Status;
+import com.sun.jersey.api.client.filter.LoggingFilter;
+import com.sun.jersey.guice.spi.container.servlet.GuiceContainer;
+import com.sun.jersey.test.framework.JerseyTest;
+import com.sun.jersey.test.framework.WebAppDescriptor;
+import io.hops.metadata.util.RMStorageFactory;
+import io.hops.metadata.util.RMUtilities;
+import io.hops.metadata.util.YarnAPIStorageFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.minikdc.MiniKdc;
@@ -59,9 +56,7 @@ import org.apache.hadoop.yarn.webapp.GenericExceptionHandler;
 import org.apache.hadoop.yarn.webapp.WebServicesTestUtils;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.*;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
@@ -71,44 +66,30 @@ import org.w3c.dom.NodeList;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.assertFalse;
+import javax.servlet.FilterConfig;
+import javax.servlet.ServletException;
+import javax.ws.rs.core.MediaType;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import java.io.File;
+import java.io.IOException;
+import java.io.StringReader;
+import java.util.*;
+import java.util.concurrent.Callable;
 
-import com.google.inject.Guice;
-import com.google.inject.Injector;
-import com.google.inject.Singleton;
-import com.google.inject.servlet.GuiceServletContextListener;
-import com.google.inject.servlet.ServletModule;
-import com.sun.jersey.api.client.ClientResponse;
-import com.sun.jersey.api.client.ClientResponse.Status;
-import com.sun.jersey.api.client.filter.LoggingFilter;
-import com.sun.jersey.guice.spi.container.servlet.GuiceContainer;
-import com.sun.jersey.test.framework.JerseyTest;
-import com.sun.jersey.test.framework.WebAppDescriptor;
-import io.hops.metadata.util.RMStorageFactory;
-import io.hops.metadata.util.RMUtilities;
-import io.hops.metadata.util.YarnAPIStorageFactory;
+import static org.junit.Assert.*;
 
   @RunWith(Parameterized.class)
 public class TestRMWebServicesDelegationTokens extends JerseyTest {
 
-  private static final File testRootDir = new File("target",
-    TestRMWebServicesDelegationTokens.class.getName() + "-root");
+  private static File testRootDir;
   private static File httpSpnegoKeytabFile = new File(
     KerberosTestUtils.getKeytabFile());
   private static String httpSpnegoPrincipal = KerberosTestUtils
     .getServerPrincipal();
 
-  private static boolean miniKDCStarted = false;
   private static MiniKdc testMiniKDC;
-  static {
-   try {
-      testMiniKDC = new MiniKdc(MiniKdc.createConf(), testRootDir);
-    } catch (Exception e) {
-     assertTrue("Couldn't create MiniKDC", false);
-    }
-  }
 
   private static MockRM rm;
   private Injector injector;
@@ -198,24 +179,24 @@ public class TestRMWebServicesDelegationTokens extends JerseyTest {
 
   private Injector getKerberosAuthInjector() {
     return Guice.createInjector(new TestServletModule() {
-      @Override
-      protected void configureServlets() {
-        isKerberosAuth = true;
-        rmconf.set(
-          CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION,
-          "kerberos");
-        rmconf.set(YarnConfiguration.RM_WEBAPP_SPNEGO_USER_NAME_KEY,
-          httpSpnegoPrincipal);
-        rmconf.set(YarnConfiguration.RM_WEBAPP_SPNEGO_KEYTAB_FILE_KEY,
-          httpSpnegoKeytabFile.getAbsolutePath());
-        rmconf.set(YarnConfiguration.NM_WEBAPP_SPNEGO_USER_NAME_KEY,
-          httpSpnegoPrincipal);
-        rmconf.set(YarnConfiguration.NM_WEBAPP_SPNEGO_KEYTAB_FILE_KEY,
-          httpSpnegoKeytabFile.getAbsolutePath());
+        @Override
+        protected void configureServlets() {
+            isKerberosAuth = true;
+            rmconf.set(
+                    CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION,
+                    "kerberos");
+            rmconf.set(YarnConfiguration.RM_WEBAPP_SPNEGO_USER_NAME_KEY,
+                    httpSpnegoPrincipal);
+            rmconf.set(YarnConfiguration.RM_WEBAPP_SPNEGO_KEYTAB_FILE_KEY,
+                    httpSpnegoKeytabFile.getAbsolutePath());
+            rmconf.set(YarnConfiguration.NM_WEBAPP_SPNEGO_USER_NAME_KEY,
+                    httpSpnegoPrincipal);
+            rmconf.set(YarnConfiguration.NM_WEBAPP_SPNEGO_KEYTAB_FILE_KEY,
+                    httpSpnegoKeytabFile.getAbsolutePath());
 
-        super.configureServlets();
-     }
-   });
+            super.configureServlets();
+        }
+    });
   }
 
   public class GuiceServletConfig extends GuiceServletContextListener {
@@ -237,7 +218,6 @@ public class TestRMWebServicesDelegationTokens extends JerseyTest {
       .contextListenerClass(GuiceServletConfig.class)
       .filterClass(com.google.inject.servlet.GuiceFilter.class)
       .contextPath("jersey-guice-filter").servletPath("/").build());
-    setupKDC();
     switch (run) {
    case 0:
     default:
@@ -249,18 +229,14 @@ public class TestRMWebServicesDelegationTokens extends JerseyTest {
     }
   }
 
- private void setupKDC() throws Exception {
-
-    if (miniKDCStarted == false) {
+  @BeforeClass
+  public static void setupKDC() throws Exception {
+      testRootDir = new File("target",
+              TestRMWebServicesDelegationTokens.class.getName() + "-root");
+      testMiniKDC = new MiniKdc(MiniKdc.createConf(), testRootDir);
       testMiniKDC.start();
-      getKdc().createPrincipal(httpSpnegoKeytabFile, "HTTP/localhost",
-        "client", "client2", "client3");
-      miniKDCStarted = true;
-    }
-  }
-
-  private MiniKdc getKdc() {
-   return testMiniKDC;
+      testMiniKDC.createPrincipal(httpSpnegoKeytabFile, "HTTP/localhost",
+              "client", "client2", "client3");
   }
 
   @Before
@@ -273,6 +249,13 @@ public class TestRMWebServicesDelegationTokens extends JerseyTest {
     super.setUp();
     httpSpnegoKeytabFile.deleteOnExit();
     testRootDir.deleteOnExit();
+  }
+
+  @AfterClass
+  public static void shutdownKdc() {
+      if (testMiniKDC != null) {
+          testMiniKDC.stop();
+      }
   }
 
   @After
