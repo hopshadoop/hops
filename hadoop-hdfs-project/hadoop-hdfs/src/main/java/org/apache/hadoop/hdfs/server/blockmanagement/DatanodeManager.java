@@ -369,6 +369,10 @@ public class DatanodeManager {
    * Get a datanode descriptor given corresponding datanode uuid
    */
   public DatanodeDescriptor getDatanodeByUuid(final String uuid) {
+    if (uuid == null) {
+      return null;
+    }
+
     return datanodeMap.get(uuid);
   }
 
@@ -384,7 +388,7 @@ public class DatanodeManager {
     DatanodeDescriptor node = null;
     if (nodeID != null && nodeID.getDatanodeUuid() != null &&
         !nodeID.getDatanodeUuid().equals("")) {
-      node = getDatanode(nodeID.getDatanodeUuid());
+      node = getDatanodeByUuid(nodeID.getDatanodeUuid());
     }
     if (node == null) {
       return null;
@@ -1397,17 +1401,6 @@ public class DatanodeManager {
     return rName;
   }
 
-  /**
-   * Get a datanode descriptor given corresponding DatanodeUUID
-   */
-  public DatanodeDescriptor getDatanode(final String datanodeUuid) {
-    if (datanodeUuid == null) {
-      return null;
-    }
-
-    return datanodeMap.get(datanodeUuid);
-  }
-  
   DatanodeDescriptor[] getDataNodeDescriptorsTx(
       final BlockInfoUnderConstruction b) throws IOException {
     final DatanodeManager datanodeManager = this;
@@ -1452,8 +1445,7 @@ public class DatanodeManager {
     }
 
     // Loop over all storages in the datanode
-    for(DatanodeStorageInfo storage: getDatanode(nodeDescr.getDatanodeUuid())
-        .getStorageInfos()) {
+    for(DatanodeStorageInfo storage: nodeDescr.getStorageInfos()) {
       storageIdMap.update(storage);
     }
   }

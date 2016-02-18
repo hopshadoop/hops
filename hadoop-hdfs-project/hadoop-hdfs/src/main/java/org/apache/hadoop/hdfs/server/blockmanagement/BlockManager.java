@@ -1585,7 +1585,7 @@ public class BlockManager {
         getDatanodeDescriptors(favoredNodes);
 
     // TODO HDP_2.6 this is a hardcoded blockstoragepolicy... :-(
-    BlockStoragePolicy policy = BlockStoragePolicy.DEFAULT;
+    BlockStoragePolicy policy = BlockStoragePolicy.DISKS;
     final DatanodeStorageInfo[] targets = blockplacement.chooseTarget(src,
         numOfReplicas, client, excludedNodes, blocksize,
         favoredDatanodeDescriptors, policy);

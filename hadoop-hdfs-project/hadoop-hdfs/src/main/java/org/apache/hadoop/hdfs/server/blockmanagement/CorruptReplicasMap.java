@@ -153,7 +153,7 @@ public class CorruptReplicasMap {
     Collection<DatanodeDescriptor> dnds = new TreeSet<DatanodeDescriptor>();
     if (corruptReplicas != null) {
       for (CorruptReplica cr : corruptReplicas) {
-        DatanodeDescriptor dn = datanodeMgr.getDatanode(cr.getDatanodeUuid());
+        DatanodeDescriptor dn = datanodeMgr.getDatanodeByUuid(cr.getDatanodeUuid());
         if (dn != null) {
           dnds.add(dn);
         }

@@ -2115,7 +2115,7 @@ public class FSNamesystem
    * client to "try again later".
    */
   LocatedBlock getAdditionalBlock(final String src, final String clientName,
-      final ExtendedBlock previous, final HashSet<Node> excludedNodes,
+      final ExtendedBlock previous, final Set<Node> excludedNodes,
       final List<String> favoredNodes) throws IOException {
     HopsTransactionalRequestHandler additionalBlockHandler =
         new HopsTransactionalRequestHandler(
@@ -2134,7 +2134,7 @@ public class FSNamesystem
           public Object performTask() throws IOException {
             long blockSize;
             int replication;
-            DatanodeDescriptor clientNode = null;
+            Node clientNode = null;
 
             if (NameNode.stateChangeLog.isDebugEnabled()) {
               NameNode.stateChangeLog.debug(
@@ -2144,8 +2144,7 @@ public class FSNamesystem
 
             // Part I. Analyze the state of the file with respect to the input data.
             LocatedBlock[] onRetryBlock = new LocatedBlock[1];
-            final INode[] inodes =
-                analyzeFileState(src, clientName, previous, onRetryBlock);
+            final INode[] inodes = analyzeFileState(src, clientName, previous, onRetryBlock);
             final INodeFileUnderConstruction pendingFile =
                 (INodeFileUnderConstruction) inodes[inodes.length - 1];
 
@@ -2155,10 +2154,12 @@ public class FSNamesystem
             }
 
             blockSize = pendingFile.getPreferredBlockSize();
-            //clientNode = pendingFile.getClientNode(); HOP
-            clientNode = pendingFile.getClientNode() == null ? null :
-                getBlockManager().getDatanodeManager()
-                    .getDatanode(pendingFile.getClientNode());
+
+            String host = pendingFile.getClientMachine();
+            // TODO this seems a bit weird to me, but this is how HDFS also
+            // does it... maybe we could use the uuid instead somehow?
+            clientNode = getBlockManager().getDatanodeManager().getDatanodeByHost(host);
+
             replication = pendingFile.getBlockReplication();
 
 

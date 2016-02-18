@@ -309,7 +309,7 @@ class InvalidateBlocks {
       throws IOException {
     List<DatanodeInfo> nodes = new ArrayList<DatanodeInfo>();
     for(String datanodeUuid : getStorageIDs()) {
-      nodes.add(manager.getDatanode(datanodeUuid));
+      nodes.add(manager.getDatanodeByUuid(datanodeUuid));
     }
     return nodes;
   }

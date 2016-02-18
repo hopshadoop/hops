@@ -1210,6 +1210,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
         block.setNumBytes(0);
         accessToken = lb.getBlockToken();
         nodes = lb.getLocations();
+        storageTypes = lb.getStorageTypes();
 
         //
         // Connect to first DataNode in the list.

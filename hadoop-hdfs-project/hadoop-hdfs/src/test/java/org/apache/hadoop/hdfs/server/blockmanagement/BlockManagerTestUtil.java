@@ -56,7 +56,8 @@ public class BlockManagerTestUtil {
    */
   public static DatanodeDescriptor getDatanode(final FSNamesystem ns,
       final String storageID) {
-    return ns.getBlockManager().getDatanodeManager().getDatanode(storageID);
+    return ns.getBlockManager().getDatanodeManager().getStorage(storageID)
+        .getDatanodeDescriptor();
   }
 
 
