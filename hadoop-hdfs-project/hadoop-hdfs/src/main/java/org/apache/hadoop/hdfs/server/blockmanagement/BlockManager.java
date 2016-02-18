@@ -3375,8 +3375,29 @@ public class BlockManager {
     final int[] receiving = {0};
 
     final DatanodeDescriptor node = datanodeManager.getDatanode(nodeID);
-    // TODO what if node==null? (check code down, in the try/catch)
-    final DatanodeStorageInfo storage = node.getStorageInfo(blockInfos.getStorageID());
+    if (node == null || !node.isAlive) {
+      blockLog
+          .warn("BLOCK* processIncrementalBlockReport"
+              + " is received from dead or unregistered node "
+              + nodeID);
+      throw new IOException(
+          "Got incremental block report from unregistered or dead node");
+    }
+
+    // Little hack; since we can reassign final s if s==null, we have to
+    // declare s as a normal variable and then assign it to a statically
+    // declared variable
+    DatanodeStorageInfo s = node.getStorageInfo(blockInfos.getStorage()
+        .getStorageID());
+    if (s == null) {
+      // The DataNode is reporting an unknown storage. Usually the NN learns
+      // about new storages from heartbeats but during NN restart we may
+      // receive a block report or incremental report before the heartbeat.
+      // We must handle this for protocol compatibility. This issue was
+      // uncovered by HDFS-6094.
+      s = node.updateStorage(blockInfos.getStorage());
+    }
+    final DatanodeStorageInfo storage = s;
 
     HopsTransactionalRequestHandler processIncrementalBlockReportHandler =
         new HopsTransactionalRequestHandler(
