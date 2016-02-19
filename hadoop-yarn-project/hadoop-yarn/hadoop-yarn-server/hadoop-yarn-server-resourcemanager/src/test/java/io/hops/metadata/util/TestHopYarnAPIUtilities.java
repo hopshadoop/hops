@@ -66,6 +66,8 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.
+        FiCaSchedulerApp;
 
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.mock;
@@ -181,9 +183,11 @@ public class TestHopYarnAPIUtilities {
     FifoScheduler fifoScheduler = (FifoScheduler) rm.getResourceScheduler();
 
     //get applications map
-    Map<ApplicationId, org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication>
-        apps = fifoScheduler.
-        getSchedulerApplications();
+    Map<ApplicationId, 
+            org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication<FiCaSchedulerApp>>
+            apps
+            = fifoScheduler.
+            getSchedulerApplications();
     //get nodes map
     Map<NodeId, org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode>
         nodes = fifoScheduler.getNodes();

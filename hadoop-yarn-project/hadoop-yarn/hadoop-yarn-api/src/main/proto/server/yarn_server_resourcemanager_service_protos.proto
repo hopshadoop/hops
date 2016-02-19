@@ -142,12 +142,13 @@ message ApplicationAttemptStateDataProto {
   optional string diagnostics = 6 [default = "N/A"];
   optional int64 start_time = 7;
   optional FinalApplicationStatusProto final_application_status = 8;
-  optional float progress = 9;
-  optional string host = 10;
-  optional int32 rpc_port = 11;
-  repeated NodeIdProto ran_nodes = 12;
-  repeated ContainerStatusProto just_finished_fontainers = 13;
-  optional AllocateResponseProto allocate_response = 14;
+  optional int32 am_container_exit_status = 9 [default = -1000];
+  optional float progress = 10;
+  optional string host = 11;
+  optional int32 rpc_port = 12;
+  repeated NodeIdProto ran_nodes = 13;
+  repeated ContainerStatusProto just_finished_fontainers = 14;
+  optional AllocateResponseProto allocate_response = 15;
 }
 
 message RMStateVersionProto {

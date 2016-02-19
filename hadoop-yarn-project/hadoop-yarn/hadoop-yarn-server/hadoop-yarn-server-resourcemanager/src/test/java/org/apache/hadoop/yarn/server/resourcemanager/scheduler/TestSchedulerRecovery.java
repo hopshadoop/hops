@@ -55,6 +55,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.RMContextImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.NDBRMStateStore;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeImpl;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerApp;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fifo.FifoScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.security.DelegationTokenRenewer;
@@ -184,7 +185,7 @@ public class TestSchedulerRecovery {
     //        scheduler.reinitialize(conf, null);
     //        scheduler.recover(null);
 
-    Map<ApplicationId, SchedulerApplication> apps = scheduler.
+    Map<ApplicationId, SchedulerApplication<FiCaSchedulerApp>> apps = scheduler.
         getSchedulerApplications();
     Assert.assertTrue("app " + appId1.getId() + " was not recoverd",
         apps.containsKey(appId1));
