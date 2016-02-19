@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdfs.protocol;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
@@ -78,7 +79,7 @@ public class DatanodeID implements Comparable<DatanodeID> {
       int xferPort, int infoPort, int ipcPort) {
     this.ipAddr = ipAddr;
     this.hostName = hostName;
-    this.datanodeUuid = datanodeUuid;
+    this.datanodeUuid = checkDatanodeUuid(datanodeUuid);
     this.xferPort = xferPort;
     this.infoPort = infoPort;
     this.ipcPort = ipcPort;
@@ -186,6 +187,11 @@ public class DatanodeID implements Comparable<DatanodeID> {
    */
   public String getDatanodeUuid() {
     return datanodeUuid;
+  }
+
+  @VisibleForTesting
+  public void setDatanodeUuidForTesting(String datanodeUuid) {
+    this.datanodeUuid = datanodeUuid;
   }
 
   private String checkDatanodeUuid(String uuid) {

@@ -254,10 +254,6 @@ public class DatanodeDescriptor extends DatanodeInfo {
     return this.storageMap.get(storageID);
   }
 
-//  public Collection<DatanodeStorageInfo> getStorageInfos() {
-//    return storageMap.values();
-//  }
-
   DatanodeStorageInfo[] getStorageInfos() {
     synchronized (storageMap) {
       final Collection<DatanodeStorageInfo> storages = storageMap.values();
@@ -798,13 +794,19 @@ public class DatanodeDescriptor extends DatanodeInfo {
   }
 
   DatanodeStorageInfo updateStorage(DatanodeStorage s) {
-    DatanodeStorageInfo storage = getStorageInfo(s.getStorageID());
-    if (storage == null) {
-      storage = new DatanodeStorageInfo(this, s);
-      storageMap.put(s.getStorageID(), storage);
-    } else {
-      storage.setState(s.getState());
+    synchronized (storageMap) {
+      DatanodeStorageInfo storage = getStorageInfo(s.getStorageID());
+      if (storage == null) {
+        storage = new DatanodeStorageInfo(this, s);
+        storageMap.put(s.getStorageID(), storage);
+      } else if (storage.getState() != s.getState() ||
+          storage.getStorageType() != s.getStorageType()) {
+        // For backwards compatibility, make sure that the type and
+        // state are updated. Some reports from older datanodes do
+        // not include these fields so we may have assumed defaults.
+        storage.updateFromStorage(s);
+      }
+      return storage;
     }
-    return storage;
   }
 }

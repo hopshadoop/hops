@@ -96,7 +96,7 @@ public class DatanodeStorageInfo {
 
   private final DatanodeDescriptor dn;
   private final String storageID;
-  private final StorageType storageType;
+  private StorageType storageType;
   private State state;
   private long capacity;
   private long dfsUsed;
@@ -238,6 +238,11 @@ public class DatanodeStorageInfo {
 
   long getBlockPoolUsed() {
     return blockPoolUsed;
+  }
+
+  public void updateFromStorage(DatanodeStorage storage) {
+    state = storage.getState();
+    storageType = storage.getStorageType();
   }
 
   public boolean addBlock(BlockInfo b) {
