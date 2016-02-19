@@ -47,15 +47,14 @@ import org.apache.hadoop.yarn.server.resourcemanager.RMAuditLogger;
 import org.apache.hadoop.yarn.server.resourcemanager.RMAuditLogger.AuditConstants;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore.RMState;
-import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppEvent;
-import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppEventType;
-import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppRejectedEvent;
-import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppState;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.*;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptState;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerEventType;
+import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerState;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeCleanContainerEvent;
@@ -1197,6 +1196,32 @@ public class CapacityScheduler extends
           app.setCurrentAppAttempt(appAttempt, null);
           LeafQueue queue = (LeafQueue) getQueue(hopFiCaSchedulerApp.
                   getQueuename());
+
+          /**
+           * Start of YARN-2022
+           */
+          // Set master container for the current running AMContainer for this
+          // attempt
+          RMApp rmApp = rmContext.getRMApps().get(appId);
+          RMAppAttempt appAttempt1 = rmApp.getCurrentAppAttempt();
+          if (appAttempt1 != null) {
+            Container masterContainer = appAttempt1.getMasterContainer();
+
+            // Mark current running AMContainer's RMContainer based on the master
+            // container ID stored in AppAttempt
+            Collection<RMContainer> rmContainers = app.getCurrentAppAttempt()
+                    .getLiveContainers();
+
+            for (RMContainer rmContainer : rmContainers) {
+              if (masterContainer != null
+                      && masterContainer.getId().equals(rmContainer.getContainerId())) {
+                ((RMContainerImpl)rmContainer).setAMContainer(true);
+              }
+            }
+          }
+          /**
+           * End of YARN-2022
+           */
 
           queue.recoverApp(appAttempt, state);
 
