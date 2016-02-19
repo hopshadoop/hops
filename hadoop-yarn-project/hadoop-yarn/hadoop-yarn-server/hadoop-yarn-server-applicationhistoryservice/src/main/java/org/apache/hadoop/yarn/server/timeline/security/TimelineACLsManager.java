@@ -19,6 +19,7 @@
 package org.apache.hadoop.yarn.server.timeline.security;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.inject.Inject;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -43,6 +44,7 @@ public class TimelineACLsManager {
 
     private AdminACLsManager adminAclsManager;
 
+    @Inject
     public TimelineACLsManager(Configuration conf) {
         this.adminAclsManager = new AdminACLsManager(conf);
     }
