@@ -429,7 +429,7 @@ public class TestRecoverCapacityScheduler {
     int waitCount = 0;
     while (contReceived < 1 && waitCount++ < 200) {
       LOG.info(
-              "Got " + contReceived + " containers. Waiting to get 2");
+              "Got " + contReceived + " containers. Waiting to get 1");
       Thread.sleep(100);
       conts = appManager.allocate(new ArrayList<ResourceRequest>(),
               new ArrayList<ContainerId>()).getAllocatedContainers();

@@ -1197,9 +1197,7 @@ public class CapacityScheduler extends
           LeafQueue queue = (LeafQueue) getQueue(hopFiCaSchedulerApp.
                   getQueuename());
 
-          /**
-           * Start of YARN-2022
-           */
+          // Reconstruct RMContainer AM status
           // Set master container for the current running AMContainer for this
           // attempt
           RMApp rmApp = rmContext.getRMApps().get(appId);
@@ -1219,9 +1217,6 @@ public class CapacityScheduler extends
               }
             }
           }
-          /**
-           * End of YARN-2022
-           */
 
           queue.recoverApp(appAttempt, state);
 
