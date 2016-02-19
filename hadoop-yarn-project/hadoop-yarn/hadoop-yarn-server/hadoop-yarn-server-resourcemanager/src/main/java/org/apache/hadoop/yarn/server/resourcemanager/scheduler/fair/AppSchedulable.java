@@ -221,8 +221,6 @@ public class AppSchedulable extends Schedulable {
    * sure the particular request should be facilitated by this node.
    * @param node
    * The node to try placing the container on.
-   * @param priority
-   * The requested priority for the container.
    * @param request
    * The ResourceRequest we're trying to satisfy.
    * @param type
@@ -280,6 +278,7 @@ public class AppSchedulable extends Schedulable {
       if (app.getLiveContainers().size() == 1 &&
               !app.getUnmanagedAM()) {
         queue.addAMResourceUsage(container.getResource());
+        app.setAmRunning(true);
       }
 
       return container.getResource();

@@ -120,7 +120,10 @@ public interface ApplicationAttemptStateData {
   public FinalApplicationStatus getFinalApplicationStatus();
 
   public void setFinalApplicationStatus(FinalApplicationStatus finishState);
+  
+  public int getAMContainerExitStatus();
 
+  public void setAMContainerExitStatus(int exitStatus);
   /**
    * Get the <em>Progress</em> of the application.
    *

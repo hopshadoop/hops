@@ -21,51 +21,30 @@ import com.google.common.collect.Multiset;
 import io.hops.ha.common.FiCaSchedulerAppInfo;
 import io.hops.ha.common.TransactionState;
 import io.hops.ha.common.TransactionStateImpl;
-import io.hops.metadata.yarn.entity.FiCaSchedulerAppContainer;
-import io.hops.metadata.yarn.entity.Resource;
 import io.hops.metadata.yarn.entity.FiCaSchedulerAppLastScheduledContainer;
-import io.hops.metadata.yarn.entity.SchedulerAppReservations;
 import io.hops.metadata.yarn.entity.FiCaSchedulerAppSchedulingOpportunities;
+import io.hops.metadata.yarn.entity.Resource;
+import io.hops.metadata.yarn.entity.SchedulerAppReservations;
 import io.hops.metadata.yarn.entity.capacity.FiCaSchedulerAppReservedContainers;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Stable;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
-import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
-import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.hadoop.yarn.api.records.ApplicationResourceUsageReport;
-import org.apache.hadoop.yarn.api.records.ApplicationSubmissionContext;
-import org.apache.hadoop.yarn.api.records.Container;
-import org.apache.hadoop.yarn.api.records.ContainerId;
-import org.apache.hadoop.yarn.api.records.NMToken;
-import org.apache.hadoop.yarn.api.records.NodeId;
-import org.apache.hadoop.yarn.api.records.Priority;
-import org.apache.hadoop.yarn.api.records.ResourceRequest;
+import org.apache.hadoop.yarn.api.records.*;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
+import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
+import org.apache.hadoop.yarn.server.resourcemanager.recovery.Recoverable;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptState;
-import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
-import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerEvent;
-import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerEventType;
-import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerImpl;
-import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerReservedEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.*;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeCleanContainerEvent;
+import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.hadoop.yarn.util.resource.Resources;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.apache.hadoop.yarn.util.ConverterUtils;
-import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
-import org.apache.hadoop.yarn.server.resourcemanager.recovery.Recoverable;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FSSchedulerApp;
 
 /**
  * Represents an application attempt from the viewpoint of the scheduler. Each
@@ -97,6 +76,7 @@ public class SchedulerApplicationAttempt implements Recoverable{
 
   private org.apache.hadoop.yarn.api.records.Resource amResource;
   private boolean unmanagedAM = true;
+  private boolean amRunning = false;
 
   protected List<RMContainer> newlyAllocatedContainers =
       new ArrayList<RMContainer>();//recovered
@@ -132,7 +112,6 @@ public class SchedulerApplicationAttempt implements Recoverable{
               rmContext.getRMApps().get(applicationAttemptId.getApplicationId())
               .getApplicationSubmissionContext();
       if (appSubmissionContext != null) {
-        amResource = appSubmissionContext.getResource();
         unmanagedAM = appSubmissionContext.getUnmanagedAM();
       }
     }
@@ -215,6 +194,18 @@ public class SchedulerApplicationAttempt implements Recoverable{
 
   public org.apache.hadoop.yarn.api.records.Resource getAMResource() {
     return amResource;
+  }
+
+  public void setAMResource(org.apache.hadoop.yarn.api.records.Resource amResource){
+      this.amResource = amResource;
+  }
+
+  public boolean isAmRunning(){
+      return amRunning;
+  }
+
+  public void setAmRunning(boolean bool){
+      amRunning = bool;
   }
 
   public boolean getUnmanagedAM() {
@@ -455,8 +446,8 @@ public class SchedulerApplicationAttempt implements Recoverable{
     try {
       Resource recoveringCurrentReservation = state
           .getResource(applicationAttemptId.toString(),
-              Resource.CURRENTRESERVATION,
-              Resource.SCHEDULERAPPLICATIONATTEMPT);
+                  Resource.CURRENTRESERVATION,
+                  Resource.SCHEDULERAPPLICATIONATTEMPT);
       if (recoveringCurrentReservation != null) {
         currentReservation.setMemory(recoveringCurrentReservation.getMemory());
         currentReservation
