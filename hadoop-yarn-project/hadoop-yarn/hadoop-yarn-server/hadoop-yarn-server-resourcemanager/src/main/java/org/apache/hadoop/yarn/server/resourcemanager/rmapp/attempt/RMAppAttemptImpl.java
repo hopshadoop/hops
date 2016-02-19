@@ -150,9 +150,10 @@ public class RMAppAttemptImpl implements RMAppAttempt, Recoverable {
   private int amContainerExitStatus = ContainerExitStatus.INVALID; //recovered
 
   private final Configuration conf;//recovered
-  // Since AM preemption is not counted towards AM failure count,
-  // even if this flag is true, a new attempt can still be re-created if this
-  // attempt is eventually preempted. So this flag indicates that this may be
+  // Since AM preemption, hardware error and NM resync are not counted towards
+  // AM failure count, even if this flag is true, a new attempt can still be
+  // re-created if this attempt is eventually failed because of preemption,
+  // hardware error or NM resync. So this flag indicates that this may be
   // last attempt.
   private final boolean maybeLastAttempt; // recovered
   private static final ExpiredTransition EXPIRED_TRANSITION =
@@ -847,13 +848,13 @@ public class RMAppAttemptImpl implements RMAppAttempt, Recoverable {
               .getKeepContainersAcrossApplicationAttempts() &&
               !appAttempt.submissionContext.getUnmanagedAM()) {
             // See if we should retain containers for non-unmanaged applications
-            if (appAttempt.isPreempted()) {
-              // Premption doesn't count towards app-failures and so we should
-              // retain containers.
-              keepContainersAcrossAppAttempts = true;
+            if (!appAttempt.shouldCountTowardsMaxAttemptRetry()) {
+              // Premption, hardware failures, NM resync doesn't count towards
+              // app-failures and so we should retain containers.              keepContainersAcrossAppAttempts = true;
             } else if (!appAttempt.maybeLastAttempt) {
-              // Not preemption. Not last-attempt too - keep containers.
-              keepContainersAcrossAppAttempts = true;
+              // Not preemption, hardware failures or NM resync.
+              // Not last-attempt too - keep containers.
+        keepContainersAcrossAppAttempts = true;
             }
           }
           LOG.debug("BaseFinalTransition " + event.getType() + " " + event.
@@ -886,10 +887,18 @@ public class RMAppAttemptImpl implements RMAppAttempt, Recoverable {
   }
 
   @Override
-  public boolean isPreempted() {
-    return getAMContainerExitStatus() == ContainerExitStatus.PREEMPTED;
+  public boolean shouldCountTowardsMaxAttemptRetry() {
+    try {
+      this.readLock.lock();
+      int exitStatus = getAMContainerExitStatus();
+      return !(exitStatus == ContainerExitStatus.PREEMPTED
+          || exitStatus == ContainerExitStatus.ABORTED
+          || exitStatus == ContainerExitStatus.DISKS_FAILED
+          || exitStatus == ContainerExitStatus.KILLED_BY_RESOURCEMANAGER);
+    } finally {
+      this.readLock.unlock();
+    }
   }
-
   private static class AMLaunchedTransition extends BaseTransition {
 
     @Override
