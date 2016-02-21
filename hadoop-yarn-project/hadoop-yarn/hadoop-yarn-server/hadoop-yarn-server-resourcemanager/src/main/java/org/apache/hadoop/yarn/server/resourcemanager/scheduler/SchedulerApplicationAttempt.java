@@ -486,6 +486,9 @@ public class SchedulerApplicationAttempt implements Recoverable{
               state.getRMContainer(rmContainerId, rmContext);
           liveContainers.put(rMContainer.getContainerId(), rMContainer);
           Resources.addTo(currentConsumption, rMContainer.getContainer().getResource());
+          QueueMetrics metrics = queue.getMetrics();
+          metrics.allocateResources(rMContainer.getUser(), 1, 
+                  rMContainer.getContainer().getResource(), true);
         }
       }
     } catch (IOException ex) {

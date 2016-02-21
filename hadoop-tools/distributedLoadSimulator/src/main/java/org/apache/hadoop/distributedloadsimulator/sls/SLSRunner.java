@@ -1000,10 +1000,12 @@ public class SLSRunner implements AMNMCommonObject {
             clusterUsage += nm.getUsedResources();
           }
           totalClusterUsageFromStart += clusterUsage;
+          Integer clusterCapacity = nmMap.size() * nmMemoryMB
+                  / containerMemoryMB;
+          lastClusterUsage = (float) clusterUsage / clusterCapacity;
           Thread.sleep(1000 - (System.currentTimeMillis() - startLoop));
         }
-        Thread.sleep(xpDuration / 4);
-        
+          
         LOG.info("Measurer start measures for " + xpDuration / 2);
         runner.startMeasures();
         start = System.currentTimeMillis();

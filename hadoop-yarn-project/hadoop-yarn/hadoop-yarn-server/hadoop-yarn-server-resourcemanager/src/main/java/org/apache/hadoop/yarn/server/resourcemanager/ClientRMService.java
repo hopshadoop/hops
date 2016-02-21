@@ -132,6 +132,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * The client interface to the Resource Manager. This module handles all the
@@ -490,12 +492,16 @@ public class ClientRMService extends AbstractService
   @Override
   public SubmitApplicationResponse submitApplication(
       SubmitApplicationRequest request) throws YarnException, IOException {
-    return submitApplication(request, null);
+    try {
+      return submitApplication(request, null);
+    } catch (InterruptedException ex) {
+      throw new YarnException(ex);
+    }
   }
 
   public SubmitApplicationResponse submitApplication(
       SubmitApplicationRequest request, Integer rpcID)
-      throws YarnException, IOException {
+      throws YarnException, IOException, InterruptedException {
     
     ApplicationSubmissionContext submissionContext =
         request.getApplicationSubmissionContext();
@@ -588,12 +594,16 @@ public class ClientRMService extends AbstractService
   @Override
   public KillApplicationResponse forceKillApplication(
       KillApplicationRequest request) throws YarnException, IOException {
-    return forceKillApplication(request, null);
+    try {
+      return forceKillApplication(request, null);
+    } catch (InterruptedException ex) {
+      throw new YarnException(ex);
+    }
   }
 
   public KillApplicationResponse forceKillApplication(
       KillApplicationRequest request, Integer rpcID)
-      throws YarnException, IOException {
+      throws YarnException, IOException, InterruptedException {
     LOG.debug("forcekillapp " + request.getApplicationId());
     
     ApplicationId applicationId = request.getApplicationId();

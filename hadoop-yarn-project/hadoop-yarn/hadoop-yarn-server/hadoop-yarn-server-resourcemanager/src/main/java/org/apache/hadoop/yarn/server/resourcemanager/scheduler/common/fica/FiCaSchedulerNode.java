@@ -136,7 +136,7 @@ public class FiCaSchedulerNode extends SchedulerNode implements Recoverable{
   public synchronized void allocateContainer(ApplicationId applicationId,
       RMContainer rmContainer, TransactionState transactionState) {
     Container container = rmContainer.getContainer();
-    deductAvailableResource(container.getResource(), transactionState);
+    deductAvailableResource(container.getResource());
     ++numContainers;
 
     launchedContainers.put(container.getId(), rmContainer);
@@ -182,7 +182,7 @@ public class FiCaSchedulerNode extends SchedulerNode implements Recoverable{
 
   private synchronized void updateResource(Container container,
       TransactionState transactionState) {
-    addAvailableResource(container.getResource(), transactionState);
+    addAvailableResource(container.getResource());
 
     --numContainers;
     //HOP :: Update numContainers
@@ -225,8 +225,7 @@ public class FiCaSchedulerNode extends SchedulerNode implements Recoverable{
   }
 
   private synchronized void addAvailableResource(
-      org.apache.hadoop.yarn.api.records.Resource resource,
-      TransactionState transactionState) {
+      org.apache.hadoop.yarn.api.records.Resource resource) {
     if (resource == null) {
       LOG.error("Invalid resource addition of null resource for " +
           rmNode.getNodeAddress());
@@ -239,8 +238,7 @@ public class FiCaSchedulerNode extends SchedulerNode implements Recoverable{
   }
 
   private synchronized void deductAvailableResource(
-      org.apache.hadoop.yarn.api.records.Resource resource,
-      TransactionState transactionState) {
+      org.apache.hadoop.yarn.api.records.Resource resource) {
     if (resource == null) {
       LOG.error(
           "Invalid deduction of null resource for " + rmNode.getNodeAddress());
@@ -346,8 +344,7 @@ public class FiCaSchedulerNode extends SchedulerNode implements Recoverable{
 
   @Override
   public synchronized void applyDeltaOnAvailableResource(
-      org.apache.hadoop.yarn.api.records.Resource deltaResource, 
-          TransactionState ts) {
+      org.apache.hadoop.yarn.api.records.Resource deltaResource) {
     // we can only adjust available resource if total resource is changed.
     Resources.addTo(this.availableResource, deltaResource);
   }
@@ -363,6 +360,7 @@ public class FiCaSchedulerNode extends SchedulerNode implements Recoverable{
       RMContainer rMContainer =
           state.getRMContainer(lc.getRmContainerID(), rmContext);
       launchedContainers.put(rMContainer.getContainerId(), rMContainer);
+      deductAvailableResource(rMContainer.getContainer().getResource());
     }
 
   }

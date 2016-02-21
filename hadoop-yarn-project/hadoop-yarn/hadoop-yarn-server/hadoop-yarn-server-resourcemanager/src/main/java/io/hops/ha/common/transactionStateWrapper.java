@@ -305,11 +305,6 @@ public class transactionStateWrapper extends TransactionStateImpl {
     ts.updateUsedResource(usedResource);
   }
 
-  public void updateClusterResource(
-          org.apache.hadoop.yarn.api.records.Resource clusterResource) {
-    ts.updateClusterResource(clusterResource);
-  }
-
   public void persistFiCaSchedulerNodeToAdd(ResourceDataAccess resourceDA,
           FiCaSchedulerNodeDataAccess ficaNodeDA,
           RMContainerDataAccess rmcontainerDA,

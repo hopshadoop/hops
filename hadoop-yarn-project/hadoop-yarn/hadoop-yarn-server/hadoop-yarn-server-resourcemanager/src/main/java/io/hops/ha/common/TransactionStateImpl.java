@@ -752,20 +752,6 @@ public class TransactionStateImpl extends TransactionState {
     }
   }
   
-  public void updateClusterResource(
-      org.apache.hadoop.yarn.api.records.Resource clusterResource) {
-    this.clusterResourceToUpdate = clusterResource;
-  }
-  
-  private void persistClusterResourceToUpdate() throws StorageException {
-    if (clusterResourceToUpdate != null) {
-      ResourceDataAccess rDA = (ResourceDataAccess) RMStorageFactory
-          .getDataAccess(ResourceDataAccess.class);
-      rDA.add(new Resource("cluster", Resource.CLUSTER, Resource.AVAILABLE,
-          clusterResourceToUpdate.getMemory(),
-          clusterResourceToUpdate.getVirtualCores(),0));
-    }
-  }
 
   private void persistFiCaSchedulerNodeToRemove(ResourceDataAccess resourceDA, 
           FiCaSchedulerNodeDataAccess ficaNodeDA, RMContainerDataAccess rmcontainerDA, 

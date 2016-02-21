@@ -842,9 +842,15 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
         final String id) throws IOException {
       if (!alreadyRecoveredContainers.containsKey(id)) {
         Container hopContainer = allContainers.get(id);
-        ContainerPBImpl container = new ContainerPBImpl(
-            YarnProtos.ContainerProto.parseFrom(hopContainer.
+        ContainerPBImpl container = null;
+        if(hopContainer!=null){
+          container = new ContainerPBImpl(
+          YarnProtos.ContainerProto.parseFrom(hopContainer.
                 getContainerState()));
+        }else{
+          //TORECOVER find out why we sometime get this
+          LOG.error("the container should not be null " + id);
+        }
         alreadyRecoveredContainers.put(id, container);
         return container;
       } else {

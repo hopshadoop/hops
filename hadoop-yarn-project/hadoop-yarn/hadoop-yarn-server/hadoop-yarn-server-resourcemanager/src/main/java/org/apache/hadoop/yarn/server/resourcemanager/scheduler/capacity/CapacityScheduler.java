@@ -803,10 +803,6 @@ public class CapacityScheduler extends AbstractYarnScheduler
     SchedulerUtils.updateResourceIfChanged(node, nm, clusterResource, LOG,
             transactionState);
     
-    if (transactionState != null) {
-      ((TransactionStateImpl) transactionState)
-              .updateClusterResource(node.getAvailableResource());
-    }
     
     List<UpdatedContainerInfo> containerInfoList = 
         nm.pullContainerUpdates(transactionState);
@@ -995,8 +991,6 @@ public class CapacityScheduler extends AbstractYarnScheduler
     if (transactionState != null) {
       ((TransactionStateImpl) transactionState).addFicaSchedulerNodeInfoToAdd(
               nodeManager.getNodeID().toString(), ficaNode);
-      ((TransactionStateImpl) transactionState).updateClusterResource(
-              clusterResource);
     }
 
     root.updateClusterResource(clusterResource, transactionState);
@@ -1019,10 +1013,6 @@ public class CapacityScheduler extends AbstractYarnScheduler
     Resources
             .subtractFrom(clusterResource, node.getRMNode().getTotalCapability());
     root.updateClusterResource(clusterResource, transactionState);
-    if (transactionState != null) {
-      ((TransactionStateImpl) transactionState).updateClusterResource(
-              clusterResource);
-    }
 
     --numNodeManagers;
 
@@ -1170,6 +1160,7 @@ public class CapacityScheduler extends AbstractYarnScheduler
         Resources.addTo(clusterResource, ficaNode.getTotalResource());
         nodes.put(nodeId, ficaNode);
         numNodeManagers++;
+        root.updateClusterResource(clusterResource, null);
       }
 
 
@@ -1193,19 +1184,22 @@ public class CapacityScheduler extends AbstractYarnScheduler
           ApplicationAttemptId appAttemptId = ConverterUtils.
                   toApplicationAttemptId(hopFiCaSchedulerApp.
                           getSchedulerAppId());
+          if (app.getCurrentAppAttempt() == null
+                  || app.getCurrentAppAttempt().getApplicationAttemptId().
+                  compareTo(appAttemptId) < 0) {
+            FiCaSchedulerApp appAttempt = new FiCaSchedulerApp(appAttemptId,
+                    hopFiCaSchedulerApp.getUser(), getQueue(hopFiCaSchedulerApp.
+                            getQueuename()),
+                    queues.get(hopFiCaSchedulerApp.
+                            getQueuename()).getActiveUsersManager(),
+                    this.rmContext, maxAllocatedContainersPerRequest);
+            appAttempt.recover(state);
+            app.setCurrentAppAttempt(appAttempt, null);
+            LeafQueue queue = (LeafQueue) getQueue(hopFiCaSchedulerApp.
+                    getQueuename());
 
-          FiCaSchedulerApp appAttempt = new FiCaSchedulerApp(appAttemptId,
-                  hopFiCaSchedulerApp.getUser(), getQueue(hopFiCaSchedulerApp.
-                          getQueuename()),
-                  queues.get(hopFiCaSchedulerApp.
-                          getQueuename()).getActiveUsersManager(),
-                  this.rmContext, maxAllocatedContainersPerRequest);
-          appAttempt.recover(state);
-          app.setCurrentAppAttempt(appAttempt, null);
-          LeafQueue queue = (LeafQueue) getQueue(hopFiCaSchedulerApp.
-                  getQueuename());
-
-          queue.recoverApp(appAttempt, state, clusterResource);
+            queue.recoverApp(appAttempt, state, clusterResource);
+          }
         }
         applications.put(appId, app);
       }

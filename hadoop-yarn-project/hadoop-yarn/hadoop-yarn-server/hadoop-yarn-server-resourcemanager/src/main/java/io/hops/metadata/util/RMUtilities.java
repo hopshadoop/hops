@@ -907,6 +907,13 @@ public static Map<String, List<ResourceRequest>> getAllResourceRequestsFullTrans
                                   hopRMNodeFull.getHopResource().
                                   getVirtualCores()),
                           hopRMNodeFull.getHopRMNode().getOvercommittimeout());
+        }else{
+          //TORECOVER find out why we sometime get this
+          LOG.error("resource option should not be null");
+          resourceOption = ResourceOption.
+                  newInstance(org.apache.hadoop.yarn.api.records.Resource.
+                          newInstance(0, 0), hopRMNodeFull.getHopRMNode().
+                          getOvercommittimeout());
         }
         //Create RMNode from HopRMNode
         rmNode = new RMNodeImpl(nodeId, rmContext,
@@ -1054,6 +1061,12 @@ public static Map<String, List<ResourceRequest>> getAllResourceRequestsFullTrans
                     org.apache.hadoop.yarn.api.records.Resource
                         .newInstance(res.getMemory(), res.getVirtualCores()),
                     hopRMNode.getOvercommittimeout());
+              } else {
+                LOG.error("resource option should not be null");
+                resourceOption = ResourceOption.
+                        newInstance(org.apache.hadoop.yarn.api.records.Resource.
+                                newInstance(0, 0), hopRMNode.
+                                getOvercommittimeout());
               }
               rmNode = new RMNodeImpl(nodeId, context, hopRMNode.getHostName(),
                   hopRMNode.getCommandPort(), hopRMNode.getHttpPort(), node,

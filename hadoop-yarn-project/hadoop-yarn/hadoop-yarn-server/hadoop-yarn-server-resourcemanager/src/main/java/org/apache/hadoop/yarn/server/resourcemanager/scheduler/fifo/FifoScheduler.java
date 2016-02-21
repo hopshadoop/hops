@@ -537,10 +537,6 @@ public class FifoScheduler extends AbstractYarnScheduler
       }
       attempt.setHeadroom(Resources.subtract(clusterResource, usedResource),
           transactionState);
-      if (transactionState != null) {
-        ((TransactionStateImpl) transactionState)
-            .updateClusterResource(clusterResource);
-      }
     }
   }
 
@@ -786,10 +782,6 @@ public class FifoScheduler extends AbstractYarnScheduler
         usedResource);
     metrics.setAvailableResourcesToQueue(
         Resources.subtract(clusterResource, usedResource));
-    if (transactionState != null) {
-      ((TransactionStateImpl) transactionState)
-          .updateClusterResource(clusterResource);
-    }
   }
 
   @Override
@@ -972,10 +964,6 @@ public class FifoScheduler extends AbstractYarnScheduler
     // Update cluster metrics
     Resources
         .subtractFrom(clusterResource, node.getRMNode().getTotalCapability());
-    if (transactionState != null) {
-      ((TransactionStateImpl) transactionState)
-          .updateClusterResource(clusterResource);
-    }
   }
 
   @Override
@@ -999,13 +987,13 @@ public class FifoScheduler extends AbstractYarnScheduler
       ((TransactionStateImpl) ts)
           .addFicaSchedulerNodeInfoToAdd(nodeManager.getNodeID().toString(),
               node);
-      ((TransactionStateImpl) ts).updateClusterResource(clusterResource);
     }
   }
 
   @Override
   public void recover(RMState state) {
     try {
+      //TODO remove it should not be used anymore 
       // recover queuemetrics
       List<QueueMetrics> recoverQueueMetrics = state.getAllQueueMetrics();
       if (recoverQueueMetrics != null) {
@@ -1035,11 +1023,13 @@ public class FifoScheduler extends AbstractYarnScheduler
         org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication app
                 = new org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication(
                         DEFAULT_QUEUE, hopSchedulerApplication.getUser());
-
+        metrics.submitApp(app.getUser());
+        
         //retrieve HopApplicationAttemptId for this specific appId
         for (AppSchedulingInfo hopFiCaSchedulerApp : state.getAppSchedulingInfo(
                 fsapp.getAppid()).values()) {
           if (hopFiCaSchedulerApp != null) {
+              metrics.submitAppAttempt(app.getUser());
             //construct ApplicationAttemptId
             ApplicationAttemptId appAttemptId = ConverterUtils
                     .toApplicationAttemptId(hopFiCaSchedulerApp.
@@ -1057,7 +1047,7 @@ public class FifoScheduler extends AbstractYarnScheduler
           }
         }
         applications.put(appId, app);
-
+        
       }
       //recover nodes map
       Collection<FiCaSchedulerNode> nodesList = 
@@ -1067,20 +1057,23 @@ public class FifoScheduler extends AbstractYarnScheduler
 
           //retrieve nodeId - key of nodes map
           NodeId nodeId = ConverterUtils.toNodeId(fsnode.getRmnodeId());
-          //retrieve HopFiCaSchedulerNode
+          
+            RMNode rmNode = this.rmContext.
+                    getActiveRMNodes().get(nodeId);
+            if (rmNode != null) {
+                org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode ficaNode
+                        = new org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode(
+                                rmNode, usePortForNodeName,
+                            rmContext);
+            ficaNode.recover(state);
 
-          org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode
-              ficaNode =
-              new org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode(
-                  this.rmContext.
-                      getActiveRMNodes().get(nodeId), usePortForNodeName, 
-                      rmContext);
-          ficaNode.recover(state);
-
-          nodes.put(nodeId, ficaNode);
+            nodes.put(nodeId, ficaNode);
+          }
         }
       }
-      //TORECOVER recover from nodes
+      metrics.setAvailableResourcesToQueue(
+        Resources.subtract(clusterResource, usedResource));
+      //TORECOVER remove recover from nodes
       Resource recovered =
           state.getResource("cluster", Resource.CLUSTER, Resource.AVAILABLE);
       if (recovered != null) {

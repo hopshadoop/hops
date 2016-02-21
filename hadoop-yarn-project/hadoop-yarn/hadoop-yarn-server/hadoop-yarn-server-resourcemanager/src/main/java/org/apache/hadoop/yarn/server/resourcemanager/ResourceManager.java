@@ -1252,6 +1252,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
     rmAppManager.recover(state);
 
     // recover scheduler
+    LOG.info("recover scheduler");
     scheduler.recover(state);
 
     //recover not finished rpc
@@ -1289,9 +1290,13 @@ public class ResourceManager extends CompositeService implements Recoverable {
       NodeId nodeId = ConverterUtils.toNodeId(pendingEvent.getId().getNodeId());
 
       RMNode rmNode = rmContext.getActiveRMNodes().get(nodeId);
-      LOG.debug("recover pending event for node " + nodeId
+      LOG.info("recover pending event for node " + nodeId
               + " of type " + pendingEvent.getType() + "rmNode " + rmNode);
-      eventRetriever.triggerEvent(rmNode, pendingEvent, true);
+      try{
+        eventRetriever.triggerEvent(rmNode, pendingEvent, true);
+      }catch(InterruptedException ex){
+        LOG.error(ex,ex);
+      }
     }
   }
   
@@ -1360,28 +1365,35 @@ public class ResourceManager extends CompositeService implements Recoverable {
 
                 List<ResourceRequest> askList
                         = new ArrayList<ResourceRequest>();
-                for (byte[] ask : allocateRPC.getAsk().values()) {
-                  askList.add(new ResourceRequestPBImpl(
-                          YarnProtos.ResourceRequestProto.parseFrom(
-                                  ask)));
+                if (allocateRPC.getAsk() != null) {
+                  for (byte[] ask : allocateRPC.getAsk().values()) {
+                    askList.add(new ResourceRequestPBImpl(
+                            YarnProtos.ResourceRequestProto.parseFrom(
+                                    ask)));
+                  }
                 }
                 request.setAskList(askList);
 
                 List<ContainerResourceIncreaseRequest> incRequestList
                         = new ArrayList<ContainerResourceIncreaseRequest>();
-                for (byte[] incRequest : allocateRPC.
-                        getResourceIncreaseRequest().values()) {
-                  incRequestList.add(new ContainerResourceIncreaseRequestPBImpl(
-                          YarnProtos.ContainerResourceIncreaseRequestProto.
-                          parseFrom(incRequest)));
+                if (allocateRPC.getResourceIncreaseRequest() != null) {
+                  for (byte[] incRequest : allocateRPC.
+                          getResourceIncreaseRequest().values()) {
+                    incRequestList.add(
+                            new ContainerResourceIncreaseRequestPBImpl(
+                                    YarnProtos.ContainerResourceIncreaseRequestProto.
+                                    parseFrom(incRequest)));
+                  }
                 }
                 request.setIncreaseRequests(incRequestList);
 
                 request.setProgress(allocateRPC.getProgress());
 
                 List<ContainerId> releaseList = new ArrayList<ContainerId>();
-                for (String containerId : allocateRPC.getReleaseList()) {
-                  releaseList.add(ConverterUtils.toContainerId(containerId));
+                if (allocateRPC.getReleaseList() != null) {
+                  for (String containerId : allocateRPC.getReleaseList()) {
+                    releaseList.add(ConverterUtils.toContainerId(containerId));
+                  }
                 }
                 request.setReleaseList(releaseList);
 
@@ -1436,7 +1448,8 @@ public class ResourceManager extends CompositeService implements Recoverable {
                 });
             break;
           case RegisterNM:
-            if (!rmContext.isDistributedEnabled() || rmContext.getGroupMembershipService().isAlone()) {
+            if (!rmContext.isDistributedEnabled() || rmContext.
+                    getGroupMembershipService().isAlone()) {
               proto
                       = YarnServerCommonServiceProtos.RegisterNodeManagerRequestProto.
                       parseFrom(rpc.getRpc());
@@ -1468,18 +1481,22 @@ public class ResourceManager extends CompositeService implements Recoverable {
 
               List<ContainerStatus> containersStatuses
                       = new ArrayList<ContainerStatus>();
-              for (byte[] statusBytes
-                      : hbRPC.getContainersStatuses().values()) {
-                YarnProtos.ContainerStatusProto csProto
-                        = YarnProtos.ContainerStatusProto.parseFrom(
-                                statusBytes);
-                containersStatuses.add(new ContainerStatusPBImpl(csProto));
+              if (hbRPC.getContainersStatuses() != null) {
+                for (byte[] statusBytes
+                        : hbRPC.getContainersStatuses().values()) {
+                  YarnProtos.ContainerStatusProto csProto
+                          = YarnProtos.ContainerStatusProto.parseFrom(
+                                  statusBytes);
+                  containersStatuses.add(new ContainerStatusPBImpl(csProto));
+                }
               }
               nodeStatus.setContainersStatuses(containersStatuses);
 
               List<ApplicationId> keepAliveApps = new ArrayList<ApplicationId>();
-              for (String appId : hbRPC.getKeepAliveApplications()) {
-                keepAliveApps.add(ConverterUtils.toApplicationId(appId));
+              if (hbRPC.getKeepAliveApplications() != null) {
+                for (String appId : hbRPC.getKeepAliveApplications()) {
+                  keepAliveApps.add(ConverterUtils.toApplicationId(appId));
+                }
               }
               nodeStatus.setKeepAliveApplications(keepAliveApps);
 
