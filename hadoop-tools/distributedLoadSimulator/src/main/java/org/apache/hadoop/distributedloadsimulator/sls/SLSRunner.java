@@ -302,8 +302,6 @@ public class SLSRunner implements AMNMCommonObject {
     rmConf.setBoolean(YarnConfiguration.RM_HA_ENABLED, true);
     rmConf.setBoolean(YarnConfiguration.DISTRIBUTED_RM, true);
     rmConf.setBoolean(YarnConfiguration.HOPS_NDB_EVENT_STREAMING_ENABLED, true);
-    rmConf.setBoolean(YarnConfiguration.HOPS_NDB_RT_EVENT_STREAMING_ENABLED,
-            true);
     rmConf.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, true);
     LOG.info(
             "HOP :: Load simulator is starting resource manager in distributed mode ######################### ");

@@ -19,10 +19,7 @@ package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fifo;
 import com.google.common.annotations.VisibleForTesting;
 import io.hops.ha.common.TransactionState;
 import io.hops.ha.common.TransactionStateImpl;
-import io.hops.ha.common.transactionStateWrapper;
 import io.hops.metadata.yarn.entity.AppSchedulingInfo;
-import io.hops.metadata.yarn.entity.FiCaSchedulerNode;
-import io.hops.metadata.yarn.entity.QueueMetrics;
 import io.hops.metadata.yarn.entity.Resource;
 import io.hops.metadata.yarn.entity.SchedulerApplication;
 import org.apache.commons.logging.Log;
@@ -103,6 +100,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.QueueMetrics;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode;
 
 @LimitedPrivate("yarn")
 @Evolving
@@ -115,9 +114,9 @@ public class FifoScheduler extends AbstractYarnScheduler
   private static final RecordFactory recordFactory =
       RecordFactoryProvider.getRecordFactory(null);//recovered
   Configuration conf;//recovered
-  protected Map<NodeId, org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode>
+  protected Map<NodeId, FiCaSchedulerNode>
       nodes =
-      new ConcurrentHashMap<NodeId, org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode>();
+      new ConcurrentHashMap<NodeId, FiCaSchedulerNode>();
       //recovered
   private boolean initialized;//recovered
   private org.apache.hadoop.yarn.api.records.Resource minimumAllocation;
@@ -127,7 +126,7 @@ public class FifoScheduler extends AbstractYarnScheduler
   private boolean usePortForNodeName;//recovered
   private ActiveUsersManager activeUsersManager;//recovered
   private static final String DEFAULT_QUEUE_NAME = "default";//recovered
-  private org.apache.hadoop.yarn.server.resourcemanager.scheduler.QueueMetrics
+  private QueueMetrics
       metrics;//recovered
   private final ResourceCalculator resourceCalculator =
       new DefaultResourceCalculator();//recovered
@@ -141,7 +140,7 @@ public class FifoScheduler extends AbstractYarnScheduler
     }
 
     @Override
-    public org.apache.hadoop.yarn.server.resourcemanager.scheduler.QueueMetrics getMetrics() {
+    public QueueMetrics getMetrics() {
       return metrics;
     }
 
@@ -259,7 +258,7 @@ public class FifoScheduler extends AbstractYarnScheduler
           YarnConfiguration.RM_SCHEDULER_INCLUDE_PORT_IN_NODE_NAME,
           YarnConfiguration.DEFAULT_RM_SCHEDULER_USE_PORT_FOR_NODE_NAME);
       this.metrics =
-          org.apache.hadoop.yarn.server.resourcemanager.scheduler.QueueMetrics
+          QueueMetrics
               .forQueue(DEFAULT_QUEUE_NAME, null, false, conf);
       this.activeUsersManager = new ActiveUsersManager(metrics);
       this.initialized = true;
@@ -366,7 +365,7 @@ public class FifoScheduler extends AbstractYarnScheduler
     return app == null ? null : app.getResourceUsageReport();
   }
 
-  private org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode getNode(
+  private FiCaSchedulerNode getNode(
       NodeId nodeId) {
     return nodes.get(nodeId);
   }
@@ -477,7 +476,7 @@ public class FifoScheduler extends AbstractYarnScheduler
    *     node on which resources are available to be allocated
    */
   private void assignContainers(
-      org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode node,
+      FiCaSchedulerNode node,
       TransactionState transactionState) {
     LOG.debug(
         "assignContainers:" + " node=" + node.getRMNode().getNodeAddress() +
@@ -542,7 +541,7 @@ public class FifoScheduler extends AbstractYarnScheduler
 
   private int getMaxAllocatableContainers(FiCaSchedulerApp application,
       Priority priority,
-      org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode node,
+      FiCaSchedulerNode node,
       NodeType type) {
     int maxContainers = 0;
 
@@ -580,7 +579,7 @@ public class FifoScheduler extends AbstractYarnScheduler
   }
 
   private int assignContainersOnNode(
-      org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode node,
+      FiCaSchedulerNode node,
       FiCaSchedulerApp application, Priority priority,
       TransactionState transactionState) {
     // Data-local
@@ -608,7 +607,7 @@ public class FifoScheduler extends AbstractYarnScheduler
   }
 
   private int assignNodeLocalContainers(
-      org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode node,
+      FiCaSchedulerNode node,
       FiCaSchedulerApp application, Priority priority,
       TransactionState transactionState) {
     int assignedContainers = 0;
@@ -633,7 +632,7 @@ public class FifoScheduler extends AbstractYarnScheduler
   }
 
   private int assignRackLocalContainers(
-      org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode node,
+      FiCaSchedulerNode node,
       FiCaSchedulerApp application, Priority priority,
       TransactionState transactionState) {
     int assignedContainers = 0;
@@ -658,7 +657,7 @@ public class FifoScheduler extends AbstractYarnScheduler
   }
 
   private int assignOffSwitchContainers(
-      org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode node,
+      FiCaSchedulerNode node,
       FiCaSchedulerApp application, Priority priority,
       TransactionState transactionState) {
     int assignedContainers = 0;
@@ -673,7 +672,7 @@ public class FifoScheduler extends AbstractYarnScheduler
   }
 
   private int assignContainer(
-      org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode node,
+      FiCaSchedulerNode node,
       FiCaSchedulerApp application, Priority priority, int assignableContainers,
       ResourceRequest request, NodeType type,
       TransactionState transactionState) {
@@ -732,7 +731,7 @@ public class FifoScheduler extends AbstractYarnScheduler
 
   private synchronized void nodeUpdate(RMNode rmNode,
       TransactionState transactionState) {    
-    org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode
+    FiCaSchedulerNode
         node = getNode(rmNode.getNodeID());
     LOG.debug("HOP :: nodeUpdate, rmNode:" + rmNode.getNodeID().toString() + 
             " node " + node);
@@ -867,7 +866,7 @@ public class FifoScheduler extends AbstractYarnScheduler
   }
 
   private void containerLaunchedOnNode(ContainerId containerId,
-      org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode node,
+      FiCaSchedulerNode node,
       TransactionState transactionState) {
     // Get the application for the finished container
     FiCaSchedulerApp application = getCurrentAttemptForContainer(containerId);
@@ -904,7 +903,7 @@ public class FifoScheduler extends AbstractYarnScheduler
         container.getId().getApplicationAttemptId().getApplicationId();
 
     // Get the node on which the container was allocated
-    org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode
+    FiCaSchedulerNode
         node = getNode(container.getNodeId());
 
     if (application == null) {
@@ -939,7 +938,7 @@ public class FifoScheduler extends AbstractYarnScheduler
 
   private synchronized void removeNode(RMNode nodeInfo,
       TransactionState transactionState) {
-    org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode
+    FiCaSchedulerNode
         node = getNode(nodeInfo.getNodeID());
     if (node == null) {
       return;
@@ -978,7 +977,7 @@ public class FifoScheduler extends AbstractYarnScheduler
   }
 
   private synchronized void addNode(RMNode nodeManager,
-      org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode node,
+      FiCaSchedulerNode node,
       TransactionState ts) {
     this.nodes.put(nodeManager.getNodeID(), node);
     LOG.debug("HOP :: FifoScheduler - node was added");
@@ -993,22 +992,6 @@ public class FifoScheduler extends AbstractYarnScheduler
   @Override
   public void recover(RMState state) {
     try {
-      //TODO remove it should not be used anymore 
-      // recover queuemetrics
-      List<QueueMetrics> recoverQueueMetrics = state.getAllQueueMetrics();
-      if (recoverQueueMetrics != null) {
-        if (recoverQueueMetrics.size() > 1) {
-          throw new UnsupportedOperationException(
-              "there should be only one queueMetrics in the fifoScheduler");
-        }
-        if (!recoverQueueMetrics.isEmpty()) {
-          metrics =
-              org.apache.hadoop.yarn.server.resourcemanager.scheduler.QueueMetrics
-                  .forQueue(recoverQueueMetrics.get(0).getQueuename(), null,
-                      false, conf);
-          metrics.recover(recoverQueueMetrics.get(0));
-        }
-      }
       //recover applications map
       Map<String, SchedulerApplication> appsList =
           state.getSchedulerApplications();
@@ -1050,10 +1033,10 @@ public class FifoScheduler extends AbstractYarnScheduler
         
       }
       //recover nodes map
-      Collection<FiCaSchedulerNode> nodesList = 
+      Collection<io.hops.metadata.yarn.entity.FiCaSchedulerNode> nodesList = 
               state.getAllFiCaSchedulerNodes().values();
       if (nodesList != null && !nodesList.isEmpty()) {
-        for (FiCaSchedulerNode fsnode : nodesList) {
+        for (io.hops.metadata.yarn.entity.FiCaSchedulerNode fsnode : nodesList) {
 
           //retrieve nodeId - key of nodes map
           NodeId nodeId = ConverterUtils.toNodeId(fsnode.getRmnodeId());
@@ -1061,30 +1044,25 @@ public class FifoScheduler extends AbstractYarnScheduler
             RMNode rmNode = this.rmContext.
                     getActiveRMNodes().get(nodeId);
             if (rmNode != null) {
-                org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode ficaNode
-                        = new org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode(
+                FiCaSchedulerNode ficaNode
+                        = new FiCaSchedulerNode(
                                 rmNode, usePortForNodeName,
                             rmContext);
             ficaNode.recover(state);
 
             nodes.put(nodeId, ficaNode);
+            Resources.addTo(clusterResource, rmNode.getTotalCapability());
           }
         }
       }
-      metrics.setAvailableResourcesToQueue(
-        Resources.subtract(clusterResource, usedResource));
       //TORECOVER remove recover from nodes
-      Resource recovered =
-          state.getResource("cluster", Resource.CLUSTER, Resource.AVAILABLE);
-      if (recovered != null) {
-        clusterResource.setMemory(recovered.getMemory());
-        clusterResource.setVirtualCores(recovered.getVirtualCores());
-      }
-      recovered = state.getResource("cluster", Resource.CLUSTER, Resource.USED);
+      Resource recovered = state.getResource("cluster", Resource.CLUSTER, Resource.USED);
       if (recovered != null) {
         usedResource.setMemory(recovered.getMemory());
         usedResource.setVirtualCores(recovered.getVirtualCores());
       }
+      metrics.setAvailableResourcesToQueue(
+        Resources.subtract(clusterResource, usedResource));
     } catch (Exception ex) {
       LOG.error(ex, ex);
     }
@@ -1092,13 +1070,13 @@ public class FifoScheduler extends AbstractYarnScheduler
 
   //For testing
   @VisibleForTesting
-  public Map<NodeId, org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode> getNodes() {
+  public Map<NodeId, FiCaSchedulerNode> getNodes() {
     return nodes;
   }
 
   @Override
   public synchronized SchedulerNodeReport getNodeReport(NodeId nodeId) {
-    org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode
+    FiCaSchedulerNode
         node = getNode(nodeId);
     return node == null ? null : new SchedulerNodeReport(node);
   }
@@ -1121,7 +1099,7 @@ public class FifoScheduler extends AbstractYarnScheduler
   }
 
   @Override
-  public org.apache.hadoop.yarn.server.resourcemanager.scheduler.QueueMetrics getRootQueueMetrics() {
+  public QueueMetrics getRootQueueMetrics() {
     return DEFAULT_QUEUE.getMetrics();
   }
 

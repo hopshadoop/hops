@@ -407,6 +407,11 @@ public class ResourceManager extends CompositeService implements Recoverable {
       LOG.info("init resourceTrackingService");
       conf.setBoolean(Dispatcher.DISPATCHER_EXIT_ON_ERROR_KEY, true);
 
+      recoveryEnabled = conf.getBoolean(
+        YarnConfiguration.RECOVERY_ENABLED,
+        YarnConfiguration.DEFAULT_RM_RECOVERY_ENABLED);
+
+            
       if (!rmStoreBlocked) {
         RMStateStore rmStore = null;
         if (recoveryEnabled) {
@@ -442,17 +447,6 @@ public class ResourceManager extends CompositeService implements Recoverable {
       AMLivelinessMonitor amFinishingMonitor = createAMLivelinessMonitor();
       this.addService(amFinishingMonitor);
       rmContext.setAMFinishingMonitor(amFinishingMonitor);
-
-      boolean isRecoveryEnabled = conf.getBoolean(
-              YarnConfiguration.RECOVERY_ENABLED,
-              YarnConfiguration.DEFAULT_RM_RECOVERY_ENABLED);
-
-      if (isRecoveryEnabled) {
-        LOG.info("recovery enabled");
-        recoveryEnabled = true;
-      } else {
-        recoveryEnabled = false;
-      }
 
       if (UserGroupInformation.isSecurityEnabled()) {
         delegationTokenRenewer = createDelegationTokenRenewer();

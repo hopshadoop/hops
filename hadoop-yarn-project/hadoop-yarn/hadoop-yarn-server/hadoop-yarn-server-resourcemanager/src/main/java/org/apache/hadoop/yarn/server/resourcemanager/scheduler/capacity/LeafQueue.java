@@ -140,7 +140,9 @@ public class LeafQueue implements CSQueue {
     if (!appAttempt.isStopped()) {
       applicationAttemptMap.
               put(appAttempt.getApplicationAttemptId(), appAttempt);
-
+      
+      metrics.submitAppAttempt(appAttempt.getUser());
+      metrics.submitApp(appAttempt.getUser());
       Set<String> csLeafQueuePendingApps = state.getCSLeafQueuePendingApps(this.
               getQueuePath());
       getUser(appAttempt.getUser()).submitApplication(appAttempt.getUser());

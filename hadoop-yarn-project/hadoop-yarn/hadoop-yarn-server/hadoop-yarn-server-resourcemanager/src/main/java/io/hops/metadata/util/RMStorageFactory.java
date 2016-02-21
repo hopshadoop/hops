@@ -77,7 +77,8 @@ public class RMStorageFactory {
             YarnAPIStorageFactory.NDB_EVENT_STREAMING_FOR_DISTRIBUTED_SERVICE);
     
     String connectionString = dStorageFactory.getConnector().getClusterConnectString() + ":" + 
-            conf.getInt(YarnConfiguration.HOPS_NDB_EVENT_STREAMING_DB_PORT, YarnConfiguration.DEFAULT_HOPS_NDB_EVENT_STREAMING_DB_PORT);
+            conf.getInt(YarnConfiguration.HOPS_NDB_EVENT_STREAMING_DB_PORT, 
+                    YarnConfiguration.DEFAULT_HOPS_NDB_EVENT_STREAMING_DB_PORT);
     
     dNdbEventStreaming.init(conf.get(
             YarnConfiguration.EVENT_SHEDULER_CONFIG_PATH,

@@ -590,31 +590,4 @@ public class QueueMetrics implements MetricsSource {
     return metricsSystem;
   }
   
-  public void recover(
-      io.hops.metadata.yarn.entity.QueueMetrics recoverQueueMetrics) {
-    this.appsSubmitted.incr(recoverQueueMetrics.getAppssubmitted());
-    this.appsRunning.incr(recoverQueueMetrics.getAppsrunning());
-    this.appsPending.incr(recoverQueueMetrics.getAppspending());
-    this.appsCompleted.incr(recoverQueueMetrics.getAppscompleted());
-    this.appsKilled.incr(recoverQueueMetrics.getAppskilled());
-    this.appsFailed.incr(recoverQueueMetrics.getAppsfailed());
-    this.allocatedMB.incr(recoverQueueMetrics.getAllocatedmb());
-    this.allocatedVCores.incr(recoverQueueMetrics.getAllocatedvcores());
-    this.allocatedContainers.incr(recoverQueueMetrics.getAllocatedcontainers());
-    this.aggregateContainersAllocated
-        .incr(recoverQueueMetrics.getAggregatecontainersallocated());
-    this.aggregateContainersReleased
-        .incr(recoverQueueMetrics.getAggregatecontainersreleased());
-    this.availableMB.incr(recoverQueueMetrics.getAvailablemb());
-    this.availableVCores.incr(recoverQueueMetrics.getAvailablevcores());
-    this.pendingMB.incr(recoverQueueMetrics.getPendingmb());
-    this.pendingVCores.incr(recoverQueueMetrics.getPendingvcores());
-    this.pendingContainers.incr(recoverQueueMetrics.getPendingContainers());
-    this.reservedMB.incr(recoverQueueMetrics.getReservedmb());
-    this.reservedVCores.incr(recoverQueueMetrics.getReservedvcores());
-    this.reservedContainers.incr(recoverQueueMetrics.getReservedcontainers());
-    this.activeUsers.incr(recoverQueueMetrics.getActiveusers());
-    this.activeApplications.incr(recoverQueueMetrics.getActiveapplications());
-
-  }
 }

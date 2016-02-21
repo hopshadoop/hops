@@ -461,8 +461,8 @@ public class TestRecoverCapacityScheduler {
 
     //TODO, check that the queuemetrics are good
     QueueMetrics queueMetrics = scheduler.getRootQueueMetrics();
-    assertTrue("wrong queueMetrics value", queueMetrics.getActiveApps()
-            == mockResMan.getResourceScheduler().getRootQueueMetrics().
+    assertEquals("wrong queueMetrics value ", queueMetrics.getActiveApps()
+            , mockResMan.getResourceScheduler().getRootQueueMetrics().
             getActiveApps());
 
     mockResMan.stop();

@@ -472,9 +472,6 @@ public class YarnConfiguration extends Configuration {
   public static final String AUTO_FAILOVER_ENABLED =
       AUTO_FAILOVER_PREFIX + "enabled";
   public static final boolean DEFAULT_AUTO_FAILOVER_ENABLED = true;
-  public static final String AUTO_FAILOVER_EMBEDDED =
-      AUTO_FAILOVER_PREFIX + "embedded";
-  public static final boolean DEFAULT_AUTO_FAILOVER_EMBEDDED = true;
   public static final String AUTO_FAILOVER_ZK_BASE_PATH =
       AUTO_FAILOVER_PREFIX + "zk-base-path";
   public static final String DEFAULT_AUTO_FAILOVER_ZK_BASE_PATH =
@@ -1442,10 +1439,6 @@ public class YarnConfiguration extends Configuration {
   public static int DEFAULT_HOPS_NDB_EVENT_STREAMING_DB_PORT = 1186;
   public static final String HOPS_NDB_EVENT_STREAMING_DB_PORT = HOPS_RM_PREFIX
           + "ndb-event-streaming.db.port";
-  
-  public static boolean DEFAULT_HOPS_NDB_RT_EVENT_STREAMING_ENABLED = true;
-  public static final String HOPS_NDB_RT_EVENT_STREAMING_ENABLED
-          = HOPS_RM_PREFIX + "ndb-rt-event-streaming.enable";
 
   public static final String MAX_ALLOCATED_CONTAINERS_PER_REQUEST= HOPS_RM_PREFIX + "max.allocated.containers.per.request";
   public static int DEFAULT_MAX_ALLOCATED_CONTAINERS_PER_REQUEST = -1;

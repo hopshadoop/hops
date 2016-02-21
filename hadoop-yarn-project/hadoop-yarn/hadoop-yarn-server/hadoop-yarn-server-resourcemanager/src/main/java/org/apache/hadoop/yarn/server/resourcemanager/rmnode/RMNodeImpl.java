@@ -656,7 +656,6 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
       } else {
         // Increment activeNodes explicitly because this is a new node.
         ClusterMetrics.getMetrics().incrNumActiveNodes();
-        //TODO: Check if we need to include this in the TS. 
       }
     }
   }
