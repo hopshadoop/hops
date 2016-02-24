@@ -637,9 +637,10 @@ public class RMAppImpl implements RMApp, Recoverable {
         new RMAppAttemptImpl(appAttemptId, rmContext, scheduler, masterService,
           submissionContext, conf,
           // The newly created attempt maybe last attempt if (number of
-          // previously NonPreempted attempts + 1) equal to the max-attempt
+          // previously failed attempts(which should not include Preempted,
+          // hardware error and NM resync) + 1) equal to the max-attempt
           // limit.
-          maxAppAttempts == (getNumNonPreemptedAppAttempts() + 1));
++          maxAppAttempts == (getNumFailedAppAttempts() + 1));
 
     attempts.put(appAttemptId, attempt);
     if (ts != null) {
@@ -752,7 +753,7 @@ public class RMAppImpl implements RMApp, Recoverable {
       msg = "Unmanaged application " + this.getApplicationId() +
           " failed due to " + failedEvent.getDiagnostics() +
           ". Failing the application.";
-    } else if (getNumNonPreemptedAppAttempts() >= this.maxAppAttempts) {
+    } else if (getNumFailedAppAttempts() >= this.maxAppAttempts) {
       msg = "Application " + this.getApplicationId() + " failed " +
           this.maxAppAttempts + " times due to " +
           failedEvent.getDiagnostics() + ". Failing the application.";
@@ -899,11 +900,12 @@ public class RMAppImpl implements RMApp, Recoverable {
 
   }
   
-  private int getNumNonPreemptedAppAttempts() {
+  private int getNumFailedAppAttempts() {
     int completedAttempts = 0;
-    // Do not count AM preemption as attempt failure.
+    // Do not count AM preemption, hardware failures or NM resync
+    // as attempt failure.
     for (RMAppAttempt attempt : attempts.values()) {
-      if (!attempt.isPreempted()) {
+      if (attempt.shouldCountTowardsMaxAttemptRetry()) {
         completedAttempts++;
       }
     }
@@ -924,7 +926,7 @@ public class RMAppImpl implements RMApp, Recoverable {
     @Override
     public RMAppState transition(RMAppImpl app, RMAppEvent event) {
       if (!app.submissionContext.getUnmanagedAM() &&
-          app.getNumNonPreemptedAppAttempts() < app.maxAppAttempts) {
+           app.getNumFailedAppAttempts() < app.maxAppAttempts) {
         boolean transferStateFromPreviousAttempt;
         RMAppFailedAttemptEvent failedEvent = (RMAppFailedAttemptEvent) event;
         transferStateFromPreviousAttempt =
