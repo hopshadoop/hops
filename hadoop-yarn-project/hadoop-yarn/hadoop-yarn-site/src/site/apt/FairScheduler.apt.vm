@@ -241,9 +241,10 @@ Allocation file format
 
    * maxAMShare: limit the resource share from the leaf queue that can be used
      to run application master. maxAMShare * queue_fair_share is the maximum
-     resources that can be used by AMs in that leaf queue. Default value is
-     1.0f, which means AMs in that leaf queue can take up to 100% resources of
-     fair share.
+     resources that can be used by AMs in that leaf queue. For example, if set
+     to 1.0f, then AMs in the leaf queue can take up to 100% of both the memory
+     and CPU fair share. The default value is -1.0f, which means that this check
+     is disabled.
 
    * weight: to share the cluster non-proportionally with other queues. Weights
      default to 1, and a queue with weight 2 should receive approximately twice
