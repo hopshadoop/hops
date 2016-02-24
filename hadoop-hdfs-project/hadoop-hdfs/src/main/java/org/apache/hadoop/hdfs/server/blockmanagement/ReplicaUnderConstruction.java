@@ -19,6 +19,7 @@ import io.hops.metadata.common.FinderType;
 import io.hops.metadata.hdfs.entity.Replica;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.ReplicaState;
+import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 
 import java.util.Comparator;
 
@@ -58,7 +59,6 @@ public class ReplicaUnderConstruction extends Replica {
   }
 
   public static enum Order implements Comparator<ReplicaUnderConstruction> {
-
     ByStorageId() {
       @Override
       public int compare(ReplicaUnderConstruction o1, ReplicaUnderConstruction o2) {

@@ -52,12 +52,11 @@ public class BlockManagerTestUtil {
   }
 
   /**
-   * @return the datanode descriptor for the given the given storageID.
+   * @return the datanode descriptor for the given the given dnUuid.
    */
   public static DatanodeDescriptor getDatanode(final FSNamesystem ns,
-      final String storageID) {
-    return ns.getBlockManager().getDatanodeManager().getStorage(storageID)
-        .getDatanodeDescriptor();
+      final String dnUuid) {
+    return ns.getBlockManager().getDatanodeManager().getDatanodeByUuid(dnUuid);
   }
 
 

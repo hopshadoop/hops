@@ -33,6 +33,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Internal class for block metadata. BlockInfo class maintains for a given
@@ -76,7 +77,6 @@ public class BlockInfo extends Block {
           throw new IllegalStateException();
       }
     }
-
   }
   
   public static enum Order implements Comparator<BlockInfo> {
@@ -402,19 +402,21 @@ public class BlockInfo extends Block {
     return set.toArray(storages);
   }
 
-  /**
-   * Returns an array of Datanodes where the replicas are stored
-   */
   protected DatanodeDescriptor[] getDatanodes(DatanodeManager datanodeMgr,
       List<? extends ReplicaBase> replicas) {
-    DatanodeStorageInfo[] storages = getStorages(datanodeMgr, replicas);
-    HashSet<DatanodeDescriptor> datanodes = new HashSet<DatanodeDescriptor>();
-
-    for (DatanodeStorageInfo storage : storages) {
-      datanodes.add(storage.getDatanodeDescriptor());
+    int numLocations = replicas.size();
+    Set<DatanodeDescriptor> datanodes = new HashSet<DatanodeDescriptor>();
+    for (int i = numLocations - 1; i >= 0; i--) {
+      DatanodeDescriptor dn =
+          datanodeMgr.getStorage(replicas.get(i).getStorageId()).getDatanodeDescriptor();
+      if (dn != null) {
+        datanodes.add(dn);
+      } else {
+        replicas.remove(i);
+      }
     }
-
-    return datanodes.toArray(new DatanodeDescriptor[datanodes.size()]);
+    DatanodeDescriptor[] locations = new DatanodeDescriptor[datanodes.size()];
+    return datanodes.toArray(locations);
   }
 
   protected void add(Replica replica)

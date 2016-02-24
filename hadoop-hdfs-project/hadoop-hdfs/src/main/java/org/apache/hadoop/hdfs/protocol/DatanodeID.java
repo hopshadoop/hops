@@ -104,7 +104,7 @@ public class DatanodeID implements Comparable<DatanodeID> {
     this.peerHostName = peerHostName;
   }
   
-  public void setStorageID(String datandodeUuid) {
+  public void setDatanodeUuid(String datandodeUuid) {
     this.datanodeUuid = datandodeUuid;
   }
 

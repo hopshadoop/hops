@@ -122,6 +122,16 @@ public class BlockInfoUnderConstruction extends BlockInfo {
     return storages;
   }
 
+//  /**
+//   * Create array of expected replica locations (as has been assigned by
+//   * chooseTargets()).
+//   */
+//  public DatanodeDescriptor[] getExpectedLocations(DatanodeManager datanodeMgr)
+//      throws StorageException, TransactionContextException {
+//    List<ReplicaUnderConstruction> rpls = getExpectedReplicas();
+//    return getDatanodes(datanodeMgr, rpls);
+//  }
+
   /**
    * Get the number of expected locations
    */

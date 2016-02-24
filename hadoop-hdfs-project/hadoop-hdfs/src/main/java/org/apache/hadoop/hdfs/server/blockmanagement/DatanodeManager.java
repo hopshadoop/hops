@@ -71,6 +71,7 @@ import org.apache.hadoop.util.Daemon;
 import org.apache.hadoop.util.HostsFileReader;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.Time;
+import org.apache.zookeeper.KeeperException;
 
 import java.io.IOException;
 import java.net.InetAddress;
@@ -79,6 +80,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -1192,10 +1194,37 @@ public class DatanodeManager {
           BlockRecoveryCommand brCommand =
               new BlockRecoveryCommand(blocks.length);
           for (BlockInfoUnderConstruction b : blocks) {
-            brCommand.add(new RecoveringBlock(new ExtendedBlock(blockPoolId, b),
-                getDataNodeDescriptorsTx(b), b.getBlockRecoveryId()));
+            final DatanodeStorageInfo[] storages = b.getExpectedStorageLocations(this);
+
+            // Skip stale nodes during recovery - not heart beated for some time (30s by default).
+            final List<DatanodeStorageInfo> recoveryLocations =
+                new ArrayList<DatanodeStorageInfo>(storages.length);
+            for (int i = 0; i < storages.length; i++) {
+              if (!storages[i].getDatanodeDescriptor().isStale(staleInterval)) {
+                recoveryLocations.add(storages[i]);
+              }
+            }
+            // If we only get 1 replica after eliminating stale nodes, then choose all
+            // replicas for recovery and let the primary data node handle failures.
+            if (recoveryLocations.size() > 1) {
+              if (recoveryLocations.size() != storages.length) {
+                LOG.info("Skipped stale nodes for recovery : " +
+                    (storages.length - recoveryLocations.size()));
+              }
+              brCommand.add(new RecoveringBlock(
+                  new ExtendedBlock(blockPoolId, b),
+                  DatanodeStorageInfo.toDatanodeInfos(recoveryLocations),
+                  b.getBlockRecoveryId()));
+            } else {
+              // If too many replicas are stale, then choose all replicas to participate
+              // in block recovery.
+              brCommand.add(new RecoveringBlock(
+                  new ExtendedBlock(blockPoolId, b),
+                  DatanodeStorageInfo.toDatanodeInfos(storages),
+                  b.getBlockRecoveryId()));
+            }
           }
-          return new DatanodeCommand[]{brCommand};
+          return new DatanodeCommand[] { brCommand };
         }
 
         final List<DatanodeCommand> cmds = new ArrayList<DatanodeCommand>();
@@ -1401,35 +1430,6 @@ public class DatanodeManager {
     return rName;
   }
 
-  DatanodeDescriptor[] getDataNodeDescriptorsTx(
-      final BlockInfoUnderConstruction b) throws IOException {
-    final DatanodeManager datanodeManager = this;
-    return (DatanodeDescriptor[]) new HopsTransactionalRequestHandler(
-        HDFSOperationType.GET_EXPECTED_BLK_LOCATIONS) {
-      INodeIdentifier inodeIdentifier;
-
-      @Override
-      public void setUp() throws StorageException {
-        inodeIdentifier = INodeUtil.resolveINodeFromBlock(b);
-      }
-
-      @Override
-      public void acquireLock(TransactionLocks locks) throws IOException {
-        LockFactory lf = LockFactory.getInstance();
-        locks.add(
-            lf.getIndividualINodeLock(TransactionLockTypes.INodeLockType.READ,
-                inodeIdentifier))
-            .add(lf.getIndividualBlockLock(b.getBlockId(), inodeIdentifier))
-            .add(lf.getBlockRelated(BLK.RE, BLK.UC));
-      }
-
-      @Override
-      public Object performTask() throws StorageException, IOException {
-        return b.getExpectedStorageLocations(datanodeManager);
-      }
-    }.handle();
-  }
-
   /**
    * @return the datanode descriptor for the host.
    */
@@ -1446,16 +1446,32 @@ public class DatanodeManager {
 
     // Loop over all storages in the datanode
     for(DatanodeStorageInfo storage: nodeDescr.getStorageInfos()) {
+      // Allow lookup of storageId (String) -> sid (int)
       storageIdMap.update(storage);
+
+      // Allow lookup of sid (int) -> storageInfo (DatanodeStorageInfo)
+      updateStorage(storage);
     }
   }
 
   // TODO is this the best place for this?
-  public DatanodeStorageInfo getStorage(int sid) {
-    throw new UnsupportedOperationException("Not implemented yet");
+  // TODO check if there ever is concurrent access to this map (now
+  // everything is in synchronized blocks, but is that necessary?
+  private Map<Integer, DatanodeStorageInfo> storageInfoMap =
+      new HashMap<Integer, DatanodeStorageInfo>();
+
+  /**
+   * Adds or replaces storageinfo for the sid
+   */
+  public void updateStorage(DatanodeStorageInfo storageInfo) {
+    synchronized(storageInfoMap) {
+      storageInfoMap.put(storageInfo.getSid(), storageInfo);
+    }
   }
 
-  public DatanodeStorageInfo getStorage(String storageId) {
-    return getStorage(this.storageIdMap.getSId(storageId));
+  public DatanodeStorageInfo getStorage(int sid) {
+    synchronized(storageInfoMap) {
+      return storageInfoMap.get(sid);
+    }
   }
 }

@@ -457,6 +457,10 @@ public class DatanodeDescriptor extends DatanodeInfo {
 
   // TODO deal with this...
   public Iterator<BlockInfo> getBlockIterator() throws IOException {
+    // We could iterate over all storages, and then over all blocks within
+    // each storage?
+
+    // For now, let's just pretend we have a single function to deal with it:
     return getAllMachineBlockInfos().iterator();
   }
 
@@ -800,7 +804,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
         storage = new DatanodeStorageInfo(this, s);
         storageMap.put(s.getStorageID(), storage);
       } else if (storage.getState() != s.getState() ||
-          storage.getStorageType() != s.getStorageType()) {
+        storage.getStorageType() != s.getStorageType()) {
         // For backwards compatibility, make sure that the type and
         // state are updated. Some reports from older datanodes do
         // not include these fields so we may have assumed defaults.

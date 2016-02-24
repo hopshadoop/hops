@@ -68,7 +68,6 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
@@ -365,7 +364,7 @@ public class TestBlockManager {
             DFSTestUtil.getDatanodeDescriptor("5.5.5.5", "/rackA"),
             DFSTestUtil.getDatanodeDescriptor("6.6.6.6", "/rackA"));
     for (int i = 0; i < nodes.size(); i++) {
-      nodes.get(i).setStorageID("DN-Name-" + i);
+      nodes.get(i).setDatanodeUuid("DN-Name-" + i);
     }
     addNodes(nodes);
     List<DatanodeDescriptor> origNodes = nodes.subList(0, 3);

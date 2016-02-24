@@ -354,4 +354,21 @@ public class DatanodeStorageInfo {
     this.remaining = remaining;
     this.blockPoolUsed = blockPoolUsed;
   }
+
+  /** @return the first {@link DatanodeStorageInfo} corresponding to
+   *          the given datanode
+   */
+  static DatanodeStorageInfo getDatanodeStorageInfo(
+      final Iterable<DatanodeStorageInfo> infos,
+      final DatanodeDescriptor datanode) {
+    if (datanode == null) {
+      return null;
+    }
+    for(DatanodeStorageInfo storage : infos) {
+      if (storage.getDatanodeDescriptor() == datanode) {
+        return storage;
+      }
+    }
+    return null;
+  }
 }

@@ -93,7 +93,5 @@ public class ReplicaUnderConstructionDALAdaptor extends
     } else {
       return null;
     }
-
   }
-
 }
