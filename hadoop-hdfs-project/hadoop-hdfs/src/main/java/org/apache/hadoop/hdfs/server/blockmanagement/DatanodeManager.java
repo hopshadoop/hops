@@ -78,6 +78,7 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -1458,20 +1459,16 @@ public class DatanodeManager {
   // TODO check if there ever is concurrent access to this map (now
   // everything is in synchronized blocks, but is that necessary?
   private Map<Integer, DatanodeStorageInfo> storageInfoMap =
-      new HashMap<Integer, DatanodeStorageInfo>();
+      Collections.synchronizedMap(new HashMap<Integer, DatanodeStorageInfo>());
 
   /**
    * Adds or replaces storageinfo for the sid
    */
   public void updateStorage(DatanodeStorageInfo storageInfo) {
-    synchronized(storageInfoMap) {
-      storageInfoMap.put(storageInfo.getSid(), storageInfo);
-    }
+    storageInfoMap.put(storageInfo.getSid(), storageInfo);
   }
 
   public DatanodeStorageInfo getStorage(int sid) {
-    synchronized(storageInfoMap) {
-      return storageInfoMap.get(sid);
-    }
+    return storageInfoMap.get(sid);
   }
 }

@@ -122,16 +122,6 @@ public class BlockInfoUnderConstruction extends BlockInfo {
     return storages;
   }
 
-//  /**
-//   * Create array of expected replica locations (as has been assigned by
-//   * chooseTargets()).
-//   */
-//  public DatanodeDescriptor[] getExpectedLocations(DatanodeManager datanodeMgr)
-//      throws StorageException, TransactionContextException {
-//    List<ReplicaUnderConstruction> rpls = getExpectedReplicas();
-//    return getDatanodes(datanodeMgr, rpls);
-//  }
-
   /**
    * Get the number of expected locations
    */
@@ -277,17 +267,15 @@ public class BlockInfoUnderConstruction extends BlockInfo {
     return replicas;
   }
 
-  private ReplicaUnderConstruction addExpectedReplica(int storageId,
-      ReplicaState rState)
+  private ReplicaUnderConstruction addExpectedReplica(int sid, ReplicaState rState)
       throws StorageException, TransactionContextException {
-    if (hasExpectedReplicaIn(storageId)) {
+    if (hasExpectedReplicaIn(sid)) {
       NameNode.blockStateChangeLog.warn(
-          "BLOCK* Trying to store multiple blocks of the file on one DataNode. Returning null");
+          "BLOCK* Trying to store multiple blocks of the file on one storage. Returning null");
       return null;
     }
     ReplicaUnderConstruction replica =
-        new ReplicaUnderConstruction(rState, storageId, getBlockId(),
-            getInodeId());
+        new ReplicaUnderConstruction(rState, sid, getBlockId(), getInodeId());
     add(replica);
     return replica;
   }

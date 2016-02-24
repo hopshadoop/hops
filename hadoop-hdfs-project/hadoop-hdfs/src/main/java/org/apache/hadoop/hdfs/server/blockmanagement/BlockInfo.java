@@ -221,12 +221,13 @@ public class BlockInfo extends Block {
    * Returns the storage on the given node which stores this block, or null
    * if it can't find such a storage.
    */
-  public DatanodeStorageInfo getStorageOnNode(DatanodeDescriptor node) {
+  public DatanodeStorageInfo getStorageOnNode(DatanodeDescriptor node)
+      throws TransactionContextException, StorageException {
     // TODO HDP_2.6 this is like a join -> should be done in SQL probably...
     DatanodeStorageInfo[] storagesOnNode = node.getStorageInfos();
 
     for(DatanodeStorageInfo s : storagesOnNode) {
-      if (s.getDatanodeDescriptor().equals(node)) {
+      if (this.isReplicatedOnStorage(s)) {
         return s;
       }
     }
