@@ -1205,15 +1205,17 @@ public class CapacityScheduler extends
           if (appAttempt1 != null) {
             Container masterContainer = appAttempt1.getMasterContainer();
 
-            // Mark current running AMContainer's RMContainer based on the master
-            // container ID stored in AppAttempt
-            Collection<RMContainer> rmContainers = app.getCurrentAppAttempt()
-                    .getLiveContainers();
+            if (masterContainer != null) {
+              // Mark current running AMContainer's RMContainer based on the master
+              // container ID stored in AppAttempt
+              Collection<RMContainer> rmContainers = app.getCurrentAppAttempt()
+                      .getLiveContainers();
 
-            for (RMContainer rmContainer : rmContainers) {
-              if (masterContainer != null
-                      && masterContainer.getId().equals(rmContainer.getContainerId())) {
-                ((RMContainerImpl)rmContainer).setAMContainer(true);
+              for (RMContainer rmContainer : rmContainers) {
+                if (masterContainer.getId().equals(rmContainer.getContainerId())) {
+                  ((RMContainerImpl) rmContainer).setAMContainer(true);
+                  break;
+                }
               }
             }
           }
