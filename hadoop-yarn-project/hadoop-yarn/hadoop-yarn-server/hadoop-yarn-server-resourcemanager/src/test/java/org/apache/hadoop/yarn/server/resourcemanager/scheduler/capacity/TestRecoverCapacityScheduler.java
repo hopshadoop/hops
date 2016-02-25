@@ -28,13 +28,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
-import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.hadoop.yarn.api.records.NodeId;
-import org.apache.hadoop.yarn.api.records.Priority;
-import org.apache.hadoop.yarn.api.records.QueueACL;
-import org.apache.hadoop.yarn.api.records.Resource;
-import org.apache.hadoop.yarn.api.records.ResourceRequest;
+import org.apache.hadoop.yarn.api.records.*;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
@@ -56,15 +50,14 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaS
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.AppAddedSchedulerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.AppAttemptAddedSchedulerEvent;
 import org.apache.hadoop.yarn.util.resource.Resources;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
 import org.junit.Before;
 import org.junit.Test;
 import io.hops.metadata.yarn.entity.appmasterrpc.RPC;
 import java.util.ArrayList;
 import java.util.Collection;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
+
+import static org.junit.Assert.*;
 
 public class TestRecoverCapacityScheduler {
 
@@ -408,6 +401,87 @@ public class TestRecoverCapacityScheduler {
     }
 
     mockResMan.stop();
+  }
+
+  @Test(timeout = 90000)
+  public void testAMStatusWithRMRestart() throws Exception {
+    MockRM rm1 = new MockRM(conf);
+    rm1.start();
+
+    MockNM nm = rm1.registerNode("host0:1234", 10 * GB);
+    MockNM nm1 = rm1.registerNode("host1:1234", 10 * GB);
+
+    RMApp application = rm1.submitApp(2 * GB, "", "user1", null, "a");
+
+    nm.nodeHeartbeat(true);
+
+    Thread.sleep(1000);
+    RMAppAttempt attempt = application.getCurrentAppAttempt();
+
+    MockAM appManager = rm1.sendAMLaunched(attempt.getAppAttemptId());
+    appManager.registerAppAttempt();
+
+    appManager.allocate("host0", 1 * GB, 1, new ArrayList<ContainerId>());
+    nm.nodeHeartbeat(true);
+    List<Container> conts = appManager.allocate(new ArrayList<ResourceRequest>(),
+            new ArrayList<ContainerId>()).getAllocatedContainers();
+    int contReceived = conts.size();
+    int waitCount = 0;
+    while (contReceived < 1 && waitCount++ < 200) {
+      LOG.info(
+              "Got " + contReceived + " containers. Waiting to get 1");
+      Thread.sleep(100);
+      conts = appManager.allocate(new ArrayList<ResourceRequest>(),
+              new ArrayList<ContainerId>()).getAllocatedContainers();
+      contReceived += conts.size();
+      nm.nodeHeartbeat(true);
+    }
+    Thread.sleep(2000);
+
+    CapacityScheduler capacityScheduler = (CapacityScheduler) rm1.
+            getResourceScheduler();
+    SchedulerNodeReport nmReport = capacityScheduler.getNodeReport(
+            nm.getNodeId());
+
+    // lets check the application resource usage
+    assertEquals("2 GB AM and 1 GB another container", 3 * GB, nmReport.getUsedResource()
+            .getMemory());
+    assertEquals("1 Container for the AM and another one requested", 2,
+            nmReport.getNumContainers());
+
+    rm1.stop();
+
+    // Start second RM
+    conf.setBoolean(YarnConfiguration.RECOVERY_ENABLED, true);
+    NDBRMStateStore stateStore = new NDBRMStateStore();
+    stateStore.init(conf);
+    MockRM rm2 = new MockRM(conf, stateStore);
+    rm2.start();
+    CapacityScheduler scheduler = (CapacityScheduler) rm2.getResourceScheduler();
+
+    Map<ApplicationId, SchedulerApplication<FiCaSchedulerApp>> apps = scheduler.
+            getSchedulerApplications();
+    assertTrue("app " + application.getApplicationId() + " was not recovered",
+            apps.containsKey(application.getApplicationId()));
+
+    SchedulerApplication<FiCaSchedulerApp> attempt1 = apps.get(application.getApplicationId());
+
+    assertTrue("AM container should be marked", scheduler.getRMContainer(
+            attempt.getMasterContainer().getId()).isAMContainer());
+
+    Collection<RMContainer> attempt1Containers = attempt1.getCurrentAppAttempt().getLiveContainers();
+
+    ContainerId nonAMContainer = null;
+    for (RMContainer c : attempt1Containers) {
+      if (!c.getContainerId().equals(attempt.getMasterContainer().getId())) {
+        nonAMContainer = c.getContainerId();
+        break;
+      }
+    }
+    assertFalse("Normal container should not be marked as AM", scheduler.getRMContainer(
+            nonAMContainer).isAMContainer());
+
+    rm2.stop();
   }
 
   @Test(timeout = 90000)
