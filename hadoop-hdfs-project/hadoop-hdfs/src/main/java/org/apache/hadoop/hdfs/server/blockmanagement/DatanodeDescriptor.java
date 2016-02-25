@@ -20,6 +20,7 @@ package org.apache.hadoop.hdfs.server.blockmanagement;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.HdfsStorageFactory;
+import io.hops.metadata.StorageMap;
 import io.hops.metadata.hdfs.dal.BlockInfoDataAccess;
 import io.hops.metadata.hdfs.dal.StorageDataAccess;
 import io.hops.transaction.handler.HDFSOperationType;
@@ -216,13 +217,21 @@ public class DatanodeDescriptor extends DatanodeInfo {
   private int PendingReplicationWithoutTargets = 0;
 
   /**
+   * The mapping of storageIds (int) to DatanodeStorageInfo's
+   * Updates here affect the storageMap in the DatanodeManager (so don't
+   * change the references)
+   */
+  private final StorageMap globalStorageMap;
+
+  /**
    * DatanodeDescriptor constructor
    *
    * @param nodeID
    *     id of the data node
    */
-  public DatanodeDescriptor(DatanodeID nodeID) {
+  public DatanodeDescriptor(StorageMap storageMap, DatanodeID nodeID) {
     super(nodeID);
+    this.globalStorageMap = storageMap;
     updateHeartbeatState(StorageReport.EMPTY_ARRAY, 0, 0);
   }
 
@@ -234,8 +243,10 @@ public class DatanodeDescriptor extends DatanodeInfo {
    * @param networkLocation
    *     location of the data node in network
    */
-  public DatanodeDescriptor(DatanodeID nodeID, String networkLocation) {
+  public DatanodeDescriptor(StorageMap storageMap, DatanodeID nodeID, String
+      networkLocation) {
     super(nodeID, networkLocation);
+    this.globalStorageMap = storageMap;
     updateHeartbeatState(StorageReport.EMPTY_ARRAY, 0, 0);
   }
 
@@ -810,6 +821,10 @@ public class DatanodeDescriptor extends DatanodeInfo {
         // not include these fields so we may have assumed defaults.
         storage.updateFromStorage(s);
       }
+
+      // Also update the list kept by the DatanodeManager
+      globalStorageMap.updateStorage(storage);
+
       return storage;
     }
   }

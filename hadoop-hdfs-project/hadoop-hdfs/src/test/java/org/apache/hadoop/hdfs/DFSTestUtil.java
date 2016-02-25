@@ -22,6 +22,7 @@ import com.google.common.base.Charsets;
 import com.google.common.base.Joiner;
 import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
+import io.hops.metadata.StorageMap;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.security.Users;
 import io.hops.transaction.handler.HDFSOperationType;
@@ -117,14 +118,14 @@ public class DFSTestUtil {
   /**
    * Creates a new instance of DFSTestUtil
    *
-   * @param testName
-   *     Name of the test from where this utility is used
    * @param nFiles
    *     Number of files to be created
    * @param maxLevels
    *     Maximum number of directory levels
    * @param maxSize
    *     Maximum size for file
+   * @param minSize
+   *     Minimum size for file
    */
   private DFSTestUtil(int nFiles, int maxLevels, int maxSize, int minSize) {
     this.nFiles = nFiles;
@@ -887,7 +888,7 @@ public class DFSTestUtil {
   }
 
   public static DatanodeDescriptor getLocalDatanodeDescriptor() {
-    return new DatanodeDescriptor(getLocalDatanodeID());
+    return new DatanodeDescriptor(new StorageMap(), getLocalDatanodeID());
   }
 
   public static DatanodeInfo getLocalDatanodeInfo() {
@@ -943,7 +944,7 @@ public class DFSTestUtil {
     DatanodeID dnId = new DatanodeID(ipAddr, hostname, "", port,
         DFSConfigKeys.DFS_DATANODE_HTTP_DEFAULT_PORT,
         DFSConfigKeys.DFS_DATANODE_IPC_DEFAULT_PORT);
-    return new DatanodeDescriptor(dnId, rackLocation);
+    return new DatanodeDescriptor(new StorageMap(), dnId, rackLocation);
   }
 
   public static DatanodeStorageInfo[] createDatanodeStorageInfos(String[] racks) {
