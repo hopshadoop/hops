@@ -237,6 +237,9 @@ public class DatanodeID implements Comparable<DatanodeID> {
   
   @Override
   public int hashCode() {
+    if(datanodeUuid == null) {
+      return getXferAddr().hashCode();
+    }
     return getXferAddr().hashCode() ^ datanodeUuid.hashCode();
   }
   
