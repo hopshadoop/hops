@@ -288,7 +288,7 @@ public class DatanodeProtocolClientSideTranslatorPB
             .setNewGenStamp(newgenerationstamp).setNewLength(newlength)
             .setCloseFile(closeFile).setDeleteBlock(deleteblock);
     for (int i = 0; i < newtargets.length; i++) {
-      builder.addNewTaragets(PBHelper.convert(newtargets[i]));
+      builder.addNewTargets(PBHelper.convert(newtargets[i]));
       builder.addNewTargetStorages(newtargetstorages[i]);
     }
     CommitBlockSynchronizationRequestProto req = builder.build();

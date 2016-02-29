@@ -226,7 +226,7 @@ public class DatanodeProtocolServerSideTranslatorPB
   public CommitBlockSynchronizationResponseProto commitBlockSynchronization(
       RpcController controller, CommitBlockSynchronizationRequestProto request)
       throws ServiceException {
-    List<DatanodeIDProto> dnprotos = request.getNewTaragetsList();
+    List<DatanodeIDProto> dnprotos = request.getNewTargetsList();
     DatanodeID[] dns = new DatanodeID[dnprotos.size()];
     for (int i = 0; i < dnprotos.size(); i++) {
       dns[i] = PBHelper.convert(dnprotos.get(i));

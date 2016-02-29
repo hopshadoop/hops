@@ -295,7 +295,7 @@ message CommitBlockSynchronizationRequestProto {
   required uint64 newLength = 3;
   required bool closeFile = 4;
   required bool deleteBlock = 5;
-  repeated DatanodeIDProto newTaragets = 6;
+  repeated DatanodeIDProto newTargets = 6;
   repeated string newTargetStorages = 7;
 }
 
