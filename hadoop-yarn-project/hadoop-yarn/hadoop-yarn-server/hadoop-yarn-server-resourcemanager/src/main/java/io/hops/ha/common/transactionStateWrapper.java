@@ -386,5 +386,20 @@ public class transactionStateWrapper extends TransactionStateImpl {
           ApplicationAttemptId appAttemptId) {
     ts.addAllJustFinishedContainersToRemove(status, appAttemptId);
   }
-  
+
+  public void addCSPreemptedContainersToAdd(String rmContainerId, long preemptionTime) {
+    ts.addCSPreemptedContainersToAdd(rmContainerId, preemptionTime);
+  }
+
+  public void persistCSPreemptedContainersToAdd() throws StorageException {
+    ts.persistCSPreemptedContainersToAdd();
+  }
+
+  public void addCSPreemptedContainersToRemove(String rmContainerId) {
+    ts.addCSPreemptedContainersToRemove(rmContainerId);
+  }
+
+  public void persistCSPreemptedContainersToRemove() throws StorageException {
+    ts.persistCSPreemptedContainersToRemove();
+  }
 }

@@ -37,6 +37,7 @@ import io.hops.metadata.yarn.dal.RMNodeDataAccess;
 import io.hops.metadata.yarn.dal.ResourceDataAccess;
 import io.hops.metadata.yarn.dal.UpdatedContainerInfoDataAccess;
 import io.hops.metadata.yarn.dal.capacity.CSLeafQueueUserInfoDataAccess;
+import io.hops.metadata.yarn.dal.capacity.CSPreemptedContainersDataAccess;
 import io.hops.metadata.yarn.dal.capacity.CSQueueDataAccess;
 import io.hops.metadata.yarn.dal.fair.FSSchedulerNodeDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.AllocateResponseDataAccess;
@@ -54,6 +55,7 @@ import io.hops.metadata.yarn.entity.RMContainer;
 import io.hops.metadata.yarn.entity.RMNode;
 import io.hops.metadata.yarn.entity.RMNodeToAdd;
 import io.hops.metadata.yarn.entity.Resource;
+import io.hops.metadata.yarn.entity.capacity.CSPreemptedContainers;
 import io.hops.metadata.yarn.entity.rmstatestore.AllocateResponse;
 import io.hops.metadata.yarn.entity.rmstatestore.ApplicationAttemptState;
 import io.hops.metadata.yarn.entity.rmstatestore.ApplicationState;
@@ -75,13 +77,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeImpl;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Queue;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentSkipListMap;
@@ -151,8 +147,11 @@ public class TransactionStateImpl extends TransactionState {
   private org.apache.hadoop.yarn.api.records.Resource clusterResourceToUpdate;
   private org.apache.hadoop.yarn.api.records.Resource usedResourceToUpdate;
   
-  
-  
+  // Preempted Containers of Capacity Scheduler preemption policy
+  private final Collection<CSPreemptedContainers> csPreemptedContainersToAdd =
+          new HashSet<CSPreemptedContainers>();
+  private final Collection<CSPreemptedContainers> csPreemptedContainersToRemove =
+          new HashSet<CSPreemptedContainers>();
 
   //PersistedEvent to persist for distributed RT
   private final Queue<PendingEvent> pendingEventsToAdd =
@@ -222,6 +221,8 @@ public class TransactionStateImpl extends TransactionState {
     persistAllocateResponsesToRemove();
     persistRMContainerToUpdate();
     persistContainers();
+    persistCSPreemptedContainersToAdd();
+    persistCSPreemptedContainersToRemove();
     //TODO rebuild cluster resource from node resources
 //    persistClusterResourceToUpdate();
 //    persistUsedResourceToUpdate();
@@ -458,7 +459,36 @@ public class TransactionStateImpl extends TransactionState {
       toRemove.add(((ContainerStatusPBImpl)container).getProto().toByteArray());
     }
   }
-  
+
+  public void addCSPreemptedContainersToAdd(String rmContainerId, long preemptionTime) {
+    CSPreemptedContainers contToAdd = new CSPreemptedContainers(rmContainerId,
+            preemptionTime);
+    csPreemptedContainersToRemove.remove(contToAdd);
+    csPreemptedContainersToAdd.add(contToAdd);
+  }
+
+  public void persistCSPreemptedContainersToAdd() throws StorageException {
+    if (!csPreemptedContainersToAdd.isEmpty()) {
+      CSPreemptedContainersDataAccess csPreContDA = (CSPreemptedContainersDataAccess)
+              RMStorageFactory.getDataAccess(CSPreemptedContainersDataAccess.class);
+      csPreContDA.addAll(csPreemptedContainersToAdd);
+    }
+  }
+
+  public void addCSPreemptedContainersToRemove(String rmContainerId) {
+    CSPreemptedContainers contToRemove = new CSPreemptedContainers(rmContainerId, -1L);
+    csPreemptedContainersToAdd.remove(contToRemove);
+    csPreemptedContainersToRemove.add(contToRemove);
+  }
+
+  public void persistCSPreemptedContainersToRemove() throws StorageException {
+    if (!csPreemptedContainersToRemove.isEmpty()) {
+      CSPreemptedContainersDataAccess csPreContDA = (CSPreemptedContainersDataAccess)
+              RMStorageFactory.getDataAccess(CSPreemptedContainersDataAccess.class);
+      csPreContDA.removeAll(csPreemptedContainersToRemove);
+    }
+  }
+
   public void addAllRanNodes(RMAppAttempt appAttempt) {
     Map<Integer, RanNode> ranNodeToPersist = new HashMap<Integer, RanNode>();
     Queue<NodeId> ranNodes = new ConcurrentLinkedQueue<NodeId>(appAttempt.getRanNodes());

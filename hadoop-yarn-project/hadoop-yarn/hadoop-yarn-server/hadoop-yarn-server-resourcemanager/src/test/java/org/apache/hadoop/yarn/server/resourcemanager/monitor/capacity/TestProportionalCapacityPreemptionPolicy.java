@@ -38,44 +38,44 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.hops.metadata.util.RMStorageFactory;
+import io.hops.metadata.util.RMUtilities;
+import io.hops.metadata.util.YarnAPIStorageFactory;
+import io.hops.metadata.yarn.entity.capacity.CSPreemptedContainers;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.service.Service;
-import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
-import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.hadoop.yarn.api.records.Container;
-import org.apache.hadoop.yarn.api.records.ContainerId;
-import org.apache.hadoop.yarn.api.records.Resource;
+import org.apache.hadoop.yarn.api.records.*;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.event.EventHandler;
+import org.apache.hadoop.yarn.server.resourcemanager.MockAM;
+import org.apache.hadoop.yarn.server.resourcemanager.MockNM;
 import org.apache.hadoop.yarn.server.resourcemanager.MockRM;
+import org.apache.hadoop.yarn.server.resourcemanager.monitor.SchedulingEditPolicy;
 import org.apache.hadoop.yarn.server.resourcemanager.monitor.SchedulingMonitor;
+import org.apache.hadoop.yarn.server.resourcemanager.recovery.NDBRMStateStore;
+import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
 import org.apache.hadoop.yarn.server.resourcemanager.resource.Priority;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
+import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ContainerPreemptEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ContainerPreemptEventType;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CSQueue;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.LeafQueue;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.ParentQueue;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.*;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerApp;
 import org.apache.hadoop.yarn.util.Clock;
+import org.apache.hadoop.yarn.util.Records;
 import org.apache.hadoop.yarn.util.resource.DefaultResourceCalculator;
 import org.apache.hadoop.yarn.util.resource.ResourceCalculator;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.*;
 import org.junit.rules.TestName;
 import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatcher;
+import sun.tools.java.ScannerInputReader;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.Deque;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.NavigableSet;
-import java.util.Random;
-import java.util.TreeSet;
+import java.io.IOException;
+import java.util.*;
 
 public class TestProportionalCapacityPreemptionPolicy {
 
@@ -108,13 +108,19 @@ public class TestProportionalCapacityPreemptionPolicy {
 
   @Before
   @SuppressWarnings("unchecked")
-  public void setup() {
+  public void setup() throws Exception {
     conf = new Configuration(false);
     conf.setLong(WAIT_TIME_BEFORE_KILL, 10000);
     conf.setLong(MONITORING_INTERVAL, 3000);
     // report "ideal" preempt
     conf.setFloat(TOTAL_PREEMPTION_PER_ROUND, (float) 1.0);
     conf.setFloat(NATURAL_TERMINATION_FACTOR, (float) 1.0);
+
+    conf.setBoolean(YarnConfiguration.RECOVERY_ENABLED, true);
+    conf.setClass(YarnConfiguration.RM_STORE, NDBRMStateStore.class, RMStateStore.class);
+    YarnAPIStorageFactory.setConfiguration(conf);
+    RMStorageFactory.setConfiguration(conf);
+    RMUtilities.InitializeDB();
 
     mClock = mock(Clock.class);
     mCS = mock(CapacityScheduler.class);
@@ -204,7 +210,10 @@ public class TestProportionalCapacityPreemptionPolicy {
   }
 
   @Test
-  public void testExpireKill() {
+  public void testExpireKill() throws Exception {
+    TransactionState transactionState = new TransactionStateImpl(
+            TransactionState.TransactionType.RM);
+
     final long killTime = 10000L;
     int[][] qData = new int[][]{
         //  /   A   B   C
@@ -222,18 +231,46 @@ public class TestProportionalCapacityPreemptionPolicy {
 
     // ensure all pending rsrc from A get preempted from other queues
     when(mClock.getTime()).thenReturn(0L);
-    policy.editSchedule(null);
+    policy.editSchedule(transactionState);
+    transactionState.decCounter(TransactionState.TransactionType.RM);
     verify(mDisp, times(10)).handle(argThat(new IsPreemptionRequestFor(appC)));
+    Thread.sleep(2000);
+    Map<String, CSPreemptedContainers> result0 =
+            RMUtilities.getAllCSPreemptedContainers();
+    Assert.assertEquals("There should be 10 preempted containers persisted", 10,
+            result0.size());
 
+    transactionState = new TransactionStateImpl(TransactionState.TransactionType.RM);
     // requests reiterated
     when(mClock.getTime()).thenReturn(killTime / 2);
-    policy.editSchedule(null);
+    policy.editSchedule(transactionState);
+    transactionState.decCounter(TransactionState.TransactionType.RM);
     verify(mDisp, times(20)).handle(argThat(new IsPreemptionRequestFor(appC)));
+    Thread.sleep(2000);
+    Map<String, CSPreemptedContainers> result1 =
+            RMUtilities.getAllCSPreemptedContainers();
+    boolean equals = true;
+    for (String contId : result1.keySet()) {
+      if (!result0.containsKey(contId)) {
+        equals = false;
+        break;
+      }
+    }
+    Assert.assertTrue("Nothing should have changed in store", equals);
+    Assert.assertEquals("We should still have 10 preempted containers", 10,
+            result1.size());
 
+    transactionState = new TransactionStateImpl(TransactionState.TransactionType.RM);
     // kill req sent
     when(mClock.getTime()).thenReturn(killTime + 1);
-    policy.editSchedule(null);
+    policy.editSchedule(transactionState);
+    transactionState.decCounter(TransactionState.TransactionType.RM);
     verify(mDisp, times(30)).handle(evtCaptor.capture());
+    Thread.sleep(2000);
+    result0 = RMUtilities.getAllCSPreemptedContainers();
+    Assert.assertTrue("Containers have been killed, thus removed from store",
+            result0.isEmpty());
+
     List<ContainerPreemptEvent> events = evtCaptor.getAllValues();
     for (ContainerPreemptEvent e : events.subList(20, 30)) {
       assertEquals(appC, e.getAppId());
@@ -446,7 +483,7 @@ public class TestProportionalCapacityPreemptionPolicy {
     conf.set(YarnConfiguration.RM_SCHEDULER_MONITOR_POLICIES,
         ProportionalCapacityPreemptionPolicy.class.getCanonicalName());
     conf.setBoolean(YarnConfiguration.RM_SCHEDULER_ENABLE_MONITORS, true);
-    
+
     @SuppressWarnings("resource")
     MockRM rm = new MockRM(conf);
     rm.init(conf);
@@ -471,7 +508,7 @@ public class TestProportionalCapacityPreemptionPolicy {
   }
   
   @Test
-  public void testSkipAMContainer() {
+  public void testSkipAMContainer() throws Exception {
     int[][] qData = new int[][] {
         //  /   A   B
         { 100, 50, 50 }, // abs
@@ -485,9 +522,8 @@ public class TestProportionalCapacityPreemptionPolicy {
     };
     setAMContainer = true;
     ProportionalCapacityPreemptionPolicy policy = buildPolicy(qData);
-    policy.editSchedule(
-            new TransactionStateImpl(TransactionState.TransactionType.RM));
-    
+
+    policy.editSchedule(null);
     // By skipping AM Container, all other 24 containers of appD will be
     // preempted
     verify(mDisp, times(24)).handle(argThat(new IsPreemptionRequestFor(appD)));
@@ -517,8 +553,7 @@ public class TestProportionalCapacityPreemptionPolicy {
     };
     setAMContainer = true;
     ProportionalCapacityPreemptionPolicy policy = buildPolicy(qData);
-    policy.editSchedule(
-            new TransactionStateImpl(TransactionState.TransactionType.RM));
+    policy.editSchedule(null);
    
     // All 5 containers of appD will be preempted including AM container.
     verify(mDisp, times(5)).handle(argThat(new IsPreemptionRequestFor(appD)));
@@ -552,8 +587,7 @@ public class TestProportionalCapacityPreemptionPolicy {
     setAMContainer = true;
     setAMResourcePercent = 0.5f;
     ProportionalCapacityPreemptionPolicy policy = buildPolicy(qData);
-    policy.editSchedule(
-            new TransactionStateImpl(TransactionState.TransactionType.RM));
+    policy.editSchedule(null);
     
     // AMResoucePercent is 50% of cluster and maxAMCapacity will be 5Gb.
     // Total used AM container size is 20GB, hence 2 AM container has

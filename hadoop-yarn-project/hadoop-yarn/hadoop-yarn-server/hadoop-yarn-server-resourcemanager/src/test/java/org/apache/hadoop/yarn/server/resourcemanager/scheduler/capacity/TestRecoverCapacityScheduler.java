@@ -35,6 +35,9 @@ import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
 import org.apache.hadoop.yarn.server.resourcemanager.MockAM;
 import org.apache.hadoop.yarn.server.resourcemanager.MockNM;
 import org.apache.hadoop.yarn.server.resourcemanager.MockRM;
+import org.apache.hadoop.yarn.server.resourcemanager.monitor.SchedulingEditPolicy;
+import org.apache.hadoop.yarn.server.resourcemanager.monitor.SchedulingMonitor;
+import org.apache.hadoop.yarn.server.resourcemanager.monitor.capacity.ProportionalCapacityPreemptionPolicy;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.NDBRMStateStore;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
@@ -50,6 +53,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaS
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.AppAddedSchedulerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.AppAttemptAddedSchedulerEvent;
 import org.apache.hadoop.yarn.util.resource.Resources;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import io.hops.metadata.yarn.entity.appmasterrpc.RPC;
@@ -488,6 +492,11 @@ public class TestRecoverCapacityScheduler {
   public void testCapacitySchedulerRecovery() throws Exception {
 
     LOG.info("--- START: testCapacityScheduler ---");
+    conf.setBoolean(YarnConfiguration.RM_SCHEDULER_ENABLE_MONITORS, true);
+    conf.setClass(YarnConfiguration.RM_SCHEDULER_MONITOR_POLICIES,
+            ProportionalCapacityPreemptionPolicy.class,
+            SchedulingEditPolicy.class);
+
     MockRM mockResMan = new MockRM(conf);
     mockResMan.start();
 
@@ -523,6 +532,20 @@ public class TestRecoverCapacityScheduler {
     // appManager_3.registerAppAttempt();
     CapacityScheduler capacityScheduler = (CapacityScheduler) mockResMan.
             getResourceScheduler();
+
+    // Add container to the preemption list and persist it
+    RMContainer toPreemptContainer = capacityScheduler.getRMContainer(
+            attempt_1.getMasterContainer().getId());
+    ProportionalCapacityPreemptionPolicy policy = getPreemptionPolicy(mockResMan);
+    Assert.assertNotNull("ProportionalPreemptionPolicy is null", policy);
+    if (policy != null) {
+      policy.addPreemptedContainer(toPreemptContainer);
+      TransactionState transactionState =
+              new TransactionStateImpl(TransactionState.TransactionType.RM);
+      policy.persistPreempted(transactionState);
+      transactionState.decCounter(TransactionState.TransactionType.RM);
+    }
+
     SchedulerNodeReport report_nm1 = capacityScheduler.getNodeReport(
             nodeManager1.getNodeId());
 
@@ -551,6 +574,20 @@ public class TestRecoverCapacityScheduler {
     Map<NodeId, FiCaSchedulerNode> afterRecoveryNodes = scheduler.getAllNodes();
     assertEquals(2, afterRecoveryNodes.size());
 
+    // Check that CS preempted containers are recovered
+    policy = getPreemptionPolicy(rm2);
+    Assert.assertNotNull("ProportionalPreemptionPolicy is null", policy);
+    if (policy != null) {
+      Map<RMContainer, Long> preemptedContainers = policy.getPreemptedContainers();
+      Assert.assertEquals("One preempted container should be there", 1,
+              preemptedContainers.size());
+      for (Map.Entry<RMContainer, Long> entry : preemptedContainers.entrySet()) {
+        Assert.assertEquals("Container: " + toPreemptContainer.getContainerId().toString()
+                + " should be there", toPreemptContainer.getContainerId().toString(),
+                entry.getKey().getContainerId().toString());
+      }
+    }
+
     //TODO, check that the queuemetrics are good
     QueueMetrics queueMetrics = scheduler.getRootQueueMetrics();
     assertTrue("wrong queueMetrics value", queueMetrics.getActiveApps()
@@ -570,6 +607,21 @@ public class TestRecoverCapacityScheduler {
     //ha_rmcontainer
     //ha_resourcerequest
     // we have to implement the recover function reload the capacity scheduler
+  }
+
+
+  private ProportionalCapacityPreemptionPolicy getPreemptionPolicy(MockRM rm) {
+    List<SchedulingMonitor> monitors = rm.getRMActiveService().getSchedulingMonitors();
+    SchedulingEditPolicy policy = null;
+
+    for (SchedulingMonitor mon : monitors) {
+      policy = mon.getSchedulingEditPolicy();
+
+      if (policy instanceof ProportionalCapacityPreemptionPolicy) {
+        return (ProportionalCapacityPreemptionPolicy) policy;
+      }
+    }
+    return null;
   }
 
   private TransactionState getTransactionState(int id) {

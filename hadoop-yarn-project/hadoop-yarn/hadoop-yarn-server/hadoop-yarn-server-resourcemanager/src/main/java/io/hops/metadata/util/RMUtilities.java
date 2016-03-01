@@ -52,6 +52,7 @@ import io.hops.metadata.yarn.dal.SchedulerApplicationDataAccess;
 import io.hops.metadata.yarn.dal.UpdatedContainerInfoDataAccess;
 import io.hops.metadata.yarn.dal.YarnVariablesDataAccess;
 import io.hops.metadata.yarn.dal.capacity.CSLeafQueueUserInfoDataAccess;
+import io.hops.metadata.yarn.dal.capacity.CSPreemptedContainersDataAccess;
 import io.hops.metadata.yarn.dal.capacity.CSQueueDataAccess;
 import io.hops.metadata.yarn.dal.capacity.FiCaSchedulerAppReservedContainersDataAccess;
 import io.hops.metadata.yarn.dal.fair.AppSchedulableDataAccess;
@@ -99,6 +100,7 @@ import io.hops.metadata.yarn.entity.UpdatedContainerInfo;
 import io.hops.metadata.yarn.entity.YarnVariables;
 import io.hops.metadata.yarn.entity.appmasterrpc.RPC;
 import io.hops.metadata.yarn.entity.capacity.CSLeafQueueUserInfo;
+import io.hops.metadata.yarn.entity.capacity.CSPreemptedContainers;
 import io.hops.metadata.yarn.entity.capacity.CSQueue;
 import io.hops.metadata.yarn.entity.capacity.FiCaSchedulerAppReservedContainers;
 import io.hops.metadata.yarn.entity.rmstatestore.AllocateResponse;
@@ -2424,6 +2426,13 @@ public static Map<String, List<ResourceRequest>> getAllResourceRequestsFullTrans
     CSQueueDataAccess csqDA = (CSQueueDataAccess) RMStorageFactory.
             getDataAccess(CSQueueDataAccess.class);
     return csqDA.getAll();
+  }
+
+  public static Map<String, CSPreemptedContainers> getAllCSPreemptedContainers()
+    throws IOException {
+    CSPreemptedContainersDataAccess csPrConDA = (CSPreemptedContainersDataAccess)
+            RMStorageFactory.getDataAccess(CSPreemptedContainersDataAccess.class);
+    return csPrConDA.getAll();
   }
 
   public static Map<String, CSLeafQueueUserInfo> getAllCSLeafQueueUserInfo()

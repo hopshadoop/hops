@@ -123,6 +123,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.security.PrivilegedExceptionAction;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
@@ -189,6 +190,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
   private boolean recoveryEnabled;
   private DelegationTokenRenewer delegationTokenRenewer;
   private CompositeService resourceTrackingService;
+  private List<SchedulingMonitor> schedulingPolicyMonitors;
   /**
    * End of Active services
    */
@@ -524,7 +526,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
 
 
       // creating monitors that handle preemption
-      createPolicyMonitors();
+      schedulingPolicyMonitors = createPolicyMonitors();
 
       masterService = createApplicationMasterService();
       addService(masterService);
@@ -556,6 +558,11 @@ public class ResourceManager extends CompositeService implements Recoverable {
       new RMNMInfo(rmContext, scheduler);
 
       super.serviceInit(conf);
+    }
+
+    @VisibleForTesting
+    public List<SchedulingMonitor> getSchedulingMonitors() {
+      return schedulingPolicyMonitors;
     }
 
     private void startDispatchers(){
@@ -612,7 +619,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
       super.serviceStop();
     }
 
-    protected void createPolicyMonitors() {
+    protected List<SchedulingMonitor> createPolicyMonitors() {
       if (scheduler instanceof PreemptableResourceScheduler &&
           conf.getBoolean(YarnConfiguration.RM_SCHEDULER_ENABLE_MONITORS,
               YarnConfiguration.DEFAULT_RM_SCHEDULER_ENABLE_MONITORS)) {
@@ -624,13 +631,17 @@ public class ResourceManager extends CompositeService implements Recoverable {
           rmDispatcher.register(ContainerPreemptEventType.class,
               new RMContainerPreemptEventDispatcher(
                   (PreemptableResourceScheduler) scheduler));
+          List<SchedulingMonitor> schedulingMonitors = new ArrayList<SchedulingMonitor>();
+
           for (SchedulingEditPolicy policy : policies) {
             LOG.info("LOADING SchedulingEditPolicy:" + policy.getPolicyName());
             // periodically check whether we need to take action to guarantee
             // constraints
             SchedulingMonitor mon = new SchedulingMonitor(rmContext, policy);
+            schedulingMonitors.add(mon);
             addService(mon);
           }
+          return schedulingMonitors;
         } else {
           LOG.warn("Policy monitors configured (" +
               YarnConfiguration.RM_SCHEDULER_ENABLE_MONITORS +
@@ -638,6 +649,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
               YarnConfiguration.RM_SCHEDULER_MONITOR_POLICIES + ")");
         }
       }
+      return null;
     }
   }
 
@@ -1299,6 +1311,15 @@ public class ResourceManager extends CompositeService implements Recoverable {
     } catch (IOException ex) {
       //TODO see what to do with this exceptions
     }
+
+    // Recover preempted containers for CapacityPreemptionPolicy
+    if (schedulingPolicyMonitors != null) {
+      for (SchedulingMonitor monitor : schedulingPolicyMonitors) {
+        LOG.info("Trying to recover policy monitor");
+        monitor.recover(state);
+      }
+    }
+
     LOG.info("Finished recovering");
   }
 

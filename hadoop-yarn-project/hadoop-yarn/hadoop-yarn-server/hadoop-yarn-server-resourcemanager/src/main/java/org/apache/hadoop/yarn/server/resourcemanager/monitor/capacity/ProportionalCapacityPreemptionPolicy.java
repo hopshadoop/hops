@@ -19,6 +19,8 @@ package org.apache.hadoop.yarn.server.resourcemanager.monitor.capacity;
 
 import com.google.common.annotations.VisibleForTesting;
 import io.hops.ha.common.TransactionState;
+import io.hops.ha.common.TransactionStateImpl;
+import io.hops.metadata.yarn.entity.capacity.CSPreemptedContainers;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -27,7 +29,10 @@ import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
+import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.monitor.SchedulingEditPolicy;
+import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
+import org.apache.hadoop.yarn.server.resourcemanager.recovery.Recoverable;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ContainerPreemptEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ContainerPreemptEventType;
@@ -65,7 +70,7 @@ import java.util.*;
  * {@link ContainerPreemptEvent}).
  */
 public class ProportionalCapacityPreemptionPolicy
-    implements SchedulingEditPolicy {
+    implements SchedulingEditPolicy, Recoverable {
 
   private static final Log LOG =
       LogFactory.getLog(ProportionalCapacityPreemptionPolicy.class);
@@ -129,6 +134,8 @@ public class ProportionalCapacityPreemptionPolicy
   private float percentageClusterPreemptionAllowed;
   private double naturalTerminationFactor;
   private boolean observeOnly;
+  // Use it for recovery
+  private RMContext rmContext;
 
   public ProportionalCapacityPreemptionPolicy() {
     clock = new SystemClock();
@@ -168,12 +175,51 @@ public class ProportionalCapacityPreemptionPolicy
         config.getFloat(TOTAL_PREEMPTION_PER_ROUND, (float) 0.1);
     observeOnly = config.getBoolean(OBSERVE_ONLY, false);
     rc = scheduler.getResourceCalculator();
+    rmContext = scheduler.getRMContext();
   }
-  
+
+  @Override
+  public void recover(RMStateStore.RMState rmState) throws Exception {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Recovering previously preempted containers");
+    }
+    // Recover preempted containers
+    Map<String, CSPreemptedContainers> recovered =
+            rmState.getAllCSPreemptedContainers();
+    for (CSPreemptedContainers recoveredCont : recovered.values()) {
+      String containerId = recoveredCont.getRmContainerId();
+      long preemptionTime = recoveredCont.getPreemptionTime();
+      RMContainer rmContainer = rmState.getRMContainer(containerId, rmContext);
+      preempted.put(rmContainer, preemptionTime);
+    }
+  }
+
+  @VisibleForTesting
+  public void addPreemptedContainer(RMContainer container) {
+    preempted.put(container, clock.getTime());
+  }
+
+  @VisibleForTesting
+  public Map<RMContainer, Long> getPreemptedContainers() {
+    return preempted;
+  }
+
+  @VisibleForTesting
+  public void persistPreempted(TransactionState transactionState) {
+    if (transactionState != null) {
+      for (Map.Entry<RMContainer, Long> toPersist : preempted.entrySet()) {
+        ((TransactionStateImpl) transactionState).addCSPreemptedContainersToAdd(
+                toPersist.getKey().getContainerId().toString(),
+                toPersist.getValue());
+      }
+    }
+  }
+
   @VisibleForTesting
   public ResourceCalculator getResourceCalculator() {
     return rc;
   }
+
   @Override
   public void editSchedule(TransactionState transactionState) {
     CSQueue root = scheduler.getRootQueue();
@@ -234,12 +280,23 @@ public class ProportionalCapacityPreemptionPolicy
           dispatcher.handle(new ContainerPreemptEvent(e.getKey(), container,
               ContainerPreemptEventType.KILL_CONTAINER, transactionState));
           preempted.remove(container);
+
+          if (transactionState != null) {
+            ((TransactionStateImpl) transactionState).addCSPreemptedContainersToRemove(
+                    container.getContainerId().toString());
+          }
         } else {
           //otherwise just send preemption events
           dispatcher.handle(new ContainerPreemptEvent(e.getKey(), container,
               ContainerPreemptEventType.PREEMPT_CONTAINER, transactionState));
           if (preempted.get(container) == null) {
-            preempted.put(container, clock.getTime());
+            long now = clock.getTime();
+            preempted.put(container, now);
+
+            if (transactionState != null) {
+              ((TransactionStateImpl) transactionState).addCSPreemptedContainersToAdd(
+                      container.getContainerId().toString(), now);
+            }
           }
         }
       }
@@ -252,6 +309,10 @@ public class ProportionalCapacityPreemptionPolicy
       // garbage collect containers that are irrelevant for preemption
       if (preempted.get(id) + 2 * maxWaitTime < clock.getTime()) {
         i.remove();
+        if (transactionState != null) {
+          ((TransactionStateImpl) transactionState).addCSPreemptedContainersToRemove(
+                  id.getContainerId().toString());
+        }
       }
     }
   }

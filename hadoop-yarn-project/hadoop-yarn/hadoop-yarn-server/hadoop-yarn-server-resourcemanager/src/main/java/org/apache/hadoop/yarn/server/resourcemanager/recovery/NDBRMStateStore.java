@@ -165,6 +165,7 @@ public class NDBRMStateStore extends RMStateStore {
                 loadAllContainerStatus(rmState);
                 loadAllJustLaunchedContainers(rmState);
                 loadAllCSQueues(rmState);
+                loadCSPreemptedContainers(rmState);
                 loadAllCSLeafQueueUserInfo(rmState);
                 LOG.info("loaded rmState");
                 connector.commit();
@@ -485,6 +486,10 @@ public class NDBRMStateStore extends RMStateStore {
   
   private void loadAllCSQueues(RMState rmState) throws IOException{
     rmState.allCSQueues = RMUtilities.getAllCSQueues();
+  }
+
+  private void loadCSPreemptedContainers(RMState rmState) throws IOException {
+    rmState.csPreemptedContainers = RMUtilities.getAllCSPreemptedContainers();
   }
   
   private void loadAllCSLeafQueueUserInfo(RMState rmState) throws IOException{

@@ -24,9 +24,15 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
+import org.apache.hadoop.yarn.server.resourcemanager.monitor.capacity.ProportionalCapacityPreemptionPolicy;
+import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
+import org.apache.hadoop.yarn.server.resourcemanager.recovery.Recoverable;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.PreemptableResourceScheduler;
 
-public class SchedulingMonitor extends AbstractService {
+import java.io.IOException;
+
+public class SchedulingMonitor extends AbstractService
+        implements Recoverable {
 
   private final SchedulingEditPolicy scheduleEditPolicy;
   private static final Log LOG = LogFactory.getLog(SchedulingMonitor.class);
@@ -49,7 +55,18 @@ public class SchedulingMonitor extends AbstractService {
   public long getMonitorInterval() {
     return monitorInterval;
   }  
- 
+
+  @Override
+  public void recover(RMStateStore.RMState rmState) throws Exception {
+    // Currently only ProportionalCapacityPreemptionPolicy
+    // is recoverable
+    if (scheduleEditPolicy instanceof ProportionalCapacityPreemptionPolicy) {
+      LOG.info("Scheduling policy is ProportionalCapacityPreemption and will recover");
+      ((ProportionalCapacityPreemptionPolicy) scheduleEditPolicy)
+              .recover(rmState);
+    }
+  }
+
   @VisibleForTesting
   public synchronized SchedulingEditPolicy getSchedulingEditPolicy() {
     return scheduleEditPolicy;
@@ -91,7 +108,17 @@ public class SchedulingMonitor extends AbstractService {
         //invoke the preemption policy at a regular pace
         //the policy will generate preemption or kill events
         //managed by the dispatcher
-        invokePolicy(null);
+        TransactionState transactionState = rmContext.getTransactionStateManager()
+                .getCurrentTransactionStateNonPriority(-1, "PreemptionChecker");
+        if (transactionState != null) {
+          invokePolicy(transactionState);
+          try {
+            transactionState.decCounter(TransactionState.TransactionType.RM);
+          } catch (IOException ex) {
+            LOG.info(getName() + " thrown an exception while trying to commit to DB");
+          }
+        }
+
         try {
           Thread.sleep(monitorInterval);
         } catch (InterruptedException e) {

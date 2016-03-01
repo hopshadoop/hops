@@ -43,6 +43,7 @@ import io.hops.metadata.yarn.entity.SchedulerApplication;
 import io.hops.metadata.yarn.entity.UpdatedContainerInfo;
 import io.hops.metadata.yarn.entity.appmasterrpc.RPC;
 import io.hops.metadata.yarn.entity.capacity.CSLeafQueueUserInfo;
+import io.hops.metadata.yarn.entity.capacity.CSPreemptedContainers;
 import io.hops.metadata.yarn.entity.capacity.CSQueue;
 import io.hops.metadata.yarn.entity.capacity.FiCaSchedulerAppReservedContainers;
 import io.hops.metadata.yarn.entity.fair.FSSchedulerNode;
@@ -416,6 +417,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
     Map<String, List<JustLaunchedContainers>> allJustLaunchedContainers;
     Map<String, Boolean> allRMNodeNextHeartbeats;
     Map<String, CSQueue> allCSQueues;
+    Map<String, CSPreemptedContainers> csPreemptedContainers;
     Map<String, CSLeafQueueUserInfo> allCSLeafQueueUserInfo;
     
     public Map<ApplicationId, ApplicationState> getApplicationState() {
@@ -551,6 +553,10 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
 
     public Map<String, CSQueue> getAllCSQueues(){
       return allCSQueues;
+    }
+
+    public Map<String, CSPreemptedContainers> getAllCSPreemptedContainers() {
+      return csPreemptedContainers;
     }
     
     public Map<String, CSLeafQueueUserInfo> getAllCSLeafQueueUserInfo(){
