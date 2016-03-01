@@ -537,10 +537,6 @@ public class FifoScheduler extends AbstractYarnScheduler
       }
       attempt.setHeadroom(Resources.subtract(clusterResource, usedResource),
           transactionState);
-      if (transactionState != null) {
-        ((TransactionStateImpl) transactionState)
-            .updateClusterResource(clusterResource);
-      }
     }
   }
 
@@ -723,10 +719,6 @@ public class FifoScheduler extends AbstractYarnScheduler
 
         // Update usage for this container
         Resources.addTo(usedResource, capability);
-        if (transactionState != null) {
-          ((TransactionStateImpl) transactionState)
-              .updateUsedResource(clusterResource);
-        }
       }
 
     }
@@ -786,10 +778,6 @@ public class FifoScheduler extends AbstractYarnScheduler
         usedResource);
     metrics.setAvailableResourcesToQueue(
         Resources.subtract(clusterResource, usedResource));
-    if (transactionState != null) {
-      ((TransactionStateImpl) transactionState)
-          .updateClusterResource(clusterResource);
-    }
   }
 
   @Override
@@ -972,10 +960,6 @@ public class FifoScheduler extends AbstractYarnScheduler
     // Update cluster metrics
     Resources
         .subtractFrom(clusterResource, node.getRMNode().getTotalCapability());
-    if (transactionState != null) {
-      ((TransactionStateImpl) transactionState)
-          .updateClusterResource(clusterResource);
-    }
   }
 
   @Override
@@ -999,7 +983,6 @@ public class FifoScheduler extends AbstractYarnScheduler
       ((TransactionStateImpl) ts)
           .addFicaSchedulerNodeInfoToAdd(nodeManager.getNodeID().toString(),
               node);
-      ((TransactionStateImpl) ts).updateClusterResource(clusterResource);
     }
   }
 

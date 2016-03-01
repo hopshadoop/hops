@@ -168,7 +168,8 @@ public class NdbRtStreamingReceiver {
     ContainerStatus hopContainerStatus = new ContainerStatus(
             hopContainerStatusContainerid, hopContainerStatusState,
             hopContainerStatusDiagnostics, hopContainerStatusExitstatus,
-            hopContainerStatusRMNodeId, hopContainerStatusPendingId);
+            hopContainerStatusRMNodeId, hopContainerStatusPendingId,
+            ContainerStatus.Type.UCI);
     hopContainersStatusList.add(hopContainerStatus);
   }
   

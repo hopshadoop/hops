@@ -804,10 +804,6 @@ public class CapacityScheduler extends AbstractYarnScheduler
     SchedulerUtils.updateResourceIfChanged(node, nm, clusterResource, LOG,
             transactionState);
     
-    if (transactionState != null) {
-      ((TransactionStateImpl) transactionState)
-              .updateClusterResource(node.getAvailableResource());
-    }
     
     List<UpdatedContainerInfo> containerInfoList = 
         nm.pullContainerUpdates(transactionState);
@@ -996,8 +992,6 @@ public class CapacityScheduler extends AbstractYarnScheduler
     if (transactionState != null) {
       ((TransactionStateImpl) transactionState).addFicaSchedulerNodeInfoToAdd(
               nodeManager.getNodeID().toString(), ficaNode);
-      ((TransactionStateImpl) transactionState).updateClusterResource(
-              clusterResource);
     }
 
     root.updateClusterResource(clusterResource, transactionState);
@@ -1020,10 +1014,6 @@ public class CapacityScheduler extends AbstractYarnScheduler
     Resources
             .subtractFrom(clusterResource, node.getRMNode().getTotalCapability());
     root.updateClusterResource(clusterResource, transactionState);
-    if (transactionState != null) {
-      ((TransactionStateImpl) transactionState).updateClusterResource(
-              clusterResource);
-    }
 
     --numNodeManagers;
 
