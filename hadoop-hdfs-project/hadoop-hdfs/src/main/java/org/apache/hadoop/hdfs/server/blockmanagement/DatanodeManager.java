@@ -186,12 +186,6 @@ public class DatanodeManager {
    */
   private boolean hasClusterEverBeenMultiRack = false;
 
-  /**
-   * Stores storageID->sid and sid->storageID mapping.
-   * Works effectively like a cache to avoid hitting the DAL.
-   */
-  private StorageIdMap storageIdMap;
-
   private final StorageMap storageMap = new StorageMap();
   
   DatanodeManager(final BlockManager blockManager, final Namesystem namesystem,
@@ -250,8 +244,6 @@ public class DatanodeManager {
         DFSConfigKeys.DFS_NAMENODE_USE_STALE_DATANODE_FOR_WRITE_RATIO_KEY +
             " = '" + ratioUseStaleDataNodesForWrite + "' is invalid. " +
             "It should be a positive non-zero float value, not greater than 1.0f.");
-    
-    this.storageIdMap = new StorageIdMap();
   }
   
   private static long getStaleIntervalFromConf(Configuration conf,
@@ -1445,21 +1437,16 @@ public class DatanodeManager {
   // only for testing
   @VisibleForTesting
   void addDnToStorageMapInDB(DatanodeDescriptor nodeDescr) throws IOException {
-    if (storageIdMap == null) {
-      storageIdMap = new StorageIdMap();
-    }
 
     // Loop over all storages in the datanode
     for(DatanodeStorageInfo storage: nodeDescr.getStorageInfos()) {
-      // Allow lookup of storageId (String) -> sid (int)
-      storageIdMap.update(storage);
-
       // Allow lookup of sid (int) -> storageInfo (DatanodeStorageInfo)
       updateStorage(storage);
     }
   }
 
-  public void updateStorage(DatanodeStorageInfo storageInfo) {
+  public void updateStorage(DatanodeStorageInfo storageInfo)
+      throws IOException {
     this.storageMap.updateStorage(storageInfo);
   }
 

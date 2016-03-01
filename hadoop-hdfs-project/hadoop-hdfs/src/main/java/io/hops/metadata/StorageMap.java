@@ -15,26 +15,71 @@
  */
 package io.hops.metadata;
 
+import io.hops.exception.StorageException;
+import io.hops.metadata.hdfs.dal.StorageIdMapDataAccess;
+import io.hops.metadata.hdfs.entity.StorageId;
+import io.hops.transaction.handler.HDFSOperationType;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 
+import java.io.IOException;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
 public class StorageMap {
-  // TODO is this the best place for this?
-  // TODO check if there ever is concurrent access to this map (now
-  // everything is in synchronized blocks, but is that necessary?
+  /**
+   * Stores storageID->sid and sid->storageID mapping.
+   * Works effectively like a cache to avoid hitting the DAL.
+   */
+  private StorageIdMap storageIdMap;
+
   private Map<Integer, DatanodeStorageInfo> storageInfoMap =
       Collections.synchronizedMap(new HashMap<Integer, DatanodeStorageInfo>());
+
+  public StorageMap() {
+    // TODO throw some stuff?
+    try {
+      this.storageIdMap = new StorageIdMap();
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+  }
 
   /**
    * Adds or replaces storageinfo for the given sid
    */
   public void updateStorage(DatanodeStorageInfo storageInfo) {
+    // Allow lookup of storageId (String) -> sid (int)
+    try {
+      storageIdMap.update(storageInfo);
+    } catch (IOException e) {
+      // TODO throw some stuff?
+      e.printStackTrace();
+    }
+
+    // Allow lookup of sid (int) ->
     storageInfoMap.put(storageInfo.getSid(), storageInfo);
   }
 
+  /**
+   * StorageUuid (String) --> sid (int)
+   */
+  public int getSid(String storageUuid) {
+    return this.storageIdMap.getSId(storageUuid);
+  }
+
+  /**
+   * sid (int) --> storageUuid (String)
+   */
+  public String getStorageUuid(int sid) {
+    return this.storageIdMap.getStorageId(sid);
+  }
+
+  /**
+   * sid (int) --> DatanodeStorageInfo
+   * (or null if the DatanodeStorageInfo isn't known on this NN yet)
+   */
   public DatanodeStorageInfo getStorage(int sid) {
     return storageInfoMap.get(sid);
   }
