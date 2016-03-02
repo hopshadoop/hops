@@ -460,6 +460,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
     this.writeLock.lock();
 
     try {
+        //TORECOVER should we realy clear here?
       this.containersToClean.clear();
       this.containersToClean.addAll(newSet);
     } finally {
@@ -653,7 +654,6 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
       } else {
         // Increment activeNodes explicitly because this is a new node.
         ClusterMetrics.getMetrics().incrNumActiveNodes();
-        //TODO: Check if we need to include this in the TS. 
       }
     }
   }

@@ -43,11 +43,7 @@ import io.hops.metadata.yarn.entity.UpdatedContainerInfo;
 import io.hops.metadata.yarn.entity.appmasterrpc.AllocateRPC;
 import io.hops.metadata.yarn.entity.appmasterrpc.HeartBeatRPC;
 import io.hops.metadata.yarn.entity.appmasterrpc.RPC;
-import io.hops.metadata.yarn.entity.capacity.CSLeafQueueUserInfo;
-import io.hops.metadata.yarn.entity.capacity.CSQueue;
 import io.hops.metadata.yarn.entity.capacity.FiCaSchedulerAppReservedContainers;
-import io.hops.metadata.yarn.entity.fair.FSSchedulerNode;
-import io.hops.metadata.yarn.entity.fair.PreemptionMap;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -71,7 +67,6 @@ import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.ResourceOption;
 import org.apache.hadoop.yarn.api.records.impl.pb.ApplicationSubmissionContextPBImpl;
 import org.apache.hadoop.yarn.api.records.impl.pb.ContainerPBImpl;
-import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.event.AsyncDispatcher;
 import org.apache.hadoop.yarn.event.Dispatcher;
 import org.apache.hadoop.yarn.event.EventHandler;
@@ -412,8 +407,6 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
     Map<String, ContainerStatus> allContainerStatus;
     Map<String, List<JustLaunchedContainers>> allJustLaunchedContainers;
     Map<String, Boolean> allRMNodeNextHeartbeats;
-    Map<String, CSQueue> allCSQueues;
-    Map<String, CSLeafQueueUserInfo> allCSLeafQueueUserInfo;
     
     public Map<ApplicationId, ApplicationState> getApplicationState() {
       return appState;
@@ -554,15 +547,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
         throws IOException {
       return blackLists.get(id);
     }
-
-    public Map<String, CSQueue> getAllCSQueues(){
-      return allCSQueues;
-    }
-    
-    public Map<String, CSLeafQueueUserInfo> getAllCSLeafQueueUserInfo(){
-      return allCSLeafQueueUserInfo;
-    }
-    
+        
     private final Map<NodeId, org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode>
         alreadyRecoveredRMContextActiveNodes =
         new HashMap<NodeId, org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode>();
@@ -857,9 +842,15 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
         final String id) throws IOException {
       if (!alreadyRecoveredContainers.containsKey(id)) {
         Container hopContainer = allContainers.get(id);
-        ContainerPBImpl container = new ContainerPBImpl(
-            YarnProtos.ContainerProto.parseFrom(hopContainer.
+        ContainerPBImpl container = null;
+        if(hopContainer!=null){
+          container = new ContainerPBImpl(
+          YarnProtos.ContainerProto.parseFrom(hopContainer.
                 getContainerState()));
+        }else{
+          //TORECOVER find out why we sometime get this
+          LOG.error("the container should not be null " + id);
+        }
         alreadyRecoveredContainers.put(id, container);
         return container;
       } else {

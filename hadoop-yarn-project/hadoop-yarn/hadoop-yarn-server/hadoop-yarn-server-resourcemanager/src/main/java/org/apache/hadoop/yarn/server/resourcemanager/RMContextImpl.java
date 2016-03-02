@@ -49,6 +49,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListSet;
+import org.apache.hadoop.yarn.api.records.NodeState;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.quota.QuotaService;
 
 public class RMContextImpl implements RMContext {
@@ -71,6 +72,9 @@ public class RMContextImpl implements RMContext {
     Map<NodeId, RMNode> activeNodesRecovered = state.
         recoverRMContextActiveNodes(this);
     this.activesNodes.putAll(activeNodesRecovered);
+    for(int i=0;i<activesNodes.size();i++){
+       ClusterMetrics.getMetrics().incrNumActiveNodes(); 
+    }
     this.resyncAfterRolback.addAll(activeNodesRecovered.keySet());
     for (NodeId nodeId : activesNodes.keySet()) {
       if (resourceTrackerService != null) {
@@ -83,6 +87,21 @@ public class RMContextImpl implements RMContext {
     //2. Recover inactiveNodes map
     this.inactiveNodes.
         putAll(state.getRMContextInactiveNodes(this, state));
+      for (RMNode node : inactiveNodes.values()) {
+          switch (node.getState()) {
+              case DECOMMISSIONED:
+                  ClusterMetrics.getMetrics().incrDecommisionedNMs();
+                  break;
+              case LOST:
+                  ClusterMetrics.getMetrics().incrNumLostNMs();
+                  break;
+              case REBOOTED:
+                  ClusterMetrics.getMetrics().incrNumRebootedNMs();
+                  break;
+              case UNHEALTHY:
+                  ClusterMetrics.getMetrics().incrNumUnhealthyNMs();
+          }
+      }
   }
 
   private Dispatcher rmDispatcher;

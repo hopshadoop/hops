@@ -116,7 +116,7 @@ public class TestApplicationLimits {
             TestUtils.spyHook, null);
 
     
-    queue = spy(new LeafQueue(csContext, A, root, null, null));
+    queue = spy(new LeafQueue(csContext, A, root, null));
 
     // Stub out ACL checks
     doReturn(true).
@@ -308,39 +308,39 @@ public class TestApplicationLimits {
     queue.submitApplicationAttempt(app_0, user_0, null);
     assertEquals(1, queue.getNumActiveApplications());
     assertEquals(0, queue.getNumPendingApplications());
-    assertEquals(1, queue.getNumActiveApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
-    assertEquals(0, queue.getNumPendingApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
+    assertEquals(1, queue.getNumActiveApplications(user_0));
+    assertEquals(0, queue.getNumPendingApplications(user_0));
 
     // Submit second application
     FiCaSchedulerApp app_1 = getMockApplication(APPLICATION_ID++, user_0);
     queue.submitApplicationAttempt(app_1, user_0,null);
     assertEquals(2, queue.getNumActiveApplications());
     assertEquals(0, queue.getNumPendingApplications());
-    assertEquals(2, queue.getNumActiveApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
-    assertEquals(0, queue.getNumPendingApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
+    assertEquals(2, queue.getNumActiveApplications(user_0));
+    assertEquals(0, queue.getNumPendingApplications(user_0));
     
     // Submit third application, should remain pending
     FiCaSchedulerApp app_2 = getMockApplication(APPLICATION_ID++, user_0);
     queue.submitApplicationAttempt(app_2, user_0,null);
     assertEquals(2, queue.getNumActiveApplications());
     assertEquals(1, queue.getNumPendingApplications());
-    assertEquals(2, queue.getNumActiveApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
-    assertEquals(1, queue.getNumPendingApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
+    assertEquals(2, queue.getNumActiveApplications(user_0));
+    assertEquals(1, queue.getNumPendingApplications(user_0));
     
     // Finish one application, app_2 should be activated
     queue.finishApplicationAttempt(app_0, A, null);
     assertEquals(2, queue.getNumActiveApplications());
     assertEquals(0, queue.getNumPendingApplications());
-    assertEquals(2, queue.getNumActiveApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
-    assertEquals(0, queue.getNumPendingApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
+    assertEquals(2, queue.getNumActiveApplications(user_0));
+    assertEquals(0, queue.getNumPendingApplications(user_0));
     
     // Submit another one for user_0
     FiCaSchedulerApp app_3 = getMockApplication(APPLICATION_ID++, user_0);
     queue.submitApplicationAttempt(app_3, user_0,null);
     assertEquals(2, queue.getNumActiveApplications());
     assertEquals(1, queue.getNumPendingApplications());
-    assertEquals(2, queue.getNumActiveApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
-    assertEquals(1, queue.getNumPendingApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
+    assertEquals(2, queue.getNumActiveApplications(user_0));
+    assertEquals(1, queue.getNumPendingApplications(user_0));
     
     // Change queue limit to be smaller so 2 users can fill it up
     doReturn(3).when(queue).getMaximumActiveApplications();
@@ -350,29 +350,29 @@ public class TestApplicationLimits {
     queue.submitApplicationAttempt(app_4, user_1,null);
     assertEquals(3, queue.getNumActiveApplications());
     assertEquals(1, queue.getNumPendingApplications());
-    assertEquals(2, queue.getNumActiveApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
-    assertEquals(1, queue.getNumPendingApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
-    assertEquals(1, queue.getNumActiveApplications(user_1, new TransactionStateImpl( TransactionState.TransactionType.RM)));
-    assertEquals(0, queue.getNumPendingApplications(user_1, new TransactionStateImpl( TransactionState.TransactionType.RM)));
+    assertEquals(2, queue.getNumActiveApplications(user_0));
+    assertEquals(1, queue.getNumPendingApplications(user_0));
+    assertEquals(1, queue.getNumActiveApplications(user_1));
+    assertEquals(0, queue.getNumPendingApplications(user_1));
 
     // Submit second app for user_1, should block due to queue-limit
     FiCaSchedulerApp app_5 = getMockApplication(APPLICATION_ID++, user_1);
     queue.submitApplicationAttempt(app_5, user_1, null);
     assertEquals(3, queue.getNumActiveApplications());
     assertEquals(2, queue.getNumPendingApplications());
-    assertEquals(2, queue.getNumActiveApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
-    assertEquals(1, queue.getNumPendingApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
-    assertEquals(1, queue.getNumActiveApplications(user_1, new TransactionStateImpl( TransactionState.TransactionType.RM)));
-    assertEquals(1, queue.getNumPendingApplications(user_1, new TransactionStateImpl( TransactionState.TransactionType.RM)));
+    assertEquals(2, queue.getNumActiveApplications(user_0));
+    assertEquals(1, queue.getNumPendingApplications(user_0));
+    assertEquals(1, queue.getNumActiveApplications(user_1));
+    assertEquals(1, queue.getNumPendingApplications(user_1));
 
     // Now finish one app of user_1 so app_5 should be activated
     queue.finishApplicationAttempt(app_4, A, null);
     assertEquals(3, queue.getNumActiveApplications());
     assertEquals(1, queue.getNumPendingApplications());
-    assertEquals(2, queue.getNumActiveApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
-    assertEquals(1, queue.getNumPendingApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
-    assertEquals(1, queue.getNumActiveApplications(user_1, new TransactionStateImpl( TransactionState.TransactionType.RM)));
-    assertEquals(0, queue.getNumPendingApplications(user_1, new TransactionStateImpl( TransactionState.TransactionType.RM)));
+    assertEquals(2, queue.getNumActiveApplications(user_0));
+    assertEquals(1, queue.getNumPendingApplications(user_0));
+    assertEquals(1, queue.getNumActiveApplications(user_1));
+    assertEquals(0, queue.getNumPendingApplications(user_1));
   }
 
   @Test
@@ -389,8 +389,8 @@ public class TestApplicationLimits {
     queue.submitApplicationAttempt(app_0, user_0, null);
     assertEquals(1, queue.getNumActiveApplications());
     assertEquals(0, queue.getNumPendingApplications());
-    assertEquals(1, queue.getNumActiveApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
-    assertEquals(0, queue.getNumPendingApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
+    assertEquals(1, queue.getNumActiveApplications(user_0));
+    assertEquals(0, queue.getNumPendingApplications(user_0));
     assertTrue(queue.activeApplications.contains(app_0));
 
     // Submit second application
@@ -398,8 +398,8 @@ public class TestApplicationLimits {
     queue.submitApplicationAttempt(app_1, user_0, null);
     assertEquals(2, queue.getNumActiveApplications());
     assertEquals(0, queue.getNumPendingApplications());
-    assertEquals(2, queue.getNumActiveApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
-    assertEquals(0, queue.getNumPendingApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
+    assertEquals(2, queue.getNumActiveApplications(user_0));
+    assertEquals(0, queue.getNumPendingApplications(user_0));
     assertTrue(queue.activeApplications.contains(app_1));
 
     // Submit third application, should remain pending
@@ -407,8 +407,8 @@ public class TestApplicationLimits {
     queue.submitApplicationAttempt(app_2, user_0, null);
     assertEquals(2, queue.getNumActiveApplications());
     assertEquals(1, queue.getNumPendingApplications());
-    assertEquals(2, queue.getNumActiveApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
-    assertEquals(1, queue.getNumPendingApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
+    assertEquals(2, queue.getNumActiveApplications(user_0));
+    assertEquals(1, queue.getNumPendingApplications(user_0));
     assertTrue(queue.pendingApplications.contains(app_2));
 
     // Submit fourth application, should remain pending
@@ -416,16 +416,16 @@ public class TestApplicationLimits {
     queue.submitApplicationAttempt(app_3, user_0, null);
     assertEquals(2, queue.getNumActiveApplications());
     assertEquals(2, queue.getNumPendingApplications());
-    assertEquals(2, queue.getNumActiveApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
-    assertEquals(2, queue.getNumPendingApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
+    assertEquals(2, queue.getNumActiveApplications(user_0));
+    assertEquals(2, queue.getNumPendingApplications(user_0));
     assertTrue(queue.pendingApplications.contains(app_3));
 
     // Kill 3rd pending application
     queue.finishApplicationAttempt(app_2, A, null);
     assertEquals(2, queue.getNumActiveApplications());
     assertEquals(1, queue.getNumPendingApplications());
-    assertEquals(2, queue.getNumActiveApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
-    assertEquals(1, queue.getNumPendingApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
+    assertEquals(2, queue.getNumActiveApplications(user_0));
+    assertEquals(1, queue.getNumPendingApplications(user_0));
     assertFalse(queue.pendingApplications.contains(app_2));
     assertFalse(queue.activeApplications.contains(app_2));
 
@@ -433,8 +433,8 @@ public class TestApplicationLimits {
     queue.finishApplicationAttempt(app_0, A, null);
     assertEquals(2, queue.getNumActiveApplications());
     assertEquals(0, queue.getNumPendingApplications());
-    assertEquals(2, queue.getNumActiveApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
-    assertEquals(0, queue.getNumPendingApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
+    assertEquals(2, queue.getNumActiveApplications(user_0));
+    assertEquals(0, queue.getNumPendingApplications(user_0));
     assertTrue(queue.activeApplications.contains(app_3));
     assertFalse(queue.pendingApplications.contains(app_3));
     assertFalse(queue.activeApplications.contains(app_0));
@@ -443,16 +443,16 @@ public class TestApplicationLimits {
     queue.finishApplicationAttempt(app_1, A, null);
     assertEquals(1, queue.getNumActiveApplications());
     assertEquals(0, queue.getNumPendingApplications());
-    assertEquals(1, queue.getNumActiveApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
-    assertEquals(0, queue.getNumPendingApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
+    assertEquals(1, queue.getNumActiveApplications(user_0));
+    assertEquals(0, queue.getNumPendingApplications(user_0));
     assertFalse(queue.activeApplications.contains(app_1));
 
     // Finish 4th application
     queue.finishApplicationAttempt(app_3, A, null);
     assertEquals(0, queue.getNumActiveApplications());
     assertEquals(0, queue.getNumPendingApplications());
-    assertEquals(0, queue.getNumActiveApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
-    assertEquals(0, queue.getNumPendingApplications(user_0, new TransactionStateImpl( TransactionState.TransactionType.RM)));
+    assertEquals(0, queue.getNumActiveApplications(user_0));
+    assertEquals(0, queue.getNumPendingApplications(user_0));
     assertFalse(queue.activeApplications.contains(app_3));
   }
 

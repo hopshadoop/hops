@@ -148,7 +148,7 @@ public class TestUnmanagedAMLauncherWhenSchedulerFailover {
     yarnCluster.stop();
   }
 
-  @Test(timeout = 100000)
+  @Test(timeout = 150000)
   public void testSchedulerFailover() throws Exception {
 
     Thread t = new Thread(new Runnable() {

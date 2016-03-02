@@ -78,7 +78,7 @@ public abstract class PendingEventRetrieval {
   }
 
   public void triggerEvent(final RMNode rmNode, PendingEvent pendingEvent,
-          boolean recovery) {
+          boolean recovery) throws InterruptedException {
     if (recovery) {
       if (!recovered.add(pendingEvent.getId())) {
         return;

@@ -79,8 +79,7 @@ public abstract class SchedulerNode {
    * @param deltaResource
    *     the delta of resource need to apply to node
    */
-  public abstract void applyDeltaOnAvailableResource(Resource deltaResource, 
-          TransactionState ts);
+  public abstract void applyDeltaOnAvailableResource(Resource deltaResource);
 
   /**
    * Get total resources on the node.

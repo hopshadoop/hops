@@ -36,8 +36,6 @@ import io.hops.metadata.yarn.dal.RMContextInactiveNodesDataAccess;
 import io.hops.metadata.yarn.dal.RMNodeDataAccess;
 import io.hops.metadata.yarn.dal.ResourceDataAccess;
 import io.hops.metadata.yarn.dal.UpdatedContainerInfoDataAccess;
-import io.hops.metadata.yarn.dal.capacity.CSLeafQueueUserInfoDataAccess;
-import io.hops.metadata.yarn.dal.capacity.CSQueueDataAccess;
 import io.hops.metadata.yarn.dal.fair.FSSchedulerNodeDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.AllocateResponseDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.AllocatedContainersDataAccess;
@@ -238,10 +236,11 @@ public class TransactionStateImpl extends TransactionState {
     return csQueueInfo;
   }
 
-  public void persistCSQueueInfo(CSQueueDataAccess CSQDA,
-          CSLeafQueueUserInfoDataAccess csLQUIDA) throws StorageException {
+  public void persistCSQueueInfo(
+          StorageConnector connector)
+          throws StorageException {
 
-      csQueueInfo.persist(CSQDA, csLQUIDA);
+      csQueueInfo.persist(connector);
   }
   
   public FiCaSchedulerNodeInfoToUpdate getFicaSchedulerNodeInfoToUpdate(
@@ -800,8 +799,8 @@ public class TransactionStateImpl extends TransactionState {
               updatedContainerInfoDA, faDA, csDA,persistedEventsDA, connector);
     }
   }
-    
 
+  
   private void persistFiCaSchedulerNodeToRemove(ResourceDataAccess resourceDA, 
           FiCaSchedulerNodeDataAccess ficaNodeDA, RMContainerDataAccess rmcontainerDA, 
           LaunchedContainersDataAccess launchedContainersDA) throws StorageException {
