@@ -36,8 +36,6 @@ import io.hops.metadata.yarn.dal.RMContextInactiveNodesDataAccess;
 import io.hops.metadata.yarn.dal.RMNodeDataAccess;
 import io.hops.metadata.yarn.dal.ResourceDataAccess;
 import io.hops.metadata.yarn.dal.UpdatedContainerInfoDataAccess;
-import io.hops.metadata.yarn.dal.capacity.CSLeafQueueUserInfoDataAccess;
-import io.hops.metadata.yarn.dal.capacity.CSQueueDataAccess;
 import io.hops.metadata.yarn.dal.fair.FSSchedulerNodeDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.AllocateResponseDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.AllocatedContainersDataAccess;
@@ -236,10 +234,11 @@ public class TransactionStateImpl extends TransactionState {
     return csQueueInfo;
   }
 
-  public void persistCSQueueInfo(CSQueueDataAccess CSQDA,
-          CSLeafQueueUserInfoDataAccess csLQUIDA) throws StorageException {
+  public void persistCSQueueInfo(
+          StorageConnector connector)
+          throws StorageException {
 
-      csQueueInfo.persist(CSQDA, csLQUIDA);
+      csQueueInfo.persist(connector);
   }
   
   public FiCaSchedulerNodeInfoToUpdate getFicaSchedulerNodeInfoToUpdate(
@@ -753,20 +752,6 @@ public class TransactionStateImpl extends TransactionState {
     }
   }
   
-  public void updateClusterResource(
-      org.apache.hadoop.yarn.api.records.Resource clusterResource) {
-    this.clusterResourceToUpdate = clusterResource;
-  }
-  
-  private void persistClusterResourceToUpdate() throws StorageException {
-    if (clusterResourceToUpdate != null) {
-      ResourceDataAccess rDA = (ResourceDataAccess) RMStorageFactory
-          .getDataAccess(ResourceDataAccess.class);
-      rDA.add(new Resource("cluster", Resource.CLUSTER, Resource.AVAILABLE,
-          clusterResourceToUpdate.getMemory(),
-          clusterResourceToUpdate.getVirtualCores(),0));
-    }
-  }
 
   private void persistFiCaSchedulerNodeToRemove(ResourceDataAccess resourceDA, 
           FiCaSchedulerNodeDataAccess ficaNodeDA, RMContainerDataAccess rmcontainerDA, 

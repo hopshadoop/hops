@@ -80,6 +80,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.impl.pb.ContainerStatusPBImpl;
@@ -278,12 +280,16 @@ public class ResourceTrackerService extends AbstractService
   @Override
   public RegisterNodeManagerResponse registerNodeManager(
           RegisterNodeManagerRequest request) throws YarnException, IOException {
-    return registerNodeManager(request, null);
+    try {
+      return registerNodeManager(request, null);
+    } catch (InterruptedException ex) {
+      throw new YarnException(ex);
+    }
   }
 
   public RegisterNodeManagerResponse registerNodeManager(
           RegisterNodeManagerRequest request, Integer rpcID) 
-          throws YarnException, IOException {
+          throws YarnException, IOException, InterruptedException {
     
     RegisterNodeManagerResponse response = recordFactory.newRecordInstance(
             RegisterNodeManagerResponse.class);
@@ -456,11 +462,15 @@ public class ResourceTrackerService extends AbstractService
   @Override
   public NodeHeartbeatResponse nodeHeartbeat(NodeHeartbeatRequest request)
           throws YarnException, IOException {
-    return nodeHeartbeat(request, null);
+    try {
+      return nodeHeartbeat(request, null);
+    } catch (InterruptedException ex) {
+      throw new YarnException(ex);
+    }
   }
 
   public NodeHeartbeatResponse nodeHeartbeat(NodeHeartbeatRequest request,
-          Integer rpcID) throws YarnException, IOException {
+          Integer rpcID) throws YarnException, IOException, InterruptedException {
 
     NodeStatus remoteNodeStatus = request.getNodeStatus();
     NodeId nodeId = remoteNodeStatus.getNodeId();

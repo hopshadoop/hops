@@ -49,9 +49,7 @@ import io.hops.metadata.yarn.dal.ResourceDataAccess;
 import io.hops.metadata.yarn.dal.ResourceRequestDataAccess;
 import io.hops.metadata.yarn.dal.SchedulerApplicationDataAccess;
 import io.hops.metadata.yarn.dal.UpdatedContainerInfoDataAccess;
-import io.hops.metadata.yarn.dal.capacity.CSLeafQueueUserInfoDataAccess;
 import io.hops.metadata.yarn.dal.capacity.CSLeafQueuesPendingAppsDataAccess;
-import io.hops.metadata.yarn.dal.capacity.CSQueueDataAccess;
 import io.hops.metadata.yarn.dal.capacity.FiCaSchedulerAppReservedContainersDataAccess;
 import io.hops.metadata.yarn.dal.fair.AppSchedulableDataAccess;
 import io.hops.metadata.yarn.dal.fair.FSSchedulerNodeDataAccess;
@@ -100,8 +98,6 @@ import io.hops.metadata.yarn.entity.UpdatedContainerInfo;
 import io.hops.metadata.yarn.entity.appmasterrpc.AllocateRPC;
 import io.hops.metadata.yarn.entity.appmasterrpc.HeartBeatRPC;
 import io.hops.metadata.yarn.entity.appmasterrpc.RPC;
-import io.hops.metadata.yarn.entity.capacity.CSLeafQueueUserInfo;
-import io.hops.metadata.yarn.entity.capacity.CSQueue;
 import io.hops.metadata.yarn.entity.capacity.FiCaSchedulerAppReservedContainers;
 import io.hops.metadata.yarn.entity.rmstatestore.AllocateResponse;
 import io.hops.metadata.yarn.entity.rmstatestore.ApplicationAttemptState;
@@ -911,6 +907,13 @@ public static Map<String, List<ResourceRequest>> getAllResourceRequestsFullTrans
                                   hopRMNodeFull.getHopResource().
                                   getVirtualCores()),
                           hopRMNodeFull.getHopRMNode().getOvercommittimeout());
+        }else{
+          //TORECOVER find out why we sometime get this
+          LOG.error("resource option should not be null");
+          resourceOption = ResourceOption.
+                  newInstance(org.apache.hadoop.yarn.api.records.Resource.
+                          newInstance(0, 0), hopRMNodeFull.getHopRMNode().
+                          getOvercommittimeout());
         }
         //Create RMNode from HopRMNode
         rmNode = new RMNodeImpl(nodeId, rmContext,
@@ -1058,6 +1061,12 @@ public static Map<String, List<ResourceRequest>> getAllResourceRequestsFullTrans
                     org.apache.hadoop.yarn.api.records.Resource
                         .newInstance(res.getMemory(), res.getVirtualCores()),
                     hopRMNode.getOvercommittimeout());
+              } else {
+                LOG.error("resource option should not be null");
+                resourceOption = ResourceOption.
+                        newInstance(org.apache.hadoop.yarn.api.records.Resource.
+                                newInstance(0, 0), hopRMNode.
+                                getOvercommittimeout());
               }
               rmNode = new RMNodeImpl(nodeId, context, hopRMNode.getHostName(),
                   hopRMNode.getCommandPort(), hopRMNode.getHttpPort(), node,
@@ -2196,11 +2205,6 @@ public static Map<String, List<ResourceRequest>> getAllResourceRequestsFullTrans
             NextHeartbeatDataAccess nextHeartbeatDA =
                 (NextHeartbeatDataAccess) RMStorageFactory
                     .getDataAccess(NextHeartbeatDataAccess.class);
-            CSQueueDataAccess csQDA = (CSQueueDataAccess) RMStorageFactory.
-                    getDataAccess(CSQueueDataAccess.class);
-            CSLeafQueueUserInfoDataAccess csLQDA
-                    = (CSLeafQueueUserInfoDataAccess) RMStorageFactory.
-                    getDataAccess(CSLeafQueueUserInfoDataAccess.class);
             AppSchedulableDataAccess appSDA
                     = (AppSchedulableDataAccess) RMStorageFactory.getDataAccess(
                             AppSchedulableDataAccess.class);
@@ -2218,7 +2222,7 @@ public static Map<String, List<ResourceRequest>> getAllResourceRequestsFullTrans
              ts.persistRmcontextInfo(rmnodeDA, resourceDA, nodeDA,
                 rmctxInactiveNodesDA);
              connector.flush();
-            ts.persistCSQueueInfo(csQDA, csLQDA);
+            ts.persistCSQueueInfo(connector);
             connector.flush();
             ts.persistRMNodeToUpdate(rmnodeDA);
             connector.flush();
@@ -2375,53 +2379,4 @@ public static Map<String, List<ResourceRequest>> getAllResourceRequestsFullTrans
     return DA.getAll();
   }
 
-  public static Map<String, CSQueue> getAllCSQueues() throws IOException {
-    CSQueueDataAccess csqDA = (CSQueueDataAccess) RMStorageFactory.
-            getDataAccess(CSQueueDataAccess.class);
-    return csqDA.getAll();
-  }
-
-  public static Map<String, CSLeafQueueUserInfo> getAllCSLeafQueueUserInfo()
-          throws IOException {
-    CSLeafQueueUserInfoDataAccess csqLUIDA
-            = (CSLeafQueueUserInfoDataAccess) RMStorageFactory.
-            getDataAccess(CSLeafQueueUserInfoDataAccess.class);
-    return csqLUIDA.findAll();
-  }
-
-  public static Map<String, CSLeafQueueUserInfo> getAllCSLeafQueueUserInfoFullTransaction()
-          throws IOException {
-    LightWeightRequestHandler handler = new LightWeightRequestHandler(
-            YARNOperationType.TEST) {
-              @Override
-              public Object performTask() throws StorageException, IOException {
-                connector.readCommitted();
-                CSLeafQueueUserInfoDataAccess csqLUIDA
-                = (CSLeafQueueUserInfoDataAccess) RMStorageFactory.
-                getDataAccess(CSLeafQueueUserInfoDataAccess.class);
-                return csqLUIDA.findAll();
-              }
-            };
-    return (Map<String, CSLeafQueueUserInfo>) handler.handle();
-  }
-   
-  //for testing
-  public static CSQueue getCSQueue(final String queuepath) throws IOException {
-    LightWeightRequestHandler getCSQueueInfoHandler
-            = new LightWeightRequestHandler(YARNOperationType.TEST) {
-              @Override
-              public Object performTask() throws StorageException, IOException {
-                connector.beginTransaction();
-                connector.writeLock();
-                CSQueueDataAccess CSQDA = (CSQueueDataAccess) RMStorageFactory.
-                getDataAccess(CSQueueDataAccess.class);
-                CSQueue found = (CSQueue) CSQDA.findById(queuepath);
-                LOG.debug("HOP :: getCSQueueInfo() - got HopSCSQueueInfo:"
-                        + queuepath);
-                connector.commit();
-                return found;
-              }
-            };
-    return (CSQueue) getCSQueueInfoHandler.handle();
-  }
 }

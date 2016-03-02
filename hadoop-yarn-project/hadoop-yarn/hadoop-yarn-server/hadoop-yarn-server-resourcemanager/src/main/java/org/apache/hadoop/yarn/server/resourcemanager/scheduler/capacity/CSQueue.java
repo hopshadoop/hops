@@ -133,7 +133,7 @@ public interface CSQueue
    * @param usedCapacity
    *     used capacity of the queue
    */
-    public void setUsedCapacity(float usedCapacity, TransactionState transactionState);
+    public void setUsedCapacity(float usedCapacity);
   
   /**
    * Set absolute used capacity of the queue.
@@ -141,8 +141,7 @@ public interface CSQueue
    * @param absUsedCapacity
    *     absolute used capacity of the queue
    */
-  public void setAbsoluteUsedCapacity(float absUsedCapacity,
-          TransactionState transactionState);
+  public void setAbsoluteUsedCapacity(float absUsedCapacity);
 
   /**
    * Get the currently utilized resources in the cluster
@@ -189,7 +188,7 @@ public interface CSQueue
    *     queue to which the application is submitted
    */
   public void submitApplication(ApplicationId applicationId, String user,
-      String queue, TransactionState transactionState) throws AccessControlException;
+      String queue) throws AccessControlException;
 
   /**
    * Submit an application attempt to the queue.
@@ -308,5 +307,4 @@ public interface CSQueue
   public void collectSchedulerApplications(
       Collection<ApplicationAttemptId> apps);
   
-  public void recover(RMStateStore.RMState state);
 }

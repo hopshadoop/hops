@@ -268,7 +268,8 @@ public class NMSimulator extends TaskRunner.Task {
       }else if (ex instanceof IOException){
         throw (IOException) ex;
       }else {
-              throw (YarnException) ex;
+        LOG.error(ex, ex);
+              throw new YarnException(ex);
       }
     }
   }

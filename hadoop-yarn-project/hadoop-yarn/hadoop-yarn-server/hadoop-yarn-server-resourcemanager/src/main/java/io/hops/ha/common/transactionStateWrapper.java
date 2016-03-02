@@ -32,12 +32,9 @@ import io.hops.metadata.yarn.dal.RMContextInactiveNodesDataAccess;
 import io.hops.metadata.yarn.dal.RMNodeDataAccess;
 import io.hops.metadata.yarn.dal.ResourceDataAccess;
 import io.hops.metadata.yarn.dal.UpdatedContainerInfoDataAccess;
-import io.hops.metadata.yarn.dal.capacity.CSLeafQueueUserInfoDataAccess;
-import io.hops.metadata.yarn.dal.capacity.CSQueueDataAccess;
 import io.hops.metadata.yarn.dal.fair.FSSchedulerNodeDataAccess;
 import io.hops.metadata.yarn.entity.RMNode;
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
@@ -54,7 +51,6 @@ import static org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStor
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerImpl;
-import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeImpl;
 
 public class transactionStateWrapper extends TransactionStateImpl {
 
@@ -221,11 +217,6 @@ public class transactionStateWrapper extends TransactionStateImpl {
     return ts.getCSQueueInfo();
   }
 
-  public void persistCSQueueInfo(CSQueueDataAccess CSQDA,
-          CSLeafQueueUserInfoDataAccess csLQUIDA) throws StorageException {
-
-    ts.persistCSQueueInfo(CSQDA, csLQUIDA);
-  }
 
   public FiCaSchedulerNodeInfoToUpdate getFicaSchedulerNodeInfoToUpdate(
           String nodeId) {
@@ -312,11 +303,6 @@ public class transactionStateWrapper extends TransactionStateImpl {
   public void updateUsedResource(
           org.apache.hadoop.yarn.api.records.Resource usedResource) {
     ts.updateUsedResource(usedResource);
-  }
-
-  public void updateClusterResource(
-          org.apache.hadoop.yarn.api.records.Resource clusterResource) {
-    ts.updateClusterResource(clusterResource);
   }
 
   public void persistFiCaSchedulerNodeToAdd(ResourceDataAccess resourceDA,
