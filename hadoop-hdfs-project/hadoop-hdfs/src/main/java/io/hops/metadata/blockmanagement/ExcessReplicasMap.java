@@ -26,11 +26,14 @@ import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeManager;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 import org.apache.hadoop.hdfs.util.LightWeightLinkedSet;
 
 import java.io.IOException;
 import java.util.Collection;
+import java.util.List;
 import java.util.TreeSet;
 
 public class ExcessReplicasMap {
@@ -41,10 +44,21 @@ public class ExcessReplicasMap {
     this.datanodeManager = datanodeManager;
   }
 
+  public LightWeightLinkedSet<Block> get(String datanodeUuid,
+      DatanodeManager manager) throws IOException {
+    LightWeightLinkedSet<Block> excessReplicas = new LightWeightLinkedSet<Block>();
+
+    List<Integer> sidsOnDatanode = manager.getSidsOnDatanode(datanodeUuid);
+    for(int sid : sidsOnDatanode) {
+      excessReplicas.addAll(get(sid));
+    }
+
+    return excessReplicas;
+  }
+
   //[M] only needed in TestOverReplicatedBlocks
-  public LightWeightLinkedSet<Block> get(String dnUuid) throws IOException {
-    Collection<ExcessReplica> excessReplicas =
-        getExcessReplicas(dnUuid);
+  public LightWeightLinkedSet<Block> get(int sid) throws IOException {
+    Collection<ExcessReplica> excessReplicas = getExcessReplicas(sid);
     if (excessReplicas == null) {
       return null;
     }
@@ -57,12 +71,11 @@ public class ExcessReplicasMap {
     return excessBlocks;
   }
 
-  public boolean put(String dnUuid, int storageId, BlockInfo excessBlk)
+  public boolean put(int storageId, BlockInfo excessBlk)
       throws StorageException, TransactionContextException {
-    ExcessReplica er = getExcessReplica(dnUuid, excessBlk);
+    ExcessReplica er = getExcessReplica(storageId, excessBlk);
     if (er == null) {
-      addExcessReplicaToDB(new ExcessReplica(dnUuid, storageId, excessBlk
-          .getBlockId(), excessBlk.getInodeId()));
+      addExcessReplicaToDB(new ExcessReplica(storageId, excessBlk.getBlockId(), excessBlk.getInodeId()));
       return true;
     }
     return false;
@@ -71,40 +84,43 @@ public class ExcessReplicasMap {
   /**
    * Mark a block on a datanode for removal
    */
-  public boolean remove(String dnUuid, BlockInfo block)
+  public boolean remove(DatanodeDescriptor dn, BlockInfo block)
       throws StorageException, TransactionContextException {
-    ExcessReplica er = getExcessReplica(dnUuid, block);
-    if (er != null) {
-      removeExcessReplicaFromDB(er);
-      return true;
-    } else {
-      return false;
+    boolean found = false;
+
+    for(DatanodeStorageInfo storage : dn.getStorageInfos()) {
+      ExcessReplica er = getExcessReplica(storage.getSid(), block);
+      if (er != null) {
+        removeExcessReplicaFromDB(er);
+        found = true;
+      }
     }
+
+    return found;
   }
 
   /**
-   * Get the datanode Uuids of all datanodes storing excess replicas of this
+   * Get the datanodeUuids of all datanodes storing excess replicas of this
    * block.
    */
-  public Collection<String> get(BlockInfo blk)
-      throws StorageException, TransactionContextException {
+  public Collection<String> get(BlockInfo blk) throws StorageException, TransactionContextException {
     Collection<ExcessReplica> excessReplicas = getExcessReplicas(blk);
     if (excessReplicas == null) {
       return null;
     }
     TreeSet<String> stIds = new TreeSet<String>();
     for (ExcessReplica er : excessReplicas) {
-      stIds.add(er.getDatanodeUuid());
+      stIds.add(datanodeManager.getDatanodeBySid(er.getStorageId()).getDatanodeUuid());
     }
     return stIds;
   }
 
-  public boolean contains(DatanodeInfo dn, BlockInfo blk)
+  public boolean contains(DatanodeStorageInfo storageInfo, BlockInfo blk)
       throws IOException {
-    return contains(dn.getDatanodeUuid(), blk);
+    return contains(storageInfo.getSid(), blk);
   }
 
-  public boolean contains(final String dnUuid, final BlockInfo blk)
+  public boolean contains(final int sid, final BlockInfo blk)
       throws IOException {
     return new LightWeightRequestHandler(
         HDFSOperationType.GET_EXCESS_RELPLICAS_BY_STORAGEID) {
@@ -112,7 +128,7 @@ public class ExcessReplicasMap {
       public Object performTask() throws StorageException, IOException {
         ExcessReplicaDataAccess da = (ExcessReplicaDataAccess)
             HdfsStorageFactory.getDataAccess(ExcessReplicaDataAccess.class);
-        return da.findByPK(blk.getBlockId(), dnUuid, blk.getInodeId());
+        return da.findByPK(blk.getBlockId(), sid, blk.getInodeId());
       }
     }.handle() != null;
   }
@@ -129,7 +145,7 @@ public class ExcessReplicasMap {
     }.handle();
   }
 
-  private Collection<ExcessReplica> getExcessReplicas(final String uuid)
+  private Collection<ExcessReplica> getExcessReplicas(final int sid)
       throws IOException {
     return (Collection<ExcessReplica>) new LightWeightRequestHandler(
         HDFSOperationType.GET_EXCESS_RELPLICAS_BY_STORAGEID) {
@@ -138,7 +154,7 @@ public class ExcessReplicasMap {
         ExcessReplicaDataAccess da =
             (ExcessReplicaDataAccess) HdfsStorageFactory
                 .getDataAccess(ExcessReplicaDataAccess.class);
-        return da.findExcessReplicaByDatanodeUuid(uuid);
+        return da.findExcessReplicaBySid(sid);
       }
     }.handle();
   }
@@ -160,9 +176,9 @@ public class ExcessReplicasMap {
             blk.getInodeId());
   }
 
-  private ExcessReplica getExcessReplica(String uuid, BlockInfo block)
+  private ExcessReplica getExcessReplica(int sid, BlockInfo block)
       throws StorageException, TransactionContextException {
-    return EntityManager.find(ExcessReplica.Finder.ByBlockIdDatanodeUuidAndINodeId,
-        block.getBlockId(), uuid, block.getInodeId());
+    return EntityManager.find(ExcessReplica.Finder.ByBlockIdSidAndINodeId,
+        block.getBlockId(), sid, block.getInodeId());
   }
 }

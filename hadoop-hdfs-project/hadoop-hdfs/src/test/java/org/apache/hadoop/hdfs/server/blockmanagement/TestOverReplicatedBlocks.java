@@ -214,7 +214,8 @@ public class TestOverReplicatedBlocks {
       // All replicas for deletion should be scheduled on lastDN.
       // And should not actually be deleted, because lastDN does not heartbeat.
       Collection<Block> dnBlocks =
-          namesystem.getBlockManager().excessReplicateMap.get(lastDNid);
+          namesystem.getBlockManager().excessReplicateMap.get(
+              lastDNid, namesystem.getBlockManager().getDatanodeManager());
       assertEquals("Replicas on node " + lastDNid + " should have been deleted",
           SMALL_FILE_LENGTH / SMALL_BLOCK_SIZE, dnBlocks.size());
       for (BlockLocation location : locs) {

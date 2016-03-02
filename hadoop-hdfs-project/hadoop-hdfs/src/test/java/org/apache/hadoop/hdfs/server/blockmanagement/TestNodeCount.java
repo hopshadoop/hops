@@ -103,8 +103,7 @@ public class TestNodeCount {
       
       // check if excessive replica is detected (transient)
       initializeTimeout(TIMEOUT);
-      while (countNodes(block.getLocalBlock(), namesystem).excessReplicas() ==
-          0) {
+      while (countNodes(block.getLocalBlock(), namesystem).excessReplicas() == 0) {
         checkTimeout("excess replicas not detected");
       }
       

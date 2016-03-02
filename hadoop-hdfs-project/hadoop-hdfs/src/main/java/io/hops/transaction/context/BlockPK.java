@@ -152,26 +152,6 @@ class BlockPK {
       }
       return keys;
     }
-
-    /**
-     * Do a lookup on (datanodeUuid, blockId, inodeId)
-     */
-    static class RBPK extends ReplicaPK {
-      private String datanodeUuid;
-
-      RBPK(long blockId, int inodeId, String datanodeUuid) {
-        super(blockId, inodeId);
-        this.datanodeUuid = datanodeUuid;
-      }
-
-      static List<ReplicaPK> getKeys(long[] blockIds, int[] inodeIds, String datanodeUuid) {
-        List<BlockPK.ReplicaPK> keys = new ArrayList<ReplicaPK>(blockIds.length);
-        for (int i = 0; i < blockIds.length; i++) {
-          keys.add(new BlockPK.ReplicaPK.RBPK(blockIds[i], inodeIds[i], datanodeUuid));
-        }
-        return keys;
-      }
-    }
   }
 
   static List<BlockPK> getBlockKeys(int[] inodeIds) {

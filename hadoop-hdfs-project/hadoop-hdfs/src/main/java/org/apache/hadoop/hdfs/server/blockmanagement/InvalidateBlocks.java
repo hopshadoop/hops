@@ -79,10 +79,10 @@ class InvalidateBlocks {
    * if a block is pending invalidation but with a different generation stamp,
    * returns false.
    */
-  boolean contains(final DatanodeInfo dn, final BlockInfo block)
+  boolean contains(final DatanodeStorageInfo dn, final BlockInfo block)
       throws StorageException, TransactionContextException {
     InvalidatedBlock blkFound = findBlock(block.getBlockId(),
-        dn.getDatanodeUuid(), block.getInodeId());
+        dn.getSid(), block.getInodeId());
     if (blkFound == null) {
       return false;
     }
@@ -96,7 +96,6 @@ class InvalidateBlocks {
   void add(final BlockInfo block, final DatanodeStorageInfo storage,
       final boolean log) throws StorageException, TransactionContextException {
     InvalidatedBlock invBlk = new InvalidatedBlock(
-        storage.getDatanodeDescriptor().getDatanodeUuid(),
         storage.getSid(),
         block.getBlockId(),
         block.getGenerationStamp(),
@@ -113,28 +112,29 @@ class InvalidateBlocks {
   }
 
   /**
-   * Remove a storage from the invalidatesSet
+   * Remove a list of storages (typically all storages on a datanode) from the
+   * invalidatesSet
    */
-  void remove(final DatanodeInfo dn) throws IOException {
-    removeInvBlocks(dn);
+  void remove(List<Integer> sids) throws IOException {
+    for(int sid : sids) {
+      removeInvBlocks(sid);
+    }
   }
 
   /**
    * Remove the block from the specified storage.
    */
-  void remove(final DatanodeInfo dn, final BlockInfo block)
-      throws IOException {
-    InvalidatedBlock invBlok = findBlock(block.getBlockId(),
-        dn.getDatanodeUuid(), block.getInodeId());
+  void remove(final DatanodeStorageInfo storageInfo, final BlockInfo block) throws IOException {
+    InvalidatedBlock invBlok = findBlock(block.getBlockId(), storageInfo.getSid(), block.getInodeId());
     if (invBlok != null) {
-      removeInvalidatedBlockFromDB(block.getBlockId(), dn.getDatanodeUuid());
+      removeInvalidatedBlockFromDB(block.getBlockId(), storageInfo.getSid());
     }
   }
 
   /**
    * @return a list of the datanode Uuids.
    */
-  List<String> getStorageIDs() throws IOException {
+  List<Integer> getSids() throws IOException {
     LightWeightRequestHandler getAllInvBlocksHandler =
         new LightWeightRequestHandler(HDFSOperationType.GET_ALL_INV_BLKS) {
           @Override
@@ -147,21 +147,25 @@ class InvalidateBlocks {
         };
     List<InvalidatedBlock> invBlocks =
         (List<InvalidatedBlock>) getAllInvBlocksHandler.handle();
-    HashSet<String> storageIds = new HashSet<String>();
+    ArrayList<Integer> sids = new ArrayList<Integer>();
     if (invBlocks != null) {
       for (InvalidatedBlock ib : invBlocks) {
-        storageIds.add(ib.getDatanodeUuid());
+        sids.add(ib.getStorageId());
       }
     }
-    return new ArrayList<String>(storageIds);
+    return sids;
   }
 
   /**
-   * Invalidate work for the storage.
+   * Invalidate work for the datanode.
    */
   List<Block> invalidateWork(DatanodeDescriptor dn) throws IOException {
-    final List<InvalidatedBlock> invBlocks =
-        findInvBlocksbyDatanodeUuid(dn.getDatanodeUuid());
+    final List<InvalidatedBlock> invBlocks = new ArrayList<InvalidatedBlock>();
+
+    for(DatanodeStorageInfo storage : dn.getStorageInfos()) {
+      invBlocks.addAll(findInvBlocksbySid(storage.getSid()));
+    }
+
     if (invBlocks == null || invBlocks.isEmpty()) {
       return null;
     }
@@ -172,8 +176,7 @@ class InvalidateBlocks {
     final Iterator<InvalidatedBlock> it = invBlocks.iterator();
     for (int count = 0; count < limit && it.hasNext(); count++) {
       InvalidatedBlock invBlock = it.next();
-      toInvalidate.add(new Block(invBlock.getBlockId(), invBlock.getNumBytes(),
-          invBlock.getGenerationStamp()));
+      toInvalidate.add(new Block(invBlock.getBlockId(), invBlock.getNumBytes(), invBlock.getGenerationStamp()));
       toInvblks.add(invBlock);
     }
     removeInvBlocks(toInvblks);
@@ -205,8 +208,7 @@ class InvalidateBlocks {
                 .getDataAccess(InvalidateBlockDataAccess.class);
         List<InvalidatedBlock> invblks = new ArrayList<InvalidatedBlock>();
         for (Block blk : blocks) {
-          invblks.add(new InvalidatedBlock(storage.getDatanodeDescriptor()
-              .getDatanodeUuid(), storage.getSid(), blk.getBlockId(),
+          invblks.add(new InvalidatedBlock(storage.getSid(), blk.getBlockId(),
               blk.getGenerationStamp(), blk.getNumBytes(), INode.NON_EXISTING_ID));
         }
         da.prepare(Collections.EMPTY_LIST, invblks, Collections.EMPTY_LIST);
@@ -218,7 +220,7 @@ class InvalidateBlocks {
   private boolean add(InvalidatedBlock invBlk)
       throws StorageException, TransactionContextException {
     InvalidatedBlock found =
-        findBlock(invBlk.getBlockId(), invBlk.getDatanodeUuid(), invBlk.getInodeId());
+        findBlock(invBlk.getBlockId(), invBlk.getStorageId(), invBlk.getInodeId());
     if (found == null) {
       addInvalidatedBlockToDB(invBlk);
       return true;
@@ -226,7 +228,7 @@ class InvalidateBlocks {
     return false;
   }
   
-  private List<InvalidatedBlock> findInvBlocksbyDatanodeUuid(final String uuid)
+  private List<InvalidatedBlock> findInvBlocksbySid(final int sid)
       throws IOException {
     return (List<InvalidatedBlock>) new LightWeightRequestHandler(
         HDFSOperationType.GET_INV_BLKS_BY_STORAGEID) {
@@ -235,7 +237,7 @@ class InvalidateBlocks {
         InvalidateBlockDataAccess da =
             (InvalidateBlockDataAccess) HdfsStorageFactory
                 .getDataAccess(InvalidateBlockDataAccess.class);
-        return da.findInvalidatedBlockByDatanodeUuid(uuid);
+        return da.findInvalidatedBlockBySid(sid);
       }
     }.handle();
   }
@@ -254,7 +256,7 @@ class InvalidateBlocks {
     }.handle();
   }
   
-  private void removeInvBlocks(final DatanodeInfo dn) throws
+  private void removeInvBlocks(final int sid) throws
       IOException {
 
     new LightWeightRequestHandler(HDFSOperationType.RM_INV_BLKS) {
@@ -263,17 +265,17 @@ class InvalidateBlocks {
         InvalidateBlockDataAccess da =
             (InvalidateBlockDataAccess) HdfsStorageFactory
                 .getDataAccess(InvalidateBlockDataAccess.class);
-        da.removeAllByDatanodeUuid(dn.getDatanodeUuid());
+        da.removeAllBySid(sid);
         return null;
       }
     }.handle();
   }
 
-  private InvalidatedBlock findBlock(long blkId, String datanodeUuid, int
+  private InvalidatedBlock findBlock(long blkId, int sid, int
       inodeId) throws StorageException, TransactionContextException {
     return (InvalidatedBlock) EntityManager
-        .find(InvalidatedBlock.Finder.ByBlockIdDatanodeUuidAndINodeId, blkId,
-            datanodeUuid, inodeId);
+        .find(InvalidatedBlock.Finder.ByBlockIdSidAndINodeId, blkId,
+            sid, inodeId);
   }
   
   private void addInvalidatedBlockToDB(InvalidatedBlock invBlk)
@@ -285,7 +287,7 @@ class InvalidateBlocks {
   Removes (all) replica's of the given block on the given datanode.
   TODO include the generation timestamp?
    */
-  private void removeInvalidatedBlockFromDB(final long blockId, final String datanodeUuid)
+  private void removeInvalidatedBlockFromDB(final long blockId, final int sid)
       throws IOException {
     new LightWeightRequestHandler(HDFSOperationType.RM_INV_BLKS) {
       @Override
@@ -293,7 +295,7 @@ class InvalidateBlocks {
         InvalidateBlockDataAccess da =
             (InvalidateBlockDataAccess) HdfsStorageFactory
                 .getDataAccess(InvalidateBlockDataAccess.class);
-        da.removeByDatanodeUuid(blockId, datanodeUuid);
+        da.removeByBlockIdAndSid(blockId, sid);
         return null;
       }
     }.handle();
@@ -308,8 +310,8 @@ class InvalidateBlocks {
   public List<DatanodeInfo> getDatanodes(DatanodeManager manager)
       throws IOException {
     List<DatanodeInfo> nodes = new ArrayList<DatanodeInfo>();
-    for(String datanodeUuid : getStorageIDs()) {
-      nodes.add(manager.getDatanodeByUuid(datanodeUuid));
+    for(int sid : getSids()) {
+      nodes.add(manager.getDatanodeBySid(sid));
     }
     return nodes;
   }

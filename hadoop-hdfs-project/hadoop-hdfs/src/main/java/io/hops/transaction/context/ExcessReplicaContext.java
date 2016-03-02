@@ -60,7 +60,7 @@ public class ExcessReplicaContext
       throws TransactionContextException, StorageException {
     ExcessReplica.Finder eFinder = (ExcessReplica.Finder) finder;
     switch (eFinder) {
-      case ByBlockIdDatanodeUuidAndINodeId:
+      case ByBlockIdSidAndINodeId:
         return findByPrimaryKey(eFinder, params);
     }
     throw new RuntimeException(UNSUPPORTED_FINDER);
@@ -94,8 +94,8 @@ public class ExcessReplicaContext
 
   @Override
   ExcessReplica cloneEntity(ExcessReplica hopExcessReplica, int inodeId) {
-    return new ExcessReplica(hopExcessReplica.getDatanodeUuid(),
-        hopExcessReplica.getStorageId(), hopExcessReplica.getBlockId(), inodeId);
+    return new ExcessReplica(hopExcessReplica.getStorageId(),
+        hopExcessReplica.getBlockId(), inodeId);
   }
 
   @Override
@@ -107,19 +107,19 @@ public class ExcessReplicaContext
   private ExcessReplica findByPrimaryKey(ExcessReplica.Finder eFinder,
       Object[] params) throws StorageCallPreventedException, StorageException {
     final long blockId = (Long) params[0];
-    final String datanodeUuid = (String) params[1];
+    final int storageId = (Integer) params[1];
     final int inodeId = (Integer) params[2];
-    final BlockPK.ReplicaPK.RBPK key = new BlockPK.ReplicaPK.RBPK(blockId, inodeId, datanodeUuid);
+    final BlockPK.ReplicaPK key = new BlockPK.ReplicaPK(blockId, inodeId, storageId);
 
     ExcessReplica result = null;
     if (contains(key) || containsByINode(inodeId) || containsByBlock(blockId)) {
       result = get(key);
-      hit(eFinder, result, "bid", blockId, "uuid", datanodeUuid);
+      hit(eFinder, result, "bid", blockId, "uuid", storageId);
     } else {
       aboutToAccessStorage(eFinder, params);
-      result = dataAccess.findByPK(blockId, datanodeUuid, inodeId);
+      result = dataAccess.findByPK(blockId, storageId, inodeId);
       gotFromDB(key, result);
-      miss(eFinder, result, "bid", blockId, "uuid", datanodeUuid);
+      miss(eFinder, result, "bid", blockId, "sid", storageId);
     }
     return result;
   }
