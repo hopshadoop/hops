@@ -408,8 +408,8 @@ public class BlockInfo extends Block {
     int numLocations = replicas.size();
     Set<DatanodeDescriptor> datanodes = new HashSet<DatanodeDescriptor>();
     for (int i = numLocations - 1; i >= 0; i--) {
-      DatanodeDescriptor dn =
-          datanodeMgr.getStorage(replicas.get(i).getStorageId()).getDatanodeDescriptor();
+      DatanodeDescriptor dn = datanodeMgr.getDatanodeBySid(replicas.get(i)
+          .getStorageId());
       if (dn != null) {
         datanodes.add(dn);
       } else {

@@ -1197,7 +1197,7 @@ public class DatanodeManager {
           BlockRecoveryCommand brCommand =
               new BlockRecoveryCommand(blocks.length);
           for (BlockInfoUnderConstruction b : blocks) {
-            final DatanodeStorageInfo[] storages = b.getExpectedStorageLocations(this);
+            final DatanodeStorageInfo[] storages = getStorageInfosTx(b);
 
             // Skip stale nodes during recovery - not heart beated for some time (30s by default).
             final List<DatanodeStorageInfo> recoveryLocations =
@@ -1431,6 +1431,35 @@ public class DatanodeManager {
     // resolve its network location
     List<String> rName = dnsToSwitchMapping.resolve(names);
     return rName;
+  }
+
+  private DatanodeStorageInfo[] getStorageInfosTx(
+      final BlockInfoUnderConstruction b) throws IOException {
+    final DatanodeManager datanodeManager = this;
+
+    return (DatanodeStorageInfo[]) new HopsTransactionalRequestHandler(
+        HDFSOperationType.GET_EXPECTED_BLK_LOCATIONS) {
+      INodeIdentifier inodeIdentifier;
+
+      @Override
+      public void setUp() throws StorageException {
+        inodeIdentifier = INodeUtil.resolveINodeFromBlock(b);
+      }
+
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = LockFactory.getInstance();
+        locks.add(
+            lf.getIndividualINodeLock(TransactionLockTypes.INodeLockType.READ, inodeIdentifier))
+            .add(lf.getIndividualBlockLock(b.getBlockId(), inodeIdentifier))
+            .add(lf.getBlockRelated(BLK.RE, BLK.UC));
+      }
+
+      @Override
+      public Object performTask() throws StorageException, IOException {
+        return b.getExpectedStorageLocations(datanodeManager);
+      }
+    }.handle();
   }
 
   /**
