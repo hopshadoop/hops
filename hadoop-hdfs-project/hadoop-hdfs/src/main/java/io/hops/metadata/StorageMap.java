@@ -16,12 +16,17 @@
 package io.hops.metadata;
 
 import io.hops.exception.StorageException;
+import io.hops.metadata.common.entity.Variable;
 import io.hops.metadata.hdfs.dal.StorageDataAccess;
 import io.hops.metadata.hdfs.dal.StorageIdMapDataAccess;
 import io.hops.metadata.hdfs.entity.Storage;
 import io.hops.metadata.hdfs.entity.StorageId;
 import io.hops.transaction.handler.HDFSOperationType;
+import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.handler.LightWeightRequestHandler;
+import io.hops.transaction.lock.LockFactory;
+import io.hops.transaction.lock.TransactionLockTypes;
+import io.hops.transaction.lock.TransactionLocks;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 
 import java.io.IOException;
@@ -94,10 +99,32 @@ public class StorageMap {
   /**
    * Adds or replaces storageinfo for the given sid
    */
-  public void updateStorage(DatanodeStorageInfo storageInfo) {
+  public void updateStorage(final DatanodeStorageInfo storageInfo) {
     // Allow lookup of storageId (String) -> sid (int)
     try {
       storageIdMap.update(storageInfo);
+
+
+      // TODO make this work (save to the DB, not just in the hashmap in RAM):
+//      // Also write to the storages table (mapping DN-Sid-storagetype)
+//      final int sid = storageInfo.getSid();
+//      final String datanodeUuid = storageInfo.getDatanodeDescriptor().getDatanodeUuid();
+//      final int storageType = storageInfo.getStorageType().ordinal();
+//
+//      new LightWeightRequestHandler(HDFSOperationType.INITIALIZE_SID_MAP) {
+//        @Override
+//        public Object performTask() throws StorageException, IOException {
+//          StorageDataAccess<Storage> da =
+//              (StorageDataAccess) HdfsStorageFactory
+//                  .getDataAccess(StorageDataAccess.class);
+//          Storage h = da.findByPk(sid);
+//          if (h == null) {
+//            h = new Storage(sid, datanodeUuid, storageType);
+//            da.add(h);
+//          }
+//          return null;
+//        }
+//      }.handle();
     } catch (IOException e) {
       // TODO throw some stuff?
       e.printStackTrace();

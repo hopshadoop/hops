@@ -993,7 +993,8 @@ public class TestFileCreation {
       out.write("something".getBytes());
       out.hflush();
       int actualRepl = out.getCurrentBlockReplication();
-      assertTrue(f + " should be replicated to " + DATANODE_NUM + " datanodes.",
+      assertTrue(f + " should be replicated to " + DATANODE_NUM + " datanodes" +
+          ", but is only replicated to " + actualRepl + " datanodes.",
           actualRepl == DATANODE_NUM);
 
       // set the soft and hard limit to be 1 second so that the
