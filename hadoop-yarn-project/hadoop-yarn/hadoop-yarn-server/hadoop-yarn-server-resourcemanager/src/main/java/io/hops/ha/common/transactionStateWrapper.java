@@ -247,8 +247,9 @@ public class transactionStateWrapper extends TransactionStateImpl {
     ts.addApplicationToAdd(app);
   }
 
-  public void addApplicationStateToRemove(ApplicationId appId) {
-    ts.addApplicationStateToRemove(appId);
+  public void addApplicationStateToRemove(ApplicationId appId,
+                                          Set<ApplicationAttemptId> appAttIds) {
+    ts.addApplicationStateToRemove(appId, appAttIds);
   }
 
   public void addAppAttempt(RMAppAttempt appAttempt) {

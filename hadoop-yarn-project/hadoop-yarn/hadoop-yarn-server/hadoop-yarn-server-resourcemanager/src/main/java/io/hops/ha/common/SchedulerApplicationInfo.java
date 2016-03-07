@@ -18,14 +18,19 @@ package io.hops.ha.common;
 import io.hops.StorageConnector;
 import io.hops.exception.StorageException;
 import io.hops.metadata.util.RMStorageFactory;
+import io.hops.metadata.yarn.dal.AppSchedulingInfoBlacklistDataAccess;
+import io.hops.metadata.yarn.dal.AppSchedulingInfoDataAccess;
 import io.hops.metadata.yarn.dal.QueueMetricsDataAccess;
 import io.hops.metadata.yarn.dal.SchedulerApplicationDataAccess;
+import io.hops.metadata.yarn.entity.AppSchedulingInfo;
+import io.hops.metadata.yarn.entity.AppSchedulingInfoBlacklist;
 import io.hops.metadata.yarn.entity.SchedulerApplication;
 import io.hops.metadata.yarn.entity.SchedulerApplicationInfoToAdd;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicationAttempt;
 
 import java.util.ArrayList;
@@ -49,12 +54,14 @@ public class SchedulerApplicationInfo {
   private Map<ApplicationId, SchedulerApplicationInfoToAdd>
       schedulerApplicationsToAdd =
       new HashMap<ApplicationId, SchedulerApplicationInfoToAdd>();
-  private Set<ApplicationId> applicationsIdToRemove =
-      new HashSet<ApplicationId>();
+  private List<ApplicationId> applicationsIdToRemove =
+          new ArrayList<ApplicationId>();
   Lock fiCaSchedulerAppInfoLock = new ReentrantLock();
   private Map<String, Map<String, FiCaSchedulerAppInfo>> fiCaSchedulerAppInfo =
       new HashMap<String, Map<String, FiCaSchedulerAppInfo>>();
-  
+  private Set<ApplicationAttemptId> applicationAttemptsToRemove =
+          new HashSet<ApplicationAttemptId>();
+
   public SchedulerApplicationInfo(TransactionStateImpl transactionState){
     this.transactionState = transactionState;
   }
@@ -92,13 +99,16 @@ public class SchedulerApplicationInfo {
       SchedulerApplicationDataAccess sappDA =
           (SchedulerApplicationDataAccess) RMStorageFactory
               .getDataAccess(SchedulerApplicationDataAccess.class);
+
       List<SchedulerApplication> applicationsToRemove =
           new ArrayList<SchedulerApplication>();
+
       for (ApplicationId appId : applicationsIdToRemove) {
         applicationsToRemove
             .add(new SchedulerApplication(appId.toString(), null, null));
       }
       sappDA.removeAll(applicationsToRemove);
+
       //TORECOVER OPT clean the table that depend on this one
     }
   }
@@ -121,9 +131,16 @@ public class SchedulerApplicationInfo {
     applicationsIdToRemove.remove(applicationIdToAdd);
   }
 
-  public void setApplicationIdtoRemove(ApplicationId applicationIdToRemove) {
+  public void setApplicationIdtoRemove(ApplicationId applicationIdToRemove,
+                                       ApplicationAttemptId appAttId,
+                                       Set<String> blackListedResources) {
     if(schedulerApplicationsToAdd.remove(applicationIdToRemove)==null){
       this.applicationsIdToRemove.add(applicationIdToRemove);
+
+      FiCaSchedulerAppInfo toBeRemoved = getFiCaSchedulerAppInfo(appAttId);
+      toBeRemoved.setBlacklistToRemove(new ArrayList<String>(blackListedResources));
+
+      this.applicationAttemptsToRemove.add(appAttId);
     }
   }
 
@@ -151,13 +168,19 @@ public class SchedulerApplicationInfo {
 
   private void persistFiCaSchedulerAppInfo(StorageConnector connector) throws StorageException {
     if(!fiCaSchedulerAppInfo.isEmpty()){
-    AgregatedAppInfo agregatedAppInfo = new AgregatedAppInfo();
-    for (Map<String,FiCaSchedulerAppInfo> map : fiCaSchedulerAppInfo.values()) {
-      for(FiCaSchedulerAppInfo appInfo: map.values()){
-        appInfo.agregate(agregatedAppInfo);
+      AgregatedAppInfo agregatedAppInfo = new AgregatedAppInfo();
+      for (Map<String,FiCaSchedulerAppInfo> map : fiCaSchedulerAppInfo.values()) {
+        for(FiCaSchedulerAppInfo appInfo: map.values()){
+          appInfo.agregate(agregatedAppInfo);
+        }
       }
-    }
-    agregatedAppInfo.persist();
+
+      for (ApplicationAttemptId appAttId : applicationAttemptsToRemove) {
+        agregatedAppInfo.addFiCaSchedulerAppToRemove(
+                new AppSchedulingInfo(appAttId.toString()));
+      }
+
+      agregatedAppInfo.persist();
     }
   }
 
@@ -174,5 +197,4 @@ public class SchedulerApplicationInfo {
         .put(schedulerApp.getApplicationAttemptId().toString(), ficaInfo);
     fiCaSchedulerAppInfoLock.unlock();
   }
-
 }

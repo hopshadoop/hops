@@ -722,9 +722,23 @@ public class ApplicationMasterService extends AbstractService
       TransactionState transactionState) {
     LOG.info("Unregistering app attempt : " + attemptId);
     AllocateResponseLock lock = responseMap.remove(attemptId);
+    List<String> completedContainers = new ArrayList<String>();
+    List<String> allocatedContainers = new ArrayList<String>();
+    List<ContainerStatus> complContStatus =
+            lock.getAllocateResponse().getCompletedContainersStatuses();
+    for (ContainerStatus contId : complContStatus) {
+      completedContainers.add(contId.getContainerId().toString());
+    }
+    List<Container> allocCont =
+            lock.getAllocateResponse().getAllocatedContainers();
+    for (Container contId : allocCont) {
+      allocatedContainers.add(contId.getId().toString());
+    }
     if (transactionState != null) {
       ((TransactionStateImpl) transactionState)
-          .removeAllocateResponse(attemptId, lock.getAllocateResponse().getResponseId());
+          .removeAllocateResponse(attemptId, lock.getAllocateResponse().getResponseId(),
+                  allocatedContainers,
+                  completedContainers);
     }
     rmContext.getNMTokenSecretManager().unregisterApplicationAttempt(attemptId);
   }

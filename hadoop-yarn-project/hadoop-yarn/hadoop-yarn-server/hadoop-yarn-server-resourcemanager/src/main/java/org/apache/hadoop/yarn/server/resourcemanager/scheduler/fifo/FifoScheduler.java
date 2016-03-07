@@ -89,13 +89,7 @@ import org.apache.hadoop.yarn.util.resource.ResourceCalculator;
 import org.apache.hadoop.yarn.util.resource.Resources;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentSkipListMap;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.QueueMetrics;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication;
@@ -412,9 +406,13 @@ public class FifoScheduler extends
     applications.remove(applicationId);
 
     if (transactionState != null) {
+      ApplicationAttemptId appAttId = application.getCurrentAppAttempt().getApplicationAttemptId();
+      Set<String> blacklistedRes = application.getCurrentAppAttempt()
+              .getAppSchedulingInfo().getBlackList();
+
       ((TransactionStateImpl) transactionState).
               getSchedulerApplicationInfos(applicationId)
-          .setApplicationIdtoRemove(applicationId);
+          .setApplicationIdtoRemove(applicationId, appAttId, blacklistedRes);
     }
   }
 

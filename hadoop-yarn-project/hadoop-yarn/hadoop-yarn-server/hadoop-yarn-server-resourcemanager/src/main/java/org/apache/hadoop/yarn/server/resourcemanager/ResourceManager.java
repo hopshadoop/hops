@@ -558,6 +558,11 @@ public class ResourceManager extends CompositeService implements Recoverable {
       super.serviceInit(conf);
     }
 
+    @VisibleForTesting
+    public RMAppManager getRMAppManager() {
+      return rmAppManager;
+    }
+
     private void startDispatchers(){
       if (schedulerDispatcher instanceof Service) {
         ((Service)schedulerDispatcher).start();
