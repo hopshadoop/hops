@@ -2450,17 +2450,14 @@ public class FSNamesystem
   boolean completeFile(final String src, final String holder,
       final ExtendedBlock last) throws IOException {
     HopsTransactionalRequestHandler completeFileHandler =
-        new HopsTransactionalRequestHandler(HDFSOperationType.COMPLETE_FILE,
-            src) {
+        new HopsTransactionalRequestHandler(HDFSOperationType.COMPLETE_FILE, src) {
           @Override
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = getInstance();
-            locks.add(lf.getINodeLock(nameNode, INodeLockType.WRITE,
-                INodeResolveType.PATH, src))
+            locks.add(lf.getINodeLock(nameNode, INodeLockType.WRITE, INodeResolveType.PATH, src))
                 .add(lf.getLeaseLock(LockType.WRITE, holder))
                 .add(lf.getLeasePathLock(LockType.WRITE)).add(lf.getBlockLock())
-                .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR,
-                    BLK.IV));
+                .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR, BLK.IV));
           }
 
           @Override
@@ -2470,6 +2467,7 @@ public class FSNamesystem
                 ExtendedBlock.getLocalBlock(last));
           }
         };
+
     return (Boolean) completeFileHandler.handle(this);
   }
 
@@ -2512,7 +2510,7 @@ public class FSNamesystem
     commitOrCompleteLastBlock(pendingFile, last);
 
     if (!checkFileProgress(pendingFile, true)) {
-      return false;
+      return false; // TODO it's going here...
     }
 
     finalizeINodeFileUnderConstruction(src, pendingFile);
@@ -3371,8 +3369,8 @@ private void commitOrCompleteLastBlock(
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = getInstance();
         locks.add(
-            lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier,
-                true)).add(lf.getLeaseLock(LockType.WRITE))
+            lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier, true))
+            .add(lf.getLeaseLock(LockType.WRITE))
             .add(lf.getLeasePathLock(LockType.WRITE))
             .add(lf.getBlockLock(lastblock.getBlockId(), inodeIdentifier))
             .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR));

@@ -18,15 +18,13 @@ package io.hops.metadata;
 import io.hops.exception.StorageException;
 import io.hops.metadata.common.entity.Variable;
 import io.hops.metadata.hdfs.dal.StorageDataAccess;
-import io.hops.metadata.hdfs.dal.StorageIdMapDataAccess;
 import io.hops.metadata.hdfs.entity.Storage;
-import io.hops.metadata.hdfs.entity.StorageId;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import io.hops.transaction.lock.LockFactory;
-import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLocks;
+import io.hops.transaction.lock.TransactionLockTypes.LockType;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 
 import java.io.IOException;
@@ -104,27 +102,31 @@ public class StorageMap {
     try {
       storageIdMap.update(storageInfo);
 
+      // Also write to the storages table (mapping DN-Sid-storagetype)
+      final int sid = storageInfo.getSid();
+      final String datanodeUuid = storageInfo.getDatanodeDescriptor().getDatanodeUuid();
+      final int storageType = storageInfo.getStorageType().ordinal();
 
-      // TODO make this work (save to the DB, not just in the hashmap in RAM):
-//      // Also write to the storages table (mapping DN-Sid-storagetype)
-//      final int sid = storageInfo.getSid();
-//      final String datanodeUuid = storageInfo.getDatanodeDescriptor().getDatanodeUuid();
-//      final int storageType = storageInfo.getStorageType().ordinal();
-//
-//      new LightWeightRequestHandler(HDFSOperationType.INITIALIZE_SID_MAP) {
-//        @Override
-//        public Object performTask() throws StorageException, IOException {
-//          StorageDataAccess<Storage> da =
-//              (StorageDataAccess) HdfsStorageFactory
-//                  .getDataAccess(StorageDataAccess.class);
-//          Storage h = da.findByPk(sid);
-//          if (h == null) {
-//            h = new Storage(sid, datanodeUuid, storageType);
-//            da.add(h);
-//          }
-//          return null;
-//        }
-//      }.handle();
+      // TODO only do this if the info changed? (compare with the cache version)
+      new HopsTransactionalRequestHandler(HDFSOperationType.INITIALIZE_SID_MAP) {
+        @Override
+        public void acquireLock(TransactionLocks locks) throws IOException {
+          LockFactory lf = LockFactory.getInstance();
+          locks.add(
+              lf.getVariableLock(Variable.Finder.StorageMap, LockType.READ_COMMITTED));
+        }
+
+        @Override
+        public Object performTask() throws StorageException, IOException {
+          StorageDataAccess<Storage> da = (StorageDataAccess) HdfsStorageFactory.getDataAccess(StorageDataAccess.class);
+          Storage h = da.findByPk(sid);
+          if (h == null) {
+            h = new Storage(sid, datanodeUuid, storageType);
+            da.add(h);
+          }
+          return null;
+        }
+      }.handle();
     } catch (IOException e) {
       // TODO throw some stuff?
       e.printStackTrace();
