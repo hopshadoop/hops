@@ -54,13 +54,19 @@ public class StorageMap {
   private Map<String, ArrayList<Integer>> datanodeUuidToSids;
 
   public StorageMap() {
-    // TODO throw some stuff?
+    this(true);
+  }
+
+  // TODO should this method throw the IOExceptions?
+  public StorageMap(boolean loadFromDB) {
     try {
       // Initialize the StorageId (String) <--> sid (int) maps
-      this.storageIdMap = new StorageIdMap();
+      this.storageIdMap = new StorageIdMap(loadFromDB);
 
-      // Initialize the datanodeUuid (String) --> sids (int[]) map
-      this.initializeDatanodeUuidToSidsMap();
+      if(loadFromDB) {
+        // Initialize the datanodeUuid (String) --> sids (int[]) map
+        this.initializeDatanodeUuidToSidsMap();
+      }
     } catch (IOException e) {
       e.printStackTrace();
     }

@@ -38,9 +38,16 @@ public class StorageIdMap {
   private Map<Integer, String> sIdtoStorageId;
   
   public StorageIdMap() throws IOException {
+    this(true);
+  }
+
+  public StorageIdMap(boolean loadFromDB) throws IOException {
     this.sIdtoStorageId = new HashMap<Integer, String>();
     this.storageIdtoSId = new HashMap<String, Integer>();
-    initialize();
+
+    if(loadFromDB) {
+      initialize();
+    }
   }
 
   public void update(DatanodeStorageInfo s) throws IOException {

@@ -21,6 +21,7 @@ import com.google.common.base.Preconditions;
 import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
+import io.hops.metadata.StorageMap;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
@@ -233,6 +234,7 @@ public class BlockManagerTestUtil {
   public static DatanodeDescriptor getDatanodeDescriptor(String ipAddr,
       String rackLocation, DatanodeStorage storage, String hostname) {
     DatanodeDescriptor dn = DFSTestUtil.getDatanodeDescriptor(ipAddr,
+        // TODO kinda ugly having a hardcoded new StorageMap(false) here...
         DFSConfigKeys.DFS_DATANODE_DEFAULT_PORT, rackLocation, hostname);
     if (storage != null) {
       dn.updateStorage(storage);

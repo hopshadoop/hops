@@ -903,8 +903,7 @@ public class DFSTestUtil {
     return new DatanodeInfo(getLocalDatanodeID(port));
   }
 
-  public static DatanodeInfo getDatanodeInfo(String ipAddr, String host,
-      int port) {
+  public static DatanodeInfo getDatanodeInfo(String ipAddr, String host, int port) {
     return new DatanodeInfo(new DatanodeID(ipAddr, host, "", port,
         DFSConfigKeys.DFS_DATANODE_HTTP_DEFAULT_PORT,
         DFSConfigKeys.DFS_DATANODE_IPC_DEFAULT_PORT));
@@ -928,6 +927,8 @@ public class DFSTestUtil {
     return datanodes;
   }
 
+  public static StorageMap storageMap = new StorageMap(false);
+
   public static DatanodeDescriptor getDatanodeDescriptor(String ipAddr,
       String rackLocation) {
     return getDatanodeDescriptor(ipAddr,
@@ -944,7 +945,7 @@ public class DFSTestUtil {
     DatanodeID dnId = new DatanodeID(ipAddr, hostname, "", port,
         DFSConfigKeys.DFS_DATANODE_HTTP_DEFAULT_PORT,
         DFSConfigKeys.DFS_DATANODE_IPC_DEFAULT_PORT);
-    return new DatanodeDescriptor(new StorageMap(), dnId, rackLocation);
+    return new DatanodeDescriptor(storageMap, dnId, rackLocation);
   }
 
   public static DatanodeStorageInfo[] createDatanodeStorageInfos(String[] racks) {
@@ -953,10 +954,6 @@ public class DFSTestUtil {
 
   public static DatanodeStorageInfo[] createDatanodeStorageInfos(String[] racks, String[] hostnames) {
     return createDatanodeStorageInfos(racks.length, racks, hostnames);
-  }
-
-  public static DatanodeStorageInfo[] createDatanodeStorageInfos(int n) {
-    return createDatanodeStorageInfos(n, null, null);
   }
 
   public static DatanodeStorageInfo[] createDatanodeStorageInfos(
@@ -992,8 +989,7 @@ public class DFSTestUtil {
       StorageType type) {
     final DatanodeStorage storage = new DatanodeStorage(storageID,
         DatanodeStorage.State.NORMAL, type);
-    final DatanodeDescriptor dn = BlockManagerTestUtil.getDatanodeDescriptor(
-        ip, rack, storage, hostname);
+    final DatanodeDescriptor dn = BlockManagerTestUtil.getDatanodeDescriptor(ip, rack, storage, hostname);
     return BlockManagerTestUtil.newDatanodeStorageInfo(dn, storage);
   }
   

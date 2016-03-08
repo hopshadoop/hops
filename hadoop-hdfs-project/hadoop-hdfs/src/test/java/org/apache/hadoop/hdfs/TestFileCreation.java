@@ -174,6 +174,53 @@ public class TestFileCreation {
   }
 
   @Test
+  public void testSimple() throws IOException {
+    Configuration conf = new HdfsConfiguration();
+
+
+    if (simulatedStorage) {
+      SimulatedFSDataset.setFactory(conf);
+    }
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).checkDataNodeHostConfig(true).build();
+
+    FileSystem fs = cluster.getFileSystem();
+    try {
+      // Do the real stuff in here...
+      String[] filenames = {
+          "file1.dat",
+          "file2.dat",
+          "file3.dat",
+          "data/test.dat",
+          "data/test2.dat"
+      };
+
+      for(String filename : filenames) {
+        // create a new file in home directory. Do not close it.
+        Path file = new Path(filename);
+        Path parent = file.getParent();
+        fs.mkdirs(parent);
+        DistributedFileSystem dfs = (DistributedFileSystem) fs;
+        dfs.setQuota(file.getParent(), 100L, blockSize * 500);
+        FSDataOutputStream stm = createFile(fs, file, 1);
+
+        // verify that file exists in FS namespace
+        assertTrue(file + " should be a file",
+            fs.getFileStatus(file).isFile());
+
+        // write to file
+        // writeFile(stm);
+        byte[] buffer = AppendTestUtil.randomBytes(seed, fileSize);
+        stm.write(buffer, 0, fileSize);
+
+        stm.close();
+      }
+    } finally {
+      cluster.shutdown();
+    }
+  }
+
+  @Test
   public void testFileCreation() throws IOException {
     checkFileCreation(null, false);
   }
@@ -1228,6 +1275,7 @@ public class TestFileCreation {
       createSmallFile(fs, new Path("/A/B/C/cf1"), 1);
       createSmallFile(fs, new Path("/A/B/C/cf2"), 1);
 
+      String s = "asdf";
 
       fs.mkdirs(new Path("/A/D"));
       fs.mkdirs(new Path("/A/D/E"));
