@@ -220,6 +220,26 @@ public class BlockManagerTestUtil {
         "Must use default policy, got %s", bpp.getClass());
     ((BlockPlacementPolicyDefault) bpp).setPreferLocalNode(prefer);
   }
+
+  public static DatanodeDescriptor getLocalDatanodeDescriptor(
+      boolean initializeStorage) {
+    DatanodeDescriptor dn = new DatanodeDescriptor(new StorageMap(false),
+        DFSTestUtil.getLocalDatanodeID());
+    if (initializeStorage) {
+      dn.updateStorage(new DatanodeStorage(DatanodeStorage.generateUuid()));
+    }
+    return dn;
+  }
+
+  public static DatanodeDescriptor getDatanodeDescriptor(String ipAddr,
+      String rackLocation, boolean initializeStorage) {
+    DatanodeDescriptor dn = DFSTestUtil.getDatanodeDescriptor(ipAddr,
+        DFSConfigKeys.DFS_DATANODE_DEFAULT_PORT, rackLocation);
+    if (initializeStorage) {
+      dn.updateStorage(new DatanodeStorage(DatanodeStorage.generateUuid()));
+    }
+    return dn;
+  }
   
   /**
    * Call heartbeat check function of HeartbeatManager

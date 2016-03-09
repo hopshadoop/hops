@@ -107,15 +107,23 @@ public class TestBlockManager {
     formatStorage();
     
     bm = new BlockManager(fsn, fsn, conf);
-    final String[] racks = {
-        "/rackA",
-        "/rackA",
-        "/rackA",
-        "/rackB",
-        "/rackB",
-        "/rackB"};
-    storages = DFSTestUtil.createDatanodeStorageInfos(racks);
-    nodes = Arrays.asList(DFSTestUtil.toDatanodeDescriptor(storages));
+//    final String[] racks = {
+//        "/rackA",
+//        "/rackA",
+//        "/rackA",
+//        "/rackB",
+//        "/rackB",
+//        "/rackB"};
+//    storages = DFSTestUtil.createDatanodeStorageInfos(racks);
+//    nodes = Arrays.asList(DFSTestUtil.toDatanodeDescriptor(storages));
+    nodes = ImmutableList.of(
+        BlockManagerTestUtil.getDatanodeDescriptor("1.1.1.1", "/rackA", true),
+        BlockManagerTestUtil.getDatanodeDescriptor("2.2.2.2", "/rackA", true),
+        BlockManagerTestUtil.getDatanodeDescriptor("3.3.3.3", "/rackA", true),
+        BlockManagerTestUtil.getDatanodeDescriptor("4.4.4.4", "/rackA", true),
+        BlockManagerTestUtil.getDatanodeDescriptor("5.5.5.5", "/rackA", true),
+        BlockManagerTestUtil.getDatanodeDescriptor("6.6.6.6", "/rackA", true)
+    );
     rackA = nodes.subList(0, 3);
     rackB = nodes.subList(3, 6);
   }
@@ -357,12 +365,12 @@ public class TestBlockManager {
   @Test
   public void testBlocksAreNotUnderreplicatedInSingleRack() throws Exception {
     List<DatanodeDescriptor> nodes = ImmutableList
-        .of(DFSTestUtil.getDatanodeDescriptor("1.1.1.1", "/rackA"),
-            DFSTestUtil.getDatanodeDescriptor("2.2.2.2", "/rackA"),
-            DFSTestUtil.getDatanodeDescriptor("3.3.3.3", "/rackA"),
-            DFSTestUtil.getDatanodeDescriptor("4.4.4.4", "/rackA"),
-            DFSTestUtil.getDatanodeDescriptor("5.5.5.5", "/rackA"),
-            DFSTestUtil.getDatanodeDescriptor("6.6.6.6", "/rackA"));
+        .of(BlockManagerTestUtil.getDatanodeDescriptor("1.1.1.1", "/rackA", true),
+            BlockManagerTestUtil.getDatanodeDescriptor("2.2.2.2", "/rackA", true),
+            BlockManagerTestUtil.getDatanodeDescriptor("3.3.3.3", "/rackA", true),
+            BlockManagerTestUtil.getDatanodeDescriptor("4.4.4.4", "/rackA", true),
+            BlockManagerTestUtil.getDatanodeDescriptor("5.5.5.5", "/rackA", true),
+            BlockManagerTestUtil.getDatanodeDescriptor("6.6.6.6", "/rackA", true));
     for (int i = 0; i < nodes.size(); i++) {
       nodes.get(i).setDatanodeUuid("DN-Name-" + i);
     }

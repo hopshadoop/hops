@@ -377,8 +377,8 @@ public class DataStorage extends Storage {
       } else if (getDatanodeUuid().compareTo(dnUuid) != 0) {
         throw new InconsistentFSStateException(sd.getRoot(),
             "Root " + sd.getRoot() + ": DatanodeUuid=" + dnUuid +
-                ", does not match " + getDatanodeUuid() + " from other" +
-                " StorageDirectory.");
+                ", does not match " + getDatanodeUuid() +
+                " from other StorageDirectory.");
       }
     }
   }

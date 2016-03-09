@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.datanode.fsdataset.impl;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.DF;
@@ -42,7 +43,7 @@ import java.util.Set;
  * It uses the {@link FsDatasetImpl} object for synchronization.
  */
 @InterfaceAudience.Private
-class FsVolumeImpl implements FsVolumeSpi {
+public class FsVolumeImpl implements FsVolumeSpi {
   private final FsDatasetImpl dataset;
   private final String storageID;
   private final StorageType storageType;
@@ -51,17 +52,23 @@ class FsVolumeImpl implements FsVolumeSpi {
   private final File currentDir;    // <StorageDirectory>/current
   private final DF usage;
   private final long reserved;
+
+  // Capacity configured. This is useful when we want to
+  // limit the visible capacity for tests. If negative, then we just
+  // query from the filesystem.
+  protected volatile long configuredCapacity;
   
   FsVolumeImpl(FsDatasetImpl dataset, String storageID, File currentDir,
       Configuration conf, StorageType storageType) throws IOException {
     this.dataset = dataset;
     this.storageID = storageID;
-    this.storageType = storageType;
     this.reserved = conf.getLong(DFSConfigKeys.DFS_DATANODE_DU_RESERVED_KEY,
         DFSConfigKeys.DFS_DATANODE_DU_RESERVED_DEFAULT);
     this.currentDir = currentDir;
     File parent = currentDir.getParentFile();
     this.usage = new DF(parent, conf);
+    this.storageType = storageType;
+    this.configuredCapacity = -1;
   }
   
   File getCurrentDir() {
@@ -98,13 +105,26 @@ class FsVolumeImpl implements FsVolumeSpi {
   /**
    * Calculate the capacity of the filesystem, after removing any
    * reserved capacity.
-   *
-   * @return the unreserved number of bytes left in this filesystem. May be
-   * zero.
+   * @return the unreserved number of bytes left in this filesystem. May be zero.
    */
-  long getCapacity() {
-    long remaining = usage.getCapacity() - reserved;
-    return remaining > 0 ? remaining : 0;
+  @VisibleForTesting
+  public long getCapacity() {
+    if (configuredCapacity < 0) {
+      long remaining = usage.getCapacity() - reserved;
+      return remaining > 0 ? remaining : 0;
+    }
+
+    return configuredCapacity;
+  }
+
+  /**
+   * This function MUST NOT be used outside of tests.
+   *
+   * @param capacity
+   */
+  @VisibleForTesting
+  public void setCapacityForTesting(long capacity) {
+    this.configuredCapacity = capacity;
   }
 
   @Override

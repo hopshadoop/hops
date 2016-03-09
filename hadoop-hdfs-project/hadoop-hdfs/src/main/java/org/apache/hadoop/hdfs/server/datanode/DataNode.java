@@ -1829,7 +1829,7 @@ public class DataNode extends Configured
    *
    * @return the fsdataset that stores the blocks
    */
-  FsDatasetSpi<?> getFSDataset() {
+  public FsDatasetSpi<?> getFSDataset() {
     return data;
   }
 

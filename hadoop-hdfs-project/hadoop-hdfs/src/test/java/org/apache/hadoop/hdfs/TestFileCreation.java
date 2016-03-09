@@ -181,8 +181,7 @@ public class TestFileCreation {
     if (simulatedStorage) {
       SimulatedFSDataset.setFactory(conf);
     }
-    MiniDFSCluster cluster =
-        new MiniDFSCluster.Builder(conf).checkDataNodeHostConfig(true).build();
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).build();
 
     FileSystem fs = cluster.getFileSystem();
     try {
@@ -205,13 +204,12 @@ public class TestFileCreation {
         FSDataOutputStream stm = createFile(fs, file, 1);
 
         // verify that file exists in FS namespace
-        assertTrue(file + " should be a file",
-            fs.getFileStatus(file).isFile());
+        assertTrue(file + " should be a file", fs.getFileStatus(file).isFile());
 
         // write to file
         // writeFile(stm);
-        byte[] buffer = AppendTestUtil.randomBytes(seed, fileSize);
-        stm.write(buffer, 0, fileSize);
+        byte[] buffer = AppendTestUtil.randomBytes(seed, fileSize*10);
+        stm.write(buffer, 0, fileSize*10);
 
         stm.close();
       }

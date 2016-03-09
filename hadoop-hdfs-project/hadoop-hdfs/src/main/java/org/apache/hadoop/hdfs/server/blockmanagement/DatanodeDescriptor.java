@@ -278,12 +278,8 @@ public class DatanodeDescriptor extends DatanodeInfo {
    */
   public boolean removeBlock(BlockInfo b)
       throws StorageException, TransactionContextException {
-    return this.removeBlock(this.getDatanodeUuid(), b);
-  }
+    DatanodeStorageInfo s = b.getStorageOnNode(this);
 
-  boolean removeBlock(String storageID, BlockInfo b) throws
-      StorageException, TransactionContextException {
-    DatanodeStorageInfo s = getStorageInfo(storageID);
     if (s != null) {
       return s.removeBlock(b);
     }

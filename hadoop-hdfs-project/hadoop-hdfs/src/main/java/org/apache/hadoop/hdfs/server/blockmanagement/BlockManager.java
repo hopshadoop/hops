@@ -1828,12 +1828,11 @@ public class BlockManager {
           "ProcessReport from dead or unregistered node: " + nodeID);
     }
 
-    // To minimize startup time, we discard any second (or later) block reports
-    // that we receive while still in startup phase.
     DatanodeStorageInfo storageInfo = node.getStorageInfo(storage.getStorageID());
 
     if (storageInfo == null) {
       // We handle this for backwards compatibility.
+      // TODO this changed!
       storageInfo = node.updateStorage(storage);
     }
 
@@ -3413,8 +3412,7 @@ public class BlockManager {
     // Little hack; since we can't reassign final s if s==null, we have to
     // declare s as a normal variable and then assign it to a statically
     // declared variable
-    DatanodeStorageInfo s = node.getStorageInfo(blockInfos.getStorage()
-        .getStorageID());
+    DatanodeStorageInfo s = node.getStorageInfo(blockInfos.getStorage().getStorageID());
     if (s == null) {
       // The DataNode is reporting an unknown storage. Usually the NN learns
       // about new storages from heartbeats but during NN restart we may
