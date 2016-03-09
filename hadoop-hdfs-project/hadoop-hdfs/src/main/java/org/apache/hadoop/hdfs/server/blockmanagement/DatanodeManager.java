@@ -1165,10 +1165,8 @@ public class DatanodeManager {
    * Handle heartbeat from datanodes.
    */
   public DatanodeCommand[] handleHeartbeat(DatanodeRegistration nodeReg,
-      StorageReport[] reports, final String blockPoolId, long capacity, long
-      dfsUsed, long remaining,
-      long blockPoolUsed, int xceiverCount, int maxTransfers, int failedVolumes)
-      throws IOException {
+      StorageReport[] reports, final String blockPoolId, int xceiverCount,
+      int maxTransfers, int failedVolumes) throws IOException {
     synchronized (heartbeatManager) {
       synchronized (datanodeMap) {
         DatanodeDescriptor nodeinfo = null;

@@ -3622,15 +3622,14 @@ private void commitOrCompleteLastBlock(
    * @throws IOException
    */
   HeartbeatResponse handleHeartbeat(DatanodeRegistration nodeReg,
-      StorageReport[] reports, long capacity,
-      long dfsUsed, long remaining, long blockPoolUsed, int xceiverCount,
+      StorageReport[] reports, int xceiverCount,
       int xmitsInProgress, int failedVolumes) throws IOException {
     final int maxTransfer =
         blockManager.getMaxReplicationStreams() - xmitsInProgress;
 
     DatanodeCommand[] cmds = blockManager.getDatanodeManager()
-        .handleHeartbeat(nodeReg, reports, blockPoolId, capacity, dfsUsed,
-            remaining, blockPoolUsed, xceiverCount, maxTransfer, failedVolumes);
+        .handleHeartbeat(nodeReg, reports, blockPoolId, xceiverCount,
+            maxTransfer, failedVolumes);
 
     return new HeartbeatResponse(cmds);
   }

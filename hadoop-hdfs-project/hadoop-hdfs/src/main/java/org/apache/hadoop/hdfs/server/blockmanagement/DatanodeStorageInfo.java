@@ -147,13 +147,11 @@ public class DatanodeStorageInfo {
     blockContentsStale = true;
   }
 
-  // TODO add a call to this method in the DatanodeDescriptor
   void receivedHeartbeat(StorageReport report) {
     updateState(report);
     heartbeatedSinceFailover = true;
   }
 
-  // TODO add a call to this method in the BlockManager
   void receivedBlockReport() {
     if (heartbeatedSinceFailover) {
       blockContentsStale = false;

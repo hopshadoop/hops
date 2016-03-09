@@ -438,6 +438,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
     private void setPipeline(LocatedBlock lb) {
       setPipeline(lb.getLocations(), lb.getStorageTypes(), lb.getStorageIDs());
     }
+
     private void setPipeline(DatanodeInfo[] nodes, StorageType[] storageTypes,
         String[] storageIDs) {
       this.nodes = nodes;
@@ -539,7 +540,6 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
             if (DFSClient.LOG.isDebugEnabled()) {
               DFSClient.LOG.debug("Allocating new block");
             }
-//            nodes = nextBlockOutputStream(src);
             setPipeline(nextBlockOutputStream());
             initDataStreaming();
           } else if (stage == BlockConstructionStage.PIPELINE_SETUP_APPEND) {
@@ -948,7 +948,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
           src, block, nodes, storageIDs,
           failed.toArray(new DatanodeInfo[failed.size()]), 1,
           dfsClient.clientName);
-      nodes = lb.getLocations();
+      setPipeline(lb);
 
       //find the new datanode
       final int d = findNewDatanode(original);
@@ -1047,11 +1047,17 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
               ": bad datanode " + nodes[errorIndex]);
           failed.add(nodes[errorIndex]);
 
-          DatanodeInfo[] newnodes = new DatanodeInfo[nodes.length - 1];
-          System.arraycopy(nodes, 0, newnodes, 0, errorIndex);
-          System.arraycopy(nodes, errorIndex + 1, newnodes, errorIndex,
-              newnodes.length - errorIndex);
-          nodes = newnodes;
+          DatanodeInfo[] newnodes = new DatanodeInfo[nodes.length-1];
+          arraycopy(nodes, newnodes, errorIndex);
+
+          final StorageType[] newStorageTypes = new StorageType[newnodes.length];
+          arraycopy(storageTypes, newStorageTypes, errorIndex);
+
+          final String[] newStorageIDs = new String[newnodes.length];
+          arraycopy(storageIDs, newStorageIDs, errorIndex);
+
+          setPipeline(newnodes, newStorageTypes, newStorageIDs);
+
           hasError = false;
           lastException = null;
           errorIndex = -1;
@@ -2154,5 +2160,10 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
       Collection<DatanodeInfo> locations) {
     parityStripeNodes.clear();
     parityStripeNodes.addAll(locations);
+  }
+
+  private static <T> void arraycopy(T[] srcs, T[] dsts, int skipIndex) {
+    System.arraycopy(srcs, 0, dsts, 0, skipIndex);
+    System.arraycopy(srcs, skipIndex+1, dsts, skipIndex, dsts.length-skipIndex);
   }
 }
