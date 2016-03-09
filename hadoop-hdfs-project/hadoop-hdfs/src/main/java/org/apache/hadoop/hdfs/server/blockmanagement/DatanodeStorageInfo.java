@@ -311,6 +311,17 @@ public class DatanodeStorageInfo {
       s.getDatanodeDescriptor().incrementBlocksScheduled(s.getStorageType());
     }
   }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (this == obj) {
+      return true;
+    } else if (obj == null || !(obj instanceof DatanodeStorageInfo)) {
+      return false;
+    }
+    final DatanodeStorageInfo that = (DatanodeStorageInfo)obj;
+    return this.storageID.equals(that.storageID);
+  }
   
   @Override
   public String toString() {

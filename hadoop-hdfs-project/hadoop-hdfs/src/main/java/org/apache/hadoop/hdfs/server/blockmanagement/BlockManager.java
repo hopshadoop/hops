@@ -1048,20 +1048,16 @@ public class BlockManager {
     // failover, then we may have been holding up on processing
     // over-replicated blocks because of it. But we can now
     // process those blocks.
-    if(node.areBlockContentsStale()) {
+    boolean stale = false;
+    for(DatanodeStorageInfo storage : node.getStorageInfos()) {
+      if (storage.areBlockContentsStale()) {
+        stale = true;
+        break;
+      }
+    }
+    if (stale) {
       rescanPostponedMisreplicatedBlocks();
     }
-    // TODO HDP_2.6 use code below (also add areBockContentsStale to storage)
-//    boolean stale = false;
-//    for(DatanodeStorageInfo storage : node.getStorageInfos()) {
-//      if (storage.areBlockContentsStale()) {
-//        stale = true;
-//        break;
-//      }
-//    }
-//    if (stale) {
-//      rescanPostponedMisreplicatedBlocks();
-//    }
   }
 
   /** Remove the blocks associated to the given DatanodeStorageInfo. */
@@ -1838,12 +1834,14 @@ public class BlockManager {
 
     // To minimize startup time, we discard any second (or later) block reports
     // that we receive while still in startup phase.
-    if (namesystem.isInStartupSafeMode() && !node.isFirstBlockReport()) {
+    if (namesystem.isInStartupSafeMode() && storageInfo.getBlockReportCount() > 0) {
       blockLog.info("BLOCK* processReport: " +
           "discarded non-initial block report from " + nodeID +
           " because namenode still in startup phase");
       return;
-    } else if (node.isFirstBlockReport()) {
+    }
+
+    if (storageInfo.getBlockReportCount() == 0) {
       // The first block report can be processed a lot more efficiently than
       // ordinary block reports.  This shortens restart times.
       processFirstBlockReport(storageInfo, newReport);
@@ -1853,9 +1851,13 @@ public class BlockManager {
 
     // Now that we have an up-to-date block report, we know that any
     // deletions from a previous NN iteration have been accounted for.
-    boolean staleBefore = node.areBlockContentsStale();
+    boolean staleBefore = storageInfo.areBlockContentsStale();
+
+    // TODO we'll want to remove the whole blockreport counting in the node...
     node.receivedBlockReport();
-    if (staleBefore && !node.areBlockContentsStale()) {
+    storageInfo.receivedBlockReport();
+
+    if (staleBefore && !storageInfo.areBlockContentsStale()) {
       LOG.info(
           "BLOCK* processReport: Received first block report from " + node +
               " after becoming active. Its block contents are no longer" +
@@ -1870,9 +1872,9 @@ public class BlockManager {
     if (metrics != null) {
       metrics.addBlockReport((int) (endTime - startTime));
     }
-    blockLog.info("BLOCK* processReport: from " + nodeID + ", blocks: " +
-        newReport.getNumberOfBlocks() + ", processing time: " +
-        (endTime - startTime) + " msecs");
+    blockLog.info("BLOCK* processReport: from storage " + storage.getStorageID()
+        + " node " + nodeID + ", blocks: " + newReport.getNumberOfBlocks()
+        + ", processing time: " + (endTime - startTime) + " msecs");
   }
 
   /**
@@ -4115,7 +4117,8 @@ public class BlockManager {
         Set<Node> excludedNodes)
         throws TransactionContextException, StorageException {
       try {
-        targets = blockplacement.chooseTarget(bc.getName(),
+        //HOP: [M] srcPath is not used
+        targets = blockplacement.chooseTarget(null /*bc.getName()*/,
             additionalReplRequired, srcNode, liveReplicaStorages, false,
             excludedNodes, block.getNumBytes(), BlockStoragePolicy.DEFAULT);
       } finally {

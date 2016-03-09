@@ -95,4 +95,18 @@ public class DatanodeStorage {
 
     return false;
   }
+
+  @Override
+  public boolean equals(Object other){
+    if (other == this) {
+      return true;
+    }
+
+    if ((other == null) ||
+        !(other instanceof DatanodeStorage)) {
+      return false;
+    }
+    DatanodeStorage otherStorage = (DatanodeStorage) other;
+    return otherStorage.getStorageID().compareTo(getStorageID()) == 0;
+  }
 }

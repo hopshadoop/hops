@@ -221,26 +221,17 @@ public class BlockManagerTestUtil {
     ((BlockPlacementPolicyDefault) bpp).setPreferLocalNode(prefer);
   }
 
-  public static DatanodeDescriptor getLocalDatanodeDescriptor(
-      boolean initializeStorage) {
-    DatanodeDescriptor dn = new DatanodeDescriptor(new StorageMap(false),
-        DFSTestUtil.getLocalDatanodeID());
-    if (initializeStorage) {
-      dn.updateStorage(new DatanodeStorage(DatanodeStorage.generateUuid()));
-    }
-    return dn;
+  public static DatanodeDescriptor getDatanodeDescriptor(String ipAddr,
+      String rackLocation, boolean initializeStorage) {
+    return getDatanodeDescriptor(ipAddr, rackLocation,
+        initializeStorage? new DatanodeStorage(DatanodeStorage.generateUuid()): null);
   }
 
   public static DatanodeDescriptor getDatanodeDescriptor(String ipAddr,
-      String rackLocation, boolean initializeStorage) {
-    DatanodeDescriptor dn = DFSTestUtil.getDatanodeDescriptor(ipAddr,
-        DFSConfigKeys.DFS_DATANODE_DEFAULT_PORT, rackLocation);
-    if (initializeStorage) {
-      dn.updateStorage(new DatanodeStorage(DatanodeStorage.generateUuid()));
-    }
-    return dn;
+      String rackLocation, DatanodeStorage storage) {
+    return getDatanodeDescriptor(ipAddr, rackLocation, storage, "host");
   }
-  
+
   /**
    * Call heartbeat check function of HeartbeatManager
    *
@@ -254,7 +245,6 @@ public class BlockManagerTestUtil {
   public static DatanodeDescriptor getDatanodeDescriptor(String ipAddr,
       String rackLocation, DatanodeStorage storage, String hostname) {
     DatanodeDescriptor dn = DFSTestUtil.getDatanodeDescriptor(ipAddr,
-        // TODO kinda ugly having a hardcoded new StorageMap(false) here...
         DFSConfigKeys.DFS_DATANODE_DEFAULT_PORT, rackLocation, hostname);
     if (storage != null) {
       dn.updateStorage(storage);

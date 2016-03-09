@@ -942,7 +942,8 @@ public class DFSTestUtil {
 
   public static DatanodeDescriptor getDatanodeDescriptor(String ipAddr,
       int port, String rackLocation, String hostname) {
-    DatanodeID dnId = new DatanodeID(ipAddr, hostname, "", port,
+    DatanodeID dnId = new DatanodeID(ipAddr, hostname,
+        UUID.randomUUID().toString(), port,
         DFSConfigKeys.DFS_DATANODE_HTTP_DEFAULT_PORT,
         DFSConfigKeys.DFS_DATANODE_IPC_DEFAULT_PORT);
     return new DatanodeDescriptor(storageMap, dnId, rackLocation);
