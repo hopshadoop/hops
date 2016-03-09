@@ -888,7 +888,16 @@ public class DFSTestUtil {
   }
 
   public static DatanodeDescriptor getLocalDatanodeDescriptor() {
-    return new DatanodeDescriptor(new StorageMap(), getLocalDatanodeID());
+    return getLocalDatanodeDescriptor(false);
+  }
+
+  public static DatanodeDescriptor getLocalDatanodeDescriptor(boolean initializeStorage) {
+    DatanodeDescriptor dn = new DatanodeDescriptor(new StorageMap(),
+        getLocalDatanodeID());
+    if (initializeStorage) {
+      dn.updateStorage(new DatanodeStorage(DatanodeStorage.generateUuid()));
+    }
+    return dn;
   }
 
   public static DatanodeInfo getLocalDatanodeInfo() {

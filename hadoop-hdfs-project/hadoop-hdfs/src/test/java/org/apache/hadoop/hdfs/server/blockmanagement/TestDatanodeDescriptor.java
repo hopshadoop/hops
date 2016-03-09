@@ -75,13 +75,12 @@ public class TestDatanodeDescriptor {
 
     BlocksMap blocksMap = new BlocksMap(null);
 
-    DatanodeDescriptor datanode = DFSTestUtil.getLocalDatanodeDescriptor();
+    DatanodeDescriptor datanode = DFSTestUtil.getLocalDatanodeDescriptor(true);
     assertEquals(0, datanode.numBlocks());
     BlockInfo blk = new BlockInfo(new Block(1L), INode.NON_EXISTING_ID);
     BlockInfo blk1 = new BlockInfo(new Block(2L), INode.NON_EXISTING_ID);
     DatanodeStorageInfo[] storages = datanode.getStorageInfos();
     assertTrue(storages.length > 0);
-    final String storageID = storages[0].getStorageID();
 
     // add first block
     assertTrue(addBlock(blocksMap, storages[0], blk));
