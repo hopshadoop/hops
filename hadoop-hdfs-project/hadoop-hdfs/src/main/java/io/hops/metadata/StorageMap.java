@@ -114,7 +114,7 @@ public class StorageMap {
       final int storageType = storageInfo.getStorageType().ordinal();
 
       // TODO only do this if the info changed? (compare with the cache version)
-      new HopsTransactionalRequestHandler(HDFSOperationType.INITIALIZE_SID_MAP) {
+      new HopsTransactionalRequestHandler(HDFSOperationType.UPDATE_SID_MAP) {
         @Override
         public void acquireLock(TransactionLocks locks) throws IOException {
           LockFactory lf = LockFactory.getInstance();

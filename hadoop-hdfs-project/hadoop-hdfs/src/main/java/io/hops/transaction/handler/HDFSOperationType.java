@@ -233,6 +233,7 @@ public enum HDFSOperationType implements OperationType {
   TEST,
   GET_VARIABLE,
   INITIALIZE_SID_MAP,
+  UPDATE_SID_MAP,
   GET_SET_SID,
   GET_SET_STORAGE,
   UPDATE_INODE_ID_COUNTER,
