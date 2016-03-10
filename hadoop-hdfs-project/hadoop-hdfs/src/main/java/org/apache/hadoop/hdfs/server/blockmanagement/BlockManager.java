@@ -497,14 +497,14 @@ public class BlockManager {
         new ArrayList<DatanodeDescriptor>();
     List<DatanodeStorageInfo> containingLiveReplicasNodes =
         new ArrayList<DatanodeStorageInfo>();
-    
+
     NumberReplicas numReplicas = new NumberReplicas();
     // source node returned is not used
     chooseSourceDatanode(block, containingNodes, containingLiveReplicasNodes, numReplicas, UnderReplicatedBlocks.LEVEL);
     assert containingLiveReplicasNodes.size() == numReplicas.liveReplicas();
     int usableReplicas =
         numReplicas.liveReplicas() + numReplicas.decommissionedReplicas();
-    
+
     if (block instanceof BlockInfo) {
       String fileName = ((BlockInfo) block).getBlockCollection().getName();
       out.print(fileName + ": ");
@@ -519,7 +519,7 @@ public class BlockManager {
 
     Collection<DatanodeDescriptor> corruptNodes =
         corruptReplicas.getNodes(getBlockInfo(block));
-    
+
     for (Iterator<DatanodeDescriptor> jt = blocksMap.nodeIterator(block);
          jt.hasNext(); ) {
       DatanodeDescriptor node = jt.next();
@@ -529,7 +529,7 @@ public class BlockManager {
       } else if (node.isDecommissioned() || node.isDecommissionInProgress()) {
         state = "(decommissioned)";
       }
-      
+
       if (node.areBlockContentsStale()) {
         state += " (block deletions maybe out of date)";
       }
@@ -1825,10 +1825,8 @@ public class BlockManager {
     }
 
     DatanodeStorageInfo storageInfo = node.getStorageInfo(storage.getStorageID());
-
     if (storageInfo == null) {
       // We handle this for backwards compatibility.
-      // TODO this changed!
       storageInfo = node.updateStorage(storage);
     }
 

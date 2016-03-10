@@ -62,4 +62,9 @@ public interface Replica {
    * @return the number of bytes that are visible to readers
    */
   public long getVisibleLength();
+
+  /**
+   * Return the storageUuid of the volume that stores this replica.
+   */
+  public String getStorageUuid();
 }

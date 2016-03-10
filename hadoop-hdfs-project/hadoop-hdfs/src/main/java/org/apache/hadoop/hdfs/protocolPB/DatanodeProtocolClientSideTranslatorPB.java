@@ -225,7 +225,9 @@ public class DatanodeProtocolClientSideTranslatorPB
     for (StorageReceivedDeletedBlocks storageBlock : receivedAndDeletedBlocks) {
       StorageReceivedDeletedBlocksProto.Builder repBuilder =
           StorageReceivedDeletedBlocksProto.newBuilder();
-      repBuilder.setStorageID(storageBlock.getStorageID());
+      repBuilder.setStorageUuid(storageBlock.getStorage().getStorageID());  // Set for
+      // wire compatibility.
+      repBuilder.setStorage(PBHelper.convert(storageBlock.getStorage()));
       for (ReceivedDeletedBlockInfo rdBlock : storageBlock.getBlocks()) {
         repBuilder.addBlocks(PBHelper.convert(rdBlock));
       }

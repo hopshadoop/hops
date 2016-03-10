@@ -1287,8 +1287,7 @@ public class PBHelper {
     return DatanodeStorageProto.newBuilder()
         .setState(PBHelper.convertState(s.getState()))
         .setStorageType(PBHelper.convertStorageType(s.getStorageType()))
-        .setStorageID(s.getStorageID())
-        .build();
+        .setStorageUuid(s.getStorageID()).build();
   }
 
   private static StorageState convertState(State state) {
@@ -1361,14 +1360,9 @@ public class PBHelper {
   }
 
   public static DatanodeStorage convert(DatanodeStorageProto s) {
-    if (s.hasStorageType()) {
-      return new DatanodeStorage(s.getStorageID(),
-          PBHelper.convertState(s.getState()),
-          PBHelper.convertType(s.getStorageType()));
-    } else {
-      return new DatanodeStorage(s.getStorageID(),
-          PBHelper.convertState(s.getState()));
-    }
+    return new DatanodeStorage(s.getStorageUuid(),
+        PBHelper.convertState(s.getState()),
+        PBHelper.convertStorageType(s.getStorageType()));
   }
 
   private static State convertState(StorageState state) {

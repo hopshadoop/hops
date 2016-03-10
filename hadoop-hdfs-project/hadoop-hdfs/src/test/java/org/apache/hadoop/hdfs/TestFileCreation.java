@@ -235,7 +235,7 @@ public class TestFileCreation {
   /**
    * Same test but the client should bind to a local interface
    */
-  //@Test      // also fails in the master branch
+  @Test      // also fails in the master branch
   public void testFileCreationSetLocalInterface()
       throws IOException {    //HOP also fails in the master branch
     assumeTrue(System.getProperty("os.name").startsWith("Linux"));

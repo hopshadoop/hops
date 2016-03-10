@@ -169,8 +169,12 @@ public class DatanodeProtocolServerSideTranslatorPB
       for (int j = 0; j < list.size(); j++) {
         rdBlocks[j] = PBHelper.convert(list.get(j));
       }
-      info[i] =
-          new StorageReceivedDeletedBlocks(sBlock.getStorageID(), rdBlocks);
+      if (sBlock.hasStorage()) {
+        info[i] = new StorageReceivedDeletedBlocks(
+            PBHelper.convert(sBlock.getStorage()), rdBlocks);
+      } else {
+        info[i] = new StorageReceivedDeletedBlocks(sBlock.getStorageUuid(), rdBlocks);
+      }
     }
     try {
       impl.blockReceivedAndDeleted(PBHelper.convert(request.getRegistration()),

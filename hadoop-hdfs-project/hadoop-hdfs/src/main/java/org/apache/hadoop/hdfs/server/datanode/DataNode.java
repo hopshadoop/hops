@@ -541,10 +541,10 @@ public class DataNode extends Configured
   
   // calls specific to BP
   protected void notifyNamenodeReceivedBlock(ExtendedBlock block,
-      String delHint) {
+      String delHint, String storageUuid) {
     BPOfferService bpos = blockPoolManager.get(block.getBlockPoolId());
     if (bpos != null) {
-      bpos.notifyNamenodeReceivedBlock(block, delHint);
+      bpos.notifyNamenodeReceivedBlock(block, delHint, storageUuid);
     } else {
       LOG.error(
           "Cannot find BPOfferService for reporting block received for bpid=" +
@@ -553,10 +553,10 @@ public class DataNode extends Configured
   }
   
   // calls specific to BP
-  protected void notifyNamenodeReceivingBlock(ExtendedBlock block) {
+  protected void notifyNamenodeReceivingBlock(ExtendedBlock block, String storageUuid) {
     BPOfferService bpos = blockPoolManager.get(block.getBlockPoolId());
     if (bpos != null) {
-      bpos.notifyNamenodeReceivingBlock(block);
+      bpos.notifyNamenodeReceivingBlock(block, storageUuid);
     } else {
       LOG.error(
           "Cannot find BPOfferService for reporting block receiving for bpid=" +
@@ -567,10 +567,10 @@ public class DataNode extends Configured
   /**
    * Notify the corresponding namenode to delete the block.
    */
-  public void notifyNamenodeDeletedBlock(ExtendedBlock block) {
+  public void notifyNamenodeDeletedBlock(ExtendedBlock block, String storageUuid) {
     BPOfferService bpos = blockPoolManager.get(block.getBlockPoolId());
     if (bpos != null) {
-      bpos.notifyNamenodeDeletedBlock(block);
+      bpos.notifyNamenodeDeletedBlock(block, storageUuid);
     } else {
       LOG.error(
           "Cannot find BPOfferService for reporting block deleted for bpid=" +
@@ -581,9 +581,11 @@ public class DataNode extends Configured
   /**
    * Report a bad block which is hosted on the local DN.
    */
-  public void reportBadBlocks(ExtendedBlock block) throws IOException {
+  public void reportBadBlocks(ExtendedBlock block) throws IOException{
     BPOfferService bpos = getBPOSForBlock(block);
-    bpos.reportBadBlocks(block);
+    FsVolumeSpi volume = getFSDataset().getVolume(block);
+    bpos.reportBadBlocks(
+        block, volume.getStorageID(), volume.getStorageType());
   }
 
   /**
@@ -1237,6 +1239,13 @@ public class DataNode extends Configured
   public int getXceiverCount() {
     return threadGroup == null ? 0 : threadGroup.activeCount();
   }
+
+  private void reportBadBlock(final BPOfferService bpos,
+      final ExtendedBlock block, final String msg) {
+    FsVolumeSpi volume = getFSDataset().getVolume(block);
+    bpos.reportBadBlocks(block, volume.getStorageID(), volume.getStorageType());
+    LOG.warn(msg);
+  }
   
   int getXmitsInProgress() {
     return xmitsInProgress.get();
@@ -1259,11 +1268,11 @@ public class DataNode extends Configured
     // Check if NN recorded length matches on-disk length 
     long onDiskLength = data.getLength(block);
     if (block.getNumBytes() > onDiskLength) {
+      // Check if NN recorded length matches on-disk length
       // Shorter on-disk len indicates corruption so report NN the corrupt block
-      bpos.reportBadBlocks(block);
-      LOG.warn("Can't replicate block " + block + " because on-disk length " +
-          onDiskLength + " is shorter than NameNode recorded length " +
-          block.getNumBytes());
+      reportBadBlock(bpos, block, "Can't replicate block " + block
+          + " because on-disk length " + data.getLength(block)
+          + " is shorter than NameNode recorded length " + block.getNumBytes());
       return;
     }
     
@@ -1529,11 +1538,11 @@ public class DataNode extends Configured
    * @param block
    * @param delHint
    */
-  void closeBlock(ExtendedBlock block, String delHint) {
+  void closeBlock(ExtendedBlock block, String delHint, String storageUuid) {
     metrics.incrBlocksWritten();
     BPOfferService bpos = blockPoolManager.get(block.getBlockPoolId());
     if (bpos != null) {
-      bpos.notifyNamenodeReceivedBlock(block, delHint);
+      bpos.notifyNamenodeReceivedBlock(block, delHint, storageUuid);
     } else {
       LOG.warn(
           "Cannot find BPOfferService for reporting block received for bpid=" +
@@ -1919,15 +1928,15 @@ public class DataNode extends Configured
   @Override // InterDatanodeProtocol
   public String updateReplicaUnderRecovery(final ExtendedBlock oldBlock,
       final long recoveryId, final long newLength) throws IOException {
-    final String storageID =
-        data.updateReplicaUnderRecovery(oldBlock, recoveryId, newLength);
+    final String storageID = data.updateReplicaUnderRecovery(oldBlock,
+        recoveryId, newLength);
     // Notify the namenode of the updated block info. This is important
     // for HA, since otherwise the standby node may lose track of the
     // block locations until the next block report.
     ExtendedBlock newBlock = new ExtendedBlock(oldBlock);
     newBlock.setGenerationStamp(recoveryId);
     newBlock.setNumBytes(newLength);
-    notifyNamenodeReceivedBlock(newBlock, "");
+    notifyNamenodeReceivedBlock(newBlock, "", storageID);
     return storageID;
   }
 

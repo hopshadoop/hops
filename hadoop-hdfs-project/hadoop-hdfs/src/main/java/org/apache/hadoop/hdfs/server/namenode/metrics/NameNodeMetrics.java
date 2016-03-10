@@ -70,6 +70,8 @@ public class NameNodeMetrics {
   MutableCounterLong getLinkTargetOps;
   @Metric
   MutableCounterLong filesInGetListingOps;
+  @Metric("Number of blockReports from individual storages")
+  MutableCounterLong storageBlockReportOps;
 
   @Metric("Journal transactions")
   MutableRate transactions;
@@ -175,6 +177,10 @@ public class NameNodeMetrics {
 
   public void incrGetLinkTargetOps() {
     getLinkTargetOps.incr();
+  }
+
+  public void incrStorageBlockReportOps() {
+    storageBlockReportOps.incr();
   }
 
   public void addTransaction(long latency) {

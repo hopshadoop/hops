@@ -39,23 +39,16 @@ public class DatanodeStorage {
   private static final String STORAGE_ID_PREFIX = "DS-";
 
   /**
-   * Create a storage with {@link State#NORMAL} and
-   * {@link org.apache.hadoop.hdfs.StorageType#DEFAULT}.
-   *
-   * @param storageID
+   * Create a storage with {@link State#NORMAL} and {@link StorageType#DEFAULT}.
    */
   public DatanodeStorage(String storageID) {
-    this(storageID, State.NORMAL);
+    this(storageID, State.NORMAL, StorageType.DEFAULT);
   }
 
-  public DatanodeStorage(String storageID, State state) {
-    this(storageID, state, StorageType.DEFAULT);
-  }
-
-  public DatanodeStorage(String storageID, State state, StorageType type) {
-    this.storageID = storageID;
-    this.state = state;
-    this.storageType = type;
+  public DatanodeStorage(String sid, State s, StorageType sm) {
+    this.storageID = sid;
+    this.state = s;
+    this.storageType = sm;
   }
 
   public String getStorageID() {
@@ -66,6 +59,10 @@ public class DatanodeStorage {
     return state;
   }
 
+  public StorageType getStorageType() {
+    return storageType;
+  }
+
   /**
    * Generate new storage ID. The format of this string can be changed
    * in the future without requiring that old storage IDs be updated.
@@ -74,10 +71,6 @@ public class DatanodeStorage {
    */
   public static String generateUuid() {
     return STORAGE_ID_PREFIX + UUID.randomUUID();
-  }
-
-  public StorageType getStorageType() {
-    return this.storageType;
   }
 
   /**
@@ -97,6 +90,11 @@ public class DatanodeStorage {
   }
 
   @Override
+  public String toString() {
+    return "DatanodeStorage["+ storageID + "," + storageType + "," + state +"]";
+  }
+
+  @Override
   public boolean equals(Object other){
     if (other == this) {
       return true;
@@ -108,5 +106,10 @@ public class DatanodeStorage {
     }
     DatanodeStorage otherStorage = (DatanodeStorage) other;
     return otherStorage.getStorageID().compareTo(getStorageID()) == 0;
+  }
+
+  @Override
+  public int hashCode() {
+    return getStorageID().hashCode();
   }
 }

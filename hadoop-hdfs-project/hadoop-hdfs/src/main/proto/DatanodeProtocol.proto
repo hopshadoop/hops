@@ -51,7 +51,7 @@ message DatanodeStorageProto {
     READ_ONLY = 1;
   }
 
-  required string storageID = 1; // Unique identifier for the storage
+  required string storageUuid = 1; // Unique identifier for the storage
   optional StorageState state = 2 [default = NORMAL];
   optional StorageTypeProto storageType = 3;
 }
@@ -229,8 +229,9 @@ message ReceivedDeletedBlockInfoProto {
  * List of blocks received and deleted for a storage.
  */
 message StorageReceivedDeletedBlocksProto {
-  required string storageID = 1;
+  required string storageUuid = 1 [ deprecated = true ];
   repeated ReceivedDeletedBlockInfoProto blocks = 2;
+  optional DatanodeStorageProto storage = 3;   // supersedes storageUuid.
 }
 
 /**

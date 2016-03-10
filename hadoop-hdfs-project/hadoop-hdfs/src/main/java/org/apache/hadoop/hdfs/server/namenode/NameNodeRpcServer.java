@@ -835,6 +835,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
     for(StorageBlockReport r : reports) {
       final BlockListAsLongs blocks = new BlockListAsLongs(r.getBlocks());
       bm.processReport(nodeReg, r.getStorage(), blocks);
+      metrics.incrStorageBlockReportOps();
     }
 
     DatanodeDescriptor datanode = bm.getDatanodeManager().getDatanode(nodeReg);

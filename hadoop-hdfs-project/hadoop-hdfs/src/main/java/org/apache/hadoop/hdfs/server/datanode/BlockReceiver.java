@@ -166,7 +166,7 @@ class BlockReceiver implements Closeable {
         switch (stage) {
           case PIPELINE_SETUP_CREATE:
             replicaInfo = datanode.data.createRbw(storageType, block);
-            datanode.notifyNamenodeReceivingBlock(block);
+            datanode.notifyNamenodeReceivingBlock(block, replicaInfo.getStorageUuid());
             break;
           case PIPELINE_SETUP_STREAMING_RECOVERY:
             replicaInfo = datanode.data
@@ -180,7 +180,7 @@ class BlockReceiver implements Closeable {
                   .deleteBlock(block.getBlockPoolId(), block.getLocalBlock());
             }
             block.setGenerationStamp(newGs);
-            datanode.notifyNamenodeReceivingBlock(block);
+            datanode.notifyNamenodeReceivingBlock(block, replicaInfo.getStorageUuid());
             break;
           case PIPELINE_SETUP_APPEND_RECOVERY:
             replicaInfo =
@@ -190,7 +190,7 @@ class BlockReceiver implements Closeable {
                   .deleteBlock(block.getBlockPoolId(), block.getLocalBlock());
             }
             block.setGenerationStamp(newGs);
-            datanode.notifyNamenodeReceivingBlock(block);
+            datanode.notifyNamenodeReceivingBlock(block, replicaInfo.getStorageUuid());
             break;
           case TRANSFER_RBW:
           case TRANSFER_FINALIZED:
@@ -258,6 +258,10 @@ class BlockReceiver implements Closeable {
    */
   DataNode getDataNode() {
     return datanode;
+  }
+
+  String getStorageUuid() {
+    return replicaInfo.getStorageUuid();
   }
 
   /**
@@ -1010,11 +1014,10 @@ class BlockReceiver implements Closeable {
           // file and finalize the block before responding success
           if (lastPacketInBlock) {
             BlockReceiver.this.close();
-            final long endTime =
-                ClientTraceLog.isInfoEnabled() ? System.nanoTime() : 0;
+            final long endTime = ClientTraceLog.isInfoEnabled() ? System.nanoTime() : 0;
             block.setNumBytes(replicaInfo.getNumBytes());
             datanode.data.finalizeBlock(block);
-            datanode.closeBlock(block, DataNode.EMPTY_DEL_HINT);
+            datanode.closeBlock(block, DataNode.EMPTY_DEL_HINT, replicaInfo.getStorageUuid());
             if (ClientTraceLog.isInfoEnabled() && isClient) {
               long offset = 0;
               DatanodeRegistration dnR =

@@ -393,9 +393,9 @@ class DataXceiver extends Receiver implements Runnable {
     Socket mirrorSock = null;           // socket to next target
     BlockReceiver blockReceiver = null; // responsible for data handling
     String mirrorNode = null;           // the name:port of next target
-    String firstBadLink =
-        "";           // first datanode that failed in connection setup
+    String firstBadLink = "";           // first datanode that failed in connection setup
     Status mirrorInStatus = SUCCESS;
+    final String storageUuid;
     try {
       if (isDatanode ||
           stage != BlockConstructionStage.PIPELINE_CLOSE_RECOVERY) {
@@ -406,8 +406,10 @@ class DataXceiver extends Receiver implements Runnable {
                 s.getLocalSocketAddress().toString(), stage,
                 latestGenerationStamp, minBytesRcvd, maxBytesRcvd, clientname,
                 srcDataNode, datanode, requestedChecksum);
+
+        storageUuid = blockReceiver.getStorageUuid();
       } else {
-        datanode.data.recoverClose(block, latestGenerationStamp, minBytesRcvd);
+        storageUuid = datanode.data.recoverClose(block, latestGenerationStamp, minBytesRcvd);
       }
 
       //
@@ -535,7 +537,7 @@ class DataXceiver extends Receiver implements Runnable {
       // the block is finalized in the PacketResponder.
       if (isDatanode ||
           stage == BlockConstructionStage.PIPELINE_CLOSE_RECOVERY) {
-        datanode.closeBlock(block, DataNode.EMPTY_DEL_HINT);
+        datanode.closeBlock(block, DataNode.EMPTY_DEL_HINT, storageUuid);
         LOG.info("Received " + block + " src: " + remoteAddress + " dest: " +
             localAddress + " of size " + block.getNumBytes());
       }
@@ -803,7 +805,8 @@ class DataXceiver extends Receiver implements Runnable {
           dataXceiverServer.balanceThrottler, null);
 
       // notify name node
-      datanode.notifyNamenodeReceivedBlock(block, delHint);
+      datanode.notifyNamenodeReceivedBlock(block, delHint,
+          blockReceiver.getStorageUuid());
 
       LOG.info("Moved " + block + " from " + s.getRemoteSocketAddress());
       

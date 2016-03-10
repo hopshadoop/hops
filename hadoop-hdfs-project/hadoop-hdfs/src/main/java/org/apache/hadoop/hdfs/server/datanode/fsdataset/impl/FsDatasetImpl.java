@@ -126,6 +126,11 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
   }
 
   @Override
+  public DatanodeStorage getStorage(final String storageUuid) {
+    return storageMap.get(storageUuid);
+  }
+
+  @Override
   public synchronized FsVolumeImpl getVolume(final ExtendedBlock b) {
     final ReplicaInfo r = volumeMap.get(b.getBlockPoolId(), b.getLocalBlock());
     return r != null ? (FsVolumeImpl) r.getVolume() : null;
@@ -723,7 +728,7 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
   }
 
   @Override // FsDatasetSpi
-  public void recoverClose(ExtendedBlock b, long newGS, long expectedBlockLen)
+  public String recoverClose(ExtendedBlock b, long newGS, long expectedBlockLen)
       throws IOException {
     LOG.info("Recover failed close " + b);
     // check replica's state
@@ -734,6 +739,7 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
     if (replicaInfo.getState() == ReplicaState.RBW) {
       finalizeReplica(b.getBlockPoolId(), replicaInfo);
     }
+    return replicaInfo.getStorageUuid();
   }
   
   /**
@@ -1052,27 +1058,34 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
    * Generates a block report from the in-memory block map.
    */
   @Override // FsDatasetSpi
-  public BlockListAsLongs getBlockReport(String bpid) {
-    int size = volumeMap.size(bpid);
-    ArrayList<ReplicaInfo> finalized = new ArrayList<ReplicaInfo>(size);
-    ArrayList<ReplicaInfo> uc = new ArrayList<ReplicaInfo>();
-    if (size == 0) {
-      return new BlockListAsLongs(finalized, uc);
+  public Map<DatanodeStorage, BlockListAsLongs> getBlockReports(String bpid) {
+    Map<DatanodeStorage, BlockListAsLongs> blockReportsMap =
+        new HashMap<DatanodeStorage, BlockListAsLongs>();
+
+    Map<String, ArrayList<ReplicaInfo>> finalized =
+        new HashMap<String, ArrayList<ReplicaInfo>>();
+    Map<String, ArrayList<ReplicaInfo>> uc =
+        new HashMap<String, ArrayList<ReplicaInfo>>();
+
+    List<FsVolumeImpl> curVolumes = getVolumes();
+    for (FsVolumeSpi v : curVolumes) {
+      finalized.put(v.getStorageID(), new ArrayList<ReplicaInfo>());
+      uc.put(v.getStorageID(), new ArrayList<ReplicaInfo>());
     }
-    
-    synchronized (this) {
+
+    synchronized(this) {
       for (ReplicaInfo b : volumeMap.replicas(bpid)) {
-        switch (b.getState()) {
+        switch(b.getState()) {
           case FINALIZED:
-            finalized.add(b);
+            finalized.get(b.getVolume().getStorageID()).add(b);
             break;
           case RBW:
           case RWR:
-            uc.add(b);
+            uc.get(b.getVolume().getStorageID()).add(b);
             break;
           case RUR:
-            ReplicaUnderRecovery rur = (ReplicaUnderRecovery) b;
-            uc.add(rur.getOriginalReplica());
+            ReplicaUnderRecovery rur = (ReplicaUnderRecovery)b;
+            uc.get(rur.getVolume().getStorageID()).add(rur.getOriginalReplica());
             break;
           case TEMPORARY:
             break;
@@ -1080,8 +1093,16 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
             assert false : "Illegal ReplicaInfo state.";
         }
       }
-      return new BlockListAsLongs(finalized, uc);
     }
+
+    for (FsVolumeImpl v : curVolumes) {
+      ArrayList<ReplicaInfo> finalizedList = finalized.get(v.getStorageID());
+      ArrayList<ReplicaInfo> ucList = uc.get(v.getStorageID());
+      blockReportsMap.put(((FsVolumeImpl) v).toDatanodeStorage(),
+          new BlockListAsLongs(finalizedList, ucList));
+    }
+
+    return blockReportsMap;
   }
 
   /**
