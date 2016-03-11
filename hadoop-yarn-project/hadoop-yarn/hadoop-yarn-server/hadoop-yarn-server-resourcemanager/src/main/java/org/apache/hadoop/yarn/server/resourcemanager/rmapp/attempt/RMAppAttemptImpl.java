@@ -615,7 +615,8 @@ public class RMAppAttemptImpl implements RMAppAttempt, Recoverable {
     this.ranNodes = attempt.getRanNodes();
     ((TransactionStateImpl) ts).addAppAttempt(this);
     ((TransactionStateImpl) ts).addAllRanNodes(this);
-    ((TransactionStateImpl) ts).addAllJustFinishedContainersToAdd(this.justFinishedContainers, this.applicationAttemptId);
+    ((TransactionStateImpl) ts).addAllJustFinishedContainersToAdd(
+            this.justFinishedContainers, this.applicationAttemptId);
   }
 
   private void recoverAppAttemptCredentials(Credentials appAttemptTokens)

@@ -1919,12 +1919,12 @@ public static Map<String, List<ResourceRequest>> getAllResourceRequestsFullTrans
     return qDA.findAll();
   }
 
-  static Map<String, Queue<TransactionState>> transactionStateForRMNode = 
-          new ConcurrentHashMap<String, Queue<TransactionState>>();
+  static Map<NodeId, Queue<TransactionState>> transactionStateForRMNode = 
+          new ConcurrentHashMap<NodeId, Queue<TransactionState>>();
   static Map<String, Map<Integer, TransactionState>> finishedTransactionStateForRMNode =
           new HashMap<String, Map<Integer, TransactionState>>();
-  public static void putTransactionStateInNodeQueue(TransactionState ts, Set<String> nodeIds){
-    for(String nodeId: nodeIds){
+  public static void putTransactionStateInNodeQueue(TransactionState ts, Set<NodeId> nodeIds){
+    for(NodeId nodeId: nodeIds){
     Queue<TransactionState> nodeQueue = transactionStateForRMNode.get(nodeId);
     if(nodeQueue==null){
       nodeQueue = new ConcurrentLinkedQueue<TransactionState>();
@@ -1950,7 +1950,7 @@ public static Map<String, List<ResourceRequest>> getAllResourceRequestsFullTrans
   }
   
   public static void putTransactionStateInQueues(TransactionState ts, 
-          Set<String> nodeIds, Set<ApplicationId> appIds){
+          Set<NodeId> nodeIds, Set<ApplicationId> appIds){
     nextRPCLock.lock();
     putTransactionStateInNodeQueue(ts, nodeIds);
     putTransactionStateInAppQueue(ts, appIds);
@@ -1981,8 +1981,7 @@ public static Map<String, List<ResourceRequest>> getAllResourceRequestsFullTrans
       }
       nextRPCLock.lock();
       int oldid = ts.getId();
-      for (String nodeId : ((TransactionStateImpl) ts).getRMNodesToUpdate().
-              keySet()) {
+      for (NodeId nodeId : ((TransactionStateImpl) ts).getNodesIds()) {
         transactionStateForRMNode.get(nodeId).poll();
       }
       for (ApplicationId appId : ts.getAppIds()) {
@@ -2000,10 +1999,10 @@ public static Map<String, List<ResourceRequest>> getAllResourceRequestsFullTrans
           toCommit.add(transactionState);
         }
       }
-      Iterator<String> itNodes = ((TransactionStateImpl) ts).
-              getRMNodesToUpdate().keySet().iterator();
+      Iterator<NodeId> itNodes = 
+              ((TransactionStateImpl) ts).getNodesIds().iterator();
       while (itNodes.hasNext()) {
-        String nodeId = itNodes.next();
+        NodeId nodeId = itNodes.next();
         TransactionState transactionState
                 = (TransactionStateImpl) transactionStateForRMNode.get(nodeId).
                 peek();
@@ -2047,7 +2046,7 @@ public static Map<String, List<ResourceRequest>> getAllResourceRequestsFullTrans
 
   private static boolean canCommitNode(TransactionStateImpl ts) {
     nextRPCLock.lock();
-    for (String nodeId : ts.getRMNodesToUpdate().keySet()) {
+    for (NodeId nodeId : ts.getNodesIds()) {
       if (transactionStateForRMNode.get(nodeId).peek() != ts) {
         LOG.debug("cannot commit rpc " + ts.getId() + " head for " + nodeId
                 + " is "
@@ -2180,7 +2179,8 @@ public static Map<String, List<ResourceRequest>> getAllResourceRequestsFullTrans
     if(ts.getManager()!=null){
       if(commitAndQueueDuration>commitAndQueueThreshold || getQueueLength()>commitQueueMaxLength){
         if(ts.getManager().blockNonHB()){
-          LOG.info("blocking non priority duration: " + commitAndQueueDuration + " length: " + commitQueueMaxLength);
+          LOG.info("blocking non priority duration: " + commitAndQueueDuration 
+                  + " length: " + getQueueLength());
         }
       }else{
         ts.getManager().unblockNonHB();

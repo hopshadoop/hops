@@ -80,6 +80,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentSkipListMap;
@@ -124,8 +125,10 @@ public class TransactionStateImpl extends TransactionState {
   
   //APP
   private final SchedulerApplicationInfo schedulerApplicationInfo;
-  private final Map<ApplicationId, ApplicationState> applicationsToAdd = new ConcurrentHashMap<ApplicationId, ApplicationState>();
-  private final Map<ApplicationId, List<UpdatedNode>> updatedNodeIdToAdd = new ConcurrentHashMap<ApplicationId, List<UpdatedNode>>();
+  private final Map<ApplicationId, ApplicationState> applicationsToAdd = 
+          new ConcurrentHashMap<ApplicationId, ApplicationState>();
+  private final Map<ApplicationId, List<UpdatedNode>> updatedNodeIdToAdd = 
+          new ConcurrentHashMap<ApplicationId, List<UpdatedNode>>();
   private final Queue<ApplicationId> applicationsStateToRemove =
       new ConcurrentLinkedQueue<ApplicationId>();
   private final Map<String, ApplicationAttemptState> appAttempts =
@@ -182,11 +185,15 @@ public class TransactionStateImpl extends TransactionState {
   @Override
   public void commit(boolean first) throws IOException {
     if(first){
-      RMUtilities.putTransactionStateInQueues(this, rmNodesToUpdate.keySet(), 
+      RMUtilities.putTransactionStateInQueues(this, nodesIds, 
               appIds);
       RMUtilities.logPutInCommitingQueue(this);
     }
     GlobalThreadPool.getExecutorService().execute(new RPCFinisher(this));
+  }
+  
+  public Set<NodeId> getNodesIds(){
+    return nodesIds;
   }
 
   public FairSchedulerNodeInfo getFairschedulerNodeInfo() {
@@ -198,17 +205,9 @@ public class TransactionStateImpl extends TransactionState {
     fairschedulerNodeInfo.persist(FSSNodeDA);
   }
 
-  public static int callsGetSchedulerApplicationInfos = 0;
   public SchedulerApplicationInfo getSchedulerApplicationInfos(ApplicationId appId) {
-    if(!addAppId(appId)){
-      callsGetSchedulerApplicationInfos++;
-    }
+    appIds.add(appId);
     return schedulerApplicationInfo;
-  }
-
-  
-  public boolean addAppId(ApplicationId appId){
-    return appIds.add(appId);
   }
     
   public void persist() throws IOException {
@@ -222,9 +221,6 @@ public class TransactionStateImpl extends TransactionState {
     persistRMContainersToRemove();
     persistContainersToAdd();
     persistContainersToRemove();
-    //TODO rebuild cluster resource from node resources
-//    persistClusterResourceToUpdate();
-//    persistUsedResourceToUpdate();
   }
 
   public void persistSchedulerApplicationInfo(QueueMetricsDataAccess QMDA, StorageConnector connector)
@@ -244,13 +240,14 @@ public class TransactionStateImpl extends TransactionState {
   }
   
   public FiCaSchedulerNodeInfoToUpdate getFicaSchedulerNodeInfoToUpdate(
-      String nodeId) {
+      NodeId nodeId) {
     FiCaSchedulerNodeInfoToUpdate nodeInfo =
         ficaSchedulerNodeInfoToUpdate.get(nodeId);
     if (nodeInfo == null) {
-      nodeInfo = new FiCaSchedulerNodeInfoToUpdate(nodeId, this);
-      ficaSchedulerNodeInfoToUpdate.put(nodeId, nodeInfo);
+      nodeInfo = new FiCaSchedulerNodeInfoToUpdate(nodeId.toString(), this);
+      ficaSchedulerNodeInfoToUpdate.put(nodeId.toString(), nodeInfo);
     }
+    nodesIds.add(nodeId);
     return nodeInfo;
   }
   
@@ -300,6 +297,7 @@ public class TransactionStateImpl extends TransactionState {
     ficaSchedulerNodeInfoToAdd.put(nodeId, nodeInfos);
     ficaSchedulerNodeInfoToRemove.remove(nodeId);
     ficaSchedulerNodeInfoToUpdate.remove(nodeId);
+    nodesIds.add(node.getNodeID());
   }
   
   public void addFicaSchedulerNodeInfoToRemove(String nodeId,
@@ -309,6 +307,7 @@ public class TransactionStateImpl extends TransactionState {
       ficaSchedulerNodeInfoToRemove.put(nodeId, nodeInfo);
     }
     ficaSchedulerNodeInfoToUpdate.remove(nodeId);
+    nodesIds.add(node.getNodeID());
     //TORECOVER shouldn't we take care of the reserved rmcontainer?
   }
   
@@ -339,7 +338,7 @@ public class TransactionStateImpl extends TransactionState {
     updatedNodeIdToAdd.put(app.getApplicationId(), nodeIdsToAdd);
     applicationsStateToRemove.remove(app.getApplicationId());
     callsAddApplicationToAdd++;
-    addAppId(app.getApplicationId());
+    appIds.add(app.getApplicationId());
   }
   
   private void persitApplicationToAdd() throws IOException {
@@ -355,13 +354,13 @@ public class TransactionStateImpl extends TransactionState {
   }
   
   public static int callsAddApplicationStateToRemove = 0;
-  public void addApplicationStateToRemove(ApplicationId appId) {
+  public void addApplicationToRemove(ApplicationId appId) {
     if(applicationsToAdd.remove(appId)==null){
     updatedNodeIdToAdd.remove(appId);
     applicationsStateToRemove.add(appId);
     }
     callsAddApplicationStateToRemove++;
-    addAppId(appId);
+    appIds.add(appId);
   }
 
   private void persistApplicationStateToRemove() throws StorageException {
@@ -421,7 +420,7 @@ public class TransactionStateImpl extends TransactionState {
                     getHost(), appAttempt.getRpcPort(), appAttemptTokens,
                     appAttempt.
                     getTrackingUrl()));
-    addAppId(appAttempt.getAppAttemptId().getApplicationId());
+    appIds.add(appAttempt.getAppAttemptId().getApplicationId());
   }
   
   
@@ -434,6 +433,7 @@ public class TransactionStateImpl extends TransactionState {
     for(ContainerStatus container: status){
       toAdd.add(((ContainerStatusPBImpl)container).getProto().toByteArray());
     }
+    appIds.add(appAttemptId.getApplicationId());
   }
   
   public void addJustFinishedContainerToAdd(ContainerStatus status, ApplicationAttemptId appAttemptId){
@@ -443,6 +443,7 @@ public class TransactionStateImpl extends TransactionState {
       justFinishedContainerToAdd.put(appAttemptId.toString(), toAdd);
     }
     toAdd.add(((ContainerStatusPBImpl)status).getProto().toByteArray());
+    appIds.add(appAttemptId.getApplicationId());
   }
   
     public void addAllJustFinishedContainersToRemove(List<ContainerStatus> status, ApplicationAttemptId appAttemptId){
@@ -454,6 +455,7 @@ public class TransactionStateImpl extends TransactionState {
     for(ContainerStatus container: status){
       toRemove.add(((ContainerStatusPBImpl)container).getProto().toByteArray());
     }
+    appIds.add(appAttemptId.getApplicationId());
   }
   
   public void addAllRanNodes(RMAppAttempt appAttempt) {
@@ -467,6 +469,7 @@ public class TransactionStateImpl extends TransactionState {
 
     this.ranNodeToAdd.put(appAttempt.getAppAttemptId(),
             ranNodeToPersist);
+    appIds.add(appAttempt.getAppAttemptId().getApplicationId());
   }
 
   public void addRanNode(NodeId nid, ApplicationAttemptId appAttemptId) {
@@ -475,6 +478,8 @@ public class TransactionStateImpl extends TransactionState {
     }
     RanNode node = new RanNode(appAttemptId.toString(), nid.toString());
     this.ranNodeToAdd.get(appAttemptId).put(node.hashCode(),node);
+    appIds.add(appAttemptId.getApplicationId());
+    nodesIds.add(nid);
   }
   
   private void persistAppAttempt() throws IOException {
@@ -531,7 +536,7 @@ public class TransactionStateImpl extends TransactionState {
                 " for " + id + " content: " + print(toPersist));
       }
       allocateResponsesToRemove.remove(id);
-      addAppId(id.getApplicationId());
+      appIds.add(id.getApplicationId());
     }
   }
   
@@ -574,7 +579,7 @@ public class TransactionStateImpl extends TransactionState {
     if(allocateResponsesToAdd.remove(id)==null){
     this.allocateResponsesToRemove.put(id,new AllocateResponse(id.toString(), responseId));
     }
-    addAppId(id.getApplicationId());
+    appIds.add(id.getApplicationId());
   }
   
   private void persistAllocateResponsesToRemove() throws IOException {
@@ -769,10 +774,6 @@ public class TransactionStateImpl extends TransactionState {
       hopRMNodeToAdd.setRMNode(hopRMNode);
     }
   }
-
-  public Map<String, RMNode> getRMNodesToUpdate(){
-    return rmNodesToUpdate;
-  }
   
   public RMNodeInfo getRMNodeInfo(NodeId rmNodeId) {
     RMNodeInfo result = rmNodeInfos.get(rmNodeId);
@@ -780,6 +781,7 @@ public class TransactionStateImpl extends TransactionState {
       result = new RMNodeInfo(rmNodeId.toString());
       rmNodeInfos.put(rmNodeId, result);
     }
+    nodesIds.add(rmNodeId);
     return result;
   }
 

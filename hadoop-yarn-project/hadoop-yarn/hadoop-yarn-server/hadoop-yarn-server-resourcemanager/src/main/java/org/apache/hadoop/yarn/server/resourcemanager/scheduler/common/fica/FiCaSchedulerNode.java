@@ -144,11 +144,11 @@ public class FiCaSchedulerNode extends SchedulerNode implements Recoverable{
     if (transactionState != null) {
       //HOP :: Update numContainers
       ((TransactionStateImpl) transactionState)
-          .getFicaSchedulerNodeInfoToUpdate(this.getNodeID().toString())
+          .getFicaSchedulerNodeInfoToUpdate(this.getNodeID())
           .infoToUpdate(this);
       //HOP :: Update reservedContainer
       ((TransactionStateImpl) transactionState)
-          .getFicaSchedulerNodeInfoToUpdate(rmNode.getNodeID().toString())
+          .getFicaSchedulerNodeInfoToUpdate(rmNode.getNodeID())
           .toAddLaunchedContainers(container.getId().toString(),
               rmContainer.getContainerId().toString());
     }
@@ -189,7 +189,7 @@ public class FiCaSchedulerNode extends SchedulerNode implements Recoverable{
     //HOP :: Update numContainers
     if (transactionState != null) {
       ((TransactionStateImpl) transactionState)
-          .getFicaSchedulerNodeInfoToUpdate(this.getNodeID().toString())
+          .getFicaSchedulerNodeInfoToUpdate(this.getNodeID())
           .infoToUpdate(this);
     }
   }
@@ -212,7 +212,7 @@ public class FiCaSchedulerNode extends SchedulerNode implements Recoverable{
       //HOP :: Update reservedContainer
       if (transactionState != null) {
         ((TransactionStateImpl) transactionState)
-            .getFicaSchedulerNodeInfoToUpdate(rmNode.getNodeID().toString())
+            .getFicaSchedulerNodeInfoToUpdate(rmNode.getNodeID())
             .toRemoveLaunchedContainers(container.getId().toString());
       }
       updateResource(container, transactionState);
@@ -306,7 +306,7 @@ public class FiCaSchedulerNode extends SchedulerNode implements Recoverable{
     this.reservedContainer = reservedContainer;
     //HOP :: Update reservedContainer
     ((TransactionStateImpl) transactionState)
-        .getFicaSchedulerNodeInfoToUpdate(this.getNodeID().toString())
+        .getFicaSchedulerNodeInfoToUpdate(this.getNodeID())
         .updateReservedContainer(this);
 
   }
@@ -334,7 +334,7 @@ public class FiCaSchedulerNode extends SchedulerNode implements Recoverable{
     }
     reservedContainer = null;
     ((TransactionStateImpl) transactionState).
-            getFicaSchedulerNodeInfoToUpdate(this.getNodeID().toString())
+            getFicaSchedulerNodeInfoToUpdate(this.getNodeID())
         .infoToUpdate(this);
 
   }

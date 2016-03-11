@@ -181,11 +181,6 @@ public class transactionStateWrapper extends TransactionStateImpl {
   }
 
   @Override
-  public boolean addAppId(ApplicationId appId) {
-    return ts.addAppId(appId);
-  }
-
-  @Override
   public FairSchedulerNodeInfo getFairschedulerNodeInfo() {
     return ts.getFairschedulerNodeInfo();
   }
@@ -209,7 +204,7 @@ public class transactionStateWrapper extends TransactionStateImpl {
 
   @Override
   public FiCaSchedulerNodeInfoToUpdate getFicaSchedulerNodeInfoToUpdate(
-          String nodeId) {
+          NodeId nodeId) {
     return ts.getFicaSchedulerNodeInfoToUpdate(nodeId);
   }
 
@@ -232,8 +227,8 @@ public class transactionStateWrapper extends TransactionStateImpl {
   }
 
   @Override
-  public void addApplicationStateToRemove(ApplicationId appId) {
-    ts.addApplicationStateToRemove(appId);
+  public void addApplicationToRemove(ApplicationId appId) {
+    ts.addApplicationToRemove(appId);
   }
 
   @Override
@@ -316,10 +311,6 @@ public class transactionStateWrapper extends TransactionStateImpl {
    ts.addRanNode(nid, appAttemptId);
   }
     
-  @Override
-  public Map<String, RMNode> getRMNodesToUpdate(){
-    return ts.getRMNodesToUpdate();
-  }
   
   @Override
   public void addAllJustFinishedContainersToAdd(List<ContainerStatus> status,

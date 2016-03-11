@@ -120,6 +120,7 @@ public class GroupMembershipService extends CompositeService
       }
 
       lEnGmMonitor = new Thread(new LEnGmMonitor());
+      lEnGmMonitor.setName("group membership monitor");
       lEnGmMonitor.start();
     }
   }
