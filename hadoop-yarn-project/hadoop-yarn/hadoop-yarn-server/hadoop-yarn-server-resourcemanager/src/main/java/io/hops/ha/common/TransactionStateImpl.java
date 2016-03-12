@@ -89,6 +89,7 @@ import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.impl.pb.ContainerPBImpl;
@@ -507,7 +508,13 @@ public class TransactionStateImpl extends TransactionState {
       
       Map<String, byte[]> completedContainersStatuses = new HashMap<String, byte[]>();
       for(ContainerStatus status: lastResponse.getCompletedContainersStatuses()){
-        completedContainersStatuses.put(status.getContainerId().toString(), ((ContainerStatusPBImpl)status).getProto().toByteArray());
+             ContainerStatus toPersist = status;
+        if(status.getDiagnostics().length()>1000){
+          toPersist = new ContainerStatusPBImpl(((ContainerStatusPBImpl)status).getProto());
+          toPersist.setDiagnostics(StringUtils.abbreviate(status.getDiagnostics(), 1000));
+        }
+        completedContainersStatuses.put(status.getContainerId().toString(), 
+                ((ContainerStatusPBImpl)toPersist).getProto().toByteArray());
       }
       
       AllocateResponsePBImpl toPersist = new AllocateResponsePBImpl();
