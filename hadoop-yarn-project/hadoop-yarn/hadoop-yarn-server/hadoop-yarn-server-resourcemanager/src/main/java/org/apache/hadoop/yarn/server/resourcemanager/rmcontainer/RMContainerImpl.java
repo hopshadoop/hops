@@ -18,7 +18,6 @@ package org.apache.hadoop.yarn.server.resourcemanager.rmcontainer;
 
 import io.hops.ha.common.TransactionState;
 import io.hops.ha.common.TransactionStateImpl;
-import io.hops.metadata.yarn.entity.RMContainer;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
@@ -50,8 +49,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 import org.apache.hadoop.yarn.event.AsyncDispatcher;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
-public class RMContainerImpl implements
-    org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer {
+public class RMContainerImpl implements RMContainer {
 
   private static final Log LOG = LogFactory.getLog(RMContainerImpl.class);
 
@@ -172,8 +170,8 @@ public class RMContainerImpl implements
 
   //TORECOVER OPT change to implement recoverable
   @Override
-  public void recover(RMContainer hopRMContainer) {
-    LOG.debug("recovering container " + hopRMContainer.getContainerIdID() + 
+  public void recover(io.hops.metadata.yarn.entity.RMContainer hopRMContainer) {
+    LOG.debug("recovering container " + hopRMContainer.getContainerId() + 
             " in state "+ hopRMContainer.getState());
     this.startTime = hopRMContainer.getStarttime();
     this.stateMachine.setCurrentState(RMContainerState.valueOf(hopRMContainer.
@@ -183,15 +181,15 @@ public class RMContainerImpl implements
     if (getState().equals(RMContainerState.ACQUIRED)) {
       this.containerAllocationExpirer.register(containerId);
     }
-    if (hopRMContainer.getReservedNodeIdID() != null) {
+    if (hopRMContainer.getReservedNodeId() != null) {
       this.reservedNode = NodeId.newInstance(hopRMContainer.
               getReservedNodeHost(),
               hopRMContainer.getReservedNodePort());
       this.reservedResource = Resource.newInstance(hopRMContainer.
               getReservedMemory(),
               hopRMContainer.getReservedVCores());
-      this.reservedPriority = Priority.newInstance(hopRMContainer.
-              getReservedPriorityID());
+      this.reservedPriority = Priority.newInstance(
+              hopRMContainer.getReservedPriority());
     }
     if (hopRMContainer.getFinishedStatusState() != null) {
       this.finishedStatus = ContainerStatus.newInstance(containerId,

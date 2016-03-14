@@ -142,12 +142,11 @@ public class TestRecoverParentCSQueue {
         final Resource allocatedResource = Resources.createResource(allocation);
         if (queue instanceof ParentQueue) {
           ((ParentQueue) queue).allocateResource(clusterResource,
-                  allocatedResource, null);
+                  allocatedResource);
         } else {
           FiCaSchedulerApp app1 = getMockApplication(0, "");
           ((LeafQueue) queue).allocateResource(clusterResource, app1,
-                  allocatedResource, new TransactionStateImpl(
-                          TransactionState.TransactionType.RM));
+                  allocatedResource);
         }
 
         // Next call - nothing
@@ -194,76 +193,4 @@ public class TestRecoverParentCSQueue {
 
   }
 
-  @Test
-  public void testPersistParentCSQueue() throws IOException,
-          InterruptedException {
-
-    setupSingleLevelQueues(csConf);
-    Map<String, CSQueue> queues = new HashMap<String, CSQueue>();
-    CSQueue root
-            = CapacityScheduler.parseQueue(csContext, csConf, null,
-                    CapacitySchedulerConfiguration.ROOT, queues, queues,
-                    TestUtils.spyHook, null);
-
-    // Setup some nodes
-    final int memoryPerNode = 10;
-    final int coresPerNode = 16;
-    final int numNodes = 2;
-
-    FiCaSchedulerNode node_0
-            = TestUtils.getMockNode("host_0", DEFAULT_RACK, 0, memoryPerNode
-                    * GB);
-    FiCaSchedulerNode node_1
-            = TestUtils.getMockNode("host_1", DEFAULT_RACK, 0, memoryPerNode
-                    * GB);
-
-    final Resource clusterResource
-            = Resources.createResource(numNodes * (memoryPerNode * GB),
-                    numNodes * coresPerNode);
-    when(csContext.getNumClusterNodes()).thenReturn(numNodes);
-
-    // Start testing
-    LeafQueue a = (LeafQueue) queues.get(A);
-    LeafQueue b = (LeafQueue) queues.get(B);
-
-    // Simulate B returning a container on node_0
-    stubQueueAllocation(a, clusterResource, node_0, 0 * GB);
-    stubQueueAllocation(b, clusterResource, node_0, 1 * GB);
-
-        // Start testing...
-    // Only 1 container
-    int rpcID = HopYarnAPIUtilities.getRPCID();
-
-        //Note :  we should call persistappmasterRPC , because otherwise it will throw following exception
-    //code 626, mysqlCode 120, status 2, classification 2, message Tuple did not exist
-    byte[] submitAppData = new byte[1];
-
-    RMUtilities.persistAppMasterRPC(rpcID, RPC.Type.SubmitApplication,
-            submitAppData);
-
-    TransactionStateImpl parentQueueTranscation
-            = new TransactionStateImpl(
-                    TransactionState.TransactionType.RM);
-
-    root.assignContainers(clusterResource, node_0, parentQueueTranscation);
-
-    verifyQueueMetrics(a, 0 * GB, clusterResource);
-    verifyQueueMetrics(b, 1 * GB, clusterResource);
-    parentQueueTranscation.decCounter(TransactionState.TransactionType.RM);
-    //wait for the commit to be done
-    Thread.sleep(500);
-    io.hops.metadata.yarn.entity.capacity.CSQueue recoverCSQueue = RMUtilities.
-            getCSQueue(root.getQueuePath());
-
-    assertEquals(recoverCSQueue.getName(), root.getQueueName());
-    assertEquals(recoverCSQueue.getPath(), root.getQueuePath());
-    assertEquals(recoverCSQueue.getUsedResourceMemory(),
-            root.getUsedResources().getMemory());
-    assertEquals(recoverCSQueue.getUsedResourceVCores(),
-            root.getUsedResources().getVirtualCores());
-    assertEquals(recoverCSQueue.getUsedCapacity(), root.getUsedCapacity(), DELTA);
-    assertEquals(recoverCSQueue.getAbsoluteUsedCapacity(), root.
-            getAbsoluteUsedCapacity(), DELTA);
-
-  }
 }

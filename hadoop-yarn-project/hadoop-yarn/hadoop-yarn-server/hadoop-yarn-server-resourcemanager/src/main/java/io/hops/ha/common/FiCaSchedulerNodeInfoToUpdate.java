@@ -48,8 +48,6 @@ public class FiCaSchedulerNodeInfoToUpdate {
   private final String id;
   private Map<String, String> launchedContainersToAdd=new HashMap<String, String>();
   private Set<String> launchedContainersToRemove = new HashSet<String>();
-  private RMContainer
-      reservedRMContainerToRemove;
   private Map<Integer, Resource>
       toUpdateResources = new HashMap<Integer, Resource>();
 
@@ -60,7 +58,6 @@ public class FiCaSchedulerNodeInfoToUpdate {
 
   public void agregate(FiCaSchedulerNodeInfoAgregate agregate){
     agregateToUpdateFicaSchedulerNode(agregate);
-    agregateRmContainerToRemove(agregate);
     agregateToUpdateFiCaSchedulerNodeId(agregate);
   }
   
@@ -76,12 +73,6 @@ public class FiCaSchedulerNodeInfoToUpdate {
           org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode node) {
     //TOPERSIST reserved container should also be updated??
     transactionState.addRMContainerToUpdate((RMContainerImpl) node.getReservedContainer());
-  }
-
-  public void toRemoveRMContainer(
-      org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer rmContainer) {
-    reservedRMContainerToRemove = new RMContainer(
-          rmContainer.getContainer().getId().toString());
   }
 
   public void toAddLaunchedContainers(String cid, String rmcon) {
@@ -118,12 +109,6 @@ public class FiCaSchedulerNodeInfoToUpdate {
     agregateToUpdateResources(agregate);
   }
     
-  private void agregateRmContainerToRemove(FiCaSchedulerNodeInfoAgregate agregate){
-    if (reservedRMContainerToRemove != null) {
-      agregate.addReservedRMContainerToRemove(reservedRMContainerToRemove);
-    }
-  }
-  
   private void agregateLaunchedContainersToAdd(FiCaSchedulerNodeInfoAgregate agregate){
     if (launchedContainersToAdd != null) {
       ArrayList<LaunchedContainers> toAddLaunchedContainers =

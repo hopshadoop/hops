@@ -167,7 +167,7 @@ public class TransactionStateManager extends AbstractService{
   }
   
   public TransactionState getCurrentTransactionStateNonPriority(int rpcId,
-          String callingFuncition) {
+          String callingFuncition) throws InterruptedException {
     synchronized(blockNonHB){
     while (blockNonHB.get()) {
       try {
@@ -182,7 +182,7 @@ public class TransactionStateManager extends AbstractService{
   }
 
   public TransactionState getCurrentTransactionStatePriority(int rpcId,
-          String callingFuncition) {
+          String callingFuncition) throws InterruptedException {
     long start = System.currentTimeMillis();
     TransactionState ts = getCurrentTransactionState(rpcId, callingFuncition,
             true);
@@ -194,8 +194,8 @@ public class TransactionStateManager extends AbstractService{
   }
 
   private TransactionState getCurrentTransactionState(int rpcId,
-          String callingFuncition, boolean priority) {
-    while (true) {
+          String callingFuncition, boolean priority) throws InterruptedException {
+    while (true && !Thread.interrupted()) {
       int accepted = acceptedRPC.incrementAndGet();
       if (priority || accepted < batchMaxSize) {
         lock.readLock().lock();
@@ -221,6 +221,7 @@ public class TransactionStateManager extends AbstractService{
         }
       }
     }
+    throw new InterruptedException();
   }
   
   

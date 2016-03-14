@@ -2412,8 +2412,9 @@ public abstract class Server {
             while (!success && nbTry<10) {
               handlers[i].join(10);
               if (handlers[i].isAlive()) {
-                LOG.info("server handler not finishing " + i);
-                handlers[i].interrupt();
+                LOG.info("server handler not finishing " + port + " thread" + 
+                        handlers[i].getName());
+                handlers[i].stop();
               }else{
                 success=true;
               }

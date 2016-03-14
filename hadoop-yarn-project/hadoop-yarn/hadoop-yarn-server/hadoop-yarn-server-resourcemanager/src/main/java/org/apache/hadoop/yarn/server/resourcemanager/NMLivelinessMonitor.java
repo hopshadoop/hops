@@ -62,6 +62,9 @@ public class NMLivelinessMonitor extends AbstractLivelinessMonitor<NodeId> {
     } catch (IOException ex) {
       Logger.getLogger(NMLivelinessMonitor.class.getName())
           .log(Level.SEVERE, null, ex);
+    } catch (InterruptedException ex) {
+      Logger.getLogger(NMLivelinessMonitor.class.getName()).
+              log(Level.SEVERE, null, ex);
     }
   }
 }

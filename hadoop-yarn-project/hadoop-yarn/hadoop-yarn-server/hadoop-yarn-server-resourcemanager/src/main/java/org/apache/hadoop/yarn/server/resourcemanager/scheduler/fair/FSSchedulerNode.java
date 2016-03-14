@@ -282,7 +282,7 @@ public class FSSchedulerNode extends SchedulerNode {
   
   @Override
   public synchronized void applyDeltaOnAvailableResource(
-      Resource deltaResource, TransactionState ts) {
+      Resource deltaResource) {
     // we can only adjust available resource if total resource is changed.
     Resources.addTo(this.availableResource, deltaResource);
   }

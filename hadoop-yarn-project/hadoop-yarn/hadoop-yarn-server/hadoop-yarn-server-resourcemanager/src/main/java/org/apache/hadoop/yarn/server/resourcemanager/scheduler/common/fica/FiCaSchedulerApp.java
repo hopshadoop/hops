@@ -20,8 +20,6 @@ package org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica;
 
 import io.hops.ha.common.TransactionState;
 import io.hops.ha.common.TransactionStateImpl;
-import io.hops.metadata.yarn.entity.AppSchedulingInfo;
-import io.hops.metadata.yarn.entity.Resource;
 import java.io.IOException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -55,6 +53,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.Recoverable;
 
 /**
@@ -92,6 +91,7 @@ public class FiCaSchedulerApp extends SchedulerApplicationAttempt
     if (null == liveContainers.remove(rmContainer.getContainerId())) {
       return false;
     }
+    ((TransactionStateImpl)transactionState).addRMContainerToRemove(rmContainer);
     Container container = rmContainer.getContainer();
     ContainerId containerId = container.getId();
 
@@ -109,7 +109,7 @@ public class FiCaSchedulerApp extends SchedulerApplicationAttempt
             getApplicationId(), containerId);
     
     // Update usage metrics 
-    org.apache.hadoop.yarn.api.records.Resource containerResource =
+    Resource containerResource =
         rmContainer.getContainer().getResource();
     queue.getMetrics()
         .releaseResources(getUser(), 1, containerResource);
@@ -191,11 +191,10 @@ public class FiCaSchedulerApp extends SchedulerApplicationAttempt
       ((TransactionStateImpl) transactionState).getSchedulerApplicationInfos(
               this.appSchedulingInfo.getApplicationId()).
               getFiCaSchedulerAppInfo(getApplicationAttemptId()).
-              removeReservedContainer(reservedContainer);
+              removeReservedContainer(reservedContainer, transactionState);
       // unreserve is now triggered in new scenarios (preemption)
       // as a consequence reservedcontainer might be null, adding NP-checks
-      if (reservedContainer != null &&
-          reservedContainer.getContainer() != null &&
+      if (reservedContainer.getContainer() != null &&
           reservedContainer.getContainer().getResource() != null) {
 
         if (reservedContainers.isEmpty()) {
@@ -204,7 +203,7 @@ public class FiCaSchedulerApp extends SchedulerApplicationAttempt
         // Reset the re-reservation count
         resetReReservations(priority, transactionState);
 
-        org.apache.hadoop.yarn.api.records.Resource resource =
+        Resource resource =
             reservedContainer.getContainer().getResource();
         Resources.subtractFrom(currentReservation, resource);
 
@@ -213,7 +212,8 @@ public class FiCaSchedulerApp extends SchedulerApplicationAttempt
                 this.appSchedulingInfo.getApplicationId())
                 .getFiCaSchedulerAppInfo(
                         this.appSchedulingInfo.getApplicationAttemptId())
-                .toUpdateResource(Resource.CURRENTRESERVATION,
+                .toUpdateResource(
+                        io.hops.metadata.yarn.entity.Resource.CURRENTRESERVATION,
                         currentReservation);
 
 
@@ -239,9 +239,9 @@ public class FiCaSchedulerApp extends SchedulerApplicationAttempt
     return Math.min(((float) requiredResources / clusterNodes), 1.0f);
   }
 
-  public synchronized org.apache.hadoop.yarn.api.records.Resource getTotalPendingRequests() {
-    org.apache.hadoop.yarn.api.records.Resource ret =
-        org.apache.hadoop.yarn.api.records.Resource.newInstance(0, 0);
+  public synchronized Resource getTotalPendingRequests() {
+    Resource ret =
+        Resource.newInstance(0, 0);
     for (ResourceRequest rr : appSchedulingInfo.getAllResourceRequests()) {
       // to avoid double counting we count only "ANY" resource requests
       if (ResourceRequest.isAnyLocation(rr.getResourceName())) {
@@ -271,15 +271,14 @@ public class FiCaSchedulerApp extends SchedulerApplicationAttempt
    * @return an allocation
    */
   public synchronized Allocation getAllocation(ResourceCalculator rc,
-      org.apache.hadoop.yarn.api.records.Resource clusterResource,
-      org.apache.hadoop.yarn.api.records.Resource minimumAllocation,
-      TransactionState transactionState) {
+    Resource clusterResource, Resource minimumAllocation,
+    TransactionState transactionState) {
 
     Set<ContainerId> currentContPreemption = Collections
         .unmodifiableSet(new HashSet<ContainerId>(containersToPreempt));
     containersToPreempt.clear();
-    org.apache.hadoop.yarn.api.records.Resource tot =
-        org.apache.hadoop.yarn.api.records.Resource.newInstance(0, 0);
+    Resource tot =
+        Resource.newInstance(0, 0);
     for (ContainerId c : currentContPreemption) {
       Resources.addTo(tot, liveContainers.get(c).getContainer().getResource());
     }

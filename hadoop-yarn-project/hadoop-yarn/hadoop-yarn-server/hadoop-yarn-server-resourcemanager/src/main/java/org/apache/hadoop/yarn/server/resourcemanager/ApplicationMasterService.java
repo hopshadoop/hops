@@ -99,6 +99,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.apache.hadoop.yarn.api.records.ContainerResourceIncreaseRequest;
 import org.apache.hadoop.yarn.api.records.impl.pb.ContainerResourceIncreaseRequestPBImpl;
 import org.apache.hadoop.yarn.api.records.impl.pb.ResourceRequestPBImpl;
@@ -237,12 +239,16 @@ public class ApplicationMasterService extends AbstractService
   public RegisterApplicationMasterResponse registerApplicationMaster(
       RegisterApplicationMasterRequest request)
       throws YarnException, IOException {
-    return registerApplicationMaster(request, null);
+    try {
+      return registerApplicationMaster(request, null);
+    } catch (InterruptedException ex) {
+      throw new YarnException(ex);
+    }
   }
 
   public RegisterApplicationMasterResponse registerApplicationMaster(
       RegisterApplicationMasterRequest request, Integer rpcID)
-      throws YarnException, IOException {
+      throws YarnException, IOException, InterruptedException {
     ApplicationAttemptId applicationAttemptId = authorizeRequest();
 
 
@@ -356,12 +362,16 @@ public class ApplicationMasterService extends AbstractService
   public FinishApplicationMasterResponse finishApplicationMaster(
       FinishApplicationMasterRequest request)
       throws YarnException, IOException {
-    return finishApplicationMaster(request, null);
+    try {
+      return finishApplicationMaster(request, null);
+    } catch (InterruptedException ex) {
+      throw new YarnException(ex);
+    }
   }
 
   public FinishApplicationMasterResponse finishApplicationMaster(
       FinishApplicationMasterRequest request, Integer rpcID)
-      throws YarnException, IOException {
+      throws YarnException, IOException, InterruptedException {
 
     ApplicationAttemptId applicationAttemptId = authorizeRequest();
 
@@ -453,11 +463,15 @@ public class ApplicationMasterService extends AbstractService
   @Override
   public AllocateResponse allocate(AllocateRequest request)
       throws YarnException, IOException {
-    return allocate(request, null);
+    try {
+      return allocate(request, null);
+    } catch (InterruptedException ex) {
+      throw new YarnException(ex);
+    }
   }
 
   public AllocateResponse allocate(AllocateRequest request, Integer rpcID)
-      throws YarnException, IOException {
+      throws YarnException, IOException, InterruptedException {
 
     ApplicationAttemptId appAttemptId = authorizeRequest();
 
@@ -734,7 +748,8 @@ public class ApplicationMasterService extends AbstractService
               getAllocatedContainers()) {
         NMToken nmToken = rmContext.getNMTokenSecretManager()
                 .createAndGetNMToken(state.getAppSchedulingInfo(
-                                attemptId.getApplicationId().toString()).
+                                attemptId.getApplicationId().toString()).get(
+                                attemptId.toString()).
                         getUser(),
                         attemptId,
                         container);

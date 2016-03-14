@@ -24,7 +24,6 @@ import io.hops.metadata.yarn.entity.AppSchedulingInfoBlacklist;
 import io.hops.metadata.yarn.entity.Container;
 import io.hops.metadata.yarn.entity.ContainerStatus;
 import io.hops.metadata.yarn.entity.FiCaSchedulerAppLastScheduledContainer;
-import io.hops.metadata.yarn.entity.FiCaSchedulerAppContainer;
 import io.hops.metadata.yarn.entity.FiCaSchedulerAppSchedulingOpportunities;
 import io.hops.metadata.yarn.entity.FiCaSchedulerNode;
 import io.hops.metadata.yarn.entity.JustLaunchedContainers;
@@ -44,11 +43,7 @@ import io.hops.metadata.yarn.entity.UpdatedContainerInfo;
 import io.hops.metadata.yarn.entity.appmasterrpc.AllocateRPC;
 import io.hops.metadata.yarn.entity.appmasterrpc.HeartBeatRPC;
 import io.hops.metadata.yarn.entity.appmasterrpc.RPC;
-import io.hops.metadata.yarn.entity.capacity.CSLeafQueueUserInfo;
-import io.hops.metadata.yarn.entity.capacity.CSQueue;
 import io.hops.metadata.yarn.entity.capacity.FiCaSchedulerAppReservedContainers;
-import io.hops.metadata.yarn.entity.fair.FSSchedulerNode;
-import io.hops.metadata.yarn.entity.fair.PreemptionMap;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -72,7 +67,6 @@ import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.ResourceOption;
 import org.apache.hadoop.yarn.api.records.impl.pb.ApplicationSubmissionContextPBImpl;
 import org.apache.hadoop.yarn.api.records.impl.pb.ContainerPBImpl;
-import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.event.AsyncDispatcher;
 import org.apache.hadoop.yarn.event.Dispatcher;
 import org.apache.hadoop.yarn.event.EventHandler;
@@ -386,7 +380,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
     Map<Integer, HeartBeatRPC> heartBeatRPCs;
     Map<Integer, AllocateRPC> allocateRPCs;
     List<PendingEvent> pendingEvents;
-    Map<String, AppSchedulingInfo> appSchedulingInfos;
+    Map<String, Map<String, AppSchedulingInfo>> appSchedulingInfos;
     Map<String, SchedulerApplication> schedulerApplications;
     Map<String, FiCaSchedulerNode> fiCaSchedulerNodes;
     Map<String, List<LaunchedContainers>> launchedContainers;
@@ -401,6 +395,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
     Map<String, Set<ContainerId>> containersToClean;
     Map<String, List<ApplicationId>> finishedApplications;
     Map<String, Map<Integer, Map<Integer, Resource>>> nodesResources;
+    Map<String, Set<String>> csLeafQueuesPendingApps;
     Map<String, Container> allContainers;
     Map<String, RMContainer> allRMContainers;
     List<RMContextActiveNodes> allRMContextActiveNodes;
@@ -412,8 +407,6 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
     Map<String, ContainerStatus> allContainerStatus;
     Map<String, List<JustLaunchedContainers>> allJustLaunchedContainers;
     Map<String, Boolean> allRMNodeNextHeartbeats;
-    Map<String, CSQueue> allCSQueues;
-    Map<String, CSLeafQueueUserInfo> allCSLeafQueueUserInfo;
     
     public Map<ApplicationId, ApplicationState> getApplicationState() {
       return appState;
@@ -467,8 +460,9 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
       }
     }
     
-    public AppSchedulingInfo getAppSchedulingInfo(final String appId)
-        throws IOException {
+    public Map<String, AppSchedulingInfo> getAppSchedulingInfo(
+            final String appId)
+            throws IOException {
       return appSchedulingInfos.get(appId);
     }
 
@@ -515,11 +509,11 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
         final String ficaId) throws IOException {
        List<String> newlyAllocatedContainers = new ArrayList<String>();
       for(RMContainer rmc: allRMContainers.values()){
-        if(rmc.getApplicationAttemptIdID().equals(ficaId)){
+        if(rmc.getApplicationAttemptId().equals(ficaId)){
           if(rmc.getState().equals(RMContainerState.NEW.toString()) ||
                   rmc.getState().equals(RMContainerState.RESERVED.toString()) ||
                   rmc.getState().equals(RMContainerState.ALLOCATED.toString())){
-              newlyAllocatedContainers.add(rmc.getContainerIdID());
+              newlyAllocatedContainers.add(rmc.getContainerId());
           }
         }
       }
@@ -531,12 +525,12 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
         final String ficaId) throws IOException {
       List<String> liveContainers = new ArrayList<String>();
       for(RMContainer rmc: allRMContainers.values()){
-        if(rmc.getApplicationAttemptIdID().equals(ficaId)){
+        if(rmc.getApplicationAttemptId().equals(ficaId)){
           if(!rmc.getState().equals(RMContainerState.COMPLETED.toString()) &&
                   !rmc.getState().equals(RMContainerState.EXPIRED.toString()) &&
                   !rmc.getState().equals(RMContainerState.KILLED.toString()) &&
                   !rmc.getState().equals(RMContainerState.RELEASED.toString())){
-              liveContainers.add(rmc.getContainerIdID());
+              liveContainers.add(rmc.getContainerId());
           }
         }
       }
@@ -553,15 +547,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
         throws IOException {
       return blackLists.get(id);
     }
-
-    public Map<String, CSQueue> getAllCSQueues(){
-      return allCSQueues;
-    }
-    
-    public Map<String, CSLeafQueueUserInfo> getAllCSLeafQueueUserInfo(){
-      return allCSLeafQueueUserInfo;
-    }
-    
+        
     private final Map<NodeId, org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode>
         alreadyRecoveredRMContextActiveNodes =
         new HashMap<NodeId, org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode>();
@@ -832,13 +818,13 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
         RMContainer hopRMContainer = allRMContainers.get(id);
         //retrieve Container
         org.apache.hadoop.yarn.api.records.Container container =
-            getContainer(hopRMContainer.getContainerIdID());
+            getContainer(hopRMContainer.getContainerId());
 
         //construct RMContainer
         org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer
             rmContainer = new RMContainerImpl(container, container.
             getId().getApplicationAttemptId(),
-            ConverterUtils.toNodeId(hopRMContainer.getNodeIdID()),
+            ConverterUtils.toNodeId(hopRMContainer.getNodeId()),
             hopRMContainer.getUser(), rmContext, null);
         rmContainer.recover(hopRMContainer);
         alreadyRecoveredRMContainers.put(id, rmContainer);
@@ -856,9 +842,15 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
         final String id) throws IOException {
       if (!alreadyRecoveredContainers.containsKey(id)) {
         Container hopContainer = allContainers.get(id);
-        ContainerPBImpl container = new ContainerPBImpl(
-            YarnProtos.ContainerProto.parseFrom(hopContainer.
+        ContainerPBImpl container = null;
+        if(hopContainer!=null){
+          container = new ContainerPBImpl(
+          YarnProtos.ContainerProto.parseFrom(hopContainer.
                 getContainerState()));
+        }else{
+          //TORECOVER find out why we sometime get this
+          LOG.error("the container should not be null " + id);
+        }
         alreadyRecoveredContainers.put(id, container);
         return container;
       } else {
@@ -881,6 +873,14 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
           nodesResources.get(id).get(type) != null) {
         return nodesResources.get(id).get(type).get(parent);
       } else {
+        return null;
+      }
+    }
+    
+    public Set<String> getCSLeafQueuePendingApps(String path){
+      if(csLeafQueuesPendingApps!=null){
+        return csLeafQueuesPendingApps.get(path);
+      }else{
         return null;
       }
     }

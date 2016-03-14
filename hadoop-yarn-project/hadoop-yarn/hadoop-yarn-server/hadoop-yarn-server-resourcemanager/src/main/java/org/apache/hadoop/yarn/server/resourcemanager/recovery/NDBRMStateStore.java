@@ -196,9 +196,6 @@ public class NDBRMStateStore extends RMStateStore {
                 connector.flush();
                 loadAllJustLaunchedContainers(rmState);
                 connector.flush();
-                loadAllCSQueues(rmState);
-                connector.flush();
-                loadAllCSLeafQueueUserInfo(rmState);
                 LOG.info("loaded rmState");
                 connector.commit();
                 return null;
@@ -380,9 +377,12 @@ public class NDBRMStateStore extends RMStateStore {
   private void loadAppSchedulingInfos(RMState rmState) throws IOException {
     List<AppSchedulingInfo> appSchedulingInfosList =
         RMUtilities.getAppSchedulingInfos();
-    rmState.appSchedulingInfos = new HashMap<String, AppSchedulingInfo>();
+    rmState.appSchedulingInfos = new HashMap<String, Map<String,AppSchedulingInfo>>();
     for (AppSchedulingInfo info : appSchedulingInfosList) {
-      rmState.appSchedulingInfos.put(info.getAppId(), info);
+      if(rmState.appSchedulingInfos.get(info.getAppId())==null){
+        rmState.appSchedulingInfos.put(info.getAppId(), new HashMap<String, AppSchedulingInfo>());
+      }
+      rmState.appSchedulingInfos.get(info.getAppId()).put(info.getSchedulerAppId(), info);
     }
   }
   
@@ -424,6 +424,10 @@ public class NDBRMStateStore extends RMStateStore {
   
   private void loadAllQueueMetrics(RMState rmState) throws IOException {
     rmState.allQueueMetrics = RMUtilities.getAllQueueMetrics();
+  }
+  
+  private void loadCSLeafQueuesPendingApps(RMState rmState) throws IOException{
+    rmState.csLeafQueuesPendingApps = RMUtilities.getCSLeafQueuesPendingApps();
   }
   
   private void loadNodeHeartBeatResponses(RMState rmState) throws IOException {
@@ -518,13 +522,6 @@ public class NDBRMStateStore extends RMStateStore {
         getAllJustLaunchedContainers();
   }
   
-  private void loadAllCSQueues(RMState rmState) throws IOException{
-    rmState.allCSQueues = RMUtilities.getAllCSQueues();
-  }
-  
-  private void loadAllCSLeafQueueUserInfo(RMState rmState) throws IOException{
-    rmState.allCSLeafQueueUserInfo = RMUtilities.getAllCSLeafQueueUserInfo();
-  }
   private void loadRMDelegationKeyState(RMState rmState) throws IOException {
     //Retrieve all DelegationKeys from NDB
     List<DelegationKey> delKeys = RMUtilities.getDelegationKeys();

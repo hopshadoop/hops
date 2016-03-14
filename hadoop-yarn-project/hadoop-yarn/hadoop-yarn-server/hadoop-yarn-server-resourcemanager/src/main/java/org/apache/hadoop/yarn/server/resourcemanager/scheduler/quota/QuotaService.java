@@ -241,7 +241,6 @@ public class QuotaService extends AbstractService {
                                   + " User : " + _appUser);
 
                           // Calculate the charge
-                          long totalTicks = _ycl.getStop() - _ycl.getStart();
 
                           Long checkpoint = containersCheckPoints.get(_ycl.
                                   getContainerid());

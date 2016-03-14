@@ -330,7 +330,7 @@ public class TestContainersLogsService {
               null,
               ContainerExitStatus.SUCCESS,
               cs.getRMNodeId(),
-              pendingId++);
+              pendingId++, ContainerStatus.Type.UCI);
       csUpdate1.add(csNewStatus);
 
       ContainerStatus cs2 = containerStatuses2.get(i);
@@ -340,7 +340,7 @@ public class TestContainersLogsService {
               null,
               ContainerExitStatus.ABORTED,
               cs2.getRMNodeId(),
-              pendingId);
+              pendingId, ContainerStatus.Type.UCI);
       csUpdate1.add(cs2NewStatus);
     }
     updateContainerStatuses(csUpdate1);
@@ -365,7 +365,7 @@ public class TestContainersLogsService {
               null,
               ContainerExitStatus.SUCCESS,
               cs.getRMNodeId(),
-              pendingId++);
+              pendingId++, ContainerStatus.Type.UCI);
       csUpdate2.add(csNewStatus);
     }
     updateContainerStatuses(csUpdate2);
@@ -655,12 +655,12 @@ public class TestContainersLogsService {
       rmContainers.add(container);
       
       ContainerStatus status = new ContainerStatus(
-              container.getContainerIdID(),
+              container.getContainerId(),
               ContainerState.RUNNING.toString(),
               null,
               ContainerExitStatus.SUCCESS,
               randomRMNode.getNodeId(),
-              randomRMNode.getPendingEventId());
+              randomRMNode.getPendingEventId(),ContainerStatus.Type.UCI);
       containersStatus.add(status);
     }
   }
@@ -692,7 +692,7 @@ public class TestContainersLogsService {
               null,
               exitStatus,
               entry.getRMNodeId(),
-              0);
+              0, ContainerStatus.Type.UCI);
       toAdd.add(status);
     }
     return toAdd;

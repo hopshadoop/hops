@@ -64,8 +64,9 @@ public class SchedulerApplication {
     this.currentAttempt = currentAttempt;
     if (ts != null) {
       ((TransactionStateImpl) ts).getSchedulerApplicationInfos(
-              this.currentAttempt.appSchedulingInfo.applicationId)
-          .setFiCaSchedulerAppInfo(currentAttempt);
+              this.currentAttempt.appSchedulingInfo.applicationId).
+              getFiCaSchedulerAppInfo(currentAttempt.getApplicationAttemptId()).
+              createFull(currentAttempt);
     }
   }
 
