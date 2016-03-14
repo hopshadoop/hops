@@ -104,8 +104,8 @@ public class StorageMap {
    * Adds or replaces storageinfo for the given sid
    */
   public void updateStorage(final DatanodeStorageInfo storageInfo) {
-    // Allow lookup of storageId (String) -> sid (int)
     try {
+      // Allow lookup of storageId (String) <--> sid (int)
       storageIdMap.update(storageInfo);
 
       // Also write to the storages table (mapping DN-Sid-storagetype)
@@ -113,32 +113,48 @@ public class StorageMap {
       final String datanodeUuid = storageInfo.getDatanodeDescriptor().getDatanodeUuid();
       final int storageType = storageInfo.getStorageType().ordinal();
 
-      // TODO only do this if the info changed? (compare with the cache version)
-      new HopsTransactionalRequestHandler(HDFSOperationType.UPDATE_SID_MAP) {
-        @Override
-        public void acquireLock(TransactionLocks locks) throws IOException {
-          LockFactory lf = LockFactory.getInstance();
-          locks.add(
-              lf.getVariableLock(Variable.Finder.StorageMap, LockType.READ_COMMITTED));
-        }
+      // Get the list of storages we know to be on this DN
+      ArrayList<Integer> sids = this.datanodeUuidToSids.get(datanodeUuid);
 
-        @Override
-        public Object performTask() throws StorageException, IOException {
-          StorageDataAccess<Storage> da = (StorageDataAccess) HdfsStorageFactory.getDataAccess(StorageDataAccess.class);
-          Storage h = da.findByPk(sid);
-          if (h == null) {
-            h = new Storage(sid, datanodeUuid, storageType);
-            da.add(h);
+      if(sids == null) { // First time we see this DN
+        sids = new ArrayList<Integer>();
+        this.datanodeUuidToSids.put(datanodeUuid, sids);
+      }
+
+      if(! sids.contains(sid)) { // We haven't seen this sid on this DN yet
+        // Add in hashmap
+        sids.add(sid);
+
+        // Persist to database
+        new HopsTransactionalRequestHandler(HDFSOperationType.UPDATE_SID_MAP) {
+          @Override
+          public void acquireLock(TransactionLocks locks) throws IOException {
+            LockFactory lf = LockFactory.getInstance();
+            locks.add(
+                lf.getVariableLock(Variable.Finder.StorageMap,
+                    LockType.READ_COMMITTED));
           }
-          return null;
-        }
-      }.handle();
+
+          @Override
+          public Object performTask() throws StorageException, IOException {
+            StorageDataAccess<Storage> da =
+                (StorageDataAccess) HdfsStorageFactory
+                    .getDataAccess(StorageDataAccess.class);
+            Storage h = da.findByPk(sid);
+            if (h == null) {
+              h = new Storage(sid, datanodeUuid, storageType);
+              da.add(h);
+            }
+            return null;
+          }
+        }.handle();
+      }
     } catch (IOException e) {
       // TODO throw some stuff?
       e.printStackTrace();
     }
 
-    // Allow lookup of sid (int) ->
+    // Allow lookup of sid (int) -> DatanodeStorageInfo
     storageInfoMap.put(storageInfo.getSid(), storageInfo);
   }
 

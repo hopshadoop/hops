@@ -2310,6 +2310,8 @@ public class BlockManager {
         return storedBlock;
       }
 
+
+      // TODO -> check this @Bram !
       toAdd.add(storedBlock);
       safeBlocks.remove(block.getBlockId());
     }
@@ -2744,7 +2746,7 @@ public class BlockManager {
       }
     }
     // Remove the block from corruptReplicasMap
-    if (!removedFromBlocksMap) {
+    if (removedFromBlocksMap) {
       corruptReplicas.removeFromCorruptReplicasMap(blk);
     }
   }

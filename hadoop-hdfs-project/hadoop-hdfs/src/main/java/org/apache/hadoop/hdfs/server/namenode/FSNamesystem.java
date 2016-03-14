@@ -2563,22 +2563,21 @@ public class FSNamesystem
       //
       // check all blocks of the file.
       //
-      for (BlockInfo block: v.getBlocks()) {
-//        TODO optimization?
-//        if (!block.isComplete()) {
-//          BlockInfo cBlock = blockManager
-//              .tryToCompleteBlock((MutableBlockCollection) v,
-//                  block.getBlockIndex());
-//          if (cBlock != null) {
-//            block = cBlock;
-//          }
-            if (!block.isComplete()) {
-              LOG.info("BLOCK* checkFileProgress: " + block
-                  + " has not reached minimal replication "
-                  + blockManager.minReplication);
-              return false;
-            }
-//        }
+      for (BlockInfo block : v.getBlocks()) {
+        if (!block.isComplete()) {
+          BlockInfo cBlock = blockManager
+              .tryToCompleteBlock((MutableBlockCollection) v,
+                  block.getBlockIndex());
+          if (cBlock != null) {
+            block = cBlock;
+          }
+          if (!block.isComplete()) {
+            LOG.info("BLOCK* checkFileProgress: " + block +
+                " has not reached minimal replication " +
+                blockManager.minReplication);
+            return false;
+          }
+        }
       }
     } else {
       //
@@ -2586,10 +2585,16 @@ public class FSNamesystem
       //
       BlockInfo b = v.getPenultimateBlock();
       if (b != null && !b.isComplete()) {
-        LOG.warn("BLOCK* checkFileProgress: " + b
-            + " has not reached minimal replication "
-            + blockManager.minReplication);
-        return false;
+        blockManager
+            .tryToCompleteBlock((MutableBlockCollection) v, b.getBlockIndex());
+        b = v.getPenultimateBlock();
+        if (!b.isComplete()) {
+          LOG.info("BLOCK* checkFileProgress: " + b +
+              " has not reached minimal replication " +
+              blockManager.minReplication);
+          return false;
+        }
+
       }
     }
     return true;
