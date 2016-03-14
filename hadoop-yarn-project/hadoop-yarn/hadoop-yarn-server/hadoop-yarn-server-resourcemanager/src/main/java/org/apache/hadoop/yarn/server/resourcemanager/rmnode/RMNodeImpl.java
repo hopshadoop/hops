@@ -436,8 +436,6 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
     this.writeLock.lock();
 
     try {
-        //TORECOVER should we realy clear here?
-      this.finishedApplications.clear();
       this.finishedApplications.addAll(newList);
     } finally {
       this.writeLock.unlock();
@@ -943,10 +941,12 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
           LOG.debug(
               "HOP :: justlaunched remove containerId (finished container)=" +
                   containerId);
-          if (rmNode.justLaunchedContainers.remove(containerId) != null) {
+          ContainerStatus status = 
+                  rmNode.justLaunchedContainers.remove(containerId);
+          if (status != null) {
             ((TransactionStateImpl) event.getTransactionState())
                     .getRMNodeInfo(rmNode.nodeId)
-                    .toRemoveJustLaunchedContainers(containerId);
+                    .toRemoveJustLaunchedContainers(containerId,status);
           }
           completedContainers.add(remoteContainer);
 
@@ -987,7 +987,8 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
                             getState().
                             toString(), status.getDiagnostics(), status.
                             getExitStatus(), "",
-                            0));
+                            0,
+                            io.hops.metadata.yarn.entity.ContainerStatus.Type.UCI));
           }
           for (ContainerStatus status : completedContainers) {
             containersToLog.add(
@@ -996,7 +997,8 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
                             getState().
                             toString(), status.getDiagnostics(), status.
                             getExitStatus(), "",
-                            0));
+                            0, 
+                            io.hops.metadata.yarn.entity.ContainerStatus.Type.UCI));
           }
           ContainersLogsService logService = rmNode.context.
                   getContainersLogsService();

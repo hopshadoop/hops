@@ -48,6 +48,7 @@ public class RMNodeInfoAgregate {
   List<JustLaunchedContainers> toAddJustLaunchedContainers
           = new ArrayList<JustLaunchedContainers>();
   List<ContainerStatus> toAddContainerStatus = new ArrayList<ContainerStatus>();
+  List<ContainerStatus> toRemoveContainerStatus = new ArrayList<ContainerStatus>();
   List<JustLaunchedContainers> toRemoveJustLaunchedContainers
           = new ArrayList<JustLaunchedContainers>();
   ArrayList<ContainerId> toAddContainerIdToClean = new ArrayList<ContainerId>();
@@ -72,12 +73,17 @@ public class RMNodeInfoAgregate {
     this.toAddContainerStatus.addAll(toAddContainerStatus);
   }
 
+  public void addAllContainersStatusToRemove(
+          List<ContainerStatus> toAddContainerStatus) {
+    this.toRemoveContainerStatus.addAll(toAddContainerStatus);
+  }
+  
   public void addAllJustLaunchedContainersToAdd(
           List<JustLaunchedContainers> toAddJustLaunchedContainers) {
     this.toAddJustLaunchedContainers.addAll(toAddJustLaunchedContainers);
   }
 
-    public void addAllJustLaunchedContainersToRemove(
+  public void addAllJustLaunchedContainersToRemove(
           List<JustLaunchedContainers> toRemoveJustLaunchedContainers) {
     this.toRemoveJustLaunchedContainers.addAll(toRemoveJustLaunchedContainers);
   }
@@ -139,6 +145,7 @@ public class RMNodeInfoAgregate {
           throws StorageException {
     persistContainerStatusToAdd(csDA);
     connector.flush();
+      persistContainerStatusToRemove(csDA);
     persistJustLaunchedContainersToAdd(justLaunchedContainersDA);
     connector.flush();
     persistJustLaunchedContainersToRemove(justLaunchedContainersDA);
@@ -167,6 +174,11 @@ public class RMNodeInfoAgregate {
   private void persistContainerStatusToAdd(ContainerStatusDataAccess csDA)
           throws StorageException {
     csDA.addAll(toAddContainerStatus);
+  }
+
+  private void persistContainerStatusToRemove(ContainerStatusDataAccess csDA)
+          throws StorageException {
+    csDA.removeAll(toRemoveContainerStatus);
   }
 
   public void persistJustLaunchedContainersToAdd(

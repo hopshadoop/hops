@@ -44,6 +44,7 @@ import io.hops.metadata.yarn.dal.rmstatestore.ApplicationStateDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.CompletedContainersStatusDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.RanNodeDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.UpdatedNodeDataAccess;
+import io.hops.metadata.yarn.entity.Container;
 import io.hops.metadata.yarn.entity.FiCaSchedulerNode;
 import io.hops.metadata.yarn.entity.FiCaSchedulerNodeInfos;
 import io.hops.metadata.yarn.entity.LaunchedContainers;
@@ -79,19 +80,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentSkipListMap;
-import java.util.concurrent.ConcurrentSkipListSet;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
-import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.impl.pb.ContainerPBImpl;
 import org.apache.hadoop.yarn.api.records.impl.pb.ContainerStatusPBImpl;
-import org.apache.hadoop.yarn.conf.YarnConfiguration;
 
 import static org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore.LOG;
 
@@ -118,8 +112,14 @@ public class TransactionStateImpl extends TransactionState {
       new FairSchedulerNodeInfo();
   private final Map<String, RMContainer> rmContainersToUpdate =
       new ConcurrentHashMap<String, RMContainer>();
-  private final Queue<io.hops.metadata.yarn.entity.Container> toAddContainers =
-          new ConcurrentLinkedQueue<io.hops.metadata.yarn.entity.Container>();
+  private final Map<String, RMContainer> rmContainersToRemove =
+      new ConcurrentHashMap<String, RMContainer>();
+  private final Map<String, Container> toAddContainers =
+          new HashMap<String, Container>();
+  private final Map<String, Container> toUpdateContainers =
+          new HashMap<String, Container>();
+  private final Map<String, Container> toRemoveContainers =
+          new HashMap<String, Container>();
   private final CSQueueInfo csQueueInfo = new CSQueueInfo();
   
   //APP
@@ -146,8 +146,6 @@ public class TransactionStateImpl extends TransactionState {
   
   //COMTEXT
   private final RMContextInfo rmcontextInfo = new RMContextInfo();
-  private org.apache.hadoop.yarn.api.records.Resource clusterResourceToUpdate;
-  private org.apache.hadoop.yarn.api.records.Resource usedResourceToUpdate;
   
   
   
@@ -184,7 +182,8 @@ public class TransactionStateImpl extends TransactionState {
   @Override
   public void commit(boolean first) throws IOException {
     if(first){
-      RMUtilities.putTransactionStateInQueues(this, rmNodesToUpdate.keySet(), appIds);
+      RMUtilities.putTransactionStateInQueues(this, rmNodesToUpdate.keySet(), 
+              appIds);
       RMUtilities.logPutInCommitingQueue(this);
     }
     GlobalThreadPool.getExecutorService().execute(new RPCFinisher(this));
@@ -216,10 +215,13 @@ public class TransactionStateImpl extends TransactionState {
     persitApplicationToAdd();
     persistApplicationStateToRemove();
     persistAppAttempt();
+    persistRandNode();
     persistAllocateResponsesToAdd();
     persistAllocateResponsesToRemove();
     persistRMContainerToUpdate();
-    persistContainers();
+    persistRMContainersToRemove();
+    persistContainersToAdd();
+    persistContainersToRemove();
     //TODO rebuild cluster resource from node resources
 //    persistClusterResourceToUpdate();
 //    persistUsedResourceToUpdate();
@@ -304,13 +306,10 @@ public class TransactionStateImpl extends TransactionState {
           org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode node) {
     if (ficaSchedulerNodeInfoToAdd.remove(nodeId) == null) {
       FiCaSchedulerNodeInfos nodeInfo = new FiCaSchedulerNodeInfos();
-      if (node.getReservedContainer() != null) {
-        nodeInfo.setReservedContainer(new RMContainer(node.
-                getReservedContainer().getContainerId().toString()));
-      }
       ficaSchedulerNodeInfoToRemove.put(nodeId, nodeInfo);
     }
     ficaSchedulerNodeInfoToUpdate.remove(nodeId);
+    //TORECOVER shouldn't we take care of the reserved rmcontainer?
   }
   
   static public int callsAddApplicationToAdd =0;
@@ -485,9 +484,13 @@ public class TransactionStateImpl extends TransactionState {
           (ApplicationAttemptStateDataAccess) RMStorageFactory.
               getDataAccess(ApplicationAttemptStateDataAccess.class);
       DA.addAll(appAttempts.values());
-      //TODO put in its own persist
-      RanNodeDataAccess rDA= (RanNodeDataAccess) RMStorageFactory.
-              getDataAccess(RanNodeDataAccess.class);
+    }
+  }
+  
+  private void persistRandNode() throws IOException {
+    if(!ranNodeToAdd.isEmpty()){
+        RanNodeDataAccess rDA= (RanNodeDataAccess) RMStorageFactory.
+            getDataAccess(RanNodeDataAccess.class);
       rDA.addAll(ranNodeToAdd.values());
     }
   }
@@ -500,7 +503,8 @@ public class TransactionStateImpl extends TransactionState {
             getAllocateResponse();
     if (lastResponse != null) {
       List<String> allocatedContainers = new ArrayList<String>();
-      for(Container container: lastResponse.getAllocatedContainers()){
+      for(org.apache.hadoop.yarn.api.records.Container container:
+              lastResponse.getAllocatedContainers()){
         allocatedContainers.add(container.getId().toString());
       }
       
@@ -593,24 +597,80 @@ public class TransactionStateImpl extends TransactionState {
   }
    
   public void addRMContainerToAdd(RMContainerImpl rmContainer) {
+    rmContainersToRemove.remove(rmContainer.getContainerId().toString());
     addRMContainerToUpdate(rmContainer);
     io.hops.metadata.yarn.entity.Container hopContainer
-            = new io.hops.metadata.yarn.entity.Container(rmContainer.
-                    getContainerId().
-                    toString(),
+            = new Container(rmContainer.
+                    getContainerId().toString(),
                     getRMContainerBytes(rmContainer.getContainer()));
-    toAddContainers.add(hopContainer);
+    toAddContainers.put(hopContainer.getContainerId(),hopContainer);
+    appIds.add(rmContainer.getApplicationAttemptId().getApplicationId());
+    nodesIds.add(rmContainer.getNodeId());
   }
   
-  protected void persistContainers() throws StorageException {
+  protected void persistContainersToAdd() throws StorageException {
     if (!toAddContainers.isEmpty()) {
       ContainerDataAccess cDA = (ContainerDataAccess) RMStorageFactory.
               getDataAccess(ContainerDataAccess.class);
-      cDA.addAll(toAddContainers);
+      cDA.addAll(toAddContainers.values());
+    }
+    if (!toUpdateContainers.isEmpty()) {
+      ContainerDataAccess cDA = (ContainerDataAccess) RMStorageFactory.
+              getDataAccess(ContainerDataAccess.class);
+      cDA.addAll(toUpdateContainers.values());
     }
   }
   
-  public void addRMContainerToUpdate(RMContainerImpl rmContainer) {
+  public void addContainerToUpdate(
+          org.apache.hadoop.yarn.api.records.Container container,
+          ApplicationId appId){
+      io.hops.metadata.yarn.entity.Container hopContainer
+            = new Container(container.getId().toString(),
+                    getRMContainerBytes(container));
+    toUpdateContainers.put(hopContainer.getContainerId(),hopContainer);
+    appIds.add(appId);
+    nodesIds.add(container.getNodeId());
+  }
+  
+  
+  public synchronized void addRMContainerToRemove(
+          org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer rmContainer) {
+    rmContainersToUpdate.remove(rmContainer.getContainerId().toString());
+    toUpdateContainers.remove(rmContainer.getContainerId().toString());
+    if(toAddContainers.remove(rmContainer.getContainerId().toString())==null){
+      rmContainersToRemove.put(rmContainer.getContainerId().toString(),
+              new RMContainer(rmContainer.getContainerId().toString(),
+              rmContainer.getApplicationAttemptId().toString()));
+      toRemoveContainers.put(rmContainer.getContainerId().toString(),
+              new Container(rmContainer.
+                  getContainerId().toString()));
+      appIds.add(rmContainer.getApplicationAttemptId().getApplicationId());
+      nodesIds.add(rmContainer.getNodeId());
+    }
+  }
+  
+  protected void persistContainersToRemove() throws StorageException {
+    if (!toRemoveContainers.isEmpty()) {
+      ContainerDataAccess cDA = (ContainerDataAccess) RMStorageFactory.
+              getDataAccess(ContainerDataAccess.class);
+      cDA.removeAll(toRemoveContainers.values());
+    }
+  }
+  protected void persistRMContainersToRemove() throws StorageException {
+      if (!rmContainersToRemove.isEmpty()) {
+          RMContainerDataAccess rmcontainerDA
+                  = (RMContainerDataAccess) RMStorageFactory
+                  .getDataAccess(RMContainerDataAccess.class);            
+          rmcontainerDA.removeAll(rmContainersToRemove.values());
+      }
+  }
+    
+  public synchronized void addRMContainerToUpdate(RMContainerImpl rmContainer) {
+    if (rmContainersToRemove.containsKey(
+            rmContainer.getContainerId().toString())) {
+        return;
+    }
+            
     boolean isReserved = (rmContainer.getReservedNode() != null)
             && (rmContainer.getReservedPriority() != null);
 
@@ -639,6 +699,8 @@ public class TransactionStateImpl extends TransactionState {
                             rmContainer.getState().toString(),
                             rmContainer.getContainerState().toString(),
                             rmContainer.getContainerExitStatus()));
+    appIds.add(rmContainer.getApplicationAttemptId().getApplicationId());
+    nodesIds.add(rmContainer.getNodeId());
   }
 
   private void persistRMContainerToUpdate() throws StorageException {
@@ -700,6 +762,7 @@ public class TransactionStateImpl extends TransactionState {
     
     RMNodeToAdd hopRMNodeToAdd = getRMContextInfo().getToAddActiveRMNode(rmnodeToAdd.getNodeID());
     if(hopRMNodeToAdd==null){
+      nodesIds.add(rmnodeToAdd.getNodeID());
       this.rmNodesToUpdate.put(rmnodeToAdd.getNodeID().toString(),
               hopRMNode);
     } else {
@@ -736,42 +799,18 @@ public class TransactionStateImpl extends TransactionState {
               updatedContainerInfoDA, faDA, csDA,persistedEventsDA, connector);
     }
   }
-  
-  public void updateUsedResource(
-      org.apache.hadoop.yarn.api.records.Resource usedResource) {
-    this.usedResourceToUpdate = usedResource;
-  }
-  
-  private void persistUsedResourceToUpdate() throws StorageException {
-    if (usedResourceToUpdate != null) {
-      ResourceDataAccess rDA = (ResourceDataAccess) RMStorageFactory
-          .getDataAccess(ResourceDataAccess.class);
-      rDA.add(new Resource("cluster", Resource.CLUSTER, Resource.USED,
-          usedResourceToUpdate.getMemory(),
-          usedResourceToUpdate.getVirtualCores(),0));
-    }
-  }
-  
 
+  
   private void persistFiCaSchedulerNodeToRemove(ResourceDataAccess resourceDA, 
           FiCaSchedulerNodeDataAccess ficaNodeDA, RMContainerDataAccess rmcontainerDA, 
           LaunchedContainersDataAccess launchedContainersDA) throws StorageException {
     if (!ficaSchedulerNodeInfoToRemove.isEmpty()) {
       Queue<FiCaSchedulerNode> toRemoveFiCaSchedulerNodes =
           new ConcurrentLinkedQueue<FiCaSchedulerNode>();
-//      ArrayList<Resource> toRemoveResources = new ArrayList<Resource>();
-      Queue<RMContainer> rmcontainerToRemove = new ConcurrentLinkedQueue<RMContainer>();
       for (String nodeId : ficaSchedulerNodeInfoToRemove.keySet()) {
         toRemoveFiCaSchedulerNodes.add(new FiCaSchedulerNode(nodeId));
-        // Update FiCaSchedulerNode reservedContainer
-        RMContainer container =
-            ficaSchedulerNodeInfoToRemove.get(nodeId).getReservedContainer();
-        if (container != null) {
-          rmcontainerToRemove.add(container);
-        }
       }
       ficaNodeDA.removeAll(toRemoveFiCaSchedulerNodes);
-      rmcontainerDA.removeAll(rmcontainerToRemove);
     }
   }
 

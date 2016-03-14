@@ -718,10 +718,6 @@ public class FifoScheduler extends AbstractYarnScheduler
 
         // Update usage for this container
         Resources.addTo(usedResource, capability);
-        if (transactionState != null) {
-          ((TransactionStateImpl) transactionState)
-              .updateUsedResource(clusterResource);
-        }
       }
 
     }

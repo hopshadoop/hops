@@ -21,7 +21,6 @@ import com.google.common.collect.Multiset;
 import io.hops.ha.common.FiCaSchedulerAppInfo;
 import io.hops.ha.common.TransactionState;
 import io.hops.ha.common.TransactionStateImpl;
-import io.hops.metadata.yarn.entity.FiCaSchedulerAppContainer;
 import io.hops.metadata.yarn.entity.Resource;
 import io.hops.metadata.yarn.entity.FiCaSchedulerAppLastScheduledContainer;
 import io.hops.metadata.yarn.entity.SchedulerAppReservations;
@@ -286,7 +285,8 @@ public class SchedulerApplicationAttempt implements Recoverable{
       rmContainer = new RMContainerImpl(container, getApplicationAttemptId(),
           node.getNodeID(), appSchedulingInfo.getUser(), rmContext,
           transactionState);
-
+      ((TransactionStateImpl) transactionState).addRMContainerToAdd(
+              (RMContainerImpl)rmContainer);
       Resources.addTo(currentReservation, container.getResource());
       //HOP : Update Resources
       if (transactionState != null) {
@@ -612,6 +612,8 @@ public class SchedulerApplicationAttempt implements Recoverable{
         container.setContainerToken(rmContext.getContainerTokenSecretManager()
             .createContainerToken(container.getId(), container.getNodeId(),
                 getUser(), container.getResource()));
+        ((TransactionStateImpl)transactionState).addContainerToUpdate(container,
+                appSchedulingInfo.getApplicationId());
         NMToken nmToken = rmContext.getNMTokenSecretManager()
             .createAndGetNMToken(getUser(), getApplicationAttemptId(),
                 container);

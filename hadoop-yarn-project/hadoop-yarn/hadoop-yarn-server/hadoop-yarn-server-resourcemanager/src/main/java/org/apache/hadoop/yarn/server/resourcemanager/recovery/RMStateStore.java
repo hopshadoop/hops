@@ -509,11 +509,11 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
         final String ficaId) throws IOException {
        List<String> newlyAllocatedContainers = new ArrayList<String>();
       for(RMContainer rmc: allRMContainers.values()){
-        if(rmc.getApplicationAttemptIdID().equals(ficaId)){
+        if(rmc.getApplicationAttemptId().equals(ficaId)){
           if(rmc.getState().equals(RMContainerState.NEW.toString()) ||
                   rmc.getState().equals(RMContainerState.RESERVED.toString()) ||
                   rmc.getState().equals(RMContainerState.ALLOCATED.toString())){
-              newlyAllocatedContainers.add(rmc.getContainerIdID());
+              newlyAllocatedContainers.add(rmc.getContainerId());
           }
         }
       }
@@ -525,12 +525,12 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
         final String ficaId) throws IOException {
       List<String> liveContainers = new ArrayList<String>();
       for(RMContainer rmc: allRMContainers.values()){
-        if(rmc.getApplicationAttemptIdID().equals(ficaId)){
+        if(rmc.getApplicationAttemptId().equals(ficaId)){
           if(!rmc.getState().equals(RMContainerState.COMPLETED.toString()) &&
                   !rmc.getState().equals(RMContainerState.EXPIRED.toString()) &&
                   !rmc.getState().equals(RMContainerState.KILLED.toString()) &&
                   !rmc.getState().equals(RMContainerState.RELEASED.toString())){
-              liveContainers.add(rmc.getContainerIdID());
+              liveContainers.add(rmc.getContainerId());
           }
         }
       }
@@ -818,13 +818,13 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
         RMContainer hopRMContainer = allRMContainers.get(id);
         //retrieve Container
         org.apache.hadoop.yarn.api.records.Container container =
-            getContainer(hopRMContainer.getContainerIdID());
+            getContainer(hopRMContainer.getContainerId());
 
         //construct RMContainer
         org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer
             rmContainer = new RMContainerImpl(container, container.
             getId().getApplicationAttemptId(),
-            ConverterUtils.toNodeId(hopRMContainer.getNodeIdID()),
+            ConverterUtils.toNodeId(hopRMContainer.getNodeId()),
             hopRMContainer.getUser(), rmContext, null);
         rmContainer.recover(hopRMContainer);
         alreadyRecoveredRMContainers.put(id, rmContainer);

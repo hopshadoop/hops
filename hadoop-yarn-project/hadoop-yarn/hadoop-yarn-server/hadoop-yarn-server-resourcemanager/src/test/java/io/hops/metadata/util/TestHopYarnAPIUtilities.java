@@ -17,10 +17,7 @@ package io.hops.metadata.util;
 
 import io.hops.exception.StorageException;
 import io.hops.exception.StorageInitializtionException;
-import io.hops.metadata.yarn.entity.FiCaSchedulerAppContainer;
 import io.hops.metadata.yarn.entity.FiCaSchedulerNode;
-import io.hops.metadata.yarn.entity.LaunchedContainers;
-import io.hops.metadata.yarn.entity.Resource;
 import io.hops.metadata.yarn.entity.ResourceRequest;
 import io.hops.metadata.yarn.entity.SchedulerApplication;
 import io.hops.metadata.yarn.entity.appmasterrpc.RPC;
@@ -229,11 +226,6 @@ public class TestHopYarnAPIUtilities {
     Map<ContainerId, RMContainer> liveContainers = saAttempt.
         getLiveContainersMap();
 
-    //retrieve newlyAllocatedContainers from the database
-    List<FiCaSchedulerAppContainer> dbNewlyAlCont = RMUtilities
-        .getNewlyAllocatedContainers(attempt1.getAppAttemptId().toString());
-
-    assertEquals(newlyAllocatedContainers.size(), dbNewlyAlCont.size());
 
     //submit a second application of 2GB memory
     RMApp app2 = rm.submitApp(2048);

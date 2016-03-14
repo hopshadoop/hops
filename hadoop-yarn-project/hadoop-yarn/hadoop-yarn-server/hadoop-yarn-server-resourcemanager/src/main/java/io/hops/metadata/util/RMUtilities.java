@@ -26,8 +26,6 @@ import io.hops.metadata.yarn.dal.ContainerDataAccess;
 import io.hops.metadata.yarn.dal.ContainerIdToCleanDataAccess;
 import io.hops.metadata.yarn.dal.ContainerStatusDataAccess;
 import io.hops.metadata.yarn.dal.FiCaSchedulerAppLastScheduledContainerDataAccess;
-import io.hops.metadata.yarn.dal.FiCaSchedulerAppLiveContainersDataAccess;
-import io.hops.metadata.yarn.dal.FiCaSchedulerAppNewlyAllocatedContainersDataAccess;
 import io.hops.metadata.yarn.dal.FiCaSchedulerAppReservationsDataAccess;
 import io.hops.metadata.yarn.dal.FiCaSchedulerAppSchedulingOpportunitiesDataAccess;
 import io.hops.metadata.yarn.dal.FiCaSchedulerNodeDataAccess;
@@ -74,7 +72,6 @@ import io.hops.metadata.yarn.entity.Container;
 import io.hops.metadata.yarn.entity.ContainerId;
 import io.hops.metadata.yarn.entity.ContainerStatus;
 import io.hops.metadata.yarn.entity.FiCaSchedulerAppLastScheduledContainer;
-import io.hops.metadata.yarn.entity.FiCaSchedulerAppContainer;
 import io.hops.metadata.yarn.entity.FiCaSchedulerAppSchedulingOpportunities;
 import io.hops.metadata.yarn.entity.FiCaSchedulerNode;
 import io.hops.metadata.yarn.entity.FinishedApplications;
@@ -540,77 +537,6 @@ public class RMUtilities {
     return DA.getAll();
   }
 
-  //For testing TODO move to test
-  public static List<FiCaSchedulerAppContainer> getNewlyAllocatedContainers(
-      final String ficaId) throws IOException {
-    LightWeightRequestHandler getNewlyAllocatedContainersHandler =
-        new LightWeightRequestHandler(YARNOperationType.TEST) {
-          @Override
-          public Object performTask() throws StorageException {
-            connector.beginTransaction();
-            connector.writeLock();
-            FiCaSchedulerAppNewlyAllocatedContainersDataAccess DA =
-                (FiCaSchedulerAppNewlyAllocatedContainersDataAccess) RMStorageFactory
-                    .getDataAccess(
-                        FiCaSchedulerAppNewlyAllocatedContainersDataAccess.class);
-            List<FiCaSchedulerAppContainer>
-                hopNewlyAllocatedContainers = DA.findById(ficaId);
-            connector.commit();
-            return hopNewlyAllocatedContainers;
-          }
-        };
-    return (List<FiCaSchedulerAppContainer>) getNewlyAllocatedContainersHandler
-        .handle();
-  }
-
-  public static Map<String, List<FiCaSchedulerAppContainer>> getAllNewlyAllocatedContainers()
-      throws IOException {
-    LightWeightRequestHandler getNewlyAllocatedContainersHandler =
-        new LightWeightRequestHandler(YARNOperationType.TEST) {
-          @Override
-          public Object performTask() throws IOException {
-            connector.beginTransaction();
-            connector.writeLock();
-            FiCaSchedulerAppNewlyAllocatedContainersDataAccess DA =
-                (FiCaSchedulerAppNewlyAllocatedContainersDataAccess) RMStorageFactory
-                    .
-                        getDataAccess(
-                            FiCaSchedulerAppNewlyAllocatedContainersDataAccess.class);
-            Map<String, List<FiCaSchedulerAppContainer>>
-                hopNewlyAllocatedContainers = DA.getAll();
-            connector.commit();
-            return hopNewlyAllocatedContainers;
-          }
-        };
-    return (Map<String, List<FiCaSchedulerAppContainer>>) getNewlyAllocatedContainersHandler
-        .
-            handle();
-  }
-  
-
-  public static Map<String, List<FiCaSchedulerAppContainer>> getAllLiveContainers()
-      throws IOException {
-    LightWeightRequestHandler getLiveContainersHandler =
-        new LightWeightRequestHandler(YARNOperationType.TEST) {
-          @Override
-          public Object performTask() throws StorageException {
-            connector.beginTransaction();
-            connector.writeLock();
-            FiCaSchedulerAppLiveContainersDataAccess DA =
-                (FiCaSchedulerAppLiveContainersDataAccess) RMStorageFactory.
-                    getDataAccess(
-                        FiCaSchedulerAppLiveContainersDataAccess.class);
-            Map<String, List<FiCaSchedulerAppContainer>>
-                hopLiveContainers = DA.getAll();
-            connector.commit();
-            return hopLiveContainers;
-          }
-        };
-    return (Map<String, List<FiCaSchedulerAppContainer>>) getLiveContainersHandler
-        .
-            handle();
-  }
-  
 
   public static Map<String, List<ResourceRequest>> getAllResourceRequests()
           throws IOException {
@@ -1077,7 +1003,7 @@ public static Map<String, List<ResourceRequest>> getAllResourceRequestsFullTrans
               ((RMNodeImpl) rmNode).setState(hopRMNode.getCurrentState());
               // *** Recover maps/lists of RMNode ***
               //Use a cache for retrieved ContainerStatus
-              Map<String, ContainerStatus> hopContainerStatuses =
+              Map<String, ContainerStatus> hopJustLaunchedContainerStatuses =
                   new HashMap<String, ContainerStatus>();
               //1. Recover JustLaunchedContainers
               JustLaunchedContainersDataAccess jlcDA =
@@ -1096,19 +1022,20 @@ public static Map<String, List<ResourceRequest>> getAllResourceRequestsFullTrans
                   org.apache.hadoop.yarn.api.records.ContainerId cid =
                       ConverterUtils.toContainerId(hop.getContainerId());
                   //Find and create ContainerStatus
-                  if (!hopContainerStatuses.containsKey(hop.getContainerId())) {
-                    hopContainerStatuses.put(hop.getContainerId(),
+                  if (!hopJustLaunchedContainerStatuses.containsKey(hop.getContainerId())) {
+                    hopJustLaunchedContainerStatuses.put(hop.getContainerId(),
                         (ContainerStatus) containerStatusDA
-                            .findEntry(hop.getContainerId(), id));
+                            .findEntry(hop.getContainerId(), id, 
+                                    ContainerStatus.Type.JUST_LAUNCHED.toString()));
                   }
                   org.apache.hadoop.yarn.api.records.ContainerStatus conStatus =
                       org.apache.hadoop.yarn.api.records.ContainerStatus
                           .newInstance(cid, ContainerState.valueOf(
-                                  hopContainerStatuses.get(hop.getContainerId())
+                              hopJustLaunchedContainerStatuses.get(hop.getContainerId())
                                       .getState()),
-                              hopContainerStatuses.get(hop.getContainerId())
+                              hopJustLaunchedContainerStatuses.get(hop.getContainerId())
                                   .getDiagnostics(),
-                              hopContainerStatuses.get(hop.getContainerId())
+                              hopJustLaunchedContainerStatuses.get(hop.getContainerId())
                                   .getExitstatus());
                   justLaunchedContainers.put(cid, conStatus);
                 }
@@ -1160,6 +1087,8 @@ public static Map<String, List<ResourceRequest>> getAllResourceRequestsFullTrans
                 ConcurrentLinkedQueue<org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo>
                     updatedContainerInfoQueue =
                     new ConcurrentLinkedQueue<org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo>();
+                Map<String, ContainerStatus> hopUCIContainerStatuses =
+                  new HashMap<String, ContainerStatus>();
                 for (int uciId : hopUpdatedContainerInfoMap.keySet()) {
                   for (UpdatedContainerInfo hopUCI : hopUpdatedContainerInfoMap
                       .get(uciId)) {
@@ -1172,21 +1101,22 @@ public static Map<String, List<ResourceRequest>> getAllResourceRequestsFullTrans
                     //Retrieve containerstatus entries for the particular updatedcontainerinfo
                     org.apache.hadoop.yarn.api.records.ContainerId cid =
                         ConverterUtils.toContainerId(hopUCI.getContainerId());
-                    if (!hopContainerStatuses
+                    if (!hopUCIContainerStatuses
                         .containsKey(hopUCI.getContainerId())) {
-                      hopContainerStatuses.put(hopUCI.getContainerId(),
+                      hopUCIContainerStatuses.put(hopUCI.getContainerId(),
                           (ContainerStatus) containerStatusDA
-                              .findEntry(hopUCI.getContainerId(), id));
+                              .findEntry(hopUCI.getContainerId(), id,
+                                      ContainerStatus.Type.UCI.toString()));
                     }
                     org.apache.hadoop.yarn.api.records.ContainerStatus
                         conStatus =
                         org.apache.hadoop.yarn.api.records.ContainerStatus
                             .newInstance(cid, ContainerState.valueOf(
-                                    hopContainerStatuses
+                                    hopUCIContainerStatuses
                                         .get(hopUCI.getContainerId())
-                                        .getState()), hopContainerStatuses
+                                        .getState()), hopUCIContainerStatuses
                                     .get(hopUCI.getContainerId())
-                                    .getDiagnostics(), hopContainerStatuses
+                                    .getDiagnostics(), hopUCIContainerStatuses
                                     .get(hopUCI.getContainerId())
                                     .getExitstatus());
                     //Check ContainerStatus state to add it to appropriate list
@@ -2023,7 +1953,8 @@ public static Map<String, List<ResourceRequest>> getAllResourceRequestsFullTrans
     }
   }
   
-  public static void putTransactionStateInQueues(TransactionState ts, Set<String> nodeIds, Set<ApplicationId> appIds){
+  public static void putTransactionStateInQueues(TransactionState ts, 
+          Set<String> nodeIds, Set<ApplicationId> appIds){
     nextRPCLock.lock();
     putTransactionStateInNodeQueue(ts, nodeIds);
     putTransactionStateInAppQueue(ts, appIds);
