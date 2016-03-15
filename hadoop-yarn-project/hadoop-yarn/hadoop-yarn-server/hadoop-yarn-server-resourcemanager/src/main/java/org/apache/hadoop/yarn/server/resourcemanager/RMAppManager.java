@@ -27,6 +27,7 @@ import org.apache.hadoop.io.DataInputByteBuffer;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ApplicationSubmissionContext;
 import org.apache.hadoop.yarn.api.records.ResourceRequest;
@@ -55,8 +56,10 @@ import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * This class manages the list of applications for the resource manager.
@@ -260,8 +263,10 @@ public class RMAppManager
           ", removing app " + removeApp.getApplicationId() +
           " from state store.");
       if (transactionState != null) {
+        Set<ApplicationAttemptId> appAttemptsId = removeApp
+                .getAppAttempts().keySet();
         ((TransactionStateImpl) transactionState)
-            .addApplicationStateToRemove(removeId);
+            .addApplicationStateToRemove(removeId, appAttemptsId);
       }
       //      rmContext.getStateStore().removeApplication(removeApp, transactionState);
       completedAppsInStateStore--;
@@ -274,10 +279,15 @@ public class RMAppManager
           " kept in memory met: maxCompletedAppsInMemory = " +
           this.maxCompletedAppsInMemory + ", removing app " + removeId +
           " from memory: ");
-      rmContext.getRMApps().remove(removeId);
+      RMApp removeApp = rmContext.getRMApps().remove(removeId);
       if (transactionState != null) {
+        Set<ApplicationAttemptId> appAttemptsId =
+                new HashSet<ApplicationAttemptId>();
+        if (removeApp != null) {
+          appAttemptsId = removeApp.getAppAttempts().keySet();
+        }
         ((TransactionStateImpl) transactionState)
-            .addApplicationStateToRemove(removeId);
+            .addApplicationStateToRemove(removeId, appAttemptsId);
       }
       this.applicationACLsManager.removeApplication(removeId);
     }
