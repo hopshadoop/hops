@@ -177,7 +177,6 @@ public class TestFileCreation {
   public void testSimple() throws IOException {
     Configuration conf = new HdfsConfiguration();
 
-
     if (simulatedStorage) {
       SimulatedFSDataset.setFactory(conf);
     }
@@ -185,7 +184,7 @@ public class TestFileCreation {
 
     FileSystem fs = cluster.getFileSystem();
     try {
-      for(int i = 0; i < 50; i++) {
+      for(int i = 0; i < 10; i++) {
         // create a new file in home directory. Do not close it.
         Path file = new Path("file_" + i + ".dat");
         FSDataOutputStream stm = createFile(fs, file, 1);
@@ -194,8 +193,8 @@ public class TestFileCreation {
         assertTrue(file + " should be a file", fs.getFileStatus(file).isFile());
 
         // write to file
-        byte[] buffer = AppendTestUtil.randomBytes(seed, blockSize - 10);
-        stm.write(buffer, 0, blockSize - 10);
+        byte[] buffer = AppendTestUtil.randomBytes(seed, blockSize*2);
+        stm.write(buffer, 0, blockSize*2);
 
         stm.close();
       }
