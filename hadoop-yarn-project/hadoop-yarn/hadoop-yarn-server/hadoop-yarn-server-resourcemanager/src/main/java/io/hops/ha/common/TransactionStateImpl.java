@@ -127,8 +127,10 @@ public class TransactionStateImpl extends TransactionState {
   private final SchedulerApplicationInfo schedulerApplicationInfo;
   private final Map<ApplicationId, ApplicationState> applicationsToAdd = 
           new ConcurrentHashMap<ApplicationId, ApplicationState>();
-  private final Map<ApplicationId, List<UpdatedNode>> updatedNodeIdToAdd = 
-          new ConcurrentHashMap<ApplicationId, List<UpdatedNode>>();
+  private final Map<ApplicationId, Set<String>> updatedNodeIdToAdd = 
+          new ConcurrentHashMap<ApplicationId, Set<String>>();
+  private final Map<ApplicationId, Set<String>> updatedNodeIdToRemove = 
+          new ConcurrentHashMap<ApplicationId, Set<String>>();
   private final Queue<ApplicationId> applicationsStateToRemove =
       new ConcurrentLinkedQueue<ApplicationId>();
   private final Map<String, ApplicationAttemptState> appAttempts =
@@ -221,6 +223,8 @@ public class TransactionStateImpl extends TransactionState {
     persistRMContainersToRemove();
     persistContainersToAdd();
     persistContainersToRemove();
+    persistUpdatedNodeToAdd();
+    persistUpdatedNodeToRemove();
   }
 
   public void persistSchedulerApplicationInfo(QueueMetricsDataAccess QMDA, StorageConnector connector)
@@ -329,13 +333,6 @@ public class TransactionStateImpl extends TransactionState {
                   appStateDataBytes, app.getUser(), app.getName(),
                   app.getState().toString());
     applicationsToAdd.put(app.getApplicationId(), hop);
-    List<UpdatedNode> nodeIdsToAdd = new ArrayList<UpdatedNode>();
-    for(NodeId nid: app.getUpdatedNodesId()){
-      UpdatedNode node = new UpdatedNode(app.getApplicationId().toString(),
-               nid.toString());
-      nodeIdsToAdd.add(node);
-    }
-    updatedNodeIdToAdd.put(app.getApplicationId(), nodeIdsToAdd);
     applicationsStateToRemove.remove(app.getApplicationId());
     callsAddApplicationToAdd++;
     appIds.add(app.getApplicationId());
@@ -347,17 +344,13 @@ public class TransactionStateImpl extends TransactionState {
           (ApplicationStateDataAccess) RMStorageFactory
               .getDataAccess(ApplicationStateDataAccess.class);
       DA.addAll(applicationsToAdd.values());
-      UpdatedNodeDataAccess uNDA = (UpdatedNodeDataAccess)RMStorageFactory
-              .getDataAccess(UpdatedNodeDataAccess.class);
-      uNDA.addAll(updatedNodeIdToAdd.values());
     }
   }
   
   public static int callsAddApplicationStateToRemove = 0;
   public void addApplicationToRemove(ApplicationId appId) {
     if(applicationsToAdd.remove(appId)==null){
-    updatedNodeIdToAdd.remove(appId);
-    applicationsStateToRemove.add(appId);
+      applicationsStateToRemove.add(appId);
     }
     callsAddApplicationStateToRemove++;
     appIds.add(appId);
@@ -500,6 +493,62 @@ public class TransactionStateImpl extends TransactionState {
     }
   }
   
+  public void addUpdatedNodeToRemove(ApplicationId appId,
+          Set<org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode> updatedNodes) {
+    Set<String> nodeIdsToRemove = updatedNodeIdToRemove.get(appId);
+    if (nodeIdsToRemove == null) {
+      nodeIdsToRemove = new HashSet<String>();
+      updatedNodeIdToRemove.put(appId, nodeIdsToRemove);
+    }
+    for (org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode node
+            : updatedNodes) {
+      if (updatedNodeIdToAdd.get(appId) == null || !updatedNodeIdToAdd.
+              get(appId).remove(node.getNodeID().toString())) {
+        nodeIdsToRemove.add(node.getNodeID().toString());
+      }
+      nodesIds.add(node.getNodeID());
+    }
+    updatedNodeIdToRemove.put(appId, nodeIdsToRemove);
+  }
+  
+  public void addUpdatedNodeToAdd(ApplicationId appId,org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode updatedNode){
+    Set<String> nodeIdsToAdd = updatedNodeIdToAdd.get(appId);
+    if(nodeIdsToAdd==null){
+        nodeIdsToAdd = new HashSet<String>();
+        updatedNodeIdToAdd.put(appId, nodeIdsToAdd);
+    }
+    
+    nodeIdsToAdd.add(updatedNode.getNodeID().toString());
+    nodesIds.add(updatedNode.getNodeID());
+    if(updatedNodeIdToRemove.get(appId)!=null){
+        updatedNodeIdToRemove.get(appId).remove(updatedNode.getNodeID().toString());
+    }
+    updatedNodeIdToAdd.put(appId, nodeIdsToAdd);
+  }
+  
+  private void persistUpdatedNodeToAdd() throws StorageException{
+      UpdatedNodeDataAccess uNDA = (UpdatedNodeDataAccess)RMStorageFactory
+              .getDataAccess(UpdatedNodeDataAccess.class);
+      List<UpdatedNode> toAdd = new ArrayList<UpdatedNode>();
+      for(ApplicationId appId: updatedNodeIdToAdd.keySet()){
+          for(String nodeId: updatedNodeIdToAdd.get(appId)){
+              toAdd.add(new UpdatedNode(appId.toString(), nodeId));
+          }
+      }
+      uNDA.addAll(toAdd);
+  }
+  
+  private void persistUpdatedNodeToRemove() throws StorageException{
+      UpdatedNodeDataAccess uNDA = (UpdatedNodeDataAccess)RMStorageFactory
+              .getDataAccess(UpdatedNodeDataAccess.class);
+      List<UpdatedNode> toRemove = new ArrayList<UpdatedNode>();
+      for(ApplicationId appId: updatedNodeIdToRemove.keySet()){
+          for(String nodeId: updatedNodeIdToRemove.get(appId)){
+              toRemove.add(new UpdatedNode(appId.toString(), nodeId));
+          }
+      }
+      uNDA.removeAll(toRemove);
+  }
   
   public void addAllocateResponse(ApplicationAttemptId id,
           AllocateResponseLock allocateResponse) {

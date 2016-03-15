@@ -90,7 +90,7 @@ public class ParentQueue implements CSQueue {
 
   private QueueState state;//from conf
 
-  private final QueueMetrics metrics;//TORECOVER
+  private final QueueMetrics metrics;//recovered
 
   private QueueInfo queueInfo; //in constructor
 
