@@ -194,6 +194,8 @@ class HeartbeatManager implements DatanodeStatistics {
   }
 
   synchronized void addDatanode(final DatanodeDescriptor d) {
+    // update in-service node count
+    stats.add(d);
     datanodes.add(d);
     d.isAlive = true;
   }
