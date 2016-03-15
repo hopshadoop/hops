@@ -2075,7 +2075,8 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
     long localstart = Time.now();
     boolean fileComplete = false;
     while (!fileComplete) {
-      fileComplete = dfsClient.complete(src, dfsClient.clientName, last);
+      fileComplete = dfsClient.complete(src, dfsClient.clientName,
+          last);
       if (!fileComplete) {
         if (!dfsClient.clientRunning || (dfsClient.hdfsTimeout > 0 &&
             localstart + dfsClient.hdfsTimeout < Time.now())) {

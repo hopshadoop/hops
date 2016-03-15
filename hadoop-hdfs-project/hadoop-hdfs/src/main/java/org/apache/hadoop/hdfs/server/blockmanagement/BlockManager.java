@@ -2181,7 +2181,7 @@ public class BlockManager {
                     Block iblk = blks[index];
                     ReplicaState iState = blksStates[index];
                     BlockInfo storedBlock =
-                            processReportedBlockOptimizedForBlkRepts(storage, 
+                            processReportedBlockOptimizedForBlkRepts(storage,
                                 iblk, iState, toAdd, toInvalidate,
                             toCorrupt, toUC, safeBlocks, firstBlockReport,
                             allMachineBlocks.contains(iblk.getBlockId()), invalidatedReplicas);
@@ -2285,7 +2285,7 @@ public class BlockManager {
     
     // Block is on the NN
     if (LOG.isDebugEnabled()) {
-      LOG.debug("In memory blockUCState = " + ucState);
+      LOG.debug("In memory blockUCState = " + ucState + " bid=" + storedBlock.getBlockIndex());
     }
 
     if (!firstBlockReport) {
@@ -2364,7 +2364,7 @@ public class BlockManager {
     
     // Block is on the NN
     if (LOG.isDebugEnabled()) {
-      LOG.debug("In memory blockUCState = " + ucState);
+      LOG.debug("In memory blockUCState = " + ucState + " bid=" + storedBlock.getBlockIndex());
     }
 
     if (!firstBlockReport) {

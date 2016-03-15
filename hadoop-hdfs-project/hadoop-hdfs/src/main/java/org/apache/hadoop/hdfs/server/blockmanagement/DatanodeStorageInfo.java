@@ -243,53 +243,26 @@ public class DatanodeStorageInfo {
     storageType = storage.getStorageType();
   }
 
-  public boolean addBlock(BlockInfo b) {
-    try {
-      return b.addReplica(this) != null;
-    } catch (StorageException e) {
-      // TODO how should we handle these exceptions?
-      e.printStackTrace();
-    } catch (TransactionContextException e) {
-      // TODO how should we handle these exceptions?
-      e.printStackTrace();
-    }
-    return false;
+  public boolean addBlock(BlockInfo b)
+      throws TransactionContextException, StorageException {
+    return b.addReplica(this) != null;
   }
 
-  public boolean removeBlock(BlockInfo b) {
-//    blockList = b.listRemove(blockList, this);
-//    return b.removeStorage(this);
-    try {
-      return b.removeReplica(this) != null;
-    } catch (StorageException e) {
-      // TODO how should we handle these exceptions?
-      e.printStackTrace();
-    } catch (TransactionContextException e) {
-      // TODO how should we handle these exceptions?
-      e.printStackTrace();
-    }
-    return false;
+  public boolean removeBlock(BlockInfo b)
+      throws TransactionContextException, StorageException {
+    return b.removeReplica(this) != null;
   }
 
-  public int numBlocks() {
-    int numBlocks = -1;
-
-    try {
-      numBlocks = (Integer) new LightWeightRequestHandler(
-          HDFSOperationType.COUNT_REPLICAS_ON_NODE) {
-        @Override
-        public Object performTask() throws StorageException, IOException {
-          ReplicaDataAccess da = (ReplicaDataAccess) HdfsStorageFactory
-              .getDataAccess(ReplicaDataAccess.class);
-          return da.countAllReplicasForStorageId(getSid());
-        }
-      }.handle();
-    } catch (IOException e) {
-      // TODO again: what do we do with the exceptions? (/where)
-      e.printStackTrace();
-    }
-
-    return numBlocks;
+  public int numBlocks() throws IOException {
+    return (Integer) new LightWeightRequestHandler(
+        HDFSOperationType.COUNT_REPLICAS_ON_NODE) {
+      @Override
+      public Object performTask() throws StorageException, IOException {
+        ReplicaDataAccess da = (ReplicaDataAccess) HdfsStorageFactory
+            .getDataAccess(ReplicaDataAccess.class);
+        return da.countAllReplicasForStorageId(getSid());
+      }
+    }.handle();
   }
   
   public void updateState(StorageReport r) {

@@ -230,7 +230,8 @@ public class DatanodeDescriptor extends DatanodeInfo {
   /**
    * Add block to the storage. Return true on success.
    */
-  public boolean addBlock(String storageID, BlockInfo b) {
+  public boolean addBlock(String storageID, BlockInfo b)
+      throws TransactionContextException, StorageException {
     DatanodeStorageInfo s = getStorageInfo(storageID);
     if(s != null) {
       return s.addBlock(b);
@@ -405,13 +406,18 @@ public class DatanodeDescriptor extends DatanodeInfo {
       // For each remaining storage, remove it if there are no associated
       // blocks.
       for (final DatanodeStorageInfo storageInfo : excessStorages.values()) {
-        if (storageInfo.numBlocks() == 0) {
-          storageMap.remove(storageInfo.getStorageID());
-          LOG.info("Removed storage " + storageInfo + " from DataNode" + this);
-        } else if (LOG.isDebugEnabled()) {
-          // This can occur until all block reports are received.
-          LOG.debug("Deferring removal of stale storage " + storageInfo +
-              " with " + storageInfo.numBlocks() + " blocks");
+        try {
+          if (storageInfo.numBlocks() == 0) {
+            storageMap.remove(storageInfo.getStorageID());
+            LOG.info("Removed storage " + storageInfo + " from DataNode" + this);
+          } else if (LOG.isDebugEnabled()) {
+            // This can occur until all block reports are received.
+            LOG.debug("Deferring removal of stale storage " + storageInfo +
+                " with " + storageInfo.numBlocks() + " blocks");
+          }
+        } catch (IOException e) {
+          // Skip for a bit
+          e.printStackTrace();
         }
       }
     }
