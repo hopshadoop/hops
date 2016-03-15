@@ -185,31 +185,17 @@ public class TestFileCreation {
 
     FileSystem fs = cluster.getFileSystem();
     try {
-      // Do the real stuff in here...
-      String[] filenames = {
-          "file1.dat",
-          "file2.dat",
-          "file3.dat",
-          "data/test.dat",
-          "data/test2.dat"
-      };
-
-      for(String filename : filenames) {
+      for(int i = 0; i < 50; i++) {
         // create a new file in home directory. Do not close it.
-        Path file = new Path(filename);
-        Path parent = file.getParent();
-        fs.mkdirs(parent);
-        DistributedFileSystem dfs = (DistributedFileSystem) fs;
-        dfs.setQuota(file.getParent(), 100L, blockSize * 500);
+        Path file = new Path("file_" + i + ".dat");
         FSDataOutputStream stm = createFile(fs, file, 1);
 
         // verify that file exists in FS namespace
         assertTrue(file + " should be a file", fs.getFileStatus(file).isFile());
 
         // write to file
-        // writeFile(stm);
-        byte[] buffer = AppendTestUtil.randomBytes(seed, fileSize*10);
-        stm.write(buffer, 0, fileSize*10);
+        byte[] buffer = AppendTestUtil.randomBytes(seed, blockSize - 10);
+        stm.write(buffer, 0, blockSize - 10);
 
         stm.close();
       }
