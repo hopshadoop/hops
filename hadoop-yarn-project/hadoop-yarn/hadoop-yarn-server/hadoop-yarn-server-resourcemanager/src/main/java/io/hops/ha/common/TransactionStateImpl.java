@@ -61,9 +61,10 @@ import io.hops.metadata.yarn.entity.rmstatestore.RanNode;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.AllocateResponsePBImpl;
-import org.apache.hadoop.yarn.api.records.*;
+import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
+import org.apache.hadoop.yarn.api.records.ApplicationId;
+import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.server.resourcemanager.ApplicationMasterService.AllocateResponseLock;
-import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.impl.pb.ApplicationAttemptStateDataPBImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.impl.pb.ApplicationStateDataPBImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppImpl;
@@ -73,11 +74,19 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeImpl;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.Collection;
+import java.util.Map;
+import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentSkipListMap;
-
+import org.apache.commons.lang.StringUtils;
+import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.impl.pb.ContainerPBImpl;
 import org.apache.hadoop.yarn.api.records.impl.pb.ContainerStatusPBImpl;
 
@@ -529,7 +538,13 @@ public class TransactionStateImpl extends TransactionState {
       
       Map<String, byte[]> completedContainersStatuses = new HashMap<String, byte[]>();
       for(ContainerStatus status: lastResponse.getCompletedContainersStatuses()){
-        completedContainersStatuses.put(status.getContainerId().toString(), ((ContainerStatusPBImpl)status).getProto().toByteArray());
+             ContainerStatus toPersist = status;
+        if(status.getDiagnostics().length()>1000){
+          toPersist = new ContainerStatusPBImpl(((ContainerStatusPBImpl)status).getProto());
+          toPersist.setDiagnostics(StringUtils.abbreviate(status.getDiagnostics(), 1000));
+        }
+        completedContainersStatuses.put(status.getContainerId().toString(),
+                ((ContainerStatusPBImpl)toPersist).getProto().toByteArray());
       }
       
       AllocateResponsePBImpl toPersist = new AllocateResponsePBImpl();
@@ -669,7 +684,7 @@ public class TransactionStateImpl extends TransactionState {
     appIds.add(appId);
     nodesIds.add(container.getNodeId());
   }
-
+  
   
   public synchronized void addRMContainerToRemove(
           org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer rmContainer) {
