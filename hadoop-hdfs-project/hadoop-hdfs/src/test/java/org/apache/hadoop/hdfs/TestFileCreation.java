@@ -177,24 +177,28 @@ public class TestFileCreation {
   public void testSimple() throws IOException {
     Configuration conf = new HdfsConfiguration();
 
+    final int NUM_FILES = 2;
+    final int NUM_BLOCKS_PER_FILE = 5;
+    final int NUM_REPLICAS = 1;
+
     if (simulatedStorage) {
       SimulatedFSDataset.setFactory(conf);
     }
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).build();
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(NUM_REPLICAS).build();
 
     FileSystem fs = cluster.getFileSystem();
     try {
-      for(int i = 0; i < 10; i++) {
+      for(int i = 0; i < NUM_FILES; i++) {
         // create a new file in home directory. Do not close it.
         Path file = new Path("file_" + i + ".dat");
-        FSDataOutputStream stm = createFile(fs, file, 1);
+        FSDataOutputStream stm = createFile(fs, file, NUM_REPLICAS);
 
         // verify that file exists in FS namespace
         assertTrue(file + " should be a file", fs.getFileStatus(file).isFile());
 
         // write to file
-        byte[] buffer = AppendTestUtil.randomBytes(seed, blockSize*2);
-        stm.write(buffer, 0, blockSize*2);
+        byte[] buffer = AppendTestUtil.randomBytes(seed, blockSize*NUM_BLOCKS_PER_FILE);
+        stm.write(buffer, 0, blockSize*NUM_BLOCKS_PER_FILE);
 
         stm.close();
       }

@@ -500,17 +500,23 @@ public class BlockManager {
 
     NumberReplicas numReplicas = new NumberReplicas();
     // source node returned is not used
-    chooseSourceDatanode(block, containingNodes, containingLiveReplicasNodes, numReplicas, UnderReplicatedBlocks.LEVEL);
-    assert containingLiveReplicasNodes.size() == numReplicas.liveReplicas();
-    int usableReplicas =
-        numReplicas.liveReplicas() + numReplicas.decommissionedReplicas();
+    chooseSourceDatanode(block, containingNodes,
+        containingLiveReplicasNodes, numReplicas,
+        UnderReplicatedBlocks.LEVEL);
+
+    // containingLiveReplicasNodes can include READ_ONLY_SHARED replicas which are
+    // not included in the numReplicas.liveReplicas() count
+    assert containingLiveReplicasNodes.size() >= numReplicas.liveReplicas();
+    int usableReplicas = numReplicas.liveReplicas() +
+        numReplicas.decommissionedReplicas();
 
     if (block instanceof BlockInfo) {
-      String fileName = ((BlockInfo) block).getBlockCollection().getName();
+      BlockCollection bc = ((BlockInfo) block).getBlockCollection();
+      String fileName = (bc == null) ? "[orphaned]" : bc.getName();
       out.print(fileName + ": ");
     }
     // l: == live:, d: == decommissioned c: == corrupt e: == excess
-    out.print(block + ((usableReplicas > 0) ? "" : " MISSING") +
+    out.print(block + ((usableReplicas > 0)? "" : " MISSING") +
         " (replicas:" +
         " l: " + numReplicas.liveReplicas() +
         " d: " + numReplicas.decommissionedReplicas() +
@@ -520,17 +526,19 @@ public class BlockManager {
     Collection<DatanodeDescriptor> corruptNodes =
         corruptReplicas.getNodes(getBlockInfo(block));
 
-    for (Iterator<DatanodeDescriptor> jt = blocksMap.nodeIterator(block);
-         jt.hasNext(); ) {
-      DatanodeDescriptor node = jt.next();
+    Iterator<DatanodeStorageInfo> iter = blocksMap.storageIterator(block);
+    while (iter.hasNext()) {
+      DatanodeStorageInfo storage = iter.next();
+      final DatanodeDescriptor node = storage.getDatanodeDescriptor();
       String state = "";
       if (corruptNodes != null && corruptNodes.contains(node)) {
         state = "(corrupt)";
-      } else if (node.isDecommissioned() || node.isDecommissionInProgress()) {
+      } else if (node.isDecommissioned() ||
+          node.isDecommissionInProgress()) {
         state = "(decommissioned)";
       }
 
-      if (node.areBlockContentsStale()) {
+      if (storage.areBlockContentsStale()) {
         state += " (block deletions maybe out of date)";
       }
       out.print(" " + node + state + " : ");
@@ -1812,7 +1820,7 @@ public class BlockManager {
    * The given storage is reporting all its blocks.
    * Update the (storage-->block list) and (block-->storage list) maps.
    */
-  public void processReport(final DatanodeID nodeID,
+  public boolean processReport(final DatanodeID nodeID,
       final DatanodeStorage storage,
       final BlockListAsLongs newReport) throws IOException {
 
@@ -1836,7 +1844,7 @@ public class BlockManager {
       blockLog.info("BLOCK* processReport: " +
           "discarded non-initial block report from " + nodeID +
           " because namenode still in startup phase");
-      return;
+      return !node.hasStaleStorages();
     }
 
     if (storageInfo.getBlockReportCount() == 0) {
@@ -1844,15 +1852,13 @@ public class BlockManager {
       // ordinary block reports.  This shortens restart times.
       processFirstBlockReport(storageInfo, newReport);
     } else {
-      processReport(node, storageInfo, newReport);
+      processReport(storageInfo, newReport);
     }
 
     // Now that we have an up-to-date block report, we know that any
     // deletions from a previous NN iteration have been accounted for.
     boolean staleBefore = storageInfo.areBlockContentsStale();
 
-    // TODO we'll want to remove the whole blockreport counting in the node...
-    node.receivedBlockReport();
     storageInfo.receivedBlockReport();
 
     if (staleBefore && !storageInfo.areBlockContentsStale()) {
@@ -1871,8 +1877,11 @@ public class BlockManager {
       metrics.addBlockReport((int) (endTime - startTime));
     }
     blockLog.info("BLOCK* processReport: from storage " + storage.getStorageID()
-        + " node " + nodeID + ", blocks: " + newReport.getNumberOfBlocks()
+        + ", node " + nodeID
+        + ", blocks: " + newReport.getNumberOfBlocks()
+        + ", hasStaleStorages: " + node.hasStaleStorages()
         + ", processing time: " + (endTime - startTime) + " msecs");
+    return !node.hasStaleStorages();
   }
 
   /**
@@ -1940,7 +1949,6 @@ public class BlockManager {
   }
 
   private void processReport(
-      final DatanodeDescriptor node,
       final DatanodeStorageInfo storage,
       final BlockListAsLongs report) throws
       IOException {
@@ -1954,11 +1962,15 @@ public class BlockManager {
     Collection<BlockToMarkCorrupt> toCorrupt =
         new HashSet<BlockToMarkCorrupt>();
     Collection<StatefulBlockInfo> toUC = new HashSet<StatefulBlockInfo>();
-    
+
     final boolean firstBlockReport =
-        namesystem.isInStartupSafeMode() && node.isFirstBlockReport();
+        namesystem.isInStartupSafeMode() && storage.getBlockReportCount() > 0;
     reportDiff(storage, report, toAdd, toRemove, toInvalidate, toCorrupt,
         toUC, firstBlockReport);
+
+    // TODO why do we have the if/else here?
+    // This function only gets called once, and when it gets called, we
+    // already know that it's *NOT* the first blockreport for this storage...
 
     // Process the blocks on each queue
     for (StatefulBlockInfo b : toUC) {
@@ -1983,7 +1995,7 @@ public class BlockManager {
 
     if (!firstBlockReport) {
       for (Block b : toInvalidate) {
-        blockLog.info("BLOCK* processReport: " + b + " on " + node + " " +
+        blockLog.info("BLOCK* processReport: " + b + " on " + storage + " " +
             storage + " size " + b.getNumBytes() +
             " does not belong to any file");
       }
@@ -3011,14 +3023,13 @@ public class BlockManager {
     Collection<DatanodeStorageInfo> nonExcess = new ArrayList<DatanodeStorageInfo>();
     Collection<DatanodeDescriptor> corruptNodes = corruptReplicas.getNodes(getBlockInfo(block));
 
-    for (Iterator<DatanodeStorageInfo> it = blocksMap.storageIterator(block); it
-        .hasNext();) {
+    for (Iterator<DatanodeStorageInfo> it = blocksMap.storageIterator(block); it.hasNext();) {
       DatanodeStorageInfo storage = it.next();
       final DatanodeDescriptor cur = storage.getDatanodeDescriptor();
 
-      if (cur.areBlockContentsStale()) {
+      if (storage.areBlockContentsStale()) {
         LOG.info("BLOCK* processOverReplicatedBlock: Postponing processing of over-replicated " +
-            block + " since datanode " + cur +
+            block + " since storage " + storage +
             " does not yet have up-to-date block information.");
         postponeBlock(block);
         return;

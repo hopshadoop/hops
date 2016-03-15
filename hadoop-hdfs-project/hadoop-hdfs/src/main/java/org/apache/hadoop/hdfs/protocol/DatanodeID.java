@@ -54,8 +54,12 @@ public class DatanodeID implements Comparable<DatanodeID> {
   private String datanodeUuid = null;
 
   public DatanodeID(DatanodeID from) {
-    this(from.getIpAddr(), from.getHostName(), from.getDatanodeUuid(),
-        from.getXferPort(), from.getInfoPort(), from.getIpcPort());
+    this(from.getIpAddr(),
+        from.getHostName(),
+        from.getDatanodeUuid(),
+        from.getXferPort(),
+        from.getInfoPort(),
+        from.getIpcPort());
     this.peerHostName = from.getPeerHostName();
   }
   
@@ -104,10 +108,6 @@ public class DatanodeID implements Comparable<DatanodeID> {
     this.peerHostName = peerHostName;
   }
   
-  public void setDatanodeUuid(String datandodeUuid) {
-    this.datanodeUuid = datandodeUuid;
-  }
-
   /**
    * @return ipAddr;
    */

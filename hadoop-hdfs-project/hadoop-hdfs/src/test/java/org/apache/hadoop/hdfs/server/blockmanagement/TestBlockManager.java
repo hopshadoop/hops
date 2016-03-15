@@ -383,7 +383,7 @@ public class TestBlockManager {
             BlockManagerTestUtil.getDatanodeDescriptor("5.5.5.5", "/rackA", true),
             BlockManagerTestUtil.getDatanodeDescriptor("6.6.6.6", "/rackA", true));
     for (int i = 0; i < nodes.size(); i++) {
-      nodes.get(i).setDatanodeUuid("DN-Name-" + i);
+      nodes.get(i).setDatanodeUuidForTesting("DN-Name-" + i);
     }
     addNodes(nodes);
     List<DatanodeDescriptor> origNodes = nodes.subList(0, 3);

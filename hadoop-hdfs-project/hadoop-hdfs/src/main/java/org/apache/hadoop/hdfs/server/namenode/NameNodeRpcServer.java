@@ -832,16 +832,18 @@ class NameNodeRpcServer implements NamenodeProtocols {
     }
 
     final BlockManager bm = namesystem.getBlockManager();
+    boolean noStaleStorages = false;
     for(StorageBlockReport r : reports) {
       final BlockListAsLongs blocks = new BlockListAsLongs(r.getBlocks());
-      bm.processReport(nodeReg, r.getStorage(), blocks);
+      noStaleStorages = bm.processReport(nodeReg, r.getStorage(), blocks);
       metrics.incrStorageBlockReportOps();
     }
 
-    DatanodeDescriptor datanode = bm.getDatanodeManager().getDatanode(nodeReg);
-    datanode.receivedBlockReport();
-
-    return new FinalizeCommand(poolId);
+    if(noStaleStorages) {
+      return new FinalizeCommand(poolId);
+    } else {
+      return null;
+    }
   }
 
   @Override // DatanodeProtocol
