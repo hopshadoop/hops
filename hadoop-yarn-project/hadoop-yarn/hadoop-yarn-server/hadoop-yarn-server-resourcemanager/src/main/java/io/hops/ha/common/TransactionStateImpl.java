@@ -25,6 +25,7 @@ import io.hops.metadata.yarn.dal.ContainerIdToCleanDataAccess;
 import io.hops.metadata.yarn.dal.ContainerStatusDataAccess;
 import io.hops.metadata.yarn.dal.FiCaSchedulerNodeDataAccess;
 import io.hops.metadata.yarn.dal.FinishedApplicationsDataAccess;
+import io.hops.metadata.yarn.dal.JustFinishedContainersDataAccess;
 import io.hops.metadata.yarn.dal.JustLaunchedContainersDataAccess;
 import io.hops.metadata.yarn.dal.LaunchedContainersDataAccess;
 import io.hops.metadata.yarn.dal.NodeDataAccess;
@@ -47,6 +48,7 @@ import io.hops.metadata.yarn.dal.rmstatestore.UpdatedNodeDataAccess;
 import io.hops.metadata.yarn.entity.Container;
 import io.hops.metadata.yarn.entity.FiCaSchedulerNode;
 import io.hops.metadata.yarn.entity.FiCaSchedulerNodeInfos;
+import io.hops.metadata.yarn.entity.JustFinishedContainer;
 import io.hops.metadata.yarn.entity.LaunchedContainers;
 import io.hops.metadata.yarn.entity.PendingEvent;
 import io.hops.metadata.yarn.entity.RMContainer;
@@ -84,6 +86,8 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentSkipListMap;
+import org.apache.commons.lang.StringUtils;
+import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.impl.pb.ContainerPBImpl;
 import org.apache.hadoop.yarn.api.records.impl.pb.ContainerStatusPBImpl;
@@ -143,10 +147,10 @@ public class TransactionStateImpl extends TransactionState {
   private final Map<ApplicationAttemptId, AllocateResponse> allocateResponsesToRemove =
       new ConcurrentHashMap<ApplicationAttemptId, AllocateResponse>();
   
-  private final Map<String, Queue<byte[]>> justFinishedContainerToAdd = 
-          new ConcurrentHashMap<String, Queue<byte[]>>();
-  private final Map<String, Queue<byte[]>> justFinishedContainerToRemove = 
-          new ConcurrentHashMap<String, Queue<byte[]>>();
+  private final Map<ContainerId, JustFinishedContainer> justFinishedContainerToAdd = 
+          new ConcurrentHashMap<ContainerId, JustFinishedContainer>();
+  private final Map<ContainerId, JustFinishedContainer> justFinishedContainerToRemove = 
+          new ConcurrentHashMap<ContainerId, JustFinishedContainer>();
   
   
   //COMTEXT
@@ -225,6 +229,8 @@ public class TransactionStateImpl extends TransactionState {
     persistContainersToRemove();
     persistUpdatedNodeToAdd();
     persistUpdatedNodeToRemove();
+    persistJustFinishedContainersToAdd();
+    persistJustFinishedContainersToRemove();
   }
 
   public void persistSchedulerApplicationInfo(QueueMetricsDataAccess QMDA, StorageConnector connector)
@@ -354,6 +360,7 @@ public class TransactionStateImpl extends TransactionState {
     }
     callsAddApplicationStateToRemove++;
     appIds.add(appId);
+    //TODO remove JustFinishedContainers when removing appAttempt (to be done when merging with branch that remove foreign keys)
   }
 
   private void persistApplicationStateToRemove() throws StorageException {
@@ -393,7 +400,7 @@ public class TransactionStateImpl extends TransactionState {
                     appAttempt.getMasterContainer(), appAttemptTokens,
                     appAttempt.getStartTime(), appAttempt.
                     getState(), appAttempt.getOriginalTrackingUrl(),
-                    appAttempt.getDiagnostics(),
+                    StringUtils.abbreviate(appAttempt.getDiagnostics(),1000),
                     appAttempt.getFinalApplicationStatus(),
                     new HashSet<NodeId>(),
                     new ArrayList<ContainerStatus>(),
@@ -403,7 +410,7 @@ public class TransactionStateImpl extends TransactionState {
     byte[] attemptStateByteArray = attemptStateData.getProto().toByteArray();
     if(attemptStateByteArray.length > 13000){
       LOG.error("application Attempt State too big: " + appAttempt.getAppAttemptId() + " " + appAttemptTokens.array().length + " " + 
-              appAttempt.getDiagnostics().getBytes().length + " " + appAttempt.getRanNodes().size() + " " + appAttempt.getJustFinishedContainers().size() +
+              appAttempt.getDiagnostics().getBytes().length + " " +
               " ");
     }
     this.appAttempts.put(appAttempt.getAppAttemptId().toString(),
@@ -416,39 +423,53 @@ public class TransactionStateImpl extends TransactionState {
     appIds.add(appAttempt.getAppAttemptId().getApplicationId());
   }
   
-  
-  public void addAllJustFinishedContainersToAdd(List<ContainerStatus> status, ApplicationAttemptId appAttemptId){
-    Queue<byte[]> toAdd = justFinishedContainerToAdd.get(appAttemptId.toString());
-    if(toAdd == null){
-      toAdd = new ConcurrentLinkedQueue<byte[]>();
-      justFinishedContainerToAdd.put(appAttemptId.toString(), toAdd);
+  public void addAllJustFinishedContainersToAdd(List<ContainerStatus> status,
+          ApplicationAttemptId appAttemptId) {
+    for (ContainerStatus container : status) {
+      addJustFinishedContainerToAdd(container, appAttemptId);
     }
-    for(ContainerStatus container: status){
-      toAdd.add(((ContainerStatusPBImpl)container).getProto().toByteArray());
-    }
+  }
+
+  public void addJustFinishedContainerToAdd(ContainerStatus status,
+          ApplicationAttemptId appAttemptId) {
+    justFinishedContainerToRemove.remove(status.getContainerId());
+    justFinishedContainerToAdd.put(status.getContainerId(),
+            new JustFinishedContainer(status.getContainerId().toString(),
+                    appAttemptId.toString(), ((ContainerStatusPBImpl) status).
+                    getProto().toByteArray()));
     appIds.add(appAttemptId.getApplicationId());
   }
   
-  public void addJustFinishedContainerToAdd(ContainerStatus status, ApplicationAttemptId appAttemptId){
-    Queue<byte[]> toAdd = justFinishedContainerToAdd.get(appAttemptId.toString());
-    if(toAdd == null){
-      toAdd = new ConcurrentLinkedQueue<byte[]>();
-      justFinishedContainerToAdd.put(appAttemptId.toString(), toAdd);
+  private void persistJustFinishedContainersToAdd() throws StorageException{
+    if (!justFinishedContainerToAdd.isEmpty()) {
+      JustFinishedContainersDataAccess jfcDA
+              = (JustFinishedContainersDataAccess) RMStorageFactory.
+              getDataAccess(JustFinishedContainersDataAccess.class);
+      jfcDA.addAll(justFinishedContainerToAdd.values());
     }
-    toAdd.add(((ContainerStatusPBImpl)status).getProto().toByteArray());
-    appIds.add(appAttemptId.getApplicationId());
   }
   
-    public void addAllJustFinishedContainersToRemove(List<ContainerStatus> status, ApplicationAttemptId appAttemptId){
-    Queue<byte[]> toRemove = justFinishedContainerToRemove.get(appAttemptId.toString());
-    if(toRemove == null){
-      toRemove = new ConcurrentLinkedQueue<byte[]>();
-      justFinishedContainerToRemove.put(appAttemptId.toString(), toRemove);
+  public void addAllJustFinishedContainersToRemove(List<ContainerStatus> status,
+          ApplicationAttemptId appAttemptId) {
+    for (ContainerStatus container : status) {
+      if (justFinishedContainerToAdd.remove(container.getContainerId()) == null) {
+        justFinishedContainerToRemove.put(container.getContainerId(),
+                new JustFinishedContainer(container.getContainerId().toString(),
+                        appAttemptId.toString(),
+                        ((ContainerStatusPBImpl) container).getProto().
+                        toByteArray()));
+        appIds.add(appAttemptId.getApplicationId());
+      }
     }
-    for(ContainerStatus container: status){
-      toRemove.add(((ContainerStatusPBImpl)container).getProto().toByteArray());
+  }
+    
+  private void persistJustFinishedContainersToRemove() throws StorageException{
+    if (!justFinishedContainerToRemove.isEmpty()) {
+      JustFinishedContainersDataAccess jfcDA
+              = (JustFinishedContainersDataAccess) RMStorageFactory.
+              getDataAccess(JustFinishedContainersDataAccess.class);
+      jfcDA.removeAll(justFinishedContainerToRemove.values());
     }
-    appIds.add(appAttemptId.getApplicationId());
   }
   
   public void addAllRanNodes(RMAppAttempt appAttempt) {

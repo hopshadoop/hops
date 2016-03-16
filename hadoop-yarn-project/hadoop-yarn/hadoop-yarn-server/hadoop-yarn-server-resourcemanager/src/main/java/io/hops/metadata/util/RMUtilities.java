@@ -31,6 +31,7 @@ import io.hops.metadata.yarn.dal.FiCaSchedulerAppSchedulingOpportunitiesDataAcce
 import io.hops.metadata.yarn.dal.FiCaSchedulerNodeDataAccess;
 import io.hops.metadata.yarn.dal.FinishedApplicationsDataAccess;
 import io.hops.metadata.yarn.dal.FullRMNodeDataAccess;
+import io.hops.metadata.yarn.dal.JustFinishedContainersDataAccess;
 import io.hops.metadata.yarn.dal.JustLaunchedContainersDataAccess;
 import io.hops.metadata.yarn.dal.LaunchedContainersDataAccess;
 import io.hops.metadata.yarn.dal.NextHeartbeatDataAccess;
@@ -75,6 +76,7 @@ import io.hops.metadata.yarn.entity.FiCaSchedulerAppLastScheduledContainer;
 import io.hops.metadata.yarn.entity.FiCaSchedulerAppSchedulingOpportunities;
 import io.hops.metadata.yarn.entity.FiCaSchedulerNode;
 import io.hops.metadata.yarn.entity.FinishedApplications;
+import io.hops.metadata.yarn.entity.JustFinishedContainer;
 import io.hops.metadata.yarn.entity.JustLaunchedContainers;
 import io.hops.metadata.yarn.entity.LaunchedContainers;
 import io.hops.metadata.yarn.entity.Load;
@@ -1471,13 +1473,21 @@ public static Map<String, List<ResourceRequest>> getAllResourceRequestsFullTrans
     return DA.getAll();
   }
 
-   public static Map<String, List<RanNode>> getAllRanNodes()
+  public static Map<String, List<RanNode>> getAllRanNodes()
           throws IOException {
     RanNodeDataAccess DA = (RanNodeDataAccess) RMStorageFactory
             .getDataAccess(RanNodeDataAccess.class);
     return DA.getAll();
   }
-    
+
+  public static Map<String, List<JustFinishedContainer>> getAllJustFinishedContainers()
+          throws IOException {
+    JustFinishedContainersDataAccess DA
+            = (JustFinishedContainersDataAccess) RMStorageFactory
+            .getDataAccess(JustFinishedContainersDataAccess.class);
+    return DA.getAll();
+  }
+
   public static Map<String, List<UpdatedNode>> getAllUpdatedNodes()
           throws IOException {
 
