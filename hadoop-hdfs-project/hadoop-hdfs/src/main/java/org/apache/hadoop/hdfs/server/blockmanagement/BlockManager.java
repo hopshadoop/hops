@@ -1849,7 +1849,7 @@ public class BlockManager {
 
     if (storageInfo.getBlockReportCount() == 0) {
       // The first block report can be processed a lot more efficiently than
-      // ordinary block reports.  This shortens restart times.
+      // ordinary block reports. This shortens restart times.
       processFirstBlockReport(storageInfo, newReport);
     } else {
       processReport(storageInfo, newReport);
@@ -2077,7 +2077,8 @@ public class BlockManager {
               //and fall through to next clause
             }
             //add replica if appropriate
-            if (reportedState == ReplicaState.FINALIZED) {
+            if (reportedState == ReplicaState.FINALIZED
+                && !storedBlock.isReplicatedOnStorage(storageInfo)){
               addStoredBlockImmediate(storedBlock, storageInfo);
             }
             return null;
@@ -2311,9 +2312,8 @@ public class BlockManager {
     }
     
     //add replica if appropriate
-    if (reportedState == ReplicaState.FINALIZED &&
-        storedBlock.isReplicatedOnStorage(storage)) {
-
+    if (reportedState == ReplicaState.FINALIZED
+      && !storedBlock.isReplicatedOnStorage(storage)){
       toAdd.add(storedBlock);
     }
     return storedBlock;

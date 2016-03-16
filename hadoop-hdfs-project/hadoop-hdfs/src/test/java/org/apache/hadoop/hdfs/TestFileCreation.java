@@ -177,7 +177,7 @@ public class TestFileCreation {
   public void testSimple() throws IOException {
     Configuration conf = new HdfsConfiguration();
 
-    final int NUM_FILES = 10;
+    final int NUM_FILES = 3;
     final int NUM_BLOCKS_PER_FILE = 5;
     final int NUM_REPLICAS = 1;
 
@@ -189,6 +189,7 @@ public class TestFileCreation {
     FileSystem fs = cluster.getFileSystem();
     try {
       for(int i = 0; i < NUM_FILES; i++) {
+        FSNamesystem.LOG.debug("Starting file iteration " + i);
         // create a new file in home directory. Do not close it.
         Path file = new Path("file_" + i + ".dat");
         FSDataOutputStream stm = createFile(fs, file, NUM_REPLICAS);
@@ -201,6 +202,8 @@ public class TestFileCreation {
         stm.write(buffer, 0, blockSize*NUM_BLOCKS_PER_FILE);
 
         stm.close();
+
+        FSNamesystem.LOG.debug("Finished file iteration " + i);
       }
     } finally {
       cluster.shutdown();
