@@ -510,5 +510,4 @@ public class BlockInfo extends Block {
       throw new StorageException("Unable to create a clone of the Block");
     }
   }
-
 }

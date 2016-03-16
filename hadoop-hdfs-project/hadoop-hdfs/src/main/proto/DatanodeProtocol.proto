@@ -43,20 +43,6 @@ message DatanodeRegistrationProto {
 }
 
 /**
- * Represents a storage available on the datanode
- */
-message DatanodeStorageProto {
-  enum StorageState {
-    NORMAL = 0;
-    READ_ONLY = 1;
-  }
-
-  required string storageUuid = 1; // Unique identifier for the storage
-  optional StorageState state = 2 [default = NORMAL];
-  optional StorageTypeProto storageType = 3;
-}
-
-/**
  * Commands sent from namenode to the datanodes
  */
 message DatanodeCommandProto {

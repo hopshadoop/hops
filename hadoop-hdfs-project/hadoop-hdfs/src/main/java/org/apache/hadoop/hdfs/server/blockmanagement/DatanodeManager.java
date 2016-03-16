@@ -786,13 +786,6 @@ public class DatanodeManager {
     DatanodeDescriptor nodeDescr = new DatanodeDescriptor(this.storageMap,
         nodeReg, NetworkTopology.DEFAULT_RACK);
 
-    // TODO check if we need this HDP_2.6
-    // Update all storages in this datanode
-//    for(DatanodeStorageInfo storage: getDatanode(nodeDescr.getDatanodeUuid())
-//        .getStorageInfos()) {
-//      storageIdMap.update(storage);
-//    }
-
     resolveNetworkLocation(nodeDescr);
     addDatanode(nodeDescr);
     checkDecommissioning(nodeDescr);
