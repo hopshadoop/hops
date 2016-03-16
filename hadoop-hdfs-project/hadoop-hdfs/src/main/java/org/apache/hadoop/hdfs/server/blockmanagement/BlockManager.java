@@ -2261,8 +2261,8 @@ public class BlockManager {
       final Block block, final ReplicaState reportedState,
       final Collection<BlockInfo> toAdd, final Collection<Block> toInvalidate,
       final Collection<BlockToMarkCorrupt> toCorrupt,
-      final Collection<StatefulBlockInfo> toUC, final Set<Long> safeBlocks,
-      final boolean firstBlockReport, final Boolean replicaAlreadyExists)
+      final Collection<StatefulBlockInfo> toUC,
+      final boolean firstBlockReport)
       throws IOException {
     
     if (LOG.isDebugEnabled()) {
@@ -2278,7 +2278,6 @@ public class BlockManager {
       blockLog.info("BLOCK* processReport: " + block + " on " + storage + " size " +
           block.getNumBytes() + " does not belong to any file");
       toInvalidate.add(new Block(block));
-      safeBlocks.remove(block.getBlockId());
       return null;
     }
     BlockUCState ucState = storedBlock.getBlockUCState();
@@ -2302,30 +2301,20 @@ public class BlockManager {
         checkReplicaCorrupt(block, reportedState, storedBlock, ucState, storage);
     if (c != null) {
       toCorrupt.add(c);
-      safeBlocks.remove(block.getBlockId());
       return storedBlock;
     }
-    
 
     if (isBlockUnderConstruction(storedBlock, ucState, reportedState)) {
       toUC.add(new StatefulBlockInfo((BlockInfoUnderConstruction) storedBlock,
           reportedState));
-      safeBlocks.remove(block.getBlockId());
       return storedBlock;
     }
     
     //add replica if appropriate
-    if (reportedState == ReplicaState.FINALIZED) {
-      if((replicaAlreadyExists == null && storedBlock.isReplicatedOnStorage
-          (storage)) ||
-          (replicaAlreadyExists != null && replicaAlreadyExists)){
-        return storedBlock;
-      }
+    if (reportedState == ReplicaState.FINALIZED &&
+        storedBlock.isReplicatedOnStorage(storage)) {
 
-
-      // TODO -> check this @Bram !
       toAdd.add(storedBlock);
-      safeBlocks.remove(block.getBlockId());
     }
     return storedBlock;
   }
@@ -4436,7 +4425,7 @@ public class BlockManager {
       final Collection<BlockToMarkCorrupt> toCorrupt,
       final Collection<StatefulBlockInfo> toUC) throws IOException {
     return processReportedBlock(storage, block, reportedState, toAdd,
-        toInvalidate, toCorrupt, toUC, new HashSet<Long>(), false, null);
+        toInvalidate, toCorrupt, toUC, false);
   }
 
   public int getTotalCompleteBlocks() throws IOException {
