@@ -95,7 +95,7 @@ public class HopYarnAPIUtilities {
    * @return
    */
   public synchronized static int incrementYarnVariables(final int type,
-          final int increment) {
+          final int increment) throws IOException {
     LightWeightRequestHandler setYarnVariablesHandler =
         new LightWeightRequestHandler(YARNOperationType.TEST) {
           @Override
@@ -121,12 +121,7 @@ public class HopYarnAPIUtilities {
             return null;
           }
         };
-    try {
       return (Integer) setYarnVariablesHandler.handle();
-    } catch (IOException ex) {
-      LOG.error("Error setting YarnVariables", ex);
-    }
-    return Integer.MIN_VALUE;
   }
 
   
@@ -141,7 +136,7 @@ public class HopYarnAPIUtilities {
    * @param type
    * @return
    */
-  public synchronized static int getRPCID() {
+  public synchronized static int getRPCID() throws IOException {
     if (currentRPCID == maxRPCID) {
         currentRPCID = incrementYarnVariables(RPC, idsInterval);
         maxRPCID = currentRPCID + idsInterval;

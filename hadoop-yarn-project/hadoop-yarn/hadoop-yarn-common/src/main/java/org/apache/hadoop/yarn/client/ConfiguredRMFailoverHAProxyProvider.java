@@ -117,21 +117,23 @@ public abstract class ConfiguredRMFailoverHAProxyProvider<T>
     int nbTry = 0;
     do {
       ActiveNode leader = getActiveNode();
-      if (currentRMId == null || !currentRMId.equals(leader.getHostname())) {
-        currentRMId = leader.getHostname();
-        this.currentProxy = getProxyFromActiveNode(leader);
-      } else {
-        this.currentProxy = createProxy(leader);
-        if (this.currentProxy == null) {
-          nbTry++;
-          try {
-            //TODO put base time and max time as parameters
-            Thread.sleep(
-                RetryPolicies.calculateExponentialTime(500, nbTry, 10000));
-          } catch (Exception e) {
-            LOG.error(e);
-          }
+      if (leader != null) {
+        if (currentRMId == null || !currentRMId.equals(leader.getHostname())) {
+          currentRMId = leader.getHostname();
+          this.currentProxy = getProxyFromActiveNode(leader);
+        } else {
+          this.currentProxy = createProxy(leader);
+          if (this.currentProxy == null) {
+            nbTry++;
+            try {
+              //TODO put base time and max time as parameters
+              Thread.sleep(
+                      RetryPolicies.calculateExponentialTime(500, nbTry, 10000));
+            } catch (Exception e) {
+              LOG.error(e);
+            }
 
+          }
         }
       }
     } while (this.currentProxy == null);
