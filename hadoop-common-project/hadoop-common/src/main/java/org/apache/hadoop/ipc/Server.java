@@ -2412,9 +2412,13 @@ public abstract class Server {
             while (!success && nbTry<10) {
               handlers[i].join(10);
               if (handlers[i].isAlive()) {
+                String stack = "";
+                for(StackTraceElement elem: handlers[i].getStackTrace()){
+                  stack = stack + "\n\t" + elem.toString();
+                }
                 LOG.info("server handler not finishing " + port + " thread" + 
-                        handlers[i].getName());
-                handlers[i].stop();
+                        handlers[i].getName() + " " + stack);
+                handlers[i].interrupt();
               }else{
                 success=true;
               }

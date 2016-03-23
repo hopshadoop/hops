@@ -363,7 +363,7 @@ public class TestRMNodeTransitions {
   }
 
   @Test(timeout = 60000)
-  public void testRunningExpire() {
+  public void testRunningExpire() throws IOException {
     RMNodeImpl node = getRunningNode();
     ClusterMetrics cm = ClusterMetrics.getMetrics();
     int initialActive = cm.getNumActiveNMs();
@@ -386,7 +386,7 @@ public class TestRMNodeTransitions {
   }
 
   @Test(timeout = 60000)
-  public void testUnhealthyExpire() {
+  public void testUnhealthyExpire() throws IOException {
     RMNodeImpl node = getUnhealthyNode();
     ClusterMetrics cm = ClusterMetrics.getMetrics();
     int initialActive = cm.getNumActiveNMs();
@@ -408,7 +408,7 @@ public class TestRMNodeTransitions {
   }
 
   @Test(timeout = 60000)
-  public void testUnhealthyExpireForSchedulerRemove() {
+  public void testUnhealthyExpireForSchedulerRemove() throws IOException {
     RMNodeImpl node = getUnhealthyNode();
     verify(scheduler, times(2)).handle(any(NodeRemovedSchedulerEvent.class));
     node.handle(new RMNodeEvent(node.getNodeID(), RMNodeEventType.EXPIRE,
@@ -418,7 +418,7 @@ public class TestRMNodeTransitions {
   }
 
   @Test(timeout = 60000)
-  public void testRunningDecommission() {
+  public void testRunningDecommission() throws IOException {
     RMNodeImpl node = getRunningNode();
     ClusterMetrics cm = ClusterMetrics.getMetrics();
     int initialActive = cm.getNumActiveNMs();
@@ -441,7 +441,7 @@ public class TestRMNodeTransitions {
   }
 
   @Test(timeout = 60000)
-  public void testUnhealthyDecommission() {
+  public void testUnhealthyDecommission() throws IOException {
     RMNodeImpl node = getUnhealthyNode();
     ClusterMetrics cm = ClusterMetrics.getMetrics();
     int initialActive = cm.getNumActiveNMs();
@@ -463,7 +463,7 @@ public class TestRMNodeTransitions {
   }
 
   @Test(timeout = 60000)
-  public void testRunningRebooting() {
+  public void testRunningRebooting() throws IOException {
     RMNodeImpl node = getRunningNode();
     ClusterMetrics cm = ClusterMetrics.getMetrics();
     int initialActive = cm.getNumActiveNMs();
@@ -486,7 +486,7 @@ public class TestRMNodeTransitions {
   }
 
   @Test(timeout = 60000)
-  public void testUnhealthyRebooting() {
+  public void testUnhealthyRebooting() throws IOException {
     RMNodeImpl node = getUnhealthyNode();
     ClusterMetrics cm = ClusterMetrics.getMetrics();
     int initialActive = cm.getNumActiveNMs();
@@ -588,7 +588,7 @@ public class TestRMNodeTransitions {
     Assert.assertEquals(finishedAppId, hbrsp.getApplicationsToCleanup().get(0));
   }
 
-  private RMNodeImpl getRunningNode() {
+  private RMNodeImpl getRunningNode() throws IOException {
     NodeId nodeId = BuilderUtils.newNodeId("localhost", 0);
     Resource capability = Resource.newInstance(4096, 4);
 
@@ -615,7 +615,7 @@ public class TestRMNodeTransitions {
     return node;
   }
 
-  private RMNodeImpl getUnhealthyNode() {
+  private RMNodeImpl getUnhealthyNode() throws IOException {
     RMNodeImpl node = getRunningNode();
     NodeHealthStatus status =
         NodeHealthStatus.newInstance(false, "sick", System.currentTimeMillis());
@@ -661,7 +661,7 @@ public class TestRMNodeTransitions {
   }
 
   @Test(timeout = 60000)
-  public void testReconnect() {
+  public void testReconnect() throws IOException {
     RMNodeImpl node = getRunningNode();
     ClusterMetrics cm = ClusterMetrics.getMetrics();
     int initialActive = cm.getNumActiveNMs();
