@@ -1005,7 +1005,7 @@ public static Map<String, List<ResourceRequest>> getAllResourceRequestsFullTrans
               ((RMNodeImpl) rmNode).setState(hopRMNode.getCurrentState());
               // *** Recover maps/lists of RMNode ***
               //Use a cache for retrieved ContainerStatus
-              Map<String, ContainerStatus> hopContainerStatuses =
+              Map<String, ContainerStatus> hopJustLaunchedContainerStatuses =
                   new HashMap<String, ContainerStatus>();
               //1. Recover JustLaunchedContainers
               JustLaunchedContainersDataAccess jlcDA =
@@ -1024,19 +1024,20 @@ public static Map<String, List<ResourceRequest>> getAllResourceRequestsFullTrans
                   org.apache.hadoop.yarn.api.records.ContainerId cid =
                       ConverterUtils.toContainerId(hop.getContainerId());
                   //Find and create ContainerStatus
-                  if (!hopContainerStatuses.containsKey(hop.getContainerId())) {
-                    hopContainerStatuses.put(hop.getContainerId(),
+                  if (!hopJustLaunchedContainerStatuses.containsKey(hop.getContainerId())) {
+                    hopJustLaunchedContainerStatuses.put(hop.getContainerId(),
                         (ContainerStatus) containerStatusDA
-                            .findEntry(hop.getContainerId(), id));
+                            .findEntry(hop.getContainerId(), id, 
+                                    ContainerStatus.Type.JUST_LAUNCHED.toString()));
                   }
                   org.apache.hadoop.yarn.api.records.ContainerStatus conStatus =
                       org.apache.hadoop.yarn.api.records.ContainerStatus
                           .newInstance(cid, ContainerState.valueOf(
-                                  hopContainerStatuses.get(hop.getContainerId())
+                              hopJustLaunchedContainerStatuses.get(hop.getContainerId())
                                       .getState()),
-                              hopContainerStatuses.get(hop.getContainerId())
+                              hopJustLaunchedContainerStatuses.get(hop.getContainerId())
                                   .getDiagnostics(),
-                              hopContainerStatuses.get(hop.getContainerId())
+                              hopJustLaunchedContainerStatuses.get(hop.getContainerId())
                                   .getExitstatus());
                   justLaunchedContainers.put(cid, conStatus);
                 }
@@ -1088,6 +1089,8 @@ public static Map<String, List<ResourceRequest>> getAllResourceRequestsFullTrans
                 ConcurrentLinkedQueue<org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo>
                     updatedContainerInfoQueue =
                     new ConcurrentLinkedQueue<org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo>();
+                Map<String, ContainerStatus> hopUCIContainerStatuses =
+                  new HashMap<String, ContainerStatus>();
                 for (int uciId : hopUpdatedContainerInfoMap.keySet()) {
                   for (UpdatedContainerInfo hopUCI : hopUpdatedContainerInfoMap
                       .get(uciId)) {
@@ -1100,21 +1103,22 @@ public static Map<String, List<ResourceRequest>> getAllResourceRequestsFullTrans
                     //Retrieve containerstatus entries for the particular updatedcontainerinfo
                     org.apache.hadoop.yarn.api.records.ContainerId cid =
                         ConverterUtils.toContainerId(hopUCI.getContainerId());
-                    if (!hopContainerStatuses
+                    if (!hopUCIContainerStatuses
                         .containsKey(hopUCI.getContainerId())) {
-                      hopContainerStatuses.put(hopUCI.getContainerId(),
+                      hopUCIContainerStatuses.put(hopUCI.getContainerId(),
                           (ContainerStatus) containerStatusDA
-                              .findEntry(hopUCI.getContainerId(), id));
+                              .findEntry(hopUCI.getContainerId(), id,
+                                      ContainerStatus.Type.UCI.toString()));
                     }
                     org.apache.hadoop.yarn.api.records.ContainerStatus
                         conStatus =
                         org.apache.hadoop.yarn.api.records.ContainerStatus
                             .newInstance(cid, ContainerState.valueOf(
-                                    hopContainerStatuses
+                                    hopUCIContainerStatuses
                                         .get(hopUCI.getContainerId())
-                                        .getState()), hopContainerStatuses
+                                        .getState()), hopUCIContainerStatuses
                                     .get(hopUCI.getContainerId())
-                                    .getDiagnostics(), hopContainerStatuses
+                                    .getDiagnostics(), hopUCIContainerStatuses
                                     .get(hopUCI.getContainerId())
                                     .getExitstatus());
                     //Check ContainerStatus state to add it to appropriate list
