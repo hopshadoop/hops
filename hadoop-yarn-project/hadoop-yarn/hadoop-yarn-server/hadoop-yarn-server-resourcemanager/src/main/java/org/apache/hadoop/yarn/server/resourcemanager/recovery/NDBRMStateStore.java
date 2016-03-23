@@ -642,7 +642,7 @@ public class NDBRMStateStore extends RMStateStore {
           }
           
           Set<NodeId> attemptRanNodes = new HashSet<NodeId>();
-          List<RanNode> ranNodeList = ranNodes.get(attemptId);
+          List<RanNode> ranNodeList = ranNodes.get(attemptId.toString());
           if (ranNodeList != null) {
             for (RanNode node : ranNodeList) {
               attemptRanNodes.add(ConverterUtils.toNodeId(node.getNodeId()));
@@ -652,7 +652,7 @@ public class NDBRMStateStore extends RMStateStore {
           List<ContainerStatus> attemptJustFinishedContainers
                   = new ArrayList<ContainerStatus>();
           List<JustFinishedContainer> justFinishedContainersList
-                  = justFinishedContainers.get(attemptId);
+                  = justFinishedContainers.get(attemptId.toString());
           if (justFinishedContainersList != null) {
             for (JustFinishedContainer container : justFinishedContainersList) {
               attemptJustFinishedContainers.add(new ContainerStatusPBImpl(

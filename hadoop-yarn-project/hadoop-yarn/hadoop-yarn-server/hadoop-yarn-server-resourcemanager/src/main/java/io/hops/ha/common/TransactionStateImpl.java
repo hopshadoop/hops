@@ -252,7 +252,7 @@ public class TransactionStateImpl extends TransactionState {
   public FiCaSchedulerNodeInfoToUpdate getFicaSchedulerNodeInfoToUpdate(
       NodeId nodeId) {
     FiCaSchedulerNodeInfoToUpdate nodeInfo =
-        ficaSchedulerNodeInfoToUpdate.get(nodeId);
+        ficaSchedulerNodeInfoToUpdate.get(nodeId.toString());
     if (nodeInfo == null) {
       nodeInfo = new FiCaSchedulerNodeInfoToUpdate(nodeId.toString(), this);
       ficaSchedulerNodeInfoToUpdate.put(nodeId.toString(), nodeInfo);
