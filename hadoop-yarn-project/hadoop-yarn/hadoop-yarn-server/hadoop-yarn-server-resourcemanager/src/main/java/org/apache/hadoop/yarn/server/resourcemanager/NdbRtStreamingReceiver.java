@@ -24,7 +24,6 @@ import java.util.concurrent.BlockingQueue;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 import io.hops.metadata.yarn.entity.ContainerStatus;
 
@@ -53,6 +52,16 @@ public class NdbRtStreamingReceiver {
   private String containerIdToCleanrmnodeid = null;
   private String finishedApplicationrmnodeid = null;
   private List<ContainerStatus> hopContainersStatusList = null;
+  private float CurrentPrice = 0.0f;
+  private long CurrentPriceTick = 0;
+
+  public void setCurrentPriceTick(long CurrentPriceTick) {
+    this.CurrentPriceTick = CurrentPriceTick;
+  }
+
+  public void setCurrentPrice(float CurrentPrice) {
+    this.CurrentPrice = CurrentPrice;
+  }
 
   NdbRtStreamingReceiver() {
   }
@@ -121,8 +130,8 @@ public class NdbRtStreamingReceiver {
   //This will be called by c++ shared library, libhopsndbevent.so
   public void onEventMethod() throws InterruptedException {
     StreamingRTComps streamingRTComps = new StreamingRTComps(
-            containersToCleanSet, finishedAppList, nodeId, nextHeartbeat, 
-    hopContainersStatusList);
+            containersToCleanSet, finishedAppList, nodeId, nextHeartbeat,
+            hopContainersStatusList, CurrentPrice, CurrentPriceTick);
     blockingRTQueue.put(streamingRTComps);
   }
   
@@ -177,7 +186,8 @@ public class NdbRtStreamingReceiver {
   // this two methods are using for multi-thread version from c++ library
   StreamingRTComps buildStreamingRTComps() {
     return new StreamingRTComps(containersToCleanSet, finishedAppList, nodeId,
-            nextHeartbeat, hopContainersStatusList);
+            nextHeartbeat, hopContainersStatusList, CurrentPrice,
+            CurrentPriceTick);
   }
 
   public void onEventMethodMultiThread(StreamingRTComps streamingRTComps) throws
@@ -191,5 +201,7 @@ public class NdbRtStreamingReceiver {
     nodeId = null;
     nextHeartbeat = false;
     hopContainersStatusList = null;
+    CurrentPrice = 0.0f;
+    CurrentPriceTick = 0;
   }
 }
