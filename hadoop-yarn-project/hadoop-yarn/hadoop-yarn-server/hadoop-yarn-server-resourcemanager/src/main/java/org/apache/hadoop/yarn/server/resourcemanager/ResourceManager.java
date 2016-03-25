@@ -140,6 +140,7 @@ import org.apache.hadoop.yarn.proto.YarnServerCommonProtos;
 import org.apache.hadoop.yarn.server.api.records.impl.pb.MasterKeyPBImpl;
 import org.apache.hadoop.yarn.server.api.records.impl.pb.NodeHealthStatusPBImpl;
 import org.apache.hadoop.yarn.server.api.records.impl.pb.NodeStatusPBImpl;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.quota.PriceFixerService;
 
 /**
  * The ResourceManager is the main class that is a set of components. "I am the
@@ -202,6 +203,8 @@ public class ResourceManager extends CompositeService implements Recoverable {
   private DelegationTokenRenewer delegationTokenRenewer;
   private CompositeService resourceTrackingService;
   private Lock resourceTrackingServiceStartStopLock = new ReentrantLock(true);
+  private PriceFixerService priceFixerService;
+
   /**
    * End of Active services
    */
@@ -549,7 +552,6 @@ public class ResourceManager extends CompositeService implements Recoverable {
       rmDispatcher.register(RMAppManagerEventType.class, rmAppManager);
 
       clientRM = createClientRMService();
-      rmContext.setClientRMService(clientRM);
       addService(clientRM);
       rmContext.setClientRMService(clientRM);
 
@@ -563,6 +565,9 @@ public class ResourceManager extends CompositeService implements Recoverable {
         delegationTokenRenewer.setRMContext(rmContext);
       }
 
+      priceFixerService = new PriceFixerService(rmContext);
+      addService(priceFixerService);
+      
       new RMNMInfo(rmContext, scheduler);
 
       super.serviceInit(conf);
