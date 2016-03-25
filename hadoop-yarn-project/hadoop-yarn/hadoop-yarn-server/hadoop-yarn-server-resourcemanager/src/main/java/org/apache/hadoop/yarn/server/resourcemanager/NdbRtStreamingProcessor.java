@@ -93,10 +93,16 @@ public class NdbRtStreamingProcessor implements Runnable {
             // Processes container statuses for ContainersLogs service
             List<ContainerStatus> hopContainersStatusList 
                     = streamingRTComps.getHopContainersStatusList();
-            if(context.isLeadingRT() && hopContainersStatusList.size() > 0 &&
-                    context.getContainersLogsService() !=null) {
+            if (context.isLeadingRT() && context.getContainersLogsService()
+                    != null) {
+              if (hopContainersStatusList.size() > 0) {
                 context.getContainersLogsService()
                         .insertEvent(hopContainersStatusList);
+              }
+              if (streamingRTComps.getCurrentPrice() > 0) {
+                context.getContainersLogsService().setCurrentPrice(
+                        streamingRTComps.getCurrentPrice());
+              }
             }
           }
         } catch (InterruptedException ex) {

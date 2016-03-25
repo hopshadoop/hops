@@ -30,17 +30,32 @@ public class StreamingRTComps {
   private final String nodeId;
   private final boolean nextHeartbeat;
   private final List<ContainerStatus> hopContainersStatusList;
+  private final float CurrentPrice;
+  private final long CurrentPriceTick;
+
 
   public StreamingRTComps(
           Set<org.apache.hadoop.yarn.api.records.ContainerId> containersToClean,
           List<org.apache.hadoop.yarn.api.records.ApplicationId> finishedApp,
           String nodeId, boolean nextHeartbeat, 
-          List<ContainerStatus> hopContainersStatusList) {
+          List<ContainerStatus> hopContainersStatusList,
+          float currentPrice,
+          long  currentPriceTick) {
     this.containersToClean = containersToClean;
     this.finishedApp = finishedApp;
     this.nodeId = nodeId;
     this.nextHeartbeat = nextHeartbeat;
     this.hopContainersStatusList = hopContainersStatusList;
+    this.CurrentPrice = currentPrice;
+    this.CurrentPriceTick = currentPriceTick;
+  }
+  
+  public float getCurrentPrice() {
+    return CurrentPrice;
+  }
+
+  public long getCurrentPriceTick() {
+    return CurrentPriceTick;
   }
 
   public Set<org.apache.hadoop.yarn.api.records.ContainerId> getContainersToClean() {
