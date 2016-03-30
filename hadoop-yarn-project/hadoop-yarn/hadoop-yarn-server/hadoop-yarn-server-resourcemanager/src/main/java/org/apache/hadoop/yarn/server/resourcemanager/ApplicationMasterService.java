@@ -45,21 +45,7 @@ import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterRespo
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.AllocateRequestPBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.FinishApplicationMasterRequestPBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.RegisterApplicationMasterRequestPBImpl;
-import org.apache.hadoop.yarn.api.records.AMCommand;
-import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
-import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.hadoop.yarn.api.records.Container;
-import org.apache.hadoop.yarn.api.records.ContainerId;
-import org.apache.hadoop.yarn.api.records.NMToken;
-import org.apache.hadoop.yarn.api.records.NodeReport;
-import org.apache.hadoop.yarn.api.records.PreemptionContainer;
-import org.apache.hadoop.yarn.api.records.PreemptionContract;
-import org.apache.hadoop.yarn.api.records.PreemptionMessage;
-import org.apache.hadoop.yarn.api.records.PreemptionResourceRequest;
-import org.apache.hadoop.yarn.api.records.Resource;
-import org.apache.hadoop.yarn.api.records.ResourceBlacklistRequest;
-import org.apache.hadoop.yarn.api.records.ResourceRequest;
-import org.apache.hadoop.yarn.api.records.StrictPreemptionContract;
+import org.apache.hadoop.yarn.api.records.*;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.InvalidApplicationMasterRequestException;
 import org.apache.hadoop.yarn.exceptions.InvalidContainerReleaseException;
@@ -101,7 +87,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.apache.hadoop.yarn.api.records.ContainerResourceIncreaseRequest;
+
 import org.apache.hadoop.yarn.api.records.impl.pb.ContainerResourceIncreaseRequestPBImpl;
 import org.apache.hadoop.yarn.api.records.impl.pb.ResourceRequestPBImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
@@ -787,9 +773,24 @@ public class ApplicationMasterService extends AbstractService
       TransactionState transactionState) {
     LOG.info("Unregistering app attempt : " + attemptId);
     AllocateResponseLock lock = responseMap.remove(attemptId);
+
     if (transactionState != null) {
+      List<String> completedContainers = new ArrayList<String>();
+      List<String> allocatedContainers = new ArrayList<String>();
+      List<ContainerStatus> complContStatus =
+              lock.getAllocateResponse().getCompletedContainersStatuses();
+      for (ContainerStatus contId : complContStatus) {
+        completedContainers.add(contId.getContainerId().toString());
+      }
+      List<Container> allocCont =
+              lock.getAllocateResponse().getAllocatedContainers();
+      for (Container contId : allocCont) {
+        allocatedContainers.add(contId.getId().toString());
+      }
+
       ((TransactionStateImpl) transactionState)
-          .removeAllocateResponse(attemptId, lock.getAllocateResponse().getResponseId());
+          .removeAllocateResponse(attemptId, lock.getAllocateResponse().getResponseId(),
+                  allocatedContainers, completedContainers);
     }
     rmContext.getNMTokenSecretManager().unregisterApplicationAttempt(attemptId);
   }

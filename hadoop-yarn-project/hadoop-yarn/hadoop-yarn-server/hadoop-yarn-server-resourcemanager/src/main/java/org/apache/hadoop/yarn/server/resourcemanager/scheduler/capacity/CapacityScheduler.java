@@ -88,13 +88,7 @@ import org.apache.hadoop.yarn.util.resource.Resources;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.QueueMetrics;
@@ -626,8 +620,13 @@ public class CapacityScheduler extends AbstractYarnScheduler
     applications.remove(applicationId);
 
     if (transactionState != null) {
+      ApplicationAttemptId appAttId = application.getCurrentAppAttempt()
+              .getApplicationAttemptId();
+      Set<String> blacklistedRes = application.getCurrentAppAttempt()
+              .getAppSchedulingInfo().getBlackList();
+
       ((TransactionStateImpl) transactionState).getSchedulerApplicationInfos(applicationId).
-              setApplicationIdtoRemove(applicationId);
+              setApplicationIdtoRemove(applicationId, appAttId, blacklistedRes);
     }
   }
 
