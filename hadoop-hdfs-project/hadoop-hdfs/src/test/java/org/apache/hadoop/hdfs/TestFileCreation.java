@@ -177,8 +177,8 @@ public class TestFileCreation {
   public void testSimple() throws IOException {
     Configuration conf = new HdfsConfiguration();
 
-    final int NUM_FILES = 4;
-    final int NUM_BLOCKS_PER_FILE = 5;
+    final int NUM_FILES = 8;
+    final int NUM_BLOCKS_PER_FILE = 6;
     final int NUM_REPLICAS = 1;
 
     if (simulatedStorage) {

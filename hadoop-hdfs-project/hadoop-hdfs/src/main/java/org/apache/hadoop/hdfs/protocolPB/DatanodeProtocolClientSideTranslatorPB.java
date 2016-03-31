@@ -21,6 +21,7 @@ import com.google.protobuf.ServiceException;
 import io.hops.leader_election.node.ActiveNode;
 import io.hops.leader_election.node.SortedActiveNodeList;
 import io.hops.leader_election.proto.ActiveNodeProtos;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -184,6 +185,7 @@ public class DatanodeProtocolClientSideTranslatorPB
       cmds[index] = PBHelper.convert(p);
       index++;
     }
+
     return new HeartbeatResponse(cmds);
   }
 
