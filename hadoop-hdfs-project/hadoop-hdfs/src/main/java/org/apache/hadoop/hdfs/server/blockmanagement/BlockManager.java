@@ -2305,6 +2305,13 @@ public class BlockManager {
       return storedBlock;
     }
 
+    FSNamesystem.LOG.debug("?x? processReportedBlock -> isstoredOnStorage=" +
+        storedBlock.isReplicatedOnStorage(storage) + " ucState=" + ucState +
+            " reportedState=" + reportedState);
+
+    FSNamesystem.LOG.debug("?y? isBlockUnderConstruction=" +
+        isBlockUnderConstruction(storedBlock, ucState, reportedState));
+
     if (isBlockUnderConstruction(storedBlock, ucState, reportedState)) {
       toUC.add(new StatefulBlockInfo((BlockInfoUnderConstruction) storedBlock,
           reportedState));

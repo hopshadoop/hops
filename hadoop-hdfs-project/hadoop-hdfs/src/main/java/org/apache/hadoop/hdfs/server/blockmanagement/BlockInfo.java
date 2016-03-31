@@ -25,6 +25,7 @@ import io.hops.transaction.EntityManager;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.BlockUCState;
+import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 import org.apache.hadoop.hdfs.server.namenode.INodeFile;
 
@@ -263,9 +264,14 @@ public class BlockInfo extends Block {
   Replica addReplica(DatanodeStorageInfo storage)
       throws StorageException, TransactionContextException {
     // TODO check we don't already have a replica on this machine
-    if(isReplicatedOnStorage(storage)) {
-      return null;
-    }
+
+//    boolean ir = isReplicatedOnStorage(storage);
+//    FSNamesystem.LOG.debug("?z? isReplicatedOnStorage=" +
+//        ir + " (should be false)");
+//
+//    if(ir) {
+//      return null;
+//    }
 
     Replica replica = new Replica(storage.getSid(), getBlockId(), getInodeId());
     add(replica);

@@ -139,7 +139,8 @@ public abstract class Receiver implements DataTransferProtocol {
    */
   private void opReplaceBlock(DataInputStream in) throws IOException {
     OpReplaceBlockProto proto = OpReplaceBlockProto.parseFrom(vintPrefixed(in));
-    replaceBlock(PBHelper.convert(proto.getHeader().getBlock()),
+    replaceBlock(
+        PBHelper.convert(proto.getHeader().getBlock()),
         PBHelper.convertStorageType(proto.getStorageType()),
         PBHelper.convert(proto.getHeader().getToken()),
         proto.getDelHint(),

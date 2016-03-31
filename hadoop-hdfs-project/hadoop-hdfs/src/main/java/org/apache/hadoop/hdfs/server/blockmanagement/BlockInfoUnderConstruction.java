@@ -22,6 +22,7 @@ import io.hops.transaction.EntityManager;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.BlockUCState;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.ReplicaState;
+import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 
 import java.io.IOException;
@@ -115,11 +116,7 @@ public class BlockInfoUnderConstruction extends BlockInfo {
   public DatanodeStorageInfo[] getExpectedStorageLocations(DatanodeManager m)
       throws StorageException, TransactionContextException {
     List<ReplicaUnderConstruction> replicas = getExpectedReplicas();
-    DatanodeStorageInfo[] storages = new DatanodeStorageInfo[replicas.size()];
-    for(int i = 0; i < replicas.size(); i++) {
-      storages[i] = replicas.get(i).getExpectedStorageLocation(m);
-    }
-    return storages;
+    return super.getStorages(m, replicas);
   }
 
   /**
@@ -191,7 +188,7 @@ public class BlockInfoUnderConstruction extends BlockInfo {
       int j = (previous + i) % replicas.size();
       ReplicaUnderConstruction replica = replicas.get(j);
       DatanodeDescriptor primary =
-          datanodeMgr.getStorage(replica.getStorageId()).getDatanodeDescriptor();
+          datanodeMgr.getDatanodeBySid(replica.getStorageId());
       if (primary.isAlive) {
         primaryNodeIndex = j;
         primary.addBlockToBeRecovered(this);
@@ -303,6 +300,7 @@ public class BlockInfoUnderConstruction extends BlockInfo {
   }
 
   private void complete() throws StorageException, TransactionContextException {
+    FSNamesystem.LOG.debug("num expected replicas for blkid " + getBlockId() + ": " + getExpectedReplicas().size());
     for (ReplicaUnderConstruction rep : getExpectedReplicas()) {
       EntityManager.remove(rep);
     }
