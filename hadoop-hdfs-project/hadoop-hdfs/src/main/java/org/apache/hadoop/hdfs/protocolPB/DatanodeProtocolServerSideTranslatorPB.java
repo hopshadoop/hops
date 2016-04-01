@@ -58,6 +58,8 @@ import org.apache.hadoop.hdfs.server.protocol.StorageReceivedDeletedBlocks;
 import org.apache.hadoop.hdfs.server.protocol.StorageReport;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class DatanodeProtocolServerSideTranslatorPB
@@ -102,8 +104,6 @@ public class DatanodeProtocolServerSideTranslatorPB
       HeartbeatRequestProto request) throws ServiceException {
     HeartbeatResponse response;
 
-//    LogFactory.getLog(DatanodeProtocolServerSideTranslatorPB.class).debug("### received heartbeat");
-
     try {
       final StorageReport[] report = PBHelper.convertStorageReports(
           request.getReportsList());
@@ -134,8 +134,6 @@ public class DatanodeProtocolServerSideTranslatorPB
     StorageBlockReport[] report =
         new StorageBlockReport[request.getReportsCount()];
 
-    LogFactory.getLog(DatanodeProtocolServerSideTranslatorPB.class).debug("### received blockReport");
-    
     int index = 0;
     for (StorageBlockReportProto s : request.getReportsList()) {
       List<Long> blockIds = s.getBlocksList();
@@ -167,6 +165,9 @@ public class DatanodeProtocolServerSideTranslatorPB
     List<StorageReceivedDeletedBlocksProto> sBlocks = request.getBlocksList();
     StorageReceivedDeletedBlocks[] info =
         new StorageReceivedDeletedBlocks[sBlocks.size()];
+
+    ArrayList<Long> blockIds = new ArrayList<Long>();
+
     for (int i = 0; i < sBlocks.size(); i++) {
       StorageReceivedDeletedBlocksProto sBlock = sBlocks.get(i);
       List<ReceivedDeletedBlockInfoProto> list = sBlock.getBlocksList();
@@ -174,6 +175,7 @@ public class DatanodeProtocolServerSideTranslatorPB
           new ReceivedDeletedBlockInfo[list.size()];
       for (int j = 0; j < list.size(); j++) {
         rdBlocks[j] = PBHelper.convert(list.get(j));
+        blockIds.add(rdBlocks[j].getBlock().getBlockId());
       }
       if (sBlock.hasStorage()) {
         info[i] = new StorageReceivedDeletedBlocks(
@@ -186,10 +188,10 @@ public class DatanodeProtocolServerSideTranslatorPB
       impl.blockReceivedAndDeleted(PBHelper.convert(request.getRegistration()),
           request.getBlockPoolId(), info);
     } catch (IOException e) {
-      LogFactory.getLog(DatanodeProtocolServerSideTranslatorPB.class).debug("### error in blockReceivedAndDeleted");
+      LogFactory.getLog(DatanodeProtocolServerSideTranslatorPB.class).debug("### error in blockReceivedAndDeleted (block id = " + Arrays.toString(blockIds.toArray()) + ")");
       throw new ServiceException(e);
     }
-    LogFactory.getLog(DatanodeProtocolServerSideTranslatorPB.class).debug("### received blockReceivedAndDeleted");
+    LogFactory.getLog(DatanodeProtocolServerSideTranslatorPB.class).debug("### received blockReceivedAndDeleted (block id = " + Arrays.toString(blockIds.toArray()) + ")");
     return VOID_BLOCK_RECEIVED_AND_DELETE_RESPONSE;
   }
 

@@ -42,6 +42,7 @@ import io.hops.transaction.lock.TransactionLockTypes.INodeLockType;
 import io.hops.transaction.lock.TransactionLockTypes.LockType;
 import io.hops.transaction.lock.TransactionLocks;
 import io.hops.util.Slicer;
+import org.apache.commons.configuration.SystemConfiguration;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.HadoopIllegalArgumentException;
@@ -2317,7 +2318,14 @@ public class BlockManager {
           reportedState));
       return storedBlock;
     }
-    
+
+    FSNamesystem.LOG.debug("?x? processReportedBlock -> isstoredOnStorage=" +
+        storedBlock.isReplicatedOnStorage(storage) + " ucState=" + ucState +
+        " reportedState=" + reportedState);
+
+    FSNamesystem.LOG.debug("?y? isBlockUnderConstruction=" +
+        isBlockUnderConstruction(storedBlock, ucState, reportedState));
+
     //add replica if appropriate
     if (reportedState == ReplicaState.FINALIZED
       && !storedBlock.isReplicatedOnStorage(storage)){
@@ -2506,7 +2514,7 @@ public class BlockManager {
       IOException {
     block.addReplicaIfNotPresent(storage, block, reportedState);
     if (reportedState == ReplicaState.FINALIZED &&
-        block.isReplicatedOnStorage(storage)) {
+        !block.isReplicatedOnStorage(storage)) {
       addStoredBlock(block, storage, null, true);
     }
   }
@@ -3469,7 +3477,8 @@ public class BlockManager {
           @Override
           public Object performTask() throws IOException {
             ReceivedDeletedBlockInfo rdbi = (ReceivedDeletedBlockInfo) getParams()[0];
-            LOG.debug("BLOCK_RECEIVED_AND_DELETED_INC_BLK_REPORT " + rdbi.getStatus() + " bid=" +
+            LOG.debug("DDD: BLOCK_RECEIVED_AND_DELETED_INC_BLK_REPORT " + rdbi
+                .getStatus() + " bid=" +
                 rdbi.getBlock().getBlockId() + " dataNode=" + node.getXferAddr() + " storage=" +
                 storage.getStorageID());
             switch (rdbi.getStatus()) {

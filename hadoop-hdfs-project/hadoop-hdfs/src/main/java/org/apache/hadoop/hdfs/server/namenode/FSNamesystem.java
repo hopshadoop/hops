@@ -96,6 +96,7 @@ import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
 import org.apache.hadoop.hdfs.protocol.RecoveryInProgressException;
 import org.apache.hadoop.hdfs.protocol.datatransfer.ReplaceDatanodeOnFailure;
+import org.apache.hadoop.hdfs.protocolPB.ClientNamenodeProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenSecretManager;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenSecretManager.AccessMode;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
@@ -2144,7 +2145,15 @@ public class FSNamesystem
 
             // Part I. Analyze the state of the file with respect to the input data.
             LocatedBlock[] onRetryBlock = new LocatedBlock[1];
-            final INode[] inodes = analyzeFileState(src, clientName, previous, onRetryBlock);
+            final INode[] inodes;
+            try {
+              inodes = analyzeFileState(src, clientName,
+                previous, onRetryBlock);
+            } catch(IOException e) {
+              LogFactory.getLog(ClientNamenodeProtocolServerSideTranslatorPB.class).debug("### threw it here");
+              throw e;
+            }
+
             final INodeFileUnderConstruction pendingFile =
                 (INodeFileUnderConstruction) inodes[inodes.length - 1];
 

@@ -345,13 +345,11 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
             .build();
       }
     } catch (IOException e) {
-      LogFactory.getLog(ClientNamenodeProtocolServerSideTranslatorPB.class)
-          .debug("### create finished (exception)");
+      LogFactory.getLog(ClientNamenodeProtocolServerSideTranslatorPB.class).debug("### create finished (exception)");
       throw new ServiceException(e);
     }
 
-    LogFactory.getLog(ClientNamenodeProtocolServerSideTranslatorPB.class)
-        .debug("### create finished (empty response)");
+    LogFactory.getLog(ClientNamenodeProtocolServerSideTranslatorPB.class).debug("### create finished (empty response)");
     return VOID_CREATE_RESPONSE;
   }
   
@@ -445,15 +443,12 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
           (excl == null || excl.size() == 0) ? null : PBHelper
               .convert(excl.toArray(new DatanodeInfoProto[excl.size()])));
 
-      LogFactory.getLog(ClientNamenodeProtocolServerSideTranslatorPB.class)
-          .debug("### addBlock finished (success)");
+      LogFactory.getLog(ClientNamenodeProtocolServerSideTranslatorPB.class).debug("### addBlock finished (success, block id = " + result.getBlock().getBlockId() + ")");
 
       return AddBlockResponseProto.newBuilder()
           .setBlock(PBHelper.convert(result)).build();
     } catch (IOException e) {
-
-      LogFactory.getLog(ClientNamenodeProtocolServerSideTranslatorPB.class)
-          .debug("### addBlock finished (exception: " + e.toString() + ")");
+      LogFactory.getLog(ClientNamenodeProtocolServerSideTranslatorPB.class).debug("### addBlock finished (exception: " + e.toString() + ")");
       throw new ServiceException(e);
     }
   }
