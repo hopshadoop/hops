@@ -1091,6 +1091,8 @@ public class BlockManager {
     DatanodeDescriptor dn = datanodeManager.getDatanode(datanode);
     DatanodeStorageInfo storage = getBlockInfo(block).getStorageOnNode(dn);
 
+    // TODO returned null -> should return non-null value
+
     addToInvalidates(block, storage);
   }
 
@@ -1110,7 +1112,6 @@ public class BlockManager {
     BlockInfo block = getBlockInfo(b);
 
     DatanodeStorageInfo[] storages = getBlockInfo(block).getStorages(datanodeManager);
-//    for(DatanodeStorageInfo storage : blocksMap.getStorages(block, DatanodeStorage.State.NORMAL)) {
     for(DatanodeStorageInfo storage : storages) {
       final DatanodeDescriptor node = storage.getDatanodeDescriptor();
       invalidateBlocks.add(block, storage, false);
@@ -1848,7 +1849,7 @@ public class BlockManager {
       return !node.hasStaleStorages();
     }
 
-    if (storageInfo.getBlockReportCount() == 0) {
+    if (storageInfo.numBlocks() == 0) {
       // The first block report can be processed a lot more efficiently than
       // ordinary block reports. This shortens restart times.
       processFirstBlockReport(storageInfo, newReport);
@@ -1964,47 +1965,32 @@ public class BlockManager {
         new HashSet<BlockToMarkCorrupt>();
     Collection<StatefulBlockInfo> toUC = new HashSet<StatefulBlockInfo>();
 
-    final boolean firstBlockReport =
-        namesystem.isInStartupSafeMode() && storage.getBlockReportCount() > 0;
     reportDiff(storage, report, toAdd, toRemove, toInvalidate, toCorrupt,
-        toUC, firstBlockReport);
-
-    // TODO why do we have the if/else here?
-    // This function only gets called once, and when it gets called, we
-    // already know that it's *NOT* the first blockreport for this storage...
+        toUC, false); // TODO remove false when switching to no difference
+    // between first and non-first blockreport
 
     // Process the blocks on each queue
     for (StatefulBlockInfo b : toUC) {
-      if (firstBlockReport) {
-        addStoredBlockUnderConstructionImmediateTx(b.storedBlock, storage, b.reportedState);
-      } else {
-        addStoredBlockUnderConstructionTx(b.storedBlock, storage, b.reportedState);
-      }
+      addStoredBlockUnderConstructionTx(b.storedBlock, storage, b.reportedState);
     }
 
     for (BlockInfo b : toAdd) {
-      if (firstBlockReport) {
-        addStoredBlockImmediateTx(b, storage);
-      } else {
-        addStoredBlockTx(b, storage, null, true);
-      }
+      addStoredBlockTx(b, storage, null, true);
     }
 
     for (BlockToMarkCorrupt b : toCorrupt) {
       markBlockAsCorruptTx(b, storage);
     }
 
-    if (!firstBlockReport) {
-      for (Block b : toInvalidate) {
-        blockLog.info("BLOCK* processReport: " + b + " on " + storage + " " +
-            storage + " size " + b.getNumBytes() +
-            " does not belong to any file");
-      }
-      addToInvalidates(toInvalidate, storage);
+    for (Block b : toInvalidate) {
+      blockLog.info("BLOCK* processReport: " + b + " on " + storage + " " +
+          storage + " size " + b.getNumBytes() +
+          " does not belong to any file");
+    }
+    addToInvalidates(toInvalidate, storage);
 
-      for (Long b : toRemove) {
-        removeStoredBlockTx(b, storage);
-      }
+    for (Long b : toRemove) {
+      removeStoredBlockTx(b, storage);
     }
   }
 

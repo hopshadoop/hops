@@ -28,6 +28,7 @@ import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
+import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 
@@ -95,6 +96,9 @@ class InvalidateBlocks {
    */
   void add(final BlockInfo block, final DatanodeStorageInfo storage,
       final boolean log) throws StorageException, TransactionContextException {
+    FSNamesystem.LOG.debug("block:   " + block);
+    FSNamesystem.LOG.debug("storage: " + storage);
+
     InvalidatedBlock invBlk = new InvalidatedBlock(
         storage.getSid(),
         block.getBlockId(),

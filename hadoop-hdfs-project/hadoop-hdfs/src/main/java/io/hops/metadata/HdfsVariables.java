@@ -99,7 +99,7 @@ public class HdfsVariables {
       HdfsStorageFactory.getConnector().readCommitted();
       return new CountersQueue.Counter(oldValue, newValue);
     }
-    throw new IllegalStateException("Cannot increment Varaible of type " +
+    throw new IllegalStateException("Cannot increment Variable of type " +
         variable.getClass().getSimpleName());
   }
 
