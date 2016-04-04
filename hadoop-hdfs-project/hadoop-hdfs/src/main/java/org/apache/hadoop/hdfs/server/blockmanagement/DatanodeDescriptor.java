@@ -355,6 +355,11 @@ public class DatanodeDescriptor extends DatanodeInfo {
     setLastUpdate(Time.now());
     this.volumeFailures = volFailures;
     for (StorageReport report : reports) {
+      // TODO do we want to pass a storage, or just the id? If we only pass
+      // the ID (which should be enough for a DB lookup), we can reduce the
+      // report object to only have a storageId, instead of a full
+      // DatanodeStorage object. If so, we could also do an if(storage !=
+      // null) check...
       DatanodeStorageInfo storage = updateStorage(report.getStorage());
       if (checkFailedStorages) {
         failedStorageInfos.remove(storage);

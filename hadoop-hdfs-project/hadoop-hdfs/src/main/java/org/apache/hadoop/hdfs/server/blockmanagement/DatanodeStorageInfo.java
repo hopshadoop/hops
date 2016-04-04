@@ -165,6 +165,7 @@ public class DatanodeStorageInfo {
    * @param dfsUsed
    * @param remaining
    */
+  @VisibleForTesting
   public void setUtilization(long capacity, long dfsUsed, long remaining) {
     this.capacity = capacity;
     this.dfsUsed = dfsUsed;
