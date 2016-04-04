@@ -22,11 +22,14 @@ import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.server.common.GenerationStamp;
+import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.hdfs.server.datanode.DataNodeTestUtils;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.NameNodeAdapter;
 import org.apache.hadoop.hdfs.server.protocol.BlockCommand;
+import org.apache.hadoop.hdfs.server.protocol.BlockRecoveryCommand;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeCommand;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeProtocol;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
@@ -123,6 +126,114 @@ public class TestHeartbeatHandling {
             .getCommands();
         assertEquals(0, cmds.length);
       }
+    } finally {
+      cluster.shutdown();
+    }
+  }
+
+  /**
+   * Test if
+   * {@link FSNamesystem#handleHeartbeat}
+   * correctly selects data node targets for block recovery.
+   */
+  @Test
+  public void testHeartbeatBlockRecovery() throws Exception {
+    final Configuration conf = new HdfsConfiguration();
+    final MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(3).build();
+    try {
+      cluster.waitActive();
+      final FSNamesystem namesystem = cluster.getNamesystem();
+      final HeartbeatManager hm = namesystem.getBlockManager(
+      ).getDatanodeManager().getHeartbeatManager();
+      final String poolId = namesystem.getBlockPoolId();
+      final DatanodeRegistration nodeReg1 =
+          DataNodeTestUtils.getDNRegistrationForBP(cluster.getDataNodes().get(0), poolId);
+      final DatanodeDescriptor dd1 = NameNodeAdapter.getDatanode(namesystem, nodeReg1);
+      dd1.updateStorage(new DatanodeStorage(DatanodeStorage.generateUuid()));
+      final DatanodeRegistration nodeReg2 =
+          DataNodeTestUtils.getDNRegistrationForBP(cluster.getDataNodes().get(1), poolId);
+      final DatanodeDescriptor dd2 = NameNodeAdapter.getDatanode(namesystem, nodeReg2);
+      dd2.updateStorage(new DatanodeStorage(DatanodeStorage.generateUuid()));
+      final DatanodeRegistration nodeReg3 =
+          DataNodeTestUtils.getDNRegistrationForBP(cluster.getDataNodes().get(2), poolId);
+      final DatanodeDescriptor dd3 = NameNodeAdapter.getDatanode(namesystem, nodeReg3);
+      dd3.updateStorage(new DatanodeStorage(DatanodeStorage.generateUuid()));
+
+        synchronized(hm) {
+          NameNodeAdapter.sendHeartBeat(nodeReg1, dd1, namesystem);
+          NameNodeAdapter.sendHeartBeat(nodeReg2, dd2, namesystem);
+          NameNodeAdapter.sendHeartBeat(nodeReg3, dd3, namesystem);
+
+          // Test with all alive nodes.
+          dd1.setLastUpdate(System.currentTimeMillis());
+          dd2.setLastUpdate(System.currentTimeMillis());
+          dd3.setLastUpdate(System.currentTimeMillis());
+          final DatanodeStorageInfo[] storages = {
+              dd1.getStorageInfos()[0],
+              dd2.getStorageInfos()[0],
+              dd3.getStorageInfos()[0]};
+          BlockInfoUnderConstruction blockInfo = new BlockInfoUnderConstruction(
+              new Block(0, 0, GenerationStamp.FIRST_VALID_STAMP), 3,
+              HdfsServerConstants.BlockUCState.UNDER_RECOVERY, storages);
+          dd1.addBlockToBeRecovered(blockInfo);
+          DatanodeCommand[] cmds =
+              NameNodeAdapter.sendHeartBeat(nodeReg1, dd1, namesystem).getCommands();
+          assertEquals(1, cmds.length);
+          assertEquals(DatanodeProtocol.DNA_RECOVERBLOCK, cmds[0].getAction());
+          BlockRecoveryCommand recoveryCommand = (BlockRecoveryCommand)cmds[0];
+          assertEquals(1, recoveryCommand.getRecoveringBlocks().size());
+          DatanodeInfo[] recoveringNodes = recoveryCommand.getRecoveringBlocks()
+              .toArray(new BlockRecoveryCommand.RecoveringBlock[0])[0].getLocations();
+          assertEquals(3, recoveringNodes.length);
+          assertEquals(recoveringNodes[0], dd1);
+          assertEquals(recoveringNodes[1], dd2);
+          assertEquals(recoveringNodes[2], dd3);
+
+          // Test with one stale node.
+          dd1.setLastUpdate(System.currentTimeMillis());
+          // More than the default stale interval of 30 seconds.
+          dd2.setLastUpdate(System.currentTimeMillis() - 40 * 1000);
+          dd3.setLastUpdate(System.currentTimeMillis());
+          blockInfo = new BlockInfoUnderConstruction(
+              new Block(0, 0, GenerationStamp.FIRST_VALID_STAMP), 3,
+              HdfsServerConstants.BlockUCState.UNDER_RECOVERY, storages);
+          dd1.addBlockToBeRecovered(blockInfo);
+          cmds = NameNodeAdapter.sendHeartBeat(nodeReg1, dd1, namesystem).getCommands();
+          assertEquals(1, cmds.length);
+          assertEquals(DatanodeProtocol.DNA_RECOVERBLOCK, cmds[0].getAction());
+          recoveryCommand = (BlockRecoveryCommand)cmds[0];
+          assertEquals(1, recoveryCommand.getRecoveringBlocks().size());
+          recoveringNodes = recoveryCommand.getRecoveringBlocks()
+              .toArray(new BlockRecoveryCommand.RecoveringBlock[0])[0].getLocations();
+          assertEquals(2, recoveringNodes.length);
+          // dd2 is skipped.
+          assertEquals(recoveringNodes[0], dd1);
+          assertEquals(recoveringNodes[1], dd3);
+
+          // Test with all stale node.
+          dd1.setLastUpdate(System.currentTimeMillis() - 60 * 1000);
+          // More than the default stale interval of 30 seconds.
+          dd2.setLastUpdate(System.currentTimeMillis() - 40 * 1000);
+          dd3.setLastUpdate(System.currentTimeMillis() - 80 * 1000);
+          blockInfo = new BlockInfoUnderConstruction(
+              new Block(0, 0, GenerationStamp.FIRST_VALID_STAMP), 3,
+              HdfsServerConstants.BlockUCState.UNDER_RECOVERY, storages);
+          dd1.addBlockToBeRecovered(blockInfo);
+          cmds = NameNodeAdapter.sendHeartBeat(nodeReg1, dd1, namesystem).getCommands();
+          assertEquals(1, cmds.length);
+          assertEquals(DatanodeProtocol.DNA_RECOVERBLOCK, cmds[0].getAction());
+          recoveryCommand = (BlockRecoveryCommand)cmds[0];
+          assertEquals(1, recoveryCommand.getRecoveringBlocks().size());
+          recoveringNodes = recoveryCommand.getRecoveringBlocks()
+              .toArray(new BlockRecoveryCommand.RecoveringBlock[0])[0].getLocations();
+          // Only dd1 is included since it heart beated and hence its not stale
+          // when the list of recovery blocks is constructed.
+          assertEquals(3, recoveringNodes.length);
+          assertEquals(recoveringNodes[0], dd1);
+          assertEquals(recoveringNodes[1], dd2);
+          assertEquals(recoveringNodes[2], dd3);
+        }
     } finally {
       cluster.shutdown();
     }
