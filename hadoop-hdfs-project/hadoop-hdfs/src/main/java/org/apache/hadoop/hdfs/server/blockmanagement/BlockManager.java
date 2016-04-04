@@ -2292,25 +2292,11 @@ public class BlockManager {
       return storedBlock;
     }
 
-    FSNamesystem.LOG.debug("?x? processReportedBlock -> isstoredOnStorage=" +
-        storedBlock.isReplicatedOnStorage(storage) + " ucState=" + ucState +
-            " reportedState=" + reportedState);
-
-    FSNamesystem.LOG.debug("?y? isBlockUnderConstruction=" +
-        isBlockUnderConstruction(storedBlock, ucState, reportedState));
-
     if (isBlockUnderConstruction(storedBlock, ucState, reportedState)) {
       toUC.add(new StatefulBlockInfo((BlockInfoUnderConstruction) storedBlock,
           reportedState));
       return storedBlock;
     }
-
-    FSNamesystem.LOG.debug("?x? processReportedBlock -> isstoredOnStorage=" +
-        storedBlock.isReplicatedOnStorage(storage) + " ucState=" + ucState +
-        " reportedState=" + reportedState);
-
-    FSNamesystem.LOG.debug("?y? isBlockUnderConstruction=" +
-        isBlockUnderConstruction(storedBlock, ucState, reportedState));
 
     //add replica if appropriate
     if (reportedState == ReplicaState.FINALIZED
@@ -3374,6 +3360,7 @@ public class BlockManager {
     for (StatefulBlockInfo b : toUC) {
       addStoredBlockUnderConstruction(b.storedBlock, storage, b.reportedState);
     }
+
     for (BlockInfo b : toAdd) {
       addStoredBlock(b, storage, delHintNode, true);
     }
@@ -3383,6 +3370,7 @@ public class BlockManager {
           b.getNumBytes() + " does not belong to any file");
       addToInvalidates(b, storage.getDatanodeDescriptor());
     }
+
     for (BlockToMarkCorrupt b : toCorrupt) {
       markBlockAsCorrupt(b, storage, storage.getDatanodeDescriptor());
     }

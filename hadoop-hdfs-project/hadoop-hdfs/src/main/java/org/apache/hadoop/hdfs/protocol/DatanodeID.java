@@ -250,7 +250,7 @@ public class DatanodeID implements Comparable<DatanodeID> {
   
   /**
    * Update fields when a new registration request comes in.
-   * Note that this does not update storageID.
+   * Note that this does not update datanodeUuid.
    */
   public void updateRegInfo(DatanodeID nodeReg) {
     ipAddr = nodeReg.getIpAddr();
