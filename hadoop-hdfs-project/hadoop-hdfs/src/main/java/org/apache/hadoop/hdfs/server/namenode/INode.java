@@ -769,7 +769,8 @@ public abstract class INode implements Comparable<byte[]> {
       throws StorageException, TransactionContextException {
     if (isPathMetaEnabled()) {
       INodeDirectory datasetDir = getMetaEnabledParent();
-      EntityManager.add(new MetadataLogEntry(datasetDir.getId(), getId(), operation));
+      EntityManager.add(new MetadataLogEntry(datasetDir.getId(), getId(),
+          getParentId(), getLocalName(), operation));
     }
   }
 
