@@ -2150,7 +2150,6 @@ public class FSNamesystem
               inodes = analyzeFileState(src, clientName,
                 previous, onRetryBlock);
             } catch(IOException e) {
-              LogFactory.getLog(ClientNamenodeProtocolServerSideTranslatorPB.class).debug("### threw it here");
               throw e;
             }
 
@@ -2174,6 +2173,9 @@ public class FSNamesystem
                     .getDatanode(pendingFile.getClientNode());
 
             replication = pendingFile.getBlockReplication();
+
+            LogFactory.getLog(LogFactory.class).debug("### >> excludedNodes (2) = " +
+                    excludedNodes == null ? Arrays.toString(excludedNodes.toArray(new Node[0])) : "[]");
 
             // choose targets for the new block to be allocated.
             final DatanodeStorageInfo targets[] = getBlockManager().chooseTarget4NewBlock(

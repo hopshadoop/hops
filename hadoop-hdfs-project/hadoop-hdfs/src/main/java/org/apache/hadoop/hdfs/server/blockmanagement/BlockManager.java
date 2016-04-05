@@ -61,6 +61,7 @@ import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.protocol.UnregisteredNodeException;
+import org.apache.hadoop.hdfs.protocolPB.ClientNamenodeProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenSecretManager;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenSecretManager.AccessMode;
 import org.apache.hadoop.hdfs.security.token.block.DataEncryptionKey;
@@ -91,6 +92,7 @@ import org.apache.hadoop.util.Time;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -1591,20 +1593,27 @@ public class BlockManager {
     List<DatanodeDescriptor> favoredDatanodeDescriptors =
         getDatanodeDescriptors(favoredNodes);
 
+    LogFactory.getLog(LogFactory.class).debug("### >> excludedNodes (3) = " +
+        (excludedNodes != null ? Arrays.toString(excludedNodes.toArray(new Node[excludedNodes.size()])) : "[]"));
+
     // TODO HDP_2.6 this is a hardcoded blockstoragepolicy... :-(
     BlockStoragePolicy policy = BlockStoragePolicy.DISKS;
     final DatanodeStorageInfo[] targets = blockplacement.chooseTarget(src,
         numOfReplicas, client, excludedNodes, blocksize,
         favoredDatanodeDescriptors, policy);
 
+    LogFactory.getLog(LogFactory.class).debug("### >> excludedNodes (4) = " +
+        (excludedNodes != null ? Arrays.toString(excludedNodes.toArray(new Node[excludedNodes.size()])) : "[]"));
+
     if (targets.length < minReplication) {
-      throw new IOException("File " + src + " could only be replicated to "
-          + targets.length + " nodes instead of minReplication (="
-          + minReplication + ").  There are "
-          + getDatanodeManager().getNetworkTopology().getNumOfLeaves()
+      throw new IOException("File " + src
+          + " could only be replicated to " + targets.length + " nodes "
+          +  "instead of minReplication (=" + minReplication + ").  "
+          +  "There are " + getDatanodeManager().getNetworkTopology().getNumOfLeaves()
           + " datanode(s) running and "
           + (excludedNodes == null? "no": excludedNodes.size())
-          + " node(s) are excluded in this operation.");
+          + " node(s) are excluded in this operation. "
+          + (excludedNodes != null ? Arrays.toString(excludedNodes.toArray(new Node[excludedNodes.size()])) : "[]"));
     }
     return targets;
   }

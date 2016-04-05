@@ -230,10 +230,15 @@ class BPServiceActor implements Runnable {
   }
 
   @VisibleForTesting
-  void triggerHeartbeatForTests() {
+  synchronized void triggerHeartbeatForTests() {
     lastHeartbeat = 0;
-    synchronized (waitForHeartBeats) {
-      waitForHeartBeats.notifyAll();
+    this.notifyAll();
+    while (lastHeartbeat == 0) {
+      try {
+        this.wait(100);
+      } catch (InterruptedException e) {
+        return;
+      }
     }
   }
 
@@ -553,7 +558,6 @@ class BPServiceActor implements Runnable {
 
     SortedActiveNodeList list = this.bpNamenode.getActiveNamenodes();
     bpos.updateNNList(list);
-
   }
 
   public void blockReceivedAndDeleted(DatanodeRegistration registration,

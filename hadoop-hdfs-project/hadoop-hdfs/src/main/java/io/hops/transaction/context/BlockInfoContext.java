@@ -26,6 +26,7 @@ import io.hops.metadata.common.FinderType;
 import io.hops.metadata.hdfs.dal.BlockInfoDataAccess;
 import io.hops.metadata.hdfs.entity.INodeCandidatePrimaryKey;
 import io.hops.transaction.lock.TransactionLocks;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 
@@ -202,10 +203,13 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
       inodeId = (Integer) params[1];
     }
     if (contains(blockId)) {
+      LogFactory.getLog(LogFactory.class).debug("### path 1");
       result = get(blockId);
       hit(bFinder, result, "bid", blockId, "inodeId",
           inodeId != null ? Integer.toString(inodeId) : "NULL");
     } else {
+      LogFactory.getLog(LogFactory.class).debug("### path 2");
+
       // some test intentionally look for blocks that are not in the DB
       // duing the acquire lock phase if we see that an id does not
       // exist in the db then we should put null in the cache for that id

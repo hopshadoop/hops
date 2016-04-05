@@ -98,7 +98,7 @@ message DatanodeStorageProto {
 }
 
 message StorageReportProto {
-  required string storageID = 1;
+  required string storageUuid = 1 [ deprecated = true ];
   optional bool failed = 2 [default = false];
   optional uint64 capacity = 3 [default = 0];
   optional uint64 dfsUsed = 4 [default = 0];

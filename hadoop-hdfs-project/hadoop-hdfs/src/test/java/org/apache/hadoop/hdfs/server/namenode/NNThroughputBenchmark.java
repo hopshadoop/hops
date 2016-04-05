@@ -1091,7 +1091,7 @@ public class NNThroughputBenchmark {
 
       // create files 
       LOG.info(
-          "Creating " + nrFiles + " with " + blocksPerFile + " blocks each.");
+          "Creating " + nrFiles + " files with " + blocksPerFile + " blocks each.");
       FileNameGenerator nameGenerator;
       nameGenerator = new FileNameGenerator(getBaseDir(), 100);
       String clientName = getClientName(007);
@@ -1127,7 +1127,7 @@ public class NNThroughputBenchmark {
                   ReceivedDeletedBlockInfo.BlockStatus.RECEIVED_BLOCK, null)};
           StorageReceivedDeletedBlocks[] report =
               {new StorageReceivedDeletedBlocks(
-                  datanodes[dnIdx].dnRegistration.getDatanodeUuid(), rdBlocks)};
+                  datanodes[dnIdx].storage.getStorageID(), rdBlocks)};
           nameNodeProto.blockReceivedAndDeleted(datanodes[dnIdx].dnRegistration,
               loc.getBlock().getBlockPoolId(), report);
         }

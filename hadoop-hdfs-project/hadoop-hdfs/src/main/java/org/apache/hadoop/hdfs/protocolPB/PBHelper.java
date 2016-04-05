@@ -1398,7 +1398,8 @@ public class PBHelper {
     return StorageReportProto.newBuilder()
         .setBlockPoolUsed(r.getBlockPoolUsed()).setCapacity(r.getCapacity())
         .setDfsUsed(r.getDfsUsed()).setRemaining(r.getRemaining())
-        .setStorageID(r.getStorage().getStorageID()).build();
+        .setStorageUuid(r.getStorage().getStorageID())
+        .setStorage(convert(r.getStorage())).build();
   }
 
   public static StorageReport convert(StorageReportProto p) {
@@ -1409,8 +1410,15 @@ public class PBHelper {
     To support that, check whether p has a storage (p.hasStorage()) and use
     that one instead of the new DatanodeStorage(p.getStorageID()).
      */
+//    return new StorageReport(
+//            new DatanodeStorage(p.getStorageUuid()),
+//        p.getFailed(), p.getCapacity(), p.getDfsUsed(), p.getRemaining(),
+//        p.getBlockPoolUsed());
+
     return new StorageReport(
-            new DatanodeStorage(p.getStorageID()),
+        p.hasStorage() ?
+            convert(p.getStorage()) :
+            new DatanodeStorage(p.getStorageUuid()),
         p.getFailed(), p.getCapacity(), p.getDfsUsed(), p.getRemaining(),
         p.getBlockPoolUsed());
   }

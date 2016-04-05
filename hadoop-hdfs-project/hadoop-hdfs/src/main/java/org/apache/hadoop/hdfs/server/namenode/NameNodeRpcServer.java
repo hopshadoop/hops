@@ -23,6 +23,7 @@ import io.hops.leader_election.node.SortedActiveNodeList;
 import io.hops.metadata.hdfs.entity.EncodingPolicy;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
 import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.ContentSummary;
@@ -444,6 +445,9 @@ class NameNodeRpcServer implements NamenodeProtocols {
           "*BLOCK* NameNode.addBlock: file " + src + " for " + clientName);
     }
     HashSet<Node> excludedNodesSet = null;
+
+    LogFactory.getLog(LogFactory.class).debug("### >> excludedNodes (1) = " + Arrays.toString(excludedNodes));
+
     if (excludedNodes != null) {
       excludedNodesSet = new HashSet<Node>(excludedNodes.length);
       for (Node node : excludedNodes) {
