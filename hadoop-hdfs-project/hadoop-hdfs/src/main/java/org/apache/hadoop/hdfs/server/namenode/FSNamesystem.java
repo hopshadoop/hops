@@ -2309,7 +2309,7 @@ public class FSNamesystem
 
   LocatedBlock makeLocatedBlock(Block blk, DatanodeStorageInfo[] locs, long offset)
       throws IOException {
-    LocatedBlock lBlk = new LocatedBlock(getExtendedBlock(blk), locs, offset);
+    LocatedBlock lBlk = new LocatedBlock(getExtendedBlock(blk), locs, offset, false);
     getBlockManager().setBlockToken(lBlk,
         BlockTokenSecretManager.AccessMode.WRITE);
     return lBlk;

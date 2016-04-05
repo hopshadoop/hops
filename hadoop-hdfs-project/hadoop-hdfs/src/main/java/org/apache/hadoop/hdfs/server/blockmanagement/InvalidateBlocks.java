@@ -96,8 +96,18 @@ class InvalidateBlocks {
    */
   void add(final BlockInfo block, final DatanodeStorageInfo storage,
       final boolean log) throws StorageException, TransactionContextException {
-    FSNamesystem.LOG.debug("block:   " + block);
-    FSNamesystem.LOG.debug("storage: " + storage);
+
+    if(storage == null) {
+      // TODO this avoids a NullPointer when running
+      // TestIncrementalBrVariations#testNnLearnsNewStorages()
+      // NullPointer is caused because we haven actually added the block in
+      // the database, so looking up which storage it's on will return null.
+      // Maybe we can do this prettier?
+
+      NameNode.blockStateChangeLog.info("Skipped invalidating blocks. " +
+            "Should only happen during tests!");
+      return;
+    }
 
     InvalidatedBlock invBlk = new InvalidatedBlock(
         storage.getSid(),

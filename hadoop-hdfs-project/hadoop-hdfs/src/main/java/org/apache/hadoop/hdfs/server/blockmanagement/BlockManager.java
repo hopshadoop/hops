@@ -845,26 +845,28 @@ public class BlockManager {
     final int numNodes = blocksMap.numNodes(blk);
     final boolean isCorrupt = numCorruptNodes == numNodes;
     final int numMachines = isCorrupt ? numNodes : numNodes - numCorruptNodes;
-    final DatanodeDescriptor[] machines = new DatanodeDescriptor[numMachines];
+    final DatanodeStorageInfo[] storages = new DatanodeStorageInfo[numMachines];
     int j = 0;
     if (numMachines > 0) {
-      for (Iterator<DatanodeDescriptor> it = blocksMap.nodeIterator(blk);
-           it.hasNext(); ) {
-        final DatanodeDescriptor d = it.next();
-        final boolean replicaCorrupt = corruptReplicas.isReplicaCorrupt(blk, d);
+      for (Iterator<DatanodeStorageInfo> storageIterator = blocksMap
+          .storageIterator(blk); storageIterator.hasNext();) {
+        final DatanodeStorageInfo storage = storageIterator.next();
+        final boolean replicaCorrupt = corruptReplicas.isReplicaCorrupt(blk,
+            storage.getDatanodeDescriptor());
         if (isCorrupt || (!isCorrupt && !replicaCorrupt)) {
-          machines[j++] = d;
+          storages[j++] = storage;
         }
       }
     }
-    assert j == machines.length : "isCorrupt: " + isCorrupt +
-        " numMachines: " + numMachines +
+
+    assert j == storages.length : "isCorrupt: " + isCorrupt +
+        " numStorages: " + numMachines +
         " numNodes: " + numNodes +
         " numCorrupt: " + numCorruptNodes +
         " numCorruptRepls: " + numCorruptReplicas;
     final ExtendedBlock eb =
         new ExtendedBlock(namesystem.getBlockPoolId(), blk);
-    return new LocatedBlock(eb, machines, pos, isCorrupt);
+    return new LocatedBlock(eb, storages, pos, isCorrupt);
   }
 
   /**
@@ -1092,8 +1094,6 @@ public class BlockManager {
       UnregisteredNodeException {
     DatanodeDescriptor dn = datanodeManager.getDatanode(datanode);
     DatanodeStorageInfo storage = getBlockInfo(block).getStorageOnNode(dn);
-
-    // TODO returned null -> should return non-null value
 
     addToInvalidates(block, storage);
   }
@@ -3393,7 +3393,7 @@ public class BlockManager {
   // TODO change to a per-storage report (one report message deals with an
   // entire host, but it's split up per storage)
   public void processIncrementalBlockReport(DatanodeRegistration nodeID,
-      final String poolId, final StorageReceivedDeletedBlocks blockInfos)
+      final StorageReceivedDeletedBlocks blockInfos)
     throws IOException {
     final int[] received = {0};
     final int[] deleted = {0};

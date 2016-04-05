@@ -24,7 +24,6 @@ import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 import org.apache.hadoop.security.token.Token;
 
-import java.util.Arrays;
 import java.util.Comparator;
 
 /**
@@ -42,7 +41,7 @@ public class LocatedBlock {
   // Storage type for each replica, if reported.
   private StorageType[] storageTypes;
   // Storage ID for each replica, if reported.
-  private String[] storageIds;
+  private String[] storageIDs;
   // corrupt flag is true if all of the replicas of a block are corrupt.
   // else false. If block has few corrupt replicas, they are filtered and 
   // their locations are not part of this object
@@ -63,10 +62,6 @@ public class LocatedBlock {
 
   public LocatedBlock(ExtendedBlock b, DatanodeStorageInfo[] storages) {
     this(b, storages, -1, false); // startOffset is unknown
-  }
-
-  public LocatedBlock(ExtendedBlock b, DatanodeStorageInfo[] storages, long offset) {
-    this(b, storages, offset, false); // startOffset is unknown
   }
 
   public LocatedBlock(ExtendedBlock b, DatanodeInfo[] locs, String[] storageIDs, StorageType[] storageTypes) {
@@ -90,6 +85,7 @@ public class LocatedBlock {
     } else {
       this.locs = locs;
     }
+    this.storageIDs = storageIDs;
     this.storageTypes = storageTypes;
   }
 
@@ -106,7 +102,7 @@ public class LocatedBlock {
   }
 
   public String[] getStorageIDs() {
-    return storageIds;
+    return storageIDs;
   }
 
   public void setBlockToken(Token<BlockTokenIdentifier> token) {
