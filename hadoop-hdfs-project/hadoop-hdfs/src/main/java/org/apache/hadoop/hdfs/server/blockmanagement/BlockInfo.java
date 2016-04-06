@@ -265,13 +265,10 @@ public class BlockInfo extends Block {
       throws StorageException, TransactionContextException {
     // TODO check we don't already have a replica on this machine
 
-//    boolean ir = isReplicatedOnStorage(storage);
-//    FSNamesystem.LOG.debug("?z? isReplicatedOnStorage=" +
-//        ir + " (should be false)");
-//
-//    if(ir) {
-//      return null;
-//    }
+    if(isReplicatedOnStorage(storage)) {
+      FSNamesystem.LOG.warn("attempting to add replica on same storage");
+      return null;
+    }
 
     Replica replica = new Replica(storage.getSid(), getBlockId(), getInodeId());
     add(replica);

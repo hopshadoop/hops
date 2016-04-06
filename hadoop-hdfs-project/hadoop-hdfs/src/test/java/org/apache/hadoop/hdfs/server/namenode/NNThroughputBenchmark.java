@@ -875,7 +875,8 @@ public class NNThroughputBenchmark {
       nsInfo = nameNodeProto.versionRequest();
       dnRegistration = new DatanodeRegistration(
           new DatanodeID(DNS.getDefaultIP("default"),
-              DNS.getDefaultHost("default", "default"), "", getNodePort(dnIdx),
+              DNS.getDefaultHost("default", "default"),
+              DataNode.generateUuid(), getNodePort(dnIdx),
               DFSConfigKeys.DFS_DATANODE_HTTP_DEFAULT_PORT,
               DFSConfigKeys.DFS_DATANODE_IPC_DEFAULT_PORT),
           new DataStorage(nsInfo), new ExportedBlockKeys(),
