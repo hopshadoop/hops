@@ -1869,9 +1869,7 @@ public class BlockManager {
     // Now that we have an up-to-date block report, we know that any
     // deletions from a previous NN iteration have been accounted for.
     boolean staleBefore = storageInfo.areBlockContentsStale();
-
     storageInfo.receivedBlockReport();
-
     if (staleBefore && !storageInfo.areBlockContentsStale()) {
       LOG.info(
           "BLOCK* processReport: Received first block report from " + node +

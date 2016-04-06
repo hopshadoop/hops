@@ -240,7 +240,9 @@ public class DatanodeDescriptor extends DatanodeInfo {
   }
 
   public DatanodeStorageInfo getStorageInfo(String storageID) {
-    return this.storageMap.get(storageID);
+    synchronized (storageMap) {
+      return this.storageMap.get(storageID);
+    }
   }
 
   public DatanodeStorageInfo[] getStorageInfos() {
@@ -301,7 +303,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
 
     int blocks = 0;
 
-    for (final DatanodeStorageInfo entry : storageMap.values()) {
+    for (final DatanodeStorageInfo entry : getStorageInfos()) {
       blocks += entry.numBlocks();
     }
 
@@ -488,6 +490,10 @@ public class DatanodeDescriptor extends DatanodeInfo {
         HdfsStorageFactory.getConnector().beginTransaction();
         List<BlockInfo> list = blocks.findBlockInfosByHostId(getDatanodeUuid());
         HdfsStorageFactory.getConnector().commit();
+
+        // TODO implement it
+        LogFactory.getLog(DatanodeDescriptor.class).fatal("Calling unimplemented function");
+
         return list;
       }
     };
