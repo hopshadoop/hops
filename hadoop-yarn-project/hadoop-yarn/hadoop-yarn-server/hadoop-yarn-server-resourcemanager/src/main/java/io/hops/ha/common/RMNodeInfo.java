@@ -15,9 +15,7 @@
  */
 package io.hops.ha.common;
 
-import io.hops.exception.StorageException;
 import static io.hops.ha.common.TransactionState.pendingEventId;
-import io.hops.metadata.yarn.dal.PendingEventDataAccess;
 import io.hops.metadata.yarn.entity.ContainerId;
 import io.hops.metadata.yarn.entity.ContainerStatus;
 import io.hops.metadata.yarn.entity.FinishedApplications;
@@ -52,7 +50,7 @@ public class RMNodeInfo {
   //PersistedEvent to persist for distributed RT
   private final Map<PendingEventID, PendingEvent> persistedEventsToAdd
           = new HashMap<PendingEventID, PendingEvent>();
-  private final ArrayList<PendingEvent> persistedEventsToRemove
+  private final ArrayList<PendingEvent> PendingEventsToRemove
           = new ArrayList<PendingEvent>();
   private Set<org.apache.hadoop.yarn.api.records.ContainerId>
       containerToCleanToAdd =
@@ -467,12 +465,12 @@ public void agregateFinishedApplicationToRemove(RMNodeInfoAgregate agregate){
   }
 
   public void addPendingEventToRemove(PendingEvent pendingEvent) {
-    this.persistedEventsToRemove
+    this.PendingEventsToRemove
             .add(new PendingEvent(pendingEvent));
   }
   
   public  ArrayList<PendingEvent> getPendingEventToRemove(){
-    return  persistedEventsToRemove;
+    return  PendingEventsToRemove;
   }
   
   public void agregatePendingEventsToAdd(RMNodeInfoAgregate agregate) {
@@ -484,9 +482,9 @@ public void agregateFinishedApplicationToRemove(RMNodeInfoAgregate agregate){
   }
 
   public void agregatePendingEventsToRemove(RMNodeInfoAgregate agregate) {
-    if (persistedEventsToRemove != null
-            && !persistedEventsToRemove.isEmpty()) {
-      agregate.addAllPendingEventsToRemove(persistedEventsToRemove);
+    if (PendingEventsToRemove != null
+            && !PendingEventsToRemove.isEmpty()) {
+      agregate.addAllPendingEventsToRemove(PendingEventsToRemove);
     }
   }
 

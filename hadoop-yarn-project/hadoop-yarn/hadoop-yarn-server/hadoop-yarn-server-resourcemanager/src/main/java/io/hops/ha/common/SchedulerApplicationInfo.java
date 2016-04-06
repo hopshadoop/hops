@@ -99,7 +99,6 @@ public class SchedulerApplicationInfo {
             .add(new SchedulerApplication(appId.toString(), null, null));
       }
       sappDA.removeAll(applicationsToRemove);
-      //TORECOVER OPT clean the table that depend on this one
     }
   }
 

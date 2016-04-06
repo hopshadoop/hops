@@ -90,6 +90,7 @@ public class NdbEventStreamingProcessor extends PendingEventRetrieval {
       active = true;
       LOG.info("start retriving thread");
       retrivingThread = new Thread(new RetrivingThread());
+      retrivingThread.setName("event retriver");
       retrivingThread.start();
     } else {
       LOG.error("ndb event retriver is already active");

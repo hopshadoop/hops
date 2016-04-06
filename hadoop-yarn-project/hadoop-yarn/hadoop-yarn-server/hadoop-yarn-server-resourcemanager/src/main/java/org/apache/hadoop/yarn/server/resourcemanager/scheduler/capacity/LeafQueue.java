@@ -114,7 +114,7 @@ public class LeafQueue implements CSQueue {
 
   private Map<String, User> users = new HashMap<String, User>();  //recovered
 
-  private final QueueMetrics metrics;  //TORECOVER
+  private final QueueMetrics metrics;  //recovered
 
   private QueueInfo queueInfo;   //recovered
 

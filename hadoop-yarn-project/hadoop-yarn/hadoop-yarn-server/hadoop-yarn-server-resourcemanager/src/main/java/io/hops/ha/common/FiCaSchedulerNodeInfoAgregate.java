@@ -47,7 +47,7 @@ public class FiCaSchedulerNodeInfoAgregate {
   }
 
   public void addAlllaunchedContainersToAdd(
-          ArrayList<LaunchedContainers> toAddLaunchedContainers) {
+          Collection<LaunchedContainers> toAddLaunchedContainers) {
     this.toAddLaunchedContainers.addAll(toAddLaunchedContainers);
   }
 

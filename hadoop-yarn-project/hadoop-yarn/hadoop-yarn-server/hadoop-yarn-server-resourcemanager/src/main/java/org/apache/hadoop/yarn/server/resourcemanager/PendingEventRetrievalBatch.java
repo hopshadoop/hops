@@ -74,6 +74,7 @@ public class PendingEventRetrievalBatch extends PendingEventRetrieval {
     if (!active) {
       active = true;
       retrivingThread = new Thread(new RetrivingThread());
+      retrivingThread.setName("pending events retriver thread");
       retrivingThread.start();
     } else {
       LOG.error("ndb event retriver is already active");

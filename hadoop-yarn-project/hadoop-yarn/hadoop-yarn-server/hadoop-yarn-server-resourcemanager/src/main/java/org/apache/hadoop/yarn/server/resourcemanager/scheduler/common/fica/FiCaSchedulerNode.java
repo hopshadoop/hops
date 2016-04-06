@@ -43,8 +43,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.Recoverable;
 
 public class FiCaSchedulerNode extends SchedulerNode implements Recoverable{
@@ -92,7 +90,6 @@ public class FiCaSchedulerNode extends SchedulerNode implements Recoverable{
   public void recover(RMStateStore.RMState state) throws Exception{
     io.hops.metadata.yarn.entity.FiCaSchedulerNode hopNode = 
             state.getAllFiCaSchedulerNodes().get(rmNode.getNodeID().toString());
-    numContainers = hopNode.getNumOfContainers();
     recoverResources(state);
     recoverLaunchedContainers(hopNode, state);
     if(hopNode.getReservedContainerId()!=null){
@@ -142,13 +139,9 @@ public class FiCaSchedulerNode extends SchedulerNode implements Recoverable{
 
     launchedContainers.put(container.getId(), rmContainer);
     if (transactionState != null) {
-      //HOP :: Update numContainers
+      //HOP :: Update launchedContainer
       ((TransactionStateImpl) transactionState)
-          .getFicaSchedulerNodeInfoToUpdate(this.getNodeID().toString())
-          .infoToUpdate(this);
-      //HOP :: Update reservedContainer
-      ((TransactionStateImpl) transactionState)
-          .getFicaSchedulerNodeInfoToUpdate(rmNode.getNodeID().toString())
+          .getFicaSchedulerNodeInfoToUpdate(rmNode.getNodeID())
           .toAddLaunchedContainers(container.getId().toString(),
               rmContainer.getContainerId().toString());
     }
@@ -186,12 +179,6 @@ public class FiCaSchedulerNode extends SchedulerNode implements Recoverable{
     addAvailableResource(container.getResource());
 
     --numContainers;
-    //HOP :: Update numContainers
-    if (transactionState != null) {
-      ((TransactionStateImpl) transactionState)
-          .getFicaSchedulerNodeInfoToUpdate(this.getNodeID().toString())
-          .infoToUpdate(this);
-    }
   }
 
   /**
@@ -212,7 +199,7 @@ public class FiCaSchedulerNode extends SchedulerNode implements Recoverable{
       //HOP :: Update reservedContainer
       if (transactionState != null) {
         ((TransactionStateImpl) transactionState)
-            .getFicaSchedulerNodeInfoToUpdate(rmNode.getNodeID().toString())
+            .getFicaSchedulerNodeInfoToUpdate(rmNode.getNodeID())
             .toRemoveLaunchedContainers(container.getId().toString());
       }
       updateResource(container, transactionState);
@@ -234,7 +221,6 @@ public class FiCaSchedulerNode extends SchedulerNode implements Recoverable{
     }
     Resources.addTo(availableResource, resource);
     Resources.subtractFrom(usedResource, resource);
-    //HOP :: Update resources
 
   }
 
@@ -247,7 +233,6 @@ public class FiCaSchedulerNode extends SchedulerNode implements Recoverable{
     }
     Resources.subtractFrom(availableResource, resource);
     Resources.addTo(usedResource, resource);
-    //HOP :: Update resources
   }
 
   @Override
@@ -306,7 +291,7 @@ public class FiCaSchedulerNode extends SchedulerNode implements Recoverable{
     this.reservedContainer = reservedContainer;
     //HOP :: Update reservedContainer
     ((TransactionStateImpl) transactionState)
-        .getFicaSchedulerNodeInfoToUpdate(this.getNodeID().toString())
+        .getFicaSchedulerNodeInfoToUpdate(this.getNodeID())
         .updateReservedContainer(this);
 
   }
@@ -334,7 +319,7 @@ public class FiCaSchedulerNode extends SchedulerNode implements Recoverable{
     }
     reservedContainer = null;
     ((TransactionStateImpl) transactionState).
-            getFicaSchedulerNodeInfoToUpdate(this.getNodeID().toString())
+            getFicaSchedulerNodeInfoToUpdate(this.getNodeID())
         .infoToUpdate(this);
 
   }
@@ -362,6 +347,7 @@ public class FiCaSchedulerNode extends SchedulerNode implements Recoverable{
           state.getRMContainer(lc.getRmContainerID(), rmContext);
       launchedContainers.put(rMContainer.getContainerId(), rMContainer);
       deductAvailableResource(rMContainer.getContainer().getResource());
+      numContainers++;
     }
 
   }
@@ -372,24 +358,14 @@ public class FiCaSchedulerNode extends SchedulerNode implements Recoverable{
     Resource hoptotalCapability = state.getResource(
             rmNode.getNodeID().toString(), Resource.TOTAL_CAPABILITY, 
             Resource.FICASCHEDULERNODE);
-    Resource hopavailable = state.getResource(rmNode.getNodeID().toString(),
-            Resource.AVAILABLE, Resource.FICASCHEDULERNODE);
-    Resource hopused = state.getResource(rmNode.getNodeID().toString(),
-            Resource.USED, Resource.FICASCHEDULERNODE);
 
     if (hoptotalCapability != null) {
       this.totalResourceCapability = org.apache.hadoop.yarn.api.records.Resource
           .newInstance(hoptotalCapability.getMemory(),
               hoptotalCapability.getVirtualCores());
     }
-    if (hopavailable != null) {
-      this.availableResource = org.apache.hadoop.yarn.api.records.Resource
-          .newInstance(hopavailable.getMemory(),
-              hopavailable.getVirtualCores());
-    }
-    if (hopused != null) {
-      this.usedResource = org.apache.hadoop.yarn.api.records.Resource
-          .newInstance(hopused.getMemory(), hopused.getVirtualCores());
-    }
+    this.availableResource.setMemory(totalResourceCapability.getMemory());
+    this.availableResource.setVirtualCores(totalResourceCapability.
+            getVirtualCores());
   }
 }

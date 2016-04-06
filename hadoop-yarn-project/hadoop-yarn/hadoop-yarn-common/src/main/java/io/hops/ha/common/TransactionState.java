@@ -60,8 +60,6 @@ public abstract class TransactionState {
     return appIds;
   }
 
-  abstract boolean addAppId(ApplicationId appId);
-
   public void incCounter(Enum type) {
     counter.incrementAndGet();
   }
