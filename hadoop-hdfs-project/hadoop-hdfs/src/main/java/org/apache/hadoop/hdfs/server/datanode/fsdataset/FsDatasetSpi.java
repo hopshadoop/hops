@@ -116,11 +116,6 @@ public interface FsDatasetSpi<V extends FsVolumeSpi> extends FSDatasetMBean {
   public Map<String, Object> getVolumeInfoMap();
 
   /**
-   * @return a list of block pools.
-   */
-  public String[] getBlockPoolList();
-
-  /**
    * @return a list of finalized blocks for the given block pool.
    */
   public List<FinalizedReplica> getFinalizedBlocks(String bpid);

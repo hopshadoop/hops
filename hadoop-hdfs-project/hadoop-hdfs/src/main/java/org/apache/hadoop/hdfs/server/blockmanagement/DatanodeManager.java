@@ -431,15 +431,23 @@ public class DatanodeManager {
     heartbeatManager.removeDatanode(nodeInfo);
     if (namesystem.isLeader()) {
       NameNode.stateChangeLog.info(
-          "DataNode is dead. Removing all replicas for datanode " + nodeInfo +
-              " StorageID " + nodeInfo.getDatanodeUuid() + " index " +
-              nodeInfo.getHostName());
+          "DataNode is dead. Removing all replicas for" +
+              " datanode " + nodeInfo +
+              " StorageID " + nodeInfo.getDatanodeUuid() +
+              " index " + nodeInfo.getHostName());
       blockManager.removeBlocksAssociatedTo(nodeInfo);
+
+      // TODO remove storages from DB
+      // TODO remove storages from storageIdMap in the blockmanager
+
+      // This method can be rewritten as:
+      // Loop over each storage, and delete all blocks on the storage. Then
+      // delete the storage from the DB & cache
     }
     networktopology.remove(nodeInfo);
 
     if (LOG.isDebugEnabled()) {
-      LOG.debug("remove datanode " + nodeInfo);
+      LOG.debug("removed datanode " + nodeInfo);
     }
     namesystem.checkSafeMode();
   }
@@ -765,9 +773,9 @@ public class DatanodeManager {
           value in "VERSION" file under the data directory of the datanode,
           but this is might not work if VERSION file format has changed 
        */
-        NameNode.stateChangeLog.info(
-            "BLOCK* registerDatanode: " + nodeS + " is replaced by " + nodeReg +
-                " with the same storageID " + nodeReg.getDatanodeUuid());
+        NameNode.stateChangeLog.info("BLOCK* registerDatanode: " + nodeS
+            + " is replaced by " + nodeReg + " with the same storageID "
+            + nodeReg.getDatanodeUuid());
       }
       // update cluster map
       getNetworkTopology().remove(nodeS);

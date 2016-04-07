@@ -1835,7 +1835,6 @@ public class DataNode extends Configured
   }
 
   /**
-   * This method is used for testing.
    * Examples are adding and deleting blocks directly.
    * The most common usage will be when the data node's storage is simulated.
    *

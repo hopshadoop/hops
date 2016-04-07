@@ -218,10 +218,13 @@ public class PBHelper {
   }
 
   public static DatanodeIDProto convert(DatanodeID dn) {
+    // For wire compatibility with older versions we transmit the StorageID
+    // which is the same as the DatanodeUuid. Since StorageID is a required
+    // field we pass the empty string if the DatanodeUuid is not yet known.
     return DatanodeIDProto.newBuilder()
         .setIpAddr(dn.getIpAddr())
         .setHostName(dn.getHostName())
-        .setDatanodeUuid(dn.getDatanodeUuid())
+        .setDatanodeUuid(dn.getDatanodeUuid() != null ? dn.getDatanodeUuid() : "")
         .setXferPort(dn.getXferPort())
         .setInfoPort(dn.getInfoPort())
         .setIpcPort(dn.getIpcPort()).build();

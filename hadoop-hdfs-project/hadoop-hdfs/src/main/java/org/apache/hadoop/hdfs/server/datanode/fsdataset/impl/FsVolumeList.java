@@ -109,12 +109,6 @@ class FsVolumeList {
     return remaining;
   }
 
-  void getVolumeMap(ReplicaMap volumeMap) throws IOException {
-    for (FsVolumeImpl v : volumes.get()) {
-      v.getVolumeMap(volumeMap);
-    }
-  }
-  
   void getVolumeMap(String bpid, ReplicaMap volumeMap) throws IOException {
     for (FsVolumeImpl v : volumes.get()) {
       v.getVolumeMap(bpid, volumeMap);

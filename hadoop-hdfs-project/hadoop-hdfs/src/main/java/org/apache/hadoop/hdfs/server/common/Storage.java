@@ -792,10 +792,6 @@ public abstract class Storage extends StorageInfo {
     this.storageType = type;
   }
 
-  protected Storage(StorageInfo storageInfo) {
-    super(storageInfo);
-  }
-  
   protected Storage(NodeType type, StorageInfo storageInfo) {
     super(storageInfo);
     this.storageType = type;

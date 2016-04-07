@@ -1349,24 +1349,15 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
   
   /**
    * Register the FSDataset MBean using the name
-   * "hadoop:service=DataNode,name=FSDatasetState-<storageid>"
+   * "hadoop:service=DataNode,name=FSDatasetState-<datanodeUuid>"
    */
-  void registerMBean(final String storageId) {
+  void registerMBean(final String datanodeUuid) {
     // We wrap to bypass standard mbean naming convetion.
     // This wraping can be removed in java 6 as it is more flexible in 
     // package naming for mbeans and their impl.
-    StandardMBean bean;
-    String storageName;
-    if (storageId == null ||
-        storageId.equals("")) {// Temp fix for the uninitialized storage
-      storageName = "UndefinedStorageId" + DFSUtil.getRandom().nextInt();
-    } else {
-      storageName = storageId;
-    }
     try {
-      bean = new StandardMBean(this, FSDatasetMBean.class);
-      mbeanName =
-          MBeans.register("DataNode", "FSDatasetState-" + storageName, bean);
+      StandardMBean bean = new StandardMBean(this,FSDatasetMBean.class);
+      mbeanName = MBeans.register("DataNode", "FSDatasetState-" + datanodeUuid, bean);
     } catch (NotCompliantMBeanException e) {
       LOG.warn("Error registering FSDatasetState MBean", e);
     }
@@ -1755,11 +1746,6 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
     LOG.info("Removing block pool " + bpid);
     volumeMap.cleanUpBlockPool(bpid);
     volumes.removeBlockPool(bpid);
-  }
-  
-  @Override
-  public String[] getBlockPoolList() {
-    return volumeMap.getBlockPoolList();
   }
   
   /**
