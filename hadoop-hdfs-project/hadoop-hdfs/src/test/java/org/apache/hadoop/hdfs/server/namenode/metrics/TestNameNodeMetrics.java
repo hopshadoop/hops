@@ -28,6 +28,7 @@ import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.hadoop.hdfs.protocol.BlockListAsLongs;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockManager;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockManagerTestUtil;
@@ -45,6 +46,7 @@ import org.junit.Test;
 
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.util.Map;
 import java.util.Random;
 
 import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
@@ -404,14 +406,15 @@ public class TestNameNodeMetrics {
   @Test
   public void testSyncAndBlockReportMetric() throws Exception {
     MetricsRecordBuilder rb = getMetrics(NN_METRICS);
-    // We have one sync when the cluster starts up, just opening the journal
     // Each datanode reports in when the cluster comes up
-    assertCounter("BlockReportNumOps", (long) DATANODE_COUNT, rb);
-    
+    assertCounter("BlockReportNumOps",
+        (long)DATANODE_COUNT * cluster.getStoragesPerDatanode(), rb);
+
     // Sleep for an interval+slop to let the percentiles rollover
-    Thread.sleep((PERCENTILES_INTERVAL + 1) * 1000);
-    
+    Thread.sleep((PERCENTILES_INTERVAL+1)*1000);
+
     // Check that the percentiles were updated
+    assertQuantileGauges("Syncs1s", rb);
     assertQuantileGauges("BlockReport1s", rb);
   }
 }

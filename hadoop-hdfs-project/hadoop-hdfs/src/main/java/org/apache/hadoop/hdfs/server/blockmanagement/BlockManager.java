@@ -3053,77 +3053,45 @@ public class BlockManager {
       BlockPlacementPolicy replicator)
       throws StorageException, TransactionContextException {
 
+    // first form a rack to datanodes map and
     BlockCollection bc = getBlockCollection(b);
-
     // TODO This should be loaded from an XAttr or whatever
-    final List<StorageType> excessTypes = BlockStoragePolicy.DEFAULT
-        .chooseExcess(replication, DatanodeStorageInfo.toStorageTypes(nonExcess));
+    final BlockStoragePolicy storagePolicy = BlockStoragePolicy.DEFAULT;
+    final List<StorageType> excessTypes = storagePolicy.chooseExcess(
+        replication, DatanodeStorageInfo.toStorageTypes(nonExcess));
 
-    // For a map from rackId
-    final Map<String, List<DatanodeStorageInfo>> rackMap = new  HashMap<String, List<DatanodeStorageInfo>>();
-    for (final Iterator<DatanodeStorageInfo> iter = nonExcess.iterator(); iter.hasNext(); ) {
-      final DatanodeStorageInfo storage = iter.next();
-      final String rackName = addedNode.getNetworkLocation();
+    final Map<String, List<DatanodeStorageInfo>> rackMap
+        = new HashMap<String, List<DatanodeStorageInfo>>();
+    final List<DatanodeStorageInfo> moreThanOne = new ArrayList<DatanodeStorageInfo>();
+    final List<DatanodeStorageInfo> exactlyOne = new ArrayList<DatanodeStorageInfo>();
 
-      // All storages in this rack that we already iterated over that contain a
-      // replica
-      List<DatanodeStorageInfo> storagesInRack = rackMap.get(rackName);
-      if (storagesInRack == null) {
-        storagesInRack = new ArrayList<DatanodeStorageInfo>();
-        rackMap.put(rackName, storagesInRack);
-      }
-      storagesInRack.add(storage);
-    }
+    // split nodes into two sets
+    // moreThanOne contains nodes on rack with more than one replica
+    // exactlyOne contains the remaining nodes
+    replicator.splitNodesWithRack(nonExcess, rackMap, moreThanOne, exactlyOne);
 
-    // Split nodes into two sets:
-    // priSet contains nodes on rack with more than one replica
-    // remains contains the remaining nodes
-    final List<DatanodeStorageInfo> priSet = new ArrayList<DatanodeStorageInfo>();
-    final List<DatanodeStorageInfo> remains = new ArrayList<DatanodeStorageInfo>();
-
-    for (List<DatanodeStorageInfo> datanodeList : rackMap.values()) {
-      if (datanodeList.size() == 1) {
-        remains.add(datanodeList.get(0));
-      } else {
-        priSet.addAll(datanodeList);
-      }
-    }
-    
     // pick one node to delete that favors the delete hint
     // otherwise pick one with least space from priSet if it is not empty
     // otherwise one node with least space from remains
     boolean firstOne = true;
-    final DatanodeStorageInfo delNodeHintStorage = DatanodeStorageInfo.getDatanodeStorageInfo(nonExcess, delNodeHint);
-    final DatanodeStorageInfo addedNodeStorage = DatanodeStorageInfo.getDatanodeStorageInfo(nonExcess, addedNode);
-
+    final DatanodeStorageInfo delNodeHintStorage
+        = DatanodeStorageInfo.getDatanodeStorageInfo(nonExcess, delNodeHint);
+    final DatanodeStorageInfo addedNodeStorage
+        = DatanodeStorageInfo.getDatanodeStorageInfo(nonExcess, addedNode);
     while (nonExcess.size() - replication > 0) {
-      // check if we can delete delNodeHint
       final DatanodeStorageInfo cur;
-      if (useDelHint(firstOne, delNodeHintStorage, addedNodeStorage, remains,
-          excessTypes)) {
+      if (useDelHint(firstOne, delNodeHintStorage, addedNodeStorage,
+          moreThanOne, excessTypes)) {
         cur = delNodeHintStorage;
       } else { // regular excessive replica removal
         cur = replicator.chooseReplicaToDelete(bc, b, replication,
-            remains, priSet, excessTypes);
+            moreThanOne, exactlyOne, excessTypes);
       }
       firstOne = false;
 
-      // adjust rackmap, priSet, and remains
-      String rack = cur.getDatanodeDescriptor().getNetworkLocation();
-      final List<DatanodeStorageInfo> storagesInRack = rackMap.get(rack);
-      storagesInRack.remove(cur);
-      if (storagesInRack.isEmpty()) {
-        rackMap.remove(rack);
-      }
-      if (priSet.remove(cur)) {
-        if (storagesInRack.size() == 1) {
-          // Only one replica left in this rack -> move storage to remains
-          priSet.remove(storagesInRack.get(0));
-          remains.add(storagesInRack.get(0));
-        }
-      } else {
-        remains.remove(cur);
-      }
+      // adjust rackmap, moreThanOne, and exactlyOne
+      replicator.adjustSetsWithChosenReplica(rackMap, moreThanOne,
+          exactlyOne, cur);
 
       nonExcess.remove(cur);
       addToExcessReplicate(cur, b);
@@ -3131,15 +3099,15 @@ public class BlockManager {
       //
       // The 'excessblocks' tracks blocks until we get confirmation
       // that the datanode has deleted them; the only way we remove them
-      // is when we get a "removeBlock" message.  
+      // is when we get a "removeBlock" message.
       //
-      // The 'invalidate' list is used to inform the datanode the block 
+      // The 'invalidate' list is used to inform the datanode the block
       // should be deleted.  Items are removed from the invalidate list
       // upon giving instructions to the namenode.
       //
       addToInvalidates(b, cur);
-      blockLog.info("BLOCK* chooseExcessReplicates: " + "(" + cur + ", " + b +
-          ") is added to invalidated blocks set");
+      blockLog.info("BLOCK* chooseExcessReplicates: "
+          +"("+cur+", "+b+") is added to invalidated blocks set");
     }
   }
 
@@ -4504,5 +4472,4 @@ public class BlockManager {
       }
     }.handle();
   }
-
 }

@@ -241,6 +241,19 @@ public class BlockManagerTestUtil {
     bm.getDatanodeManager().getHeartbeatManager().heartbeatCheck();
   }
 
+  /**
+   * Call heartbeat check function of HeartbeatManager and get
+   * under replicated blocks count within write lock to make sure
+   * computeDatanodeWork doesn't interfere.
+   * @param bm the BlockManager to manipulate
+   * @return the number of under replicated blocks
+   */
+  public static int checkHeartbeatAndGetUnderReplicatedBlocksCount(BlockManager bm)
+      throws IOException {
+    bm.getDatanodeManager().getHeartbeatManager().heartbeatCheck();
+    return bm.getUnderReplicatedNotMissingBlocks();
+  }
+
   public static DatanodeDescriptor getDatanodeDescriptor(String ipAddr,
       String rackLocation, DatanodeStorage storage, String hostname) {
     DatanodeDescriptor dn = DFSTestUtil.getDatanodeDescriptor(ipAddr,
