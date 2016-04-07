@@ -254,6 +254,11 @@ public class BlockManagerTestUtil {
     return bm.getUnderReplicatedNotMissingBlocks();
   }
 
+  public static DatanodeStorageInfo updateStorage(DatanodeDescriptor dn,
+      DatanodeStorage s) {
+    return dn.updateStorage(s);
+  }
+
   public static DatanodeDescriptor getDatanodeDescriptor(String ipAddr,
       String rackLocation, DatanodeStorage storage, String hostname) {
     DatanodeDescriptor dn = DFSTestUtil.getDatanodeDescriptor(ipAddr,

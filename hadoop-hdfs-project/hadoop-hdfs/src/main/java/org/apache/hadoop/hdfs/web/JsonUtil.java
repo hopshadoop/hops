@@ -437,7 +437,7 @@ public class JsonUtil {
     final boolean isCorrupt = (Boolean) m.get("isCorrupt");
 
     final LocatedBlock locatedblock =
-        new LocatedBlock(b, locations, startOffset, isCorrupt);
+        new LocatedBlock(b, locations, null, null, startOffset, isCorrupt);
     locatedblock.setBlockToken(toBlockToken((Map<?, ?>) m.get("blockToken")));
     return locatedblock;
   }

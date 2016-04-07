@@ -387,18 +387,18 @@ public class TestPBHelper {
             AdminStates.DECOMMISSIONED),
         DFSTestUtil.getLocalDatanodeInfo("127.0.0.1", "h3", AdminStates.NORMAL)
     };
-
+    String[] storageIDs = {"s1", "s2", "s3", "s4"};
     StorageType[] media = {
         StorageType.DISK,
         StorageType.SSD,
         StorageType.DISK
     };
     LocatedBlock lb = new LocatedBlock(
-        new ExtendedBlock("bp12", 12345, 10, 53), dnInfos, 5, false);
+        new ExtendedBlock("bp12", 12345, 10, 53),
+        dnInfos, storageIDs, media, 5, false);
     lb.setBlockToken(new Token<BlockTokenIdentifier>(
         "identifier".getBytes(), "password".getBytes(), new Text("kind"),
         new Text("service")));
-    lb.setStorageTypes(media);
     return lb;
   }
 

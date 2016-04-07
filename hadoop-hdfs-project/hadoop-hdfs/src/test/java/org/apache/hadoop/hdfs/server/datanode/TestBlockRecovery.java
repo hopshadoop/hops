@@ -138,7 +138,7 @@ public class TestBlockRecovery {
     File dataDir = new File(DATA_DIR);
     FileUtil.fullyDelete(dataDir);
     dataDir.mkdirs();
-    StorageLocation location = new StorageLocation(new URI(dataDir.getPath()));
+    StorageLocation location = StorageLocation.parse(dataDir.getPath());
     locations.add(location);
     final DatanodeProtocolClientSideTranslatorPB namenode =
         mock(DatanodeProtocolClientSideTranslatorPB.class);

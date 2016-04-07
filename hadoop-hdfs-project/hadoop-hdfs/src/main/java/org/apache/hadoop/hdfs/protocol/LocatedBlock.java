@@ -93,10 +93,6 @@ public class LocatedBlock {
     return blockToken;
   }
 
-  public void setStorageTypes(StorageType[] storageTypes) {
-    this.storageTypes = storageTypes;
-  }
-
   public StorageType[] getStorageTypes() {
     return storageTypes;
   }

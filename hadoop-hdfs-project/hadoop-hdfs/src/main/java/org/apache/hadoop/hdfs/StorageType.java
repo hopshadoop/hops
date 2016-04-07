@@ -29,19 +29,9 @@ import org.apache.hadoop.classification.InterfaceStability;
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 public enum StorageType {
-  DISK(1),
-  SSD(2);
+  DISK,
+  SSD;
   // TODO add RAID/RAM(?)/MIRROR/RAIDZ
   // TODO also update hdfs.proto:Storagetype when changing stuff here
   public static StorageType DEFAULT = DISK;
-
-  private final int storageType;
-
-  StorageType(int medium) {
-    storageType = medium;
-  }
-
-  public int getStorageType() {
-    return this.storageType;
-  }
 }
