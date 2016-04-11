@@ -22,8 +22,6 @@ import io.hops.metadata.hdfs.entity.BlockInfo;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoUnderConstruction;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
-import org.apache.hadoop.hdfs.server.namenode.UnsupportedActionException;
-import org.apache.zookeeper.KeeperException;
 
 import java.util.Collection;
 import java.util.List;
