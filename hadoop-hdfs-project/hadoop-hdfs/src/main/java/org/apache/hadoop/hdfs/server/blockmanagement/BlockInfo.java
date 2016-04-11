@@ -18,7 +18,9 @@ package org.apache.hadoop.hdfs.server.blockmanagement;
 
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
+import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.common.FinderType;
+import io.hops.metadata.hdfs.dal.BlockInfoDataAccess;
 import io.hops.metadata.hdfs.entity.Replica;
 import io.hops.metadata.hdfs.entity.ReplicaBase;
 import io.hops.transaction.EntityManager;
@@ -263,10 +265,9 @@ public class BlockInfo extends Block {
    */
   Replica addReplica(DatanodeStorageInfo storage)
       throws StorageException, TransactionContextException {
-    // TODO check we don't already have a replica on this machine
-
-    if(isReplicatedOnStorage(storage)) {
-      FSNamesystem.LOG.warn("attempting to add replica on same storage");
+    // Check if one of the storages (sids) already stores a replica
+    if(isReplicatedOnDatanode(storage.getDatanodeDescriptor())) {
+      FSNamesystem.LOG.warn("attempting to add replica on same datanode");
       return null;
     }
 
@@ -300,6 +301,28 @@ public class BlockInfo extends Block {
     }
     return replica;
   }
+
+  /**
+   * Returns true if this block has a replica on the given datanode.
+   * @param dn
+   * @return
+   */
+  boolean isReplicatedOnDatanode(DatanodeDescriptor dn)
+      throws StorageException {
+
+    DatanodeStorageInfo[] storages = dn.getStorageInfos();
+    List<Integer> sids = new ArrayList<Integer>();
+    for(DatanodeStorageInfo s : storages) {
+      sids.add(s.getSid());
+    }
+
+    BlockInfoDataAccess da =
+        (BlockInfoDataAccess) HdfsStorageFactory
+            .getDataAccess(BlockInfoDataAccess.class);
+
+    return da.existsOnAnyStorage(getBlockId(), sids);
+  }
+
   
   boolean isReplicatedOnStorage(DatanodeStorageInfo storage)
       throws StorageException, TransactionContextException {

@@ -91,10 +91,12 @@ public class TestBlockHasMultipleReplicasOnSameDN {
   public void testBlockHasMultipleReplicasOnSameDN() throws IOException {
     String filename = makeFileName(GenericTestUtils.getMethodName());
     Path filePath = new Path(filename);
+    LogFactory.getLog("foooo").debug("HERE (asdfasdfasdfasdf)");
 
     // Write out a file with a few blocks.
     DFSTestUtil.createFile(fs, filePath, BLOCK_SIZE, BLOCK_SIZE * NUM_BLOCKS,
         BLOCK_SIZE, NUM_DATANODES, seed);
+    LogFactory.getLog("foooo").debug("HERE (-1)");
 
     // Get the block list for the file with the block locations.
     LocatedBlocks locatedBlocks = client.getLocatedBlocks(
@@ -108,10 +110,11 @@ public class TestBlockHasMultipleReplicasOnSameDN {
         new StorageBlockReport[cluster.getStoragesPerDatanode()];
 
     ArrayList<Block> blocks = new ArrayList<Block>();
-
+    LogFactory.getLog("foooo").debug("HERE (0)");
     for (LocatedBlock locatedBlock : locatedBlocks.getLocatedBlocks()) {
       blocks.add(locatedBlock.getBlock().getLocalBlock());
     }
+    LogFactory.getLog("foooo").debug("HERE (1)");
 
     for (int i = 0; i < cluster.getStoragesPerDatanode(); ++i) {
       BlockListAsLongs bll = new BlockListAsLongs(blocks, null);
@@ -120,12 +123,15 @@ public class TestBlockHasMultipleReplicasOnSameDN {
       reports[i] = new StorageBlockReport(dns, bll.getBlockListAsLongs());
     }
 
+    LogFactory.getLog("foooo").debug("HERE (1b)");
+
     // Should not assert!
     cluster.getNameNodeRpc().blockReport(dnReg, bpid, reports);
+    LogFactory.getLog("foooo").debug("HERE (2)");
 
     // Get the block locations once again.
     locatedBlocks = client.getLocatedBlocks(filename, 0, BLOCK_SIZE * NUM_BLOCKS);
-
+    LogFactory.getLog("foooo").debug("HERE (3)");
     // Make sure that each block has two replicas, one on each DataNode.
     for (LocatedBlock locatedBlock : locatedBlocks.getLocatedBlocks()) {
       // TODO it fails because we do not report unique datanodes, i.e. one of
