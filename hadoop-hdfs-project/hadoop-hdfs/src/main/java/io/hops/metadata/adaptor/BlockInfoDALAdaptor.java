@@ -22,6 +22,8 @@ import io.hops.metadata.hdfs.entity.BlockInfo;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoUnderConstruction;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
+import org.apache.hadoop.hdfs.server.namenode.UnsupportedActionException;
+import org.apache.zookeeper.KeeperException;
 
 import java.util.Collection;
 import java.util.List;
@@ -84,11 +86,17 @@ public class BlockInfoDALAdaptor extends
   }
 
   @Override
+  @Deprecated
   public List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo> findBlockInfosByHostId(
-      String hostId)
-      throws StorageException {
+      String hostId) throws StorageException {
+    throw new StorageException("Method obsolete. Use findBySids instead.");
+  }
+
+  @Override
+  public List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo> findBlockInfosBySids(
+      List<Integer> sids) throws StorageException {
     return (List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo>) convertDALtoHDFS(
-        dataAccess.findBlockInfosByHostId(hostId));
+        dataAccess.findBlockInfosBySids(sids));
   }
 
   @Override

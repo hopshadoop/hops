@@ -488,12 +488,9 @@ public class DatanodeDescriptor extends DatanodeInfo {
         BlockInfoDataAccess blocks = (BlockInfoDataAccess) HdfsStorageFactory.getDataAccess(
             BlockInfoDataAccess.class);
         HdfsStorageFactory.getConnector().beginTransaction();
-        List<BlockInfo> list = blocks.findBlockInfosByHostId(getDatanodeUuid());
+        final List<Integer> sids = globalStorageMap.getSidsForDatanodeUuid(getDatanodeUuid());
+        List<BlockInfo> list = blocks.findBlockInfosBySids(sids);
         HdfsStorageFactory.getConnector().commit();
-
-        // TODO implement it
-        LogFactory.getLog(DatanodeDescriptor.class).fatal("Calling unimplemented function");
-
         return list;
       }
     };

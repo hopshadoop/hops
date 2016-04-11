@@ -5546,6 +5546,11 @@ private void commitOrCompleteLastBlock(
   public BlockManager getBlockManager() {
     return blockManager;
   }
+
+  /** @return the FSDirectory. */
+  public FSDirectory getFSDirectory() {
+    return dir;
+  }
   
   /**
    * Verifies that the given identifier and password are valid and match.

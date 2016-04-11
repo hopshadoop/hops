@@ -718,6 +718,11 @@ class BPOfferService implements Runnable {
       }
     }
 
+    if (blockArrays.size() == 0) {
+      // Nothing new to report.
+      return;
+    }
+
     // Send incremental block reports to the Namenode outside the lock
     for (Map.Entry<String, ReceivedDeletedBlockInfo[]> entry :
         blockArrays.entrySet()) {

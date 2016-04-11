@@ -45,11 +45,6 @@ public class ReplicaUnderConstructionContext
     super.update(replica);
     log("added-replicauc", "bid", replica.getBlockId(), "sid",
         replica.getStorageId(), "state", replica.getState().name());
-
-    // TODO remove debug statement
-    for (StackTraceElement ste : Thread.currentThread().getStackTrace()) {
-      log(ste.toString());
-    }
   }
 
   @Override
@@ -58,10 +53,6 @@ public class ReplicaUnderConstructionContext
     super.remove(replica);
     log("removed-replicauc", "bid", replica.getBlockId(), "sid",
         replica.getStorageId(), "state", replica.getState().name());
-    // TODO remove debug statement
-    for (StackTraceElement ste : Thread.currentThread().getStackTrace()) {
-      log(ste.toString());
-    }
   }
 
   @Override
