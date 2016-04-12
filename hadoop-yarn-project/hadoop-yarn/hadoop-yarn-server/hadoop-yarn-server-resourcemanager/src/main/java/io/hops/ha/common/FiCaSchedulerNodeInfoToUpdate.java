@@ -46,7 +46,8 @@ public class FiCaSchedulerNodeInfoToUpdate {
   private FiCaSchedulerNode
       infoToUpdate;
   private final String id;
-  private Map<String, String> launchedContainersToAdd=new HashMap<String, String>();
+  private Map<String, LaunchedContainers> launchedContainersToAdd
+          = new HashMap<String, LaunchedContainers>();
   private Set<String> launchedContainersToRemove = new HashSet<String>();
   private Map<Integer, Resource>
       toUpdateResources = new HashMap<Integer, Resource>();
@@ -76,13 +77,13 @@ public class FiCaSchedulerNodeInfoToUpdate {
   }
 
   public void toAddLaunchedContainers(String cid, String rmcon) {
-    launchedContainersToAdd.put(cid, rmcon);
+    launchedContainersToAdd.put(cid, new LaunchedContainers(id, cid, rmcon));
     launchedContainersToRemove.remove(cid);
   }
 
   public void toRemoveLaunchedContainers(String cid) {
     if (launchedContainersToAdd.remove(cid)==null){
-    launchedContainersToRemove.add(cid);
+      launchedContainersToRemove.add(cid);
     }
   }
 
@@ -111,17 +112,7 @@ public class FiCaSchedulerNodeInfoToUpdate {
     
   private void agregateLaunchedContainersToAdd(FiCaSchedulerNodeInfoAgregate agregate){
     if (launchedContainersToAdd != null) {
-      ArrayList<LaunchedContainers> toAddLaunchedContainers =
-          new ArrayList<LaunchedContainers>();
-      for (String key : launchedContainersToAdd.keySet()) {
-        if (launchedContainersToRemove == null || !launchedContainersToRemove.
-                remove(key)) {
-
-          String val = launchedContainersToAdd.get(key);
-          toAddLaunchedContainers.add(new LaunchedContainers(id, key, val));
-        }
-      }
-      agregate.addAlllaunchedContainersToAdd(toAddLaunchedContainers);
+      agregate.addAlllaunchedContainersToAdd(launchedContainersToAdd.values());
     }
   }
     

@@ -182,7 +182,9 @@ public class ResourceTrackerService extends AbstractService
     if (rmContext.isDistributedEnabled() && !rmContext.isLeader()) {
         LOG.info("streaming porcessor is straring for resource tracker");
         RMStorageFactory.kickTheNdbEventStreamingAPI(false, conf);
-        new Thread(rtStreamingProcessor).start();
+        Thread rtStreamingProcessorThread = new Thread(rtStreamingProcessor);
+        rtStreamingProcessorThread.setName("rt streaming processor");
+        rtStreamingProcessorThread.start();
 
     }
     

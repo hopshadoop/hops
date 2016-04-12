@@ -294,7 +294,6 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
             nodeManagerVersion);
     this.healthReport = healthReport;
     this.lastHealthReportTime = lastHealthReportTime;
-    //TORECOVER check if we should recover or not?
     this.nextHeartBeat = nextHeartBeat;
   }
 

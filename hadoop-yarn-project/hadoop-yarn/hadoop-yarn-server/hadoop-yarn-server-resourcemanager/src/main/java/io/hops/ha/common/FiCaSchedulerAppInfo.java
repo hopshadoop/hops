@@ -202,9 +202,11 @@ public class FiCaSchedulerAppInfo {
   }
 
   public void setBlacklistToRemove(List<String> blacklistToRemove) {
-    if (!blacklistToAdd.remove(blacklistToRemove)) {
-      this.blacklistToRemove.addAll(blacklistToRemove);
-    }
+      for(String name: blacklistToRemove){
+        if (!blacklistToAdd.remove(name)) {
+          this.blacklistToRemove.add(name);
+        }
+      }
   }
 
   public void setBlacklistToAdd(Collection<String> set) {

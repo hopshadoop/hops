@@ -31,17 +31,22 @@ public class StreamingRTComps {
   private final MasterKey currentNMMasterKey;
   private final MasterKey nextNMMasterKey;
   private final MasterKey currentRMContainerMasterKey;
-  private final MasterKey nextRMContainerMasterKey;
-  
+  private final MasterKey nextRMContainerMasterKey;  
+  private final float currentPrice;
+  private final long currentPriceTick;
+
+
   public StreamingRTComps(
           Set<org.apache.hadoop.yarn.api.records.ContainerId> containersToClean,
           List<org.apache.hadoop.yarn.api.records.ApplicationId> finishedApp,
-          String nodeId, boolean nextHeartbeat, 
+          String nodeId, boolean nextHeartbeat,
           List<ContainerStatus> hopContainersStatusList,
           MasterKey currentNMMasterKey,
           MasterKey nextNMMasterKey,
           MasterKey currentRMContainerMasterKey,
-          MasterKey nextRMContainerMasterKey
+          MasterKey nextRMContainerMasterKey,
+          float currentPrice,
+          long currentPriceTick
   ) {
     this.containersToClean = containersToClean;
     this.finishedApp = finishedApp;
@@ -52,6 +57,16 @@ public class StreamingRTComps {
     this.nextNMMasterKey = nextNMMasterKey;
     this.currentRMContainerMasterKey = currentRMContainerMasterKey;
     this.nextRMContainerMasterKey = nextRMContainerMasterKey;
+    this.currentPrice = currentPrice;
+    this.currentPriceTick = currentPriceTick;
+  }
+  
+  public float getCurrentPrice() {
+    return currentPrice;
+  }
+
+  public long getCurrentPriceTick() {
+    return currentPriceTick;
   }
 
   public Set<org.apache.hadoop.yarn.api.records.ContainerId> getContainersToClean() {

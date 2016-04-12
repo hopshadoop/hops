@@ -520,11 +520,11 @@ public class AppSchedulingInfo {
           asks.get(ResourceRequest.ANY);
       if (request != null) {
         metrics.decrPendingResources(user, request.getNumContainers(), request
-            .getCapability()); //TORECOVER MS: this updates to queuemetrics are not pushed
+            .getCapability());
       }
     }
     metrics.finishAppAttempt(applicationId, pending,
-        user);//TORECOVER OPT: this updates to queuemetrics are not pushed
+        user);
 
     // Clear requests themselves
     clearRequests(transactionState);

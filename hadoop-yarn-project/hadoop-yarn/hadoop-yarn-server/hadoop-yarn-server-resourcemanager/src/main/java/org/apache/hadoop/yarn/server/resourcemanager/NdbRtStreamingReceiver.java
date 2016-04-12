@@ -53,6 +53,16 @@ public class NdbRtStreamingReceiver {
   private String containerIdToCleanrmnodeid = null;
   private String finishedApplicationrmnodeid = null;
   private List<ContainerStatus> hopContainersStatusList = null;
+  private float currentPrice = 0.0f;
+  private long currentPriceTick = 0;
+
+  public void setCurrentPriceTick(long CurrentPriceTick) {
+    this.currentPriceTick = CurrentPriceTick;
+  }
+
+  public void setCurrentPrice(float CurrentPrice) {
+    this.currentPrice = CurrentPrice;
+  }
 
   NdbRtStreamingReceiver() {
   }
@@ -164,7 +174,8 @@ public class NdbRtStreamingReceiver {
     StreamingRTComps streamingRTComps = new StreamingRTComps(
             containersToCleanSet, finishedAppList, nodeId, nextHeartbeat,
             hopContainersStatusList, currentNMMasterKey, nextNMMasterKey,
-            currentRMContainerMasterKey, nextRMContainerMasterKey);
+            currentRMContainerMasterKey, nextRMContainerMasterKey,
+            currentPrice, currentPriceTick);
     blockingRTQueue.put(streamingRTComps);
   }
   
@@ -221,7 +232,8 @@ public class NdbRtStreamingReceiver {
     return new StreamingRTComps(
             containersToCleanSet, finishedAppList, nodeId, nextHeartbeat,
             hopContainersStatusList, currentNMMasterKey, nextNMMasterKey,
-            currentRMContainerMasterKey, nextRMContainerMasterKey);
+            currentRMContainerMasterKey, nextRMContainerMasterKey, currentPrice,
+            currentPriceTick);
   }
 
   public void onEventMethodMultiThread(StreamingRTComps streamingRTComps) throws
@@ -239,5 +251,7 @@ public class NdbRtStreamingReceiver {
     nextNMMasterKey = null;
     currentRMContainerMasterKey = null;
     nextRMContainerMasterKey = null;
+    currentPrice = 0.0f;
+    currentPriceTick = 0;
   }
 }
