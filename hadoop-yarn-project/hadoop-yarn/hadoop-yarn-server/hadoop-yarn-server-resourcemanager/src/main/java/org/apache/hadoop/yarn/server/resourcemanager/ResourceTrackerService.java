@@ -80,8 +80,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.impl.pb.ContainerStatusPBImpl;
@@ -181,8 +179,7 @@ public class ResourceTrackerService extends AbstractService
             "starting ResourceTrackerService server on "
             + resourceTrackerAddress);
     
-    if (rmContext.isDistributedEnabled() && !rmContext.
-            getGroupMembershipService().isLeader()) {
+    if (rmContext.isDistributedEnabled() && !rmContext.isLeader()) {
         LOG.info("streaming porcessor is straring for resource tracker");
         RMStorageFactory.kickTheNdbEventStreamingAPI(false, conf);
         new Thread(rtStreamingProcessor).start();
@@ -594,7 +591,7 @@ public class ResourceTrackerService extends AbstractService
       rmNode = RMUtilities.getRMNode(nodeId.toString(), rmContext, conf);
       if (rmNode != null) {
         this.rmContext.getActiveRMNodes().put(nodeId, rmNode);
-        this.nmLivelinessMonitor.register(nodeId);
+        lastNodeHeartbeatResponse = rmNode.getLastNodeHeartBeatResponse();
       }
       if (lastNodeHeartbeatResponse.getResponseId() < remoteNodeStatus.
             getResponseId()) {

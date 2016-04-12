@@ -561,7 +561,7 @@ public class RMAppAttemptImpl implements RMAppAttempt, Recoverable {
   }
 
   @Override
-  public void recover(RMState state) throws Exception {
+  public void recover(RMState state) throws IOException {
     ApplicationState appState =
         state.getApplicationState().get(getAppAttemptId().
             getApplicationId());

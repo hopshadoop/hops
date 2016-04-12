@@ -19,8 +19,6 @@ package org.apache.hadoop.yarn.server.resourcemanager.rmnode;
 import com.google.common.annotations.VisibleForTesting;
 import io.hops.ha.common.TransactionState;
 import io.hops.ha.common.TransactionStateImpl;
-import io.hops.ha.common.transactionStateWrapper;
-import io.hops.metadata.util.RMUtilities;
 import io.hops.metadata.yarn.TablesDef;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -57,7 +55,6 @@ import org.apache.hadoop.yarn.state.SingleArcTransition;
 import org.apache.hadoop.yarn.state.StateMachine;
 import org.apache.hadoop.yarn.state.StateMachineFactory;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -625,7 +622,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
       //If distributedRT is enabled and if HA is disabled or HA is enabled
       // and I am not Leader, persist event
       if (event.getTransactionState() != null && rmNode.context.isDistributedEnabled()&&
-          !rmNode.context.getGroupMembershipService().isLeader()) {
+          !rmNode.context.isLeader()) {
         //Add NodeAddedSchedulerEvent to TransactionState
         LOG.debug("HOP :: Added Pending event to TransactionState");
         ((TransactionStateImpl) event.getTransactionState()).getRMNodeInfo(
@@ -672,7 +669,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
               .toRemoveNodeUpdateQueue(rmNode.nodeUpdateQueue);
       rmNode.nodeUpdateQueue.clear();
       if (rmNode.context.isDistributedEnabled()&&
-          !rmNode.context.getGroupMembershipService().isLeader()) {
+          !rmNode.context.isLeader()) {
         //Add NodeRemovedSchedulerEvent to TransactionState
         LOG.debug("HOP :: Added Pending event to TransactionState");
         ((TransactionStateImpl) event.getTransactionState()).getRMNodeInfo(
@@ -693,7 +690,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
         if (rmNode.getState() != NodeState.UNHEALTHY) {
           // Only add new node if old state is not UNHEALTHY
           if (rmNode.context.isDistributedEnabled()&&
-              !rmNode.context.getGroupMembershipService().isLeader()) {
+              !rmNode.context.isLeader()) {
             //Add NodeAddedSchedulerEvent to TransactionState
             LOG.debug("HOP :: Added Pending event to TransactionState");
             ((TransactionStateImpl) event.getTransactionState()).
@@ -801,7 +798,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
       NodeState initialState = rmNode.getState();
       if (!initialState.equals(NodeState.UNHEALTHY)) {
         if (rmNode.context.isDistributedEnabled()&&
-          !rmNode.context.getGroupMembershipService().isLeader()) {
+          !rmNode.context.isLeader()) {
           //Add NodeRemovedSchedulerEvent to TransactionState
           LOG.debug("HOP :: Added Pending event to TransactionState");
           ((TransactionStateImpl) event.getTransactionState()).
@@ -873,7 +870,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
         rmNode.nodeUpdateQueue.clear();
         // Inform the scheduler
         if (rmNode.context.isDistributedEnabled()&&
-          !rmNode.context.getGroupMembershipService().isLeader()) {
+          !rmNode.context.isLeader()) {
           //Add NodeRemovedSchedulerEvent to TransactionState
           LOG.debug("HOP :: Added Pending event to TransactionState");
           ((TransactionStateImpl) event.getTransactionState()).
@@ -975,8 +972,8 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
         ((TransactionStateImpl) event.getTransactionState())
                 .getRMNodeInfo(rmNode.nodeId).toAddNodeUpdateQueue(uci);
         rmNode.nodeUpdateQueue.add(uci);
-        if (!rmNode.context.isDistributedEnabled() || (rmNode.context.
-                getGroupMembershipService().isLeader() && rmNode.context.
+        if (!rmNode.context.isDistributedEnabled() || (rmNode.context.isLeader()
+                && rmNode.context.
                 getGroupMembershipService().isLeadingRT())) {
           List<io.hops.metadata.yarn.entity.ContainerStatus> containersToLog
                   = new ArrayList<io.hops.metadata.yarn.entity.ContainerStatus>();
@@ -1022,7 +1019,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
         ((TransactionStateImpl) event.getTransactionState()).
               toUpdateRMNode(rmNode);
         if (rmNode.context.isDistributedEnabled() &&
-          !rmNode.context.getGroupMembershipService().isLeader()) {
+          !rmNode.context.isLeader()) {
           //Add NodeUpdatedSchedulerEvent to TransactionState
           LOG.debug(
                   "HOP_pending RT adding pending event<SCHEDULER_FINISHED_PROCESSING>"
@@ -1042,7 +1039,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
                           getTransactionState()));
         }
       } else if (rmNode.context.isDistributedEnabled() &&
-          !rmNode.context.getGroupMembershipService().isLeader()) {
+          !rmNode.context.isLeader()) {
         //Add NodeUpdatedSchedulerEvent to TransactionState
 
         LOG.debug(
@@ -1059,7 +1056,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
                         TablesDef.PendingEventTableDef.SCHEDULER_NOT_FINISHED_PROCESSING);
       }
 
-      //TODO: Consider adding this to TransactionState
+      //TODO: Consider adding this to TransactionState should be done on the scheduler node
       // Update DTRenewer in secure mode to keep these apps alive. Today this is
       // needed for log-aggregation to finish long after the apps are gone.
       if (UserGroupInformation.isSecurityEnabled()) {
@@ -1107,7 +1104,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
 
       if (remoteNodeHealthStatus.getIsNodeHealthy()) {
         if (rmNode.context.isDistributedEnabled()&&
-          !rmNode.context.getGroupMembershipService().isLeader()) {
+          !rmNode.context.isLeader()) {
           //Add NodeAddedSchedulerEvent to TransactionState
           LOG.debug("HOP :: Added Pending event to TransactionState");
           ((TransactionStateImpl) event.getTransactionState()).getRMNodeInfo(
