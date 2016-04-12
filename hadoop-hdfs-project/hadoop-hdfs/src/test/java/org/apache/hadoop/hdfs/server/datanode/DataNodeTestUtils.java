@@ -173,4 +173,17 @@ public class DataNodeTestUtils {
       final String bpid, final long blkId) {
     return FsDatasetTestUtil.fetchReplicaInfo(dn.getFSDataset(), bpid, blkId);
   }
+
+  private static BlockPoolSliceScanner getBlockPoolScanner(DataNode dn,
+      ExtendedBlock b) {
+    DataBlockScanner scanner = dn.getBlockScanner();
+    BlockPoolSliceScanner bpScanner = scanner.getBPScanner(b.getBlockPoolId());
+    return bpScanner;
+  }
+
+  public static long getLatestScanTime(DataNode dn,
+      ExtendedBlock b) {
+    BlockPoolSliceScanner scanner = getBlockPoolScanner(dn, b);
+    return scanner.getLastScanTime(b.getLocalBlock());
+  }
 }

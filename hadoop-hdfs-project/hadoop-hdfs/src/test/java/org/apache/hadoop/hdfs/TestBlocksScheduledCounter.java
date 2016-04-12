@@ -56,6 +56,14 @@ public class TestBlocksScheduledCounter {
     cluster.waitActive();
     fs = cluster.getFileSystem();
 
+    ArrayList<DatanodeDescriptor> dnList = new ArrayList<DatanodeDescriptor>();
+    final DatanodeManager dm = cluster.getNamesystem().getBlockManager(
+    ).getDatanodeManager();
+    dm.fetchDatanodes(dnList, dnList, false);
+    DatanodeDescriptor dn = dnList.get(0);
+
+    assertEquals(0, dn.getBlocksScheduled());
+
     //open a file an write a few bytes:
     FSDataOutputStream out = fs.create(new Path("/testBlockScheduledCounter"));
     for (int i=0; i<1024; i++) {
@@ -63,12 +71,6 @@ public class TestBlocksScheduledCounter {
     }
     // flush to make sure a block is allocated.
     out.hflush();
-
-    ArrayList<DatanodeDescriptor> dnList = new ArrayList<DatanodeDescriptor>();
-    final DatanodeManager dm = cluster.getNamesystem().getBlockManager(
-    ).getDatanodeManager();
-    dm.fetchDatanodes(dnList, dnList, false);
-    DatanodeDescriptor dn = dnList.get(0);
 
     assertEquals(1, dn.getBlocksScheduled());
 

@@ -613,7 +613,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
   
   /** Increment the number of blocks scheduled. */
   void incrementBlocksScheduled(StorageType t) {
-    currApproxBlocksScheduled.add(t, 1);;
+    currApproxBlocksScheduled.add(t, 1);
   }
 
   /** Decrement the number of blocks scheduled. */
@@ -630,8 +630,8 @@ public class DatanodeDescriptor extends DatanodeInfo {
    * Adjusts curr and prev number of blocks scheduled every few minutes.
    */
   private void rollBlocksScheduled(long now) {
-    if ((now - lastBlocksScheduledRollTime) > BLOCKS_SCHEDULED_ROLL_INTERVAL) {
-      prevApproxBlocksScheduled = currApproxBlocksScheduled;
+    if (now - lastBlocksScheduledRollTime > BLOCKS_SCHEDULED_ROLL_INTERVAL) {
+      prevApproxBlocksScheduled.set(currApproxBlocksScheduled);
       currApproxBlocksScheduled.reset();
       lastBlocksScheduledRollTime = now;
     }

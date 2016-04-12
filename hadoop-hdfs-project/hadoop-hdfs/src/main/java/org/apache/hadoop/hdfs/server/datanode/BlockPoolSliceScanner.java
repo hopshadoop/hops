@@ -140,6 +140,11 @@ class BlockPoolSliceScanner {
       long t2 = other.lastScanTime;
       return (t1 < t2) ? -1 : ((t1 > t2) ? 1 : block.compareTo(other.block));
     }
+
+    @Override
+    public String toString() {
+      return block.getBlockName() + "_" + block.getGenerationStamp();
+    }
   }
   
   BlockPoolSliceScanner(String bpid, DataNode datanode,
@@ -336,45 +341,46 @@ class BlockPoolSliceScanner {
     long blockId = -1;
     long verificationTime = -1;
     long genStamp = GenerationStamp.GRANDFATHER_GENERATION_STAMP;
-    
+
     /**
      * The format consists of single line with multiple entries. each
      * entry is in the form : name="value".
      * This simple text and easily extendable and easily parseable with a
      * regex.
      */
-    private static Pattern entryPattern =
+    private static final Pattern entryPattern =
         Pattern.compile("\\G\\s*([^=\\p{Space}]+)=\"(.*?)\"\\s*");
-    
+
     static String toString(long verificationTime, long genStamp, long blockId,
         DateFormat dateFormat) {
-      return "\ndate=\"" + dateFormat.format(new Date(verificationTime)) +
-          "\"\t time=\"" + verificationTime + "\"\t genstamp=\"" + genStamp +
-          "\"\t id=\"" + blockId + "\"";
+      return "\ndate=\"" + dateFormat.format(new Date(verificationTime))
+          + "\"\t time=\"" + verificationTime
+          + "\"\t genstamp=\"" + genStamp
+          + "\"\t id=\"" + blockId + "\"";
     }
 
     static LogEntry parseEntry(String line) {
       LogEntry entry = new LogEntry();
-      
+
       Matcher matcher = entryPattern.matcher(line);
       while (matcher.find()) {
         String name = matcher.group(1);
         String value = matcher.group(2);
-        
+
         try {
           if (name.equals("id")) {
-            entry.blockId = Long.valueOf(value);
+            entry.blockId = Long.parseLong(value);
           } else if (name.equals("time")) {
-            entry.verificationTime = Long.valueOf(value);
+            entry.verificationTime = Long.parseLong(value);
           } else if (name.equals("genstamp")) {
-            entry.genStamp = Long.valueOf(value);
+            entry.genStamp = Long.parseLong(value);
           }
-        } catch (NumberFormatException nfe) {
+        } catch(NumberFormatException nfe) {
           LOG.warn("Cannot parse line: " + line, nfe);
           return null;
         }
       }
-      
+
       return entry;
     }
   }
@@ -678,68 +684,57 @@ class BlockPoolSliceScanner {
   
   synchronized void printBlockReport(StringBuilder buffer,
       boolean summaryOnly) {
-    long oneHour = 3600 * 1000;
-    long oneDay = 24 * oneHour;
-    long oneWeek = 7 * oneDay;
-    long fourWeeks = 4 * oneWeek;
-    
+    long oneHour = 3600*1000;
+    long oneDay = 24*oneHour;
+    long oneWeek = 7*oneDay;
+    long fourWeeks = 4*oneWeek;
+
     int inOneHour = 0;
     int inOneDay = 0;
     int inOneWeek = 0;
     int inFourWeeks = 0;
     int inScanPeriod = 0;
     int neverScanned = 0;
-    
+
     DateFormat dateFormat = new SimpleDateFormat(DATA_FORMAT);
-    
+
     int total = blockInfoSet.size();
-    
-    long now = Time.now();
-    
+
+    long now = Time.monotonicNow();
+
     Date date = new Date();
-    
-    for (Iterator<BlockScanInfo> it = blockInfoSet.iterator(); it.hasNext(); ) {
+
+    for(Iterator<BlockScanInfo> it = blockInfoSet.iterator(); it.hasNext();) {
       BlockScanInfo info = it.next();
-      
+
       long scanTime = info.getLastScanTime();
       long diff = now - scanTime;
 
-      if (diff <= oneHour) {
-        inOneHour++;
-      }
-      if (diff <= oneDay) {
-        inOneDay++;
-      }
-      if (diff <= oneWeek) {
-        inOneWeek++;
-      }
-      if (diff <= fourWeeks) {
-        inFourWeeks++;
-      }
-      if (diff <= scanPeriod) {
-        inScanPeriod++;
-      }
-      if (scanTime <= 0) {
-        neverScanned++;
-      }
-      
+      if (diff <= oneHour) inOneHour++;
+      if (diff <= oneDay) inOneDay++;
+      if (diff <= oneWeek) inOneWeek++;
+      if (diff <= fourWeeks) inFourWeeks++;
+      if (diff <= scanPeriod) inScanPeriod++;
+      if (scanTime <= 0) neverScanned++;
+
       if (!summaryOnly) {
         date.setTime(scanTime);
         String scanType =
-            (info.lastScanType == ScanType.VERIFICATION_SCAN) ? "local" :
-                "none";
+            (info.lastScanType == ScanType.VERIFICATION_SCAN) ? "local" : "none";
         buffer.append(String.format("%-26s : status : %-6s type : %-6s" +
                 " scan time : " +
-                "%-15d %s%n", info.block, (info.lastScanOk ? "ok" : "failed"),
+                "%-15d %s%n", info,
+            (info.lastScanOk ? "ok" : "failed"),
             scanType, scanTime,
-            (scanTime <= 0) ? "not yet verified" : dateFormat.format(date)));
+            (scanTime <= 0) ? "not yet verified" :
+                dateFormat.format(date)));
       }
     }
-    
-    double pctPeriodLeft =
-        (scanPeriod + currentPeriodStart - now) * 100.0 / scanPeriod;
+
+    double pctPeriodLeft = (scanPeriod + currentPeriodStart - now)
+        *100.0/scanPeriod;
     double pctProgress = (totalBytesToScan == 0) ? 100 :
-        (totalBytesToScan - bytesLeft) * 100.0 / totalBytesToScan;
+        (totalBytesToScan-bytesLeft)*100.0/totalBytesToScan;
 
     buffer.append(String.format("%nTotal Blocks                 : %6d" +
             "%nVerified in last hour        : %6d" +
@@ -755,9 +750,12 @@ class BlockPoolSliceScanner {
             "%nCurrent scan rate limit KBps : %6d" +
             "%nProgress this period         : %6.0f%%" +
             "%nTime left in cur period      : %6.2f%%" +
-            "%n", total, inOneHour, inOneDay, inOneWeek, inFourWeeks,
-        inScanPeriod, neverScanned, totalScans, totalScans, totalScanErrors,
-        totalTransientErrors, Math.round(throttler.getBandwidth() / 1024.0),
+            "%n",
+        total, inOneHour, inOneDay, inOneWeek,
+        inFourWeeks, inScanPeriod, neverScanned,
+        totalScans, totalScans,
+        totalScanErrors, totalTransientErrors,
+        Math.round(throttler.getBandwidth()/1024.0),
         pctProgress, pctPeriodLeft));
   }
   
