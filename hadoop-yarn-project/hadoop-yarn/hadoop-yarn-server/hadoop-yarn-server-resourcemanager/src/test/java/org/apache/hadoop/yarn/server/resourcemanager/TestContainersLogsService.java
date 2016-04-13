@@ -43,11 +43,9 @@ import org.junit.Test;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Random;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -91,7 +89,8 @@ public class TestContainersLogsService {
   public void testTickCounterInitialization() throws Exception {
     conf.setInt(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_MONITOR_INTERVAL, 1000);
     conf.setInt(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_TICK_INCREMENT, 1);
-    conf.setBoolean(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS, false);
+    conf.setBoolean(
+            YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_ENABLED, false);
 
     YarnVariables tc = getTickCounter();
 
@@ -111,10 +110,14 @@ public class TestContainersLogsService {
     conf.setInt(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_MONITOR_INTERVAL,
             monitorInterval);
     conf.setInt(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_TICK_INCREMENT, 1);
-    conf.setBoolean(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS, true);
-    conf.setInt(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_TICKS,
-            checkpointTicks);
-    MockRM rm = new MockRM(conf);
+    conf.setBoolean(
+            YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_ENABLED, true);
+    conf.setInt(YarnConfiguration.QUOTAS_MIN_TICKS_CHARGE, checkpointTicks);
+    conf.setInt(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_MINTICKS,
+            1);
+    RMContext rmContext = new RMContextImpl();
+    ContainersLogsService logService = new ContainersLogsService(rmContext);
+    logService.init(conf);
 
     try {
       // Insert dummy data into necessary tables
@@ -124,7 +127,7 @@ public class TestContainersLogsService {
       generateRMContainersToAdd(10, 0, rmNodes,rmContainers,containerStatuses);
       populateDB(rmNodes, rmContainers, containerStatuses);
 
-      rm.start();
+      logService.start();
 
       int sleepTillCheckpoint = monitorInterval * (checkpointTicks + 1);
       Thread.sleep(sleepTillCheckpoint);
@@ -140,7 +143,7 @@ public class TestContainersLogsService {
       }
 
     } finally {
-      rm.stop();
+      logService.stop();
     }
   }
 
@@ -158,7 +161,8 @@ public class TestContainersLogsService {
     conf.setInt(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_MONITOR_INTERVAL,
             monitorInterval);
     conf.setInt(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_TICK_INCREMENT, 1);
-    conf.setBoolean(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS, false);
+    conf.setBoolean(
+            YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_ENABLED, false);
 
     MockRM rm = new MockRM(conf);
 
@@ -208,7 +212,8 @@ public class TestContainersLogsService {
     conf.setInt(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_MONITOR_INTERVAL,
             monitorInterval);
     conf.setInt(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_TICK_INCREMENT, 1);
-    conf.setBoolean(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS, false);
+    conf.setBoolean(
+            YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_ENABLED, false);
 
     // Insert dummy data into necessary tables
     List<RMNode> rmNodes = generateRMNodesToAdd(10);
@@ -218,10 +223,12 @@ public class TestContainersLogsService {
     populateDB(rmNodes, rmContainers, containerStatuses);
 
     // Start RM1
-    MockRM rm1 = new MockRM(conf);
-    rm1.start();
+    RMContext rmContext = new RMContextImpl();
+    ContainersLogsService logService1 = new ContainersLogsService(rmContext);
+    logService1.init(conf);
+    logService1.start();
     Thread.sleep(monitorInterval * 5);
-    rm1.stop();
+    logService1.stop();
 
     // Change Container Statuses to COMPLETED
     List<ContainerStatus> updatedStatuses = changeContainerStatuses(
@@ -232,14 +239,15 @@ public class TestContainersLogsService {
     updateContainerStatuses(updatedStatuses);
 
     // Start RM2
-    MockRM rm2 = new MockRM(conf);
-    rm2.start();
+    ContainersLogsService logService2 = new ContainersLogsService(rmContext);
+    logService2.init(conf);
+    logService2.start();
     Thread.sleep(monitorInterval * 2);
-    rm2.stop();
+    logService2.stop();
 
     // Check if tick counter is correct
     YarnVariables tc = getTickCounter();
-    Assert.assertEquals(7, tc.getValue());
+    Assert.assertTrue(tc.getValue()>=5);
 
     // Check if container logs have correct values
     Map<String, ContainersLogs> cl = getContainersLogs();
@@ -261,15 +269,17 @@ public class TestContainersLogsService {
   @Test(timeout=60000)
   public void testFullUseCase() throws Exception {
     int monitorInterval = 2000;
-    int checkpointTicks = 10;
     conf.setInt(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_MONITOR_INTERVAL,
             monitorInterval);
     conf.setInt(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_TICK_INCREMENT, 1);
-    conf.setBoolean(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS, true);
-    conf.setInt(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_TICKS,
-            checkpointTicks);
+    conf.setBoolean(
+            YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_ENABLED, true);
+    conf.setInt(YarnConfiguration.QUOTAS_MIN_TICKS_CHARGE, 10);
+    conf.setInt(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_MINTICKS,
+            1);
     conf.setBoolean(YarnConfiguration.DISTRIBUTED_RM, true);
-    
+    conf.setBoolean(
+            YarnConfiguration.QUOTAS_ENABLED, true);
     MockRM rm = new MockRM(conf);
 
     // Insert first batch of dummy containers
@@ -320,7 +330,7 @@ public class TestContainersLogsService {
               null,
               ContainerExitStatus.SUCCESS,
               cs.getRMNodeId(),
-              pendingId++);
+              pendingId++, ContainerStatus.Type.UCI);
       csUpdate1.add(csNewStatus);
 
       ContainerStatus cs2 = containerStatuses2.get(i);
@@ -330,7 +340,7 @@ public class TestContainersLogsService {
               null,
               ContainerExitStatus.ABORTED,
               cs2.getRMNodeId(),
-              pendingId);
+              pendingId, ContainerStatus.Type.UCI);
       csUpdate1.add(cs2NewStatus);
     }
     updateContainerStatuses(csUpdate1);
@@ -355,7 +365,7 @@ public class TestContainersLogsService {
               null,
               ContainerExitStatus.SUCCESS,
               cs.getRMNodeId(),
-              pendingId++);
+              pendingId++, ContainerStatus.Type.UCI);
       csUpdate2.add(csNewStatus);
     }
     updateContainerStatuses(csUpdate2);
@@ -638,18 +648,19 @@ public class TestContainersLogsService {
     for (int i = startNo; i < (startNo + nbContainers); i++) {
       int randRMNode = random.nextInt(rmNodesList.size());
       RMNode randomRMNode = rmNodesList.get(randRMNode);
-      RMContainer container = new RMContainer("containerid" + i, "appAttemptId",
+      RMContainer container = new RMContainer(
+              "container_1450009406746_0001_01_00000" + i, "appAttemptId",
               randomRMNode.getNodeId(), "user", "reservedNodeId", i, i, i, i, i,
               "state", "finishedStatusState", i);
       rmContainers.add(container);
       
       ContainerStatus status = new ContainerStatus(
-              container.getContainerIdID(),
+              container.getContainerId(),
               ContainerState.RUNNING.toString(),
               null,
               ContainerExitStatus.SUCCESS,
               randomRMNode.getNodeId(),
-              randomRMNode.getPendingEventId());
+              randomRMNode.getPendingEventId(),ContainerStatus.Type.UCI);
       containersStatus.add(status);
     }
   }
@@ -681,7 +692,7 @@ public class TestContainersLogsService {
               null,
               exitStatus,
               entry.getRMNodeId(),
-              0);
+              0, ContainerStatus.Type.UCI);
       toAdd.add(status);
     }
     return toAdd;

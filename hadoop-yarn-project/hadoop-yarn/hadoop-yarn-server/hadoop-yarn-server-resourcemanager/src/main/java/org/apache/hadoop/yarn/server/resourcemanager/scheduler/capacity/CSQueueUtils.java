@@ -71,8 +71,7 @@ class CSQueueUtils {
   @Lock(CSQueue.class)
   public static void updateQueueStatistics(final ResourceCalculator calculator,
           final CSQueue childQueue, final CSQueue parentQueue,
-          final Resource clusterResource, final Resource minimumAllocation,
-          TransactionState transactionState) {
+          final Resource clusterResource, final Resource minimumAllocation) {
     Resource queueLimit = Resources.none();
     Resource usedResources = childQueue.getUsedResources();
 
@@ -90,8 +89,8 @@ class CSQueueUtils {
               .divide(calculator, clusterResource, usedResources, queueLimit);
     }
 
-    childQueue.setUsedCapacity(usedCapacity, transactionState);
-    childQueue.setAbsoluteUsedCapacity(absoluteUsedCapacity, transactionState);
+    childQueue.setUsedCapacity(usedCapacity);
+    childQueue.setAbsoluteUsedCapacity(absoluteUsedCapacity);
 
     Resource available = Resources.subtract(queueLimit, usedResources);
     childQueue.getMetrics().setAvailableResourcesToQueue(Resources

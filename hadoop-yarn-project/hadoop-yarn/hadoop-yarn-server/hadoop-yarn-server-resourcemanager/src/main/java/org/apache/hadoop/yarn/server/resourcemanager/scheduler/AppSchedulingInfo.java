@@ -19,7 +19,6 @@ package org.apache.hadoop.yarn.server.resourcemanager.scheduler;
 import io.hops.ha.common.TransactionState;
 import io.hops.ha.common.TransactionStateImpl;
 import io.hops.metadata.yarn.entity.AppSchedulingInfoBlacklist;
-import io.hops.metadata.yarn.entity.ResourceRequest;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -47,6 +46,7 @@ import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.apache.hadoop.yarn.api.records.ResourceRequest;
 
 /**
  * This class keeps track of all the consumption of an application. This also
@@ -68,9 +68,9 @@ public class AppSchedulingInfo {
   final Set<Priority> priorities = new TreeSet<Priority>(
       new org.apache.hadoop.yarn.server.resourcemanager.resource.Priority.Comparator());
       //recovered
-  final Map<Priority, Map<String, org.apache.hadoop.yarn.api.records.ResourceRequest>>
+  final Map<Priority, Map<String, ResourceRequest>>
       requests =
-      new HashMap<Priority, Map<String, org.apache.hadoop.yarn.api.records.ResourceRequest>>();
+      new HashMap<Priority, Map<String, ResourceRequest>>();
       //recovered
   private Set<String> blacklist = new HashSet<String>();//recovered
 
@@ -117,7 +117,7 @@ public class AppSchedulingInfo {
   private synchronized void clearRequests(TransactionState transactionState) {
 
     for (Priority priority : priorities) {
-      for (org.apache.hadoop.yarn.api.records.ResourceRequest request : requests
+      for (ResourceRequest request : requests
           .get(priority).values()) {
         if (transactionState != null) {
           ((TransactionStateImpl) transactionState)
@@ -153,19 +153,19 @@ public class AppSchedulingInfo {
    *     resources to be acquired
    */
   synchronized public void updateResourceRequests(
-      List<org.apache.hadoop.yarn.api.records.ResourceRequest> requests,
+      List<ResourceRequest> requests,
       TransactionState ts) {
     QueueMetrics metrics = queue.getMetrics();
 
     // Update resource requests
-    for (org.apache.hadoop.yarn.api.records.ResourceRequest request : requests) {
+    for (ResourceRequest request : requests) {
       Priority priority = request.getPriority();
       String resourceName = request.getResourceName();
       boolean updatePendingResources = false;
-      org.apache.hadoop.yarn.api.records.ResourceRequest lastRequest = null;
+      ResourceRequest lastRequest = null;
 
       if (resourceName
-          .equals(org.apache.hadoop.yarn.api.records.ResourceRequest.ANY)) {
+          .equals(ResourceRequest.ANY)) {
         if (LOG.isDebugEnabled()) {
           LOG.debug("update:" + " application=" + applicationId + " request=" +
               request);
@@ -183,12 +183,12 @@ public class AppSchedulingInfo {
         }
       }
 
-      Map<String, org.apache.hadoop.yarn.api.records.ResourceRequest> asks =
+      Map<String, ResourceRequest> asks =
           this.requests.get(priority);
 
       if (asks == null) {
         asks =
-            new HashMap<String, org.apache.hadoop.yarn.api.records.ResourceRequest>();
+            new HashMap<String, ResourceRequest>();
         this.requests.put(priority, asks);
         this.priorities.add(priority);
 
@@ -257,32 +257,32 @@ public class AppSchedulingInfo {
     return priorities;
   }
 
-  synchronized public Map<String, org.apache.hadoop.yarn.api.records.ResourceRequest> getResourceRequests(
+  synchronized public Map<String, ResourceRequest> getResourceRequests(
       Priority priority) {
     return requests.get(priority);
   }
 
-  synchronized public List<org.apache.hadoop.yarn.api.records.ResourceRequest> getAllResourceRequests() {
-    List<org.apache.hadoop.yarn.api.records.ResourceRequest> ret =
-        new ArrayList<org.apache.hadoop.yarn.api.records.ResourceRequest>();
-    for (Map<String, org.apache.hadoop.yarn.api.records.ResourceRequest> r : requests
+  synchronized public List<ResourceRequest> getAllResourceRequests() {
+    List<ResourceRequest> ret =
+        new ArrayList<ResourceRequest>();
+    for (Map<String, ResourceRequest> r : requests
         .values()) {
       ret.addAll(r.values());
     }
     return ret;
   }
 
-  synchronized public org.apache.hadoop.yarn.api.records.ResourceRequest getResourceRequest(
+  synchronized public ResourceRequest getResourceRequest(
       Priority priority, String resourceName) {
-    Map<String, org.apache.hadoop.yarn.api.records.ResourceRequest>
+    Map<String, ResourceRequest>
         nodeRequests = requests.get(priority);
     return (nodeRequests == null) ? null : nodeRequests.get(resourceName);
   }
 
   public synchronized Resource getResource(Priority priority) {
-    org.apache.hadoop.yarn.api.records.ResourceRequest request =
+    ResourceRequest request =
         getResourceRequest(priority,
-            org.apache.hadoop.yarn.api.records.ResourceRequest.ANY);
+            ResourceRequest.ANY);
     return request.getCapability();
   }
 
@@ -308,14 +308,14 @@ public class AppSchedulingInfo {
    */
   synchronized public void allocate(NodeType type, SchedulerNode node,
       Priority priority,
-      org.apache.hadoop.yarn.api.records.ResourceRequest request,
+      ResourceRequest request,
       Container container, TransactionState ts) {
     if (type == NodeType.NODE_LOCAL) {
       allocateNodeLocal(node, priority, request, container, ts);
     } else if (type == NodeType.RACK_LOCAL) {
       allocateRackLocal(node, priority, request, container, ts);
     } else {
-      allocateOffSwitch(request);
+      allocateOffSwitch(request, ts);
     }
     QueueMetrics metrics = queue.getMetrics();
     if (pending) {
@@ -343,7 +343,7 @@ public class AppSchedulingInfo {
    */
   synchronized private void allocateNodeLocal(SchedulerNode node,
       Priority priority,
-      org.apache.hadoop.yarn.api.records.ResourceRequest nodeLocalRequest,
+      ResourceRequest nodeLocalRequest,
       Container container, TransactionState ts) {
     // Update future requirements
     nodeLocalRequest.setNumContainers(nodeLocalRequest.getNumContainers() - 1);
@@ -364,7 +364,7 @@ public class AppSchedulingInfo {
       }
     }
 
-    org.apache.hadoop.yarn.api.records.ResourceRequest rackLocalRequest =
+    ResourceRequest rackLocalRequest =
         requests.get(priority).get(node.getRackName());
     rackLocalRequest.setNumContainers(rackLocalRequest.getNumContainers() - 1);
     if (rackLocalRequest.getNumContainers() == 0) {
@@ -384,9 +384,9 @@ public class AppSchedulingInfo {
       }
     }
 
-    org.apache.hadoop.yarn.api.records.ResourceRequest request =
+    ResourceRequest request =
         requests.get(priority)
-            .get(org.apache.hadoop.yarn.api.records.ResourceRequest.ANY);
+            .get(ResourceRequest.ANY);
     decrementOutstanding(request);
     if (ts != null) {
       //update the request in db
@@ -405,7 +405,7 @@ public class AppSchedulingInfo {
    */
   synchronized private void allocateRackLocal(SchedulerNode node,
       Priority priority,
-      org.apache.hadoop.yarn.api.records.ResourceRequest rackLocalRequest,
+      ResourceRequest rackLocalRequest,
       Container container, TransactionState ts) {
     // Update future requirements
     rackLocalRequest.setNumContainers(rackLocalRequest.getNumContainers() - 1);
@@ -426,9 +426,9 @@ public class AppSchedulingInfo {
       }
     }
 
-    org.apache.hadoop.yarn.api.records.ResourceRequest request =
+    ResourceRequest request =
         requests.get(priority)
-            .get(org.apache.hadoop.yarn.api.records.ResourceRequest.ANY);
+            .get(ResourceRequest.ANY);
     decrementOutstanding(request);
     if (ts != null) {
       ((TransactionStateImpl) ts).getSchedulerApplicationInfos(this.applicationId).
@@ -445,13 +445,19 @@ public class AppSchedulingInfo {
    *     resources allocated to the application
    */
   synchronized private void allocateOffSwitch(
-      org.apache.hadoop.yarn.api.records.ResourceRequest offSwitchRequest) {
+      ResourceRequest offSwitchRequest, TransactionState ts) {
     // Update future requirements
     decrementOutstanding(offSwitchRequest);
+    if (ts != null) {
+      ((TransactionStateImpl) ts).getSchedulerApplicationInfos(this.applicationId).
+          getFiCaSchedulerAppInfo(this.applicationAttemptId).
+          setRequestsToAdd(offSwitchRequest);
+    }
   }
 
   synchronized private void decrementOutstanding(
-      org.apache.hadoop.yarn.api.records.ResourceRequest offSwitchRequest) {
+      ResourceRequest offSwitchRequest) {
+      LOG.info("decrement outstanding " + applicationAttemptId);
     int numOffSwitchContainers = offSwitchRequest.getNumContainers() - 1;
 
     // Do not remove ANY
@@ -465,11 +471,12 @@ public class AppSchedulingInfo {
   }
 
   synchronized private void checkForDeactivation() {
+      LOG.info("check for deactivation " + applicationAttemptId);
     boolean deactivate = true;
     for (Priority priority : getPriorities()) {
-      org.apache.hadoop.yarn.api.records.ResourceRequest request =
+      ResourceRequest request =
           getResourceRequest(priority,
-              org.apache.hadoop.yarn.api.records.ResourceRequest.ANY);
+              ResourceRequest.ANY);
       if (request.getNumContainers() > 0) {
         deactivate = false;
         break;
@@ -484,10 +491,10 @@ public class AppSchedulingInfo {
   synchronized public void move(Queue newQueue) {
     QueueMetrics oldMetrics = queue.getMetrics();
     QueueMetrics newMetrics = newQueue.getMetrics();
-    for (Map<String, org.apache.hadoop.yarn.api.records.ResourceRequest> asks : requests
+    for (Map<String, ResourceRequest> asks : requests
         .values()) {
-      org.apache.hadoop.yarn.api.records.ResourceRequest request =
-          asks.get(org.apache.hadoop.yarn.api.records.ResourceRequest.ANY);
+      ResourceRequest request =
+          asks.get(ResourceRequest.ANY);
       if (request != null) {
         oldMetrics.decrPendingResources(user, request.getNumContainers(),
             request.getCapability());
@@ -507,17 +514,17 @@ public class AppSchedulingInfo {
       TransactionState transactionState) {
     // clear pending resources metrics for the application
     QueueMetrics metrics = queue.getMetrics();
-    for (Map<String, org.apache.hadoop.yarn.api.records.ResourceRequest> asks : requests
+    for (Map<String, ResourceRequest> asks : requests
         .values()) {
-      org.apache.hadoop.yarn.api.records.ResourceRequest request =
-          asks.get(org.apache.hadoop.yarn.api.records.ResourceRequest.ANY);
+      ResourceRequest request =
+          asks.get(ResourceRequest.ANY);
       if (request != null) {
         metrics.decrPendingResources(user, request.getNumContainers(), request
-            .getCapability()); //TORECOVER MS: this updates to queuemetrics are not pushed
+            .getCapability());
       }
     }
     metrics.finishAppAttempt(applicationId, pending,
-        user);//TORECOVER OPT: this updates to queuemetrics are not pushed
+        user);
 
     // Clear requests themselves
     clearRequests(transactionState);
@@ -539,13 +546,16 @@ public class AppSchedulingInfo {
   public void recover(io.hops.metadata.yarn.entity.AppSchedulingInfo hopInfo,
       RMStateStore.RMState state) {
     this.pending = hopInfo.isPending();
+    if(!pending){
+        queue.getMetrics().runAppAttempt(applicationId, user);
+    }
     this.containerIdCounter.addAndGet(hopInfo.getContaineridcounter());
     try {
       //construct priorities Set and requests Map
-      List<ResourceRequest> resourceRequestlist =
+      List<io.hops.metadata.yarn.entity.ResourceRequest> resourceRequestlist =
           state.getResourceRequests(this.applicationAttemptId.toString());
       if (resourceRequestlist != null && !resourceRequestlist.isEmpty()) {
-        for (ResourceRequest hop : resourceRequestlist) {
+        for (io.hops.metadata.yarn.entity.ResourceRequest hop : resourceRequestlist) {
           //construct Priority
           Priority priority = Priority.newInstance(hop.getPriority());
           //construct ResourceRequest
@@ -554,10 +564,18 @@ public class AppSchedulingInfo {
           this.priorities.add(priority);
           if (this.requests.get(priority) == null) {
             this.requests.put(priority,
-                new HashMap<String, org.apache.hadoop.yarn.api.records.ResourceRequest>());
+                new HashMap<String, ResourceRequest>());
           }
           this.requests.get(priority)
               .put(resourceRequest.getResourceName(), resourceRequest);
+          if (resourceRequest.getResourceName().equals(ResourceRequest.ANY)) {
+            if (resourceRequest.getNumContainers() > 0) {
+              activeUsersManager.activateApplication(user, applicationId);
+              queue.getMetrics().incrPendingResources(user, 
+                      resourceRequest.getNumContainers(),
+                      resourceRequest.getCapability());
+            }
+          }
         }
       }
 

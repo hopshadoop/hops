@@ -23,21 +23,13 @@ import io.hops.metadata.yarn.dal.FiCaSchedulerNodeDataAccess;
 import io.hops.metadata.yarn.dal.FinishedApplicationsDataAccess;
 import io.hops.metadata.yarn.dal.JustLaunchedContainersDataAccess;
 import io.hops.metadata.yarn.dal.LaunchedContainersDataAccess;
-import io.hops.metadata.yarn.dal.NodeDataAccess;
 import io.hops.metadata.yarn.dal.NodeHBResponseDataAccess;
 import io.hops.metadata.yarn.dal.PendingEventDataAccess;
-import io.hops.metadata.yarn.dal.QueueMetricsDataAccess;
 import io.hops.metadata.yarn.dal.RMContainerDataAccess;
-import io.hops.metadata.yarn.dal.RMContextInactiveNodesDataAccess;
-import io.hops.metadata.yarn.dal.RMNodeDataAccess;
 import io.hops.metadata.yarn.dal.ResourceDataAccess;
 import io.hops.metadata.yarn.dal.UpdatedContainerInfoDataAccess;
-import io.hops.metadata.yarn.dal.capacity.CSLeafQueueUserInfoDataAccess;
-import io.hops.metadata.yarn.dal.capacity.CSQueueDataAccess;
-import io.hops.metadata.yarn.dal.fair.FSSchedulerNodeDataAccess;
 import io.hops.metadata.yarn.entity.RMNode;
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
@@ -53,8 +45,8 @@ import org.apache.hadoop.yarn.server.resourcemanager.ApplicationMasterService;
 import static org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore.LOG;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
+import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerImpl;
-import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeImpl;
 
 public class transactionStateWrapper extends TransactionStateImpl {
 
@@ -189,143 +181,85 @@ public class transactionStateWrapper extends TransactionStateImpl {
   }
 
   @Override
-  public boolean addAppId(ApplicationId appId) {
-    return ts.addAppId(appId);
-  }
-
   public FairSchedulerNodeInfo getFairschedulerNodeInfo() {
     return ts.getFairschedulerNodeInfo();
   }
-
-  public void persistFairSchedulerNodeInfo(FSSchedulerNodeDataAccess FSSNodeDA)
-          throws StorageException {
-    ts.persistFairSchedulerNodeInfo(FSSNodeDA);
-  }
-
+  
+  @Override
   public SchedulerApplicationInfo getSchedulerApplicationInfos(
           ApplicationId appId) {
     return ts.getSchedulerApplicationInfos(appId);
   }
 
+  @Override
   public void persist() throws IOException {
     ts.persist();
   }
 
-  public void persistSchedulerApplicationInfo(QueueMetricsDataAccess QMDA,
-          StorageConnector connector)
-          throws StorageException {
-    ts.persistSchedulerApplicationInfo(QMDA, connector);
-  }
-
+  @Override
   public CSQueueInfo getCSQueueInfo() {
     return ts.getCSQueueInfo();
   }
 
-  public void persistCSQueueInfo(CSQueueDataAccess CSQDA,
-          CSLeafQueueUserInfoDataAccess csLQUIDA) throws StorageException {
 
-    ts.persistCSQueueInfo(CSQDA, csLQUIDA);
-  }
-
+  @Override
   public FiCaSchedulerNodeInfoToUpdate getFicaSchedulerNodeInfoToUpdate(
-          String nodeId) {
+          NodeId nodeId) {
     return ts.getFicaSchedulerNodeInfoToUpdate(nodeId);
   }
 
+  @Override
   public void addFicaSchedulerNodeInfoToAdd(String nodeId,
           org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode node) {
 
     ts.addFicaSchedulerNodeInfoToAdd(nodeId, node);
   }
 
+  @Override
   public void addFicaSchedulerNodeInfoToRemove(String nodeId,
           org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode node) {
     ts.addFicaSchedulerNodeInfoToRemove(nodeId, node);
   }
 
+  @Override
   public void addApplicationToAdd(RMAppImpl app) {
     ts.addApplicationToAdd(app);
   }
 
-  public void addApplicationStateToRemove(ApplicationId appId) {
-    ts.addApplicationStateToRemove(appId);
+  @Override
+  public void addApplicationToRemove(ApplicationId appId) {
+    ts.addApplicationToRemove(appId);
   }
 
+  @Override
   public void addAppAttempt(RMAppAttempt appAttempt) {
     ts.addAppAttempt(appAttempt);
   }
 
-
+  @Override
   public void removeAllocateResponse(ApplicationAttemptId id, int responseId) {
     ts.removeAllocateResponse(id, responseId);
   }
 
+  @Override
   public void addRMContainerToUpdate(RMContainerImpl rmContainer) {
     ts.addRMContainerToUpdate(rmContainer);
   }
 
-  public void persistFicaSchedulerNodeInfo(ResourceDataAccess resourceDA,
-          FiCaSchedulerNodeDataAccess ficaNodeDA,
-          RMContainerDataAccess rmcontainerDA,
-          LaunchedContainersDataAccess launchedContainersDA)
-          throws StorageException {
-    ts.persistFicaSchedulerNodeInfo(resourceDA, ficaNodeDA, rmcontainerDA,
-            launchedContainersDA);
-  }
-
+  @Override
   public RMContextInfo getRMContextInfo() {
     return ts.getRMContextInfo();
   }
 
-  public void persistRmcontextInfo(RMNodeDataAccess rmnodeDA,
-          ResourceDataAccess resourceDA, NodeDataAccess nodeDA,
-          RMContextInactiveNodesDataAccess rmctxinactivenodesDA)
-          throws StorageException {
-    ts.persistRmcontextInfo(rmnodeDA, resourceDA, nodeDA, rmctxinactivenodesDA);
-  }
-
-  public void persistRMNodeToUpdate(RMNodeDataAccess rmnodeDA)
-          throws StorageException {
-    ts.persistRMNodeToUpdate(rmnodeDA);
-  }
-
+  @Override
   public void toUpdateRMNode(
           org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode rmnodeToAdd) {
     ts.toUpdateRMNode(rmnodeToAdd);
   }
 
+  @Override
   public RMNodeInfo getRMNodeInfo(NodeId rmNodeId) {
     return ts.getRMNodeInfo(rmNodeId);
-  }
-
-  public void persistRMNodeInfo(NodeHBResponseDataAccess hbDA,
-          ContainerIdToCleanDataAccess cidToCleanDA,
-          JustLaunchedContainersDataAccess justLaunchedContainersDA,
-          UpdatedContainerInfoDataAccess updatedContainerInfoDA,
-          FinishedApplicationsDataAccess faDA, ContainerStatusDataAccess csDA,
-          PendingEventDataAccess persistedEventsDA, StorageConnector connector)
-          throws StorageException {
-    ts.persistRMNodeInfo(hbDA, cidToCleanDA, justLaunchedContainersDA,
-            updatedContainerInfoDA, faDA, csDA,persistedEventsDA, connector);
-  }
-
-  public void updateUsedResource(
-          org.apache.hadoop.yarn.api.records.Resource usedResource) {
-    ts.updateUsedResource(usedResource);
-  }
-
-  public void updateClusterResource(
-          org.apache.hadoop.yarn.api.records.Resource clusterResource) {
-    ts.updateClusterResource(clusterResource);
-  }
-
-  public void persistFiCaSchedulerNodeToAdd(ResourceDataAccess resourceDA,
-          FiCaSchedulerNodeDataAccess ficaNodeDA,
-          RMContainerDataAccess rmcontainerDA,
-          LaunchedContainersDataAccess launchedContainersDA)
-          throws StorageException {
-    ts.persistFiCaSchedulerNodeToAdd(resourceDA, ficaNodeDA, rmcontainerDA,
-            launchedContainersDA);
   }
 
   /**
@@ -338,8 +272,9 @@ public class transactionStateWrapper extends TransactionStateImpl {
    * @param type
    * @param status
    */
-  public void addPendingEventToRemove(int id, String rmnodeId, byte type,
-          byte status) {
+  @Override
+  public void addPendingEventToRemove(int id, String rmnodeId, int type,
+          int status) {
     ts.addPendingEventToRemove(id, rmnodeId, type, status);
   }
   
@@ -350,38 +285,46 @@ public class transactionStateWrapper extends TransactionStateImpl {
     return ts.getAppIds();
   }
     
+  @Override
   public void addRMContainerToAdd(RMContainerImpl rmContainer) {
     ts.addRMContainerToAdd(rmContainer);
   }  
 
+  @Override
+  public void addRMContainerToRemove(RMContainer rmContainer){
+      ts.addRMContainerToRemove(rmContainer);
+  }
+  
+  @Override
   public void addAllocateResponse(ApplicationAttemptId id,
           ApplicationMasterService.AllocateResponseLock allocateResponse) {
     ts.addAllocateResponse(id, allocateResponse);
   }
     
+  @Override
   public void addAllRanNodes(RMAppAttempt appAttempt) {
     ts.addAllRanNodes(appAttempt);
   }
 
+  @Override
   public void addRanNode(NodeId nid, ApplicationAttemptId appAttemptId) {
    ts.addRanNode(nid, appAttemptId);
   }
     
-  @Override
-  public Map<String, RMNode> getRMNodesToUpdate(){
-    return ts.getRMNodesToUpdate();
-  }
   
+  @Override
   public void addAllJustFinishedContainersToAdd(List<ContainerStatus> status,
           ApplicationAttemptId appAttemptId) {
     ts.addAllJustFinishedContainersToAdd(status, appAttemptId);
   }
   
+  @Override
   public void addJustFinishedContainerToAdd(ContainerStatus status,
           ApplicationAttemptId appAttemptId) {
     ts.addJustFinishedContainerToAdd(status, appAttemptId);
   }
   
+  @Override
   public void addAllJustFinishedContainersToRemove(List<ContainerStatus> status,
           ApplicationAttemptId appAttemptId) {
     ts.addAllJustFinishedContainersToRemove(status, appAttemptId);

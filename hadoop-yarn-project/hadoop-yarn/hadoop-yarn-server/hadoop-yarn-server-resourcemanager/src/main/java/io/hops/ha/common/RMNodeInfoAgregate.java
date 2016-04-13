@@ -35,6 +35,7 @@ import io.hops.metadata.yarn.entity.NodeHBResponse;
 import io.hops.metadata.yarn.entity.PendingEvent;
 import io.hops.metadata.yarn.entity.UpdatedContainerInfo;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -47,6 +48,7 @@ public class RMNodeInfoAgregate {
   List<JustLaunchedContainers> toAddJustLaunchedContainers
           = new ArrayList<JustLaunchedContainers>();
   List<ContainerStatus> toAddContainerStatus = new ArrayList<ContainerStatus>();
+  List<ContainerStatus> toRemoveContainerStatus = new ArrayList<ContainerStatus>();
   List<JustLaunchedContainers> toRemoveJustLaunchedContainers
           = new ArrayList<JustLaunchedContainers>();
   ArrayList<ContainerId> toAddContainerIdToClean = new ArrayList<ContainerId>();
@@ -71,18 +73,23 @@ public class RMNodeInfoAgregate {
     this.toAddContainerStatus.addAll(toAddContainerStatus);
   }
 
+  public void addAllContainersStatusToRemove(
+          List<ContainerStatus> toAddContainerStatus) {
+    this.toRemoveContainerStatus.addAll(toAddContainerStatus);
+  }
+  
   public void addAllJustLaunchedContainersToAdd(
           List<JustLaunchedContainers> toAddJustLaunchedContainers) {
     this.toAddJustLaunchedContainers.addAll(toAddJustLaunchedContainers);
   }
 
-    public void addAllJustLaunchedContainersToRemove(
+  public void addAllJustLaunchedContainersToRemove(
           List<JustLaunchedContainers> toRemoveJustLaunchedContainers) {
     this.toRemoveJustLaunchedContainers.addAll(toRemoveJustLaunchedContainers);
   }
     
   public void addAllPendingEventsToAdd(
-          ArrayList<PendingEvent> toAddPendingEvents) {
+          Collection<PendingEvent> toAddPendingEvents) {
     this.toAddPendingEvents.addAll(toAddPendingEvents);
   }
 
@@ -137,23 +144,41 @@ public class RMNodeInfoAgregate {
           PendingEventDataAccess persistedEventsDA, StorageConnector connector)
           throws StorageException {
     persistContainerStatusToAdd(csDA);
+    connector.flush();
+      persistContainerStatusToRemove(csDA);
     persistJustLaunchedContainersToAdd(justLaunchedContainersDA);
+    connector.flush();
     persistJustLaunchedContainersToRemove(justLaunchedContainersDA);
+    connector.flush();
     persistContainerToCleanToAdd(cidToCleanDA);
+    connector.flush();
     persistContainerToCleanToRemove(cidToCleanDA);
+    connector.flush();
     persistFinishedApplicationToAdd(faDA);
+    connector.flush();
     persistFinishedApplicationToRemove(faDA);
+    connector.flush();
     persistNodeUpdateQueueToAdd(updatedContainerInfoDA);
+    connector.flush();
     persistNodeUpdateQueueToRemove(updatedContainerInfoDA);
+    connector.flush();
     persistLatestHeartBeatResponseToAdd(hbDA);
+    connector.flush();
     persistNextHeartbeat();
+    connector.flush();
     persistPendingEventsToAdd(persistedEventsDA);
+    connector.flush();
     persistPendingEventsToRemove(persistedEventsDA);
   }
 
   private void persistContainerStatusToAdd(ContainerStatusDataAccess csDA)
           throws StorageException {
     csDA.addAll(toAddContainerStatus);
+  }
+
+  private void persistContainerStatusToRemove(ContainerStatusDataAccess csDA)
+          throws StorageException {
+    csDA.removeAll(toRemoveContainerStatus);
   }
 
   public void persistJustLaunchedContainersToAdd(

@@ -26,7 +26,6 @@ import io.hops.metadata.yarn.dal.SchedulerApplicationDataAccess;
 import io.hops.metadata.yarn.dal.util.YARNOperationType;
 import io.hops.metadata.yarn.entity.SchedulerApplication;
 import io.hops.metadata.yarn.entity.appmasterrpc.RPC;
-import io.hops.metadata.yarn.entity.capacity.CSLeafQueueUserInfo;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -194,105 +193,6 @@ public class TestRecoverLeafCSQueue {
 
   private static ApplicationId getApplicationId(int id) {
     return ApplicationId.newInstance(123456, id);
-  }
-
-  @Test
-  public void testPersistLeafCSQueue() throws IOException, InterruptedException {
-
-    //LeafQueue a = stubLeafQueue((LeafQueue) queues.get(B));
-    LeafQueue a = (LeafQueue) queues.get(B);
-
-    // Users
-    final String user_0 = "user_1";
-
-        // Start testing...
-    // Only 1 container
-    int rpcID = HopYarnAPIUtilities.getRPCID();
-
-        //Note :  we should call persistappmasterRPC , because otherwise it will throw following exception
-    //code 626, mysqlCode 120, status 2, classification 2, message Tuple did not exist
-    byte[] submitAppData = new byte[1];
-
-    RMUtilities.persistAppMasterRPC(rpcID, RPC.Type.SubmitApplication,
-            submitAppData);
-
-    TransactionStateImpl leafQueueTranscation
-            = new TransactionStateImpl(
-                    TransactionState.TransactionType.RM);
-    // Submit applications
-    ApplicationId appId1 = getApplicationId(100);
-    persistAppInfo(new SchedulerApplication(appId1.toString(), user_0, a.
-            getQueueName()));
-    ApplicationAttemptId appAttemptId
-            = ApplicationAttemptId.newInstance(appId1, 4);
-
-    FiCaSchedulerApp app_0
-            = new FiCaSchedulerApp(appAttemptId, user_0, a,
-                    mock(ActiveUsersManager.class), rmContext, -1);
-
-    a.submitApplicationAttempt(app_0, user_0, leafQueueTranscation);
-
-    RMNode mockRMNode
-            = MockNodes.newNodeInfo(0, MockNodes.
-                    newResourceWithVcores(8 * GB, 1), 1, "127.0.0.2", 1222);
-
-    FiCaSchedulerNode node_0 = spy(new FiCaSchedulerNode(mockRMNode, false,
-            rmContext));
-
-    final int numNodes = 1;
-    Resource clusterResource
-            = Resources.createResource(numNodes * (8 * GB), numNodes * 16);
-    when(csContext.getNumClusterNodes()).thenReturn(numNodes);
-
-    // Setup resource-requests
-    Priority priority = TestUtils.createMockPriority(1);
-    app_0.updateResourceRequests(Collections.singletonList(
-            TestUtils.
-            createResourceRequest(ResourceRequest.ANY, 1 * GB, 3, true,
-                    priority, recordFactory)), new TransactionStateImpl(
-                    TransactionState.TransactionType.RM));
-
-    a.assignContainers(clusterResource, node_0, leafQueueTranscation);
-    assertEquals(
-            (int) (node_0.getTotalResource().getMemory() * a.getCapacity()) - (1
-            * GB),
-            a.getMetrics().getAvailableMB());
-
-    leafQueueTranscation.decCounter(TransactionState.TransactionType.APP);
-    Thread.sleep(10000);
-    io.hops.metadata.yarn.entity.capacity.CSQueue recoverCSQueue = RMUtilities.
-            getCSQueue(a.getQueuePath());
-
-    // Testing whether the reserved fields are indeed restored
-    assertEquals(recoverCSQueue.getName(), a.getQueueName());
-    assertEquals(recoverCSQueue.getPath(), a.getQueuePath());
-    assertEquals(recoverCSQueue.getUsedResourceMemory(), a.getUsedResources().
-            getMemory());
-    assertEquals(recoverCSQueue.getUsedResourceVCores(), a.getUsedResources().
-            getVirtualCores());
-    assertEquals(recoverCSQueue.getUsedCapacity(), a.getUsedCapacity(), DELTA);
-    assertEquals(recoverCSQueue.getAbsoluteUsedCapacity(), a.
-            getAbsoluteUsedCapacity(), DELTA);
-
-    Collection<CSLeafQueueUserInfo> recoverCSLeafQueueUser = RMUtilities.
-            getAllCSLeafQueueUserInfoFullTransaction().values();
-
-    for (UserInfo userInfo : a.getUsers()) {
-
-      for (CSLeafQueueUserInfo hopCSLeafQueue : recoverCSLeafQueueUser) {
-
-        if (!userInfo.getUsername().equals(hopCSLeafQueue.getUserName())) {
-          continue;
-        }
-
-        assertEquals(userInfo.getNumActiveApplications(),
-                hopCSLeafQueue.getActiveApplications());
-        assertEquals(userInfo.getNumPendingApplications(),
-                hopCSLeafQueue.getPendingApplications());
-      }
-
-    }
-
   }
 
   private void persistAppInfo(final SchedulerApplication application)

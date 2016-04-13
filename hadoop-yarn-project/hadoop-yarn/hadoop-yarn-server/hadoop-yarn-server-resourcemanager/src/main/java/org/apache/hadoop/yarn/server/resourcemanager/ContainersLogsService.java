@@ -20,10 +20,12 @@ import io.hops.metadata.util.HopYarnAPIUtilities;
 import io.hops.metadata.util.RMStorageFactory;
 import io.hops.metadata.yarn.dal.ContainerStatusDataAccess;
 import io.hops.metadata.yarn.dal.ContainersLogsDataAccess;
+import io.hops.metadata.yarn.dal.YarnRunningPriceDataAccess;
 import io.hops.metadata.yarn.dal.YarnVariablesDataAccess;
 import io.hops.metadata.yarn.dal.util.YARNOperationType;
 import io.hops.metadata.yarn.entity.ContainerStatus;
 import io.hops.metadata.yarn.entity.ContainersLogs;
+import io.hops.metadata.yarn.entity.YarnRunningPrice;
 import io.hops.metadata.yarn.entity.YarnVariables;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 
@@ -41,6 +43,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.service.CompositeService;
 import org.apache.hadoop.yarn.api.records.ContainerState;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.quota.QuotaService;
 
 public class ContainersLogsService extends CompositeService {
 
@@ -55,28 +58,31 @@ public class ContainersLogsService extends CompositeService {
   private int checkpointInterval; //Time in ticks between checkpoints
   private double alertThreshold;
   private double threshold;
-
+  private final RMContext rMContext;
+  private float currentPrice; // This variable will be set/updated by the streaming service.
+  private int priceUpdateIntervel;
+  
   ContainerStatusDataAccess containerStatusDA;
   ContainersLogsDataAccess containersLogsDA;
   YarnVariablesDataAccess yarnVariablesDA;
 
   Map<String, ContainersLogs> activeContainers
           = new HashMap<String, ContainersLogs>();
-  List<ContainersLogs> updateContainers = new ArrayList<ContainersLogs>();
+  Map<String, ContainersLogs> updateContainers
+          = new HashMap<String, ContainersLogs>();
   LinkedBlockingQueue<ContainerStatus> eventContainers
           = new LinkedBlockingQueue<ContainerStatus>();
 
   YarnVariables tickCounter = new YarnVariables(
-          HopYarnAPIUtilities.CONTAINERSTICKCOUNTER,
-          0
-  );
+          HopYarnAPIUtilities.CONTAINERSTICKCOUNTER, 0);
 
-    // True when service is up to speed with existing statuses and 
-  // with events triggered while initializing
+// True when service is up to speed with existing statuses and
+// with events triggered while initializing
   boolean recovered = true;
 
-  public ContainersLogsService() {
+  public ContainersLogsService(RMContext rMContext) {
     super(ContainersLogsService.class.getName());
+    this.rMContext = rMContext;
   }
 
   @Override
@@ -87,34 +93,43 @@ public class ContainersLogsService extends CompositeService {
     // Initialize config parameters
     this.monitorInterval = this.conf.getInt(
             YarnConfiguration.QUOTAS_CONTAINERS_LOGS_MONITOR_INTERVAL,
-            YarnConfiguration.DEFAULT_QUOTAS_CONTAINERS_LOGS_MONITOR_INTERVAL
-    );
+            YarnConfiguration.DEFAULT_QUOTAS_CONTAINERS_LOGS_MONITOR_INTERVAL);
     this.tickIncrement = this.conf.getInt(
             YarnConfiguration.QUOTAS_CONTAINERS_LOGS_TICK_INCREMENT,
-            YarnConfiguration.DEFAULT_QUOTAS_CONTAINERS_LOGS_TICK_INCREMENT
-    );
+            YarnConfiguration.DEFAULT_QUOTAS_CONTAINERS_LOGS_TICK_INCREMENT);
     this.checkpointEnabled = this.conf.getBoolean(
-            YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS,
-            YarnConfiguration.DEFAULT_QUOTAS_CONTAINERS_LOGS_CHECKPOINTS
-    );
+            YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_ENABLED,
+            YarnConfiguration.DEFAULT_QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_ENABLED);
     this.checkpointInterval = this.conf.getInt(
-            YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_TICKS,
-            YarnConfiguration.DEFAULT_QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_TICKS
-    );
+            YarnConfiguration.QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_MINTICKS,
+            YarnConfiguration.DEFAULT_QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_MINTICKS)
+            * this.conf.getInt(YarnConfiguration.QUOTAS_MIN_TICKS_CHARGE,
+                    YarnConfiguration.DEFAULT_QUOTAS_MIN_TICKS_CHARGE);
     this.alertThreshold = this.conf.getDouble(
             YarnConfiguration.QUOTAS_CONTAINERS_LOGS_ALERT_THRESHOLD,
-            YarnConfiguration.DEFAULT_QUOTAS_CONTAINERS_LOGS_ALERT_THRESHOLD
-    );
+            YarnConfiguration.DEFAULT_QUOTAS_CONTAINERS_LOGS_ALERT_THRESHOLD);
     // Calculate execution time warning threshold
     this.threshold = this.monitorInterval * alertThreshold;
+    
+    this.priceUpdateIntervel = this.conf.getInt(
+            YarnConfiguration.QUOTAS_PRICE_DURATIOM,
+            YarnConfiguration.DEFAULT_QUOTAS_PRICE_DURATIOM)*checkpointInterval;
+    
+    float basePricePerTickMB = this.conf.getFloat(
+            YarnConfiguration.BASE_PRICE_PER_TICK_FOR_MEMORY,
+            YarnConfiguration.DEFAULT_BASE_PRICE_PER_TICK_FOR_MEMORY);
+    float basePricePerTickVC = this.conf.getFloat(
+            YarnConfiguration.BASE_PRICE_PER_TICK_FOR_VIRTUAL_CORE,
+            YarnConfiguration.DEFAULT_BASE_PRICE_PER_TICK_FOR_VIRTUAL_CORE);
+    currentPrice = basePricePerTickMB + basePricePerTickVC;
 
     // Initialize DataAccesses
-    containerStatusDA = (ContainerStatusDataAccess) RMStorageFactory
-            .getDataAccess(ContainerStatusDataAccess.class);
-    containersLogsDA = (ContainersLogsDataAccess) RMStorageFactory
-            .getDataAccess(ContainersLogsDataAccess.class);
-    yarnVariablesDA = (YarnVariablesDataAccess) RMStorageFactory
-            .getDataAccess(YarnVariablesDataAccess.class);
+    containerStatusDA = (ContainerStatusDataAccess) RMStorageFactory.
+            getDataAccess(ContainerStatusDataAccess.class);
+    containersLogsDA = (ContainersLogsDataAccess) RMStorageFactory.
+            getDataAccess(ContainersLogsDataAccess.class);
+    yarnVariablesDA = (YarnVariablesDataAccess) RMStorageFactory.getDataAccess(
+            YarnVariablesDataAccess.class);
 
     // Creates separate thread for retrieving container statuses
     tickThread = new Thread(new TickThread());
@@ -128,9 +143,7 @@ public class ContainersLogsService extends CompositeService {
     LOG.info("Starting containers logs service");
 
     recover();
-
     tickThread.start();
-
     super.serviceStart();
   }
 
@@ -157,10 +170,15 @@ public class ContainersLogsService extends CompositeService {
       try {
         eventContainers.put(cs);
       } catch (InterruptedException ex) {
-        LOG.warn("Unable to insert container status: "
-                + cs.toString() + " inside event queue", ex);
+        LOG.warn("Unable to insert container status: " + cs.toString()
+                + " inside event queue", ex);
       }
     }
+  }
+
+  public synchronized void setCurrentPrice(float currentPrice) {
+    LOG.debug("set new price: " + currentPrice);
+    this.currentPrice = currentPrice;
   }
 
   /**
@@ -189,23 +207,29 @@ public class ContainersLogsService extends CompositeService {
     try {
       tickCounter = getTickCounter();
       activeContainers = getContainersLogs();
-
+      //recover current price
+      Map<YarnRunningPrice.PriceType, YarnRunningPrice> currentPrices
+              = getCurrentPrice();
+      if (currentPrices.get(YarnRunningPrice.PriceType.VARIABLE) != null) {
+        this.currentPrice = currentPrices.get(
+                YarnRunningPrice.PriceType.VARIABLE).getPrice();
+      }
       // Iterate container statuses and update active list
-      List<ContainerStatus> containerStatuses
-              = new ArrayList<ContainerStatus>(getContainerStatuses().values());
+      List<ContainerStatus> containerStatuses = new ArrayList<ContainerStatus>(
+              getContainerStatuses().values());
       recoverContainerStatuses(containerStatuses, tickCounter);
 
       // Iterate events and update active list
       List<ContainerStatus> latestEvents = getLatestEvents();
       recoverContainerStatuses(latestEvents, tickCounter);
 
-            // Iterate active list, remove COMPLETE from active list
+      // Iterate active list, remove COMPLETE from active list
       // and insert all in update list
-      for (Iterator<Map.Entry<String, ContainersLogs>> it
-              = activeContainers.entrySet().iterator(); it.hasNext();) {
+      for (Iterator<Map.Entry<String, ContainersLogs>> it = activeContainers.
+              entrySet().iterator(); it.hasNext();) {
         ContainersLogs cl = it.next().getValue();
 
-        updateContainers.add(cl);
+        updateContainers.put(cl.getContainerid(), cl);
 
         if (cl.getExitstatus() != ContainersLogs.CONTAINER_RUNNING_STATE) {
           it.remove();
@@ -221,31 +245,30 @@ public class ContainersLogsService extends CompositeService {
     }
   }
 
-  private void checkEventContainerStatuses(
+  private synchronized void checkEventContainerStatuses(
           List<ContainerStatus> latestEvents
   ) {
     for (ContainerStatus cs : latestEvents) {
       ContainersLogs cl;
       boolean updatable = false;
-
-      if (activeContainers.get(cs.getContainerid()) == null) {
-        cl = new ContainersLogs(
-                cs.getContainerid(),
-                tickCounter.getValue(),
+      if (cs.getState().equals(ContainerState.NEW)) {
+        continue;
+      }
+      cl = activeContainers.get(cs.getContainerid());
+      if (cl == null) {
+        cl = new ContainersLogs(cs.getContainerid(), tickCounter.getValue(),
                 ContainersLogs.DEFAULT_STOP_TIMESTAMP,
-                ContainersLogs.CONTAINER_RUNNING_STATE
-        );
+                ContainersLogs.CONTAINER_RUNNING_STATE, currentPrice);
 
-        // Unable to capture start use case,
+        // Unable to capture start use case
         if (cs.getState().equals(ContainerState.COMPLETE.toString())) {
+          //TODO: this is overwriten by the next cl.setExitstatus, need to be verified
           cl.setExitstatus(ContainersLogs.UNKNOWN_CONTAINER_EXIT);
         }
 
         activeContainers.put(cl.getContainerid(), cl);
         updatable = true;
-      } else {
-        cl = activeContainers.get(cs.getContainerid());
-      }
+      } 
 
       if (cs.getState().equals(ContainerState.COMPLETE.toString())) {
         cl.setStop(tickCounter.getValue());
@@ -255,7 +278,7 @@ public class ContainersLogsService extends CompositeService {
       }
 
       if (updatable) {
-        updateContainers.add(cl);
+        updateContainers.put(cl.getContainerid(), cl);
       }
     }
   }
@@ -268,7 +291,7 @@ public class ContainersLogsService extends CompositeService {
    * @param recoveryStatuses
    * @param ticks
    */
-  private void recoverContainerStatuses(
+  private synchronized void recoverContainerStatuses(
           List<ContainerStatus> recoveryStatuses,
           YarnVariables ticks
   ) {
@@ -283,7 +306,8 @@ public class ContainersLogsService extends CompositeService {
                   cs.getContainerid(),
                   ticks.getValue(),
                   ContainersLogs.DEFAULT_STOP_TIMESTAMP,
-                  ContainersLogs.CONTAINER_RUNNING_STATE
+                  ContainersLogs.CONTAINER_RUNNING_STATE,
+                  currentPrice
           );
 
           activeContainers.put(cl.getContainerid(), cl);
@@ -313,33 +337,39 @@ public class ContainersLogsService extends CompositeService {
     try {
       LightWeightRequestHandler containersLogsHandler
               = new LightWeightRequestHandler(YARNOperationType.TEST) {
-                @Override
-                public Object performTask() throws StorageException {
-                  connector.beginTransaction();
-                  connector.writeLock();
+        @Override
+        public Object performTask() throws StorageException {
+          connector.beginTransaction();
+          connector.writeLock();
 
-                  // Update containers logs table if necessary
-                  if (updateContainers.size() > 0) {
-                    LOG.debug("CL :: Update containers logs size: "
-                            + updateContainers.size());
-                    try {
-                      containersLogsDA.addAll(updateContainers);
-                      updateContainers.clear();
-                    } catch (StorageException ex) {
-                      LOG.warn("Unable to update containers logs table", ex);
-                    }
-                  }
+          // Update containers logs table if necessary
+          if (updateContainers.size() > 0) {
+            LOG.debug("CL :: Update containers logs size: " + updateContainers.
+                    size());
+            try {
+              containersLogsDA.addAll(updateContainers.values());
+            } catch (StorageException ex) {
+              LOG.warn("Unable to update containers logs table", ex);
+            }
+          }
 
-                  // Update tick counter
-                  if (updatetTick) {
-                    yarnVariablesDA.add(tickCounter);
-                  }
+          // Update tick counter
+          if (updatetTick) {
+            yarnVariablesDA.add(tickCounter);
+          }
 
-                  connector.commit();
-                  return null;
-                }
-              };
+          connector.commit();
+          return null;
+        }
+      };
       containersLogsHandler.handle();
+
+      QuotaService quotaService = rMContext.getQuotaService();
+      if (quotaService != null) {
+        quotaService.insertEvents(updateContainers.values());
+      }
+      updateContainers.clear();
+
     } catch (IOException ex) {
       LOG.warn("Unable to update containers logs and tick counter", ex);
     }
@@ -359,19 +389,19 @@ public class ContainersLogsService extends CompositeService {
       // Retrieve unfinished containers logs entries
       LightWeightRequestHandler allContainersHandler
               = new LightWeightRequestHandler(YARNOperationType.TEST) {
-                @Override
-                public Object performTask() throws StorageException {
-                  connector.beginTransaction();
-                  connector.readCommitted();
+        @Override
+        public Object performTask() throws StorageException {
+          connector.beginTransaction();
+          connector.readCommitted();
 
-                  Map<String, ContainersLogs> allContainersLogs
+          Map<String, ContainersLogs> allContainersLogs
                   = containersLogsDA.getAll();
 
-                  connector.commit();
+          connector.commit();
 
-                  return allContainersLogs;
-                }
-              };
+          return allContainersLogs;
+        }
+      };
       allContainersLogs = (Map<String, ContainersLogs>) allContainersHandler.
               handle();
 
@@ -398,20 +428,19 @@ public class ContainersLogsService extends CompositeService {
 
       LightWeightRequestHandler tickCounterHandler
               = new LightWeightRequestHandler(YARNOperationType.TEST) {
-                @Override
-                public Object performTask() throws StorageException {
-                  connector.beginTransaction();
-                  connector.readCommitted();
+        @Override
+        public Object performTask() throws StorageException {
+          connector.beginTransaction();
+          connector.readCommitted();
 
-                  YarnVariables tickCounterVariable
-                  = (YarnVariables) yarnVariablesDA
-                  .findById(HopYarnAPIUtilities.CONTAINERSTICKCOUNTER);
+          YarnVariables tickCounterVariable = (YarnVariables) yarnVariablesDA.
+                  findById(HopYarnAPIUtilities.CONTAINERSTICKCOUNTER);
 
-                  connector.commit();
+          connector.commit();
 
-                  return tickCounterVariable;
-                }
-              };
+          return tickCounterVariable;
+        }
+      };
       found = (YarnVariables) tickCounterHandler.handle();
 
       if (found != null) {
@@ -436,19 +465,19 @@ public class ContainersLogsService extends CompositeService {
     try {
       LightWeightRequestHandler containerStatusHandler
               = new LightWeightRequestHandler(YARNOperationType.TEST) {
-                @Override
-                public Object performTask() throws StorageException {
-                  connector.beginTransaction();
-                  connector.readCommitted();
+        @Override
+        public Object performTask() throws StorageException {
+          connector.beginTransaction();
+          connector.readCommitted();
 
-                  Map<String, ContainerStatus> containerStatuses
+          Map<String, ContainerStatus> containerStatuses
                   = containerStatusDA.getAll();
 
-                  connector.commit();
+          connector.commit();
 
-                  return containerStatuses;
-                }
-              };
+          return containerStatuses;
+        }
+      };
       allContainerStatuses
               = (Map<String, ContainerStatus>) containerStatusHandler.handle();
     } catch (IOException ex) {
@@ -457,16 +486,51 @@ public class ContainersLogsService extends CompositeService {
     return allContainerStatuses;
   }
 
+  private Map<YarnRunningPrice.PriceType, YarnRunningPrice> getCurrentPrice() {
+    try {
+      LightWeightRequestHandler currentPriceHandler
+              = new LightWeightRequestHandler(YARNOperationType.TEST) {
+        @Override
+        public Object performTask() throws StorageException {
+          connector.beginTransaction();
+          connector.readCommitted();
+
+          YarnRunningPriceDataAccess da
+                  = (YarnRunningPriceDataAccess) RMStorageFactory.getDataAccess(
+                          YarnRunningPriceDataAccess.class);
+
+          Map<YarnRunningPrice.PriceType, YarnRunningPrice> currentPrices = da.
+                  getAll();
+
+          connector.commit();
+
+          return currentPrices;
+        }
+      };
+      return (Map<YarnRunningPrice.PriceType, YarnRunningPrice>) currentPriceHandler.
+              handle();
+    } catch (IOException ex) {
+      LOG.warn("Unable to retrieve container statuses", ex);
+    }
+    return null;
+  }
+  
+//TODO optimisation
   /**
    * Loop active list and add all found & not completed container statuses to
    * update list. This ensures that whole running time is not lost.
    */
-  private void createCheckpoint() {
-    for (Map.Entry<String, ContainersLogs> entry : activeContainers.entrySet()) {
-      ContainersLogs cl = entry.getValue();
+  private synchronized void createCheckpoint() {
+    int tick = tickCounter.getValue();
+    for (ContainersLogs log : activeContainers.values()) {
+      if ((tick - log.getStart()) % checkpointInterval == 0) {
+        log.setStop(tickCounter.getValue());
+        if ((tick - log.getStart()) % priceUpdateIntervel == 0) {
+          log.setPrice(currentPrice);
+        }
 
-      cl.setStop(tickCounter.getValue());
-      updateContainers.add(cl);
+        updateContainers.put(log.getContainerid(), log);
+      }
     }
   }
 
@@ -477,8 +541,7 @@ public class ContainersLogsService extends CompositeService {
    * Update containers logs table
    */
   public void processTick() {
-    List<ContainerStatus> latestEvents
-            = getLatestEvents();
+    List<ContainerStatus> latestEvents = getLatestEvents();
 
     LOG.debug("CL :: Event count: " + latestEvents.size());
 
@@ -486,9 +549,7 @@ public class ContainersLogsService extends CompositeService {
     checkEventContainerStatuses(latestEvents);
 
     // Checkpoint
-    if (checkpointEnabled
-            && (tickCounter.getValue() % checkpointInterval == 0)) {
-      LOG.debug("CL :: Creating checkoint");
+    if (checkpointEnabled) {
       createCheckpoint();
     }
 
@@ -529,14 +590,12 @@ public class ContainersLogsService extends CompositeService {
           executionTime = System.currentTimeMillis() - startTime;
           if (threshold < executionTime) {
             LOG.warn("Monitor interval threshold exceeded!"
-                    + " Execution time: "
-                    + Long.toString(executionTime) + "ms."
-                    + " Threshold: "
-                    + Double.toString(threshold) + "ms."
+                    + " Execution time: " + Long.toString(executionTime) + "ms."
+                    + " Threshold: " + Double.toString(threshold) + "ms."
                     + " Consider increasing monitor interval!");
             //To avoid negative values
-            executionTime = (executionTime > monitorInterval)
-                    ? monitorInterval : executionTime;
+            executionTime = (executionTime > monitorInterval) ? monitorInterval
+                    : executionTime;
           }
         } catch (Exception ex) {
           LOG.warn("Exception in containers logs thread loop", ex);
@@ -551,8 +610,8 @@ public class ContainersLogsService extends CompositeService {
       }
     }
   }
-  
-  public int getCurrentTick(){
+
+  public int getCurrentTick() {
     return tickCounter.getValue();
   }
 }

@@ -96,9 +96,7 @@ public class GroupMembershipService extends CompositeService
     if (rmContext.isHAEnabled()) {
       autoFailoverEnabled = HAUtil.isAutomaticFailoverEnabled(conf);
       if (autoFailoverEnabled) {
-        if (HAUtil.isAutomaticFailoverEmbedded(conf)) {
-          initLEandGM(conf);
-        }
+        initLEandGM(conf);
       }
     }
   }
@@ -122,6 +120,7 @@ public class GroupMembershipService extends CompositeService
       }
 
       lEnGmMonitor = new Thread(new LEnGmMonitor());
+      lEnGmMonitor.setName("group membership monitor");
       lEnGmMonitor.start();
     }
   }

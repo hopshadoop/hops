@@ -32,6 +32,8 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Periodically retrieves and processes pending events created by the
@@ -72,6 +74,7 @@ public class PendingEventRetrievalBatch extends PendingEventRetrieval {
     if (!active) {
       active = true;
       retrivingThread = new Thread(new RetrivingThread());
+      retrivingThread.setName("pending events retriver thread");
       retrivingThread.start();
     } else {
       LOG.error("ndb event retriver is already active");
@@ -159,7 +162,12 @@ public class PendingEventRetrievalBatch extends PendingEventRetrieval {
           ConcurrentSkipListSet<PendingEvent> eventsToRemove = pendingEvents.
               get(id);
           for (PendingEvent pendingEvent : eventsToRemove) {
-            triggerEvent(rmNode, pendingEvent, false);
+            try {
+              triggerEvent(rmNode, pendingEvent, false);
+            } catch (InterruptedException ex) {
+              LOG.error(ex,ex);
+              return;
+            }
           }
           try {
             writeLock.lock();

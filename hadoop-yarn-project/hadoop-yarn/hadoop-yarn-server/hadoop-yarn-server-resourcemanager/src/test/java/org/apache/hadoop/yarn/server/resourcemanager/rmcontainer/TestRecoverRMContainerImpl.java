@@ -176,8 +176,8 @@ public class TestRecoverRMContainerImpl {
             rmContainer.getContainerId().toString());
 
     // Testing whether the reserved fields are indeed restored
-    assertEquals(recoverRmCont.getReservedNodeIdID(), reservedNodeId.toString());
-    assertEquals(recoverRmCont.getReservedPriorityID(), reservedPriority.
+    assertEquals(recoverRmCont.getReservedNodeId(), reservedNodeId.toString());
+    assertEquals(recoverRmCont.getReservedPriority(), reservedPriority.
             getPriority());
     assertEquals(recoverRmCont.getReservedMemory(), reservedResource.getMemory());
     assertEquals(recoverRmCont.getReservedVCores(), reservedResource.

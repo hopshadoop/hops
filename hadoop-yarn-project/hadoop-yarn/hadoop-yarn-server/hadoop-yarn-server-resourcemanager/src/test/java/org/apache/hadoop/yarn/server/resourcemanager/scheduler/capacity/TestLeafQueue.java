@@ -402,7 +402,7 @@ public class TestLeafQueue {
     // Manipulate queue 'a'
     LeafQueue a = stubLeafQueue((LeafQueue) queues.get(A));
     //unset maxCapacity
-    a.setMaxCapacity(1.0f, null);
+    a.setMaxCapacity(1.0f);
 
     // Users
     final String user_0 = "user_0";
@@ -495,7 +495,7 @@ public class TestLeafQueue {
 
     // Test max-capacity
     // Now - no more allocs since we are at max-cap
-    a.setMaxCapacity(0.5f, null);
+    a.setMaxCapacity(0.5f);
     a.assignContainers(clusterResource, node_0,
         new TransactionStateImpl( TransactionState.TransactionType.RM));
     assertEquals(4 * GB, a.getUsedResources().getMemory());
@@ -538,7 +538,7 @@ public class TestLeafQueue {
     // Mock the queue
     LeafQueue a = stubLeafQueue((LeafQueue) queues.get(A));
     //unset maxCapacity
-    a.setMaxCapacity(1.0f, null);
+    a.setMaxCapacity(1.0f);
     
     // Users
     final String user_0 = "user_0";
@@ -636,7 +636,7 @@ public class TestLeafQueue {
     // Mock the queue
     LeafQueue a = stubLeafQueue((LeafQueue) queues.get(A));
     //unset maxCapacity
-    a.setMaxCapacity(1.0f, null);
+    a.setMaxCapacity(1.0f);
     
     // Users
     final String user_0 = "user_0";
@@ -717,7 +717,7 @@ public class TestLeafQueue {
     assertEquals(0 * GB, app_0.getHeadroom().getMemory()); // 3G - 2G
     
     // Submit requests for app_1 and set max-cap
-    a.setMaxCapacity(.1f, null);
+    a.setMaxCapacity(.1f);
     app_2.updateResourceRequests(Collections.singletonList(TestUtils
             .createResourceRequest(ResourceRequest.ANY, 1 * GB, 1, true,
                 priority, recordFactory)),
@@ -754,7 +754,7 @@ public class TestLeafQueue {
     // Mock the queue
     LeafQueue a = stubLeafQueue((LeafQueue) queues.get(A));
     //unset maxCapacity
-    a.setMaxCapacity(1.0f, null);
+    a.setMaxCapacity(1.0f);
     
     // Users
     final String user_0 = "user_0";
@@ -870,7 +870,7 @@ public class TestLeafQueue {
     
     // Test max-capacity
     // Now - no more allocs since we are at max-cap
-    a.setMaxCapacity(0.5f, null);
+    a.setMaxCapacity(0.5f);
     a.assignContainers(clusterResource, node_0,
         new TransactionStateImpl( TransactionState.TransactionType.RM));
     assertEquals(6 * GB, a.getUsedResources().getMemory());
@@ -881,7 +881,7 @@ public class TestLeafQueue {
     
     // Revert max-capacity and user-limit-factor
     // Now, allocations should goto app_3 since it's under user-limit 
-    a.setMaxCapacity(1.0f, null);
+    a.setMaxCapacity(1.0f);
     a.setUserLimitFactor(1);
     a.assignContainers(clusterResource, node_0,
         new TransactionStateImpl( TransactionState.TransactionType.RM));
@@ -943,7 +943,7 @@ public class TestLeafQueue {
     // Manipulate queue 'a'
     LeafQueue a = stubLeafQueue((LeafQueue) queues.get(A));
     //unset maxCapacity
-    a.setMaxCapacity(1.0f, null);
+    a.setMaxCapacity(1.0f);
 
     // Users
     final String user_0 = "user_0";
@@ -1053,7 +1053,7 @@ public class TestLeafQueue {
     // Manipulate queue 'a'
     LeafQueue a = stubLeafQueue((LeafQueue) queues.get(A));
     //unset maxCapacity
-    a.setMaxCapacity(1.0f, null);
+    a.setMaxCapacity(1.0f);
 
     // Users
     final String user_0 = "user_0";
@@ -1166,7 +1166,7 @@ public class TestLeafQueue {
     // Manipulate queue 'a'
     LeafQueue a = stubLeafQueue((LeafQueue) queues.get(A));
     //unset maxCapacity
-    a.setMaxCapacity(1.0f, null);
+    a.setMaxCapacity(1.0f);
     a.setUserLimitFactor(10);
 
     // Users
@@ -2146,13 +2146,13 @@ public class TestLeafQueue {
         new ParentQueue(csContext, CapacitySchedulerConfiguration.ROOT, null,
             null);
     csConf.setCapacity(CapacitySchedulerConfiguration.ROOT + "." + A, 80);
-    LeafQueue a = new LeafQueue(csContext, A, root, null, null);
+    LeafQueue a = new LeafQueue(csContext, A, root, null);
     assertEquals(0.1f, a.getMaxAMResourcePerQueuePercent(), 1e-3f);
     assertEquals(160, a.getMaximumActiveApplications());
     
     csConf.setFloat(CapacitySchedulerConfiguration.
         MAXIMUM_APPLICATION_MASTERS_RESOURCE_PERCENT, 0.2f);
-    LeafQueue newA = new LeafQueue(csContext, A, root, null, null);
+    LeafQueue newA = new LeafQueue(csContext, A, root, null);
     a.reinitialize(newA, clusterResource, null);
     assertEquals(0.2f, a.getMaxAMResourcePerQueuePercent(), 1e-3f);
     assertEquals(320, a.getMaximumActiveApplications());

@@ -69,6 +69,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
+import org.apache.hadoop.yarn.server.resourcemanager.ContainersLogsService;
 
 /**
  * This class is used to keep track of all the applications/containers running
@@ -296,7 +297,6 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
             nodeManagerVersion);
     this.healthReport = healthReport;
     this.lastHealthReportTime = lastHealthReportTime;
-    //TORECOVER check if we should recover or not?
     this.nextHeartBeat = nextHeartBeat;
   }
 
@@ -435,7 +435,6 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
     this.writeLock.lock();
 
     try {
-      this.finishedApplications.clear();
       this.finishedApplications.addAll(newList);
     } finally {
       this.writeLock.unlock();
@@ -460,6 +459,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
     this.writeLock.lock();
 
     try {
+        //TORECOVER should we realy clear here?
       this.containersToClean.clear();
       this.containersToClean.addAll(newSet);
     } finally {
@@ -623,7 +623,8 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
       LOG.debug("HOP :: Transition AddNodeTransition");
       //If distributedRT is enabled and if HA is disabled or HA is enabled
       // and I am not Leader, persist event
-      if (event.getTransactionState() != null && rmNode.context.isDistributedEnabled()) {
+      if (event.getTransactionState() != null && rmNode.context.isDistributedEnabled()&&
+          !rmNode.context.getGroupMembershipService().isLeader()) {
         //Add NodeAddedSchedulerEvent to TransactionState
         LOG.debug("HOP :: Added Pending event to TransactionState");
         ((TransactionStateImpl) event.getTransactionState()).getRMNodeInfo(
@@ -652,7 +653,6 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
       } else {
         // Increment activeNodes explicitly because this is a new node.
         ClusterMetrics.getMetrics().incrNumActiveNodes();
-        //TODO: Check if we need to include this in the TS. 
       }
     }
   }
@@ -670,7 +670,8 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
               .getRMNodeInfo(rmNode.nodeId)
               .toRemoveNodeUpdateQueue(rmNode.nodeUpdateQueue);
       rmNode.nodeUpdateQueue.clear();
-      if (rmNode.context.isDistributedEnabled()) {
+      if (rmNode.context.isDistributedEnabled()&&
+          !rmNode.context.getGroupMembershipService().isLeader()) {
         //Add NodeRemovedSchedulerEvent to TransactionState
         LOG.debug("HOP :: Added Pending event to TransactionState");
         ((TransactionStateImpl) event.getTransactionState()).getRMNodeInfo(
@@ -690,7 +691,8 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
         rmNode.setLastNodeHeartBeatResponseId(0);
         if (rmNode.getState() != NodeState.UNHEALTHY) {
           // Only add new node if old state is not UNHEALTHY
-          if (rmNode.context.isDistributedEnabled()) {
+          if (rmNode.context.isDistributedEnabled()&&
+              !rmNode.context.getGroupMembershipService().isLeader()) {
             //Add NodeAddedSchedulerEvent to TransactionState
             LOG.debug("HOP :: Added Pending event to TransactionState");
             ((TransactionStateImpl) event.getTransactionState()).
@@ -797,7 +799,8 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
       // Scheduler
       NodeState initialState = rmNode.getState();
       if (!initialState.equals(NodeState.UNHEALTHY)) {
-        if (rmNode.context.isDistributedEnabled()) {
+        if (rmNode.context.isDistributedEnabled()&&
+          !rmNode.context.getGroupMembershipService().isLeader()) {
           //Add NodeRemovedSchedulerEvent to TransactionState
           LOG.debug("HOP :: Added Pending event to TransactionState");
           ((TransactionStateImpl) event.getTransactionState()).
@@ -868,7 +871,8 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
                 .toRemoveNodeUpdateQueue(rmNode.nodeUpdateQueue);
         rmNode.nodeUpdateQueue.clear();
         // Inform the scheduler
-        if (rmNode.context.isDistributedEnabled()) {
+        if (rmNode.context.isDistributedEnabled()&&
+          !rmNode.context.getGroupMembershipService().isLeader()) {
           //Add NodeRemovedSchedulerEvent to TransactionState
           LOG.debug("HOP :: Added Pending event to TransactionState");
           ((TransactionStateImpl) event.getTransactionState()).
@@ -936,10 +940,12 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
           LOG.debug(
               "HOP :: justlaunched remove containerId (finished container)=" +
                   containerId);
-          if (rmNode.justLaunchedContainers.remove(containerId) != null) {
+          ContainerStatus status = 
+                  rmNode.justLaunchedContainers.remove(containerId);
+          if (status != null) {
             ((TransactionStateImpl) event.getTransactionState())
                     .getRMNodeInfo(rmNode.nodeId)
-                    .toRemoveJustLaunchedContainers(containerId);
+                    .toRemoveJustLaunchedContainers(containerId,status);
           }
           completedContainers.add(remoteContainer);
 
@@ -968,8 +974,9 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
         ((TransactionStateImpl) event.getTransactionState())
                 .getRMNodeInfo(rmNode.nodeId).toAddNodeUpdateQueue(uci);
         rmNode.nodeUpdateQueue.add(uci);
-        
-        if (!rmNode.context.isDistributedEnabled()) {
+        if (!rmNode.context.isDistributedEnabled() || (rmNode.context.
+                getGroupMembershipService().isLeader() && rmNode.context.
+                getGroupMembershipService().isLeadingRT())) {
           List<io.hops.metadata.yarn.entity.ContainerStatus> containersToLog
                   = new ArrayList<io.hops.metadata.yarn.entity.ContainerStatus>();
           for (ContainerStatus status : newlyLaunchedContainers) {
@@ -979,7 +986,8 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
                             getState().
                             toString(), status.getDiagnostics(), status.
                             getExitStatus(), "",
-                            0));
+                            0,
+                            io.hops.metadata.yarn.entity.ContainerStatus.Type.UCI));
           }
           for (ContainerStatus status : completedContainers) {
             containersToLog.add(
@@ -988,10 +996,14 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
                             getState().
                             toString(), status.getDiagnostics(), status.
                             getExitStatus(), "",
-                            0));
+                            0, 
+                            io.hops.metadata.yarn.entity.ContainerStatus.Type.UCI));
           }
-          rmNode.context.getContainersLogsService()
-                        .insertEvent(containersToLog);
+          ContainersLogsService logService = rmNode.context.
+                  getContainersLogsService();
+          if (logService != null) {
+            logService.insertEvent(containersToLog);
+          }
         }
       }
 
@@ -999,13 +1011,8 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
       LOG.debug(
               "HOP :: next herbeat node " + rmNode.nextHeartBeat + " nexthb "
               + rmNode.nextHeartBeat);
-      boolean isDTEnabledRT = false;
-      if (rmNode.context.isDistributedEnabled()) {
-        isDTEnabledRT = true;
-      }
       if (rmNode.nextHeartBeat) {
-        LOG.debug("HOP :: rmNode.heartbeat-set to false:" + rmNode.nodeId.
-                toString());
+        LOG.debug("set next HeartBeat to false " + rmNode.nodeId);
         rmNode.nextHeartBeat = false;
         ((TransactionStateImpl) event.getTransactionState())
                 .getRMNodeInfo(rmNode.nodeId)
@@ -1013,7 +1020,8 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
                         toString(), rmNode.nextHeartBeat);
         ((TransactionStateImpl) event.getTransactionState()).
               toUpdateRMNode(rmNode);
-        if (isDTEnabledRT) {
+        if (rmNode.context.isDistributedEnabled() &&
+          !rmNode.context.getGroupMembershipService().isLeader()) {
           //Add NodeUpdatedSchedulerEvent to TransactionState
           LOG.debug(
                   "HOP_pending RT adding pending event<SCHEDULER_FINISHED_PROCESSING>"
@@ -1032,7 +1040,8 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
                   new NodeUpdateSchedulerEvent(rmNode, event.
                           getTransactionState()));
         }
-      } else if (isDTEnabledRT) {
+      } else if (rmNode.context.isDistributedEnabled() &&
+          !rmNode.context.getGroupMembershipService().isLeader()) {
         //Add NodeUpdatedSchedulerEvent to TransactionState
 
         LOG.debug(
@@ -1096,7 +1105,8 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
               toUpdateRMNode(rmNode);
 
       if (remoteNodeHealthStatus.getIsNodeHealthy()) {
-        if (rmNode.context.isDistributedEnabled()) {
+        if (rmNode.context.isDistributedEnabled()&&
+          !rmNode.context.getGroupMembershipService().isLeader()) {
           //Add NodeAddedSchedulerEvent to TransactionState
           LOG.debug("HOP :: Added Pending event to TransactionState");
           ((TransactionStateImpl) event.getTransactionState()).getRMNodeInfo(
@@ -1151,7 +1161,6 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
     return latestContainerInfoList;
   }
 
-  @VisibleForTesting
   public void setNextHeartBeat(boolean nextHeartBeat) {
     this.nextHeartBeat = nextHeartBeat;
   }

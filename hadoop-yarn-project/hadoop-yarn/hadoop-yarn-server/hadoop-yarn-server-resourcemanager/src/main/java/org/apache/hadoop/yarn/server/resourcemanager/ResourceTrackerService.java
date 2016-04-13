@@ -23,6 +23,7 @@ import io.hops.ha.common.transactionStateWrapper;
 import io.hops.metadata.util.HopYarnAPIUtilities;
 import io.hops.metadata.util.RMStorageFactory;
 import io.hops.metadata.util.RMUtilities;
+import io.hops.metadata.yarn.entity.appmasterrpc.HeartBeatRPC;
 import io.hops.metadata.yarn.entity.appmasterrpc.RPC;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -75,6 +76,17 @@ import org.apache.hadoop.yarn.util.YarnVersionInfo;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import org.apache.commons.lang.StringUtils;
+import org.apache.hadoop.yarn.api.records.ApplicationId;
+import org.apache.hadoop.yarn.api.records.impl.pb.ContainerStatusPBImpl;
+import org.apache.hadoop.yarn.server.api.records.impl.pb.MasterKeyPBImpl;
+import org.apache.hadoop.yarn.server.api.records.impl.pb.NodeHealthStatusPBImpl;
 
 public class ResourceTrackerService extends AbstractService
         implements ResourceTracker {
@@ -173,7 +185,9 @@ public class ResourceTrackerService extends AbstractService
             getGroupMembershipService().isLeader()) {
         LOG.info("streaming porcessor is straring for resource tracker");
         RMStorageFactory.kickTheNdbEventStreamingAPI(false, conf);
-        new Thread(rtStreamingProcessor).start();
+        Thread rtStreamingProcessorThread = new Thread(rtStreamingProcessor);
+        rtStreamingProcessorThread.setName("rt streaming processor");
+        rtStreamingProcessorThread.start();
 
     }
     
@@ -268,12 +282,16 @@ public class ResourceTrackerService extends AbstractService
   @Override
   public RegisterNodeManagerResponse registerNodeManager(
           RegisterNodeManagerRequest request) throws YarnException, IOException {
-    return registerNodeManager(request, null);
+    try {
+      return registerNodeManager(request, null);
+    } catch (InterruptedException ex) {
+      throw new YarnException(ex);
+    }
   }
 
   public RegisterNodeManagerResponse registerNodeManager(
           RegisterNodeManagerRequest request, Integer rpcID) 
-          throws YarnException, IOException {
+          throws YarnException, IOException, InterruptedException {
     
     RegisterNodeManagerResponse response = recordFactory.newRecordInstance(
             RegisterNodeManagerResponse.class);
@@ -446,11 +464,15 @@ public class ResourceTrackerService extends AbstractService
   @Override
   public NodeHeartbeatResponse nodeHeartbeat(NodeHeartbeatRequest request)
           throws YarnException, IOException {
-    return nodeHeartbeat(request, null);
+    try {
+      return nodeHeartbeat(request, null);
+    } catch (InterruptedException ex) {
+      throw new YarnException(ex);
+    }
   }
 
   public NodeHeartbeatResponse nodeHeartbeat(NodeHeartbeatRequest request,
-          Integer rpcID) throws YarnException, IOException {
+          Integer rpcID) throws YarnException, IOException, InterruptedException {
 
     NodeStatus remoteNodeStatus = request.getNodeStatus();
     NodeId nodeId = remoteNodeStatus.getNodeId();
@@ -494,9 +516,55 @@ public class ResourceTrackerService extends AbstractService
       rpcID = HopYarnAPIUtilities.getRPCID();
       byte[] allHBRequestData = ((NodeHeartbeatRequestPBImpl) request).
               getProto().toByteArray();
+      
+      Map<String, byte[]> containersStatuses = new HashMap<String, byte[]>();
+      for (ContainerStatus status : request.getNodeStatus().
+              getContainersStatuses()) {
+        containersStatuses.put(status.getContainerId().toString(),
+                ((ContainerStatusPBImpl) status).getProto().toByteArray());
+      }
+
+      List<String> keepAliveApplications = new ArrayList<String>();
+      for (ApplicationId appId : request.getNodeStatus().
+              getKeepAliveApplications()) {
+        keepAliveApplications.add(appId.toString());
+      }
+
+      byte[] nodeHealthStatus = ((NodeHealthStatusPBImpl) request.
+              getNodeStatus().getNodeHealthStatus()).getProto().toByteArray();
+      if (nodeHealthStatus.length > 1000) {
+        LOG.warn("Node Health Status too big for node " + request.
+                getNodeStatus().getNodeId() + " truncating it");
+        NodeHealthStatusPBImpl healthStatus = new NodeHealthStatusPBImpl();
+        healthStatus.setIsNodeHealthy(request.getNodeStatus().
+                getNodeHealthStatus().getIsNodeHealthy());
+        healthStatus.setLastHealthReportTime(request.getNodeStatus().
+                getNodeHealthStatus().getLastHealthReportTime());
+        String healthReport = StringUtils.abbreviate(request.getNodeStatus().
+                getNodeHealthStatus().getHealthReport(), 200);
+        healthStatus.setHealthReport(healthReport);
+        nodeHealthStatus = healthStatus.getProto().toByteArray();
+      }
+
+      byte[] lastKnownContainerTokenMasterKey = null;
+      byte[] lastKnownNMTokenMasterKey = null;
+      if (request.getLastKnownContainerTokenMasterKey() != null) {
+        lastKnownContainerTokenMasterKey = ((MasterKeyPBImpl) request.
+                getLastKnownContainerTokenMasterKey()).getProto().toByteArray();
+      }
+      if (request.getLastKnownNMTokenMasterKey() != null) {
+        lastKnownNMTokenMasterKey = ((MasterKeyPBImpl) request.
+                getLastKnownNMTokenMasterKey()).getProto().toByteArray();
+      }
+      HeartBeatRPC rpc = new HeartBeatRPC(request.getNodeStatus().getNodeId().
+              toString(),
+              request.getNodeStatus().getResponseId(), containersStatuses,
+              keepAliveApplications,
+              nodeHealthStatus, lastKnownContainerTokenMasterKey,
+              lastKnownNMTokenMasterKey, rpcID);
+
       RMUtilities
-              .persistAppMasterRPC(rpcID, RPC.Type.NodeHeartbeat,
-                      allHBRequestData);
+              .persistHeartBeatRPC(rpc);
     }
     TransactionState transactionState = rmContext.getTransactionStateManager().
             getCurrentTransactionStatePriority(rpcID, "nodeHeartbeat");

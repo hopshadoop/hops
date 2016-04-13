@@ -99,7 +99,6 @@ public class SchedulerApplicationInfo {
             .add(new SchedulerApplication(appId.toString(), null, null));
       }
       sappDA.removeAll(applicationsToRemove);
-      //TORECOVER OPT clean the table that depend on this one
     }
   }
 
@@ -160,19 +159,5 @@ public class SchedulerApplicationInfo {
     agregatedAppInfo.persist();
     }
   }
-
-  public void setFiCaSchedulerAppInfo(
-      SchedulerApplicationAttempt schedulerApp) {
-    
-    ApplicationId appId = schedulerApp.getApplicationId();
-    FiCaSchedulerAppInfo ficaInfo = new FiCaSchedulerAppInfo(schedulerApp, transactionState);
-    fiCaSchedulerAppInfoLock.lock();
-    if(fiCaSchedulerAppInfo.get(appId.toString())==null){
-      fiCaSchedulerAppInfo.put(appId.toString(), new HashMap<String, FiCaSchedulerAppInfo>());
-    }
-    fiCaSchedulerAppInfo.get(appId.toString())
-        .put(schedulerApp.getApplicationAttemptId().toString(), ficaInfo);
-    fiCaSchedulerAppInfoLock.unlock();
-  }
-
+  
 }

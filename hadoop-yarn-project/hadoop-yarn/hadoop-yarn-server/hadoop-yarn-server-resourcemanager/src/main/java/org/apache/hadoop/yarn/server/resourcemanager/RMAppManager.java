@@ -261,7 +261,7 @@ public class RMAppManager
           " from state store.");
       if (transactionState != null) {
         ((TransactionStateImpl) transactionState)
-            .addApplicationStateToRemove(removeId);
+            .addApplicationToRemove(removeId);
       }
       //      rmContext.getStateStore().removeApplication(removeApp, transactionState);
       completedAppsInStateStore--;
@@ -277,7 +277,7 @@ public class RMAppManager
       rmContext.getRMApps().remove(removeId);
       if (transactionState != null) {
         ((TransactionStateImpl) transactionState)
-            .addApplicationStateToRemove(removeId);
+            .addApplicationToRemove(removeId);
       }
       this.applicationACLsManager.removeApplication(removeId);
     }

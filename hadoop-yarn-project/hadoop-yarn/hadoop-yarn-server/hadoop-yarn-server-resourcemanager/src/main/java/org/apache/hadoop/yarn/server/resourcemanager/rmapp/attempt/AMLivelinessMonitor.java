@@ -66,6 +66,9 @@ public class AMLivelinessMonitor
     } catch (IOException ex) {
       Logger.getLogger(AMLivelinessMonitor.class.getName())
           .log(Level.SEVERE, null, ex);
+    } catch (InterruptedException ex) {
+      Logger.getLogger(AMLivelinessMonitor.class.getName()).
+              log(Level.SEVERE, null, ex);
     }
   }
 }

@@ -90,6 +90,7 @@ public class NdbEventStreamingProcessor extends PendingEventRetrieval {
       active = true;
       LOG.info("start retriving thread");
       retrivingThread = new Thread(new RetrivingThread());
+      retrivingThread.setName("event retriver");
       retrivingThread.start();
     } else {
       LOG.error("ndb event retriver is already active");
@@ -131,7 +132,8 @@ public class NdbEventStreamingProcessor extends PendingEventRetrieval {
             // Processes container statuses for ContainersLogs service
             List<ContainerStatus> hopContainersStatusList
                     = hopRMNodeCompObject.getHopContainersStatus();
-            if (rmContext.isLeadingRT() && hopContainersStatusList.size() > 0) {
+            if (rmContext.isLeadingRT() && hopContainersStatusList.size() > 0 &&
+                    rmContext.getContainersLogsService() !=null) {
               rmContext.getContainersLogsService()
                       .insertEvent(hopContainersStatusList);
             }
