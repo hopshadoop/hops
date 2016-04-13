@@ -1135,6 +1135,11 @@ public class BlockManager {
   public void findAndMarkBlockAsCorrupt(final ExtendedBlock blk,
       final DatanodeInfo dn, final String storageID, final String reason) throws
       IOException {
+
+    final DatanodeDescriptor node = getDatanodeManager().getDatanode(dn);
+    final DatanodeStorageInfo storage =
+        storageID == null ? null : node.getStorageInfo(storageID);
+
     new HopsTransactionalRequestHandler(
         HDFSOperationType.FIND_AND_MARK_BLOCKS_AS_CORRUPT) {
       INodeIdentifier inodeIdentifier;
@@ -1173,12 +1178,9 @@ public class BlockManager {
           return null;
         }
 
-        DatanodeDescriptor node = getDatanodeManager().getDatanode(dn);
 
-        markBlockAsCorrupt(new BlockToMarkCorrupt(storedBlock,
-                blk.getGenerationStamp(), reason),
-            storageID == null ? null : node.getStorageInfo(storageID),
-            node);
+        BlockToMarkCorrupt b = new BlockToMarkCorrupt(storedBlock, blk.getGenerationStamp(), reason);
+        markBlockAsCorrupt(b, storage, node);
 
         return null;
       }

@@ -28,6 +28,8 @@ import io.hops.metadata.hdfs.entity.Storage;
 import io.hops.transaction.EntityManager;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
@@ -54,6 +56,8 @@ import java.util.TreeSet;
 public class CorruptReplicasMap {
   
   private final DatanodeManager datanodeMgr;
+  private static final Log LOG =
+      LogFactory.getLog(CorruptReplicasMap.class);
   
   public CorruptReplicasMap(DatanodeManager datanodeMgr) {
     this.datanodeMgr = datanodeMgr;
@@ -78,6 +82,12 @@ public class CorruptReplicasMap {
       reasonText = " because " + reason;
     } else {
       reasonText = "";
+    }
+
+    if(storage == null) {
+      LOG.warn("Attempted to set block " + blk.getBlockId() + " as corrupt on" +
+          " non-existing storage (null)" + reason);
+      return;
     }
     
     if (!nodes.contains(storage.getDatanodeDescriptor())) {

@@ -17,6 +17,20 @@
  */
 package org.apache.hadoop.hdfs;
 
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+import static org.mockito.Matchers.anyLong;
+import static org.mockito.Matchers.anyObject;
+import static org.mockito.Matchers.anyString;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.spy;
+
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.logging.impl.Log4JLogger;
@@ -41,20 +55,6 @@ import org.apache.log4j.Level;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.io.IOException;
-import java.io.OutputStream;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
-
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-import static org.mockito.Matchers.anyLong;
-import static org.mockito.Matchers.anyObject;
-import static org.mockito.Matchers.anyString;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.spy;
-
 /* File Append tests for HDFS-200 & HDFS-142, specifically focused on:
  *  using append()/sync() to recover block information
  */
@@ -63,21 +63,20 @@ public class TestFileAppend4 {
   static final long BLOCK_SIZE = 1024;
   static final long BBW_SIZE = 500; // don't align on bytes/checksum
 
-  static final Object[] NO_ARGS = new Object[]{};
+  static final Object [] NO_ARGS = new Object []{};
 
   Configuration conf;
   MiniDFSCluster cluster;
   Path file1;
   FSDataOutputStream stm;
-  boolean simulatedStorage = false;
+  final boolean simulatedStorage = false;
 
   {
-    ((Log4JLogger) NameNode.stateChangeLog).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger) LeaseManager.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger) LogFactory.getLog(FSNamesystem.class)).getLogger()
-        .setLevel(Level.ALL);
-    ((Log4JLogger) DataNode.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger) DFSClient.LOG).getLogger().setLevel(Level.ALL);
+    ((Log4JLogger)NameNode.stateChangeLog).getLogger().setLevel(Level.ALL);
+    ((Log4JLogger)LeaseManager.LOG).getLogger().setLevel(Level.ALL);
+    ((Log4JLogger)LogFactory.getLog(FSNamesystem.class)).getLogger().setLevel(Level.ALL);
+    ((Log4JLogger)DataNode.LOG).getLogger().setLevel(Level.ALL);
+    ((Log4JLogger)DFSClient.LOG).getLogger().setLevel(Level.ALL);
   }
 
   @Before
@@ -93,15 +92,15 @@ public class TestFileAppend4 {
     conf.setInt(DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY, 1);
     conf.setInt(DFSConfigKeys.DFS_CLIENT_SOCKET_TIMEOUT_KEY, 5000);
     // handle under-replicated blocks quickly (for replication asserts)
-    conf.setInt(DFSConfigKeys.DFS_NAMENODE_REPLICATION_PENDING_TIMEOUT_SEC_KEY,
-        5);
+    conf.setInt(
+        DFSConfigKeys.DFS_NAMENODE_REPLICATION_PENDING_TIMEOUT_SEC_KEY, 5);
     conf.setInt(DFSConfigKeys.DFS_NAMENODE_REPLICATION_INTERVAL_KEY, 1);
-    
+
     // handle failures in the DFSClient pipeline quickly
     // (for cluster.shutdown(); fs.close() idiom)
     conf.setInt("ipc.client.connect.max.retries", 1);
   }
-  
+
   /*
    * Recover file.
    * Try and open file in append mode.
@@ -145,7 +144,7 @@ public class TestFileAppend4 {
     }
     LOG.info("Past out lease recovery");
   }
-  
+
   /**
    * Test case that stops a writer after finalizing a block but
    * before calling completeFile, and then tries to recover
@@ -161,8 +160,10 @@ public class TestFileAppend4 {
       NamenodeProtocols spyNN = spy(preSpyNN);
 
       // Delay completeFile
-      GenericTestUtils.DelayAnswer delayer = new GenericTestUtils.DelayAnswer(LOG);
-      doAnswer(delayer).when(spyNN).complete(anyString(), anyString(), (ExtendedBlock)anyObject());
+      GenericTestUtils.DelayAnswer delayer =
+          new GenericTestUtils.DelayAnswer(LOG);
+      doAnswer(delayer).when(spyNN)
+          .complete(anyString(), anyString(), (ExtendedBlock) anyObject());
 
       DFSClient client = new DFSClient(null, spyNN, conf, null);
       file1 = new Path("/testRecoverFinalized");
@@ -179,7 +180,8 @@ public class TestFileAppend4 {
           } catch (Throwable t) {
             err.set(t);
           }
-        }};
+        }
+      };
       t.start();
       LOG.info("Waiting for close to get to latch...");
       delayer.waitForCall();
@@ -191,8 +193,8 @@ public class TestFileAppend4 {
       client.getLeaseRenewer().interruptAndJoin();
 
       FileSystem fs1 = cluster.getFileSystem();
-      FileSystem fs2 = AppendTestUtil.createHdfsWithDifferentUsername(
-          fs1.getConf());
+      FileSystem fs2 =
+          AppendTestUtil.createHdfsWithDifferentUsername(fs1.getConf());
 
       LOG.info("Recovering file");
       recoverFile(fs2);
@@ -208,9 +210,10 @@ public class TestFileAppend4 {
       Throwable thrownByClose = err.get();
       assertNotNull(thrownByClose);
       assertTrue(thrownByClose instanceof IOException);
-      if (!thrownByClose.getMessage().contains(
-          "No lease on /testRecoverFinalized"))
+      if (!thrownByClose.getMessage()
+          .contains("No lease on /testRecoverFinalized")) {
         throw thrownByClose;
+      }
     } finally {
       cluster.shutdown();
     }
@@ -222,7 +225,7 @@ public class TestFileAppend4 {
    * starts writing from that writer, and then has the old lease holder
    * call completeFile
    */
-  @Test(timeout = 300000)
+  @Test(timeout=60000)
   public void testCompleteOtherLeaseHoldersFile() throws Throwable {
     cluster = new MiniDFSCluster.Builder(conf).numDataNodes(5).build();
 
@@ -297,6 +300,7 @@ public class TestFileAppend4 {
       cluster.shutdown();
     }
   }
+
   /**
    * Test the updation of NeededReplications for the Appended Block
    */
