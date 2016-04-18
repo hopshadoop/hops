@@ -350,11 +350,11 @@ public class RMContextImpl implements RMContext {
       return quotaService;
   }
   
-  void setHAEnabled(boolean isHAEnabled) {
+  public void setHAEnabled(boolean isHAEnabled) {
     this.isHAEnabled = isHAEnabled;
   }
 
-  void setDistributedEnabled(boolean isDistributedEnabled){
+  public void setDistributedEnabled(boolean isDistributedEnabled){
     this.isDistributedEnabled = isDistributedEnabled;
   }
   
