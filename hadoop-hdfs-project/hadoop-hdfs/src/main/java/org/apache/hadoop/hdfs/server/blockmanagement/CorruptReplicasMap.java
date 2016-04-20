@@ -137,29 +137,23 @@ public class CorruptReplicasMap {
     if (corruptReplicas == null || corruptReplicas.size() == 0) {
       return false;
     }
+
     HashSet<Integer> replicaSids = new HashSet<Integer>();
     for(CorruptReplica c : corruptReplicas) {
       replicaSids.add(c.getStorageId());
     }
 
+    boolean result = false;
     // Get the list of storages on this datanode
-    HashSet<Integer> DNSids = new HashSet<Integer>();
     for(DatanodeStorageInfo storage : datanode.getStorageInfos()) {
-      DNSids.add(storage.getSid());
+      if(replicaSids.contains(storage.getSid())) {
+        result = true;
+        removeCorruptReplicaFromDB(new CorruptReplica(storage.getSid(), blk
+            .getBlockId(), blk.getInodeId()));
+      }
     }
 
-    // The intersection of replicaSids and DNSids are the sids of all
-    // storages on this datanode that store a replica of this block
-    replicaSids.retainAll(DNSids);
-
-    // Now replicaSids only contains the sids that we want to remove this
-    // replica from
-    for(Integer sid : replicaSids) {
-      removeCorruptReplicaFromDB(blk.getBlockId(), sid);
-    }
-
-    // Return true if the intersection had elements in it
-    return replicaSids.size() > 0;
+    return result;
   }
 
 
@@ -319,19 +313,5 @@ public class CorruptReplicasMap {
   private void removeCorruptReplicaFromDB(CorruptReplica cr)
       throws StorageException, TransactionContextException {
     EntityManager.remove(cr);
-  }
-
-  private void removeCorruptReplicaFromDB(final long blockId, final int sid)
-      throws IOException {
-    new LightWeightRequestHandler(HDFSOperationType.REMOVE_CORRUPT_REPLICA) {
-      @Override
-      public Object performTask() throws IOException {
-        CorruptReplicaDataAccess crDa =
-            (CorruptReplicaDataAccess) HdfsStorageFactory
-                .getDataAccess(CorruptReplicaDataAccess.class);
-        crDa.removeByBlockIdAndSid(blockId, sid);
-        return null;
-      }
-    }.handle();
   }
 }
