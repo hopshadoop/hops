@@ -18,7 +18,6 @@ package org.apache.hadoop.yarn.server.resourcemanager;
 import io.hops.metadata.yarn.entity.ContainerId;
 import io.hops.metadata.yarn.entity.ContainerStatus;
 import io.hops.metadata.yarn.entity.FinishedApplications;
-import io.hops.metadata.yarn.entity.JustLaunchedContainers;
 import io.hops.metadata.yarn.entity.NextHeartbeat;
 import io.hops.metadata.yarn.entity.Node;
 import io.hops.metadata.yarn.entity.NodeHBResponse;
@@ -31,16 +30,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
-/**
- *
- * @author sri
- */
 public class NdbEventStreamingReceiver {
 
   //TODO move this to configuration and rename properly.
@@ -58,7 +50,6 @@ public class NdbEventStreamingReceiver {
   private NodeHBResponse hopNodeHBResponse = null;
   private Resource hopResource = null;
 
-  private List<JustLaunchedContainers> hopJustLaunchedContainersList = null;
   private List<UpdatedContainerInfo> hopUpdatedContainerInfoList = null;
   private List<ContainerId> hopContainerIdsToCleanList = null;
   private List<FinishedApplications> hopFinishedApplicationsList = null;
@@ -245,38 +236,14 @@ public class NdbEventStreamingReceiver {
             hopNodeParent, hopNodePendingEventId);
   }
 
-  ///list processing - just launched containers ///////////////////////////////////////
-  public void buildHopJustLaunchedContainers() {
-    hopJustLaunchedContainersList = new ArrayList<JustLaunchedContainers>();
 
-  }
-
-  private String hopJustLaunchedContainersRmnodeid = "";
-  private String hopJustLaunchedContainersContainerid = "";
-  private int hopJulstLaunchedContainersPendingId = 0;
 
   public void setHopUpdatedContainerInfoPendingId(
           int hopUpdatedContainerInfoPendingId) {
     this.hopUpdatedContainerInfoPendingId = hopUpdatedContainerInfoPendingId;
   }
 
-  public void setHopJustLaunchedContainersRmnodeid(
-          String hopJustLaunchedContainersRmnodeid) {
-    this.hopJustLaunchedContainersRmnodeid = hopJustLaunchedContainersRmnodeid;
-  }
 
-  public void setHopJustLaunchedContainersContainerid(
-          String hopJustLaunchedContainersContainerid) {
-    this.hopJustLaunchedContainersContainerid
-            = hopJustLaunchedContainersContainerid;
-  }
-
-  public void AddJustLaunchedContainers() {
-    JustLaunchedContainers hopJustLaunchedContainers
-            = new JustLaunchedContainers(hopJustLaunchedContainersRmnodeid,
-                    hopJustLaunchedContainersContainerid);
-    hopJustLaunchedContainersList.add(hopJustLaunchedContainers);
-  }
 
   //// list building - hopupdatedcontainerinfo
   public void buildHopUpdatedContainerInfo() {
@@ -291,12 +258,6 @@ public class NdbEventStreamingReceiver {
   public void setHopUpdatedContainerInfoRmnodeid(
           String hopUpdatedContainerInfoRmnodeid) {
     this.hopUpdatedContainerInfoRmnodeid = hopUpdatedContainerInfoRmnodeid;
-  }
-
-  public void setHopJulstLaunchedContainersPendingId(
-          int hopJulstLaunchedContainersPendingId) {
-    this.hopJulstLaunchedContainersPendingId
-            = hopJulstLaunchedContainersPendingId;
   }
 
   public void setHopUpdatedContainerInfoContainerId(
@@ -370,7 +331,7 @@ public class NdbEventStreamingReceiver {
     RMNodeComps hopRMNodeBDBObject
             = new RMNodeComps(hopRMNode, hopNextHeartbeat, hopNode,
                     hopNodeHBResponse, hopResource,
-                    hopPendingEvent, hopJustLaunchedContainersList,
+                    hopPendingEvent,
                     hopUpdatedContainerInfoList, hopContainerIdsToCleanList,
                     hopFinishedApplicationsList, hopContainersStatusList,
                     hopPendingEvent.getId().getNodeId());
@@ -384,7 +345,7 @@ public class NdbEventStreamingReceiver {
   RMNodeComps buildCompositeClass() {
     return new RMNodeComps(hopRMNode, hopNextHeartbeat, hopNode,
             hopNodeHBResponse, hopResource,
-            hopPendingEvent, hopJustLaunchedContainersList,
+            hopPendingEvent,
             hopUpdatedContainerInfoList, hopContainerIdsToCleanList,
             hopFinishedApplicationsList, hopContainersStatusList,
             hopPendingEvent.getId().getNodeId());
@@ -402,7 +363,6 @@ public class NdbEventStreamingReceiver {
     hopNodeHBResponse = null;
     hopResource = null;
     hopPendingEvent = null;
-    hopJustLaunchedContainersList = null;
     hopUpdatedContainerInfoList = null;
     hopContainerIdsToCleanList = null;
     hopFinishedApplicationsList = null;

@@ -90,9 +90,11 @@ public class RMContainerTokenSecretManager
   }
 
   public void start() {
-    rollMasterKey();
-    this.timer.scheduleAtFixedRate(new MasterKeyRoller(), rollingInterval,
-        rollingInterval);
+    if (!rmContext.isDistributedEnabled() || rmContext.isLeader()) {
+      rollMasterKey();
+      this.timer.scheduleAtFixedRate(new MasterKeyRoller(), rollingInterval,
+              rollingInterval);
+    }
     stoped = false;
   }
 
@@ -131,6 +133,27 @@ public class RMContainerTokenSecretManager
     }
   }
 
+  public void setCurrentMasterKey(MasterKey currentMasterKey){
+  super.writeLock.lock();
+    try {
+      this.currentMasterKey=new MasterKeyData(currentMasterKey,
+          createSecretKey(currentMasterKey.getBytes().array()));
+      LOG.info("set current master key: " + currentMasterKey.toString());
+    } finally {
+      super.writeLock.unlock();
+    }
+  }
+  
+  public void setNextMasterKey(MasterKey nextMasterKey){
+    super.writeLock.lock();
+    try {
+      this.nextMasterKey = new MasterKeyData(nextMasterKey,
+          createSecretKey(nextMasterKey.getBytes().array()));
+    } finally {
+      super.writeLock.unlock();
+    }
+  }
+  
   @Private
   public MasterKey getNextKey() {
     super.readLock.lock();

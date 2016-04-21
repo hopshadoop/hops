@@ -381,7 +381,9 @@ public class GroupMembershipService extends CompositeService
   }
 
   public void relinquishId() throws InterruptedException {
-    groupMembership.relinquishCurrentIdInNextRound();
+    if(groupMembership!=null){
+      groupMembership.relinquishCurrentIdInNextRound();
+    }
   }
 
 }

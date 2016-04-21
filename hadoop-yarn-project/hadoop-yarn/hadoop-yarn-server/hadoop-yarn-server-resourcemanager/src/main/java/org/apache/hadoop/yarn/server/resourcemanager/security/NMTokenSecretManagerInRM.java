@@ -113,6 +113,29 @@ public class NMTokenSecretManagerInRM extends BaseNMTokenSecretManager {
     }
   }
 
+  public void setCurrentMasterKey(MasterKey currentMasterKey) {
+    super.writeLock.lock();
+    try {
+      if (currentMasterKey != this.currentMasterKey) {
+        this.currentMasterKey = new MasterKeyData(currentMasterKey,
+          createSecretKey(currentMasterKey.getBytes().array()));
+        clearApplicationNMTokenKeys();
+      }
+    } finally {
+      super.writeLock.unlock();
+    }
+  }
+
+  public void setNextMasterKey(MasterKey nextMasterKey) {
+    super.writeLock.lock();
+    try {
+      this.nextMasterKey = new MasterKeyData(nextMasterKey,
+          createSecretKey(nextMasterKey.getBytes().array()));
+    } finally {
+      super.writeLock.unlock();
+    }
+  }
+
   @Private
   public MasterKey getNextKey() {
     super.readLock.lock();
@@ -176,9 +199,11 @@ public class NMTokenSecretManagerInRM extends BaseNMTokenSecretManager {
   }
 
   public void start() {
-    rollMasterKey();
-    this.timer.scheduleAtFixedRate(new MasterKeyRoller(), rollingInterval,
+    if(!rmContext.isDistributedEnabled() || rmContext.isLeader()){
+      rollMasterKey();
+      this.timer.scheduleAtFixedRate(new MasterKeyRoller(), rollingInterval,
         rollingInterval);
+    }
   }
 
   public void stop() {
