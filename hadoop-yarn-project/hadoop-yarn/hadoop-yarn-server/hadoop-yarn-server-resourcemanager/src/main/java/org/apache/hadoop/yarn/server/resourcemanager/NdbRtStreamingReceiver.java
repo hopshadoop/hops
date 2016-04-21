@@ -15,6 +15,7 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager;
 
+import com.google.protobuf.InvalidProtocolBufferException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -26,11 +27,11 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 import io.hops.metadata.yarn.entity.ContainerStatus;
+import org.apache.hadoop.yarn.proto.YarnServerCommonProtos;
+import org.apache.hadoop.yarn.server.api.records.MasterKey;
+import org.apache.hadoop.yarn.server.api.records.impl.pb.MasterKeyPBImpl;
+import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
 
-/**
- *
- * @author sri
- */
 public class NdbRtStreamingReceiver {
 
   //TODO make the queue size configurable
@@ -52,15 +53,15 @@ public class NdbRtStreamingReceiver {
   private String containerIdToCleanrmnodeid = null;
   private String finishedApplicationrmnodeid = null;
   private List<ContainerStatus> hopContainersStatusList = null;
-  private float CurrentPrice = 0.0f;
-  private long CurrentPriceTick = 0;
+  private float currentPrice = 0.0f;
+  private long currentPriceTick = 0;
 
   public void setCurrentPriceTick(long CurrentPriceTick) {
-    this.CurrentPriceTick = CurrentPriceTick;
+    this.currentPriceTick = CurrentPriceTick;
   }
 
   public void setCurrentPrice(float CurrentPrice) {
-    this.CurrentPrice = CurrentPrice;
+    this.currentPrice = CurrentPrice;
   }
 
   public void setPriceName(String priceName){
@@ -131,11 +132,54 @@ public class NdbRtStreamingReceiver {
     this.nextHeartbeat = nextHeartbeat;
   }
 
+  
+  private MasterKey currentNMMasterKey = null;
+  private MasterKey nextNMMasterKey = null;
+  private MasterKey currentRMContainerMasterKey = null;
+  private MasterKey nextRMContainerMasterKey = null;
+  
+  private String keyId = "";
+  private byte[] keyBytes=null;
+  
+  public void setKeyId(String keyId){
+    this.keyId = keyId;
+  }
+  
+  public void setKeyBytes(byte[] keyBytes){
+    this.keyBytes = keyBytes;
+  }
+  
+  public void setKey(){
+    try {
+      RMStateStore.KeyType keyType = RMStateStore.KeyType.valueOf(keyId);
+      MasterKey key = new MasterKeyPBImpl(
+              YarnServerCommonProtos.MasterKeyProto
+                      .parseFrom(keyBytes));
+      switch(keyType){
+        case CURRENTNMTOKENMASTERKEY:
+          currentNMMasterKey=key;
+          break;
+        case NEXTNMTOKENMASTERKEY:
+          nextNMMasterKey=key;
+          break;
+        case CURRENTCONTAINERTOKENMASTERKEY:
+          currentRMContainerMasterKey = key;
+          break;
+        case NEXTCONTAINERTOKENMASTERKEY:
+          nextRMContainerMasterKey=key;
+      }
+    } catch (InvalidProtocolBufferException ex) {
+      LOG.error(ex, ex);
+    }
+  }
+
   //This will be called by c++ shared library, libhopsndbevent.so
   public void onEventMethod() throws InterruptedException {
     StreamingRTComps streamingRTComps = new StreamingRTComps(
             containersToCleanSet, finishedAppList, nodeId, nextHeartbeat,
-            hopContainersStatusList, CurrentPrice, CurrentPriceTick);
+            hopContainersStatusList, currentNMMasterKey, nextNMMasterKey,
+            currentRMContainerMasterKey, nextRMContainerMasterKey,
+            currentPrice, currentPriceTick);
     blockingRTQueue.put(streamingRTComps);
   }
   
@@ -189,9 +233,11 @@ public class NdbRtStreamingReceiver {
 
   // this two methods are using for multi-thread version from c++ library
   StreamingRTComps buildStreamingRTComps() {
-    return new StreamingRTComps(containersToCleanSet, finishedAppList, nodeId,
-            nextHeartbeat, hopContainersStatusList, CurrentPrice,
-            CurrentPriceTick);
+    return new StreamingRTComps(
+            containersToCleanSet, finishedAppList, nodeId, nextHeartbeat,
+            hopContainersStatusList, currentNMMasterKey, nextNMMasterKey,
+            currentRMContainerMasterKey, nextRMContainerMasterKey, currentPrice,
+            currentPriceTick);
   }
 
   public void onEventMethodMultiThread(StreamingRTComps streamingRTComps) throws
@@ -205,7 +251,11 @@ public class NdbRtStreamingReceiver {
     nodeId = null;
     nextHeartbeat = false;
     hopContainersStatusList = null;
-    CurrentPrice = 0.0f;
-    CurrentPriceTick = 0;
+    currentNMMasterKey = null;
+    nextNMMasterKey = null;
+    currentRMContainerMasterKey = null;
+    nextRMContainerMasterKey = null;
+    currentPrice = 0.0f;
+    currentPriceTick = 0;
   }
 }

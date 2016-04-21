@@ -92,6 +92,8 @@ public class TestPriceEstimationService {
     conf.setInt(YarnConfiguration.QUOTAS_CONTAINERS_LOGS_MONITOR_INTERVAL, 2000);
     conf.setFloat(YarnConfiguration.OVERPRICING_THRESHOLD_MB, 0.2f);
     conf.setFloat(YarnConfiguration.OVERPRICING_THRESHOLD_VC, 0.2f);
+    conf.setFloat(YarnConfiguration.MEMORY_INCREMENT_FACTOR, 10f);
+    conf.setFloat(YarnConfiguration.VCORE_INCREMENT_FACTOR, 10f);
 
     conf.setFloat(YarnConfiguration.BASE_PRICE_PER_TICK_FOR_MEMORY, 50f);
     conf.setFloat(YarnConfiguration.BASE_PRICE_PER_TICK_FOR_VIRTUAL_CORE, 50f);
@@ -127,14 +129,14 @@ public class TestPriceEstimationService {
           YarnRunningPriceDataAccess runningPriceDA
                   = (YarnRunningPriceDataAccess) RMStorageFactory.getDataAccess(
                           YarnRunningPriceDataAccess.class);
-          Map<Integer, YarnRunningPrice> priceList = runningPriceDA.getAll();
+          Map<YarnRunningPrice.PriceType, YarnRunningPrice> priceList = runningPriceDA.getAll();
 
           connector.commit();
-          return priceList.get(1).getPrice();
+          return priceList.get(YarnRunningPrice.PriceType.VARIABLE).getPrice();
         }
       };
       float currentRunningPrice = (Float) currentPriceHandler.handle();
-      Assert.assertEquals(currentRunningPrice, value);
+      Assert.assertEquals(value, currentRunningPrice);
     } catch (IOException ex) {
       LOG.warn("Unable to update container statuses table", ex);
     }

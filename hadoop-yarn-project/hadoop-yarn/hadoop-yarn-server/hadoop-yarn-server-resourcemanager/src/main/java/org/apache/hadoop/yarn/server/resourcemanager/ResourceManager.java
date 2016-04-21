@@ -201,7 +201,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
   private ContainerAllocationExpirer containerAllocationExpirer;
   private boolean recoveryEnabled;
   private DelegationTokenRenewer delegationTokenRenewer;
-  private CompositeService resourceTrackingService;
+  private ResourceTrackingServices resourceTrackingService;
   private Lock resourceTrackingServiceStartStopLock = new ReentrantLock(true);
   private PriceFixerService priceFixerService;
 
@@ -350,7 +350,8 @@ public class ResourceManager extends CompositeService implements Recoverable {
   }
 
   private NMLivelinessMonitor createNMLivelinessMonitor() {
-    return new NMLivelinessMonitor(this.rmContext.getDispatcher(), rmContext);
+    return new NMLivelinessMonitor(this.rmContext.getDispatcher(), rmContext,
+            conf);
   }
 
   protected AMLivelinessMonitor createAMLivelinessMonitor() {
@@ -436,7 +437,6 @@ public class ResourceManager extends CompositeService implements Recoverable {
         }
         rmContext.setStateStore(rmStore);
       }
-      
       rmSecretManagerService = createRMSecretManagerService();
       this.addService(rmSecretManagerService);
 
@@ -490,6 +490,23 @@ public class ResourceManager extends CompositeService implements Recoverable {
     @Override
     protected void serviceStart() throws Exception {
       LOG.info("starting resourceTrackingService");
+      RMStateStore rmStore = rmContext.getStateStore();
+        // The state store needs to start irrespective of recoveryEnabled as apps
+        // need events to move to further states.
+        rmStore.start();
+
+        if (recoveryEnabled) {
+          try {
+            rmStore.checkVersion();
+            RMState state = rmStore.loadState(rmContext);
+            recover(state);
+          } catch (Exception e) {
+            // the Exception from loadState() needs to be handled for
+            // HA and we need to give up master status if we got fenced
+            LOG.error("Failed to load/recover state", e);
+            throw e;
+          }
+        }
       super.serviceStart();
     }
   }
@@ -587,25 +604,9 @@ public class ResourceManager extends CompositeService implements Recoverable {
       resourceTrackingServiceStartStopLock.lock();
       try {
         LOG.info("start schedulerServices");
-        RMStateStore rmStore = rmContext.getStateStore();
-        // The state store needs to start irrespective of recoveryEnabled as apps
-        // need events to move to further states.
-        rmStore.start();
-
-        if (recoveryEnabled) {
-          try {
-            rmStore.checkVersion();
-            RMState state = rmStore.loadState(rmContext);
-            //the dispatchers should be started to recover the RPCs.
-            startDispatchers();
-            recover(state);
-          } catch (Exception e) {
-            // the Exception from loadState() needs to be handled for
-            // HA and we need to give up master status if we got fenced
-            LOG.error("Failed to load/recover state", e);
-            throw e;
-          }
-        }
+        //the dispatchers should be started before any recovery 
+        //to recover the RPCs.
+        startDispatchers();
         resourceTrackingService.start();
       } finally {
         resourceTrackingServiceStartStopLock.unlock();
@@ -1065,7 +1066,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
               == HAServiceProtocol.HAServiceState.ACTIVE) {
         stopSchedulerServices();
         resourceTrackingService.stop();
-        if (groupMembershipService.isLeader()) {
+        if (rmContext.isLeader()) {
           groupMembershipService.relinquishId();
         }
         if (initialize) {
@@ -1271,10 +1272,14 @@ public class ResourceManager extends CompositeService implements Recoverable {
   @Override
   public void recover(RMState state) throws Exception {
     LOG.info("Recovering");
-    // recover RMdelegationTokenSecretManager
-    rmContext.getRMDelegationTokenSecretManager().recover(state);
-    rmContext.recover(state);
+    recoverResourceTracker(state);
+    if(rmContext.getGroupMembershipService().isLeader()||
+            !rmContext.isDistributedEnabled()){
+      recoverScheduler(state);
+    }
+  }
 
+  private void recoverScheduler(RMState state) throws Exception{
     // recover applications
     rmAppManager.recover(state);
 
@@ -1295,7 +1300,14 @@ public class ResourceManager extends CompositeService implements Recoverable {
     }
     LOG.info("Finished recovering");
   }
+  
+  private void recoverResourceTracker(RMState state) throws Exception{
+    // recover RMdelegationTokenSecretManager
+    rmContext.getRMDelegationTokenSecretManager().recover(state);
+    rmContext.recover(state);
 
+  }
+  
   private UserGroupInformation creatAMRMTokenUGI(RPC rpc) throws IOException {
     UserGroupInformation ugi = UserGroupInformation.createRemoteUser(rpc.
         getUserId());
