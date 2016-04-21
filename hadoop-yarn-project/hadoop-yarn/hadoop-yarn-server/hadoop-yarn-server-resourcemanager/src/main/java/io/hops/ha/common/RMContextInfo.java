@@ -103,8 +103,7 @@ public class RMContextInfo {
             val.getHttpAddress(), val.getHealthReport(),
             val.getLastHealthReportTime(),
             ((RMNodeImpl) val).getCurrentState(), val.
-            getNodeManagerVersion(), 0, ((RMNodeImpl) val).
-            getUpdatedContainerInfoId(),pendingEventId);
+            getNodeManagerVersion(), -1, pendingEventId); //overcomitTimeOut is never set and getting it return an error
     toAdd.setRMNode(hopRMNode);
     //Persist RMCoxtentNodesMap
     RMContextActiveNodes hopCtxNode = new RMContextActiveNodes(val.
