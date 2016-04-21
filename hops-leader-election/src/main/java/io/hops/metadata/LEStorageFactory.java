@@ -160,9 +160,9 @@ public class LEStorageFactory {
     return dStorageFactory.getConnector().formatStorage();
   }
   
-  public static boolean formatStorageNonTransactional()
+  public static boolean formatAllStorageNonTransactional()
       throws StorageException {
-    return dStorageFactory.getConnector().formatStorageNonTransactional();
+    return dStorageFactory.getConnector().formatAllStorageNonTransactional();
   }
 
   public static boolean formatStorage(Class<? extends EntityDataAccess>... das)

@@ -330,15 +330,15 @@ public class HdfsStorageFactory {
     return dStorageFactory.getDataAccess(type);
   }
   
-  public static boolean formatStorage() throws StorageException {
+  public static boolean formatAllStorage() throws StorageException {
     Cache.getInstance().flush();
-    return dStorageFactory.getConnector().formatStorage();
+    return dStorageFactory.getConnector().formatAllStorage();
   }
   
-  public static boolean formatStorageNonTransactional()
+  public static boolean formatAllStorageNonTransactional()
       throws StorageException {
     Cache.getInstance().flush();
-    return dStorageFactory.getConnector().formatStorageNonTransactional();
+    return dStorageFactory.getConnector().formatAllStorageNonTransactional();
   }
 
   public static boolean formatStorage(Class<? extends EntityDataAccess>... das)

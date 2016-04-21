@@ -18,6 +18,7 @@ package io.hops.metadata.util;
 import io.hops.DalDriver;
 import io.hops.DalStorageFactory;
 import io.hops.StorageConnector;
+import io.hops.exception.StorageException;
 import io.hops.exception.StorageInitializtionException;
 import io.hops.metadata.adaptor.YarnVariablesDALAdaptor;
 import io.hops.metadata.common.EntityDataAccess;
@@ -161,5 +162,14 @@ public class YarnAPIStorageFactory {
       return dataAccessAdaptors.get(type);
     }
     return dStorageFactory.getDataAccess(type);
+  }
+  
+  public static boolean formatYarnStorageNonTransactional()
+      throws StorageException {
+    return dStorageFactory.getConnector().formatYarnStorageNonTransactional();
+  }
+  
+  public static boolean formatYarnStorage() throws StorageException {
+    return dStorageFactory.getConnector().formatYarnStorage();
   }
 }

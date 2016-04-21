@@ -17,6 +17,7 @@
 package org.apache.hadoop.yarn.server.resourcemanager;
 
 import com.google.common.annotations.VisibleForTesting;
+import io.hops.exception.StorageException;
 import io.hops.ha.common.TransactionStateManager;
 import io.hops.metadata.util.RMStorageFactory;
 import io.hops.metadata.util.YarnAPIStorageFactory;
@@ -117,6 +118,7 @@ import org.apache.hadoop.yarn.webapp.util.WebAppUtils;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintStream;
 import java.net.InetSocketAddress;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
@@ -126,6 +128,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import static org.apache.hadoop.util.ExitUtil.terminate;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.quota.QuotaService;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerResourceIncreaseRequest;
@@ -1580,8 +1583,15 @@ public class ResourceManager extends CompositeService implements Recoverable {
       Configuration conf = new YarnConfiguration();
       YarnAPIStorageFactory.setConfiguration(conf);
       RMStorageFactory.setConfiguration(conf);
-      if (conf.getBoolean(YarnConfiguration.INITIALIZEDB,
-          YarnConfiguration.DEFAULT_INITIALIZEDB)) {
+      StartupOption startOpt = parseArguments(argv);
+      if (startOpt == null) {
+        printUsage(System.err);
+        return;
+      }
+      if(startOpt== StartupOption.FORMAT){
+        boolean aborted = format(conf, startOpt.getForceFormat());
+        terminate(aborted ? 1 : 0);
+        return;
       }
       ResourceManager resourceManager = new ResourceManager();
       ShutdownHookManager.get()
@@ -1638,5 +1648,119 @@ public class ResourceManager extends CompositeService implements Recoverable {
         YarnConfiguration.DEFAULT_RM_ADDRESS,
         YarnConfiguration.DEFAULT_RM_PORT);
   }
+  
+  private static boolean format(Configuration conf, boolean force) throws
+          IOException {
+    try {
+      YarnAPIStorageFactory.setConfiguration(conf);
+      if (force) {
+        YarnAPIStorageFactory.formatYarnStorageNonTransactional();
+      } else {
+        YarnAPIStorageFactory.formatYarnStorage();
+      }
+    } catch (StorageException e) {
+      throw new RuntimeException(e.getMessage());
+    }
 
+    return false;
+  }
+  
+  private static StartupOption parseArguments(String args[]) {
+    int argsLen = (args == null) ? 0 : args.length;
+    StartupOption startOpt = StartupOption.REGULAR;
+    for (int i = 0; i < argsLen; i++) {
+      String cmd = args[i];
+      if (StartupOption.FORMAT.getName().equalsIgnoreCase(cmd)) {
+        startOpt = StartupOption.FORMAT;
+
+        i = i + 1;
+        if (i < argsLen && args[i].equalsIgnoreCase(StartupOption.FORCE.
+                getName())) {
+          startOpt.setForceFormat(true);
+        }
+
+      } else {
+        return null;
+      }
+    }
+    return startOpt;
+  }
+
+    static public enum StartupOption {
+    REGULAR("-regular"),
+    FORMAT("-format"),
+    FORCE("-force");
+    
+    private final String name;
+    
+    // Used only with format and upgrade options
+    private String clusterId = null;
+    
+    // Used only with format option
+    private boolean isForceFormat = false;
+    private boolean isInteractiveFormat = true;
+    
+    // Used only with recovery option
+    private int force = 0;
+    
+    //maximum mumber of blocks processed in block reporting at any given time
+    private long maxBlkReptProcessSize = 0;
+
+    private StartupOption(String arg) {
+      this.name = arg;
+    }
+
+    public String getName() {
+      return name;
+    }
+    
+    public void setClusterId(String cid) {
+      clusterId = cid;
+    }
+
+    public void setMaxBlkRptProcessSize(long maxBlkReptProcessSize){
+      this.maxBlkReptProcessSize = maxBlkReptProcessSize;
+    }
+    
+    public long getMaxBlkRptProcessSize(){
+      return maxBlkReptProcessSize;
+    }
+    
+    public String getClusterId() {
+      return clusterId;
+    }
+
+    public void setForce(int force) {
+      this.force = force;
+    }
+    
+    public int getForce() {
+      return this.force;
+    }
+    
+    public boolean getForceFormat() {
+      return isForceFormat;
+    }
+    
+    public void setForceFormat(boolean force) {
+      isForceFormat = force;
+    }
+    
+    public boolean getInteractiveFormat() {
+      return isInteractiveFormat;
+    }
+    
+    public void setInteractiveFormat(boolean interactive) {
+      isInteractiveFormat = interactive;
+    }
+  }
+   
+  private static final String USAGE =
+      "Usage: java ResourceManager [" + 
+          StartupOption.FORMAT.getName() + " [" +
+          StartupOption.FORCE.getName() + "]" ;
+  
+  private static void printUsage(PrintStream out) {
+    out.println(USAGE + "\n");
+  }
 }
