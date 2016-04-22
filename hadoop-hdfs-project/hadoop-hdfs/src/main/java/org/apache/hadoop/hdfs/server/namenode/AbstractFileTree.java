@@ -30,6 +30,7 @@ import io.hops.metadata.hdfs.dal.INodeDataAccess;
 import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.metadata.hdfs.entity.ProjectedINode;
 import io.hops.security.Users;
+import io.hops.security.UsersGroups;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import io.hops.transaction.lock.SubtreeLockHelper;
@@ -157,7 +158,7 @@ abstract class AbstractFileTree {
   }
 
   private void checkAccess(INode node, FsAction action)
-      throws AccessControlException {
+      throws IOException {
     if (!fsPermissionChecker.isSuperUser() && node.isDirectory()) {
       fsPermissionChecker.check(node, action);
     }
@@ -166,6 +167,8 @@ abstract class AbstractFileTree {
   private void checkAccess(ProjectedINode node, FsAction action)
       throws IOException {
     if (!fsPermissionChecker.isSuperUser() && node.isDirectory()) {
+      node.setUserName(UsersGroups.getUser(node.getUserID()));
+      node.setGroupName(UsersGroups.getGroup(node.getGroupID()));
       fsPermissionChecker.check(node, action);
     }
   }
