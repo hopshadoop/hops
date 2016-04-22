@@ -73,7 +73,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
    */
   private final Map<String, DatanodeStorageInfo> storageMap =
       new HashMap<String, DatanodeStorageInfo>();
-  
+
   /**
    * Block and targets pair
    */
@@ -805,5 +805,13 @@ public class DatanodeDescriptor extends DatanodeInfo {
 
       return storage;
     }
+  }
+
+  public HashSet<Integer> getSidsOnNode() {
+    HashSet<Integer> sids = new HashSet<Integer>();
+    for(DatanodeStorageInfo s : getStorageInfos()) {
+      sids.add(s.getSid());
+    }
+    return sids;
   }
 }

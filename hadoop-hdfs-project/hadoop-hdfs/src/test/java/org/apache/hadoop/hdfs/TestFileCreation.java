@@ -1032,8 +1032,6 @@ public class TestFileCreation {
       out.hflush();
       int actualRepl = out.getCurrentBlockReplication();
 
-      // TODO this is failing because the current strategy only has one
-      // TODO (cont.) destination (a single DISK)
       assertTrue(f + " should be replicated to " + DATANODE_NUM + " datanodes" +
           ", but is only replicated to " + actualRepl + " datanodes.",
           actualRepl == DATANODE_NUM);

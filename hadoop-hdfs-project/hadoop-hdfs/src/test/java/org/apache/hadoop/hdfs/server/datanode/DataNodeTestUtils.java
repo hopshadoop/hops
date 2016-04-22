@@ -113,9 +113,9 @@ public class DataNodeTestUtils {
   }
   
   public static void runBlockScannerForBlock(DataNode dn, ExtendedBlock b) {
-    DataBlockScanner scanner = dn.getBlockScanner();
-    BlockPoolSliceScanner bpScanner = scanner.getBPScanner(b.getBlockPoolId());
-    bpScanner.verifyBlock(b);
+    BlockPoolSliceScanner bpScanner = getBlockPoolScanner(dn, b);
+    bpScanner.verifyBlock(new ExtendedBlock(b.getBlockPoolId(),
+        new BlockPoolSliceScanner.BlockScanInfo(b.getLocalBlock())));
   }
   
   public static void shutdownBlockScanner(DataNode dn) {
@@ -181,8 +181,7 @@ public class DataNodeTestUtils {
     return bpScanner;
   }
 
-  public static long getLatestScanTime(DataNode dn,
-      ExtendedBlock b) {
+  public static long getLatestScanTime(DataNode dn, ExtendedBlock b) {
     BlockPoolSliceScanner scanner = getBlockPoolScanner(dn, b);
     return scanner.getLastScanTime(b.getLocalBlock());
   }
