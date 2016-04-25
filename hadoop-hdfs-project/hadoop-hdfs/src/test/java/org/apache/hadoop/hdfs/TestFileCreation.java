@@ -1133,16 +1133,10 @@ public class TestFileCreation {
           TestFileCreation.createFile(dfs, fpath, DATANODE_NUM);
       out.write("something_test".getBytes());
 
-      LogFactory.getLog(LogFactory.class).debug("### >> HERE (0)");
-
       out.hflush();    // ensure that block is allocated
-
-      LogFactory.getLog(LogFactory.class).debug("### >> HERE (1)");
 
       // shutdown last datanode in pipeline.
       cluster.stopDataNode(2);
-
-      LogFactory.getLog(LogFactory.class).debug("### >> HERE (2)");
 
       // close file. Since we have set the minReplication to 3 but have killed one
       // of the three datanodes, the close call will loop until the hdfsTimeout is
