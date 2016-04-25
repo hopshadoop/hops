@@ -18,12 +18,12 @@ package org.apache.hadoop.hdfs.server.blockmanagement;
 
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
+import io.hops.metadata.HdfsStorageFactory;
+import io.hops.metadata.hdfs.dal.ReplicaUnderConstructionDataAccess;
 import io.hops.transaction.EntityManager;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.BlockUCState;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.ReplicaState;
-import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 
 import java.io.IOException;
@@ -277,10 +277,11 @@ public class BlockInfoUnderConstruction extends BlockInfo {
   }
 
   private void complete() throws StorageException, TransactionContextException {
-    FSNamesystem.LOG.debug("num expected replicas for blkid " + getBlockId() + ": " + getExpectedReplicas().size());
-    for (ReplicaUnderConstruction rep : getExpectedReplicas()) {
-      EntityManager.remove(rep);
-    }
+    ReplicaUnderConstructionDataAccess da =
+        (ReplicaUnderConstructionDataAccess) HdfsStorageFactory
+            .getDataAccess(ReplicaUnderConstructionDataAccess.class);
+
+    da.removeByBlockIdAndInodeId(getBlockId(), getInodeId());
   }
 
   public void setBlockUCState(BlockUCState s)

@@ -71,6 +71,12 @@ public class ReplicaUnderConstructionDALAdaptor extends
   }
 
   @Override
+  public void removeByBlockIdAndInodeId(long blockId, int inodeId)
+      throws StorageException {
+    dataAccces.removeByBlockIdAndInodeId(blockId, inodeId);
+  }
+
+  @Override
   public ReplicaUnderConstruction convertHDFStoDAL(
       org.apache.hadoop.hdfs.server.blockmanagement.ReplicaUnderConstruction hdfsClass)
       throws StorageException {
