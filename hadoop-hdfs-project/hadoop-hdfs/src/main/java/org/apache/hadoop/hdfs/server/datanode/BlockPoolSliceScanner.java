@@ -18,7 +18,23 @@
 
 package org.apache.hadoop.hdfs.server.datanode;
 
-import com.google.common.annotations.VisibleForTesting;
+import java.io.DataOutputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.SortedSet;
+import java.util.TreeSet;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -31,26 +47,13 @@ import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsDatasetSpi;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsVolumeSpi;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.RollingLogs;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
+import org.apache.hadoop.util.GSet;
+import org.apache.hadoop.util.LightWeightGSet;
+import org.apache.hadoop.util.LightWeightGSet.LinkedElement;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.util.Time;
 
-import java.io.DataOutputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
-import java.util.Collections;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.SortedSet;
-import java.util.TreeSet;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import com.google.common.annotations.VisibleForTesting;
 
 /**
  * Scans the block files under a block pool and verifies that the
@@ -60,17 +63,16 @@ import java.util.regex.Pattern;
  */
 
 class BlockPoolSliceScanner {
-  
+
   public static final Log LOG = LogFactory.getLog(BlockPoolSliceScanner.class);
-  
+
   private static final String DATA_FORMAT = "yyyy-MM-dd HH:mm:ss,SSS";
 
   private static final int MAX_SCAN_RATE = 8 * 1024 * 1024; // 8MB per sec
   private static final int MIN_SCAN_RATE = 1 * 1024 * 1024; // 1MB per sec
-  private static final long DEFAULT_SCAN_PERIOD_HOURS = 21 * 24L; // three weeks
+  private static final long DEFAULT_SCAN_PERIOD_HOURS = 21*24L; // three weeks
 
-  private static final String VERIFICATION_PREFIX =
-      "dncp_block_verification.log";
+  private static final String VERIFICATION_PREFIX = "dncp_block_verification.log";
 
   private final String blockPoolId;
   private final long scanPeriod;
@@ -78,100 +80,122 @@ class BlockPoolSliceScanner {
 
   private final DataNode datanode;
   private final FsDatasetSpi<? extends FsVolumeSpi> dataset;
-  
-  private final SortedSet<BlockScanInfo> blockInfoSet =
-      new TreeSet<BlockScanInfo>();
-  private final Map<Block, BlockScanInfo> blockMap =
-      new HashMap<Block, BlockScanInfo>();
-  
+
+  private final SortedSet<BlockScanInfo> blockInfoSet
+      = new TreeSet<BlockScanInfo>(BlockScanInfo.LAST_SCAN_TIME_COMPARATOR);
+
+  private final SortedSet<BlockScanInfo> newBlockInfoSet =
+      new TreeSet<BlockScanInfo>(BlockScanInfo.LAST_SCAN_TIME_COMPARATOR);
+
+  private final GSet<Block, BlockScanInfo> blockMap
+      = new LightWeightGSet<Block, BlockScanInfo>(
+      LightWeightGSet.computeCapacity(0.5, "BlockMap"));
+
   // processedBlocks keeps track of which blocks are scanned
   // since the last run.
   private volatile HashMap<Long, Integer> processedBlocks;
-  
+
   private long totalScans = 0;
   private long totalScanErrors = 0;
   private long totalTransientErrors = 0;
-  private final AtomicInteger totalBlocksScannedInLastRun = new AtomicInteger();
-      // Used for test only
-  
-  private long currentPeriodStart = Time.now();
+  private final AtomicInteger totalBlocksScannedInLastRun = new AtomicInteger(); // Used for test only
+
+  private long currentPeriodStart = Time.monotonicNow();
   private long bytesLeft = 0; // Bytes to scan in this period
   private long totalBytesToScan = 0;
-  
+  private boolean isNewPeriod = true;
+
   private final LogFileHandler verificationLog;
-  
-  private final DataTransferThrottler throttler =
-      new DataTransferThrottler(200, MAX_SCAN_RATE);
-  
+
+  private final DataTransferThrottler throttler = new DataTransferThrottler(
+      200, MAX_SCAN_RATE);
+
   private static enum ScanType {
-    VERIFICATION_SCAN,
-    // scanned as part of periodic verfication
+    VERIFICATION_SCAN,     // scanned as part of periodic verfication
     NONE,
   }
-  
-  static class BlockScanInfo implements Comparable<BlockScanInfo> {
-    Block block;
+
+  // Extend Block because in the DN process there's a 1-to-1 correspondence of
+  // BlockScanInfo to Block instances, so by extending rather than containing
+  // Block, we can save a bit of Object overhead (about 24 bytes per block
+  // replica.)
+  static class BlockScanInfo extends Block
+      implements LightWeightGSet.LinkedElement {
+
+    /** Compare the info by the last scan time. */
+    static final Comparator<BlockScanInfo> LAST_SCAN_TIME_COMPARATOR
+        = new Comparator<BlockPoolSliceScanner.BlockScanInfo>() {
+
+      @Override
+      public int compare(BlockScanInfo left, BlockScanInfo right) {
+        final long l = left.lastScanTime;
+        final long r = right.lastScanTime;
+        // compare blocks itself if scantimes are same to avoid.
+        // because TreeMap uses comparator if available to check existence of
+        // the object.
+        return l < r? -1: l > r? 1: left.compareTo(right);
+      }
+    };
+
     long lastScanTime = 0;
     ScanType lastScanType = ScanType.NONE;
     boolean lastScanOk = true;
-    
+    private LinkedElement next;
+
     BlockScanInfo(Block block) {
-      this.block = block;
-    }
-    
-    @Override
-    public int hashCode() {
-      return block.hashCode();
-    }
-    
-    @Override
-    public boolean equals(Object other) {
-      return other instanceof BlockScanInfo &&
-          compareTo((BlockScanInfo) other) == 0;
-    }
-    
-    long getLastScanTime() {
-      return (lastScanType == ScanType.NONE) ? 0 : lastScanTime;
-    }
-    
-    @Override
-    public int compareTo(BlockScanInfo other) {
-      long t1 = lastScanTime;
-      long t2 = other.lastScanTime;
-      return (t1 < t2) ? -1 : ((t1 > t2) ? 1 : block.compareTo(other.block));
+      super(block);
     }
 
     @Override
-    public String toString() {
-      return block.getBlockName() + "_" + block.getGenerationStamp();
+    public int hashCode() {
+      return super.hashCode();
+    }
+
+    @Override
+    public boolean equals(Object that) {
+        return this == that || super.equals(that);
+    }
+
+    long getLastScanTime() {
+      return (lastScanType == ScanType.NONE) ? 0 : lastScanTime;
+    }
+
+    @Override
+    public void setNext(LinkedElement next) {
+      this.next = next;
+    }
+
+    @Override
+    public LinkedElement getNext() {
+      return next;
     }
   }
-  
+
   BlockPoolSliceScanner(String bpid, DataNode datanode,
       FsDatasetSpi<? extends FsVolumeSpi> dataset, Configuration conf) {
     this.datanode = datanode;
     this.dataset = dataset;
-    this.blockPoolId = bpid;
-    
+    this.blockPoolId  = bpid;
+
     long hours = conf.getInt(DFSConfigKeys.DFS_DATANODE_SCAN_PERIOD_HOURS_KEY,
         DFSConfigKeys.DFS_DATANODE_SCAN_PERIOD_HOURS_DEFAULT);
     if (hours <= 0) {
       hours = DEFAULT_SCAN_PERIOD_HOURS;
     }
     this.scanPeriod = hours * 3600 * 1000;
-    LOG.info("Periodic Block Verification Scanner initialized with interval " +
-        hours + " hours for block pool " + bpid);
+    LOG.info("Periodic Block Verification Scanner initialized with interval "
+        + hours + " hours for block pool " + bpid);
 
     // get the list of blocks and arrange them in random order
     List<FinalizedReplica> arr = dataset.getFinalizedBlocks(blockPoolId);
     Collections.shuffle(arr);
-    
+
     long scanTime = -1;
     for (Block block : arr) {
-      BlockScanInfo info = new BlockScanInfo(block);
+      BlockScanInfo info = new BlockScanInfo( block );
       info.lastScanTime = scanTime--;
       //still keep 'info.lastScanType' to NONE.
-      addBlockInfo(info);
+      addBlockInfo(info, false);
     }
 
     RollingLogs rollingLogs = null;
@@ -181,87 +205,98 @@ class BlockPoolSliceScanner {
       LOG.warn("Could not open verfication log. " +
           "Verification times are not stored.");
     }
-    verificationLog =
-        rollingLogs == null ? null : new LogFileHandler(rollingLogs);
+    verificationLog = rollingLogs == null? null: new LogFileHandler(rollingLogs);
   }
-  
+
   String getBlockPoolId() {
     return blockPoolId;
   }
-  
+
   private void updateBytesToScan(long len, long lastScanTime) {
     // len could be negative when a block is deleted.
     totalBytesToScan += len;
-    if (lastScanTime < currentPeriodStart) {
+    if ( lastScanTime < currentPeriodStart ) {
       bytesLeft += len;
     }
     // Should we change throttler bandwidth every time bytesLeft changes?
     // not really required.
   }
-  
-  private synchronized void addBlockInfo(BlockScanInfo info) {
-    boolean added = blockInfoSet.add(info);
-    blockMap.put(info.block, info);
-    
+
+  /**
+   * Add the BlockScanInfo to sorted set of blockScanInfo
+   * @param info BlockScanInfo to be added
+   * @param isNewBlock true if the block is the new Block, false if
+   *          BlockScanInfo is being updated with new scanTime
+   */
+  private synchronized void addBlockInfo(BlockScanInfo info,
+      boolean isNewBlock) {
+    boolean added = false;
+    if (isNewBlock) {
+      // check whether the block already present
+      boolean exists = blockInfoSet.contains(info);
+      added = !exists && newBlockInfoSet.add(info);
+    } else {
+      added = blockInfoSet.add(info);
+    }
+    blockMap.put(info);
+
     if (added) {
-      updateBytesToScan(info.block.getNumBytes(), info.lastScanTime);
+      updateBytesToScan(info.getNumBytes(), info.lastScanTime);
     }
   }
-  
+
   private synchronized void delBlockInfo(BlockScanInfo info) {
     boolean exists = blockInfoSet.remove(info);
-    blockMap.remove(info.block);
+    if (!exists){
+      exists = newBlockInfoSet.remove(info);
+    }
+    blockMap.remove(info);
 
     if (exists) {
-      updateBytesToScan(-info.block.getNumBytes(), info.lastScanTime);
+      updateBytesToScan(-info.getNumBytes(), info.lastScanTime);
     }
   }
-  
-  /**
-   * Update blockMap by the given LogEntry
-   */
+
+  /** Update blockMap by the given LogEntry */
   private synchronized void updateBlockInfo(LogEntry e) {
     BlockScanInfo info = blockMap.get(new Block(e.blockId, 0, e.genStamp));
-    
-    if (info != null && e.verificationTime > 0 &&
+
+    if(info != null && e.verificationTime > 0 &&
         info.lastScanTime < e.verificationTime) {
       delBlockInfo(info);
       info.lastScanTime = e.verificationTime;
       info.lastScanType = ScanType.VERIFICATION_SCAN;
-      addBlockInfo(info);
+      addBlockInfo(info, false);
     }
   }
 
   private synchronized long getNewBlockScanTime() {
-    /* If there are a lot of blocks, this returns a random time with in 
+    /* If there are a lot of blocks, this returns a random time with in
      * the scan period. Otherwise something sooner.
      */
-    long period =
-        Math.min(scanPeriod, Math.max(blockMap.size(), 1) * 600 * 1000L);
-    int periodInt = Math.abs((int) period);
-    return Time.now() - scanPeriod + DFSUtil.getRandom().nextInt(periodInt);
+    long period = Math.min(scanPeriod,
+        Math.max(blockMap.size(),1) * 600 * 1000L);
+    int periodInt = Math.abs((int)period);
+    return Time.monotonicNow() - scanPeriod +
+        DFSUtil.getRandom().nextInt(periodInt);
   }
 
-  /**
-   * Adds block to list of blocks
-   */
+  /** Adds block to list of blocks */
   synchronized void addBlock(ExtendedBlock block) {
     BlockScanInfo info = blockMap.get(block.getLocalBlock());
-    if (info != null) {
+    if ( info != null ) {
       LOG.warn("Adding an already existing block " + block);
       delBlockInfo(info);
     }
-    
+
     info = new BlockScanInfo(block.getLocalBlock());
     info.lastScanTime = getNewBlockScanTime();
-    
-    addBlockInfo(info);
+
+    addBlockInfo(info, true);
     adjustThrottler();
   }
-  
-  /**
-   * Deletes the block from internal structures
-   */
+
+  /** Deletes the block from internal structures */
   synchronized void deleteBlock(Block block) {
     BlockScanInfo info = blockMap.get(block);
     if (info != null) {
@@ -274,58 +309,46 @@ class BlockPoolSliceScanner {
     return totalScans;
   }
 
-  /**
-   * @return the last scan time for the block pool.
-   */
+  /** @return the last scan time for the block pool. */
   long getLastScanTime() {
     return lastScanTime.get();
   }
 
-  /**
-   * @return the last scan time the given block.
-   */
+  /** @return the last scan time the given block. */
   synchronized long getLastScanTime(Block block) {
     BlockScanInfo info = blockMap.get(block);
-    return info == null ? 0 : info.lastScanTime;
+    return info == null? 0: info.lastScanTime;
   }
 
-  /**
-   * Deletes blocks from internal structures
-   */
+  /** Deletes blocks from internal structures */
   void deleteBlocks(Block[] blocks) {
-    for (Block b : blocks) {
+    for ( Block b : blocks ) {
       deleteBlock(b);
     }
   }
-  
-  private synchronized void updateScanStatus(Block block, ScanType type,
+
+  private synchronized void updateScanStatus(BlockScanInfo info,
+      ScanType type,
       boolean scanOk) {
-    BlockScanInfo info = blockMap.get(block);
-    
-    if (info != null) {
-      delBlockInfo(info);
-    } else {
-      // It might already be removed. Thats ok, it will be caught next time.
-      info = new BlockScanInfo(block);
-    }
-    
-    long now = Time.now();
+    delBlockInfo(info);
+
+    long now = Time.monotonicNow();
     info.lastScanType = type;
     info.lastScanTime = now;
     info.lastScanOk = scanOk;
-    addBlockInfo(info);
+    addBlockInfo(info, false);
 
     // Don't update meta data if the verification failed.
     if (!scanOk) {
       return;
     }
-    
+
     if (verificationLog != null) {
-      verificationLog
-          .append(now, block.getGenerationStamp(), block.getBlockId());
+      verificationLog.append(now, info.getGenerationStamp(),
+          info.getBlockId());
     }
   }
-  
+
   private void handleScanFailure(ExtendedBlock block) {
     LOG.info("Reporting bad " + block);
     try {
@@ -335,7 +358,7 @@ class BlockPoolSliceScanner {
       LOG.warn("Cannot report bad " + block.getBlockId());
     }
   }
-  
+
   static private class LogEntry {
 
     long blockId = -1;
@@ -384,49 +407,49 @@ class BlockPoolSliceScanner {
       return entry;
     }
   }
-  
+
   private synchronized void adjustThrottler() {
-    long timeLeft = currentPeriodStart + scanPeriod - Time.now();
-    long bw = Math.max(bytesLeft * 1000 / timeLeft, MIN_SCAN_RATE);
+    long timeLeft = Math.max(1L,
+        currentPeriodStart + scanPeriod - Time.monotonicNow());
+    long bw = Math.max((bytesLeft * 1000) / timeLeft, MIN_SCAN_RATE);
     throttler.setBandwidth(Math.min(bw, MAX_SCAN_RATE));
   }
-  
+
   @VisibleForTesting
   void verifyBlock(ExtendedBlock block) {
     BlockSender blockSender = null;
 
     /* In case of failure, attempt to read second time to reduce
-     * transient errors. How do we flush block data from kernel 
-     * buffers before the second read? 
+     * transient errors. How do we flush block data from kernel
+     * buffers before the second read?
      */
-    for (int i = 0; i < 2; i++) {
+    for (int i=0; i<2; i++) {
       boolean second = (i > 0);
-      
+
       try {
         adjustThrottler();
-        
-        blockSender =
-            new BlockSender(block, 0, -1, false, true, true, datanode, null);
+
+        blockSender = new BlockSender(block, 0, -1, false, true, true, datanode, null);
 
         DataOutputStream out =
             new DataOutputStream(new IOUtils.NullOutputStream());
-        
+
         blockSender.sendBlock(out, null, throttler);
 
         LOG.info((second ? "Second " : "") +
             "Verification succeeded for " + block);
-        
-        if (second) {
+
+        if ( second ) {
           totalTransientErrors++;
         }
-        
-        updateScanStatus(block.getLocalBlock(), ScanType.VERIFICATION_SCAN,
-            true);
+
+        updateScanStatus((BlockScanInfo)block.getLocalBlock(),
+            ScanType.VERIFICATION_SCAN, true);
 
         return;
       } catch (IOException e) {
-        updateScanStatus(block.getLocalBlock(), ScanType.VERIFICATION_SCAN,
-            false);
+        updateScanStatus((BlockScanInfo)block.getLocalBlock(),
+            ScanType.VERIFICATION_SCAN, false);
 
         // If the block does not exists anymore, then its not an error
         if (!dataset.contains(block)) {
@@ -441,16 +464,16 @@ class BlockPoolSliceScanner {
         // file before BlockReceiver updated the VolumeMap. The state of the
         // block can be changed again now, so ignore this error here. If there
         // is a block really deleted by mistake, DirectoryScan should catch it.
-        if (e instanceof FileNotFoundException) {
+        if (e instanceof FileNotFoundException ) {
           LOG.info("Verification failed for " + block +
               " - may be due to race with write");
           deleteBlock(block.getLocalBlock());
           return;
         }
 
-        LOG.warn((second ? "Second " : "First ") + "Verification failed for " +
-            block, e);
-        
+        LOG.warn((second ? "Second " : "First ") + "Verification failed for "
+            + block, e);
+
         if (second) {
           totalScanErrors++;
           datanode.getMetrics().incrBlockVerificationFailures();
@@ -464,39 +487,39 @@ class BlockPoolSliceScanner {
       }
     }
   }
-  
+
   private synchronized long getEarliestScanTime() {
     if (!blockInfoSet.isEmpty()) {
       return blockInfoSet.first().lastScanTime;
     }
     return Long.MAX_VALUE;
   }
-  
+
   private synchronized boolean isFirstBlockProcessed() {
     if (!blockInfoSet.isEmpty()) {
-      long blockId = blockInfoSet.first().block.getBlockId();
-      if ((processedBlocks.get(blockId) != null) &&
-          (processedBlocks.get(blockId) == 1)) {
+      long blockId = blockInfoSet.first().getBlockId();
+      if ((processedBlocks.get(blockId) != null)
+          && (processedBlocks.get(blockId) == 1)) {
         return true;
       }
     }
     return false;
   }
-  
+
   // Picks one block and verifies it
   private void verifyFirstBlock() {
-    Block block = null;
+    BlockScanInfo block = null;
     synchronized (this) {
       if (!blockInfoSet.isEmpty()) {
-        block = blockInfoSet.first().block;
+        block = blockInfoSet.first();
       }
     }
-    if (block != null) {
+    if ( block != null ) {
       verifyBlock(new ExtendedBlock(blockPoolId, block));
       processedBlocks.put(block.getBlockId(), 1);
     }
   }
-  
+
   // Used for tests only
   int getBlocksScannedInLastRun() {
     return totalBlocksScannedInLastRun.get();
@@ -512,25 +535,27 @@ class BlockPoolSliceScanner {
   private boolean assignInitialVerificationTimes() {
     //First updates the last verification times from the log file.
     if (verificationLog != null) {
-      long now = Time.now();
+      long now = Time.monotonicNow();
       RollingLogs.LineIterator logIterator = null;
       try {
         logIterator = verificationLog.logs.iterator(false);
         // update verification times from the verificationLog.
         while (logIterator.hasNext()) {
-          if (!datanode.shouldRun ||
-              datanode.blockScanner.blockScannerThread.isInterrupted()) {
+          if (!datanode.shouldRun
+              || datanode.blockScanner.blockScannerThread.isInterrupted()) {
             return false;
           }
           LogEntry entry = LogEntry.parseEntry(logIterator.next());
           if (entry != null) {
             updateBlockInfo(entry);
             if (now - entry.verificationTime < scanPeriod) {
-              BlockScanInfo info =
-                  blockMap.get(new Block(entry.blockId, 0, entry.genStamp));
+              BlockScanInfo info = blockMap.get(new Block(entry.blockId, 0,
+                  entry.genStamp));
               if (info != null) {
                 if (processedBlocks.get(entry.blockId) == null) {
-                  updateBytesLeft(-info.block.getNumBytes());
+                  if (isNewPeriod) {
+                    updateBytesLeft(-info.getNumBytes());
+                  }
                   processedBlocks.put(entry.blockId, 1);
                 }
                 if (logIterator.isPrevious()) {
@@ -548,9 +573,10 @@ class BlockPoolSliceScanner {
       } finally {
         IOUtils.closeStream(logIterator);
       }
+      isNewPeriod = false;
     }
-    
-    
+
+
     /* Before this loop, entries in blockInfoSet that are not
      * updated above have lastScanTime of <= 0 . Loop until first entry has
      * lastModificationTime > 0.
@@ -559,44 +585,44 @@ class BlockPoolSliceScanner {
       final int numBlocks = Math.max(blockMap.size(), 1);
       // Initially spread the block reads over half of scan period
       // so that we don't keep scanning the blocks too quickly when restarted.
-      long verifyInterval =
-          Math.min(scanPeriod / (2L * numBlocks), 10 * 60 * 1000L);
-      long lastScanTime = Time.now() - scanPeriod;
+      long verifyInterval = Math.min(scanPeriod/(2L * numBlocks), 10*60*1000L);
+      long lastScanTime = Time.monotonicNow() - scanPeriod;
 
       if (!blockInfoSet.isEmpty()) {
         BlockScanInfo info;
-        while ((info = blockInfoSet.first()).lastScanTime < 0) {
+        while ((info =  blockInfoSet.first()).lastScanTime < 0) {
           delBlockInfo(info);
           info.lastScanTime = lastScanTime;
           lastScanTime += verifyInterval;
-          addBlockInfo(info);
+          addBlockInfo(info, false);
         }
       }
     }
-    
+
     return true;
   }
-  
+
   private synchronized void updateBytesLeft(long len) {
     bytesLeft += len;
   }
-  
+
   private synchronized void startNewPeriod() {
-    LOG.info("Starting a new period : work left in prev period : " + String
-        .format("%.2f%%", totalBytesToScan == 0 ? 0 :
-            (bytesLeft * 100.0) / totalBytesToScan));
+    LOG.info("Starting a new period : work left in prev period : "
+        + String.format("%.2f%%", totalBytesToScan == 0 ? 0
+        : (bytesLeft * 100.0) / totalBytesToScan));
 
     // reset the byte counts :
     bytesLeft = totalBytesToScan;
-    currentPeriodStart = Time.now();
+    currentPeriodStart = Time.monotonicNow();
+    isNewPeriod = true;
   }
-  
+
   private synchronized boolean workRemainingInCurrentPeriod() {
-    if (bytesLeft <= 0 && Time.now() < currentPeriodStart + scanPeriod) {
+    if (bytesLeft <= 0 && Time.monotonicNow() < currentPeriodStart + scanPeriod) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Skipping scan since bytesLeft=" + bytesLeft + ", Start=" +
             currentPeriodStart + ", period=" + scanPeriod + ", now=" +
-            Time.now() + " " + blockPoolId);
+            Time.monotonicNow() + " " + blockPoolId);
       }
       return false;
     } else {
@@ -619,7 +645,7 @@ class BlockPoolSliceScanner {
       scan();
     } finally {
       totalBlocksScannedInLastRun.set(processedBlocks.size());
-      lastScanTime.set(Time.now());
+      lastScanTime.set(Time.monotonicNow());
     }
   }
 
@@ -631,7 +657,7 @@ class BlockPoolSliceScanner {
       verificationLog.close();
     }
   }
-  
+
   private void scan() {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Starting to scan blockpool: " + blockPoolId);
@@ -639,22 +665,22 @@ class BlockPoolSliceScanner {
     try {
       adjustThrottler();
 
-      while (datanode.shouldRun &&
-          !datanode.blockScanner.blockScannerThread.isInterrupted() &&
-          datanode.isBPServiceAlive(blockPoolId)) {
-        long now = Time.now();
+      while (datanode.shouldRun
+          && !datanode.blockScanner.blockScannerThread.isInterrupted()
+          && datanode.isBPServiceAlive(blockPoolId)) {
+        long now = Time.monotonicNow();
         synchronized (this) {
-          if (now >= (currentPeriodStart + scanPeriod)) {
+          if ( now >= (currentPeriodStart + scanPeriod)) {
             startNewPeriod();
           }
         }
-        if (((now - getEarliestScanTime()) >= scanPeriod) ||
-            ((!blockInfoSet.isEmpty()) && !(this.isFirstBlockProcessed()))) {
+        if (((now - getEarliestScanTime()) >= scanPeriod)
+            || ((!blockInfoSet.isEmpty()) && !(this.isFirstBlockProcessed()))) {
           verifyFirstBlock();
         } else {
           if (LOG.isDebugEnabled()) {
-            LOG.debug("All remaining blocks were processed recently, " +
-                "so this run is complete");
+            LOG.debug("All remaining blocks were processed recently, "
+                + "so this run is complete");
           }
           break;
         }
@@ -664,12 +690,21 @@ class BlockPoolSliceScanner {
       throw e;
     } finally {
       rollVerificationLogs();
+      rollNewBlocksInfo();
       if (LOG.isDebugEnabled()) {
         LOG.debug("Done scanning block pool: " + blockPoolId);
       }
     }
   }
-  
+
+  // add new blocks to scan in next iteration
+  private synchronized void rollNewBlocksInfo() {
+    for (BlockScanInfo newBlock : newBlockInfoSet) {
+      blockInfoSet.add(newBlock);
+    }
+    newBlockInfoSet.clear();
+  }
+
   private synchronized void rollVerificationLogs() {
     if (verificationLog != null) {
       try {
@@ -681,7 +716,7 @@ class BlockPoolSliceScanner {
     }
   }
 
-  
+
   synchronized void printBlockReport(StringBuilder buffer,
       boolean summaryOnly) {
     long oneHour = 3600*1000;
@@ -704,8 +739,7 @@ class BlockPoolSliceScanner {
 
     Date date = new Date();
 
-    for(Iterator<BlockScanInfo> it = blockInfoSet.iterator(); it.hasNext();) {
-      BlockScanInfo info = it.next();
+    for(BlockScanInfo info : blockInfoSet) {
 
       long scanTime = info.getLastScanTime();
       long diff = now - scanTime;
@@ -721,13 +755,15 @@ class BlockPoolSliceScanner {
         date.setTime(scanTime);
         String scanType =
             (info.lastScanType == ScanType.VERIFICATION_SCAN) ? "local" : "none";
-        buffer.append(String.format("%-26s : status : %-6s type : %-6s" +
-                " scan time : " +
-                "%-15d %s%n", info,
-            (info.lastScanOk ? "ok" : "failed"),
-            scanType, scanTime,
-            (scanTime <= 0) ? "not yet verified" :
-                dateFormat.format(date)));
+        buffer.append(String.format(
+              "%-26s : " +
+              "status : %-6s " +
+              "type : %-6s" +
+              " scan time : %-15d %s%n",
+              info,
+              (info.lastScanOk ? "ok" : "failed"),
+              scanType, scanTime,
+              ( scanTime <= 0) ? "not yet verified" : dateFormat.format(date)));
       }
     }
 
@@ -758,7 +794,7 @@ class BlockPoolSliceScanner {
         Math.round(throttler.getBandwidth()/1024.0),
         pctProgress, pctPeriodLeft));
   }
-  
+
   /**
    * This class takes care of log file used to store the last verification
    * times of the blocks.
@@ -768,13 +804,13 @@ class BlockPoolSliceScanner {
 
     private final RollingLogs logs;
 
-    private LogFileHandler(RollingLogs logs) {
+    private LogFileHandler(RollingLogs logs)  {
       this.logs = logs;
     }
 
     void append(long verificationTime, long genStamp, long blockId) {
-      final String m =
-          LogEntry.toString(verificationTime, genStamp, blockId, dateFormat);
+      final String m = LogEntry.toString(verificationTime, genStamp, blockId,
+          dateFormat);
       try {
         logs.appender().append(m);
       } catch (IOException e) {
