@@ -53,7 +53,9 @@ public interface RMContext extends Recoverable {
   boolean isHAEnabled();
 
   boolean isLeadingRT();
-    
+  
+  boolean isLeader();
+  
   boolean isDistributedEnabled();
   
   HAServiceState getHAServiceState();
@@ -66,8 +68,6 @@ public interface RMContext extends Recoverable {
 
   ConcurrentMap<NodeId, RMNode> getActiveRMNodes();
 
-  ConcurrentSkipListSet<NodeId> getRMNodesToResyncAfterRolback();
-  
   AMLivelinessMonitor getAMLivelinessMonitor();
 
   AMLivelinessMonitor getAMFinishingMonitor();

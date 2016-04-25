@@ -171,7 +171,7 @@ public class TestDistributedRT {
     try {
       //Wait for leader election to start
       Thread.sleep(3000);
-      if (rm1.getRMContext().getGroupMembershipService().isLeader()) {
+      if (rm1.getRMContext().isLeader()) {
         rmL = rm1;
         rmRT = rm2;
       } else {
@@ -248,7 +248,7 @@ public class TestDistributedRT {
       MockNM nm1, nm2;
       //Wait for leader election to start
       Thread.sleep(3000);
-      if (rm1.getRMContext().getGroupMembershipService().isLeader()) {
+      if (rm1.getRMContext().isLeader()) {
         rmL = rm1;
         rmRT = rm2;
       } else {
@@ -346,7 +346,7 @@ public class TestDistributedRT {
     try {
       //Wait for leader election to start
       Thread.sleep(3000);
-      if (rm1.getRMContext().getGroupMembershipService().isLeader()) {
+      if (rm1.getRMContext().isLeader()) {
         rmL = rm1;
         rmRT = rm2;
       } else {

@@ -186,7 +186,7 @@ public class TestDBLimites {
       RMNode rmNode
               = new RMNode("nodeid_" + random.nextInt(4000), "hostName", 1,
                       1, "nodeAddress", "httpAddress", "", 1, "currentState",
-                      "version", 1, 1,0);
+                      "version", 1, 0);
       toAdd.add(rmNode);
     }
     return toAdd;
@@ -219,7 +219,7 @@ public class TestDBLimites {
                 for (int i = 0; i < 4000; i++) {
                   RMNode rmNode = new RMNode("nodeid_" + i, "hostName", 1,
                           1, "nodeAddress", "httpAddress", "", 1, "currentState",
-                          "version", 1, 1,0);
+                          "version", 1,0);
                   toAdd.add(rmNode);
                 }
 

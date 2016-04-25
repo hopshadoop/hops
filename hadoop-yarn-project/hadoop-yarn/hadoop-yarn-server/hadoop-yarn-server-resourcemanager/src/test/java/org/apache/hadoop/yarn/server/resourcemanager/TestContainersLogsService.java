@@ -301,8 +301,7 @@ public class TestContainersLogsService {
               getCommandPort(), node.getHttpPort(), node.getNodeAddress(), node.
               getHttpAddress(), node.getHealthReport(),
               node.getLastHealthReportTime(), node.getCurrentState(), node.
-              getNodemanagerVersion(), node.getOvercommittimeout(), node.
-              getUciId(),
+              getNodemanagerVersion(), -1, //overcomitTimeOut is never set and getting it return an error
               pendingId++));
     }
     List<RMContainer> rmContainers2 = new ArrayList<RMContainer>();
@@ -671,7 +670,7 @@ public class TestContainersLogsService {
     for (int i = 0; i < nbNodes; i++) {
       RMNode rmNode = new RMNode("nodeid_" + i + ":" + 9999, "hostName", 1,
               1, "nodeAddress", "httpAddress", "", 1, "RUNNING",
-              "version", 1, 1, pendingId++);
+              "version", 1, pendingId++);
       toAdd.add(rmNode);
     }
     return toAdd;

@@ -65,8 +65,9 @@ public class TestNMExpiry {
   ResourceTrackerService resourceTrackerService;
 
   private class TestNmLivelinessMonitor extends NMLivelinessMonitor {
-    public TestNmLivelinessMonitor(Dispatcher dispatcher, RMContext rmContext) {
-      super(dispatcher, rmContext);
+    public TestNmLivelinessMonitor(Dispatcher dispatcher, RMContext rmContext,
+            Configuration conf) {
+      super(dispatcher, rmContext, conf);
     }
 
     @Override
@@ -102,7 +103,7 @@ public class TestNMExpiry {
     dispatcher
         .register(RMNodeEventType.class, new NodeEventDispatcher(context));
     NMLivelinessMonitor nmLivelinessMonitor =
-        new TestNmLivelinessMonitor(dispatcher, context);
+        new TestNmLivelinessMonitor(dispatcher, context, conf);
     nmLivelinessMonitor.init(conf);
     nmLivelinessMonitor.start();
     NodesListManager nodesListManager = new NodesListManager(context);
