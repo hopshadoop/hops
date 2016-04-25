@@ -1044,9 +1044,11 @@ public class BlockManager {
    */
   void removeBlocksAssociatedTo(final DatanodeDescriptor node)
       throws IOException {
-    final Iterator<? extends Block> it = node.getBlockIterator();
-    while(it.hasNext()) {
-      removeStoredBlock(it.next(), node);
+    for(DatanodeStorageInfo storage : node.getStorageInfos()) {
+      final Iterator<? extends Block> it = storage.getBlockIterator();
+      while (it.hasNext()) {
+        removeStoredBlockTx(it.next().getBlockId(), storage);
+      }
     }
 
     // TODO HDP_2.6 also does this:
@@ -1353,15 +1355,24 @@ public class BlockManager {
    * @return total number of block for deletion
    */
   int computeInvalidateWork(int nodesToProcess) throws IOException {
-//    final List<String> nodes = invalidateBlocks.getStorageIDs();
     final List<DatanodeInfo> nodes = invalidateBlocks.getDatanodes(datanodeManager);
     Collections.shuffle(nodes);
 
     nodesToProcess = Math.min(nodes.size(), nodesToProcess);
 
     int blockCnt = 0;
-    for (DatanodeInfo node : nodes) {
-      blockCnt += invalidateWorkForOneNode(node);
+    for (DatanodeInfo dnInfo : nodes) {
+      LOG.debug("!.! node: " + dnInfo);
+      if(dnInfo == null) {
+        (new Throwable()).printStackTrace();
+      }
+      int blocks = invalidateWorkForOneNode(dnInfo);
+      if (blocks > 0) {
+        blockCnt += blocks;
+        if (--nodesToProcess == 0) {
+          break;
+        }
+      }
     }
     return blockCnt;
   }

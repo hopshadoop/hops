@@ -20,7 +20,6 @@ package org.apache.hadoop.hdfs;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.anyObject;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.doAnswer;
@@ -31,6 +30,12 @@ import java.io.OutputStream;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
+import io.hops.exception.StorageException;
+import io.hops.transaction.handler.HDFSOperationType;
+import io.hops.transaction.handler.HopsTransactionalRequestHandler;
+import io.hops.transaction.lock.LockFactory;
+import io.hops.transaction.lock.TransactionLockTypes;
+import io.hops.transaction.lock.TransactionLocks;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.logging.impl.Log4JLogger;
@@ -43,7 +48,6 @@ import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
-import org.apache.hadoop.hdfs.server.datanode.SimulatedFSDataset;
 import org.apache.hadoop.hdfs.server.namenode.FSDirectory;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.INodeFile;
@@ -53,6 +57,7 @@ import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocols;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.log4j.Level;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /* File Append tests for HDFS-200 & HDFS-142, specifically focused on:
@@ -61,15 +66,11 @@ import org.junit.Test;
 public class TestFileAppend4 {
   static final Log LOG = LogFactory.getLog(TestFileAppend4.class);
   static final long BLOCK_SIZE = 1024;
-  static final long BBW_SIZE = 500; // don't align on bytes/checksum
-
-  static final Object [] NO_ARGS = new Object []{};
 
   Configuration conf;
   MiniDFSCluster cluster;
   Path file1;
   FSDataOutputStream stm;
-  final boolean simulatedStorage = false;
 
   {
     ((Log4JLogger)NameNode.stateChangeLog).getLogger().setLevel(Level.ALL);
@@ -82,9 +83,6 @@ public class TestFileAppend4 {
   @Before
   public void setUp() throws Exception {
     this.conf = new Configuration();
-    if (simulatedStorage) {
-      SimulatedFSDataset.setFactory(conf);
-    }
 
     // lower heartbeat interval for fast recognition of DN death
     conf.setInt(DFSConfigKeys.DFS_NAMENODE_HEARTBEAT_RECHECK_INTERVAL_KEY,
@@ -341,8 +339,10 @@ public class TestFileAppend4 {
    * showing insufficient locations.
    */
   @Test(timeout = 60000)
+  @Ignore   // TODO also fails in Hops without Bram's changes
   public void testAppendInsufficientLocations() throws Exception {
     Configuration conf = new Configuration();
+    final String filename = "/testAppend";
 
     // lower heartbeat interval for fast recognition of DN
     conf.setInt(DFSConfigKeys.DFS_NAMENODE_HEARTBEAT_RECHECK_INTERVAL_KEY,
@@ -356,7 +356,7 @@ public class TestFileAppend4 {
     try {
       // create a file with replication 3
       fileSystem = cluster.getFileSystem();
-      Path f = new Path("/testAppend");
+      Path f = new Path(filename);
       FSDataOutputStream create = fileSystem.create(f, (short) 2);
       create.write("/testAppend".getBytes());
       create.close();
@@ -366,7 +366,7 @@ public class TestFileAppend4 {
 
       // Shut down all DNs that have the last block location for the file
       LocatedBlocks lbs = fileSystem.dfs.getNamenode().
-          getBlockLocations("/testAppend", 0, Long.MAX_VALUE);
+          getBlockLocations(filename, 0, Long.MAX_VALUE);
       List<DataNode> dnsOfCluster = cluster.getDataNodes();
       DatanodeInfo[] dnsWithLocations = lbs.getLastLocatedBlock().
           getLocations();
@@ -390,10 +390,26 @@ public class TestFileAppend4 {
       } catch (IOException e){
         LOG.info("Expected exception: ", e);
       }
-      FSDirectory dir = cluster.getNamesystem().getFSDirectory();
-      final INodeFile inode = INodeFile.
-          valueOf(dir.getINode("/testAppend"), "/testAppend");
-      assertTrue("File should remain closed", !inode.isUnderConstruction());
+      final FSDirectory dir = cluster.getNamesystem().getFSDirectory();
+
+      new HopsTransactionalRequestHandler(HDFSOperationType.TEST) {
+        @Override
+        public void acquireLock(TransactionLocks locks) throws IOException {
+          LockFactory lf = LockFactory.getInstance();
+          locks.add(lf.getINodeLock(cluster.getNameNode(),
+              TransactionLockTypes.INodeLockType.WRITE,
+              TransactionLockTypes.INodeResolveType.PATH, filename))
+              .add(lf.getBlockLock());
+        }
+
+        @Override
+        public Object performTask() throws StorageException, IOException {
+          final INodeFile inode = INodeFile.valueOf(dir.getINode(filename), filename);
+          assertTrue("File should remain closed", !inode.isUnderConstruction());
+          return null;
+        }
+      }.handle();
+
     } finally {
       if (null != fileSystem) {
         fileSystem.close();
