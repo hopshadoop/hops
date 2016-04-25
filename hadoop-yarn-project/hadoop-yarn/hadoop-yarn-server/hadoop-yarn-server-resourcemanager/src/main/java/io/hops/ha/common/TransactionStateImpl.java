@@ -837,8 +837,7 @@ public class TransactionStateImpl extends TransactionState {
             rmnodeToAdd.getHttpAddress(), rmnodeToAdd.getHealthReport(),
             rmnodeToAdd.getLastHealthReportTime(),
             ((RMNodeImpl) rmnodeToAdd).getCurrentState(),
-            rmnodeToAdd.getNodeManagerVersion(), -1,
-            ((RMNodeImpl) rmnodeToAdd).getUpdatedContainerInfoId(),
+            rmnodeToAdd.getNodeManagerVersion(), -1, //overcomitTimeOut is never set and getting it return an error
             pendingEventId);
     
     RMNodeToAdd hopRMNodeToAdd = getRMContextInfo().getToAddActiveRMNode(rmnodeToAdd.getNodeID());
