@@ -439,7 +439,7 @@ public class TestPriceEstimationService {
     List<RMNode> toAdd = new ArrayList<RMNode>();
     for (int i = 0; i < nbNodes; i++) {
       RMNode rmNode = new RMNode("nodeid_" + i + ":" + 9999, "hostName", 1, 1,
-              "nodeAddress", "httpAddress", "", 1, "RUNNING", "version", 1, 1,
+              "nodeAddress", "httpAddress", "", 1, "RUNNING", "version", 1,
               pendingId++);
       toAdd.add(rmNode);
     }

@@ -238,7 +238,7 @@ public class TestDistributedRMContainerTokenSecretManager {
         List<RMNode> toAdd = new ArrayList<RMNode>();
         RMNode rmNode = new RMNode("nodeid_1", "hostName", 1,
                 1, "nodeAddress", "httpAddress", "", 1, "currentState",
-                "version", 1, 1, 0);
+                "version", 1, 0);
         toAdd.add(rmNode);
 
         da.addAll(toAdd);

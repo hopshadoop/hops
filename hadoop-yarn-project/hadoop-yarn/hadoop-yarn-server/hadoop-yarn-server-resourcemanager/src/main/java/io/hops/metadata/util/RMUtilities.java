@@ -1084,66 +1084,72 @@ public static Map<String, List<ResourceRequest>> getAllResourceRequestsFullTrans
               //Retrieve all UpdatedContainerInfo entries for this particular RMNode
               Map<Integer, List<UpdatedContainerInfo>>
                   hopUpdatedContainerInfoMap = uciDA.findByRMNode(id);
-              if (hopUpdatedContainerInfoMap != null &&
-                  !hopUpdatedContainerInfoMap.isEmpty()) {
-                ConcurrentLinkedQueue<org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo>
-                    updatedContainerInfoQueue =
-                    new ConcurrentLinkedQueue<org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo>();
-                Map<String, ContainerStatus> hopUCIContainerStatuses =
-                  new HashMap<String, ContainerStatus>();
+              if (hopUpdatedContainerInfoMap != null
+                      && !hopUpdatedContainerInfoMap.isEmpty()) {
+                ConcurrentLinkedQueue<org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo> updatedContainerInfoQueue
+                        = new ConcurrentLinkedQueue<org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo>();
+                Map<Integer, org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo> ucis
+                        = new HashMap<Integer, org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo>();
+                Map<String, ContainerStatus> hopUCIContainerStatuses
+                        = new HashMap<String, ContainerStatus>();
                 for (int uciId : hopUpdatedContainerInfoMap.keySet()) {
+                  ucis.put(uciId,
+                          new org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo(
+                                  new ArrayList<org.apache.hadoop.yarn.api.records.ContainerStatus>(),
+                                  new ArrayList<org.apache.hadoop.yarn.api.records.ContainerStatus>(),
+                                  uciId));
+
                   for (UpdatedContainerInfo hopUCI : hopUpdatedContainerInfoMap
-                      .get(uciId)) {
-                    List<org.apache.hadoop.yarn.api.records.ContainerStatus>
-                        newlyAllocated =
-                        new ArrayList<org.apache.hadoop.yarn.api.records.ContainerStatus>();
-                    List<org.apache.hadoop.yarn.api.records.ContainerStatus>
-                        completed =
-                        new ArrayList<org.apache.hadoop.yarn.api.records.ContainerStatus>();
-                    //Retrieve containerstatus entries for the particular updatedcontainerinfo
-                    org.apache.hadoop.yarn.api.records.ContainerId cid =
-                        ConverterUtils.toContainerId(hopUCI.getContainerId());
-                    if (!hopUCIContainerStatuses
-                        .containsKey(hopUCI.getContainerId())) {
-                      hopUCIContainerStatuses.put(hopUCI.getContainerId(),
-                          (ContainerStatus) containerStatusDA
+                          .get(uciId)) {
+
+                    org.apache.hadoop.yarn.api.records.ContainerId cid
+                            = ConverterUtils.toContainerId(hopUCI.
+                                    getContainerId());
+                    ContainerStatus hopContainerStatus
+                            = hopUCIContainerStatuses.get(hopUCI.
+                                    getContainerId());
+                    if (hopContainerStatus == null) {
+                      hopContainerStatus = (ContainerStatus) containerStatusDA
                               .findEntry(hopUCI.getContainerId(), id,
-                                      ContainerStatus.Type.UCI.toString()));
+                                      ContainerStatus.Type.UCI.toString());
+                      hopUCIContainerStatuses.put(hopUCI.getContainerId(),
+                              hopContainerStatus);
                     }
-                    org.apache.hadoop.yarn.api.records.ContainerStatus
-                        conStatus =
-                        org.apache.hadoop.yarn.api.records.ContainerStatus
-                            .newInstance(cid, ContainerState.valueOf(
-                                    hopUCIContainerStatuses
-                                        .get(hopUCI.getContainerId())
-                                        .getState()), hopUCIContainerStatuses
-                                    .get(hopUCI.getContainerId())
-                                    .getDiagnostics(), hopUCIContainerStatuses
-                                    .get(hopUCI.getContainerId())
-                                    .getExitstatus());
+
+                    org.apache.hadoop.yarn.api.records.ContainerStatus conStatus
+                            = org.apache.hadoop.yarn.api.records.ContainerStatus.
+                            newInstance(cid, ContainerState.valueOf(
+                                    hopContainerStatus.getState()),
+                                    hopContainerStatus.getDiagnostics(),
+                                    hopContainerStatus.getExitstatus());
                     //Check ContainerStatus state to add it to appropriate list
                     if (conStatus != null) {
-                      if (conStatus.getState().toString()
-                          .equals(TablesDef.ContainerStatusTableDef.STATE_RUNNING)) {
-                        newlyAllocated.add(conStatus);
-                      } else if (conStatus.getState().toString()
-                          .equals(TablesDef.ContainerStatusTableDef.STATE_COMPLETED)) {
-                        completed.add(conStatus);
+                      LOG.debug("add uci for container " + conStatus.
+                              getContainerId()
+                              + " status " + conStatus.getState());
+                      if (conStatus.getState().equals(ContainerState.RUNNING)) {
+                        ucis.get(hopUCI.getUpdatedContainerInfoId()).
+                                getNewlyLaunchedContainers().add(conStatus);
+                      } else if (conStatus.getState().equals(
+                              ContainerState.COMPLETE)) {
+                        ucis.get(hopUCI.getUpdatedContainerInfoId()).
+                                getCompletedContainers().add(conStatus);
                       }
                     }
-                    org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo
-                        uci =
-                        new org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo(
-                            newlyAllocated, completed,
-                            hopUCI.getUpdatedContainerInfoId());
-                    updatedContainerInfoQueue.add(uci);
-                    ((RMNodeImpl) rmNode)
-                        .setUpdatedContainerInfo(updatedContainerInfoQueue);
-                    //Update uci counter
-                    ((RMNodeImpl) rmNode)
-                        .setUpdatedContainerInfoId(hopRMNode.getUciId());
                   }
                 }
+                int maxUciId = 0;
+                for (org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo uci
+                        : ucis.values()) {
+                  updatedContainerInfoQueue.add(uci);
+                  if (uci.getUpdatedContainerInfoId() > maxUciId) {
+                    maxUciId = uci.getUpdatedContainerInfoId();
+                  }
+                }
+
+                ((RMNodeImpl) rmNode).setUpdatedContainerInfoId(maxUciId);
+                ((RMNodeImpl) rmNode).setUpdatedContainerInfo(
+                        updatedContainerInfoQueue);
               }
 
               //5. Retrieve latestNodeHeartBeatResponse
