@@ -186,14 +186,14 @@ public class PBHelper {
   public static StorageInfoProto convert(StorageInfo info) {
     return StorageInfoProto.newBuilder().setClusterID(info.getClusterID())
         .setCTime(info.getCTime()).setLayoutVersion(info.getLayoutVersion())
-        .setNamespceID(info.getNamespaceID()).setBlockpoolID(
+        .setNamespaceID(info.getNamespaceID()).setBlockpoolID(
             info.getBlockPoolId())                //HOP added this line
         .setDEFAULTROWID(info.getDefaultRowId())
         .build();     //HOP added this line
   }
 
   public static StorageInfo convert(StorageInfoProto info) {
-    return new StorageInfo(info.getLayoutVersion(), info.getNamespceID(),
+    return new StorageInfo(info.getLayoutVersion(), info.getNamespaceID(),
         info.getClusterID(), info.getCTime(), info.getBlockpoolID());
   }
 
@@ -343,7 +343,7 @@ public class PBHelper {
 
   public static NamespaceInfo convert(NamespaceInfoProto info) {
     StorageInfoProto storage = info.getStorageInfo();
-    return new NamespaceInfo(storage.getNamespceID(), storage.getClusterID(),
+    return new NamespaceInfo(storage.getNamespaceID(), storage.getClusterID(),
         info.getBlockPoolID(), storage.getCTime(), info.getBuildVersion(),
         info.getSoftwareVersion());
   }
