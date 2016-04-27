@@ -71,7 +71,6 @@ public class NdbEventStreamingReceiver {
   private String hopRMNodeCurrentState = "";
   private String hopRMNodeNodemanagerVersion = "";
   private int hopRMNodeOvercommittimeout = 0;
-  private int hopRMNodeUciId = 0;
   private int hopRMNodePendingEventId = 0;
 
   public void setHopRMNodeNodeId(String hopRMNodeNodeId) {
@@ -119,10 +118,6 @@ public class NdbEventStreamingReceiver {
     this.hopRMNodeOvercommittimeout = hopRMNodeOvercommittimeout;
   }
 
-  public void setHopRMNodeUciId(int hopRMNodeUciId) {
-    this.hopRMNodeUciId = hopRMNodeUciId;
-  }
-
   public void setHopRMNodePendingEventId(int hopRMNodePendingEventId) {
     this.hopRMNodePendingEventId = hopRMNodePendingEventId;
   }
@@ -133,7 +128,7 @@ public class NdbEventStreamingReceiver {
             hopRMNodeHttpAddress, hopRMNodeHealthReport,
             hopRMNodelastHealthReportTime, hopRMNodeCurrentState,
             hopRMNodeNodemanagerVersion, hopRMNodeOvercommittimeout,
-            hopRMNodeUciId, hopRMNodePendingEventId);
+            hopRMNodePendingEventId);
 
   }
 

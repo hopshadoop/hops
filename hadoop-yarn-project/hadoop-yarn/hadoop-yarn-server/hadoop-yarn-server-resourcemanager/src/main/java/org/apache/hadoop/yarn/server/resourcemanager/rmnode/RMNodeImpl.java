@@ -118,10 +118,6 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
     this.updatedContainerInfoId = updatedContainerInfoId;
   }
 
-  public int getUpdatedContainerInfoId() {
-    return this.updatedContainerInfoId;
-  }
-
   /**
    * Recovers state from NDB into RMNode impl.
    *
@@ -1015,8 +1011,6 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
                 .getRMNodeInfo(rmNode.nodeId)
                 .toAddNextHeartbeat(rmNode.nodeId.
                         toString(), rmNode.nextHeartBeat);
-        ((TransactionStateImpl) event.getTransactionState()).
-              toUpdateRMNode(rmNode);
         if (rmNode.context.isDistributedEnabled() &&
           !rmNode.context.isLeader()) {
           //Add NodeUpdatedSchedulerEvent to TransactionState
@@ -1097,9 +1091,6 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
       rmNode.setHealthReport(remoteNodeHealthStatus.getHealthReport());
       rmNode.setLastHealthReportTime(remoteNodeHealthStatus.
               getLastHealthReportTime());
-      //HOP :: Update TransactionState
-      ((TransactionStateImpl) event.getTransactionState()).
-              toUpdateRMNode(rmNode);
 
       if (remoteNodeHealthStatus.getIsNodeHealthy()) {
         if (rmNode.context.isDistributedEnabled()&&

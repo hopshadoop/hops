@@ -214,7 +214,7 @@ public class PriceFixerService extends AbstractService {
     incrementBaseVC = incrementBaseVC > 0 ? incrementBaseVC : 0;
     float newPriceVC = basePricePerTickVC + (incrementBaseVC
             * incrementFactorForVirtualCore);
-    LOG.debug("VC use: " + usedMB + " of " + totalMB + " ("
+    LOG.debug("VC use: " + usedCore + " of " + totalCore + " ("
             + (int) ((float) usedCore * 100 / (float) totalCore)
             + "%) " + incrementBaseVC + "% over limit");
     LOG.debug("VC price: " + newPriceVC);
