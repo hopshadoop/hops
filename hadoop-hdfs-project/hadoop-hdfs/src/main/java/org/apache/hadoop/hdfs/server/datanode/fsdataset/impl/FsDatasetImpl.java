@@ -1622,8 +1622,9 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
       rur = (ReplicaUnderRecovery) replica;
       if (rur.getRecoveryID() >= recoveryId) {
         throw new RecoveryInProgressException(
-            "rur.getRecoveryID() >= recoveryId = " + recoveryId + ", block=" +
-                block + ", rur=" + rur);
+            "rur.getRecoveryID()=" + rur.getRecoveryID() +
+                " >= recoveryId=" + recoveryId + ", " +
+                "block=" + block + ", rur=" + rur);
       }
       final long oldRecoveryID = rur.getRecoveryID();
       rur.setRecoveryID(recoveryId);

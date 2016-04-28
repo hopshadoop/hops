@@ -42,6 +42,7 @@ import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.RecoveryInProgressException;
 import org.apache.hadoop.hdfs.protocolPB.DatanodeProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.ReplicaState;
 import org.apache.hadoop.hdfs.server.datanode.DataNode.BlockRecord;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.ReplicaOutputStreams;
@@ -575,7 +576,7 @@ public class TestBlockRecovery {
   }
 
   private final static RecoveringBlock rBlock =
-      new RecoveringBlock(block, null, RECOVERY_ID);
+      new RecoveringBlock(block, DatanodeStorageInfo.EMPTY_ARRAY, RECOVERY_ID);
 
   /**
    * BlockRecoveryFI_09. some/all DNs failed to update replicas.
@@ -642,7 +643,7 @@ public class TestBlockRecovery {
           DataChecksum.newDataChecksum(DataChecksum.Type.CRC32, 512));
       streams.getChecksumOut().write('a');
       dn.data.initReplicaRecovery(
-          new RecoveringBlock(block, null, RECOVERY_ID + 1));
+          new RecoveringBlock(block, DatanodeStorageInfo.EMPTY_ARRAY, RECOVERY_ID + 1));
       try {
         dn.syncBlock(rBlock, initBlockRecords(dn));
         fail("Sync should fail");

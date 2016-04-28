@@ -23,6 +23,7 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -59,6 +60,14 @@ public class BlockRecoveryCommand extends DatanodeCommand {
      */
     public RecoveringBlock(ExtendedBlock b, DatanodeInfo[] locs, long newGS) {
       super(b, locs, -1, false); // startOffset is unknown
+      this.newGenerationStamp = newGS;
+    }
+
+    /**
+     * Create RecoveringBlock.
+     */
+    public RecoveringBlock(ExtendedBlock b, DatanodeStorageInfo[] locs, long newGS) {
+      super(b, locs); // startOffset is unknown
       this.newGenerationStamp = newGS;
     }
 

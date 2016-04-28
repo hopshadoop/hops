@@ -1190,7 +1190,7 @@ public class DatanodeManager {
         }
 
         heartbeatManager.updateHeartbeat(nodeinfo, reports, xceiverCount, failedVolumes);
-        
+
         //check lease recovery
         BlockInfoUnderConstruction[] blocks =
             nodeinfo.getLeaseRecoveryCommand(Integer.MAX_VALUE);
@@ -1217,14 +1217,15 @@ public class DatanodeManager {
               }
               brCommand.add(new RecoveringBlock(
                   new ExtendedBlock(blockPoolId, b),
-                  DatanodeStorageInfo.toDatanodeInfos(recoveryLocations),
+                  recoveryLocations.toArray(
+                      new DatanodeStorageInfo[recoveryLocations.size()]),
                   b.getBlockRecoveryId()));
             } else {
               // If too many replicas are stale, then choose all replicas to participate
               // in block recovery.
               brCommand.add(new RecoveringBlock(
                   new ExtendedBlock(blockPoolId, b),
-                  DatanodeStorageInfo.toDatanodeInfos(storages),
+                  storages,
                   b.getBlockRecoveryId()));
             }
           }

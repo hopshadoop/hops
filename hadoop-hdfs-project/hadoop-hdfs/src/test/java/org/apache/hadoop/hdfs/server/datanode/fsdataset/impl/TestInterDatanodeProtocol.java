@@ -33,6 +33,7 @@ import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.protocol.RecoveryInProgressException;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.ReplicaState;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.datanode.DataNodeTestUtils;
@@ -364,7 +365,7 @@ public class TestInterDatanodeProtocol {
       final FsDatasetSpi<?> fsdataset =
           DataNodeTestUtils.getFSDataset(datanode);
       final ReplicaRecoveryInfo rri = fsdataset
-          .initReplicaRecovery(new RecoveringBlock(b, null, recoveryid));
+          .initReplicaRecovery(new RecoveringBlock(b, DatanodeStorageInfo.EMPTY_ARRAY, recoveryid));
 
       //check replica
       final ReplicaInfo replica =
@@ -420,7 +421,7 @@ public class TestInterDatanodeProtocol {
       proxy =
           DataNode.createInterDataNodeProtocolProxy(dInfo, conf, 500, false);
       proxy.initReplicaRecovery(
-          new RecoveringBlock(new ExtendedBlock("bpid", 1), null, 100));
+          new RecoveringBlock(new ExtendedBlock("bpid", 1), DatanodeStorageInfo.EMPTY_ARRAY, 100));
       fail("Expected SocketTimeoutException exception, but did not get.");
     } finally {
       if (proxy != null) {
