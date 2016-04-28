@@ -330,9 +330,9 @@ public class HdfsStorageFactory {
     return dStorageFactory.getDataAccess(type);
   }
   
-  public static boolean formatAllStorage() throws StorageException {
+  public static boolean formatStorage() throws StorageException {
     Cache.getInstance().flush();
-    return dStorageFactory.getConnector().formatAllStorage();
+    return dStorageFactory.getConnector().formatStorage();
   }
   
   public static boolean formatAllStorageNonTransactional()

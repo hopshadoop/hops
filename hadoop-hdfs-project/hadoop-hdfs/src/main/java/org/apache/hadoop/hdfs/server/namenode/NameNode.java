@@ -749,7 +749,7 @@ public class NameNode {
       if (force) {
         HdfsStorageFactory.formatAllStorageNonTransactional();
       } else {
-        HdfsStorageFactory.formatAllStorage();
+        HdfsStorageFactory.formatStorage();
       }
       StorageInfo
           .storeStorageInfoToDB(clusterId);  //this adds new row to the db
