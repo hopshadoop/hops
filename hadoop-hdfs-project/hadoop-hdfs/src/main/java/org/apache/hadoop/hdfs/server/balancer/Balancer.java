@@ -41,6 +41,7 @@ import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockPlacementPolicy;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockPlacementPolicyDefault;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
+import org.apache.hadoop.hdfs.server.common.Storage;
 import org.apache.hadoop.hdfs.server.namenode.UnsupportedActionException;
 import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations.BlockWithLocations;
 import org.apache.hadoop.io.IOUtils;
@@ -342,7 +343,7 @@ public class Balancer {
         in = new DataInputStream(new BufferedInputStream(unbufIn,
             HdfsConstants.IO_FILE_BUFFER_SIZE));
         
-        sendRequest(out);
+        sendRequest(out, StorageType.DEFAULT);
         receiveResponse(in);
         bytesMoved.inc(block.getNumBytes());
         LOG.info("Moving block " + block.getBlock().getBlockId() +
@@ -374,16 +375,13 @@ public class Balancer {
     }
     
     /* Send a block replace request to the output stream*/
-    private void sendRequest(DataOutputStream out) throws IOException {
+    private void sendRequest(DataOutputStream out, StorageType storageType) throws
+        IOException {
       final ExtendedBlock eb =
           new ExtendedBlock(nnc.blockpoolID, block.getBlock());
       final Token<BlockTokenIdentifier> accessToken = nnc.getAccessToken(eb);
 
-      // TODO HDP_2.6 FIX ME
-      // This should not be a static type:
-      StorageType type = StorageType.DEFAULT;
-
-      new Sender(out).replaceBlock(eb, type, accessToken, source.getStorageID(),
+      new Sender(out).replaceBlock(eb, storageType, accessToken, source.getStorageID(),
           proxySource.getDatanode());
     }
     

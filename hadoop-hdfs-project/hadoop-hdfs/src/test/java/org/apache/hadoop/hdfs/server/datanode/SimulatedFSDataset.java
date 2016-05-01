@@ -701,8 +701,7 @@ public class SimulatedFSDataset implements FsDatasetSpi<FsVolumeSpi> {
 
   @Override // FsDatasetSpi
   public synchronized ReplicaInPipelineInterface createRbw(StorageType
-      storageType, ExtendedBlock b)
-      throws IOException {
+      storageType, ExtendedBlock b) throws IOException {
     return createTemporary(storageType, b);
   }
 

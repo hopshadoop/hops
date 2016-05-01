@@ -74,14 +74,24 @@ public interface DataTransferProtocol {
   /**
    * Write a block to a datanode pipeline.
    *
+   * The receiver datanode of this call is the next datanode in the pipeline.
+   * The other downstream datanodes are specified by the targets parameter.
+   * Note that the receiver {@link DatanodeInfo} is not required in the
+   * parameter list since the receiver datanode knows its info.  However, the
+   * {@link StorageType} for storing the replica in the receiver datanode is a
+   * parameter since the receiver datanode may support multiple storage types.
+   *
    * @param blk
    *     the block being written.
+   * @param storageType
+   *     for storing the replica in the receiver datanode.
    * @param blockToken
    *     security token for accessing the block.
    * @param clientName
    *     client's name.
-   * @param targets
-   *     target datanodes in the pipeline.
+   * @param targets other downstream datanodes in the pipeline.
+   * @param targetStorageTypes target {@link StorageType}s corresponding
+   *                           to the target datanodes.
    * @param source
    *     source datanode.
    * @param stage
@@ -140,6 +150,7 @@ public interface DataTransferProtocol {
    *
    * @param blk
    *     the block being replaced.
+   * @param storageType the {@link StorageType} for storing the block.
    * @param blockToken
    *     security token for accessing the block.
    * @param delHint

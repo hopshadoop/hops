@@ -759,18 +759,19 @@ public class BlockManager {
   /**
    * Get all valid locations of the block
    */
-  private List<String> getValidLocations(BlockInfo block)
+  private List<DatanodeStorageInfo> getValidLocations(BlockInfo block)
       throws StorageException, TransactionContextException {
-    ArrayList<String> storageSet =
-        new ArrayList<String>(blocksMap.numNodes(block));
+    ArrayList<DatanodeStorageInfo> storageSet = new ArrayList<DatanodeStorageInfo>();
+
     for (Iterator<DatanodeStorageInfo> it = blocksMap.storageIterator(block);
          it.hasNext(); ) {
       DatanodeStorageInfo storage = it.next();
       // filter invalid replicas
       if (!invalidateBlocks.contains(storage, block)) {
-        storageSet.add(storage.getStorageID());
+        storageSet.add(storage);
       }
     }
+
     return storageSet;
   }
 
@@ -3257,7 +3258,7 @@ public class BlockManager {
   private long addBlock(final Block block, List<BlockWithLocations> results)
       throws IOException {
     
-    final List<String> machineSet = new ArrayList<String>();
+    final List<DatanodeStorageInfo> locations = new ArrayList<DatanodeStorageInfo>();
     
     new HopsTransactionalRequestHandler(HDFSOperationType.GET_VALID_BLK_LOCS) {
       INodeIdentifier inodeIdentifier;
@@ -3279,17 +3280,28 @@ public class BlockManager {
       @Override
       public Object performTask() throws IOException {
         BlockInfo temp = getBlockInfo(block);
-        final List<String> ms = getValidLocations(temp);
-        machineSet.addAll(ms);
+        final List<DatanodeStorageInfo> ms = getValidLocations(temp);
+        locations.addAll(ms);
         return null;
       }
     }.handle(namesystem);
     
-    if (machineSet.isEmpty()) {
+    if (locations.isEmpty()) {
       return 0;
     } else {
-      results.add(new BlockWithLocations(block,
-          machineSet.toArray(new String[machineSet.size()])));
+      final String[] datanodeUuids = new String[locations.size()];
+      final String[] storageIDs = new String[datanodeUuids.length];
+      final StorageType[] storageTypes = new StorageType[datanodeUuids.length];
+      for(int i = 0; i < locations.size(); i++) {
+        final DatanodeStorageInfo s = locations.get(i);
+        datanodeUuids[i] = s.getDatanodeDescriptor().getDatanodeUuid();
+        storageIDs[i] = s.getStorageID();
+        storageTypes[i] = s.getStorageType();
+      }
+
+      results.add(new BlockWithLocations(block, datanodeUuids, storageIDs,
+          storageTypes));
+
       return block.getNumBytes();
     }
   }

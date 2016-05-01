@@ -401,8 +401,8 @@ class DataXceiver extends Receiver implements Runnable {
           stage != BlockConstructionStage.PIPELINE_CLOSE_RECOVERY) {
         // open a block receiver
         blockReceiver =
-            new BlockReceiver(block, storageType, in, s
-                .getRemoteSocketAddress().toString(),
+            new BlockReceiver(block, storageType, in,
+                s.getRemoteSocketAddress().toString(),
                 s.getLocalSocketAddress().toString(), stage,
                 latestGenerationStamp, minBytesRcvd, maxBytesRcvd, clientname,
                 srcDataNode, datanode, requestedChecksum);

@@ -1135,6 +1135,7 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
         throws IOException {
       LocatedBlock lb = null;
       DatanodeInfo[] nodes = null;
+      StorageType[] storageTypes = null;
       int count = dfsClient.getConf().nBlockWriteRetry;
       boolean success = false;
       ExtendedBlock oldBlock = block;
@@ -1288,11 +1289,13 @@ public class DFSOutputStream extends FSOutputSummer implements Syncable {
           // Xmit header info to datanode
           //
 
+          BlockConstructionStage bcs =
+              recoveryFlag ? stage.getRecoveryStage() : stage;
           // send the request
           new Sender(out).writeBlock(block, nodeStorageTypes[0], accessToken,
-                  dfsClient.clientName, nodes, nodeStorageTypes, null,
-                  recoveryFlag ? stage.getRecoveryStage() : stage, nodes.length,
-                  block.getNumBytes(), bytesSent, newGS, checksum);
+              dfsClient.clientName, nodes, nodeStorageTypes, null,
+              bcs, nodes.length, block.getNumBytes(), bytesSent, newGS,
+              checksum);
 
           // receive ack for connect
           BlockOpResponseProto resp = BlockOpResponseProto

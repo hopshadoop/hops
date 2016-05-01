@@ -267,12 +267,20 @@ public class PBHelper {
   public static BlockWithLocationsProto convert(BlockWithLocations blk) {
     return BlockWithLocationsProto.newBuilder()
         .setBlock(convert(blk.getBlock()))
-        .addAllStorageIDs(Arrays.asList(blk.getStorageIDs())).build();
+        .addAllDatanodeUuids(Arrays.asList(blk.getDatanodeUuids()))
+        .addAllStorageUuids(Arrays.asList(blk.getStorageIDs()))
+        .addAllStorageTypes(convertStorageTypes(blk.getStorageTypes()))
+        .build();
   }
 
   public static BlockWithLocations convert(BlockWithLocationsProto b) {
+    final List<String> datanodeUuids = b.getDatanodeUuidsList();
+    final List<String> storageUuids = b.getStorageUuidsList();
+    final List<StorageTypeProto> storageTypes = b.getStorageTypesList();
     return new BlockWithLocations(convert(b.getBlock()),
-        b.getStorageIDsList().toArray(new String[0]));
+        datanodeUuids.toArray(new String[datanodeUuids.size()]),
+        storageUuids.toArray(new String[storageUuids.size()]),
+        convertStorageTypes(storageTypes, storageUuids.size()));
   }
 
   public static BlocksWithLocationsProto convert(BlocksWithLocations blks) {
@@ -539,11 +547,8 @@ public class PBHelper {
       targets[i] = PBHelper.convert(locs.get(i));
     }
 
-    List<StorageTypeProto> types = proto.getStorageTypesList();
-    final StorageType[] storageTypes = new StorageType[types.size()];
-    for(int i = 0; i < storageTypes.length; i++) {
-      storageTypes[i] = PBHelper.convertType(types.get(i));
-    }
+    final StorageType[] storageTypes =
+        convertStorageTypes(proto.getStorageTypesList(), locs.size());
 
     final int storageIDsCount = proto.getStorageIDsCount();
     final String[] storageIDs;
@@ -800,10 +805,7 @@ public class PBHelper {
     } else {
       for(int i = 0; i < targetStorageTypes.length; i++) {
         List<StorageTypeProto> p = targetStorageTypesList.get(i).getStorageTypesList();
-        targetStorageTypes[i] = new StorageType[targets[i].length];
-        for(int j = 0; i < targetStorageTypes[j].length; j++) {
-          targetStorageTypes[i][j] = convertType(p.get(i));
-        }
+        targetStorageTypes[i] = p.toArray(new StorageType[p.size()]);
       }
     }
 
