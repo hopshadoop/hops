@@ -1606,17 +1606,11 @@ public class BlockManager {
     List<DatanodeDescriptor> favoredDatanodeDescriptors =
         getDatanodeDescriptors(favoredNodes);
 
-    LogFactory.getLog(LogFactory.class).debug("### >> excludedNodes (3) = " +
-        (excludedNodes != null ? Arrays.toString(excludedNodes.toArray(new Node[excludedNodes.size()])) : "[]"));
-
     // TODO HDP_2.6 this is a hardcoded blockstoragepolicy... :-(
     BlockStoragePolicy policy = BlockStoragePolicy.DISKS;
     final DatanodeStorageInfo[] targets = blockplacement.chooseTarget(src,
         numOfReplicas, client, excludedNodes, blocksize,
         favoredDatanodeDescriptors, policy);
-
-    LogFactory.getLog(LogFactory.class).debug("### >> excludedNodes (4) = " +
-        (excludedNodes != null ? Arrays.toString(excludedNodes.toArray(new Node[excludedNodes.size()])) : "[]"));
 
     if (targets.length < minReplication) {
       throw new IOException("File " + src
@@ -1713,7 +1707,11 @@ public class BlockManager {
         nodesContainingLiveReplicas.add(storage);
         live++;
       }
-      containingNodes.add(node);
+      if(!containingNodes.contains(node)) {
+        containingNodes.add(node);
+      }
+
+
       // Check if this replica is corrupt
       // If so, do not select the node as src node
       if ((nodesCorrupt != null) && nodesCorrupt.contains(node)) {
@@ -3411,8 +3409,8 @@ public class BlockManager {
           @Override
           public void setUp() throws StorageException {
             ReceivedDeletedBlockInfo rdbi = (ReceivedDeletedBlockInfo) getParams()[0];
-            inodeIdentifier = INodeUtil.resolveINodeFromBlock(rdbi.getBlock());
             LOG.debug("reported block id=" + rdbi.getBlock().getBlockId());
+            inodeIdentifier = INodeUtil.resolveINodeFromBlock(rdbi.getBlock());
             if (inodeIdentifier == null) {
               LOG.error("Invalid State. deleted blk is not recognized. bid=" +
                   rdbi.getBlock().getBlockId());

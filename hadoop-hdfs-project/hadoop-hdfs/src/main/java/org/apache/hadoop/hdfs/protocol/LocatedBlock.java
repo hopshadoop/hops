@@ -25,6 +25,7 @@ import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 import org.apache.hadoop.security.token.Token;
 
 import java.util.Comparator;
+import java.util.HashSet;
 
 /**
  * Associates a block with the Datanodes that contain its replicas
@@ -112,7 +113,15 @@ public class LocatedBlock {
   public DatanodeInfo[] getLocations() {
     return locs;
   }
-  
+
+  public DatanodeInfo[] getUniqueLocations() {
+    HashSet<DatanodeInfo> dns = new HashSet<DatanodeInfo>();
+    for(DatanodeInfo dn : this.locs) {
+      dns.add(dn);
+    }
+    return dns.toArray(new DatanodeInfo[0]);
+  }
+
   public long getStartOffset() {
     return offset;
   }

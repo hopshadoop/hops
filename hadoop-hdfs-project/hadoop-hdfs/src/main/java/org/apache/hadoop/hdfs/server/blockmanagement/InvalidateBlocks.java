@@ -25,6 +25,8 @@ import io.hops.metadata.hdfs.entity.InvalidatedBlock;
 import io.hops.transaction.EntityManager;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
@@ -47,7 +49,9 @@ import java.util.List;
  */
 @InterfaceAudience.Private
 class InvalidateBlocks {
-  
+
+  private static final Log LOG = LogFactory.getLog(InvalidateBlocks.class);;
+
   private final DatanodeManager datanodeManager;
 
   InvalidateBlocks(final DatanodeManager datanodeManager) {
@@ -323,10 +327,16 @@ class InvalidateBlocks {
 
   public List<DatanodeInfo> getDatanodes(DatanodeManager manager)
       throws IOException {
-    List<DatanodeInfo> nodes = new ArrayList<DatanodeInfo>();
+    HashSet<DatanodeInfo> nodes = new HashSet<DatanodeInfo>();
     for(int sid : getSids()) {
-      nodes.add(manager.getDatanodeBySid(sid));
+      DatanodeInfo node = manager.getDatanodeBySid(sid);
+
+      // We should never search for a non-existing storage/datanode
+      assert node != null;
+
+      nodes.add(node);
     }
-    return nodes;
+
+    return new ArrayList<DatanodeInfo>(nodes);
   }
 }

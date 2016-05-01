@@ -253,6 +253,7 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
     }
 
     int maxNodesPerRack = (totalNumOfReplicas-1)/numOfRacks + 2;
+
     // At this point, there are more than one racks and more than one replicas
     // to store. Avoid all replicas being in the same rack.
     //
@@ -263,9 +264,14 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
     //
     // Thus, the following adjustment will still result in a value that forces
     // multi-rack allocation and gives enough number of total nodes.
-    if (maxNodesPerRack == totalNumOfReplicas) {
-      maxNodesPerRack--;
-    }
+
+    // TODO this is the new Hadoop style (and it's better), but it didn't
+    // play nice with Hops yet. Fix it, so this if statement can be uncommented.
+    // Test with: TestReplaceDatanodeOnFailure#testReplaceDatanodeOnFailure()
+
+//    if (maxNodesPerRack == totalNumOfReplicas) {
+//      maxNodesPerRack--;
+//    }
     return new int[] {numOfReplicas, maxNodesPerRack};
   }
 
@@ -632,7 +638,8 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
     boolean badTarget = false;
     DatanodeStorageInfo firstChosen = null;
 
-    LOG.debug("@@@ -- START --");
+    LOG.debug("@@@ -- START -- " + numOfAvailableNodes + " " + scope + " " +
+        Arrays.toString(excludedNodes.toArray()));
 
     while(numOfReplicas > 0 && numOfAvailableNodes > 0) {
       DatanodeDescriptor chosenNode =
@@ -645,6 +652,7 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
 
         final DatanodeStorageInfo[] storages = DFSUtil.shuffle(
             chosenNode.getStorageInfos());
+
         int i = 0;
         boolean search = true;
         // For each storagetype that we need (starting at fastest), check if
@@ -768,6 +776,7 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
       List<DatanodeStorageInfo> results,
       boolean avoidStaleNodes,
       StorageType requiredStorageType) {
+
     if (storage.getStorageType() != requiredStorageType) {
       logNodeIsNotChosen(storage, "storage types do not match,"
           + " where the required storage type is " + requiredStorageType);
@@ -827,7 +836,8 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
       }
     }
     if (counter>maxTargetPerRack) {
-      logNodeIsNotChosen(storage, "the rack has too many chosen nodes ");
+      logNodeIsNotChosen(storage, "the rack (" + rackname + ") has too many chosen nodes (" +
+          counter + ">" + maxTargetPerRack + ")");
       return false;
     }
     return true;

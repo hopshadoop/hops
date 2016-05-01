@@ -212,8 +212,7 @@ class ReplicaMap {
    * @return a collection of the replicas belonging to the block pool
    */
   Collection<ReplicaInfo> replicas(String bpid) {
-    Map<Long, ReplicaInfo> m = null;
-    m = map.get(bpid);
+    Map<Long, ReplicaInfo> m = map.get(bpid);
     return m != null ? m.values() : null;
   }
 
