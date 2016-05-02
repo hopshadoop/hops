@@ -144,7 +144,7 @@ public class TestPBHelper {
     DatanodeID dn2 = PBHelper.convert(dnProto);
     compare(dn, dn2);
   }
-  
+
   void compare(DatanodeID dn, DatanodeID dn2) {
     assertEquals(dn.getIpAddr(), dn2.getIpAddr());
     assertEquals(dn.getHostName(), dn2.getHostName());
@@ -229,7 +229,7 @@ public class TestPBHelper {
     ExportedBlockKeys expKeys1 = PBHelper.convert(expKeysProto);
     compare(expKeys, expKeys1);
   }
-  
+
   void compare(ExportedBlockKeys expKeys, ExportedBlockKeys expKeys1) {
     BlockKey[] allKeys = expKeys.getAllKeys();
     BlockKey[] allKeys1 = expKeys1.getAllKeys();
@@ -246,11 +246,11 @@ public class TestPBHelper {
   public ExtendedBlock getExtendedBlock() {
     return getExtendedBlock(1);
   }
-  
+
   public ExtendedBlock getExtendedBlock(long blkid) {
     return new ExtendedBlock("bpid", blkid, 100, 2);
   }
-  
+
   private void compare(DatanodeInfo dn1, DatanodeInfo dn2) {
     assertEquals(dn1.getAdminState(), dn2.getAdminState());
     assertEquals(dn1.getBlockPoolUsed(), dn2.getBlockPoolUsed());
@@ -268,20 +268,20 @@ public class TestPBHelper {
     assertEquals(dn1.getLevel(), dn2.getLevel());
     assertEquals(dn1.getNetworkLocation(), dn2.getNetworkLocation());
   }
-  
+
   @Test
   public void testConvertExtendedBlock() {
     ExtendedBlock b = getExtendedBlock();
     ExtendedBlockProto bProto = PBHelper.convert(b);
     ExtendedBlock b1 = PBHelper.convert(bProto);
     assertEquals(b, b1);
-    
+
     b.setBlockId(-1);
     bProto = PBHelper.convert(b);
     b1 = PBHelper.convert(bProto);
     assertEquals(b, b1);
   }
-  
+
   @Test
   public void testConvertRecoveringBlock() {
     DatanodeInfo di1 = DFSTestUtil.getLocalDatanodeInfo();
@@ -297,7 +297,7 @@ public class TestPBHelper {
       compare(dnInfo[0], dnInfo1[0]);
     }
   }
-  
+
   @Test
   public void testConvertBlockRecoveryCommand() {
     DatanodeInfo di1 = DFSTestUtil.getLocalDatanodeInfo();
@@ -307,14 +307,14 @@ public class TestPBHelper {
     List<RecoveringBlock> blks = ImmutableList
         .of(new RecoveringBlock(getExtendedBlock(1), dnInfo, 3),
             new RecoveringBlock(getExtendedBlock(2), dnInfo, 3));
-    
+
     BlockRecoveryCommand cmd = new BlockRecoveryCommand(blks);
     BlockRecoveryCommandProto proto = PBHelper.convert(cmd);
     assertEquals(1, proto.getBlocks(0).getBlock().getB().getBlockId());
     assertEquals(2, proto.getBlocks(1).getBlock().getB().getBlockId());
-    
+
     BlockRecoveryCommand cmd2 = PBHelper.convert(proto);
-    
+
     List<RecoveringBlock> cmd2Blks =
         Lists.newArrayList(cmd2.getRecoveringBlocks());
     assertEquals(blks.get(0).getBlock(), cmd2Blks.get(0).getBlock());
@@ -330,7 +330,7 @@ public class TestPBHelper {
     Text t1 = new Text(s);
     assertEquals(t, t1);
   }
-  
+
   @Test
   public void testConvertBlockToken() {
     Token<BlockTokenIdentifier> token =
@@ -340,7 +340,7 @@ public class TestPBHelper {
     Token<BlockTokenIdentifier> token2 = PBHelper.convert(tokenProto);
     compare(token, token2);
   }
-  
+
   @Test
   public void testConvertNamespaceInfo() {
     NamespaceInfo info = new NamespaceInfo(37, "clusterID", "bpID", 2300);
@@ -385,12 +385,16 @@ public class TestPBHelper {
             AdminStates.DECOMMISSION_INPROGRESS),
         DFSTestUtil.getLocalDatanodeInfo("127.0.0.1", "h2",
             AdminStates.DECOMMISSIONED),
-        DFSTestUtil.getLocalDatanodeInfo("127.0.0.1", "h3", AdminStates.NORMAL)
+        DFSTestUtil.getLocalDatanodeInfo("127.0.0.1", "h3",
+            AdminStates.NORMAL),
+        DFSTestUtil.getLocalDatanodeInfo("127.0.0.1", "h4",
+            AdminStates.NORMAL),
     };
     String[] storageIDs = {"s1", "s2", "s3", "s4"};
     StorageType[] media = {
         StorageType.DISK,
         StorageType.SSD,
+        StorageType.DISK,
         StorageType.DISK
     };
     LocatedBlock lb = new LocatedBlock(
@@ -449,7 +453,7 @@ public class TestPBHelper {
       compare(lbl.get(i), lbl2.get(2));
     }
   }
-  
+
   @Test
   public void testConvertLocatedBlockArray() {
     LocatedBlock[] lbl = new LocatedBlock[3];
@@ -491,31 +495,26 @@ public class TestPBHelper {
 
   @Test
   public void testConvertBlockCommand() {
-    Block[] blocks = new Block[]{new Block(21), new Block(22)};
-    DatanodeInfo[][] dnInfos = new DatanodeInfo[][]{new DatanodeInfo[1], new DatanodeInfo[2]};
-    StorageType[][] types = new StorageType[][]{new StorageType[1], new StorageType[2]};
-    String[][] storageIds = {{"storage1"}, {"storage2", "storage3"}};
+    Block[] blocks = new Block[] { new Block(21), new Block(22) };
+    DatanodeInfo[][] dnInfos = new DatanodeInfo[][] { new DatanodeInfo[1],
+        new DatanodeInfo[2] };
     dnInfos[0][0] = DFSTestUtil.getLocalDatanodeInfo();
     dnInfos[1][0] = DFSTestUtil.getLocalDatanodeInfo();
     dnInfos[1][1] = DFSTestUtil.getLocalDatanodeInfo();
+    String[][] storageIDs = {{"s00"}, {"s10", "s11"}};
+    StorageType[][] storageTypes = {{StorageType.DEFAULT},
+        {StorageType.DEFAULT, StorageType.DEFAULT}};
     BlockCommand bc = new BlockCommand(DatanodeProtocol.DNA_TRANSFER, "bp1",
-        blocks, dnInfos, types, storageIds);
-
-    // Convert to proto and back again
+        blocks, dnInfos, storageTypes, storageIDs);
     BlockCommandProto bcProto = PBHelper.convert(bc);
     BlockCommand bc2 = PBHelper.convert(bcProto);
-
     assertEquals(bc.getAction(), bc2.getAction());
     assertEquals(bc.getBlocks().length, bc2.getBlocks().length);
-
     Block[] blocks2 = bc2.getBlocks();
     for (int i = 0; i < blocks.length; i++) {
       assertEquals(blocks[i], blocks2[i]);
     }
-
     DatanodeInfo[][] dnInfos2 = bc2.getTargets();
-    StorageType[][] types2 = bc2.getTargetStorageTypes();
-    String[][] storageIds2 = bc2.getTargetStorageIDs();
     assertEquals(dnInfos.length, dnInfos2.length);
     for (int i = 0; i < dnInfos.length; i++) {
       DatanodeInfo[] d1 = dnInfos[i];
@@ -523,13 +522,10 @@ public class TestPBHelper {
       assertEquals(d1.length, d2.length);
       for (int j = 0; j < d1.length; j++) {
         compare(d1[j], d2[j]);
-
-        assertEquals(types[i][j], types2[i][j]);
-        assertEquals(storageIds[i][j], storageIds2[i][j]);
       }
     }
   }
-  
+
   @Test
   public void testChecksumTypeProto() {
     assertEquals(DataChecksum.Type.NULL,
