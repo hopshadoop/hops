@@ -303,8 +303,8 @@ public class DatanodeDescriptor extends DatanodeInfo {
 
     int blocks = 0;
 
-    for (final DatanodeStorageInfo entry : getStorageInfos()) {
-      blocks += entry.numBlocks();
+    for (final DatanodeStorageInfo storage : getStorageInfos()) {
+      blocks += storage.numBlocks();
     }
 
     return blocks;

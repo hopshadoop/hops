@@ -1433,6 +1433,15 @@ public class PBHelper {
     return report;
   }
 
+  public static List<StorageReportProto> convertStorageReports(StorageReport[] storages) {
+    final List<StorageReportProto> protos = new ArrayList<StorageReportProto>(
+        storages.length);
+    for(int i = 0; i < storages.length; i++) {
+      protos.add(convert(storages[i]));
+    }
+    return protos;
+  }
+
   public static DataChecksum.Type convert(HdfsProtos.ChecksumTypeProto type) {
     return DataChecksum.Type.valueOf(type.getNumber());
   }
