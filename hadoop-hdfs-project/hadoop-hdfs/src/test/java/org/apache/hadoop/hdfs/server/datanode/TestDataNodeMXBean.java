@@ -42,8 +42,7 @@ public class TestDataNodeMXBean {
       DataNode datanode = datanodes.get(0);
 
       MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
-      ObjectName mxbeanName =
-          new ObjectName("Hadoop:service=DataNode,name=DataNodeInfo");
+      ObjectName mxbeanName = new ObjectName("Hadoop:service=DataNode,name=DataNodeInfo");
 
       // get attribute "ClusterId"
       String clusterId = (String) mbs.getAttribute(mxbeanName, "ClusterId");
@@ -67,8 +66,7 @@ public class TestDataNodeMXBean {
 
       // get attribute "getVolumeInfo"
       String volumeInfo = (String) mbs.getAttribute(mxbeanName, "VolumeInfo");
-      Assert.assertEquals(replaceDigits(datanode.getVolumeInfo()),
-          replaceDigits(volumeInfo));
+      Assert.assertEquals(replaceDigits(datanode.getVolumeInfo()), replaceDigits(volumeInfo));
 
       // Ensure mxbean's XceiverCount is same as the DataNode's
       // live value.

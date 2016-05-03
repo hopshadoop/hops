@@ -114,6 +114,7 @@ import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 import org.apache.hadoop.util.GenericOptionsParser;
 import org.apache.hadoop.util.ServicePlugin;
 import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.VersionInfo;
 import org.mortbay.util.ajax.JSON;
 
@@ -283,6 +284,12 @@ public class DataNode extends Configured
   private boolean connectToDnViaHostname;
   ReadaheadPool readaheadPool;
   private final boolean getHdfsBlockLocationsEnabled;
+
+  private Thread checkDiskErrorThread = null;
+  protected final int checkDiskErrorInterval = 5*1000;
+  private boolean checkDiskErrorFlag = false;
+  private Object checkDiskErrorMutex = new Object();
+  private long lastDiskErrorCheck = 0;
 
   /**
    * Create the DataNode given a configuration, an array of dataDirs,
@@ -1206,6 +1213,20 @@ public class DataNode extends Configured
       data.checkDataDir();
     } catch (DiskErrorException de) {
       handleDiskError(de.getMessage());
+    }
+  }
+
+  /**
+   * Check if there is a disk failure asynchronously and if so, handle the error
+   */
+  public void checkDiskErrorAsync() {
+    synchronized(checkDiskErrorMutex) {
+      checkDiskErrorFlag = true;
+      if(checkDiskErrorThread == null) {
+        startCheckDiskErrorThread();
+        checkDiskErrorThread.start();
+        LOG.info("Starting CheckDiskError Thread");
+      }
     }
   }
   
@@ -2405,5 +2426,49 @@ public class DataNode extends Configured
 
   boolean shouldRun() {
     return shouldRun;
+  }
+
+  /**
+   * Starts a new thread which will check for disk error check request
+   * every 5 sec
+   */
+  private void startCheckDiskErrorThread() {
+    checkDiskErrorThread = new Thread(new Runnable() {
+      @Override
+      public void run() {
+        while(shouldRun) {
+          boolean tempFlag ;
+          synchronized(checkDiskErrorMutex) {
+            tempFlag = checkDiskErrorFlag;
+            checkDiskErrorFlag = false;
+          }
+          if(tempFlag) {
+            try {
+              checkDiskError();
+            } catch (Exception e) {
+              LOG.warn("Unexpected exception occurred while checking disk error  " + e);
+              checkDiskErrorThread = null;
+              return;
+            }
+            synchronized(checkDiskErrorMutex) {
+              lastDiskErrorCheck = Time.monotonicNow();
+            }
+          }
+          try {
+            Thread.sleep(checkDiskErrorInterval);
+          } catch (InterruptedException e) {
+            LOG.debug("InterruptedException in check disk error thread", e);
+            checkDiskErrorThread = null;
+            return;
+          }
+        }
+      }
+    });
+  }
+
+  public long getLastDiskErrorCheck() {
+    synchronized(checkDiskErrorMutex) {
+      return lastDiskErrorCheck;
+    }
   }
 }
