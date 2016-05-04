@@ -747,7 +747,7 @@ public class NameNode {
     try {
       HdfsStorageFactory.setConfiguration(conf);
       if (force) {
-        HdfsStorageFactory.formatStorageNonTransactional();
+        HdfsStorageFactory.formatAllStorageNonTransactional();
       } else {
         HdfsStorageFactory.formatStorage();
       }
