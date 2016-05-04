@@ -215,14 +215,14 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
     final Node localNode = chooseTarget(numOfReplicas, writer, excludedNodes,
         blocksize, maxNodesPerRack, results, avoidStaleNodes, storagePolicy,
         EnumSet.noneOf(StorageType.class), results.isEmpty());
+
     if (!returnChosenNodes) {
       results.removeAll(chosenStorage);
     }
 
     // sorting nodes to form a pipeline
     return getPipeline(
-        (writer != null && writer instanceof DatanodeDescriptor) ? writer
-            : localNode,
+        (writer != null && writer instanceof DatanodeDescriptor) ? writer : localNode,
         results.toArray(new DatanodeStorageInfo[results.size()]));
   }
 
