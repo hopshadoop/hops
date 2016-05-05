@@ -404,7 +404,7 @@ public class DatanodeInfo extends DatanodeID implements Node {
    * @return true if the node is stale
    */
   public boolean isStale(long staleInterval) {
-    return (Time.now() - lastUpdate) >= staleInterval;
+    return (Time.monotonicNow() - lastUpdate) >= staleInterval;
   }
   
   /**

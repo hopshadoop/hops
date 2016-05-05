@@ -169,9 +169,7 @@ public class DatanodeProtocolClientSideTranslatorPB
         .setRegistration(PBHelper.convert(registration))
         .setXmitsInProgress(xmitsInProgress).setXceiverCount(xceiverCount)
         .setFailedVolumes(failedVolumes);
-    for (StorageReport r : reports) {
-      builder.addReports(PBHelper.convert(r));
-    }
+    builder.addAllReports(PBHelper.convertStorageReports(reports));
 
     HeartbeatResponseProto resp;
     try {
@@ -185,7 +183,6 @@ public class DatanodeProtocolClientSideTranslatorPB
       cmds[index] = PBHelper.convert(p);
       index++;
     }
-
     return new HeartbeatResponse(cmds);
   }
 

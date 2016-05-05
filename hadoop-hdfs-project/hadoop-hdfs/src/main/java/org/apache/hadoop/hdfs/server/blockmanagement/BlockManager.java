@@ -1363,10 +1363,9 @@ public class BlockManager {
 
     int blockCnt = 0;
     for (DatanodeInfo dnInfo : nodes) {
-      LOG.debug("!.! node: " + dnInfo);
-      if(dnInfo == null) {
-        (new Throwable()).printStackTrace();
-      }
+
+      assert dnInfo != null;
+
       int blocks = invalidateWorkForOneNode(dnInfo);
       if (blocks > 0) {
         blockCnt += blocks;

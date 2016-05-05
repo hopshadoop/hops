@@ -25,6 +25,8 @@ import io.hops.transaction.handler.LightWeightRequestHandler;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLocks;
 import io.hops.transaction.lock.TransactionLockTypes.LockType;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 
 import java.io.IOException;
@@ -37,6 +39,8 @@ import java.util.Map;
 
 // TODO merge with StorageIdMap
 public class StorageMap {
+  private static final Log LOG = LogFactory.getLog(StorageMap.class);
+
   /**
    * Stores storageID->sid and sid->storageID mapping.
    * Works effectively like a cache to avoid hitting the DAL.
@@ -51,7 +55,8 @@ public class StorageMap {
    * Loads the data from the database, so it might contain datanodes/storages
    * that haven't heartbeated to this namenode yet.
    */
-  private Map<String, ArrayList<Integer>> datanodeUuidToSids;
+  private Map<String, ArrayList<Integer>> datanodeUuidToSids =
+      Collections.synchronizedMap(new HashMap<String, ArrayList<Integer>>());;
 
   public StorageMap() {
     this(true);
@@ -68,7 +73,7 @@ public class StorageMap {
         this.initializeDatanodeUuidToSidsMap();
       }
     } catch (IOException e) {
-      e.printStackTrace();
+      LOG.error("Failed to load storageIdMap from database.", e);
     }
   }
 
@@ -76,8 +81,6 @@ public class StorageMap {
    * Load the storage entries from the database to map DNUuids to sids
    */
   private void initializeDatanodeUuidToSidsMap() throws IOException {
-    this.datanodeUuidToSids = Collections.synchronizedMap(new HashMap<String, ArrayList<Integer>>());
-
     new LightWeightRequestHandler(HDFSOperationType.INITIALIZE_SID_MAP) {
       @Override
       public Object performTask() throws StorageException, IOException {

@@ -512,21 +512,20 @@ public class PBHelper {
   }
   
   public static LocatedBlockProto convert(LocatedBlock b) {
-    if (b == null) {
-      return null;
-    }
+    if (b == null) return null;
     Builder builder = LocatedBlockProto.newBuilder();
     DatanodeInfo[] locs = b.getLocations();
     for (int i = 0; i < locs.length; i++) {
-      builder.addLocs(i, PBHelper.convert(locs[i]));
+      DatanodeInfo loc = locs[i];
+      builder.addLocs(i, PBHelper.convert(loc));
     }
+
     StorageType[] storageTypes = b.getStorageTypes();
     if (storageTypes != null) {
       for (int i = 0; i < storageTypes.length; ++i) {
         builder.addStorageTypes(PBHelper.convertStorageType(storageTypes[i]));
       }
     }
-
     final String[] storageIDs = b.getStorageIDs();
     if (storageIDs != null) {
       builder.addAllStorageIDs(Arrays.asList(storageIDs));
@@ -538,9 +537,7 @@ public class PBHelper {
   }
   
   public static LocatedBlock convert(LocatedBlockProto proto) {
-    if (proto == null) {
-      return null;
-    }
+    if (proto == null) return null;
     List<DatanodeInfoProto> locs = proto.getLocsList();
     DatanodeInfo[] targets = new DatanodeInfo[locs.size()];
     for (int i = 0; i < locs.size(); i++) {
@@ -555,19 +552,14 @@ public class PBHelper {
     if (storageIDsCount == 0) {
       storageIDs = null;
     } else {
-      Preconditions.checkState(storageIDsCount == locs.size());
+      assert storageIDsCount == locs.size();
       storageIDs = proto.getStorageIDsList().toArray(new String[storageIDsCount]);
     }
 
-    LocatedBlock lb = new LocatedBlock(
-        PBHelper.convert(proto.getB()),
-        targets,
-        storageIDs,
-        storageTypes,
-        proto.getOffset(),
-        proto.getCorrupt());
-
+    LocatedBlock lb = new LocatedBlock(PBHelper.convert(proto.getB()), targets,
+        storageIDs, storageTypes, proto.getOffset(), proto.getCorrupt());
     lb.setBlockToken(PBHelper.convert(proto.getBlockToken()));
+
     return lb;
   }
 
@@ -1433,6 +1425,15 @@ public class PBHelper {
       report[i] = convert(list.get(i));
     }
     return report;
+  }
+
+  public static List<StorageReportProto> convertStorageReports(StorageReport[] storages) {
+    final List<StorageReportProto> protos = new ArrayList<StorageReportProto>(
+        storages.length);
+    for(int i = 0; i < storages.length; i++) {
+      protos.add(convert(storages[i]));
+    }
+    return protos;
   }
 
   public static DataChecksum.Type convert(HdfsProtos.ChecksumTypeProto type) {

@@ -320,9 +320,7 @@ public class TestPBHelper {
     assertEquals(2, proto.getBlocks(1).getBlock().getB().getBlockId());
 
     BlockRecoveryCommand cmd2 = PBHelper.convert(proto);
-
-    List<RecoveringBlock> cmd2Blks = Lists.newArrayList(
-        cmd2.getRecoveringBlocks());
+    List<RecoveringBlock> cmd2Blks = Lists.newArrayList(cmd2.getRecoveringBlocks());
     assertEquals(blks.get(0).getBlock(), cmd2Blks.get(0).getBlock());
     assertEquals(blks.get(1).getBlock(), cmd2Blks.get(1).getBlock());
     assertEquals(Joiner.on(",").join(blks), Joiner.on(",").join(cmd2Blks));

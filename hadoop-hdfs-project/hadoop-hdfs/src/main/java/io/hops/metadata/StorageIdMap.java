@@ -92,8 +92,7 @@ public class StorageIdMap {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
-        locks.add(
-            lf.getVariableLock(Variable.Finder.SIdCounter, LockType.WRITE));
+        locks.add(lf.getVariableLock(Variable.Finder.SIdCounter, LockType.WRITE));
       }
 
       @Override
