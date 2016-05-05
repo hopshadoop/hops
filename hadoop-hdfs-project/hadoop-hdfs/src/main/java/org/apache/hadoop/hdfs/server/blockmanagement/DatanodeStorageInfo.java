@@ -302,6 +302,12 @@ public class DatanodeStorageInfo {
         storageID + ":" + state;
   }
 
+  StorageReport toStorageReport() {
+    return new StorageReport(
+        new DatanodeStorage(storageID, state, storageType),
+        false, capacity, dfsUsed, remaining, blockPoolUsed);
+  }
+
   public Map<Long, Integer> getAllStorageReplicas() throws IOException {
     LightWeightRequestHandler findBlocksHandler = new LightWeightRequestHandler(
         HDFSOperationType.GET_ALL_STORAGE_BLOCKS_IDS) {

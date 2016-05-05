@@ -15,32 +15,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.hadoop.hdfs.server.protocol;
 
-package org.apache.hadoop.hdfs;
-
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
-
-import java.util.Arrays;
-import java.util.List;
+import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 
 /**
- * Defines the types of supported storage media. The default storage
- * medium is assumed to be DISK.
- *
+ * Class captures information of a datanode and its storages.
  */
-@InterfaceAudience.Public
-@InterfaceStability.Evolving
-public enum StorageType {
-  DISK,
-  SSD;
-  // TODO add RAID/RAM(?)/MIRROR/RAIDZ
-  // TODO also update hdfs.proto:Storagetype when changing stuff here
-  public static StorageType DEFAULT = DISK;
+public class DatanodeStorageReport {
+  final DatanodeInfo datanodeInfo;
+  final StorageReport[] storageReports;
 
-  public static final StorageType[] EMPTY_ARRAY = {};
-  private static final StorageType[] VALUES = values();
-  public static List<StorageType> asList() {
-    return Arrays.asList(VALUES);
+  public DatanodeStorageReport(DatanodeInfo datanodeInfo,
+      StorageReport[] storageReports) {
+    this.datanodeInfo = datanodeInfo;
+    this.storageReports = storageReports;
+  }
+
+  public DatanodeInfo getDatanodeInfo() {
+    return datanodeInfo;
+  }
+
+  public StorageReport[] getStorageReports() {
+    return storageReports;
   }
 }

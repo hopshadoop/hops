@@ -622,6 +622,21 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
   }
 
   @Override
+  public ClientNamenodeProtocolProtos.GetDatanodeStorageReportResponseProto getDatanodeStorageReport(
+      RpcController controller, ClientNamenodeProtocolProtos.GetDatanodeStorageReportRequestProto req)
+      throws ServiceException {
+    try {
+      List<ClientNamenodeProtocolProtos.DatanodeStorageReportProto> reports = PBHelper.convertDatanodeStorageReports(
+          server.getDatanodeStorageReport(PBHelper.convert(req.getType())));
+      return ClientNamenodeProtocolProtos.GetDatanodeStorageReportResponseProto.newBuilder()
+          .addAllDatanodeStorageReports(reports)
+          .build();
+    } catch (IOException e) {
+      throw new ServiceException(e);
+    }
+  }
+
+  @Override
   public GetPreferredBlockSizeResponseProto getPreferredBlockSize(
       RpcController controller, GetPreferredBlockSizeRequestProto req)
       throws ServiceException {

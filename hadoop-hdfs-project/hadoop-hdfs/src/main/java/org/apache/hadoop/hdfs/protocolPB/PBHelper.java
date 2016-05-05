@@ -114,6 +114,7 @@ import org.apache.hadoop.hdfs.server.protocol.DatanodeProtocol;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage.State;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
+import org.apache.hadoop.hdfs.server.protocol.DatanodeStorageReport;
 import org.apache.hadoop.hdfs.server.protocol.FinalizeCommand;
 import org.apache.hadoop.hdfs.server.protocol.KeyUpdateCommand;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeCommand;
@@ -497,6 +498,41 @@ public class PBHelper {
         .setRemaining(info.getRemaining())
         .setXceiverCount(info.getXceiverCount()).build();
     return builder.build();
+  }
+
+  public static ClientNamenodeProtocolProtos.DatanodeStorageReportProto convertDatanodeStorageReport(
+      DatanodeStorageReport report) {
+    return ClientNamenodeProtocolProtos.DatanodeStorageReportProto.newBuilder()
+        .setDatanodeInfo(convert(report.getDatanodeInfo()))
+        .addAllStorageReports(convertStorageReports(report.getStorageReports()))
+        .build();
+  }
+
+  public static List<ClientNamenodeProtocolProtos.DatanodeStorageReportProto> convertDatanodeStorageReports(
+      DatanodeStorageReport[] reports) {
+    final List<ClientNamenodeProtocolProtos.DatanodeStorageReportProto> protos
+        = new ArrayList<ClientNamenodeProtocolProtos.DatanodeStorageReportProto>(reports.length);
+    for(int i = 0; i < reports.length; i++) {
+      protos.add(convertDatanodeStorageReport(reports[i]));
+    }
+    return protos;
+  }
+
+  public static DatanodeStorageReport convertDatanodeStorageReport(
+      ClientNamenodeProtocolProtos.DatanodeStorageReportProto proto) {
+    return new DatanodeStorageReport(
+        convert(proto.getDatanodeInfo()),
+        convertStorageReports(proto.getStorageReportsList()));
+  }
+
+  public static DatanodeStorageReport[] convertDatanodeStorageReports(
+      List<ClientNamenodeProtocolProtos.DatanodeStorageReportProto> protos) {
+    final DatanodeStorageReport[] reports
+        = new DatanodeStorageReport[protos.size()];
+    for(int i = 0; i < reports.length; i++) {
+      reports[i] = convertDatanodeStorageReport(protos.get(i));
+    }
+    return reports;
   }
 
   public static AdminStates convert(AdminState adminState) {
