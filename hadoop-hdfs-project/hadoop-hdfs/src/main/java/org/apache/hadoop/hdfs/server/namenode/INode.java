@@ -40,6 +40,7 @@ import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.util.StringUtils;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -163,12 +164,13 @@ public abstract class INode implements Comparable<byte[]> {
   private String userName;
   private String groupName;
 
-  private byte[] userId;
-  private byte[] groupId;
+  private int userId;
+  private int groupId;
 
   private FsPermission permission;
 
-  INode(PermissionStatus permissions, long mTime, long atime) {
+  INode(PermissionStatus permissions, long mTime, long atime)
+      throws IOException {
     this.setLocalNameNoPersistance((byte[]) null);
     this.parent = null;
     this.modificationTime = mTime;
@@ -176,7 +178,8 @@ public abstract class INode implements Comparable<byte[]> {
     setPermissionStatusNoPersistance(permissions);
   }
 
-  protected INode(String name, PermissionStatus permissions) {
+  protected INode(String name, PermissionStatus permissions)
+      throws IOException {
     this(permissions, 0L, 0L);
     setLocalNameNoPersistance(name);
   }
@@ -187,7 +190,7 @@ public abstract class INode implements Comparable<byte[]> {
    * @param other
    *     Other node to be copied
    */
-  INode(INode other) throws StorageException, TransactionContextException {
+  INode(INode other) throws IOException {
     setLocalNameNoPersistance(other.getLocalName());
     this.parent = other.getParent();
     setPermissionStatusNoPersistance(other.getPermissionStatus());
@@ -208,7 +211,8 @@ public abstract class INode implements Comparable<byte[]> {
   /**
    * Set the {@link PermissionStatus}
    */
-  private void setPermissionStatusNoPersistance(PermissionStatus ps) {
+  private void setPermissionStatusNoPersistance(PermissionStatus ps)
+      throws IOException {
     setUserNoPersistance(ps.getUserName());
     setGroupNoPersistance(ps.getGroupName());
     setPermissionNoPersistance(ps.getPermission());
@@ -217,7 +221,7 @@ public abstract class INode implements Comparable<byte[]> {
   /**
    * Get the {@link PermissionStatus}
    */
-  public PermissionStatus getPermissionStatus() {
+  public PermissionStatus getPermissionStatus() throws IOException {
     return new PermissionStatus(getUserName(), getGroupName(),
         getFsPermission());
   }
@@ -225,22 +229,24 @@ public abstract class INode implements Comparable<byte[]> {
   /**
    * Get user name
    */
-  public String getUserName() {
-    //FIXME: if just userID exists?!
+  public String getUserName() throws IOException {
+    if(userName == null || userName.isEmpty()){
+      userName = UsersGroups.getUser(userId);
+    }
     return userName;
   }
 
-  public byte[] getUserID(){
+  public int getUserID(){
     return userId;
   }
 
-  public void setUserIDNoPersistance(byte[] userId){
+  public void setUserIDNoPersistance(int userId){
     this.userId = userId;
   }
   /**
    * Set user
    */
-  public void setUserNoPersistance(String user) {
+  public void setUserNoPersistance(String user) throws IOException {
     this.userName = user;
     this.userId = UsersGroups.getUserID(user);
   }
@@ -248,23 +254,25 @@ public abstract class INode implements Comparable<byte[]> {
   /**
    * Get group name
    */
-  public String getGroupName() {
-    //FIXME: if just the groupID exists?!
+  public String getGroupName() throws IOException {
+    if(groupName == null || groupName.isEmpty()){
+      groupName = UsersGroups.getGroup(groupId);
+    }
     return groupName;
   }
 
-  public byte[] getGroupID(){
+  public int getGroupID(){
     return groupId;
   }
 
-  public void setGroupIDNoPersistance(byte[] groupId){
+  public void setGroupIDNoPersistance(int groupId){
     this.groupId = groupId;
   }
 
   /**
    * Set group
    */
-  public void setGroupNoPersistance(String group) {
+  public void setGroupNoPersistance(String group) throws IOException {
     this.groupName = group;
     this.groupId = UsersGroups.getGroupID(group);
   }
@@ -402,7 +410,7 @@ public abstract class INode implements Comparable<byte[]> {
       return "\"" + getFullPathName() + "\":" + getUserName() + ":" +
           getGroupName() + ":" + (isDirectory() ? "d" : "-") +
           getFsPermission();
-    } catch (HopsException ex) {
+    } catch (IOException ex) {
       Logger.getLogger(INode.class.getName()).log(Level.SEVERE, null, ex);
     }
     return null;
@@ -624,13 +632,13 @@ public abstract class INode implements Comparable<byte[]> {
    * Set user
    */
   protected void setUser(String user)
-      throws StorageException, TransactionContextException {
+      throws IOException {
     setUserNoPersistance(user);
     save();
   }
 
   protected void setGroup(String group)
-      throws StorageException, TransactionContextException {
+      throws IOException {
     setGroupNoPersistance(group);
     save();
   }
@@ -642,7 +650,7 @@ public abstract class INode implements Comparable<byte[]> {
   }
 
   protected void setPermissionStatus(PermissionStatus ps)
-      throws StorageException, TransactionContextException {
+      throws IOException {
     setUser(ps.getUserName());
     setGroup(ps.getGroupName());
     setPermission(ps.getPermission());

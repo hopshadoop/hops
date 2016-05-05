@@ -136,8 +136,7 @@ class FSPermissionChecker {
   void checkPermission(String path, INodeDirectory root, boolean doCheckOwner,
       FsAction ancestorAccess, FsAction parentAccess, FsAction access,
       FsAction subAccess)
-      throws AccessControlException, UnresolvedLinkException, StorageException,
-      TransactionContextException {
+      throws IOException {
     if (LOG.isDebugEnabled()) {
       LOG.debug("ACCESS CHECK: " + this + ", doCheckOwner=" + doCheckOwner +
           ", ancestorAccess=" + ancestorAccess + ", parentAccess=" +
@@ -177,7 +176,8 @@ class FSPermissionChecker {
   /**
    * Guarded by {@link FSNamesystem#readLock()}
    */
-  private void checkOwner(INode inode) throws AccessControlException {
+  private void checkOwner(INode inode)
+      throws IOException {
     if (inode != null && user.equals(inode.getUserName())) {
       return;
     }
@@ -188,7 +188,7 @@ class FSPermissionChecker {
    * Guarded by {@link FSNamesystem#readLock()}
    */
   private void checkTraverse(INode[] inodes, int last)
-      throws AccessControlException {
+      throws IOException {
     for (int j = 0; j <= last; j++) {
       check(inodes[j], FsAction.EXECUTE);
     }
@@ -198,8 +198,7 @@ class FSPermissionChecker {
    * Guarded by {@link FSNamesystem#readLock()}
    */
   private void checkSubAccess(INode inode, FsAction access)
-      throws AccessControlException, StorageException,
-      TransactionContextException {
+      throws IOException {
     if (inode == null || !inode.isDirectory()) {
       return;
     }
@@ -221,14 +220,15 @@ class FSPermissionChecker {
    * Guarded by {@link FSNamesystem#readLock()}
    */
   private void check(INode[] inodes, int i, FsAction access)
-      throws AccessControlException {
+      throws IOException {
     check(i >= 0 ? inodes[i] : null, access);
   }
 
   /**
    * Guarded by {@link FSNamesystem#readLock()}
    */
-  void check(INode inode, FsAction access) throws AccessControlException {
+  void check(INode inode, FsAction access)
+      throws IOException {
     if (inode == null) {
       return;
     }
@@ -270,7 +270,7 @@ class FSPermissionChecker {
    * Guarded by {@link FSNamesystem#readLock()}
    */
   private void checkStickyBit(INode parent, INode inode)
-      throws AccessControlException {
+      throws IOException {
     if (!parent.getFsPermission().getStickyBit()) {
       return;
     }
