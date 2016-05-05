@@ -108,7 +108,7 @@ class InvalidateBlocks {
       // the database, so looking up which storage it's on will return null.
       // Maybe we can do this prettier?
 
-      NameNode.blockStateChangeLog.info("Skipped invalidating blocks. " +
+      NameNode.blockStateChangeLog.error("Skipped invalidating blocks. " +
             "Should only happen during tests!");
       return;
     }
@@ -121,11 +121,9 @@ class InvalidateBlocks {
         block.getInodeId());
 
     if (add(invBlk)) {
-      if (log) {
-        NameNode.blockStateChangeLog.info(
-            "BLOCK* " + getClass().getSimpleName() + ": add " + block + " to " +
-                storage);
-      }
+      LOG.info("BLOCK* " + getClass().getSimpleName() + ": add " + block + " to " + storage);
+    } else {
+      LOG.info("failed to add BLOCK* " + getClass().getSimpleName() + ": add " + block + " to " + storage);
     }
   }
 
