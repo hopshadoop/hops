@@ -456,17 +456,17 @@ public class Balancer {
     /** The locations of the replicas of the block. */
     private final List<BalancerDatanode.StorageGroup> locations
         = new ArrayList<BalancerDatanode.StorageGroup>(3);
-    
+
     /* Constructor */
     private BalancerBlock(Block block) {
       this.block = block;
     }
-    
+
     /* clean block locations */
     private synchronized void clearLocations() {
       locations.clear();
     }
-    
+
     /* add a location */
     private synchronized void addLocation(BalancerDatanode.StorageGroup g) {
       if (!locations.contains(g)) {
@@ -478,22 +478,22 @@ public class Balancer {
     private synchronized boolean isLocatedOn(BalancerDatanode.StorageGroup g) {
       return locations.contains(g);
     }
-    
+
     /* Return its locations */
     private synchronized List<BalancerDatanode.StorageGroup> getLocations() {
       return locations;
     }
-    
+
     /* Return the block */
     private Block getBlock() {
       return block;
     }
-    
+
     /* Return the block id */
     private long getBlockId() {
       return block.getBlockId();
     }
-    
+
     /* Return the length of the block */
     private long getNumBytes() {
       return block.getNumBytes();
@@ -811,7 +811,7 @@ public class Balancer {
           pendingBlock.scheduleBlockMove();
           continue;
         }
-        
+
         /* Since we can not schedule any block to move,
          * filter any moved blocks from the source block list and
          * check if we should fetch more blocks from the namenode
@@ -827,15 +827,15 @@ public class Balancer {
             return;
           }
         }
-        
+
         // check if time is up or not
         if (Time.now() - startTime > MAX_ITERATION_TIME) {
           isTimeUp = true;
           continue;
         }
-        
+
         /* Now we can not schedule any block to move and there are
-         * no new blocks added to the source block list, so we wait. 
+         * no new blocks added to the source block list, so we wait.
          */
         try {
           synchronized (Balancer.this) {
@@ -938,7 +938,7 @@ public class Balancer {
    *                needed to move to make the cluster balanced.
    * @param reports a set of datanode storage reports
    */
-  private long init(DatanodeStorageReport[] reports) {
+  private long init(List<DatanodeStorageReport> reports) {
     // compute average utilization
     for (DatanodeStorageReport r : reports) {
       if (shouldIgnore(r.getDatanodeInfo())) {
@@ -946,11 +946,12 @@ public class Balancer {
       }
       policy.accumulateSpaces(r);
     }
+    policy.initAvgUtilization();
 
     // create network topology and classify utilization collections:
     //   over-utilized, above-average, below-average and under-utilized.
     long overLoadedBytes = 0L, underLoadedBytes = 0L;
-    for(DatanodeStorageReport r : DFSUtil.shuffle(reports)) {
+    for(DatanodeStorageReport r : reports) {
       final DatanodeInfo datanode = r.getDatanodeInfo();
       if (shouldIgnore(datanode)) {
         continue; // ignore decommissioning or decommissioned nodes
@@ -1343,6 +1344,128 @@ public class Balancer {
     cleanGlobalBlockList();
     this.movedBlocks.cleanup();
   }
+
+  static class Result {
+    final ReturnStatus exitStatus;
+    final long bytesLeftToMove;
+    final long bytesBeingMoved;
+    final long bytesAlreadyMoved;
+
+    Result(ReturnStatus exitStatus, long bytesLeftToMove, long bytesBeingMoved,
+        long bytesAlreadyMoved) {
+      this.exitStatus = exitStatus;
+      this.bytesLeftToMove = bytesLeftToMove;
+      this.bytesBeingMoved = bytesBeingMoved;
+      this.bytesAlreadyMoved = bytesAlreadyMoved;
+    }
+
+    void print(int iteration, PrintStream out) {
+      out.printf("%-24s %10d  %19s  %18s  %17s%n",
+          DateFormat.getDateTimeInstance().format(new Date()), iteration,
+          StringUtils.byteDesc(bytesAlreadyMoved),
+          StringUtils.byteDesc(bytesLeftToMove),
+          StringUtils.byteDesc(bytesBeingMoved));
+    }
+  }
+
+  Result newResult(ReturnStatus exitStatus, long bytesLeftToMove, long bytesBeingMoved) {
+    return new Result(exitStatus, bytesLeftToMove, bytesBeingMoved,
+        bytesMoved.get());
+  }
+
+  Result newResult(ReturnStatus exitStatus) {
+    return new Result(exitStatus, -1, -1, bytesMoved.get());
+  }
+
+  /** Run an iteration for all datanodes. */
+  Result runOneIteration() {
+    try {
+      final List<DatanodeStorageReport> reports = init();
+      final long bytesLeftToMove = init(reports);
+      if (bytesLeftToMove == 0) {
+        System.out.println("The cluster is balanced. Exiting...");
+        return newResult(ReturnStatus.SUCCESS, bytesLeftToMove, -1);
+      } else {
+        LOG.info( "Need to move "+ StringUtils.byteDesc(bytesLeftToMove)
+            + " to make the cluster balanced." );
+      }
+
+      /* Decide all the nodes that will participate in the block move and
+       * the number of bytes that need to be moved from one node to another
+       * in this iteration. Maximum bytes to be moved per node is
+       * Min(1 Band worth of bytes,  MAX_SIZE_TO_MOVE).
+       */
+      final long bytesBeingMoved = chooseStorageGroups();
+      if (bytesBeingMoved == 0) {
+        System.out.println("No block can be moved. Exiting...");
+        return newResult(ReturnStatus.NO_MOVE_BLOCK, bytesLeftToMove, bytesBeingMoved);
+      } else {
+        LOG.info( "Will move " + StringUtils.byteDesc(bytesBeingMoved) +
+            " in this iteration");
+      }
+
+      /* For each pair of <source, target>, start a thread that repeatedly
+       * decide a block to be moved and its proxy source,
+       * then initiates the move until all bytes are moved or no more block
+       * available to move.
+       * Exit no byte has been moved for 5 consecutive iterations.
+       */
+      if (dispatchBlockMoves() > 0) {
+        notChangedIterations = 0;
+      } else {
+        notChangedIterations++;
+        if (notChangedIterations >= 5) {
+          System.out
+              .println("No block has been moved for 5 iterations. Exiting...");
+//          return ReturnStatus.NO_MOVE_PROGRESS;
+          return newResult(ReturnStatus.NO_MOVE_PROGRESS, bytesLeftToMove, bytesBeingMoved);
+        }
+      }
+
+//      /* For each pair of <source, target>, start a thread that repeatedly
+//       * decide a block to be moved and its proxy source,
+//       * then initiates the move until all bytes are moved or no more block
+//       * available to move.
+//       * Exit no byte has been moved for 5 consecutive iterations.
+//       */
+//      if (!dispatcher.dispatchAndCheckContinue()) {
+//        return newResult(ReturnStatus.NO_MOVE_PROGRESS, bytesLeftToMove, bytesBeingMoved);
+//      }
+
+      return newResult(ReturnStatus.IN_PROGRESS, bytesLeftToMove, bytesBeingMoved);
+    } catch (IllegalArgumentException e) {
+      System.out.println(e + ".  Exiting ...");
+      return newResult(ReturnStatus.ILLEGAL_ARGS);
+    } catch (IOException e) {
+      System.out.println(e + ".  Exiting ...");
+      return newResult(ReturnStatus.IO_EXCEPTION);
+    } catch (InterruptedException e) {
+      System.out.println(e + ".  Exiting ...");
+      return newResult(ReturnStatus.INTERRUPTED);
+    } finally {
+      if (dispatcherExecutor != null) {
+        dispatcherExecutor.shutdownNow();
+      }
+      moverExecutor.shutdownNow();
+    }
+  }
+
+  /** Get live datanode storage reports and then build the network topology. */
+  public List<DatanodeStorageReport> init() throws IOException {
+    final DatanodeStorageReport[] reports = nnc.client.getDatanodeStorageReport(DatanodeReportType.LIVE);
+    final List<DatanodeStorageReport> trimmed = new ArrayList<DatanodeStorageReport>();
+    // create network topology and classify utilization collections:
+    // over-utilized, above-average, below-average and under-utilized.
+    for (DatanodeStorageReport r : DFSUtil.shuffle(reports)) {
+      final DatanodeInfo datanode = r.getDatanodeInfo();
+      if (shouldIgnore(datanode)) {
+        continue;
+      }
+      trimmed.add(r);
+      cluster.add(datanode);
+    }
+    return trimmed;
+  }
   
   /* Remove all blocks from the global block list except for the ones in the
    * moved list.
@@ -1377,79 +1500,79 @@ public class Balancer {
     }
   }
 
-  /**
-   * Run an iteration for all datanodes.
-   */
-  private ReturnStatus run(int iteration, Formatter formatter) {
-    try {
-      /* get all live datanodes of a cluster and their disk usage
-       * decide the number of bytes need to be moved
-       */
-      final long bytesLeftToMove =
-          init(nnc.client.getDatanodeStorageReport(DatanodeReportType.LIVE));
-      if (bytesLeftToMove == 0) {
-        System.out.println("The cluster is balanced. Exiting...");
-        return ReturnStatus.SUCCESS;
-      } else {
-        LOG.info("Need to move " + StringUtils.byteDesc(bytesLeftToMove) +
-            " to make the cluster balanced.");
-      }
-      
-      /* Decide all the nodes that will participate in the block move and
-       * the number of bytes that need to be moved from one node to another
-       * in this iteration. Maximum bytes to be moved per node is
-       * Min(1 Band worth of bytes,  MAX_SIZE_TO_MOVE).
-       */
-      final long bytesToMove = chooseStorageGroups();
-      if (bytesToMove == 0) {
-        System.out.println("No block can be moved. Exiting...");
-        return ReturnStatus.NO_MOVE_BLOCK;
-      } else {
-        LOG.info("Will move " + StringUtils.byteDesc(bytesToMove) +
-            " in this iteration");
-      }
-
-      formatter.format("%-24s %10d  %19s  %18s  %17s%n",
-          DateFormat.getDateTimeInstance().format(new Date()), iteration,
-          StringUtils.byteDesc(bytesMoved.get()),
-          StringUtils.byteDesc(bytesLeftToMove),
-          StringUtils.byteDesc(bytesToMove));
-      
-      /* For each pair of <source, target>, start a thread that repeatedly 
-       * decide a block to be moved and its proxy source, 
-       * then initiates the move until all bytes are moved or no more block
-       * available to move.
-       * Exit no byte has been moved for 5 consecutive iterations.
-       */
-      if (dispatchBlockMoves() > 0) {
-        notChangedIterations = 0;
-      } else {
-        notChangedIterations++;
-        if (notChangedIterations >= 5) {
-          System.out
-              .println("No block has been moved for 5 iterations. Exiting...");
-          return ReturnStatus.NO_MOVE_PROGRESS;
-        }
-      }
-
-      // clean all lists
-      resetData();
-      return ReturnStatus.IN_PROGRESS;
-    } catch (IllegalArgumentException e) {
-      System.out.println(e + ".  Exiting ...");
-      return ReturnStatus.ILLEGAL_ARGS;
-    } catch (IOException e) {
-      System.out.println(e + ".  Exiting ...");
-      return ReturnStatus.IO_EXCEPTION;
-    } catch (InterruptedException e) {
-      System.out.println(e + ".  Exiting ...");
-      return ReturnStatus.INTERRUPTED;
-    } finally {
-      // shutdown thread pools
-      dispatcherExecutor.shutdownNow();
-      moverExecutor.shutdownNow();
-    }
-  }
+//  /**
+//   * Run an iteration for all datanodes.
+//   */
+//  private ReturnStatus run(int iteration, Formatter formatter) {
+//    try {
+//      /* get all live datanodes of a cluster and their disk usage
+//       * decide the number of bytes need to be moved
+//       */
+//      final long bytesLeftToMove =
+//          init(nnc.client.getDatanodeStorageReport(DatanodeReportType.LIVE));
+//      if (bytesLeftToMove == 0) {
+//        System.out.println("The cluster is balanced. Exiting...");
+//        return ReturnStatus.SUCCESS;
+//      } else {
+//        LOG.info("Need to move " + StringUtils.byteDesc(bytesLeftToMove) +
+//            " to make the cluster balanced.");
+//      }
+//
+//      /* Decide all the nodes that will participate in the block move and
+//       * the number of bytes that need to be moved from one node to another
+//       * in this iteration. Maximum bytes to be moved per node is
+//       * Min(1 Band worth of bytes,  MAX_SIZE_TO_MOVE).
+//       */
+//      final long bytesToMove = chooseStorageGroups();
+//      if (bytesToMove == 0) {
+//        System.out.println("No block can be moved. Exiting...");
+//        return ReturnStatus.NO_MOVE_BLOCK;
+//      } else {
+//        LOG.info("Will move " + StringUtils.byteDesc(bytesToMove) +
+//            " in this iteration");
+//      }
+//
+//      formatter.format("%-24s %10d  %19s  %18s  %17s%n",
+//          DateFormat.getDateTimeInstance().format(new Date()), iteration,
+//          StringUtils.byteDesc(bytesMoved.get()),
+//          StringUtils.byteDesc(bytesLeftToMove),
+//          StringUtils.byteDesc(bytesToMove));
+//
+//      /* For each pair of <source, target>, start a thread that repeatedly
+//       * decide a block to be moved and its proxy source,
+//       * then initiates the move until all bytes are moved or no more block
+//       * available to move.
+//       * Exit no byte has been moved for 5 consecutive iterations.
+//       */
+//      if (dispatchBlockMoves() > 0) {
+//        notChangedIterations = 0;
+//      } else {
+//        notChangedIterations++;
+//        if (notChangedIterations >= 5) {
+//          System.out
+//              .println("No block has been moved for 5 iterations. Exiting...");
+//          return ReturnStatus.NO_MOVE_PROGRESS;
+//        }
+//      }
+//
+//      // clean all lists
+//      resetData();
+//      return ReturnStatus.IN_PROGRESS;
+//    } catch (IllegalArgumentException e) {
+//      System.out.println(e + ".  Exiting ...");
+//      return ReturnStatus.ILLEGAL_ARGS;
+//    } catch (IOException e) {
+//      System.out.println(e + ".  Exiting ...");
+//      return ReturnStatus.IO_EXCEPTION;
+//    } catch (InterruptedException e) {
+//      System.out.println(e + ".  Exiting ...");
+//      return ReturnStatus.INTERRUPTED;
+//    } finally {
+//      // shutdown thread pools
+//      dispatcherExecutor.shutdownNow();
+//      moverExecutor.shutdownNow();
+//    }
+//  }
 
   /**
    * Balance all namenodes.
@@ -1468,26 +1591,55 @@ public class Balancer {
     final Formatter formatter = new Formatter(System.out);
     System.out.println(
         "Time Stamp               Iteration#  Bytes Already Moved  Bytes Left To Move  Bytes Being Moved");
-    
-    final List<NameNodeConnector> connectors =
-        new ArrayList<NameNodeConnector>(namenodes.size());
+
+
+//      boolean done = false;
+//      for (int iteration = 0; !done; iteration++) {
+//        done = true;
+//        Collections.shuffle(connectors);
+//        for (NameNodeConnector nnc : connectors) {
+//          final Balancer b = new Balancer(nnc, p, conf);
+//          final ReturnStatus r = b.run(iteration, formatter);
+//          if (r == ReturnStatus.IN_PROGRESS) {
+//            done = false;
+//          } else if (r != ReturnStatus.SUCCESS) {
+//            //must be an error statue, return.
+//            return r.code;
+//          }
+//        }
+//
+//        if (!done) {
+//          Thread.sleep(sleeptime);
+//        }
+//      }
+//    } finally {
+//      for (NameNodeConnector nnc : connectors) {
+//        nnc.close();
+//      }
+//    }
+
+    List<NameNodeConnector> connectors = new ArrayList<NameNodeConnector>();
     try {
       for (URI uri : namenodes) {
         connectors.add(new NameNodeConnector(uri, conf));
       }
 
       boolean done = false;
-      for (int iteration = 0; !done; iteration++) {
+      for(int iteration = 0; !done; iteration++) {
         done = true;
         Collections.shuffle(connectors);
-        for (NameNodeConnector nnc : connectors) {
+        for(NameNodeConnector nnc : connectors) {
           final Balancer b = new Balancer(nnc, p, conf);
-          final ReturnStatus r = b.run(iteration, formatter);
-          if (r == ReturnStatus.IN_PROGRESS) {
+          final Result r = b.runOneIteration();
+          r.print(iteration, System.out);
+
+          // clean all lists
+          b.resetData();//conf);
+          if (r.exitStatus == ReturnStatus.IN_PROGRESS) {
             done = false;
-          } else if (r != ReturnStatus.SUCCESS) {
+          } else if (r.exitStatus != ReturnStatus.SUCCESS) {
             //must be an error statue, return.
-            return r.code;
+            return r.exitStatus.code;
           }
         }
 
@@ -1496,10 +1648,11 @@ public class Balancer {
         }
       }
     } finally {
-      for (NameNodeConnector nnc : connectors) {
+      for(NameNodeConnector nnc : connectors) {
         nnc.close();
       }
     }
+
     return ReturnStatus.SUCCESS.code;
   }
 

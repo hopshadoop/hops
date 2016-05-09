@@ -59,7 +59,7 @@ public class TestBalancer {
   private static final Log LOG =
       LogFactory.getLog("org.apache.hadoop.hdfs.TestBalancer");
   
-  final static long CAPACITY = 500L;
+  final static long CAPACITY = 5000L;
   final static String RACK0 = "/rack0";
   final static String RACK1 = "/rack1";
   final static String RACK2 = "/rack2";
@@ -72,7 +72,7 @@ public class TestBalancer {
   static final long TIMEOUT = 20000L; //msec
   static final double CAPACITY_ALLOWED_VARIANCE = 0.005;  // 0.5%
   static final double BALANCE_ALLOWED_VARIANCE = 0.11;    // 10%+delta
-  static final int DEFAULT_BLOCK_SIZE = 10;
+  static final int DEFAULT_BLOCK_SIZE = 100;
   private static final Random r = new Random();
 
   static {
