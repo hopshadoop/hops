@@ -38,19 +38,19 @@ import java.util.Iterator;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
-
+//TORECOVER TOKEN all the store action done in this class must be remplaced by transaction state actions (getStateStore)
 public class NMTokenSecretManagerInRM extends BaseNMTokenSecretManager {
 
   private static Log LOG = LogFactory.getLog(NMTokenSecretManagerInRM.class);
 
-  private MasterKeyData nextMasterKey;
+  private MasterKeyData nextMasterKey; //TORECOVER?
   private Configuration conf;
   private RMContext rmContext;
   private final Timer timer;
   private final long rollingInterval;
   private final long activationDelay;
   private final ConcurrentHashMap<ApplicationAttemptId, HashSet<NodeId>>
-      appAttemptToNodeKeyMap;
+      appAttemptToNodeKeyMap; //TORECOVER?
 
   public NMTokenSecretManagerInRM(Configuration conf, RMContext rmContext) {
     this.rmContext = rmContext;
@@ -108,6 +108,29 @@ public class NMTokenSecretManagerInRM extends BaseNMTokenSecretManager {
       }
     } catch (Exception ex) {
       LOG.error(ex);
+    } finally {
+      super.writeLock.unlock();
+    }
+  }
+
+  public void setCurrentMasterKey(MasterKey currentMasterKey) {
+    super.writeLock.lock();
+    try {
+      if (currentMasterKey != this.currentMasterKey) {
+        this.currentMasterKey = new MasterKeyData(currentMasterKey,
+          createSecretKey(currentMasterKey.getBytes().array()));
+        clearApplicationNMTokenKeys();
+      }
+    } finally {
+      super.writeLock.unlock();
+    }
+  }
+
+  public void setNextMasterKey(MasterKey nextMasterKey) {
+    super.writeLock.lock();
+    try {
+      this.nextMasterKey = new MasterKeyData(nextMasterKey,
+          createSecretKey(nextMasterKey.getBytes().array()));
     } finally {
       super.writeLock.unlock();
     }
@@ -176,9 +199,11 @@ public class NMTokenSecretManagerInRM extends BaseNMTokenSecretManager {
   }
 
   public void start() {
-    rollMasterKey();
-    this.timer.scheduleAtFixedRate(new MasterKeyRoller(), rollingInterval,
+    if(!rmContext.isDistributedEnabled() || rmContext.isLeader()){
+      rollMasterKey();
+      this.timer.scheduleAtFixedRate(new MasterKeyRoller(), rollingInterval,
         rollingInterval);
+    }
   }
 
   public void stop() {

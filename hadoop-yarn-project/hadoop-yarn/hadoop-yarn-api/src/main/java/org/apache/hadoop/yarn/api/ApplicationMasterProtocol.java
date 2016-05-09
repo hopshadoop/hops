@@ -79,6 +79,7 @@ public interface ApplicationMasterProtocol {
    * @see RegisterApplicationMasterRequest
    * @see RegisterApplicationMasterResponse
    */
+  //TODO make this idempotent
   @Public
   @Stable
   public RegisterApplicationMasterResponse registerApplicationMaster(
@@ -106,6 +107,7 @@ public interface ApplicationMasterProtocol {
    */
   @Public
   @Stable
+  //TODO make this idempotent
   public FinishApplicationMasterResponse finishApplicationMaster(
       FinishApplicationMasterRequest request) throws YarnException, IOException;
 

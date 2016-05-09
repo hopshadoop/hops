@@ -59,18 +59,21 @@ public class INodeDirectory extends INode {
 
   private boolean metaEnabled;
 
-  public INodeDirectory(String name, PermissionStatus permissions) {
+  public INodeDirectory(String name, PermissionStatus permissions)
+      throws IOException {
     super(name, permissions);
   }
 
-  public INodeDirectory(PermissionStatus permissions, long mTime) {
+  public INodeDirectory(PermissionStatus permissions, long mTime)
+      throws IOException {
     super(permissions, mTime, 0);
   }
 
   /**
    * constructor
    */
-  INodeDirectory(byte[] localName, PermissionStatus permissions, long mTime) {
+  INodeDirectory(byte[] localName, PermissionStatus permissions, long mTime)
+      throws IOException {
     this(permissions, mTime);
     this.setLocalNameNoPersistance(localName);
   }
@@ -81,7 +84,7 @@ public class INodeDirectory extends INode {
    * @param other
    */
   INodeDirectory(INodeDirectory other)
-      throws StorageException, TransactionContextException {
+      throws IOException {
     super(other);
     //HOP: FIXME: Mahmoud: the new directory has the same id as the "other"
     // directory so we don't need to notify the children of the directory change
@@ -323,7 +326,7 @@ public class INodeDirectory extends INode {
    * node, otherwise
    */
   <T extends INode> T addChild(final T node, boolean setModTime)
-      throws StorageException, TransactionContextException {
+      throws IOException {
     INode existingInode = getChildINode(node.name);
     if (existingInode != null) {
       return null;
@@ -372,8 +375,7 @@ public class INodeDirectory extends INode {
    *     is not a directory.
    */
   <T extends INode> T addNode(String path, T newNode)
-      throws FileNotFoundException, UnresolvedLinkException, StorageException,
-      TransactionContextException {
+      throws IOException {
     byte[][] pathComponents = getPathComponents(path);
     return addToParent(pathComponents, newNode, true) == null ? null : newNode;
   }
@@ -390,8 +392,7 @@ public class INodeDirectory extends INode {
    */
   INodeDirectory addToParent(byte[] localname, INode newNode,
       INodeDirectory parent, boolean propagateModTime)
-      throws FileNotFoundException, StorageException,
-      TransactionContextException {
+      throws IOException {
     // insert into the parent children list
     newNode.setLocalNameNoPersistance(localname);
     if (parent.addChild(newNode, propagateModTime) == null) {
@@ -434,8 +435,7 @@ public class INodeDirectory extends INode {
    */
   INodeDirectory addToParent(byte[][] pathComponents, INode newNode,
       boolean propagateModTime)
-      throws FileNotFoundException, UnresolvedLinkException, StorageException,
-      TransactionContextException {
+      throws IOException {
     if (pathComponents.length < 2) { // add root
       return null;
     }

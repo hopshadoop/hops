@@ -1633,7 +1633,7 @@ public class FSNamesystem
     ProjectedINode datasetDir = fileTree.getSubtreeRoot();
     for (ProjectedINode node : fileTree.getAllChildren()) {
       MetadataLogEntry logEntry = new MetadataLogEntry(datasetDir.getId(),
-          node.getId(), operation);
+          node.getId(), node.getParentId(), node.getName(), operation);
       EntityManager.add(logEntry);
     }
   }
@@ -4580,35 +4580,30 @@ private void commitOrCompleteLastBlock(
   }
 
   private void checkOwner(FSPermissionChecker pc, String path)
-      throws AccessControlException, UnresolvedLinkException, StorageException,
-      TransactionContextException {
+      throws IOException {
     checkPermission(pc, path, true, null, null, null, null);
   }
 
   private void checkPathAccess(FSPermissionChecker pc, String path,
       FsAction access)
-      throws AccessControlException, UnresolvedLinkException, StorageException,
-      TransactionContextException {
+      throws IOException {
     checkPermission(pc, path, false, null, null, access, null);
   }
 
   private void checkParentAccess(FSPermissionChecker pc, String path,
       FsAction access)
-      throws AccessControlException, UnresolvedLinkException, StorageException,
-      TransactionContextException {
+      throws IOException {
     checkPermission(pc, path, false, null, access, null, null);
   }
 
   private void checkAncestorAccess(FSPermissionChecker pc, String path,
       FsAction access)
-      throws AccessControlException, UnresolvedLinkException, StorageException,
-      TransactionContextException {
+      throws IOException {
     checkPermission(pc, path, false, access, null, null, null);
   }
 
   private void checkTraverse(FSPermissionChecker pc, String path)
-      throws AccessControlException, UnresolvedLinkException, StorageException,
-      TransactionContextException {
+      throws IOException {
     checkPermission(pc, path, false, null, null, null, null);
   }
 
@@ -4628,8 +4623,7 @@ private void commitOrCompleteLastBlock(
   private void checkPermission(FSPermissionChecker pc, String path,
       boolean doCheckOwner, FsAction ancestorAccess, FsAction parentAccess,
       FsAction access, FsAction subAccess)
-      throws AccessControlException, UnresolvedLinkException, StorageException,
-      TransactionContextException {
+      throws IOException {
     if (!pc.isSuperUser()) {
       pc.checkPermission(path, dir.getRootDir(), doCheckOwner, ancestorAccess,
           parentAccess, access, subAccess);

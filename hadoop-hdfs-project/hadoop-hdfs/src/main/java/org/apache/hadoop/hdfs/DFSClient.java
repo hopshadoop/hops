@@ -1926,7 +1926,24 @@ public class DFSClient implements java.io.Closeable {
         dfsClientConf.socketTimeout, getDataEncryptionKey(),
         dfsClientConf.connectToDnViaHostname);
   }
-  
+
+  /**
+   * Get the checksum of a file.
+   *
+   * @param src
+   *     The file path
+   * @return The checksum
+   * @see DistributedFileSystem#getFileChecksum(Path)
+   */
+  public MD5Hash getFileBlockChecksum(String src,int blkNo)
+      throws IOException {
+    checkOpen();
+    return getFileBlockChecksum(src, clientName, /*HOPnamenode*/
+        namenodeSelector.getNextNamenode().getRPCHandle(), socketFactory,
+        dfsClientConf.socketTimeout, getDataEncryptionKey(),
+        dfsClientConf.connectToDnViaHostname, blkNo);
+  }
+
   @InterfaceAudience.Private
   public void clearDataEncryptionKey() {
     LOG.debug("Clearing encryption key");
@@ -1967,6 +1984,80 @@ public class DFSClient implements java.io.Closeable {
     } else {
       return null;
     }
+  }
+
+  static MD5Hash getFileBlockChecksum(String src, String clientName,
+                                      ClientProtocol namenode, SocketFactory socketFactory, int socketTimeout,
+                                      DataEncryptionKey encryptionKey, boolean connectToDnViaHostname, int blkNo)
+          throws IOException {
+    //get all block locations
+    LocatedBlocks blockLocations =
+            callGetBlockLocations(namenode, src, 0, Long.MAX_VALUE);
+    if (null == blockLocations) {
+      throw new FileNotFoundException("File does not exist: " + src);
+    }
+    List<LocatedBlock> locatedblocks = blockLocations.getLocatedBlocks();
+    if (blkNo >= locatedblocks.size()) {
+      throw new IOException("Block index " + blkNo + " does not exist");
+    }
+
+    DataChecksum.Type crcType = DataChecksum.Type.DEFAULT;
+    //get block checksum for each block
+    LocatedBlock lb = locatedblocks.get(blkNo);
+    final ExtendedBlock block = lb.getBlock();
+    final DatanodeInfo[] datanodes = lb.getLocations();
+
+    //try each datanode location of the block
+    final int timeout = 3000 * datanodes.length + socketTimeout;
+    boolean done = false;
+    for (int j = 0; !done && j < datanodes.length; j++) {
+      DataOutputStream out = null;
+      DataInputStream in = null;
+
+      try {
+        //connect to a datanode
+        IOStreamPair pair =
+                connectToDN(socketFactory, connectToDnViaHostname, encryptionKey,
+                        datanodes[j], timeout);
+        out = new DataOutputStream(new BufferedOutputStream(pair.out,
+                HdfsConstants.SMALL_BUFFER_SIZE));
+        in = new DataInputStream(pair.in);
+
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("write to " + datanodes[j] + ": " + Op.BLOCK_CHECKSUM +
+                  ", block=" + block);
+        }
+        // get block MD5
+        new Sender(out).blockChecksum(block, lb.getBlockToken());
+
+        final BlockOpResponseProto reply =
+                BlockOpResponseProto.parseFrom(PBHelper.vintPrefixed(in));
+
+        if (reply.getStatus() != Status.SUCCESS) {
+          if (reply.getStatus() == Status.ERROR_ACCESS_TOKEN) {
+            throw new InvalidBlockTokenException();
+          } else {
+            throw new IOException(
+                    "Bad response " + reply + " for block " + block +
+                            " from datanode " + datanodes[j]);
+          }
+        }
+
+        OpBlockChecksumResponseProto checksumData =
+                reply.getChecksumResponse();
+
+        //read md5
+        MD5Hash md5 = new MD5Hash(checksumData.getMd5().toByteArray());
+        if (md5 != null){
+          return md5;
+        }
+      } finally {
+        IOUtils.closeStream(in);
+        IOUtils.closeStream(out);
+      }
+    }
+
+    return null;
   }
 
   /**
@@ -2200,10 +2291,6 @@ public class DFSClient implements java.io.Closeable {
    * with older HDFS versions which did not include the checksum type in
    * OpBlockChecksumResponseProto.
    *
-   * @param in
-   *     input stream from datanode
-   * @param out
-   *     output stream to datanode
    * @param lb
    *     the located block
    * @param clientName

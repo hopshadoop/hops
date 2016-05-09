@@ -39,6 +39,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaS
 import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
+import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
 
 /**
  * <code>CSQueue</code> represents a node in the tree of
@@ -132,7 +133,7 @@ public interface CSQueue
    * @param usedCapacity
    *     used capacity of the queue
    */
-  public void setUsedCapacity(float usedCapacity);
+    public void setUsedCapacity(float usedCapacity);
   
   /**
    * Set absolute used capacity of the queue.
@@ -193,7 +194,7 @@ public interface CSQueue
    * Submit an application attempt to the queue.
    */
   public void submitApplicationAttempt(FiCaSchedulerApp application,
-      String userName);
+      String userName, TransactionState transactionState);
 
   /**
    * An application submitted to this queue has finished.
@@ -208,7 +209,7 @@ public interface CSQueue
    * An application attempt submitted to this queue has finished.
    */
   public void finishApplicationAttempt(FiCaSchedulerApp application,
-      String queue);
+      String queue, TransactionState transactionState);
 
   /**
    * Assign containers to applications in the queue or it's children (if any).
@@ -264,8 +265,8 @@ public interface CSQueue
    * @param clusterResource
    *     resources in the cluster
    */
-  public void reinitialize(CSQueue newlyParsedQueue, Resource clusterResource)
-      throws IOException;
+  public void reinitialize(CSQueue newlyParsedQueue, Resource clusterResource,
+          TransactionState transactionState) throws IOException;
 
   /**
    * Update the cluster resource for queues as we add/remove nodes
@@ -273,7 +274,8 @@ public interface CSQueue
    * @param clusterResource
    *     the current cluster resource
    */
-  public void updateClusterResource(Resource clusterResource);
+    public void updateClusterResource(Resource clusterResource,
+            TransactionState transactionState);
   
   /**
    * Get the {@link ActiveUsersManager} for the queue.
@@ -304,4 +306,5 @@ public interface CSQueue
    */
   public void collectSchedulerApplications(
       Collection<ApplicationAttemptId> apps);
+  
 }

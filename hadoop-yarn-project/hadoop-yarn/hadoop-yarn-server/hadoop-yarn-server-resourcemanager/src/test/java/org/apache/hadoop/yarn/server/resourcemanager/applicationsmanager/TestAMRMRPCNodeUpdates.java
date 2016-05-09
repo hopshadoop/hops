@@ -75,6 +75,7 @@ public class TestAMRMRPCNodeUpdates {
 
       @Override
       protected Dispatcher createDispatcher() {
+        dispatcher = new DrainDispatcher();
         return dispatcher;
       }
     };

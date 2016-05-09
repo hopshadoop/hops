@@ -50,7 +50,7 @@ public class NodesListManager extends AbstractService
   private Configuration conf;
   private Set<RMNode> unusableRMNodesConcurrentSet =
       Collections.newSetFromMap(new ConcurrentHashMap<RMNode, Boolean>());
-      //TORECOVER : optimisation the list of unusable nodes should be recovered
+      //TORECOVER MS: optimisation the list of unusable nodes should be recovered
   
   private final RMContext rmContext;
 

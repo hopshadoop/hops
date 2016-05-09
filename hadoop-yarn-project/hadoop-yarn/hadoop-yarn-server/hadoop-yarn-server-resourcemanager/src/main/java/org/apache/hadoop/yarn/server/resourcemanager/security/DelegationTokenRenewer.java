@@ -660,7 +660,7 @@ public class DelegationTokenRenewer extends AbstractService {
         DelegationTokenRenewer.this.handleAppFinishEvent(evt);
       }
       try {
-        evt.getTransactionState().decCounter("delegationTokenRenewer");
+        evt.getTransactionState().decCounter(evt.getType());
       } catch (IOException ex) {
         LOG.error(ex);
       }
@@ -679,8 +679,6 @@ public class DelegationTokenRenewer extends AbstractService {
       try {
         // Setup tokens for renewal
         DelegationTokenRenewer.this.handleAppSubmitEvent(event);
-        LOG.debug(
-            "handle START for rpc " + event.getTransactionState().getId());
         rmContext.getDispatcher().getEventHandler().handle(
             new RMAppEvent(event.getApplicationId(), RMAppEventType.START,
                 event.getTransactionState()));

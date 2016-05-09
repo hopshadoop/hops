@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdfs.server.namenode;
 
 import com.google.common.primitives.SignedBytes;
+import io.hops.security.Users;
 import io.hops.erasure_coding.ErasureCodingManager;
 import io.hops.exception.HopsException;
 import io.hops.exception.StorageException;
@@ -28,6 +29,7 @@ import io.hops.metadata.hdfs.dal.AccessTimeLogDataAccess;
 import io.hops.metadata.hdfs.entity.AccessTimeLogEntry;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
 import io.hops.metadata.hdfs.entity.MetadataLogEntry;
+import io.hops.security.UsersGroups;
 import io.hops.transaction.EntityManager;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.ContentSummary;
@@ -36,7 +38,6 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.Block;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.StringUtils;
 
 import java.io.IOException;
@@ -159,36 +160,17 @@ public abstract class INode implements Comparable<byte[]> {
       return dsCount;
     }
   }
-  
-  //Only updated by updatePermissionStatus(...).
-  //Other codes should not modify it.
-  private long permission;
 
-  private static enum PermissionStatusFormat {
-    MODE(0, 16),
-    GROUP(MODE.OFFSET + MODE.LENGTH, 25),
-    USER(GROUP.OFFSET + GROUP.LENGTH, 23);
+  private String userName;
+  private String groupName;
 
-    final int OFFSET;
-    final int LENGTH; //bit length
-    final long MASK;
+  private int userId;
+  private int groupId;
 
-    PermissionStatusFormat(int offset, int length) {
-      OFFSET = offset;
-      LENGTH = length;
-      MASK = ((-1L) >>> (64 - LENGTH)) << OFFSET;
-    }
+  private FsPermission permission;
 
-    long retrieve(long record) {
-      return (record & MASK) >>> OFFSET;
-    }
-
-    long combine(long bits, long record) {
-      return (record & ~MASK) | (bits << OFFSET);
-    }
-  }
-
-  INode(PermissionStatus permissions, long mTime, long atime) {
+  INode(PermissionStatus permissions, long mTime, long atime)
+      throws IOException {
     this.setLocalNameNoPersistance((byte[]) null);
     this.parent = null;
     this.modificationTime = mTime;
@@ -196,7 +178,8 @@ public abstract class INode implements Comparable<byte[]> {
     setPermissionStatusNoPersistance(permissions);
   }
 
-  protected INode(String name, PermissionStatus permissions) {
+  protected INode(String name, PermissionStatus permissions)
+      throws IOException {
     this(permissions, 0L, 0L);
     setLocalNameNoPersistance(name);
   }
@@ -207,7 +190,7 @@ public abstract class INode implements Comparable<byte[]> {
    * @param other
    *     Other node to be copied
    */
-  INode(INode other) throws StorageException, TransactionContextException {
+  INode(INode other) throws IOException {
     setLocalNameNoPersistance(other.getLocalName());
     this.parent = other.getParent();
     setPermissionStatusNoPersistance(other.getPermissionStatus());
@@ -228,7 +211,8 @@ public abstract class INode implements Comparable<byte[]> {
   /**
    * Set the {@link PermissionStatus}
    */
-  private void setPermissionStatusNoPersistance(PermissionStatus ps) {
+  private void setPermissionStatusNoPersistance(PermissionStatus ps)
+      throws IOException {
     setUserNoPersistance(ps.getUserName());
     setGroupNoPersistance(ps.getGroupName());
     setPermissionNoPersistance(ps.getPermission());
@@ -237,64 +221,78 @@ public abstract class INode implements Comparable<byte[]> {
   /**
    * Get the {@link PermissionStatus}
    */
-  public PermissionStatus getPermissionStatus() {
+  public PermissionStatus getPermissionStatus() throws IOException {
     return new PermissionStatus(getUserName(), getGroupName(),
         getFsPermission());
-  }
-
-  private void updatePermissionStatus(PermissionStatusFormat f, long n) {
-    permission = f.combine(n, permission);
   }
 
   /**
    * Get user name
    */
-  public String getUserName() {
-    int n = (int) PermissionStatusFormat.USER.retrieve(permission);
-    return SerialNumberManager.INSTANCE.getUser(n);
+  public String getUserName() throws IOException {
+    if(userName == null || userName.isEmpty()){
+      userName = UsersGroups.getUser(userId);
+    }
+    return userName;
   }
 
+  public int getUserID(){
+    return userId;
+  }
+
+  public void setUserIDNoPersistance(int userId){
+    this.userId = userId;
+  }
   /**
    * Set user
    */
-  private void setUserNoPersistance(String user) {
-    int n = SerialNumberManager.INSTANCE.getUserSerialNumber(user);
-    updatePermissionStatus(PermissionStatusFormat.USER, n);
+  public void setUserNoPersistance(String user) throws IOException {
+    this.userName = user;
+    this.userId = UsersGroups.getUserID(user);
   }
 
   /**
    * Get group name
    */
-  public String getGroupName() {
-    int n = (int) PermissionStatusFormat.GROUP.retrieve(permission);
-    return SerialNumberManager.INSTANCE.getGroup(n);
+  public String getGroupName() throws IOException {
+    if(groupName == null || groupName.isEmpty()){
+      groupName = UsersGroups.getGroup(groupId);
+    }
+    return groupName;
+  }
+
+  public int getGroupID(){
+    return groupId;
+  }
+
+  public void setGroupIDNoPersistance(int groupId){
+    this.groupId = groupId;
   }
 
   /**
    * Set group
    */
-  private void setGroupNoPersistance(String group) {
-    int n = SerialNumberManager.INSTANCE.getGroupSerialNumber(group);
-    updatePermissionStatus(PermissionStatusFormat.GROUP, n);
+  public void setGroupNoPersistance(String group) throws IOException {
+    this.groupName = group;
+    this.groupId = UsersGroups.getGroupID(group);
   }
 
   /**
    * Get the {@link FsPermission}
    */
   public FsPermission getFsPermission() {
-    return new FsPermission(
-        (short) PermissionStatusFormat.MODE.retrieve(permission));
+    return permission;
   }
 
   protected short getFsPermissionShort() {
-    return (short) PermissionStatusFormat.MODE.retrieve(permission);
+    return permission.toShort();
   }
 
   /**
    * Set the {@link FsPermission} of this {@link INode}
    */
   private void setPermissionNoPersistance(FsPermission permission) {
-    updatePermissionStatus(PermissionStatusFormat.MODE, permission.toShort());
+    this.permission = permission;
   }
 
   /**
@@ -412,7 +410,7 @@ public abstract class INode implements Comparable<byte[]> {
       return "\"" + getFullPathName() + "\":" + getUserName() + ":" +
           getGroupName() + ":" + (isDirectory() ? "d" : "-") +
           getFsPermission();
-    } catch (HopsException ex) {
+    } catch (IOException ex) {
       Logger.getLogger(INode.class.getName()).log(Level.SEVERE, null, ex);
     }
     return null;
@@ -634,13 +632,13 @@ public abstract class INode implements Comparable<byte[]> {
    * Set user
    */
   protected void setUser(String user)
-      throws StorageException, TransactionContextException {
+      throws IOException {
     setUserNoPersistance(user);
     save();
   }
 
   protected void setGroup(String group)
-      throws StorageException, TransactionContextException {
+      throws IOException {
     setGroupNoPersistance(group);
     save();
   }
@@ -652,7 +650,7 @@ public abstract class INode implements Comparable<byte[]> {
   }
 
   protected void setPermissionStatus(PermissionStatus ps)
-      throws StorageException, TransactionContextException {
+      throws IOException {
     setUser(ps.getUserName());
     setGroup(ps.getGroupName());
     setPermission(ps.getPermission());
@@ -767,15 +765,12 @@ public abstract class INode implements Comparable<byte[]> {
     return !isDirectory() && !isSymlink();
   }
 
-  long getPermission() {
-    return permission;
-  }
-
   void logMetadataEvent(MetadataLogEntry.Operation operation)
       throws StorageException, TransactionContextException {
     if (isPathMetaEnabled()) {
       INodeDirectory datasetDir = getMetaEnabledParent();
-      EntityManager.add(new MetadataLogEntry(datasetDir.getId(), getId(), operation));
+      EntityManager.add(new MetadataLogEntry(datasetDir.getId(), getId(),
+          getParentId(), getLocalName(), operation));
     }
   }
 

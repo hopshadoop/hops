@@ -283,7 +283,9 @@ public class AllocateResponsePBImpl extends AllocateResponse {
       if (this.nmTokens != null) {
         this.nmTokens.clear();
       }
-      builder.clearNmTokens();
+      if(builder!=null){
+        builder.clearNmTokens();
+      }
       return;
     }
     // Implementing it as an append rather than set for consistency

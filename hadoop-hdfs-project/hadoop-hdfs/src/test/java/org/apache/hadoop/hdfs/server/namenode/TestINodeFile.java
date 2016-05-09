@@ -47,7 +47,7 @@ public class TestINodeFile {
    * correct.
    */
   @Test
-  public void testReplication() {
+  public void testReplication() throws IOException {
     replication = 3;
     preferredBlockSize = 128 * 1024 * 1024;
     INodeFile inf = new INodeFile(
@@ -65,7 +65,8 @@ public class TestINodeFile {
    *     as the result
    */
   @Test(expected = IllegalArgumentException.class)
-  public void testReplicationBelowLowerBound() throws IllegalArgumentException {
+  public void testReplicationBelowLowerBound()
+      throws IllegalArgumentException, IOException {
     replication = -1;
     preferredBlockSize = 128 * 1024 * 1024;
     new INodeFile(
@@ -78,7 +79,7 @@ public class TestINodeFile {
    * set correct.
    */
   @Test
-  public void testPreferredBlockSize() {
+  public void testPreferredBlockSize() throws IOException {
     replication = 3;
     preferredBlockSize = 128 * 1024 * 1024;
     INodeFile inf = new INodeFile(
@@ -89,7 +90,7 @@ public class TestINodeFile {
   }
 
   @Test
-  public void testPreferredBlockSizeUpperBound() {
+  public void testPreferredBlockSizeUpperBound() throws IOException {
     replication = 3;
     preferredBlockSize = BLKSIZE_MAXVALUE;
     INodeFile inf = new INodeFile(
@@ -108,7 +109,7 @@ public class TestINodeFile {
    */
   @Test(expected = IllegalArgumentException.class)
   public void testPreferredBlockSizeBelowLowerBound()
-      throws IllegalArgumentException {
+      throws IllegalArgumentException, IOException {
     replication = 3;
     preferredBlockSize = -1;
     new INodeFile(
@@ -125,7 +126,7 @@ public class TestINodeFile {
    */
   @Test(expected = IllegalArgumentException.class)
   public void testPreferredBlockSizeAboveUpperBound()
-      throws IllegalArgumentException {
+      throws IllegalArgumentException, IOException {
     replication = 3;
     preferredBlockSize = BLKSIZE_MAXVALUE + 1;
     new INodeFile(
@@ -135,7 +136,7 @@ public class TestINodeFile {
 
   //  @Test
   public void testGetFullPathName()
-      throws StorageException, TransactionContextException {
+      throws IOException {
     PermissionStatus perms =
         new PermissionStatus(userName, null, FsPermission.getDefault());
 
@@ -167,7 +168,7 @@ public class TestINodeFile {
   
   //  @Test
   public void testAppendBlocks()
-      throws StorageException, TransactionContextException {
+      throws IOException {
     INodeFile origFile = createINodeFiles(1, "origfile")[0];
     assertEquals("Number of blocks didn't match", origFile.numBlocks(), 1L);
 
@@ -198,7 +199,7 @@ public class TestINodeFile {
   static int blkid = 0;
 
   private INodeFile[] createINodeFiles(int nCount, String fileNamePrefix)
-      throws StorageException, TransactionContextException {
+      throws IOException {
 
     if (nCount <= 0) {
       return new INodeFile[1];

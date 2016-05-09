@@ -48,6 +48,7 @@ import javax.security.auth.login.LoginException;
 import javax.security.auth.login.AppConfigurationEntry.LoginModuleControlFlag;
 import javax.security.auth.spi.LoginModule;
 
+import io.hops.security.UsersGroups;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -1105,6 +1106,7 @@ public class UserGroupInformation {
     subject.getPrincipals().add(new User(user));
     UserGroupInformation result = new UserGroupInformation(subject);
     result.setAuthenticationMethod(AuthenticationMethod.SIMPLE);
+    createHopsUser(user);
     return result;
   }
 
@@ -1182,6 +1184,7 @@ public class UserGroupInformation {
     principals.add(new RealUser(realUser));
     UserGroupInformation result =new UserGroupInformation(subject);
     result.setAuthenticationMethod(AuthenticationMethod.PROXY);
+    createHopsUser(user);
     return result;
   }
 
@@ -1227,6 +1230,19 @@ public class UserGroupInformation {
 
     private void setUserGroups(String user, String[] groups) {
       userToGroupsMapping.put(user, Arrays.asList(groups));
+      createHopsUser(user, groups);
+    }
+  }
+
+  private static void createHopsUser(String user){
+    createHopsUser(user, null);
+  }
+
+  private static void createHopsUser(String user, String[] groups){
+    try {
+      UsersGroups.addUserToGroups(user, groups);
+    }catch (IOException ex){
+      throw new RuntimeException(ex);
     }
   }
 

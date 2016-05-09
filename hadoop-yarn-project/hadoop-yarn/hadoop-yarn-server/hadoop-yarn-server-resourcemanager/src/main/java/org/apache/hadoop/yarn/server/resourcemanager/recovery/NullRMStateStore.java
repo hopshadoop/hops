@@ -29,6 +29,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.impl.pb.Ap
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.impl.pb.ApplicationStateDataPBImpl;
 
 import java.io.IOException;
+import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 
 @Unstable
 public class NullRMStateStore extends RMStateStore {
@@ -49,7 +50,7 @@ public class NullRMStateStore extends RMStateStore {
   }
 
   @Override
-  public RMState loadState() throws Exception {
+  public RMState loadState(RMContext rmContext) throws Exception {
     throw new UnsupportedOperationException(
         "Cannot load state from null store");
   }

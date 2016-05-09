@@ -28,8 +28,10 @@ import io.hops.transaction.lock.SubtreeLockedException;
 import junit.framework.TestCase;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
@@ -37,10 +39,15 @@ import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.MiniDFSNNTopology;
 import org.apache.hadoop.hdfs.TestFileCreation;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.authorize.ProxyUsers;
+import org.junit.Assert;
 import org.junit.Test;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.security.PrivilegedExceptionAction;
+import java.util.ArrayList;
 import java.util.List;
 import static junit.framework.Assert.assertFalse;
 import static junit.framework.Assert.assertTrue;
@@ -805,6 +812,81 @@ public class TestSubtreeLock extends TestCase {
       if (cluster != null) {
         cluster.shutdown();
       }
+    }
+  }
+
+
+  @Test
+  public void testRecursiveDeleteAsaProxyUser() throws Exception {
+    Configuration conf = new HdfsConfiguration();
+
+    final int NumberOfFileSystems = 100;
+    final String UserPrefix = "testUser";
+    
+    String userName = UserGroupInformation.getCurrentUser().getShortUserName();
+    conf.set(String.format("hadoop.proxyuser.%s.hosts", userName), "*");
+    conf.set(String.format("hadoop.proxyuser.%s.users", userName), "*");
+    conf.set(String.format("hadoop.proxyuser.%s.groups", userName), "*");
+
+    ProxyUsers.refreshSuperUserGroupsConfiguration(conf);
+
+    final MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).format(true).build();
+    cluster.waitActive();
+
+    FileSystem superFS = cluster.getFileSystem();
+
+    List<UserGroupInformation> ugis = new ArrayList<UserGroupInformation>();
+    List<FileSystem> fss = new ArrayList<FileSystem>();
+
+    for(int u=0; u<NumberOfFileSystems; u++) {
+      UserGroupInformation ugi =
+          UserGroupInformation.createProxyUserForTesting(UserPrefix+u,
+              UserGroupInformation
+                  .getLoginUser(), new String[]{UserPrefix+u});
+
+      FileSystem fs = ugi.doAs(new PrivilegedExceptionAction<FileSystem>() {
+
+        @Override
+        public FileSystem run() throws Exception {
+          return cluster.getFileSystem();
+        }
+      });
+
+      ugis.add(ugi);
+      fss.add(fs);
+    }
+
+    try {
+
+      superFS.mkdirs(new Path("/root"));
+      superFS.setPermission(new Path("/root"), new FsPermission(FsAction.ALL,
+          FsAction.ALL, FsAction.ALL));
+
+
+      for(int u=0; u<fss.size(); u++){
+        FileSystem fs = fss.get(u);
+        Path root = new Path(String.format("/root/a%d", u));
+        fs.mkdirs(root);
+        fs.setOwner(root, UserPrefix + u , UserPrefix + u);
+
+        fs.mkdirs(new Path(root, "b"+u));
+        fs.mkdirs(new Path(root, "c"+u));
+
+        fs.create(new Path(root, "b"+u+"/f")).close();
+        fs.create(new Path(root, "c"+u+"/f")).close();
+
+      }
+
+      for(int u=0; u<fss.size(); u++){
+        FileSystem fs = fss.get(u);
+        Assert
+            .assertTrue(fs.delete(new Path(String.format("/root/a%d", u)), true));
+        FileSystem.closeAllForUGI(ugis.get(u));
+      }
+
+    } finally {
+      cluster.shutdown();
     }
   }
 }
