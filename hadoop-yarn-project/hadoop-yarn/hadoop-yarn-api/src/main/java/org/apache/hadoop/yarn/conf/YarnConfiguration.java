@@ -171,6 +171,47 @@ public class YarnConfiguration extends Configuration {
       YARN_PREFIX + "scheduler.include-port-in-node-name";
   public static final boolean DEFAULT_RM_SCHEDULER_USE_PORT_FOR_NODE_NAME =
       false;
+  ////////////////////////////////////////
+  // Containers Quotas configuration   //
+  ///////////////////////////////////////
+  /**
+   * Time in ms between container status checks.
+   */
+  public static final String QUOTAS_CONTAINERS_LOGS_MONITOR_INTERVAL = 
+          YARN_PREFIX + "quotas.containers-logs.monitor-interval";
+  public static final int DEFAULT_QUOTAS_CONTAINERS_LOGS_MONITOR_INTERVAL = 
+          1000;
+  /**
+   * Unit of time in ticks that is incremented on each monitor interval.
+   */
+  public static final String QUOTAS_CONTAINERS_LOGS_TICK_INCREMENT = 
+          YARN_PREFIX + "quotas.containers-logs.tick-increment";
+  public static final int DEFAULT_QUOTAS_CONTAINERS_LOGS_TICK_INCREMENT = 1;
+  /**
+   * Enable or disable periodic containers logs checkpoints.
+   */
+  public static final String QUOTAS_CONTAINERS_LOGS_CHECKPOINTS = 
+          YARN_PREFIX + "quotas.containers-logs.checkpoints";
+  public static final boolean DEFAULT_QUOTAS_CONTAINERS_LOGS_CHECKPOINTS = true;
+  /**
+   * Number of ticks between checkpoints.
+   */
+  public static final String QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_TICKS = 
+          YARN_PREFIX + "quotas.containers-logs.checkpoints-ticks";
+  public static final int DEFAULT_QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_TICKS = 
+          60;
+  /**
+   * If threshold is exceeded writes a warning about increasing monitor interval 
+   * It is obtained by multiplying threshold with monitor interval
+   */
+  public static final String QUOTAS_CONTAINERS_LOGS_ALERT_THRESHOLD = 
+          YARN_PREFIX + "quotas.containers-logs.alert-ratio";
+  public static final double DEFAULT_QUOTAS_CONTAINERS_LOGS_ALERT_THRESHOLD = 
+          0.6;
+  public static final String QUOTAS_MONITOR_INTERVAL = 
+          YARN_PREFIX + "quotas.containers-logs.monitor-interval";
+  public static final int DEFAULT_QUOTAS_MONITOR_INTERVAL = 
+          1000;
   /**
    * Enable periodic monitor threads.
    *
@@ -427,6 +468,7 @@ public class YarnConfiguration extends Configuration {
   public static final String DISTRIBUTED_RM =
       CLIENT_FAILOVER_PREFIX + "distributed";
   public static final Boolean DEFAULT_DISTRIBUTED_RM = false;
+  //TODO this is the same as CLIENT_FAILOVER_PROXY_PROVIDER on of this should be removed
   public static final String DISTRIBUTED_CLIENT_FAILOVER_PROXY_PROVIDER =
       CLIENT_FAILOVER_PREFIX + "proxy-provider";
   public static final String
@@ -1346,11 +1388,7 @@ public class YarnConfiguration extends Configuration {
 
   //end of TODO What is this for? does it have to be cleaned
   
-   //Distributed RT properties
-  public static final String HOPS_DISTRIBUTED_RT_ENABLED =
-      HOPS_RM_PREFIX + "distributed-rt.enable";
-  public static boolean DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED = false;
-  
+   //Distributed RT properties  
   public static final String EVENT_SHEDULER_CONFIG_PATH = 
           HOPS_RM_PREFIX + "event.scheduler.config.path";
   public static final String DEFAULT_EVENT_SHEDULER_CONFIG_PATH = 
@@ -1374,12 +1412,17 @@ public class YarnConfiguration extends Configuration {
   public static final String HOPS_BATCH_MAX_DURATION = HOPS_RM_PREFIX + "batch.max.duration";
   public static int DEFAULT_HOPS_BATCH_MAX_DURATION = 100;
 
+  //TODO why do we need two conf ndb-event-streaming.enable and ndb-rt-event-streaming.enable ?
   //NDB event streaming
-  public static boolean DEFAULT_HOPS_NDB_EVENT_STREAMING_ENABLED = false;
+  public static boolean DEFAULT_HOPS_NDB_EVENT_STREAMING_ENABLED = true;
   public static final String HOPS_NDB_EVENT_STREAMING_ENABLED = HOPS_RM_PREFIX
           + "ndb-event-streaming.enable";
 
-  public static boolean DEFAULT_HOPS_NDB_RT_EVENT_STREAMING_ENABLED = false;
+  public static int DEFAULT_HOPS_NDB_EVENT_STREAMING_DB_PORT = 1186;
+  public static final String HOPS_NDB_EVENT_STREAMING_DB_PORT = HOPS_RM_PREFIX
+          + "ndb-event-streaming.db.port";
+  
+  public static boolean DEFAULT_HOPS_NDB_RT_EVENT_STREAMING_ENABLED = true;
   public static final String HOPS_NDB_RT_EVENT_STREAMING_ENABLED
           = HOPS_RM_PREFIX + "ndb-rt-event-streaming.enable";
 

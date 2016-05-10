@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p/>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p/>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -21,6 +21,7 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import org.apache.hadoop.hdfs.DFSTestUtil;
+import org.apache.hadoop.hdfs.StorageType;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
@@ -36,6 +37,7 @@ import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.BlockProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.BlockWithLocationsProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.BlocksWithLocationsProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.DatanodeIDProto;
+import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.DatanodeStorageProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.ExportedBlockKeysProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.ExtendedBlockProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.LocatedBlockProto;
@@ -56,6 +58,7 @@ import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations;
 import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations.BlockWithLocations;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeProtocol;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
+import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeRegistration;
 import org.apache.hadoop.hdfs.server.protocol.NamespaceInfo;
 import org.apache.hadoop.io.Text;
@@ -69,7 +72,9 @@ import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
+import static org.hamcrest.CoreMatchers.is;
 
 /**
  * Tests for {@link PBHelper}
@@ -143,10 +148,16 @@ public class TestPBHelper {
   void compare(DatanodeID dn, DatanodeID dn2) {
     assertEquals(dn.getIpAddr(), dn2.getIpAddr());
     assertEquals(dn.getHostName(), dn2.getHostName());
-    assertEquals(dn.getStorageID(), dn2.getStorageID());
+    assertEquals(dn.getDatanodeUuid(), dn2.getDatanodeUuid());
     assertEquals(dn.getXferPort(), dn2.getXferPort());
     assertEquals(dn.getInfoPort(), dn2.getInfoPort());
     assertEquals(dn.getIpcPort(), dn2.getIpcPort());
+  }
+
+  void compare(DatanodeStorage dns1, DatanodeStorage dns2) {
+    assertThat(dns2.getStorageID(), is(dns1.getStorageID()));
+    assertThat(dns2.getState(), is(dns1.getState()));
+    assertThat(dns2.getStorageType(), is(dns1.getStorageType()));
   }
 
   @Test
@@ -369,12 +380,38 @@ public class TestPBHelper {
   }
 
   private LocatedBlock createLocatedBlock() {
-    DatanodeInfo[] dnInfos = {DFSTestUtil
-        .getLocalDatanodeInfo("127.0.0.1", "h1",
-            AdminStates.DECOMMISSION_INPROGRESS), DFSTestUtil
-        .getLocalDatanodeInfo("127.0.0.1", "h2", AdminStates.DECOMMISSIONED),
-        DFSTestUtil
-            .getLocalDatanodeInfo("127.0.0.1", "h3", AdminStates.NORMAL)};
+    DatanodeInfo[] dnInfos = {
+        DFSTestUtil.getLocalDatanodeInfo("127.0.0.1", "h1",
+            AdminStates.DECOMMISSION_INPROGRESS),
+        DFSTestUtil.getLocalDatanodeInfo("127.0.0.1", "h2",
+            AdminStates.DECOMMISSIONED),
+        DFSTestUtil.getLocalDatanodeInfo("127.0.0.1", "h3", AdminStates.NORMAL)
+    };
+
+    StorageType[] media = {
+        StorageType.DISK,
+        StorageType.SSD,
+        StorageType.DISK
+    };
+    LocatedBlock lb = new LocatedBlock(
+        new ExtendedBlock("bp12", 12345, 10, 53), dnInfos, 5, false);
+    lb.setBlockToken(new Token<BlockTokenIdentifier>(
+        "identifier".getBytes(), "password".getBytes(), new Text("kind"),
+        new Text("service")));
+    lb.setStorageTypes(media);
+    return lb;
+  }
+
+  private LocatedBlock createLocatedBlockNoStorageMedia() {
+    DatanodeInfo[] dnInfos = {
+        DFSTestUtil.getLocalDatanodeInfo("127.0.0.1", "h1",
+            AdminStates.DECOMMISSION_INPROGRESS),
+        DFSTestUtil.getLocalDatanodeInfo("127.0.0.1", "h2",
+            AdminStates.DECOMMISSIONED),
+        DFSTestUtil.getLocalDatanodeInfo("127.0.0.1", "h3",
+            AdminStates.NORMAL)
+    };
+
     LocatedBlock lb =
         new LocatedBlock(new ExtendedBlock("bp12", 12345, 10, 53), dnInfos, 5,
             false);
@@ -386,6 +423,14 @@ public class TestPBHelper {
   @Test
   public void testConvertLocatedBlock() {
     LocatedBlock lb = createLocatedBlock();
+    LocatedBlockProto lbProto = PBHelper.convert(lb);
+    LocatedBlock lb2 = PBHelper.convert(lbProto);
+    compare(lb, lb2);
+  }
+
+  @Test
+  public void testConvertLocatedBlockNoStorageMedia() {
+    LocatedBlock lb = createLocatedBlockNoStorageMedia();
     LocatedBlockProto lbProto = PBHelper.convert(lb);
     LocatedBlock lb2 = PBHelper.convert(lbProto);
     compare(lb, lb2);
@@ -434,26 +479,43 @@ public class TestPBHelper {
     compare(reg, reg2);
     assertEquals(reg.getSoftwareVersion(), reg2.getSoftwareVersion());
   }
-  
+
+  @Test
+  public void TestConvertDatanodeStorage() {
+    DatanodeStorage dns1 = new DatanodeStorage(
+        "id1", DatanodeStorage.State.NORMAL, StorageType.SSD);
+    DatanodeStorageProto proto = PBHelper.convert(dns1);
+    DatanodeStorage dns2 = PBHelper.convert(proto);
+    compare(dns1, dns2);
+  }
+
   @Test
   public void testConvertBlockCommand() {
     Block[] blocks = new Block[]{new Block(21), new Block(22)};
-    DatanodeInfo[][] dnInfos =
-        new DatanodeInfo[][]{new DatanodeInfo[1], new DatanodeInfo[2]};
+    DatanodeInfo[][] dnInfos = new DatanodeInfo[][]{new DatanodeInfo[1], new DatanodeInfo[2]};
+    StorageType[][] types = new StorageType[][]{new StorageType[1], new StorageType[2]};
+    String[][] storageIds = {{"storage1"}, {"storage2", "storage3"}};
     dnInfos[0][0] = DFSTestUtil.getLocalDatanodeInfo();
     dnInfos[1][0] = DFSTestUtil.getLocalDatanodeInfo();
     dnInfos[1][1] = DFSTestUtil.getLocalDatanodeInfo();
-    BlockCommand bc =
-        new BlockCommand(DatanodeProtocol.DNA_TRANSFER, "bp1", blocks, dnInfos);
+    BlockCommand bc = new BlockCommand(DatanodeProtocol.DNA_TRANSFER, "bp1",
+        blocks, dnInfos, types, storageIds);
+
+    // Convert to proto and back again
     BlockCommandProto bcProto = PBHelper.convert(bc);
     BlockCommand bc2 = PBHelper.convert(bcProto);
+
     assertEquals(bc.getAction(), bc2.getAction());
     assertEquals(bc.getBlocks().length, bc2.getBlocks().length);
+
     Block[] blocks2 = bc2.getBlocks();
     for (int i = 0; i < blocks.length; i++) {
       assertEquals(blocks[i], blocks2[i]);
     }
+
     DatanodeInfo[][] dnInfos2 = bc2.getTargets();
+    StorageType[][] types2 = bc2.getTargetStorageTypes();
+    String[][] storageIds2 = bc2.getTargetStorageIDs();
     assertEquals(dnInfos.length, dnInfos2.length);
     for (int i = 0; i < dnInfos.length; i++) {
       DatanodeInfo[] d1 = dnInfos[i];
@@ -461,6 +523,9 @@ public class TestPBHelper {
       assertEquals(d1.length, d2.length);
       for (int j = 0; j < d1.length; j++) {
         compare(d1[j], d2[j]);
+
+        assertEquals(types[i][j], types2[i][j]);
+        assertEquals(storageIds[i][j], storageIds2[i][j]);
       }
     }
   }

@@ -19,9 +19,6 @@ package org.apache.hadoop.distributedloadsimulator.sls.appmaster;
  *
  * @author sri
  */
-import java.io.DataOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -67,8 +64,6 @@ import org.apache.hadoop.distributedloadsimulator.sls.scheduler.ResourceSchedule
 import org.apache.hadoop.distributedloadsimulator.sls.SLSRunner;
 import org.apache.hadoop.distributedloadsimulator.sls.scheduler.TaskRunner;
 import org.apache.hadoop.distributedloadsimulator.sls.utils.SLSUtils;
-import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.ipc.UserIdentityProvider;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.SaslRpcServer;
 import org.apache.hadoop.security.SecurityUtil;
@@ -91,9 +86,10 @@ import org.apache.hadoop.yarn.api.records.LocalResource;
 import org.apache.hadoop.yarn.api.records.YarnApplicationAttemptState;
 import org.apache.hadoop.yarn.api.records.YarnApplicationState;
 import org.apache.hadoop.yarn.client.ClientRMProxy;
+import org.apache.hadoop.yarn.client.ConfiguredLeaderFailoverHAProxyProvider;
+import org.apache.hadoop.yarn.client.RMFailoverProxyProvider;
 import org.apache.hadoop.yarn.client.api.YarnClient;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
-import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.security.AMRMTokenIdentifier;
 import org.apache.hadoop.yarn.util.Records;
 
@@ -159,6 +155,10 @@ public abstract class AMSimulator extends TaskRunner.Task {
     super.init(traceStartTime, traceStartTime + 1000000L * heartbeatInterval,
             heartbeatInterval);
     this.conf = conf;
+    conf.setClass(YarnConfiguration.CLIENT_FAILOVER_PROXY_PROVIDER,
+            ConfiguredLeaderFailoverHAProxyProvider.class,
+            RMFailoverProxyProvider.class);
+
     this.user = user;
     this.amId = id;
     this.rm = rm;
@@ -206,15 +206,6 @@ public abstract class AMSimulator extends TaskRunner.Task {
       }
     }
 
-  }
-
-  protected ApplicationMasterProtocol createSchedulerProxy() {
-
-    try {
-      return ClientRMProxy.createRMProxy(conf, ApplicationMasterProtocol.class);
-    } catch (IOException e) {
-      throw new YarnRuntimeException(e);
-    }
   }
 
   /**

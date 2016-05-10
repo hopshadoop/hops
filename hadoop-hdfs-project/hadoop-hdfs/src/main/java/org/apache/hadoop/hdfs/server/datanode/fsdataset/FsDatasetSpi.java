@@ -21,6 +21,7 @@ package org.apache.hadoop.hdfs.server.datanode.fsdataset;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
+import org.apache.hadoop.hdfs.StorageType;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.BlockListAsLongs;
 import org.apache.hadoop.hdfs.protocol.BlockLocalPathInfo;
@@ -33,7 +34,9 @@ import org.apache.hadoop.hdfs.server.datanode.ReplicaInPipelineInterface;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.impl.FsDatasetFactory;
 import org.apache.hadoop.hdfs.server.datanode.metrics.FSDatasetMBean;
 import org.apache.hadoop.hdfs.server.protocol.BlockRecoveryCommand.RecoveringBlock;
+import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.apache.hadoop.hdfs.server.protocol.ReplicaRecoveryInfo;
+import org.apache.hadoop.hdfs.server.protocol.StorageReport;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 import org.apache.hadoop.util.ReflectionUtils;
 
@@ -93,6 +96,13 @@ public interface FsDatasetSpi<V extends FsVolumeSpi> extends FSDatasetMBean {
    * @return a list of volumes.
    */
   public List<V> getVolumes();
+
+  /** @return a storage with the given storage ID */
+  public DatanodeStorage getStorage(final String storageUuid);
+
+  /** @return one or more storage reports for attached volumes. */
+  public StorageReport[] getStorageReports(String bpid)
+      throws IOException;
 
   /**
    * @return the volume that contains a replica of the block.
@@ -197,20 +207,18 @@ public interface FsDatasetSpi<V extends FsVolumeSpi> extends FSDatasetMBean {
    * @throws IOException
    *     if an error occurs
    */
-  public ReplicaInPipelineInterface createTemporary(ExtendedBlock b)
+  public ReplicaInPipelineInterface createTemporary(StorageType storageType, ExtendedBlock b)
       throws IOException;
 
   /**
    * Creates a RBW replica and returns the meta info of the replica
    *
-   * @param b
-   *     block
+   * @param b block
    * @return the meta info of the replica which is being written to
-   * @throws IOException
-   *     if an error occurs
+   * @throws IOException if an error occurs
    */
-  public ReplicaInPipelineInterface createRbw(ExtendedBlock b)
-      throws IOException;
+  public ReplicaInPipelineInterface createRbw(StorageType storageType,
+      ExtendedBlock b) throws IOException;
 
   /**
    * Recovers a RBW replica and returns the meta info of the replica
@@ -283,7 +291,7 @@ public interface FsDatasetSpi<V extends FsVolumeSpi> extends FSDatasetMBean {
    *     the number of bytes the replica is expected to have
    * @throws IOException
    */
-  public void recoverClose(ExtendedBlock b, long newGS, long expectedBlockLen)
+  public String recoverClose(ExtendedBlock b, long newGS, long expectedBlockLen)
       throws IOException;
   
   /**
@@ -306,14 +314,11 @@ public interface FsDatasetSpi<V extends FsVolumeSpi> extends FSDatasetMBean {
   public void unfinalizeBlock(ExtendedBlock b) throws IOException;
 
   /**
-   * Returns the block report - the full list of blocks stored under a
-   * block pool
-   *
-   * @param bpid
-   *     Block Pool Id
-   * @return - the block report - the full list of blocks stored
+   * Returns one block report per volume.
+   * @param bpid Block Pool Id
+   * @return - a map of DatanodeStorage to block report for the volume.
    */
-  public BlockListAsLongs getBlockReport(String bpid);
+  public Map<DatanodeStorage, BlockListAsLongs> getBlockReports(String bpid);
 
   /**
    * Does the dataset contain the block?

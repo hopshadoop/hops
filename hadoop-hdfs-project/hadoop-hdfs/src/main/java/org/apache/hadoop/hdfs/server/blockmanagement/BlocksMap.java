@@ -45,6 +45,8 @@ class BlocksMap {
   private final DatanodeManager datanodeManager;
   private final static List<DatanodeDescriptor> empty_datanode_list =
       Collections.unmodifiableList(new ArrayList<DatanodeDescriptor>());
+  private final static List<DatanodeStorageInfo> empty_storage_list =
+      Collections.unmodifiableList(new ArrayList<DatanodeStorageInfo>());
   
   BlocksMap(DatanodeManager datanodeManager) {
     this.datanodeManager = datanodeManager;
@@ -102,6 +104,33 @@ class BlocksMap {
 
   /**
    * Searches for the block in the BlocksMap and
+   * returns Iterator that iterates through the storages the block belongs to.
+   */
+  Iterator<DatanodeStorageInfo> storageIterator(Block b)
+      throws TransactionContextException, StorageException {
+    BlockInfo blockInfo = getStoredBlock(b);
+    return storageIterator(blockInfo);
+  }
+
+  /**
+   * For a block that has already been retrieved from the BlocksMap
+   * returns Iterator that iterates through the storages the block belongs to.
+   */
+  Iterator<DatanodeStorageInfo> storageIterator(BlockInfo storedBlock)
+      throws StorageException, TransactionContextException {
+    if (storedBlock == null) {
+      return null;
+    }
+    DatanodeStorageInfo[] desc = storedBlock.getStorages(datanodeManager);
+    if (desc == null) {
+      return empty_storage_list.iterator();
+    } else {
+      return Arrays.asList(desc).iterator();
+    }
+  }
+
+  /**
+   * Searches for the block in the BlocksMap and
    * returns Iterator that iterates through the nodes the block belongs to.
    */
   Iterator<DatanodeDescriptor> nodeIterator(Block b)
@@ -119,7 +148,8 @@ class BlocksMap {
     if (storedBlock == null) {
       return null;
     }
-    DatanodeDescriptor[] desc = storedBlock.getDatanodes(datanodeManager);
+    DatanodeDescriptor[] desc = storedBlock.getDatanodes(datanodeManager,
+        storedBlock.getReplicas(datanodeManager));
     if (desc == null) {
       return empty_datanode_list.iterator();
     } else {

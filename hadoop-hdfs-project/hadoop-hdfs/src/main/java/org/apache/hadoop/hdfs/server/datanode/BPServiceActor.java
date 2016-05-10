@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p/>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p/>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,10 +18,12 @@
 package org.apache.hadoop.hdfs.server.datanode;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.Maps;
 import io.hops.leader_election.node.ActiveNode;
 import io.hops.leader_election.node.SortedActiveNodeList;
 import org.apache.commons.logging.Log;
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdfs.StorageType;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
@@ -35,6 +37,7 @@ import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.hdfs.server.protocol.DisallowedDatanodeException;
 import org.apache.hadoop.hdfs.server.protocol.HeartbeatResponse;
 import org.apache.hadoop.hdfs.server.protocol.NamespaceInfo;
+import org.apache.hadoop.hdfs.server.protocol.ReceivedDeletedBlockInfo;
 import org.apache.hadoop.hdfs.server.protocol.StorageBlockReport;
 import org.apache.hadoop.hdfs.server.protocol.StorageReceivedDeletedBlocks;
 import org.apache.hadoop.hdfs.server.protocol.StorageReport;
@@ -50,6 +53,7 @@ import java.net.InetSocketAddress;
 import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.util.Collection;
+import java.util.Map;
 
 import static org.apache.hadoop.util.Time.now;
 
@@ -64,7 +68,7 @@ import static org.apache.hadoop.util.Time.now;
  */
 @InterfaceAudience.Private
 class BPServiceActor implements Runnable {
-  
+
   static final Log LOG = DataNode.LOG;
   final InetSocketAddress nnAddr;
   BPOfferService bpos;
@@ -77,9 +81,9 @@ class BPServiceActor implements Runnable {
   private final DNConf dnConf;
 
   private DatanodeRegistration bpRegistration;
-  
+
   private final Object waitForHeartBeats = new Object();
-  
+
   BPServiceActor(InetSocketAddress nnAddr, BPOfferService bpos) {
     this.bpos = bpos;
     this.dn = bpos.getDataNode();
@@ -96,7 +100,7 @@ class BPServiceActor implements Runnable {
   boolean isInitialized() {
     return initialized;
   }
-  
+
   boolean isAlive() {
     return shouldServiceRun && bpThread.isAlive();
   }
@@ -105,7 +109,7 @@ class BPServiceActor implements Runnable {
   public String toString() {
     return bpos.toString() + " service to " + nnAddr;
   }
-  
+
   InetSocketAddress getNNSocketAddress() {
     return nnAddr;
   }
@@ -144,11 +148,11 @@ class BPServiceActor implements Runnable {
       } catch (IOException e) {  // namenode is not available
         LOG.warn("Problem connecting to server: " + nnAddr);
       }
-      
+
       // try again in a second
       sleepAndLogInterrupts(5000, "requesting version info from NN");
     }
-    
+
     if (nsInfo != null) {
       checkNNVersion(nsInfo);
     } else {
@@ -187,28 +191,31 @@ class BPServiceActor implements Runnable {
 
   private void connectToNNAndHandshake() throws IOException {
     // get NN proxy
-    
+
     bpNamenode = dn.connectToNN(nnAddr);
     // First phase of the handshake with NN - get the namespace
     // info.
     NamespaceInfo nsInfo = retrieveNamespaceInfo();
-    
+
     // Verify that this matches the other NN in this HA pair.
     // This also initializes our block pool in the DN if we are
     // the first NN connection for this BP.
     bpos.verifyAndSetNamespaceInfo(nsInfo);
-    
+
     // Second phase of the handshake with the NN.
     register();
   }
-  
-  void reportBadBlocks(ExtendedBlock block) throws IOException {
+
+  void reportBadBlocks(ExtendedBlock block, String storageUuid,
+      StorageType storageType) throws IOException {
     if (bpRegistration == null) {
       return;
     }
     DatanodeInfo[] dnArr = {new DatanodeInfo(bpRegistration)};
-    LocatedBlock[] blocks = {new LocatedBlock(block, dnArr)};
-    
+    String[] uuids = { storageUuid };
+    StorageType[] types = { storageType };
+    LocatedBlock[] blocks = { new LocatedBlock(block, dnArr, uuids, types) };
+
     try {
       bpNamenode.reportBadBlocks(blocks);
     } catch (IOException e) {
@@ -221,7 +228,7 @@ class BPServiceActor implements Runnable {
       throw e;
     }
   }
-  
+
   @VisibleForTesting
   void triggerHeartbeatForTests() {
     lastHeartbeat = 0;
@@ -229,22 +236,22 @@ class BPServiceActor implements Runnable {
       waitForHeartBeats.notifyAll();
     }
   }
-  
+
   HeartbeatResponse sendHeartBeat() throws IOException {
+    StorageReport[] reports =
+        dn.getFSDataset().getStorageReports(bpos.getBlockPoolId());
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Sending heartbeat from service actor: " + this);
+      LOG.debug("Sending heartbeat with " + reports.length +
+          " storage reports from service actor: " + this);
     }
-    // reports number of failed volumes
-    StorageReport[] report =
-        {new StorageReport(bpRegistration.getStorageID(), false,
-            dn.getFSDataset().getCapacity(), dn.getFSDataset().getDfsUsed(),
-            dn.getFSDataset().getRemaining(),
-            dn.getFSDataset().getBlockPoolUsed(bpos.getBlockPoolId()))};
-    return bpNamenode
-        .sendHeartbeat(bpRegistration, report, dn.getXmitsInProgress(),
-            dn.getXceiverCount(), dn.getFSDataset().getNumFailedVolumes());
+
+    return bpNamenode.sendHeartbeat(bpRegistration,
+        reports,
+        dn.getXmitsInProgress(),
+        dn.getXceiverCount(),
+        dn.getFSDataset().getNumFailedVolumes());
   }
-  
+
   //This must be called only by BPOfferService
   void start() {
     if ((bpThread != null) && (bpThread.isAlive())) {
@@ -255,14 +262,14 @@ class BPServiceActor implements Runnable {
     bpThread.setDaemon(true); // needed for JUnit testing
     bpThread.start();
   }
-  
+
   private String formatThreadName() {
-    Collection<URI> dataDirs = DataNode.getStorageDirs(dn.getConf());
-    return "DataNode: [" +
-        StringUtils.uriToString(dataDirs.toArray(new URI[0])) + "] " +
+    Collection<StorageLocation> dataDirs = DataNode.getStorageLocations(
+        dn.getConf());
+    return "DataNode: [" + dataDirs.toString() + "] " +
         " heartbeating to " + nnAddr;
   }
-  
+
   //This must be called only by blockPoolManager.
   void stop() {
     shouldServiceRun = false;
@@ -270,7 +277,7 @@ class BPServiceActor implements Runnable {
       bpThread.interrupt();
     }
   }
-  
+
   //This must be called only by blockPoolManager
   void join() {
     try {
@@ -280,16 +287,16 @@ class BPServiceActor implements Runnable {
     } catch (InterruptedException ie) {
     }
   }
-  
+
   //Cleanup method to be called by current thread before exiting.
   private synchronized void cleanUp() {
-    
+
     shouldServiceRun = false;
     IOUtils.cleanup(LOG, bpNamenode);
 
     bpos.shutdownActor(this);
-    
-    
+
+
   }
 
   /**
@@ -306,7 +313,7 @@ class BPServiceActor implements Runnable {
 
     bpos.startWhirlingSufiThread();
 
-    
+
     //
     // Now loop for a long time....
     //
@@ -320,9 +327,9 @@ class BPServiceActor implements Runnable {
         if (startTime - lastHeartbeat > dnConf.heartBeatInterval) {
 
 
-          refreshNNConnection(); //[S] is the frequency of this operation high? only one actor s  
+          refreshNNConnection(); //[S] is the frequency of this operation high? only one actor s
 
-          
+
           //
           // All heartbeat messages include following info:
           // -- Datanode name
@@ -348,18 +355,18 @@ class BPServiceActor implements Runnable {
             }
           }
         }
-        
+
         long waitTime =
             Math.abs(dnConf.heartBeatInterval - (Time.now() - startTime));
         if (waitTime > dnConf.heartBeatInterval) {
-          // above code took longer than dnConf.heartBeatInterval to execute 
+          // above code took longer than dnConf.heartBeatInterval to execute
           // set wait time to 1 ms to send a new HB immediately
           waitTime = 1;
         }
         synchronized (waitForHeartBeats) {
           waitForHeartBeats.wait(waitTime);
         }
-        
+
       } catch (RemoteException re) {
         String reClass = re.getClassName();
         if (UnregisteredNodeException.class.getName().equals(reClass) ||
@@ -411,7 +418,7 @@ class BPServiceActor implements Runnable {
         sleepAndLogInterrupts(1000, "connecting to server");
       }
     }
-    
+
     LOG.info("Block pool " + this + " successfully registered with NN");
     bpos.registrationSucceeded(this, bpRegistration);
 
@@ -454,7 +461,7 @@ class BPServiceActor implements Runnable {
       }
 
       initialized = true; // bp is initialized;
-      
+
       while (shouldRun()) {
         try {
           offerService();
@@ -571,5 +578,4 @@ class BPServiceActor implements Runnable {
       return null;
     }
   }
-
 }

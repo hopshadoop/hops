@@ -111,7 +111,9 @@ public class TestOverReplicatedBlocks {
         String corruptMachineName = corruptDataNode.getXferAddr();
         for (DatanodeDescriptor datanode : hm.getDatanodes()) {
           if (!corruptMachineName.equals(datanode.getXferAddr())) {
-            datanode.updateHeartbeat(100L, 100L, 0L, 100L, 0, 0);
+            datanode.getStorageInfos()[0].setUtilizationForTesting(100L, 100L, 0, 100L);
+            datanode.updateHeartbeat(
+                BlockManagerTestUtil.getStorageReportsForDatanode(datanode), 0, 0);
           }
         }
 
@@ -186,7 +188,7 @@ public class TestOverReplicatedBlocks {
       DataNode lastDN = cluster.getDataNodes().get(3);
       DatanodeRegistration dnReg = DataNodeTestUtils
           .getDNRegistrationForBP(lastDN, namesystem.getBlockPoolId());
-      String lastDNid = dnReg.getStorageID();
+      String lastDNid = dnReg.getDatanodeUuid();
 
       final Path fileName = new Path("/foo2");
       DFSTestUtil.createFile(fs, fileName, SMALL_FILE_LENGTH, (short) 4, 0L);
@@ -212,7 +214,8 @@ public class TestOverReplicatedBlocks {
       // All replicas for deletion should be scheduled on lastDN.
       // And should not actually be deleted, because lastDN does not heartbeat.
       Collection<Block> dnBlocks =
-          namesystem.getBlockManager().excessReplicateMap.get(lastDNid);
+          namesystem.getBlockManager().excessReplicateMap.get(
+              lastDNid, namesystem.getBlockManager().getDatanodeManager());
       assertEquals("Replicas on node " + lastDNid + " should have been deleted",
           SMALL_FILE_LENGTH / SMALL_BLOCK_SIZE, dnBlocks.size());
       for (BlockLocation location : locs) {

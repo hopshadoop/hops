@@ -25,16 +25,20 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.BlockListAsLongs;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.server.datanode.SimulatedFSDataset;
+import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.apache.hadoop.util.Time;
 import org.junit.Test;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
@@ -139,23 +143,21 @@ public class TestInjectionForSimulatedStorage {
     
     try {
       Configuration conf = new HdfsConfiguration();
-      conf.set(DFSConfigKeys.DFS_REPLICATION_KEY,
-          Integer.toString(numDataNodes));
+      conf.set(DFSConfigKeys.DFS_REPLICATION_KEY, Integer.toString(numDataNodes));
       conf.setInt(DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY, checksumSize);
       SimulatedFSDataset.setFactory(conf);
       //first time format
-      cluster =
-          new MiniDFSCluster.Builder(conf).numDataNodes(numDataNodes).build();
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(numDataNodes).build();
       cluster.waitActive();
       String bpid = cluster.getNamesystem().getBlockPoolId();
-      DFSClient dfsClient = new DFSClient(
-          new InetSocketAddress("localhost", cluster.getNameNodePort()), conf);
-      
+      DFSClient dfsClient = new DFSClient(new InetSocketAddress("localhost",
+          cluster.getNameNodePort()),
+          conf);
+
       writeFile(cluster.getFileSystem(), testPath, numDataNodes);
-      waitForBlockReplication(testFile, dfsClient.getNamenode(), numDataNodes,
-          20);
-      Iterable<Block>[] blocksList = cluster.getAllBlockReports(bpid);
-      
+      waitForBlockReplication(testFile, dfsClient.getNamenode(), numDataNodes, 20);
+      List<Map<DatanodeStorage, BlockListAsLongs>> blocksList = cluster.getAllBlockReports(bpid);
+
       cluster.shutdown();
       cluster = null;
       
@@ -163,32 +165,36 @@ public class TestInjectionForSimulatedStorage {
        * to a datanode node fails, same block can not be written to it
        * immediately. In our case some replication attempts will fail.
        */
-      
+
       LOG.info("Restarting minicluster");
       conf = new HdfsConfiguration();
       SimulatedFSDataset.setFactory(conf);
       conf.set(DFSConfigKeys.DFS_NAMENODE_SAFEMODE_THRESHOLD_PCT_KEY, "0.0f");
-      
-      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(numDataNodes * 2)
-          .format(false).build();
+
+      cluster = new MiniDFSCluster.Builder(conf)
+          .numDataNodes(numDataNodes * 2)
+          .format(false)
+          .build();
       cluster.waitActive();
       Set<Block> uniqueBlocks = new HashSet<Block>();
-      for (int i = 0; i < blocksList.length; ++i) {
-        for (Block b : blocksList[i]) {
-          uniqueBlocks.add(new Block(b));
+      for(Map<DatanodeStorage, BlockListAsLongs> map : blocksList) {
+        for(BlockListAsLongs blockList : map.values()) {
+          for(Block b : blockList) {
+            uniqueBlocks.add(new Block(b));
+          }
         }
       }
       // Insert all the blocks in the first data node
-      
+
       LOG.info("Inserting " + uniqueBlocks.size() + " blocks");
-      cluster.injectBlocks(0, uniqueBlocks);
-      
-      dfsClient = new DFSClient(
-          new InetSocketAddress("localhost", cluster.getNameNodePort()), conf);
-      
-      waitForBlockReplication(testFile, dfsClient.getNamenode(), numDataNodes,
-          -1);
-      
+      cluster.injectBlocks(0, uniqueBlocks, null);
+
+      dfsClient = new DFSClient(new InetSocketAddress("localhost",
+          cluster.getNameNodePort()),
+          conf);
+
+      waitForBlockReplication(testFile, dfsClient.getNamenode(), numDataNodes, -1);
+
     } finally {
       if (cluster != null) {
         cluster.shutdown();

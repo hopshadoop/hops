@@ -228,6 +228,7 @@ public class AdminService extends CompositeService
     throw new StandbyException("ResourceManager " + rmId + " is not Active!");
   }
 
+  //TODO redo for distributed version
   @Override
   public synchronized void monitorHealth() throws IOException {
     checkAccess("monitorHealth");

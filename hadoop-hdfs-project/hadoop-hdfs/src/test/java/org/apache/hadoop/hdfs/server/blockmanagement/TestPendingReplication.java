@@ -203,9 +203,9 @@ public class TestPendingReplication {
           .getBlockLocations(cluster.getNameNode(), filePath.toString(), 0, 1)
           .get(0);
       bm.findAndMarkBlockAsCorrupt(block.getBlock(), block.getLocations()[0],
-          "TEST");
+          "STORAGE_ID", "TEST");
       bm.findAndMarkBlockAsCorrupt(block.getBlock(), block.getLocations()[1],
-          "TEST");
+          "STORAGE_ID", "TEST");
       BlockManagerTestUtil.computeAllPendingWork(bm);
       BlockManagerTestUtil.updateState(bm);
       assertEquals(bm.getPendingReplicationBlocksCount(), 1L);

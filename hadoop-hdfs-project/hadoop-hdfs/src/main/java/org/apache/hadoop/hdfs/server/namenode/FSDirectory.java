@@ -64,6 +64,7 @@ import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoUnderConstruction;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockManager;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.BlockUCState;
 import org.apache.hadoop.hdfs.util.ByteArray;
 import org.apache.hadoop.security.AccessControlException;
@@ -292,18 +293,15 @@ public class FSDirectory implements Closeable {
    * Add a block to the file. Returns a reference to the added block.
    */
   BlockInfo addBlock(String path, INode[] inodes, Block block,
-      DatanodeDescriptor targets[])
+      DatanodeStorageInfo targets[])
       throws QuotaExceededException, StorageException,
       TransactionContextException {
     assert inodes[inodes.length - 1]
         .isUnderConstruction() : "INode should correspond to a file under construction";
-    INodeFileUnderConstruction fileINode =
-        (INodeFileUnderConstruction) inodes[inodes.length - 1];
+    INodeFileUnderConstruction fileINode = (INodeFileUnderConstruction) inodes[inodes.length - 1];
 
     // check quota limits and updated space consumed
-    updateCount(inodes, inodes.length - 1, 0,
-        fileINode.getPreferredBlockSize() * fileINode.getBlockReplication(),
-        true);
+    updateCount(inodes, inodes.length - 1, 0, fileINode.getBlockDiskspace(), true);
 
     // associate new last block for the file
     BlockInfoUnderConstruction blockInfo =

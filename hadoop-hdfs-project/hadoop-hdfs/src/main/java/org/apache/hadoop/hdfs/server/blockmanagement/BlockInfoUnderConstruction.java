@@ -22,6 +22,7 @@ import io.hops.transaction.EntityManager;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.BlockUCState;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.ReplicaState;
+import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 
 import java.io.IOException;
@@ -74,7 +75,7 @@ public class BlockInfoUnderConstruction extends BlockInfo {
    * Create a block that is currently being constructed.
    */
   public BlockInfoUnderConstruction(Block blk, int inodeId, BlockUCState state,
-      DatanodeDescriptor[] targets)
+      DatanodeStorageInfo[] targets)
       throws StorageException, TransactionContextException {
     this(blk, inodeId, state);
     setExpectedLocations(targets);
@@ -101,10 +102,10 @@ public class BlockInfoUnderConstruction extends BlockInfo {
   /**
    * Set expected locations
    */
-  public void setExpectedLocations(DatanodeDescriptor[] targets)
+  public void setExpectedLocations(DatanodeStorageInfo[] targets)
       throws StorageException, TransactionContextException {
-    for (DatanodeDescriptor dn : targets) {
-      addExpectedReplica(dn.getSId(), ReplicaState.RBW);
+    for (DatanodeStorageInfo storage : targets) {
+      addExpectedReplica(storage.getSid(), ReplicaState.RBW);
     }
   }
 
@@ -112,10 +113,10 @@ public class BlockInfoUnderConstruction extends BlockInfo {
    * Create array of expected replica locations (as has been assigned by
    * chooseTargets()).
    */
-  public DatanodeDescriptor[] getExpectedLocations(DatanodeManager datanodeMgr)
+  public DatanodeStorageInfo[] getExpectedStorageLocations(DatanodeManager m)
       throws StorageException, TransactionContextException {
-    List<ReplicaUnderConstruction> rpls = getExpectedReplicas();
-    return getDatanodes(datanodeMgr, rpls);
+    List<ReplicaUnderConstruction> replicas = getExpectedReplicas();
+    return super.getStorages(m, replicas);
   }
 
   /**
@@ -187,7 +188,7 @@ public class BlockInfoUnderConstruction extends BlockInfo {
       int j = (previous + i) % replicas.size();
       ReplicaUnderConstruction replica = replicas.get(j);
       DatanodeDescriptor primary =
-          datanodeMgr.getDatanode(replica.getStorageId());
+          datanodeMgr.getDatanodeBySid(replica.getStorageId());
       if (primary.isAlive) {
         primaryNodeIndex = j;
         primary.addBlockToBeRecovered(this);
@@ -198,15 +199,15 @@ public class BlockInfoUnderConstruction extends BlockInfo {
     }
   }
 
-  void addReplicaIfNotPresent(DatanodeDescriptor dn, Block block,
+  void addReplicaIfNotPresent(DatanodeStorageInfo storage, Block block,
       ReplicaState rState)
       throws StorageException, TransactionContextException {
     for (ReplicaUnderConstruction r : getExpectedReplicas()) {
-      if (r.getStorageId() == dn.getSId()) {
+      if (r.getStorageId() == storage.getSid()) {
         return;
       }
     }
-    addExpectedReplica(dn.getSId(), rState);
+    addExpectedReplica(storage.getSid(), rState);
   }
 
   @Override // BlockInfo
@@ -223,7 +224,7 @@ public class BlockInfoUnderConstruction extends BlockInfo {
 
   @Override
   public String toString() {
-    return "BlkInfoUnderConstruction FIXME " + super.toString();
+    return "BlkInfoUnderConstruction " + super.toString();
   }
 
   @Override
@@ -263,17 +264,15 @@ public class BlockInfoUnderConstruction extends BlockInfo {
     return replicas;
   }
 
-  private ReplicaUnderConstruction addExpectedReplica(int storageId,
-      ReplicaState rState)
+  private ReplicaUnderConstruction addExpectedReplica(int sid, ReplicaState rState)
       throws StorageException, TransactionContextException {
-    if (hasExpectedReplicaIn(storageId)) {
+    if (hasExpectedReplicaIn(sid)) {
       NameNode.blockStateChangeLog.warn(
-          "BLOCK* Trying to store multiple blocks of the file on one DataNode. Returning null");
+          "BLOCK* Trying to store multiple blocks of the file on one storage. Returning null");
       return null;
     }
     ReplicaUnderConstruction replica =
-        new ReplicaUnderConstruction(rState, storageId, getBlockId(),
-            getInodeId());
+        new ReplicaUnderConstruction(rState, sid, getBlockId(), getInodeId());
     add(replica);
     return replica;
   }
@@ -301,6 +300,7 @@ public class BlockInfoUnderConstruction extends BlockInfo {
   }
 
   private void complete() throws StorageException, TransactionContextException {
+    FSNamesystem.LOG.debug("num expected replicas for blkid " + getBlockId() + ": " + getExpectedReplicas().size());
     for (ReplicaUnderConstruction rep : getExpectedReplicas()) {
       EntityManager.remove(rep);
     }

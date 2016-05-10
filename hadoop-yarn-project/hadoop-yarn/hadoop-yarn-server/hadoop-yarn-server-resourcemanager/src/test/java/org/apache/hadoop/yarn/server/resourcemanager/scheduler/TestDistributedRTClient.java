@@ -290,7 +290,7 @@ public class TestDistributedRTClient {
   public void testGetRMNodePerformance() throws Exception {
     RMUtilities.InitializeDB();
     MockRM rm = new MockRM(conf);
-    conf.setBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED, false);
+    conf.setBoolean(YarnConfiguration.DISTRIBUTED_RM, false);
     rm.start();
     String nodeId = "host1:1234";
     int numOfRetrievals = 500;
@@ -329,7 +329,7 @@ public class TestDistributedRTClient {
   @Test
   public void testRPCValidation() throws IOException, Exception {
     RMUtilities.InitializeDB();
-    conf.setBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED, true);
+    conf.setBoolean(YarnConfiguration.DISTRIBUTED_RM, true);
     conf.setInt(YarnConfiguration.HOPS_PENDING_EVENTS_RETRIEVAL_PERIOD, 5000);
     MockRM rm = new MockRM(conf);
     rm.start();
@@ -370,13 +370,13 @@ public class TestDistributedRTClient {
     RMUtilities.InitializeDB();
     boolean distributedRTEnabled = false;
     Assert.assertEquals(distributedRTEnabled,
-        conf.getBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED,
-            YarnConfiguration.DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED));
+        conf.getBoolean(YarnConfiguration.DISTRIBUTED_RM,
+            YarnConfiguration.DEFAULT_DISTRIBUTED_RM));
     distributedRTEnabled = true;
-    conf.setBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED, true);
+    conf.setBoolean(YarnConfiguration.DISTRIBUTED_RM, true);
     Assert.assertEquals(distributedRTEnabled,
-        conf.getBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED,
-            YarnConfiguration.DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED));
+        conf.getBoolean(YarnConfiguration.DISTRIBUTED_RM,
+            YarnConfiguration.DEFAULT_DISTRIBUTED_RM));
   }
 
   @Ignore

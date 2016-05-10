@@ -23,6 +23,7 @@ import io.hops.metadata.common.FinderType;
 import io.hops.metadata.hdfs.dal.ReplicaUnderConstructionDataAccess;
 import io.hops.transaction.lock.TransactionLocks;
 import org.apache.hadoop.hdfs.server.blockmanagement.ReplicaUnderConstruction;
+import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -44,6 +45,11 @@ public class ReplicaUnderConstructionContext
     super.update(replica);
     log("added-replicauc", "bid", replica.getBlockId(), "sid",
         replica.getStorageId(), "state", replica.getState().name());
+
+    // TODO remove debug statement
+    for (StackTraceElement ste : Thread.currentThread().getStackTrace()) {
+      log(ste.toString());
+    }
   }
 
   @Override
@@ -52,6 +58,10 @@ public class ReplicaUnderConstructionContext
     super.remove(replica);
     log("removed-replicauc", "bid", replica.getBlockId(), "sid",
         replica.getStorageId(), "state", replica.getState().name());
+    // TODO remove debug statement
+    for (StackTraceElement ste : Thread.currentThread().getStackTrace()) {
+      log(ste.toString());
+    }
   }
 
   @Override
@@ -93,9 +103,11 @@ public class ReplicaUnderConstructionContext
   @Override
   ReplicaUnderConstruction cloneEntity(
       ReplicaUnderConstruction replicaUnderConstruction, int inodeId) {
-    return new ReplicaUnderConstruction(replicaUnderConstruction.getState(),
+    return new ReplicaUnderConstruction(
+        replicaUnderConstruction.getState(),
         replicaUnderConstruction.getStorageId(),
-        replicaUnderConstruction.getBlockId(), inodeId);
+        replicaUnderConstruction.getBlockId(),
+        inodeId);
   }
 
   private List<ReplicaUnderConstruction> findByBlockId(

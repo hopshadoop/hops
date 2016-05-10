@@ -23,6 +23,7 @@ import io.hops.leader_election.node.ActiveNode;
 import io.hops.leader_election.node.SortedActiveNodeList;
 import io.hops.leader_election.proto.ActiveNodeProtos;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.ContentSummary;
@@ -320,6 +321,11 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
   @Override
   public CreateResponseProto create(RpcController controller,
       CreateRequestProto req) throws ServiceException {
+
+    LogFactory.getLog(ClientNamenodeProtocolServerSideTranslatorPB.class).debug("###");
+    LogFactory.getLog(ClientNamenodeProtocolServerSideTranslatorPB.class).debug("###");
+    LogFactory.getLog(ClientNamenodeProtocolServerSideTranslatorPB.class).debug("### create called");
+
     try {
       HdfsFileStatus result = null;
       if (req.hasPolicy()) {
@@ -339,8 +345,11 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
             .build();
       }
     } catch (IOException e) {
+      LogFactory.getLog(ClientNamenodeProtocolServerSideTranslatorPB.class).debug("### create finished (exception)");
       throw new ServiceException(e);
     }
+
+    LogFactory.getLog(ClientNamenodeProtocolServerSideTranslatorPB.class).debug("### create finished (empty response)");
     return VOID_CREATE_RESPONSE;
   }
   
@@ -424,6 +433,8 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
   @Override
   public AddBlockResponseProto addBlock(RpcController controller,
       AddBlockRequestProto req) throws ServiceException {
+
+    LogFactory.getLog(ClientNamenodeProtocolServerSideTranslatorPB.class).debug("### addBlock called");
     
     try {
       List<DatanodeInfoProto> excl = req.getExcludeNodesList();
@@ -431,9 +442,13 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
           req.hasPrevious() ? PBHelper.convert(req.getPrevious()) : null,
           (excl == null || excl.size() == 0) ? null : PBHelper
               .convert(excl.toArray(new DatanodeInfoProto[excl.size()])));
+
+      LogFactory.getLog(ClientNamenodeProtocolServerSideTranslatorPB.class).debug("### addBlock finished (success, block id = " + result.getBlock().getBlockId() + ")");
+
       return AddBlockResponseProto.newBuilder()
           .setBlock(PBHelper.convert(result)).build();
     } catch (IOException e) {
+      LogFactory.getLog(ClientNamenodeProtocolServerSideTranslatorPB.class).debug("### addBlock finished (exception: " + e.toString() + ")");
       throw new ServiceException(e);
     }
   }
@@ -444,13 +459,16 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
       throws ServiceException {
     try {
       List<DatanodeInfoProto> existingList = req.getExistingsList();
+      List<String> existingStorageIDsList = req.getExistingStorageUuidsList();
       List<DatanodeInfoProto> excludesList = req.getExcludesList();
       LocatedBlock result = server
           .getAdditionalDatanode(req.getSrc(), PBHelper.convert(req.getBlk()),
-              PBHelper.convert(existingList
-                  .toArray(new DatanodeInfoProto[existingList.size()])),
-              PBHelper.convert(excludesList
-                  .toArray(new DatanodeInfoProto[excludesList.size()])),
+              PBHelper.convert(existingList.toArray(
+                  new DatanodeInfoProto[existingList.size()])),
+              existingStorageIDsList.toArray(
+                  new String[existingStorageIDsList.size()]),
+              PBHelper.convert(excludesList.toArray(
+                  new DatanodeInfoProto[excludesList.size()])),
               req.getNumAdditionalNodes(), req.getClientName());
       return GetAdditionalDatanodeResponseProto.newBuilder()
           .setBlock(PBHelper.convert(result)).build();
@@ -798,10 +816,13 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
       UpdatePipelineRequestProto req) throws ServiceException {
     try {
       List<DatanodeIDProto> newNodes = req.getNewNodesList();
+      List<String> newStorageIDs = req.getStorageIDsList();
       server.updatePipeline(req.getClientName(),
           PBHelper.convert(req.getOldBlock()),
-          PBHelper.convert(req.getNewBlock()), PBHelper
-          .convert(newNodes.toArray(new DatanodeIDProto[newNodes.size()])));
+          PBHelper.convert(req.getNewBlock()),
+          PBHelper.convert(
+              newNodes.toArray(new DatanodeIDProto[newNodes.size()])),
+          newStorageIDs.toArray(new String[newStorageIDs.size()]));
       return VOID_UPDATEPIPELINE_RESPONSE;
     } catch (IOException e) {
       throw new ServiceException(e);

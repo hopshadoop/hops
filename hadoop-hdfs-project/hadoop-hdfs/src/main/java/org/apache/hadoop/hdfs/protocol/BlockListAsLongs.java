@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.protocol;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.ReplicaState;
@@ -24,6 +25,7 @@ import org.apache.hadoop.hdfs.server.datanode.ReplicaInfo;
 
 import java.util.Iterator;
 import java.util.List;
+import java.util.Random;
 
 /**
  * This class provides an interface for accessing list of blocks that
@@ -292,6 +294,31 @@ public class BlockListAsLongs implements Iterable<Block> {
   @Deprecated
   public long getBlockGenStamp(final int index) {
     return blockGenerationStamp(index);
+  }
+
+  /**
+   * Corrupt the generation stamp of the block with the given index.
+   * Not meant to be used outside of tests.
+   */
+  @VisibleForTesting
+  public long corruptBlockGSForTesting(final int blockIndex, Random rand) {
+    long oldGS = blockList[index2BlockId(blockIndex) + 2];
+    while (blockList[index2BlockId(blockIndex) + 2] == oldGS) {
+      blockList[index2BlockId(blockIndex) + 2] = rand.nextInt();
+    }
+    return oldGS;
+  }
+
+  /**
+   * Corrupt the length of the block with the given index by truncation.
+   * Not meant to be used outside of tests.
+   */
+  @VisibleForTesting
+  public long corruptBlockLengthForTesting(final int blockIndex, Random rand) {
+    long oldLength = blockList[index2BlockId(blockIndex) + 1];
+    blockList[index2BlockId(blockIndex) + 1] =
+        rand.nextInt((int) oldLength - 1);
+    return oldLength;
   }
   
   /**
