@@ -64,6 +64,10 @@ public class NdbRtStreamingReceiver {
     this.currentPrice = CurrentPrice;
   }
 
+  public void setPriceName(String priceName){
+    //not usefull so far
+  }
+  
   NdbRtStreamingReceiver() {
   }
 

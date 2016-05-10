@@ -210,57 +210,59 @@ public class INodeDALAdaptor
   @Override
   public org.apache.hadoop.hdfs.server.namenode.INode convertDALtoHDFS(
       INode hopINode) throws StorageException {
-    org.apache.hadoop.hdfs.server.namenode.INode inode = null;
-    if (hopINode != null) {
-      PermissionStatus ps = new PermissionStatus(null, null, new FsPermission
-          (hopINode.getPermission()));
-      if (hopINode.isDir()) {
-        if (hopINode.isDirWithQuota()) {
-          inode = new INodeDirectoryWithQuota(hopINode.getName(), ps);
-        } else {
-          String iname =
-              (hopINode.getName().length() == 0) ? INodeDirectory.ROOT_NAME :
-                  hopINode.getName();
-          inode = new INodeDirectory(iname, ps);
-        }
-
-        inode.setAccessTimeNoPersistance(hopINode.getAccessTime());
-        inode.setModificationTimeNoPersistance(hopINode.getModificationTime());
-        ((INodeDirectory) inode).setMetaEnabled(hopINode.isMetaEnabled());
-      } else if (hopINode.getSymlink() != null) {
-        inode = new INodeSymlink(hopINode.getSymlink(),
-            hopINode.getModificationTime(), hopINode.getAccessTime(), ps);
-      } else {
-        if (hopINode.isUnderConstruction()) {
-          DatanodeID dnID = (hopINode.getClientNode() == null ||
-              hopINode.getClientNode().isEmpty()) ? null :
-              new DatanodeID(hopINode.getClientNode());
-
-          inode = new INodeFileUnderConstruction(ps,
-              INodeFile.getBlockReplication(hopINode.getHeader()),
-              INodeFile.getPreferredBlockSize(hopINode.getHeader()),
-              hopINode.getModificationTime(), hopINode.getClientName(),
-              hopINode.getClientMachine(), dnID);
+    try{
+      org.apache.hadoop.hdfs.server.namenode.INode inode = null;
+      if (hopINode != null) {
+        PermissionStatus ps = new PermissionStatus(null, null, new FsPermission
+            (hopINode.getPermission()));
+        if (hopINode.isDir()) {
+          if (hopINode.isDirWithQuota()) {
+            inode = new INodeDirectoryWithQuota(hopINode.getName(), ps);
+          } else {
+            String iname =
+                (hopINode.getName().length() == 0) ? INodeDirectory.ROOT_NAME :
+                    hopINode.getName();
+            inode = new INodeDirectory(iname, ps);
+          }
 
           inode.setAccessTimeNoPersistance(hopINode.getAccessTime());
+          inode.setModificationTimeNoPersistance(hopINode.getModificationTime());
+          ((INodeDirectory) inode).setMetaEnabled(hopINode.isMetaEnabled());
+        } else if (hopINode.getSymlink() != null) {
+          inode = new INodeSymlink(hopINode.getSymlink(),
+              hopINode.getModificationTime(), hopINode.getAccessTime(), ps);
         } else {
-          inode = new INodeFile(ps, hopINode.getHeader(),
-              hopINode.getModificationTime(), hopINode.getAccessTime());
+          if (hopINode.isUnderConstruction()) {
+            DatanodeID dnID = (hopINode.getClientNode() == null ||
+                hopINode.getClientNode().isEmpty()) ? null :
+                new DatanodeID(hopINode.getClientNode());
+
+            inode = new INodeFileUnderConstruction(ps,
+                INodeFile.getBlockReplication(hopINode.getHeader()),
+                INodeFile.getPreferredBlockSize(hopINode.getHeader()),
+                hopINode.getModificationTime(), hopINode.getClientName(),
+                hopINode.getClientMachine(), dnID);
+
+            inode.setAccessTimeNoPersistance(hopINode.getAccessTime());
+          } else {
+            inode = new INodeFile(ps, hopINode.getHeader(),
+                hopINode.getModificationTime(), hopINode.getAccessTime());
+          }
+          ((INodeFile) inode).setGenerationStampNoPersistence(
+              hopINode.getGenerationStamp());
+          ((INodeFile) inode).setSizeNoPersistence(hopINode.getFileSize());
         }
-        ((INodeFile) inode).setGenerationStampNoPersistence(
-            hopINode.getGenerationStamp());
-        ((INodeFile) inode).setSizeNoPersistence(hopINode.getFileSize());
+        inode.setIdNoPersistance(hopINode.getId());
+        inode.setLocalNameNoPersistance(hopINode.getName());
+        inode.setParentIdNoPersistance(hopINode.getParentId());
+        inode.setSubtreeLocked(hopINode.isSubtreeLocked());
+        inode.setSubtreeLockOwner(hopINode.getSubtreeLockOwner());
+        inode.setUserIDNoPersistance(hopINode.getUserID());
+        inode.setGroupIDNoPersistance(hopINode.getGroupID());
       }
-      inode.setIdNoPersistance(hopINode.getId());
-      inode.setLocalNameNoPersistance(hopINode.getName());
-      inode.setParentIdNoPersistance(hopINode.getParentId());
-      inode.setSubtreeLocked(hopINode.isSubtreeLocked());
-      inode.setSubtreeLockOwner(hopINode.getSubtreeLockOwner());
-      inode.setUserIDNoPersistance(hopINode.getUserID());
-      inode.setGroupIDNoPersistance(hopINode.getGroupID());
-      inode.setUserNoPersistance(hopINode.getUserName());
-      inode.setGroupNoPersistance(hopINode.getGroupName());
+      return inode;
+    }catch (IOException ex){
+      throw new StorageException(ex);
     }
-    return inode;
   }
 }
