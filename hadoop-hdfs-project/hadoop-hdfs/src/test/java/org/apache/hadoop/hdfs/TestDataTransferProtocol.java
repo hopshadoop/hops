@@ -125,18 +125,17 @@ public class TestDataTransferProtocol {
         throw eof;
       }
 
-      LOG.info("Received: " + new String(retBuf));
-      LOG.info(
-          "Expected: " + StringUtils.byteToHexString(recvBuf.toByteArray()));
-      
+      String received = StringUtils.byteToHexString(retBuf);
+      String expected = StringUtils.byteToHexString(recvBuf.toByteArray());
+      LOG.info("Received: " + received);
+      LOG.info("Expected: " + expected);
+
       if (eofExpected) {
         throw new IOException("Did not recieve IOException when an exception " +
             "is expected while reading from " + datanode);
       }
       
-      byte[] needed = recvBuf.toByteArray();
-      assertEquals(StringUtils.byteToHexString(needed),
-          StringUtils.byteToHexString(retBuf));
+      assertEquals(expected, received);
     } finally {
       IOUtils.closeSocket(sock);
     }
@@ -344,9 +343,7 @@ public class TestDataTransferProtocol {
         new MiniDFSCluster.Builder(conf).numDataNodes(numDataNodes).build();
     try {
       cluster.waitActive();
-      DFSClient dfsClient = new DFSClient(
-          new InetSocketAddress("localhost", cluster.getNameNodePort()), conf);
-      datanode = dfsClient.datanodeReport(DatanodeReportType.LIVE)[0];
+      datanode = cluster.getFileSystem().getDataNodeStats(DatanodeReportType.LIVE)[0];
       dnAddr = NetUtils.createSocketAddr(datanode.getXferAddr());
       FileSystem fileSys = cluster.getFileSystem();
 

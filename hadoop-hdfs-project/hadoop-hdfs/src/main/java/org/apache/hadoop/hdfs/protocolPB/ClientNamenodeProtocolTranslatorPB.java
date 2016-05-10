@@ -102,6 +102,7 @@ import org.apache.hadoop.hdfs.security.token.block.DataEncryptionKey;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.hdfs.server.namenode.NotReplicatedYetException;
 import org.apache.hadoop.hdfs.server.namenode.SafeModeException;
+import org.apache.hadoop.hdfs.server.protocol.DatanodeStorageReport;
 import org.apache.hadoop.io.EnumSetWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.ProtobufHelper;
@@ -591,8 +592,22 @@ public class ClientNamenodeProtocolTranslatorPB
   }
 
   @Override
+  public DatanodeStorageReport[] getDatanodeStorageReport(DatanodeReportType type)
+      throws IOException {
+    final ClientNamenodeProtocolProtos.GetDatanodeStorageReportRequestProto req
+        = ClientNamenodeProtocolProtos.GetDatanodeStorageReportRequestProto.newBuilder()
+        .setType(PBHelper.convert(type)).build();
+    try {
+      return PBHelper.convertDatanodeStorageReports(
+          rpcProxy.getDatanodeStorageReport(null, req).getDatanodeStorageReportsList());
+    } catch (ServiceException e) {
+      throw ProtobufHelper.getRemoteException(e);
+    }
+  }
+
+  @Override
   public long getPreferredBlockSize(String filename)
-      throws IOException, UnresolvedLinkException {
+      throws IOException {
     GetPreferredBlockSizeRequestProto req =
         GetPreferredBlockSizeRequestProto.newBuilder().setFilename(filename)
             .build();
