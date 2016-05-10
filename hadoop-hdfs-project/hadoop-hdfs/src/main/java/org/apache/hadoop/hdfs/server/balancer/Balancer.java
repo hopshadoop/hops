@@ -72,7 +72,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.EnumMap;
-import java.util.Formatter;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -556,11 +555,6 @@ public class Balancer {
         return scheduledSize;
       }
 
-      /** Reset scheduled size to zero. */
-      synchronized void resetScheduledSize() {
-        scheduledSize = 0L;
-      }
-
       /** @return the name for display */
       String getDisplayName() {
         return datanode + ":" + storageType;
@@ -614,10 +608,7 @@ public class Balancer {
     
     /* Check if the node can schedule more blocks to move */
     synchronized private boolean isPendingQNotFull() {
-      if (pendingBlocks.size() < MAX_NUM_CONCURRENT_MOVES) {
-        return true;
-      }
-      return false;
+      return pendingBlocks.size() < MAX_NUM_CONCURRENT_MOVES;
     }
     
     /* Check if all the dispatched moves are done */
@@ -872,16 +863,6 @@ public class Balancer {
     this.nnc = theblockpool;
   }
   
-  /* Shuffle datanode array */
-  static private void shuffleArray(DatanodeInfo[] datanodes) {
-    for (int i = datanodes.length; i > 1; i--) {
-      int randomIndex = DFSUtil.getRandom().nextInt(i);
-      DatanodeInfo tmp = datanodes[randomIndex];
-      datanodes[randomIndex] = datanodes[i - 1];
-      datanodes[i - 1] = tmp;
-    }
-  }
-  
   private static long getCapacity(DatanodeStorageReport report, StorageType t) {
     long capacity = 0L;
     for(StorageReport r : report.getStorageReports()) {
@@ -912,6 +893,7 @@ public class Balancer {
     // ignore decommissioning nodes
     final boolean decommissioning = dn.isDecommissionInProgress();
 
+    // This is some Hadoop 2.6 stuff (not supported in Hops yet)
 //    // ignore nodes in exclude list
 //    final boolean excluded = Util.isExcluded(excludedNodes, dn);
 //    // ignore nodes not in the include list (if include list is not empty)
@@ -1417,20 +1399,9 @@ public class Balancer {
         if (notChangedIterations >= 5) {
           System.out
               .println("No block has been moved for 5 iterations. Exiting...");
-//          return ReturnStatus.NO_MOVE_PROGRESS;
           return newResult(ReturnStatus.NO_MOVE_PROGRESS, bytesLeftToMove, bytesBeingMoved);
         }
       }
-
-//      /* For each pair of <source, target>, start a thread that repeatedly
-//       * decide a block to be moved and its proxy source,
-//       * then initiates the move until all bytes are moved or no more block
-//       * available to move.
-//       * Exit no byte has been moved for 5 consecutive iterations.
-//       */
-//      if (!dispatcher.dispatchAndCheckContinue()) {
-//        return newResult(ReturnStatus.NO_MOVE_PROGRESS, bytesLeftToMove, bytesBeingMoved);
-//      }
 
       return newResult(ReturnStatus.IN_PROGRESS, bytesLeftToMove, bytesBeingMoved);
     } catch (IllegalArgumentException e) {
@@ -1443,9 +1414,7 @@ public class Balancer {
       System.out.println(e + ".  Exiting ...");
       return newResult(ReturnStatus.INTERRUPTED);
     } finally {
-      if (dispatcherExecutor != null) {
-        dispatcherExecutor.shutdownNow();
-      }
+      dispatcherExecutor.shutdownNow();
       moverExecutor.shutdownNow();
     }
   }
@@ -1500,79 +1469,6 @@ public class Balancer {
     }
   }
 
-//  /**
-//   * Run an iteration for all datanodes.
-//   */
-//  private ReturnStatus run(int iteration, Formatter formatter) {
-//    try {
-//      /* get all live datanodes of a cluster and their disk usage
-//       * decide the number of bytes need to be moved
-//       */
-//      final long bytesLeftToMove =
-//          init(nnc.client.getDatanodeStorageReport(DatanodeReportType.LIVE));
-//      if (bytesLeftToMove == 0) {
-//        System.out.println("The cluster is balanced. Exiting...");
-//        return ReturnStatus.SUCCESS;
-//      } else {
-//        LOG.info("Need to move " + StringUtils.byteDesc(bytesLeftToMove) +
-//            " to make the cluster balanced.");
-//      }
-//
-//      /* Decide all the nodes that will participate in the block move and
-//       * the number of bytes that need to be moved from one node to another
-//       * in this iteration. Maximum bytes to be moved per node is
-//       * Min(1 Band worth of bytes,  MAX_SIZE_TO_MOVE).
-//       */
-//      final long bytesToMove = chooseStorageGroups();
-//      if (bytesToMove == 0) {
-//        System.out.println("No block can be moved. Exiting...");
-//        return ReturnStatus.NO_MOVE_BLOCK;
-//      } else {
-//        LOG.info("Will move " + StringUtils.byteDesc(bytesToMove) +
-//            " in this iteration");
-//      }
-//
-//      formatter.format("%-24s %10d  %19s  %18s  %17s%n",
-//          DateFormat.getDateTimeInstance().format(new Date()), iteration,
-//          StringUtils.byteDesc(bytesMoved.get()),
-//          StringUtils.byteDesc(bytesLeftToMove),
-//          StringUtils.byteDesc(bytesToMove));
-//
-//      /* For each pair of <source, target>, start a thread that repeatedly
-//       * decide a block to be moved and its proxy source,
-//       * then initiates the move until all bytes are moved or no more block
-//       * available to move.
-//       * Exit no byte has been moved for 5 consecutive iterations.
-//       */
-//      if (dispatchBlockMoves() > 0) {
-//        notChangedIterations = 0;
-//      } else {
-//        notChangedIterations++;
-//        if (notChangedIterations >= 5) {
-//          System.out
-//              .println("No block has been moved for 5 iterations. Exiting...");
-//          return ReturnStatus.NO_MOVE_PROGRESS;
-//        }
-//      }
-//
-//      // clean all lists
-//      resetData();
-//      return ReturnStatus.IN_PROGRESS;
-//    } catch (IllegalArgumentException e) {
-//      System.out.println(e + ".  Exiting ...");
-//      return ReturnStatus.ILLEGAL_ARGS;
-//    } catch (IOException e) {
-//      System.out.println(e + ".  Exiting ...");
-//      return ReturnStatus.IO_EXCEPTION;
-//    } catch (InterruptedException e) {
-//      System.out.println(e + ".  Exiting ...");
-//      return ReturnStatus.INTERRUPTED;
-//    } finally {
-//      // shutdown thread pools
-//      dispatcherExecutor.shutdownNow();
-//      moverExecutor.shutdownNow();
-//    }
-//  }
 
   /**
    * Balance all namenodes.
@@ -1583,40 +1479,12 @@ public class Balancer {
   static int run(Collection<URI> namenodes, final Parameters p,
       Configuration conf) throws IOException, InterruptedException {
     final long sleeptime = 2000 *
-        conf.getLong(DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY,
-            DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_DEFAULT);
+        conf.getLong(DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY, DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_DEFAULT);
     LOG.info("namenodes = " + namenodes);
     LOG.info("p         = " + p);
     
-    final Formatter formatter = new Formatter(System.out);
     System.out.println(
         "Time Stamp               Iteration#  Bytes Already Moved  Bytes Left To Move  Bytes Being Moved");
-
-
-//      boolean done = false;
-//      for (int iteration = 0; !done; iteration++) {
-//        done = true;
-//        Collections.shuffle(connectors);
-//        for (NameNodeConnector nnc : connectors) {
-//          final Balancer b = new Balancer(nnc, p, conf);
-//          final ReturnStatus r = b.run(iteration, formatter);
-//          if (r == ReturnStatus.IN_PROGRESS) {
-//            done = false;
-//          } else if (r != ReturnStatus.SUCCESS) {
-//            //must be an error statue, return.
-//            return r.code;
-//          }
-//        }
-//
-//        if (!done) {
-//          Thread.sleep(sleeptime);
-//        }
-//      }
-//    } finally {
-//      for (NameNodeConnector nnc : connectors) {
-//        nnc.close();
-//      }
-//    }
 
     List<NameNodeConnector> connectors = new ArrayList<NameNodeConnector>();
     try {
@@ -1784,19 +1652,6 @@ public class Balancer {
   }
 
   static class Util {
-    /** @return true if data node is part of the excludedNodes. */
-    static boolean isExcluded(Set<String> excludedNodes, DatanodeInfo dn) {
-      return isIn(excludedNodes, dn);
-    }
-
-    /**
-     * @return true if includedNodes is empty or data node is part of the
-     *         includedNodes.
-     */
-    static boolean isIncluded(Set<String> includedNodes, DatanodeInfo dn) {
-      return (includedNodes.isEmpty() || isIn(includedNodes, dn));
-    }
-
     /**
      * Match is checked using host name , ip address with and without port
      * number.
