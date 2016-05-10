@@ -36,8 +36,6 @@ public class FiCaSchedulerNodeInfoAgregate {
           FiCaSchedulerNodeInfoAgregate.class);
   private List<FiCaSchedulerNode> infosToUpdate
           = new ArrayList<FiCaSchedulerNode>();
-  private List<RMContainer> reservedContainersToRemove
-          = new ArrayList<RMContainer>();
   ArrayList<LaunchedContainers> toAddLaunchedContainers
           = new ArrayList<LaunchedContainers>();
   List<LaunchedContainers> toRemoveLaunchedContainers
@@ -48,13 +46,8 @@ public class FiCaSchedulerNodeInfoAgregate {
     infosToUpdate.add(infoToUpdate);
   }
 
-  public void addReservedRMContainerToRemove(
-          RMContainer reservedRMContainerToRemove) {
-    reservedContainersToRemove.add(reservedRMContainerToRemove);
-  }
-
   public void addAlllaunchedContainersToAdd(
-          ArrayList<LaunchedContainers> toAddLaunchedContainers) {
+          Collection<LaunchedContainers> toAddLaunchedContainers) {
     this.toAddLaunchedContainers.addAll(toAddLaunchedContainers);
   }
 
@@ -73,7 +66,6 @@ public class FiCaSchedulerNodeInfoAgregate {
           LaunchedContainersDataAccess launchedContainersDA)
           throws StorageException {
     persistToUpdateFicaSchedulerNode(ficaNodeDA, rmcontainerDA);
-    persistRmContainerToRemove(rmcontainerDA);
     persistLaunchedContainersToAdd(launchedContainersDA);
     persistLaunchedContainersToRemove(launchedContainersDA);
     persistToUpdateResources(resourceDA);
@@ -85,13 +77,6 @@ public class FiCaSchedulerNodeInfoAgregate {
     if (!infosToUpdate.isEmpty()) {
 
       ficaNodeDA.addAll(infosToUpdate);
-    }
-  }
-
-  private void persistRmContainerToRemove(RMContainerDataAccess rmcontainerDA)
-          throws StorageException {
-    if (!reservedContainersToRemove.isEmpty()) {
-      rmcontainerDA.removeAll(reservedContainersToRemove);
     }
   }
 

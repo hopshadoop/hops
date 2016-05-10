@@ -15,20 +15,18 @@
  */
 package io.hops.ha.common;
 
+import io.hops.StorageConnector;
 import io.hops.exception.StorageException;
 import io.hops.metadata.util.RMStorageFactory;
-import io.hops.metadata.yarn.dal.capacity.CSLeafQueueUserInfoDataAccess;
-import io.hops.metadata.yarn.dal.capacity.CSQueueDataAccess;
-import java.util.ArrayList;
+import io.hops.metadata.yarn.dal.capacity.CSLeafQueuesPendingAppsDataAccess;
+import io.hops.metadata.yarn.entity.capacity.LeafQueuePendingApp;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CSQueue;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.LeafQueue;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerApp;
 
 public class CSQueueInfo {
 
@@ -79,91 +77,22 @@ public class CSQueueInfo {
 
   private static final Log LOG = LogFactory.getLog(
           SchedulerApplicationInfo.class);
-  private Map<String, io.hops.metadata.yarn.entity.capacity.CSQueue> csQueueToAdd =
-          new HashMap<String, io.hops.metadata.yarn.entity.capacity.CSQueue>();
   private Map<String, CSLeafQueueUserInfo> csLeafQueueUserInfoToAdd =
           new HashMap<String, CSLeafQueueUserInfo>();
   private Set<String> usersToRemove = new HashSet<String>();
+  private Map<String, LeafQueuePendingApp> csLeafQueuePendingAppToAdd
+          = new HashMap<String, LeafQueuePendingApp>();
+  private Map<String, LeafQueuePendingApp> csLeafQueuePendingAppToRemove
+          = new HashMap<String, LeafQueuePendingApp>();
 
-  public void persist(CSQueueDataAccess csQDA,
-          CSLeafQueueUserInfoDataAccess csLeafQUI) throws StorageException {
-    persistCSQueueInfoToAdd(csQDA);
-    persistCSLeafQueueInfoToAdd(csLeafQUI);
-    persistCSLeafQueueUsersToRemove();
+  public void persist(
+          StorageConnector connector) throws StorageException {
+    persistCSLeafQueuesPendingAppToAdd();
+    connector.flush();
+    persistCSLeafQueuesPendingAppToRemove();
+    connector.flush();
   }
 
-  private void persistCSQueueInfoToAdd(CSQueueDataAccess QMDA) throws
-          StorageException {
-    if (csQueueToAdd != null) {
-      QMDA.addAll(csQueueToAdd.values());
-    }
-  }
-
-  private void persistCSLeafQueueInfoToAdd(CSLeafQueueUserInfoDataAccess QMDA)
-          throws StorageException {
-    if (csLeafQueueUserInfoToAdd != null) {
-      List<io.hops.metadata.yarn.entity.capacity.CSLeafQueueUserInfo> toAddQueues
-              = new ArrayList<io.hops.metadata.yarn.entity.capacity.CSLeafQueueUserInfo>();
-      for (String username : csLeafQueueUserInfoToAdd.keySet()) {
-
-        CSLeafQueueUserInfo csLeafQueueUser = csLeafQueueUserInfoToAdd.get(
-                username);
-        io.hops.metadata.yarn.entity.capacity.CSLeafQueueUserInfo hopCSLeafQueueUserInfo
-                = new io.hops.metadata.yarn.entity.capacity.CSLeafQueueUserInfo(
-                        username,
-                        csLeafQueueUser.getConsumedMemory(),
-                        csLeafQueueUser.getConsumedVCores(),
-                        csLeafQueueUser.getPendingApplications(),
-                        csLeafQueueUser.getActiveApplications()
-                );
-
-        toAddQueues.add(hopCSLeafQueueUserInfo);
-    }
-      QMDA.addAll(toAddQueues);
-
-  }
-  }
-
-  public void persistCSLeafQueueUsersToRemove() throws StorageException {
-    if (usersToRemove != null && !usersToRemove.isEmpty()) {
-      CSLeafQueueUserInfoDataAccess csLQueueDA
-              = (CSLeafQueueUserInfoDataAccess) RMStorageFactory.getDataAccess(
-                      CSLeafQueueUserInfoDataAccess.class);
-      List<io.hops.metadata.yarn.entity.capacity.CSLeafQueueUserInfo> usersToRemoveList
-              = new ArrayList<io.hops.metadata.yarn.entity.capacity.CSLeafQueueUserInfo>();
-      for (String userName : usersToRemove) {
-        usersToRemoveList.add(
-                new io.hops.metadata.yarn.entity.capacity.CSLeafQueueUserInfo(
-                        userName, 0, 0, 0, 0));
-      }
-
-      csLQueueDA.removeAll(usersToRemoveList);
-    }
-  }
-
-  public void addCSQueue(String csQueuePath, CSQueue csQueueAdd) {
-    boolean isParent;
-        isParent = csQueueAdd.getChildQueues() != null;
-
-        int numContainers = -1;
-        if (!isParent) {
-          numContainers = ((LeafQueue) csQueueAdd).getNumContainers();
-        }
-
-        io.hops.metadata.yarn.entity.capacity.CSQueue hopCSQueue
-                = new io.hops.metadata.yarn.entity.capacity.CSQueue(
-                        csQueueAdd.getQueueName(),
-                        csQueueAdd.getQueuePath(),
-                        csQueueAdd.getUsedCapacity(),
-                        csQueueAdd.getUsedResources().getMemory(),
-                        csQueueAdd.getUsedResources().getVirtualCores(),
-                        csQueueAdd.getAbsoluteUsedCapacity(),
-                        isParent,
-                        numContainers
-                );
-    csQueueToAdd.put(csQueuePath, hopCSQueue);
-
-  }
 
   public void addCSLeafUsers(String userName) {
     csLeafQueueUserInfoToAdd.put(userName, new CSLeafQueueUserInfo());
@@ -187,4 +116,42 @@ public class CSQueueInfo {
     return userInfo;
   }
 
+  public void addCSLeafPendingApp(FiCaSchedulerApp application, String queuePath) {
+    csLeafQueuePendingAppToAdd.put(application.getApplicationAttemptId().
+            toString(),
+            new LeafQueuePendingApp(application.getApplicationAttemptId().
+                    toString(),
+                    queuePath));
+  }
+
+  public void removeCSLeafPendingApp(FiCaSchedulerApp application) {
+    if (csLeafQueuePendingAppToAdd.remove(application.getApplicationAttemptId().
+            toString())
+            == null) {
+      csLeafQueuePendingAppToRemove.put(application.getApplicationAttemptId().
+              toString(),
+              new LeafQueuePendingApp(application.getApplicationAttemptId().
+                      toString()));
+    }
+  }
+
+  private void persistCSLeafQueuesPendingAppToAdd() throws StorageException {
+    if (!csLeafQueuePendingAppToAdd.isEmpty()) {
+      CSLeafQueuesPendingAppsDataAccess DA
+              = (CSLeafQueuesPendingAppsDataAccess) RMStorageFactory.
+              getDataAccess(
+                      CSLeafQueuesPendingAppsDataAccess.class);
+      DA.addAll(csLeafQueuePendingAppToAdd.values());
+    }
+  }
+
+  private void persistCSLeafQueuesPendingAppToRemove() throws StorageException {
+    if (!csLeafQueuePendingAppToRemove.isEmpty()) {
+      CSLeafQueuesPendingAppsDataAccess DA
+              = (CSLeafQueuesPendingAppsDataAccess) RMStorageFactory.
+              getDataAccess(
+                      CSLeafQueuesPendingAppsDataAccess.class);
+      DA.removeAll(csLeafQueuePendingAppToRemove.values());
+    }
+  }
 }

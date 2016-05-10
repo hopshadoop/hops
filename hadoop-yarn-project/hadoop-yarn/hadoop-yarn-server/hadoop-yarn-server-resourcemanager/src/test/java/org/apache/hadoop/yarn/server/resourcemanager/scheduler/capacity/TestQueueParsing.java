@@ -183,7 +183,7 @@ public class TestQueueParsing {
     fail = false;
     try {
       LeafQueue a = (LeafQueue) capacityScheduler.getQueue(A);
-      a.setMaxCapacity(45, null);
+      a.setMaxCapacity(45);
     } catch (IllegalArgumentException iae) {
       fail = true;
     }

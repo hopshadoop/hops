@@ -19,7 +19,6 @@
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity;
 
 import io.hops.ha.common.TransactionState;
-import io.hops.ha.common.TransactionStateImpl;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -91,7 +90,7 @@ public class ParentQueue implements CSQueue {
 
   private QueueState state;//from conf
 
-  private final QueueMetrics metrics;//TORECOVER
+  private final QueueMetrics metrics;//recovered
 
   private QueueInfo queueInfo; //in constructor
 
@@ -102,17 +101,6 @@ public class ParentQueue implements CSQueue {
           = RecordFactoryProvider.getRecordFactory(null);
 
   private final ResourceCalculator resourceCalculator; //in constructor
-
-  public void recover(RMStateStore.RMState state){
-    io.hops.metadata.yarn.entity.capacity.CSQueue hopCSQueue =
-            state.getAllCSQueues().get(this.getQueuePath());
-            
-    absoluteUsedCapacity = hopCSQueue.getAbsoluteUsedCapacity();
-    usedResources.setMemory(hopCSQueue.getUsedResourceMemory());
-    usedResources.setVirtualCores(hopCSQueue.getUsedResourceVCores());
-    usedCapacity = hopCSQueue.getUsedCapacity();
-    numContainers = hopCSQueue.getNumContainers();
-  }
   
   public ParentQueue(CapacitySchedulerContext cs, String queueName, 
           CSQueue parent, CSQueue old) {
@@ -197,7 +185,7 @@ public class ParentQueue implements CSQueue {
 
     // Update metrics
     CSQueueUtils.updateQueueStatistics(resourceCalculator, this, parent,
-            clusterResource, minimumAllocation, null);
+            clusterResource, minimumAllocation);
 
     LOG.info(queueName +
         ", capacity=" + capacity +
@@ -453,7 +441,7 @@ public class ParentQueue implements CSQueue {
 
   @Override
   public void submitApplication(ApplicationId applicationId, String user,
-          String queue, TransactionState transactionState)
+          String queue)
           throws AccessControlException {
 
     synchronized (this) {
@@ -475,7 +463,7 @@ public class ParentQueue implements CSQueue {
     // Inform the parent queue
     if (parent != null) {
       try {
-        parent.submitApplication(applicationId, user, queue, transactionState);
+        parent.submitApplication(applicationId, user, queue);
       } catch (AccessControlException ace) {
         LOG.info("Failed to submit application to parent-queue: " +
             parent.getQueuePath(), ace);
@@ -536,23 +524,13 @@ public class ParentQueue implements CSQueue {
   }
 
   @Override
-  public synchronized void setUsedCapacity(float usedCapacity,
-          TransactionState transactionState) {
+  public synchronized void setUsedCapacity(float usedCapacity) {
     this.usedCapacity = usedCapacity;
-    if (transactionState != null) {
-      ((TransactionStateImpl) transactionState).getCSQueueInfo().addCSQueue(
-              this.getQueuePath(), this);
-    }
   }
 
   @Override
-  public synchronized void setAbsoluteUsedCapacity(float absUsedCapacity,
-          TransactionState transactionState) {
+  public synchronized void setAbsoluteUsedCapacity(float absUsedCapacity) {
     this.absoluteUsedCapacity = absUsedCapacity;
-    if (transactionState != null) {
-      ((TransactionStateImpl) transactionState).getCSQueueInfo().addCSQueue(
-              this.getQueuePath(), this);
-    }
   }
 
   /**
@@ -586,7 +564,7 @@ public class ParentQueue implements CSQueue {
       }
 
       // Are we over maximum-capacity for this queue?
-      if (!assignToQueue(clusterResource, transactionState)) {
+      if (!assignToQueue(clusterResource)) {
         break;
       }
 
@@ -600,8 +578,7 @@ public class ParentQueue implements CSQueue {
       if (Resources.greaterThan(resourceCalculator, clusterResource,
               assignedToChild.getResource(), Resources.none())) {
         // Track resource utilization for the parent-queue
-        allocateResource(clusterResource, assignedToChild.getResource(),
-                transactionState);
+        allocateResource(clusterResource, assignedToChild.getResource());
 
         // Track resource utilization in this pass of the scheduler
         Resources
@@ -642,15 +619,11 @@ public class ParentQueue implements CSQueue {
     return assignment;
   }
 
-  private synchronized boolean assignToQueue(Resource clusterResource,
-          TransactionState transactionState) {
+  private synchronized boolean assignToQueue(Resource clusterResource) {
     // Check how of the cluster's absolute capacity we are currently using...
     float currentCapacity = Resources
         .divide(resourceCalculator, clusterResource, usedResources,
             clusterResource);
-   
-    ((TransactionStateImpl) transactionState).getCSQueueInfo().addCSQueue(
-              this.getQueuePath(), this);
   
     if (currentCapacity >= absoluteMaxCapacity) {
       LOG.info(getQueueName() +
@@ -736,7 +709,7 @@ public class ParentQueue implements CSQueue {
       // Book keeping
       synchronized (this) {
         releaseResource(clusterResource,
-                rmContainer.getContainer().getResource(), transactionState);
+                rmContainer.getContainer().getResource());
 
         LOG.info("completedContainer" +
             " queue=" + getQueueName() +
@@ -769,23 +742,19 @@ public class ParentQueue implements CSQueue {
   }
 
   synchronized void allocateResource(Resource clusterResource,
-          Resource resource, TransactionState transactionState) {
+          Resource resource) {
     Resources.addTo(usedResources, resource);
     CSQueueUtils.updateQueueStatistics(resourceCalculator, this, parent,
-            clusterResource, minimumAllocation, transactionState);
+            clusterResource, minimumAllocation);
     ++numContainers;
-    ((TransactionStateImpl) transactionState).getCSQueueInfo().addCSQueue(
-              this.getQueuePath(), this);
   }
 
   synchronized void releaseResource(Resource clusterResource,
-          Resource resource, TransactionState transactionState) {
+          Resource resource) {
     Resources.subtractFrom(usedResources, resource);
     CSQueueUtils.updateQueueStatistics(resourceCalculator, this, parent,
-            clusterResource, minimumAllocation, transactionState);
+            clusterResource, minimumAllocation);
     --numContainers;
-    ((TransactionStateImpl) transactionState).getCSQueueInfo().addCSQueue(
-              this.getQueuePath(), this);
   }
 
   @Override
@@ -798,7 +767,7 @@ public class ParentQueue implements CSQueue {
 
     // Update metrics
     CSQueueUtils.updateQueueStatistics(resourceCalculator, this, parent, 
-            clusterResource, minimumAllocation, transactionState);
+            clusterResource, minimumAllocation);
   }
 
   @Override
@@ -812,7 +781,7 @@ public class ParentQueue implements CSQueue {
           FiCaSchedulerApp application, Container container) {
     // Careful! Locking order is important! 
     synchronized (this) {
-      allocateResource(clusterResource, container.getResource(), null);
+      allocateResource(clusterResource, container.getResource());
     }
     if (parent != null) {
       parent.recoverContainer(clusterResource, application, container);

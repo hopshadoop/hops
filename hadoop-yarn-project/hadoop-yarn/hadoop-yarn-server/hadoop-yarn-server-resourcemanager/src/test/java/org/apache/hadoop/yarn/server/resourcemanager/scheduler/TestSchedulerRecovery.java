@@ -17,13 +17,10 @@ package org.apache.hadoop.yarn.server.resourcemanager.scheduler;
 
 import io.hops.exception.StorageException;
 import io.hops.exception.StorageInitializtionException;
-import io.hops.ha.common.TransactionState;
-import io.hops.ha.common.TransactionStateImpl;
 import io.hops.metadata.util.RMStorageFactory;
 import io.hops.metadata.util.RMUtilities;
 import io.hops.metadata.util.TestHopYarnAPIUtilities;
 import io.hops.metadata.util.YarnAPIStorageFactory;
-import io.hops.metadata.yarn.entity.appmasterrpc.RPC;
 import junit.framework.Assert;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -107,7 +104,7 @@ public class TestSchedulerRecovery {
     }
   }
 
-  @Test(timeout = 600000)
+  @Test(timeout = 60000)
   public void testRecovery() throws Exception {
     conf.setClass(YarnConfiguration.RM_STORE, NDBRMStateStore.class,
         RMStateStore.class);

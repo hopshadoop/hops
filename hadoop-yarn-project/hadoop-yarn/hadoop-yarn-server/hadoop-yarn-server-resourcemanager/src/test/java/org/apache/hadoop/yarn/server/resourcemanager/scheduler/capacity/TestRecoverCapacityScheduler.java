@@ -20,7 +20,6 @@ import io.hops.ha.common.TransactionStateImpl;
 import io.hops.metadata.util.RMStorageFactory;
 import io.hops.metadata.util.RMUtilities;
 import io.hops.metadata.util.YarnAPIStorageFactory;
-import io.hops.metadata.yarn.entity.capacity.CSLeafQueueUserInfo;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
@@ -44,7 +43,6 @@ import org.apache.hadoop.yarn.server.resourcemanager.MockRM;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.NDBRMStateStore;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
-import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerState;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.QueueMetrics;
@@ -57,13 +55,11 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.AppAddedSch
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.AppAttemptAddedSchedulerEvent;
 import org.apache.hadoop.yarn.util.resource.Resources;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import org.junit.Before;
 import org.junit.Test;
 import io.hops.metadata.yarn.entity.appmasterrpc.RPC;
 import java.util.ArrayList;
-import java.util.Collection;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
 
 public class TestRecoverCapacityScheduler {
@@ -157,7 +153,7 @@ public class TestRecoverCapacityScheduler {
     // Manipulate queue 'a'
     LeafQueue a = (LeafQueue) capScheduler.getQueue(A);
     //unset maxCapacity
-    a.setMaxCapacity(1.0f, null);
+    a.setMaxCapacity(1.0f);
 
     /*
      * This fakecluster resource will be used to manually manipulate the
@@ -201,7 +197,7 @@ public class TestRecoverCapacityScheduler {
                     appId_1, a.getQueueName(), user_0, transaction);
     capScheduler.handle(appAddedSchedulerEvent_1);
 
-    a.initializeApplicationLimits(fakeClusterResource);
+    a.updateClusterResource(fakeClusterResource, transaction);
 
     ApplicationId appId_2 = getApplicationId(102);
     AppAddedSchedulerEvent appAddedSchedulerEvent_2
@@ -340,54 +336,6 @@ public class TestRecoverCapacityScheduler {
     assertEquals(RMContainerState.ALLOCATED.toString(), rmContainer.getState());
 
     
-    //TORECOVER queues and queue metrics are not persisted correctly.
-    // Retrieve QueueMetrics data from the db and make assertions
-//    List<io.hops.metadata.yarn.entity.QueueMetrics> queueMetricsList
-//            = RMUtilities.getAllQueueMetrics();
-//    assertEquals(1, queueMetricsList.size());
-//
-//    io.hops.metadata.yarn.entity.QueueMetrics queueMetrics = queueMetricsList.
-//            get(0);
-//    assertEquals(4 * GB, queueMetrics.getAllocatedmb());
-//    assertEquals(1, queueMetrics.getAllocatedvcores());
-//    assertEquals(1, queueMetrics.getAllocatedcontainers());
-//    assertEquals(3L, queueMetrics.getAggregatecontainersallocated());
-
-    // Retrieve CSQueue data from the db and make assertions
-//    List<io.hops.metadata.yarn.entity.capacity.CSQueue> csQueues = RMUtilities.
-//            getAllCSQueues();
-//    io.hops.metadata.yarn.entity.capacity.CSQueue rootA = null;
-//
-//    for (io.hops.metadata.yarn.entity.capacity.CSQueue q : csQueues) {
-//      if (q.getPath().equals("root.a")) {
-//        rootA = q;
-//        break;
-//      }
-//    }
-//
-//    assertNotNull(rootA);
-//    assertEquals(4 * GB, rootA.getUsedResourceMemory());
-//    assertEquals(1, rootA.getUsedResourceVCores());
-//    assertEquals(1, rootA.getNumContainers());
-
-    // Retrieve CSLeafQueueUserInfo from the db and make assertions
-    Collection<CSLeafQueueUserInfo> leafQueueUserInfoList = RMUtilities.
-            getAllCSLeafQueueUserInfoFullTransaction().values();
-
-    for (CSLeafQueueUserInfo leafQueueUserInfo : leafQueueUserInfoList) {
-      // sri
-      if (leafQueueUserInfo.getUserName().equals(user_0)) {
-        assertEquals(0 * GB, leafQueueUserInfo.getConsumedMemory());
-        assertEquals(0, leafQueueUserInfo.getConsumedVCores());
-      }
-
-      // Daniel
-      if (leafQueueUserInfo.getUserName().equals(user_1)) {
-        assertEquals(4 * GB, leafQueueUserInfo.getConsumedMemory());
-        assertEquals(1, leafQueueUserInfo.getConsumedVCores());
-      }
-    }
-
     // Test CapacityScheduler node map
     List<io.hops.metadata.yarn.entity.FiCaSchedulerNode> nodeList
             = new ArrayList<io.hops.metadata.yarn.entity.FiCaSchedulerNode>(
@@ -395,7 +343,6 @@ public class TestRecoverCapacityScheduler {
     io.hops.metadata.yarn.entity.FiCaSchedulerNode node = nodeList.get(0);
 
     assertEquals(1, nodeList.size());
-    assertEquals(1, node.getNumOfContainers());
 
     // Test application list
     Map<String, io.hops.metadata.yarn.entity.SchedulerApplication> appMap
@@ -479,8 +426,8 @@ public class TestRecoverCapacityScheduler {
 
     //TODO, check that the queuemetrics are good
     QueueMetrics queueMetrics = scheduler.getRootQueueMetrics();
-    assertTrue("wrong queueMetrics value", queueMetrics.getActiveApps()
-            == mockResMan.getResourceScheduler().getRootQueueMetrics().
+    assertEquals("wrong queueMetrics value ", queueMetrics.getActiveApps()
+            , mockResMan.getResourceScheduler().getRootQueueMetrics().
             getActiveApps());
 
     mockResMan.stop();

@@ -527,7 +527,8 @@ public class RMAppAttemptImpl implements RMAppAttempt, Recoverable {
          * keep the master in sync with the state machine
          */
         this.stateMachine.doTransition(event.getType(), event);
-        if (event.getTransactionState() != null) {
+        
+        if (oldState!=getState() && event.getTransactionState() != null) {
           ((TransactionStateImpl) event.getTransactionState()).
               addAppAttempt(this);
         }
@@ -561,7 +562,7 @@ public class RMAppAttemptImpl implements RMAppAttempt, Recoverable {
   }
 
   @Override
-  public void recover(RMState state) throws Exception {
+  public void recover(RMState state) throws IOException {
     ApplicationState appState =
         state.getApplicationState().get(getAppAttemptId().
             getApplicationId());
@@ -615,7 +616,8 @@ public class RMAppAttemptImpl implements RMAppAttempt, Recoverable {
     this.ranNodes = attempt.getRanNodes();
     ((TransactionStateImpl) ts).addAppAttempt(this);
     ((TransactionStateImpl) ts).addAllRanNodes(this);
-    ((TransactionStateImpl) ts).addAllJustFinishedContainersToAdd(this.justFinishedContainers, this.applicationAttemptId);
+    ((TransactionStateImpl) ts).addAllJustFinishedContainersToAdd(
+            this.justFinishedContainers, this.applicationAttemptId);
   }
 
   private void recoverAppAttemptCredentials(Credentials appAttemptTokens)
@@ -1072,7 +1074,10 @@ public class RMAppAttemptImpl implements RMAppAttempt, Recoverable {
       RMAppAttemptStatusupdateEvent statusUpdateEvent =
           (RMAppAttemptStatusupdateEvent) event;
 
-      // Update progress
+      // Update progress 
+      //(We do not alwasy persist it to the database, 
+      //this may result in a temporary wron information when recovering,
+      //but this avoid contention on the database)
       appAttempt.progress = statusUpdateEvent.getProgress();
 
       // Ping to AMLivelinessMonitor

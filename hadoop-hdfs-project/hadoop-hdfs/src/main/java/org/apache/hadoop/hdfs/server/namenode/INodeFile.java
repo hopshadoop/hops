@@ -71,21 +71,21 @@ public class INodeFile extends INode implements BlockCollection {
 
   public INodeFile(PermissionStatus permissions, BlockInfo[] blklist,
       short replication, long modificationTime, long atime,
-      long preferredBlockSize) {
+      long preferredBlockSize) throws IOException {
     super(permissions, modificationTime, atime);
     this.setReplicationNoPersistance(replication);
     this.setPreferredBlockSizeNoPersistance(preferredBlockSize);
   }
 
   public INodeFile(PermissionStatus permissions, long header,
-      long modificationTime, long atime) {
+      long modificationTime, long atime) throws IOException {
     super(permissions, modificationTime, atime);
     this.setHeader(header);
   }
 
   //HOP:
   public INodeFile(INodeFile other)
-      throws StorageException, TransactionContextException {
+      throws IOException {
     super(other);
     setReplicationNoPersistance(other.getBlockReplication());
     setPreferredBlockSizeNoPersistance(other.getPreferredBlockSize());
@@ -360,7 +360,7 @@ public class INodeFile extends INode implements BlockCollection {
 
   public INodeFileUnderConstruction convertToUnderConstruction(
       String clientName, String clientMachine, DatanodeID clientNode)
-      throws StorageException, TransactionContextException {
+      throws IOException {
     INodeFileUnderConstruction ucfile =
         new INodeFileUnderConstruction(this, clientName, clientMachine,
             clientNode);

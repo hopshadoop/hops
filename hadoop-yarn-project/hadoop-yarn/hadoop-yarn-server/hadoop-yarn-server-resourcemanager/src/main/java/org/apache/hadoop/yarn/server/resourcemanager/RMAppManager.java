@@ -261,7 +261,7 @@ public class RMAppManager
           " from state store.");
       if (transactionState != null) {
         ((TransactionStateImpl) transactionState)
-            .addApplicationStateToRemove(removeId);
+            .addApplicationToRemove(removeId);
       }
       //      rmContext.getStateStore().removeApplication(removeApp, transactionState);
       completedAppsInStateStore--;
@@ -277,7 +277,7 @@ public class RMAppManager
       rmContext.getRMApps().remove(removeId);
       if (transactionState != null) {
         ((TransactionStateImpl) transactionState)
-            .addApplicationStateToRemove(removeId);
+            .addApplicationToRemove(removeId);
       }
       this.applicationACLsManager.removeApplication(removeId);
     }
@@ -325,7 +325,7 @@ public class RMAppManager
 
   @SuppressWarnings("unchecked")
   protected void recoverApplication(ApplicationState appState, RMState rmState,
-      TransactionState transactionState) throws Exception {
+      TransactionState transactionState) throws YarnException, IOException {
     ApplicationSubmissionContext appContext = appState.
         getApplicationSubmissionContext();
     ApplicationId appId = appState.getAppId();
@@ -334,13 +334,6 @@ public class RMAppManager
     RMAppImpl application = createAndPopulateNewRMApp(appContext, appState.
             getSubmitTime(), appState.getUser(), transactionState);
     application.recover(rmState);
-    //    if (isApplicationInFinalState(appState.getState())) {
-    //      // We are synchronously moving the application into final state so that
-    //      // momentarily client will not see this application in NEW state. Also
-    //      // for finished applications we will avoid renewing tokens.
-    //      application.handle(new RMAppEvent(appId, RMAppEventType.RECOVER, null));
-    //      return;
-    //    }
 
     if (UserGroupInformation.isSecurityEnabled()) {
       Credentials credentials;
@@ -351,14 +344,12 @@ public class RMAppManager
             .addApplicationSync(appId, credentials,
                 appContext.getCancelTokensWhenComplete(), null);
         //        application.handle(new RMAppEvent(appId, RMAppEventType.RECOVER, null));
-      } catch (Exception e) {
+      } catch (IOException e) {
         LOG.warn("Unable to parse and renew delegation tokens.", e);
         this.rmContext.getDispatcher().getEventHandler()
             .handle(new RMAppRejectedEvent(appId, e.getMessage(), null));
         throw e;
       }
-    } else {
-      //      application.handle(new RMAppEvent(appId, RMAppEventType.RECOVER, null));
     }
   }
 
@@ -431,7 +422,7 @@ public class RMAppManager
   }
 
   @Override
-  public void recover(RMState state) throws Exception {
+  public void recover(RMState state) throws YarnException, IOException {
     RMStateStore store = rmContext.getStateStore();
     assert store != null;
     // recover applications

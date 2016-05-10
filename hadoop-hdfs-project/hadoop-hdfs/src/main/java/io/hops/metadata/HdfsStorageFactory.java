@@ -335,10 +335,10 @@ public class HdfsStorageFactory {
     return dStorageFactory.getConnector().formatStorage();
   }
   
-  public static boolean formatStorageNonTransactional()
+  public static boolean formatAllStorageNonTransactional()
       throws StorageException {
     Cache.getInstance().flush();
-    return dStorageFactory.getConnector().formatStorageNonTransactional();
+    return dStorageFactory.getConnector().formatAllStorageNonTransactional();
   }
 
   public static boolean formatStorage(Class<? extends EntityDataAccess>... das)

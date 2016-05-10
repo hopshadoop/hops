@@ -18,11 +18,9 @@ package org.apache.hadoop.yarn.server.resourcemanager;
 import io.hops.metadata.yarn.entity.ContainerStatus;
 import java.util.List;
 import java.util.Set;
+import org.apache.hadoop.yarn.server.api.records.MasterKey;
+import org.apache.hadoop.yarn.server.security.MasterKeyData;
 
-/**
- *
- * @author sri
- */
 public class StreamingRTComps {
 
   private final Set<org.apache.hadoop.yarn.api.records.ContainerId> containersToClean;
@@ -30,17 +28,45 @@ public class StreamingRTComps {
   private final String nodeId;
   private final boolean nextHeartbeat;
   private final List<ContainerStatus> hopContainersStatusList;
+  private final MasterKey currentNMMasterKey;
+  private final MasterKey nextNMMasterKey;
+  private final MasterKey currentRMContainerMasterKey;
+  private final MasterKey nextRMContainerMasterKey;  
+  private final float currentPrice;
+  private final long currentPriceTick;
+
 
   public StreamingRTComps(
           Set<org.apache.hadoop.yarn.api.records.ContainerId> containersToClean,
           List<org.apache.hadoop.yarn.api.records.ApplicationId> finishedApp,
-          String nodeId, boolean nextHeartbeat, 
-          List<ContainerStatus> hopContainersStatusList) {
+          String nodeId, boolean nextHeartbeat,
+          List<ContainerStatus> hopContainersStatusList,
+          MasterKey currentNMMasterKey,
+          MasterKey nextNMMasterKey,
+          MasterKey currentRMContainerMasterKey,
+          MasterKey nextRMContainerMasterKey,
+          float currentPrice,
+          long currentPriceTick
+  ) {
     this.containersToClean = containersToClean;
     this.finishedApp = finishedApp;
     this.nodeId = nodeId;
     this.nextHeartbeat = nextHeartbeat;
     this.hopContainersStatusList = hopContainersStatusList;
+    this.currentNMMasterKey=currentNMMasterKey;
+    this.nextNMMasterKey = nextNMMasterKey;
+    this.currentRMContainerMasterKey = currentRMContainerMasterKey;
+    this.nextRMContainerMasterKey = nextRMContainerMasterKey;
+    this.currentPrice = currentPrice;
+    this.currentPriceTick = currentPriceTick;
+  }
+  
+  public float getCurrentPrice() {
+    return currentPrice;
+  }
+
+  public long getCurrentPriceTick() {
+    return currentPriceTick;
   }
 
   public Set<org.apache.hadoop.yarn.api.records.ContainerId> getContainersToClean() {
@@ -63,4 +89,21 @@ public class StreamingRTComps {
       return hopContainersStatusList;
   }
 
+  public MasterKey getCurrentNMMasterKey() {
+    return currentNMMasterKey;
+  }
+
+  public MasterKey getNextNMMasterKey() {
+    return nextNMMasterKey;
+  }
+
+  public MasterKey getCurrentRMContainerMasterKey() {
+    return currentRMContainerMasterKey;
+  }
+
+  public MasterKey getNextRMContainerMasterKey() {
+    return nextRMContainerMasterKey;
+  }
+
+  
 }

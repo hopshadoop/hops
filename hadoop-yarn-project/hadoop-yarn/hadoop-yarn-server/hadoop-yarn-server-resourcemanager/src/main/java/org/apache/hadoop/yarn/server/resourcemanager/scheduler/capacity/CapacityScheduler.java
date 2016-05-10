@@ -491,8 +491,7 @@ public class CapacityScheduler extends AbstractYarnScheduler
                 "Queue configuration missing child queue names for " + queueName);
       }
       queue =
-          new LeafQueue(csContext, queueName, parent, oldQueues.get(queueName),
-          transactionState);
+          new LeafQueue(csContext, queueName, parent, oldQueues.get(queueName));
 
       // Used only for unit tests
       queue = hook.hook(queue);
@@ -548,7 +547,7 @@ public class CapacityScheduler extends AbstractYarnScheduler
     }
     // Submit to the queue
     try {
-      queue.submitApplication(applicationId, user, queueName, transactionState);
+      queue.submitApplication(applicationId, user, queueName);
     } catch (AccessControlException ace) {
       LOG.info("Failed to submit application " + applicationId + " to queue " +
           queueName + " from user " + user, ace);
@@ -593,8 +592,8 @@ public class CapacityScheduler extends AbstractYarnScheduler
 
     if (transactionState != null) {
       ((TransactionStateImpl) transactionState).getSchedulerApplicationInfos(
-              applicationAttemptId.getApplicationId()).
-              setFiCaSchedulerAppInfo(attempt);
+              applicationAttemptId.getApplicationId()).getFiCaSchedulerAppInfo(
+                      attempt.getApplicationAttemptId()).createFull(attempt);
     }
 
     queue.submitApplicationAttempt(attempt, application.getUser(),
@@ -804,10 +803,6 @@ public class CapacityScheduler extends AbstractYarnScheduler
     SchedulerUtils.updateResourceIfChanged(node, nm, clusterResource, LOG,
             transactionState);
     
-    if (transactionState != null) {
-      ((TransactionStateImpl) transactionState)
-              .updateClusterResource(node.getAvailableResource());
-    }
     
     List<UpdatedContainerInfo> containerInfoList = 
         nm.pullContainerUpdates(transactionState);
@@ -996,8 +991,6 @@ public class CapacityScheduler extends AbstractYarnScheduler
     if (transactionState != null) {
       ((TransactionStateImpl) transactionState).addFicaSchedulerNodeInfoToAdd(
               nodeManager.getNodeID().toString(), ficaNode);
-      ((TransactionStateImpl) transactionState).updateClusterResource(
-              clusterResource);
     }
 
     root.updateClusterResource(clusterResource, transactionState);
@@ -1020,10 +1013,6 @@ public class CapacityScheduler extends AbstractYarnScheduler
     Resources
             .subtractFrom(clusterResource, node.getRMNode().getTotalCapability());
     root.updateClusterResource(clusterResource, transactionState);
-    if (transactionState != null) {
-      ((TransactionStateImpl) transactionState).updateClusterResource(
-              clusterResource);
-    }
 
     --numNodeManagers;
 
@@ -1171,27 +1160,9 @@ public class CapacityScheduler extends AbstractYarnScheduler
         Resources.addTo(clusterResource, ficaNode.getTotalResource());
         nodes.put(nodeId, ficaNode);
         numNodeManagers++;
+        root.updateClusterResource(clusterResource, null);
       }
 
-      //recover csqueues
-      for (io.hops.metadata.yarn.entity.capacity.CSQueue hopQueue
-              : state.getAllCSQueues().values()) {
-
-        CSQueue csQueue = queues.get(hopQueue.getName());
-        csQueue.recover(state);
-
-        LOG.info("recovered csQueue: " + csQueue.getQueueName()
-                + " with usedcapacity " + csQueue.getUsedCapacity()
-                + ", used memory " + csQueue.getUsedResources().getMemory()
-                + " and used vcores: " + csQueue.getUsedResources().
-                getVirtualCores());
-        //if it is child queue, the inset the user in to map
-        if (!hopQueue.isParent()) {
-          LeafQueue leafQueue = (LeafQueue) csQueue;
-          leafQueue.initializeApplicationLimits(clusterResource);
-        }
-
-      }
 
       //recover applications
       for (io.hops.metadata.yarn.entity.SchedulerApplication fsapp : state.
@@ -1200,35 +1171,37 @@ public class CapacityScheduler extends AbstractYarnScheduler
         //construct appliactionId - key of applications map
         ApplicationId appId = ConverterUtils.toApplicationId(fsapp.getAppid());
 
-        //retrieve HopApplicationAttemptId for this specific appId
-        AppSchedulingInfo hopFiCaSchedulerApp = state.getAppSchedulingInfo(
-                fsapp.getAppid());
+        //construct SchedulerAppliaction
+        org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication app
+                = new org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication(
+                        getQueue(fsapp.getQueuename()), fsapp.
+                        getUser());
 
-        if (hopFiCaSchedulerApp != null) {
-          //construct SchedulerAppliaction
-          org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication app
-                  = new org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication(
-                          getQueue(hopFiCaSchedulerApp.getQueuename()), fsapp.
-                          getUser());
+        //recover application attempts
+        for (AppSchedulingInfo hopFiCaSchedulerApp : state.getAppSchedulingInfo(
+                fsapp.getAppid()).values()) {
           //construct ApplicationAttemptId
           ApplicationAttemptId appAttemptId = ConverterUtils.
-                  toApplicationAttemptId(hopFiCaSchedulerApp.getSchedulerAppId());
+                  toApplicationAttemptId(hopFiCaSchedulerApp.
+                          getSchedulerAppId());
+          if (app.getCurrentAppAttempt() == null
+                  || app.getCurrentAppAttempt().getApplicationAttemptId().
+                  compareTo(appAttemptId) < 0) {
+            FiCaSchedulerApp appAttempt = new FiCaSchedulerApp(appAttemptId,
+                    hopFiCaSchedulerApp.getUser(), getQueue(hopFiCaSchedulerApp.
+                            getQueuename()),
+                    queues.get(hopFiCaSchedulerApp.
+                            getQueuename()).getActiveUsersManager(),
+                    this.rmContext, maxAllocatedContainersPerRequest);
+            appAttempt.recover(state);
+            app.setCurrentAppAttempt(appAttempt, null);
+            LeafQueue queue = (LeafQueue) getQueue(hopFiCaSchedulerApp.
+                    getQueuename());
 
-          FiCaSchedulerApp appAttempt = new FiCaSchedulerApp(appAttemptId,
-                  hopFiCaSchedulerApp.getUser(), getQueue(hopFiCaSchedulerApp.
-                          getQueuename()),
-                  queues.get(hopFiCaSchedulerApp.
-                          getQueuename()).getActiveUsersManager(),
-                  this.rmContext, maxAllocatedContainersPerRequest);
-          appAttempt.recover(state);
-          app.setCurrentAppAttempt(appAttempt, null);
-          LeafQueue queue = (LeafQueue) getQueue(hopFiCaSchedulerApp.
-                  getQueuename());
-
-          queue.recoverApp(appAttempt, state);
-
-          applications.put(appId, app);
+            queue.recoverApp(appAttempt, state, clusterResource);
+          }
         }
+        applications.put(appId, app);
       }
     } catch (IOException ex) {
 

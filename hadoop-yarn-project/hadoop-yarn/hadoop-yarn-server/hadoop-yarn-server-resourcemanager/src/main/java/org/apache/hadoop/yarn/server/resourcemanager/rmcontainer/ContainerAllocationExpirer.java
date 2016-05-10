@@ -67,6 +67,9 @@ public class ContainerAllocationExpirer
     } catch (IOException ex) {
       Logger.getLogger(ContainerAllocationExpirer.class.getName())
           .log(Level.SEVERE, null, ex);
+    } catch (InterruptedException ex) {
+      Logger.getLogger(ContainerAllocationExpirer.class.getName()).
+              log(Level.SEVERE, null, ex);
     }
   }
 }

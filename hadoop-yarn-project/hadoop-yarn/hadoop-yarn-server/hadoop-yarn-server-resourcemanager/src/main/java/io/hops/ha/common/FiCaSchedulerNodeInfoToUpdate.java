@@ -46,10 +46,9 @@ public class FiCaSchedulerNodeInfoToUpdate {
   private FiCaSchedulerNode
       infoToUpdate;
   private final String id;
-  private Map<String, String> launchedContainersToAdd=new HashMap<String, String>();
+  private Map<String, LaunchedContainers> launchedContainersToAdd
+          = new HashMap<String, LaunchedContainers>();
   private Set<String> launchedContainersToRemove = new HashSet<String>();
-  private RMContainer
-      reservedRMContainerToRemove;
   private Map<Integer, Resource>
       toUpdateResources = new HashMap<Integer, Resource>();
 
@@ -60,7 +59,6 @@ public class FiCaSchedulerNodeInfoToUpdate {
 
   public void agregate(FiCaSchedulerNodeInfoAgregate agregate){
     agregateToUpdateFicaSchedulerNode(agregate);
-    agregateRmContainerToRemove(agregate);
     agregateToUpdateFiCaSchedulerNodeId(agregate);
   }
   
@@ -78,20 +76,14 @@ public class FiCaSchedulerNodeInfoToUpdate {
     transactionState.addRMContainerToUpdate((RMContainerImpl) node.getReservedContainer());
   }
 
-  public void toRemoveRMContainer(
-      org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer rmContainer) {
-    reservedRMContainerToRemove = new RMContainer(
-          rmContainer.getContainer().getId().toString());
-  }
-
   public void toAddLaunchedContainers(String cid, String rmcon) {
-    launchedContainersToAdd.put(cid, rmcon);
+    launchedContainersToAdd.put(cid, new LaunchedContainers(id, cid, rmcon));
     launchedContainersToRemove.remove(cid);
   }
 
   public void toRemoveLaunchedContainers(String cid) {
     if (launchedContainersToAdd.remove(cid)==null){
-    launchedContainersToRemove.add(cid);
+      launchedContainersToRemove.add(cid);
     }
   }
 
@@ -118,25 +110,9 @@ public class FiCaSchedulerNodeInfoToUpdate {
     agregateToUpdateResources(agregate);
   }
     
-  private void agregateRmContainerToRemove(FiCaSchedulerNodeInfoAgregate agregate){
-    if (reservedRMContainerToRemove != null) {
-      agregate.addReservedRMContainerToRemove(reservedRMContainerToRemove);
-    }
-  }
-  
   private void agregateLaunchedContainersToAdd(FiCaSchedulerNodeInfoAgregate agregate){
     if (launchedContainersToAdd != null) {
-      ArrayList<LaunchedContainers> toAddLaunchedContainers =
-          new ArrayList<LaunchedContainers>();
-      for (String key : launchedContainersToAdd.keySet()) {
-        if (launchedContainersToRemove == null || !launchedContainersToRemove.
-                remove(key)) {
-
-          String val = launchedContainersToAdd.get(key);
-          toAddLaunchedContainers.add(new LaunchedContainers(id, key, val));
-        }
-      }
-      agregate.addAlllaunchedContainersToAdd(toAddLaunchedContainers);
+      agregate.addAlllaunchedContainersToAdd(launchedContainersToAdd.values());
     }
   }
     

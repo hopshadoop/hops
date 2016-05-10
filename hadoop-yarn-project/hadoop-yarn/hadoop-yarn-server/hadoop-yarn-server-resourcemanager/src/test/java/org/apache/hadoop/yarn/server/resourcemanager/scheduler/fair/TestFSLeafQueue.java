@@ -19,6 +19,7 @@
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair;
 
 import io.hops.metadata.util.RMStorageFactory;
+import io.hops.metadata.util.RMUtilities;
 import io.hops.metadata.util.YarnAPIStorageFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.records.Resource;
@@ -46,13 +47,14 @@ public class TestFSLeafQueue {
     FairScheduler scheduler = new FairScheduler();
     Configuration conf = createConfiguration();
     YarnAPIStorageFactory.setConfiguration(conf);
+    RMStorageFactory.setConfiguration(conf);
+    RMUtilities.InitializeDB();
     // All tests assume only one assignment per node update
     conf.set(FairSchedulerConfiguration.ASSIGN_MULTIPLE, "false");
     ResourceManager resourceManager = new ResourceManager();
     resourceManager.init(conf);
     ((AsyncDispatcher) resourceManager.getRMContext().getDispatcher()).start();
     scheduler.reinitialize(conf, resourceManager.getRMContext(), null);
-    RMStorageFactory.setConfiguration(conf);
     String queueName = "root.queue1";
     scheduler.allocConf = mock(AllocationConfiguration.class);
     when(scheduler.allocConf.getMaxResources(queueName))

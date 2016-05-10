@@ -19,20 +19,14 @@ import io.hops.exception.StorageException;
 import io.hops.metadata.util.RMStorageFactory;
 import io.hops.metadata.yarn.dal.AppSchedulingInfoBlacklistDataAccess;
 import io.hops.metadata.yarn.dal.AppSchedulingInfoDataAccess;
-import io.hops.metadata.yarn.dal.ContainerDataAccess;
 import io.hops.metadata.yarn.dal.FiCaSchedulerAppLastScheduledContainerDataAccess;
-import io.hops.metadata.yarn.dal.FiCaSchedulerAppLiveContainersDataAccess;
-import io.hops.metadata.yarn.dal.FiCaSchedulerAppNewlyAllocatedContainersDataAccess;
 import io.hops.metadata.yarn.dal.FiCaSchedulerAppReservationsDataAccess;
 import io.hops.metadata.yarn.dal.FiCaSchedulerAppSchedulingOpportunitiesDataAccess;
-import io.hops.metadata.yarn.dal.RMContainerDataAccess;
 import io.hops.metadata.yarn.dal.ResourceDataAccess;
 import io.hops.metadata.yarn.dal.ResourceRequestDataAccess;
 import io.hops.metadata.yarn.dal.capacity.FiCaSchedulerAppReservedContainersDataAccess;
 import io.hops.metadata.yarn.entity.AppSchedulingInfo;
 import io.hops.metadata.yarn.entity.AppSchedulingInfoBlacklist;
-import io.hops.metadata.yarn.entity.Container;
-import io.hops.metadata.yarn.entity.FiCaSchedulerAppContainer;
 import io.hops.metadata.yarn.entity.FiCaSchedulerAppLastScheduledContainer;
 import io.hops.metadata.yarn.entity.FiCaSchedulerAppSchedulingOpportunities;
 import io.hops.metadata.yarn.entity.Resource;
@@ -57,25 +51,14 @@ public class AgregatedAppInfo {
   List<Resource> resourcesToRemove = new ArrayList<Resource>();
   List<FiCaSchedulerAppReservedContainers> toAddReservedContainers
           = new ArrayList<FiCaSchedulerAppReservedContainers>();
-  List<Container> toAddContainers = new ArrayList<Container>();
   List<FiCaSchedulerAppReservedContainers> toRemoveReservedContainers
           = new ArrayList<FiCaSchedulerAppReservedContainers>();
-  List<io.hops.metadata.yarn.entity.RMContainer> toRemoveRMContainers
-          = new ArrayList<io.hops.metadata.yarn.entity.RMContainer>();
   List<FiCaSchedulerAppLastScheduledContainer> toAddLastScheduledCont
           = new ArrayList<FiCaSchedulerAppLastScheduledContainer>();
   List<FiCaSchedulerAppSchedulingOpportunities> toAddSO
           = new ArrayList<FiCaSchedulerAppSchedulingOpportunities>();
   List<SchedulerAppReservations> toAddReReservations
           = new ArrayList<SchedulerAppReservations>();
-  List<FiCaSchedulerAppContainer> toAddNewlyAllocatedContainersList
-          = new ArrayList<FiCaSchedulerAppContainer>();
-  List<FiCaSchedulerAppContainer> toRemoveNewlyAllocatedContainersList
-          = new ArrayList<FiCaSchedulerAppContainer>();
-  List<FiCaSchedulerAppContainer> toAddLiveContainers
-          = new ArrayList<FiCaSchedulerAppContainer>();
-  List<FiCaSchedulerAppContainer> toRemoveLiveContainers
-          = new ArrayList<FiCaSchedulerAppContainer>();
   List<ResourceRequest> toAddResourceRequests = new ArrayList<ResourceRequest>();
   List<ResourceRequest> toRemoveResourceRequests
           = new ArrayList<ResourceRequest>();
@@ -105,19 +88,11 @@ public class AgregatedAppInfo {
     toAddReservedContainers.addAll(reserved);
   }
 
-  public void addAllContainers(List<Container> containers) {
-    toAddContainers.addAll(containers);
-  }
-
   public void addAllReservedContainersToRemove(
           List<FiCaSchedulerAppReservedContainers> toRemove) {
     toRemoveReservedContainers.addAll(toRemove);
   }
 
-  public void addAllRMContainersToRemove(
-          List<io.hops.metadata.yarn.entity.RMContainer> toRemove) {
-    toRemoveRMContainers.addAll(toRemove);
-  }
 
   public void addAllLastScheduerContainersToAdd(
           List<FiCaSchedulerAppLastScheduledContainer> toAdd) {
@@ -131,25 +106,6 @@ public class AgregatedAppInfo {
 
   public void addAllReReservateion(List<SchedulerAppReservations> toAdd) {
     toAddReReservations.addAll(toAdd);
-  }
-
-  public void addAllNewlyAllocatedcontainersToAdd(
-          List<FiCaSchedulerAppContainer> toAdd) {
-    toAddNewlyAllocatedContainersList.addAll(toAdd);
-  }
-
-  public void addAllNewlyAllocatedContainersToRemove(
-          List<FiCaSchedulerAppContainer> toRemove) {
-    toRemoveNewlyAllocatedContainersList.addAll(toRemove);
-  }
-
-  public void addAllLiveContainersToAdd(List<FiCaSchedulerAppContainer> toAdd) {
-    toAddLiveContainers.addAll(toAdd);
-  }
-
-  public void addAllLiveContainersToRemove(
-          List<FiCaSchedulerAppContainer> toRemove) {
-    toRemoveLiveContainers.addAll(toRemove);
   }
 
   public void addAllResourceRequest(List<ResourceRequest> toAdd) {
@@ -170,17 +126,12 @@ public class AgregatedAppInfo {
 
   public void persist() throws StorageException {
     persistApplicationToAdd();
-    persistContainers();
     persistReservedContainersToAdd();
     persistReservedContainersToRemove();
     //TORECOVER FAIR used only in fair scheduler
 //    persistLastScheduledContainersToAdd();
     persistSchedulingOpportunitiesToAdd();
     persistReReservations();
-    persistNewlyAllocatedContainersToAdd();
-    persistNewlyAllocatedContainersToRemove();
-    persistLiveContainersToAdd();
-    persistLiveContainersToRemove();
     persistRequestsToAdd();
     persistRequestsToRemove();
     persistBlackListsToAdd();
@@ -197,12 +148,6 @@ public class AgregatedAppInfo {
     asinfoDA.addAll(appSchedulingInfoToPersist);
   }
 
-  protected void persistContainers() throws StorageException {
-    ContainerDataAccess cDA = (ContainerDataAccess) RMStorageFactory.
-            getDataAccess(ContainerDataAccess.class);
-    cDA.addAll(toAddContainers);
-  }
-
   protected void persistReservedContainersToAdd() throws StorageException {
     FiCaSchedulerAppReservedContainersDataAccess reservedContDA
             = (FiCaSchedulerAppReservedContainersDataAccess) RMStorageFactory.
@@ -216,11 +161,7 @@ public class AgregatedAppInfo {
             = (FiCaSchedulerAppReservedContainersDataAccess) RMStorageFactory.
             getDataAccess(FiCaSchedulerAppReservedContainersDataAccess.class);
 
-    RMContainerDataAccess rmcDA = (RMContainerDataAccess) RMStorageFactory.
-            getDataAccess(RMContainerDataAccess.class);
-
     reservedContDA.removeAll(toRemoveReservedContainers);
-    rmcDA.removeAll(toRemoveRMContainers);
   }
 
   protected void persistLastScheduledContainersToAdd() throws StorageException {
@@ -245,41 +186,6 @@ public class AgregatedAppInfo {
             getDataAccess(FiCaSchedulerAppReservationsDataAccess.class);
 
     reservationsDA.addAll(toAddReReservations);
-  }
-
-  private void persistNewlyAllocatedContainersToAdd() throws StorageException {
-    //Persist NewllyAllocatedContainers list
-    FiCaSchedulerAppNewlyAllocatedContainersDataAccess fsanDA
-            = (FiCaSchedulerAppNewlyAllocatedContainersDataAccess) RMStorageFactory.
-            getDataAccess(
-                    FiCaSchedulerAppNewlyAllocatedContainersDataAccess.class);
-    fsanDA.addAll(toAddNewlyAllocatedContainersList);
-  }
-
-  private void persistNewlyAllocatedContainersToRemove()
-          throws StorageException {
-    //Remove NewllyAllocatedContainers list
-    FiCaSchedulerAppNewlyAllocatedContainersDataAccess fsanDA
-            = (FiCaSchedulerAppNewlyAllocatedContainersDataAccess) RMStorageFactory.
-            getDataAccess(
-                    FiCaSchedulerAppNewlyAllocatedContainersDataAccess.class);
-    fsanDA.removeAll(toRemoveNewlyAllocatedContainersList);
-  }
-
-  private void persistLiveContainersToAdd() throws StorageException {
-    //Persist LiveContainers
-    FiCaSchedulerAppLiveContainersDataAccess fsalcDA
-            = (FiCaSchedulerAppLiveContainersDataAccess) RMStorageFactory.
-            getDataAccess(FiCaSchedulerAppLiveContainersDataAccess.class);
-    fsalcDA.addAll(toAddLiveContainers);
-
-  }
-
-  private void persistLiveContainersToRemove() throws StorageException {
-    FiCaSchedulerAppLiveContainersDataAccess fsalcDA
-            = (FiCaSchedulerAppLiveContainersDataAccess) RMStorageFactory.
-            getDataAccess(FiCaSchedulerAppLiveContainersDataAccess.class);
-    fsalcDA.removeAll(toRemoveLiveContainers);
   }
 
   private void persistRequestsToAdd() throws StorageException {

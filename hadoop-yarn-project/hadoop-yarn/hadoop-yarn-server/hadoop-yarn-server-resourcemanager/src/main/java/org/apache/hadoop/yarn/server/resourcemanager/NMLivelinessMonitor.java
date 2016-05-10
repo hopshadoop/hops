@@ -17,7 +17,7 @@
 package org.apache.hadoop.yarn.server.resourcemanager;
 
 import io.hops.ha.common.TransactionState;
-import io.hops.ha.common.TransactionStateImpl;
+import io.hops.metadata.util.RMUtilities;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
@@ -31,16 +31,21 @@ import org.apache.hadoop.yarn.util.SystemClock;
 import java.io.IOException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
+import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 
 public class NMLivelinessMonitor extends AbstractLivelinessMonitor<NodeId> {
 
   private final EventHandler dispatcher;
   private final RMContext rmContext;
+  private final Configuration conf;
   
-  public NMLivelinessMonitor(Dispatcher d, RMContext rmContext) {
+  public NMLivelinessMonitor(Dispatcher d, RMContext rmContext, 
+          Configuration conf) {
     super("NMLivelinessMonitor", new SystemClock());
     this.dispatcher = d.getEventHandler();
     this.rmContext = rmContext;
+    this.conf = conf;
   }
 
   @Override
@@ -55,6 +60,9 @@ public class NMLivelinessMonitor extends AbstractLivelinessMonitor<NodeId> {
   @Override
   protected void expire(NodeId id) {
     try {
+      if(rmContext.isDistributedEnabled() && isHeartbeatingOtherRT(id)){
+        return;
+      }
       TransactionState ts = rmContext.getTransactionStateManager().
             getCurrentTransactionStatePriority(-1, "NMLivelinessMonitor");
       dispatcher.handle(new RMNodeEvent(id, RMNodeEventType.EXPIRE, ts));
@@ -62,6 +70,28 @@ public class NMLivelinessMonitor extends AbstractLivelinessMonitor<NodeId> {
     } catch (IOException ex) {
       Logger.getLogger(NMLivelinessMonitor.class.getName())
           .log(Level.SEVERE, null, ex);
+    } catch (InterruptedException ex) {
+      Logger.getLogger(NMLivelinessMonitor.class.getName()).
+              log(Level.SEVERE, null, ex);
     }
+  }
+  
+  private boolean isHeartbeatingOtherRT(NodeId id) {
+    RMNode dbRMNode;
+    try {
+      dbRMNode = RMUtilities.getRMNode(id.toString(), rmContext, conf);
+    } catch (IOException ex) {
+      return false;
+    }
+    if (dbRMNode != null) {
+      NodeHeartbeatResponse lastNodeHeartbeatResponse = dbRMNode.
+              getLastNodeHeartBeatResponse();
+      if (lastNodeHeartbeatResponse.getResponseId() > rmContext.
+              getActiveRMNodes().get(id).getLastNodeHeartBeatResponse().
+              getResponseId()) {
+        return true;
+      }
+    }
+    return false;
   }
 }

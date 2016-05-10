@@ -64,7 +64,7 @@ public class NdbRtStreamingProcessor implements Runnable {
   public void run() {
     running = true;
     while (running) {
-      if (!context.getGroupMembershipService().isLeader()) {
+      if (!context.isLeader()) {
         try {
 
           StreamingRTComps streamingRTComps = null;
@@ -93,9 +93,33 @@ public class NdbRtStreamingProcessor implements Runnable {
             // Processes container statuses for ContainersLogs service
             List<ContainerStatus> hopContainersStatusList 
                     = streamingRTComps.getHopContainersStatusList();
-            if(context.isLeadingRT() && hopContainersStatusList.size() > 0) {
+            if (context.isLeadingRT() && context.getContainersLogsService()
+                    != null) {
+              if (hopContainersStatusList.size() > 0) {
                 context.getContainersLogsService()
                         .insertEvent(hopContainersStatusList);
+              }
+              if (streamingRTComps.getCurrentPrice() > 0) {
+                context.getContainersLogsService().setCurrentPrice(
+                        streamingRTComps.getCurrentPrice());
+              }
+            }
+            
+            if(streamingRTComps.getCurrentNMMasterKey()!=null){
+              context.getNMTokenSecretManager().setCurrentMasterKey(
+                      streamingRTComps.getCurrentNMMasterKey());
+            }
+            if(streamingRTComps.getNextNMMasterKey()!=null){
+              context.getNMTokenSecretManager().setCurrentMasterKey(
+                      streamingRTComps.getNextNMMasterKey());
+            }
+            if(streamingRTComps.getCurrentRMContainerMasterKey()!=null){
+              context.getContainerTokenSecretManager().setCurrentMasterKey(
+                      streamingRTComps.getCurrentRMContainerMasterKey());
+            }
+            if(streamingRTComps.getNextNMMasterKey()!=null){
+              context.getContainerTokenSecretManager().setCurrentMasterKey(
+                      streamingRTComps.getNextNMMasterKey());
             }
           }
         } catch (InterruptedException ex) {

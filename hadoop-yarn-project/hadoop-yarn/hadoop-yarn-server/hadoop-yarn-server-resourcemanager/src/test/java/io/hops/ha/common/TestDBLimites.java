@@ -22,7 +22,6 @@ import io.hops.metadata.util.YarnAPIStorageFactory;
 import io.hops.metadata.yarn.dal.AppSchedulingInfoDataAccess;
 import io.hops.metadata.yarn.dal.ContainerDataAccess;
 import io.hops.metadata.yarn.dal.ContainerStatusDataAccess;
-import io.hops.metadata.yarn.dal.FiCaSchedulerAppNewlyAllocatedContainersDataAccess;
 import io.hops.metadata.yarn.dal.NextHeartbeatDataAccess;
 import io.hops.metadata.yarn.dal.NodeHBResponseDataAccess;
 import io.hops.metadata.yarn.dal.RMContainerDataAccess;
@@ -33,7 +32,6 @@ import io.hops.metadata.yarn.dal.util.YARNOperationType;
 import io.hops.metadata.yarn.entity.AppSchedulingInfo;
 import io.hops.metadata.yarn.entity.Container;
 import io.hops.metadata.yarn.entity.ContainerStatus;
-import io.hops.metadata.yarn.entity.FiCaSchedulerAppContainer;
 import io.hops.metadata.yarn.entity.NextHeartbeat;
 import io.hops.metadata.yarn.entity.NodeHBResponse;
 import io.hops.metadata.yarn.entity.RMContainer;
@@ -45,14 +43,11 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
-import java.util.concurrent.LinkedBlockingQueue;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
-import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Test;
 
 public class TestDBLimites {
 
@@ -155,9 +150,9 @@ public class TestDBLimites {
           List<RMContainer> rmContainersList) {
     List<ContainerStatus> toAdd = new ArrayList<ContainerStatus>();
     for (RMContainer rmContainer : rmContainersList) {
-      ContainerStatus status = new ContainerStatus(rmContainer.
-              getContainerIdID(), "running", "", 0,
-              "nodeid_" + random.nextInt(10),0);
+      ContainerStatus status = new ContainerStatus(rmContainer.getContainerId(),
+              "running", "", 0,
+              "nodeid_" + random.nextInt(10),0,ContainerStatus.Type.UCI);
       toAdd.add(status);
     }
     return toAdd;
@@ -191,7 +186,7 @@ public class TestDBLimites {
       RMNode rmNode
               = new RMNode("nodeid_" + random.nextInt(4000), "hostName", 1,
                       1, "nodeAddress", "httpAddress", "", 1, "currentState",
-                      "version", 1, 1,0);
+                      "version", 1, 0);
       toAdd.add(rmNode);
     }
     return toAdd;
@@ -224,7 +219,7 @@ public class TestDBLimites {
                 for (int i = 0; i < 4000; i++) {
                   RMNode rmNode = new RMNode("nodeid_" + i, "hostName", 1,
                           1, "nodeAddress", "httpAddress", "", 1, "currentState",
-                          "version", 1, 1,0);
+                          "version", 1,0);
                   toAdd.add(rmNode);
                 }
 

@@ -22,10 +22,8 @@ import io.hops.metadata.yarn.entity.AppSchedulingInfo;
 import io.hops.metadata.yarn.entity.AppSchedulingInfoBlacklist;
 import io.hops.metadata.yarn.entity.Container;
 import io.hops.metadata.yarn.entity.FiCaSchedulerAppLastScheduledContainer;
-import io.hops.metadata.yarn.entity.FiCaSchedulerAppContainer;
 import io.hops.metadata.yarn.entity.FiCaSchedulerAppReservedContainerInfo;
 import io.hops.metadata.yarn.entity.FiCaSchedulerAppSchedulingOpportunities;
-import io.hops.metadata.yarn.entity.ToPersistContainersInfo;
 import io.hops.metadata.yarn.entity.RMContainer;
 import io.hops.metadata.yarn.entity.Resource;
 import io.hops.metadata.yarn.entity.ResourceRequest;
@@ -59,16 +57,9 @@ public class FiCaSchedulerAppInfo {
   private AppSchedulingInfo fiCaSchedulerAppToAdd;
   private Map<Integer, Resource> resourcesToUpdate
           = new HashMap<Integer, Resource>();
+  private boolean create = false;
   
   protected ApplicationAttemptId applicationAttemptId;
-  private Map<ContainerId, ToPersistContainersInfo> liveContainersToAdd
-          = new HashMap<ContainerId, ToPersistContainersInfo>();
-  private Map<ContainerId, ToPersistContainersInfo> liveContainersToRemove
-          = new HashMap<ContainerId, ToPersistContainersInfo>();
-  private HashMap<ContainerId, ToPersistContainersInfo> newlyAllocatedContainersToAdd
-          = new HashMap<ContainerId, ToPersistContainersInfo>();
-  private HashMap< ContainerId, ToPersistContainersInfo> newlyAllocatedContainersToRemove
-          = new HashMap<ContainerId, ToPersistContainersInfo>();
 
   private Map<Integer, ResourceRequest> requestsToAdd
           = new HashMap<Integer, ResourceRequest>();
@@ -102,10 +93,6 @@ public class FiCaSchedulerAppInfo {
     agregateLastScheduledContainersToAdd(agregate);
     agregateSchedulingOpportunitiesToAdd(agregate);
     agregateReReservations(agregate);
-    agregateNewlyAllocatedContainersToAdd(agregate);
-    agregateNewlyAllocatedContainersToRemove(agregate);
-    agregateLiveContainersToAdd(agregate);
-    agregateLiveContainersToRemove(agregate);
     agregateRequestsToAdd(agregate);
     agregateRequestsToRemove(agregate);
     agregateBlackListsToAdd(agregate);
@@ -120,10 +107,12 @@ public class FiCaSchedulerAppInfo {
     this.applicationAttemptId = applicationAttemptId;
   }
 
-  public FiCaSchedulerAppInfo(SchedulerApplicationAttempt schedulerApp,
-          TransactionStateImpl transactionState) {
-    this.transactionState = transactionState;
-    this.applicationAttemptId = schedulerApp.getApplicationAttemptId();
+  public void createFull(SchedulerApplicationAttempt schedulerApp){
+    this.create = true;
+    updateFull(schedulerApp);
+  }
+  
+  public void updateFull(SchedulerApplicationAttempt schedulerApp) {
     fiCaSchedulerAppToAdd = new AppSchedulingInfo(applicationAttemptId.
             toString(),
             applicationAttemptId.getApplicationId().toString(),
@@ -154,14 +143,6 @@ public class FiCaSchedulerAppInfo {
               Resource.RESOURCELIMIT, Resource.SCHEDULERAPPLICATIONATTEMPT,
               schedulerApp.getResourceLimit().getMemory(),
               schedulerApp.getResourceLimit().getVirtualCores(), 0));
-    }
-    if (!schedulerApp.getLiveContainers().isEmpty()) {
-      for (org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer rmContainer
-              : schedulerApp.getLiveContainersMap().values()) {
-        liveContainersToAdd
-                .put(rmContainer.getContainerId(),
-                        convertToToPersistContainersInfo(rmContainer));
-      }
     }
     if (!schedulerApp.getLastScheduledContainer().isEmpty()) {
       lastScheduledContainerToAdd.putAll(
@@ -221,48 +202,16 @@ public class FiCaSchedulerAppInfo {
   }
 
   public void setBlacklistToRemove(List<String> blacklistToRemove) {
-    if (!blacklistToAdd.remove(blacklistToRemove)) {
-      this.blacklistToRemove.addAll(blacklistToRemove);
-    }
+      for(String name: blacklistToRemove){
+        if (!blacklistToAdd.remove(name)) {
+          this.blacklistToRemove.add(name);
+        }
+      }
   }
 
   public void setBlacklistToAdd(Collection<String> set) {
     this.blacklistToAdd.addAll(set);
     this.blacklistToRemove.removeAll(set);
-  }
-
-  public void setLiveContainersToAdd(ContainerId key,
-          org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer val) {
-    this.liveContainersToAdd.put(key, convertToToPersistContainersInfo(val));
-    transactionState.addRMContainerToUpdate((RMContainerImpl) val);
-    liveContainersToRemove.remove(key);
-  }
-
-  private ToPersistContainersInfo convertToToPersistContainersInfo(
-          org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer rmContainer) {
-    FiCaSchedulerAppContainer fiCaSchedulerAppContainer
-            = new FiCaSchedulerAppContainer(
-                    applicationAttemptId.toString(), rmContainer.
-                    getContainerId().toString());
-
-    RMContainer hopRMContainer = createRMContainer(rmContainer);
-
-    Container hopContainer = new Container(rmContainer.getContainerId().
-            toString(),
-            getRMContainerBytes(rmContainer.getContainer()));
-    LOG.debug("adding ha_container " + hopContainer.getContainerId());
-
-    return new ToPersistContainersInfo(hopRMContainer, fiCaSchedulerAppContainer,
-            hopContainer);
-  }
-
-  public void setLiveContainersToRemove(
-          org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer rmc) {
-    if (liveContainersToAdd.remove(rmc.getContainerId()) == null) {
-      liveContainersToRemove.put(rmc.getContainerId(),
-              convertToToPersistContainersInfo(rmc));
-    }
-
   }
 
   private byte[] getRMContainerBytes(
@@ -275,42 +224,6 @@ public class FiCaSchedulerAppInfo {
     }
   }
 
-  public void setNewlyAllocatedContainersToAdd(
-          org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer rmContainer) {
-    RMContainer hopRMContainer = createRMContainer(rmContainer);
-
-    Container hopContainer = new Container(rmContainer.getContainerId().
-            toString(), getRMContainerBytes(rmContainer.getContainer()));
-
-    FiCaSchedulerAppContainer toAdd
-            = new FiCaSchedulerAppContainer(
-                    applicationAttemptId.toString(),
-                    rmContainer.getContainerId().toString());
-
-    ToPersistContainersInfo containerInfo
-            = new ToPersistContainersInfo(hopRMContainer, toAdd,
-                    hopContainer);
-
-    transactionState.addRMContainerToUpdate((RMContainerImpl) rmContainer);
-    this.newlyAllocatedContainersToAdd.put(rmContainer.getContainerId(),
-            containerInfo);
-    this.newlyAllocatedContainersToRemove.remove(rmContainer.getContainerId());
-  }
-
-  public void setNewlyAllocatedContainersToRemove(
-          org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer rmContainer) {
-    if (newlyAllocatedContainersToAdd.remove(rmContainer.getContainerId())
-            == null) {
-      FiCaSchedulerAppContainer toRemove
-              = new FiCaSchedulerAppContainer(
-                      applicationAttemptId.toString(), rmContainer.toString());
-      ToPersistContainersInfo containerInfo
-              = new ToPersistContainersInfo(null, toRemove, null);
-
-      this.newlyAllocatedContainersToRemove.put(rmContainer.getContainerId(),
-              containerInfo);
-    }
-  }
 
   private void agregateRequestsToAdd(AgregatedAppInfo agregate) throws
           StorageException {
@@ -347,77 +260,6 @@ public class FiCaSchedulerAppInfo {
 
         agregate.addAllResources(resourcesToUpdate.values());
       }
-    }
-  }
-
-  private void agregateLiveContainersToAdd(AgregatedAppInfo agregate) throws
-          StorageException {
-    if (liveContainersToAdd != null) {
-      //Persist LiveContainers
-      List<Container> toAddContainers = new ArrayList<Container>();
-      List<FiCaSchedulerAppContainer> toAddLiveContainers
-              = new ArrayList<FiCaSchedulerAppContainer>();
-      for (ToPersistContainersInfo container : liveContainersToAdd.values()) {
-        toAddLiveContainers.add(container.getFiCaSchedulerAppContainer());
-
-        toAddContainers.add(container.getContainer());
-      }
-      agregate.addAllContainers(toAddContainers);
-      agregate.addAllLiveContainersToAdd(toAddLiveContainers);
-
-    }
-  }
-
-  private void agregateLiveContainersToRemove(AgregatedAppInfo agregate) throws
-          StorageException {
-    if (liveContainersToRemove != null && !liveContainersToRemove.isEmpty()) {
-      List<FiCaSchedulerAppContainer> toRemoveLiveContainers
-              = new ArrayList<FiCaSchedulerAppContainer>();
-      for (ToPersistContainersInfo container : liveContainersToRemove.values()) {
-        toRemoveLiveContainers.add(container.getFiCaSchedulerAppContainer());
-      }
-      agregate.addAllLiveContainersToRemove(toRemoveLiveContainers);
-    }
-  }
-
-  private void agregateNewlyAllocatedContainersToAdd(AgregatedAppInfo agregate)
-          throws StorageException {
-    if (newlyAllocatedContainersToAdd != null) {
-      //Persist NewllyAllocatedContainers list
-      List<FiCaSchedulerAppContainer> toAddNewlyAllocatedContainersList
-              = new ArrayList<FiCaSchedulerAppContainer>();
-      List<Container> toAddContainers = new ArrayList<Container>();
-
-      for (ToPersistContainersInfo rmContainer : newlyAllocatedContainersToAdd.
-              values()) {
-        toAddNewlyAllocatedContainersList.add(rmContainer.
-                getFiCaSchedulerAppContainer());
-        toAddContainers.add(rmContainer.getContainer());
-      }
-      agregate.addAllNewlyAllocatedcontainersToAdd(
-              toAddNewlyAllocatedContainersList);
-      agregate.addAllContainers(toAddContainers);
-    }
-  }
-
-  private void agregateNewlyAllocatedContainersToRemove(
-          AgregatedAppInfo agregate)
-          throws StorageException {
-    if (newlyAllocatedContainersToRemove != null) {
-      //Remove NewllyAllocatedContainers list
-      List<FiCaSchedulerAppContainer> toRemoveNewlyAllocatedContainersList
-              = new ArrayList<FiCaSchedulerAppContainer>();
-
-      for (ToPersistContainersInfo rmContainer
-              : newlyAllocatedContainersToRemove.values()) {
-        LOG.debug("remove newlyAllocatedContainers " + applicationAttemptId.
-                toString() + " container " + rmContainer.toString());
-
-        toRemoveNewlyAllocatedContainersList.add(rmContainer.
-                getFiCaSchedulerAppContainer());
-      }
-      agregate.addAllNewlyAllocatedContainersToRemove(
-              toRemoveNewlyAllocatedContainersList);
     }
   }
 
@@ -468,7 +310,7 @@ public class FiCaSchedulerAppInfo {
   }
 
   public void remove(SchedulerApplicationAttempt schedulerApp) {
-    if (fiCaSchedulerAppToAdd == null) {
+    if (fiCaSchedulerAppToAdd == null || !create) {
       remove = true;
       fiCaSchedulerAppToAdd = new AppSchedulingInfo(applicationAttemptId.
               toString());
@@ -586,17 +428,18 @@ public class FiCaSchedulerAppInfo {
         toAddContainers.add(rmContainer.getHopContainer());
       }
       agregate.addAllReservedContainers(toAddReservedContainers);
-      agregate.addAllContainers(toAddContainers);
     }
   }
 
   public void removeReservedContainer(
-          org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer cont) {
+          org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer cont,
+          TransactionState ts) {
     if (reservedContainersToAdd.remove(cont.getContainerId()) == null) {
       FiCaSchedulerAppReservedContainerInfo reservedContainerInfo
               = convertToFiCaSchedulerAppReservedContainerInfo(cont);
       reservedContainersToRemove.put(cont.getContainerId(),
               reservedContainerInfo);
+      ((TransactionStateImpl)ts).addRMContainerToRemove(cont);
     }
   }
 
@@ -617,7 +460,6 @@ public class FiCaSchedulerAppInfo {
 
       }
       agregate.addAllReservedContainersToRemove(toRemoveReservedContainers);
-      agregate.addAllRMContainersToRemove(toRemoveRMContainers);
     }
   }
 

@@ -92,7 +92,7 @@ public class TestNMReconnect {
     dispatcher
         .register(RMNodeEventType.class, new NodeEventDispatcher(context));
     NMLivelinessMonitor nmLivelinessMonitor =
-        new NMLivelinessMonitor(dispatcher, context);
+        new NMLivelinessMonitor(dispatcher, context, conf);
     nmLivelinessMonitor.init(conf);
     nmLivelinessMonitor.start();
     NodesListManager nodesListManager = new NodesListManager(context);

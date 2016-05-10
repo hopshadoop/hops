@@ -23,6 +23,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
+import org.apache.hadoop.yarn.api.records.NodeId;
 
 public abstract class TransactionState {
 
@@ -41,7 +42,7 @@ public abstract class TransactionState {
   private static final Log LOG = LogFactory.getLog(TransactionState.class);
   private AtomicInteger counter = new AtomicInteger(0);
   protected final Set<ApplicationId> appIds = new ConcurrentSkipListSet<ApplicationId>();
-//  private final Lock counterLock = new ReentrantLock(true);
+  protected final Set<NodeId> nodesIds = new ConcurrentSkipListSet<NodeId>();
   private Set<Integer> rpcIds = new ConcurrentSkipListSet<Integer>();
   private AtomicInteger id=new AtomicInteger(-1);
   private final boolean batch;
@@ -58,8 +59,6 @@ public abstract class TransactionState {
     public Set<ApplicationId> getAppIds(){
     return appIds;
   }
-
-  abstract boolean addAppId(ApplicationId appId);
 
   public void incCounter(Enum type) {
     counter.incrementAndGet();

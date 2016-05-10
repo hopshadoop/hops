@@ -174,6 +174,58 @@ public class YarnConfiguration extends Configuration {
   ////////////////////////////////////////
   // Containers Quotas configuration   //
   ///////////////////////////////////////
+  public static final String QUOTAS_ENABLED = 
+          YARN_PREFIX + "quotas.enabled";
+  public static final boolean DEFAULT_QUOTAS_ENABLED = false;
+  
+  /**
+   * The maximum percentage of the resource after which price will start increasing.
+   */
+  public static final String OVERPRICING_THRESHOLD_MB = 
+          YARN_PREFIX + "quotas.overpricing-threshold.mb";
+  public static final float DEFAULT_OVERPRICING_THRESHOLD_MB = 0.5f;
+  
+  public static final String OVERPRICING_THRESHOLD_VC = 
+          YARN_PREFIX + "quotas.overpricing-threshold.vc";
+  public static final float DEFAULT_OVERPRICING_THRESHOLD_VC = 0.5f;
+  
+  
+  /**
+   * Price per tick, the the minimum price for resource usage. 
+   * the default prices are fixed to have a base price of 1credit per minute
+   * with the default tick period of 1 per second.
+   */
+  public static final String BASE_PRICE_PER_TICK_FOR_MEMORY = 
+          YARN_PREFIX + "quotas.price-estimation.min-price-per-tick-MB";
+  public static final float DEFAULT_BASE_PRICE_PER_TICK_FOR_MEMORY = 1f/60/2;
+  
+  public static final String BASE_PRICE_PER_TICK_FOR_VIRTUAL_CORE = 
+          YARN_PREFIX + "quotas.price-estimation.min-price-per-tick-VC";
+  public static final float DEFAULT_BASE_PRICE_PER_TICK_FOR_VIRTUAL_CORE = 1f/60/2;
+  
+  
+  /**
+   * The the price increment factor over the minimum price.
+   * the default prices are fixed so that with a quotas.overpricing-threshold.*
+   * of 0.5 the default price per tick is doubled when the cluster is used at 100%
+   */
+  public static final String MEMORY_INCREMENT_FACTOR = 
+          YARN_PREFIX + "quotas.memory.increment.factor";
+  public static final float DEFAULT_MEMORY_INCREMENT_FACTOR = 2f/60/2;
+  
+  public static final String VCORE_INCREMENT_FACTOR = 
+          YARN_PREFIX + "quotas.vcore.increment.factor";
+  public static final float DEFAULT_VCOREINCREMENT_FACTOR = 2f/60/2;
+  
+  /**
+   * Time in ms between Price Fixing.
+   */
+  public static final String QUOTAS_PRICE_FIXER_INTERVAL = 
+          YARN_PREFIX + "quotas.price-fixer.monitor-interval";
+  public static final int DEFAULT_QUOTAS_PRICE_FIXER_INTERVAL = 
+          1000;
+          
+  
   /**
    * Time in ms between container status checks.
    */
@@ -187,19 +239,39 @@ public class YarnConfiguration extends Configuration {
   public static final String QUOTAS_CONTAINERS_LOGS_TICK_INCREMENT = 
           YARN_PREFIX + "quotas.containers-logs.tick-increment";
   public static final int DEFAULT_QUOTAS_CONTAINERS_LOGS_TICK_INCREMENT = 1;
+   
+
+  /*
+   * the minimum of ticks that will be charged, what ever the running time.
+   * If a container run less thant this number of ticks it will still pay for
+   * this number of ticks.
+   */
+  public static final String QUOTAS_MIN_TICKS_CHARGE = YARN_PREFIX
+          + "quotas.min.ticks.charge";
+  public static final int DEFAULT_QUOTAS_MIN_TICKS_CHARGE = 600;
+
   /**
    * Enable or disable periodic containers logs checkpoints.
    */
-  public static final String QUOTAS_CONTAINERS_LOGS_CHECKPOINTS = 
-          YARN_PREFIX + "quotas.containers-logs.checkpoints";
-  public static final boolean DEFAULT_QUOTAS_CONTAINERS_LOGS_CHECKPOINTS = true;
+  public static final String QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_ENABLED
+          = YARN_PREFIX + "quotas.containers-logs.checkpoints.enabled";
+  public static final boolean DEFAULT_QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_ENABLED
+          = true;
   /**
-   * Number of ticks between checkpoints.
+   * Number of quotas.min.ticks.charge ticks between checkpoints.
    */
-  public static final String QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_TICKS = 
-          YARN_PREFIX + "quotas.containers-logs.checkpoints-ticks";
-  public static final int DEFAULT_QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_TICKS = 
-          60;
+  public static final String QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_MINTICKS
+          = YARN_PREFIX + "quotas.containers-logs.checkpoints-minticks";
+  public static final int DEFAULT_QUOTAS_CONTAINERS_LOGS_CHECKPOINTS_MINTICKS
+          = 1;
+
+  /**
+   * checkpoints for which a container keep a fixed price
+   */
+  public static final String QUOTAS_PRICE_DURATIOM = 
+          YARN_PREFIX + "quota.price-duration";
+  public static final int DEFAULT_QUOTAS_PRICE_DURATIOM = 3;
+          
   /**
    * If threshold is exceeded writes a warning about increasing monitor interval 
    * It is obtained by multiplying threshold with monitor interval
@@ -208,10 +280,6 @@ public class YarnConfiguration extends Configuration {
           YARN_PREFIX + "quotas.containers-logs.alert-ratio";
   public static final double DEFAULT_QUOTAS_CONTAINERS_LOGS_ALERT_THRESHOLD = 
           0.6;
-  public static final String QUOTAS_MONITOR_INTERVAL = 
-          YARN_PREFIX + "quotas.containers-logs.monitor-interval";
-  public static final int DEFAULT_QUOTAS_MONITOR_INTERVAL = 
-          1000;
   /**
    * Enable periodic monitor threads.
    *
@@ -451,9 +519,6 @@ public class YarnConfiguration extends Configuration {
   public static final String AUTO_FAILOVER_ENABLED =
       AUTO_FAILOVER_PREFIX + "enabled";
   public static final boolean DEFAULT_AUTO_FAILOVER_ENABLED = true;
-  public static final String AUTO_FAILOVER_EMBEDDED =
-      AUTO_FAILOVER_PREFIX + "embedded";
-  public static final boolean DEFAULT_AUTO_FAILOVER_EMBEDDED = true;
   public static final String AUTO_FAILOVER_ZK_BASE_PATH =
       AUTO_FAILOVER_PREFIX + "zk-base-path";
   public static final String DEFAULT_AUTO_FAILOVER_ZK_BASE_PATH =
@@ -1421,10 +1486,6 @@ public class YarnConfiguration extends Configuration {
   public static int DEFAULT_HOPS_NDB_EVENT_STREAMING_DB_PORT = 1186;
   public static final String HOPS_NDB_EVENT_STREAMING_DB_PORT = HOPS_RM_PREFIX
           + "ndb-event-streaming.db.port";
-  
-  public static boolean DEFAULT_HOPS_NDB_RT_EVENT_STREAMING_ENABLED = true;
-  public static final String HOPS_NDB_RT_EVENT_STREAMING_ENABLED
-          = HOPS_RM_PREFIX + "ndb-rt-event-streaming.enable";
 
   public static final String MAX_ALLOCATED_CONTAINERS_PER_REQUEST= HOPS_RM_PREFIX + "max.allocated.containers.per.request";
   public static int DEFAULT_MAX_ALLOCATED_CONTAINERS_PER_REQUEST = -1;
