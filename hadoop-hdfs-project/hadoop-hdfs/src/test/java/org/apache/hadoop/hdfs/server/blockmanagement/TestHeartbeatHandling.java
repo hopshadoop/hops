@@ -17,23 +17,36 @@
  */
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
+import io.hops.metadata.hdfs.entity.INodeIdentifier;
+import io.hops.transaction.handler.HDFSOperationType;
+import io.hops.transaction.handler.HopsTransactionalRequestHandler;
+import io.hops.transaction.lock.LockFactory;
+import io.hops.transaction.lock.TransactionLockTypes;
+import io.hops.transaction.lock.TransactionLocks;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.server.common.GenerationStamp;
+import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.hdfs.server.datanode.DataNodeTestUtils;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
+import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.namenode.NameNodeAdapter;
 import org.apache.hadoop.hdfs.server.protocol.BlockCommand;
+import org.apache.hadoop.hdfs.server.protocol.BlockRecoveryCommand;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeCommand;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeProtocol;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
+import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.junit.Test;
 
+import java.io.IOException;
 import java.util.ArrayList;
 
+import static io.hops.transaction.lock.LockFactory.getInstance;
 import static org.junit.Assert.assertEquals;
 
 /**
@@ -53,17 +66,13 @@ public class TestHeartbeatHandling {
     try {
       cluster.waitActive();
       final FSNamesystem namesystem = cluster.getNamesystem();
-      final HeartbeatManager hm =
-          namesystem.getBlockManager().getDatanodeManager()
-              .getHeartbeatManager();
+      final HeartbeatManager hm = namesystem.getBlockManager().getDatanodeManager().getHeartbeatManager();
       final String poolId = namesystem.getBlockPoolId();
-      final DatanodeRegistration nodeReg = DataNodeTestUtils
-          .getDNRegistrationForBP(cluster.getDataNodes().get(0), poolId);
+      final DatanodeRegistration nodeReg = DataNodeTestUtils.getDNRegistrationForBP(cluster.getDataNodes().get(0), poolId);
+      final DatanodeDescriptor dd = NameNodeAdapter.getDatanode(namesystem, nodeReg);
+      final String storageID = DatanodeStorage.generateUuid();
+      dd.updateStorage(new DatanodeStorage(storageID));
 
-
-      final DatanodeDescriptor dd =
-          NameNodeAdapter.getDatanode(namesystem, nodeReg);
-      
       final int REMAINING_BLOCKS = 1;
       final int MAX_REPLICATE_LIMIT =
           conf.getInt(DFSConfigKeys.DFS_NAMENODE_REPLICATION_MAX_STREAMS_KEY,
@@ -74,7 +83,7 @@ public class TestHeartbeatHandling {
           2 * MAX_INVALIDATE_LIMIT + REMAINING_BLOCKS;
       final int MAX_REPLICATE_BLOCKS =
           2 * MAX_REPLICATE_LIMIT + REMAINING_BLOCKS;
-      final DatanodeDescriptor[] ONE_TARGET = new DatanodeDescriptor[1];
+      final DatanodeStorageInfo[] ONE_TARGET = {dd.getStorageInfo(storageID)};
 
       synchronized (hm) {
         for (int i = 0; i < MAX_REPLICATE_BLOCKS; i++) {

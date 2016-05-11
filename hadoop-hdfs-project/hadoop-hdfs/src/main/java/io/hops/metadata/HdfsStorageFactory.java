@@ -22,6 +22,9 @@ import io.hops.common.IDsMonitor;
 import io.hops.exception.StorageException;
 import io.hops.exception.StorageInitializtionException;
 import io.hops.log.NDCWrapper;
+import io.hops.metadata.hdfs.dal.GroupDataAccess;
+import io.hops.metadata.hdfs.dal.UserDataAccess;
+import io.hops.metadata.hdfs.dal.UserGroupDataAccess;
 import io.hops.resolvingcache.Cache;
 import io.hops.metadata.adaptor.BlockInfoDALAdaptor;
 import io.hops.metadata.adaptor.INodeAttributeDALAdaptor;
@@ -68,6 +71,7 @@ import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.metadata.hdfs.entity.QuotaUpdate;
 import io.hops.metadata.hdfs.entity.SubTreeOperation;
 import io.hops.metadata.hdfs.entity.UnderReplicatedBlock;
+import io.hops.security.UsersGroups;
 import io.hops.transaction.EntityManager;
 import io.hops.transaction.context.BlockChecksumContext;
 import io.hops.transaction.context.BlockInfoContext;
@@ -93,6 +97,7 @@ import io.hops.transaction.context.UnderReplicatedBlockContext;
 import io.hops.transaction.context.VariableContext;
 import io.hops.transaction.lock.LockFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoUnderConstruction;
@@ -146,7 +151,7 @@ public class HdfsStorageFactory {
             .getBoolean(DFSConfigKeys.DFS_TRANSACTION_STATS_DETAILED_ENABLED,
                 DFSConfigKeys.DFS_TRANSACTION_STATS_DETAILED_ENABLED_DEFAULT));
     if (!isDALInitialized) {
-      HdfsVariables.registerDefaultValues();
+      HdfsVariables.registerDefaultValues(conf);
       addToClassPath(conf.get(DFSConfigKeys.DFS_STORAGE_DRIVER_JAR_FILE,
           DFSConfigKeys.DFS_STORAGE_DRIVER_JAR_FILE_DEFAULT));
       dStorageFactory = DalDriver.load(
@@ -155,6 +160,17 @@ public class HdfsStorageFactory {
       dStorageFactory.setConfiguration(getMetadataClusterConfiguration(conf));
       initDataAccessWrappers();
       EntityManager.addContextInitializer(getContextInitializer());
+      if(conf.getBoolean(CommonConfigurationKeys.HOPS_GROUPS_ENABLE, CommonConfigurationKeys
+          .HOPS_GROUPS_ENABLE_DEFAULT)) {
+        UsersGroups.init(getConnector(), (UserDataAccess) getDataAccess
+            (UserDataAccess.class), (UserGroupDataAccess) getDataAccess
+            (UserGroupDataAccess.class), (GroupDataAccess) getDataAccess
+            (GroupDataAccess.class), conf.getInt(CommonConfigurationKeys
+            .HOPS_GROUPS_UPDATER_ROUND, CommonConfigurationKeys
+            .HOPS_GROUPS_UPDATER_ROUND_DEFAULT), conf.getInt(CommonConfigurationKeys
+            .HOPS_USERS_LRU_THRESHOLD, CommonConfigurationKeys
+            .HOPS_USERS_LRU_THRESHOLD_DEFAULT));
+      }
       isDALInitialized = true;
     }
   }
@@ -319,10 +335,10 @@ public class HdfsStorageFactory {
     return dStorageFactory.getConnector().formatStorage();
   }
   
-  public static boolean formatStorageNonTransactional()
+  public static boolean formatAllStorageNonTransactional()
       throws StorageException {
     Cache.getInstance().flush();
-    return dStorageFactory.getConnector().formatStorageNonTransactional();
+    return dStorageFactory.getConnector().formatAllStorageNonTransactional();
   }
 
   public static boolean formatStorage(Class<? extends EntityDataAccess>... das)

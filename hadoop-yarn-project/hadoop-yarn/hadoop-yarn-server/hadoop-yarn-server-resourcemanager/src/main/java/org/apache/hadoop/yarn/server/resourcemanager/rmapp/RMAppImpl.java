@@ -18,6 +18,7 @@ package org.apache.hadoop.yarn.server.resourcemanager.rmapp;
 
 import io.hops.ha.common.TransactionState;
 import io.hops.ha.common.TransactionStateImpl;
+import java.io.IOException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -421,10 +422,11 @@ public class RMAppImpl implements RMApp, Recoverable {
     try {
       int updatedNodeCount = this.updatedNodes.size();
       updatedNodes.addAll(this.updatedNodes);
-      this.updatedNodes.clear();
       if (ts != null) {
-        ((TransactionStateImpl) ts).addApplicationToAdd(this);
+        ((TransactionStateImpl) ts).addUpdatedNodeToRemove(this.applicationId, 
+                this.updatedNodes);
       }
+      this.updatedNodes.clear();
       return updatedNodeCount;
     } finally {
       this.writeLock.unlock();
@@ -577,12 +579,7 @@ public class RMAppImpl implements RMApp, Recoverable {
          * keep the master in sync with the state machine
          */
         this.stateMachine.doTransition(event.getType(), event);
-        if (event.getTransactionState() != null) {
-          List<NodeId> updatedNodesId = new ArrayList<NodeId>();
-          for (RMNode node : updatedNodes) {
-            updatedNodesId.add(node.getNodeID());
-          }
-          
+        if (event.getTransactionState() != null) {          
           ((TransactionStateImpl) event.getTransactionState()).
               addApplicationToAdd(this);
         }
@@ -603,7 +600,7 @@ public class RMAppImpl implements RMApp, Recoverable {
   }
 
   @Override
-  public void recover(RMState state) throws Exception {
+  public void recover(RMState state) throws IOException {
     ApplicationState appState =
         state.getApplicationState().get(getApplicationId());
     this.recoveredFinalState = appState.getState();
@@ -656,9 +653,12 @@ public class RMAppImpl implements RMApp, Recoverable {
         transferStateFromPreviousAttempt, transactionState));
   }
 
-  private void processNodeUpdate(RMAppNodeUpdateType type, RMNode node) {
+  private void processNodeUpdate(RMAppNodeUpdateType type, RMNode node, TransactionState ts) {
     NodeState nodeState = node.getState();
     updatedNodes.add(node);
+    if (ts != null) {
+      ((TransactionStateImpl) ts).addUpdatedNodeToAdd(applicationId, node);
+    }
     LOG.debug("Received node update event:" + type + " for node:" + node +
         " with state:" + nodeState);
   }
@@ -680,7 +680,7 @@ public class RMAppImpl implements RMApp, Recoverable {
     public void transition(RMAppImpl app, RMAppEvent event) {
       RMAppNodeUpdateEvent nodeUpdateEvent = (RMAppNodeUpdateEvent) event;
       app.processNodeUpdate(nodeUpdateEvent.getUpdateType(),
-          nodeUpdateEvent.getNode());
+          nodeUpdateEvent.getNode(), event.getTransactionState());
     }
 
     ;

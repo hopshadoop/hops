@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs;
 
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -41,6 +42,7 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -79,6 +81,14 @@ public class TestGetBlocks {
     }
     return null;
   }
+
+//  @Test
+//  public void repeatTestReadSelectNonStaleDatanode() throws Exception {
+//    TestGetBlocks t = new TestGetBlocks();
+//    for(int i = 0; i < 1000; i++) {
+//      t.testReadSelectNonStaleDatanode();
+//    }
+//  }
 
   /**
    * Test if the datanodes returned by
@@ -126,10 +136,16 @@ public class TestGetBlocks {
       // the writing seems to be still ongoing
       stm.hflush();
 
+      Thread.sleep(500);
+
+
       LocatedBlocks blocks = client.getNamenode()
           .getBlockLocations(fileName.toString(), 0, blockSize);
+
+
       DatanodeInfo[] nodes = blocks.get(0).getLocations();
-      assertEquals(nodes.length, 3);
+
+      assertEquals(3, nodes.length);
       DataNode staleNode = null;
       DatanodeDescriptor staleNodeInfo = null;
       // stop the heartbeat of the first node
@@ -155,10 +171,11 @@ public class TestGetBlocks {
           client.getLocatedBlocks(fileName.toString(), 0, Long.MAX_VALUE)
               .getLastLocatedBlock();
       nodes = lastBlock.getLocations();
-      assertEquals(nodes.length, 3);
+      assertEquals(3, nodes.length);
       // stop the heartbeat of the first node for the last block
       staleNode = this.stopDataNodeHeartbeat(cluster, nodes[0].getHostName());
       assertNotNull(staleNode);
+
       // set the node as stale
       cluster.getNameNode().getNamesystem().getBlockManager()
           .getDatanodeManager().getDatanode(staleNode.getDatanodeId())
@@ -169,7 +186,7 @@ public class TestGetBlocks {
               .getLastLocatedBlock();
       nodesAfterStale = lastBlockAfterStale.getLocations();
       assertEquals(nodesAfterStale.length, 3);
-      assertEquals(nodesAfterStale[2].getHostName(), nodes[0].getHostName());
+      assertEquals(nodes[0].getHostName(), nodesAfterStale[2].getHostName());
     } finally {
       if (stm != null) {
         stm.close();
@@ -247,19 +264,19 @@ public class TestGetBlocks {
       // get blocks of size fileLen from dataNodes[0]
       BlockWithLocations[] locs;
       locs = namenode.getBlocks(dataNodes[0], fileLen).getBlocks();
-      assertEquals(locs.length, 2);
-      assertEquals(locs[0].getStorageIDs().length, 2);
-      assertEquals(locs[1].getStorageIDs().length, 2);
+      assertEquals(2, locs.length);
+      assertEquals(2, locs[0].getStorageIDs().length);
+      assertEquals(2, locs[1].getStorageIDs().length);
 
       // get blocks of size BlockSize from dataNodes[0]
       locs = namenode.getBlocks(dataNodes[0], DEFAULT_BLOCK_SIZE).getBlocks();
-      assertEquals(locs.length, 1);
-      assertEquals(locs[0].getStorageIDs().length, 2);
+      assertEquals(1, locs.length);
+      assertEquals(2, locs[0].getStorageIDs().length);
 
       // get blocks of size 1 from dataNodes[0]
       locs = namenode.getBlocks(dataNodes[0], 1).getBlocks();
-      assertEquals(locs.length, 1);
-      assertEquals(locs[0].getStorageIDs().length, 2);
+      assertEquals(1, locs.length);
+      assertEquals(2, locs[0].getStorageIDs().length);
 
       // get blocks of size 0 from dataNodes[0]
       getBlocksWithException(namenode, dataNodes[0], 0);
@@ -307,7 +324,7 @@ public class TestGetBlocks {
           new Block(blkids[i], 0, GenerationStamp.GRANDFATHER_GENERATION_STAMP);
       Long v = map.get(b);
       System.out.println(b + " => " + v);
-      assertEquals(blkids[i], v.longValue());
+      assertEquals(v.longValue(), blkids[i]);
     }
   }
 

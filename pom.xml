@@ -513,7 +513,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <dependency>
           <groupId>io.hops.metadata</groupId>
           <artifactId>hops-metadata-dal-impl-ndb</artifactId>
-          <version>1.0-SNAPSHOT</version>
+          <version>1.1-SNAPSHOT</version>
         </dependency>
         <dependency>
           <groupId>com.mysql.ndb</groupId>

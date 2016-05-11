@@ -68,7 +68,7 @@ public class TestMaxRunningAppsEnforcer {
     ApplicationId appId = ApplicationId.newInstance(0l, appNum++);
     ApplicationAttemptId attId = ApplicationAttemptId.newInstance(appId, 0);
     boolean runnable = maxAppsEnforcer.canAppBeRunnable(queue, user);
-    FSSchedulerApp app = new FSSchedulerApp(attId, user, queue, null, null);
+    FSSchedulerApp app = new FSSchedulerApp(attId, user, queue, null, null, -1);
     queue.addApp(app, runnable);
     if (runnable) {
       maxAppsEnforcer.trackRunnableApp(app);

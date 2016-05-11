@@ -98,7 +98,9 @@ public class LayoutVersion {
         "Use LongWritable and ShortWritable directly instead of ArrayWritable of UTF8"),
     OPTIMIZE_PERSIST_BLOCKS(-40,
         "Serialize block lists with delta-encoded variable length ints, " +
-            "add OP_UPDATE_BLOCKS");
+            "add OP_UPDATE_BLOCKS"),
+    ADD_DATANODE_AND_STORAGE_UUIDS(-49, "Replace StorageID with DatanodeUuid."
+        + " Use distinct StorageUuid per storage directory.");
     
     final int lv;
     final int ancestorLV;

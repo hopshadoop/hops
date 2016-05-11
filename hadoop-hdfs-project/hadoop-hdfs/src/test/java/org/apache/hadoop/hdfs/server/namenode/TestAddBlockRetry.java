@@ -29,6 +29,7 @@ import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockManager;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocols;
 import org.apache.hadoop.io.EnumSetWritable;
 import org.apache.hadoop.net.Node;
@@ -42,6 +43,8 @@ import org.mockito.stubbing.Answer;
 import java.lang.reflect.Field;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.doAnswer;
@@ -108,13 +111,13 @@ public class TestAddBlockRetry {
     bmField.setAccessible(true);
     bmField.set(ns, spyBM);
 
-    doAnswer(new Answer<DatanodeDescriptor[]>() {
+    doAnswer(new Answer<DatanodeStorageInfo[]>() {
       @Override
-      public DatanodeDescriptor[] answer(InvocationOnMock invocation)
+      public DatanodeStorageInfo[] answer(InvocationOnMock invocation)
           throws Throwable {
         LOG.info("chooseTarget for " + src);
-        DatanodeDescriptor[] ret =
-            (DatanodeDescriptor[]) invocation.callRealMethod();
+        DatanodeStorageInfo[] ret =
+            (DatanodeStorageInfo[]) invocation.callRealMethod();
         count++;
         if (count == 1) { // run second addBlock()
           LOG.info("Starting second addBlock for " + src);
@@ -127,9 +130,9 @@ public class TestAddBlockRetry {
         }
         return ret;
       }
-    }).when(spyBM).chooseTarget(Mockito.anyString(), Mockito.anyInt(),
-        Mockito.<DatanodeDescriptor>any(), Mockito.<HashMap<Node, Node>>any(),
-        Mockito.anyLong());
+    }).when(spyBM).chooseTarget4NewBlock(Mockito.anyString(), Mockito.anyInt(),
+        Mockito.<DatanodeDescriptor>any(), Mockito.<HashSet<Node>>any(),
+        Mockito.anyLong(), Mockito.<List<String>>any(), Mockito.anyByte());
 
     // create file
     nn.create(src, FsPermission.getFileDefault(), "clientName",

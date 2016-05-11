@@ -25,16 +25,16 @@ import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLocks;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FsServerDefaults;
 import org.apache.hadoop.fs.InvalidPathException;
-import org.apache.hadoop.fs.LocatedFileStatus;
-import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.ParentNotDirectoryException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
@@ -175,6 +175,43 @@ public class TestFileCreation {
   }
 
   @Test
+  public void testSimple() throws IOException {
+    Configuration conf = new HdfsConfiguration();
+
+    final int NUM_FILES = 5;
+    final int NUM_BLOCKS_PER_FILE = 5;
+    final int NUM_REPLICAS = 1;
+
+    if (simulatedStorage) {
+      SimulatedFSDataset.setFactory(conf);
+    }
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(NUM_REPLICAS).build();
+
+    FileSystem fs = cluster.getFileSystem();
+    try {
+      for(int i = 0; i < NUM_FILES; i++) {
+        FSNamesystem.LOG.debug("Starting file iteration " + i);
+        // create a new file in home directory. Do not close it.
+        Path file = new Path("file_" + i + ".dat");
+        FSDataOutputStream stm = createFile(fs, file, NUM_REPLICAS);
+
+        // verify that file exists in FS namespace
+        assertTrue(file + " should be a file", fs.getFileStatus(file).isFile());
+
+        // write to file
+        byte[] buffer = AppendTestUtil.randomBytes(seed, blockSize*NUM_BLOCKS_PER_FILE);
+        stm.write(buffer, 0, blockSize*NUM_BLOCKS_PER_FILE);
+
+        stm.close();
+
+        FSNamesystem.LOG.debug("Finished file iteration " + i);
+      }
+    } finally {
+      cluster.shutdown();
+    }
+  }
+
+  @Test
   public void testFileCreation() throws IOException {
     checkFileCreation(null, false);
   }
@@ -191,7 +228,7 @@ public class TestFileCreation {
   /**
    * Same test but the client should bind to a local interface
    */
-  //@Test      // also fails in the master branch
+//  @Test      // also fails in the master branch
   public void testFileCreationSetLocalInterface()
       throws IOException {    //HOP also fails in the master branch
     assumeTrue(System.getProperty("os.name").startsWith("Linux"));
@@ -257,10 +294,8 @@ public class TestFileCreation {
         fs.create(dir1, true); // Create path, overwrite=true
         fs.close();
         assertTrue("Did not prevent directory from being overwritten.", false);
-      } catch (IOException ie) {
-        if (!ie.getMessage().contains("already exists as a directory.")) {
-          throw ie;
-        }
+      } catch (FileAlreadyExistsException e) {
+        // expected
       }
       
       // create a new file in home directory. Do not close it.
@@ -996,7 +1031,9 @@ public class TestFileCreation {
       out.write("something".getBytes());
       out.hflush();
       int actualRepl = out.getCurrentBlockReplication();
-      assertTrue(f + " should be replicated to " + DATANODE_NUM + " datanodes.",
+
+      assertTrue(f + " should be replicated to " + DATANODE_NUM + " datanodes" +
+          ", but is only replicated to " + actualRepl + " datanodes.",
           actualRepl == DATANODE_NUM);
 
       // set the soft and hard limit to be 1 second so that the
@@ -1095,12 +1132,13 @@ public class TestFileCreation {
       FSDataOutputStream out =
           TestFileCreation.createFile(dfs, fpath, DATANODE_NUM);
       out.write("something_test".getBytes());
+
       out.hflush();    // ensure that block is allocated
 
       // shutdown last datanode in pipeline.
       cluster.stopDataNode(2);
 
-      // close file. Since we have set the minReplcatio to 3 but have killed one
+      // close file. Since we have set the minReplication to 3 but have killed one
       // of the three datanodes, the close call will loop until the hdfsTimeout is
       // encountered.
       boolean hasException = false;
@@ -1230,6 +1268,7 @@ public class TestFileCreation {
       createSmallFile(fs, new Path("/A/B/C/cf1"), 1);
       createSmallFile(fs, new Path("/A/B/C/cf2"), 1);
 
+      String s = "asdf";
 
       fs.mkdirs(new Path("/A/D"));
       fs.mkdirs(new Path("/A/D/E"));

@@ -205,13 +205,13 @@ public class DataBlockScanner implements Runnable {
       boolean summary) {
     String[] bpIdList = getBpIdList();
     if (bpIdList == null || bpIdList.length == 0) {
-      buffer.append("Periodic block scanner is not yet initialized. " +
-          "Please check back again after some time.");
+      buffer.append("Periodic block scanner is not yet initialized. "
+          + "Please check back again after some time.");
       return;
     }
     for (String bpid : bpIdList) {
       BlockPoolSliceScanner bpScanner = getBPScanner(bpid);
-      buffer.append("\n\nBlock report for block pool: " + bpid + "\n");
+      buffer.append("\n\nBlock report for block pool: "+bpid + "\n");
       bpScanner.printBlockReport(buffer, summary);
       buffer.append("\n");
     }

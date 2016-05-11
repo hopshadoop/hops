@@ -25,6 +25,8 @@ import org.apache.hadoop.hdfs.protocol.DSQuotaExceededException;
 import org.apache.hadoop.hdfs.protocol.NSQuotaExceededException;
 import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
 
+import java.io.IOException;
+
 /**
  * Directory INode class that has a quota restriction
  */
@@ -41,7 +43,7 @@ public class INodeDirectoryWithQuota extends INodeDirectory {
    *     The other inode from which all other properties are copied
    */
   INodeDirectoryWithQuota(Long nsQuota, Long dsQuota, INodeDirectory other)
-      throws StorageException, TransactionContextException {
+      throws IOException {
     super(other);
     INode.DirCounts counts = new INode.DirCounts();
     other.spaceConsumedInTree(counts);
@@ -52,7 +54,7 @@ public class INodeDirectoryWithQuota extends INodeDirectory {
 
   INodeDirectoryWithQuota(Long nsQuota, Long dsQuota, Long nsCount,
       Long dsCount, INodeDirectory other)
-      throws StorageException, TransactionContextException {
+      throws IOException {
     super(other);
     createINodeAttributes(nsQuota, nsCount, dsQuota, dsCount);
     setQuota(nsQuota, dsQuota);
@@ -61,7 +63,8 @@ public class INodeDirectoryWithQuota extends INodeDirectory {
   /**
    * constructor with no quota verification
    */
-  public INodeDirectoryWithQuota(String name, PermissionStatus permissions) {
+  public INodeDirectoryWithQuota(String name, PermissionStatus permissions)
+      throws IOException {
     super(name, permissions);
   }
   
@@ -206,7 +209,7 @@ public class INodeDirectoryWithQuota extends INodeDirectory {
 
 
   public static INodeDirectoryWithQuota createRootDir(
-      PermissionStatus permissions) throws StorageException {
+      PermissionStatus permissions) throws IOException {
     INodeDirectoryWithQuota newRootINode =
         new INodeDirectoryWithQuota(ROOT_NAME, permissions);
     newRootINode.setIdNoPersistance(ROOT_ID);

@@ -56,14 +56,17 @@ public class SchedulerApplication {
   public void setCurrentAppAttempt(SchedulerApplicationAttempt currentAttempt,
       TransactionState ts) {
     if (this.currentAttempt != null && ts != null) {
-      ((TransactionStateImpl) ts).getSchedulerApplicationInfo().
+      ((TransactionStateImpl) ts).getSchedulerApplicationInfos(
+              this.currentAttempt.appSchedulingInfo.applicationId).
           getFiCaSchedulerAppInfo(this.currentAttempt.
               getApplicationAttemptId()).remove(this.currentAttempt);
     }
     this.currentAttempt = currentAttempt;
     if (ts != null) {
-      ((TransactionStateImpl) ts).getSchedulerApplicationInfo()
-          .setFiCaSchedulerAppInfo(currentAttempt);
+      ((TransactionStateImpl) ts).getSchedulerApplicationInfos(
+              this.currentAttempt.appSchedulingInfo.applicationId).
+              getFiCaSchedulerAppInfo(currentAttempt.getApplicationAttemptId()).
+              createFull(currentAttempt);
     }
   }
 

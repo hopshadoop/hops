@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager;
 
+import io.hops.ha.common.TransactionStateManager;
 import org.apache.hadoop.ha.HAServiceProtocol.HAServiceState;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.NodeId;
@@ -40,6 +41,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.security.RMDelegationTokenS
 
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListSet;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.quota.QuotaService;
 
 /**
  * Context of the ResourceManager.
@@ -50,6 +52,12 @@ public interface RMContext extends Recoverable {
 
   boolean isHAEnabled();
 
+  boolean isLeadingRT();
+  
+  boolean isLeader();
+  
+  boolean isDistributedEnabled();
+  
   HAServiceState getHAServiceState();
 
   RMStateStore getStateStore();
@@ -60,8 +68,6 @@ public interface RMContext extends Recoverable {
 
   ConcurrentMap<NodeId, RMNode> getActiveRMNodes();
 
-  ConcurrentSkipListSet<NodeId> getRMNodesToResyncAfterRolback();
-  
   AMLivelinessMonitor getAMLivelinessMonitor();
 
   AMLivelinessMonitor getAMFinishingMonitor();
@@ -84,14 +90,18 @@ public interface RMContext extends Recoverable {
 
   AdminService getRMAdminService();
 
-  GroupMembershipService getRMGroupMembershipService();
+  GroupMembershipService getGroupMembershipService();
   
   ClientRMService getClientRMService();
 
   ApplicationMasterService getApplicationMasterService();
 
   ResourceTrackerService getResourceTrackerService();
-
+  
+  ContainersLogsService getContainersLogsService();
+  
+  QuotaService getQuotaService();
+  
   void setClientRMService(ClientRMService clientRMService);
 
   RMDelegationTokenSecretManager getRMDelegationTokenSecretManager();
@@ -105,4 +115,6 @@ public interface RMContext extends Recoverable {
       RMApplicationHistoryWriter rmApplicationHistoryWriter);
 
   ConfigurationProvider getConfigurationProvider();
+  
+  public TransactionStateManager getTransactionStateManager();
 }

@@ -72,9 +72,21 @@ public class IDsGeneratorFactory {
   }
 
   private List<IDsGenerator> iDsGenerators = Lists.newArrayList();
+
+  Boolean isConfigured = false;
   void setConfiguration(int inodeIdsBatchSize, int blockIdsBatchSize,
       int quotaUpdateIdsBatchSize, float inodeIdsThreshold,
       float blockIdsThreshold, float quotaUpdateIdsThreshold) {
+
+    synchronized (isConfigured) {
+      if (isConfigured) {
+        LogFactory.getLog(this.getClass())
+            .error("Called setConfiguration more than once.");
+        return;
+      }
+      isConfigured = true;
+    }
+
     iDsGenerators.add(new INodeIDGen(inodeIdsBatchSize, inodeIdsThreshold));
     iDsGenerators.add(new BlockIDGen(blockIdsBatchSize, blockIdsThreshold));
     iDsGenerators.add(new QuotaUpdateIDGen(quotaUpdateIdsBatchSize,

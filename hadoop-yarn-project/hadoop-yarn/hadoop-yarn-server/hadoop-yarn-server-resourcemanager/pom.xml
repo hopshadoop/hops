@@ -41,7 +41,7 @@
     <dependency>
       <groupId>io.hops.metadata</groupId>
       <artifactId>hops-metadata-dal</artifactId>
-      <version>1.0-SNAPSHOT</version>
+      <version>1.1-SNAPSHOT</version>
     </dependency>
     <dependency>
       <groupId>javax.servlet</groupId>
@@ -216,6 +216,14 @@
       <artifactId>jersey-test-framework-grizzly2</artifactId>
       <scope>test</scope>
     </dependency>
+    
+    <dependency>
+      <groupId>io.hops.streaming</groupId>
+      <artifactId>libhopsyarn</artifactId>
+      <version>1.0</version>
+      <type>so</type>
+    </dependency>
+        
   </dependencies>
 
   <build>
@@ -235,6 +243,39 @@
 
     <plugins>
 
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>copy-dependency</id>
+            <phase>compile</phase>
+            <goals>
+              <goal>copy</goal>
+            </goals>
+            <configuration>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>io.hops.streaming</groupId>
+                  <artifactId>libhopsyarn</artifactId>
+                  <version>1.0</version>
+                  <type>so</type>
+                  <overWrite>true</overWrite>
+                  <outputDirectory>target/lib</outputDirectory>
+                </artifactItem>
+              </artifactItems>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <argLine>-Djava.library.path=${java.library.path}:${basedir}/target/lib</argLine>         
+        </configuration>
+      </plugin>
       <!-- Publish tests jar -->
       <plugin>
         <artifactId>maven-jar-plugin</artifactId>

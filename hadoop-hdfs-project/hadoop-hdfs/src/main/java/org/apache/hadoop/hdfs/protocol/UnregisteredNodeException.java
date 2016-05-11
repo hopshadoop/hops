@@ -48,7 +48,7 @@ public class UnregisteredNodeException extends IOException {
    */
   public UnregisteredNodeException(DatanodeID nodeID, DatanodeInfo storedNode) {
     super("Data node " + nodeID + " is attempting to report storage ID " +
-        nodeID.getStorageID() + ". Node " + storedNode +
+        nodeID.getDatanodeUuid() + ". Node " + storedNode +
         " is expected to serve this storage.");
   }
 }

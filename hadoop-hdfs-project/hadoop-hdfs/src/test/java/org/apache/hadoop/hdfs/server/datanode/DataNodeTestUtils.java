@@ -113,9 +113,9 @@ public class DataNodeTestUtils {
   }
   
   public static void runBlockScannerForBlock(DataNode dn, ExtendedBlock b) {
-    DataBlockScanner scanner = dn.getBlockScanner();
-    BlockPoolSliceScanner bpScanner = scanner.getBPScanner(b.getBlockPoolId());
-    bpScanner.verifyBlock(b);
+    BlockPoolSliceScanner bpScanner = getBlockPoolScanner(dn, b);
+    bpScanner.verifyBlock(new ExtendedBlock(b.getBlockPoolId(),
+        new BlockPoolSliceScanner.BlockScanInfo(b.getLocalBlock())));
   }
   
   public static void shutdownBlockScanner(DataNode dn) {
@@ -172,5 +172,17 @@ public class DataNodeTestUtils {
   public static ReplicaInfo fetchReplicaInfo(final DataNode dn,
       final String bpid, final long blkId) {
     return FsDatasetTestUtil.fetchReplicaInfo(dn.getFSDataset(), bpid, blkId);
+  }
+
+  private static BlockPoolSliceScanner getBlockPoolScanner(DataNode dn,
+      ExtendedBlock b) {
+    DataBlockScanner scanner = dn.getBlockScanner();
+    BlockPoolSliceScanner bpScanner = scanner.getBPScanner(b.getBlockPoolId());
+    return bpScanner;
+  }
+
+  public static long getLatestScanTime(DataNode dn, ExtendedBlock b) {
+    BlockPoolSliceScanner scanner = getBlockPoolScanner(dn, b);
+    return scanner.getLastScanTime(b.getLocalBlock());
   }
 }

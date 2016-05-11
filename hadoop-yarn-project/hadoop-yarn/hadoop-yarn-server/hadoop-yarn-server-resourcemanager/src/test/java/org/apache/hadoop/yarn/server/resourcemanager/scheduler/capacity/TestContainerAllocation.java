@@ -57,21 +57,22 @@ public class TestContainerAllocation {
   private static final Log LOG = LogFactory.
       getLog(TestContainerAllocation.class);
 
+  private Configuration conf;
+    
   private final int GB = 1024;
 
   @Before
   public void setup() throws IOException {
-    YarnConfiguration conf = new YarnConfiguration();
+    conf = new YarnConfiguration();
     YarnAPIStorageFactory.setConfiguration(conf);
     RMStorageFactory.setConfiguration(conf);
     RMUtilities.InitializeDB();
+    conf.setClass(YarnConfiguration.RM_SCHEDULER,
+              CapacityScheduler.class, ResourceScheduler.class);
   }
 
   @Test(timeout = 30000)
   public void testExcessReservationThanNodeManagerCapacity() throws Exception {
-    YarnConfiguration conf = new YarnConfiguration();
-    YarnAPIStorageFactory.setConfiguration(conf);
-    RMStorageFactory.setConfiguration(conf);
     MockRM rm = new MockRM(conf);
     try {
       rm.start();
@@ -148,11 +149,6 @@ public class TestContainerAllocation {
   // acquired by the AM, not when the containers are allocated
   @Test
   public void testContainerTokenGeneratedOnPullRequest() throws Exception {
-    YarnConfiguration conf = new YarnConfiguration();
-    YarnAPIStorageFactory.setConfiguration(conf);
-    RMStorageFactory.setConfiguration(conf);
-    conf.setClass(YarnConfiguration.RM_SCHEDULER, CapacityScheduler.class,
-        ResourceScheduler.class);
     MockRM rm1 = new MockRM(conf);
     try {
       rm1.start();
@@ -187,9 +183,6 @@ public class TestContainerAllocation {
   @Test
   public void testNormalContainerAllocationWhenDNSUnavailable()
       throws Exception {
-    YarnConfiguration conf = new YarnConfiguration();
-    YarnAPIStorageFactory.setConfiguration(conf);
-    RMStorageFactory.setConfiguration(conf);
     MockRM rm1 = new MockRM(conf);
     try {
       rm1.start();

@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdfs.protocol;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
@@ -41,14 +42,24 @@ public class DatanodeID implements Comparable<DatanodeID> {
   private String ipAddr;     // IP address
   private String hostName;   // hostname claimed by datanode
   private String peerHostName; // hostname from the actual connection
-  private String storageID;  // unique per cluster storageID
   private int xferPort;      // data streaming port
   private int infoPort;      // info server port
   private int ipcPort;       // IPC server port
 
+  /**
+   * UUID identifying a given datanode. For upgraded Datanodes this is the
+   * same as the StorageID that was previously used by this Datanode.
+   * For newly formatted Datanodes it is a UUID.
+   */
+  private String datanodeUuid = null;
+
   public DatanodeID(DatanodeID from) {
-    this(from.getIpAddr(), from.getHostName(), from.getStorageID(),
-        from.getXferPort(), from.getInfoPort(), from.getIpcPort());
+    this(from.getIpAddr(),
+        from.getHostName(),
+        from.getDatanodeUuid(),
+        from.getXferPort(),
+        from.getInfoPort(),
+        from.getIpcPort());
     this.peerHostName = from.getPeerHostName();
   }
   
@@ -59,7 +70,7 @@ public class DatanodeID implements Comparable<DatanodeID> {
    *     IP
    * @param hostName
    *     hostname
-   * @param storageID
+   * @param datanodeUuid
    *     data storage ID
    * @param xferPort
    *     data transfer port
@@ -68,11 +79,11 @@ public class DatanodeID implements Comparable<DatanodeID> {
    * @param ipcPort
    *     ipc server port
    */
-  public DatanodeID(String ipAddr, String hostName, String storageID,
+  public DatanodeID(String ipAddr, String hostName, String datanodeUuid,
       int xferPort, int infoPort, int ipcPort) {
     this.ipAddr = ipAddr;
     this.hostName = hostName;
-    this.storageID = storageID;
+    this.datanodeUuid = checkDatanodeUuid(datanodeUuid);
     this.xferPort = xferPort;
     this.infoPort = infoPort;
     this.ipcPort = ipcPort;
@@ -84,7 +95,7 @@ public class DatanodeID implements Comparable<DatanodeID> {
     this.ipAddr = ns[0];
     this.xferPort = Integer.parseInt(ns[1]);
     this.hostName = "";
-    this.storageID = "";
+    this.datanodeUuid = "";
     this.infoPort = -1;
     this.ipcPort = -1;
   }
@@ -97,10 +108,6 @@ public class DatanodeID implements Comparable<DatanodeID> {
     this.peerHostName = peerHostName;
   }
   
-  public void setStorageID(String storageID) {
-    this.storageID = storageID;
-  }
-
   /**
    * @return ipAddr;
    */
@@ -176,10 +183,23 @@ public class DatanodeID implements Comparable<DatanodeID> {
   }
 
   /**
-   * @return data storage ID.
+   * @return data node ID.
    */
-  public String getStorageID() {
-    return storageID;
+  public String getDatanodeUuid() {
+    return datanodeUuid;
+  }
+
+  @VisibleForTesting
+  public void setDatanodeUuidForTesting(String datanodeUuid) {
+    this.datanodeUuid = datanodeUuid;
+  }
+
+  private String checkDatanodeUuid(String uuid) {
+    if (uuid == null || uuid.isEmpty()) {
+      return null;
+    } else {
+      return uuid;
+    }
   }
 
   /**
@@ -212,12 +232,15 @@ public class DatanodeID implements Comparable<DatanodeID> {
       return false;
     }
     return (getXferAddr().equals(((DatanodeID) to).getXferAddr()) &&
-        storageID.equals(((DatanodeID) to).getStorageID()));
+        datanodeUuid.equals(((DatanodeID) to).getDatanodeUuid()));
   }
   
   @Override
   public int hashCode() {
-    return getXferAddr().hashCode() ^ storageID.hashCode();
+    if(datanodeUuid == null) {
+      return getXferAddr().hashCode();
+    }
+    return getXferAddr().hashCode() ^ datanodeUuid.hashCode();
   }
   
   @Override
@@ -227,7 +250,7 @@ public class DatanodeID implements Comparable<DatanodeID> {
   
   /**
    * Update fields when a new registration request comes in.
-   * Note that this does not update storageID.
+   * Note that this does not update datanodeUuid.
    */
   public void updateRegInfo(DatanodeID nodeReg) {
     ipAddr = nodeReg.getIpAddr();
