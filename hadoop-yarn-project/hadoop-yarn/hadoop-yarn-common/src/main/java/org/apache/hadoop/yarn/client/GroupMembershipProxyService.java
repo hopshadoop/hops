@@ -30,11 +30,16 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.security.PrivilegedAction;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.yarn.exceptions.YarnException;
 
 public class GroupMembershipProxyService implements Closeable {
 
@@ -59,6 +64,7 @@ public class GroupMembershipProxyService implements Closeable {
     protocol = GroupMembership.class;
     Collection<String> rmIds = HAUtil.getRMHAIds(conf);
     this.rmServiceIds = rmIds.toArray(new String[rmIds.size()]);
+    currentProxyIndex = rmServiceIds.length-1;
     conf.set(YarnConfiguration.RM_HA_ID, rmServiceIds[currentProxyIndex]);
   }
 
@@ -92,22 +98,45 @@ public class GroupMembershipProxyService implements Closeable {
     while (!anList.isEmpty()) {
       List<ActiveNode> activeNodes = anList.getActiveNodes();
 
-      ActiveNode nextNode = activeNodes.get(random.nextInt(activeNodes.size()));
+      final ActiveNode nextNode = activeNodes.get(random.nextInt(activeNodes.
+              size()));
       try {
-        GroupMembership proxy = oldProxies.get(nextNode.getInetSocketAddress());
-        if (proxy == null) {
-          proxy = new GroupMembershipPBClientImpl(1,
-              nextNode.getInetSocketAddress(), conf);
-          oldProxies.put(nextNode.getInetSocketAddress(), proxy);
-        }
 
-        LiveRMsResponse response = proxy.getLiveRMList();
+        UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+        if (ugi.getRealUser() != null) {
+          ugi = ugi.getRealUser();
+        }
+        LiveRMsResponse response = ugi
+                .doAs(new PrivilegedAction<LiveRMsResponse>() {
+                  @Override
+                  public LiveRMsResponse run() {
+                    try {
+                      GroupMembership proxy = oldProxies.get(nextNode.
+                              getInetSocketAddress());
+                      if (proxy == null) {
+                        proxy = new GroupMembershipPBClientImpl(1,
+                                nextNode.getInetSocketAddress(), conf);
+                        oldProxies.put(nextNode.getInetSocketAddress(), proxy);
+                      }
+
+                      return (LiveRMsResponse) proxy.getLiveRMList();
+                    } catch (IOException ex) {
+                      LOG.warn(ex, ex);
+                    } catch (YarnException ex) {
+                      LOG.warn(ex, ex);
+                    }
+                    return null;
+                  }
+                });
+        if (response == null) {
+          activeNodes.remove(nextNode);
+          anList = new SortedActiveRMList(activeNodes);
+          continue;
+        }
         anList = response.getLiveRMsList();
         return;
-      } catch (Exception e) {
-        activeNodes.remove(nextNode);
-        anList = new SortedActiveRMList(activeNodes);
-        continue;
+      } catch (IOException e) {
+        LOG.error(e, e);
       }
     }
     updateFromConfigFile();
@@ -120,22 +149,41 @@ public class GroupMembershipProxyService implements Closeable {
       conf.set(YarnConfiguration.RM_HA_ID, rmServiceIds[currentProxyIndex]);
       try {
         LOG.info("connecting to " + rmServiceIds[currentProxyIndex]);
-        final InetSocketAddress rmAddress =
-            rmProxy.getRMAddress(conf, protocol);
-        GroupMembership proxy = oldProxies.get(rmAddress);
-        if (proxy == null) {
-          proxy = RMProxy.getProxy(conf, protocol, rmAddress);
-          oldProxies.put(rmAddress, proxy);
+        final InetSocketAddress rmAddress = rmProxy.getRMAddress(conf, protocol);
+        UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+        if (ugi.getRealUser() != null) {
+          ugi = ugi.getRealUser();
         }
-
-        LiveRMsResponse response = proxy.getLiveRMList();
+        LiveRMsResponse response = ugi
+                .doAs(new PrivilegedAction<LiveRMsResponse>() {
+                  @Override
+                  public LiveRMsResponse run() {
+                    try {
+                      GroupMembership proxy = oldProxies.get(rmAddress);
+                      if (proxy == null) {
+                        proxy = RMProxy.getProxy(conf, protocol, rmAddress);
+                        oldProxies.put(rmAddress, proxy);
+                      }
+                      return (LiveRMsResponse) proxy.getLiveRMList();
+                    } catch (IOException ex) {
+                      LOG.warn(ex, ex);
+                    } catch (YarnException ex) {
+                      LOG.warn(ex, ex);
+                    }
+                    return null;
+                  }
+                });
+        if (response == null) {
+          LOG.info("Unable to create proxy to the ResourceManager "
+                  + rmServiceIds[currentProxyIndex]);
+          anList = null;
+          tries++;
+          continue;
+        }
         anList = response.getLiveRMsList();
         return;
-      } catch (Exception e) {
-        LOG.error("Unable to create proxy to the ResourceManager " +
-            rmServiceIds[currentProxyIndex]);
-        anList = null;
-        tries++;
+      } catch (IOException e) {
+        LOG.error(e, e);
       }
     }
   }

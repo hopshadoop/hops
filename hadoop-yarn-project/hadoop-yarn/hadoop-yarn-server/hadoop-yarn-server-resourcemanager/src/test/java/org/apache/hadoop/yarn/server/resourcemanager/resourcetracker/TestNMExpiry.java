@@ -20,6 +20,7 @@ package org.apache.hadoop.yarn.server.resourcemanager.resourcetracker;
 
 import io.hops.exception.StorageException;
 import io.hops.exception.StorageInitializtionException;
+import io.hops.ha.common.TransactionStateManager;
 import io.hops.metadata.util.RMStorageFactory;
 import io.hops.metadata.util.RMUtilities;
 import io.hops.metadata.util.YarnAPIStorageFactory;
@@ -54,6 +55,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.io.IOException;
+import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 
 public class TestNMExpiry {
   private static final Log LOG = LogFactory.getLog(TestNMExpiry.class);
@@ -63,8 +65,9 @@ public class TestNMExpiry {
   ResourceTrackerService resourceTrackerService;
 
   private class TestNmLivelinessMonitor extends NMLivelinessMonitor {
-    public TestNmLivelinessMonitor(Dispatcher dispatcher) {
-      super(dispatcher);
+    public TestNmLivelinessMonitor(Dispatcher dispatcher, RMContext rmContext,
+            Configuration conf) {
+      super(dispatcher, rmContext, conf);
     }
 
     @Override
@@ -87,9 +90,12 @@ public class TestNMExpiry {
     RMUtilities.InitializeDB();
     // Dispatcher that processes events inline
     Dispatcher dispatcher = new InlineDispatcher();
+    TransactionStateManager tsm = new TransactionStateManager();
+    tsm.init(conf);
+    tsm.start();
     RMContextImpl context =
         new RMContextImpl(dispatcher, null, null, null, null, null, null, null,
-            null);
+            conf, tsm);
     groupMembership = new GroupMembershipService(null, context);
     context.setRMGroupMembershipService(groupMembership);
     dispatcher.register(SchedulerEventType.class,
@@ -97,7 +103,7 @@ public class TestNMExpiry {
     dispatcher
         .register(RMNodeEventType.class, new NodeEventDispatcher(context));
     NMLivelinessMonitor nmLivelinessMonitor =
-        new TestNmLivelinessMonitor(dispatcher);
+        new TestNmLivelinessMonitor(dispatcher, context, conf);
     nmLivelinessMonitor.init(conf);
     nmLivelinessMonitor.start();
     NodesListManager nodesListManager = new NodesListManager(context);

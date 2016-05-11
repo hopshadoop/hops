@@ -55,6 +55,7 @@ public class HopYarnAPIUtilities {
   public static final int RMCONTAINERID = 17;
   public static final int PRIORITYID = 18;
   public static final int QUEMETRICSID = 1;
+  public static final int CONTAINERSTICKCOUNTER = 19;
   public final static Map<Integer, Integer> availableIDs =
       new HashMap<Integer, Integer>();
   public static final int AVAILABLE_IDS_INIT_VALUE = 0;
@@ -82,6 +83,7 @@ public class HopYarnAPIUtilities {
     availableIDs.put(APPSCHEDULINGINFO, AVAILABLE_IDS_INIT_VALUE);
     availableIDs.put(RMCONTAINERID, AVAILABLE_IDS_INIT_VALUE);
     availableIDs.put(PRIORITYID, AVAILABLE_IDS_INIT_VALUE);
+    availableIDs.put(CONTAINERSTICKCOUNTER, AVAILABLE_IDS_INIT_VALUE);
   }
 
 
@@ -92,7 +94,8 @@ public class HopYarnAPIUtilities {
    * @param type
    * @return
    */
-  public synchronized static int setYarnVariables(final int type) {
+  public synchronized static int incrementYarnVariables(final int type,
+          final int increment) throws IOException {
     LightWeightRequestHandler setYarnVariablesHandler =
         new LightWeightRequestHandler(YARNOperationType.TEST) {
           @Override
@@ -108,7 +111,7 @@ public class HopYarnAPIUtilities {
 
             if (found != null) {
               int toReturn = found.getValue();
-              found.setValue(found.getValue() + 1);
+              found.setValue(found.getValue() + increment);
               yDA.add(found);
               connector.commit();
               LOG.debug("HOP :: setYarnVariables Finish-" +
@@ -118,15 +121,10 @@ public class HopYarnAPIUtilities {
             return null;
           }
         };
-    try {
       return (Integer) setYarnVariablesHandler.handle();
-    } catch (IOException ex) {
-      LOG.error("Error setting YarnVariables", ex);
-    }
-    return Integer.MIN_VALUE;
   }
 
-
+  
   private static int currentRPCID = -1;
   private static int maxRPCID = -1;
   private static final int idsInterval = 1000;
@@ -138,44 +136,12 @@ public class HopYarnAPIUtilities {
    * @param type
    * @return
    */
-  public synchronized static int getRPCID() {
-    LightWeightRequestHandler setYarnVariablesHandler =
-        new LightWeightRequestHandler(YARNOperationType.TEST) {
-          @Override
-          public Object performTask() throws IOException {
-            connector.beginTransaction();
-            connector.writeLock();
-            LOG.debug(
-                "HOP :: setYarnVariables Start-" + System.currentTimeMillis());
-            YarnVariablesDataAccess yDA =
-                (YarnVariablesDataAccess) YarnAPIStorageFactory
-                    .getDataAccess(YarnVariablesDataAccess.class);
-            YarnVariables found =
-                (YarnVariables) yDA.findById(HopYarnAPIUtilities.RPC);
-
-            if (found != null) {
-              int toReturn = found.getValue();
-              found.setValue(found.getValue() + idsInterval);
-              yDA.add(found);
-              connector.commit();
-              LOG.debug("HOP :: setYarnVariables Finish-" +
-                  System.currentTimeMillis());
-              return toReturn;
-            }
-            return null;
-          }
-        };
+  public synchronized static int getRPCID() throws IOException {
     if (currentRPCID == maxRPCID) {
-      try {
-        currentRPCID = (Integer) setYarnVariablesHandler.handle();
+        currentRPCID = incrementYarnVariables(RPC, idsInterval);
         maxRPCID = currentRPCID + idsInterval;
-      } catch (IOException ex) {
-        LOG.error("Error setting YarnVariables", ex);
-      }
     }
-
     return currentRPCID++;
-
   }
 
   /**

@@ -228,6 +228,7 @@ public class AdminService extends CompositeService
     throw new StandbyException("ResourceManager " + rmId + " is not Active!");
   }
 
+  //TODO redo for distributed version
   @Override
   public synchronized void monitorHealth() throws IOException {
     checkAccess("monitorHealth");
@@ -314,6 +315,7 @@ public class AdminService extends CompositeService
   @Override
   public RefreshQueuesResponse refreshQueues(RefreshQueuesRequest request)
       throws YarnException, StandbyException {
+    //TORECOVER make recoverable
     String argName = "refreshQueues";
     UserGroupInformation user = checkAcls(argName);
 
@@ -328,7 +330,7 @@ public class AdminService extends CompositeService
     RefreshQueuesResponse response =
         recordFactory.newRecordInstance(RefreshQueuesResponse.class);
     try {
-      rmContext.getScheduler().reinitialize(getConfig(), this.rmContext);
+      rmContext.getScheduler().reinitialize(getConfig(), this.rmContext, null);
       RMAuditLogger
           .logSuccess(user.getShortUserName(), argName, "AdminService");
       return response;

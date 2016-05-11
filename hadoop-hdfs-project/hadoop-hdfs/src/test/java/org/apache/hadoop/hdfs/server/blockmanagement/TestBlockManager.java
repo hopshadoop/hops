@@ -26,6 +26,7 @@ import io.hops.exception.StorageException;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.INodeDataAccess;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
+import io.hops.security.Users;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.handler.LightWeightRequestHandler;
@@ -42,11 +43,13 @@ import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.BlockListAsLongs;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor.BlockTargetPair;
+import org.apache.hadoop.hdfs.server.datanode.DataStorage;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 import org.apache.hadoop.hdfs.server.namenode.INodeDirectory;
 import org.apache.hadoop.hdfs.server.namenode.INodeFile;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
+import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.apache.hadoop.net.NetworkTopology;
 import org.junit.Before;
 import org.junit.Test;
@@ -54,6 +57,7 @@ import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map.Entry;
@@ -65,12 +69,12 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 
 public class TestBlockManager {
+  private DatanodeStorageInfo[] storages;
   private List<DatanodeDescriptor> nodes;
   private List<DatanodeDescriptor> rackA;
   private List<DatanodeDescriptor> rackB;
@@ -91,37 +95,52 @@ public class TestBlockManager {
   private FSNamesystem fsn;
   private BlockManager bm;
 
+  private final String USER = "user";
+  private final String GROUP = "grp";
+
   @Before
   public void setupMockCluster() throws IOException {
     conf = new HdfsConfiguration();
     HdfsStorageFactory.setConfiguration(conf);
-    HdfsStorageFactory.formatStorage();
     conf.set(DFSConfigKeys.NET_TOPOLOGY_SCRIPT_FILE_NAME_KEY,
         "need to set a dummy value here so it assumes a multi-rack cluster");
     fsn = Mockito.mock(FSNamesystem.class);
+    formatStorage();
+
     bm = new BlockManager(fsn, fsn, conf);
-    nodes = ImmutableList
-        .of(DFSTestUtil.getDatanodeDescriptor("1.1.1.1", "/rackA"),
-            DFSTestUtil.getDatanodeDescriptor("2.2.2.2", "/rackA"),
-            DFSTestUtil.getDatanodeDescriptor("3.3.3.3", "/rackA"),
-            DFSTestUtil.getDatanodeDescriptor("4.4.4.4", "/rackB"),
-            DFSTestUtil.getDatanodeDescriptor("5.5.5.5", "/rackB"),
-            DFSTestUtil.getDatanodeDescriptor("6.6.6.6", "/rackB"));
+    final String[] racks = {
+        "/rackA",
+        "/rackA",
+        "/rackA",
+        "/rackB",
+        "/rackB",
+        "/rackB"};
+    storages = DFSTestUtil.createDatanodeStorageInfos(racks);
+    nodes = Arrays.asList(DFSTestUtil.toDatanodeDescriptor(storages));
+
     for (int i = 0; i < nodes.size(); i++) {
-      nodes.get(i).setStorageID("DN-Name-" + i);
+      nodes.get(i).setDatanodeUuidForTesting("DN-Name-" + DatanodeStorage.generateUuid());
     }
+
     rackA = nodes.subList(0, 3);
     rackB = nodes.subList(3, 6);
   }
-  
+
+  private void formatStorage() throws IOException {
+    HdfsStorageFactory.formatStorage();
+    Users.addUserToGroup(USER, GROUP);
+  }
+
   private void addNodes(Iterable<DatanodeDescriptor> nodesToAdd)
       throws IOException {
     NetworkTopology cluster = bm.getDatanodeManager().getNetworkTopology();
     // construct network topology
     for (DatanodeDescriptor dn : nodesToAdd) {
       cluster.add(dn);
-      dn.updateHeartbeat(2 * HdfsConstants.MIN_BLOCKS_FOR_WRITE * BLOCK_SIZE,
-          0L, 2 * HdfsConstants.MIN_BLOCKS_FOR_WRITE * BLOCK_SIZE, 0L, 0, 0);
+      dn.getStorageInfos()[0].setUtilizationForTesting(
+          2 * HdfsConstants.MIN_BLOCKS_FOR_WRITE*BLOCK_SIZE, 0L,
+          2 * HdfsConstants.MIN_BLOCKS_FOR_WRITE*BLOCK_SIZE, 0L);
+      dn.updateHeartbeat(BlockManagerTestUtil.getStorageReportsForDatanode(dn), 0, 0);
       bm.getDatanodeManager().checkIfClusterIsNowMultiRack(dn);
       bm.getDatanodeManager().addDnToStorageMapInDB(dn);
       bm.getDatanodeManager().addDatanode(dn);
@@ -148,14 +167,23 @@ public class TestBlockManager {
   }
   
   private void doBasicTest(int testIndex) throws IOException {
-    List<DatanodeDescriptor> origNodes = getNodes(0, 1);
+    List<DatanodeStorageInfo> origStorages = getStorages(0, 1);
+    List<DatanodeDescriptor> origNodes = getNodes(origStorages);
     BlockInfo blockInfo = addBlockOnNodes((long) testIndex, origNodes);
 
-    DatanodeDescriptor[] pipeline = scheduleSingleReplication(blockInfo);
+    DatanodeStorageInfo[] pipeline = scheduleSingleReplication(blockInfo);
+
+    // Since
+    boolean isOnNode =
+        origStorages.get(0).equals(pipeline[0]) ||
+        origStorages.get(1).equals(pipeline[0]);
+
     assertTrue("Source of replication should be one of the nodes the block " +
-            "was on. Was: " + pipeline[0], origNodes.contains(pipeline[0]));
+            "was on. (" + origStorages.toString() + ")" +
+            "Was: " + pipeline[0], origStorages.contains(pipeline[0]));
+
     assertTrue("Destination of replication should be on the other rack. " +
-            "Was: " + pipeline[1], rackB.contains(pipeline[1]));
+        "Was: " + pipeline[1], rackB.contains(pipeline[1].getDatanodeDescriptor()));
   }
   
 
@@ -178,20 +206,22 @@ public class TestBlockManager {
   private void doTestTwoOfThreeNodesDecommissioned(int testIndex)
       throws Exception {
     // Block originally on A1, A2, B1
-    List<DatanodeDescriptor> origNodes = getNodes(0, 1, 3);
+    List<DatanodeStorageInfo> origStorages = getStorages(0, 1, 3);
+    List<DatanodeDescriptor> origNodes = getNodes(origStorages);
     BlockInfo blockInfo = addBlockOnNodes(testIndex, origNodes);
     
     // Decommission two of the nodes (A1, A2)
     List<DatanodeDescriptor> decomNodes = startDecommission(0, 1);
-    
-    DatanodeDescriptor[] pipeline = scheduleSingleReplication(blockInfo);
+
+    DatanodeStorageInfo[] pipeline = scheduleSingleReplication(blockInfo);
     assertTrue("Source of replication should be one of the nodes the block " +
-            "was on. Was: " + pipeline[0], origNodes.contains(pipeline[0]));
+            "was on(" + origStorages.toString() + "). " +
+            "Was: " + pipeline[0], origStorages.contains(pipeline[0]));
     assertEquals("Should have three targets", 3, pipeline.length);
     
     boolean foundOneOnRackA = false;
     for (int i = 1; i < pipeline.length; i++) {
-      DatanodeDescriptor target = pipeline[i];
+      DatanodeDescriptor target = pipeline[i].getDatanodeDescriptor();
       if (rackA.contains(target)) {
         foundOneOnRackA = true;
       }
@@ -220,21 +250,22 @@ public class TestBlockManager {
   private void doTestAllNodesHoldingReplicasDecommissioned(int testIndex)
       throws Exception {
     // Block originally on A1, A2, B1
-    List<DatanodeDescriptor> origNodes = getNodes(0, 1, 3);
+    List<DatanodeStorageInfo> origStorages = getStorages(0, 1, 3);
+    List<DatanodeDescriptor> origNodes = getNodes(origStorages);
     BlockInfo blockInfo = addBlockOnNodes(testIndex, origNodes);
     
     // Decommission all of the nodes
     List<DatanodeDescriptor> decomNodes = startDecommission(0, 1, 3);
-    
-    DatanodeDescriptor[] pipeline = scheduleSingleReplication(blockInfo);
+
+    DatanodeStorageInfo[] pipeline = scheduleSingleReplication(blockInfo);
     assertTrue("Source of replication should be one of the nodes the block " +
-            "was on. Was: " + pipeline[0], origNodes.contains(pipeline[0]));
+            "was on. Was: " + pipeline[0], origStorages.contains(pipeline[0]));
     assertEquals("Should have three targets", 4, pipeline.length);
     
     boolean foundOneOnRackA = false;
     boolean foundOneOnRackB = false;
     for (int i = 1; i < pipeline.length; i++) {
-      DatanodeDescriptor target = pipeline[i];
+      DatanodeDescriptor target = pipeline[i].getDatanodeDescriptor();
       if (rackA.contains(target)) {
         foundOneOnRackA = true;
       } else if (rackB.contains(target)) {
@@ -270,30 +301,32 @@ public class TestBlockManager {
   private void doTestOneOfTwoRacksDecommissioned(int testIndex)
       throws Exception {
     // Block originally on A1, A2, B1
-    List<DatanodeDescriptor> origNodes = getNodes(0, 1, 3);
+    List<DatanodeStorageInfo> origStorages = getStorages(0, 1, 3);
+    List<DatanodeDescriptor> origNodes = getNodes(origStorages);
+
     BlockInfo blockInfo = addBlockOnNodes(testIndex, origNodes);
-    
+
     // Decommission all of the nodes in rack A
     List<DatanodeDescriptor> decomNodes = startDecommission(0, 1, 2);
-    
-    DatanodeDescriptor[] pipeline = scheduleSingleReplication(blockInfo);
+
+    DatanodeStorageInfo[] pipeline = scheduleSingleReplication(blockInfo);
     assertTrue("Source of replication should be one of the nodes the block " +
-            "was on. Was: " + pipeline[0], origNodes.contains(pipeline[0]));
+        "was on. Was: " + pipeline[0], origStorages.contains(pipeline[0]));
     assertEquals("Should have three targets", 3, pipeline.length);
-    
+
     boolean foundOneOnRackB = false;
     for (int i = 1; i < pipeline.length; i++) {
-      DatanodeDescriptor target = pipeline[i];
-      if (rackB.contains(target)) {
+      DatanodeStorageInfo target = pipeline[i];
+      if (rackB.contains(target.getDatanodeDescriptor())) {
         foundOneOnRackB = true;
       }
       assertFalse(decomNodes.contains(target));
       assertFalse(origNodes.contains(target));
     }
-    
+
     assertTrue("Should have at least one target on rack B. Pipeline: " +
-            Joiner.on(",").join(pipeline), foundOneOnRackB);
-    
+        Joiner.on(",").join(pipeline), foundOneOnRackB);
+
     // Mark the block as received on the target nodes in the pipeline
     fulfillPipeline(blockInfo, pipeline);
 
@@ -301,11 +334,12 @@ public class TestBlockManager {
     // the third off-rack replica.
     DatanodeDescriptor rackCNode =
         DFSTestUtil.getDatanodeDescriptor("7.7.7.7", "/rackC");
+    rackCNode.updateStorage(new DatanodeStorage(DatanodeStorage.generateUuid()));
     addNodes(ImmutableList.of(rackCNode));
     try {
-      DatanodeDescriptor[] pipeline2 = scheduleSingleReplication(blockInfo);
+      DatanodeStorageInfo[] pipeline2 = scheduleSingleReplication(blockInfo);
       assertEquals(2, pipeline2.length);
-      assertEquals(rackCNode, pipeline2[1]);
+      assertEquals(rackCNode, pipeline2[1].getDatanodeDescriptor());
     } finally {
       removeNode(rackCNode);
     }
@@ -328,30 +362,32 @@ public class TestBlockManager {
     // Originally on only nodes in rack A.
     List<DatanodeDescriptor> origNodes = rackA;
     BlockInfo blockInfo = addBlockOnNodes((long) testIndex, origNodes);
-    DatanodeDescriptor pipeline[] = scheduleSingleReplication(blockInfo);
+    DatanodeStorageInfo pipeline[] = scheduleSingleReplication(blockInfo);
     
     assertEquals(2, pipeline.length); // single new copy
     assertTrue("Source of replication should be one of the nodes the block " +
-            "was on. Was: " + pipeline[0], origNodes.contains(pipeline[0]));
-    assertTrue("Destination of replication should be on the other rack. " +
-            "Was: " + pipeline[1], rackB.contains(pipeline[1]));
+            "was on. Was: " + pipeline[0],
+        origNodes.contains(pipeline[0].getDatanodeDescriptor()));
+    assertTrue("Destination node of replication should be on the other rack. " +
+        "Was: " + pipeline[1].getDatanodeDescriptor(),
+        rackB.contains(pipeline[1].getDatanodeDescriptor()));
   }
   
   @Test
   public void testBlocksAreNotUnderreplicatedInSingleRack() throws Exception {
     List<DatanodeDescriptor> nodes = ImmutableList
-        .of(DFSTestUtil.getDatanodeDescriptor("1.1.1.1", "/rackA"),
-            DFSTestUtil.getDatanodeDescriptor("2.2.2.2", "/rackA"),
-            DFSTestUtil.getDatanodeDescriptor("3.3.3.3", "/rackA"),
-            DFSTestUtil.getDatanodeDescriptor("4.4.4.4", "/rackA"),
-            DFSTestUtil.getDatanodeDescriptor("5.5.5.5", "/rackA"),
-            DFSTestUtil.getDatanodeDescriptor("6.6.6.6", "/rackA"));
+        .of(BlockManagerTestUtil.getDatanodeDescriptor("1.1.1.1", "/rackA", true),
+            BlockManagerTestUtil.getDatanodeDescriptor("2.2.2.2", "/rackA", true),
+            BlockManagerTestUtil.getDatanodeDescriptor("3.3.3.3", "/rackA", true),
+            BlockManagerTestUtil.getDatanodeDescriptor("4.4.4.4", "/rackA", true),
+            BlockManagerTestUtil.getDatanodeDescriptor("5.5.5.5", "/rackA", true),
+            BlockManagerTestUtil.getDatanodeDescriptor("6.6.6.6", "/rackA", true));
     for (int i = 0; i < nodes.size(); i++) {
-      nodes.get(i).setStorageID("DN-Name-" + i);
+      nodes.get(i).setDatanodeUuidForTesting("DN-Name-" + i);
     }
     addNodes(nodes);
     List<DatanodeDescriptor> origNodes = nodes.subList(0, 3);
-    ;
+
     for (int i = 0; i < NUM_TEST_ITERS; i++) {
       doTestSingleRackClusterIsSufficientlyReplicated(i, origNodes);
     }
@@ -371,7 +407,7 @@ public class TestBlockManager {
    * pipeline.
    */
   private void fulfillPipeline(final BlockInfo blockInfo,
-      DatanodeDescriptor[] pipeline) throws IOException {
+      DatanodeStorageInfo[] pipeline) throws IOException {
     HopsTransactionalRequestHandler handler =
         new HopsTransactionalRequestHandler(
             HDFSOperationType.FULFILL_PIPELINE) {
@@ -395,8 +431,8 @@ public class TestBlockManager {
 
           @Override
           public Object performTask() throws IOException {
-            DatanodeDescriptor dnd = (DatanodeDescriptor) getParams()[0];
-            bm.addBlock(dnd, blockInfo, null);
+            DatanodeStorageInfo storage = (DatanodeStorageInfo) getParams()[0];
+            bm.addBlock(storage, blockInfo, null);
             return null;
           }
         };
@@ -425,17 +461,35 @@ public class TestBlockManager {
         BlockInfo blockInfo = new BlockInfo(block, inode_id);
 
         for (DatanodeDescriptor dn : nodes) {
-          dn.addBlock(blockInfo);
+          for (DatanodeStorageInfo storage : dn.getStorageInfos()) {
+            blockInfo.addReplica(storage);
+          }
         }
         return blockInfo;
       }
     }.handle();
   }
 
-  private List<DatanodeDescriptor> getNodes(int... indexes) {
+  private List<DatanodeDescriptor> getNodes(int ... indexes) {
     List<DatanodeDescriptor> ret = Lists.newArrayList();
     for (int idx : indexes) {
       ret.add(nodes.get(idx));
+    }
+    return ret;
+  }
+
+  private List<DatanodeDescriptor> getNodes(List<DatanodeStorageInfo> storages) {
+    List<DatanodeDescriptor> ret = Lists.newArrayList();
+    for (DatanodeStorageInfo s : storages) {
+      ret.add(s.getDatanodeDescriptor());
+    }
+    return ret;
+  }
+
+  private List<DatanodeStorageInfo> getStorages(int... indexes) {
+    List<DatanodeStorageInfo> ret = Lists.newArrayList();
+    for (int idx : indexes) {
+      ret.add(storages[idx]);
     }
     return ret;
   }
@@ -457,7 +511,7 @@ public class TestBlockManager {
         new LightWeightRequestHandler(HDFSOperationType.TEST) {
           @Override
           public INodeFile performTask() throws IOException {
-            INodeFile file = new INodeFile(new PermissionStatus("user", "grp",
+            INodeFile file = new INodeFile(new PermissionStatus(USER, GROUP,
                 new FsPermission((short) 0777)), null, (short) 3,
                 System.currentTimeMillis(), System.currentTimeMillis(), 1000l);
             file.setLocalNameNoPersistance("hop");
@@ -500,7 +554,7 @@ public class TestBlockManager {
     return blockInfo;
   }
 
-  private DatanodeDescriptor[] scheduleSingleReplication(final BlockInfo block)
+  private DatanodeStorageInfo[] scheduleSingleReplication(final BlockInfo block)
       throws IOException {
     final List<Block> list_p1 = new ArrayList<Block>();
     final List<List<Block>> list_all = new ArrayList<List<Block>>();
@@ -542,7 +596,7 @@ public class TestBlockManager {
     assertEquals("computeReplicationWork should indicate replication is needed",
         1, bm.computeReplicationWorkForBlocks(list_all));
 
-    return (DatanodeDescriptor[]) new HopsTransactionalRequestHandler(
+    return (DatanodeStorageInfo[]) new HopsTransactionalRequestHandler(
         HDFSOperationType.SCHEDULE_SINGLE_REPLICATION) {
       INodeIdentifier inodeIdentifier;
 
@@ -566,16 +620,16 @@ public class TestBlockManager {
         assertTrue("replication is pending after work is computed",
             bm.pendingReplications.getNumReplicas(block) > 0);
 
-        LinkedListMultimap<DatanodeDescriptor, BlockTargetPair> repls =
+        LinkedListMultimap<DatanodeStorageInfo, BlockTargetPair> repls =
             getAllPendingReplications();
         assertEquals(1, repls.size());
-        Entry<DatanodeDescriptor, BlockTargetPair> repl =
+        Entry<DatanodeStorageInfo, BlockTargetPair> repl =
             repls.entries().iterator().next();
 
-        DatanodeDescriptor[] targets = repl.getValue().targets;
+        DatanodeStorageInfo[] targets = repl.getValue().targets;
 
-        DatanodeDescriptor[] pipeline =
-            new DatanodeDescriptor[1 + targets.length];
+        DatanodeStorageInfo[] pipeline =
+            new DatanodeStorageInfo[1 + targets.length];
         pipeline[0] = repl.getKey();
         System.arraycopy(targets, 0, pipeline, 1, targets.length);
 
@@ -584,13 +638,15 @@ public class TestBlockManager {
     }.handle(fsn);
   }
 
-  private LinkedListMultimap<DatanodeDescriptor, BlockTargetPair> getAllPendingReplications() {
-    LinkedListMultimap<DatanodeDescriptor, BlockTargetPair> repls =
+  private LinkedListMultimap<DatanodeStorageInfo, BlockTargetPair> getAllPendingReplications() {
+    LinkedListMultimap<DatanodeStorageInfo, BlockTargetPair> repls =
         LinkedListMultimap.create();
     for (DatanodeDescriptor dn : nodes) {
       List<BlockTargetPair> thisRepls = dn.getReplicationCommand(10);
       if (thisRepls != null) {
-        repls.putAll(dn, thisRepls);
+        for(DatanodeStorageInfo storage : dn.getStorageInfos()) {
+          repls.putAll(storage, thisRepls);
+        }
       }
     }
     return repls;
@@ -604,7 +660,7 @@ public class TestBlockManager {
   @Test
   public void testHighestPriReplSrcChosenDespiteMaxReplLimit()
       throws Exception {
-    HdfsStorageFactory.formatStorage();
+    formatStorage();
     bm.maxReplicationStreams = 0;
     bm.replicationStreamsHardLimit = 1;
 
@@ -617,10 +673,8 @@ public class TestBlockManager {
     // Add the block to the first node.
     addBlockOnNodes(blockId, origNodes.subList(0, 1));
 
-    final List<DatanodeDescriptor> cntNodes =
-        new LinkedList<DatanodeDescriptor>();
-    final List<DatanodeDescriptor> liveNodes =
-        new LinkedList<DatanodeDescriptor>();
+    final List<DatanodeDescriptor> cntNodes = new LinkedList<DatanodeDescriptor>();
+    final List<DatanodeStorageInfo> liveNodes = new LinkedList<DatanodeStorageInfo>();
     
     
     new HopsTransactionalRequestHandler(HDFSOperationType.TEST) {
@@ -659,7 +713,7 @@ public class TestBlockManager {
                 UnderReplicatedBlocks.QUEUE_VERY_UNDER_REPLICATED));
 
         // Increase the replication count to test replication count > hard limit
-        DatanodeDescriptor targets[] = {origNodes.get(1)};
+        DatanodeStorageInfo targets[] = { origNodes.get(1).getStorageInfos()[0] };
         origNodes.get(0).addBlockToBeReplicated(aBlock, targets);
 
         assertNull("Does not choose a source node for a highest-priority" +
@@ -676,7 +730,11 @@ public class TestBlockManager {
   @Test
   public void testSafeModeIBR() throws Exception {
     DatanodeDescriptor node = spy(nodes.get(0));
-    node.setStorageID("dummy-storage");
+    DatanodeStorageInfo ds = node.getStorageInfos()[0];
+
+    // TODO: Needs to be fixed. DatanodeUuid is not storageID.
+    node.setDatanodeUuidForTesting(ds.getStorageID());
+
     node.isAlive = true;
 
     DatanodeRegistration nodeReg =
@@ -684,40 +742,47 @@ public class TestBlockManager {
 
     // pretend to be in safemode
     doReturn(true).when(fsn).isInStartupSafeMode();
-    
+
     // register new node
     bm.getDatanodeManager().registerDatanode(nodeReg);
     bm.getDatanodeManager().addDatanode(node); // swap in spy    
     assertEquals(node, bm.getDatanodeManager().getDatanode(node));
-    assertTrue(node.isFirstBlockReport());
+    assertEquals(0, ds.getBlockReportCount());
     // send block report, should be processed
     reset(node);
-    bm.processReport(node, "pool", new BlockListAsLongs(null, null));
-    verify(node).receivedBlockReport();
-    assertFalse(node.isFirstBlockReport());
+
+    bm.processReport(node, new DatanodeStorage(ds.getStorageID()),
+        new BlockListAsLongs(null, null));
+    assertEquals(1, ds.getBlockReportCount());
     // send block report again, should NOT be processed
     reset(node);
-    bm.processReport(node, "pool", new BlockListAsLongs(null, null));
-    verify(node, never()).receivedBlockReport();
-    assertFalse(node.isFirstBlockReport());
+    bm.processReport(node, new DatanodeStorage(ds.getStorageID()),
+        new BlockListAsLongs(null, null));
+    assertEquals(1, ds.getBlockReportCount());
 
     // re-register as if node restarted, should update existing node
     bm.getDatanodeManager().removeDatanode(node);
     reset(node);
     bm.getDatanodeManager().registerDatanode(nodeReg);
     verify(node).updateRegInfo(nodeReg);
-    assertTrue(node.isFirstBlockReport()); // ready for report again
     // send block report, should be processed after restart
     reset(node);
-    bm.processReport(node, "pool", new BlockListAsLongs(null, null));
-    verify(node).receivedBlockReport();
-    assertFalse(node.isFirstBlockReport());
+    bm.processReport(node, new DatanodeStorage(ds.getStorageID()),
+        new BlockListAsLongs(null, null));
+    // Reinitialize as registration with empty storage list pruned
+    // node.storageMap.
+    ds = node.getStorageInfos()[0];
+    assertEquals(1, ds.getBlockReportCount());
   }
   
   @Test
   public void testSafeModeIBRAfterIncremental() throws Exception {
     DatanodeDescriptor node = spy(nodes.get(0));
-    node.setStorageID("dummy-storage");
+    DatanodeStorageInfo ds = node.getStorageInfos()[0];
+
+    // TODO: Needs to be fixed. DatanodeUuid is not storageID.
+    node.setDatanodeUuidForTesting(ds.getStorageID());
+
     node.isAlive = true;
 
     DatanodeRegistration nodeReg =
@@ -730,12 +795,12 @@ public class TestBlockManager {
     bm.getDatanodeManager().registerDatanode(nodeReg);
     bm.getDatanodeManager().addDatanode(node); // swap in spy    
     assertEquals(node, bm.getDatanodeManager().getDatanode(node));
-    assertTrue(node.isFirstBlockReport());
+    assertEquals(0, ds.getBlockReportCount());
     // send block report while pretending to already have blocks
     reset(node);
     doReturn(1).when(node).numBlocks();
-    bm.processReport(node, "pool", new BlockListAsLongs(null, null));
-    verify(node).receivedBlockReport();
-    assertFalse(node.isFirstBlockReport());
+    bm.processReport(node, new DatanodeStorage(ds.getStorageID()),
+        new BlockListAsLongs(null, null));
+    assertEquals(1, ds.getBlockReportCount());
   }
 }

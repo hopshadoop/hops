@@ -16,6 +16,8 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager;
 
+import io.hops.ha.common.TransactionState;
+import io.hops.ha.common.TransactionStateImpl;
 import io.hops.metadata.util.RMStorageFactory;
 import io.hops.metadata.util.RMUtilities;
 import io.hops.metadata.util.YarnAPIStorageFactory;
@@ -58,6 +60,7 @@ public class TestResourceManager {
     RMStorageFactory.setConfiguration(conf);
     RMUtilities.InitializeDB();
     resourceManager = new ResourceManager();
+    conf.setInt(YarnConfiguration.HOPS_BATCH_MAX_DURATION, 60000);
     resourceManager.init(conf);
     resourceManager.getRMContext().getContainerTokenSecretManager()
         .rollMasterKey();
@@ -83,7 +86,7 @@ public class TestResourceManager {
     return nm;
   }
 
-  @Test
+  @Test(timeout = 60000)
   public void testResourceAllocation()
       throws IOException, YarnException, InterruptedException {
     LOG.info("--- START: testResourceAllocation ---");
@@ -174,7 +177,7 @@ public class TestResourceManager {
     AppAttemptRemovedSchedulerEvent appRemovedEvent1 =
         new AppAttemptRemovedSchedulerEvent(
             application.getApplicationAttemptId(), RMAppAttemptState.FINISHED,
-            false, null);
+            false, new TransactionStateImpl(TransactionState.TransactionType.RM));
     resourceManager.getResourceScheduler().handle(appRemovedEvent1);
 
     checkResourceUsage(nm1, nm2);
@@ -188,11 +191,12 @@ public class TestResourceManager {
         resourceManager.getRMContext().getActiveRMNodes().get(nm1.getNodeId());
     // Send a heartbeat to kick the tires on the Scheduler
     NodeUpdateSchedulerEvent nodeUpdate =
-        new NodeUpdateSchedulerEvent(node, null);
+ new NodeUpdateSchedulerEvent(node,
+            new TransactionStateImpl( TransactionState.TransactionType.RM));
     resourceManager.getResourceScheduler().handle(nodeUpdate);
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testNodeHealthReportIsNotNull() throws Exception {
     String host1 = "host1";
     final int memory = 4 * 1024;
@@ -233,7 +237,7 @@ public class TestResourceManager {
     }
   }
 
-  @Test
+  @Test(timeout = 30000)
   public void testNMExpiryAndHeartbeatIntervalsValidation() throws Exception {
     Configuration conf = new YarnConfiguration();
     conf.setLong(YarnConfiguration.RM_NM_EXPIRY_INTERVAL_MS, 1000);

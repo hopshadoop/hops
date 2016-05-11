@@ -80,6 +80,6 @@ public class InterDatanodeProtocolServerSideTranslatorPB
       throw new ServiceException(e);
     }
     return UpdateReplicaUnderRecoveryResponseProto.newBuilder()
-        .setStorageID(storageID).build();
+        .setStorageUuid(storageID).build();
   }
 }

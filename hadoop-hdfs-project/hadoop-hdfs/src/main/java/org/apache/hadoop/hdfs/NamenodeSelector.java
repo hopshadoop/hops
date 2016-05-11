@@ -99,7 +99,6 @@ public class NamenodeSelector extends Thread {
     }
   }
 
-  
   /* List of name nodes */
   private List<NamenodeSelector.NamenodeHandle> nnList =
       new CopyOnWriteArrayList<NamenodeSelector.NamenodeHandle>();

@@ -26,6 +26,7 @@ import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoUnderConstruction;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 import org.apache.hadoop.hdfs.server.blockmanagement.MutableBlockCollection;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.BlockUCState;
 
@@ -55,7 +56,8 @@ public class INodeFileUnderConstruction extends INodeFile
   
   public INodeFileUnderConstruction(PermissionStatus permissions,
       short replication, long preferredBlockSize, long modTime,
-      String clientName, String clientMachine, DatanodeID clientNode) {
+      String clientName, String clientMachine, DatanodeID clientNode)
+      throws IOException {
     super(permissions, null, replication, modTime, modTime, preferredBlockSize);
     this.clientName = clientName;
     this.clientMachine = clientMachine;
@@ -65,7 +67,7 @@ public class INodeFileUnderConstruction extends INodeFile
   public INodeFileUnderConstruction(byte[] name, short blockReplication,
       long modificationTime, long preferredBlockSize, BlockInfo[] blocks,
       PermissionStatus perm, String clientName, String clientMachine,
-      DatanodeID clientNode, int inodeId, int pid) {
+      DatanodeID clientNode, int inodeId, int pid) throws IOException {
     super(perm, blocks, blockReplication, modificationTime, modificationTime,
         preferredBlockSize);
     setLocalNameNoPersistance(name);
@@ -80,7 +82,7 @@ public class INodeFileUnderConstruction extends INodeFile
   //HOP: used instead of INodeFile.convertToUnderConstruction
   protected INodeFileUnderConstruction(INodeFile file, String clientName,
       String clientMachine, DatanodeID clientNode)
-      throws StorageException, TransactionContextException {
+      throws IOException {
     super(file);
     this.clientName = clientName;
     this.clientMachine = clientMachine;
@@ -118,7 +120,7 @@ public class INodeFileUnderConstruction extends INodeFile
   // use the modification time as the access time
   //
   INodeFile convertToInodeFile()
-      throws StorageException, TransactionContextException {
+      throws IOException {
     assert allBlocksComplete() : "Can't finalize inode " + this +
         " since it contains non-complete blocks! Blocks are " + getBlocks();
     INodeFile obj = new INodeFile(this);
@@ -163,7 +165,7 @@ public class INodeFileUnderConstruction extends INodeFile
    */
   @Override
   public BlockInfoUnderConstruction setLastBlock(BlockInfo lastBlock,
-      DatanodeDescriptor[] targets) throws IOException, StorageException {
+      DatanodeStorageInfo[] targets) throws IOException, StorageException {
     if (numBlocks() == 0) {
       throw new IOException("Failed to set last block: File is empty.");
     }
@@ -208,5 +210,4 @@ public class INodeFileUnderConstruction extends INodeFile
       }
     }
   }
-
 }

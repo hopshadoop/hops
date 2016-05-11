@@ -27,8 +27,9 @@ import io.hops.metadata.common.entity.Variable;
 import io.hops.metadata.hdfs.dal.VariableDataAccess;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
-import org.apache.commons.digester.substitution.VariableAttributes;
 import org.apache.commons.io.output.ByteArrayOutputStream;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.security.token.block.BlockKey;
 import org.apache.hadoop.hdfs.server.common.StorageInfo;
 
@@ -98,7 +99,7 @@ public class HdfsVariables {
       HdfsStorageFactory.getConnector().readCommitted();
       return new CountersQueue.Counter(oldValue, newValue);
     }
-    throw new IllegalStateException("Cannot increment Varaible of type " +
+    throw new IllegalStateException("Cannot increment Variable of type " +
         variable.getClass().getSimpleName());
   }
 
@@ -170,6 +171,37 @@ public class HdfsVariables {
       }
     }.handle();
     return safemode;
+  }
+
+  public static void setBrLbMasBlkPerMin(final long value) throws IOException {
+    new LightWeightRequestHandler(HDFSOperationType.SET_BR_LB_MAX_BLKS_PER_MIN) {
+      @Override
+      public Object performTask() throws IOException {
+        VariableDataAccess vd = (VariableDataAccess) HdfsStorageFactory
+                .getDataAccess(VariableDataAccess.class);
+        HdfsStorageFactory.getConnector().writeLock();
+        vd.setVariable(new LongVariable(Variable.Finder.BrLbMaxBlkPerTU, value));
+        HdfsStorageFactory.getConnector().readCommitted();
+        return null;
+      }
+    }.handle();
+  }
+
+  public static long getBrLbMasBlkPerMin() throws IOException {
+    Long value = (Long) new LightWeightRequestHandler(
+            HDFSOperationType.GET_BR_LB_MAX_BLKS_PER_TU) {
+      @Override
+      public Object performTask() throws IOException {
+        VariableDataAccess vd = (VariableDataAccess) HdfsStorageFactory
+                .getDataAccess(VariableDataAccess.class);
+        HdfsStorageFactory.getConnector().readLock();
+        LongVariable var =
+                (LongVariable) vd.getVariable(Variable.Finder.BrLbMaxBlkPerTU);
+        HdfsStorageFactory.getConnector().readCommitted();
+        return var.getValue();
+      }
+    }.handle();
+    return value;
   }
 
   public static void setReplicationIndex(List<Integer> indeces)
@@ -308,7 +340,7 @@ public class HdfsVariables {
     }.handle();
   }
   
-  public static void registerDefaultValues() {
+  public static void registerDefaultValues(Configuration conf) {
     Variable.registerVariableDefaultValue(Variable.Finder.BlockID,
         new LongVariable(0).getBytes());
     Variable.registerVariableDefaultValue(Variable.Finder.INodeID,
@@ -325,6 +357,9 @@ public class HdfsVariables {
         new IntVariable(1).getBytes());
     Variable.registerVariableDefaultValue(Variable.Finder.QuotaUpdateID,
         new IntVariable(0).getBytes());
+    Variable.registerVariableDefaultValue(Variable.Finder.BrLbMaxBlkPerTU,
+            new LongVariable(conf.getLong(DFSConfigKeys.DFS_BR_LB_MAX_BLK_PER_TW,
+                    DFSConfigKeys.DFS_BR_LB_MAX_BLK_PER_TU_DEFAULT)).getBytes());
     VarsRegister.registerHdfsDefaultValues();
     // This is a workaround that is needed until HA-YARN has its own format command
     VarsRegister.registerYarnDefaultValues();

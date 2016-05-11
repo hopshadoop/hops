@@ -17,13 +17,10 @@ package org.apache.hadoop.yarn.server.resourcemanager.scheduler;
 
 import io.hops.exception.StorageException;
 import io.hops.exception.StorageInitializtionException;
-import io.hops.ha.common.TransactionState;
-import io.hops.ha.common.TransactionStateImpl;
 import io.hops.metadata.util.RMStorageFactory;
 import io.hops.metadata.util.RMUtilities;
 import io.hops.metadata.util.TestHopYarnAPIUtilities;
 import io.hops.metadata.util.YarnAPIStorageFactory;
-import io.hops.metadata.yarn.entity.appmasterrpc.RPC;
 import junit.framework.Assert;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -107,7 +104,7 @@ public class TestSchedulerRecovery {
     }
   }
 
-  @Test(timeout = 600000)
+  @Test(timeout = 60000)
   public void testRecovery() throws Exception {
     conf.setClass(YarnConfiguration.RM_STORE, NDBRMStateStore.class,
         RMStateStore.class);
@@ -250,13 +247,12 @@ public class TestSchedulerRecovery {
         mock(NMTokenSecretManagerInRM.class);
     RMContext rmContext = new RMContextImpl(rmDispatcher, null, null, null,
         mock(DelegationTokenRenewer.class), null, containerTokenSecretManager,
-        nmTokenSecretManager, null, null);
+        nmTokenSecretManager, null, null, conf);
     RMNodeImpl node =
         new RMNodeImpl(nodeId, rmContext, nodeId.getHost(), 0, 0, null, null,
-            null, conf.getBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED,
-            YarnConfiguration.DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED));
+            null);
 
-    RMStateStore.RMState rmState = stateStore.loadState();
+    RMStateStore.RMState rmState = stateStore.loadState(rmContext);
     node.recover(rmState);
 
     rmContext.recover(rmState);
@@ -278,7 +274,7 @@ public class TestSchedulerRecovery {
             2);
     rmContext = new RMContextImpl(rmDispatcher, null, null, null,
         mock(DelegationTokenRenewer.class), null, containerTokenSecretManager,
-        nmTokenSecretManager, null, null);
+        nmTokenSecretManager, null, null, conf);
     rmContext.recover(rmState);
 
     Thread.sleep(
@@ -304,18 +300,7 @@ public class TestSchedulerRecovery {
     return attId;
   }
 
-  private TransactionState getTransactionState(int id) {
-    TransactionState ts =
-        new TransactionStateImpl(id, TransactionState.TransactionType.RM);
-    byte[] allNMRequestData = new byte[10];
-    try {
-      RMUtilities.persistAppMasterRPC(id, RPC.Type.SubmitApplication,
-          allNMRequestData);
-    } catch (IOException ex) {
-      LOG.error(ex);
-    }
-    return ts;
-  }
+
 
   private static ApplicationId getApplicationId(int id) {
     return ApplicationId.newInstance(123456, id);

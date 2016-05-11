@@ -18,10 +18,10 @@ package org.apache.hadoop.yarn.server.resourcemanager;
 
 import com.google.common.annotations.VisibleForTesting;
 import io.hops.ha.common.TransactionState;
-import io.hops.ha.common.TransactionState.TransactionType;
 import io.hops.ha.common.TransactionStateImpl;
 import io.hops.metadata.util.HopYarnAPIUtilities;
 import io.hops.metadata.util.RMUtilities;
+import io.hops.metadata.yarn.entity.appmasterrpc.AllocateRPC;
 import io.hops.metadata.yarn.entity.appmasterrpc.RPC;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -92,11 +92,19 @@ import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import org.apache.hadoop.yarn.api.records.ContainerResourceIncreaseRequest;
+import org.apache.hadoop.yarn.api.records.impl.pb.ContainerResourceIncreaseRequestPBImpl;
+import org.apache.hadoop.yarn.api.records.impl.pb.ResourceRequestPBImpl;
+import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
 
 @SuppressWarnings("unchecked")
 @Private
@@ -231,30 +239,20 @@ public class ApplicationMasterService extends AbstractService
   public RegisterApplicationMasterResponse registerApplicationMaster(
       RegisterApplicationMasterRequest request)
       throws YarnException, IOException {
-    return registerApplicationMaster(request, null);
+    try {
+      return registerApplicationMaster(request, null);
+    } catch (InterruptedException ex) {
+      throw new YarnException(ex);
+    }
   }
 
   public RegisterApplicationMasterResponse registerApplicationMaster(
       RegisterApplicationMasterRequest request, Integer rpcID)
-      throws YarnException, IOException {
+      throws YarnException, IOException, InterruptedException {
     ApplicationAttemptId applicationAttemptId = authorizeRequest();
 
 
-    if (rpcID == null) {
-      rpcID = HopYarnAPIUtilities.setYarnVariables(HopYarnAPIUtilities.RPC);
-      byte[] regAMRequestData =
-          ((RegisterApplicationMasterRequestPBImpl) request).getProto().
-              toByteArray();
-
-      RMUtilities.persistAppMasterRPC(rpcID, RPC.Type.RegisterApplicationMaster,
-          regAMRequestData, applicationAttemptId.toString());
-      
-    }
-    TransactionState transactionState =
-        new TransactionStateImpl(rpcID, TransactionType.APP);
-
-
-    ApplicationId appID = applicationAttemptId.getApplicationId();
+     ApplicationId appID = applicationAttemptId.getApplicationId();
     AllocateResponseLock lock = responseMap.get(applicationAttemptId);
     if (lock == null) {
       RMAuditLogger.logFailure(this.rmContext.getRMApps().get(appID).getUser(),
@@ -262,7 +260,6 @@ public class ApplicationMasterService extends AbstractService
           "Application doesn't exist in cache " + applicationAttemptId,
           "ApplicationMasterService", "Error in registering application master",
           appID, applicationAttemptId);
-      transactionState.decCounter("rpc");
       throwApplicationDoesNotExistInCacheException(applicationAttemptId);
     }
 
@@ -277,10 +274,24 @@ public class ApplicationMasterService extends AbstractService
                 .get(applicationAttemptId.getApplicationId()).getUser(),
             AuditConstants.REGISTER_AM, "", "ApplicationMasterService", message,
             applicationAttemptId.getApplicationId(), applicationAttemptId);
-        transactionState.decCounter("rpc");
         throw new InvalidApplicationMasterRequestException(message);
-        //TORECOVER save request response and resend it if the request is received again after a recover
+        //TORECOVER OPT save request response and resend it if the request is received again after a recover
       }
+      
+    
+    if (rpcID == null) {
+      rpcID = HopYarnAPIUtilities.getRPCID();
+      byte[] regAMRequestData =
+          ((RegisterApplicationMasterRequestPBImpl) request).getProto().
+              toByteArray();
+
+      RMUtilities.persistAppMasterRPC(rpcID, RPC.Type.RegisterApplicationMaster,
+          regAMRequestData, applicationAttemptId.toString());
+      
+    }
+    TransactionState transactionState = rmContext.getTransactionStateManager().getCurrentTransactionStateNonPriority(rpcID,
+                    "registerApplicationMaster");
+    
 
       this.amLivelinessMonitor.receivedPing(applicationAttemptId);
       RMApp app = this.rmContext.getRMApps().get(appID);
@@ -288,10 +299,10 @@ public class ApplicationMasterService extends AbstractService
       // Setting the response id to 0 to identify if the
       // application master is register for the respective attemptid
       lastResponse.setResponseId(0);
+      lock.setAllocateResponse(lastResponse);
       ((TransactionStateImpl) transactionState)
           .addAllocateResponse(applicationAttemptId, lock);
-      lock.setAllocateResponse(lastResponse);
-      LOG.info("AM registration " + applicationAttemptId);
+      LOG.debug("AM registration " + applicationAttemptId);
       this.rmContext.getDispatcher().getEventHandler().handle(
           new RMAppAttemptRegistrationEvent(applicationAttemptId,
               request.getHost(), request.getRpcPort(), request.
@@ -332,7 +343,7 @@ public class ApplicationMasterService extends AbstractService
             // if it's a DNS issue, throw UnknowHostException directly and that
             // will be automatically retried by RMProxy in RPC layer.
             if (e.getCause() instanceof UnknownHostException) {
-              transactionState.decCounter("rpc");
+              transactionState.decCounter(TransactionState.TransactionType.INIT);
               throw (UnknownHostException) e.getCause();
             }
           }
@@ -342,7 +353,7 @@ public class ApplicationMasterService extends AbstractService
             transferredContainers.size() + " containers from previous" +
             " attempts and " + nmTokens.size() + " NM tokens.");
       }
-      transactionState.decCounter("rpc register appmaster return");
+      transactionState.decCounter(TransactionState.TransactionType.INIT);
       return response;
     }
   }
@@ -351,18 +362,22 @@ public class ApplicationMasterService extends AbstractService
   public FinishApplicationMasterResponse finishApplicationMaster(
       FinishApplicationMasterRequest request)
       throws YarnException, IOException {
-    return finishApplicationMaster(request, null);
+    try {
+      return finishApplicationMaster(request, null);
+    } catch (InterruptedException ex) {
+      throw new YarnException(ex);
+    }
   }
 
   public FinishApplicationMasterResponse finishApplicationMaster(
       FinishApplicationMasterRequest request, Integer rpcID)
-      throws YarnException, IOException {
+      throws YarnException, IOException, InterruptedException {
 
     ApplicationAttemptId applicationAttemptId = authorizeRequest();
 
 
     if (rpcID == null) {
-      rpcID = HopYarnAPIUtilities.setYarnVariables(HopYarnAPIUtilities.RPC);
+      rpcID = HopYarnAPIUtilities.getRPCID();
       byte[] finAMRequestData =
           ((FinishApplicationMasterRequestPBImpl) request).getProto().
               toByteArray();
@@ -371,13 +386,12 @@ public class ApplicationMasterService extends AbstractService
           finAMRequestData, applicationAttemptId.toString());
       
     }
-    TransactionState transactionState =
-        new TransactionStateImpl(rpcID, TransactionType.APP);
-
-
+    TransactionState transactionState = 
+          rmContext.getTransactionStateManager().getCurrentTransactionStateNonPriority(rpcID,
+                    "finishApplicationMaster");
     AllocateResponseLock lock = responseMap.get(applicationAttemptId);
     if (lock == null) {
-      transactionState.decCounter("rpc");
+      transactionState.decCounter(TransactionState.TransactionType.INIT);
       throwApplicationDoesNotExistInCacheException(applicationAttemptId);
     }
 
@@ -393,7 +407,7 @@ public class ApplicationMasterService extends AbstractService
             AuditConstants.UNREGISTER_AM, "", "ApplicationMasterService",
             message, applicationAttemptId.getApplicationId(),
             applicationAttemptId);
-        transactionState.decCounter("rpc");
+        transactionState.decCounter(TransactionState.TransactionType.INIT);
         throw new InvalidApplicationMasterRequestException(message);
       }
 
@@ -403,7 +417,7 @@ public class ApplicationMasterService extends AbstractService
           getApplicationId());
 
       if (rmApp.isAppFinalStateStored()) {
-        transactionState.decCounter("rpc");
+        transactionState.decCounter(TransactionState.TransactionType.INIT);
         return FinishApplicationMasterResponse.newInstance(true);
       }
 
@@ -413,7 +427,7 @@ public class ApplicationMasterService extends AbstractService
               request.getDiagnostics(), transactionState));
 
       // For UnmanagedAMs, return true so they don't retry
-      transactionState.decCounter("rpc finish appmaster return");
+      transactionState.decCounter(TransactionState.TransactionType.INIT);
       return FinishApplicationMasterResponse.newInstance(
           rmApp.getApplicationSubmissionContext().getUnmanagedAM());
     }
@@ -449,28 +463,67 @@ public class ApplicationMasterService extends AbstractService
   @Override
   public AllocateResponse allocate(AllocateRequest request)
       throws YarnException, IOException {
-    return allocate(request, null);
+    try {
+      return allocate(request, null);
+    } catch (InterruptedException ex) {
+      throw new YarnException(ex);
+    }
   }
 
   public AllocateResponse allocate(AllocateRequest request, Integer rpcID)
-      throws YarnException, IOException {
+      throws YarnException, IOException, InterruptedException {
 
     ApplicationAttemptId appAttemptId = authorizeRequest();
 
 
     if (rpcID == null) {
-      rpcID = HopYarnAPIUtilities.setYarnVariables(HopYarnAPIUtilities.RPC);
+      rpcID = HopYarnAPIUtilities.getRPCID();
       byte[] allAMRequestData = ((AllocateRequestPBImpl) request).getProto().
-          toByteArray();
+              toByteArray();
+
+      List<String> releaseList = new ArrayList<String>();
+      for (ContainerId containerId : request.getReleaseList()) {
+        releaseList.add(containerId.toString());
+      }
+
+      Map<String, byte[]> ask = new HashMap<String, byte[]>();
+      for (ResourceRequest resourceRequest : request.getAskList()) {
+        resourceRequest.getCapability();
+
+        ask.put(resourceRequest.getResourceName(),
+                ((ResourceRequestPBImpl) resourceRequest).getProto().
+                toByteArray());
+      }
+
+      Map<String, byte[]> resourceIncreaseRequest
+              = new HashMap<String, byte[]>();
+      for (ContainerResourceIncreaseRequest incRequest : request.
+              getIncreaseRequests()) {
+        resourceIncreaseRequest.put(incRequest.getContainerId().toString(),
+                ((ContainerResourceIncreaseRequestPBImpl) incRequest).getProto().
+                toByteArray());
+      }
+
+      List<String> blackListAddition = new ArrayList<String>();
+      List<String> blackListRemovals = new ArrayList<String>();
+      if (request.getResourceBlacklistRequest() != null) {
+        blackListAddition.addAll(request.getResourceBlacklistRequest().
+                getBlacklistAdditions());
+
+        blackListRemovals.addAll(request.getResourceBlacklistRequest().
+                getBlacklistRemovals());
+      }
+      AllocateRPC rpc = new AllocateRPC(rpcID, request.getResponseId(), request.
+              getProgress(), releaseList, ask, resourceIncreaseRequest,
+              blackListAddition, blackListRemovals);
+
       RMUtilities
-          .persistAppMasterRPC(rpcID, RPC.Type.Allocate, allAMRequestData,
-              appAttemptId.toString());
-      
+              .persistAllocateRPC(rpc, appAttemptId.toString());
+
     }
-    TransactionState transactionState =
-        new TransactionStateImpl(rpcID, TransactionType.APP);
-
-
+    TransactionState transactionState = 
+           rmContext.getTransactionStateManager().getCurrentTransactionStateNonPriority(rpcID,
+                    "allocate");
     this.amLivelinessMonitor.receivedPing(appAttemptId);
 
     /*
@@ -479,7 +532,7 @@ public class ApplicationMasterService extends AbstractService
     AllocateResponseLock lock = responseMap.get(appAttemptId);
     if (lock == null) {
       LOG.error("AppAttemptId doesnt exist in cache " + appAttemptId);
-      transactionState.decCounter("rpc");
+      transactionState.decCounter(TransactionState.TransactionType.INIT);
       return resync;
     }
     synchronized (lock) {
@@ -494,7 +547,7 @@ public class ApplicationMasterService extends AbstractService
                 .getUser(), AuditConstants.REGISTER_AM, "",
             "ApplicationMasterService", message,
             appAttemptId.getApplicationId(), appAttemptId);
-        transactionState.decCounter("rpc");
+        transactionState.decCounter(TransactionState.TransactionType.INIT);
         throw new InvalidApplicationMasterRequestException(message);
       }
 
@@ -502,7 +555,7 @@ public class ApplicationMasterService extends AbstractService
         /*
          * old heartbeat
          */
-        transactionState.decCounter("rpc");
+        transactionState.decCounter(TransactionState.TransactionType.INIT);
         return lastResponse;
       } else if (request.getResponseId() + 1 < lastResponse.getResponseId()) {
         LOG.error("Invalid responseid from appAttemptId " + appAttemptId);
@@ -510,7 +563,7 @@ public class ApplicationMasterService extends AbstractService
         // Reboot is not useful since after AM reboots, it will send register
         // and
         // get an exception. Might as well throw an exception here.
-        transactionState.decCounter("rpc");
+        transactionState.decCounter(TransactionState.TransactionType.INIT);
         return resync;
       }
 
@@ -518,7 +571,7 @@ public class ApplicationMasterService extends AbstractService
       this.rmContext.getDispatcher().getEventHandler().handle(
           new RMAppAttemptStatusupdateEvent(appAttemptId, request.getProgress(),
               transactionState));
-
+      
       List<ResourceRequest> ask = request.getAskList();
       List<ContainerId> release = request.getReleaseList();
 
@@ -536,7 +589,7 @@ public class ApplicationMasterService extends AbstractService
             rScheduler.getMaximumResourceCapability());
       } catch (InvalidResourceRequestException e) {
         LOG.warn("Invalid resource ask by application " + appAttemptId, e);
-        transactionState.decCounter("rpc");
+        transactionState.decCounter(TransactionState.TransactionType.INIT);
         throw e;
       }
 
@@ -544,7 +597,7 @@ public class ApplicationMasterService extends AbstractService
         RMServerUtils.validateBlacklistRequest(blacklistRequest);
       } catch (InvalidResourceBlacklistRequestException e) {
         LOG.warn("Invalid blacklist request by application " + appAttemptId, e);
-        transactionState.decCounter("rpc");
+        transactionState.decCounter(TransactionState.TransactionType.INIT);
         throw e;
       }
 
@@ -560,7 +613,7 @@ public class ApplicationMasterService extends AbstractService
           LOG.
               warn("Invalid container release by application " + appAttemptId,
                   e);
-          transactionState.decCounter("rpc");
+          transactionState.decCounter(TransactionState.TransactionType.INIT);
           throw e;
         }
       }
@@ -625,10 +678,10 @@ public class ApplicationMasterService extends AbstractService
        * need to worry about unregister call occurring in between (which
        * removes the lock object).
        */
+      lock.setAllocateResponse(allocateResponse);
       ((TransactionStateImpl) transactionState).
           addAllocateResponse(appAttemptId, lock);
-      lock.setAllocateResponse(allocateResponse);
-      transactionState.decCounter("rpc allocate return");
+      transactionState.decCounter(TransactionState.TransactionType.INIT);
       return allocateResponse;
     }
   }
@@ -685,10 +738,30 @@ public class ApplicationMasterService extends AbstractService
   }
 
   public void recoverAllocateResponse(ApplicationAttemptId attemptId,
-      AllocateResponse allocateResponse) {
+          AllocateResponse allocateResponse, RMStateStore.RMState state) throws
+          IOException {
     if (allocateResponse != null) {
+      List<NMToken> allocatedNMTokens
+              = new ArrayList<NMToken>();
+      for (org.apache.hadoop.yarn.api.records.Container container
+              : allocateResponse.
+              getAllocatedContainers()) {
+        NMToken nmToken = rmContext.getNMTokenSecretManager()
+                .createAndGetNMToken(state.getAppSchedulingInfo(
+                                attemptId.getApplicationId().toString()).get(
+                                attemptId.toString()).
+                        getUser(),
+                        attemptId,
+                        container);
+        if (nmToken != null) {
+          LOG.debug("set allocated nm token for: " + attemptId + ", " + nmToken);
+          allocatedNMTokens.add(nmToken);
+        }
+      }
+      allocateResponse.setNMTokens(allocatedNMTokens);
       LOG.debug(
-          "recovering AllocateResponse " + attemptId + " " + allocateResponse);
+              "recovering AllocateResponse " + attemptId + " "
+              + allocateResponse);
       responseMap.get(attemptId).setAllocateResponse(allocateResponse);
     }
   }
@@ -713,10 +786,10 @@ public class ApplicationMasterService extends AbstractService
   public void unregisterAttempt(ApplicationAttemptId attemptId,
       TransactionState transactionState) {
     LOG.info("Unregistering app attempt : " + attemptId);
-    responseMap.remove(attemptId);
+    AllocateResponseLock lock = responseMap.remove(attemptId);
     if (transactionState != null) {
       ((TransactionStateImpl) transactionState)
-          .removeAllocateResponse(attemptId);
+          .removeAllocateResponse(attemptId, lock.getAllocateResponse().getResponseId());
     }
     rmContext.getNMTokenSecretManager().unregisterApplicationAttempt(attemptId);
   }

@@ -18,20 +18,26 @@ package org.apache.hadoop.hdfs.server.blockmanagement;
 
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
+import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.common.FinderType;
+import io.hops.metadata.hdfs.dal.BlockInfoDataAccess;
 import io.hops.metadata.hdfs.entity.Replica;
 import io.hops.metadata.hdfs.entity.ReplicaBase;
 import io.hops.transaction.EntityManager;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.BlockUCState;
+import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 import org.apache.hadoop.hdfs.server.namenode.INodeFile;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Internal class for block metadata. BlockInfo class maintains for a given
@@ -75,7 +81,6 @@ public class BlockInfo extends Block {
           throw new IllegalStateException();
       }
     }
-
   }
   
   public static enum Order implements Comparator<BlockInfo> {
@@ -205,10 +210,32 @@ public class BlockInfo extends Block {
     return getReplicas(datanodeMgr).size();
   }
 
-  public DatanodeDescriptor[] getDatanodes(DatanodeManager datanodeMgr)
+  /**
+   * Returns the Storages on which the replicas of this block are stored.
+   * @param datanodeMgr
+   * @return array of storages that store a replica of this block
+   */
+  public DatanodeStorageInfo[] getStorages(DatanodeManager datanodeMgr)
       throws StorageException, TransactionContextException {
     List<Replica> replicas = getReplicas(datanodeMgr);
-    return getDatanodes(datanodeMgr, replicas);
+    return getStorages(datanodeMgr, replicas);
+  }
+
+  /**
+   * Returns the storage on the given node which stores this block, or null
+   * if it can't find such a storage.
+   */
+  public DatanodeStorageInfo getStorageOnNode(DatanodeDescriptor node)
+      throws TransactionContextException, StorageException {
+    // TODO HDP_2.6 this is like a join -> should be done in SQL probably...
+    DatanodeStorageInfo[] storagesOnNode = node.getStorageInfos();
+
+    for(DatanodeStorageInfo s : storagesOnNode) {
+      if (this.isReplicatedOnStorage(s)) {
+        return s;
+      }
+    }
+    return null;
   }
 
   List<Replica> getReplicasNoCheck()
@@ -235,11 +262,16 @@ public class BlockInfo extends Block {
   
   /**
    * Adds new replica for this block.
+   * @return the replica stored, or null if it is already stored on this storage
    */
-  Replica addReplica(DatanodeDescriptor dn, BlockInfo b)
+  Replica addReplica(DatanodeStorageInfo storage)
       throws StorageException, TransactionContextException {
-    Replica replica =
-        new Replica(dn.getSId(), getBlockId(), b.getInodeId());
+
+    if (isReplicatedOnDatanode(storage.getDatanodeDescriptor())) {
+      return null;
+    }
+
+    Replica replica = new Replica(storage.getSid(), getBlockId(), getInodeId());
     add(replica);
     return replica;
   }
@@ -256,12 +288,12 @@ public class BlockInfo extends Block {
    *
    * @return
    */
-  Replica removeReplica(DatanodeDescriptor dn)
+  Replica removeReplica(DatanodeStorageInfo storage)
       throws StorageException, TransactionContextException {
     List<Replica> replicas = getReplicasNoCheck();
     Replica replica = null;
     for (Replica r : replicas) {
-      if (r.getStorageId() == dn.getSId()) {
+      if (r.getStorageId() == storage.getSid()) {
         replica = r;
         remove(r);
         break;
@@ -269,23 +301,34 @@ public class BlockInfo extends Block {
     }
     return replica;
   }
-  
-  int findDatanode(DatanodeDescriptor dn)
+
+  /**
+   * Returns true if this block has a replica on the given datanode.
+   * @param dn
+   * @return
+   */
+  boolean isReplicatedOnDatanode(DatanodeDescriptor dn)
+      throws StorageException {
+    DatanodeStorageInfo[] storages = dn.getStorageInfos();
+    List<Integer> sids = new ArrayList<Integer>();
+    for(DatanodeStorageInfo s : storages) {
+      sids.add(s.getSid());
+    }
+
+    BlockInfoDataAccess da =
+        (BlockInfoDataAccess) HdfsStorageFactory
+            .getDataAccess(BlockInfoDataAccess.class);
+
+    return da.existsOnAnyStorage(getBlockId(), sids);
+  }
+
+  boolean isReplicatedOnStorage(DatanodeStorageInfo storage)
       throws StorageException, TransactionContextException {
     Replica replica = EntityManager
         .find(Replica.Finder.ByBlockIdAndStorageId, getBlockId(),
-            dn.getSId());
-    if (replica == null) {
-      return -1;
-    }
-    return 1;
-  }
+            storage.getSid());
 
-  boolean hasReplicaIn(DatanodeDescriptor dn)
-      throws StorageException, TransactionContextException {
-    return EntityManager
-        .find(Replica.Finder.ByBlockIdAndStorageId, getBlockId(),
-            dn.getSId()) != null;
+    return replica != null;
   }
 
   /**
@@ -314,7 +357,7 @@ public class BlockInfo extends Block {
    * @return BlockInfoUnderConstruction - an under construction block.
    */
   public BlockInfoUnderConstruction convertToBlockUnderConstruction(
-      BlockUCState s, DatanodeDescriptor[] targets)
+      BlockUCState s, DatanodeStorageInfo[] targets)
       throws StorageException, TransactionContextException {
     if (isComplete()) {
       return new BlockInfoUnderConstruction(this, this.getInodeId(), s,
@@ -368,22 +411,41 @@ public class BlockInfo extends Block {
     setTimestampNoPersistance(ts);
     save();
   }
-  
-  protected DatanodeDescriptor[] getDatanodes(DatanodeManager datanodeMgr,
+
+  /**
+   * Returns an array of storages where the replicas are stored
+   */
+  protected DatanodeStorageInfo[] getStorages(DatanodeManager datanodeMgr,
       List<? extends ReplicaBase> replicas) {
     int numLocations = replicas.size();
-    List<DatanodeDescriptor> list = new ArrayList<DatanodeDescriptor>();
+    HashSet<DatanodeStorageInfo> set = new HashSet<DatanodeStorageInfo>();
     for (int i = numLocations - 1; i >= 0; i--) {
-      DatanodeDescriptor desc =
-          datanodeMgr.getDatanode(replicas.get(i).getStorageId());
+      DatanodeStorageInfo desc = datanodeMgr.getStorage(replicas.get(i).getStorageId());
       if (desc != null) {
-        list.add(desc);
+        set.add(desc);
       } else {
         replicas.remove(i);
       }
     }
-    DatanodeDescriptor[] locations = new DatanodeDescriptor[list.size()];
-    return list.toArray(locations);
+    DatanodeStorageInfo[] storages = new DatanodeStorageInfo[set.size()];
+    return set.toArray(storages);
+  }
+
+  protected DatanodeDescriptor[] getDatanodes(DatanodeManager datanodeMgr,
+      List<? extends ReplicaBase> replicas) {
+    int numLocations = replicas.size();
+    Set<DatanodeDescriptor> datanodes = new HashSet<DatanodeDescriptor>();
+    for (int i = numLocations - 1; i >= 0; i--) {
+      DatanodeDescriptor dn = datanodeMgr.getDatanodeBySid(replicas.get(i)
+          .getStorageId());
+      if (dn != null) {
+        datanodes.add(dn);
+      } else {
+        replicas.remove(i);
+      }
+    }
+    DatanodeDescriptor[] locations = new DatanodeDescriptor[datanodes.size()];
+    return datanodes.toArray(locations);
   }
 
   protected void add(Replica replica)
@@ -472,5 +534,4 @@ public class BlockInfo extends Block {
       throw new StorageException("Unable to create a clone of the Block");
     }
   }
-
 }

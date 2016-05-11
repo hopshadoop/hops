@@ -456,7 +456,7 @@ public class TestListCorruptFileBlocks {
    * Also, test that DFS.listCorruptFileBlocks can make multiple successive
    * calls.
    */
-  @Test(timeout = 300000)
+  @Test(timeout = 400000)
   public void testMaxCorruptFiles() throws Exception {
     MiniDFSCluster cluster = null;
     try {

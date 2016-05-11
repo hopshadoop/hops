@@ -18,15 +18,15 @@
 
 package org.apache.hadoop.util;
 
-import java.io.File;
-import java.io.IOException;
-
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
+
+import java.io.File;
+import java.io.IOException;
 
 /**
  * Class that provides utility functions for checking disk problem

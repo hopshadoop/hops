@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -25,25 +26,30 @@ import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.hadoop.hdfs.StorageType;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.protocol.datatransfer.BlockConstructionStage;
 import org.apache.hadoop.hdfs.protocol.datatransfer.Sender;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenSecretManager;
+import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsVolumeSpi;
 import org.apache.hadoop.hdfs.server.namenode.NameNodeAdapter;
 import org.apache.hadoop.util.DataChecksum;
+import org.apache.hadoop.util.Time;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.io.DataOutputStream;
 import java.io.File;
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeTrue;
 
 /**
  * Test that datanodes can correctly handle errors during block read/write.
@@ -73,16 +79,15 @@ public class TestDiskError {
    */
   @Test
   public void testShutdown() throws Exception {
-    if (System.getProperty("os.name").startsWith("Windows")) {
-      /**
-       * This test depends on OS not allowing file creations on a directory
-       * that does not have write permissions for the user. Apparently it is 
-       * not the case on Windows (at least under Cygwin), and possibly AIX.
-       * This is disabled on Windows.
-       */
-      return;
-    }
-    // Bring up two more datanodes
+    /**
+     * This test depends on OS not allowing file creations on a directory
+     * that does not have write permissions for the user. Apparently it is
+     * not the case on Windows (at least under Cygwin), and possibly AIX.
+     * This is disabled on Windows.
+     */
+    assumeTrue(!System.getProperty("os.name").startsWith("Windows"));
+
+      // Bring up two more datanodes
     cluster.startDataNodes(conf, 2, true, null, null);
     cluster.waitActive();
     final int dnIndex = 0;
@@ -145,8 +150,9 @@ public class TestDiskError {
     DataChecksum checksum =
         DataChecksum.newDataChecksum(DataChecksum.Type.CRC32, 512);
     new Sender(out)
-        .writeBlock(block.getBlock(), BlockTokenSecretManager.DUMMY_TOKEN, "",
-            new DatanodeInfo[0], null,
+        .writeBlock(block.getBlock(), StorageType.DEFAULT,
+            BlockTokenSecretManager.DUMMY_TOKEN, "",
+            new DatanodeInfo[0], new StorageType[0], null,
             BlockConstructionStage.PIPELINE_SETUP_CREATE, 1, 0L, 0L, 0L,
             checksum);
     out.flush();
@@ -186,14 +192,34 @@ public class TestDiskError {
     // Check permissions on directories in 'dfs.datanode.data.dir'
     FileSystem localFS = FileSystem.getLocal(conf);
     for (DataNode dn : cluster.getDataNodes()) {
-      String[] dataDirs =
-          dn.getConf().getStrings(DFSConfigKeys.DFS_DATANODE_DATA_DIR_KEY);
-      for (String dir : dataDirs) {
+      for (FsVolumeSpi v : dn.getFSDataset().getVolumes()) {
+        String dir = v.getBasePath();
         Path dataDir = new Path(dir);
         FsPermission actual = localFS.getFileStatus(dataDir).getPermission();
         assertEquals("Permission for dir: " + dataDir + ", is " + actual +
             ", while expected is " + expected, expected, actual);
       }
     }
+  }
+
+  /**
+   * Checks whether {@link DataNode#checkDiskErrorAsync()} is being called or not.
+   * Before refactoring the code the above function was not getting called
+   * @throws IOException, InterruptedException
+   */
+  @Test
+  public void testcheckDiskError() throws IOException, InterruptedException {
+    if(cluster.getDataNodes().size() <= 0) {
+      cluster.startDataNodes(conf, 1, true, null, null);
+      cluster.waitActive();
+    }
+    DataNode dataNode = cluster.getDataNodes().get(0);
+    long slackTime = dataNode.checkDiskErrorInterval/2;
+    //checking for disk error
+    dataNode.checkDiskErrorAsync();
+    Thread.sleep(dataNode.checkDiskErrorInterval);
+    long lastDiskErrorCheck = dataNode.getLastDiskErrorCheck();
+    assertTrue("Disk Error check is not performed within  " + dataNode.checkDiskErrorInterval +  "  ms", ((
+        Time.monotonicNow()-lastDiskErrorCheck) < (dataNode.checkDiskErrorInterval + slackTime)));
   }
 }

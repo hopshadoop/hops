@@ -347,9 +347,9 @@ public class MockRM extends ResourceManager {
     RMNodeImpl node =
         (RMNodeImpl) getRMContext().getActiveRMNodes().get(nm.getNodeId());
     TransactionState ts =
-        new TransactionStateImpl(-1, TransactionState.TransactionType.RM);
+        new TransactionStateImpl(TransactionState.TransactionType.RM);
     node.handle(new RMNodeEvent(nm.getNodeId(), RMNodeEventType.EXPIRE, ts));
-    ts.decCounter("");
+    ts.decCounter(TransactionState.TransactionType.INIT);
   }
 
   public void NMwaitForState(NodeId nodeid, NodeState finalState)
@@ -384,9 +384,11 @@ public class MockRM extends ResourceManager {
       throws Exception {
     MockAM am = new MockAM(getRMContext(), masterService, appAttemptId);
     am.waitForState(RMAppAttemptState.ALLOCATED, nm);
+    TransactionState ts = new TransactionStateImpl(TransactionState.TransactionType.RM);
     getRMContext().getDispatcher().getEventHandler().handle(
         new RMAppAttemptEvent(appAttemptId, RMAppAttemptEventType.LAUNCHED,
-            null));
+            ts));
+    ts.decCounter(TransactionState.TransactionType.INIT);
     return am;
   }
 

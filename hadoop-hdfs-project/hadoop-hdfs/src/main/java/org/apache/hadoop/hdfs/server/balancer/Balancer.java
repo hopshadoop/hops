@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.balancer;
 
+import com.google.common.base.Preconditions;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -25,6 +26,7 @@ import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
+import org.apache.hadoop.hdfs.StorageType;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
@@ -41,6 +43,8 @@ import org.apache.hadoop.hdfs.server.blockmanagement.BlockPlacementPolicyDefault
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.hdfs.server.namenode.UnsupportedActionException;
 import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations.BlockWithLocations;
+import org.apache.hadoop.hdfs.server.protocol.DatanodeStorageReport;
+import org.apache.hadoop.hdfs.server.protocol.StorageReport;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.NetworkTopology;
@@ -67,13 +71,14 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
-import java.util.Formatter;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -182,8 +187,9 @@ import static org.apache.hadoop.hdfs.protocolPB.PBHelper.vintPrefixed;
 @InterfaceAudience.Private
 public class Balancer {
   static final Log LOG = LogFactory.getLog(Balancer.class);
-  final private static long MAX_BLOCKS_SIZE_TO_FETCH = 2 * 1024 * 1024 * 1024L;
-      //2GB
+  final private static long GB = 1L << 30; //1GB
+  final private static long MAX_SIZE_TO_MOVE = 10*GB;
+  final private static long MAX_BLOCKS_SIZE_TO_FETCH = 2*GB;
   private static long WIN_WIDTH = 5400 * 1000L; // 1.5 hour
 
   /**
@@ -204,49 +210,60 @@ public class Balancer {
   private final double threshold;
   
   // all data node lists
-  private Collection<Source> overUtilizedDatanodes = new LinkedList<Source>();
-  private Collection<Source> aboveAvgUtilizedDatanodes =
-      new LinkedList<Source>();
-  private Collection<BalancerDatanode> belowAvgUtilizedDatanodes =
-      new LinkedList<BalancerDatanode>();
-  private Collection<BalancerDatanode> underUtilizedDatanodes =
-      new LinkedList<BalancerDatanode>();
-  
+  private Collection<Source> overUtilized = new LinkedList<Source>();
+  private Collection<Source> aboveAvgUtilized = new LinkedList<Source>();
+  private Collection<BalancerDatanode.StorageGroup> belowAvgUtilized = new LinkedList<BalancerDatanode.StorageGroup>();
+  private Collection<BalancerDatanode.StorageGroup> underUtilized = new LinkedList<BalancerDatanode.StorageGroup>();
+
   private Collection<Source> sources = new HashSet<Source>();
-  private Collection<BalancerDatanode> targets =
-      new HashSet<BalancerDatanode>();
+  private Collection<BalancerDatanode.StorageGroup> targets = new HashSet<BalancerDatanode.StorageGroup>();
   
-  private Map<Block, BalancerBlock> globalBlockList =
-      new HashMap<Block, BalancerBlock>();
+  private Map<Block, BalancerBlock> globalBlockList = new HashMap<Block, BalancerBlock>();
   private MovedBlocks movedBlocks = new MovedBlocks();
-  // Map storage IDs to BalancerDatanodes
-  private Map<String, BalancerDatanode> datanodes =
-      new HashMap<String, BalancerDatanode>();
+  /** Map (datanodeUuid,storageType -> StorageGroup) */
+  private final StorageGroupMap storageGroupMap = new StorageGroupMap();
   
   private NetworkTopology cluster = new NetworkTopology();
   
   final static private int MOVER_THREAD_POOL_SIZE = 1000;
-  final private ExecutorService moverExecutor =
-      Executors.newFixedThreadPool(MOVER_THREAD_POOL_SIZE);
+  final private ExecutorService moverExecutor = Executors.newFixedThreadPool(MOVER_THREAD_POOL_SIZE);
   final static private int DISPATCHER_THREAD_POOL_SIZE = 200;
-  final private ExecutorService dispatcherExecutor =
-      Executors.newFixedThreadPool(DISPATCHER_THREAD_POOL_SIZE);
-  
+  final private ExecutorService dispatcherExecutor = Executors.newFixedThreadPool(DISPATCHER_THREAD_POOL_SIZE);
+
+  private static class StorageGroupMap {
+    private static String toKey(String datanodeUuid, StorageType storageType) {
+      return datanodeUuid + ":" + storageType;
+    }
+    private final Map<String, BalancerDatanode.StorageGroup> map
+        = new HashMap<String, BalancerDatanode.StorageGroup>();
+
+    BalancerDatanode.StorageGroup get(String datanodeUuid, StorageType storageType) {
+      return map.get(toKey(datanodeUuid, storageType));
+    }
+
+    void put(BalancerDatanode.StorageGroup g) {
+      final String key = toKey(g.getDatanode().getDatanodeUuid(), g.storageType);
+      final BalancerDatanode.StorageGroup existing = map.put(key, g);
+      Preconditions.checkState(existing == null);
+    }
+
+    int size() {
+      return map.size();
+    }
+
+    void clear() {
+      map.clear();
+    }
+  }
 
   /* This class keeps track of a scheduled block move */
   private class PendingBlockMove {
     private BalancerBlock block;
     private Source source;
     private BalancerDatanode proxySource;
-    private BalancerDatanode target;
+    private BalancerDatanode.StorageGroup target;
     
-    /**
-     * constructor
-     */
-    private PendingBlockMove() {
-    }
-    
-    /* choose a block & a proxy source for this pendingMove 
+    /* choose a block & a proxy source for this pendingMove
      * whose source & target have already been chosen.
      * 
      * Return true if a block and its proxy are chosen; false otherwise
@@ -281,7 +298,7 @@ public class Balancer {
                     " with a length of " +
                     StringUtils.byteDesc(block.getNumBytes()) + " bytes from " +
                     source.getDisplayName() + " to " + target.getDisplayName() +
-                    " using proxy source " + proxySource.getDisplayName());
+                    " using proxy source " + proxySource.datanode);
               }
               return true;
             }
@@ -296,21 +313,37 @@ public class Balancer {
      * @return true if a proxy is found; otherwise false
      */
     private boolean chooseProxySource() {
-      // check if there is replica which is on the same rack with the target
-      for (BalancerDatanode loc : block.getLocations()) {
-        if (cluster.isOnSameRack(loc.getDatanode(), target.getDatanode())) {
-          if (loc.addPendingBlock(this)) {
-            proxySource = loc;
+      final DatanodeInfo targetDN = target.getDatanode();
+      // if node group is supported, first try add nodes in the same node group
+      if (cluster.isNodeGroupAware()) {
+        for (BalancerDatanode.StorageGroup loc : block.getLocations()) {
+          if (cluster.isOnSameNodeGroup(loc.getDatanode(), targetDN)
+              && addTo(loc)) {
             return true;
           }
         }
       }
-      // find out a non-busy replica
-      for (BalancerDatanode loc : block.getLocations()) {
-        if (loc.addPendingBlock(this)) {
-          proxySource = loc;
+      // check if there is replica which is on the same rack with the target
+      for (BalancerDatanode.StorageGroup loc : block.getLocations()) {
+        if (cluster.isOnSameRack(loc.getDatanode(), targetDN) && addTo(loc)) {
           return true;
         }
+      }
+      // find out a non-busy replica
+      for (BalancerDatanode.StorageGroup loc : block.getLocations()) {
+        if (addTo(loc)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    /** add to a proxy source for specific block movement */
+    private boolean addTo(BalancerDatanode.StorageGroup g) {
+      final BalancerDatanode dn = g.getBalancerDatanode();
+      if (dn.addPendingBlock(this)) {
+        proxySource = dn;
+        return true;
       }
       return false;
     }
@@ -322,7 +355,7 @@ public class Balancer {
       DataOutputStream out = null;
       DataInputStream in = null;
       try {
-        sock.connect(NetUtils.createSocketAddr(target.datanode.getXferAddr()),
+        sock.connect(NetUtils.createSocketAddr(target.getDatanode().getXferAddr()),
             HdfsServerConstants.READ_TIMEOUT);
         sock.setKeepAlive(true);
         
@@ -340,27 +373,25 @@ public class Balancer {
         in = new DataInputStream(new BufferedInputStream(unbufIn,
             HdfsConstants.IO_FILE_BUFFER_SIZE));
         
-        sendRequest(out);
+        sendRequest(out, StorageType.DEFAULT);
         receiveResponse(in);
         bytesMoved.inc(block.getNumBytes());
         LOG.info("Moving block " + block.getBlock().getBlockId() +
             " from " + source.getDisplayName() + " to " +
             target.getDisplayName() + " through " +
-            proxySource.getDisplayName() +
-            " is succeeded.");
+            proxySource + " is succeeded.");
       } catch (IOException e) {
         LOG.warn("Error moving block " + block.getBlockId() +
             " from " + source.getDisplayName() + " to " +
             target.getDisplayName() + " through " +
-            proxySource.getDisplayName() +
-            ": " + e.getMessage());
+            proxySource + ": " + e.getMessage());
       } finally {
         IOUtils.closeStream(out);
         IOUtils.closeStream(in);
         IOUtils.closeSocket(sock);
         
         proxySource.removePendingBlock(this);
-        target.removePendingBlock(this);
+        target.getBalancerDatanode().removePendingBlock(this);
 
         synchronized (this) {
           reset();
@@ -372,12 +403,14 @@ public class Balancer {
     }
     
     /* Send a block replace request to the output stream*/
-    private void sendRequest(DataOutputStream out) throws IOException {
+    private void sendRequest(DataOutputStream out, StorageType storageType) throws
+        IOException {
       final ExtendedBlock eb =
           new ExtendedBlock(nnc.blockpoolID, block.getBlock());
       final Token<BlockTokenIdentifier> accessToken = nnc.getAccessToken(eb);
-      new Sender(out).replaceBlock(eb, accessToken, source.getStorageID(),
-          proxySource.getDatanode());
+
+      new Sender(out).replaceBlock(eb, storageType, accessToken,
+          source.getDatanode().getDatanodeUuid(), proxySource.datanode);
     }
     
     /* Receive a block copy response from the input stream */
@@ -407,7 +440,7 @@ public class Balancer {
         public void run() {
           if (LOG.isDebugEnabled()) {
             LOG.debug("Starting moving " + block.getBlockId() +
-                " from " + proxySource.getDisplayName() + " to " +
+                " from " + proxySource + " to " +
                 target.getDisplayName());
           }
           dispatch();
@@ -419,47 +452,47 @@ public class Balancer {
   /* A class for keeping track of blocks in the Balancer */
   static private class BalancerBlock {
     private Block block; // the block
-    private List<BalancerDatanode> locations =
-        new ArrayList<BalancerDatanode>(3); // its locations
-    
+    /** The locations of the replicas of the block. */
+    private final List<BalancerDatanode.StorageGroup> locations
+        = new ArrayList<BalancerDatanode.StorageGroup>(3);
+
     /* Constructor */
     private BalancerBlock(Block block) {
       this.block = block;
     }
-    
+
     /* clean block locations */
     private synchronized void clearLocations() {
       locations.clear();
     }
-    
+
     /* add a location */
-    private synchronized void addLocation(BalancerDatanode datanode) {
-      if (!locations.contains(datanode)) {
-        locations.add(datanode);
+    private synchronized void addLocation(BalancerDatanode.StorageGroup g) {
+      if (!locations.contains(g)) {
+        locations.add(g);
       }
     }
-    
-    /* Return if the block is located on <code>datanode</code> */
-    private synchronized boolean isLocatedOnDatanode(
-        BalancerDatanode datanode) {
-      return locations.contains(datanode);
+
+    /** @return if the block is located on the given storage group. */
+    private synchronized boolean isLocatedOn(BalancerDatanode.StorageGroup g) {
+      return locations.contains(g);
     }
-    
+
     /* Return its locations */
-    private synchronized List<BalancerDatanode> getLocations() {
+    private synchronized List<BalancerDatanode.StorageGroup> getLocations() {
       return locations;
     }
-    
+
     /* Return the block */
     private Block getBlock() {
       return block;
     }
-    
+
     /* Return the block id */
     private long getBlockId() {
       return block.getBlockId();
     }
-    
+
     /* Return the length of the block */
     private long getNumBytes() {
       return block.getNumBytes();
@@ -470,114 +503,112 @@ public class Balancer {
    * and the target.
    * An object of this class is stored in a source node. 
    */
-  static private class NodeTask {
-    private BalancerDatanode datanode; //target node
+  static private class Task {
+    private final BalancerDatanode.StorageGroup target;
     private long size;  //bytes scheduled to move
     
     /* constructor */
-    private NodeTask(BalancerDatanode datanode, long size) {
-      this.datanode = datanode;
+    private Task(BalancerDatanode.StorageGroup target, long size) {
+        this.target = target;
       this.size = size;
-    }
-    
-    /* Get the node */
-    private BalancerDatanode getDatanode() {
-      return datanode;
-    }
-    
-    /* Get the number of bytes that need to be moved */
-    private long getSize() {
-      return size;
     }
   }
   
-  
   /* A class that keeps track of a datanode in Balancer */
   private static class BalancerDatanode {
-    final private static long MAX_SIZE_TO_MOVE = 10 * 1024 * 1024 * 1024L;
-        //10GB
+    /** A group of storages in a datanode with the same storage type. */
+    private class StorageGroup {
+      final StorageType storageType;
+      final double utilization;
+      final long maxSize2Move;
+      private long scheduledSize = 0L;
+      private StorageGroup(StorageType storageType, double utilization,
+          long maxSize2Move) {
+        this.storageType = storageType;
+        this.utilization = utilization;
+        this.maxSize2Move = maxSize2Move;
+      }
+
+      BalancerDatanode getBalancerDatanode() {
+        return BalancerDatanode.this;
+      }
+
+      DatanodeInfo getDatanode() {
+        return BalancerDatanode.this.datanode;
+      }
+      /** Decide if still need to move more bytes */
+      protected synchronized boolean hasSpaceForScheduling() {
+        return availableSizeToMove() > 0L;
+      }
+      /** @return the total number of bytes that need to be moved */
+      synchronized long availableSizeToMove() {
+        return maxSize2Move - scheduledSize;
+      }
+
+      /** increment scheduled size */
+      synchronized void incScheduledSize(long size) {
+        scheduledSize += size;
+      }
+
+      /** @return scheduled size */
+      synchronized long getScheduledSize() {
+        return scheduledSize;
+      }
+
+      /** @return the name for display */
+      String getDisplayName() {
+        return datanode + ":" + storageType;
+      }
+
+      @Override
+      public String toString() {
+        return "" + utilization;
+      }
+    }
+
     final DatanodeInfo datanode;
-    final double utilization;
-    final long maxSize2Move;
-    protected long scheduledSize = 0L;
+    final EnumMap<StorageType, StorageGroup> storageMap
+        = new EnumMap<StorageType, StorageGroup>(StorageType.class);
     //  blocks being moved but not confirmed yet
     private List<PendingBlockMove> pendingBlocks =
         new ArrayList<PendingBlockMove>(MAX_NUM_CONCURRENT_MOVES);
-    
+
     @Override
     public String toString() {
-      return getClass().getSimpleName() + "[" + datanode + ", utilization=" +
-          utilization + "]";
+      return getClass().getSimpleName() + ":" + datanode + ":" + storageMap;
     }
 
     /* Constructor 
      * Depending on avgutil & threshold, calculate maximum bytes to move 
      */
-    private BalancerDatanode(DatanodeInfo node, BalancingPolicy policy,
-        double threshold) {
-      datanode = node;
-      utilization = policy.getUtilization(node);
-      final double avgUtil = policy.getAvgUtilization();
-      long maxSizeToMove;
-
-      if (utilization >= avgUtil + threshold ||
-          utilization <= avgUtil - threshold) {
-        maxSizeToMove = (long) (threshold * datanode.getCapacity() / 100);
-      } else {
-        maxSizeToMove =
-            (long) (Math.abs(avgUtil - utilization) * datanode.getCapacity() /
-                100);
-      }
-      if (utilization < avgUtil) {
-        maxSizeToMove = Math.min(datanode.getRemaining(), maxSizeToMove);
-      }
-      this.maxSize2Move = Math.min(MAX_SIZE_TO_MOVE, maxSizeToMove);
-    }
-    
-    /**
-     * Get the datanode
-     */
-    protected DatanodeInfo getDatanode() {
-      return datanode;
-    }
-    
-    /**
-     * Get the name of the datanode
-     */
-    protected String getDisplayName() {
-      return datanode.toString();
-    }
-    
-    /* Get the storage id of the datanode */
-    protected String getStorageID() {
-      return datanode.getStorageID();
-    }
-    
-    /**
-     * Decide if still need to move more bytes
-     */
-    protected boolean isMoveQuotaFull() {
-      return scheduledSize < maxSize2Move;
+    private BalancerDatanode(DatanodeStorageReport report, double threshold) {
+      this.datanode = report.getDatanodeInfo();
+      this.pendingBlocks = new ArrayList<PendingBlockMove>(MAX_NUM_CONCURRENT_MOVES);
     }
 
-    /**
-     * Return the total number of bytes that need to be moved
-     */
-    protected long availableSizeToMove() {
-      return maxSize2Move - scheduledSize;
+    private void put(StorageType storageType, StorageGroup g) {
+      final StorageGroup existing = storageMap.put(storageType, g);
+      Preconditions.checkState(existing == null);
     }
-    
-    /* increment scheduled size */
-    protected void incScheduledSize(long size) {
-      scheduledSize += size;
+
+    StorageGroup addStorageGroup(StorageType storageType, double utilization,
+        long maxSize2Move) {
+      final StorageGroup g = new StorageGroup(storageType, utilization,
+          maxSize2Move);
+      put(storageType, g);
+      return g;
+    }
+
+    Source addSource(StorageType storageType, double utilization,
+        long maxSize2Move, Balancer balancer) {
+      final Source s = balancer.new Source(storageType, utilization, maxSize2Move, this);
+      put(storageType, s);
+      return s;
     }
     
     /* Check if the node can schedule more blocks to move */
     synchronized private boolean isPendingQNotFull() {
-      if (pendingBlocks.size() < MAX_NUM_CONCURRENT_MOVES) {
-        return true;
-      }
-      return false;
+      return pendingBlocks.size() < MAX_NUM_CONCURRENT_MOVES;
     }
     
     /* Check if all the dispatched moves are done */
@@ -604,8 +635,8 @@ public class Balancer {
   /**
    * A node that can be the sources of a block move
    */
-  private class Source extends BalancerDatanode {
-    
+  private class Source extends BalancerDatanode.StorageGroup {
+
     /* A thread that initiates a block move 
      * and waits for block move to complete */
     private class BlockMoveDispatcher implements Runnable {
@@ -615,7 +646,7 @@ public class Balancer {
       }
     }
     
-    private ArrayList<NodeTask> nodeTasks = new ArrayList<NodeTask>(2);
+    private ArrayList<Task> tasks = new ArrayList<Task>(2);
     private long blocksToReceive = 0L;
     /* source blocks point to balancerBlocks in the global list because
      * we want to keep one copy of a block in balancer and be aware that
@@ -624,19 +655,19 @@ public class Balancer {
     private List<BalancerBlock> srcBlockList = new ArrayList<BalancerBlock>();
     
     /* constructor */
-    private Source(DatanodeInfo node, BalancingPolicy policy,
-        double threshold) {
-      super(node, policy, threshold);
+    private Source(StorageType storageType, double utilization,
+        long maxSize2Move, BalancerDatanode dn) {
+      dn.super(storageType, utilization, maxSize2Move);
     }
     
     /**
      * Add a node task
      */
-    private void addNodeTask(NodeTask task) {
-      assert (task.datanode != this) :
-          "Source and target are the same " + datanode;
-      incScheduledSize(task.getSize());
-      nodeTasks.add(task);
+    private void addTask(Task task) {
+      Preconditions.checkState(task.target != this,
+          "Source and target are the same storage group " + getDisplayName());
+      incScheduledSize(task.size);
+      tasks.add(task);
     }
     
     /* Return an iterator to this source's blocks */
@@ -649,9 +680,11 @@ public class Balancer {
      * Return the total size of the received blocks in the number of bytes.
      */
     private long getBlockList() throws IOException {
-      BlockWithLocations[] newBlocks = nnc.namenode.getBlocks(datanode,
-          Math.min(MAX_BLOCKS_SIZE_TO_FETCH, blocksToReceive)).getBlocks();
+      final long size = Math.min(MAX_BLOCKS_SIZE_TO_FETCH, blocksToReceive);
+      final BlockWithLocations[] newBlocks = nnc.namenode.getBlocks(
+          getDatanode(), size).getBlocks();
       long bytesReceived = 0;
+
       for (BlockWithLocations blk : newBlocks) {
         bytesReceived += blk.getBlock().getNumBytes();
         BalancerBlock block;
@@ -666,16 +699,19 @@ public class Balancer {
 
           synchronized (block) {
             // update locations
-            for (String storageID : blk.getStorageIDs()) {
-              BalancerDatanode datanode = datanodes.get(storageID);
-              if (datanode != null) { // not an unknown datanode
-                block.addLocation(datanode);
+            final String[] datanodeUuids = blk.getDatanodeUuids();
+            final StorageType[] storageTypes = blk.getStorageTypes();
+            for (int i = 0; i < datanodeUuids.length; i++) {
+              final BalancerDatanode.StorageGroup g = storageGroupMap.get(
+                  datanodeUuids[i], storageTypes[i]);
+              if (g != null) { // not unknown
+                block.addLocation(g);
               }
             }
-          }
-          if (!srcBlockList.contains(block) && isGoodBlockCandidate(block)) {
-            // filter bad candidates
-            srcBlockList.add(block);
+            if (!srcBlockList.contains(block) && isGoodBlockCandidate(block)) {
+              // filter bad candidates
+              srcBlockList.add(block);
+            }
           }
         }
       }
@@ -684,9 +720,8 @@ public class Balancer {
 
     /* Decide if the given block is a good candidate to move or not */
     private boolean isGoodBlockCandidate(BalancerBlock block) {
-      for (NodeTask nodeTask : nodeTasks) {
-        if (Balancer.this
-            .isGoodBlockCandidate(this, nodeTask.datanode, block)) {
+      for (Task t : tasks) {
+        if (Balancer.this.isGoodBlockCandidate(this, t.target, block)) {
           return true;
         }
       }
@@ -701,20 +736,20 @@ public class Balancer {
      * The block should be dispatched immediately after this method is returned.
      */
     private PendingBlockMove chooseNextBlockToMove() {
-      for (Iterator<NodeTask> tasks = nodeTasks.iterator(); tasks.hasNext(); ) {
-        NodeTask task = tasks.next();
-        BalancerDatanode target = task.getDatanode();
+      for (Iterator<Task> i = tasks.iterator(); i.hasNext();) {
+        final Task task = i.next();
+        final BalancerDatanode target = task.target.getBalancerDatanode();
         PendingBlockMove pendingBlock = new PendingBlockMove();
         if (target.addPendingBlock(pendingBlock)) {
           // target is not busy, so do a tentative block allocation
           pendingBlock.source = this;
-          pendingBlock.target = target;
+          pendingBlock.target = task.target;
           if (pendingBlock.chooseBlockAndProxy()) {
             long blockSize = pendingBlock.block.getNumBytes();
-            scheduledSize -= blockSize;
+            incScheduledSize(-blockSize);
             task.size -= blockSize;
             if (task.size == 0) {
-              tasks.remove();
+              i.remove();
             }
             return pendingBlock;
           } else {
@@ -757,9 +792,9 @@ public class Balancer {
 
     private void dispatchBlocks() {
       long startTime = Time.now();
-      this.blocksToReceive = 2 * scheduledSize;
+      this.blocksToReceive = 2 * getScheduledSize();
       boolean isTimeUp = false;
-      while (!isTimeUp && scheduledSize > 0 &&
+      while (!isTimeUp && getScheduledSize() > 0 &&
           (!srcBlockList.isEmpty() || blocksToReceive > 0)) {
         PendingBlockMove pendingBlock = chooseNextBlockToMove();
         if (pendingBlock != null) {
@@ -767,7 +802,7 @@ public class Balancer {
           pendingBlock.scheduleBlockMove();
           continue;
         }
-        
+
         /* Since we can not schedule any block to move,
          * filter any moved blocks from the source block list and
          * check if we should fetch more blocks from the namenode
@@ -783,15 +818,15 @@ public class Balancer {
             return;
           }
         }
-        
+
         // check if time is up or not
         if (Time.now() - startTime > MAX_ITERATION_TIME) {
           isTimeUp = true;
           continue;
         }
-        
+
         /* Now we can not schedule any block to move and there are
-         * no new blocks added to the source block list, so we wait. 
+         * no new blocks added to the source block list, so we wait.
          */
         try {
           synchronized (Balancer.this) {
@@ -808,7 +843,7 @@ public class Balancer {
    */
   private static void checkReplicationPolicyCompatibility(Configuration conf)
       throws UnsupportedActionException {
-    if (BlockPlacementPolicy.getInstance(conf, null, null).getClass() !=
+    if (BlockPlacementPolicy.getInstance(conf, null, null, null).getClass() !=
         BlockPlacementPolicyDefault.class) {
       throw new UnsupportedActionException(
           "Balancer without BlockPlacementPolicyDefault");
@@ -828,107 +863,154 @@ public class Balancer {
     this.nnc = theblockpool;
   }
   
-  /* Shuffle datanode array */
-  static private void shuffleArray(DatanodeInfo[] datanodes) {
-    for (int i = datanodes.length; i > 1; i--) {
-      int randomIndex = DFSUtil.getRandom().nextInt(i);
-      DatanodeInfo tmp = datanodes[randomIndex];
-      datanodes[randomIndex] = datanodes[i - 1];
-      datanodes[i - 1] = tmp;
+  private static long getCapacity(DatanodeStorageReport report, StorageType t) {
+    long capacity = 0L;
+    for(StorageReport r : report.getStorageReports()) {
+      if (r.getStorage().getStorageType() == t) {
+        capacity += r.getCapacity();
+      }
     }
+    return capacity;
   }
-  
-  /* Given a data node set, build a network topology and decide
-   * over-utilized datanodes, above average utilized datanodes, 
-   * below average utilized datanodes, and underutilized datanodes. 
-   * The input data node set is shuffled before the datanodes 
-   * are put into the over-utilized datanodes, above average utilized
-   * datanodes, below average utilized datanodes, and
-   * underutilized datanodes lists. This will add some randomness
-   * to the node matching later on.
-   * 
+  private static long getRemaining(DatanodeStorageReport report, StorageType t) {
+    long remaining = 0L;
+    for(StorageReport r : report.getStorageReports()) {
+      if (r.getStorage().getStorageType() == t) {
+        remaining += r.getRemaining();
+      }
+    }
+    return remaining;
+  }
+
+  void add(Source source, BalancerDatanode.StorageGroup target) {
+    sources.add(source);
+    targets.add(target);
+  }
+
+  private boolean shouldIgnore(DatanodeInfo dn) {
+    // ignore decommissioned nodes
+    final boolean decommissioned = dn.isDecommissioned();
+    // ignore decommissioning nodes
+    final boolean decommissioning = dn.isDecommissionInProgress();
+
+    // This is some Hadoop 2.6 stuff (not supported in Hops yet)
+//    // ignore nodes in exclude list
+//    final boolean excluded = Util.isExcluded(excludedNodes, dn);
+//    // ignore nodes not in the include list (if include list is not empty)
+//    final boolean notIncluded = !Util.isIncluded(includedNodes, dn);
+
+    if (decommissioned || decommissioning) {// || excluded || notIncluded) {
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("Excluding datanode " + dn + ": " + decommissioned + ", "
+            + decommissioning);// + ", " + excluded + ", " + notIncluded);
+      }
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Given a datanode storage set, build a network topology and decide
+   * over-utilized storages, above average utilized storages,
+   * below average utilized storages, and underutilized storages.
+   * The input datanode storage set is shuffled in order to randomize
+   * to the storage matching later on.
+   *
    * @return the total number of bytes that are 
    *                needed to move to make the cluster balanced.
-   * @param datanodes a set of datanodes
+   * @param reports a set of datanode storage reports
    */
-  private long initNodes(DatanodeInfo[] datanodes) {
+  private long init(List<DatanodeStorageReport> reports) {
     // compute average utilization
-    for (DatanodeInfo datanode : datanodes) {
-      if (datanode.isDecommissioned() || datanode.isDecommissionInProgress()) {
-        continue; // ignore decommissioning or decommissioned nodes
+    for (DatanodeStorageReport r : reports) {
+      if (shouldIgnore(r.getDatanodeInfo())) {
+        continue;
       }
-      policy.accumulateSpaces(datanode);
+      policy.accumulateSpaces(r);
     }
     policy.initAvgUtilization();
 
-    /*create network topology and all data node lists: 
-     * overloaded, above-average, below-average, and underloaded
-     * we alternates the accessing of the given datanodes array either by
-     * an increasing order or a decreasing order.
-     */
+    // create network topology and classify utilization collections:
+    //   over-utilized, above-average, below-average and under-utilized.
     long overLoadedBytes = 0L, underLoadedBytes = 0L;
-    shuffleArray(datanodes);
-    for (DatanodeInfo datanode : datanodes) {
-      if (datanode.isDecommissioned() || datanode.isDecommissionInProgress()) {
+    for(DatanodeStorageReport r : reports) {
+      final DatanodeInfo datanode = r.getDatanodeInfo();
+      if (shouldIgnore(datanode)) {
         continue; // ignore decommissioning or decommissioned nodes
       }
       cluster.add(datanode);
-      BalancerDatanode datanodeS;
-      final double avg = policy.getAvgUtilization();
-      if (policy.getUtilization(datanode) > avg) {
-        datanodeS = new Source(datanode, policy, threshold);
-        if (isAboveAvgUtilized(datanodeS)) {
-          this.aboveAvgUtilizedDatanodes.add((Source) datanodeS);
-        } else {
-          assert (isOverUtilized(datanodeS)) :
-              datanodeS.getDisplayName() + "is not an overUtilized node";
-          this.overUtilizedDatanodes.add((Source) datanodeS);
-          overLoadedBytes += (long) ((datanodeS.utilization - avg - threshold) *
-              datanodeS.datanode.getCapacity() / 100.0);
+      final BalancerDatanode dn = new BalancerDatanode(r, underLoadedBytes);
+      for(StorageType t : StorageType.asList()) {
+        final Double utilization = policy.getUtilization(r, t);
+        if (utilization == null) { // datanode does not have such storage type
+          continue;
         }
-      } else {
-        datanodeS = new BalancerDatanode(datanode, policy, threshold);
-        if (isBelowOrEqualAvgUtilized(datanodeS)) {
-          this.belowAvgUtilizedDatanodes.add(datanodeS);
+        final long capacity = getCapacity(r, t);
+        final double utilizationDiff = utilization - policy.getAvgUtilization(t);
+        final double thresholdDiff = Math.abs(utilizationDiff) - threshold;
+        final long maxSize2Move = computeMaxSize2Move(capacity,
+            getRemaining(r, t), utilizationDiff, threshold);
+        final BalancerDatanode.StorageGroup g;
+        if (utilizationDiff > 0) {
+          final Source s = dn.addSource(t, utilization, maxSize2Move, this);
+          if (thresholdDiff <= 0) { // within threshold
+            aboveAvgUtilized.add(s);
+          } else {
+            overLoadedBytes += precentage2bytes(thresholdDiff, capacity);
+            overUtilized.add(s);
+          }
+          g = s;
         } else {
-          assert isUnderUtilized(datanodeS) :
-              "isUnderUtilized(" + datanodeS.getDisplayName() + ")=" +
-                  isUnderUtilized(datanodeS) + ", utilization=" +
-                  datanodeS.utilization;
-          this.underUtilizedDatanodes.add(datanodeS);
-          underLoadedBytes += (long) ((avg - threshold -
-              datanodeS.utilization) * datanodeS.datanode.getCapacity() /
-              100.0);
+          g = dn.addStorageGroup(t, utilization, maxSize2Move);
+          if (thresholdDiff <= 0) { // within threshold
+            belowAvgUtilized.add(g);
+          } else {
+            underLoadedBytes += precentage2bytes(thresholdDiff, capacity);
+            underUtilized.add(g);
+          }
         }
+        storageGroupMap.put(g);
       }
-      this.datanodes.put(datanode.getStorageID(), datanodeS);
     }
 
-    //logging
-    logNodes();
-    
-    assert (this.datanodes.size() ==
-        overUtilizedDatanodes.size() + underUtilizedDatanodes.size() +
-            aboveAvgUtilizedDatanodes.size() + belowAvgUtilizedDatanodes
-            .size()) : "Mismatched number of datanodes";
+    logUtilizationCollections();
+
+    Preconditions.checkState(storageGroupMap.size() == overUtilized.size()
+            + underUtilized.size() + aboveAvgUtilized.size() + belowAvgUtilized.size(),
+        "Mismatched number of storage groups");
     
     // return number of bytes to be moved in order to make the cluster balanced
     return Math.max(overLoadedBytes, underLoadedBytes);
   }
 
-  /* log the over utilized & under utilized nodes */
-  private void logNodes() {
-    logNodes("over-utilized", overUtilizedDatanodes);
-    if (LOG.isTraceEnabled()) {
-      logNodes("above-average", aboveAvgUtilizedDatanodes);
-      logNodes("below-average", belowAvgUtilizedDatanodes);
+  private static long computeMaxSize2Move(final long capacity, final long remaining,
+      final double utilizationDiff, final double threshold) {
+    final double diff = Math.min(threshold, Math.abs(utilizationDiff));
+    long maxSizeToMove = precentage2bytes(diff, capacity);
+    if (utilizationDiff < 0) {
+      maxSizeToMove = Math.min(remaining, maxSizeToMove);
     }
-    logNodes("underutilized", underUtilizedDatanodes);
+    return Math.min(MAX_SIZE_TO_MOVE, maxSizeToMove);
+  }
+  private static long precentage2bytes(double precentage, long capacity) {
+    Preconditions.checkArgument(precentage >= 0,
+        "precentage = " + precentage + " < 0");
+    return (long)(precentage * capacity / 100.0);
   }
 
-  private static <T extends BalancerDatanode> void logNodes(String name,
-      Collection<T> nodes) {
-    LOG.info(nodes.size() + " " + name + ": " + nodes);
+  /* log the over utilized & under utilized nodes */
+  private void logUtilizationCollections() {
+    logUtilizationCollection("over-utilized", overUtilized);
+    if (LOG.isTraceEnabled()) {
+      logUtilizationCollection("above-average", aboveAvgUtilized);
+      logUtilizationCollection("below-average", belowAvgUtilized);
+    }
+    logUtilizationCollection("underutilized", underUtilized);
+  }
+
+  private static <T extends BalancerDatanode.StorageGroup>
+  void logUtilizationCollection(String name, Collection<T> items) {
+    LOG.info(items.size() + " " + name + ": " + items);
   }
 
   /* Decide all <source, target> pairs and
@@ -937,23 +1019,25 @@ public class Balancer {
    * Min(1 Band worth of bytes,  MAX_SIZE_TO_MOVE).
    * Return total number of bytes to move in this iteration
    */
-  private long chooseNodes() {
-    // Match nodes on the same rack first
-    chooseNodes(true);
-    // Then match nodes on different racks
-    chooseNodes(false);
-    
-    assert (datanodes.size() >= sources.size() + targets.size()) :
-        "Mismatched number of datanodes (" +
-            datanodes.size() + " total, " +
-            sources.size() + " sources, " +
-            targets.size() + " targets)";
+  private long chooseStorageGroups() {
+    // First, match nodes on the same node group if cluster is node group aware
+    chooseStorageGroups(Matcher.SAME_NODE_GROUP);
+    // Then, match nodes on the same rack
+    chooseStorageGroups(Matcher.SAME_RACK);
+    // At last, match all remaining nodes
+    chooseStorageGroups(Matcher.ANY_OTHER);
 
-    long bytesToMove = 0L;
+    Preconditions.checkState(
+        storageGroupMap.size() >= sources.size() + targets.size(),
+        "Mismatched number of storage groups (" + storageGroupMap.size()
+            + " < " + sources.size() + " sources + " + targets.size()
+            + " targets)");
+
+    long b = 0L;
     for (Source src : sources) {
-      bytesToMove += src.scheduledSize;
+      b += src.getScheduledSize();
     }
-    return bytesToMove;
+    return b;
   }
 
   /* if onRack is true, decide all <source, target> pairs
@@ -961,164 +1045,94 @@ public class Balancer {
    * decide all <source, target> pairs where source and target are
    * on different racks
    */
-  private void chooseNodes(boolean onRack) {
+  private void chooseStorageGroups(final Matcher matcher) {
     /* first step: match each overUtilized datanode (source) to
      * one or more underUtilized datanodes (targets).
      */
-    chooseTargets(underUtilizedDatanodes.iterator(), onRack);
+    chooseStorageGroups(overUtilized, underUtilized, matcher);
     
     /* match each remaining overutilized datanode (source) to 
      * below average utilized datanodes (targets).
      * Note only overutilized datanodes that haven't had that max bytes to move
      * satisfied in step 1 are selected
      */
-    chooseTargets(belowAvgUtilizedDatanodes.iterator(), onRack);
+    chooseStorageGroups(overUtilized, belowAvgUtilized, matcher);
 
     /* match each remaining underutilized datanode to 
      * above average utilized datanodes.
      * Note only underutilized datanodes that have not had that max bytes to
      * move satisfied in step 1 are selected.
      */
-    chooseSources(aboveAvgUtilizedDatanodes.iterator(), onRack);
+    chooseStorageGroups(underUtilized, aboveAvgUtilized, matcher);
   }
 
-  /* choose targets from the target candidate list for each over utilized
-   * source datanode. OnRackTarget determines if the chosen target 
-   * should be on the same rack as the source
+  /**
+   * For each datanode, choose matching nodes from the candidates. Either the
+   * datanodes or the candidates are source nodes with (utilization > Avg), and
+   * the others are target nodes with (utilization < Avg).
    */
-  private void chooseTargets(Iterator<BalancerDatanode> targetCandidates,
-      boolean onRackTarget) {
-    for (Iterator<Source> srcIterator = overUtilizedDatanodes.iterator();
-         srcIterator.hasNext(); ) {
-      Source source = srcIterator.next();
-      while (chooseTarget(source, targetCandidates, onRackTarget)) {
-      }
-      if (!source.isMoveQuotaFull()) {
-        srcIterator.remove();
+  private <G extends BalancerDatanode.StorageGroup,
+      C extends BalancerDatanode.StorageGroup>
+  void chooseStorageGroups(Collection<G> groups, Collection<C> candidates,
+      Matcher matcher) {
+    for(final Iterator<G> i = groups.iterator(); i.hasNext();) {
+      final G g = i.next();
+      for(; choose4One(g, candidates, matcher); );
+      if (!g.hasSpaceForScheduling()) {
+        i.remove();
       }
     }
-    return;
-  }
-  
-  /* choose sources from the source candidate list for each under utilized
-   * target datanode. onRackSource determines if the chosen source 
-   * should be on the same rack as the target
-   */
-  private void chooseSources(Iterator<Source> sourceCandidates,
-      boolean onRackSource) {
-    for (Iterator<BalancerDatanode> targetIterator =
-             underUtilizedDatanodes.iterator(); targetIterator.hasNext(); ) {
-      BalancerDatanode target = targetIterator.next();
-      while (chooseSource(target, sourceCandidates, onRackSource)) {
-      }
-      if (!target.isMoveQuotaFull()) {
-        targetIterator.remove();
-      }
-    }
-    return;
   }
 
-  /* For the given source, choose targets from the target candidate list.
-   * OnRackTarget determines if the chosen target 
-   * should be on the same rack as the source
-   */
-  private boolean chooseTarget(Source source,
-      Iterator<BalancerDatanode> targetCandidates, boolean onRackTarget) {
-    if (!source.isMoveQuotaFull()) {
+  private <C extends BalancerDatanode.StorageGroup>
+  boolean choose4One(BalancerDatanode.StorageGroup g,
+      Collection<C> candidates, Matcher matcher) {
+    final Iterator<C> i = candidates.iterator();
+    final C chosen = chooseCandidate(g, i, matcher);
+
+    if (chosen == null) {
       return false;
     }
-    boolean foundTarget = false;
-    BalancerDatanode target = null;
-    while (!foundTarget && targetCandidates.hasNext()) {
-      target = targetCandidates.next();
-      if (!target.isMoveQuotaFull()) {
-        targetCandidates.remove();
-        continue;
-      }
-      if (onRackTarget) {
-        // choose from on-rack nodes
-        if (cluster.isOnSameRack(source.datanode, target.datanode)) {
-          foundTarget = true;
-        }
-      } else {
-        // choose from off-rack nodes
-        if (!cluster.isOnSameRack(source.datanode, target.datanode)) {
-          foundTarget = true;
-        }
-      }
+    if (g instanceof Source) {
+      matchSourceWithTargetToMove((Source)g, chosen);
+    } else {
+      matchSourceWithTargetToMove((Source) chosen, g);
     }
-    if (foundTarget) {
-      assert (target != null) : "Choose a null target";
-      long size =
-          Math.min(source.availableSizeToMove(), target.availableSizeToMove());
-      NodeTask nodeTask = new NodeTask(target, size);
-      source.addNodeTask(nodeTask);
-      target.incScheduledSize(nodeTask.getSize());
-      sources.add(source);
-      targets.add(target);
-      if (!target.isMoveQuotaFull()) {
-        targetCandidates.remove();
-      }
-      LOG.info(
-          "Decided to move " + StringUtils.byteDesc(size) + " bytes from " +
-              source.datanode + " to " + target.datanode);
-      return true;
+    if (!chosen.hasSpaceForScheduling()) {
+      i.remove();
     }
-    return false;
+    return true;
   }
-  
-  /* For the given target, choose sources from the source candidate list.
-   * OnRackSource determines if the chosen source 
-   * should be on the same rack as the target
-   */
-  private boolean chooseSource(BalancerDatanode target,
-      Iterator<Source> sourceCandidates, boolean onRackSource) {
-    if (!target.isMoveQuotaFull()) {
-      return false;
-    }
-    boolean foundSource = false;
-    Source source = null;
-    while (!foundSource && sourceCandidates.hasNext()) {
-      source = sourceCandidates.next();
-      if (!source.isMoveQuotaFull()) {
-        sourceCandidates.remove();
-        continue;
-      }
-      if (onRackSource) {
-        // choose from on-rack nodes
-        if (cluster.isOnSameRack(source.getDatanode(), target.getDatanode())) {
-          foundSource = true;
-        }
-      } else {
-        // choose from off-rack nodes
-        if (!cluster.isOnSameRack(source.datanode, target.datanode)) {
-          foundSource = true;
-        }
-      }
-    }
-    if (foundSource) {
-      assert (source != null) : "Choose a null source";
-      long size =
-          Math.min(source.availableSizeToMove(), target.availableSizeToMove());
-      NodeTask nodeTask = new NodeTask(target, size);
-      source.addNodeTask(nodeTask);
-      target.incScheduledSize(nodeTask.getSize());
-      sources.add(source);
-      targets.add(target);
-      if (!source.isMoveQuotaFull()) {
-        sourceCandidates.remove();
-      }
-      LOG.info(
-          "Decided to move " + StringUtils.byteDesc(size) + " bytes from " +
-              source.datanode + " to " + target.datanode);
-      return true;
-    }
-    return false;
+
+  private void matchSourceWithTargetToMove(Source source, BalancerDatanode.StorageGroup target) {
+    long size = Math.min(source.availableSizeToMove(), target.availableSizeToMove());
+    final Task task = new Task(target, size);
+    source.addTask(task);
+    target.incScheduledSize(task.size);
+    add(source, target);
+    LOG.info("Decided to move "+StringUtils.byteDesc(size)+" bytes from " +
+        source.getDisplayName() + " to " + target.getDisplayName());
   }
+
+  /** Choose a candidate for the given datanode. */
+  private <G extends BalancerDatanode.StorageGroup, C extends BalancerDatanode.StorageGroup>
+  C chooseCandidate(G g, Iterator<C> candidates, Matcher matcher) {
+    if (g.hasSpaceForScheduling()) {
+      for(; candidates.hasNext(); ) {
+        final C c = candidates.next();
+        if (!c.hasSpaceForScheduling()) {
+          candidates.remove();
+        } else if (matcher.match(cluster, g.getDatanode(), c.getDatanode())) {
+          return c;
+        }
+      }
+    }
+    return null;
+  }
+
 
   private static class BytesMoved {
     private long bytesMoved = 0L;
-    ;
 
     private synchronized void inc(long bytes) {
       bytesMoved += bytes;
@@ -1129,7 +1143,6 @@ public class Balancer {
     }
   }
 
-  ;
   private BytesMoved bytesMoved = new BytesMoved();
   private int notChangedIterations = 0;
   
@@ -1180,9 +1193,10 @@ public class Balancer {
     boolean shouldWait;
     do {
       shouldWait = false;
-      for (BalancerDatanode target : targets) {
-        if (!target.isPendingQEmpty()) {
+      for (BalancerDatanode.StorageGroup target : targets) {
+        if (!target.getBalancerDatanode().isPendingQEmpty()) {
           shouldWait = true;
+          break;
         }
       }
       if (shouldWait) {
@@ -1252,13 +1266,18 @@ public class Balancer {
    * 2. the block does not have a replica on the target;
    * 3. doing the move does not reduce the number of racks that the block has
    */
-  private boolean isGoodBlockCandidate(Source source, BalancerDatanode target,
-      BalancerBlock block) {
+  private boolean isGoodBlockCandidate(Source source,
+      BalancerDatanode.StorageGroup target, BalancerBlock block) {
+    if (source.storageType != target.storageType) {
+      return false;
+    }
+
     // check if the block is moved or not
     if (movedBlocks.contains(block)) {
       return false;
     }
-    if (block.isLocatedOnDatanode(target)) {
+
+    if (block.isLocatedOn(target)) {
       return false;
     }
 
@@ -1269,8 +1288,8 @@ public class Balancer {
     } else {
       boolean notOnSameRack = true;
       synchronized (block) {
-        for (BalancerDatanode loc : block.locations) {
-          if (cluster.isOnSameRack(loc.datanode, target.datanode)) {
+        for (BalancerDatanode.StorageGroup loc : block.locations) {
+          if (cluster.isOnSameRack(loc.getDatanode(), target.getDatanode())) {
             notOnSameRack = false;
             break;
           }
@@ -1281,9 +1300,9 @@ public class Balancer {
         goodBlock = true;
       } else {
         // good if source is on the same rack as on of the replicas
-        for (BalancerDatanode loc : block.locations) {
+        for (BalancerDatanode.StorageGroup loc : block.locations) {
           if (loc != source &&
-              cluster.isOnSameRack(loc.datanode, source.datanode)) {
+              cluster.isOnSameRack(loc.getDatanode(), source.getDatanode())) {
             goodBlock = true;
             break;
           }
@@ -1296,16 +1315,125 @@ public class Balancer {
   /* reset all fields in a balancer preparing for the next iteration */
   private void resetData() {
     this.cluster = new NetworkTopology();
-    this.overUtilizedDatanodes.clear();
-    this.aboveAvgUtilizedDatanodes.clear();
-    this.belowAvgUtilizedDatanodes.clear();
-    this.underUtilizedDatanodes.clear();
-    this.datanodes.clear();
+    this.overUtilized.clear();
+    this.aboveAvgUtilized.clear();
+    this.belowAvgUtilized.clear();
+    this.underUtilized.clear();
+    this.storageGroupMap.clear();
     this.sources.clear();
     this.targets.clear();
     this.policy.reset();
     cleanGlobalBlockList();
     this.movedBlocks.cleanup();
+  }
+
+  static class Result {
+    final ReturnStatus exitStatus;
+    final long bytesLeftToMove;
+    final long bytesBeingMoved;
+    final long bytesAlreadyMoved;
+
+    Result(ReturnStatus exitStatus, long bytesLeftToMove, long bytesBeingMoved,
+        long bytesAlreadyMoved) {
+      this.exitStatus = exitStatus;
+      this.bytesLeftToMove = bytesLeftToMove;
+      this.bytesBeingMoved = bytesBeingMoved;
+      this.bytesAlreadyMoved = bytesAlreadyMoved;
+    }
+
+    void print(int iteration, PrintStream out) {
+      out.printf("%-24s %10d  %19s  %18s  %17s%n",
+          DateFormat.getDateTimeInstance().format(new Date()), iteration,
+          StringUtils.byteDesc(bytesAlreadyMoved),
+          StringUtils.byteDesc(bytesLeftToMove),
+          StringUtils.byteDesc(bytesBeingMoved));
+    }
+  }
+
+  Result newResult(ReturnStatus exitStatus, long bytesLeftToMove, long bytesBeingMoved) {
+    return new Result(exitStatus, bytesLeftToMove, bytesBeingMoved,
+        bytesMoved.get());
+  }
+
+  Result newResult(ReturnStatus exitStatus) {
+    return new Result(exitStatus, -1, -1, bytesMoved.get());
+  }
+
+  /** Run an iteration for all datanodes. */
+  Result runOneIteration() {
+    try {
+      final List<DatanodeStorageReport> reports = init();
+      final long bytesLeftToMove = init(reports);
+      if (bytesLeftToMove == 0) {
+        System.out.println("The cluster is balanced. Exiting...");
+        return newResult(ReturnStatus.SUCCESS, bytesLeftToMove, -1);
+      } else {
+        LOG.info( "Need to move "+ StringUtils.byteDesc(bytesLeftToMove)
+            + " to make the cluster balanced." );
+      }
+
+      /* Decide all the nodes that will participate in the block move and
+       * the number of bytes that need to be moved from one node to another
+       * in this iteration. Maximum bytes to be moved per node is
+       * Min(1 Band worth of bytes,  MAX_SIZE_TO_MOVE).
+       */
+      final long bytesBeingMoved = chooseStorageGroups();
+      if (bytesBeingMoved == 0) {
+        System.out.println("No block can be moved. Exiting...");
+        return newResult(ReturnStatus.NO_MOVE_BLOCK, bytesLeftToMove, bytesBeingMoved);
+      } else {
+        LOG.info( "Will move " + StringUtils.byteDesc(bytesBeingMoved) +
+            " in this iteration");
+      }
+
+      /* For each pair of <source, target>, start a thread that repeatedly
+       * decide a block to be moved and its proxy source,
+       * then initiates the move until all bytes are moved or no more block
+       * available to move.
+       * Exit no byte has been moved for 5 consecutive iterations.
+       */
+      if (dispatchBlockMoves() > 0) {
+        notChangedIterations = 0;
+      } else {
+        notChangedIterations++;
+        if (notChangedIterations >= 5) {
+          System.out
+              .println("No block has been moved for 5 iterations. Exiting...");
+          return newResult(ReturnStatus.NO_MOVE_PROGRESS, bytesLeftToMove, bytesBeingMoved);
+        }
+      }
+
+      return newResult(ReturnStatus.IN_PROGRESS, bytesLeftToMove, bytesBeingMoved);
+    } catch (IllegalArgumentException e) {
+      System.out.println(e + ".  Exiting ...");
+      return newResult(ReturnStatus.ILLEGAL_ARGS);
+    } catch (IOException e) {
+      System.out.println(e + ".  Exiting ...");
+      return newResult(ReturnStatus.IO_EXCEPTION);
+    } catch (InterruptedException e) {
+      System.out.println(e + ".  Exiting ...");
+      return newResult(ReturnStatus.INTERRUPTED);
+    } finally {
+      dispatcherExecutor.shutdownNow();
+      moverExecutor.shutdownNow();
+    }
+  }
+
+  /** Get live datanode storage reports and then build the network topology. */
+  public List<DatanodeStorageReport> init() throws IOException {
+    final DatanodeStorageReport[] reports = nnc.client.getDatanodeStorageReport(DatanodeReportType.LIVE);
+    final List<DatanodeStorageReport> trimmed = new ArrayList<DatanodeStorageReport>();
+    // create network topology and classify utilization collections:
+    // over-utilized, above-average, below-average and under-utilized.
+    for (DatanodeStorageReport r : DFSUtil.shuffle(reports)) {
+      final DatanodeInfo datanode = r.getDatanodeInfo();
+      if (shouldIgnore(datanode)) {
+        continue;
+      }
+      trimmed.add(r);
+      cluster.add(datanode);
+    }
+    return trimmed;
   }
   
   /* Remove all blocks from the global block list except for the ones in the
@@ -1320,32 +1448,6 @@ public class Balancer {
         globalBlockListIterator.remove();
       }
     }
-  }
-  
-  /* Return true if the given datanode is overUtilized */
-  private boolean isOverUtilized(BalancerDatanode datanode) {
-    return datanode.utilization > (policy.getAvgUtilization() + threshold);
-  }
-  
-  /* Return true if the given datanode is above average utilized
-   * but not overUtilized */
-  private boolean isAboveAvgUtilized(BalancerDatanode datanode) {
-    final double avg = policy.getAvgUtilization();
-    return (datanode.utilization <= (avg + threshold)) &&
-        (datanode.utilization > avg);
-  }
-  
-  /* Return true if the given datanode is underUtilized */
-  private boolean isUnderUtilized(BalancerDatanode datanode) {
-    return datanode.utilization < (policy.getAvgUtilization() - threshold);
-  }
-
-  /* Return true if the given datanode is below average utilized 
-   * but not underUtilized */
-  private boolean isBelowOrEqualAvgUtilized(BalancerDatanode datanode) {
-    final double avg = policy.getAvgUtilization();
-    return (datanode.utilization >= (avg - threshold)) &&
-        (datanode.utilization <= avg);
   }
 
   // Exit status
@@ -1367,79 +1469,6 @@ public class Balancer {
     }
   }
 
-  /**
-   * Run an iteration for all datanodes.
-   */
-  private ReturnStatus run(int iteration, Formatter formatter) {
-    try {
-      /* get all live datanodes of a cluster and their disk usage
-       * decide the number of bytes need to be moved
-       */
-      final long bytesLeftToMove =
-          initNodes(nnc.client.getDatanodeReport(DatanodeReportType.LIVE));
-      if (bytesLeftToMove == 0) {
-        System.out.println("The cluster is balanced. Exiting...");
-        return ReturnStatus.SUCCESS;
-      } else {
-        LOG.info("Need to move " + StringUtils.byteDesc(bytesLeftToMove) +
-            " to make the cluster balanced.");
-      }
-      
-      /* Decide all the nodes that will participate in the block move and
-       * the number of bytes that need to be moved from one node to another
-       * in this iteration. Maximum bytes to be moved per node is
-       * Min(1 Band worth of bytes,  MAX_SIZE_TO_MOVE).
-       */
-      final long bytesToMove = chooseNodes();
-      if (bytesToMove == 0) {
-        System.out.println("No block can be moved. Exiting...");
-        return ReturnStatus.NO_MOVE_BLOCK;
-      } else {
-        LOG.info("Will move " + StringUtils.byteDesc(bytesToMove) +
-            " in this iteration");
-      }
-
-      formatter.format("%-24s %10d  %19s  %18s  %17s%n",
-          DateFormat.getDateTimeInstance().format(new Date()), iteration,
-          StringUtils.byteDesc(bytesMoved.get()),
-          StringUtils.byteDesc(bytesLeftToMove),
-          StringUtils.byteDesc(bytesToMove));
-      
-      /* For each pair of <source, target>, start a thread that repeatedly 
-       * decide a block to be moved and its proxy source, 
-       * then initiates the move until all bytes are moved or no more block
-       * available to move.
-       * Exit no byte has been moved for 5 consecutive iterations.
-       */
-      if (dispatchBlockMoves() > 0) {
-        notChangedIterations = 0;
-      } else {
-        notChangedIterations++;
-        if (notChangedIterations >= 5) {
-          System.out
-              .println("No block has been moved for 5 iterations. Exiting...");
-          return ReturnStatus.NO_MOVE_PROGRESS;
-        }
-      }
-
-      // clean all lists
-      resetData();
-      return ReturnStatus.IN_PROGRESS;
-    } catch (IllegalArgumentException e) {
-      System.out.println(e + ".  Exiting ...");
-      return ReturnStatus.ILLEGAL_ARGS;
-    } catch (IOException e) {
-      System.out.println(e + ".  Exiting ...");
-      return ReturnStatus.IO_EXCEPTION;
-    } catch (InterruptedException e) {
-      System.out.println(e + ".  Exiting ...");
-      return ReturnStatus.INTERRUPTED;
-    } finally {
-      // shutdown thread pools
-      dispatcherExecutor.shutdownNow();
-      moverExecutor.shutdownNow();
-    }
-  }
 
   /**
    * Balance all namenodes.
@@ -1450,34 +1479,35 @@ public class Balancer {
   static int run(Collection<URI> namenodes, final Parameters p,
       Configuration conf) throws IOException, InterruptedException {
     final long sleeptime = 2000 *
-        conf.getLong(DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY,
-            DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_DEFAULT);
+        conf.getLong(DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY, DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_DEFAULT);
     LOG.info("namenodes = " + namenodes);
     LOG.info("p         = " + p);
     
-    final Formatter formatter = new Formatter(System.out);
     System.out.println(
         "Time Stamp               Iteration#  Bytes Already Moved  Bytes Left To Move  Bytes Being Moved");
-    
-    final List<NameNodeConnector> connectors =
-        new ArrayList<NameNodeConnector>(namenodes.size());
+
+    List<NameNodeConnector> connectors = new ArrayList<NameNodeConnector>();
     try {
       for (URI uri : namenodes) {
         connectors.add(new NameNodeConnector(uri, conf));
       }
 
       boolean done = false;
-      for (int iteration = 0; !done; iteration++) {
+      for(int iteration = 0; !done; iteration++) {
         done = true;
         Collections.shuffle(connectors);
-        for (NameNodeConnector nnc : connectors) {
+        for(NameNodeConnector nnc : connectors) {
           final Balancer b = new Balancer(nnc, p, conf);
-          final ReturnStatus r = b.run(iteration, formatter);
-          if (r == ReturnStatus.IN_PROGRESS) {
+          final Result r = b.runOneIteration();
+          r.print(iteration, System.out);
+
+          // clean all lists
+          b.resetData();//conf);
+          if (r.exitStatus == ReturnStatus.IN_PROGRESS) {
             done = false;
-          } else if (r != ReturnStatus.SUCCESS) {
+          } else if (r.exitStatus != ReturnStatus.SUCCESS) {
             //must be an error statue, return.
-            return r.code;
+            return r.exitStatus.code;
           }
         }
 
@@ -1486,10 +1516,11 @@ public class Balancer {
         }
       }
     } finally {
-      for (NameNodeConnector nnc : connectors) {
+      for(NameNodeConnector nnc : connectors) {
         nnc.close();
       }
     }
+
     return ReturnStatus.SUCCESS.code;
   }
 

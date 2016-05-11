@@ -18,11 +18,13 @@ package io.hops.leaderElection;
 import io.hops.exception.TransientStorageException;
 import io.hops.leaderElection.LeaderElectionRole.Role;
 import io.hops.leaderElection.exception.LeaderElectionForceAbort;
+import io.hops.leader_election.node.ActiveNode;
 import io.hops.leader_election.node.SortedActiveNodeList;
 import io.hops.metadata.election.entity.LeDescriptorFactory;
 import org.apache.log4j.Logger;
 
 import java.io.IOException;
+import java.util.List;
 
 public class LeaderElection extends Thread {
 
@@ -66,6 +68,7 @@ public class LeaderElection extends Thread {
 
   @Override
   public void run() {
+    Thread.currentThread().setPriority(Thread.MAX_PRIORITY);
     while (running) {
       long txStartTime = System.currentTimeMillis();
       long sleepDuration = -1;
@@ -160,6 +163,20 @@ public class LeaderElection extends Thread {
     }
   }
 
+  public synchronized boolean isSecond() {
+    List<ActiveNode> activeNodes =context.memberShip.getSortedActiveNodes();
+    if (activeNodes.size()<2 ||
+            context.memberShip.getSortedActiveNodes().get(1).getId()==context.id) {
+      long elapsed_time = System.currentTimeMillis() - context.last_hb_time;
+      if (elapsed_time <
+          (context.time_period * context.max_missed_hb_threshold -
+              DRIFT_CONSTANT)) {
+        return true;
+      } 
+    }
+    return false;
+  }
+  
   public void stopElectionThread() {
     this.interrupt();
     running = false;

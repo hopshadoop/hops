@@ -24,6 +24,7 @@ import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.server.namenode.Namesystem;
+import org.apache.hadoop.hdfs.server.protocol.StorageReport;
 import org.apache.hadoop.util.Daemon;
 import org.apache.hadoop.util.Time;
 
@@ -159,6 +160,16 @@ class HeartbeatManager implements DatanodeStatistics {
   }
 
   @Override
+  public synchronized int getInServiceXceiverCount() {
+    return stats.nodesInServiceXceiverCount;
+  }
+
+  @Override
+  public int getNumDatanodesInService() {
+    return stats.nodesInService;
+  }
+
+  @Override
   public synchronized long[] getStats() {
     return new long[]{getCapacityTotal(), getCapacityUsed(),
         getCapacityRemaining(), -1L, -1L, -1L, getBlockPoolUsed()};
@@ -174,7 +185,7 @@ class HeartbeatManager implements DatanodeStatistics {
       addDatanode(d);
 
       //update its timestamp
-      d.updateHeartbeat(0L, 0L, 0L, 0L, 0, 0);
+      d.updateHeartbeatState(StorageReport.EMPTY_ARRAY, 0, 0);
     }
   }
 
@@ -183,6 +194,8 @@ class HeartbeatManager implements DatanodeStatistics {
   }
 
   synchronized void addDatanode(final DatanodeDescriptor d) {
+    // update in-service node count
+    stats.add(d);
     datanodes.add(d);
     d.isAlive = true;
   }
@@ -196,11 +209,9 @@ class HeartbeatManager implements DatanodeStatistics {
   }
 
   synchronized void updateHeartbeat(final DatanodeDescriptor node,
-      long capacity, long dfsUsed, long remaining, long blockPoolUsed,
-      int xceiverCount, int failedVolumes) {
+      StorageReport[] reports, int xceiverCount, int failedVolumes) {
     stats.subtract(node);
-    node.updateHeartbeat(capacity, dfsUsed, remaining, blockPoolUsed,
-        xceiverCount, failedVolumes);
+    node.updateHeartbeat(reports, xceiverCount, failedVolumes);
     stats.add(node);
   }
 
@@ -282,7 +293,7 @@ class HeartbeatManager implements DatanodeStatistics {
             lastHeartbeatCheck = now;
           }
           if (blockManager.shouldUpdateBlockKey(now -
-              lastBlockKeyUpdate)) { //updeated when leader. blocktokensecretmanager does leader check
+              lastBlockKeyUpdate)) { //updated when leader. blocktokensecretmanager does leader check
             synchronized (HeartbeatManager.this) {
               for (DatanodeDescriptor d : datanodes) {
                 d.needKeyUpdate = true;
@@ -310,8 +321,11 @@ class HeartbeatManager implements DatanodeStatistics {
     private long capacityUsed = 0L;
     private long capacityRemaining = 0L;
     private long blockPoolUsed = 0L;
-    private int xceiverCount = 0;
 
+    private int xceiverCount = 0;
+    private int nodesInServiceXceiverCount = 0;
+
+    private int nodesInService = 0;
     private int expiredHeartbeats = 0;
 
     private void add(final DatanodeDescriptor node) {
@@ -319,6 +333,8 @@ class HeartbeatManager implements DatanodeStatistics {
       blockPoolUsed += node.getBlockPoolUsed();
       xceiverCount += node.getXceiverCount();
       if (!(node.isDecommissionInProgress() || node.isDecommissioned())) {
+        nodesInService++;
+        nodesInServiceXceiverCount += node.getXceiverCount();
         capacityTotal += node.getCapacity();
         capacityRemaining += node.getRemaining();
       } else {
@@ -331,6 +347,8 @@ class HeartbeatManager implements DatanodeStatistics {
       blockPoolUsed -= node.getBlockPoolUsed();
       xceiverCount -= node.getXceiverCount();
       if (!(node.isDecommissionInProgress() || node.isDecommissioned())) {
+        nodesInService--;
+        nodesInServiceXceiverCount -= node.getXceiverCount();
         capacityTotal -= node.getCapacity();
         capacityRemaining -= node.getRemaining();
       } else {

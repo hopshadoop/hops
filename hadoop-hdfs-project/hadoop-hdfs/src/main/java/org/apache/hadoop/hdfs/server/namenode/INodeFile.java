@@ -19,12 +19,8 @@ package org.apache.hadoop.hdfs.server.namenode;
 
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
-import io.hops.metadata.HdfsStorageFactory;
-import io.hops.metadata.hdfs.dal.MetadataLogDataAccess;
-import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.transaction.EntityManager;
 import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
@@ -71,21 +67,21 @@ public class INodeFile extends INode implements BlockCollection {
 
   public INodeFile(PermissionStatus permissions, BlockInfo[] blklist,
       short replication, long modificationTime, long atime,
-      long preferredBlockSize) {
+      long preferredBlockSize) throws IOException {
     super(permissions, modificationTime, atime);
     this.setReplicationNoPersistance(replication);
     this.setPreferredBlockSizeNoPersistance(preferredBlockSize);
   }
 
   public INodeFile(PermissionStatus permissions, long header,
-      long modificationTime, long atime) {
+      long modificationTime, long atime) throws IOException {
     super(permissions, modificationTime, atime);
     this.setHeader(header);
   }
 
   //HOP:
   public INodeFile(INodeFile other)
-      throws StorageException, TransactionContextException {
+      throws IOException {
     super(other);
     setReplicationNoPersistance(other.getBlockReplication());
     setPreferredBlockSizeNoPersistance(other.getPreferredBlockSize());
@@ -99,6 +95,13 @@ public class INodeFile extends INode implements BlockCollection {
   @Override
   public short getBlockReplication() {
     return extractBlockReplication(header);
+  }
+
+  /**
+   * @return the storage policy ID.
+   */
+  public byte getStoragePolicyID() {
+    return blockStoragePolicyID;
   }
 
   static short extractBlockReplication(long header) {
@@ -339,6 +342,11 @@ public class INodeFile extends INode implements BlockCollection {
     return header;
   }
 
+  /** @return the diskspace required for a full block. */
+  final long getBlockDiskspace() {
+    return getPreferredBlockSize() * getBlockReplication();
+  }
+
   public static short getBlockReplication(long header) {
     return (short) ((header & HEADERMASK) >> BLOCKBITS);
   }
@@ -355,7 +363,7 @@ public class INodeFile extends INode implements BlockCollection {
 
   public INodeFileUnderConstruction convertToUnderConstruction(
       String clientName, String clientMachine, DatanodeID clientNode)
-      throws StorageException, TransactionContextException {
+      throws IOException {
     INodeFileUnderConstruction ucfile =
         new INodeFileUnderConstruction(this, clientName, clientMachine,
             clientNode);

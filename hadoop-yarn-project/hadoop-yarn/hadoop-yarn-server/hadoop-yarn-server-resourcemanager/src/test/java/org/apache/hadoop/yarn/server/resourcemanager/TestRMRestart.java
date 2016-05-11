@@ -1831,8 +1831,8 @@ public class TestRMRestart {
     //TODO: Before setting the attribute to false and allowing the test to continue,
     //make sure all classes access this particular conf instance. At the moment
     //some classes like RMNodeImpl access this attritube statically
-    if (conf.getBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED,
-        YarnConfiguration.DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED)) {
+    if (conf.getBoolean(YarnConfiguration.DISTRIBUTED_RM,
+        YarnConfiguration.DEFAULT_DISTRIBUTED_RM)) {
       return;
     }
     conf.setInt(YarnConfiguration.RM_AM_MAX_ATTEMPTS, 2);

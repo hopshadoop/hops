@@ -55,6 +55,17 @@ public interface FSDatasetMBean {
   public long getDfsUsed() throws IOException;
 
   /**
+   * Returns the storage id of the underlying storage
+   */
+  public String getStorageInfo();
+
+  /**
+   * Returns the number of failed volumes in the datanode.
+   * @return The number of failed volumes in the datanode.
+   */
+  public int getNumFailedVolumes();
+
+  /**
    * Returns total capacity (in bytes) of storage (used and unused)
    *
    * @return total capacity of storage (used and unused)
@@ -68,16 +79,4 @@ public interface FSDatasetMBean {
    * @throws IOException
    */
   public long getRemaining() throws IOException;
-  
-  /**
-   * Returns the storage id of the underlying storage
-   */
-  public String getStorageInfo();
-
-  /**
-   * Returns the number of failed volumes in the datanode.
-   *
-   * @return The number of failed volumes in the datanode.
-   */
-  public int getNumFailedVolumes();
 }

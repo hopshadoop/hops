@@ -19,6 +19,7 @@
 package org.apache.hadoop.yarn.server.resourcemanager.rmcontainer;
 
 import io.hops.ha.common.TransactionState;
+import io.hops.ha.common.TransactionStateImpl;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.Container;
@@ -120,7 +121,9 @@ public class TestRMContainerImpl {
             SchedulerUtils.RELEASED_CONTAINER);
     rmContainer.handle(
         new RMContainerFinishedEvent(containerId, containerStatus,
-            RMContainerEventType.RELEASED, null));
+            RMContainerEventType.RELEASED, new TransactionStateImpl(
+                    TransactionState.TransactionType.RM, 1,
+                            false, null)));
     drainDispatcher.await();
     assertEquals(RMContainerState.RELEASED, rmContainer.getState());
     assertEquals(SchedulerUtils.RELEASED_CONTAINER,

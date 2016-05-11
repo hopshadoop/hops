@@ -64,21 +64,21 @@ public class TestResourceTrackerOnHA extends ProtocolHATestBase {
         .newInstance(nodeId, 0, resource, YarnVersionInfo.getVersion(), null);
     resourceTracker.registerNodeManager(request);
     //HOP :: Sleep to allow registration to complete in case
-    if (conf.getBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED,
-        YarnConfiguration.DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED)) {
+    if (conf.getBoolean(YarnConfiguration.DISTRIBUTED_RM,
+        YarnConfiguration.DEFAULT_DISTRIBUTED_RM)) {
       Thread.sleep(5000);
     }
     Assert.assertTrue(waitForNodeManagerToConnect(10000, nodeId));
     //HOP :: Sleep to allow registration to complete in case
-    if (conf.getBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED,
-        YarnConfiguration.DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED)) {
+    if (conf.getBoolean(YarnConfiguration.DISTRIBUTED_RM,
+        YarnConfiguration.DEFAULT_DISTRIBUTED_RM)) {
       Thread.sleep(5000);
     }
     // restart the failover thread, and make sure nodeHeartbeat works
     failoverThread = createAndStartFailoverThread();
     //HOP :: Sleep to allow registration to complete in case
-    if (conf.getBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED,
-        YarnConfiguration.DEFAULT_HOPS_DISTRIBUTED_RT_ENABLED)) {
+    if (conf.getBoolean(YarnConfiguration.DISTRIBUTED_RM,
+        YarnConfiguration.DEFAULT_DISTRIBUTED_RM)) {
       Thread.sleep(5000);
     }
     NodeStatus status = NodeStatus

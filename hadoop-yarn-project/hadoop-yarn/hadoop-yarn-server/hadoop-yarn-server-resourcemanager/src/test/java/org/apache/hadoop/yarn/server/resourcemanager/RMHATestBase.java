@@ -167,6 +167,9 @@ public class RMHATestBase /*extends ClientBaseWithFixes*/ {
           .put(submissionContext.getApplicationId(), application);
       //Do not send RMAppEventType.START event
       //so the state of Application will not reach to NEW_SAVING state.
+      //In this case of failure the transactionState associated with the rpc
+      //should not be commited 
+      transactionState.incCounter(TransactionState.TransactionType.INIT);
     }
   }
 

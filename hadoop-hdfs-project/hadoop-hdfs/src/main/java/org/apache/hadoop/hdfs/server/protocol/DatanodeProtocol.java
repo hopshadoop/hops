@@ -188,6 +188,6 @@ public interface DatanodeProtocol {
    * namenodes
    * @return active namenode to send the next block report to
    */
-  public ActiveNode getNextNamenodeToSendBlockReport() throws IOException;
+  public ActiveNode getNextNamenodeToSendBlockReport(long noOfBlks) throws IOException;
 
 }

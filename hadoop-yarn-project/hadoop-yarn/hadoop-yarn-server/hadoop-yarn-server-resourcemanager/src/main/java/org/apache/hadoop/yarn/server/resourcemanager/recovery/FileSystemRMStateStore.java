@@ -55,6 +55,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 
 @Private
 @Unstable
@@ -150,7 +151,7 @@ import java.util.List;
   }
 
   @Override
-  public synchronized RMState loadState() throws Exception {
+  public synchronized RMState loadState(RMContext rmContext) throws Exception {
     RMState rmState = new RMState();
     // recover DelegationTokenSecretManager
     loadRMDTSecretManagerState(rmState);

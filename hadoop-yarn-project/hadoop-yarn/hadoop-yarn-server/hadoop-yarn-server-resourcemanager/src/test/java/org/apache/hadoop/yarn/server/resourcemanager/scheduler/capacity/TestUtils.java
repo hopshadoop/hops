@@ -19,6 +19,7 @@
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity;
 
 import io.hops.ha.common.TransactionState;
+import io.hops.ha.common.TransactionStateManager;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -83,15 +84,18 @@ public class TestUtils {
     
     // No op 
     ContainerAllocationExpirer cae =
-        new ContainerAllocationExpirer(nullDispatcher);
+        new ContainerAllocationExpirer(nullDispatcher, null);
     
     Configuration conf = new Configuration();
     RMApplicationHistoryWriter writer = mock(RMApplicationHistoryWriter.class);
+    TransactionStateManager tsm = new TransactionStateManager();
+    tsm.init(conf);
+    tsm.start();
     RMContext rmContext =
         new RMContextImpl(nullDispatcher, cae, null, null, null,
             new AMRMTokenSecretManager(conf),
 
-            new ClientToAMTokenSecretManagerInRM(), writer, conf);
+            new ClientToAMTokenSecretManagerInRM(), writer, conf,tsm);
     
     return rmContext;
   }
@@ -164,7 +168,8 @@ public class TestUtils {
     when(rmNode.getHostName()).thenReturn(host);
     when(rmNode.getRackName()).thenReturn(rack);
     
-    FiCaSchedulerNode node = spy(new FiCaSchedulerNode(rmNode, false));
+    FiCaSchedulerNode node = spy(new FiCaSchedulerNode(rmNode, false, 
+            getMockRMContext()));
     LOG.info("node = " + host + " avail=" + node.getAvailableResource());
     return node;
   }
