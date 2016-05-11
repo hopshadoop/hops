@@ -180,9 +180,8 @@ public class NamenodeWebHdfsMethods {
       final DatanodeDescriptor clientNode =
           bm.getDatanodeManager().getDatanodeByHost(getRemoteAddress());
       if (clientNode != null) {
-        final DatanodeStorageInfo[] storages = bm.getBlockPlacementPolicy()
-            .chooseTarget(path, 1, clientNode, new ArrayList<DatanodeStorageInfo>(),
-                false, null, blocksize, BlockStoragePolicy.DEFAULT);
+        final DatanodeStorageInfo[] storages = bm.chooseTarget4WebHDFS(path,
+            clientNode, null, blocksize);
 
         if (storages.length > 0) {
           return storages[0].getDatanodeDescriptor();

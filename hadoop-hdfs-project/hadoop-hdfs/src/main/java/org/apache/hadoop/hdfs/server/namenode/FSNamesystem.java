@@ -106,6 +106,7 @@ import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoUnderConstruction;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockManager;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockPlacementPolicyDefault;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeManager;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStatistics;
@@ -2177,13 +2178,13 @@ public class FSNamesystem
 
             replication = pendingFile.getBlockReplication();
 
-            LogFactory.getLog(LogFactory.class).debug("### >> excludedNodes (2) = " +
-                    excludedNodes == null ? Arrays.toString(excludedNodes.toArray(new Node[0])) : "[]");
+            // Get the storagePolicyID of this file
+            byte storagePolicyID = pendingFile.getStoragePolicyID();
 
             // choose targets for the new block to be allocated.
             final DatanodeStorageInfo targets[] = getBlockManager().chooseTarget4NewBlock(
                 src, replication, clientNode, excludedNodes, blockSize,
-                favoredNodes);
+                favoredNodes, storagePolicyID);
 
             // Part II.
             // Allocate a new block, add it to the INode and the BlocksMap.
@@ -2357,6 +2358,10 @@ public class FSNamesystem
                 file.getClientNode());
             preferredblocksize = file.getPreferredBlockSize();
 
+            byte storagePolicyID = file.getStoragePolicyID();
+            BlockStoragePolicy storagePolicy =
+                BlockStoragePolicySuite.getPolicy(storagePolicyID);
+
             //find datanode storages
             final DatanodeManager dm = blockManager.getDatanodeManager();
             chosen = Arrays.asList(dm.getDatanodeStorageInfos(existings, storageIDs));
@@ -2365,8 +2370,8 @@ public class FSNamesystem
             final DatanodeStorageInfo[] targets =
                 blockManager.getBlockPlacementPolicy()
                     .chooseTarget(src, numAdditionalNodes, clientnode, chosen,
-                        true, excludes, preferredblocksize,
-                        BlockStoragePolicy.DEFAULT);
+                        true, excludes, preferredblocksize, storagePolicy);
+
             final LocatedBlock lb = new LocatedBlock(blk, targets);
             blockManager.setBlockToken(lb, AccessMode.COPY);
             return lb;
@@ -7360,13 +7365,19 @@ private void commitOrCompleteLastBlock(
       }
     }
 
+    // TODO lookup the inodeid, then lookup the storagePolicyID
+    byte storagePolicyID = BlockStoragePolicySuite.ID_UNSPECIFIED;
+
     BlockPlacementPolicyDefault placementPolicy = (BlockPlacementPolicyDefault)
         getBlockManager().getBlockPlacementPolicy();
     List<DatanodeStorageInfo> chosenStorages = new LinkedList<DatanodeStorageInfo>();
+
     DatanodeStorageInfo[] descriptors = placementPolicy
         .chooseTarget(isParity ? parityPath : sourcePath,
             isParity ? 1 : status.getEncodingPolicy().getTargetReplication(),
-            null, chosenStorages, false, excluded, block.getBlockSize(), BlockStoragePolicy.DEFAULT);
+            null, chosenStorages, false, excluded, block.getBlockSize(),
+            BlockStoragePolicySuite.getPolicy(storagePolicyID));
+
     return new LocatedBlock(block.getBlock(), descriptors);
   }
 

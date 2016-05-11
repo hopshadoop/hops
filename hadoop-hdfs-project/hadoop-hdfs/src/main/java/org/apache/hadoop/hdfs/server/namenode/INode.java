@@ -18,9 +18,7 @@
 package org.apache.hadoop.hdfs.server.namenode;
 
 import com.google.common.primitives.SignedBytes;
-import io.hops.security.Users;
 import io.hops.erasure_coding.ErasureCodingManager;
-import io.hops.exception.HopsException;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.HdfsStorageFactory;
@@ -38,6 +36,7 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
 import org.apache.hadoop.util.StringUtils;
 
 import java.io.IOException;
@@ -128,6 +127,7 @@ public abstract class INode implements Comparable<byte[]> {
   protected INodeDirectory parent;
   protected long modificationTime;
   protected long accessTime;
+  protected byte blockStoragePolicyID;
   
 
   public static final int NON_EXISTING_ID = 0;
@@ -176,12 +176,18 @@ public abstract class INode implements Comparable<byte[]> {
     this.modificationTime = mTime;
     setAccessTimeNoPersistance(atime);
     setPermissionStatusNoPersistance(permissions);
+
+    // TODO set me to a real value!
+    blockStoragePolicyID = BlockStoragePolicySuite.ID_UNSPECIFIED;
   }
 
   protected INode(String name, PermissionStatus permissions)
       throws IOException {
     this(permissions, 0L, 0L);
     setLocalNameNoPersistance(name);
+
+    // TODO set me to a real value!
+    blockStoragePolicyID = BlockStoragePolicySuite.ID_UNSPECIFIED;
   }
   
   /**
@@ -477,6 +483,36 @@ public abstract class INode implements Comparable<byte[]> {
   }
 
   /**
+   * @return the latest block storage policy id of the INode. Specifically,
+   * if a storage policy is directly specified on the INode then return the ID
+   * of that policy. Otherwise follow the latest parental path and return the
+   * ID of the first specified storage policy.
+   */
+  public byte getStoragePolicyID() {
+    // TODO do a database lookup
+
+
+    return BlockStoragePolicySuite.ID_UNSPECIFIED;
+  }
+
+  /**
+   * @return the storage policy directly specified on the INode. Return
+   * {@link BlockStoragePolicySuite#ID_UNSPECIFIED} if no policy has
+   * been specified.
+   */
+  public byte getLocalStoragePolicyID()
+      throws TransactionContextException, StorageException {
+    byte id = getLocalStoragePolicyID();
+    if (id != BlockStoragePolicySuite.ID_UNSPECIFIED) {
+      return id;
+    }
+    // if it is unspecified, check its parent
+    INodeDirectory parent = getParent();
+    return parent != null ? parent.getStoragePolicyID() :
+        BlockStoragePolicySuite.ID_UNSPECIFIED;
+  }
+
+  /**
    * Is this inode being constructed?
    */
   public boolean isUnderConstruction() {
@@ -693,11 +729,7 @@ public abstract class INode implements Comparable<byte[]> {
   }
   
   public boolean exists() {
-    if (id == NON_EXISTING_ID) {
-      return false;
-    }
-    
-    return true;
+    return id != NON_EXISTING_ID;
   }
 
   protected void save() throws StorageException, TransactionContextException {

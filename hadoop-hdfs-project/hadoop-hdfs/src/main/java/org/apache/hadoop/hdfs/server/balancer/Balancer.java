@@ -1651,28 +1651,6 @@ public class Balancer {
     }
   }
 
-  static class Util {
-    /**
-     * Match is checked using host name , ip address with and without port
-     * number.
-     *
-     * @return true if the datanode's transfer address matches the set of nodes.
-     */
-    private static boolean isIn(Set<String> datanodes, DatanodeInfo dn) {
-      return isIn(datanodes, dn.getPeerHostName(), dn.getXferPort())
-          || isIn(datanodes, dn.getIpAddr(), dn.getXferPort())
-          || isIn(datanodes, dn.getHostName(), dn.getXferPort());
-    }
-
-    /** @return true if nodes contains host or host:port */
-    private static boolean isIn(Set<String> nodes, String host, int port) {
-      if (host == null) {
-        return false;
-      }
-      return (nodes.contains(host) || nodes.contains(host + ":" + port));
-    }
-  }
-
   /**
    * Run a balancer
    *

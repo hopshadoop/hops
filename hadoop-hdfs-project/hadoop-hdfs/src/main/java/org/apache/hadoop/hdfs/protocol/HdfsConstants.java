@@ -112,4 +112,12 @@ public class HdfsConstants {
    */
   public static final int LAYOUT_VERSION =
       LayoutVersion.getCurrentLayoutVersion();
+
+  public static final String ALLSSD_STORAGE_POLICY_NAME = "ALL_SSD";
+  public static final String ONESSD_STORAGE_POLICY_NAME = "ONE_SSD";
+  public static final String WARM_STORAGE_POLICY_NAME = "WARM";
+
+  public static final byte ALLSSD_STORAGE_POLICY_ID = 12;
+  public static final byte ONESSD_STORAGE_POLICY_ID = 10;
+  public static final byte WARM_STORAGE_POLICY_ID = 5;
 }
