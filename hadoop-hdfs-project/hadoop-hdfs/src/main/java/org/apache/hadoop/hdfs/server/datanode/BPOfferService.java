@@ -388,7 +388,7 @@ class BPOfferService implements Runnable {
     }
   }
 
-  synchronized DatanodeRegistration createRegistration() {
+  synchronized DatanodeRegistration createRegistration() throws IOException {
     Preconditions.checkState(bpNSInfo != null,
         "getRegistration() can only be called after initial handshake");
     return dn.createBPRegistration(bpNSInfo);
@@ -716,6 +716,11 @@ class BPOfferService implements Runnable {
           blockArrays.put(storageUuid, rdbi);
         }
       }
+    }
+
+    if (blockArrays.size() == 0) {
+      // Nothing new to report.
+      return;
     }
 
     // Send incremental block reports to the Namenode outside the lock

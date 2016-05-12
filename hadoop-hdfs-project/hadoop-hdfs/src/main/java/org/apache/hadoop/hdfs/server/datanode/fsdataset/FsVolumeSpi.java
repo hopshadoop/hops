@@ -39,6 +39,9 @@ public interface FsVolumeSpi {
    */
   public long getAvailable() throws IOException;
 
+  /** @return the base path to the volume */
+  public String getBasePath();
+
   /**
    * @return the path to the volume
    */

@@ -73,7 +73,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
    */
   private final Map<String, DatanodeStorageInfo> storageMap =
       new HashMap<String, DatanodeStorageInfo>();
-  
+
   /**
    * Block and targets pair
    */
@@ -240,7 +240,9 @@ public class DatanodeDescriptor extends DatanodeInfo {
   }
 
   public DatanodeStorageInfo getStorageInfo(String storageID) {
-    return this.storageMap.get(storageID);
+    synchronized (storageMap) {
+      return this.storageMap.get(storageID);
+    }
   }
 
   public DatanodeStorageInfo[] getStorageInfos() {
@@ -248,6 +250,15 @@ public class DatanodeDescriptor extends DatanodeInfo {
       final Collection<DatanodeStorageInfo> storages = storageMap.values();
       return storages.toArray(new DatanodeStorageInfo[storages.size()]);
     }
+  }
+
+  public StorageReport[] getStorageReports() {
+    final DatanodeStorageInfo[] infos = getStorageInfos();
+    final StorageReport[] reports = new StorageReport[infos.length];
+    for(int i = 0; i < infos.length; i++) {
+      reports[i] = infos[i].toStorageReport();
+    }
+    return reports;
   }
 
   boolean hasStaleStorages() {
@@ -301,8 +312,8 @@ public class DatanodeDescriptor extends DatanodeInfo {
 
     int blocks = 0;
 
-    for (final DatanodeStorageInfo entry : storageMap.values()) {
-      blocks += entry.numBlocks();
+    for (final DatanodeStorageInfo storage : getStorageInfos()) {
+      blocks += storage.numBlocks();
     }
 
     return blocks;
@@ -486,7 +497,8 @@ public class DatanodeDescriptor extends DatanodeInfo {
         BlockInfoDataAccess blocks = (BlockInfoDataAccess) HdfsStorageFactory.getDataAccess(
             BlockInfoDataAccess.class);
         HdfsStorageFactory.getConnector().beginTransaction();
-        List<BlockInfo> list = blocks.findBlockInfosByHostId(getDatanodeUuid());
+        final List<Integer> sids = globalStorageMap.getSidsForDatanodeUuid(getDatanodeUuid());
+        List<BlockInfo> list = blocks.findBlockInfosBySids(sids);
         HdfsStorageFactory.getConnector().commit();
         return list;
       }
@@ -610,7 +622,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
   
   /** Increment the number of blocks scheduled. */
   void incrementBlocksScheduled(StorageType t) {
-    currApproxBlocksScheduled.add(t, 1);;
+    currApproxBlocksScheduled.add(t, 1);
   }
 
   /** Decrement the number of blocks scheduled. */
@@ -627,8 +639,8 @@ public class DatanodeDescriptor extends DatanodeInfo {
    * Adjusts curr and prev number of blocks scheduled every few minutes.
    */
   private void rollBlocksScheduled(long now) {
-    if ((now - lastBlocksScheduledRollTime) > BLOCKS_SCHEDULED_ROLL_INTERVAL) {
-      prevApproxBlocksScheduled = currApproxBlocksScheduled;
+    if (now - lastBlocksScheduledRollTime > BLOCKS_SCHEDULED_ROLL_INTERVAL) {
+      prevApproxBlocksScheduled.set(currApproxBlocksScheduled);
       currApproxBlocksScheduled.reset();
       lastBlocksScheduledRollTime = now;
     }
@@ -802,5 +814,13 @@ public class DatanodeDescriptor extends DatanodeInfo {
 
       return storage;
     }
+  }
+
+  public HashSet<Integer> getSidsOnNode() {
+    HashSet<Integer> sids = new HashSet<Integer>();
+    for(DatanodeStorageInfo s : getStorageInfos()) {
+      sids.add(s.getSid());
+    }
+    return sids;
   }
 }

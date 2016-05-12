@@ -19,6 +19,7 @@ package org.apache.hadoop.hdfs.server.namenode;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Charsets;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import io.hops.common.IDsGeneratorFactory;
 import io.hops.common.IDsMonitor;
@@ -119,12 +120,14 @@ import org.apache.hadoop.hdfs.server.namenode.metrics.NameNodeMetrics;
 import org.apache.hadoop.hdfs.server.namenode.web.resources.NamenodeWebHdfsMethods;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeCommand;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
+import org.apache.hadoop.hdfs.server.protocol.DatanodeStorageReport;
 import org.apache.hadoop.hdfs.server.protocol.HeartbeatResponse;
 import org.apache.hadoop.hdfs.server.protocol.NamespaceInfo;
 import org.apache.hadoop.hdfs.server.protocol.StorageReport;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.ipc.StandbyException;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -2150,7 +2153,6 @@ public class FSNamesystem
               inodes = analyzeFileState(src, clientName,
                 previous, onRetryBlock);
             } catch(IOException e) {
-              LogFactory.getLog(ClientNamenodeProtocolServerSideTranslatorPB.class).debug("### threw it here");
               throw e;
             }
 
@@ -2174,6 +2176,9 @@ public class FSNamesystem
                     .getDatanode(pendingFile.getClientNode());
 
             replication = pendingFile.getBlockReplication();
+
+            LogFactory.getLog(LogFactory.class).debug("### >> excludedNodes (2) = " +
+                    excludedNodes == null ? Arrays.toString(excludedNodes.toArray(new Node[0])) : "[]");
 
             // choose targets for the new block to be allocated.
             final DatanodeStorageInfo targets[] = getBlockManager().chooseTarget4NewBlock(
@@ -2307,7 +2312,7 @@ public class FSNamesystem
 
   LocatedBlock makeLocatedBlock(Block blk, DatanodeStorageInfo[] locs, long offset)
       throws IOException {
-    LocatedBlock lBlk = new LocatedBlock(getExtendedBlock(blk), locs, offset);
+    LocatedBlock lBlk = new LocatedBlock(getExtendedBlock(blk), locs, offset, false);
     getBlockManager().setBlockToken(lBlk,
         BlockTokenSecretManager.AccessMode.WRITE);
     return lBlk;
@@ -3797,6 +3802,20 @@ private void commitOrCompleteLastBlock(
       arr[i] = new DatanodeInfo(results.get(i));
     }
     return arr;
+  }
+
+  DatanodeStorageReport[] getDatanodeStorageReport(final DatanodeReportType type
+  ) throws AccessControlException, StandbyException {
+    checkSuperuserPrivilege();
+    final DatanodeManager dm = getBlockManager().getDatanodeManager();
+    final List<DatanodeDescriptor> datanodes = dm.getDatanodeListForReport(type);
+
+    DatanodeStorageReport[] reports = new DatanodeStorageReport[datanodes.size()];
+    for (int i = 0; i < reports.length; i++) {
+      final DatanodeDescriptor d = datanodes.get(i);
+      reports[i] = new DatanodeStorageReport(new DatanodeInfo(d), d.getStorageReports());
+    }
+    return reports;
   }
 
   Date getStartTime() {
@@ -5448,13 +5467,23 @@ private void commitOrCompleteLastBlock(
     final List<DatanodeDescriptor> live = new ArrayList<DatanodeDescriptor>();
     blockManager.getDatanodeManager().fetchDatanodes(live, null, true);
     for (DatanodeDescriptor node : live) {
-      final Map<String, Object> innerinfo = new HashMap<String, Object>();
-      innerinfo.put("lastContact", getLastContact(node));
-      innerinfo.put("usedSpace", getDfsUsed(node));
-      innerinfo.put("adminState", node.getAdminState().toString());
-      innerinfo.put("nonDfsUsedSpace", node.getNonDfsUsed());
-      innerinfo.put("capacity", node.getCapacity());
-      innerinfo.put("numBlocks", node.numBlocks());
+      Map<String, Object> innerinfo = ImmutableMap.<String, Object>builder()
+          .put("infoAddr", node.getInfoAddr())
+          .put("xferaddr", node.getXferAddr())
+          .put("lastContact", getLastContact(node))
+          .put("usedSpace", getDfsUsed(node))
+          .put("adminState", node.getAdminState().toString())
+          .put("nonDfsUsedSpace", node.getNonDfsUsed())
+          .put("capacity", node.getCapacity())
+          .put("numBlocks", node.numBlocks())
+          .put("used", node.getDfsUsed())
+          .put("remaining", node.getRemaining())
+          .put("blockScheduled", node.getBlocksScheduled())
+          .put("blockPoolUsed", node.getBlockPoolUsed())
+          .put("blockPoolUsedPercent", node.getBlockPoolUsedPercent())
+          .put("volfails", node.getVolumeFailures())
+          .build();
+
       info.put(node.getHostName(), innerinfo);
     }
     return JSON.toString(info);
@@ -5537,6 +5566,11 @@ private void commitOrCompleteLastBlock(
    */
   public BlockManager getBlockManager() {
     return blockManager;
+  }
+
+  /** @return the FSDirectory. */
+  public FSDirectory getFSDirectory() {
+    return dir;
   }
   
   /**

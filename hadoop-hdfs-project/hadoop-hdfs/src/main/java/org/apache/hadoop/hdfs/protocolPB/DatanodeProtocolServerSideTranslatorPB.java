@@ -23,7 +23,6 @@ import com.google.protobuf.ServiceException;
 import io.hops.leader_election.node.ActiveNode;
 import io.hops.leader_election.node.SortedActiveNodeList;
 import io.hops.leader_election.proto.ActiveNodeProtos;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.ActiveNamenodeListRequestProto;
@@ -188,10 +187,8 @@ public class DatanodeProtocolServerSideTranslatorPB
       impl.blockReceivedAndDeleted(PBHelper.convert(request.getRegistration()),
           request.getBlockPoolId(), info);
     } catch (IOException e) {
-      LogFactory.getLog(DatanodeProtocolServerSideTranslatorPB.class).debug("### error in blockReceivedAndDeleted (block id = " + Arrays.toString(blockIds.toArray()) + ")");
       throw new ServiceException(e);
     }
-    LogFactory.getLog(DatanodeProtocolServerSideTranslatorPB.class).debug("### received blockReceivedAndDeleted (block id = " + Arrays.toString(blockIds.toArray()) + ")");
     return VOID_BLOCK_RECEIVED_AND_DELETE_RESPONSE;
   }
 

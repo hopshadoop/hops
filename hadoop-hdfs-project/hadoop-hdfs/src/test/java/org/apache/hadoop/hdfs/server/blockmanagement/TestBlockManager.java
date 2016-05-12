@@ -303,6 +303,7 @@ public class TestBlockManager {
     // Block originally on A1, A2, B1
     List<DatanodeStorageInfo> origStorages = getStorages(0, 1, 3);
     List<DatanodeDescriptor> origNodes = getNodes(origStorages);
+
     BlockInfo blockInfo = addBlockOnNodes(testIndex, origNodes);
 
     // Decommission all of the nodes in rack A
@@ -310,15 +311,13 @@ public class TestBlockManager {
 
     DatanodeStorageInfo[] pipeline = scheduleSingleReplication(blockInfo);
     assertTrue("Source of replication should be one of the nodes the block " +
-            "was on. Was: " + pipeline[0],
-        origStorages.contains(pipeline[0]));
-    // Only up to two nodes can be picked per rack when there are two racks.
-    assertEquals("Should have two targets", 2, pipeline.length);
+        "was on. Was: " + pipeline[0], origStorages.contains(pipeline[0]));
+    assertEquals("Should have three targets", 3, pipeline.length);
 
     boolean foundOneOnRackB = false;
     for (int i = 1; i < pipeline.length; i++) {
-      DatanodeDescriptor target = pipeline[i].getDatanodeDescriptor();
-      if (rackB.contains(target)) {
+      DatanodeStorageInfo target = pipeline[i];
+      if (rackB.contains(target.getDatanodeDescriptor())) {
         foundOneOnRackB = true;
       }
       assertFalse(decomNodes.contains(target));
@@ -326,20 +325,21 @@ public class TestBlockManager {
     }
 
     assertTrue("Should have at least one target on rack B. Pipeline: " +
-            Joiner.on(",").join(pipeline), foundOneOnRackB);
+        Joiner.on(",").join(pipeline), foundOneOnRackB);
 
     // Mark the block as received on the target nodes in the pipeline
     fulfillPipeline(blockInfo, pipeline);
 
     // the block is still under-replicated. Add a new node. This should allow
     // the third off-rack replica.
-    DatanodeDescriptor rackCNode = DFSTestUtil.getDatanodeDescriptor("7.7.7.7", "/rackC");
+    DatanodeDescriptor rackCNode =
+        DFSTestUtil.getDatanodeDescriptor("7.7.7.7", "/rackC");
     rackCNode.updateStorage(new DatanodeStorage(DatanodeStorage.generateUuid()));
     addNodes(ImmutableList.of(rackCNode));
     try {
       DatanodeStorageInfo[] pipeline2 = scheduleSingleReplication(blockInfo);
       assertEquals(2, pipeline2.length);
-      assertEquals(rackCNode, pipeline2[1]);
+      assertEquals(rackCNode, pipeline2[1].getDatanodeDescriptor());
     } finally {
       removeNode(rackCNode);
     }

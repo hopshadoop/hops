@@ -215,14 +215,14 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
     final Node localNode = chooseTarget(numOfReplicas, writer, excludedNodes,
         blocksize, maxNodesPerRack, results, avoidStaleNodes, storagePolicy,
         EnumSet.noneOf(StorageType.class), results.isEmpty());
+
     if (!returnChosenNodes) {
       results.removeAll(chosenStorage);
     }
 
     // sorting nodes to form a pipeline
     return getPipeline(
-        (writer != null && writer instanceof DatanodeDescriptor) ? writer
-            : localNode,
+        (writer != null && writer instanceof DatanodeDescriptor) ? writer : localNode,
         results.toArray(new DatanodeStorageInfo[results.size()]));
   }
 
@@ -253,6 +253,7 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
     }
 
     int maxNodesPerRack = (totalNumOfReplicas-1)/numOfRacks + 2;
+
     // At this point, there are more than one racks and more than one replicas
     // to store. Avoid all replicas being in the same rack.
     //
@@ -263,9 +264,14 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
     //
     // Thus, the following adjustment will still result in a value that forces
     // multi-rack allocation and gives enough number of total nodes.
-    if (maxNodesPerRack == totalNumOfReplicas) {
-      maxNodesPerRack--;
-    }
+
+    // TODO this is the new Hadoop style (and it's better), but it didn't
+    // play nice with Hops yet. Fix it, so this if statement can be uncommented.
+    // Test with: TestReplaceDatanodeOnFailure#testReplaceDatanodeOnFailure()
+
+//    if (maxNodesPerRack == totalNumOfReplicas) {
+//      maxNodesPerRack--;
+//    }
     return new int[] {numOfReplicas, maxNodesPerRack};
   }
 
@@ -622,8 +628,7 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
       EnumMap<StorageType, Integer> storageTypes)
       throws NotEnoughReplicasException {
 
-    int numOfAvailableNodes = clusterMap.countNumOfAvailableNodes(
-        scope, excludedNodes);
+    int numOfAvailableNodes = clusterMap.countNumOfAvailableNodes(scope, excludedNodes);
     StringBuilder builder = null;
     if (LOG.isDebugEnabled()) {
       builder = debugLoggingBuilder.get();
@@ -632,6 +637,10 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
     }
     boolean badTarget = false;
     DatanodeStorageInfo firstChosen = null;
+
+    LOG.debug("@@@ -- START -- " + numOfAvailableNodes + " " + scope + " " +
+        Arrays.toString(excludedNodes.toArray()));
+
     while(numOfReplicas > 0 && numOfAvailableNodes > 0) {
       DatanodeDescriptor chosenNode =
           (DatanodeDescriptor)clusterMap.chooseRandom(scope);
@@ -643,16 +652,22 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
 
         final DatanodeStorageInfo[] storages = DFSUtil.shuffle(
             chosenNode.getStorageInfos());
+
         int i = 0;
         boolean search = true;
+        // For each storagetype that we need (starting at fastest), check if
+        // this node has it.
         for (Iterator<Map.Entry<StorageType, Integer>> iter = storageTypes
             .entrySet().iterator(); search && iter.hasNext(); ) {
           Map.Entry<StorageType, Integer> entry = iter.next();
+          StorageType type = entry.getKey();
+          // Check all storages on this node
           for (i = 0; i < storages.length; i++) {
-            StorageType type = entry.getKey();
+            // Check if it's a good storage
             final int newExcludedNodes = addIfIsGoodTarget(storages[i],
                 excludedNodes, blocksize, maxNodesPerRack, considerLoad, results,
                 avoidStaleNodes, type);
+
             if (newExcludedNodes >= 0) {
               numOfReplicas--;
               if (firstChosen == null) {
@@ -667,15 +682,20 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
               }
               search = false;
               break;
+            } else {
+              LOG.debug("@@@ not a good storage on node " + chosenNode);
             }
           }
         }
+
         if (LOG.isDebugEnabled()) {
           builder.append("\n]");
         }
 
         // If no candidate storage was found on this DN then set badTarget.
         badTarget = (i == storages.length);
+      } else {
+        LOG.debug("@@@ not chosen because already excluded: " + chosenNode);
       }
     }
 
@@ -690,7 +710,11 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
         }
       }
       throw new NotEnoughReplicasException(detail);
+    } else {
+      LOG.debug("@@@ CHOSE " + firstChosen);
     }
+
+    LOG.debug("@@@ -- END --");
 
     return firstChosen;
   }
@@ -720,6 +744,8 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
   }
 
   private static void logNodeIsNotChosen(DatanodeStorageInfo storage, String reason) {
+    LOG.debug("@@@ " + reason);
+
     if (LOG.isDebugEnabled()) {
       // build the error message for later use.
       debugLoggingBuilder.get()
@@ -750,13 +776,15 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
       List<DatanodeStorageInfo> results,
       boolean avoidStaleNodes,
       StorageType requiredStorageType) {
+
     if (storage.getStorageType() != requiredStorageType) {
       logNodeIsNotChosen(storage, "storage types do not match,"
           + " where the required storage type is " + requiredStorageType);
       return false;
     }
-    if (storage.getState() == State.READ_ONLY) {
-      logNodeIsNotChosen(storage, "storage is read-only");
+
+    if (storage.getState() == State.FAILED) {
+      logNodeIsNotChosen(storage, "storage has failed");
       return false;
     }
 
@@ -773,7 +801,7 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
         return false;
       }
     }
-    
+
     final long requiredSize = blockSize * HdfsConstants.MIN_BLOCKS_FOR_WRITE;
     final long scheduledSize = blockSize * node.getBlocksScheduled(storage.getStorageType());
     final long remaining =
@@ -808,7 +836,8 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
       }
     }
     if (counter>maxTargetPerRack) {
-      logNodeIsNotChosen(storage, "the rack has too many chosen nodes ");
+      logNodeIsNotChosen(storage, "the rack (" + rackname + ") has too many chosen nodes (" +
+          counter + ">" + maxTargetPerRack + ")");
       return false;
     }
     return true;

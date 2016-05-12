@@ -28,6 +28,8 @@ import io.hops.metadata.hdfs.entity.Storage;
 import io.hops.transaction.EntityManager;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
@@ -54,6 +56,8 @@ import java.util.TreeSet;
 public class CorruptReplicasMap {
   
   private final DatanodeManager datanodeMgr;
+  private static final Log LOG =
+      LogFactory.getLog(CorruptReplicasMap.class);
   
   public CorruptReplicasMap(DatanodeManager datanodeMgr) {
     this.datanodeMgr = datanodeMgr;
@@ -78,6 +82,12 @@ public class CorruptReplicasMap {
       reasonText = " because " + reason;
     } else {
       reasonText = "";
+    }
+
+    if(storage == null) {
+      LOG.warn("Attempted to set block " + blk.getBlockId() + " as corrupt on" +
+          " non-existing storage (null)" + reason);
+      return;
     }
     
     if (!nodes.contains(storage.getDatanodeDescriptor())) {
@@ -127,29 +137,23 @@ public class CorruptReplicasMap {
     if (corruptReplicas == null || corruptReplicas.size() == 0) {
       return false;
     }
+
     HashSet<Integer> replicaSids = new HashSet<Integer>();
     for(CorruptReplica c : corruptReplicas) {
       replicaSids.add(c.getStorageId());
     }
 
+    boolean result = false;
     // Get the list of storages on this datanode
-    HashSet<Integer> DNSids = new HashSet<Integer>();
     for(DatanodeStorageInfo storage : datanode.getStorageInfos()) {
-      DNSids.add(storage.getSid());
+      if(replicaSids.contains(storage.getSid())) {
+        result = true;
+        removeCorruptReplicaFromDB(new CorruptReplica(storage.getSid(), blk
+            .getBlockId(), blk.getInodeId()));
+      }
     }
 
-    // The intersection of replicaSids and DNSids are the sids of all
-    // storages on this datanode that store a replica of this block
-    replicaSids.retainAll(DNSids);
-
-    // Now replicaSids only contains the sids that we want to remove this
-    // replica from
-    for(Integer sid : replicaSids) {
-      removeCorruptReplicaFromDB(blk.getBlockId(), sid);
-    }
-
-    // Return true if the intersection had elements in it
-    return replicaSids.size() > 0;
+    return result;
   }
 
 
@@ -309,19 +313,5 @@ public class CorruptReplicasMap {
   private void removeCorruptReplicaFromDB(CorruptReplica cr)
       throws StorageException, TransactionContextException {
     EntityManager.remove(cr);
-  }
-
-  private void removeCorruptReplicaFromDB(final long blockId, final int sid)
-      throws IOException {
-    new LightWeightRequestHandler(HDFSOperationType.REMOVE_CORRUPT_REPLICA) {
-      @Override
-      public Object performTask() throws IOException {
-        CorruptReplicaDataAccess crDa =
-            (CorruptReplicaDataAccess) HdfsStorageFactory
-                .getDataAccess(CorruptReplicaDataAccess.class);
-        crDa.removeByBlockIdAndSid(blockId, sid);
-        return null;
-      }
-    }.handle();
   }
 }

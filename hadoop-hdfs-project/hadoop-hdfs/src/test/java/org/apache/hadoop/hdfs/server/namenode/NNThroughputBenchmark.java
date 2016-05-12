@@ -875,7 +875,8 @@ public class NNThroughputBenchmark {
       nsInfo = nameNodeProto.versionRequest();
       dnRegistration = new DatanodeRegistration(
           new DatanodeID(DNS.getDefaultIP("default"),
-              DNS.getDefaultHost("default", "default"), "", getNodePort(dnIdx),
+              DNS.getDefaultHost("default", "default"),
+              DataNode.generateUuid(), getNodePort(dnIdx),
               DFSConfigKeys.DFS_DATANODE_HTTP_DEFAULT_PORT,
               DFSConfigKeys.DFS_DATANODE_IPC_DEFAULT_PORT),
           new DataStorage(nsInfo), new ExportedBlockKeys(),
@@ -1091,7 +1092,7 @@ public class NNThroughputBenchmark {
 
       // create files 
       LOG.info(
-          "Creating " + nrFiles + " with " + blocksPerFile + " blocks each.");
+          "Creating " + nrFiles + " files with " + blocksPerFile + " blocks each.");
       FileNameGenerator nameGenerator;
       nameGenerator = new FileNameGenerator(getBaseDir(), 100);
       String clientName = getClientName(007);
@@ -1127,7 +1128,7 @@ public class NNThroughputBenchmark {
                   ReceivedDeletedBlockInfo.BlockStatus.RECEIVED_BLOCK, null)};
           StorageReceivedDeletedBlocks[] report =
               {new StorageReceivedDeletedBlocks(
-                  datanodes[dnIdx].dnRegistration.getDatanodeUuid(), rdBlocks)};
+                  datanodes[dnIdx].storage.getStorageID(), rdBlocks)};
           nameNodeProto.blockReceivedAndDeleted(datanodes[dnIdx].dnRegistration,
               loc.getBlock().getBlockPoolId(), report);
         }

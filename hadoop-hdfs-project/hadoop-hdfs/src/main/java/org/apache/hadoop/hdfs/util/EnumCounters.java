@@ -37,7 +37,7 @@ import com.google.common.base.Preconditions;
 public class EnumCounters<E extends Enum<E>> {
   /** The class of the enum. */
   private final Class<E> enumClass;
-  /** An array of longs corresponding to the enum type. */
+  /** An array of longs corresponding to the enum type.. */
   private final long[] counters;
 
   /**

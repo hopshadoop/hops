@@ -21,7 +21,6 @@ import com.google.common.base.Preconditions;
 import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
-import io.hops.metadata.StorageMap;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
@@ -240,6 +239,24 @@ public class BlockManagerTestUtil {
    */
   public static void checkHeartbeat(BlockManager bm) throws IOException {
     bm.getDatanodeManager().getHeartbeatManager().heartbeatCheck();
+  }
+
+  /**
+   * Call heartbeat check function of HeartbeatManager and get
+   * under replicated blocks count within write lock to make sure
+   * computeDatanodeWork doesn't interfere.
+   * @param bm the BlockManager to manipulate
+   * @return the number of under replicated blocks
+   */
+  public static int checkHeartbeatAndGetUnderReplicatedBlocksCount(BlockManager bm)
+      throws IOException {
+    bm.getDatanodeManager().getHeartbeatManager().heartbeatCheck();
+    return bm.getUnderReplicatedNotMissingBlocks();
+  }
+
+  public static DatanodeStorageInfo updateStorage(DatanodeDescriptor dn,
+      DatanodeStorage s) {
+    return dn.updateStorage(s);
   }
 
   public static DatanodeDescriptor getDatanodeDescriptor(String ipAddr,

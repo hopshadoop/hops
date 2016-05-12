@@ -23,6 +23,7 @@ import io.hops.leader_election.node.SortedActiveNodeList;
 import io.hops.metadata.hdfs.entity.EncodingPolicy;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
 import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.ContentSummary;
@@ -73,6 +74,7 @@ import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeCommand;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeProtocol;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
+import org.apache.hadoop.hdfs.server.protocol.DatanodeStorageReport;
 import org.apache.hadoop.hdfs.server.protocol.FinalizeCommand;
 import org.apache.hadoop.hdfs.server.protocol.HeartbeatResponse;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocols;
@@ -444,6 +446,9 @@ class NameNodeRpcServer implements NamenodeProtocols {
           "*BLOCK* NameNode.addBlock: file " + src + " for " + clientName);
     }
     HashSet<Node> excludedNodesSet = null;
+
+    LogFactory.getLog(LogFactory.class).debug("### >> excludedNodes (1) = " + Arrays.toString(excludedNodes));
+
     if (excludedNodes != null) {
       excludedNodesSet = new HashSet<Node>(excludedNodes.length);
       for (Node node : excludedNodes) {
@@ -697,6 +702,17 @@ class NameNodeRpcServer implements NamenodeProtocols {
   }
 
   @Override // ClientProtocol
+  public DatanodeStorageReport[] getDatanodeStorageReport(
+      DatanodeReportType type) throws IOException {
+    final DatanodeStorageReport[] reports = namesystem.getDatanodeStorageReport(type);
+    if (reports == null ) {
+      throw new IOException("Failed to get datanode storage report for " + type
+          + " datanodes.");
+    }
+    return reports;
+  }
+
+  @Override // ClientProtocol
   public boolean setSafeMode(SafeModeAction action, boolean isChecked)
       throws IOException {
     return namesystem.setSafeMode(action);
@@ -858,7 +874,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
     }
 
     for(StorageReceivedDeletedBlocks r : receivedAndDeletedBlocks) {
-      namesystem.getBlockManager().processIncrementalBlockReport(nodeReg, poolId, r);
+      namesystem.getBlockManager().processIncrementalBlockReport(nodeReg, r);
     }
   }
   

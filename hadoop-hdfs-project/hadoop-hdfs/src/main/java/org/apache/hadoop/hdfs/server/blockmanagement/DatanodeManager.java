@@ -431,15 +431,23 @@ public class DatanodeManager {
     heartbeatManager.removeDatanode(nodeInfo);
     if (namesystem.isLeader()) {
       NameNode.stateChangeLog.info(
-          "DataNode is dead. Removing all replicas for datanode " + nodeInfo +
-              " StorageID " + nodeInfo.getDatanodeUuid() + " index " +
-              nodeInfo.getHostName());
+          "DataNode is dead. Removing all replicas for" +
+              " datanode " + nodeInfo +
+              " StorageID " + nodeInfo.getDatanodeUuid() +
+              " index " + nodeInfo.getHostName());
       blockManager.removeBlocksAssociatedTo(nodeInfo);
+
+      // TODO remove storages from DB
+      // TODO remove storages from storageIdMap in the blockmanager
+
+      // This method can be rewritten as:
+      // Loop over each storage, and delete all blocks on the storage. Then
+      // delete the storage from the DB & cache
     }
     networktopology.remove(nodeInfo);
 
     if (LOG.isDebugEnabled()) {
-      LOG.debug("remove datanode " + nodeInfo);
+      LOG.debug("removed datanode " + nodeInfo);
     }
     namesystem.checkSafeMode();
   }
@@ -663,8 +671,10 @@ public class DatanodeManager {
    */
   private void startDecommission(DatanodeDescriptor node) throws IOException {
     if (!node.isDecommissionInProgress() && !node.isDecommissioned()) {
-      LOG.info("Start Decommissioning " + node + " with " +
-          node.numBlocks() + " blocks");
+      for (DatanodeStorageInfo storage : node.getStorageInfos()) {
+        LOG.info("Start Decommissioning " + node + " " + storage
+            + " with " + storage.numBlocks() + " blocks");
+      }
       heartbeatManager.startDecommission(node);
       node.decommissioningStatus.setStartTime(now());
       
@@ -763,9 +773,9 @@ public class DatanodeManager {
           value in "VERSION" file under the data directory of the datanode,
           but this is might not work if VERSION file format has changed 
        */
-        NameNode.stateChangeLog.info(
-            "BLOCK* registerDatanode: " + nodeS + " is replaced by " + nodeReg +
-                " with the same storageID " + nodeReg.getDatanodeUuid());
+        NameNode.stateChangeLog.info("BLOCK* registerDatanode: " + nodeS
+            + " is replaced by " + nodeReg + " with the same storageID "
+            + nodeReg.getDatanodeUuid());
       }
       // update cluster map
       getNetworkTopology().remove(nodeS);
@@ -1180,7 +1190,7 @@ public class DatanodeManager {
         }
 
         heartbeatManager.updateHeartbeat(nodeinfo, reports, xceiverCount, failedVolumes);
-        
+
         //check lease recovery
         BlockInfoUnderConstruction[] blocks =
             nodeinfo.getLeaseRecoveryCommand(Integer.MAX_VALUE);
@@ -1207,14 +1217,15 @@ public class DatanodeManager {
               }
               brCommand.add(new RecoveringBlock(
                   new ExtendedBlock(blockPoolId, b),
-                  DatanodeStorageInfo.toDatanodeInfos(recoveryLocations),
+                  recoveryLocations.toArray(
+                      new DatanodeStorageInfo[recoveryLocations.size()]),
                   b.getBlockRecoveryId()));
             } else {
               // If too many replicas are stale, then choose all replicas to participate
               // in block recovery.
               brCommand.add(new RecoveringBlock(
                   new ExtendedBlock(blockPoolId, b),
-                  DatanodeStorageInfo.toDatanodeInfos(storages),
+                  storages,
                   b.getBlockRecoveryId()));
             }
           }

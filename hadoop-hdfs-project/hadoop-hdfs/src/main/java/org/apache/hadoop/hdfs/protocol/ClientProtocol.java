@@ -38,6 +38,7 @@ import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifie
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenSelector;
 import org.apache.hadoop.hdfs.server.namenode.NotReplicatedYetException;
 import org.apache.hadoop.hdfs.server.namenode.SafeModeException;
+import org.apache.hadoop.hdfs.server.protocol.DatanodeStorageReport;
 import org.apache.hadoop.io.EnumSetWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.retry.Idempotent;
@@ -855,6 +856,13 @@ public interface ClientProtocol {
   @Idempotent
   public DatanodeInfo[] getDatanodeReport(HdfsConstants.DatanodeReportType type)
       throws IOException;
+
+  /**
+   * Get a report on the current datanode storages.
+   */
+  @Idempotent
+  public DatanodeStorageReport[] getDatanodeStorageReport(
+      HdfsConstants.DatanodeReportType type) throws IOException;
 
   /**
    * Get the block size for the given file.

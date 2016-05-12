@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdfs.server.datanode;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.Maps;
 import io.hops.leader_election.node.ActiveNode;
 import io.hops.leader_election.node.SortedActiveNodeList;
 import org.apache.commons.logging.Log;
@@ -37,13 +36,11 @@ import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.hdfs.server.protocol.DisallowedDatanodeException;
 import org.apache.hadoop.hdfs.server.protocol.HeartbeatResponse;
 import org.apache.hadoop.hdfs.server.protocol.NamespaceInfo;
-import org.apache.hadoop.hdfs.server.protocol.ReceivedDeletedBlockInfo;
 import org.apache.hadoop.hdfs.server.protocol.StorageBlockReport;
 import org.apache.hadoop.hdfs.server.protocol.StorageReceivedDeletedBlocks;
 import org.apache.hadoop.hdfs.server.protocol.StorageReport;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ipc.RemoteException;
-import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.VersionInfo;
 import org.apache.hadoop.util.VersionUtil;
@@ -51,9 +48,7 @@ import org.apache.hadoop.util.VersionUtil;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketTimeoutException;
-import java.net.URI;
 import java.util.Collection;
-import java.util.Map;
 
 import static org.apache.hadoop.util.Time.now;
 
@@ -230,10 +225,15 @@ class BPServiceActor implements Runnable {
   }
 
   @VisibleForTesting
-  void triggerHeartbeatForTests() {
+  synchronized void triggerHeartbeatForTests() {
     lastHeartbeat = 0;
-    synchronized (waitForHeartBeats) {
-      waitForHeartBeats.notifyAll();
+    this.notifyAll();
+    while (lastHeartbeat == 0) {
+      try {
+        this.wait(100);
+      } catch (InterruptedException e) {
+        return;
+      }
     }
   }
 
@@ -493,7 +493,7 @@ class BPServiceActor implements Runnable {
     if (cmds != null) {
       for (DatanodeCommand cmd : cmds) {
         try {
-          if (bpos.processCommandFromActor(cmd, this) == false) {
+          if (!bpos.processCommandFromActor(cmd, this)) {
             return false;
           }
         } catch (IOException ioe) {
@@ -534,12 +534,12 @@ class BPServiceActor implements Runnable {
 
   @Override
   public boolean equals(Object obj) {
+    if(obj == null || !(obj instanceof BPServiceActor)) {
+      return false;
+    }
     //Two actors are same if they are connected to save NN
     BPServiceActor that = (BPServiceActor) obj;
-    if (this.getNNSocketAddress().equals(that.getNNSocketAddress())) {
-      return true;
-    }
-    return false;
+    return this.getNNSocketAddress().equals(that.getNNSocketAddress());
   }
 
   /**
@@ -553,7 +553,6 @@ class BPServiceActor implements Runnable {
 
     SortedActiveNodeList list = this.bpNamenode.getActiveNamenodes();
     bpos.updateNNList(list);
-
   }
 
   public void blockReceivedAndDeleted(DatanodeRegistration registration,
@@ -572,8 +571,7 @@ class BPServiceActor implements Runnable {
 
   public ActiveNode nextNNForBlkReport(long noOfBlks) throws IOException {
     if (bpNamenode != null) {
-      ActiveNode an = bpNamenode.getNextNamenodeToSendBlockReport(noOfBlks);
-      return an;
+      return bpNamenode.getNextNamenodeToSendBlockReport(noOfBlks);
     } else {
       return null;
     }

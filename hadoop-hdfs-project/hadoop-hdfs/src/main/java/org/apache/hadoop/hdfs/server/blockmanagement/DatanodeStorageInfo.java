@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
@@ -299,6 +300,12 @@ public class DatanodeStorageInfo {
   public String toString() {
     return getDatanodeDescriptor().toString() + "[" + storageType + "]" +
         storageID + ":" + state;
+  }
+
+  StorageReport toStorageReport() {
+    return new StorageReport(
+        new DatanodeStorage(storageID, state, storageType),
+        false, capacity, dfsUsed, remaining, blockPoolUsed);
   }
 
   public Map<Long, Integer> getAllStorageReplicas() throws IOException {

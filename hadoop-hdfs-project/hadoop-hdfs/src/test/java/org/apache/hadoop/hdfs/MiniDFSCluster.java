@@ -136,6 +136,10 @@ public class MiniDFSCluster {
     DefaultMetricsSystem.setMiniClusterMode(true);
   }
 
+  public int getStoragesPerDatanode() {
+    return storagesPerDatanode;
+  }
+
   /**
    * Class to construct instances of MiniDFSClusters with specific options.
    */
@@ -2087,19 +2091,14 @@ public class MiniDFSCluster {
   }
 
   /**
-   * Get a storage directory for a datanode. There are two storage directories
-   * per datanode:
+   * Get a storage directory for a datanode.
    * <ol>
    * <li><base directory>/data/data<2*dnIndex + 1></li>
    * <li><base directory>/data/data<2*dnIndex + 2></li>
    * </ol>
    *
-   * @param dnIndex
-   *     datanode index (starts from 0)
-   * @param dirIndex
-   *     directory index (0 or 1). Index 0 provides access to the
-   *     first storage directory. Index 1 provides access to the second
-   *     storage directory.
+   * @param dnIndex datanode index (starts from 0)
+   * @param dirIndex directory index.
    * @return Storage directory
    */
   public static File getStorageDir(int dnIndex, int dirIndex) {
@@ -2114,7 +2113,7 @@ public class MiniDFSCluster {
    * @param dnIndex
    *     datanode index
    * @param dirIndex
-   *     directory index (0 or 1).
+   *     directory index.
    * @return
    */
   private static String getStorageDirPath(int dnIndex, int dirIndex) {

@@ -92,7 +92,7 @@ public class DataStorage extends Storage {
   }
 
   public DataStorage(StorageInfo storageInfo) {
-    super(storageInfo);
+    super(NodeType.DATA_NODE, storageInfo);
   }
 
   public synchronized String getDatanodeUuid() {

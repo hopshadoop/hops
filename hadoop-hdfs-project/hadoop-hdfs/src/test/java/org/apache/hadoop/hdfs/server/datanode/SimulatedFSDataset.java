@@ -701,8 +701,7 @@ public class SimulatedFSDataset implements FsDatasetSpi<FsVolumeSpi> {
 
   @Override // FsDatasetSpi
   public synchronized ReplicaInPipelineInterface createRbw(StorageType
-      storageType, ExtendedBlock b)
-      throws IOException {
+      storageType, ExtendedBlock b) throws IOException {
     return createTemporary(storageType, b);
   }
 
@@ -1015,11 +1014,6 @@ public class SimulatedFSDataset implements FsDatasetSpi<FsVolumeSpi> {
   }
 
   @Override
-  public String[] getBlockPoolList() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
   public void checkAndUpdate(String bpid, long blockId, File diskFile,
       File diskMetaFile, FsVolumeSpi vol) {
     throw new UnsupportedOperationException();
@@ -1043,7 +1037,7 @@ public class SimulatedFSDataset implements FsDatasetSpi<FsVolumeSpi> {
   }
 
   @Override
-  public List<Block> getFinalizedBlocks(String bpid) {
+  public List<FinalizedReplica> getFinalizedBlocks(String bpid) {
     throw new UnsupportedOperationException();
   }
 

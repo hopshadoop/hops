@@ -28,6 +28,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static java.util.regex.Pattern.compile;
 
@@ -43,15 +44,12 @@ public class StorageLocation {
   final StorageType storageType;
   final File file;
 
-  // Regular expression that describes a storage uri with a storage type.
-  // e.g. [Disk]/storages/storage1/
-  private static final String rawStringRegex = "^\\[(\\w*)\\](.+)$";
+  /** Regular expression that describes a storage uri with a storage type.
+   *  e.g. [Disk]/storages/storage1/
+   */
+  private static final Pattern regex = Pattern.compile("^\\[(\\w*)\\](.+)$");
 
-  StorageLocation(URI uri) {
-    this(StorageType.DISK, uri);
-  }
-
-  StorageLocation(StorageType storageType, URI uri) {
+  private StorageLocation(StorageType storageType, URI uri) {
     this.storageType = storageType;
 
     if (uri.getScheme() == null ||
@@ -59,8 +57,7 @@ public class StorageLocation {
       // drop any (illegal) authority in the URI for backwards compatibility
       this.file = new File(uri.getPath());
     } else {
-      throw new IllegalArgumentException(
-          "Got an Unsupported URI schema in " + uri + ". Ignoring ...");
+      throw new IllegalArgumentException("Unsupported URI schema in " + uri);
     }
   }
 
@@ -68,7 +65,7 @@ public class StorageLocation {
     return this.storageType;
   }
 
-  public URI getUri() {
+  URI getUri() {
     return file.toURI();
   }
 
@@ -85,22 +82,16 @@ public class StorageLocation {
    * @return A StorageLocation object if successfully parsed, null otherwise.
    *         Does not throw any exceptions.
    */
-  public static StorageLocation parse(String rawLocation) throws IOException {
-    Matcher matcher = compile(rawStringRegex).matcher(rawLocation);
-    StorageType storageType = StorageType.DISK;
+  static StorageLocation parse(String rawLocation) throws IOException {
+    Matcher matcher = regex.matcher(rawLocation);
+    StorageType storageType = StorageType.DEFAULT;
     String location = rawLocation;
 
     if (matcher.matches()) {
       String classString = matcher.group(1);
       location = matcher.group(2);
       if (!classString.isEmpty()) {
-        try {
-          storageType = StorageType.valueOf(classString.toUpperCase());
-        } catch (RuntimeException re) {
-          LOG.error("Unable to parse storage type: " + re.toString() +
-              ". Using the default storage type for directory " +
-              location);
-        }
+        storageType = StorageType.valueOf(classString.toUpperCase());
       }
     }
 
@@ -108,6 +99,6 @@ public class StorageLocation {
   }
 
   public String toString() {
-    return "[" + storageType.toString() + "]" + file.toURI().toString();
+    return "[" + storageType + "]" + file.toURI();
   }
 }

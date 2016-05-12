@@ -84,11 +84,10 @@ public class BlockInfoDALAdaptor extends
   }
 
   @Override
-  public List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo> findBlockInfosByHostId(
-      String hostId)
-      throws StorageException {
+  public List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo> findBlockInfosBySids(
+      List<Integer> sids) throws StorageException {
     return (List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo>) convertDALtoHDFS(
-        dataAccess.findBlockInfosByHostId(hostId));
+        dataAccess.findBlockInfosBySids(sids));
   }
 
   @Override
@@ -102,6 +101,12 @@ public class BlockInfoDALAdaptor extends
       long[] blockIds, int[] inodeIds) throws StorageException {
     return (List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo>) convertDALtoHDFS(
         dataAccess.findByIds(blockIds, inodeIds));
+  }
+
+  @Override
+  public boolean existsOnAnyStorage(long blockId, List<Integer> sids) throws
+      StorageException {
+    return dataAccess.existsOnAnyStorage(blockId, sids);
   }
 
   @Override

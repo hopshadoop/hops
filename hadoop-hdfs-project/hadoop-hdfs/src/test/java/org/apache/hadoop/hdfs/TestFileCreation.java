@@ -1032,8 +1032,6 @@ public class TestFileCreation {
       out.hflush();
       int actualRepl = out.getCurrentBlockReplication();
 
-      // TODO this is failing because the current strategy only has one
-      // TODO (cont.) destination (a single DISK)
       assertTrue(f + " should be replicated to " + DATANODE_NUM + " datanodes" +
           ", but is only replicated to " + actualRepl + " datanodes.",
           actualRepl == DATANODE_NUM);
@@ -1134,12 +1132,13 @@ public class TestFileCreation {
       FSDataOutputStream out =
           TestFileCreation.createFile(dfs, fpath, DATANODE_NUM);
       out.write("something_test".getBytes());
+
       out.hflush();    // ensure that block is allocated
 
       // shutdown last datanode in pipeline.
       cluster.stopDataNode(2);
 
-      // close file. Since we have set the minReplcatio to 3 but have killed one
+      // close file. Since we have set the minReplication to 3 but have killed one
       // of the three datanodes, the close call will loop until the hdfsTimeout is
       // encountered.
       boolean hasException = false;

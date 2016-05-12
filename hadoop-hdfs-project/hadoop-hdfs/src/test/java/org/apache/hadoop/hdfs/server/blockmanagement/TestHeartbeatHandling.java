@@ -17,24 +17,36 @@
  */
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
+import io.hops.metadata.hdfs.entity.INodeIdentifier;
+import io.hops.transaction.handler.HDFSOperationType;
+import io.hops.transaction.handler.HopsTransactionalRequestHandler;
+import io.hops.transaction.lock.LockFactory;
+import io.hops.transaction.lock.TransactionLockTypes;
+import io.hops.transaction.lock.TransactionLocks;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.server.common.GenerationStamp;
+import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.hdfs.server.datanode.DataNodeTestUtils;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
+import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.namenode.NameNodeAdapter;
 import org.apache.hadoop.hdfs.server.protocol.BlockCommand;
+import org.apache.hadoop.hdfs.server.protocol.BlockRecoveryCommand;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeCommand;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeProtocol;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.junit.Test;
 
+import java.io.IOException;
 import java.util.ArrayList;
 
+import static io.hops.transaction.lock.LockFactory.getInstance;
 import static org.junit.Assert.assertEquals;
 
 /**

@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.HardLink;
@@ -280,5 +281,28 @@ abstract public class ReplicaInfo extends Block implements Replica {
         "\n  getVisibleLength()= " + getVisibleLength() +
         "\n  getVolume()       = " + getVolume() + "\n  getBlockFile()    = " +
         getBlockFile();
+  }
+
+  @VisibleForTesting
+  public static class ReplicaDirInfo {
+    public String baseDirPath;
+    public boolean hasSubidrs;
+
+    public ReplicaDirInfo (String baseDirPath, boolean hasSubidrs) {
+      this.baseDirPath = baseDirPath;
+      this.hasSubidrs = hasSubidrs;
+    }
+  }
+
+  @VisibleForTesting
+  public static ReplicaDirInfo parseBaseDir(File dir) {
+    File currentDir = dir;
+    boolean hasSubdirs = false;
+    while (currentDir.getName().startsWith(DataStorage.BLOCK_SUBDIR_PREFIX)) {
+      hasSubdirs = true;
+      currentDir = currentDir.getParentFile();
+    }
+
+    return new ReplicaDirInfo(currentDir.getAbsolutePath(), hasSubdirs);
   }
 }

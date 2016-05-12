@@ -40,9 +40,9 @@ public class BlockStoragePolicy {
 
   public static BlockStoragePolicy DEFAULT = new BlockStoragePolicy((byte) 1,
       "default",
-      new StorageType[]{StorageType.SSD, StorageType.SSD, StorageType.DISK},
-      new StorageType[]{StorageType.DISK, StorageType.DISK, StorageType.DISK},
-      new StorageType[]{StorageType.DISK, StorageType.DISK, StorageType.DISK},
+      new StorageType[]{StorageType.DISK},
+      new StorageType[]{StorageType.DISK},
+      new StorageType[]{StorageType.DISK},
       false);
 
   public static BlockStoragePolicy DISKS = new BlockStoragePolicy((byte) 2,

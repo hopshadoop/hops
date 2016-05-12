@@ -18,7 +18,9 @@ package org.apache.hadoop.hdfs.server.blockmanagement;
 
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
+import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.common.FinderType;
+import io.hops.metadata.hdfs.dal.BlockInfoDataAccess;
 import io.hops.metadata.hdfs.entity.Replica;
 import io.hops.metadata.hdfs.entity.ReplicaBase;
 import io.hops.transaction.EntityManager;
@@ -30,6 +32,7 @@ import org.apache.hadoop.hdfs.server.namenode.INode;
 import org.apache.hadoop.hdfs.server.namenode.INodeFile;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -263,15 +266,10 @@ public class BlockInfo extends Block {
    */
   Replica addReplica(DatanodeStorageInfo storage)
       throws StorageException, TransactionContextException {
-    // TODO check we don't already have a replica on this machine
 
-//    boolean ir = isReplicatedOnStorage(storage);
-//    FSNamesystem.LOG.debug("?z? isReplicatedOnStorage=" +
-//        ir + " (should be false)");
-//
-//    if(ir) {
-//      return null;
-//    }
+    if (isReplicatedOnDatanode(storage.getDatanodeDescriptor())) {
+      return null;
+    }
 
     Replica replica = new Replica(storage.getSid(), getBlockId(), getInodeId());
     add(replica);
@@ -303,7 +301,27 @@ public class BlockInfo extends Block {
     }
     return replica;
   }
-  
+
+  /**
+   * Returns true if this block has a replica on the given datanode.
+   * @param dn
+   * @return
+   */
+  boolean isReplicatedOnDatanode(DatanodeDescriptor dn)
+      throws StorageException {
+    DatanodeStorageInfo[] storages = dn.getStorageInfos();
+    List<Integer> sids = new ArrayList<Integer>();
+    for(DatanodeStorageInfo s : storages) {
+      sids.add(s.getSid());
+    }
+
+    BlockInfoDataAccess da =
+        (BlockInfoDataAccess) HdfsStorageFactory
+            .getDataAccess(BlockInfoDataAccess.class);
+
+    return da.existsOnAnyStorage(getBlockId(), sids);
+  }
+
   boolean isReplicatedOnStorage(DatanodeStorageInfo storage)
       throws StorageException, TransactionContextException {
     Replica replica = EntityManager

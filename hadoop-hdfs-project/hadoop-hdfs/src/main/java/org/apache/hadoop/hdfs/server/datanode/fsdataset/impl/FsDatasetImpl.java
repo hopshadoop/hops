@@ -22,7 +22,6 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
-import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.StorageType;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.BlockListAsLongs;
@@ -983,7 +982,7 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
   
   private synchronized FinalizedReplica finalizeReplica(String bpid,
       ReplicaInfo replicaInfo) throws IOException {
-    FinalizedReplica newReplicaInfo = null;
+    FinalizedReplica newReplicaInfo;
     if (replicaInfo.getState() == ReplicaState.RUR &&
         ((ReplicaUnderRecovery) replicaInfo).getOriginalReplica().getState() ==
             ReplicaState.FINALIZED) {
@@ -1098,7 +1097,7 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
     for (FsVolumeImpl v : curVolumes) {
       ArrayList<ReplicaInfo> finalizedList = finalized.get(v.getStorageID());
       ArrayList<ReplicaInfo> ucList = uc.get(v.getStorageID());
-      blockReportsMap.put(((FsVolumeImpl) v).toDatanodeStorage(),
+      blockReportsMap.put(v.toDatanodeStorage(),
           new BlockListAsLongs(finalizedList, ucList));
     }
 
@@ -1109,14 +1108,15 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
    * Get the list of finalized blocks from in-memory blockmap for a block pool.
    */
   @Override
-  public synchronized List<Block> getFinalizedBlocks(String bpid) {
-    ArrayList<Block> finalized = new ArrayList<Block>(volumeMap.size(bpid));
-
-    if (volumeMap.replicas(bpid) != null) {
-
-      for (ReplicaInfo b : volumeMap.replicas(bpid)) {
+  public synchronized List<FinalizedReplica> getFinalizedBlocks(String bpid) {
+    ArrayList<FinalizedReplica> finalized =
+        new ArrayList<FinalizedReplica>(volumeMap.size(bpid));
+  
+    Collection<ReplicaInfo> replicas = volumeMap.replicas(bpid);
+    if (replicas != null) {
+      for (ReplicaInfo b : replicas) {
         if (b.getState() == ReplicaState.FINALIZED) {
-          finalized.add(new Block(b));
+          finalized.add(new FinalizedReplica((FinalizedReplica)b));
         }
       }
     }
@@ -1348,24 +1348,15 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
   
   /**
    * Register the FSDataset MBean using the name
-   * "hadoop:service=DataNode,name=FSDatasetState-<storageid>"
+   * "hadoop:service=DataNode,name=FSDatasetState-<datanodeUuid>"
    */
-  void registerMBean(final String storageId) {
+  void registerMBean(final String datanodeUuid) {
     // We wrap to bypass standard mbean naming convetion.
     // This wraping can be removed in java 6 as it is more flexible in 
     // package naming for mbeans and their impl.
-    StandardMBean bean;
-    String storageName;
-    if (storageId == null ||
-        storageId.equals("")) {// Temp fix for the uninitialized storage
-      storageName = "UndefinedStorageId" + DFSUtil.getRandom().nextInt();
-    } else {
-      storageName = storageId;
-    }
     try {
-      bean = new StandardMBean(this, FSDatasetMBean.class);
-      mbeanName =
-          MBeans.register("DataNode", "FSDatasetState-" + storageName, bean);
+      StandardMBean bean = new StandardMBean(this,FSDatasetMBean.class);
+      mbeanName = MBeans.register("DataNode", "FSDatasetState-" + datanodeUuid, bean);
     } catch (NotCompliantMBeanException e) {
       LOG.warn("Error registering FSDatasetState MBean", e);
     }
@@ -1631,8 +1622,9 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
       rur = (ReplicaUnderRecovery) replica;
       if (rur.getRecoveryID() >= recoveryId) {
         throw new RecoveryInProgressException(
-            "rur.getRecoveryID() >= recoveryId = " + recoveryId + ", block=" +
-                block + ", rur=" + rur);
+            "rur.getRecoveryID()=" + rur.getRecoveryID() +
+                " >= recoveryId=" + recoveryId + ", " +
+                "block=" + block + ", rur=" + rur);
       }
       final long oldRecoveryID = rur.getRecoveryID();
       rur.setRecoveryID(recoveryId);
@@ -1754,11 +1746,6 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
     LOG.info("Removing block pool " + bpid);
     volumeMap.cleanUpBlockPool(bpid);
     volumes.removeBlockPool(bpid);
-  }
-  
-  @Override
-  public String[] getBlockPoolList() {
-    return volumeMap.getBlockPoolList();
   }
   
   /**

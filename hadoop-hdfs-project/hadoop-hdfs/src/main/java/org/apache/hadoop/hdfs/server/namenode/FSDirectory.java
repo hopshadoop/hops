@@ -1446,8 +1446,8 @@ public class FSDirectory implements Closeable {
   /**
    * Get {@link INode} associated with the file / directory.
    */
-  INode getINode(String src) throws UnresolvedLinkException, StorageException,
-      TransactionContextException {
+  public INode getINode(String src) throws UnresolvedLinkException,
+      StorageException, TransactionContextException {
     return getRootDir().getNode(src, true);
   }
 

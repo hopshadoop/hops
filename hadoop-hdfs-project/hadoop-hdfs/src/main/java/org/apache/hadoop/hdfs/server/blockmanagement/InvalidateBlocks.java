@@ -25,6 +25,8 @@ import io.hops.metadata.hdfs.entity.InvalidatedBlock;
 import io.hops.transaction.EntityManager;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
@@ -47,7 +49,9 @@ import java.util.List;
  */
 @InterfaceAudience.Private
 class InvalidateBlocks {
-  
+
+  private static final Log LOG = LogFactory.getLog(InvalidateBlocks.class);;
+
   private final DatanodeManager datanodeManager;
 
   InvalidateBlocks(final DatanodeManager datanodeManager) {
@@ -96,8 +100,18 @@ class InvalidateBlocks {
    */
   void add(final BlockInfo block, final DatanodeStorageInfo storage,
       final boolean log) throws StorageException, TransactionContextException {
-    FSNamesystem.LOG.debug("block:   " + block);
-    FSNamesystem.LOG.debug("storage: " + storage);
+
+    if(storage == null) {
+      // TODO this avoids a NullPointer when running
+      // TestIncrementalBrVariations#testNnLearnsNewStorages()
+      // NullPointer is caused because we haven actually added the block in
+      // the database, so looking up which storage it's on will return null.
+      // Maybe we can do this prettier?
+
+      NameNode.blockStateChangeLog.error("Skipped invalidating blocks. " +
+            "Should only happen during tests!");
+      return;
+    }
 
     InvalidatedBlock invBlk = new InvalidatedBlock(
         storage.getSid(),
@@ -107,11 +121,9 @@ class InvalidateBlocks {
         block.getInodeId());
 
     if (add(invBlk)) {
-      if (log) {
-        NameNode.blockStateChangeLog.info(
-            "BLOCK* " + getClass().getSimpleName() + ": add " + block + " to " +
-                storage);
-      }
+      LOG.info("BLOCK* " + getClass().getSimpleName() + ": add " + block + " to " + storage);
+    } else {
+      LOG.info("failed to add BLOCK* " + getClass().getSimpleName() + ": add " + block + " to " + storage);
     }
   }
 
@@ -313,10 +325,16 @@ class InvalidateBlocks {
 
   public List<DatanodeInfo> getDatanodes(DatanodeManager manager)
       throws IOException {
-    List<DatanodeInfo> nodes = new ArrayList<DatanodeInfo>();
+    HashSet<DatanodeInfo> nodes = new HashSet<DatanodeInfo>();
     for(int sid : getSids()) {
-      nodes.add(manager.getDatanodeBySid(sid));
+      DatanodeInfo node = manager.getDatanodeBySid(sid);
+
+      // We should never search for a non-existing storage/datanode
+      assert node != null;
+
+      nodes.add(node);
     }
-    return nodes;
+
+    return new ArrayList<DatanodeInfo>(nodes);
   }
 }

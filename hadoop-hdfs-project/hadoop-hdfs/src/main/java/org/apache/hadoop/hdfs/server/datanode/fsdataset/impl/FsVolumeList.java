@@ -63,8 +63,8 @@ class FsVolumeList {
    * @param storageType the desired {@link StorageType}
    * @return next volume to store the block in.
    */
-  FsVolumeImpl getNextVolume(StorageType storageType, long blockSize)
-      throws IOException {
+  synchronized FsVolumeImpl getNextVolume(StorageType storageType,
+      long blockSize) throws IOException {
     // Get a snapshot of currently available volumes.
     final FsVolumeImpl[] curVolumes = volumes.get();
     final List<FsVolumeImpl> list =
@@ -109,12 +109,6 @@ class FsVolumeList {
     return remaining;
   }
 
-  void getVolumeMap(ReplicaMap volumeMap) throws IOException {
-    for (FsVolumeImpl v : volumes.get()) {
-      v.getVolumeMap(volumeMap);
-    }
-  }
-  
   void getVolumeMap(String bpid, ReplicaMap volumeMap) throws IOException {
     for (FsVolumeImpl v : volumes.get()) {
       v.getVolumeMap(bpid, volumeMap);
