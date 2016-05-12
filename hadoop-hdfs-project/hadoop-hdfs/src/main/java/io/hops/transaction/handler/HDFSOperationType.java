@@ -31,6 +31,7 @@ public enum HDFSOperationType implements OperationType {
   CONCAT,
   SET_TIMES,
   CREATE_SYM_LINK,
+  SET_STORAGE_POLICY,
   GET_PREFERRED_BLOCK_SIZE,
   SET_REPLICATION,
   SET_META_ENABLED,

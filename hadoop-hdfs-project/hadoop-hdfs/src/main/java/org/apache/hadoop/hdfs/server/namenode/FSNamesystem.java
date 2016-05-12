@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdfs.server.namenode;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import io.hops.common.IDsGeneratorFactory;
@@ -36,7 +35,6 @@ import io.hops.metadata.hdfs.dal.BlockChecksumDataAccess;
 import io.hops.metadata.hdfs.dal.EncodingStatusDataAccess;
 import io.hops.metadata.hdfs.dal.INodeAttributesDataAccess;
 import io.hops.metadata.hdfs.dal.INodeDataAccess;
-import io.hops.metadata.hdfs.dal.MetadataLogDataAccess;
 import io.hops.metadata.hdfs.dal.SafeBlocksDataAccess;
 import io.hops.metadata.hdfs.dal.SizeLogDataAccess;
 import io.hops.metadata.hdfs.entity.BlockChecksum;
@@ -97,7 +95,6 @@ import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
 import org.apache.hadoop.hdfs.protocol.RecoveryInProgressException;
 import org.apache.hadoop.hdfs.protocol.datatransfer.ReplaceDatanodeOnFailure;
-import org.apache.hadoop.hdfs.protocolPB.ClientNamenodeProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenSecretManager;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenSecretManager.AccessMode;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
@@ -150,17 +147,11 @@ import org.mortbay.util.ajax.JSON;
 import javax.management.NotCompliantMBeanException;
 import javax.management.ObjectName;
 import javax.management.StandardMBean;
-import java.io.BufferedWriter;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.lang.management.ManagementFactory;
 import java.net.InetAddress;
 import java.util.ArrayList;
@@ -1644,6 +1635,68 @@ public class FSNamesystem
           node.getId(), node.getParentId(), node.getName(), operation);
       EntityManager.add(logEntry);
     }
+  }
+
+  /**
+   * Set the storage policy for a file or a directory.
+   *
+   * @param src file/directory path
+   * @param policyName storage policy name
+   */
+  void setStoragePolicy(String src, final String policyName)
+      throws IOException {
+    try {
+      setStoragePolicyInt(src, policyName);
+    } catch (AccessControlException e) {
+      logAuditEvent(false, "setStoragePolicy", src);
+      throw e;
+    }
+  }
+
+  private void setStoragePolicyInt(final String filename, final String policyName)
+      throws IOException, UnresolvedLinkException, AccessControlException {
+
+    final BlockStoragePolicy policy = BlockStoragePolicySuite.getPolicy(policyName);
+    if (policy == null) {
+      throw new HadoopIllegalArgumentException(
+          "Cannot find a block policy with the name " + policyName);
+    }
+
+    HopsTransactionalRequestHandler getPreferredBlockSizeHandler =
+        new HopsTransactionalRequestHandler(
+            HDFSOperationType.SET_STORAGE_POLICY, filename) {
+          @Override
+          public void acquireLock(TransactionLocks locks) throws IOException {
+            LockFactory lf = LockFactory.getInstance();
+            locks.add(lf.getINodeLock(nameNode, INodeLockType.WRITE,
+                INodeResolveType.PATH, filename));
+          }
+
+          @Override
+          public Object performTask() throws IOException {
+            FSPermissionChecker pc = getPermissionChecker();
+            if (isInSafeMode()) {
+              throw new SafeModeException("Cannot set metaEnabled for " + filename, safeMode);
+            }
+            if (isPermissionEnabled) {
+              checkPathAccess(pc, filename, FsAction.WRITE);
+            }
+
+            dir.setStoragePolicy(filename, policy);
+
+            return null;
+          }
+        };
+
+    getPreferredBlockSizeHandler.handle();
+  }
+
+
+  /**
+   * @return All the existing block storage policies
+   */
+  BlockStoragePolicy[] getStoragePolicies() throws IOException {
+    return BlockStoragePolicySuite.getAllStoragePolicies();
   }
 
   long getPreferredBlockSize(final String filename) throws IOException {

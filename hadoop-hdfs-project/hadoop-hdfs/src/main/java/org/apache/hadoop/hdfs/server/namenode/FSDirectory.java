@@ -35,6 +35,7 @@ import io.hops.transaction.EntityManager;
 import io.hops.transaction.context.HdfsTransactionContextMaintenanceCmds;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
+import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
@@ -49,6 +50,7 @@ import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DirectoryListing;
@@ -1088,6 +1090,25 @@ public class FSDirectory implements Closeable {
       oldReplication[0] = oldRepl;
     }
     return fileNode.getBlocks();
+  }
+
+  void setStoragePolicy(String src, BlockStoragePolicy policy)
+      throws IOException {
+    unprotectedSetStoragePolicy(src, policy);
+  }
+
+  void unprotectedSetStoragePolicy(String src, BlockStoragePolicy policy)
+      throws IOException {
+    INode[] inodes = getRootDir().getExistingPathINodes(src, true);
+    INode inode = inodes[inodes.length - 1];
+
+    if (inode == null) {
+      throw new FileNotFoundException(src + " is not a file or directory");
+    } else if (inode.isSymlink()) {
+      throw new IOException("Cannot set storage policy for symlink: " + src);
+    } else {
+      inode.setBlockStoragePolicyID(policy);
+    }
   }
 
   /**

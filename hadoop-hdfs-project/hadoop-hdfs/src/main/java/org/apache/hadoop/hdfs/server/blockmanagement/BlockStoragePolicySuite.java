@@ -82,7 +82,25 @@ public class BlockStoragePolicySuite {
     }
   }
 
+  public static BlockStoragePolicy getPolicy(String name) {
+    LOG.debug("called getPolicy(\"" + name + "\")");
+
+    if(WARM_STORAGE_POLICY_NAME.equals(name)) {
+      return WARM;
+    } else if(ONESSD_STORAGE_POLICY_NAME.equals(name)) {
+      return ONE_SSD;
+    } else if(ALLSSD_STORAGE_POLICY_NAME.equals(name)) {
+      return ALL_SSD;
+    } else {
+       return null;
+    }
+  }
+
   public static BlockStoragePolicy getDefaultPolicy() {
     return DEFAULT;
+  }
+
+  public static BlockStoragePolicy[] getAllStoragePolicies() {
+    return new BlockStoragePolicy[]{WARM, ONE_SSD, ALL_SSD};
   }
 }

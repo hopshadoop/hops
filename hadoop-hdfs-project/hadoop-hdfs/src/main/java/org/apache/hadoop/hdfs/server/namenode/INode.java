@@ -29,6 +29,7 @@ import io.hops.metadata.hdfs.entity.EncodingStatus;
 import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.security.UsersGroups;
 import io.hops.transaction.EntityManager;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.Path;
@@ -36,6 +37,7 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
 import org.apache.hadoop.util.StringUtils;
 
@@ -489,10 +491,7 @@ public abstract class INode implements Comparable<byte[]> {
    * ID of the first specified storage policy.
    */
   public byte getStoragePolicyID() {
-    // TODO do a database lookup
-
-
-    return BlockStoragePolicySuite.ID_UNSPECIFIED;
+    return this.blockStoragePolicyID;
   }
 
   /**
@@ -719,6 +718,14 @@ public abstract class INode implements Comparable<byte[]> {
       int userId = -1; // TODO get userId
       da.add(new AccessTimeLogEntry(getId(), userId, atime));
     }
+    save();
+  }
+
+  public void setBlockStoragePolicyID(BlockStoragePolicy policy)
+      throws TransactionContextException, StorageException {
+    LogFactory.getLog("inode").debug("Setting policy of node " + this + " to " + policy);
+
+    this.blockStoragePolicyID = policy.getId();
     save();
   }
 
