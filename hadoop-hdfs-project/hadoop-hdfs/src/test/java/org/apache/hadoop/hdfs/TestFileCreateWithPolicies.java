@@ -47,22 +47,20 @@ public class TestFileCreateWithPolicies {
   static final int numDatanodes = 4;
   static final int storagesPerDN = 3;
   static final StorageType[][] storageTypes = {
-      {DISK, DISK, SSD},
-      {DISK, DISK, SSD},
-      {SSD, SSD, SSD},
-      {DISK, DISK, DISK}
+      {DISK, DISK, DISK}, // sid 0,1,2
+      {DISK, DISK, SSD}, // sid 3,4,5
+      {DISK, DISK, SSD}, // sid 6,7,8
+      {SSD, SSD, SSD}, // sid 9,10,11
   };
 
   static final Log LOG = LogFactory.getLog(TestFileCreateWithPolicies.class);
 
   // creates a file but does not close it
-  public static FSDataOutputStream createFile(FileSystem fileSys, Path name,
-      int repl) throws IOException {
-    System.out
-        .println("createFile: Created " + name + " with " + repl + " replica.");
-    FSDataOutputStream stm = fileSys.create(name, true, fileSys.getConf()
-            .getInt(CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096),
-        (short) repl, blockSize);
+  public static FSDataOutputStream createFile(FileSystem fileSys, Path name, int repl) throws IOException {
+    System.out.println("createFile: Created " + name + " with " + repl + " replica.");
+
+    FSDataOutputStream stm = fileSys.create(name, true, 4096, (short) repl, blockSize);
+
     return stm;
   }
 
