@@ -211,8 +211,8 @@ public class TestDataNodeVolumeFailure {
     DFSTestUtil.waitReplication(fs, file1, (short)3);
 
     // Fail the first volume on both datanodes
-    File dn1Vol1 = new File(dataDir, "data"+(2*0+1));
-    File dn2Vol1 = new File(dataDir, "data"+(2*1+1));
+    File dn1Vol1 = new File(dataDir, "data_0_0");
+    File dn2Vol1 = new File(dataDir, "data_1_0");
     assertTrue("Couldn't chmod local vol", FileUtil.setExecutable(dn1Vol1, false));
     assertTrue("Couldn't chmod local vol", FileUtil.setExecutable(dn2Vol1, false));
 

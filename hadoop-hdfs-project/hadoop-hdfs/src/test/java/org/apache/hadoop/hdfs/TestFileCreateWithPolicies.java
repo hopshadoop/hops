@@ -20,20 +20,17 @@ package org.apache.hadoop.hdfs;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.BlockLocation;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.client.HdfsDataOutputStream;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
-import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
-import org.apache.hadoop.hdfs.protocol.HdfsLocatedFileStatus;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
+import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.util.ArrayList;
 
 import static org.apache.hadoop.hdfs.StorageType.*;
 import static org.junit.Assert.assertTrue;
@@ -95,7 +92,14 @@ public class TestFileCreateWithPolicies {
         .storageTypes(storageTypes)
         .build();
 
+    cluster.waitActive();
+
     DistributedFileSystem dfs = cluster.getFileSystem();
+  
+    ArrayList<DataNode> dns = cluster.getDataNodes();
+    for(int i = 0; i < dns.size(); i++) {
+      LOG.debug("datanode " + i + ": " + dns.get(i));
+    }
 
     String[] policyNames = {
         HdfsConstants.ALLSSD_STORAGE_POLICY_NAME,
