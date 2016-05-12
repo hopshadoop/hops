@@ -64,6 +64,14 @@ public class INodeFileUnderConstruction extends INodeFile
     this.clientNode = clientNode;
   }
 
+  public INodeFileUnderConstruction(INodeFileUnderConstruction other) throws
+      IOException {
+    super(other);
+
+    this.clientMachine = other.getClientMachine();
+    this.clientNode = other.getClientNode();
+  }
+
   public INodeFileUnderConstruction(byte[] name, short blockReplication,
       long modificationTime, long preferredBlockSize, BlockInfo[] blocks,
       PermissionStatus perm, String clientName, String clientMachine,
@@ -76,7 +84,7 @@ public class INodeFileUnderConstruction extends INodeFile
     this.clientNode = clientNode;
     this.id = inodeId;
     this.parentId = pid;
-    //throw new UnsupportedOperationException("HOP: This constructor should not be used"); // The only reason it is here that it is called in some FSImage Classes that are not deleted. 
+    //throw new UnsupportedOperationException("HOP: This constructor should not be used"); // The only reason it is here that it is called in some FSImage Classes that are not deleted.
   }
 
   //HOP: used instead of INodeFile.convertToUnderConstruction
@@ -126,7 +134,6 @@ public class INodeFileUnderConstruction extends INodeFile
     INodeFile obj = new INodeFile(this);
     obj.setAccessTime(getModificationTime());
     return obj;
-    
   }
   
   /**

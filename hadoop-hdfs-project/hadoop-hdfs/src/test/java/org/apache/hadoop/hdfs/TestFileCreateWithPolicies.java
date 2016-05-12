@@ -20,12 +20,15 @@ package org.apache.hadoop.hdfs;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.client.HdfsDataOutputStream;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
+import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
+import org.apache.hadoop.hdfs.protocol.HdfsLocatedFileStatus;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.junit.Test;
@@ -108,18 +111,19 @@ public class TestFileCreateWithPolicies {
       for(int i = 0; i < 10; i++) {
         FSNamesystem.LOG.debug("Starting file iteration " + i);
         // create a new file in home directory. Do not close it.
-        Path file = new Path("file_" + i + ".dat");
+        Path file = new Path("/file_" + i + ".dat");
         FSDataOutputStream stm = createFile(dfs, file, 3);
 
         // Set the policy to all ssd
+        dfs.setReplication(file, (short) 4);
         dfs.setStoragePolicy(file, policyNames[i % policyNames.length]);
 
         // verify that file exists in FS namespace
         assertTrue(file + " should be a file", dfs.getFileStatus(file).isFile());
 
         // write to file
-        byte[] buffer = AppendTestUtil.randomBytes(seed, blockSize*numBlocks);
-        stm.write(buffer, 0, blockSize*numBlocks);
+        byte[] buffer = AppendTestUtil.randomBytes(seed, fileSize);
+        stm.write(buffer, 0, fileSize);
 
         stm.close();
 
@@ -130,3 +134,31 @@ public class TestFileCreateWithPolicies {
     }
   }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

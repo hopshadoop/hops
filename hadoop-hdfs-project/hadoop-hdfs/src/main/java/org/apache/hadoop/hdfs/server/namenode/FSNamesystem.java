@@ -1658,18 +1658,15 @@ public class FSNamesystem
 
     final BlockStoragePolicy policy = BlockStoragePolicySuite.getPolicy(policyName);
     if (policy == null) {
-      throw new HadoopIllegalArgumentException(
-          "Cannot find a block policy with the name " + policyName);
+      throw new HadoopIllegalArgumentException("Cannot find a block policy with the name " + policyName);
     }
 
-    HopsTransactionalRequestHandler getPreferredBlockSizeHandler =
-        new HopsTransactionalRequestHandler(
-            HDFSOperationType.SET_STORAGE_POLICY, filename) {
+    HopsTransactionalRequestHandler setStoragePolicyHandler =
+        new HopsTransactionalRequestHandler(HDFSOperationType.SET_STORAGE_POLICY, filename) {
           @Override
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = LockFactory.getInstance();
-            locks.add(lf.getINodeLock(nameNode, INodeLockType.WRITE,
-                INodeResolveType.PATH, filename));
+            locks.add(lf.getINodeLock(nameNode, INodeLockType.WRITE, INodeResolveType.PATH, filename));
           }
 
           @Override
@@ -1688,7 +1685,7 @@ public class FSNamesystem
           }
         };
 
-    getPreferredBlockSizeHandler.handle();
+    setStoragePolicyHandler.handle();
   }
 
 
@@ -2583,7 +2580,7 @@ public class FSNamesystem
     commitOrCompleteLastBlock(pendingFile, last);
 
     if (!checkFileProgress(pendingFile, true)) {
-      return false; // TODO it's going here...
+      return false;
     }
 
     finalizeINodeFileUnderConstruction(src, pendingFile);

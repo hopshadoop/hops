@@ -179,7 +179,6 @@ public abstract class INode implements Comparable<byte[]> {
     setAccessTimeNoPersistance(atime);
     setPermissionStatusNoPersistance(permissions);
 
-    // TODO set me to a real value!
     blockStoragePolicyID = BlockStoragePolicySuite.ID_UNSPECIFIED;
   }
 
@@ -187,9 +186,6 @@ public abstract class INode implements Comparable<byte[]> {
       throws IOException {
     this(permissions, 0L, 0L);
     setLocalNameNoPersistance(name);
-
-    // TODO set me to a real value!
-    blockStoragePolicyID = BlockStoragePolicySuite.ID_UNSPECIFIED;
   }
   
   /**
@@ -204,6 +200,14 @@ public abstract class INode implements Comparable<byte[]> {
     setPermissionStatusNoPersistance(other.getPermissionStatus());
     setModificationTimeNoPersistance(other.getModificationTime());
     setAccessTimeNoPersistance(other.getAccessTime());
+
+    // TODO for some reason, this is always 0
+    byte op = other.getLocalStoragePolicyID();
+    setBlockStoragePolicyID(op);
+
+    if(other.getLocalStoragePolicyID() == 0) {
+      LogFactory.getLog(INode.class).debug("noooooooooo");
+    }
 
     this.parentId = other.getParentId();
     this.id = other.getId();
@@ -490,8 +494,17 @@ public abstract class INode implements Comparable<byte[]> {
    * of that policy. Otherwise follow the latest parental path and return the
    * ID of the first specified storage policy.
    */
-  public byte getStoragePolicyID() {
-    return this.blockStoragePolicyID;
+  public byte getStoragePolicyID() throws TransactionContextException, StorageException {
+    byte localPolicyId = getLocalStoragePolicyID();
+
+    if (localPolicyId != BlockStoragePolicySuite.ID_UNSPECIFIED) {
+      return localPolicyId;
+    }
+
+    // if it is unspecified, check its parent
+    INodeDirectory parent = getParent();
+    return parent != null ? parent.getStoragePolicyID() :
+        BlockStoragePolicySuite.ID_UNSPECIFIED;
   }
 
   /**
@@ -499,16 +512,8 @@ public abstract class INode implements Comparable<byte[]> {
    * {@link BlockStoragePolicySuite#ID_UNSPECIFIED} if no policy has
    * been specified.
    */
-  public byte getLocalStoragePolicyID()
-      throws TransactionContextException, StorageException {
-    byte id = getLocalStoragePolicyID();
-    if (id != BlockStoragePolicySuite.ID_UNSPECIFIED) {
-      return id;
-    }
-    // if it is unspecified, check its parent
-    INodeDirectory parent = getParent();
-    return parent != null ? parent.getStoragePolicyID() :
-        BlockStoragePolicySuite.ID_UNSPECIFIED;
+  public byte getLocalStoragePolicyID() {
+    return this.blockStoragePolicyID;
   }
 
   /**
@@ -721,11 +726,12 @@ public abstract class INode implements Comparable<byte[]> {
     save();
   }
 
-  public void setBlockStoragePolicyID(BlockStoragePolicy policy)
+  public void setBlockStoragePolicyID(byte blockStoragePolicyID)
       throws TransactionContextException, StorageException {
-    LogFactory.getLog("inode").debug("Setting policy of node " + this + " to " + policy);
+    LogFactory.getLog("inode").debug("Setting policy of node " + this + " to " + blockStoragePolicyID);
+    (new Throwable()).printStackTrace();
 
-    this.blockStoragePolicyID = policy.getId();
+    this.blockStoragePolicyID = blockStoragePolicyID;
     save();
   }
 

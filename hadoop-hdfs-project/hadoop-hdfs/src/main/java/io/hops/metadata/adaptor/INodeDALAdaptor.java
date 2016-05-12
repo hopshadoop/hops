@@ -168,7 +168,7 @@ public class INodeDALAdaptor
       hopINode.setPermission(inode.getFsPermission().toShort());
       hopINode.setParentId(inode.getParentId());
       hopINode.setId(inode.getId());
-      hopINode.setStoragePolicy(inode.getStoragePolicyID());
+      hopINode.setStoragePolicy(inode.getLocalStoragePolicyID());
 
       if (inode.isDirectory()) {
         hopINode.setUnderConstruction(false);

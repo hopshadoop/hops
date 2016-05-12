@@ -459,8 +459,6 @@ class NameNodeRpcServer implements NamenodeProtocols {
     }
     HashSet<Node> excludedNodesSet = null;
 
-    LogFactory.getLog(LogFactory.class).debug("### >> excludedNodes (1) = " + Arrays.toString(excludedNodes));
-
     if (excludedNodes != null) {
       excludedNodesSet = new HashSet<Node>(excludedNodes.length);
       for (Node node : excludedNodes) {

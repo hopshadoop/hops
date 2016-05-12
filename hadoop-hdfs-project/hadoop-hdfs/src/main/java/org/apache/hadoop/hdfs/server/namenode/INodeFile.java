@@ -365,8 +365,7 @@ public class INodeFile extends INode implements BlockCollection {
       String clientName, String clientMachine, DatanodeID clientNode)
       throws IOException {
     INodeFileUnderConstruction ucfile =
-        new INodeFileUnderConstruction(this, clientName, clientMachine,
-            clientNode);
+        new INodeFileUnderConstruction(this, clientName, clientMachine, clientNode);
     save(ucfile);
     return ucfile;
   }

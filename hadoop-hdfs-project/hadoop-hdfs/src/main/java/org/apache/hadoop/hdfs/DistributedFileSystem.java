@@ -488,7 +488,27 @@ public class DistributedFileSystem extends FileSystem {
       throws IOException {
     statistics.incrementWriteOps(1);
 
-    dfs.setStoragePolicy(getPathName(src), policyName);
+    Path absF = fixRelativePart(src);
+    new FileSystemLinkResolver<Void>() {
+      @Override
+      public Void doCall(final Path p)
+          throws IOException, UnresolvedLinkException {
+        dfs.setStoragePolicy(getPathName(p), policyName);
+        return null;
+      }
+      @Override
+      public Void next(final FileSystem fs, final Path p)
+          throws IOException {
+        if (fs instanceof DistributedFileSystem) {
+          ((DistributedFileSystem) fs).setStoragePolicy(p, policyName);
+          return null;
+        } else {
+          throw new UnsupportedOperationException(
+              "Cannot perform setStoragePolicy on a non-DistributedFileSystem: "
+                  + src + " -> " + p);
+        }
+      }
+    }.resolve(this, absF);
   }
 
   /** Get all the existing storage policies */
