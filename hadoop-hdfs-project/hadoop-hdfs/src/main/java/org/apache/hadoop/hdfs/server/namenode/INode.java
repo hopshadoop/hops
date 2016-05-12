@@ -29,7 +29,6 @@ import io.hops.metadata.hdfs.entity.EncodingStatus;
 import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.security.UsersGroups;
 import io.hops.transaction.EntityManager;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.Path;
