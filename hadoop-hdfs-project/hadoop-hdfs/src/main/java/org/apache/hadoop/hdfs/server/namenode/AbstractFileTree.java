@@ -263,7 +263,7 @@ abstract class AbstractFileTree {
                 subtreeRoot.isSubtreeLocked(),
                 subtreeRoot.getSubtreeLockOwner(),
                 size,
-                subtreeRoot.getStoragePolicyID()));
+                subtreeRoot.getLocalStoragePolicyID()));
         return subtreeRoot;
       }
     }.handle(this);
