@@ -35,17 +35,14 @@ import java.util.Map;
 
 public class StorageIdMap {
 
-  private Map<String, Integer> storageIdtoSId;
-  private Map<Integer, String> sIdtoStorageId;
+  private Map<String, Integer> storageIdtoSId = Collections.synchronizedMap(new HashMap<String, Integer>());
+  private Map<Integer, String> sIdtoStorageId = Collections.synchronizedMap(new HashMap<Integer, String>());;
   
   public StorageIdMap() throws IOException {
     this(true);
   }
 
   public StorageIdMap(boolean loadFromDB) throws IOException {
-    this.sIdtoStorageId = Collections.synchronizedMap(new HashMap<Integer, String>());
-    this.storageIdtoSId = Collections.synchronizedMap(new HashMap<String, Integer>());
-
     if(loadFromDB) {
       initialize();
     }
@@ -70,9 +67,13 @@ public class StorageIdMap {
       @Override
       public Object performTask() throws StorageException, IOException {
         StorageIdMapDataAccess<StorageId> da =
-            (StorageIdMapDataAccess) HdfsStorageFactory
-                .getDataAccess(StorageIdMapDataAccess.class);
+            (StorageIdMapDataAccess) HdfsStorageFactory.getDataAccess(StorageIdMapDataAccess.class);
         Collection<StorageId> sids = da.findAll();
+
+        if(sids == null) {
+          return null;
+        }
+
         for (StorageId h : sids) {
           storageIdtoSId.put(h.getStorageId(), h.getsId());
           sIdtoStorageId.put(h.getsId(), h.getStorageId());
