@@ -17,49 +17,99 @@
  */
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
+import com.google.common.base.Preconditions;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hdfs.StorageType;
 import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
 import static org.apache.hadoop.hdfs.protocol.HdfsConstants.*;
+import static org.apache.hadoop.hdfs.protocol.HdfsConstants.ALLSSD_STORAGE_POLICY_ID;
+import static org.apache.hadoop.hdfs.protocol.HdfsConstants.ALLSSD_STORAGE_POLICY_NAME;
 
 public class BlockStoragePolicySuite {
   private static final Log LOG = LogFactory.getLog(BlockStoragePolicySuite.class);
 
+  /**
+   * Storage type unspecified: inherits parent storage type, or DEFAULT (for
+   * root folder)
+   */
   public final static byte ID_UNSPECIFIED = 0;
 
   /**
-   * Store all replica's on DISK.
+   * Array where the ID of each policy maps to the actual policy.
+   * Length = max(id's + 1)
    */
-  private final static BlockStoragePolicy WARM = new BlockStoragePolicy(
-      WARM_STORAGE_POLICY_ID,
-      WARM_STORAGE_POLICY_NAME,
-      new StorageType[]{StorageType.DISK},
-      new StorageType[]{},
-      new StorageType[]{});
+  private static BlockStoragePolicy[] policies = new BlockStoragePolicy[13];
+  static {
+    /*
+    In accordance with HDFS:
 
-  /**
-   * Store one replica on SSD, the rest on DISK.
-   */
-  private final static BlockStoragePolicy ONE_SSD = new BlockStoragePolicy(
-      ONESSD_STORAGE_POLICY_ID,
-      ONESSD_STORAGE_POLICY_NAME,
-      new StorageType[]{StorageType.SSD, StorageType.DISK},
-      new StorageType[]{},
-      new StorageType[]{});
+    Policy ID	Policy Name	  Block Placement         Fallback storages   Fallback storages
+                             (n  replicas)	         for creation	       for replication
+    (15	      Lasy_Persist	RAM_DISK: 1, DISK: n-1	   DISK	              DISK)   <-- not implemented in Hops
+    12	      All_SSD	      SSD: n	                   DISK	              DISK
+    10	      One_SSD	      SSD: 1,DISK: n-1           SSD, DISK	        SSD, DISK
+    7	        Hot (default)	DISK: n	                   <none>	            ARCHIVE
+    5	        Warm	        DISK: 1, ARCHIVE: n-1    	 ARCHIVE, DISK	    ARCHIVE, DISK
+    2	        Cold	        ARCHIVE: n	               <none>	            <none>
 
-  /**
-   * Attempt to store all replica's on ssd, but fallback to DISK if no space
-   * available.
-   */
-  private final static BlockStoragePolicy ALL_SSD = new BlockStoragePolicy(
-      ALLSSD_STORAGE_POLICY_ID,
-      ALLSSD_STORAGE_POLICY_NAME,
-      new StorageType[]{StorageType.SSD},
-      new StorageType[]{StorageType.DISK},
-      new StorageType[]{StorageType.DISK});
+    New type:
+    4         RAID5         RAID5                     DISK                DISK
+  */
 
-  public final static BlockStoragePolicy DEFAULT = WARM;
+    /** Attempt to store all replica's on SSD. */
+    final BlockStoragePolicy ALL_SSD = new BlockStoragePolicy(
+        ALLSSD_STORAGE_POLICY_ID, ALLSSD_STORAGE_POLICY_NAME,
+        new StorageType[]{StorageType.SSD},
+        new StorageType[]{StorageType.DISK},
+        new StorageType[]{StorageType.DISK});
+
+    /** Store one replica on SSD, the rest on DISK. */
+    final BlockStoragePolicy ONE_SSD = new BlockStoragePolicy(
+        ONESSD_STORAGE_POLICY_ID, ONESSD_STORAGE_POLICY_NAME,
+        new StorageType[]{StorageType.SSD, StorageType.DISK},
+        new StorageType[]{StorageType.SSD, StorageType.DISK},
+        new StorageType[]{StorageType.SSD, StorageType.DISK});
+
+    /** Store all replica's on DISK. */
+    final BlockStoragePolicy HOT = new BlockStoragePolicy(
+        HOT_STORAGE_POLICY_ID, HOT_STORAGE_POLICY_NAME,
+        new StorageType[]{StorageType.DISK},
+        new StorageType[]{},
+        new StorageType[]{StorageType.ARCHIVE});
+
+    /** Store 1 replica on DISK, rest on ARCHIVE. */
+    final BlockStoragePolicy WARM = new BlockStoragePolicy(
+        WARM_STORAGE_POLICY_ID, WARM_STORAGE_POLICY_NAME,
+        new StorageType[]{StorageType.DISK, StorageType.ARCHIVE},
+        new StorageType[]{StorageType.ARCHIVE, StorageType.DISK},
+        new StorageType[]{StorageType.ARCHIVE, StorageType.DISK});
+
+    /** Store all replica's on ARCHIVE. */
+    final BlockStoragePolicy COLD = new BlockStoragePolicy(
+        COLD_STORAGE_POLICY_ID, COLD_STORAGE_POLICY_NAME,
+        new StorageType[]{StorageType.ARCHIVE},
+        new StorageType[]{},
+        new StorageType[]{});
+
+    /** Store all replica's on RAID (nice for combining with Erasure Coding). */
+    final BlockStoragePolicy RAID5 = new BlockStoragePolicy(
+        RAID5_STORAGE_POLICY_ID,
+        RAID5_STORAGE_POLICY_NAME,
+        new StorageType[]{StorageType.RAID5},
+        new StorageType[]{},
+        new StorageType[]{});
+
+    policies[ALLSSD_STORAGE_POLICY_ID] = ALL_SSD; // 12
+    policies[ONESSD_STORAGE_POLICY_ID] = ONE_SSD; // 10
+    policies[HOT_STORAGE_POLICY_ID] = HOT; // 7
+    policies[WARM_STORAGE_POLICY_ID] = WARM; // 5
+    policies[RAID5_STORAGE_POLICY_ID] = RAID5; // 3
+    policies[COLD_STORAGE_POLICY_ID] = COLD; // 2
+    policies[ID_UNSPECIFIED] = HOT; // 0
+  }
+
+  public final static BlockStoragePolicy DEFAULT = policies[0];
 
   /**
    * @return the corresponding policy, or {@link BlockStoragePolicySuite#DEFAULT}
@@ -67,33 +117,27 @@ public class BlockStoragePolicySuite {
    */
   public static BlockStoragePolicy getPolicy(byte id) {
     LOG.debug("called getPolicy(" + id + ")");
-    switch(id) {
-      case ID_UNSPECIFIED:
-        return DEFAULT;
-      case WARM_STORAGE_POLICY_ID:
-        return WARM;
-      case ONESSD_STORAGE_POLICY_ID:
-        return ONE_SSD;
-      case ALLSSD_STORAGE_POLICY_ID:
-        return ALL_SSD;
-      default:
-        LOG.debug("getPolicy() called with unknown/unspecified storagePolicyID " + id);
-        return DEFAULT;
+
+    if(0 <= id && id < policies.length && policies[id] != null) {
+      return policies[id];
     }
+
+    LOG.debug("getPolicy() called with unknown/unspecified storagePolicyID " + id);
+    return null;
   }
 
   public static BlockStoragePolicy getPolicy(String name) {
     LOG.debug("called getPolicy(\"" + name + "\")");
+    Preconditions.checkNotNull(name);
 
-    if(WARM_STORAGE_POLICY_NAME.equals(name)) {
-      return WARM;
-    } else if(ONESSD_STORAGE_POLICY_NAME.equals(name)) {
-      return ONE_SSD;
-    } else if(ALLSSD_STORAGE_POLICY_NAME.equals(name)) {
-      return ALL_SSD;
-    } else {
-       return null;
+    if (policies != null) {
+      for (BlockStoragePolicy policy : policies) {
+        if (policy != null && policy.getName().equalsIgnoreCase(name)) {
+          return policy;
+        }
+      }
     }
+    return null;
   }
 
   public static BlockStoragePolicy getDefaultPolicy() {
@@ -101,6 +145,6 @@ public class BlockStoragePolicySuite {
   }
 
   public static BlockStoragePolicy[] getAllStoragePolicies() {
-    return new BlockStoragePolicy[]{WARM, ONE_SSD, ALL_SSD};
+    return policies;
   }
 }
