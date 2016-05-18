@@ -1364,6 +1364,10 @@ public class PBHelper {
         return StorageTypeProto.DISK;
       case SSD:
         return StorageTypeProto.SSD;
+      case RAID5:
+        return StorageTypeProto.RAID5;
+      case ARCHIVE:
+        return StorageTypeProto.ARCHIVE;
       default:
         Preconditions.checkState(
             false,
@@ -1379,6 +1383,10 @@ public class PBHelper {
         return StorageType.DISK;
       case SSD:
         return StorageType.SSD;
+      case RAID5:
+        return StorageType.RAID5;
+      case ARCHIVE:
+        return StorageType.ARCHIVE;
       default:
         throw new IllegalStateException(
             "BUG: StorageTypeProto not found, type=" + type);
@@ -1412,17 +1420,6 @@ public class PBHelper {
       case NORMAL:
       default:
         return DatanodeStorage.State.NORMAL;
-    }
-  }
-
-  private static StorageType convertType(StorageTypeProto type) {
-    switch(type) {
-      case DISK:
-        return StorageType.DISK;
-      case SSD:
-        return StorageType.SSD;
-      default:
-        return StorageType.DEFAULT;
     }
   }
 
