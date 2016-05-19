@@ -32,6 +32,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSOutputStream;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
+import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.util.Progressable;
 import org.apache.hadoop.util.StringUtils;
 import org.json.JSONException;
@@ -249,6 +250,14 @@ public abstract class BaseEncodingManager extends EncodingManager {
         statistics.remainingSize += diskSpace;
         return false;
       }
+
+      // Set the storage policy to RAID5 for disk-fault tolerance
+      srcFs.setStoragePolicy(sourceFile, HdfsConstants.RAID5_STORAGE_POLICY_NAME);
+      // The policy is now updated, but did not change the locations of
+      // blocks yet. This only happens when we trigger the Mover.
+      // TODO
+      // Mover.trigger(sourceFile);
+
     } catch (IOException e) {
       if (out != null) {
         out.close();

@@ -7415,8 +7415,10 @@ private void commitOrCompleteLastBlock(
       }
     }
 
-    // TODO lookup the inodeid, then lookup the storagePolicyID
-    byte storagePolicyID = BlockStoragePolicySuite.ID_UNSPECIFIED;
+    // We always want to store Erasure Coded files on RAID5 volumes, but can
+    // fall back to DISK
+    byte storagePolicyID = HdfsConstants.RAID5_STORAGE_POLICY_ID;
+    BlockStoragePolicy policy = BlockStoragePolicySuite.getPolicy(storagePolicyID);
 
     BlockPlacementPolicyDefault placementPolicy = (BlockPlacementPolicyDefault)
         getBlockManager().getBlockPlacementPolicy();
@@ -7425,8 +7427,7 @@ private void commitOrCompleteLastBlock(
     DatanodeStorageInfo[] descriptors = placementPolicy
         .chooseTarget(isParity ? parityPath : sourcePath,
             isParity ? 1 : status.getEncodingPolicy().getTargetReplication(),
-            null, chosenStorages, false, excluded, block.getBlockSize(),
-            BlockStoragePolicySuite.getPolicy(storagePolicyID));
+            null, chosenStorages, false, excluded, block.getBlockSize(), policy);
 
     return new LocatedBlock(block.getBlock(), descriptors);
   }
