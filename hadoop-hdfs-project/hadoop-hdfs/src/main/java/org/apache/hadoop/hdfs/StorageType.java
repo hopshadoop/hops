@@ -33,9 +33,10 @@ import java.util.List;
 @InterfaceStability.Evolving
 public enum StorageType {
   DISK,
-  SSD;
-  // TODO add RAID/RAM(?)/MIRROR/RAIDZ
-  // TODO also update hdfs.proto:Storagetype when changing stuff here
+  SSD,
+  RAID5,
+  ARCHIVE;
+
   public static StorageType DEFAULT = DISK;
 
   public static final StorageType[] EMPTY_ARRAY = {};

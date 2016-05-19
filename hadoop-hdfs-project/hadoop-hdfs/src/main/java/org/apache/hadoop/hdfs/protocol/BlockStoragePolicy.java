@@ -38,20 +38,6 @@ public class BlockStoragePolicy {
   public static final Logger LOG = LoggerFactory.getLogger(BlockStoragePolicy
       .class);
 
-  public static BlockStoragePolicy DEFAULT = new BlockStoragePolicy((byte) 1,
-      "default",
-      new StorageType[]{StorageType.DISK},
-      new StorageType[]{StorageType.DISK},
-      new StorageType[]{StorageType.DISK},
-      false);
-
-  public static BlockStoragePolicy DISKS = new BlockStoragePolicy((byte) 2,
-      "single disk",
-      new StorageType[]{StorageType.DISK},
-      new StorageType[]{},
-      new StorageType[]{},
-      false);
-
   /** A 4-bit policy ID */
   private final byte id;
   /** Policy name */
@@ -63,29 +49,15 @@ public class BlockStoragePolicy {
   private final StorageType[] creationFallbacks;
   /** The fallback storage type for replication. */
   private final StorageType[] replicationFallbacks;
-  /**
-   * Whether the policy is inherited during file creation.
-   * If set then the policy cannot be changed after file creation.
-   */
-  private boolean copyOnCreateFile;
 
   @VisibleForTesting
   public BlockStoragePolicy(byte id, String name, StorageType[] storageTypes,
       StorageType[] creationFallbacks, StorageType[] replicationFallbacks) {
-    this(id, name, storageTypes, creationFallbacks, replicationFallbacks,
-        false);
-  }
-
-  @VisibleForTesting
-  public BlockStoragePolicy(byte id, String name, StorageType[] storageTypes,
-      StorageType[] creationFallbacks, StorageType[] replicationFallbacks,
-      boolean copyOnCreateFile) {
     this.id = id;
     this.name = name;
     this.storageTypes = storageTypes;
     this.creationFallbacks = creationFallbacks;
     this.replicationFallbacks = replicationFallbacks;
-    this.copyOnCreateFile = copyOnCreateFile;
   }
 
   /**
@@ -96,11 +68,9 @@ public class BlockStoragePolicy {
     int i = 0, j = 0;
 
     final StorageType last = storageTypes[storageTypes.length - 1];
-//    if (!last.isTransient()) {
       for (; i < replication; i++) {
         types.add(last);
       }
-//    }
     return types;
   }
 
@@ -268,9 +238,5 @@ public class BlockStoragePolicy {
       }
     }
     return null;
-  }
-
-  public boolean isCopyOnCreateFile() {
-    return copyOnCreateFile;
   }
 }

@@ -406,6 +406,26 @@ public interface ClientProtocol {
       FileNotFoundException, SafeModeException, UnresolvedLinkException,
       IOException;
 
+  /**
+   * Get all the available block storage policies.
+   * @return All the in-use block storage policies currently.
+   */
+  @Idempotent
+  public BlockStoragePolicy[] getStoragePolicies() throws IOException;
+
+  /**
+   * Set the storage policy for a file/directory
+   * @param src Path of an existing file/directory.
+   * @param policyName The name of the storage policy
+   * @throws UnresolvedLinkException if <code>src</code> contains a symlink
+   * @throws FileNotFoundException If file/dir <code>src</code> is not found
+   * @throws QuotaExceededException If changes violate the quota restriction
+   */
+  @Idempotent
+  public void setStoragePolicy(String src, String policyName)
+      throws UnresolvedLinkException, FileNotFoundException,
+      QuotaExceededException, IOException;
+
   @Idempotent
   public void setMetaEnabled(String src, boolean metaEnabled)
       throws AccessControlException, FileNotFoundException, SafeModeException,

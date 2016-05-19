@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdfs.server.namenode;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import io.hops.common.IDsGeneratorFactory;
@@ -36,7 +35,6 @@ import io.hops.metadata.hdfs.dal.BlockChecksumDataAccess;
 import io.hops.metadata.hdfs.dal.EncodingStatusDataAccess;
 import io.hops.metadata.hdfs.dal.INodeAttributesDataAccess;
 import io.hops.metadata.hdfs.dal.INodeDataAccess;
-import io.hops.metadata.hdfs.dal.MetadataLogDataAccess;
 import io.hops.metadata.hdfs.dal.SafeBlocksDataAccess;
 import io.hops.metadata.hdfs.dal.SizeLogDataAccess;
 import io.hops.metadata.hdfs.entity.BlockChecksum;
@@ -97,7 +95,6 @@ import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
 import org.apache.hadoop.hdfs.protocol.RecoveryInProgressException;
 import org.apache.hadoop.hdfs.protocol.datatransfer.ReplaceDatanodeOnFailure;
-import org.apache.hadoop.hdfs.protocolPB.ClientNamenodeProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenSecretManager;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenSecretManager.AccessMode;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
@@ -106,6 +103,7 @@ import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoUnderConstruction;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockManager;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockPlacementPolicyDefault;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeManager;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStatistics;
@@ -149,17 +147,11 @@ import org.mortbay.util.ajax.JSON;
 import javax.management.NotCompliantMBeanException;
 import javax.management.ObjectName;
 import javax.management.StandardMBean;
-import java.io.BufferedWriter;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.lang.management.ManagementFactory;
 import java.net.InetAddress;
 import java.util.ArrayList;
@@ -1645,6 +1637,65 @@ public class FSNamesystem
     }
   }
 
+  /**
+   * Set the storage policy for a file or a directory.
+   *
+   * @param src file/directory path
+   * @param policyName storage policy name
+   */
+  void setStoragePolicy(String src, final String policyName)
+      throws IOException {
+    try {
+      setStoragePolicyInt(src, policyName);
+    } catch (AccessControlException e) {
+      logAuditEvent(false, "setStoragePolicy", src);
+      throw e;
+    }
+  }
+
+  private void setStoragePolicyInt(final String filename, final String policyName)
+      throws IOException, UnresolvedLinkException, AccessControlException {
+
+    final BlockStoragePolicy policy = BlockStoragePolicySuite.getPolicy(policyName);
+    if (policy == null) {
+      throw new HadoopIllegalArgumentException("Cannot find a block policy with the name " + policyName);
+    }
+
+    HopsTransactionalRequestHandler setStoragePolicyHandler =
+        new HopsTransactionalRequestHandler(HDFSOperationType.SET_STORAGE_POLICY, filename) {
+          @Override
+          public void acquireLock(TransactionLocks locks) throws IOException {
+            LockFactory lf = LockFactory.getInstance();
+            locks.add(lf.getINodeLock(nameNode, INodeLockType.WRITE, INodeResolveType.PATH, filename));
+          }
+
+          @Override
+          public Object performTask() throws IOException {
+            FSPermissionChecker pc = getPermissionChecker();
+            if (isInSafeMode()) {
+              throw new SafeModeException("Cannot set metaEnabled for " + filename, safeMode);
+            }
+            if (isPermissionEnabled) {
+              checkPathAccess(pc, filename, FsAction.WRITE);
+            }
+
+            dir.setStoragePolicy(filename, policy);
+
+            return null;
+          }
+        };
+
+    setStoragePolicyHandler.handle();
+  }
+
+
+  /**
+   * @return All the existing block storage policies
+   */
+  BlockStoragePolicy[] getStoragePolicies() throws IOException {
+    return BlockStoragePolicySuite.getAllStoragePolicies();
+  }
+
   long getPreferredBlockSize(final String filename) throws IOException {
     HopsTransactionalRequestHandler getPreferredBlockSizeHandler =
         new HopsTransactionalRequestHandler(
@@ -2177,13 +2228,13 @@ public class FSNamesystem
 
             replication = pendingFile.getBlockReplication();
 
-            LogFactory.getLog(LogFactory.class).debug("### >> excludedNodes (2) = " +
-                    excludedNodes == null ? Arrays.toString(excludedNodes.toArray(new Node[0])) : "[]");
+            // Get the storagePolicyID of this file
+            byte storagePolicyID = pendingFile.getStoragePolicyID();
 
             // choose targets for the new block to be allocated.
             final DatanodeStorageInfo targets[] = getBlockManager().chooseTarget4NewBlock(
                 src, replication, clientNode, excludedNodes, blockSize,
-                favoredNodes);
+                favoredNodes, storagePolicyID);
 
             // Part II.
             // Allocate a new block, add it to the INode and the BlocksMap.
@@ -2357,6 +2408,10 @@ public class FSNamesystem
                 file.getClientNode());
             preferredblocksize = file.getPreferredBlockSize();
 
+            byte storagePolicyID = file.getStoragePolicyID();
+            BlockStoragePolicy storagePolicy =
+                BlockStoragePolicySuite.getPolicy(storagePolicyID);
+
             //find datanode storages
             final DatanodeManager dm = blockManager.getDatanodeManager();
             chosen = Arrays.asList(dm.getDatanodeStorageInfos(existings, storageIDs));
@@ -2365,8 +2420,8 @@ public class FSNamesystem
             final DatanodeStorageInfo[] targets =
                 blockManager.getBlockPlacementPolicy()
                     .chooseTarget(src, numAdditionalNodes, clientnode, chosen,
-                        true, excludes, preferredblocksize,
-                        BlockStoragePolicy.DEFAULT);
+                        true, excludes, preferredblocksize, storagePolicy);
+
             final LocatedBlock lb = new LocatedBlock(blk, targets);
             blockManager.setBlockToken(lb, AccessMode.COPY);
             return lb;
@@ -2525,7 +2580,7 @@ public class FSNamesystem
     commitOrCompleteLastBlock(pendingFile, last);
 
     if (!checkFileProgress(pendingFile, true)) {
-      return false; // TODO it's going here...
+      return false;
     }
 
     finalizeINodeFileUnderConstruction(src, pendingFile);
@@ -7360,13 +7415,19 @@ private void commitOrCompleteLastBlock(
       }
     }
 
+    // TODO lookup the inodeid, then lookup the storagePolicyID
+    byte storagePolicyID = BlockStoragePolicySuite.ID_UNSPECIFIED;
+
     BlockPlacementPolicyDefault placementPolicy = (BlockPlacementPolicyDefault)
         getBlockManager().getBlockPlacementPolicy();
     List<DatanodeStorageInfo> chosenStorages = new LinkedList<DatanodeStorageInfo>();
+
     DatanodeStorageInfo[] descriptors = placementPolicy
         .chooseTarget(isParity ? parityPath : sourcePath,
             isParity ? 1 : status.getEncodingPolicy().getTargetReplication(),
-            null, chosenStorages, false, excluded, block.getBlockSize(), BlockStoragePolicy.DEFAULT);
+            null, chosenStorages, false, excluded, block.getBlockSize(),
+            BlockStoragePolicySuite.getPolicy(storagePolicyID));
+
     return new LocatedBlock(block.getBlock(), descriptors);
   }
 

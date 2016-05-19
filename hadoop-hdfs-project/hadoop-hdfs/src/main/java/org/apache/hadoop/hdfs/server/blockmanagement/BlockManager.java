@@ -1602,12 +1602,14 @@ public class BlockManager {
       final int numOfReplicas, final Node client,
       final Set<Node> excludedNodes,
       final long blocksize,
-      final List<String> favoredNodes) throws IOException {
+      final List<String> favoredNodes,
+      final byte storagePolicyID) throws IOException {
     List<DatanodeDescriptor> favoredDatanodeDescriptors =
         getDatanodeDescriptors(favoredNodes);
 
     // TODO HDP_2.6 this is a hardcoded blockstoragepolicy... :-(
-    BlockStoragePolicy policy = BlockStoragePolicy.DISKS;
+    BlockStoragePolicy policy = BlockStoragePolicySuite.getPolicy(storagePolicyID);
+
     final DatanodeStorageInfo[] targets = blockplacement.chooseTarget(src,
         numOfReplicas, client, excludedNodes, blocksize,
         favoredDatanodeDescriptors, policy);
@@ -1623,6 +1625,14 @@ public class BlockManager {
           + (excludedNodes != null ? Arrays.toString(excludedNodes.toArray(new Node[excludedNodes.size()])) : "[]"));
     }
     return targets;
+  }
+
+  /** Choose target for WebHDFS redirection. */
+  public DatanodeStorageInfo[] chooseTarget4WebHDFS(String src,
+      DatanodeDescriptor clientnode, Set<Node> excludes, long blocksize) {
+    return blockplacement.chooseTarget(src, 1, clientnode,
+        Collections.<DatanodeStorageInfo>emptyList(), false, excludes,
+        blocksize, BlockStoragePolicySuite.getDefaultPolicy());
   }
 
   /**
@@ -3067,8 +3077,11 @@ public class BlockManager {
 
     // first form a rack to datanodes map and
     BlockCollection bc = getBlockCollection(b);
-    // TODO This should be loaded from an XAttr or whatever
-    final BlockStoragePolicy storagePolicy = BlockStoragePolicy.DEFAULT;
+    final BlockStoragePolicy storagePolicy =
+        BlockStoragePolicySuite.getPolicy(bc.getStoragePolicyID());
+//    // TODO This should be loaded from an XAttr or whatever
+//    final BlockStoragePolicy storagePolicy = BlockStoragePolicy.DEFAULT;
+
     final List<StorageType> excessTypes = storagePolicy.chooseExcess(
         replication, DatanodeStorageInfo.toStorageTypes(nonExcess));
 
@@ -4105,7 +4118,8 @@ public class BlockManager {
         //HOP: [M] srcPath is not used
         targets = blockplacement.chooseTarget(null /*bc.getName()*/,
             additionalReplRequired, srcNode, liveReplicaStorages, false,
-            excludedNodes, block.getNumBytes(), BlockStoragePolicy.DEFAULT);
+            excludedNodes, block.getNumBytes(),
+            BlockStoragePolicySuite.getPolicy(bc.getStoragePolicyID()));
       } finally {
         srcNode.decrementPendingReplicationWithoutTargets();
       }

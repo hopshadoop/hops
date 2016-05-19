@@ -32,31 +32,29 @@ public class HdfsLocatedFileStatus extends HdfsFileStatus {
   
   /**
    * Constructor
-   *
-   * @param length
+   *  @param length
    *     size
    * @param isdir
    *     if this is directory
    * @param block_replication
-   *     the file's replication factor
+ *     the file's replication factor
    * @param blocksize
-   *     the file's block size
+*     the file's block size
    * @param modification_time
-   *     most recent modification time
+*     most recent modification time
    * @param access_time
-   *     most recent access time
+*     most recent access time
    * @param permission
-   *     permission
+*     permission
    * @param owner
-   *     owner
+*     owner
    * @param group
-   *     group
+*     group
    * @param symlink
-   *     symbolic link
+*     symbolic link
    * @param path
-   *     local path name in java UTF8 format
+*     local path name in java UTF8 format
    * @param locations
-   *     block locations
    */
   public HdfsLocatedFileStatus(long length, boolean isdir,
       int block_replication, long blocksize, long modification_time,

@@ -38,6 +38,7 @@ import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.HDFSPolicyProvider;
 import org.apache.hadoop.hdfs.protocol.BlockListAsLongs;
+import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
 import org.apache.hadoop.hdfs.protocol.CorruptFileBlocks;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
@@ -416,6 +417,17 @@ class NameNodeRpcServer implements NamenodeProtocols {
     return namesystem.setReplication(src, replication);
   }
 
+  @Override
+  public void setStoragePolicy(String src, String policyName)
+      throws IOException {
+    namesystem.setStoragePolicy(src, policyName);
+  }
+
+  @Override
+  public BlockStoragePolicy[] getStoragePolicies() throws IOException {
+    return namesystem.getStoragePolicies();
+  }
+
   @Override // ClientProtocol
   public void setMetaEnabled(String src, boolean metaEnabled)
       throws AccessControlException, FileNotFoundException, SafeModeException,
@@ -446,8 +458,6 @@ class NameNodeRpcServer implements NamenodeProtocols {
           "*BLOCK* NameNode.addBlock: file " + src + " for " + clientName);
     }
     HashSet<Node> excludedNodesSet = null;
-
-    LogFactory.getLog(LogFactory.class).debug("### >> excludedNodes (1) = " + Arrays.toString(excludedNodes));
 
     if (excludedNodes != null) {
       excludedNodesSet = new HashSet<Node>(excludedNodes.length);

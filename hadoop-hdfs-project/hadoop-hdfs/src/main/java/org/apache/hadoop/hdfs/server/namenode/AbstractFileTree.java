@@ -261,7 +261,9 @@ abstract class AbstractFileTree {
                 subtreeRoot instanceof INodeDirectoryWithQuota ? true : false,
                 subtreeRoot.isUnderConstruction(),
                 subtreeRoot.isSubtreeLocked(),
-                subtreeRoot.getSubtreeLockOwner(),size));
+                subtreeRoot.getSubtreeLockOwner(),
+                size,
+                subtreeRoot.getLocalStoragePolicyID()));
         return subtreeRoot;
       }
     }.handle(this);

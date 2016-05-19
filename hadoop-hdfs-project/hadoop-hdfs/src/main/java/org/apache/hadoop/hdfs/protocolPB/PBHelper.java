@@ -34,6 +34,7 @@ import org.apache.hadoop.fs.FsServerDefaults;
 import org.apache.hadoop.hdfs.StorageType;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.CorruptFileBlocks;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
@@ -1363,6 +1364,10 @@ public class PBHelper {
         return StorageTypeProto.DISK;
       case SSD:
         return StorageTypeProto.SSD;
+      case RAID5:
+        return StorageTypeProto.RAID5;
+      case ARCHIVE:
+        return StorageTypeProto.ARCHIVE;
       default:
         Preconditions.checkState(
             false,
@@ -1378,6 +1383,10 @@ public class PBHelper {
         return StorageType.DISK;
       case SSD:
         return StorageType.SSD;
+      case RAID5:
+        return StorageType.RAID5;
+      case ARCHIVE:
+        return StorageType.ARCHIVE;
       default:
         throw new IllegalStateException(
             "BUG: StorageTypeProto not found, type=" + type);
@@ -1411,17 +1420,6 @@ public class PBHelper {
       case NORMAL:
       default:
         return DatanodeStorage.State.NORMAL;
-    }
-  }
-
-  private static StorageType convertType(StorageTypeProto type) {
-    switch(type) {
-      case DISK:
-        return StorageType.DISK;
-      case SSD:
-        return StorageType.SSD;
-      default:
-        return StorageType.DEFAULT;
     }
   }
 
@@ -1630,5 +1628,64 @@ public class PBHelper {
       ClientNamenodeProtocolProtos.EncodingPolicyProto encodingPolicyProto) {
     return new EncodingPolicy(encodingPolicyProto.getCodec(),
         (short) encodingPolicyProto.getTargetReplication());
+  }
+
+  public static BlockStoragePolicy[] convertStoragePolicies(
+      List<HdfsProtos.BlockStoragePolicyProto> policyProtos) {
+    if (policyProtos == null || policyProtos.size() == 0) {
+      return new BlockStoragePolicy[0];
+    }
+    BlockStoragePolicy[] policies = new BlockStoragePolicy[policyProtos.size()];
+    int i = 0;
+    for (HdfsProtos.BlockStoragePolicyProto proto : policyProtos) {
+      policies[i++] = convert(proto);
+    }
+    return policies;
+  }
+
+  public static BlockStoragePolicy convert(HdfsProtos.BlockStoragePolicyProto proto) {
+    List<StorageTypeProto> cList = proto.getCreationPolicy()
+        .getStorageTypesList();
+    StorageType[] creationTypes = convertStorageTypes(cList, cList.size());
+    List<StorageTypeProto> cfList = proto.hasCreationFallbackPolicy() ? proto
+        .getCreationFallbackPolicy().getStorageTypesList() : null;
+    StorageType[] creationFallbackTypes = cfList == null ? StorageType
+        .EMPTY_ARRAY : convertStorageTypes(cfList, cfList.size());
+    List<StorageTypeProto> rfList = proto.hasReplicationFallbackPolicy() ?
+        proto.getReplicationFallbackPolicy().getStorageTypesList() : null;
+    StorageType[] replicationFallbackTypes = rfList == null ? StorageType
+        .EMPTY_ARRAY : convertStorageTypes(rfList, rfList.size());
+    return new BlockStoragePolicy((byte) proto.getPolicyId(), proto.getName(),
+        creationTypes, creationFallbackTypes, replicationFallbackTypes);
+  }
+
+  public static HdfsProtos.BlockStoragePolicyProto convert(BlockStoragePolicy policy) {
+    HdfsProtos.BlockStoragePolicyProto.Builder builder = HdfsProtos.BlockStoragePolicyProto
+        .newBuilder().setPolicyId(policy.getId()).setName(policy.getName());
+    // creation storage types
+    HdfsProtos.StorageTypesProto creationProto = convert(policy.getStorageTypes());
+    Preconditions.checkArgument(creationProto != null);
+    builder.setCreationPolicy(creationProto);
+    // creation fallback
+    HdfsProtos.StorageTypesProto creationFallbackProto = convert(
+        policy.getCreationFallbacks());
+    if (creationFallbackProto != null) {
+      builder.setCreationFallbackPolicy(creationFallbackProto);
+    }
+    // replication fallback
+    HdfsProtos.StorageTypesProto replicationFallbackProto = convert(
+        policy.getReplicationFallbacks());
+    if (replicationFallbackProto != null) {
+      builder.setReplicationFallbackPolicy(replicationFallbackProto);
+    }
+    return builder.build();
+  }
+
+  public static HdfsProtos.StorageTypesProto convert(StorageType[] types) {
+    if (types == null || types.length == 0) {
+      return null;
+    }
+    List<StorageTypeProto> list = convertStorageTypes(types);
+    return HdfsProtos.StorageTypesProto.newBuilder().addAllStorageTypes(list).build();
   }
 }
