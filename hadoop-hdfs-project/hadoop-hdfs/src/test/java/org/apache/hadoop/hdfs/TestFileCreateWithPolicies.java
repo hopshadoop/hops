@@ -23,16 +23,21 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.client.HdfsDataOutputStream;
-import org.apache.hadoop.hdfs.protocol.HdfsConstants;
+import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.junit.Test;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import static org.apache.hadoop.hdfs.StorageType.*;
+import static org.apache.hadoop.hdfs.protocol.HdfsConstants.*;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertTrue;
 
 public class TestFileCreateWithPolicies {
@@ -61,25 +66,90 @@ public class TestFileCreateWithPolicies {
     return stm;
   }
 
-  public static HdfsDataOutputStream create(DistributedFileSystem dfs,
-      Path name, int repl) throws IOException {
-    return (HdfsDataOutputStream) createFile(dfs, name, repl);
+  String[] policyNames = {
+      ALLSSD_STORAGE_POLICY_NAME,
+      WARM_STORAGE_POLICY_NAME,
+      ONESSD_STORAGE_POLICY_NAME
+  };
+
+  /**
+   * Test setting the storage policy of the root folder
+   * @throws IOException
+   */
+  @Test (timeout=300000)
+  public void testConfigKeyEnabled() throws IOException {
+    Configuration conf = new HdfsConfiguration();
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
+        .numDataNodes(1)
+        .build();
+
+    try {
+      cluster.waitActive();
+      cluster.getFileSystem().setStoragePolicy(new Path("/"), COLD_STORAGE_POLICY_NAME);
+    } finally {
+      cluster.shutdown();
+    }
   }
 
-  //
-  // writes to file but does not close it
-  //
-  static void writeFile(FSDataOutputStream stm) throws IOException {
-    writeFile(stm, fileSize);
-  }
+  /**
+   * Test whether the BlockStoragePolicy returns the expected storage types
+   */
+  @Test
+  public void testChooseStorageTypesSimple() {
+    HashMap<String, StorageType[][]> expected = new HashMap<String, StorageType[][]>();
 
-  //
-  // writes specified bytes to file.
-  //
-  public static void writeFile(FSDataOutputStream stm, int size)
-      throws IOException {
-    byte[] buffer = AppendTestUtil.randomBytes(seed, size);
-    stm.write(buffer, 0, size);
+    expected.put(ALLSSD_STORAGE_POLICY_NAME, new StorageType[][] {
+        new StorageType[]{},
+        new StorageType[]{SSD},
+        new StorageType[]{SSD, SSD},
+        new StorageType[]{SSD, SSD, SSD}
+    });
+
+    expected.put(ONESSD_STORAGE_POLICY_NAME, new StorageType[][] {
+        new StorageType[]{},
+        new StorageType[]{SSD},
+        new StorageType[]{SSD, DISK},
+        new StorageType[]{SSD, DISK, DISK}
+    });
+
+    expected.put(HOT_STORAGE_POLICY_NAME, new StorageType[][] {
+        new StorageType[]{},
+        new StorageType[]{DISK},
+        new StorageType[]{DISK, DISK},
+        new StorageType[]{DISK, DISK, DISK}
+    });
+
+    expected.put(WARM_STORAGE_POLICY_NAME, new StorageType[][] {
+        new StorageType[]{},
+        new StorageType[]{DISK},
+        new StorageType[]{DISK, ARCHIVE},
+        new StorageType[]{DISK, ARCHIVE, ARCHIVE}
+    });
+  
+    expected.put(COLD_STORAGE_POLICY_NAME, new StorageType[][] {
+        new StorageType[]{},
+        new StorageType[]{ARCHIVE},
+        new StorageType[]{ARCHIVE, ARCHIVE},
+        new StorageType[]{ARCHIVE, ARCHIVE, ARCHIVE}
+    });
+  
+    expected.put(RAID5_STORAGE_POLICY_NAME, new StorageType[][] {
+        new StorageType[]{},
+        new StorageType[]{RAID5},
+        new StorageType[]{RAID5, RAID5},
+        new StorageType[]{RAID5, RAID5, RAID5}
+    });
+
+    for(Map.Entry<String, StorageType[][]> policy : expected.entrySet()) {
+      BlockStoragePolicy bsp = BlockStoragePolicySuite.getPolicy(policy.getKey());
+  
+      for(int repl = 0; repl < policy.getValue().length; repl++) {
+        List<StorageType> types = bsp.chooseStorageTypes((byte) repl);
+        StorageType[] actual = types.toArray(new StorageType[0]);
+
+        assertArrayEquals(policy.getValue()[repl], actual);
+      }
+    }
   }
 
   @Test
@@ -92,25 +162,17 @@ public class TestFileCreateWithPolicies {
         .storageTypes(storageTypes)
         .build();
 
-    cluster.waitActive();
-
-    DistributedFileSystem dfs = cluster.getFileSystem();
-  
-    ArrayList<DataNode> dns = cluster.getDataNodes();
-    for(int i = 0; i < dns.size(); i++) {
-      LOG.debug("datanode " + i + ": " + dns.get(i));
-    }
-
-    String[] policyNames = {
-        HdfsConstants.ALLSSD_STORAGE_POLICY_NAME,
-        HdfsConstants.WARM_STORAGE_POLICY_NAME,
-        HdfsConstants.ONESSD_STORAGE_POLICY_NAME
-    };
-
-    LOG.debug("arrived here");
-
     try {
-      for(int i = 0; i < 10; i++) {
+      cluster.waitActive();
+
+      DistributedFileSystem dfs = cluster.getFileSystem();
+
+      ArrayList<DataNode> dns = cluster.getDataNodes();
+      for(int i = 0; i < dns.size(); i++) {
+        LOG.debug("datanode " + i + ": " + dns.get(i));
+      }
+
+      for(int i = 0; i < 1; i++) {
         FSNamesystem.LOG.debug("Starting file iteration " + i);
         // create a new file in home directory. Do not close it.
         Path file = new Path("/file_" + i + ".dat");
@@ -129,7 +191,8 @@ public class TestFileCreateWithPolicies {
 
         stm.close();
 
-        FSNamesystem.LOG.debug("Finished file iteration " + i);
+        String[] hosts = dfs.getFileBlockLocations(file, 0, fileSize)[0].getHosts();
+
       }
     } finally {
       cluster.shutdown();
