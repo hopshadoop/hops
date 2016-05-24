@@ -824,11 +824,16 @@ public class TestDFSClientRetries {
         5000);
 
     final short numDatanodes = 3;
-    final MiniDFSCluster cluster =
-        new MiniDFSCluster.Builder(conf).numDataNodes(numDatanodes).format(true)
-            .build();
+    MiniDFSCluster cluster = null;
+
     try {
+      cluster = new MiniDFSCluster
+          .Builder(conf)
+          .numDataNodes(numDatanodes)
+          .format(true)
+          .build();
       cluster.waitActive();
+
       final DistributedFileSystem dfs = cluster.getFileSystem();
       final FileSystem fs =
           isWebHDFS ? WebHdfsTestUtil.getWebHdfsFileSystem(conf) : dfs;
@@ -926,6 +931,7 @@ public class TestDFSClientRetries {
       thread.start();
 
       //restart namenode in a new thread
+      final MiniDFSCluster finalCluster = cluster;
       new Thread(new Runnable() {
         @Override
         public void run() {
@@ -933,8 +939,8 @@ public class TestDFSClientRetries {
             //sleep, restart, and then wait active
             TimeUnit.SECONDS.sleep(30);
             assertFalse(HdfsUtils.isHealthy(uri));
-            cluster.restartNameNode(0, false);
-            cluster.waitActive();
+            finalCluster.restartNameNode(0, false);
+            finalCluster.waitActive();
             assertTrue(HdfsUtils.isHealthy(uri));
           } catch (Exception e) {
             exceptions.add(e);
@@ -1084,12 +1090,14 @@ public class TestDFSClientRetries {
   @Test
   public void testRetryOnChecksumFailure() throws Exception {
     HdfsConfiguration conf = new HdfsConfiguration();
-    MiniDFSCluster cluster =
-        new MiniDFSCluster.Builder(conf).format(true).numDataNodes(1).build();
+    MiniDFSCluster cluster = null;
+    DFSClient client = null;
+
 
     try {
       final short REPL_FACTOR = 1;
       final long FILE_LENGTH = 512L;
+      cluster = new MiniDFSCluster.Builder(conf).format(true).numDataNodes(1).build();
       cluster.waitActive();
       FileSystem fs = cluster.getFileSystem();
 
@@ -1105,7 +1113,7 @@ public class TestDFSClientRetries {
 
       InetSocketAddress nnAddr =
           new InetSocketAddress("localhost", cluster.getNameNodePort());
-      DFSClient client = new DFSClient(nnAddr, conf);
+      client = new DFSClient(nnAddr, conf);
       DFSInputStream dis = client.open(path.toString());
       byte[] arr = new byte[(int) FILE_LENGTH];
       for (int i = 0; i < 2; ++i) {
@@ -1117,7 +1125,12 @@ public class TestDFSClientRetries {
         }
       }
     } finally {
-      cluster.shutdown();
+      if(client != null) {
+        client.close();
+      }
+      if(cluster != null) {
+        cluster.shutdown();
+      }
     }
   }
 }
