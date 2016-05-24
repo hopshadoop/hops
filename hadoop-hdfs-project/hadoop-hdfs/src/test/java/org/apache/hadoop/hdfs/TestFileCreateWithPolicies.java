@@ -23,7 +23,9 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
+import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
@@ -38,6 +40,7 @@ import java.util.Map;
 import static org.apache.hadoop.hdfs.StorageType.*;
 import static org.apache.hadoop.hdfs.protocol.HdfsConstants.*;
 import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 public class TestFileCreateWithPolicies {
@@ -89,6 +92,73 @@ public class TestFileCreateWithPolicies {
     } finally {
       cluster.shutdown();
     }
+  }
+
+  @Test (timeout=300000)
+  public void testGetStorageType() throws IOException {
+    Configuration conf = new HdfsConfiguration();
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
+        .numDataNodes(1)
+        .build();
+
+    cluster.waitActive();
+
+    DistributedFileSystem dfs = cluster.getFileSystem();
+    DFSClient client = dfs.getClient();
+
+    final byte defaultPolicy = BlockStoragePolicySuite.getDefaultPolicy().getId();
+
+    try {
+      dfs.mkdir(new Path("/foo"), FsPermission.getDirDefault());
+      dfs.mkdir(new Path("/foo/bar"), FsPermission.getDirDefault());
+      dfs.mkdir(new Path("/foo/bar2"), FsPermission.getDirDefault());
+      dfs.create(new Path("/foo/bar/file1.txt"));
+      dfs.create(new Path("/foo/bar/file2.txt"));
+      dfs.create(new Path("/foo/bar2/file3.txt"));
+
+      check(client, "/", defaultPolicy);
+      check(client, "/foo", defaultPolicy);
+      check(client, "/foo/bar", defaultPolicy);
+      check(client, "/foo/bar/file1.txt", defaultPolicy);
+      check(client, "/foo/bar/file2.txt", defaultPolicy);
+
+      // Now change some policies
+      dfs.setStoragePolicy(new Path("/foo/bar/file1.txt"), ALLSSD_STORAGE_POLICY_NAME);
+      check(client, "/foo/bar", defaultPolicy);
+      check(client, "/foo/bar/file1.txt", ALLSSD_STORAGE_POLICY_ID);
+      check(client, "/foo/bar/file2.txt", defaultPolicy);
+
+      // Now set the folder storage policy
+      dfs.setStoragePolicy(new Path("/foo/bar"), COLD_STORAGE_POLICY_NAME);
+      check(client, "/foo/bar", COLD_STORAGE_POLICY_ID);
+      check(client, "/foo/bar/file1.txt", ALLSSD_STORAGE_POLICY_ID);
+      check(client, "/foo/bar/file2.txt", COLD_STORAGE_POLICY_ID);
+
+      // Now set the root folder storage policy
+      dfs.setStoragePolicy(new Path("/"), ONESSD_STORAGE_POLICY_NAME);
+      check(client, "/", ONESSD_STORAGE_POLICY_ID);
+      // Inherit root
+      check(client, "/foo", ONESSD_STORAGE_POLICY_ID);
+      // Its own policy
+      check(client, "/foo/bar", COLD_STORAGE_POLICY_ID);
+      // Its own policy
+      check(client, "/foo/bar/file1.txt", ALLSSD_STORAGE_POLICY_ID);
+      // Inherit /foo/bar
+      check(client, "/foo/bar/file2.txt", COLD_STORAGE_POLICY_ID);
+      // Inherit root
+      check(client, "/foo/bar2", ONESSD_STORAGE_POLICY_ID);
+      check(client, "/foo/bar2/file3.txt", ONESSD_STORAGE_POLICY_ID);
+    } finally {
+      client.close();
+      cluster.shutdown();
+    }
+  }
+
+  private static void check(DFSClient client, String path, byte policy)
+      throws IOException {
+    LOG.debug("Checking path " + path + " to have policy " +
+        BlockStoragePolicySuite.getPolicy(policy));
+    assertEquals(client.getFileInfo(path).getStoragePolicy(), policy);
   }
 
   /**
