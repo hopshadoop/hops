@@ -25,10 +25,13 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
-import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeManager;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
+import org.apache.hadoop.hdfs.util.EnumCounters;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -47,16 +50,7 @@ public class TestFileCreateWithPolicies {
   static final long seed = 0xDEADBEEFL;
   static final int blockSize = 8192;
   static final int numBlocks = 2;
-  static final int fileSize = numBlocks * blockSize + 1;
-
-  static final int numDatanodes = 4;
-  static final int storagesPerDN = 3;
-  static final StorageType[][] storageTypes = {
-      {DISK, DISK, DISK}, // sid 0,1,2
-      {DISK, DISK, SSD}, // sid 3,4,5
-      {DISK, DISK, SSD}, // sid 6,7,8
-      {SSD, SSD, SSD}, // sid 9,10,11
-  };
+  static final int fileSize = numBlocks * blockSize;
 
   static final Log LOG = LogFactory.getLog(TestFileCreateWithPolicies.class);
 
@@ -68,12 +62,6 @@ public class TestFileCreateWithPolicies {
 
     return stm;
   }
-
-  String[] policyNames = {
-      ALLSSD_STORAGE_POLICY_NAME,
-      WARM_STORAGE_POLICY_NAME,
-      ONESSD_STORAGE_POLICY_NAME
-  };
 
   /**
    * Test setting the storage policy of the root folder
@@ -96,19 +84,23 @@ public class TestFileCreateWithPolicies {
 
   @Test (timeout=300000)
   public void testGetStorageType() throws IOException {
+    MiniDFSCluster cluster = null;
+    DFSClient client = null;
     Configuration conf = new HdfsConfiguration();
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-        .numDataNodes(1)
-        .build();
 
-    cluster.waitActive();
-
-    DistributedFileSystem dfs = cluster.getFileSystem();
-    DFSClient client = dfs.getClient();
 
     final byte defaultPolicy = BlockStoragePolicySuite.getDefaultPolicy().getId();
 
     try {
+      cluster = new MiniDFSCluster.Builder(conf)
+          .numDataNodes(1)
+          .build();
+
+      cluster.waitActive();
+      DistributedFileSystem dfs = cluster.getFileSystem();
+      client = dfs.getClient();
+
+
       dfs.mkdir(new Path("/foo"), FsPermission.getDirDefault());
       dfs.mkdir(new Path("/foo/bar"), FsPermission.getDirDefault());
       dfs.mkdir(new Path("/foo/bar2"), FsPermission.getDirDefault());
@@ -149,8 +141,12 @@ public class TestFileCreateWithPolicies {
       check(client, "/foo/bar2", ONESSD_STORAGE_POLICY_ID);
       check(client, "/foo/bar2/file3.txt", ONESSD_STORAGE_POLICY_ID);
     } finally {
-      client.close();
-      cluster.shutdown();
+      if (client != null) {
+        client.close();
+      }
+      if (cluster != null) {
+        cluster.shutdown();
+      }
     }
   }
 
@@ -222,78 +218,123 @@ public class TestFileCreateWithPolicies {
     }
   }
 
+  static final int storagesPerDN = 3;
+  static final StorageType[][] storageTypes = {
+      {DISK, DISK, DISK},
+      {DISK, DISK, SSD},
+      {DISK, DISK, SSD},
+      {SSD, SSD, SSD},
+      {RAID5, RAID5, SSD},
+      {RAID5, RAID5, RAID5},
+      {RAID5, RAID5, RAID5},
+  };
+  static final short numberOfReplicas = 3;
+
+  String[] policyNames = {
+      ALLSSD_STORAGE_POLICY_NAME, // all SSD
+      WARM_STORAGE_POLICY_NAME, // all DISK
+      ONESSD_STORAGE_POLICY_NAME, // one SSD, rest DISK
+      RAID5_STORAGE_POLICY_NAME // all RAID5
+  };
+
+  /**
+   * Maps a policy to a map of storagetypes with the expected no. of replicas
+   */
+  static EnumCounters<StorageType>[] replicaCounts = new EnumCounters[] {
+      new EnumCounters(StorageType.class), // All_SSD
+      new EnumCounters(StorageType.class), // Hot
+      new EnumCounters(StorageType.class), // One_SSD
+      new EnumCounters(StorageType.class) // RAID5
+  };
+
+  static {
+    TestFileCreateWithPolicies.replicaCounts[0].set(SSD, 3);
+    TestFileCreateWithPolicies.replicaCounts[0].set(DISK, 0);
+    TestFileCreateWithPolicies.replicaCounts[0].set(RAID5, 0);
+
+    TestFileCreateWithPolicies.replicaCounts[1].set(SSD, 0);
+    TestFileCreateWithPolicies.replicaCounts[1].set(DISK, 3);
+    TestFileCreateWithPolicies.replicaCounts[1].set(RAID5, 0);
+
+    TestFileCreateWithPolicies.replicaCounts[2].set(SSD, 1);
+    TestFileCreateWithPolicies.replicaCounts[2].set(DISK, 2);
+    TestFileCreateWithPolicies.replicaCounts[2].set(RAID5, 0);
+
+    TestFileCreateWithPolicies.replicaCounts[3].set(SSD, 0);
+    TestFileCreateWithPolicies.replicaCounts[3].set(DISK, 0);
+    TestFileCreateWithPolicies.replicaCounts[3].set(RAID5, 3);
+  }
+
   @Test
   public void testSimple() throws IOException {
+    assert(policyNames.length == replicaCounts.length);
+
+    MiniDFSCluster cluster = null;
+    DFSClient client = null;
     Configuration conf = new HdfsConfiguration();
 
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-        .numDataNodes(numDatanodes)
-        .storagesPerDatanode(storagesPerDN)
-        .storageTypes(storageTypes)
-        .build();
-
     try {
+      cluster = new MiniDFSCluster.Builder(conf)
+          .numDataNodes(storageTypes.length)
+          .storagesPerDatanode(storagesPerDN)
+          .storageTypes(storageTypes)
+          .build();
+
       cluster.waitActive();
-
       DistributedFileSystem dfs = cluster.getFileSystem();
+      client = dfs.getClient();
 
-      ArrayList<DataNode> dns = cluster.getDataNodes();
-      for(int i = 0; i < dns.size(); i++) {
-        LOG.debug("datanode " + i + ": " + dns.get(i));
+      DatanodeManager dm = cluster.getNamesystem().getBlockManager().getDatanodeManager();
+
+      ArrayList<DatanodeDescriptor> nodes = new ArrayList<DatanodeDescriptor>();
+
+      for(DataNode dn : cluster.getDataNodes()) {
+        nodes.add(dm.getDatanodeByUuid(dn.getDatanodeUuid()));
       }
 
-      for(int i = 0; i < 1; i++) {
+      EnumCounters expectedReplicasOnType = new EnumCounters(StorageType.class);
+
+      for(int i = 0; i < 4; i++) {
+
         FSNamesystem.LOG.debug("Starting file iteration " + i);
         // create a new file in home directory. Do not close it.
         Path file = new Path("/file_" + i + ".dat");
         FSDataOutputStream stm = createFile(dfs, file, 3);
 
-        // Set the policy to all ssd
-        dfs.setReplication(file, (short) 4);
+        // Set the policy
+        dfs.setReplication(file, numberOfReplicas);
         dfs.setStoragePolicy(file, policyNames[i % policyNames.length]);
 
         // verify that file exists in FS namespace
         assertTrue(file + " should be a file", dfs.getFileStatus(file).isFile());
 
-        // write to file
+        // write one block to the file and close
         byte[] buffer = AppendTestUtil.randomBytes(seed, fileSize);
         stm.write(buffer, 0, fileSize);
-
         stm.close();
 
-        String[] hosts = dfs.getFileBlockLocations(file, 0, fileSize)[0].getHosts();
+        // Each block has numBlocks blocks (so multiply by that factor)
+        for(int x = 0; x < numBlocks; x++)
+          expectedReplicasOnType.add(replicaCounts[i%policyNames.length]);
 
+        // Count the blocks stored on each storage type:
+        EnumCounters actualReplicasOnType = new EnumCounters(StorageType.class);
+        for(DatanodeDescriptor node : nodes) {
+          for (DatanodeStorageInfo storage : node.getStorageInfos()) {
+            actualReplicasOnType.add(storage.getStorageType(), storage.numBlocks());
+          }
+        }
+
+        assertEquals("iteration "+i, expectedReplicasOnType, actualReplicasOnType);
       }
     } finally {
-      cluster.shutdown();
+      if (client != null) {
+        client.close();
+      }
+      if (cluster != null) {
+        cluster.shutdown();
+      }
     }
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
