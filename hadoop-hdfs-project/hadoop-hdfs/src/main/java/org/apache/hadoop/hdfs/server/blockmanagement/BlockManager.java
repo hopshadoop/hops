@@ -3079,8 +3079,6 @@ public class BlockManager {
     BlockCollection bc = getBlockCollection(b);
     final BlockStoragePolicy storagePolicy =
         BlockStoragePolicySuite.getPolicy(bc.getStoragePolicyID());
-//    // TODO This should be loaded from an XAttr or whatever
-//    final BlockStoragePolicy storagePolicy = BlockStoragePolicy.DEFAULT;
 
     final List<StorageType> excessTypes = storagePolicy.chooseExcess(
         replication, DatanodeStorageInfo.toStorageTypes(nonExcess));

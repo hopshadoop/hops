@@ -7415,8 +7415,7 @@ private void commitOrCompleteLastBlock(
       }
     }
 
-    // TODO lookup the inodeid, then lookup the storagePolicyID
-    byte storagePolicyID = BlockStoragePolicySuite.ID_UNSPECIFIED;
+    byte storagePolicyID = getINode(sourcePath).getLocalStoragePolicyID();
 
     BlockPlacementPolicyDefault placementPolicy = (BlockPlacementPolicyDefault)
         getBlockManager().getBlockPlacementPolicy();

@@ -24,6 +24,8 @@ import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLocks;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -50,6 +52,7 @@ import static org.junit.Assert.assertTrue;
  * and then the under replicated block gets replicated to the datanode.
  */
 public class TestRBWBlockInvalidation {
+  private static final Log LOG = LogFactory.getLog(TestRBWBlockInvalidation.class);
 
   private static NumberReplicas countReplicas(final FSNamesystem namesystem,
       final ExtendedBlock block) throws IOException {
@@ -120,36 +123,34 @@ public class TestRBWBlockInvalidation {
 
       out.close();
 
-      // Check datanode has reported the corrupt block.
-      boolean isCorruptReported = false;
-      while (!isCorruptReported) {
-        if (countReplicas(namesystem, blk).corruptReplicas() > 0) {
-          isCorruptReported = true;
+      int liveReplicas = 0;
+      while (true) {
+        if ((liveReplicas = countReplicas(namesystem, blk).liveReplicas()) < 2) {
+          // This confirms we have a corrupt replica
+          LOG.info("Live Replicas after corruption: " + liveReplicas);
+          break;
         }
         Thread.sleep(100);
       }
-      assertEquals("There should be 1 replica in the corruptReplicasMap", 1,
-          countReplicas(namesystem, blk).corruptReplicas());
+      assertEquals("There should be less than 2 replicas in the liveReplicasMap", 1, liveReplicas);
 
-      // Check the block has got replicated to another datanode.
-      blk = DFSTestUtil.getFirstBlock(fs, testPath);
-      boolean isReplicated = false;
-      while (!isReplicated) {
-        if (countReplicas(namesystem, blk).liveReplicas() > 1) {
-          isReplicated = true;
+      while (true) {
+        if ((liveReplicas = countReplicas(namesystem, blk).liveReplicas()) > 1) {
+          //Wait till the live replica count becomes equal to Replication Factor
+          LOG.info("Live Replicas after Rereplication: " + liveReplicas);
+          break;
         }
         Thread.sleep(100);
       }
-      assertEquals("There should be two live replicas", 2,
-          countReplicas(namesystem, blk).liveReplicas());
+      assertEquals("There should be two live replicas", 2, liveReplicas);
 
-      // sleep for 1 second, so that by this time datanode reports the corrupt
-      // block after a live replica of block got replicated.
-      Thread.sleep(1000);
-
-      // Check that there is no corrupt block in the corruptReplicasMap.
-      assertEquals("There should not be any replica in the corruptReplicasMap",
-          0, countReplicas(namesystem, blk).corruptReplicas());
+      while (true) {
+        Thread.sleep(100);
+        if (countReplicas(namesystem, blk).corruptReplicas() == 0) {
+          LOG.info("Corrupt Replicas becomes 0");
+          break;
+        }
+      }
     } finally {
       if (out != null) {
         out.close();
