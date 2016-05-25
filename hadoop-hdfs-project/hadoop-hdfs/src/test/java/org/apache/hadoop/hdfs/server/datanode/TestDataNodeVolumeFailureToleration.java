@@ -128,7 +128,6 @@ public class TestDataNodeVolumeFailureToleration {
       cluster.shutdownDataNodes();
       FileUtil.chmod(dataDir2.toString(), "755");
     }
-
   }
 
   /**
