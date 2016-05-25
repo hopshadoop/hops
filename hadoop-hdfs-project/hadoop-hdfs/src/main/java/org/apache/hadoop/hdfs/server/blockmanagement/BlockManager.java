@@ -3445,7 +3445,7 @@ public class BlockManager {
             LockFactory lf = LockFactory.getInstance();
             ReceivedDeletedBlockInfo rdbi = (ReceivedDeletedBlockInfo) getParams()[0];
             locks.add(
-                lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier))
+                lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier, true))
                 .add(lf.getBlockLock(rdbi.getBlock().getBlockId(), inodeIdentifier))
                 .add(lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UR));
             if (!rdbi.isDeletedBlock()) {
