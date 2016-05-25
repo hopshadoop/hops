@@ -2085,6 +2085,19 @@ public class MiniDFSCluster {
   }
 
   /**
+   * Get all storage directories for this instance of the MiniCluster
+   */
+  public ArrayList<File> getAllInstanceStorageDirs() {
+    ArrayList<File> dirs = new ArrayList<File>();
+    for(int dirId = 0; dirId < this.numDataNodes; dirId++) {
+      for(int storageId = 0; storageId < this.storagesPerDatanode; storageId++) {
+        dirs.add(getInstanceStorageDir(dirId, storageId));
+      }
+    }
+    return dirs;
+  }
+
+  /**
    * Get a storage directory for a datanode.
    * <ol>
    * <li><base directory>/data/data<2*dnIndex + 1></li>

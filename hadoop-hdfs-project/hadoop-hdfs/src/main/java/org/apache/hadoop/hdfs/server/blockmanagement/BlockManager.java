@@ -4206,10 +4206,9 @@ public class BlockManager {
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
         locks.add(
-            lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier))
+            lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier, true))
             .add(lf.getIndividualBlockLock(b.getBlockId(), inodeIdentifier))
-            .add(lf.getVariableLock(Variable.Finder.ReplicationIndex,
-                LockType.WRITE)).add(
+            .add(lf.getVariableLock(Variable.Finder.ReplicationIndex, LockType.WRITE)).add(
             lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.PE, BLK.UR, BLK.UC));
       }
 

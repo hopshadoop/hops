@@ -94,11 +94,9 @@ public class TestDataNodeVolumeFailure {
 
   @After
   public void tearDown() throws Exception {
-    // Make the directories writeable again
-    for(int i = 0; i < 3; i++) {
-      File dnVol = new File(dataDir, "data_" + i + "_0");
-      if (dnVol.exists()) {
-        dnVol.setExecutable(true);
+    if (cluster != null) {
+      for (File dir : cluster.getAllInstanceStorageDirs()) {
+        dir.setExecutable(true);
       }
     }
 
@@ -216,8 +214,8 @@ public class TestDataNodeVolumeFailure {
     DFSTestUtil.waitReplication(fs, file1, (short)3);
 
     // Fail the first volume on both datanodes
-    File dn1Vol1 = new File(dataDir, "data_0_0");
-    File dn2Vol1 = new File(dataDir, "data_1_0");
+    File dn1Vol1 = cluster.getInstanceStorageDir(0, 0);
+    File dn2Vol1 = cluster.getInstanceStorageDir(1, 0);
     assertTrue("Couldn't chmod local vol", dn1Vol1.setExecutable(false));
     assertTrue("Couldn't chmod local vol", dn2Vol1.setExecutable(false));
 

@@ -77,11 +77,12 @@ public class TestDataNodeVolumeFailureToleration {
 
   @After
   public void tearDown() throws Exception {
-    for (int i = 0; i < 3; i++) {
-      new File(dataDir, "data" + (2 * i + 1)).setExecutable(true);
-      new File(dataDir, "data" + (2 * i + 2)).setExecutable(true);
+    if (cluster != null) {
+      for (File dir : cluster.getAllInstanceStorageDirs()) {
+        dir.setExecutable(true);
+      }
+      cluster.shutdown();
     }
-    cluster.shutdown();
   }
 
   /**
@@ -150,7 +151,7 @@ public class TestDataNodeVolumeFailureToleration {
     long dnCapacity = DFSTestUtil.getDatanodeCapacity(dm, 0);
 
     // Fail a volume on the 2nd DN
-    File dn2Vol1 = new File(dataDir, "data" + (2 * 1 + 1));
+    File dn2Vol1 = cluster.getInstanceStorageDir(1, 0);
     assertTrue("Couldn't chmod local vol", dn2Vol1.setExecutable(false));
 
     // Should only get two replicas (the first DN and the 3rd)
