@@ -33,6 +33,7 @@ import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
@@ -283,9 +284,12 @@ public class JsonUtil {
     final long mTime = (Long) m.get("modificationTime");
     final long blockSize = (Long) m.get("blockSize");
     final short replication = (short) (long) (Long) m.get("replication");
+    final byte storagePolicy = m.containsKey("storagePolicy") ?
+        (byte) (long) (Long) m.get("storagePolicy") :
+        BlockStoragePolicySuite.ID_UNSPECIFIED;
     return new HdfsFileStatus(len, type == PathType.DIRECTORY, replication,
         blockSize, mTime, aTime, permission, owner, group, symlink,
-        DFSUtil.string2Bytes(localName));
+        DFSUtil.string2Bytes(localName), storagePolicy);
   }
 
   /**
@@ -332,7 +336,7 @@ public class JsonUtil {
     final Map<String, Object> m = new TreeMap<String, Object>();
     m.put("ipAddr", datanodeinfo.getIpAddr());
     m.put("hostName", datanodeinfo.getHostName());
-    m.put("storageID", datanodeinfo.getStorageID());
+    m.put("storageID", datanodeinfo.getDatanodeUuid());
     m.put("xferPort", datanodeinfo.getXferPort());
     m.put("infoPort", datanodeinfo.getInfoPort());
     m.put("ipcPort", datanodeinfo.getIpcPort());
@@ -437,7 +441,7 @@ public class JsonUtil {
     final boolean isCorrupt = (Boolean) m.get("isCorrupt");
 
     final LocatedBlock locatedblock =
-        new LocatedBlock(b, locations, startOffset, isCorrupt);
+        new LocatedBlock(b, locations, null, null, startOffset, isCorrupt);
     locatedblock.setBlockToken(toBlockToken((Map<?, ?>) m.get("blockToken")));
     return locatedblock;
   }

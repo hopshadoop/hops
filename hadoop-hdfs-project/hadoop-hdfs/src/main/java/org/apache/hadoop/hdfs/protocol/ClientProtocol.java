@@ -38,6 +38,7 @@ import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifie
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenSelector;
 import org.apache.hadoop.hdfs.server.namenode.NotReplicatedYetException;
 import org.apache.hadoop.hdfs.server.namenode.SafeModeException;
+import org.apache.hadoop.hdfs.server.protocol.DatanodeStorageReport;
 import org.apache.hadoop.io.EnumSetWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.retry.Idempotent;
@@ -220,7 +221,7 @@ public interface ClientProtocol {
    *     block replication factor.
    * @param blockSize
    *     maximum block size.
-   * @param codec
+   * @param policy
    *     name of the codec used for erasure coding. Use Codec.NO_ENCODING fo no
    *     encoding
    * @throws AccessControlException
@@ -405,6 +406,26 @@ public interface ClientProtocol {
       FileNotFoundException, SafeModeException, UnresolvedLinkException,
       IOException;
 
+  /**
+   * Get all the available block storage policies.
+   * @return All the in-use block storage policies currently.
+   */
+  @Idempotent
+  public BlockStoragePolicy[] getStoragePolicies() throws IOException;
+
+  /**
+   * Set the storage policy for a file/directory
+   * @param src Path of an existing file/directory.
+   * @param policyName The name of the storage policy
+   * @throws UnresolvedLinkException if <code>src</code> contains a symlink
+   * @throws FileNotFoundException If file/dir <code>src</code> is not found
+   * @throws QuotaExceededException If changes violate the quota restriction
+   */
+  @Idempotent
+  public void setStoragePolicy(String src, String policyName)
+      throws UnresolvedLinkException, FileNotFoundException,
+      QuotaExceededException, IOException;
+
   @Idempotent
   public void setMetaEnabled(String src, boolean metaEnabled)
       throws AccessControlException, FileNotFoundException, SafeModeException,
@@ -546,8 +567,11 @@ public interface ClientProtocol {
    */
   @Idempotent
   public LocatedBlock getAdditionalDatanode(final String src,
-      final ExtendedBlock blk, final DatanodeInfo[] existings,
-      final DatanodeInfo[] excludes, final int numAdditionalNodes,
+      final ExtendedBlock blk,
+      final DatanodeInfo[] existings,
+      final String[] existingStorageIDs,
+      final DatanodeInfo[] excludes,
+      final int numAdditionalNodes,
       final String clientName)
       throws AccessControlException, FileNotFoundException, SafeModeException,
       UnresolvedLinkException, IOException;
@@ -852,6 +876,13 @@ public interface ClientProtocol {
   @Idempotent
   public DatanodeInfo[] getDatanodeReport(HdfsConstants.DatanodeReportType type)
       throws IOException;
+
+  /**
+   * Get a report on the current datanode storages.
+   */
+  @Idempotent
+  public DatanodeStorageReport[] getDatanodeStorageReport(
+      HdfsConstants.DatanodeReportType type) throws IOException;
 
   /**
    * Get the block size for the given file.
@@ -1203,7 +1234,8 @@ public interface ClientProtocol {
    *     if any error occurs
    */
   public void updatePipeline(String clientName, ExtendedBlock oldBlock,
-      ExtendedBlock newBlock, DatanodeID[] newNodes) throws IOException;
+      ExtendedBlock newBlock, DatanodeID[] newNodes, String[] newStorages)
+      throws IOException;
 
   /**
    * Get a valid Delegation Token.

@@ -20,6 +20,7 @@ package org.apache.hadoop.hdfs.server.datanode;
 import org.apache.commons.logging.Log;
 import org.apache.hadoop.fs.ChecksumException;
 import org.apache.hadoop.fs.FSOutputSummer;
+import org.apache.hadoop.hdfs.StorageType;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
@@ -122,7 +123,8 @@ class BlockReceiver implements Closeable {
 
   private boolean syncOnClose;
 
-  BlockReceiver(final ExtendedBlock block, final DataInputStream in,
+  BlockReceiver(final ExtendedBlock block, final StorageType storageType,
+      final DataInputStream in,
       final String inAddr, final String myAddr,
       final BlockConstructionStage stage, final long newGs,
       final long minBytesRcvd, final long maxBytesRcvd, final String clientname,
@@ -149,22 +151,22 @@ class BlockReceiver implements Closeable {
 
       if (LOG.isDebugEnabled()) {
         LOG.debug(
-            getClass().getSimpleName() + ": " + block + "\n  isClient  =" +
-                isClient + ", clientname=" + clientname + "\n  isDatanode=" +
-                isDatanode + ", srcDataNode=" + srcDataNode + "\n  inAddr=" +
-                inAddr + ", myAddr=" + myAddr);
+            getClass().getSimpleName() + ": " + block
+                + "\n  isClient  =" + isClient + ", clientname=" + clientname
+                + "\n  isDatanode=" + isDatanode + ", srcDataNode=" + srcDataNode
+                + "\n  inAddr=" + inAddr + ", myAddr=" + myAddr);
       }
 
       //
       // Open local disk out
       //
       if (isDatanode) { //replication or move
-        replicaInfo = datanode.data.createTemporary(block);
+        replicaInfo = datanode.data.createTemporary(storageType, block);
       } else {
         switch (stage) {
           case PIPELINE_SETUP_CREATE:
-            replicaInfo = datanode.data.createRbw(block);
-            datanode.notifyNamenodeReceivingBlock(block);
+            replicaInfo = datanode.data.createRbw(storageType, block);
+            datanode.notifyNamenodeReceivingBlock(block, replicaInfo.getStorageUuid());
             break;
           case PIPELINE_SETUP_STREAMING_RECOVERY:
             replicaInfo = datanode.data
@@ -178,7 +180,7 @@ class BlockReceiver implements Closeable {
                   .deleteBlock(block.getBlockPoolId(), block.getLocalBlock());
             }
             block.setGenerationStamp(newGs);
-            datanode.notifyNamenodeReceivingBlock(block);
+            datanode.notifyNamenodeReceivingBlock(block, replicaInfo.getStorageUuid());
             break;
           case PIPELINE_SETUP_APPEND_RECOVERY:
             replicaInfo =
@@ -188,12 +190,12 @@ class BlockReceiver implements Closeable {
                   .deleteBlock(block.getBlockPoolId(), block.getLocalBlock());
             }
             block.setGenerationStamp(newGs);
-            datanode.notifyNamenodeReceivingBlock(block);
+            datanode.notifyNamenodeReceivingBlock(block, replicaInfo.getStorageUuid());
             break;
           case TRANSFER_RBW:
           case TRANSFER_FINALIZED:
             // this is a transfer destination
-            replicaInfo = datanode.data.createTemporary(block);
+            replicaInfo = datanode.data.createTemporary(storageType, block);
             break;
           default:
             throw new IOException("Unsupported stage " + stage +
@@ -256,6 +258,10 @@ class BlockReceiver implements Closeable {
    */
   DataNode getDataNode() {
     return datanode;
+  }
+
+  String getStorageUuid() {
+    return replicaInfo.getStorageUuid();
   }
 
   /**
@@ -1008,11 +1014,10 @@ class BlockReceiver implements Closeable {
           // file and finalize the block before responding success
           if (lastPacketInBlock) {
             BlockReceiver.this.close();
-            final long endTime =
-                ClientTraceLog.isInfoEnabled() ? System.nanoTime() : 0;
+            final long endTime = ClientTraceLog.isInfoEnabled() ? System.nanoTime() : 0;
             block.setNumBytes(replicaInfo.getNumBytes());
             datanode.data.finalizeBlock(block);
-            datanode.closeBlock(block, DataNode.EMPTY_DEL_HINT);
+            datanode.closeBlock(block, DataNode.EMPTY_DEL_HINT, replicaInfo.getStorageUuid());
             if (ClientTraceLog.isInfoEnabled() && isClient) {
               long offset = 0;
               DatanodeRegistration dnR =
@@ -1020,7 +1025,7 @@ class BlockReceiver implements Closeable {
               ClientTraceLog.info(String
                   .format(DN_CLIENTTRACE_FORMAT, inAddr, myAddr,
                       block.getNumBytes(), "HDFS_WRITE", clientname, offset,
-                      dnR.getStorageID(), block, endTime - startTime));
+                      dnR.getDatanodeUuid(), block, endTime - startTime));
             } else {
               LOG.info("Received " + block + " size " + block.getNumBytes() +
                   " from " + inAddr);

@@ -100,11 +100,8 @@ public class NamenodeSelector extends Thread {
         return res;
       }
     }
-
-
   }
 
-  
   /* List of name nodes */
   private List<NamenodeSelector.NamenodeHandle> nnList =
       new CopyOnWriteArrayList<NamenodeSelector.NamenodeHandle>();

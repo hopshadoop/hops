@@ -103,8 +103,7 @@ public class TestNodeCount {
       
       // check if excessive replica is detected (transient)
       initializeTimeout(TIMEOUT);
-      while (countNodes(block.getLocalBlock(), namesystem).excessReplicas() ==
-          0) {
+      while (countNodes(block.getLocalBlock(), namesystem).excessReplicas() == 0) {
         checkTimeout("excess replicas not detected");
       }
       
@@ -137,7 +136,7 @@ public class TestNodeCount {
               DatanodeDescriptor nonExcessDN = null;
               while (iter.hasNext()) {
                 DatanodeDescriptor dn = iter.next();
-                if (!excessDns.contains(dn.getStorageID())) {
+                if (!excessDns.contains(dn.getDatanodeUuid())) {
                   nonExcessDN = dn;
                 }
               }

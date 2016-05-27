@@ -42,7 +42,7 @@ public class HdfsConstants {
       "org.apache.hadoop.hdfs.protocol.ClientDatanodeProtocol";
   
   
-  public static int MIN_BLOCKS_FOR_WRITE = 5;
+  public static int MIN_BLOCKS_FOR_WRITE = 1;
 
   // Long that indicates "leave current quota unchanged"
   public static final long QUOTA_DONT_SET = Long.MAX_VALUE;
@@ -112,4 +112,35 @@ public class HdfsConstants {
    */
   public static final int LAYOUT_VERSION =
       LayoutVersion.getCurrentLayoutVersion();
+
+  /*
+  In accordance with HDFS:
+
+  Policy ID	Policy Name	  Block Placement         Fallback storages   Fallback storages
+                           (n  replicas)	         for creation	       for replication
+  (15	      Lasy_Persist	RAM_DISK: 1, DISK: n-1	   DISK	              DISK)   <-- not implemented in Hops
+  12	      All_SSD	      SSD: n	                   DISK	              DISK
+  10	      One_SSD	      SSD: 1,DISK: n-1           SSD, DISK	        SSD, DISK
+  7	        Hot (default)	DISK: n	                   <none>	            ARCHIVE
+  5	        Warm	        DISK: 1, ARCHIVE: n-1    	 ARCHIVE, DISK	    ARCHIVE, DISK
+  2	        Cold	        ARCHIVE: n	               <none>	            <none>
+  */
+
+  public static final String ALLSSD_STORAGE_POLICY_NAME = "All_SSD";
+  public static final byte ALLSSD_STORAGE_POLICY_ID = 12;
+
+  public static final String ONESSD_STORAGE_POLICY_NAME = "One_SSD";
+  public static final byte ONESSD_STORAGE_POLICY_ID = 10;
+
+  public static final String HOT_STORAGE_POLICY_NAME = "Hot";
+  public static final byte HOT_STORAGE_POLICY_ID = 7;
+
+  public static final String WARM_STORAGE_POLICY_NAME = "Warm";
+  public static final byte WARM_STORAGE_POLICY_ID = 5;
+
+  public static final String RAID5_STORAGE_POLICY_NAME = "RAID5";
+  public static final byte RAID5_STORAGE_POLICY_ID = 4;
+
+  public static final String COLD_STORAGE_POLICY_NAME = "Cold";
+  public static final byte COLD_STORAGE_POLICY_ID = 2;
 }

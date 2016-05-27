@@ -875,16 +875,18 @@ public class NNThroughputBenchmark {
       nsInfo = nameNodeProto.versionRequest();
       dnRegistration = new DatanodeRegistration(
           new DatanodeID(DNS.getDefaultIP("default"),
-              DNS.getDefaultHost("default", "default"), "", getNodePort(dnIdx),
+              DNS.getDefaultHost("default", "default"),
+              DataNode.generateUuid(), getNodePort(dnIdx),
               DFSConfigKeys.DFS_DATANODE_HTTP_DEFAULT_PORT,
               DFSConfigKeys.DFS_DATANODE_IPC_DEFAULT_PORT),
-          new DataStorage(nsInfo, ""), new ExportedBlockKeys(),
+          new DataStorage(nsInfo), new ExportedBlockKeys(),
           VersionInfo.getVersion());
-      DataNode.setNewStorageID(dnRegistration);
+
       // register datanode
       dnRegistration = nameNodeProto.registerDatanode(dnRegistration);
+
       //first block reports
-      storage = new DatanodeStorage(dnRegistration.getStorageID());
+      storage = new DatanodeStorage(DatanodeStorage.generateUuid());
       final StorageBlockReport[] reports = {new StorageBlockReport(storage,
           new BlockListAsLongs(null, null).getBlockListAsLongs())};
       nameNodeProto.blockReport(dnRegistration,
@@ -899,7 +901,7 @@ public class NNThroughputBenchmark {
       // register datanode
       // TODO:FEDERATION currently a single block pool is supported
       StorageReport[] rep =
-          {new StorageReport(dnRegistration.getStorageID(), false, DF_CAPACITY,
+          {new StorageReport(storage, false, DF_CAPACITY,
               DF_USED, DF_CAPACITY - DF_USED, DF_USED)};
       DatanodeCommand[] cmds =
           nameNodeProto.sendHeartbeat(dnRegistration, rep, 0, 0, 0)
@@ -950,18 +952,17 @@ public class NNThroughputBenchmark {
     // keep it for future blockReceived benchmark
     int replicateBlocks() throws IOException {
       // register datanode
-      StorageReport[] rep =
-          {new StorageReport(dnRegistration.getStorageID(), false, DF_CAPACITY,
-              DF_USED, DF_CAPACITY - DF_USED, DF_USED)};
-      DatanodeCommand[] cmds =
-          nameNodeProto.sendHeartbeat(dnRegistration, rep, 0, 0, 0)
-              .getCommands();
+      StorageReport[] rep = { new StorageReport(storage,
+          false, DF_CAPACITY, DF_USED, DF_CAPACITY - DF_USED, DF_USED) };
+      DatanodeCommand[] cmds = nameNodeProto.sendHeartbeat(dnRegistration,
+          rep, 0, 0, 0).getCommands();
       if (cmds != null) {
         for (DatanodeCommand cmd : cmds) {
           if (cmd.getAction() == DatanodeProtocol.DNA_TRANSFER) {
             // Send a copy of a block to another datanode
-            BlockCommand bcmd = (BlockCommand) cmd;
-            return transferBlocks(bcmd.getBlocks(), bcmd.getTargets());
+            BlockCommand bcmd = (BlockCommand)cmd;
+            return transferBlocks(bcmd.getBlocks(), bcmd.getTargets(),
+                bcmd.getTargetStorageIDs());
           }
         }
       }
@@ -973,24 +974,28 @@ public class NNThroughputBenchmark {
      * Just report on behalf of the other data-node
      * that the blocks have been received.
      */
-    private int transferBlocks(Block blocks[], DatanodeInfo xferTargets[][])
+    private int transferBlocks(
+        Block[] blocks,
+        DatanodeInfo[][] xferTargets,
+        String[][] targetStorageIDs)
         throws IOException {
-      for (int i = 0; i < blocks.length; i++) {
+      for(int i = 0; i < blocks.length; i++) {
         DatanodeInfo blockTargets[] = xferTargets[i];
-        for (int t = 0; t < blockTargets.length; t++) {
+        for(int t = 0; t < blockTargets.length; t++) {
           DatanodeInfo dnInfo = blockTargets[t];
+          String targetStorageID = targetStorageIDs[i][t];
           DatanodeRegistration receivedDNReg;
           receivedDNReg = new DatanodeRegistration(dnInfo,
-              new DataStorage(nsInfo, dnInfo.getStorageID()),
+              new DataStorage(nsInfo),
               new ExportedBlockKeys(), VersionInfo.getVersion());
-          ReceivedDeletedBlockInfo[] rdBlocks =
-              {new ReceivedDeletedBlockInfo(blocks[i],
-                  ReceivedDeletedBlockInfo.BlockStatus.RECEIVED_BLOCK, null)};
-          StorageReceivedDeletedBlocks[] report =
-              {new StorageReceivedDeletedBlocks(receivedDNReg.getStorageID(),
-                  rdBlocks)};
-          nameNodeProto.blockReceivedAndDeleted(receivedDNReg,
-              nameNode.getNamesystem().getBlockPoolId(), report);
+          ReceivedDeletedBlockInfo[] rdBlocks = {
+              new ReceivedDeletedBlockInfo(
+                  blocks[i], ReceivedDeletedBlockInfo.BlockStatus.RECEIVED_BLOCK,
+                  null) };
+          StorageReceivedDeletedBlocks[] report = { new StorageReceivedDeletedBlocks(
+              targetStorageID, rdBlocks) };
+          nameNodeProto.blockReceivedAndDeleted(receivedDNReg, nameNode
+              .getNamesystem().getBlockPoolId(), report);
         }
       }
       return blocks.length;
@@ -1087,7 +1092,7 @@ public class NNThroughputBenchmark {
 
       // create files 
       LOG.info(
-          "Creating " + nrFiles + " with " + blocksPerFile + " blocks each.");
+          "Creating " + nrFiles + " files with " + blocksPerFile + " blocks each.");
       FileNameGenerator nameGenerator;
       nameGenerator = new FileNameGenerator(getBaseDir(), 100);
       String clientName = getClientName(007);
@@ -1123,7 +1128,7 @@ public class NNThroughputBenchmark {
                   ReceivedDeletedBlockInfo.BlockStatus.RECEIVED_BLOCK, null)};
           StorageReceivedDeletedBlocks[] report =
               {new StorageReceivedDeletedBlocks(
-                  datanodes[dnIdx].dnRegistration.getStorageID(), rdBlocks)};
+                  datanodes[dnIdx].storage.getStorageID(), rdBlocks)};
           nameNodeProto.blockReceivedAndDeleted(datanodes[dnIdx].dnRegistration,
               loc.getBlock().getBlockPoolId(), report);
         }

@@ -697,9 +697,9 @@ public class ContainerLaunch implements Callable<Integer> {
             new HashMap<String, String>(System.getenv());
         mergedEnv.putAll(environment);
 
-        String classPathJar = FileUtil
+        String[] classPathJar = FileUtil
             .createJarWithClassPath(newClassPath.toString(), pwd, mergedEnv);
-        environment.put(Environment.CLASSPATH.name(), classPathJar);
+        environment.put(Environment.CLASSPATH.name(), classPathJar[0]);
       }
     }
     // put AuxiliaryService data to environment

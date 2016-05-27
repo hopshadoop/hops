@@ -25,30 +25,33 @@ import io.hops.transaction.handler.LightWeightRequestHandler;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLockTypes.LockType;
 import io.hops.transaction.lock.TransactionLocks;
-import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 
 import java.io.IOException;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
 public class StorageIdMap {
 
-  private Map<String, Integer> storageIdtoSId;
-  private Map<Integer, String> sIdtoStorageId;
+  private Map<String, Integer> storageIdtoSId = Collections.synchronizedMap(new HashMap<String, Integer>());
+  private Map<Integer, String> sIdtoStorageId = Collections.synchronizedMap(new HashMap<Integer, String>());;
   
   public StorageIdMap() throws IOException {
-    this.sIdtoStorageId = new HashMap<Integer, String>();
-    this.storageIdtoSId = new HashMap<String, Integer>();
-    initialize();
+    this(true);
   }
 
-  public void update(DatanodeDescriptor dn) throws IOException {
-    String storageId = dn.getStorageID();
-    if (!storageIdtoSId.containsKey(storageId)) {
-      getSetSId(storageId);
+  public StorageIdMap(boolean loadFromDB) throws IOException {
+    if(loadFromDB) {
+      initialize();
     }
-    dn.setSId(storageIdtoSId.get(storageId));
+  }
+
+  public void update(DatanodeStorageInfo s) throws IOException {
+    String storageUuid = s.getStorageID();
+    getSetSId(storageUuid);
+    s.setSid(storageIdtoSId.get(storageUuid));
   }
 
   public int getSId(String storageId) {
@@ -64,9 +67,13 @@ public class StorageIdMap {
       @Override
       public Object performTask() throws StorageException, IOException {
         StorageIdMapDataAccess<StorageId> da =
-            (StorageIdMapDataAccess) HdfsStorageFactory
-                .getDataAccess(StorageIdMapDataAccess.class);
+            (StorageIdMapDataAccess) HdfsStorageFactory.getDataAccess(StorageIdMapDataAccess.class);
         Collection<StorageId> sids = da.findAll();
+
+        if(sids == null) {
+          return null;
+        }
+
         for (StorageId h : sids) {
           storageIdtoSId.put(h.getStorageId(), h.getsId());
           sIdtoStorageId.put(h.getsId(), h.getStorageId());
@@ -76,13 +83,17 @@ public class StorageIdMap {
     }.handle();
   }
 
-  private void getSetSId(final String storageId) throws IOException {
+  private void getSetSId(final String storageUuid) throws IOException {
+    // If we've already seen this storageUuid, ignore this call.
+    if(this.storageIdtoSId.containsKey(storageUuid)) {
+      return;
+    }
+
     new HopsTransactionalRequestHandler(HDFSOperationType.GET_SET_SID) {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
-        locks.add(
-            lf.getVariableLock(Variable.Finder.SIdCounter, LockType.WRITE));
+        locks.add(lf.getVariableLock(Variable.Finder.SIdCounter, LockType.WRITE));
       }
 
       @Override
@@ -91,16 +102,16 @@ public class StorageIdMap {
         StorageIdMapDataAccess<StorageId> da =
             (StorageIdMapDataAccess) HdfsStorageFactory
                 .getDataAccess(StorageIdMapDataAccess.class);
-        StorageId h = da.findByPk(storageId);
+        StorageId h = da.findByPk(storageUuid);
         if (h == null) {
-          h = new StorageId(storageId, currSIdCount);
+          h = new StorageId(storageUuid, currSIdCount);
           da.add(h);
           currSIdCount++;
           HdfsVariables.setSIdCounter(currSIdCount);
         }
 
-        storageIdtoSId.put(storageId, h.getsId());
-        sIdtoStorageId.put(h.getsId(), storageId);
+        storageIdtoSId.put(storageUuid, h.getsId());
+        sIdtoStorageId.put(h.getsId(), storageUuid);
 
         return null;
       }

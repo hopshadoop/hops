@@ -54,6 +54,7 @@ import org.apache.hadoop.hdfs.NamenodeSelector.NamenodeHandle;
 import org.apache.hadoop.hdfs.client.HdfsDataInputStream;
 import org.apache.hadoop.hdfs.client.HdfsDataOutputStream;
 import org.apache.hadoop.hdfs.protocol.AlreadyBeingCreatedException;
+import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.CorruptFileBlocks;
 import org.apache.hadoop.hdfs.protocol.DSQuotaExceededException;
@@ -1676,6 +1677,53 @@ public class DFSClient implements java.io.Closeable {
     }
   }
 
+  /**
+   * Set storage policy for an existing file/directory
+   * @param src file/directory name
+   * @param policyName name of the storage policy
+   */
+  public void setStoragePolicy(final String src, final String policyName)
+      throws IOException {
+    try {
+      ClientActionHandler handler = new ClientActionHandler() {
+        @Override
+        public Object doAction(ClientProtocol namenode)
+            throws RemoteException, IOException {
+          namenode.setStoragePolicy(src, policyName);
+          return null;
+        }
+      };
+      doClientActionWithRetry(handler, "setStoragePolicy");
+
+    } catch (RemoteException re) {
+      throw re.unwrapRemoteException(AccessControlException.class,
+          FileNotFoundException.class,
+          SafeModeException.class,
+          NSQuotaExceededException.class,
+          UnresolvedPathException.class);
+    }
+  }
+
+  /**
+   * @return All the existing storage policies
+   */
+  public BlockStoragePolicy[] getStoragePolicies() throws IOException {
+    try {
+      ClientActionHandler handler = new ClientActionHandler() {
+        @Override
+        public Object doAction(ClientProtocol namenode)
+            throws RemoteException, IOException {
+          return namenode.getStoragePolicies();
+        }
+      };
+      return (BlockStoragePolicy[]) doClientActionWithRetry(handler, "getStoragePolicies");
+    } catch (RemoteException re) {
+      throw re.unwrapRemoteException(AccessControlException.class,
+          FileNotFoundException.class, SafeModeException.class,
+          DSQuotaExceededException.class, UnresolvedPathException.class);
+    }
+  }
+
   public void setMetaEnabled(final String src, final boolean metaEnabled)
       throws IOException {
     try {
@@ -2199,20 +2247,7 @@ public class DFSClient implements java.io.Closeable {
    * for the first byte of that replica. This is used for compatibility
    * with older HDFS versions which did not include the checksum type in
    * OpBlockChecksumResponseProto.
-   *
-   * @param in
-   *     input stream from datanode
-   * @param out
-   *     output stream to datanode
-   * @param lb
-   *     the located block
-   * @param clientName
-   *     the name of the DFSClient requesting the checksum
-   * @param dn
-   *     the connected datanode
    * @return the inferred checksum type
-   * @throws IOException
-   *     if an error occurs
    */
   private static Type inferChecksumTypeByReading(String clientName,
       SocketFactory socketFactory, int socketTimeout, LocatedBlock lb,
@@ -2882,16 +2917,16 @@ public class DFSClient implements java.io.Closeable {
 
   public LocatedBlock getAdditionalDatanode(final String src,
       final ExtendedBlock blk, final DatanodeInfo[] existings,
-      final DatanodeInfo[] excludes, final int numAdditionalNodes,
-      final String clientName)
+      final String[] existingStorages, final DatanodeInfo[] excludes,
+      final int numAdditionalNodes, final String clientName)
       throws AccessControlException, FileNotFoundException, SafeModeException,
       UnresolvedLinkException, IOException {
     ClientActionHandler handler = new ClientActionHandler() {
       @Override
       public Object doAction(ClientProtocol namenode)
           throws RemoteException, IOException {
-        return namenode.getAdditionalDatanode(src, blk, existings, excludes,
-            numAdditionalNodes, clientName);
+        return namenode.getAdditionalDatanode(src, blk, existings, existingStorages,
+            excludes, numAdditionalNodes, clientName);
       }
     };
     return (LocatedBlock) doClientActionWithRetry(handler,
@@ -2913,12 +2948,13 @@ public class DFSClient implements java.io.Closeable {
 
   public void updatePipeline(final String clientName,
       final ExtendedBlock oldBlock, final ExtendedBlock newBlock,
-      final DatanodeID[] newNodes) throws IOException {
+      final DatanodeID[] newNodes, final String[] newStorages) throws IOException {
     ClientActionHandler handler = new ClientActionHandler() {
       @Override
       public Object doAction(ClientProtocol namenode)
           throws RemoteException, IOException {
-        namenode.updatePipeline(clientName, oldBlock, newBlock, newNodes);
+        namenode.updatePipeline(clientName, oldBlock, newBlock, newNodes,
+            newStorages);
         return null;
       }
     };

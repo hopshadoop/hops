@@ -20,6 +20,7 @@ package org.apache.hadoop.hdfs;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockPlacementPolicyDefault;
 
 /**
  * This class contains constants for configuration keys used
@@ -698,6 +699,12 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
       "dfs.block.access.token.lifetime";
   public static final long DFS_BLOCK_ACCESS_TOKEN_LIFETIME_DEFAULT = 600L;
 
+  public static final String DFS_BLOCK_REPLICATOR_CLASSNAME_KEY =
+      "dfs.block.replicator.classname";
+  public static final Class<BlockPlacementPolicyDefault>
+      DFS_BLOCK_REPLICATOR_CLASSNAME_DEFAULT =
+      BlockPlacementPolicyDefault.class;
+
   public static final String DFS_REPLICATION_MAX_KEY = "dfs.replication.max";
   public static final int DFS_REPLICATION_MAX_DEFAULT = 512;
   public static final String DFS_DF_INTERVAL_KEY = "dfs.df.interval";
@@ -709,6 +716,8 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String DFS_BLOCKREPORT_INITIAL_DELAY_KEY =
       "dfs.blockreport.initialDelay";
   public static final int DFS_BLOCKREPORT_INITIAL_DELAY_DEFAULT = 0;
+  public static final String  DFS_BLOCKREPORT_SPLIT_THRESHOLD_KEY = "dfs.blockreport.split.threshold";
+  public static final long    DFS_BLOCKREPORT_SPLIT_THRESHOLD_DEFAULT = 1000 * 1000;
   public static final String DFS_BLOCK_INVALIDATE_LIMIT_KEY =
       "dfs.block.invalidate.limit";
   public static final int DFS_BLOCK_INVALIDATE_LIMIT_DEFAULT = 1000;

@@ -104,19 +104,30 @@ public class TestFileAppendRestart {
   public void testAppendWithPipelineRecovery() throws Exception {
     Configuration conf = new Configuration();
     MiniDFSCluster cluster = null;
+    FSDataOutputStream out = null;
     try {
       cluster = new MiniDFSCluster.Builder(conf).manageDataDfsDirs(true)
           .manageNameDfsDirs(true).numDataNodes(4)
-          .racks(new String[]{"/rack1", "/rack1", "/rack1", "/rack2"}).build();
+          .racks(new String[] { "/rack1", "/rack1", "/rack2", "/rack2" })
+          .build();
       cluster.waitActive();
 
       DistributedFileSystem fs = cluster.getFileSystem();
       Path path = new Path("/test1");
-      DFSTestUtil.createFile(fs, path, 1024, (short) 3, 1l);
+
+      out = fs.create(path, true, BLOCK_SIZE, (short) 3, BLOCK_SIZE);
+      AppendTestUtil.write(out, 0, 1024);
+      out.close();
 
       cluster.stopDataNode(3);
-      DFSTestUtil.appendFile(fs, path, "hello");
+      out = fs.append(path);
+      AppendTestUtil.write(out, 1024, 1024);
+      out.close();
+
+      cluster.restartNameNode(true);
+      AppendTestUtil.check(fs, path, 2048);
     } finally {
+      IOUtils.closeStream(out);
       if (null != cluster) {
         cluster.shutdown();
       }

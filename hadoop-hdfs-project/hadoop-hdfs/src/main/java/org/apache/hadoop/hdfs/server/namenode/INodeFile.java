@@ -19,18 +19,15 @@ package org.apache.hadoop.hdfs.server.namenode;
 
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
-import io.hops.metadata.HdfsStorageFactory;
-import io.hops.metadata.hdfs.dal.MetadataLogDataAccess;
-import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.transaction.EntityManager;
 import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockCollection;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoUnderConstruction;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
 import org.apache.hadoop.hdfs.server.common.GenerationStamp;
 
 import java.io.FileNotFoundException;
@@ -99,6 +96,15 @@ public class INodeFile extends INode implements BlockCollection {
   @Override
   public short getBlockReplication() {
     return extractBlockReplication(header);
+  }
+
+  @Override
+  public byte getStoragePolicyID() throws TransactionContextException, StorageException {
+    byte id = getLocalStoragePolicyID();
+    if (id == BlockStoragePolicySuite.ID_UNSPECIFIED) {
+      return this.getParent() != null ? this.getParent().getStoragePolicyID() : id;
+    }
+    return id;
   }
 
   static short extractBlockReplication(long header) {
@@ -339,6 +345,11 @@ public class INodeFile extends INode implements BlockCollection {
     return header;
   }
 
+  /** @return the diskspace required for a full block. */
+  final long getBlockDiskspace() {
+    return getPreferredBlockSize() * getBlockReplication();
+  }
+
   public static short getBlockReplication(long header) {
     return (short) ((header & HEADERMASK) >> BLOCKBITS);
   }
@@ -357,8 +368,7 @@ public class INodeFile extends INode implements BlockCollection {
       String clientName, String clientMachine, DatanodeID clientNode)
       throws IOException {
     INodeFileUnderConstruction ucfile =
-        new INodeFileUnderConstruction(this, clientName, clientMachine,
-            clientNode);
+        new INodeFileUnderConstruction(this, clientName, clientMachine, clientNode);
     save(ucfile);
     return ucfile;
   }

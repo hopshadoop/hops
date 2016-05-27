@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.net;
 
+import io.hops.metadata.StorageMap;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
 import org.junit.Before;

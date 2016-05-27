@@ -19,9 +19,11 @@ package org.apache.hadoop.hdfs.server.protocol;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.hdfs.StorageType;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor.BlockTargetPair;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 
 import java.util.List;
 
@@ -52,6 +54,9 @@ public class BlockCommand extends DatanodeCommand {
   String poolId;
   Block blocks[];
   DatanodeInfo targets[][];
+  final StorageType[][] targetStorageTypes;
+  final String[][] targetStorageIDs;
+
 
   /**
    * Create BlockCommand for transferring blocks to another datanode
@@ -65,37 +70,44 @@ public class BlockCommand extends DatanodeCommand {
     this.poolId = poolId;
     blocks = new Block[blocktargetlist.size()];
     targets = new DatanodeInfo[blocks.length][];
+    targetStorageTypes = new StorageType[blocks.length][];
+    targetStorageIDs = new String[blocks.length][];
+
     for (int i = 0; i < blocks.length; i++) {
       BlockTargetPair p = blocktargetlist.get(i);
       blocks[i] = p.block;
-      targets[i] = p.targets;
+      targets[i] = DatanodeStorageInfo.toDatanodeInfos(p.targets);
+      targetStorageTypes[i] = DatanodeStorageInfo.toStorageTypes(p.targets);
+      targetStorageIDs[i] = DatanodeStorageInfo.toStorageIDs(p.targets);
     }
   }
 
-  private static final DatanodeInfo[][] EMPTY_TARGET = {};
+  private static final DatanodeInfo[][] EMPTY_TARGET_DATANODES = {};
+  private static final StorageType[][] EMPTY_TARGET_STORAGE_TYPES = {};
+  private static final String[][] EMPTY_TARGET_STORAGEIDS = {};
 
   /**
    * Create BlockCommand for the given action
-   *
-   * @param blocks
-   *     blocks related to the action
+   * @param blocks blocks related to the action
    */
   public BlockCommand(int action, String poolId, Block blocks[]) {
-    this(action, poolId, blocks, EMPTY_TARGET);
+    this(action, poolId, blocks, EMPTY_TARGET_DATANODES,
+        EMPTY_TARGET_STORAGE_TYPES, EMPTY_TARGET_STORAGEIDS);
   }
 
   /**
    * Create BlockCommand for the given action
-   *
-   * @param blocks
-   *     blocks related to the action
+   * @param blocks blocks related to the action
    */
   public BlockCommand(int action, String poolId, Block[] blocks,
-      DatanodeInfo[][] targets) {
+      DatanodeInfo[][] targets, StorageType[][] targetStorageTypes,
+      String[][] targetStorageIDs) {
     super(action);
     this.poolId = poolId;
     this.blocks = blocks;
     this.targets = targets;
+    this.targetStorageTypes = targetStorageTypes;
+    this.targetStorageIDs = targetStorageIDs;
   }
   
   public String getBlockPoolId() {
@@ -108,5 +120,13 @@ public class BlockCommand extends DatanodeCommand {
 
   public DatanodeInfo[][] getTargets() {
     return targets;
+  }
+
+  public StorageType[][] getTargetStorageTypes() {
+    return targetStorageTypes;
+  }
+
+  public String[][] getTargetStorageIDs() {
+    return targetStorageIDs;
   }
 }

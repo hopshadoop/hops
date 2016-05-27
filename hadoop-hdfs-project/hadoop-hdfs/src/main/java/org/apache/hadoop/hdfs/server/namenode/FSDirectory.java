@@ -35,6 +35,7 @@ import io.hops.transaction.EntityManager;
 import io.hops.transaction.context.HdfsTransactionContextMaintenanceCmds;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
+import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
@@ -49,6 +50,7 @@ import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DirectoryListing;
@@ -63,7 +65,9 @@ import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoUnderConstruction;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockManager;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.BlockUCState;
 import org.apache.hadoop.hdfs.util.ByteArray;
 import org.apache.hadoop.security.AccessControlException;
@@ -234,32 +238,32 @@ public class FSDirectory implements Closeable {
     return newNode;
   }
 
-  INode unprotectedAddFile(String path, PermissionStatus permissions,
-      short replication, long modificationTime, long atime,
-      long preferredBlockSize, boolean underConstruction, String clientName,
-      String clientMachine) throws IOException {
-    INode newNode;
-    if (underConstruction) {
-      newNode = new INodeFileUnderConstruction(permissions, replication,
-          preferredBlockSize, modificationTime, clientName, clientMachine,
-          null);
-    } else {
-      newNode = new INodeFile(permissions, BlockInfo.EMPTY_ARRAY, replication,
-          modificationTime, atime, preferredBlockSize);
-    }
-
-    try {
-      newNode = addNode(path, newNode, UNKNOWN_DISK_SPACE);
-    } catch (IOException e) {
-      if (NameNode.stateChangeLog.isDebugEnabled()) {
-        NameNode.stateChangeLog.debug(
-            "DIR* FSDirectory.unprotectedAddFile: exception when add " + path +
-                " to the file system", e);
-      }
-      return null;
-    }
-    return newNode;
-  }
+//  INode unprotectedAddFile(String path, PermissionStatus permissions,
+//      short replication, long modificationTime, long atime,
+//      long preferredBlockSize, boolean underConstruction, String clientName,
+//      String clientMachine) throws IOException {
+//    INode newNode;
+//    if (underConstruction) {
+//      newNode = new INodeFileUnderConstruction(permissions, replication,
+//          preferredBlockSize, modificationTime, clientName, clientMachine,
+//          null);
+//    } else {
+//      newNode = new INodeFile(permissions, BlockInfo.EMPTY_ARRAY, replication,
+//          modificationTime, atime, preferredBlockSize);
+//    }
+//
+//    try {
+//      newNode = addNode(path, newNode, UNKNOWN_DISK_SPACE);
+//    } catch (IOException e) {
+//      if (NameNode.stateChangeLog.isDebugEnabled()) {
+//        NameNode.stateChangeLog.debug(
+//            "DIR* FSDirectory.unprotectedAddFile: exception when add " + path +
+//                " to the file system", e);
+//      }
+//      return null;
+//    }
+//    return newNode;
+//  }
 
   INodeDirectory addToParent(byte[] src, INodeDirectory parentINode,
       INode newNode, boolean propagateModTime)
@@ -291,18 +295,15 @@ public class FSDirectory implements Closeable {
    * Add a block to the file. Returns a reference to the added block.
    */
   BlockInfo addBlock(String path, INode[] inodes, Block block,
-      DatanodeDescriptor targets[])
+      DatanodeStorageInfo targets[])
       throws QuotaExceededException, StorageException,
       TransactionContextException {
     assert inodes[inodes.length - 1]
         .isUnderConstruction() : "INode should correspond to a file under construction";
-    INodeFileUnderConstruction fileINode =
-        (INodeFileUnderConstruction) inodes[inodes.length - 1];
+    INodeFileUnderConstruction fileINode = (INodeFileUnderConstruction) inodes[inodes.length - 1];
 
     // check quota limits and updated space consumed
-    updateCount(inodes, inodes.length - 1, 0,
-        fileINode.getPreferredBlockSize() * fileINode.getBlockReplication(),
-        true);
+    updateCount(inodes, inodes.length - 1, 0, fileINode.getBlockDiskspace(), true);
 
     // associate new last block for the file
     BlockInfoUnderConstruction blockInfo =
@@ -1092,6 +1093,23 @@ public class FSDirectory implements Closeable {
     return fileNode.getBlocks();
   }
 
+  void setStoragePolicy(String src, BlockStoragePolicy policy) throws IOException {
+    unprotectedSetStoragePolicy(src, policy);
+  }
+
+  void unprotectedSetStoragePolicy(String src, BlockStoragePolicy policy) throws IOException {
+    INode[] inodes = getRootDir().getExistingPathINodes(src, true);
+    INode inode = inodes[inodes.length - 1];
+
+    if (inode == null) {
+      throw new FileNotFoundException(src + " is not a file or directory");
+    } else if (inode.isSymlink()) {
+      throw new IOException("Cannot set storage policy for symlink: " + src);
+    } else {
+      inode.setBlockStoragePolicyID(policy.getId());
+    }
+  }
+
   /**
    * Get the blocksize of a file
    *
@@ -1287,7 +1305,7 @@ public class FSDirectory implements Closeable {
    * Delete a path from the name space
    * Update the count at each ancestor directory with quota
    * <br>
-   * Note: This is to be used by {@link FSEditLog} only.
+   * Note: This is to be used by FSEditLog only.
    * <br>
    *
    * @param src
@@ -1448,8 +1466,8 @@ public class FSDirectory implements Closeable {
   /**
    * Get {@link INode} associated with the file / directory.
    */
-  INode getINode(String src) throws UnresolvedLinkException, StorageException,
-      TransactionContextException {
+  public INode getINode(String src) throws UnresolvedLinkException,
+      StorageException, TransactionContextException {
     return getRootDir().getNode(src, true);
   }
 
@@ -1463,7 +1481,7 @@ public class FSDirectory implements Closeable {
    * deepest INodes. The array size will be the number of expected
    * components in the path, and non existing components will be
    * filled with null
-   * @see INodeDirectory#getExistingPathINodes(byte[][], INode[])
+   * @see INodeDirectory#getExistingPathINodes(byte[][], INode[], boolean)
    */
   INode[] getExistingPathINodes(String path)
       throws UnresolvedLinkException, StorageException,
@@ -1522,7 +1540,7 @@ public class FSDirectory implements Closeable {
    *     the delta change of diskspace
    * @throws QuotaExceededException
    *     if the new count violates any quota limit
-   * @throws FileNotFound
+   * @throws FileNotFoundException
    *     if path does not exist.
    */
   void updateSpaceConsumed(String path, long nsDelta, long dsDelta)
@@ -1661,11 +1679,6 @@ public class FSDirectory implements Closeable {
    *     string representation of the path to the directory
    * @param permissions
    *     the permission of the directory
-   * @param isAutocreate
-   *     if the permission of the directory should inherit
-   *     from its parent or not. u+wx is implicitly added to
-   *     the automatically created directories, and to the
-   *     given directory if inheritPermission is true
    * @param now
    *     creation time
    * @return true if the operation succeeds false otherwise
@@ -2240,7 +2253,7 @@ public class FSDirectory implements Closeable {
    *
    * @param dir
    *     the root of the tree that represents the directory
-   * @param counters
+   * @param counts
    *     counters for name space and disk space
    * @param nodesInPath
    *     INodes for the each of components in the path.
@@ -2577,17 +2590,25 @@ public class FSDirectory implements Closeable {
       blocksize = fileNode.getPreferredBlockSize();
     }
     // TODO Add encoding status
-    return new HdfsFileStatus(size, node.isDirectory(), replication, blocksize,
-        node.getModificationTime(), node.getAccessTime(),
-        node.getFsPermission(), node.getUserName(), node.getGroupName(),
-        node.isSymlink() ? ((INodeSymlink) node).getSymlink() : null, path);
+    return new HdfsFileStatus(
+        size,
+        node.isDirectory(),
+        replication,
+        blocksize,
+        node.getModificationTime(),
+        node.getAccessTime(),
+        node.getFsPermission(),
+        node.getUserName(),
+        node.getGroupName(),
+        node.isSymlink() ? ((INodeSymlink) node).getSymlink() : null,
+        path,
+        node.getStoragePolicyID());
   }
 
   /**
    * Create FileStatus with location info by file INode
    */
-  private HdfsLocatedFileStatus createLocatedFileStatus(byte[] path, INode node)
-      throws IOException, StorageException {
+  private HdfsLocatedFileStatus createLocatedFileStatus(byte[] path, INode node) throws IOException, StorageException {
     long size = 0;     // length is zero for directories
     short replication = 0;
     long blocksize = 0;
@@ -2609,7 +2630,7 @@ public class FSDirectory implements Closeable {
         blocksize, node.getModificationTime(), node.getAccessTime(),
         node.getFsPermission(), node.getUserName(), node.getGroupName(),
         node.isSymlink() ? ((INodeSymlink) node).getSymlink() : null, path,
-        loc);
+        loc, node.getStoragePolicyID());
   }
 
 
@@ -2688,13 +2709,13 @@ public class FSDirectory implements Closeable {
           @Override
           public Object performTask() throws IOException {
             INodeDirectoryWithQuota newRootINode = null;
-            INodeDataAccess da = (INodeDataAccess) HdfsStorageFactory
-                .getDataAccess(INodeDataAccess.class);
-            INodeDirectoryWithQuota rootInode = (INodeDirectoryWithQuota) da
-                .pkLookUpFindInodeByNameAndParentId(INodeDirectory.ROOT_NAME,
-                    INodeDirectory.ROOT_PARENT_ID);
+            INodeDataAccess da = (INodeDataAccess) HdfsStorageFactory.getDataAccess(INodeDataAccess.class);
+            INodeDirectoryWithQuota rootInode =
+                (INodeDirectoryWithQuota) da.pkLookUpFindInodeByNameAndParentId(INodeDirectory.ROOT_NAME, INodeDirectory.ROOT_PARENT_ID);
             if (rootInode == null || overwrite == true) {
               newRootINode = INodeDirectoryWithQuota.createRootDir(ps);
+              // Set the block storage policy to DEFAULT
+              newRootINode.setBlockStoragePolicyIDNoPersistance(BlockStoragePolicySuite.getDefaultPolicy().getId());
               List<INode> newINodes = new ArrayList();
               newINodes.add(newRootINode);
               da.prepare(INode.EMPTY_LIST, newINodes, INode.EMPTY_LIST);
@@ -2710,7 +2731,7 @@ public class FSDirectory implements Closeable {
               ida.prepare(attrList, null);
               LOG.info("Added new root inode");
             }
-            return (Object) newRootINode;
+            return newRootINode;
           }
         };
     return (INodeDirectoryWithQuota) addRootINode.handle();
@@ -2734,27 +2755,8 @@ public class FSDirectory implements Closeable {
       clone.setParentIdNoPersistance(inode.getParentId());
       clone.setUser(inode.getUserName());
     } else if (inode instanceof INodeFileUnderConstruction) {
-      int id = ((INodeFileUnderConstruction) inode).getId();
-      int pid = ((INodeFileUnderConstruction) inode).getParentId();
-      byte[] name = ((INodeFileUnderConstruction) inode).getLocalNameBytes();
-      short replication =
-          ((INodeFileUnderConstruction) inode).getBlockReplication();
-      long modificationTime =
-          ((INodeFileUnderConstruction) inode).getModificationTime();
-      long preferredBlockSize =
-          ((INodeFileUnderConstruction) inode).getPreferredBlockSize();
-      BlockInfo[] blocks = null/*BlockInfo[] blocks,*/;
-      PermissionStatus permissionStatus =
-          ((INodeFileUnderConstruction) inode).getPermissionStatus();
-      String clientName = ((INodeFileUnderConstruction) inode).getClientName();
-      String clientMachineName =
-          ((INodeFileUnderConstruction) inode).getClientMachine();
-      DatanodeID datanodeID =
-          ((INodeFileUnderConstruction) inode).getClientNode();
-      clone =
-          new INodeFileUnderConstruction(name, replication, modificationTime,
-              preferredBlockSize, blocks, permissionStatus, clientName,
-              clientMachineName, datanodeID, id, pid);
+      INodeFileUnderConstruction ifuc = ((INodeFileUnderConstruction) inode);
+      clone = new INodeFileUnderConstruction(ifuc);
 
     } else if (inode instanceof INodeFile) {
       clone = new INodeFile((INodeFile) inode);
