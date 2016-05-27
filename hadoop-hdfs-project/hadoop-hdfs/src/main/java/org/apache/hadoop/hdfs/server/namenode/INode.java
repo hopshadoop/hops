@@ -56,7 +56,7 @@ import java.util.logging.Logger;
 @InterfaceAudience.Private
 public abstract class INode implements Comparable<byte[]> {
   
-  static final List<INode> EMPTY_LIST =
+  public static final List<INode> EMPTY_LIST =
       Collections.unmodifiableList(new ArrayList<INode>());
 
 
