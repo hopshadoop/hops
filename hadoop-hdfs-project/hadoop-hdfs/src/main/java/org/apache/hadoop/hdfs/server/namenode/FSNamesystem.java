@@ -1050,8 +1050,7 @@ public class FSNamesystem
 
               LocatedBlock lastBlock = blocks.getLastLocatedBlock();
               if (lastBlock != null) {
-                ArrayList<LocatedBlock> lastBlockList =
-                    new ArrayList<LocatedBlock>();
+                ArrayList<LocatedBlock> lastBlockList = new ArrayList<LocatedBlock>();
                 lastBlockList.add(lastBlock);
                 blockManager.getDatanodeManager()
                     .sortLocatedBlocks(clientMachine, lastBlockList);

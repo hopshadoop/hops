@@ -17,23 +17,32 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
+import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
+import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
+import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.*;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.util.Random;
 import java.util.UUID;
 
+import org.apache.commons.lang.math.RandomUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdfs.AppendTestUtil;
 import org.apache.hadoop.hdfs.DFSClient;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.protocol.*;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockManager;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsVolumeSpi;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
@@ -63,12 +72,13 @@ public class TestIncrementalBrVariations {
   static final int BLOCK_SIZE = 1024;
   static final int NUM_BLOCKS = 10;
   private static final long seed = 0xFACEFEEDL;
+  private static final String NN_METRICS = "NameNodeActivity";
 
 
   private MiniDFSCluster cluster;
   private DistributedFileSystem fs;
   private DFSClient client;
-  private Configuration conf;
+  private static Configuration conf;
   private String poolId;
   private DataNode dn0;           // DataNode at index0 in the MiniDFSCluster
   private DatanodeRegistration dn0Reg;  // DataNodeRegistration for dn0
@@ -179,8 +189,38 @@ public class TestIncrementalBrVariations {
     assertThat(cluster.getNamesystem().getMissingBlocksCount(), is((long) reports.length));
   }
 
+  /**
+   * Verify that the DataNode sends a single incremental block report for all
+   * storages.
+   * @throws IOException
+   * @throws InterruptedException
+   */
+  @Test (timeout=60000)
+  public void testDataNodeDoesNotSplitReports()
+      throws IOException, InterruptedException {
+    LocatedBlocks blocks = createFileGetBlocks(GenericTestUtils.getMethodName());
+    assertThat(cluster.getDataNodes().size(), is(1));
+
+    // Remove all blocks from the DataNode.
+    for (LocatedBlock block : blocks.getLocatedBlocks()) {
+      dn0.notifyNamenodeDeletedBlock(
+          block.getBlock(), block.getStorageIDs()[0]);
+    }
+
+    LOG.info("Triggering report after deleting blocks");
+    long ops = getLongCounter("BlockReceivedAndDeletedOps", getMetrics(NN_METRICS));
+
+    // Trigger a report to the NameNode and give it a few seconds.
+    DataNodeTestUtils.triggerBlockReport(dn0);
+    Thread.sleep(5000);
+
+    // Ensure that NameNodeRpcServer.blockReceivedAndDeletes is invoked
+    // exactly once after we triggered the report.
+    assertCounter("BlockReceivedAndDeletedOps", ops+1, getMetrics(NN_METRICS));
+  }
+
   private static Block getDummyBlock() {
-    return new Block(10000000L, 100L, 1048576L);
+    return new Block(0L, 100L, 1048576L);
   }
 
   private static StorageReceivedDeletedBlocks[] makeReportForReceivedBlock(
@@ -203,6 +243,13 @@ public class TestIncrementalBrVariations {
   @Test (timeout=60000)
   public void testNnLearnsNewStorages()
       throws IOException, InterruptedException {
+
+    // First create a file, so the block we'll be randomly generating
+    // corresponds to a block in a real file (avoid nullpointers when reading
+    // its parent)
+    FSDataOutputStream stream = fs.create(new Path("/foo/testfile.dat"), (short) 3);
+    stream.write(AppendTestUtil.randomBytes(0, 100));
+    stream.close();
 
     // Generate a report for a fake block on a fake storage.
     final String newStorageUuid = UUID.randomUUID().toString();

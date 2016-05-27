@@ -70,6 +70,8 @@ public class NameNodeMetrics {
   MutableCounterLong getLinkTargetOps;
   @Metric
   MutableCounterLong filesInGetListingOps;
+  @Metric("Number of blockReceivedAndDeleted calls")
+  MutableCounterLong blockReceivedAndDeletedOps;
   @Metric("Number of blockReports from individual storages")
   MutableCounterLong storageBlockReportOps;
 
@@ -171,6 +173,10 @@ public class NameNodeMetrics {
 
   public void incrGetLinkTargetOps() {
     getLinkTargetOps.incr();
+  }
+
+  public void incrBlockReceivedAndDeletedOps() {
+    blockReceivedAndDeletedOps.incr();
   }
 
   public void incrStorageBlockReportOps() {
