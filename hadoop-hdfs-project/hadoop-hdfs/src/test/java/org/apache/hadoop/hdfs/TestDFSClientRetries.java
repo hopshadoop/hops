@@ -197,6 +197,7 @@ public class TestDFSClientRetries {
       }
       // successfully read with write timeout on datanodes.
       in.close();
+      fs.close();
     } finally {
       cluster.shutdown();
     }
@@ -824,14 +825,11 @@ public class TestDFSClientRetries {
         5000);
 
     final short numDatanodes = 3;
-    MiniDFSCluster cluster = null;
+    final MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
+        .numDataNodes(numDatanodes)
+        .build();
 
     try {
-      cluster = new MiniDFSCluster
-          .Builder(conf)
-          .numDataNodes(numDatanodes)
-          .format(true)
-          .build();
       cluster.waitActive();
 
       final DistributedFileSystem dfs = cluster.getFileSystem();
@@ -931,7 +929,6 @@ public class TestDFSClientRetries {
       thread.start();
 
       //restart namenode in a new thread
-      final MiniDFSCluster finalCluster = cluster;
       new Thread(new Runnable() {
         @Override
         public void run() {
@@ -939,8 +936,8 @@ public class TestDFSClientRetries {
             //sleep, restart, and then wait active
             TimeUnit.SECONDS.sleep(30);
             assertFalse(HdfsUtils.isHealthy(uri));
-            finalCluster.restartNameNode(0, false);
-            finalCluster.waitActive();
+            cluster.restartNameNode(0, false);
+            cluster.waitActive();
             assertTrue(HdfsUtils.isHealthy(uri));
           } catch (Exception e) {
             exceptions.add(e);
@@ -1037,15 +1034,15 @@ public class TestDFSClientRetries {
   }
 
   private static FileSystem createFsWithDifferentUsername(
-      final Configuration conf, final boolean isWebHDFS)
-      throws IOException, InterruptedException {
-    final String username =
-        UserGroupInformation.getCurrentUser().getShortUserName() + "_XXX";
-    final UserGroupInformation ugi = UserGroupInformation
-        .createUserForTesting(username, new String[]{"supergroup"});
+      final Configuration conf, final boolean isWebHDFS
+  ) throws IOException, InterruptedException {
+    final String username = UserGroupInformation.getCurrentUser(
+    ).getShortUserName() + "_XXX";
+    final UserGroupInformation ugi = UserGroupInformation.createUserForTesting(
+        username, new String[]{"supergroup"});
 
-    return isWebHDFS ? WebHdfsTestUtil.getWebHdfsFileSystemAs(ugi, conf) :
-        DFSTestUtil.getFileSystemAs(ugi, conf);
+    return isWebHDFS? WebHdfsTestUtil.getWebHdfsFileSystemAs(ugi, conf)
+        : DFSTestUtil.getFileSystemAs(ugi, conf);
   }
 
   @Test
