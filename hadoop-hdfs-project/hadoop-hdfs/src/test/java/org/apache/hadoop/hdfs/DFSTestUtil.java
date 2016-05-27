@@ -948,7 +948,7 @@ public class DFSTestUtil {
   }
 
   public static DatanodeDescriptor getLocalDatanodeDescriptor(boolean initializeStorage) {
-    DatanodeDescriptor dn = new DatanodeDescriptor(new StorageMap(),
+    DatanodeDescriptor dn = new DatanodeDescriptor(new StorageMap(false),
         getLocalDatanodeID());
     if (initializeStorage) {
       dn.updateStorage(new DatanodeStorage(DatanodeStorage.generateUuid()));

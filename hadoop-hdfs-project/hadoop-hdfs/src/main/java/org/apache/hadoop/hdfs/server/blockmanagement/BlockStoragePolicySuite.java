@@ -97,8 +97,8 @@ public class BlockStoragePolicySuite {
         RAID5_STORAGE_POLICY_ID,
         RAID5_STORAGE_POLICY_NAME,
         new StorageType[]{StorageType.RAID5},
-        new StorageType[]{},
-        new StorageType[]{});
+        new StorageType[]{StorageType.DISK},
+        new StorageType[]{StorageType.DISK});
 
     policies[ALLSSD_STORAGE_POLICY_ID] = ALL_SSD; // 12
     policies[ONESSD_STORAGE_POLICY_ID] = ONE_SSD; // 10

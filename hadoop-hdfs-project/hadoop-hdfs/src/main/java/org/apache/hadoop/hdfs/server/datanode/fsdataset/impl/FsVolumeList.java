@@ -141,17 +141,13 @@ class FsVolumeList {
         }
         removedVols.add(fsv);
         removeVolume(fsv);
-        fsv.shutdown();
-        i.remove(); // Remove the volume
         numFailedVolumes++;
       }
     }
-    
+
     if (removedVols != null && removedVols.size() > 0) {
-      // Replace volume list
-      FsDatasetImpl.LOG.warn(
-          "Completed checkDirs. Removed " + removedVols.size() +
-              " volumes. Current volumes: " + this);
+      FsDatasetImpl.LOG.warn("Completed checkDirs. Removed " + removedVols.size()
+          + " volumes. Current volumes: " + this);
     }
 
     return removedVols;
@@ -159,7 +155,7 @@ class FsVolumeList {
 
   @Override
   public String toString() {
-    return volumes.toString();
+    return Arrays.toString(volumes.get());
   }
 
   /**

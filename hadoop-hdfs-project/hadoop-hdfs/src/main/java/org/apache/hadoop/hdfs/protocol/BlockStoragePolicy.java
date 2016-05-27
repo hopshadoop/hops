@@ -65,12 +65,11 @@ public class BlockStoragePolicy {
    */
   public List<StorageType> chooseStorageTypes(final short replication) {
     final List<StorageType> types = new LinkedList<StorageType>();
-    int i = 0, j = 0;
 
-    final StorageType last = storageTypes[storageTypes.length - 1];
-      for (; i < replication; i++) {
-        types.add(last);
-      }
+    for(int i = 0; i < replication; i++) {
+      types.add(storageTypes[Math.min(i, storageTypes.length-1)]);
+    }
+
     return types;
   }
 

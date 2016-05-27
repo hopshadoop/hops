@@ -17,10 +17,8 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.BlockReaderFactory;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
@@ -96,6 +94,12 @@ public class TestDataNodeVolumeFailure {
 
   @After
   public void tearDown() throws Exception {
+    if (cluster != null) {
+      for (File dir : cluster.getAllInstanceStorageDirs()) {
+        dir.setExecutable(true);
+      }
+    }
+
     if (data_fail != null) {
       data_fail.setWritable(true);
     }
@@ -144,8 +148,7 @@ public class TestDataNodeVolumeFailure {
     }
     data_fail.setReadOnly();
     failedDir.setReadOnly();
-    System.out.println(
-        "Deleteing " + failedDir.getPath() + "; exist=" + failedDir.exists());
+    System.out.println("Deleting " + failedDir.getPath() + "; exist=" + failedDir.exists());
 
     // access all the blocks on the "failed" DataNode,
     // we need to make sure that the "failed" volume is being accessed -
@@ -211,10 +214,10 @@ public class TestDataNodeVolumeFailure {
     DFSTestUtil.waitReplication(fs, file1, (short)3);
 
     // Fail the first volume on both datanodes
-    File dn1Vol1 = new File(dataDir, "data_0_0");
-    File dn2Vol1 = new File(dataDir, "data_1_0");
-    assertTrue("Couldn't chmod local vol", FileUtil.setExecutable(dn1Vol1, false));
-    assertTrue("Couldn't chmod local vol", FileUtil.setExecutable(dn2Vol1, false));
+    File dn1Vol1 = cluster.getInstanceStorageDir(0, 0);
+    File dn2Vol1 = cluster.getInstanceStorageDir(1, 0);
+    assertTrue("Couldn't chmod local vol", dn1Vol1.setExecutable(false));
+    assertTrue("Couldn't chmod local vol", dn2Vol1.setExecutable(false));
 
     Path file2 = new Path("/test2");
     DFSTestUtil.createFile(fs, file2, 1024, (short)3, 1L);
@@ -355,12 +358,6 @@ public class TestDataNodeVolumeFailure {
   /**
    * Count datanodes that have copies of the blocks for a file
    * put it into the map
-   *
-   * @param map
-   * @param path
-   * @param size
-   * @return
-   * @throws IOException
    */
   private int countNNBlocks(Map<String, BlockLocs> map, String path, long size)
       throws IOException {

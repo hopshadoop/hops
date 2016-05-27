@@ -38,6 +38,7 @@ import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import io.hops.transaction.lock.LockFactory;
+import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLockTypes.INodeLockType;
 import io.hops.transaction.lock.TransactionLockTypes.LockType;
 import io.hops.transaction.lock.TransactionLocks;
@@ -3079,8 +3080,6 @@ public class BlockManager {
     BlockCollection bc = getBlockCollection(b);
     final BlockStoragePolicy storagePolicy =
         BlockStoragePolicySuite.getPolicy(bc.getStoragePolicyID());
-//    // TODO This should be loaded from an XAttr or whatever
-//    final BlockStoragePolicy storagePolicy = BlockStoragePolicy.DEFAULT;
 
     final List<StorageType> excessTypes = storagePolicy.chooseExcess(
         replication, DatanodeStorageInfo.toStorageTypes(nonExcess));
@@ -3446,7 +3445,7 @@ public class BlockManager {
             LockFactory lf = LockFactory.getInstance();
             ReceivedDeletedBlockInfo rdbi = (ReceivedDeletedBlockInfo) getParams()[0];
             locks.add(
-                lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier))
+                lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier, true))
                 .add(lf.getBlockLock(rdbi.getBlock().getBlockId(), inodeIdentifier))
                 .add(lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UR));
             if (!rdbi.isDeletedBlock()) {
@@ -3628,11 +3627,9 @@ public class BlockManager {
             LockFactory lf = LockFactory.getInstance();
             Block block = (Block) getParams()[0];
             locks.add(
-                lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier))
-                .add(lf.getIndividualBlockLock(block.getBlockId(),
-                    inodeIdentifier)).add(
-                lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.PE, BLK.UR,
-                    BLK.IV));
+                lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier, true))
+                .add(lf.getIndividualBlockLock(block.getBlockId(), inodeIdentifier))
+                .add(lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.PE, BLK.UR, BLK.IV));
           }
 
           @Override
@@ -4175,10 +4172,10 @@ public class BlockManager {
             lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier))
             .add(lf.getIndividualBlockLock(b, inodeIdentifier))
             .add(lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UR, BLK.UC));
+
         if (((FSNamesystem) namesystem).isErasureCodingEnabled() &&
             inodeIdentifier != null) {
-          locks.add(lf.getIndivdualEncodingStatusLock(LockType.WRITE,
-              inodeIdentifier.getInodeId()));
+          locks.add(lf.getIndivdualEncodingStatusLock(LockType.WRITE, inodeIdentifier.getInodeId()));
         }
       }
 
@@ -4207,12 +4204,10 @@ public class BlockManager {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
-        locks.add(
-            lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier))
+        locks.add(lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier, true))
             .add(lf.getIndividualBlockLock(b.getBlockId(), inodeIdentifier))
-            .add(lf.getVariableLock(Variable.Finder.ReplicationIndex,
-                LockType.WRITE)).add(
-            lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.PE, BLK.UR, BLK.UC));
+            .add(lf.getVariableLock(Variable.Finder.ReplicationIndex, LockType.WRITE))
+            .add(lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.PE, BLK.UR, BLK.UC));
       }
 
       @Override
