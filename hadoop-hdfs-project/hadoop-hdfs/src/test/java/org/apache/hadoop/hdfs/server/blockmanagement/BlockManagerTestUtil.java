@@ -269,11 +269,6 @@ public class BlockManagerTestUtil {
     return dn;
   }
 
-  public static DatanodeStorageInfo newDatanodeStorageInfo(
-      DatanodeDescriptor dn, DatanodeStorage s) {
-    return new DatanodeStorageInfo(dn, s);
-  }
-
   public static StorageReport[] getStorageReportsForDatanode(
       DatanodeDescriptor dnd) {
     ArrayList<StorageReport> reports = new ArrayList<StorageReport>();

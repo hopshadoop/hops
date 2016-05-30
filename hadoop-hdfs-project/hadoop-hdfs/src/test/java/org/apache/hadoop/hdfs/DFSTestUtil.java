@@ -1068,14 +1068,9 @@ public class DFSTestUtil {
     final DatanodeStorage storage = new DatanodeStorage(storageID,
         DatanodeStorage.State.NORMAL, type);
     final DatanodeDescriptor dn = BlockManagerTestUtil.getDatanodeDescriptor(ip, rack, storage, hostname);
-    return BlockManagerTestUtil.newDatanodeStorageInfo(dn, storage);
+    return new DatanodeStorageInfo(dn, storage);
   }
   
-  public static DatanodeRegistration getLocalDatanodeRegistration() {
-    return new DatanodeRegistration(getLocalDatanodeID(), new StorageInfo(),
-        new ExportedBlockKeys(), VersionInfo.getVersion());
-  }
-
   public static class Builder {
     private int maxLevels = 3;
     private int maxSize = 8 * 1024;
