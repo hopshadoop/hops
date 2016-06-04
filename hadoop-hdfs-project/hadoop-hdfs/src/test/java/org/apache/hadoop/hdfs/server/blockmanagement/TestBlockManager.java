@@ -127,45 +127,12 @@ public class TestBlockManager {
     rackA = nodes.subList(0, 3);
     rackB = nodes.subList(3, 6);
 
-    createRootFolder();
+    DFSTestUtil.createRootFolder();
   }
 
   private void formatStorage() throws IOException {
     HdfsStorageFactory.formatStorage();
     Users.addUserToGroup(USER, GROUP);
-  }
-
-  private void createRootFolder() throws IOException {
-    LightWeightRequestHandler addRootINode =
-        new LightWeightRequestHandler(HDFSOperationType.SET_ROOT) {
-          @Override
-          public Object performTask() throws IOException {
-            INodeDirectoryWithQuota newRootINode = null;
-            INodeDataAccess da = (INodeDataAccess) HdfsStorageFactory.getDataAccess(INodeDataAccess.class);
-
-            newRootINode = INodeDirectoryWithQuota.createRootDir(
-                new PermissionStatus(USER, GROUP, new FsPermission((short) 0755)));
-
-            // Set the block storage policy to DEFAULT
-            newRootINode.setBlockStoragePolicyIDNoPersistance(BlockStoragePolicySuite.getDefaultPolicy().getId());
-            List<INode> newINodes = new ArrayList<INode>();
-            newINodes.add(newRootINode);
-            da.prepare(INode.EMPTY_LIST, newINodes, INode.EMPTY_LIST);
-
-            INodeAttributes inodeAttributes =
-                new INodeAttributes(newRootINode.getId(), Long.MAX_VALUE, 1L,
-                    FSDirectory.UNKNOWN_DISK_SPACE, 0L);
-            INodeAttributesDataAccess ida =
-                (INodeAttributesDataAccess) HdfsStorageFactory
-                    .getDataAccess(INodeAttributesDataAccess.class);
-            List<INodeAttributes> attrList = new ArrayList<INodeAttributes>();
-            attrList.add(inodeAttributes);
-            ida.prepare(attrList, null);
-
-            return null;
-          }
-        };
-    addRootINode.handle();
   }
 
   private void addNodes(Iterable<DatanodeDescriptor> nodesToAdd)
