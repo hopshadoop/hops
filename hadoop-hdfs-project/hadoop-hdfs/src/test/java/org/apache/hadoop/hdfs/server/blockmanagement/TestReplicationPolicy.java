@@ -27,7 +27,6 @@ import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLocks;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.DFSUtil;
@@ -36,6 +35,7 @@ import org.apache.hadoop.hdfs.LogVerificationAppender;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.StorageType;
 import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.datanode.DataNodeTestUtils;
@@ -44,7 +44,6 @@ import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.apache.hadoop.net.NetworkTopology;
 import org.apache.hadoop.net.Node;
-import org.apache.hadoop.test.PathUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.log4j.AppenderSkeleton;
 import org.apache.log4j.Level;
@@ -56,7 +55,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -74,7 +72,7 @@ public class TestReplicationPolicy {
   private Random random = DFSUtil.getRandom();
   private static final int BLOCK_SIZE = 1024;
   private static final int NUM_OF_DATANODES = 6;
-  private static NetworkTopology cluster;
+  private static NetworkTopology topology;
   private static NameNode namenode;
   private static BlockPlacementPolicy replicator;
   private static final String filename = "/dummyfile.txt";
@@ -87,44 +85,15 @@ public class TestReplicationPolicy {
   @Rule
   public ExpectedException exception = ExpectedException.none();
 
-//  @BeforeClass
-//  public static void setupCluster() throws Exception {
-//    Configuration conf = new HdfsConfiguration();
-//    dataNodes = new DatanodeDescriptor[]{
-//        DFSTestUtil.getDatanodeDescriptor("1.1.1.1", "/d1/r1"),
-//        DFSTestUtil.getDatanodeDescriptor("2.2.2.2", "/d1/r1"),
-//        DFSTestUtil.getDatanodeDescriptor("3.3.3.3", "/d1/r2"),
-//        DFSTestUtil.getDatanodeDescriptor("4.4.4.4", "/d1/r2"),
-//        DFSTestUtil.getDatanodeDescriptor("5.5.5.5", "/d2/r3"),
-//        DFSTestUtil.getDatanodeDescriptor("6.6.6.6", "/d2/r3")};
-//
-//    FileSystem.setDefaultUri(conf, "hdfs://localhost:0");
-//    conf.set(DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY, "0.0.0.0:0");
-//
-//    conf.setBoolean(
-//        DFSConfigKeys.DFS_NAMENODE_AVOID_STALE_DATANODE_FOR_READ_KEY, true);
-//    conf.setBoolean(
-//        DFSConfigKeys.DFS_NAMENODE_AVOID_STALE_DATANODE_FOR_WRITE_KEY, true);
-//
-//    conf.setInt(DFSConfigKeys.DFS_NAMENODE_REPLICATION_INTERVAL_KEY, 10);
-//    DFSTestUtil.formatNameNode(conf);
-//    namenode = new NameNode(conf);
-//
-//    final BlockManager bm = namenode.getNamesystem().getBlockManager();
-//    replicator = bm.getBlockPlacementPolicy();
-//    cluster = bm.getDatanodeManager().getNetworkTopology();
-//    // construct network topology
-//    for (int i=0; i < NUM_OF_DATANODES; i++) {
-//      cluster.add(dataNodes[i]);
-//      bm.getDatanodeManager().getHeartbeatManager().addDatanode(dataNodes[i]);
-//      dataNodes[i].updateStorage(new DatanodeStorage("storage-"+i, DatanodeStorage.State.NORMAL, StorageType.DISK));
-//    }
-//    resetHeartbeatForStorages();
-//  }
-
   @BeforeClass
   public static void setupCluster() throws Exception {
     Configuration conf = new HdfsConfiguration();
+
+    conf.set(DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY, "0.0.0.0:0");
+    conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_AVOID_STALE_DATANODE_FOR_READ_KEY, true);
+    conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_AVOID_STALE_DATANODE_FOR_WRITE_KEY, true);
+    conf.setInt(DFSConfigKeys.DFS_NAMENODE_REPLICATION_INTERVAL_KEY, 10);
+
     final String[] racks = {
         "/d1/r1",
         "/d1/r1",
@@ -132,36 +101,40 @@ public class TestReplicationPolicy {
         "/d1/r2",
         "/d2/r3",
         "/d2/r3"};
-    storages = DFSTestUtil.createDatanodeStorageInfos(racks);
-    dataNodes = DFSTestUtil.toDatanodeDescriptor(storages);
+
+    final MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf)
+            .numDataNodes(NUM_OF_DATANODES)
+            .storagesPerDatanode(1)
+            .racks(racks)
+            .build();
+
+    cluster.waitActive();
+
+    final BlockManager bm = cluster.getNamesystem().getBlockManager();
+    namenode = cluster.getNameNode();
+    replicator = bm.getBlockPlacementPolicy();
+    topology = bm.getDatanodeManager().getNetworkTopology();
+
+    dataNodes = new DatanodeDescriptor[racks.length];
+    for(int i = 0; i < racks.length; i++) {
+      DatanodeInfo datanode = (DatanodeInfo) topology.getDatanodesInRack(racks[i]).get(i % 2);
+      dataNodes[i] = bm.getDatanodeManager().getDatanode(datanode);
+    }
+
+    storages = new DatanodeStorageInfo[dataNodes.length];
+    for(int i = 0; i < dataNodes.length; i++) {
+      storages[i] = dataNodes[i].getStorageInfos()[0];
+    }
 
     // create an extra storage for dn5.
     DatanodeStorage extraStorage = new DatanodeStorage(
         storages[5].getStorageID() + "-extra", DatanodeStorage.State.NORMAL,
         StorageType.DEFAULT);
-/*    DatanodeStorageInfo si = new DatanodeStorageInfo(
-        storages[5].getDatanodeDescriptor(), extraStorage);
-*/
+
     BlockManagerTestUtil.updateStorage(storages[5].getDatanodeDescriptor(),
         extraStorage);
 
-    FileSystem.setDefaultUri(conf, "hdfs://localhost:0");
-    conf.set(DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY, "0.0.0.0:0");
-
-    conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_AVOID_STALE_DATANODE_FOR_READ_KEY, true);
-    conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_AVOID_STALE_DATANODE_FOR_WRITE_KEY, true);
-    DFSTestUtil.formatNameNode(conf);
-    namenode = new NameNode(conf);
-
-    final BlockManager bm = namenode.getNamesystem().getBlockManager();
-    replicator = bm.getBlockPlacementPolicy();
-    cluster = bm.getDatanodeManager().getNetworkTopology();
-    // construct network topology
-    for (int i=0; i < NUM_OF_DATANODES; i++) {
-      cluster.add(dataNodes[i]);
-      bm.getDatanodeManager().getHeartbeatManager().addDatanode(
-          dataNodes[i]);
-    }
     resetHeartbeatForStorages();
   }
 
@@ -173,11 +146,11 @@ public class TestReplicationPolicy {
   }
 
   private static boolean isOnSameRack(DatanodeStorageInfo left, DatanodeDescriptor right) {
-    return cluster.isOnSameRack(left.getDatanodeDescriptor(), right);
+    return topology.isOnSameRack(left.getDatanodeDescriptor(), right);
   }
 
   private static boolean isOnSameRack(DatanodeStorageInfo left, DatanodeStorageInfo right) {
-    return cluster.isOnSameRack(left.getDatanodeDescriptor(), right.getDatanodeDescriptor());
+    return topology.isOnSameRack(left.getDatanodeDescriptor(), right.getDatanodeDescriptor());
   }
 
   /**
@@ -585,28 +558,6 @@ public class TestReplicationPolicy {
     resetHeartbeatForStorages();
   }
 
-  class TestAppender extends AppenderSkeleton {
-    private final List<LoggingEvent> log = new ArrayList<LoggingEvent>();
-
-    @Override
-    public boolean requiresLayout() {
-      return false;
-    }
-
-    @Override
-    protected void append(final LoggingEvent loggingEvent) {
-      log.add(loggingEvent);
-    }
-
-    @Override
-    public void close() {
-    }
-
-    public List<LoggingEvent> getLog() {
-      return new ArrayList<LoggingEvent>(log);
-    }
-  }
-
   private boolean containsWithinRange(DatanodeStorageInfo target,
       DatanodeDescriptor[] nodes, int startIndex, int endIndex) {
     assert startIndex >= 0 && startIndex < nodes.length;
@@ -702,8 +653,8 @@ public class TestReplicationPolicy {
     assertTrue(containsWithinRange(dataNodes[4], targets, 0, 3));
     assertTrue(containsWithinRange(dataNodes[5], targets, 0, 3));
 
-    for (int i = 0; i < dataNodes.length; i++) {
-      dataNodes[i].setLastUpdate(Time.now());
+    for (DatanodeDescriptor dataNode : dataNodes) {
+      dataNode.setLastUpdate(Time.now());
     }
     namenode.getNamesystem().getBlockManager()
         .getDatanodeManager().getHeartbeatManager().heartbeatCheck();
