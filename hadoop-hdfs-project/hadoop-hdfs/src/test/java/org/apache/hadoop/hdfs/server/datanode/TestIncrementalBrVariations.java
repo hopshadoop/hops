@@ -95,6 +95,7 @@ public class TestIncrementalBrVariations {
   public void startUpCluster() throws IOException {
     conf = new Configuration();
     cluster = new MiniDFSCluster.Builder(conf).numDataNodes(NUM_DATANODES).build();
+    cluster.waitActive();
     fs = cluster.getFileSystem();
     client = new DFSClient(new InetSocketAddress("localhost", cluster.getNameNodePort()),
         cluster.getConfiguration(0));
@@ -247,6 +248,7 @@ public class TestIncrementalBrVariations {
     // First create a file, so the block we'll be randomly generating
     // corresponds to a block in a real file (avoid nullpointers when reading
     // its parent)
+    DFSTestUtil.createRootFolder();
     FSDataOutputStream stream = fs.create(new Path("/foo/testfile.dat"), (short) 3);
     stream.write(AppendTestUtil.randomBytes(0, 100));
     stream.close();
