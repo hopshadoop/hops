@@ -27,9 +27,11 @@ import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLocks;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.DFSUtil;
+import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.LogVerificationAppender;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
@@ -45,7 +47,6 @@ import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.apache.hadoop.net.NetworkTopology;
 import org.apache.hadoop.net.Node;
 import org.apache.hadoop.util.Time;
-import org.apache.log4j.AppenderSkeleton;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.log4j.spi.LoggingEvent;
@@ -868,18 +869,29 @@ public class TestReplicationPolicy {
     int HIGH_PRIORITY = 0;
     Configuration conf = new Configuration();
     conf.setInt(DFSConfigKeys.DFS_NAMENODE_REPLICATION_INTERVAL_KEY, 1);
-    MiniDFSCluster cluster =
-        new MiniDFSCluster.Builder(conf).numDataNodes(2).format(true).build();
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
+            .numDataNodes(2)
+            .format(true)
+            .build();
     try {
       cluster.waitActive();
+      DFSTestUtil.createRootFolder();
+      DistributedFileSystem dfs = cluster.getFileSystem();
+
+      // Create an inode (file) that we can have the blocks be a part of
+      dfs.create(new Path("/test-1.dat")).close();
+
+      // The inode id of /test.dat should be 2 (since it's the only non-root
+      // entry)
+      int inodeId = 2;
+
       final UnderReplicatedBlocks neededReplications =
           cluster.getNameNode().getNamesystem()
               .getBlockManager().neededReplications;
       for (int i = 0; i < 100; i++) {
         // Adding the blocks directly to normal priority
         int blkId = random.nextInt();
-        add(neededReplications, new BlockInfo(new Block(blkId), blkId), 2, 0,
-            3);
+        add(neededReplications, new BlockInfo(new Block(blkId), inodeId), 2, 0, 3);
       }
       // Lets wait for the replication interval, to start process normal
       // priority blocks
@@ -887,13 +899,14 @@ public class TestReplicationPolicy {
 
       // Adding the block directly to high priority list
       int blkId = random.nextInt();
-      add(neededReplications, new BlockInfo(new Block(blkId), blkId), 1, 0, 3);
+      add(neededReplications, new BlockInfo(new Block(blkId), inodeId), 1, 0, 3);
 
       // Lets wait for the replication interval
       Thread.sleep(3 * DFS_NAMENODE_REPLICATION_INTERVAL);
 
       // Check replication completed successfully. Need not wait till it process
       // all the 100 normal blocks.
+      // We waited for 3 periods; the high priority block should be removed by now
       assertFalse("Not able to clear the element from high priority list",
           neededReplications.iterator(HIGH_PRIORITY).hasNext());
     } finally {

@@ -4012,8 +4012,11 @@ public class BlockManager {
       while (namesystem.isRunning()) {
         try {
           if (namesystem.isLeader()) {
+            LOG.debug("Running replication monitor");
             computeDatanodeWork();
             processPendingReplications();
+          } else {
+            LOG.warn("Namesystem is not leader: will not run replication monitor");
           }
           Thread.sleep(replicationRecheckInterval);
         } catch (InterruptedException ie) {
