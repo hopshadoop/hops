@@ -27,10 +27,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -370,6 +372,19 @@ public class StringUtils {
     }
 
     return str.trim().split("\\s*,\\s*");
+  }
+
+  /**
+   * Trims all the strings in a Collection<String> and returns a Set<String>.
+   * @param strings
+   * @return
+   */
+  public static Set<String> getTrimmedStrings(Collection<String> strings) {
+    Set<String> trimmedStrings = new HashSet<String>();
+    for (String string: strings) {
+      trimmedStrings.add(string.trim());
+    }
+    return trimmedStrings;
   }
 
   final public static String[] emptyStringArray = {};
