@@ -1102,7 +1102,12 @@ public class Dispatcher {
       Set<String> nodes = new HashSet<String>();
       try {
         HostsFileReader.readFileToSet(type, fileName, nodes);
-        return StringUtils.getTrimmedStrings(nodes);
+
+        Set<String> output = new HashSet<String>();
+        for(String s : nodes) {
+          output.add(s.trim());
+        }
+        return output;
       } catch (IOException e) {
         throw new IllegalArgumentException(
             "Failed to read host list from file: " + fileName);
