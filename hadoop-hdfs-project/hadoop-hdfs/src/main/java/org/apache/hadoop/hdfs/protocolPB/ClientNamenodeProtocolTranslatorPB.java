@@ -986,7 +986,15 @@ public class ClientNamenodeProtocolTranslatorPB
     
     @Override
     public void rollBack(String userName) throws IOException{
-        
+        RollBackRequestProto req = RollBackRequestProto.newBuilder()
+                .setUser(userName)
+                .build();
+        try {
+            RollBackResponseProto resp = rpcProxy.rollBack(null,
+                    req);
+        } catch (ServiceException e) {
+            throw ProtobufHelper.getRemoteException(e);
+        }
     }
 
   //END_HOP_CODE

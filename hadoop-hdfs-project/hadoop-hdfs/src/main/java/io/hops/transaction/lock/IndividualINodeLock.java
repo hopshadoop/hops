@@ -34,6 +34,8 @@ final class IndividualINodeLock extends BaseINodeLock {
   private final TransactionLockTypes.INodeLockType lockType;
   private final INodeIdentifier inodeIdentifier;
   private final boolean readUpPathInodes;
+  private boolean readBackUpRow=false;
+  private boolean isForBlockReport=false;
 
   IndividualINodeLock(TransactionLockTypes.INodeLockType lockType,
       INodeIdentifier inodeIdentifier, boolean readUpPathInodes) {
@@ -52,6 +54,17 @@ final class IndividualINodeLock extends BaseINodeLock {
     this(lockType, inodeIdentifier, false);
   }
 
+  IndividualINodeLock(TransactionLockTypes.INodeLockType lockType,
+                      INodeIdentifier inodeIdentifier, boolean readUpPathInodes, boolean readBackUpRow) {
+    this(lockType,inodeIdentifier,readUpPathInodes);
+    this.readBackUpRow=readBackUpRow;
+  }
+
+  public IndividualINodeLock(boolean isForBlockReport, TransactionLockTypes.INodeLockType lockType, INodeIdentifier inodeIdentifier) {
+    this(lockType, inodeIdentifier);
+    this.isForBlockReport = isForBlockReport;
+  }
+
   @Override
   protected void acquire(TransactionLocks locks) throws IOException {
     setPartitioningKey(inodeIdentifier.getInodeId());
@@ -61,11 +74,30 @@ final class IndividualINodeLock extends BaseINodeLock {
       inode =
           find(lockType, inodeIdentifier.getName(), inodeIdentifier.getPid(),
               inodeIdentifier.getInodeId());
+
+      if(readBackUpRow){
+        INode backUpNode = find(lockType, inodeIdentifier.getName(), -inodeIdentifier.getPid(),
+                -inodeIdentifier.getInodeId());
+        //addIndividualINode(backUpNode);
+
+      }
     } else if (inodeIdentifier.getInodeId() != null) {
       inode = find(lockType, inodeIdentifier.getInodeId());
+
+      if(readBackUpRow){
+        INode backUpNode = find(lockType, -inodeIdentifier.getInodeId());
+        //addIndividualINode(backUpNode);
+      }
     } else {
       throw new StorageException(
           "INodeIdentifier object is not properly " + "initialized ");
+    }
+
+
+    if(inode==null && isForBlockReport){
+      //InCase of file is created and deleted. or created then modified and then deleted. Those cases before or after creating the snapshot.
+      //We have to read the back-up inode row.
+      inode = find(lockType,-inodeIdentifier.getInodeId());
     }
 
     if (readUpPathInodes) {
@@ -74,7 +106,9 @@ final class IndividualINodeLock extends BaseINodeLock {
     } else {
       addIndividualINode(inode);
     }
-    acquireINodeAttributes();
+
+      acquireINodeAttributes();
+
   }
 
   private List<INode> readUpInodes(INode leaf)

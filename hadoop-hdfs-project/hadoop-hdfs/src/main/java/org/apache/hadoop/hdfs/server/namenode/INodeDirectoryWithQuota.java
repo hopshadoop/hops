@@ -64,7 +64,19 @@ public class INodeDirectoryWithQuota extends INodeDirectory {
   public INodeDirectoryWithQuota(String name, PermissionStatus permissions) {
     super(name, permissions);
   }
-  
+
+  /**
+   * Constructor with-out creating INodeAttributes
+   * @param other
+   * @throws StorageException
+   * @throws TransactionContextException
+     */
+  INodeDirectoryWithQuota( INodeDirectory other)
+          throws StorageException, TransactionContextException {
+    super(other);
+  }
+
+
   /**
    * Get this directory's namespace quota
    *

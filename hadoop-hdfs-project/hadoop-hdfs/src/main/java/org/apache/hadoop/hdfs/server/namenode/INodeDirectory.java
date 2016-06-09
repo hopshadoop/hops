@@ -20,6 +20,7 @@ package org.apache.hadoop.hdfs.server.namenode;
 import io.hops.common.INodeIdGen;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
+import io.hops.metadata.hdfs.snapshots.SnapShotConstants;
 import io.hops.transaction.EntityManager;
 import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.fs.permission.PermissionStatus;
@@ -53,8 +54,8 @@ public class INodeDirectory extends INode {
   protected static final int DEFAULT_FILES_PER_DIRECTORY = 5;
   public final static String ROOT_NAME = "";
 
-  public final static int ROOT_ID = 1;
-  public final static int ROOT_PARENT_ID = NON_EXISTING_ID;
+  public final static int ROOT_ID = 2;
+  public final static int ROOT_PARENT_ID = 1;
 
   
   public INodeDirectory(String name, PermissionStatus permissions) {
@@ -299,6 +300,34 @@ public class INodeDirectory extends INode {
     return -nextPos;
   }
 
+  <T extends INode> T addChild(final T node, boolean setModTime,boolean isSnapshotTaken)
+          throws StorageException, TransactionContextException {
+    if(isSnapshotTaken){
+      if (!node.exists()) {
+        Integer inodeID = INodeIdGen.getUniqueINodeID();
+        node.setIdNoPersistance(inodeID);
+        node.setParentNoPersistance(this);
+        EntityManager.add(node);
+        //add the INodeAttributes if it is Directory with Quota
+        if (this instanceof INodeDirectoryWithQuota) {
+          ((INodeDirectoryWithQuota) this).persistAttributes();
+        }
+      } else {
+        node.setParent(this);
+      }
+      // update modification time of the parent directory
+      if (setModTime) {
+        setModificationTime(node.getModificationTime());
+      }
+      if (node.getGroupName() == null) {
+        node.setGroup(getGroupName());
+      }
+
+      return node;
+    }else{
+     return addChild(node,setModTime);
+    }
+  }
   /**
    * Add a child inode to the directory.
    *

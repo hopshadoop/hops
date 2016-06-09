@@ -1204,5 +1204,8 @@ public class DistributedFileSystem extends FileSystem {
   public boolean takeRootLevelSnapshot(String userName) throws IOException{
       return dfs.takeRootLevelSnapshot(userName);
   }
+    public void rollBack(String userName)throws IOException{
+         dfs.rollBack(userName);
+    }
   //STOP_HOP_CODE
 }

@@ -347,8 +347,8 @@ public class HdfsVariables {
     Variable.registerVariableDefaultValue(Variable.Finder.BlockID,
         new LongVariable(0).getBytes());
     Variable.registerVariableDefaultValue(Variable.Finder.INodeID,
-        new IntVariable(2)
-            .getBytes()); // 1 is taken by the root and zero is parent of the root
+        new IntVariable(3)
+            .getBytes()); // 2 is taken by the root and  1 is parent of the root
     Variable.registerVariableDefaultValue(Variable.Finder.ReplicationIndex,
         new ArrayVariable(Arrays.asList(0, 0, 0, 0, 0)).getBytes());
     Variable.registerVariableDefaultValue(Variable.Finder.SIdCounter,

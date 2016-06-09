@@ -149,16 +149,35 @@ public class LockFactory {
     return new BatchedINodeLock(inodeIdentifiers);
   }
 
+  public Lock getIndividualINodeAttributesLock(
+          TransactionLockTypes.LockType lockType,
+          INodeIdentifier inodeIdentifier) {
+    return new IndividualINodeAttributesLock(lockType, inodeIdentifier);
+  }
+
   public Lock getIndividualINodeLock(
       TransactionLockTypes.INodeLockType lockType,
       INodeIdentifier inodeIdentifier, boolean readUpPathInodes) {
     return new IndividualINodeLock(lockType, inodeIdentifier, readUpPathInodes);
   }
 
+
   public Lock getIndividualINodeLock(
+          TransactionLockTypes.INodeLockType lockType,
+          INodeIdentifier inodeIdentifier, boolean readUpPathInodes,boolean readBackUpRow) {
+    return new IndividualINodeLock(lockType, inodeIdentifier, readUpPathInodes,readBackUpRow);
+  }
+
+  public Lock getIndividualINodeLock(
+          TransactionLockTypes.INodeLockType lockType,
+          INodeIdentifier inodeIdentifier) {
+    return new IndividualINodeLock(lockType, inodeIdentifier);
+  }
+
+  public Lock getIndividualINodeLock(boolean isForBlockReport,
       TransactionLockTypes.INodeLockType lockType,
       INodeIdentifier inodeIdentifier) {
-    return new IndividualINodeLock(lockType, inodeIdentifier);
+    return new IndividualINodeLock(isForBlockReport,lockType, inodeIdentifier);
   }
 
   public Lock getINodeLock(NameNode nameNode,

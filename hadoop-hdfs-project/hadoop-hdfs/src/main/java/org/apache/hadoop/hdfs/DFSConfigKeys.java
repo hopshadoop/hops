@@ -33,7 +33,7 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String DFS_STORAGE_DRIVER_JAR_FILE =
       "dfs.storage.driver.jarFile";
 
-  public static final String DFS_STORAGE_DRIVER_JAR_FILE_DEFAULT = "/home/pushparaj/code/github/hops-metadata-dal-impl-ndb/target/hops-metadata-dal-impl-ndb-1.0-SNAPSHOT.jar";
+  public static final String DFS_STORAGE_DRIVER_JAR_FILE_DEFAULT = "/Users/pushparaj.motamari/Desktop/ubuntu/github/hops-metadata-dal-impl-ndb/target/hops-metadata-dal-impl-ndb-1.0-SNAPSHOT-jar-with-dependencies.jar";
 
   public static final String DFS_STORAGE_DRIVER_CLASS =
       "dfs.storage.driver.class";
@@ -56,7 +56,7 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
 
   public static final String DFS_NAMENODE_QUOTA_UPDATE_INTERVAL_KEY =
       "dfs.namenode.quota.update.interval";
-  public static final int DFS_NAMENODE_QUOTA_UPDATE_INTERVAL_DEFAULT = 1000;
+  public static final int DFS_NAMENODE_QUOTA_UPDATE_INTERVAL_DEFAULT = 1000;//Changed from 1000 to 5.
 
   public static final String DFS_NAMENODE_QUOTA_UPDATE_LIMIT_KEY =
       "dfs.namenode.quota.update.limit";

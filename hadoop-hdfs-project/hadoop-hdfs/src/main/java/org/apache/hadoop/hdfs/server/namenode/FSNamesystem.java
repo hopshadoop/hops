@@ -3462,6 +3462,7 @@ public class FSNamesystem
 //START ROOT_LEVEL_SNAPSHOT
     boolean takeRootSnapShot(String user) {
         if (!isSnapshotAtRootTaken) {
+            //TODO: Publish this news that snapshot has been taken to other name-systems.
             return isSnapshotAtRootTaken = true;
 
         } else {
@@ -6229,6 +6230,7 @@ public class FSNamesystem
                  *1.Quota is Not updated. since this subtree still occupies the space.
                  *2.Just the isDeleted flag is set to 1.
                  * */
+         unlockSubtree(path);
          HopsTransactionalRequestHandler deleteHanlder = new HopsTransactionalRequestHandler(HDFSOperationType.DELETE_SINGLE_SNAPSHOT, path) {
 
                     @Override
@@ -6236,14 +6238,7 @@ public class FSNamesystem
 
                         LockFactory lf = LockFactory.getInstance();
                         locks.add(lf.getINodeLock(nameNode, INodeLockType.WRITE_ON_TARGET_AND_PARENT,
-                                INodeResolveType.PATH, false, path))
-                                .add(lf.getLeaseLock(LockType.WRITE))
-                                .add(lf.getLeasePathLock(LockType.WRITE))
-                                .add(lf.getBlockLock()).add(
-                                lf.getBlockRelated(BLK.RE, BLK.CR, BLK.UC, BLK.UR, BLK.PE,
-                                        BLK.IV));
-                        locks.add(lf.getQuotaUpdateLock(true, path));/*This quota lock is necessary??*/
-
+                                INodeResolveType.PATH, false, path));
                     }
 
                     @Override
@@ -6252,10 +6247,15 @@ public class FSNamesystem
 
                         INode[] inodes = dir.getRootDir().getExistingPathINodes(src, false);
                         INode targetNode = inodes[inodes.length - 1];
-                        targetNode.setIsDeletedNoPersistance(SnapShotConstants.isDeleted);
-                        targetNode.setSubtreeLocked(false);
-                        targetNode.setSubtreeLockOwner(0);
-                        EntityManager.update(targetNode);
+                        //clone targetInode with-out cloning INodeAtributes..since we are not changing anything over-there..like quota
+                        INode targetNode_backup = dir.cloneINode(targetNode,false);
+                        targetNode_backup.setParentIdNoPersistance(-targetNode.getParentId());
+                        targetNode_backup.setIsDeletedNoPersistance(SnapShotConstants.isDeleted);
+                        targetNode_backup.setIdNoPersistance(-targetNode.getId());
+                        targetNode_backup.setLocalName(targetNode.getLocalName()+"$DEL:"+targetNode.getId()+"$");
+                        EntityManager.add(targetNode_backup);
+                        EntityManager.remove(targetNode);
+
                          // set the parent's modification time
                         int pos = inodes.length-1;
                         if (inodes[pos - 1].getStatus() == SnapShotConstants.Original) {
@@ -6295,13 +6295,11 @@ public class FSNamesystem
             }
 
     } finally {
-      unlockSubtree(path);
+        if(!snapshotOnRootTaken){
+            unlockSubtree(path);
+        }
     }
-    if(!snapshotOnRootTaken){
-                //For the case of snapshotOnRootTaken, we unlockSubtree in the code above. 
-                //That is because,after we set isDeleted=1, we will not get children with isDeleted=1, when we call findInodeByNameAndParentId or findInodesByParentId.
-                 unlockSubtree(path);
-            }
+
       return  true;
   }
 
@@ -6480,6 +6478,7 @@ public class FSNamesystem
         INode inode = nodes[nodes.length - 1];
         if (inode != null && inode.isSubtreeLocked()) {
           inode.setSubtreeLocked(false);
+            inode.setSubtreeLockOwner(0);
           EntityManager.update(inode);
         }
         return null;

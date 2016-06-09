@@ -126,7 +126,7 @@ public abstract class INode implements Comparable<byte[]> {
   protected int status=SnapShotConstants.Original;
   protected int isDeleted;
   //END_ROOT_LEVRL_SNAPSHOT
-  public static final int NON_EXISTING_ID = 0;
+  public static final int NON_EXISTING_ID = -10;
   protected int id = NON_EXISTING_ID;
   protected int parentId = NON_EXISTING_ID;
 

@@ -54,9 +54,12 @@ public class MysqlServerConnectorForTest  {
   }
 
   public void setConfiguration(Properties conf) throws StorageException {
-    this.protocol = conf.getProperty(Constants.PROPERTY_JDBC_URL);
-    this.user = conf.getProperty(Constants.PROPERTY_JDBC_USERNAME);
-    this.password = conf.getProperty(Constants.PROPERTY_JDBC_PASSWORD);
+    //jdbc:mysql://cloud11.sics.se:3306/hop_pushparaj_new
+    this.protocol = "jdbc:mysql://cloud1.sics.se:3307/hop_pushparaj";
+    //this.user = conf.getProperty(Constants.PROPERTY_JDBC_USERNAME);
+    //this.password = conf.getProperty(Constants.PROPERTY_JDBC_PASSWORD);
+    this.user = "hop";
+    this.password = "hop";
     loadDriver();
   }
 
@@ -77,7 +80,7 @@ public class MysqlServerConnectorForTest  {
   }
 
   
-  public Connection obtainSession() throws StorageException {
+  public Connection obtainConnection() throws StorageException {
     Connection conn = connectionPool.get();
     if (conn == null) {
       try {
@@ -90,7 +93,7 @@ public class MysqlServerConnectorForTest  {
     return conn;
   }
   
-  public void closeSession() throws StorageException
+  public void closeConnection() throws StorageException
   {
     Connection conn = connectionPool.get();
     if (conn != null) {
@@ -106,11 +109,11 @@ public class MysqlServerConnectorForTest  {
   public static void truncateTable(String tableName) throws StorageException, SQLException{
     MysqlServerConnectorForTest connector = MysqlServerConnectorForTest.getInstance();
     try {
-      Connection conn = connector.obtainSession();
+      Connection conn = connector.obtainConnection();
       PreparedStatement s = conn.prepareStatement("delete from "+tableName);
       s.executeUpdate();
     } finally {
-      connector.closeSession();
+      connector.closeConnection();
     }
   }
 
