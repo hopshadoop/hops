@@ -242,8 +242,8 @@ public class PriceFixerService extends AbstractService {
         runningPriceDA.add(new YarnRunningPrice(
                 YarnRunningPrice.PriceType.VARIABLE, currentPriceTick,
                 currentPrice));
-        historyPriceDA.add(
-                new YarnHistoryPrice(currentPriceTick, currentPrice));
+//        historyPriceDA.add(
+//                new YarnHistoryPrice(currentPriceTick, currentPrice));
 
         connector.commit();
         return null;
