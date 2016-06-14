@@ -25,6 +25,7 @@ import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.Block;
 
+import java.io.IOException;
 import java.util.List;
 
 /**
@@ -35,7 +36,7 @@ public class INodeSymlink extends INode {
   private byte[] symlink; // The target URI
 
   public INodeSymlink(String value, long modTime, long atime,
-      PermissionStatus permissions) {
+      PermissionStatus permissions) throws IOException {
     super(permissions, modTime, atime);
     assert value != null;
     setLinkValue(value);

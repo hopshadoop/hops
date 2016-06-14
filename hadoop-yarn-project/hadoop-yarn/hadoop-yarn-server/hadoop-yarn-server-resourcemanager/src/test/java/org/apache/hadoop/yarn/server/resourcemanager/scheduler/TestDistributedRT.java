@@ -21,7 +21,10 @@ import io.hops.metadata.util.RMStorageFactory;
 import io.hops.metadata.util.RMUtilities;
 import io.hops.metadata.util.YarnAPIStorageFactory;
 import io.hops.metadata.yarn.TablesDef;
+import io.hops.metadata.yarn.dal.PendingEventDataAccess;
+import io.hops.metadata.yarn.dal.util.YARNOperationType;
 import io.hops.metadata.yarn.entity.PendingEvent;
+import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -33,7 +36,6 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fifo.FifoSchedule
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -57,6 +59,10 @@ public class TestDistributedRT {
     try {
       LOG.info("Setting up Factories");
       conf = new YarnConfiguration();
+      conf.set(YarnConfiguration.EVENT_RT_CONFIG_PATH,
+              "target/test-classes/RT_EventAPIConfig.ini");
+      conf.set(YarnConfiguration.EVENT_SHEDULER_CONFIG_PATH,
+              "target/test-classes/RM_EventAPIConfig.ini");
       YarnAPIStorageFactory.setConfiguration(conf);
       RMStorageFactory.setConfiguration(conf);
       RMUtilities.InitializeDB();
@@ -75,11 +81,10 @@ public class TestDistributedRT {
    *
    * @throws Exception
    */
-  @Ignore
   @Test(timeout = 50000)
   public void testGetRMNodePerformance() throws Exception {
     MockRM rm = new MockRM(conf);
-    conf.setBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED, false);
+    conf.setBoolean(YarnConfiguration.DISTRIBUTED_RM, false);
     rm.start();
     String nodeId = "host1:1234";
     int numOfRetrievals = 500;
@@ -110,7 +115,6 @@ public class TestDistributedRT {
     batchTime = batchTime / numOfRetrievals;
     LOG.debug("HOP :: nonBatchTime=" + nonBatchTime + " ms");
     LOG.debug("HOP :: BatchTime=" + batchTime + " ms");
-    rm.stop();
     Thread.sleep(2000);
   }
 
@@ -155,7 +159,7 @@ public class TestDistributedRT {
    */
   @Test
   public void testNMRegistration() throws InterruptedException, Exception {
-    conf.setBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED, true);
+    conf.setBoolean(YarnConfiguration.DISTRIBUTED_RM, true);
     conf.setBoolean(YarnConfiguration.RM_HA_ENABLED, true);
     conf.setInt(YarnConfiguration.HOPS_PENDING_EVENTS_RETRIEVAL_PERIOD, 500);
     MockRM rm1 = new MockRM(conf);
@@ -164,56 +168,64 @@ public class TestDistributedRT {
     MockRM rmRT;
     rm1.start();
     rm2.start();
-    //Wait for leader election to start
-    Thread.sleep(3000);
-    if (rm1.getRMContext().getRMGroupMembershipService().isLeader()) {
-      rmL = rm1;
-      rmRT = rm2;
-    } else {
-      rmL = rm2;
-      rmRT = rm1;
+    try {
+      //Wait for leader election to start
+      Thread.sleep(3000);
+      if (rm1.getRMContext().isLeader()) {
+        rmL = rm1;
+        rmRT = rm2;
+      } else {
+        rmL = rm2;
+        rmRT = rm1;
+      }
+      FifoScheduler scheduler = (FifoScheduler) rmL.getResourceScheduler();
+
+      //1. Register NM to the leader RM
+      rmL.registerNode("host1:1234", 5012);
+      int retries = 0;
+      while (rmRT.getRMContext().getActiveRMNodes().isEmpty() && retries++ < 20) {
+        Thread.sleep(100);
+        commitDummyPendingEvent();
+      }
+      //Assert that registration was successful
+      Assert.assertEquals(1, rmL.getRMContext().getActiveRMNodes().size());
+      //Wait for scheduler to process added node
+      retries = 0;
+      while (scheduler.getNodes().isEmpty() && retries++ < 20) {
+        Thread.sleep(100);
+        commitDummyPendingEvent();
+      }
+      Assert.assertEquals(1, scheduler.getNodes().size());
+
+      //2. Register NM to the ResourceTracker
+      MockNM nm2 = rmRT.registerNode("host2:5678", 1024);
+      //Wait for RT to process added node
+      retries = 0;
+      while (rmRT.getRMContext().getActiveRMNodes().isEmpty() && retries++ < 20) {
+        Thread.sleep(100);
+        commitDummyPendingEvent();
+      }
+      Assert.assertEquals(1, rmRT.getRMContext().getActiveRMNodes().size());
+      //Wait for scheduler to process added node
+      retries = 0;
+      while (scheduler.getNodes().size() == 1 && retries++ < 20) {
+        Thread.sleep(1000);
+        commitDummyPendingEvent();
+      }
+      Assert.assertEquals(2, scheduler.getNodes().size());
+
+      //NM2 is lost, scheduler should be updated
+      rmRT.sendNodeLost(nm2);
+      retries = 0;
+      while (scheduler.getNodes().size() == 2 && retries++ < 20) {
+        Thread.sleep(100);
+        commitDummyPendingEvent();
+      }
+      Assert.assertEquals(1, scheduler.getNodes().size());
+    } finally {
+      rm1.stop();
+      rm2.stop();
     }
-    FifoScheduler scheduler = (FifoScheduler) rmL.getResourceScheduler();
-    
-    //1. Register NM to the leader RM
-    rmL.registerNode("host1:1234", 5012);
-    int retries = 0;
-    while (rmRT.getRMContext().getActiveRMNodes().isEmpty() && retries++ < 20) {
-      Thread.sleep(100);
-    }
-    //Assert that registration was successful
-    Assert.assertEquals(1, rmL.getRMContext().getActiveRMNodes().size());
-    //Wait for scheduler to process added node
-    retries = 0;
-    while (scheduler.getNodes().isEmpty() && retries++ < 20) {
-      Thread.sleep(100);
-    }
-    Assert.assertEquals(1, scheduler.getNodes().size());
-    
-    //2. Register NM to the ResourceTracker
-    MockNM nm2 = rmRT.registerNode("host2:5678", 1024);
-    //Wait for RT to process added node
-    retries = 0;
-    while (rmRT.getRMContext().getActiveRMNodes().isEmpty() && retries++ < 20) {
-      Thread.sleep(100);
-    }
-    Assert.assertEquals(1, rmRT.getRMContext().getActiveRMNodes().size());
-    //Wait for scheduler to process added node
-    retries = 0;
-    while (scheduler.getNodes().size() == 1 && retries++ < 20) {
-      Thread.sleep(100);
-    }
-    Assert.assertEquals(2, scheduler.getNodes().size());
-    
-    //NM2 is lost, scheduler should be updated
-    rmRT.sendNodeLost(nm2);
-    retries = 0;
-    while (scheduler.getNodes().size() == 2 && retries++ < 20) {
-      Thread.sleep(100);
-    }
-    Assert.assertEquals(1, scheduler.getNodes().size());
-    rm1.stop();
-    rm2.stop();
   }
   
   /**
@@ -224,7 +236,7 @@ public class TestDistributedRT {
    */
   @Test
   public void testNMHeartbeat() throws InterruptedException, Exception {
-    conf.setBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED, true);
+    conf.setBoolean(YarnConfiguration.DISTRIBUTED_RM, true);
     conf.setBoolean(YarnConfiguration.RM_HA_ENABLED, true);
     conf.setInt(YarnConfiguration.HOPS_PENDING_EVENTS_RETRIEVAL_PERIOD, 500);
     MockRM rm1 = new MockRM(conf);
@@ -232,75 +244,85 @@ public class TestDistributedRT {
     MockRM rmL, rmRT;
     rm1.start();
     rm2.start();
-    MockNM nm1, nm2;
-    //Wait for leader election to start
-    Thread.sleep(3000);
-    if (rm1.getRMContext().getRMGroupMembershipService().isLeader()) {
-      rmL = rm1;
-      rmRT = rm2;
-    } else {
-      rmL = rm2;
-      rmRT = rm1;
-    }
-    FifoScheduler scheduler = (FifoScheduler) rmL.getResourceScheduler();
-    
-    //1. Register NM to the leader RM
-    nm1 = rmL.registerNode("host1:1234", 5012);
-    int retries = 0;
-    while (rmRT.getRMContext().getActiveRMNodes().isEmpty() && retries++ < 20) {
-      Thread.sleep(100);
-    }
-    //Assert that registration was successful
-    Assert.assertEquals(1, rmL.getRMContext().getActiveRMNodes().size());
-    //Wait for scheduler to process added node
-    retries = 0;
-    while (scheduler.getNodes().isEmpty() && retries++ < 20) {
-      Thread.sleep(100);
-    }
-    Assert.assertEquals(1, scheduler.getNodes().size());
-    
-    //2. Register NM to the ResourceTracker
-    nm2 = rmRT.registerNode("host2:5678", 1024);
-    //Wait for RT to process added node
-    retries = 0;
-    while (rmRT.getRMContext().getActiveRMNodes().isEmpty() && retries++ < 20) {
-      Thread.sleep(100);
-    }
-    Assert.assertEquals(1, rmRT.getRMContext().getActiveRMNodes().size());
-    //Wait for scheduler to process added node
-    retries = 0;
-    while (scheduler.getNodes().size() == 1 && retries++ < 20) {
-      Thread.sleep(100);
-    }
-    Assert.assertEquals(2, scheduler.getNodes().size());
-    
-    //3. NM1 sends a heartbeat to the leader
-    nm1.nodeHeartbeat(true);
+    try {
+      MockNM nm1, nm2;
+      //Wait for leader election to start
+      Thread.sleep(3000);
+      if (rm1.getRMContext().isLeader()) {
+        rmL = rm1;
+        rmRT = rm2;
+      } else {
+        rmL = rm2;
+        rmRT = rm1;
+      }
+      FifoScheduler scheduler = (FifoScheduler) rmL.getResourceScheduler();
 
-    //4. NM2 sends a heartbeat to the ResourceTracker
-    nm2.nodeHeartbeat(true);
-    //Wait for heartbeat to be processed
-    Thread.sleep(
-        conf.getInt(YarnConfiguration.HOPS_PENDING_EVENTS_RETRIEVAL_PERIOD,
-            YarnConfiguration.DEFAULT_HOPS_PENDING_EVENTS_RETRIEVAL_PERIOD) *
-            2);
-    //5. NM2 sends a heartbeat to the ResourceTracker to report unhealthy
-    nm2.nodeHeartbeat(false);
-    retries = 0;
-    while (scheduler.getNodes().size() == 2 && retries++ < 20) {
-      Thread.sleep(100);
+      //1. Register NM to the leader RM
+      nm1 = rmL.registerNode("host1:1234", 5012);
+      int retries = 0;
+      while (rmRT.getRMContext().getActiveRMNodes().isEmpty() && retries++ < 20) {
+        Thread.sleep(100);
+        commitDummyPendingEvent();
+      }
+      //Assert that registration was successful
+      Assert.assertEquals(1, rmL.getRMContext().getActiveRMNodes().size());
+      //Wait for scheduler to process added node
+      retries = 0;
+      while (scheduler.getNodes().isEmpty() && retries++ < 20) {
+        Thread.sleep(100);
+        commitDummyPendingEvent();
+      }
+      Assert.assertEquals(1, scheduler.getNodes().size());
+
+      //2. Register NM to the ResourceTracker
+      nm2 = rmRT.registerNode("host2:5678", 1024);
+      //Wait for RT to process added node
+      retries = 0;
+      while (rmRT.getRMContext().getActiveRMNodes().isEmpty() && retries++ < 20) {
+        Thread.sleep(100);
+        commitDummyPendingEvent();
+      }
+      Assert.assertEquals(1, rmRT.getRMContext().getActiveRMNodes().size());
+      //Wait for scheduler to process added node
+      retries = 0;
+      while (scheduler.getNodes().size() == 1 && retries++ < 20) {
+        Thread.sleep(100);
+        commitDummyPendingEvent();
+      }
+      Assert.assertEquals(2, scheduler.getNodes().size());
+
+      //3. NM1 sends a heartbeat to the leader
+      nm1.nodeHeartbeat(true);
+
+      //4. NM2 sends a heartbeat to the ResourceTracker
+      nm2.nodeHeartbeat(true);
+      //Wait for heartbeat to be processed
+      Thread.sleep(
+              conf.
+              getInt(YarnConfiguration.HOPS_PENDING_EVENTS_RETRIEVAL_PERIOD,
+                      YarnConfiguration.DEFAULT_HOPS_PENDING_EVENTS_RETRIEVAL_PERIOD)
+              * 2);
+      //5. NM2 sends a heartbeat to the ResourceTracker to report unhealthy
+      nm2.nodeHeartbeat(false);
+      retries = 0;
+      while (scheduler.getNodes().size() == 2 && retries++ < 20) {
+        Thread.sleep(100);
+        commitDummyPendingEvent();
+      }
+      Assert.assertEquals(1, scheduler.getNodes().size());
+
+      //6. NM1 sends a heartbeat to the Leader to report unhealthy
+      nm1.nodeHeartbeat(false);
+      retries = 0;
+      while (scheduler.getNodes().size() == 1 && retries++ < 20) {
+        Thread.sleep(100);
+        commitDummyPendingEvent();
+      }
+      Assert.assertEquals(0, scheduler.getNodes().size());
+    } finally {
+      rm1.stop();
+      rm2.stop();
     }
-    Assert.assertEquals(1, scheduler.getNodes().size());
-    
-    //6. NM1 sends a heartbeat to the Leader to report unhealthy
-    nm1.nodeHeartbeat(false);
-    retries = 0;
-    while (scheduler.getNodes().size() == 1 && retries++ < 20) {
-      Thread.sleep(100);
-    }
-    Assert.assertEquals(0, scheduler.getNodes().size());
-    rm1.stop();
-    rm2.stop();
   }
   
   /**
@@ -313,7 +335,7 @@ public class TestDistributedRT {
   @Test
   public void testConcurrentRegistration()
       throws InterruptedException, Exception {
-    conf.setBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED, true);
+    conf.setBoolean(YarnConfiguration.DISTRIBUTED_RM, true);
     conf.setBoolean(YarnConfiguration.RM_HA_ENABLED, true);
     conf.setInt(YarnConfiguration.HOPS_PENDING_EVENTS_RETRIEVAL_PERIOD, 500);
     MockRM rm1 = new MockRM(conf);
@@ -321,29 +343,68 @@ public class TestDistributedRT {
     MockRM rmL, rmRT;
     rm1.start();
     rm2.start();
-    
-    //Wait for leader election to start
-    Thread.sleep(3000);
-    if (rm1.getRMContext().getRMGroupMembershipService().isLeader()) {
-      rmL = rm1;
-      rmRT = rm2;
-    } else {
-      rmL = rm2;
-      rmRT = rm1;
+    try {
+      //Wait for leader election to start
+      Thread.sleep(3000);
+      if (rm1.getRMContext().isLeader()) {
+        rmL = rm1;
+        rmRT = rm2;
+      } else {
+        rmL = rm2;
+        rmRT = rm1;
+      }
+      FifoScheduler scheduler = (FifoScheduler) rmL.getResourceScheduler();
+      rmRT.registerNode("host:1234", 1024);
+      rmRT.registerNode("host:1234", 1024);
+      //Assert that registration was successful and node was registered once
+      Assert.assertEquals(1, rmRT.getRMContext().getActiveRMNodes().size());
+      //Wait for scheduler to process added node
+      int retries = 0;
+      while (scheduler.getNodes().isEmpty() && retries++ < 20) {
+        Thread.sleep(100);
+        commitDummyPendingEvent();
+      }
+      Assert.assertEquals(1, scheduler.getNodes().size());
+    } finally {
+      rm1.stop();
+      rm2.stop();
     }
-    FifoScheduler scheduler = (FifoScheduler) rmL.getResourceScheduler();
-    rmRT.registerNode("host:1234", 1024);
-    rmRT.registerNode("host:1234", 1024);
-    //Assert that registration was successful and node was registered once
-    Assert.assertEquals(1, rmRT.getRMContext().getActiveRMNodes().size());
-    //Wait for scheduler to process added node
-    int retries = 0;
-    while (scheduler.getNodes().isEmpty() && retries++ < 20) {
-      Thread.sleep(100);
+  }
+  
+  int pendingId=1000;
+  
+   private void commitDummyPendingEvent() {
+    try {
+      LightWeightRequestHandler bomb = new LightWeightRequestHandler(
+              YARNOperationType.TEST) {
+                @Override
+                public Object performTask() throws IOException {
+                  connector.beginTransaction();
+                  connector.writeLock();
+
+                  //Insert Pending Event
+                  List<PendingEvent> pendingEventsToAdd = 
+                          new ArrayList<PendingEvent>();
+                  
+                    pendingEventsToAdd.add(
+                            new PendingEvent("nodeid", -1,
+                            0, pendingId++));
+                  
+                  PendingEventDataAccess pendingEventDA =
+                          (PendingEventDataAccess) RMStorageFactory.
+                          getDataAccess(PendingEventDataAccess.class);
+                  pendingEventDA.addAll(pendingEventsToAdd);
+                  
+                 
+
+                  connector.commit();
+                  return null;
+                }
+              };
+      bomb.handle();
+    } catch (IOException ex) {
+      LOG.warn("Unable to update container statuses table", ex);
     }
-    Assert.assertEquals(1, scheduler.getNodes().size());
-    rm1.stop();
-    rm2.stop();
   }
   
 }

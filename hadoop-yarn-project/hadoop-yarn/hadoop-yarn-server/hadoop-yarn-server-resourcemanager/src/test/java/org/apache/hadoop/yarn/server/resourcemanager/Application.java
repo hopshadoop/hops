@@ -309,7 +309,7 @@ public class Application {
     Allocation allocation = resourceManager.getResourceScheduler()
         .allocate(applicationAttemptId, new ArrayList<ResourceRequest>(ask),
             new ArrayList<ContainerId>(), null, null,
-            new TransactionStateImpl(-1, TransactionState.TransactionType.RM));
+            new TransactionStateImpl(TransactionState.TransactionType.RM));
     System.out.println("-=======" + applicationAttemptId);
     System.out.println("----------" +
         resourceManager.getRMContext().getRMApps().get(applicationId)

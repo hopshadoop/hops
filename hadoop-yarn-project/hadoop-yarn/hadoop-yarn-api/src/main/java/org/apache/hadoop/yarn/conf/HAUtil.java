@@ -60,17 +60,6 @@ public class HAUtil {
         YarnConfiguration.DEFAULT_AUTO_FAILOVER_ENABLED);
   }
 
-  public static boolean isAutomaticFailoverEnabledAndEmbedded(
-      Configuration conf) {
-    return isAutomaticFailoverEnabled(conf) &&
-        isAutomaticFailoverEmbedded(conf);
-  }
-
-  public static boolean isAutomaticFailoverEmbedded(Configuration conf) {
-    return conf.getBoolean(YarnConfiguration.AUTO_FAILOVER_EMBEDDED,
-        YarnConfiguration.DEFAULT_AUTO_FAILOVER_EMBEDDED);
-  }
-
   /**
    * Verify configuration for Resource Manager HA.
    *

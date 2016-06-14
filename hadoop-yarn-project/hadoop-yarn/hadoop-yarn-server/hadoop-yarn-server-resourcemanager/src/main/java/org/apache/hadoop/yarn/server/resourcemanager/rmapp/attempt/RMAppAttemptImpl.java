@@ -477,10 +477,11 @@ public class RMAppAttemptImpl implements RMAppAttempt, Recoverable {
     try {
       List<ContainerStatus> returnList =
           new ArrayList<ContainerStatus>(this.justFinishedContainers.size());
-      returnList.addAll(this.justFinishedContainers);
-      this.justFinishedContainers.clear();
+        returnList.addAll(this.justFinishedContainers);
+        this.justFinishedContainers.clear();
       if (ts != null) {
-        ((TransactionStateImpl) ts).addAppAttempt(this);
+        ((TransactionStateImpl) ts).addAllJustFinishedContainersToRemove(
+                returnList, this.applicationAttemptId);
       }
       return returnList;
     } finally {
@@ -526,7 +527,8 @@ public class RMAppAttemptImpl implements RMAppAttempt, Recoverable {
          * keep the master in sync with the state machine
          */
         this.stateMachine.doTransition(event.getType(), event);
-        if (event.getTransactionState() != null) {
+        
+        if (oldState!=getState() && event.getTransactionState() != null) {
           ((TransactionStateImpl) event.getTransactionState()).
               addAppAttempt(this);
         }
@@ -537,10 +539,6 @@ public class RMAppAttemptImpl implements RMAppAttempt, Recoverable {
          */
       }
 
-      if (oldState != getState()) {
-        LOG.info(appAttemptID + " State change from " + oldState + " to " +
-            getState());
-      }
     } finally {
       this.writeLock.unlock();
     }
@@ -564,7 +562,7 @@ public class RMAppAttemptImpl implements RMAppAttempt, Recoverable {
   }
 
   @Override
-  public void recover(RMState state) throws Exception {
+  public void recover(RMState state) throws IOException {
     ApplicationState appState =
         state.getApplicationState().get(getAppAttemptId().
             getApplicationId());
@@ -598,7 +596,7 @@ public class RMAppAttemptImpl implements RMAppAttempt, Recoverable {
       case ALLOCATED:
         this.masterService.registerAppAttempt(applicationAttemptId, null);
         this.masterService.recoverAllocateResponse(applicationAttemptId, state.
-            getAllocateResponses().get(applicationAttemptId));
+            getAllocateResponses().get(applicationAttemptId),state);
         break;
       case FINISHING:
         this.rmContext.getAMFinishingMonitor().register(applicationAttemptId);
@@ -616,12 +614,10 @@ public class RMAppAttemptImpl implements RMAppAttempt, Recoverable {
       TransactionState ts) {
     this.justFinishedContainers = attempt.getJustFinishedContainers();
     this.ranNodes = attempt.getRanNodes();
-    ApplicationAttemptState appAttemptState =
-        new ApplicationAttemptState(this.applicationAttemptId, masterContainer,
-            getCredentials(), startTime, this.stateMachine.getCurrentState(),
-            originalTrackingUrl, "", finalStatus, progress, host, rpcPort,
-            ranNodes, justFinishedContainers);
     ((TransactionStateImpl) ts).addAppAttempt(this);
+    ((TransactionStateImpl) ts).addAllRanNodes(this);
+    ((TransactionStateImpl) ts).addAllJustFinishedContainersToAdd(
+            this.justFinishedContainers, this.applicationAttemptId);
   }
 
   private void recoverAppAttemptCredentials(Credentials appAttemptTokens)
@@ -1078,7 +1074,10 @@ public class RMAppAttemptImpl implements RMAppAttempt, Recoverable {
       RMAppAttemptStatusupdateEvent statusUpdateEvent =
           (RMAppAttemptStatusupdateEvent) event;
 
-      // Update progress
+      // Update progress 
+      //(We do not alwasy persist it to the database, 
+      //this may result in a temporary wron information when recovering,
+      //but this avoid contention on the database)
       appAttempt.progress = statusUpdateEvent.getProgress();
 
       // Ping to AMLivelinessMonitor
@@ -1160,6 +1159,8 @@ public class RMAppAttemptImpl implements RMAppAttempt, Recoverable {
       RMAppAttemptContainerAcquiredEvent acquiredEvent =
           (RMAppAttemptContainerAcquiredEvent) event;
       appAttempt.ranNodes.add(acquiredEvent.getContainer().getNodeId());
+      ((TransactionStateImpl) event.getTransactionState()).addRanNode(
+              acquiredEvent.getContainer().getNodeId(), appAttempt.getAppAttemptId());
     }
   }
 
@@ -1188,6 +1189,9 @@ public class RMAppAttemptImpl implements RMAppAttempt, Recoverable {
 
       // Normal container.Put it in completedcontainers list
       appAttempt.justFinishedContainers.add(containerStatus);
+      ((TransactionStateImpl) event.getTransactionState()).
+              addJustFinishedContainerToAdd(containerStatus, 
+                      appAttempt.getAppAttemptId());
       return RMAppAttemptState.RUNNING;
     }
   }
@@ -1204,6 +1208,9 @@ public class RMAppAttemptImpl implements RMAppAttempt, Recoverable {
           containerFinishedEvent.getContainerStatus();
       // Normal container. Add it in completed containers list
       appAttempt.justFinishedContainers.add(containerStatus);
+      ((TransactionStateImpl) event.getTransactionState()).
+              addJustFinishedContainerToAdd(containerStatus, 
+                      appAttempt.getAppAttemptId());
     }
   }
 
@@ -1247,6 +1254,9 @@ public class RMAppAttemptImpl implements RMAppAttempt, Recoverable {
       }
       // Normal container.
       appAttempt.justFinishedContainers.add(containerStatus);
+      ((TransactionStateImpl) event.getTransactionState()).
+              addJustFinishedContainerToAdd(containerStatus, 
+                      appAttempt.getAppAttemptId());
       return RMAppAttemptState.FINISHING;
     }
   }

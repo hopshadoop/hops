@@ -248,7 +248,7 @@ public class RMStateStoreTestBase /*extends ClientBaseWithFixes*/ {
     // load state
     store = stateStoreHelper.getRMStateStore();
     store.setRMDispatcher(dispatcher);
-    RMState state = store.loadState();
+    RMState state = store.loadState(null);
     Map<ApplicationId, ApplicationState> rmAppState =
         state.getApplicationState();
 
@@ -315,7 +315,7 @@ public class RMStateStoreTestBase /*extends ClientBaseWithFixes*/ {
     // check updated application state.
     store = stateStoreHelper.getRMStateStore();
     store.setRMDispatcher(dispatcher);
-    RMState newRMState = store.loadState();
+    RMState newRMState = store.loadState(null);
     Map<ApplicationId, ApplicationState> newRMAppState =
         newRMState.getApplicationState();
     ApplicationState updatedAppState = newRMAppState.get(appId1);
@@ -377,7 +377,7 @@ public class RMStateStoreTestBase /*extends ClientBaseWithFixes*/ {
     store.storeRMDTMasterKey(key, null);
 
     RMDTSecretManagerState secretManagerState =
-        store.loadState().getRMDTSecretManagerState();
+        store.loadState(null).getRMDTSecretManagerState();
     Assert.assertEquals(token1, secretManagerState.getTokenState());
     Assert.assertEquals(keySet, secretManagerState.getMasterKeyState());
     Assert
@@ -391,7 +391,7 @@ public class RMStateStoreTestBase /*extends ClientBaseWithFixes*/ {
     token1.put(dtId1, renewDate1);
 
     RMDTSecretManagerState updateSecretManagerState =
-        store.loadState().getRMDTSecretManagerState();
+        store.loadState(null).getRMDTSecretManagerState();
     Assert.assertEquals(token1, updateSecretManagerState.getTokenState());
     Assert.assertEquals(keySet, updateSecretManagerState.getMasterKeyState());
     Assert.assertEquals(sequenceNumber,
@@ -401,7 +401,7 @@ public class RMStateStoreTestBase /*extends ClientBaseWithFixes*/ {
     store.removeRMDTMasterKey(key, null);
     keySet.clear();
     RMDTSecretManagerState noKeySecretManagerState =
-        store.loadState().getRMDTSecretManagerState();
+        store.loadState(null).getRMDTSecretManagerState();
     Assert.assertEquals(token1, noKeySecretManagerState.getTokenState());
     Assert.assertEquals(keySet, noKeySecretManagerState.getMasterKeyState());
     Assert.assertEquals(sequenceNumber,
@@ -410,7 +410,7 @@ public class RMStateStoreTestBase /*extends ClientBaseWithFixes*/ {
     // check to delete delegationToken
     store.removeRMDelegationToken(dtId1, sequenceNumber, null);
     RMDTSecretManagerState noKeyAndTokenSecretManagerState =
-        store.loadState().getRMDTSecretManagerState();
+        store.loadState(null).getRMDTSecretManagerState();
     token1.clear();
     Assert
         .assertEquals(token1, noKeyAndTokenSecretManagerState.getTokenState());

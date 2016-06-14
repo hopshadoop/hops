@@ -63,8 +63,9 @@ public class FSSchedulerApp extends SchedulerApplicationAttempt {
   
   public FSSchedulerApp(ApplicationAttemptId applicationAttemptId, String user,
       FSLeafQueue queue, ActiveUsersManager activeUsersManager,
-      RMContext rmContext) {
-    super(applicationAttemptId, user, queue, activeUsersManager, rmContext);
+      RMContext rmContext, int maxAllocatedContainersPerRequest) {
+    super(applicationAttemptId, user, queue, activeUsersManager, rmContext,
+            maxAllocatedContainersPerRequest);
   }
 
   public void setAppSchedulable(AppSchedulable appSchedulable) {
@@ -105,7 +106,8 @@ public class FSSchedulerApp extends SchedulerApplicationAttempt {
     preemptionMap.remove(rmContainer);
   }
 
-  public synchronized void unreserve(FSSchedulerNode node, Priority priority) {
+  public synchronized void unreserve(FSSchedulerNode node, Priority priority,
+          TransactionState transactionState) {
     Map<NodeId, RMContainer> reservedContainers =
         this.reservedContainers.get(priority);
     RMContainer reservedContainer = reservedContainers.remove(node.getNodeID());
@@ -114,7 +116,7 @@ public class FSSchedulerApp extends SchedulerApplicationAttempt {
     }
     
     // Reset the re-reservation count
-    resetReReservations(priority);
+    resetReReservations(priority, transactionState);
 
     Resource resource = reservedContainer.getContainer().getResource();
     Resources.subtractFrom(currentReservation, resource);
@@ -160,7 +162,7 @@ public class FSSchedulerApp extends SchedulerApplicationAttempt {
    */
   public synchronized NodeType getAllowedLocalityLevel(Priority priority,
       int numNodes, double nodeLocalityThreshold,
-      double rackLocalityThreshold) {
+      double rackLocalityThreshold,TransactionState transactionState) {
     // upper limit on threshold
     if (nodeLocalityThreshold > 1.0) {
       nodeLocalityThreshold = 1.0;
@@ -195,10 +197,10 @@ public class FSSchedulerApp extends SchedulerApplicationAttempt {
     if (getSchedulingOpportunities(priority) > (numNodes * threshold)) {
       if (allowed.equals(NodeType.NODE_LOCAL)) {
         allowedLocalityLevel.put(priority, NodeType.RACK_LOCAL);
-        resetSchedulingOpportunities(priority);
+        resetSchedulingOpportunities(priority, transactionState);
       } else if (allowed.equals(NodeType.RACK_LOCAL)) {
         allowedLocalityLevel.put(priority, NodeType.OFF_SWITCH);
-        resetSchedulingOpportunities(priority);
+        resetSchedulingOpportunities(priority, transactionState);
       }
     }
     return allowedLocalityLevel.get(priority);
@@ -210,7 +212,8 @@ public class FSSchedulerApp extends SchedulerApplicationAttempt {
    * scheduling constraints.
    */
   public synchronized NodeType getAllowedLocalityLevelByTime(Priority priority,
-      long nodeLocalityDelayMs, long rackLocalityDelayMs, long currentTimeMs) {
+      long nodeLocalityDelayMs, long rackLocalityDelayMs, long currentTimeMs,
+      TransactionState transactionState) {
 
     // if not being used, can schedule anywhere
     if (nodeLocalityDelayMs < 0 || rackLocalityDelayMs < 0) {
@@ -245,10 +248,10 @@ public class FSSchedulerApp extends SchedulerApplicationAttempt {
     if (waitTime > thresholdTime) {
       if (allowed.equals(NodeType.NODE_LOCAL)) {
         allowedLocalityLevel.put(priority, NodeType.RACK_LOCAL);
-        resetSchedulingOpportunities(priority, currentTimeMs);
+        resetSchedulingOpportunities(priority, currentTimeMs, transactionState);
       } else if (allowed.equals(NodeType.RACK_LOCAL)) {
         allowedLocalityLevel.put(priority, NodeType.OFF_SWITCH);
-        resetSchedulingOpportunities(priority, currentTimeMs);
+        resetSchedulingOpportunities(priority, currentTimeMs, transactionState);
       }
     }
     return allowedLocalityLevel.get(priority);

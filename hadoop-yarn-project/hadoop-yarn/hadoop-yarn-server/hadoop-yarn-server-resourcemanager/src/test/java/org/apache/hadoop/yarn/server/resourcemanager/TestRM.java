@@ -613,6 +613,7 @@ public class TestRM {
     }
   }
 
+  Dispatcher dispatcher;
   /**
    * Validate killing an application when it is at accepted state.
    * <p/>
@@ -624,33 +625,34 @@ public class TestRM {
   public void testApplicationKillAtAcceptedState() throws Exception {
     LOG.debug("HOP :: current method-" + RMUtilities.getCallerMethod("TestRM"));
     YarnConfiguration conf = new YarnConfiguration();
-    final Dispatcher dispatcher = new AsyncDispatcher() {
-      @Override
-      public EventHandler getEventHandler() {
-
-        class EventArgMatcher extends ArgumentMatcher<AbstractEvent> {
-
-          @Override
-          public boolean matches(Object argument) {
-            if (argument instanceof RMAppAttemptEvent) {
-              if (((RMAppAttemptEvent) argument).getType()
-                  .equals(RMAppAttemptEventType.KILL)) {
-                return true;
-              }
-            }
-            return false;
-          }
-        }
-
-        EventHandler handler = spy(super.getEventHandler());
-        doNothing().when(handler).handle(argThat(new EventArgMatcher()));
-        return handler;
-      }
-    };
+    
 
     MockRM rm = new MockRM(conf) {
       @Override
       protected Dispatcher createDispatcher() {
+        dispatcher = new AsyncDispatcher() {
+          @Override
+          public EventHandler getEventHandler() {
+
+            class EventArgMatcher extends ArgumentMatcher<AbstractEvent> {
+
+              @Override
+              public boolean matches(Object argument) {
+                if (argument instanceof RMAppAttemptEvent) {
+                  if (((RMAppAttemptEvent) argument).getType()
+                          .equals(RMAppAttemptEventType.KILL)) {
+                    return true;
+                  }
+                }
+                return false;
+              }
+            }
+
+            EventHandler handler = spy(super.getEventHandler());
+            doNothing().when(handler).handle(argThat(new EventArgMatcher()));
+            return handler;
+          }
+        };
         return dispatcher;
       }
     };

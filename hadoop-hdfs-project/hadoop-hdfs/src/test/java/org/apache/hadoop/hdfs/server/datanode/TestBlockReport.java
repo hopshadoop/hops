@@ -591,7 +591,6 @@ public class TestBlockReport {
       // it before it gets to the NN.
       dn.scheduleAllBlockReport(0);
       delayer.waitForCall();
-      
     } finally {
       IOUtils.closeStream(out);
     }

@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity;
 
+import io.hops.ha.common.TransactionStateManager;
 import junit.framework.Assert;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -41,9 +42,12 @@ public class TestQueueParsing {
 
     CapacityScheduler capacityScheduler = new CapacityScheduler();
     capacityScheduler.setConf(conf);
+    TransactionStateManager tsm = new TransactionStateManager();
+    tsm.init(conf);
+    tsm.start();
     capacityScheduler.reinitialize(conf,
         new RMContextImpl(null, null, null, null, null, null,
-            new ClientToAMTokenSecretManagerInRM(), null, conf));
+            new ClientToAMTokenSecretManagerInRM(), null, conf, tsm), null);
     
     CSQueue a = capacityScheduler.getQueue("a");
     Assert.assertEquals(0.10, a.getAbsoluteCapacity(), DELTA);
@@ -139,7 +143,7 @@ public class TestQueueParsing {
 
     CapacityScheduler capacityScheduler = new CapacityScheduler();
     capacityScheduler.setConf(new YarnConfiguration());
-    capacityScheduler.reinitialize(conf, null);
+    capacityScheduler.reinitialize(conf, null, null);
   }
   
   public void testMaxCapacity() throws Exception {
@@ -162,7 +166,7 @@ public class TestQueueParsing {
     try {
       capacityScheduler = new CapacityScheduler();
       capacityScheduler.setConf(new YarnConfiguration());
-      capacityScheduler.reinitialize(conf, null);
+      capacityScheduler.reinitialize(conf, null, null);
     } catch (IllegalArgumentException iae) {
       fail = true;
     }
@@ -174,7 +178,7 @@ public class TestQueueParsing {
     // Now this should work
     capacityScheduler = new CapacityScheduler();
     capacityScheduler.setConf(new YarnConfiguration());
-    capacityScheduler.reinitialize(conf, null);
+    capacityScheduler.reinitialize(conf, null, null);
     
     fail = false;
     try {

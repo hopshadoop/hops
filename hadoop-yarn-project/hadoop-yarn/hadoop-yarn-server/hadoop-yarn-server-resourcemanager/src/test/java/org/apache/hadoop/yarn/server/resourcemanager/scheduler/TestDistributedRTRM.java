@@ -65,7 +65,7 @@ public class TestDistributedRTRM {
     RMUtilities.InitializeDB();
     ResourceManager rm = new ResourceManager();
     conf.setBoolean(YarnConfiguration.RM_HA_ENABLED, true);
-    conf.setBoolean(YarnConfiguration.HOPS_DISTRIBUTED_RT_ENABLED, true);
+    conf.setBoolean(YarnConfiguration.DISTRIBUTED_RM, true);
     conf.setInt(YarnConfiguration.HOPS_PENDING_EVENTS_RETRIEVAL_PERIOD, 500);
     rm.init(conf);
     rm.start();

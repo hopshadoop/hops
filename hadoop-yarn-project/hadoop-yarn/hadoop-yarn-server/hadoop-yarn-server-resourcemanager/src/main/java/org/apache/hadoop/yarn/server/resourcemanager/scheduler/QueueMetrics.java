@@ -51,51 +51,50 @@ import static org.apache.hadoop.metrics2.lib.Interns.info;
 @Metrics(context = "yarn")
 public class QueueMetrics implements MetricsSource {
   @Metric("# of apps submitted")
-  MutableCounterInt appsSubmitted; //recovered
+  MutableCounterInt appsSubmitted; 
   @Metric("# of running apps")
-  MutableGaugeInt appsRunning;//recovered
+  MutableGaugeInt appsRunning;
   @Metric("# of pending apps")
-  MutableGaugeInt appsPending;//recovered
+  MutableGaugeInt appsPending;
   @Metric("# of apps completed")
-  MutableCounterInt appsCompleted;//recovered
+  MutableCounterInt appsCompleted;
   @Metric("# of apps killed")
-  MutableCounterInt appsKilled;//recovered
+  MutableCounterInt appsKilled;
   @Metric("# of apps failed")
-  MutableCounterInt appsFailed;//recovered
+  MutableCounterInt appsFailed;
 
   @Metric("Allocated memory in MB")
-  MutableGaugeInt allocatedMB;//recovered
+  MutableGaugeInt allocatedMB;
   @Metric("Allocated CPU in virtual cores")
-  MutableGaugeInt allocatedVCores;//recovered
+  MutableGaugeInt allocatedVCores;
   @Metric("# of allocated containers")
-  MutableGaugeInt allocatedContainers;//recovered
+  MutableGaugeInt allocatedContainers;
   @Metric("Aggregate # of allocated containers")
-  MutableCounterLong aggregateContainersAllocated;//recovered
+  MutableCounterLong aggregateContainersAllocated;
   @Metric("Aggregate # of released containers")
-  MutableCounterLong aggregateContainersReleased;//recovered
+  MutableCounterLong aggregateContainersReleased;
   @Metric("Available memory in MB")
-  MutableGaugeInt availableMB;//recovered
+  MutableGaugeInt availableMB;
   @Metric("Available CPU in virtual cores")
-  MutableGaugeInt availableVCores;//recovered
+  MutableGaugeInt availableVCores;
   @Metric("Pending memory allocation in MB")
-  MutableGaugeInt pendingMB;//recovered
+  MutableGaugeInt pendingMB;
   @Metric("Pending CPU allocation in virtual cores")
-  MutableGaugeInt pendingVCores;//recovered
+  MutableGaugeInt pendingVCores;
   @Metric("# of pending containers")
-  MutableGaugeInt pendingContainers;//recovered
+  MutableGaugeInt pendingContainers;
   @Metric("# of reserved memory in MB")
-  MutableGaugeInt reservedMB;//recovered
+  MutableGaugeInt reservedMB;
   @Metric("Reserved CPU in virtual cores")
-  MutableGaugeInt reservedVCores;//recovered
+  MutableGaugeInt reservedVCores;
   @Metric("# of reserved containers")
-  MutableGaugeInt reservedContainers;//recovered
+  MutableGaugeInt reservedContainers;
   @Metric("# of active users")
-  MutableGaugeInt activeUsers;//recovered
+  MutableGaugeInt activeUsers;
   @Metric("# of active applications")
-  MutableGaugeInt activeApplications;//recovered
-  private final MutableGaugeInt[] runningTime;//TORECOVER : not recovered yet 
+  MutableGaugeInt activeApplications;
+  private final MutableGaugeInt[] runningTime;
   private TimeBucketMetrics<ApplicationId> runBuckets;
-      //TORECOVER : not recovered yet
 
   static final Logger LOG = LoggerFactory.getLogger(QueueMetrics.class);
   static final MetricsInfo RECORD_INFO =
@@ -106,13 +105,12 @@ public class QueueMetrics implements MetricsSource {
   static final Splitter Q_SPLITTER =
       Splitter.on('.').omitEmptyStrings().trimResults();
 
-  final MetricsRegistry registry;//TORECOVER : not recovered yet 
-  final String queueName;//recovered
-  final QueueMetrics parent;//recovered
+  final MetricsRegistry registry;
+  final String queueName;
+  final QueueMetrics parent;
   final MetricsSystem metricsSystem;
-      //TORECOVER : not recovered yet (we have to recover what have been stored in the ms)
-  private final Map<String, QueueMetrics> users;//TORECOVER : not recovered yet
-  private final Configuration conf;//recovered
+  private final Map<String, QueueMetrics> users;
+  private final Configuration conf;
 
   protected QueueMetrics(MetricsSystem ms, String queueName, Queue parent,
       boolean enableUserMetrics, Configuration conf) {
@@ -590,31 +588,4 @@ public class QueueMetrics implements MetricsSource {
     return metricsSystem;
   }
   
-  public void recover(
-      io.hops.metadata.yarn.entity.QueueMetrics recoverQueueMetrics) {
-    this.appsSubmitted.incr(recoverQueueMetrics.getAppssubmitted());
-    this.appsRunning.incr(recoverQueueMetrics.getAppsrunning());
-    this.appsPending.incr(recoverQueueMetrics.getAppspending());
-    this.appsCompleted.incr(recoverQueueMetrics.getAppscompleted());
-    this.appsKilled.incr(recoverQueueMetrics.getAppskilled());
-    this.appsFailed.incr(recoverQueueMetrics.getAppsfailed());
-    this.allocatedMB.incr(recoverQueueMetrics.getAllocatedmb());
-    this.allocatedVCores.incr(recoverQueueMetrics.getAllocatedvcores());
-    this.allocatedContainers.incr(recoverQueueMetrics.getAllocatedcontainers());
-    this.aggregateContainersAllocated
-        .incr(recoverQueueMetrics.getAggregatecontainersallocated());
-    this.aggregateContainersReleased
-        .incr(recoverQueueMetrics.getAggregatecontainersreleased());
-    this.availableMB.incr(recoverQueueMetrics.getAvailablemb());
-    this.availableVCores.incr(recoverQueueMetrics.getAvailablevcores());
-    this.pendingMB.incr(recoverQueueMetrics.getPendingmb());
-    this.pendingVCores.incr(recoverQueueMetrics.getPendingvcores());
-    this.pendingContainers.incr(recoverQueueMetrics.getPendingContainers());
-    this.reservedMB.incr(recoverQueueMetrics.getReservedmb());
-    this.reservedVCores.incr(recoverQueueMetrics.getReservedvcores());
-    this.reservedContainers.incr(recoverQueueMetrics.getReservedcontainers());
-    this.activeUsers.incr(recoverQueueMetrics.getActiveusers());
-    this.activeApplications.incr(recoverQueueMetrics.getActiveapplications());
-
-  }
 }

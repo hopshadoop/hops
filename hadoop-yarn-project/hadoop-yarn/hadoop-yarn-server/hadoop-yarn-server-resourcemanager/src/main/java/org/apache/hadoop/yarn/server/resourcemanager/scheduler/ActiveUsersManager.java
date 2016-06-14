@@ -42,9 +42,9 @@ public class ActiveUsersManager {
   
   private final QueueMetrics metrics;
   
-  private int activeUsers = 0;
+  private int activeUsers = 0; //TORECOVER
   private Map<String, Set<ApplicationId>> usersApplications =
-      new HashMap<String, Set<ApplicationId>>();
+      new HashMap<String, Set<ApplicationId>>(); //TORECOVER
   
   public ActiveUsersManager(QueueMetrics metrics) {
     this.metrics = metrics;
@@ -67,7 +67,7 @@ public class ActiveUsersManager {
       usersApplications.put(user, userApps);
       ++activeUsers;
       metrics.incrActiveUsers();
-      LOG.debug("User " + user + " added to activeUsers, currently: " +
+      LOG.info("User " + user + " added to activeUsers, currently: " +
           activeUsers);
     }
     if (userApps.add(applicationId)) {

@@ -8,6 +8,7 @@
     <goals>
       <goal>test</goal>
       <goal>-fn</goal>
+      <goal>-Pndb</goal>
     </goals>
   </action>
 </actions>

@@ -65,13 +65,14 @@ public class TestMiniMRProxyUser extends TestCase {
     conf.set("hadoop.proxyuser." + proxyUser + ".hosts", sb.toString());
     conf.set("hadoop.proxyuser." + proxyUser + ".groups", proxyGroup);
 
+    dfsCluster = new MiniDFSCluster.Builder(conf).numDataNodes(dataNodes)
+        .build();
+
     String[] userGroups = new String[]{proxyGroup};
     UserGroupInformation.createUserForTesting(proxyUser, userGroups);
     UserGroupInformation.createUserForTesting("u1", userGroups);
     UserGroupInformation.createUserForTesting("u2", new String[]{"gg"});
 
-    dfsCluster = new MiniDFSCluster.Builder(conf).numDataNodes(dataNodes)
-        .build();
     FileSystem fileSystem = dfsCluster.getFileSystem();
     fileSystem.mkdirs(new Path("/tmp"));
     fileSystem.mkdirs(new Path("/user"));
