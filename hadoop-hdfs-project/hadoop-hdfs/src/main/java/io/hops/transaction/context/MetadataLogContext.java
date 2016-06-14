@@ -34,12 +34,12 @@ public class MetadataLogContext
   class Key {
     private int datasetId;
     private int inodeId;
-    private int logicTime;
+    private long timestamp;
 
-    public Key(int datasetId, int inodeId, int logicTime) {
+    public Key(int datasetId, int inodeId, long timestamp) {
       this.datasetId = datasetId;
       this.inodeId = inodeId;
-      this.logicTime = logicTime;
+      this.timestamp = timestamp;
     }
 
     @Override
@@ -59,14 +59,14 @@ public class MetadataLogContext
       if (inodeId != key.inodeId) {
         return false;
       }
-      return logicTime == key.logicTime;
+      return timestamp == key.timestamp;
     }
 
     @Override
     public int hashCode() {
       int result = datasetId;
       result = 31 * result + inodeId;
-      result = 31 * result + logicTime;
+      result = 31 * result + (int) (timestamp ^ (timestamp >>> 32));
       return result;
     }
   }
@@ -81,16 +81,15 @@ public class MetadataLogContext
       throws TransactionContextException {
     Key key = getKey(logEntry);
     while (get(key) != null) {
-      key.logicTime++;
+      key.timestamp = logEntry.updateTimestamp();
     }
-    logEntry.setLogicalTime(key.logicTime);
     super.add(logEntry);
   }
 
   @Override
   Key getKey(MetadataLogEntry metadataLogEntry) {
     return new Key(metadataLogEntry.getDatasetId(),
-        metadataLogEntry.getInodeId(), metadataLogEntry.getLogicalTime());
+        metadataLogEntry.getInodeId(), metadataLogEntry.getTimestamp());
   }
 
   @Override
@@ -98,7 +97,7 @@ public class MetadataLogContext
       throws TransactionContextException, StorageException {
     for (MetadataLogEntry existingEntry : existing) {
       MetadataLogEntry cached = get(getKey(existingEntry));
-      cached.incrementLogicalTime();
+      cached.updateTimestamp();
     }
     dataAccess.addAll(getAdded());
   }

@@ -1,0 +1,12 @@
+{
+  "rack" : "default-rack",
+  "nodes" : [ {
+    "node" : "a2115.smile.com"
+  }, {
+    "node" : "a2116.smile.com"
+  }, {
+    "node" : "a2117.smile.com"
+  }, {
+    "node" : "a2118.smile.com"
+  } ]
+}

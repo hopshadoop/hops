@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler;
 
+import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.classification.InterfaceAudience.LimitedPrivate;
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.hadoop.conf.Configuration;
@@ -40,5 +41,6 @@ public interface ResourceScheduler extends YarnScheduler, Recoverable {
    *     configuration
    * @throws IOException
    */
-  void reinitialize(Configuration conf, RMContext rmContext) throws IOException;
+  void reinitialize(Configuration conf, RMContext rmContext, 
+          TransactionState transactionState) throws IOException;
 }

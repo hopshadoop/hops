@@ -1304,6 +1304,7 @@ public class PBHelper {
     anp.setIpAddress(p.getIpAddress());
     anp.setPort(p.getPort());
     anp.setHttpAddress(p.getHttpAddress());
+
     return anp.build();
   }
   

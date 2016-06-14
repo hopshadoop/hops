@@ -271,7 +271,7 @@ public class AMLauncher implements Runnable {
     }
 
     try {
-      ts.decCounter("AMLauncher run");
+      ts.decCounter(eventType);
     } catch (IOException ex) {
       LOG.error(ex);
     }

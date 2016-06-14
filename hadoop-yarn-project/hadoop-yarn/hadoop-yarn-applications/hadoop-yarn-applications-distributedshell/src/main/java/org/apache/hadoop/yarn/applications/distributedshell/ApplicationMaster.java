@@ -772,7 +772,7 @@ public class ApplicationMaster {
         LaunchContainerRunnable runnableLaunchContainer =
             new LaunchContainerRunnable(allocatedContainer, containerListener);
         Thread launchThread = new Thread(runnableLaunchContainer);
-
+        launchThread.setName("launch thread " + launchThreads.size());
         // launch and start the container on a separate thread to keep
         // the main thread unblocked
         // as all containers may not be allocated at one go.

@@ -69,16 +69,13 @@ public class TestKillApplicationWithRMHA extends RMHATestBase {
 
     // failover and kill application
     // When FailOver happens, the state of this application is NEW,
-    // and ApplicationState is not saved in RMStateStore. The active RM
-    // can not load the ApplicationState of this application.
-    // Expected to get ApplicationNotFoundException
-    // when receives the KillApplicationRequest
+    // and ApplicationState is saved in RMStateStore. The active RM
+    // will load the ApplicationState of this application.
+    // Expected to get no exception
     try {
       failOverAndKillApp(app0.getApplicationId(), RMAppState.NEW);
-      fail("Should get an exception here");
     } catch (ApplicationNotFoundException ex) {
-      Assert.assertTrue(ex.getMessage().contains(
-          "Trying to kill an absent application " + app0.getApplicationId()));
+      fail("Should not get an exception here " + ex);
     }
   }
 
@@ -168,6 +165,8 @@ public class TestKillApplicationWithRMHA extends RMHATestBase {
         rm1.getRMContext().getRMApps().get(appId).getAppAttempts()
             .get(appAttemptId).getState());
     explicitFailover();
+    //WAIT for RPCs to be replayed
+    Thread.sleep(1000);
     Assert.assertEquals(expectedAppStateBeforeKillApp,
         rm2.getRMContext().getRMApps().get(appId).getState());
     killApplication(rm2, appId, appAttemptId, initialRMAppState);
@@ -178,7 +177,6 @@ public class TestKillApplicationWithRMHA extends RMHATestBase {
     Assert.assertEquals(initialRMAppState,
         rm1.getRMContext().getRMApps().get(appId).getState());
     explicitFailover();
-    Assert.assertTrue(rm2.getRMContext().getRMApps().get(appId) == null);
     killApplication(rm2, appId, null, initialRMAppState);
   }
 

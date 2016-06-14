@@ -163,6 +163,9 @@ public class TestDelegationTokenForProxyUser {
         UserGroupInformation.createRemoteUser(REAL_USER);
     WebHdfsTestUtil.LOG
         .info("ugi.getShortUserName()=" + ugi.getShortUserName());
+    final UserGroupInformation proxyUgi = UserGroupInformation
+        .createProxyUserForTesting(PROXY_USER, ugi, GROUP_NAMES);
+    
     final WebHdfsFileSystem webhdfs =
         WebHdfsTestUtil.getWebHdfsFileSystemAs(ugi, config);
     

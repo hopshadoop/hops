@@ -333,9 +333,8 @@ message ActiveNamenodeListResponseProto {
  * void request
  */
 message NameNodeAddressRequestForBlockReportingProto {
+required uint64 noOfBlks = 1;
 }
-
-
 
 /**
  * Protocol used from datanode to the namenode

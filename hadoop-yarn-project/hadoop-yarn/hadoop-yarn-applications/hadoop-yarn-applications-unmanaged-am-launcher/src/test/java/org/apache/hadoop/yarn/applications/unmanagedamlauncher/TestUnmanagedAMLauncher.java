@@ -58,6 +58,14 @@ public class TestUnmanagedAMLauncher {
   @BeforeClass
   public static void setup() throws InterruptedException, IOException {
     LOG.info("Starting up YARN cluster");
+    URL url = Thread.currentThread().getContextClassLoader()
+            .getResource("yarn-site.xml");
+    if (url == null) {
+      throw new RuntimeException(
+              "Could not find 'yarn-site.xml' dummy file in classpath");
+    }
+    File f = new File(url.getPath());
+    f.delete();
     conf.setInt(YarnConfiguration.RM_SCHEDULER_MINIMUM_ALLOCATION_MB, 128);
     if (yarnCluster == null) {
       yarnCluster =
@@ -74,14 +82,8 @@ public class TestUnmanagedAMLauncher {
       String webapp =
           yarnClusterConfig.get(YarnConfiguration.RM_WEBAPP_ADDRESS);
       assertTrue("Web app address still unbound to a host at " + webapp,
-          !webapp.startsWith("0.0.0.0"));
+              !webapp.startsWith("0.0.0.0"));
       LOG.info("Yarn webapp is at " + webapp);
-      URL url = Thread.currentThread().getContextClassLoader()
-          .getResource("yarn-site.xml");
-      if (url == null) {
-        throw new RuntimeException(
-            "Could not find 'yarn-site.xml' dummy file in classpath");
-      }
       //write the document to a buffer (not directly to the file, as that
       //can cause the file being written to get read -which will then fail.
       ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
@@ -112,7 +114,7 @@ public class TestUnmanagedAMLauncher {
 
   private static String getTestRuntimeClasspath() {
     LOG.info(
-        "Trying to generate classpath for app master from current thread's classpath");
+            "Trying to generate classpath for app master from current thread's classpath");
     String envClassPath = "";
     String cp = System.getProperty("java.class.path");
     if (cp != null) {
@@ -141,16 +143,16 @@ public class TestUnmanagedAMLauncher {
     LOG.info("Initializing Launcher");
     UnmanagedAMLauncher launcher =
         new UnmanagedAMLauncher(new Configuration(yarnCluster.getConfig())) {
-          public void launchAM(ApplicationAttemptId attemptId)
+              public void launchAM(ApplicationAttemptId attemptId)
               throws IOException, YarnException {
             YarnApplicationAttemptState attemptState =
                 rmClient.getApplicationAttemptReport(attemptId)
-                    .getYarnApplicationAttemptState();
-            Assert.assertTrue(
+                .getYarnApplicationAttemptState();
+                Assert.assertTrue(
                 attemptState.equals(YarnApplicationAttemptState.LAUNCHED));
-            super.launchAM(attemptId);
-          }
-        };
+                super.launchAM(attemptId);
+              }
+            };
     boolean initSuccess = launcher.init(args);
     Assert.assertTrue(initSuccess);
     LOG.info("Running Launcher");
@@ -194,10 +196,10 @@ public class TestUnmanagedAMLauncher {
       ApplicationMasterProtocol client =
           ClientRMProxy.createRMProxy(conf, ApplicationMasterProtocol.class);
       client.registerApplicationMaster(RegisterApplicationMasterRequest
-          .newInstance(NetUtils.getHostname(), -1, ""));
+              .newInstance(NetUtils.getHostname(), -1, ""));
       Thread.sleep(1000);
       FinishApplicationMasterResponse resp = client.finishApplicationMaster(
-          FinishApplicationMasterRequest
+              FinishApplicationMasterRequest
               .newInstance(FinalApplicationStatus.SUCCEEDED, "success", null));
       assertTrue(resp.getIsUnregistered());
       System.exit(0);

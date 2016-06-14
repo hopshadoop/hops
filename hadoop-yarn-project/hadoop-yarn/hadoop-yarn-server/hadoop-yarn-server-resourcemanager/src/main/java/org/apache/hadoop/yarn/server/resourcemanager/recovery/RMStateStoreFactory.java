@@ -24,8 +24,9 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 public class RMStateStoreFactory {
   
   public static RMStateStore getStore(Configuration conf) {
+    //TODO shouldn't NDBRMStateStore.class be in the config instead of here?
     RMStateStore store = ReflectionUtils.newInstance(
-        conf.getClass(YarnConfiguration.RM_STORE, MemoryRMStateStore.class,
+        conf.getClass(YarnConfiguration.RM_STORE, NDBRMStateStore.class,
             RMStateStore.class), conf);
     return store;
   }

@@ -1268,7 +1268,7 @@ public class TestRMContainerAllocator {
       super();
       try {
         Configuration conf = new Configuration();
-        reinitialize(conf, rmContext);
+        reinitialize(conf, rmContext, null);
       } catch (IOException ie) {
         LOG.info("add application failed with ", ie);
         assert (false);
