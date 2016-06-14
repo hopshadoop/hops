@@ -77,35 +77,6 @@ to generate the java classes from the protocol buffer files.
 
 ===============================================================================
 
-Memcache Setup
-===
-
-for memcached backed ndb setup follow the 
-
-1- add ndbmemcache schema to mysql cluster
-
-Ex:
-```
-/usr/local/mysql/bin/mysql -S /tmp/mysql.sock < /usr/local/mysql/share/memcache-api/ndb_memcache_metadata.sql
-```
-2- insert the following rows to the ndbmemcache database
-
-```SQL
-use ndbmemcache;
-INSERT INTO containers VALUES ('path_cnt', 'DATABASE_NAME','path_memcached', 'path', 'inodeids', 0, NULL, NULL, NULL, NULL);
-INSERT INTO key_prefixes VALUES (3, 'p:', 0,'caching', 'path_cnt');
-```
-
-3- use the memcached command associated with the mysql cluster on your namenode
-
-Ex:
-```
-/home/mahmoud/opt/mysql-cluster/bin/memcached -E /home/mahmoud/opt/mysql-cluster/lib/ndb_engine.so -e "connectstring=MYSQL_CLUSTER_ADDRESS;role=ndb-caching" -p 11212 -U 11212 -v
-```
-4- In DFSConfigKeys.java update the Memcache config parameters 
-
-NOTE: don't forget to change DATABASE_NAME to your database name
-
 # License
 
 Hops is released under an [Apache 2.0 license](LICENSE.txt).

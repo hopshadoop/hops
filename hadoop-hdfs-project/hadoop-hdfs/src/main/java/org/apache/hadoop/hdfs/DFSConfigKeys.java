@@ -155,11 +155,11 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
       //min value is 0. Better set it >= 1
   
   public static final String DFS_CLIENT_INITIAL_WAIT_ON_RETRY_IN_MS_KEY =
-      "dsf.client.initial.wait.on.retry";
+      "dfs.client.initial.wait.on.retry";
   public static final int DFS_CLIENT_INITIAL_WAIT_ON_RETRY_IN_MS_DEFAULT = 1000;
   
   public static final String DFS_CLIENT_REFRESH_NAMENODE_LIST_IN_MS_KEY =
-      "dsf.client.refresh.namenode.list";
+      "dfs.client.refresh.namenode.list";
   public static final int DFS_CLIENT_REFRESH_NAMENODE_LIST_IN_MS_DEFAULT =
       60 * 1000; //time in milliseconds.
   
