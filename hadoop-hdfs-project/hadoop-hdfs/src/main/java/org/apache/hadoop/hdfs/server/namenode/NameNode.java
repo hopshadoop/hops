@@ -165,7 +165,7 @@ public class NameNode {
           StartupOption.CHECKPOINT.getName() + "] | [" +
           StartupOption.FORMAT.getName() + " [" +
           StartupOption.CLUSTERID.getName() + " cid ] | [" +
-          StartupOption.SAFEMODE_FIX.getName() + "] | [" +
+          StartupOption.DROP_AND_CREATE_DB.getName() + "] | [" +
           StartupOption.FORCE.getName() + "] [" +
           StartupOption.NONINTERACTIVE.getName() + "] ] | [" +
           StartupOption.UPGRADE.getName() + "] | [" +
@@ -636,26 +636,28 @@ public class NameNode {
   /**
    * Stop all NameNode threads and wait for all to finish.
    */
-  public void stop() {
-    synchronized (this) {
-      if (stopRequested) {
-        return;
-      }
-      stopRequested = true;
+    public void stop() {
+        synchronized (this) {
+            if (stopRequested) {
+                return;
+            }
+            stopRequested = true;
+        }
+        try {
+            exitActiveServices();
+        } catch (ServiceFailedException e) {
+            LOG.warn("Encountered exception while exiting state ", e);
+        } finally {
+            stopCommonServices();
+            if (metrics != null) {
+                metrics.shutdown();
+            }
+            if (namesystem != null) {
+                namesystem.shutdown();
+            }
+        }
     }
-    try {
-      exitActiveServices();
-    } catch (ServiceFailedException e) {
-      LOG.warn("Encountered exception while exiting state ", e);
-    }
-    stopCommonServices();
-    if (metrics != null) {
-      metrics.shutdown();
-    }
-    if (namesystem != null) {
-      namesystem.shutdown();
-    }
-  }
+  
 
   synchronized boolean isStopRequested() {
     return stopRequested;
@@ -798,8 +800,8 @@ public class NameNode {
             startOpt.setInteractiveFormat(false);
           }
         }
-      } else if (StartupOption.SAFEMODE_FIX.getName().equalsIgnoreCase(cmd)) {
-        startOpt = StartupOption.SAFEMODE_FIX;
+      } else if (StartupOption.DROP_AND_CREATE_DB.getName().equalsIgnoreCase(cmd)) {
+        startOpt = StartupOption.DROP_AND_CREATE_DB;
       } else if (StartupOption.GENCLUSTERID.getName().equalsIgnoreCase(cmd)) {
         startOpt = StartupOption.GENCLUSTERID;
       } else if (StartupOption.REGULAR.getName().equalsIgnoreCase(cmd)) {
@@ -885,8 +887,8 @@ public class NameNode {
 
     switch (startOpt) {
       //HOP
-      case SAFEMODE_FIX: { //delete everything other than inode and blocks table. this is tmp fix for safe mode
-        safeModeTmpFix(conf);
+      case DROP_AND_CREATE_DB: { //delete everything other than inode and blocks table. this is tmp fix for safe mode
+        dropAndCreateDB(conf);
         return null;
       }
       case FORMAT: {
@@ -1084,16 +1086,9 @@ public class NameNode {
     }
   }
 
-  private static void safeModeTmpFix(Configuration conf) throws IOException {
+  private static void dropAndCreateDB(Configuration conf) throws IOException {
     HdfsStorageFactory.setConfiguration(conf);
-    HdfsVariables.enterClusterSafeMode();
-    HdfsVariables.resetMisReplicatedIndex();
-    HdfsStorageFactory.getConnector()
-        .formatStorage(UnderReplicatedBlockDataAccess.class,
-            ExcessReplicaDataAccess.class, CorruptReplicaDataAccess.class,
-            InvalidateBlockDataAccess.class, PendingBlockDataAccess.class,
-            HdfsLeDescriptorDataAccess.class, SafeBlocksDataAccess.class,
-            MisReplicatedRangeQueueDataAccess.class);
+    HdfsStorageFactory.getConnector().dropAndRecreateDB();
   }
 
   public boolean isNameNodeAlive(long namenodeId) {
@@ -1152,3 +1147,4 @@ public class NameNode {
     }
   }
 }
+

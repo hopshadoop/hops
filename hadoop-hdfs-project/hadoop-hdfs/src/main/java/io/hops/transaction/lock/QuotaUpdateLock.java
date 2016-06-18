@@ -51,8 +51,10 @@ final class QuotaUpdateLock extends Lock {
 
   private void acquireQuotaUpdate(List<INode> iNodes)
       throws StorageException, TransactionContextException {
-    for (INode iNode : iNodes) {
+    if(iNodes != null){
+      for (INode iNode : iNodes) {
       acquireQuotaUpdate(iNode);
+      }
     }
   }
 

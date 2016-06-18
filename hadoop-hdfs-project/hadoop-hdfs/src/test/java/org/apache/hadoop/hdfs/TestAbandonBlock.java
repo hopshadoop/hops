@@ -30,8 +30,9 @@ import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-
+import static junit.framework.Assert.assertFalse;
 import java.io.IOException;
+import org.apache.hadoop.hdfs.server.namenode.TestSubtreeLock;
 
 import static org.junit.Assert.fail;
 
@@ -61,7 +62,8 @@ public class TestAbandonBlock {
   }
 
   @Test
-  /** Abandon a block while creating a file */ public void testAbandonBlock()
+  /** Abandon a block while creating a file */ 
+  public void testAbandonBlock()
       throws IOException {
     String src = FILE_NAME_PREFIX + "foo";
 
@@ -96,7 +98,8 @@ public class TestAbandonBlock {
   }
 
   @Test
-  /** Make sure that the quota is decremented correctly when a block is abandoned */ public void testQuotaUpdatedWhenBlockAbandoned()
+  /** Make sure that the quota is decremented correctly when a block is abandoned */ 
+  public void testQuotaUpdatedWhenBlockAbandoned()
       throws IOException {
     DistributedFileSystem dfs = (DistributedFileSystem) fs;
     // Setting diskspace quota to 3MB
@@ -113,6 +116,9 @@ public class TestAbandonBlock {
 
     // Shutdown one datanode, causing the block abandonment.
     cluster.getDataNodes().get(0).shutdown();
+    
+    assertFalse("Not all sub tree locks were removed properly",
+            TestSubtreeLock.subTreeLocksExists());
 
     // Close the file, new block will be allocated with 2MB pending size.
     try {

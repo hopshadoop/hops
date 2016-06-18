@@ -80,8 +80,8 @@ public class InvalidatedBlockContext
         return findByINodeId(iFinder, params);
       case All:
         return findAll(iFinder);
-      case ByBlockIdsStorageIdsAndINodeIds:
-        return findByPrimaryKeys(iFinder, params);
+      case ByStorageId:
+        return findByStorageId(iFinder, params);
       case ByINodeIds:
         return findByINodeIds(iFinder, params);
     }
@@ -195,17 +195,14 @@ public class InvalidatedBlockContext
     return result;
   }
 
-  private List<InvalidatedBlock> findByPrimaryKeys(
+  private List<InvalidatedBlock> findByStorageId(
       InvalidatedBlock.Finder iFinder, Object[] params)
       throws StorageCallPreventedException, StorageException {
     final long[] blockIds = (long[]) params[0];
     final int[] inodeIds = (int[]) params[1];
     final int sid = (Integer) params[2];
-    final int[] sids = new int[blockIds.length];
-    Arrays.fill(sids, sid);
     aboutToAccessStorage(iFinder, params);
-    List<InvalidatedBlock> result =
-        dataAccess.findInvalidatedBlocksbyPKS(blockIds, inodeIds, sids);
+    List<InvalidatedBlock> result = dataAccess.findInvalidatedBlockByStorageId(sid);
     gotFromDB(BlockPK.ReplicaPK.getKeys(blockIds, inodeIds, sid), result);
     miss(iFinder, result, "bids", Arrays.toString(blockIds), "inodeIds",
         Arrays.toString(inodeIds), "sid", sid);

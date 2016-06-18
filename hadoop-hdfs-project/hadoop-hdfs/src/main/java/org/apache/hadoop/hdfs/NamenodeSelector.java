@@ -29,9 +29,7 @@ import org.apache.hadoop.ipc.RPC;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
-import java.util.List;
-import java.util.Random;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
@@ -50,6 +48,7 @@ public class NamenodeSelector extends Thread {
   enum NNSelectionPolicy {
 
     RANDOM("RANDOM"),
+    RANDOM_STICKY("RANDOM_STICKY"),
     ROUND_ROBIN("ROUND_ROBIN");
     private String description = null;
 
@@ -68,7 +67,7 @@ public class NamenodeSelector extends Thread {
     final private ClientProtocol namenodeRPCHandle;
     final private ActiveNode namenode;
 
-    NamenodeHandle(ClientProtocol proto, ActiveNode an) {
+    public NamenodeHandle(ClientProtocol proto, ActiveNode an) {
       this.namenode = an;
       this.namenodeRPCHandle = proto;
     }
@@ -98,11 +97,9 @@ public class NamenodeSelector extends Thread {
         return res;
       }
     }
-
-
   }
 
-  ;
+  
   /* List of name nodes */
   private List<NamenodeSelector.NamenodeHandle> nnList =
       new CopyOnWriteArrayList<NamenodeSelector.NamenodeHandle>();
@@ -111,11 +108,13 @@ public class NamenodeSelector extends Thread {
   private static Log LOG = LogFactory.getLog(NamenodeSelector.class);
   private final URI defaultUri;
   private final NamenodeSelector.NNSelectionPolicy policy;
-  private final Configuration conf;
+  private NamenodeSelector.NamenodeHandle stickyHandle = null; //only used if
+  // RANDOM_STICKY policy is used
+  protected final Configuration conf;
   private boolean periodicNNListUpdate = true;
   private final Object wiatObjectForUpdate = new Object();
   private final int namenodeListUpdateTimePeriod;
-  Random rand = new Random();
+  Random rand = new Random((UUID.randomUUID()).hashCode());
 
 
   //only for testing
@@ -132,10 +131,9 @@ public class NamenodeSelector extends Thread {
     this.namenodeListUpdateTimePeriod = -1;
   }
 
-  NamenodeSelector(Configuration conf, URI defaultUri) throws IOException {
+  public NamenodeSelector(Configuration conf, URI defaultUri) throws IOException {
     this.defaultUri = defaultUri;
     this.conf = conf;
-    rand.setSeed(System.currentTimeMillis());
 
     namenodeListUpdateTimePeriod =
         conf.getInt(DFSConfigKeys.DFS_CLIENT_REFRESH_NAMENODE_LIST_IN_MS_KEY,
@@ -144,14 +142,16 @@ public class NamenodeSelector extends Thread {
     // Getting appropriate policy
     // supported policies are 'RANDOM' and 'ROUND_ROBIN'
     String policyName =
-        conf.get(DFSConfigKeys.DFS_NAMENODE_SELECTOR_POLICY_KEY, "ROUND_ROBIN");
-    if (policyName == NamenodeSelector.NNSelectionPolicy.RANDOM.toString()) {
+        conf.get(DFSConfigKeys.DFS_NAMENODE_SELECTOR_POLICY_KEY,
+            DFSConfigKeys.DFS_NAMENODE_SELECTOR_POLICY_DEFAULT);
+    if (policyName.equals(NamenodeSelector.NNSelectionPolicy.RANDOM.toString())){
       policy = NamenodeSelector.NNSelectionPolicy.RANDOM;
-    } else if (policyName ==
-        NamenodeSelector.NNSelectionPolicy.ROUND_ROBIN.toString()) {
+    } else if (policyName.equals(NamenodeSelector.NNSelectionPolicy.ROUND_ROBIN.toString())) {
       policy = NamenodeSelector.NNSelectionPolicy.ROUND_ROBIN;
+    }else if (policyName.equals(NamenodeSelector.NNSelectionPolicy.RANDOM_STICKY.toString())) {
+      policy = NamenodeSelector.NNSelectionPolicy.RANDOM_STICKY;
     } else {
-      policy = NamenodeSelector.NNSelectionPolicy.ROUND_ROBIN;
+      policy = NamenodeSelector.NNSelectionPolicy.RANDOM_STICKY;
     }
     LOG.debug("Client's namenode selection policy is " + policy);
 
@@ -227,8 +227,17 @@ public class NamenodeSelector extends Thread {
    * @throws IOException
    */
   public NamenodeHandle getLeadingNameNode() throws IOException {
-    // The first one is supposed to be the leader. An exception is thrown if none is available.
-    return getAllNameNode().get(0);
+    NamenodeHandle leaderHandle = null; // leader is one with the least id
+    for(NamenodeHandle handle : getAllNameNode()){
+      if(leaderHandle == null){
+        leaderHandle = handle;
+      }
+      
+      if(leaderHandle.getNamenode().getId() > handle.getNamenode().getId()){
+       leaderHandle = handle; 
+      }
+    }
+    return leaderHandle;
   }
 
   /**
@@ -263,28 +272,46 @@ public class NamenodeSelector extends Thread {
 
   private synchronized NamenodeSelector.NamenodeHandle getNextNNBasedOnPolicy() {
     if (policy == NamenodeSelector.NNSelectionPolicy.RANDOM) {
-      for (int i = 0; i < 10; i++) {
-        int index = rand.nextInt(nnList.size());
-        NamenodeSelector.NamenodeHandle handle = nnList.get(index);
-        if (!this.blackListedNamenodes.contains(handle)) {
-          return handle;
-        }
-      }
-      return null;
+      return getRandomNNInternal();
     } else if (policy == NamenodeSelector.NNSelectionPolicy.ROUND_ROBIN) {
       for (int i = 0; i < nnList.size() + 1; i++) {
         rrIndex = (++rrIndex) % nnList.size();
         NamenodeSelector.NamenodeHandle handle = nnList.get(rrIndex);
         if (!this.blackListedNamenodes.contains(handle)) {
+          LOG.debug("ROUND_ROBIN returning "+handle);
           return handle;
         }
       }
       return null;
+    }  else if( policy == NamenodeSelector.NNSelectionPolicy.RANDOM_STICKY) {
+      // stick to a random NN untill the NN dies
+      //stickyHandle
+      if(stickyHandle != null && nnList.contains(stickyHandle) &&
+          !blackListedNamenodes.contains(stickyHandle)){
+        LOG.debug("RANDOM_STICKY returning "+stickyHandle);
+        return stickyHandle;
+      } else { // stick to some other random alive NN
+        stickyHandle = getRandomNNInternal();
+        return stickyHandle;
+      }
     } else {
       throw new UnsupportedOperationException(
           "Namenode selection policy is not supported. Selected policy is " +
               policy);
     }
+  }
+  
+  // synchronize by the calling method
+  private NamenodeSelector.NamenodeHandle getRandomNNInternal(){
+    for (int i = 0; i < 10; i++) {
+      int index = rand.nextInt(nnList.size());
+      NamenodeSelector.NamenodeHandle handle = nnList.get(index);
+      if (!this.blackListedNamenodes.contains(handle)) {
+        LOG.debug("RANDOM returning "+handle);
+        return handle;
+      }
+    }
+    return null;
   }
 
   String printNamenodes() {
@@ -359,7 +386,7 @@ public class NamenodeSelector extends Thread {
       LOG.debug("Refreshing the Namenode handles");
       refreshNamenodeList(anl);
     } else {
-      LOG.debug("No new namenodes were found");
+      LOG.warn("No new namenodes were found");
     }
   }
 
@@ -371,6 +398,7 @@ public class NamenodeSelector extends Thread {
    */
   private synchronized void periodicNamenodeClientsUpdate() throws IOException {
     SortedActiveNodeList anl = null;
+    LOG.debug("Fetching new list of namenodes");
     if (!nnList.isEmpty()) {
       for (NamenodeSelector.NamenodeHandle namenode : nnList) { //TODO dont try with black listed nodes
         try {
@@ -393,6 +421,7 @@ public class NamenodeSelector extends Thread {
     if (anl == null) { // try contacting default NNs
       createNamenodeClientsFromConfiguration();
     }
+
   }
 
 
@@ -436,6 +465,8 @@ public class NamenodeSelector extends Thread {
       }
     }
 
+
+    LOG.debug("nnList Size:"+nnList.size()+"  Handles: " + Arrays.toString(nnList.toArray()));
     //clear black listed nodes
     this.blackListedNamenodes.clear();
   }
@@ -478,7 +509,7 @@ public class NamenodeSelector extends Thread {
     }
   }
 
-  private NamenodeSelector.NamenodeHandle getNamenodeHandle(
+  protected NamenodeSelector.NamenodeHandle getNamenodeHandle(
       InetSocketAddress address) {
     for (NamenodeSelector.NamenodeHandle handle : nnList) {
       if (handle.getNamenode().getInetSocketAddress().equals(address)) {
@@ -500,9 +531,15 @@ public class NamenodeSelector extends Thread {
       this.blackListedNamenodes.add(handle);
     }
 
+    if(policy == NamenodeSelector.NNSelectionPolicy.RANDOM_STICKY &&
+            stickyHandle != null && stickyHandle == handle  ){
+      stickyHandle = null;
+    }
+
     //if a bad namenode is detected then update the list of Namenodes in the system
     synchronized (wiatObjectForUpdate) {
       wiatObjectForUpdate.notify();
     }
   }
 }
+

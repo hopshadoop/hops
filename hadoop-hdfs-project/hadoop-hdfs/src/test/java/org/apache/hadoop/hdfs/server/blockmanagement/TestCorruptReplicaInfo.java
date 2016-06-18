@@ -27,9 +27,12 @@ import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLocks;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.server.namenode.INodeFile;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -58,6 +61,7 @@ public class TestCorruptReplicaInfo {
       LogFactory.getLog(TestCorruptReplicaInfo.class);
   
   private Map<Integer, BlockInfo> block_map = new HashMap<Integer, BlockInfo>();
+  private BlocksMap blocksMap = new BlocksMap(null);
 
   // Allow easy block creation by block id
   // Return existing block if one with same block id already exists
@@ -161,6 +165,8 @@ public class TestCorruptReplicaInfo {
 
       @Override
       public Object performTask() throws StorageException, IOException {
+        blocksMap.addBlockCollection(blk, new INodeFile(new PermissionStatus
+            ("n", "n", FsPermission.getDefault()), null, (short)1, 0, 0, 1));
         crm.addToCorruptReplicasMap(blk, dn, reason);
         return null;
       }

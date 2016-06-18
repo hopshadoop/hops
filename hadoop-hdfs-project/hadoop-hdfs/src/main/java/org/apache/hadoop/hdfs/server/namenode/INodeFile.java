@@ -19,8 +19,12 @@ package org.apache.hadoop.hdfs.server.namenode;
 
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
+import io.hops.metadata.HdfsStorageFactory;
+import io.hops.metadata.hdfs.dal.MetadataLogDataAccess;
+import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.transaction.EntityManager;
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
@@ -62,6 +66,7 @@ public class INodeFile extends INode implements BlockCollection {
 
   private long header;
   private int generationStamp = (int) GenerationStamp.FIRST_VALID_STAMP;
+  private long size;
   
 
   public INodeFile(PermissionStatus permissions, BlockInfo[] blklist,
@@ -85,6 +90,7 @@ public class INodeFile extends INode implements BlockCollection {
     setReplicationNoPersistance(other.getBlockReplication());
     setPreferredBlockSizeNoPersistance(other.getPreferredBlockSize());
     setGenerationStampNoPersistence(other.getGenerationStamp());
+    setSizeNoPersistence(other.getSize());
   }
 
   /**
@@ -236,7 +242,7 @@ public class INodeFile extends INode implements BlockCollection {
    * Compute file size.
    * May or may not include BlockInfoUnderConstruction.
    */
-  long computeFileSize(boolean includesBlockInfoUnderConstruction)
+  public long computeFileSize(boolean includesBlockInfoUnderConstruction)
       throws StorageException, TransactionContextException {
     return computeFileSize(includesBlockInfoUnderConstruction, getBlocks());
   }
@@ -248,8 +254,15 @@ public class INodeFile extends INode implements BlockCollection {
     }
     final int last = blocks.length - 1;
     //check if the last block is BlockInfoUnderConstruction
-    long bytes = blocks[last] instanceof BlockInfoUnderConstruction &&
-        !includesBlockInfoUnderConstruction ? 0 : blocks[last].getNumBytes();
+    long bytes = 0;
+    
+    if(blocks[last] instanceof BlockInfoUnderConstruction){
+        if(includesBlockInfoUnderConstruction){
+            bytes = blocks[last].getNumBytes();
+        }
+    }else{
+        bytes = blocks[last].getNumBytes();
+    }
     for (int i = 0; i < last; i++) {
       bytes += blocks[i].getNumBytes();
     }
@@ -372,4 +385,16 @@ public class INodeFile extends INode implements BlockCollection {
     return generationStamp;
   }
 
+  public long getSize() {
+    return size;
+  }
+
+  public void setSizeNoPersistence(long size) {
+    this.size = size;
+  }
+  
+  public void recomputeFileSize() throws StorageException, TransactionContextException {
+    setSizeNoPersistence(this.computeFileSize(true));
+    save();
+  }
 }

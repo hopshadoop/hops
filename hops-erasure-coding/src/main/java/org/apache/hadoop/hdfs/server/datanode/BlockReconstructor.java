@@ -19,12 +19,15 @@
 package org.apache.hadoop.hdfs.server.datanode;
 
 import io.hops.erasure_coding.Decoder;
+import io.hops.erasure_coding.Helper;
 import io.hops.erasure_coding.RaidUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.fs.ErasureCodingFileSystem;
 import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DFSClient;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
@@ -60,16 +63,9 @@ public class BlockReconstructor extends Configured {
         conf.getInt(SEND_BLOCK_RETRY_COUNT_KEY, DEFAULT_SEND_BLOCK_RETRY_COUNT);
   }
 
-  /**
-   * Returns a DistributedFileSystem hosting the path supplied.
-   */
-  public DistributedFileSystem getDFS(Path p) throws IOException {
-    return (DistributedFileSystem) p.getFileSystem(getConf());
-  }
-
   public boolean processFile(Path sourceFile, Path parityFile, Decoder decoder)
       throws IOException, InterruptedException {
-    DFSClient dfsClient = getDFS(sourceFile).getClient();
+    DFSClient dfsClient = Helper.getDFS(getConf(), sourceFile).getClient();
     LocatedBlocks missingBlocks =
         dfsClient.getMissingLocatedBlocks(sourceFile.toUri().getPath());
     return processFile(sourceFile, parityFile, missingBlocks, decoder, null);
@@ -84,9 +80,9 @@ public class BlockReconstructor extends Configured {
       progress = RaidUtils.NULL_PROGRESSABLE;
     }
 
-    DistributedFileSystem srcFs = getDFS(sourceFile);
+    DistributedFileSystem srcFs = Helper.getDFS(getConf(), sourceFile);
     FileStatus sourceStatus = srcFs.getFileStatus(sourceFile);
-    DistributedFileSystem parityFs = getDFS(parityFile);
+    DistributedFileSystem parityFs = Helper.getDFS(getConf(), parityFile);
     long blockSize = sourceStatus.getBlockSize();
     long srcFileSize = sourceStatus.getLen();
     String uriPath = sourceFile.toUri().getPath();
@@ -134,7 +130,7 @@ public class BlockReconstructor extends Configured {
   public boolean processParityFile(Path sourceFile, Path parityFile,
       Decoder decoder, Context context)
       throws IOException, InterruptedException {
-    DFSClient dfsClient = getDFS(sourceFile).getClient();
+    DFSClient dfsClient = Helper.getDFS(getConf(), sourceFile).getClient();
     LocatedBlocks missingBlocks =
         dfsClient.getMissingLocatedBlocks(parityFile.toUri().getPath());
     return processParityFile(sourceFile, parityFile, missingBlocks, decoder,
@@ -144,27 +140,20 @@ public class BlockReconstructor extends Configured {
   public boolean processParityFile(Path sourceFile, Path parityFile,
       LocatedBlocks missingBlocks, Decoder decoder, Context context)
       throws IOException, InterruptedException {
-    LOG.info("Processing parity file " + sourceFile.toString());
+    LOG.info("Processing parity file for " + sourceFile.toString());
 
     Progressable progress = context;
     if (progress == null) {
       progress = RaidUtils.NULL_PROGRESSABLE;
     }
 
-    DistributedFileSystem srcFs = getDFS(sourceFile);
+    DistributedFileSystem srcFs = Helper.getDFS(getConf(), sourceFile);
     Path srcPath = sourceFile;
-    DistributedFileSystem parityFs = getDFS(parityFile);
+    DistributedFileSystem parityFs = Helper.getDFS(getConf(), parityFile);
     Path parityPath = parityFile;
     FileStatus parityStat = parityFs.getFileStatus(parityPath);
     long blockSize = parityStat.getBlockSize();
     FileStatus srcStat = srcFs.getFileStatus(srcPath);
-
-    // Check timestamp.
-    if (srcStat.getModificationTime() != parityStat.getModificationTime()) {
-      LOG.warn("Mismatching timestamp for " + srcPath + " and " + parityPath +
-          ", ignoring...");
-      return false;
-    }
 
     int numBlocksReconstructed = 0;
     for (LocatedBlock lb : missingBlocks.getLocatedBlocks()) {

@@ -26,6 +26,7 @@ import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.MiniDFSNNTopology;
 import org.apache.log4j.Level;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.DataOutputStream;
@@ -38,6 +39,8 @@ import java.net.ConnectException;
  * It also tests if the system can be made highly available for reads even if
  * the writer is down
  */
+@Ignore(value = "The design of this test needs to be reconsidered. " +
+    "It fails most of the times because of race conditions.")
 public class TestHARead extends junit.framework.TestCase {
 
   public static final Log LOG = LogFactory.getLog(TestHARead.class);

@@ -13,36 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.hops.common;
+package io.hops.erasure_coding;
 
-import io.hops.metadata.HdfsVariables;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.ErasureCodingFileSystem;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdfs.DistributedFileSystem;
 
 import java.io.IOException;
 
-public class QuotaUpdateIdGen {
-  
-  private static int BATCH_SIZE;
-  private static CountersQueue cQ;
-  
-  public static void setBatchSize(int batchSize) {
-    BATCH_SIZE = batchSize;
-    cQ = new CountersQueue();
-  }
+public class Helper {
 
-  public static int getUniqueQuotaUpdateId() {
-    return (int) cQ.next();
-  }
-
-  public synchronized static boolean getMoreIdsIfNeeded(int threshold)
+  public static DistributedFileSystem getDFS(Configuration conf, Path path)
       throws IOException {
-    if (!cQ.has(threshold)) {
-      cQ.addCounter(HdfsVariables.incrementQuotaUpdateIdCounter(BATCH_SIZE));
-      return true;
-    }
-    return false;
-  }
-  
-  static CountersQueue getCQ() {
-    return cQ;
+    FileSystem fs = path.getFileSystem(conf);
+    DistributedFileSystem dfs =(DistributedFileSystem)
+        (fs instanceof ErasureCodingFileSystem ?
+            ((ErasureCodingFileSystem) fs).getFileSystem() : fs);
+    return dfs;
   }
 }

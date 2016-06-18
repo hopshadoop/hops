@@ -304,6 +304,20 @@ public class ClientNamenodeProtocolTranslatorPB
   }
 
   @Override
+  public void setMetaEnabled(String src, boolean metaEnabled)
+      throws AccessControlException, FileNotFoundException, SafeModeException,
+      UnresolvedLinkException, IOException {
+    ClientNamenodeProtocolProtos.SetMetaEnabledRequestProto req =
+        ClientNamenodeProtocolProtos.SetMetaEnabledRequestProto.newBuilder()
+            .setSrc(src).setMetaEnabled(metaEnabled).build();
+    try {
+      rpcProxy.setMetaEnabled(null, req);
+    } catch (ServiceException e) {
+      throw ProtobufHelper.getRemoteException(e);
+    }
+  }
+
+  @Override
   public void setPermission(String src, FsPermission permission)
       throws AccessControlException, FileNotFoundException, SafeModeException,
       UnresolvedLinkException, IOException {
@@ -440,16 +454,21 @@ public class ClientNamenodeProtocolTranslatorPB
       NSQuotaExceededException, ParentNotDirectoryException, SafeModeException,
       UnresolvedLinkException, IOException {
     boolean overwrite = false;
+    boolean keepEncodingStatus = false;
     if (options != null) {
       for (Rename option : options) {
         if (option == Rename.OVERWRITE) {
           overwrite = true;
+        }
+        if (option == Rename.KEEP_ENCODING_STATUS) {
+          keepEncodingStatus = true;
         }
       }
     }
     Rename2RequestProto req = Rename2RequestProto.newBuilder().
         setSrc(src).
         setDst(dst).setOverwriteDest(overwrite).
+        setKeepEncodingStatus(keepEncodingStatus).
         build();
     try {
       rpcProxy.rename2(null, req);

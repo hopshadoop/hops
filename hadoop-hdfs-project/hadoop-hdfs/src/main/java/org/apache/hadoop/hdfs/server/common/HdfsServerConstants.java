@@ -23,6 +23,7 @@ import org.apache.hadoop.hdfs.server.namenode.MetaRecoveryContext;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
+import org.apache.hadoop.hdfs.server.namenode.Lease;
 
 /**
  * *********************************
@@ -51,7 +52,7 @@ public final class HdfsServerConstants {
    */
   static public enum StartupOption {
     FORMAT("-format"),
-    SAFEMODE_FIX("-safeModeFix"),
+    DROP_AND_CREATE_DB("-dropAndCreateDB"),
     CLUSTERID("-clusterid"),
     GENCLUSTERID("-genclusterid"),
     REGULAR("-regular"),
@@ -255,6 +256,7 @@ public final class HdfsServerConstants {
   }
   
   public static final String NAMENODE_LEASE_HOLDER = "HDFS_NameNode";
+  public static final int NAMENODE_LEASE_HOLDER_ID = Lease.getHolderId(NAMENODE_LEASE_HOLDER);
   public static final long NAMENODE_LEASE_RECHECK_INTERVAL = 2000;
 }
 

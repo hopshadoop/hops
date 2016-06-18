@@ -81,7 +81,6 @@ public class TestCodec extends TestCase {
     assertEquals(4, codecs.get(0).parityLength);
     assertEquals(300, codecs.get(0).priority);
     assertEquals("/raidrs", codecs.get(0).parityDirectory);
-    assertEquals("/tmp/raidrs", codecs.get(0).tmpParityDirectory);
     assertEquals("ReedSolomonCode code", codecs.get(0).description);
 
     assertEquals("sr", codecs.get(1).id);
@@ -89,7 +88,6 @@ public class TestCodec extends TestCase {
     assertEquals(5, codecs.get(1).parityLength);
     assertEquals(200, codecs.get(1).priority);
     assertEquals("/raidsr", codecs.get(1).parityDirectory);
-    assertEquals("/tmp/raidsr", codecs.get(1).tmpParityDirectory);
     assertEquals("SimpleRegeneratingCode code", codecs.get(1).description);
 
     assertEquals("xor", codecs.get(2).id);
@@ -97,7 +95,6 @@ public class TestCodec extends TestCase {
     assertEquals(1, codecs.get(2).parityLength);
     assertEquals(100, codecs.get(2).priority);
     assertEquals("/raid", codecs.get(2).parityDirectory);
-    assertEquals("/tmp/raid", codecs.get(2).tmpParityDirectory);
     assertEquals("", codecs.get(2).description);
 
     assertTrue(

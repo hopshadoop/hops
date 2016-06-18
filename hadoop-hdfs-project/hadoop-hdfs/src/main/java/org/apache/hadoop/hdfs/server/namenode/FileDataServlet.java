@@ -27,6 +27,7 @@ import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.server.common.JspHelper;
+import org.apache.hadoop.hdfs.web.HftpFileSystem;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.ServletUtil;
 
@@ -39,7 +40,7 @@ import java.security.PrivilegedExceptionAction;
 /**
  * Redirect queries about the hosted filesystem to an appropriate datanode.
  *
- * @see org.apache.hadoop.hdfs.HftpFileSystem
+ * @see HftpFileSystem
  */
 @InterfaceAudience.Private
 public class FileDataServlet extends DfsServlet {

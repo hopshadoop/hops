@@ -47,7 +47,7 @@ public class INodeAttributesContext
       throws TransactionContextException {
     if (iNodeAttributes.getInodeId() != INode.NON_EXISTING_ID) {
       super.update(iNodeAttributes);
-      log("updated-attributes", "id", iNodeAttributes.getInodeId());
+      log("updated-attributes", "id", iNodeAttributes.getInodeId(), "DS", iNodeAttributes.getDiskspace(), "NS", iNodeAttributes.getNsCount());
     } else {
       log("updated-attributes -- IGNORED as id is not set");
     }

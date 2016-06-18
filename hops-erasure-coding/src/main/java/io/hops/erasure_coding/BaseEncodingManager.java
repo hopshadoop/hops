@@ -23,10 +23,14 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
+import org.apache.hadoop.fs.ErasureCodingFileSystem;
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
+import org.apache.hadoop.hdfs.DFSOutputStream;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.util.Progressable;
 import org.apache.hadoop.util.StringUtils;
@@ -60,8 +64,6 @@ public abstract class BaseEncodingManager extends EncodingManager {
    * hadoop configuration
    */
   protected Configuration conf;
-
-  protected boolean initialized = false;  // Are we initialized?
 
   // statistics about RAW hdfs blocks. This counts all replicas of a block.
   public static class Statistics {
@@ -108,28 +110,10 @@ public abstract class BaseEncodingManager extends EncodingManager {
     }
   }
 
-  private void cleanUpDirectory(String dir, Configuration conf)
-      throws IOException {
-    Path pdir = new Path(dir);
-    FileSystem fs = pdir.getFileSystem(conf);
-    if (fs.exists(pdir)) {
-      fs.delete(pdir);
-    }
-  }
-
-  protected void cleanUpTempDirectory(Configuration conf) throws IOException {
-    for (Codec codec : Codec.getCodecs()) {
-      cleanUpDirectory(codec.tmpParityDirectory, conf);
-    }
-  }
-
   private void initialize(Configuration conf)
       throws IOException, SAXException, InterruptedException,
       ClassNotFoundException, ParserConfigurationException {
     this.conf = conf;
-    // clean up temporay directory
-    cleanUpTempDirectory(conf);
-    initialized = true;
   }
 
   static long numBlocks(FileStatus stat) {
@@ -144,14 +128,17 @@ public abstract class BaseEncodingManager extends EncodingManager {
    * RAID a list of files / directories
    */
   void doRaid(Configuration conf, PolicyInfo info) throws IOException {
-    int targetRepl = Integer.parseInt(info.getProperty("targetReplication"));
-    int metaRepl = Integer.parseInt(info.getProperty("metaReplication"));
+    int targetRepl = Integer.parseInt(info.getProperty(
+        PolicyInfo.PROPERTY_REPLICATION));
+    int metaRepl = Integer.parseInt(info.getProperty(
+        PolicyInfo.PROPERTY_PARITY_REPLICATION));
     Codec codec = Codec.getCodec(info.getCodecId());
     Path destPref = new Path(codec.parityDirectory);
+    boolean copy = Boolean.valueOf(info.getProperty(PolicyInfo.PROPERTY_COPY));
 
     Statistics statistics = new Statistics();
     doRaid(conf, info.getSrcPath(), destPref, codec, statistics,
-        RaidUtils.NULL_PROGRESSABLE, targetRepl, metaRepl);
+        RaidUtils.NULL_PROGRESSABLE, targetRepl, metaRepl, copy);
     LOG.info("RAID statistics " + statistics.toString());
   }
 
@@ -161,24 +148,27 @@ public abstract class BaseEncodingManager extends EncodingManager {
    */
   static public boolean doRaid(Configuration conf, PolicyInfo info, Path src,
       Statistics statistics, Progressable reporter) throws IOException {
-    int targetRepl = Integer.parseInt(info.getProperty("targetReplication"));
-    int metaRepl = Integer.parseInt(info.getProperty("metaReplication"));
-
+    int targetRepl = Integer.parseInt(info.getProperty(
+        PolicyInfo.PROPERTY_REPLICATION));
+    int metaRepl = Integer.parseInt(info.getProperty(
+        PolicyInfo.PROPERTY_PARITY_REPLICATION));
     Codec codec = Codec.getCodec(info.getCodecId());
-    Path parityPath = new Path(info.getProperty("parityPath"));
+    Path parityPath = new Path(info.getProperty(
+        PolicyInfo.PROPERTY_PARITY_PATH));
+    boolean copy = Boolean.valueOf(info.getProperty(PolicyInfo.PROPERTY_COPY));
 
     return doRaid(conf, src, parityPath, codec, statistics, reporter,
-        targetRepl, metaRepl);
+        targetRepl, metaRepl, copy);
   }
   
   public static boolean doRaid(Configuration conf, Path path, Path parityPath,
       Codec codec, Statistics statistics, Progressable reporter, int targetRepl,
-      int metaRepl) throws IOException {
+      int metaRepl, boolean copy) throws IOException {
     long startTime = System.currentTimeMillis();
     boolean success = false;
     try {
       return doFileRaid(conf, path, parityPath, codec, statistics, reporter,
-          targetRepl, metaRepl);
+          targetRepl, metaRepl, copy);
     } catch (IOException ioe) {
       throw ioe;
     } finally {
@@ -214,8 +204,9 @@ public abstract class BaseEncodingManager extends EncodingManager {
    */
   public static boolean doFileRaid(Configuration conf, Path sourceFile,
       Path parityPath, Codec codec, Statistics statistics,
-      Progressable reporter, int targetRepl, int metaRepl) throws IOException {
-    FileSystem srcFs = sourceFile.getFileSystem(conf);
+      Progressable reporter, int targetRepl, int metaRepl, boolean copy)
+      throws IOException {
+    DistributedFileSystem srcFs = Helper.getDFS(conf, sourceFile);
     FileStatus sourceStatus = srcFs.getFileStatus(sourceFile);
 
     // extract block locations from File system
@@ -234,17 +225,36 @@ public abstract class BaseEncodingManager extends EncodingManager {
     statistics.numProcessedBlocks += locations.length;
     statistics.processedSize += diskSpace;
 
-    // generate parity file
-    generateParityFile(conf, sourceStatus, targetRepl, reporter, srcFs,
-        parityPath, codec, locations.length, sourceStatus.getReplication(),
-        metaRepl, sourceStatus.getBlockSize());
-    if (srcFs.setReplication(sourceFile, (short) targetRepl) == false) {
-      LOG.info("Error in reducing replication of " + sourceFile + " to " +
-          targetRepl);
-      statistics.remainingSize += diskSpace;
-      return false;
+    Path tmpFile = null;
+    FSDataOutputStream out = null;
+    try {
+      if (copy) {
+        tmpFile = new Path("/tmp" + sourceFile);
+        out = srcFs.create(tmpFile, (short) targetRepl);
+        DFSOutputStream dfsOut = (DFSOutputStream) out.getWrappedStream();
+        dfsOut.enableSourceStream(codec.getStripeLength());
+      }
+
+      // generate parity file
+      generateParityFile(conf, sourceStatus, reporter, srcFs, parityPath, codec,
+          metaRepl, sourceStatus.getBlockSize(), tmpFile, out);
+
+      if (copy) {
+        out.close();
+        srcFs.rename(tmpFile, sourceFile, Options.Rename.OVERWRITE,
+            Options.Rename.KEEP_ENCODING_STATUS);
+      } else if (srcFs.setReplication(sourceFile, (short) targetRepl) == false) {
+        LOG.info("Error in reducing replication of " + sourceFile + " to " +
+            targetRepl);
+        statistics.remainingSize += diskSpace;
+        return false;
+      }
+    } catch (IOException e) {
+      if (out != null) {
+        out.close();
+      }
+      throw e;
     }
-    ;
 
     diskSpace = 0;
     for (BlockLocation l : locations) {
@@ -270,26 +280,11 @@ public abstract class BaseEncodingManager extends EncodingManager {
    * Generate parity file
    */
   static private void generateParityFile(Configuration conf,
-      FileStatus sourceFile, int targetRepl, Progressable reporter,
-      FileSystem inFs, Path destPath, Codec codec, long blockNum, int srcRepl,
-      int metaRepl, long blockSize) throws IOException {
+      FileStatus sourceFile, Progressable reporter, FileSystem inFs,
+      Path destPath, Codec codec, int metaRepl, long blockSize,
+      Path copyPath, FSDataOutputStream copy) throws IOException {
     Path inpath = sourceFile.getPath();
     FileSystem outFs = inFs;
-
-    // If the parity file is already upto-date and source replication is set
-    // then nothing to do.
-    try {
-      FileStatus stmp = outFs.getFileStatus(destPath);
-      if (stmp.getModificationTime() == sourceFile.getModificationTime() &&
-          srcRepl == targetRepl) {
-        LOG.info("Parity file for " + inpath + "(" + blockNum +
-            ") is " + destPath + " already upto-date and " +
-            "file is at target replication . Nothing more to do.");
-        return;
-      }
-    } catch (IOException e) {
-      // ignore errors because the raid file might not exist yet.
-    }
 
     Encoder encoder = new Encoder(conf, codec);
     FileStatus srcStat = inFs.getFileStatus(inpath);
@@ -302,40 +297,20 @@ public abstract class BaseEncodingManager extends EncodingManager {
     StripeReader sReader =
         new FileStripeReader(conf, blockSize, codec, inFs, 0, inpath, srcSize);
     encoder.encodeFile(conf, inFs, inpath, outFs, destPath, (short) metaRepl,
-        numStripes, blockSize, reporter, sReader);
-
-    // set the modification time of the RAID file. This is done so that the modTime of the
-    // RAID file reflects that contents of the source file that it has RAIDed. This should
-    // also work for files that are being appended to. This is necessary because the time on
-    // on the destination namenode may not be synchronised with the timestamp of the 
-    // source namenode.
-    outFs.setTimes(destPath, sourceFile.getModificationTime(), -1);
+        numStripes, blockSize, reporter, sReader, copyPath, copy);
 
     FileStatus outstat = outFs.getFileStatus(destPath);
     FileStatus inStat = inFs.getFileStatus(inpath);
-    if (sourceFile.getModificationTime() != inStat.getModificationTime()) {
-      String msg = "Source file changed mtime during raiding from " +
-          sourceFile.getModificationTime() + " to " +
-          inStat.getModificationTime();
-      throw new IOException(msg);
-    }
-    if (outstat.getModificationTime() != inStat.getModificationTime()) {
-      String msg = "Parity file mtime " + outstat.getModificationTime() +
-          " does not match source mtime " + inStat.getModificationTime();
-      throw new IOException(msg);
-    }
     LOG.info("Source file " + inpath + " of size " + inStat.getLen() +
         " Parity file " + destPath + " of size " + outstat.getLen() +
         " src mtime " + sourceFile.getModificationTime() +
         " parity mtime " + outstat.getModificationTime());
   }
 
-  
   public static Decoder.DecoderInputStream unRaidCorruptInputStream(
       Configuration conf, Path srcPath, long blockSize, long corruptOffset,
       long limit) throws IOException {
-    DistributedFileSystem srcFs =
-        (DistributedFileSystem) srcPath.getFileSystem(conf);
+    DistributedFileSystem srcFs = Helper.getDFS(conf, srcPath);
     EncodingStatus encodingStatus =
         srcFs.getEncodingStatus(srcPath.toUri().getPath());
     Decoder decoder = new Decoder(conf,

@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdfs.server.namenode;
 
 import com.google.protobuf.BlockingService;
-import io.hops.erasure_coding.Codec;
 import io.hops.leader_election.node.ActiveNode;
 import io.hops.leader_election.node.SortedActiveNodeList;
 import io.hops.metadata.hdfs.entity.EncodingPolicy;
@@ -63,8 +62,6 @@ import org.apache.hadoop.hdfs.protocolPB.NamenodeProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdfs.security.token.block.DataEncryptionKey;
 import org.apache.hadoop.hdfs.security.token.block.ExportedBlockKeys;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockPlacementPolicyDefault;
-import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
 import org.apache.hadoop.hdfs.server.common.IncorrectVersionException;
 import org.apache.hadoop.hdfs.server.common.StorageInfo;
 import org.apache.hadoop.hdfs.server.namenode.metrics.NameNodeMetrics;
@@ -88,6 +85,7 @@ import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ipc.WritableRpcEngine;
 import org.apache.hadoop.net.Node;
+import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.Groups;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.AuthorizationException;
@@ -106,14 +104,12 @@ import org.apache.hadoop.tools.protocolPB.GetUserMappingsProtocolServerSideTrans
 import org.apache.hadoop.util.VersionInfo;
 import org.apache.hadoop.util.VersionUtil;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_HANDLER_COUNT_DEFAULT;
@@ -122,6 +118,7 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SERVICE_HANDLER_
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SERVICE_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.hdfs.protocol.HdfsConstants.MAX_PATH_DEPTH;
 import static org.apache.hadoop.hdfs.protocol.HdfsConstants.MAX_PATH_LENGTH;
+import org.tukaani.xz.UnsupportedOptionsException;
 
 /**
  * This class is responsible for handling all of the RPC calls to the NameNode.
@@ -414,15 +411,22 @@ class NameNodeRpcServer implements NamenodeProtocols {
   }
 
   @Override // ClientProtocol
+  public void setMetaEnabled(String src, boolean metaEnabled)
+      throws AccessControlException, FileNotFoundException, SafeModeException,
+      UnresolvedLinkException, IOException {
+    namesystem.setMetaEnabled(src, metaEnabled);
+  }
+
+  @Override // ClientProtocol
   public void setPermission(String src, FsPermission permissions)
       throws IOException {
-    namesystem.setPermission(src, permissions);
+    namesystem.setPermissionSTO(src, permissions);
   }
 
   @Override // ClientProtocol
   public void setOwner(String src, String username, String groupname)
       throws IOException {
-    namesystem.setOwner(src, username, groupname);
+    namesystem.setOwnerSTO(src, username, groupname);
   }
 
   @Override // ClientProtocol
@@ -594,7 +598,9 @@ class NameNodeRpcServer implements NamenodeProtocols {
 
     boolean ret;
     if (namesystem.isLegacyDeleteEnabled()) {
-      ret = namesystem.incrementalDelete(src, recursive);
+      //ret = namesystem.incrementalDelete(src, recursive);
+      throw new UnsupportedOptionsException("Old single transaction delete "
+              + "is not supported ");
     } else {
       ret = namesystem.multiTransactionalDelete(src, recursive);
     }
@@ -724,7 +730,8 @@ class NameNodeRpcServer implements NamenodeProtocols {
   public void setQuota(String path, long namespaceQuota, long diskspaceQuota)
       throws IOException {
     if (namesystem.isLegacySetQuotaEnabled()) {
-      namesystem.setQuota(path, namespaceQuota, diskspaceQuota);
+      //namesystem.setQuota(path, namespaceQuota, diskspaceQuota);
+      throw new UnsupportedOperationException("Legacy SetQuota is not supported");
     } else {
       namesystem
           .multiTransactionalSetQuota(path, namespaceQuota, diskspaceQuota);
@@ -1019,20 +1026,24 @@ class NameNodeRpcServer implements NamenodeProtocols {
     HdfsFileStatus stat =
         create(src, masked, clientName, flag, createParent, replication,
             blockSize);
-    if (policy != null && namesystem.isErasureCodingEnabled()) {
+    if (policy != null) {
+      if (!namesystem.isErasureCodingEnabled()) {
+        throw new IOException("Requesting encoding although erasure coding" +
+            " was disabled");
+      }
       LOG.info("Create file " + src + " with policy " + policy.toString());
-      namesystem.addEncodingStatus(src, policy);
+      namesystem.addEncodingStatus(src, policy,
+          EncodingStatus.Status.ENCODING_REQUESTED);
     }
     return stat;
   }
 
   @Override // ClientProtocol
   public EncodingStatus getEncodingStatus(String filePath) throws IOException {
-    // TODO Check file access rights?
     EncodingStatus status = namesystem.getEncodingStatus(filePath);
 
     if (status.getStatus() == EncodingStatus.Status.DELETED) {
-      throw new IOException("Trying to read encoding status of deleted file");
+      throw new IOException("Trying to read encoding status of a deleted file");
     }
 
     return status;
@@ -1041,15 +1052,21 @@ class NameNodeRpcServer implements NamenodeProtocols {
   @Override // ClientProtocol
   public void encodeFile(String filePath, EncodingPolicy policy)
       throws IOException {
-    // TODO Check file access rights?
-    // TODO STEFFEN - Throw error if already encoded
-    namesystem.addEncodingStatus(filePath, policy);
+    if (!namesystem.isErasureCodingEnabled()) {
+      throw new IOException("Requesting encoding although erasure coding" +
+          " was disabled");
+    }
+    namesystem.addEncodingStatus(filePath, policy,
+        EncodingStatus.Status.COPY_ENCODING_REQUESTED);
   }
 
   @Override
   public void revokeEncoding(String filePath, short replication)
       throws IOException {
-    // TODO Check file access rights?
+    if (!namesystem.isErasureCodingEnabled()) {
+      throw new IOException("Requesting revoke although erasure coding" +
+          " was disabled");
+    }
     namesystem.revokeEncoding(filePath, replication);
   }
 
@@ -1062,14 +1079,11 @@ class NameNodeRpcServer implements NamenodeProtocols {
   @Override // ClientProtocol
   public void addBlockChecksum(String src, int blockIndex, long checksum)
       throws IOException {
-    // TODO Throw exception if already existing?
-    // TODO Check file access rights?
     namesystem.addBlockChecksum(src, blockIndex, checksum);
   }
 
   @Override // ClientProtocol
   public long getBlockChecksum(String src, int blockIndex) throws IOException {
-    // TODO Check file access rights?
     return namesystem.getBlockChecksum(src, blockIndex);
   }
 

@@ -46,7 +46,7 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
       "ndb-config.properties";
 
   public static final String DFS_STORAGE_ANCESTOR_LOCK_TYPE =
-      "dfs.storage.ansestor.lock.type";
+      "dfs.storage.ancestor.lock.type";
   public static final String DFS_STORAGE_ANCESTOR_LOCK_TYPE_DEFAULT =
       "READ_COMMITTED"; // "READ"  | "READ_COMMITTED"
 
@@ -98,7 +98,7 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String DFS_NAMENODE_PROCESS_REPORT_BATCH_SIZE =
       "dfs.namenode.processReport.batchsize";
   public static final int DFS_NAMENODE_PROCESS_REPORT_BATCH_SIZE_DEFAULT =
-      10000;
+      5000;
   
   public static final String DFS_NAMENODE_PROCESS_MISREPLICATED_BATCH_SIZE =
       "dfs.namenode.misreplicated.batchsize";
@@ -114,10 +114,19 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
       "dfs.transaction.stats.enabled";
   public static final boolean DFS_TRANSACTION_STATS_ENABLED_DEFAULT = false;
 
+  public static final String DFS_TRANSACTION_STATS_DETAILED_ENABLED =
+      "dfs.transaction.stats.detailed.enabled";
+  public static final boolean DFS_TRANSACTION_STATS_DETAILED_ENABLED_DEFAULT =
+      false;
+
   public static final String DFS_TRANSACTION_STATS_DIR =
       "dfs.transaction.stats.dir";
   public static final String DFS_TRANSACTION_STATS_DIR_DEFAULT =
       "/tmp/hopsstats";
+
+  public static final String DFS_TRANSACTION_STATS_WRITER_ROUND =
+      "dfs.transaction.stats.writerround";
+  public static final int DFS_TRANSACTION_STATS_WRITER_ROUND_DEFAULT = 120;
 
   /*for client failover api*/
   // format {ip:port, ip:port, ip:port} comma separated
@@ -132,7 +141,7 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String DFS_NAMENODE_SELECTOR_POLICY_KEY =
       "dfs.namenode.selector-policy";
   public static final String DFS_NAMENODE_SELECTOR_POLICY_DEFAULT =
-      "ROUND_ROBIN";     //RANDOM
+      "RANDOM_STICKY";     //RANDOM ROUND_ROBIN RANDOM_STICKY
   
   public static final String DFS_BLOCK_POOL_ID_KEY = "dfs.block.pool.id";
   public static final String DFS_BLOCK_POOL_ID_DEFAULT = "HOP_BLOCK_POOL_123";
@@ -157,25 +166,41 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String DFS_SET_PARTITION_KEY_ENABLED =
       "dfs.ndb.setpartitionkey.enabled";
   public static final boolean DFS_SET_PARTITION_KEY_ENABLED_DEFAULT = true;
-  
-  public static final String DFS_MEMCACHE_ENABLED = "dfs.memcache.enabled";
-  public static final boolean DFS_MEMCACHE_ENABLED_DEFAULT = false;
+
+  public static final String  DFS_SET_RANDOM_PARTITION_KEY_ENABLED =
+      "dfs.ndb.setrandompartitionkey.enabled";
+  public static final boolean  DFS_SET_RANDOM_PARTITION_KEY_ENABLED_DEFAULT =
+      true;
+
+  public static final String DFS_RESOLVING_CACHE_ENABLED = "dfs" +
+      ".resolvingcache.enabled";
+  public static final boolean DFS_RESOLVING_CACHE_ENABLED_DEFAULT = true;
   
   public static final String DFS_MEMCACHE_SERVER =
-      "dfs.memcache.server.address";
+      "dfs.resolvingcache.memcache.server.address";
   public static final String DFS_MEMCACHE_SERVER_DEFAULT = "127.0.0.1:11212";
   
   public static final String DFS_MEMCACHE_CONNECTION_POOL_SIZE =
-      "dfs.memcache.connectionpool.size";
+      "dfs.resolvingcache.memcache.connectionpool.size";
   public static final int DFS_MEMCACHE_CONNECTION_POOL_SIZE_DEFAULT = 10;
   
   public static final String DFS_MEMCACHE_KEY_PREFIX =
-      "dfs.memcache.key.prefix";
+      "dfs.resolvingcache.memcache.key.prefix";
   public static final String DFS_MEMCACHE_KEY_PREFIX_DEFAULT = "p:";
   
   public static final String DFS_MEMCACHE_KEY_EXPIRY_IN_SECONDS =
-      "dfs.memcache.key.expiry";
+      "dfs.resolvingcache.memcache.key.expiry";
   public static final int DFS_MEMCACHE_KEY_EXPIRY_IN_SECONDS_DEFAULT = 0;
+
+  public static final String DFS_RESOLVING_CACHE_TYPE = "dfs.resolvingcache" +
+      ".type";
+
+  //INode, Path, InMemory, Optimal
+  public static final String DFS_RESOLVING_CACHE_TYPE_DEFAULT = "InMemory";
+
+  public static final String DFS_INMEMORY_CACHE_MAX_SIZE = "dfs" +
+      ".resolvingcache.inmemory.maxsize";
+  public static final int DFS_INMEMORY_CACHE_MAX_SIZE_DEFAULT = 100000;
 
   public static final String DFS_LEGACY_DELETE_ENABLE_KEY =
       "dfs.namenode.legacy-delete.enable";
@@ -198,7 +223,7 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
 
   public static final String DFS_SUBTREE_EXECUTOR_LIMIT_KEY =
       "dfs.namenode.subtree-executor-limit";
-  public static final int DFS_SUBTREE_EXECUTOR_LIMIT_DEFAULT = 20;
+  public static final int DFS_SUBTREE_EXECUTOR_LIMIT_DEFAULT = 80;
 
   public static final String ERASURE_CODING_CODECS_KEY =
       "dfs.erasure_coding.codecs.json";

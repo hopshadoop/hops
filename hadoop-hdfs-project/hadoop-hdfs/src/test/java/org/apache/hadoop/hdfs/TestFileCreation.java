@@ -69,9 +69,11 @@ import java.security.PrivilegedExceptionAction;
 import java.util.EnumSet;
 import java.util.Properties;
 import java.util.logging.Logger;
+import org.apache.commons.io.FileUtils;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_KEY;
+import org.apache.hadoop.fs.FileStatus;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_DEFAULT;
@@ -1274,36 +1276,53 @@ public class TestFileCreation {
     try {
 
       fs.mkdirs(new Path("/dir"));
-      fs.mkdirs(new Path("/test"));
+      
 
-      FSDataOutputStream stm = createFile(fs, new Path("/dir/file1"), 1);
-      writeFile(stm);
-      stm.close();
-
-      fs.rename(new Path("/dir"), new Path("/test"));
-
-
-      fs.mkdirs(new Path("/dir"));
-      stm = createFile(fs, new Path("/dir/file2"), 1);
-      writeFile(stm);
-      stm.close();
-
-      if (!fs.rename(new Path("/dir"), new Path("/test"))) {
-        try {
-          dfs.rename(new Path("/dir"), new Path("/test"),
-              Options.Rename.OVERWRITE);
-          fail("rename should have failed");
-        } catch (Exception e) {
-          // it should fail
-        }
+      int i = 0;
+      for( ; i < 100; i++){
+        FSDataOutputStream stm = createFile(fs, new Path("/dir/file"+i), 1);
+        stm.close();
       }
+      
 
-      RemoteIterator<LocatedFileStatus> itr =
-          fs.listFiles(new Path("/test"), true);
-      while (itr.hasNext()) {
-        LocatedFileStatus status = itr.next();
-        System.out.println("FILE LISTING: " + status.getPath());
-      }
+      fs.rename(new Path("/dir/file"+(i-1)), new Path("/dir/file"+i));
+
+      
+
+    } finally {
+      cluster.shutdown();
+    }
+    
+
+  }
+  
+  @Test
+  public void testRenameDL() throws Exception {
+
+    Configuration conf = new HdfsConfiguration();
+    MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).format(true).build();
+    FileSystem fs = cluster.getFileSystem();
+    DistributedFileSystem dfs = (DistributedFileSystem) FileSystem
+        .newInstance(fs.getUri(), fs.getConf());
+    try {
+
+      Path dir1 = new Path("/A/B/C/D");
+      Path dir2 = new Path("/D");
+      fs.mkdirs(dir1);
+      fs.mkdirs(dir2);
+      
+      
+      fs.rename(dir2, dir1);
+      
+//     Path file1 = new Path("/file");
+//     FSDataOutputStream stm = createFile(fs, file1, 1);
+//     stm.close();
+//     
+//      
+     fs.rename(dir2, new Path("/A/B/C"));
+
+      
 
     } finally {
       cluster.shutdown();
@@ -1329,17 +1348,28 @@ public class TestFileCreation {
     DistributedFileSystem dfs = (DistributedFileSystem) FileSystem
         .newInstance(fs.getUri(), fs.getConf());
     try {
-      dfs.mkdirs(new Path("/f1/f2"));
-      dfs.mkdirs(new Path("/f1/f2/f3/f4/f5"));
-      Path p1 = new Path("/f1/f2/test.txt");
-      Path p2 = new Path("/f2");
-      int blocks = 1;
-      FSDataOutputStream out = dfs.create(p1);
-      int i = 0;
-      for (; i < blocks; i++) {
-        out.write(i);
+      final int FILES = 10;
+      final int BLOCKS = 2;
+
+      Path base = new Path("/f1/f2/f3/f4/f5");
+      dfs.mkdirs(base);
+      
+      for(int f=0; f < FILES; f++){
+        FSDataOutputStream out = dfs.create(new Path(base, "test"+f));
+        for(int k=0; k<BLOCKS; k++){
+          out.write(k);
+        }
+        out.close();
       }
-      out.close();
+
+      for(int f=0; f<FILES; f++){
+        FSDataInputStream in = dfs.open(new Path(base, "test" + f));
+        for(int k=0; k<BLOCKS; k++){
+          assertTrue(in.read() == k);
+        }
+        in.close();
+      }
+      
     } catch (Exception e) {
       e.printStackTrace();
     } finally {
@@ -1347,6 +1377,60 @@ public class TestFileCreation {
     }
   }
 
+  
+  
+  @Test
+    public void testFileAndDirListing() throws IOException {
+        Configuration conf = new HdfsConfiguration();
+        final int BYTES_PER_CHECKSUM = 1;
+        final int PACKET_SIZE = BYTES_PER_CHECKSUM;
+        final int BLOCK_SIZE = 1 * PACKET_SIZE;
+        conf.setInt(DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY, BYTES_PER_CHECKSUM);
+        conf.setLong(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE);
+        conf.setInt(DFSConfigKeys.DFS_CLIENT_WRITE_PACKET_SIZE_KEY, PACKET_SIZE);
+
+        MiniDFSCluster cluster =
+                new MiniDFSCluster.Builder(conf).numDataNodes(1).format(true).build();
+        FileSystem fs = cluster.getFileSystem();
+        DistributedFileSystem dfs = (DistributedFileSystem) FileSystem
+                .newInstance(fs.getUri(), fs.getConf());
+        try {
+            final String data = "test";
+
+            Path base = new Path("/f1");
+            dfs.mkdirs(base);
+            dfs.mkdirs(new Path(base, "dir"));
+
+            FSDataOutputStream out = dfs.create(new Path(base, "test"));
+            out.write(data.getBytes());
+            out.close();
+
+
+            FileStatus[] status = dfs.listStatus(base);
+            for (int i = 0; i < status.length; i++) {
+                if (status[i].isFile()) {
+                    assertTrue("File size does not match ", status[i].getLen() == data.getBytes().length);
+                }
+            }
+
+            status = dfs.listStatus(new Path(base, "test"));
+            for (int i = 0; i < status.length; i++) {
+                if (status[i].isFile()) {
+                    assertTrue("File size does not match ", status[i].getLen() == data.getBytes().length);
+                }
+            }
+
+
+        dfs.listLocatedStatus(base);
+        dfs.listLocatedStatus(new Path(base, "test"));
+
+        } catch (Exception e) {
+            fail();
+            e.printStackTrace();
+        } finally {
+            cluster.shutdown();
+        }
+    }
 
   @Test
   public void test2() throws IOException {
@@ -1355,6 +1439,36 @@ public class TestFileCreation {
     HdfsVariables.enterClusterSafeMode();
     HdfsVariables.resetMisReplicatedIndex();
   }
+  
+  
+  @Test
+    public void testLockUpgrade() throws IOException {
+        Configuration conf = new HdfsConfiguration();
+        final int BYTES_PER_CHECKSUM = 1;
+        final int PACKET_SIZE = BYTES_PER_CHECKSUM;
+        final int BLOCK_SIZE = 1 * PACKET_SIZE;
+        conf.setInt(DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY, BYTES_PER_CHECKSUM);
+        conf.setLong(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE);
+        conf.setInt(DFSConfigKeys.DFS_CLIENT_WRITE_PACKET_SIZE_KEY, PACKET_SIZE);
+
+        MiniDFSCluster cluster =
+                new MiniDFSCluster.Builder(conf).numDataNodes(1).format(true).build();
+        FileSystem fs = cluster.getFileSystem();
+        DistributedFileSystem dfs = (DistributedFileSystem) FileSystem
+                .newInstance(fs.getUri(), fs.getConf());
+        try {
+            fs.mkdirs(new Path("/test"));
+            
+            fs.listStatus(new Path("/test"));
+            TestFileCreation.createFile(fs, new Path("/test/f.txt"),3);
+
+        } catch (Exception e) {
+            fail();
+            e.printStackTrace();
+        } finally {
+            cluster.shutdown();
+        }
+    }
 
   
   static class Writer implements Runnable {
@@ -1445,7 +1559,7 @@ public class TestFileCreation {
           @Override
           public Object performTask() throws IOException {
 
-            Lease lease = EntityManager.find(Lease.Finder.ByHolder, holder);
+            Lease lease = EntityManager.find(Lease.Finder.ByHolder, holder, Lease.getHolderId(holder));
             if (lease != null) {
               FSNamesystem.LOG.debug("XXXXXXXXXXX Got the lock " + lockType +
                   "Lease. Holder is: " + lease.getHolder() + " ID: " +
@@ -1469,4 +1583,125 @@ public class TestFileCreation {
     testHandler.handle();
   }
 
+  
+  @Test
+    public void testListDirPerformance() throws IOException {
+        Configuration conf = new HdfsConfiguration();
+        final int BYTES_PER_CHECKSUM = 1;
+        final int PACKET_SIZE = BYTES_PER_CHECKSUM;
+        final int BLOCK_SIZE = 1 * PACKET_SIZE;
+        conf.setInt(DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY, BYTES_PER_CHECKSUM);
+        conf.setLong(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE);
+        conf.setInt(DFSConfigKeys.DFS_CLIENT_WRITE_PACKET_SIZE_KEY, PACKET_SIZE);
+
+        MiniDFSCluster cluster =
+                new MiniDFSCluster.Builder(conf).numDataNodes(1).format(true).build();
+        FileSystem fs = cluster.getFileSystem();
+        DistributedFileSystem dfs = (DistributedFileSystem) FileSystem
+                .newInstance(fs.getUri(), fs.getConf());
+        try {
+            fs.mkdirs(new Path("/test"));
+            TestFileCreation.createFile(fs, new Path("/test/f.txt"),3);
+            
+            for(int i = 0 ; i < 32 ; i++){
+              fs.mkdirs(new Path("/test/dir"+i));
+            }
+            
+            
+            
+            fs.listLocatedStatus(new Path("/test"));
+
+        } catch (Exception e) {
+            fail();
+            e.printStackTrace();
+        } finally {
+            cluster.shutdown();
+        }
+    }
+  
+  @Test
+  public void testFilesWithLotsOfBlocks() throws IOException {
+    MiniDFSCluster cluster = null;
+    try {
+      Configuration conf = new HdfsConfiguration();
+      final int BLOCK_SIZE = 1024;
+      conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE); // 4 byte
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
+      cluster.waitActive();
+
+      DistributedFileSystem dfs = cluster.getFileSystem();
+      
+      FSDataOutputStream out = dfs.create(new Path("/test.file"), (short)3);
+      for(int i = 0; i < 1000; i++){
+        byte data[] = new byte[BLOCK_SIZE];
+        out.write(data);
+      }
+      out.close();
+      
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
+  
+  @Test
+  public void testFileRead() throws IOException {
+    MiniDFSCluster cluster = null;
+    try {
+      Configuration conf = new HdfsConfiguration();
+      final int BLOCK_SIZE = 1024;
+      conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE); // 4 byte
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(0).build();
+      cluster.waitActive();
+
+      DistributedFileSystem dfs = cluster.getFileSystem();
+      
+      dfs.mkdirs(new Path("/dir"), new FsPermission((short)777));
+      
+      dfs.create(new Path("/test.txt"),(short)3).close();
+      
+      dfs.append(new Path("/test.txt")).close();
+      
+      dfs.open(new Path("/test.txt")).close();
+      
+      dfs.getFileStatus(new Path("/test.txt"));
+      
+      dfs.listStatus(new Path("/test.txt"));
+      
+      dfs.setReplication(new Path("/dir"), (short)1);
+
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
+  
+  @Test
+  public void testLS() throws IOException {
+    MiniDFSCluster cluster = null;
+    try {
+      Configuration conf = new HdfsConfiguration();
+      final int BLOCK_SIZE = 1024;
+      conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE); // 4 byte
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(0).build();
+      cluster.waitActive();
+
+      DistributedFileSystem dfs = cluster.getFileSystem();
+      
+      dfs.mkdirs(new Path("/dir"), new FsPermission((short)777));
+      
+      for(int i = 0 ; i < 32 ; i ++){
+        dfs.create(new Path("/dir/file"+i+".txt"),(short)3).close();
+      }
+      
+      dfs.listStatus(new Path("/dir"));
+
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
 }

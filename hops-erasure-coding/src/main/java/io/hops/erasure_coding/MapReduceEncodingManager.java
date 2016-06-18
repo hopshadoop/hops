@@ -18,15 +18,23 @@
 
 package io.hops.erasure_coding;
 
+import io.hops.metadata.HdfsStorageFactory;
+import io.hops.metadata.hdfs.dal.EncodingJobsDataAccess;
+import io.hops.metadata.hdfs.entity.EncodingJob;
 import io.hops.metadata.hdfs.entity.EncodingPolicy;
+import io.hops.transaction.handler.HDFSOperationType;
+import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.mapred.JobID;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -47,6 +55,8 @@ public class MapReduceEncodingManager extends BaseEncodingManager {
   private final long executionLimit;
   private Map<String, MapReduceEncoder> currentJobs =
       new HashMap<String, MapReduceEncoder>();
+  private Collection<MapReduceEncoder> completedJobs =
+      new ArrayList<MapReduceEncoder>();
 
   private boolean initialized = false;
 
@@ -59,28 +69,24 @@ public class MapReduceEncodingManager extends BaseEncodingManager {
 
   @Override
   public void encodeFile(EncodingPolicy policy, Path sourceFile,
-      Path parityFile) {
-    if (!initialized) {
-      try {
-        cleanUpTempDirectory(conf);
-      } catch (IOException e) {
-        LOG.error("Cleanup tmp failed ", e);
-      }
-      initialized = true;
-    }
+      Path parityFile, boolean copy) {
+    initialize();
 
     Codec codec = Codec.getCodec(policy.getCodec());
     LOG.info("Start encoding with policy: " + policy + " for source file " +
-        sourceFile.toUri().getPath() + " and parity file " + parityFile);
+        sourceFile.toUri().getPath() + " and parity file " + parityFile +
+        " copy " + copy);
     PolicyInfo policyInfo = new PolicyInfo();
     try {
-      // This is somewhat redundant with the list below
       policyInfo.setSrcPath(sourceFile.toUri().getPath());
       policyInfo.setCodecId(codec.getId());
-      policyInfo.setProperty("parityPath", parityFile.toUri().getPath());
-      policyInfo.setProperty("targetReplication",
+      policyInfo.setProperty(PolicyInfo.PROPERTY_PARITY_PATH,
+          parityFile.toUri().getPath());
+      policyInfo.setProperty(PolicyInfo.PROPERTY_REPLICATION,
           String.valueOf(policy.getTargetReplication()));
-      policyInfo.setProperty("metaReplication", String.valueOf(1));
+      policyInfo.setProperty(PolicyInfo.PROPERTY_PARITY_REPLICATION,
+          String.valueOf(1));
+      policyInfo.setProperty(PolicyInfo.PROPERTY_COPY, String.valueOf(copy));
       raidFiles(policyInfo);
     } catch (IOException e) {
       LOG.error("Exception", e);
@@ -94,14 +100,22 @@ public class MapReduceEncodingManager extends BaseEncodingManager {
     MapReduceEncoder dr = new MapReduceEncoder(conf);
     boolean started = dr.startDistRaid(info);
     if (started) {
-      currentJobs.put(info.getSrcPath().toUri().getPath(), dr);
+      String path = info.getSrcPath().toUri().getPath();
+      // There is a risk that it crashes before persisting the job for recovery.
+      // The ErasureCodingManager should restart the job in that case as it
+      // does not set the state to active before this code succeeded.
+      persistActiveJob(path, dr.getJobID(),
+          dr.getConf().get(MapReduceEncoder.JOB_DIR_LABEL));
+      currentJobs.put(path, dr);
     }
   }
 
   @Override
-  public List<Report> computeReports() {
-    List<Report> reports = new ArrayList<Report>(currentJobs.size());
+  public List<Report> computeReports() throws IOException {
+    initialize();
+    cleanRecovery();
 
+    List<Report> reports = new ArrayList<Report>(currentJobs.size());
     for (Map.Entry<String, MapReduceEncoder> entry : currentJobs.entrySet()) {
       String fileName = entry.getKey();
       MapReduceEncoder job = entry.getValue();
@@ -135,15 +149,49 @@ public class MapReduceEncodingManager extends BaseEncodingManager {
       Report.Status status = report.getStatus();
       if (status == Report.Status.FINISHED || status == Report.Status.FAILED ||
           status == Report.Status.CANCELED) {
-        currentJobs.remove(report.getFilePath());
+        MapReduceEncoder job = currentJobs.remove(report.getFilePath());
+        completedJobs.add(job);
       }
     }
 
     return reports;
   }
 
+  private void persistActiveJob(final String path, final JobID jobId,
+      final String jobDir) throws IOException {
+    new LightWeightRequestHandler(HDFSOperationType.PERSIST_ENCODING_JOB) {
+      @Override
+      public Object performTask() throws IOException {
+        EncodingJobsDataAccess da = (EncodingJobsDataAccess)
+            HdfsStorageFactory.getDataAccess(EncodingJobsDataAccess.class);
+          da.add(new EncodingJob(jobId.getJtIdentifier(),
+              jobId.getId(), path, jobDir));
+        return null;
+      }
+    }.handle();
+  }
+
+  private void cleanRecovery() throws IOException {
+    new LightWeightRequestHandler(HDFSOperationType.DELETE_ENCODING_JOBS) {
+      @Override
+      public Object performTask() throws IOException {
+        EncodingJobsDataAccess da = (EncodingJobsDataAccess)
+            HdfsStorageFactory.getDataAccess(EncodingJobsDataAccess.class);
+        Iterator<MapReduceEncoder> it = completedJobs.iterator();
+        while (it.hasNext()) {
+          MapReduceEncoder job = it.next();
+          JobID jobId = job.getJobID();
+          da.delete(new EncodingJob(jobId.getJtIdentifier(), jobId.getId()));
+          it.remove();
+        }
+        return null;
+      }
+    }.handle();
+  }
+
   @Override
   public void cancelAll() {
+    initialize();
     for (MapReduceEncoder job : currentJobs.values()) {
       try {
         job.killJob();
@@ -156,6 +204,7 @@ public class MapReduceEncodingManager extends BaseEncodingManager {
 
   @Override
   public void cancel(String toCancel) {
+    initialize();
     MapReduceEncoder job = currentJobs.get(toCancel);
     try {
       job.killJob();
@@ -163,5 +212,37 @@ public class MapReduceEncodingManager extends BaseEncodingManager {
       LOG.error("Exception", e);
     }
     currentJobs.remove(toCancel);
+  }
+
+  private void initialize() {
+    if (initialized) {
+      return;
+    }
+
+    try {
+      for (EncodingJob job : recoverActiveJobs()) {
+        MapReduceEncoder recovered = new MapReduceEncoder(conf, job);
+        currentJobs.put(job.getPath(), recovered);
+      }
+    } catch (IOException e) {
+      LOG.error("Encoding job recovery failed", e);
+      throw new RuntimeException(e);
+    }
+
+    initialized = true;
+  }
+
+  private Collection<EncodingJob> recoverActiveJobs() throws IOException {
+    LightWeightRequestHandler handler = new LightWeightRequestHandler(
+        HDFSOperationType.RECOVER_ENCODING_JOBS) {
+      @Override
+      public Object performTask() throws IOException {
+        EncodingJobsDataAccess da = (EncodingJobsDataAccess)
+            HdfsStorageFactory.getDataAccess(EncodingJobsDataAccess.class);
+        return da.findAll();
+      }
+    };
+
+    return (Collection<EncodingJob>) handler.handle();
   }
 }

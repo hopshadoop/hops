@@ -20,6 +20,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.Path;
 
+import java.io.IOException;
 import java.util.List;
 
 public abstract class EncodingManager extends Configured
@@ -30,7 +31,7 @@ public abstract class EncodingManager extends Configured
   }
 
   public abstract void encodeFile(EncodingPolicy policy, Path sourceFile,
-      Path parityFile);
+      Path parityFile, boolean copy) throws IOException;
 
-  public abstract List<Report> computeReports();
+  public abstract List<Report> computeReports() throws IOException;
 }

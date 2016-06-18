@@ -84,10 +84,10 @@ public class INodeDALAdaptor
         return list;
     }
   @Override
-  public List<ProjectedINode> findInodesForSubtreeOperationsWithReadLock(
+  public List<ProjectedINode> findInodesForSubtreeOperationsWithWriteLock(
       int parentId) throws StorageException {
     List<ProjectedINode> list =
-        dataAccess.findInodesForSubtreeOperationsWithReadLock(parentId);
+        dataAccess.findInodesForSubtreeOperationsWithWriteLock(parentId);
     Collections.sort(list);
     return list;
   }
@@ -153,6 +153,20 @@ public class INodeDALAdaptor
   public int countAllFiles() throws StorageException {
     return dataAccess.countAllFiles();
   }
+  
+  @Override
+  public boolean hasChildren(int parentId) throws StorageException {
+    return dataAccess.hasChildren(parentId);
+  }
+  
+  //Only for testing
+  @Override
+  public List<org.apache.hadoop.hdfs.server.namenode.INode> allINodes() throws StorageException {
+    List<org.apache.hadoop.hdfs.server.namenode.INode> list =
+        (List) convertDALtoHDFS(
+            dataAccess.allINodes());
+    return list;
+  }
 
   @Override
   public INode convertHDFStoDAL(
@@ -178,13 +192,11 @@ public class INodeDALAdaptor
 hopINode.setStatus(inode.getStatus());
         hopINode.setIsDeleted(inode.getIsDeleted());
 
-      if (inode instanceof INodeDirectory) {
+      if (inode.isDirectory()) {
         hopINode.setUnderConstruction(false);
-        hopINode.setDirWithQuota(false);
-      }
-      if (inode instanceof INodeDirectoryWithQuota) {
-        hopINode.setUnderConstruction(false);
-        hopINode.setDirWithQuota(true);
+        hopINode.setDirWithQuota(inode instanceof INodeDirectoryWithQuota ?
+            true : false);
+        hopINode.setMetaEnabled(((INodeDirectory) inode).isMetaEnabled());
       }
       if (inode instanceof INodeFile) {
         hopINode
@@ -202,6 +214,7 @@ hopINode.setStatus(inode.getStatus());
                   .getXferAddr());
         }
         hopINode.setGenerationStamp(((INodeFile) inode).getGenerationStamp());
+        hopINode.setSize(((INodeFile) inode).getSize());
       }
       if (inode instanceof INodeSymlink) {
         hopINode.setUnderConstruction(false);
@@ -243,6 +256,7 @@ hopINode.setStatus(inode.getStatus());
 
         inode.setAccessTimeNoPersistance(hopINode.getAccessTime());
         inode.setModificationTimeNoPersistance(hopINode.getModificationTime());
+        ((INodeDirectory) inode).setMetaEnabled(hopINode.isMetaEnabled());
       } else if (hopINode.getSymlink() != null) {
         inode = new INodeSymlink(hopINode.getSymlink(),
             hopINode.getModificationTime(), hopINode.getAccessTime(), ps);
@@ -263,8 +277,9 @@ hopINode.setStatus(inode.getStatus());
           inode = new INodeFile(ps, hopINode.getHeader(),
               hopINode.getModificationTime(), hopINode.getAccessTime());
         }
-        ((INodeFile) inode)
-            .setGenerationStampNoPersistence(hopINode.getGenerationStamp());
+        ((INodeFile) inode).setGenerationStampNoPersistence(
+            hopINode.getGenerationStamp());
+        ((INodeFile) inode).setSizeNoPersistence(hopINode.getSize());
       }
       inode.setIdNoPersistance(hopINode.getId());
       inode.setLocalNameNoPersistance(hopINode.getName());
@@ -276,5 +291,4 @@ inode.setStatusNoPersistance(hopINode.getStatus());
     }
     return inode;
   }
-
 }

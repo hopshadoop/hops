@@ -475,6 +475,12 @@ public class DistributedFileSystem extends FileSystem {
     statistics.incrementWriteOps(1);
     return dfs.setReplication(getPathName(src), replication);
   }
+
+  public void setMetaEnabled(Path src, boolean metaEnabled)
+      throws IOException {
+    statistics.incrementWriteOps(1);
+    dfs.setMetaEnabled(getPathName(src), metaEnabled);
+  }
   
   /**
    * Move blocks from srcs to trg
@@ -1114,10 +1120,9 @@ public class DistributedFileSystem extends FileSystem {
   /**
    * Request the encoding for the given file according to the given policy.
    * The encoding is executed asynchronously depending on the current utilization
-   * of the cluster.
-   *
-   * NOTE: The current implementation will require the client to read and
-   * rewrite the entire file.
+   * of the cluster. NOTE: This requires the whole file to be rewritten in order
+   * to ensure durability constraints for the encoded file. Clients reading the
+   * file might fail while it is rewritten.
    *
    * @param filePath
    *    the path of the file
@@ -1127,40 +1132,7 @@ public class DistributedFileSystem extends FileSystem {
    */
   public void encodeFile(final String filePath, final EncodingPolicy policy)
       throws IOException {
-    // TODO STEFFEN - This is a quick and dirty solution to enforce block placement but it is really slow and expensive.
-    // Instead we should ensure the block placement by namenode mechanisums and only
-    // decrease the replication factor after successfully encoding
-    //dfs.encodeFile(filePath, policy);
-    Path path = new Path(filePath);
-    FileStatus status = getFileStatus(path);
-    FSDataOutputStream out = null;
-    try {
-      Path tmpFile = new Path("/tmp" + filePath);
-      out = create(tmpFile, status.getReplication(), policy);
-      FSDataInputStream in = open(path);
-      byte[] b = new byte[getConf().getInt("io.file.buffer.size", 4096)];
-      while (in.read(b) > 0) {
-        out.write(b);
-      }
-      try {
-        in.close();
-      } catch (IOException e) {
-      }
-      try {
-        out.close();
-      } catch (IOException e) {
-      }
-
-      delete(path);
-      rename(tmpFile, path);
-    } finally {
-      if (out != null) {
-        try {
-          out.close();
-        } catch (IOException e) {
-        }
-      }
-    }
+    dfs.encodeFile(filePath, policy);
   }
 
   /**
@@ -1181,11 +1153,11 @@ public class DistributedFileSystem extends FileSystem {
 
 
   public void enableMemcached() throws IOException {
-    changeConf(DFSConfigKeys.DFS_MEMCACHE_ENABLED, String.valueOf(true));
+    changeConf(DFSConfigKeys.DFS_RESOLVING_CACHE_ENABLED, String.valueOf(true));
   }
 
   public void disableMemcached() throws IOException {
-    changeConf(DFSConfigKeys.DFS_MEMCACHE_ENABLED, String.valueOf(false));
+    changeConf(DFSConfigKeys.DFS_RESOLVING_CACHE_ENABLED, String.valueOf(false));
   }
 
   public void enableSetPartitionKey() throws IOException {

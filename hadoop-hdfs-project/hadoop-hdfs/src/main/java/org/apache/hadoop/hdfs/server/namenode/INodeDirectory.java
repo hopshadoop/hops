@@ -17,10 +17,10 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
-import io.hops.common.INodeIdGen;
+import io.hops.common.IDsGeneratorFactory;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
-import io.hops.metadata.hdfs.snapshots.SnapShotConstants;
+import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.transaction.EntityManager;
 import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.fs.permission.PermissionStatus;
@@ -57,7 +57,8 @@ public class INodeDirectory extends INode {
   public final static int ROOT_ID = 2;
   public final static int ROOT_PARENT_ID = 1;
 
-  
+  private boolean metaEnabled;
+
   public INodeDirectory(String name, PermissionStatus permissions) {
     super(name, permissions);
   }
@@ -94,11 +95,20 @@ public class INodeDirectory extends INode {
     return true;
   }
 
+  public boolean isMetaEnabled() {
+    return metaEnabled;
+  }
+
+  public void setMetaEnabled(boolean metaEnabled) {
+    this.metaEnabled = metaEnabled;
+  }
+
   INode removeChild(INode node)
       throws StorageException, TransactionContextException {
     INode existingInode = getChildINode(node.getLocalNameBytes());
     if (existingInode != null) {
       remove(existingInode);
+      existingInode.logMetadataEvent(MetadataLogEntry.Operation.DELETE);
       return existingInode;
     }
     return null;
@@ -243,13 +253,13 @@ public class INodeDirectory extends INode {
         }
         throw new UnresolvedPathException(path, preceding, remainder, target);
       }
+      count++;
+      index++;
       if (lastComp || !curNode.isDirectory()) {
         break;
       }
       INodeDirectory parentDir = (INodeDirectory) curNode;
-      curNode = parentDir.getChildINode(components[count + 1]);
-      count++;
-      index++;
+      curNode = parentDir.getChildINode(components[count]);
     }
     return count;
   }
@@ -268,7 +278,7 @@ public class INodeDirectory extends INode {
    * deepest INodes. The array size will be the number of expected
    * components in the path, and non existing components will be
    * filled with null
-   * @see #getExistingPathINodes(byte[][], INode[])
+   * @see #getExistingPathINodes(byte[][], INode[],boolean)
    */
   INode[] getExistingPathINodes(String path, boolean resolveLink)
       throws UnresolvedLinkException, StorageException,
@@ -304,7 +314,7 @@ public class INodeDirectory extends INode {
           throws StorageException, TransactionContextException {
     if(isSnapshotTaken){
       if (!node.exists()) {
-        Integer inodeID = INodeIdGen.getUniqueINodeID();
+        Integer inodeID = IDsGeneratorFactory.getInstance().getUniqueINodeID();
         node.setIdNoPersistance(inodeID);
         node.setParentNoPersistance(this);
         EntityManager.add(node);
@@ -348,7 +358,7 @@ public class INodeDirectory extends INode {
     }
 
     if (!node.exists()) {
-      Integer inodeID = INodeIdGen.getUniqueINodeID();
+      Integer inodeID = IDsGeneratorFactory.getInstance().getUniqueINodeID();
       node.setIdNoPersistance(inodeID);
       node.setParentNoPersistance(this);
       EntityManager.add(node);
@@ -365,6 +375,10 @@ public class INodeDirectory extends INode {
     }
     if (node.getGroupName() == null) {
       node.setGroup(getGroupName());
+    }
+
+    if (!node.isUnderConstruction()) {
+      node.logMetadataEvent(MetadataLogEntry.Operation.ADD);
     }
 
     return node;

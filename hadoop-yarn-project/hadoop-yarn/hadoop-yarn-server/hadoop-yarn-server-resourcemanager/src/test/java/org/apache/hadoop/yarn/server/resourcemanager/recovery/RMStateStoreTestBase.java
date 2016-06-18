@@ -309,7 +309,7 @@ public class RMStateStoreTestBase /*extends ClientBaseWithFixes*/ {
             FinalApplicationStatus.SUCCEEDED, 0, "N/A", -1, null, null);
     store.updateApplicationAttemptState(newAttemptState, null);
     // let things settle down
-    Thread.sleep(1000);
+    Thread.sleep(10000);
     store.close();
 
     // check updated application state.
@@ -347,7 +347,7 @@ public class RMStateStoreTestBase /*extends ClientBaseWithFixes*/ {
 
     // assert store is in expected state after everything is cleaned
     assertTrue(stateStoreHelper.isFinalStateValid());
-
+    
     store.close();
   }
 

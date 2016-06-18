@@ -18,22 +18,27 @@
 
 package org.apache.hadoop.hdfs;
 
+import java.io.Closeable;
+import java.net.Socket;
+import java.net.SocketAddress;
+
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map.Entry;
+
+import java.io.IOException;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.LinkedListMultimap;
 import org.apache.commons.logging.Log;
+import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hdfs.protocol.datatransfer.IOStreamPair;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.util.Daemon;
+import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
-
-import java.io.Closeable;
-import java.net.Socket;
-import java.net.SocketAddress;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map.Entry;
 
 /**
  * A cache of input stream sockets to Data Node.
@@ -55,7 +60,7 @@ class SocketCache {
     
     @Override
     public void close() {
-      if (ioStreams != null) {
+      if (ioStreams != null) { 
         IOUtils.closeStream(ioStreams.in);
         IOUtils.closeStream(ioStreams.out);
       }
@@ -68,34 +73,33 @@ class SocketCache {
   }
 
   private Daemon daemon;
-  /**
-   * A map for per user per datanode.
-   */
+  /** A map for per user per datanode. */
   private static LinkedListMultimap<SocketAddress, SocketAndStreams> multimap =
-      LinkedListMultimap.create();
+    LinkedListMultimap.create();
   private static int capacity;
   private static long expiryPeriod;
   private static SocketCache scInstance = new SocketCache();
   private static boolean isInitedOnce = false;
-
+ 
   public static synchronized SocketCache getInstance(int c, long e) {
     // capacity is only initialized once
     if (isInitedOnce == false) {
       capacity = c;
       expiryPeriod = e;
 
-      if (capacity == 0) {
+      if (capacity == 0 ) {
         LOG.info("SocketCache disabled.");
-      } else if (expiryPeriod == 0) {
+      }
+      else if (expiryPeriod == 0) {
         throw new IllegalStateException("Cannot initialize expiryPeriod to " +
-            expiryPeriod + "when cache is enabled.");
+           expiryPeriod + "when cache is enabled.");
       }
       isInitedOnce = true;
     } else { //already initialized once
       if (capacity != c || expiryPeriod != e) {
-        LOG.info("capacity and expiry periods already set to " + capacity +
-            " and " + expiryPeriod + " respectively. Cannot set it to " + c +
-            " and " + e);
+        LOG.info("capacity and expiry periods already set to " + capacity + 
+          " and " + expiryPeriod + " respectively. Cannot set it to " + c + 
+          " and " + e);
       }
     }
 
@@ -103,7 +107,7 @@ class SocketCache {
   }
 
   private boolean isDaemonStarted() {
-    return (daemon == null) ? false : true;
+    return (daemon == null)? false: true;
   }
 
   private synchronized void startExpiryDaemon() {
@@ -117,7 +121,7 @@ class SocketCache {
       public void run() {
         try {
           SocketCache.this.run();
-        } catch (InterruptedException e) {
+        } catch(InterruptedException e) {
           //noop
         } finally {
           SocketCache.this.clear();
@@ -134,10 +138,8 @@ class SocketCache {
 
   /**
    * Get a cached socket to the given address.
-   *
-   * @param remote
-   *     Remote address the socket is connected to.
-   * @return A socket with unknown state, possibly closed underneath. Or null.
+   * @param remote  Remote address the socket is connected to.
+   * @return  A socket with unknown state, possibly closed underneath. Or null.
    */
   public synchronized SocketAndStreams get(SocketAddress remote) {
 
@@ -163,9 +165,7 @@ class SocketCache {
 
   /**
    * Give an unused socket to the cache.
-   *
-   * @param sock
-   *     socket not used by anyone.
+   * @param sock socket not used by anyone.
    */
   public synchronized void put(Socket sock, IOStreamPair ioStreams) {
 
@@ -176,13 +176,13 @@ class SocketCache {
       s.close();
       return;
     }
-
+ 
     startExpiryDaemon();
 
     SocketAddress remoteAddr = sock.getRemoteSocketAddress();
     if (remoteAddr == null) {
-      LOG.warn(
-          "Cannot cache (unconnected) socket with no remote address: " + sock);
+      LOG.warn("Cannot cache (unconnected) socket with no remote address: " +
+               sock);
       IOUtils.closeSocket(sock);
       return;
     }
@@ -203,12 +203,12 @@ class SocketCache {
   private synchronized void evictExpired(long expiryPeriod) {
     while (multimap.size() != 0) {
       Iterator<Entry<SocketAddress, SocketAndStreams>> iter =
-          multimap.entries().iterator();
+        multimap.entries().iterator();
       Entry<SocketAddress, SocketAndStreams> entry = iter.next();
       // if oldest socket expired, remove it
-      if (entry == null ||
-          Time.monotonicNow() - entry.getValue().getCreateTime() <
-              expiryPeriod) {
+      if (entry == null || 
+        Time.monotonicNow() - entry.getValue().getCreateTime() < 
+        expiryPeriod) {
         break;
       }
       iter.remove();
@@ -222,10 +222,10 @@ class SocketCache {
    */
   private synchronized void evictOldest() {
     Iterator<Entry<SocketAddress, SocketAndStreams>> iter =
-        multimap.entries().iterator();
+      multimap.entries().iterator();
     if (!iter.hasNext()) {
       throw new IllegalStateException("Cannot evict from empty cache! " +
-          "capacity: " + capacity);
+        "capacity: " + capacity);
     }
     Entry<SocketAddress, SocketAndStreams> entry = iter.next();
     iter.remove();
@@ -238,8 +238,9 @@ class SocketCache {
    * older than expiryPeriod minutes
    */
   private void run() throws InterruptedException {
-    for (long lastExpiryTime = Time.monotonicNow(); !Thread.interrupted();
-         Thread.sleep(expiryPeriod)) {
+    for(long lastExpiryTime = Time.monotonicNow();
+        !Thread.interrupted();
+        Thread.sleep(expiryPeriod)) {
       final long elapsed = Time.monotonicNow() - lastExpiryTime;
       if (elapsed >= expiryPeriod) {
         evictExpired(expiryPeriod);
@@ -253,7 +254,8 @@ class SocketCache {
   /**
    * Empty the cache, and close all sockets.
    */
-  private synchronized void clear() {
+  @VisibleForTesting
+  protected synchronized void clear() {
     for (SocketAndStreams sockAndStream : multimap.values()) {
       sockAndStream.close();
     }

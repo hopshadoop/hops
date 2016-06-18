@@ -19,7 +19,12 @@ import io.hops.erasure_coding.ClusterTest;
 import io.hops.erasure_coding.Codec;
 import io.hops.erasure_coding.TestLocalEncodingManagerImpl;
 import io.hops.erasure_coding.Util;
+import io.hops.metadata.HdfsStorageFactory;
+import io.hops.metadata.hdfs.dal.BlockChecksumDataAccess;
+import io.hops.metadata.hdfs.entity.BlockChecksum;
 import io.hops.metadata.hdfs.entity.EncodingPolicy;
+import io.hops.transaction.handler.HDFSOperationType;
+import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -65,6 +70,8 @@ public class TestErasureCodingFileSystem extends ClusterTest {
         DFSConfigKeys.DEFAULT_BLOCK_REPAIR_MANAGER_CLASSNAME);
     conf.setInt(DFSConfigKeys.RECHECK_INTERVAL_KEY, 10000);
     conf.setInt(DFSConfigKeys.REPAIR_DELAY_KEY, 100 * 60 * 60 * 1000);
+    conf.setClass("fs.hdfs.impl", ErasureCodingFileSystem.class,
+        FileSystem.class);
     numDatanode = 16;
   }
 
@@ -74,8 +81,15 @@ public class TestErasureCodingFileSystem extends ClusterTest {
   }
 
   @Test
+  public void testSetAsDefaultFS() throws IOException {
+    assertEquals(ErasureCodingFileSystem.class,
+        FileSystem.get(conf).getClass());
+  }
+
+  @Test
   public void testReadBrokenFile() throws IOException, InterruptedException {
-    DistributedFileSystem dfs = (DistributedFileSystem) getFileSystem();
+    DistributedFileSystem dfs = (DistributedFileSystem)
+        ((ErasureCodingFileSystem) getFileSystem()).getFileSystem();
     TestDfsClient testDfsClient = new TestDfsClient(getConfig());
     testDfsClient.injectIntoDfs(dfs);
 
@@ -101,10 +115,10 @@ public class TestErasureCodingFileSystem extends ClusterTest {
     LocatedBlocks locatedBlocks =
         new LocatedBlocks(0, false, lostBlocks, null, true);
     testDfsClient.setMissingLocatedBlocks(locatedBlocks);
-    LOG.info("Loosing block " + lb.toString());
+    LOG.info("Losing block " + lb.toString());
     getCluster().triggerBlockReports();
 
-    ErasureCodingFileSystem ecfs = new ErasureCodingFileSystem();
+    ErasureCodingFileSystem ecfs = (ErasureCodingFileSystem) getFileSystem();
     NameNode nameNode = getCluster().getNameNode();
     ecfs.initialize(nameNode.getUri(nameNode.getServiceRpcAddress()), conf);
     try {
@@ -118,7 +132,8 @@ public class TestErasureCodingFileSystem extends ClusterTest {
 
   @Test
   public void testCorruptRepair() throws IOException, InterruptedException {
-    DistributedFileSystem dfs = (DistributedFileSystem) getFileSystem();
+    DistributedFileSystem dfs = (DistributedFileSystem)
+        ((ErasureCodingFileSystem) getFileSystem()).getFileSystem();
     TestDfsClient testDfsClient = new TestDfsClient(getConfig());
     testDfsClient.injectIntoDfs(dfs);
 
@@ -136,7 +151,8 @@ public class TestErasureCodingFileSystem extends ClusterTest {
     String path = testFileStatus.getPath().toUri().getPath();
     int blockToLoose = new Random(seed).nextInt(
         (int) (testFileStatus.getLen() / testFileStatus.getBlockSize()));
-    LocatedBlock lb = dfs.getClient().getLocatedBlocks(path, 0, Long.MAX_VALUE)
+    final LocatedBlock lb = dfs.getClient()
+        .getLocatedBlocks(path, 0, Long.MAX_VALUE)
         .get(blockToLoose);
     DataNodeUtil.loseBlock(getCluster(), lb);
     List<LocatedBlock> lostBlocks = new ArrayList<LocatedBlock>();
@@ -144,14 +160,23 @@ public class TestErasureCodingFileSystem extends ClusterTest {
     LocatedBlocks locatedBlocks =
         new LocatedBlocks(0, false, lostBlocks, null, true);
     testDfsClient.setMissingLocatedBlocks(locatedBlocks);
-    LOG.info("Loosing block " + lb.toString());
+    LOG.info("Losing block " + lb.toString());
     getCluster().triggerBlockReports();
 
-    dfs.getClient().addBlockChecksum(testFile.toUri().getPath(),
-        (int) (lb.getStartOffset() / lb.getBlockSize()), 0);
+    final int inodeId = io.hops.TestUtil.getINodeId(cluster.getNameNode(),
+        testFile);
+    new LightWeightRequestHandler(HDFSOperationType.TEST) {
+      @Override
+      public Object performTask() throws IOException {
+        BlockChecksumDataAccess da = (BlockChecksumDataAccess)
+            HdfsStorageFactory.getDataAccess(BlockChecksumDataAccess.class);
+        da.update(new BlockChecksum(inodeId,
+            (int) (lb.getStartOffset() / lb.getBlockSize()), 0));
+        return null;
+      }
+    }.handle();
 
-
-    ErasureCodingFileSystem ecfs = new ErasureCodingFileSystem();
+    ErasureCodingFileSystem ecfs = (ErasureCodingFileSystem) getFileSystem();
     NameNode nameNode = getCluster().getNameNode();
     ecfs.initialize(nameNode.getUri(nameNode.getServiceRpcAddress()), conf);
     try {

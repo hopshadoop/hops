@@ -27,6 +27,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FsServerDefaults;
+import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.Options.Rename;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.CorruptFileBlocks;
@@ -220,6 +221,11 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
       VOID_CHANGECONF_RESPONSE =
       ClientNamenodeProtocolProtos.ChangeConfResponseProto.newBuilder().build();
 
+  private static final ClientNamenodeProtocolProtos.SetMetaEnabledResponseProto
+      VOID_SET_META_ENABLED_RESPONSE =
+      ClientNamenodeProtocolProtos.SetMetaEnabledResponseProto.newBuilder()
+          .build();
+
   /**
    * Constructor
    *
@@ -367,6 +373,19 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
     }
   }
 
+  @Override
+  public ClientNamenodeProtocolProtos.SetMetaEnabledResponseProto setMetaEnabled(
+      RpcController controller,
+      ClientNamenodeProtocolProtos.SetMetaEnabledRequestProto req)
+      throws ServiceException {
+    try {
+      server.setMetaEnabled(req.getSrc(), req.getMetaEnabled());
+    } catch (IOException e) {
+      throw new ServiceException(e);
+    }
+    return VOID_SET_META_ENABLED_RESPONSE;
+  }
+
 
   @Override
   public SetPermissionResponseProto setPermission(RpcController controller,
@@ -495,8 +514,15 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
       Rename2RequestProto req) throws ServiceException {
 
     try {
-      server.rename2(req.getSrc(), req.getDst(),
-          req.getOverwriteDest() ? Rename.OVERWRITE : Rename.NONE);
+      Options.Rename[] options;
+      if (req.hasKeepEncodingStatus() && req.getKeepEncodingStatus()) {
+        options = new Rename[2];
+        options[1] = Rename.KEEP_ENCODING_STATUS;
+      } else {
+        options = new Rename[1];
+      }
+      options[0] = req.getOverwriteDest() ? Rename.OVERWRITE : Rename.NONE;
+      server.rename2(req.getSrc(), req.getDst(), options);
     } catch (IOException e) {
       throw new ServiceException(e);
     }

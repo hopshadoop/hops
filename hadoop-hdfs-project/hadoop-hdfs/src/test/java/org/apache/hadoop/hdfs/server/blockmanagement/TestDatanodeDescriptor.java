@@ -25,11 +25,14 @@ import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLocks;
+import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.server.common.GenerationStamp;
 import org.apache.hadoop.hdfs.server.namenode.INode;
+import org.apache.hadoop.hdfs.server.namenode.INodeFile;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -69,23 +72,25 @@ public class TestDatanodeDescriptor {
   public void testBlocksCounter() throws Exception {
     HdfsStorageFactory.setConfiguration(new HdfsConfiguration());
     HdfsStorageFactory.formatStorage();
-    
+
+    BlocksMap blocksMap = new BlocksMap(null);
+
     DatanodeDescriptor dd = DFSTestUtil.getLocalDatanodeDescriptor();
     assertEquals(0, dd.numBlocks());
     BlockInfo blk = new BlockInfo(new Block(1L), INode.NON_EXISTING_ID);
     BlockInfo blk1 = new BlockInfo(new Block(2L), INode.NON_EXISTING_ID);
     // add first block
-    assertTrue(addBlock(dd, blk));
+    assertTrue(addBlock(blocksMap, dd, blk));
     assertEquals(1, dd.numBlocks());
     // remove a non-existent block
     assertFalse(removeBlock(dd, blk1));
     assertEquals(1, dd.numBlocks());
     // add an existent block
-    assertFalse(addBlock(dd, blk));
+    assertFalse(addBlock(blocksMap, dd, blk));
     System.out.println("number of blks are " + dd.numBlocks());
     assertEquals(1, dd.numBlocks());
     // add second block
-    assertTrue(addBlock(dd, blk1));
+    assertTrue(addBlock(blocksMap, dd, blk1));
     assertEquals(2, dd.numBlocks());
     // remove first block
     assertTrue(removeBlock(dd, blk));
@@ -95,7 +100,10 @@ public class TestDatanodeDescriptor {
     assertEquals(0, dd.numBlocks());
   }
   
-  private boolean addBlock(final DatanodeDescriptor dn, final BlockInfo blk)
+  private boolean addBlock(final BlocksMap blocksMap, final DatanodeDescriptor
+      dn,
+      final
+  BlockInfo blk)
       throws IOException {
     return (Boolean) new HopsTransactionalRequestHandler(
         HDFSOperationType.TEST) {
@@ -115,6 +123,8 @@ public class TestDatanodeDescriptor {
 
       @Override
       public Object performTask() throws StorageException, IOException {
+        blocksMap.addBlockCollection(blk, new INodeFile(new PermissionStatus
+            ("n", "n", FsPermission.getDefault()), null, (short)1, 0, 0, 1));
         return dn.addBlock(blk);
       }
 

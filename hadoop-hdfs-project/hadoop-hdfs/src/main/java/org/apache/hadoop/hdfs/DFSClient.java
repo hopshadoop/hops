@@ -1676,6 +1676,25 @@ public class DFSClient implements java.io.Closeable {
     }
   }
 
+  public void setMetaEnabled(final String src, final boolean metaEnabled)
+      throws IOException {
+    try {
+      ClientActionHandler handler = new ClientActionHandler() {
+        @Override
+        public Object doAction(ClientProtocol namenode)
+            throws RemoteException, IOException {
+          namenode.setMetaEnabled(src, metaEnabled);
+          return null;
+        }
+      };
+      doClientActionWithRetry(handler, "setMetaEnabled");
+    } catch (RemoteException re) {
+      throw re.unwrapRemoteException(AccessControlException.class,
+          FileNotFoundException.class, SafeModeException.class,
+          UnresolvedPathException.class);
+    }
+  }
+
   /**
    * Rename file or directory.
    *
@@ -3027,7 +3046,6 @@ public class DFSClient implements java.io.Closeable {
    */
   public void encodeFile(final String filePath, final EncodingPolicy policy)
       throws IOException {
-    // TODO STEFFEN - Not used for now because of placement enforcement hack
     ClientActionHandler handler = new ClientActionHandler() {
       @Override
       public Object doAction(ClientProtocol namenode) throws IOException {

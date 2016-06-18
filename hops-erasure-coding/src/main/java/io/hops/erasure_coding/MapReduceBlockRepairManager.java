@@ -18,6 +18,11 @@
 
 package io.hops.erasure_coding;
 
+import io.hops.metadata.HdfsStorageFactory;
+import io.hops.metadata.hdfs.dal.RepairJobsDataAccess;
+import io.hops.metadata.hdfs.entity.RepairJob;
+import io.hops.transaction.handler.HDFSOperationType;
+import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -28,10 +33,13 @@ import org.apache.hadoop.hdfs.server.datanode.BlockReconstructor;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapred.JobClient;
 import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapred.RunningJob;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.JobID;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.lib.input.FileSplit;
 import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat;
@@ -40,7 +48,9 @@ import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -74,7 +84,78 @@ public class MapReduceBlockRepairManager extends BlockRepairManager {
     PARITY_FILE
   }
 
-  private Map<String, Job> currentRepairs = new HashMap<String, Job>();
+  private class ActiveRepair {
+    private JobID jobId;
+    private Job job;
+    private RunningJob runningJob;
+    private Path inDir;
+    private Path outDir;
+    // Not persisted right now.
+    private long startTime = System.currentTimeMillis();
+
+    public ActiveRepair(JobID jobId, Job job,
+        Path inDir, Path outDir) {
+      this.jobId = jobId;
+      this.job = job;
+      this.inDir = inDir;
+      this.outDir = outDir;
+    }
+
+    public ActiveRepair(JobID jobId, RunningJob job,
+        Path inDir, Path outDir) {
+      this.jobId = jobId;
+      this.runningJob = job;
+      this.inDir = inDir;
+      this.outDir = outDir;
+    }
+
+    public JobID getJobId() {
+      return jobId;
+    }
+
+    public void killJob() throws IOException {
+      if (job != null) {
+        job.killJob();
+      } else {
+        runningJob.killJob();
+      }
+    }
+
+    public boolean isComplete() throws IOException {
+      if (job != null) {
+        return job.isComplete();
+      } else {
+        return runningJob.isComplete();
+      }
+    }
+
+    public boolean isSuccessful() throws IOException {
+      if (job != null) {
+        return job.isSuccessful();
+      } else {
+        return runningJob.isSuccessful();
+      }
+    }
+
+    public Path getInDir() {
+      return inDir;
+    }
+
+    public Path getOutDir() {
+      return outDir;
+    }
+
+    public long getStartTime() {
+      return startTime;
+    }
+  }
+
+  private Map<String, ActiveRepair> currentRepairs =
+      new HashMap<String, ActiveRepair>();
+  private Collection<ActiveRepair> completedJobs =
+      new ArrayList<ActiveRepair>();
+
+  private boolean initialized = false;
 
   public MapReduceBlockRepairManager(Configuration conf) {
     super(conf);
@@ -83,6 +164,7 @@ public class MapReduceBlockRepairManager extends BlockRepairManager {
   @Override
   public void repairSourceBlocks(String codecId, Path sourceFile,
       Path parityFile) {
+    initialize();
     String uniqueName =
         sourceFile.getName() + "_" + UUID.randomUUID().toString();
     try {
@@ -101,6 +183,7 @@ public class MapReduceBlockRepairManager extends BlockRepairManager {
   @Override
   public void repairParityBlocks(String codecId, Path sourceFile,
       Path parityFile) {
+    initialize();
     String uniqueName =
         sourceFile.getName() + "_" + UUID.randomUUID().toString();
     try {
@@ -137,7 +220,7 @@ public class MapReduceBlockRepairManager extends BlockRepairManager {
     /**
      * creates and submits a job, updates file index and job index
      */
-    void startJob(String jobName, Path sourceFile, Path parityFile,
+    private void startJob(String jobName, Path sourceFile, Path parityFile,
         String codecId, RepairType type)
         throws IOException, InterruptedException, ClassNotFoundException {
       Path inDir = new Path(JOB_NAME_PREFIX + "/in/" + jobName);
@@ -165,10 +248,22 @@ public class MapReduceBlockRepairManager extends BlockRepairManager {
       SequenceFileOutputFormat.setOutputPath(job, outDir);
 
       submitJob(job);
-      currentRepairs.put(sourceFile.toUri().getPath(), job);
+      String path = sourceFile.toUri().getPath();
+      JobClient jobClient = new JobClient(getConf());
+      JobID jobId = job.getJobID();
+      ActiveRepair activeRepair = new ActiveRepair(jobId, job, inDir,
+          outDir);
+      // There is a risk that it crashes before persisting the job for recovery.
+      // The ErasureCodingManager should restart the job in that case as it
+      // does not set the state to active before this code succeeded.
+      persistActiveJob(path, jobId, inDir.toUri().getPath(),
+          outDir.toUri().getPath());
+      currentRepairs.put(type == RepairType.SOURCE_FILE ?
+          sourceFile.toUri().getPath() : parityFile.toUri().getPath(),
+          activeRepair);
     }
 
-    void submitJob(Job job)
+    private void submitJob(Job job)
         throws IOException, InterruptedException, ClassNotFoundException {
       LOG.info("Submitting job");
       MapReduceBlockRepairManager.this.submitJob(job);
@@ -206,7 +301,7 @@ public class MapReduceBlockRepairManager extends BlockRepairManager {
             reconstructorClass, BlockReconstructor.class);
   }
 
-  void submitJob(Job job)
+  private void submitJob(Job job)
       throws IOException, InterruptedException, ClassNotFoundException {
     job.submit();
     LOG.info("Job " + job.getJobID() + "(" + job.getJobName() + ") started");
@@ -385,12 +480,14 @@ public class MapReduceBlockRepairManager extends BlockRepairManager {
   }
 
   @Override
-  public List<Report> computeReports() {
-    List<Report> reports = new ArrayList<Report>();
+  public List<Report> computeReports() throws IOException {
+    initialize();
+    cleanRecovery();
 
-    for (Map.Entry<String, Job> entry : currentRepairs.entrySet()) {
+    List<Report> reports = new ArrayList<Report>();
+    for (Map.Entry<String, ActiveRepair> entry : currentRepairs.entrySet()) {
       String fileName = entry.getKey();
-      Job job = entry.getValue();
+      ActiveRepair job = entry.getValue();
       try {
         if (job.isComplete() && job.isSuccessful()) {
           LOG.info("REPAIR COMPLETE");
@@ -400,13 +497,14 @@ public class MapReduceBlockRepairManager extends BlockRepairManager {
           LOG.info("REPAIR FAILED");
           reports.add(new Report(fileName, Report.Status.FAILED));
           cleanup(job);
-        } /* TODO FIX timeout
-         else if (System.currentTimeMillis() - job.getStartTime() > getMaxFixTimeForFile()) {
-          LOG.info("Timeout: " + (System.currentTimeMillis() - job.getStartTime()) + " " + job.getStartTime());
+        } else if (job.getStartTime() > 0 && System.currentTimeMillis()
+            - job.getStartTime() > getMaxFixTimeForFile()){
+          LOG.info("Timeout: " + (System.currentTimeMillis()
+              - job.getStartTime()) + " " + job.getStartTime());
           job.killJob();
           reports.add(new Report(fileName, Report.Status.CANCELED));
           cleanup(job);
-        }*/ else {
+        } else {
           LOG.info("REPAIR RUNNING");
           reports.add(new Report(fileName, Report.Status.ACTIVE));
         }
@@ -425,7 +523,8 @@ public class MapReduceBlockRepairManager extends BlockRepairManager {
       Report.Status status = report.getStatus();
       if (status == Report.Status.FINISHED || status == Report.Status.FAILED ||
           status == Report.Status.CANCELED) {
-        currentRepairs.remove(report.getFilePath());
+        ActiveRepair activeRepair = currentRepairs.remove(report.getFilePath());
+        completedJobs.add(activeRepair);
       }
     }
 
@@ -434,7 +533,8 @@ public class MapReduceBlockRepairManager extends BlockRepairManager {
 
   @Override
   public void cancelAll() {
-    for (Job job : currentRepairs.values()) {
+    initialize();
+    for (ActiveRepair job : currentRepairs.values()) {
       try {
         job.killJob();
       } catch (Exception e) {
@@ -447,7 +547,8 @@ public class MapReduceBlockRepairManager extends BlockRepairManager {
 
   @Override
   public void cancel(String toCancel) {
-    Job job = currentRepairs.get(toCancel);
+    initialize();
+    ActiveRepair job = currentRepairs.get(toCancel);
     try {
       job.killJob();
     } catch (Exception e) {
@@ -457,21 +558,94 @@ public class MapReduceBlockRepairManager extends BlockRepairManager {
     cleanup(job);
   }
 
-  private void cleanup(Job job) {
+  private void cleanup(ActiveRepair job) {
     Path outDir = null;
     try {
-      outDir = SequenceFileOutputFormat.getOutputPath(job);
+      outDir = job.getOutDir();
       outDir.getFileSystem(getConf()).delete(outDir, true);
     } catch (IOException e) {
       LOG.warn("Could not delete output dir " + outDir, e);
     }
-    Path[] inDir = null;
+    Path inDir = null;
     try {
       // We only create one input directory.
-      inDir = ReconstructionInputFormat.getInputPaths(job);
-      inDir[0].getFileSystem(getConf()).delete(inDir[0], true);
+      inDir = job.getInDir();
+      inDir.getFileSystem(getConf()).delete(inDir, true);
     } catch (IOException e) {
-      LOG.warn("Could not delete input dir " + inDir[0], e);
+      LOG.warn("Could not delete input dir " + inDir, e);
     }
+  }
+
+  private void persistActiveJob(final String path, final JobID jobId,
+      final String inDir, final String outDir) throws IOException {
+    new LightWeightRequestHandler(HDFSOperationType.PERSIST_ENCODING_JOB) {
+      @Override
+      public Object performTask() throws IOException {
+        RepairJobsDataAccess da = (RepairJobsDataAccess)
+            HdfsStorageFactory.getDataAccess(RepairJobsDataAccess.class);
+        da.add(new RepairJob(jobId.getJtIdentifier(),
+            jobId.getId(), path, inDir, outDir));
+        return null;
+      }
+    }.handle();
+  }
+
+  private void cleanRecovery() throws IOException {
+    new LightWeightRequestHandler(HDFSOperationType.DELETE_ENCODING_JOBS) {
+      @Override
+      public Object performTask() throws IOException {
+        RepairJobsDataAccess da = (RepairJobsDataAccess)
+            HdfsStorageFactory.getDataAccess(RepairJobsDataAccess.class);
+        Iterator<ActiveRepair> it = completedJobs.iterator();
+        while (it.hasNext()) {
+          ActiveRepair job = it.next();
+          JobID jobId = job.getJobId();
+          da.delete(new RepairJob(jobId.getJtIdentifier(), jobId.getId()));
+          it.remove();
+        }
+        return null;
+      }
+    }.handle();
+  }
+
+  private void initialize() {
+    if (initialized) {
+      return;
+    }
+
+    try {
+      JobClient jobClient = new JobClient(getConf());
+      for (RepairJob job : recoverActiveJobs()) {
+        org.apache.hadoop.mapred.JobID jobId =
+            new org.apache.hadoop.mapred.JobID(job.getJtIdentifier(),
+                job.getJobId());
+        RunningJob runningJob = jobClient.getJob(jobId);
+        if (runningJob == null) {
+          throw new IOException("Failed to recover");
+        }
+        ActiveRepair recovered = new ActiveRepair(jobId, runningJob,
+            new Path(job.getInDir()), new Path(job.getOutDir()));
+        currentRepairs.put(job.getPath(), recovered);
+      }
+    } catch (IOException e) {
+      LOG.error("Encoding job recovery failed", e);
+      throw new RuntimeException(e);
+    }
+
+    initialized = true;
+  }
+
+  private Collection<RepairJob> recoverActiveJobs() throws IOException {
+    LightWeightRequestHandler handler = new LightWeightRequestHandler(
+        HDFSOperationType.RECOVER_ENCODING_JOBS) {
+      @Override
+      public Object performTask() throws IOException {
+        RepairJobsDataAccess da = (RepairJobsDataAccess)
+            HdfsStorageFactory.getDataAccess(RepairJobsDataAccess.class);
+        return da.findAll();
+      }
+    };
+
+    return (Collection<RepairJob>) handler.handle();
   }
 }

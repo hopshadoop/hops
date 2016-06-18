@@ -15,9 +15,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdfs;
+package org.apache.hadoop.hdfs.web;
 
 import org.apache.hadoop.hdfs.server.namenode.StreamFile;
+import org.apache.hadoop.hdfs.web.ByteRangeInputStream;
+import org.apache.hadoop.hdfs.web.HftpFileSystem;
 import org.junit.Test;
 
 import java.io.ByteArrayInputStream;

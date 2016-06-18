@@ -21,6 +21,7 @@ package io.hops.erasure_coding;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.ErasureCodingFileSystem;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -54,7 +55,6 @@ public class Encoder {
   protected ErasureCode code;
   protected Random rand;
   protected int bufSize;
-  protected byte[][] readBufs;
   protected byte[][] writeBufs;
 
   /**
@@ -117,7 +117,8 @@ public class Encoder {
    */
   public void encodeFile(Configuration jobConf, FileSystem fs, Path srcFile,
       FileSystem parityFs, Path parityFile, short parityRepl, long numStripes,
-      long blockSize, Progressable reporter, StripeReader sReader)
+      long blockSize, Progressable reporter, StripeReader sReader,
+      Path copyPath, FSDataOutputStream copy)
       throws IOException {
     long expectedParityBlocks = numStripes * codec.parityLength;
     long expectedParityFileSize = numStripes * blockSize * codec.parityLength;
@@ -141,17 +142,16 @@ public class Encoder {
         tmpRepl = 2;
       }
     }
-    FSDataOutputStream out = parityFs
-        .create(parityFile, true, conf.getInt("io.file.buffer.size", 64 * 1024),
-            tmpRepl, blockSize);
+    FSDataOutputStream out = parityFs.create(parityFile, true,
+        conf.getInt("io.file.buffer.size", 64 * 1024), tmpRepl, blockSize);
 
     DFSOutputStream dfsOut = (DFSOutputStream) out.getWrappedStream();
     dfsOut.enableParityStream(codec.getStripeLength(), codec.getParityLength(),
-        srcFile.toUri().getPath());
+        copy == null ? srcFile.toUri().getPath() : null);
 
     try {
       encodeFileToStream(fs, srcFile, parityFile, sReader, blockSize, out,
-          reporter);
+          reporter, copyPath, copy);
       out.close();
       out = null;
       LOG.info("Wrote parity file " + parityFile);
@@ -278,8 +278,9 @@ public class Encoder {
    *     The destination for the reovered block.
    */
   private void encodeFileToStream(FileSystem fs, Path sourceFile,
-      Path parityFile, StripeReader sReader, long blockSize, OutputStream out,
-      Progressable reporter) throws IOException {
+      Path parityFile, StripeReader sReader, long blockSize,
+      FSDataOutputStream out, Progressable reporter,
+      Path copyPath, FSDataOutputStream copy) throws IOException {
     OutputStream[] tmpOuts = new OutputStream[codec.parityLength];
     // One parity block can be written directly to out, rest to local files.
     tmpOuts[0] = out;
@@ -289,8 +290,21 @@ public class Encoder {
       LOG.info("Created tmp file " + tmpFiles[i]);
       tmpFiles[i].deleteOnExit();
     }
+
+    OutputStream[] copyOuts = null;
+    File[] tmpCopyFiles = null;
+    if (copy != null) {
+      tmpCopyFiles = new File[codec.stripeLength];
+      copyOuts = new OutputStream[codec.stripeLength];
+      for (int i = 0; i < codec.stripeLength; i++) {
+        tmpCopyFiles[i] = File.createTempFile("copy", "_" + i);
+        LOG.info("Created copy file " + tmpCopyFiles[i]);
+        tmpCopyFiles[i].deleteOnExit();
+      }
+    }
+
     try {
-      // Loop over stripe
+      // Loop over stripes
       int stripe = 0;
       while (sReader.hasNext()) {
         reporter.progress();
@@ -301,9 +315,14 @@ public class Encoder {
           for (int i = 0; i < codec.parityLength - 1; i++) {
             tmpOuts[i + 1] = new FileOutputStream(tmpFiles[i]);
           }
+          if (copy != null) {
+            for (int i = 0; i < codec.stripeLength; i++) {
+              copyOuts[i] = new FileOutputStream(tmpCopyFiles[i]);
+            }
+          }
           // Call the implementation of encoding.
           encodeStripe(fs, sourceFile, parityFile, blocks, blockSize, tmpOuts,
-              reporter, true, stripe);
+              reporter, true, stripe, copyPath, copyOuts);
           stripe++;
         } finally {
           RaidUtils.closeStreams(blocks);
@@ -317,6 +336,21 @@ public class Encoder {
           RaidUtils.copyBytes(in, out, writeBufs[i], blockSize);
           reporter.progress();
         }
+        if (copy != null) {
+          out.hflush();
+          DFSOutputStream sourceOut = (DFSOutputStream) copy.getWrappedStream();
+          DFSOutputStream parityOut = (DFSOutputStream) out.getWrappedStream();
+          sourceOut.setParityStripeNodesForNextStripe(parityOut.getUsedNodes());
+
+          for (int i = 0; i < codec.stripeLength; i++) {
+            copyOuts[i].close();
+            copyOuts[i] = null;
+            InputStream in = new FileInputStream(tmpCopyFiles[i]);
+            RaidUtils.copyBytes(in, copy, writeBufs[0], blockSize);
+            reporter.progress();
+          }
+          copy.hflush();
+        }
       }
     } finally {
       for (int i = 0; i < codec.parityLength - 1; i++) {
@@ -326,6 +360,15 @@ public class Encoder {
         tmpFiles[i].delete();
         LOG.info("Deleted tmp file " + tmpFiles[i]);
       }
+      if (copy != null) {
+        for (int i = 0; i < codec.stripeLength; i++) {
+          if (copyOuts[i] != null) {
+            copyOuts[i].close();
+          }
+          tmpCopyFiles[i].delete();
+          LOG.info("Deleted tmp file " + tmpCopyFiles[i]);
+        }
+      }
     }
   }
 
@@ -333,7 +376,7 @@ public class Encoder {
       InputStream[] blocks, long blockSize, OutputStream[] outs,
       Progressable reporter) throws IOException {
     encodeStripe(fs, sourceFile, parityFile, blocks, blockSize, outs, reporter,
-        false, 0);
+        false, 0, null, null);
   }
 
   /**
@@ -344,8 +387,8 @@ public class Encoder {
    */
   void encodeStripe(FileSystem fs, Path sourceFile, Path parityFile,
       InputStream[] blocks, long blockSize, OutputStream[] outs,
-      Progressable reporter, boolean computeBlockChecksum, int stripe)
-      throws IOException {
+      Progressable reporter, boolean computeBlockChecksum, int stripe,
+      Path copyPath, OutputStream[] copyOuts) throws IOException {
     configureBuffers(blockSize);
     int boundedBufferCapacity = 1;
     ParallelStreamReader parallelReader =
@@ -382,6 +425,11 @@ public class Encoder {
         if (computeBlockChecksum) {
           updateChecksums(sourceChecksums, readResult.readBufs);
         }
+        if (copyOuts != null) {
+          for (int i = 0; i < readResult.readBufs.length; i++) {
+            copyOuts[i].write(readResult.readBufs[i], 0, readResult.numRead[i]);
+          }
+        }
         code.encodeBulk(readResult.readBufs, writeBufs);
         reporter.progress();
 
@@ -394,10 +442,13 @@ public class Encoder {
           reporter.progress();
         }
       }
-      sendChecksums((DistributedFileSystem) fs, sourceFile, sourceChecksums,
-          stripe, codec.stripeLength);
-      sendChecksums((DistributedFileSystem) fs, parityFile, parityChecksums,
-          stripe, codec.parityLength);
+      DistributedFileSystem dfs =(DistributedFileSystem)
+          (fs instanceof ErasureCodingFileSystem ?
+              ((ErasureCodingFileSystem) fs).getFileSystem() : fs);
+      sendChecksums(dfs, copyPath == null ? sourceFile : copyPath,
+          sourceChecksums, stripe, codec.stripeLength);
+      sendChecksums(dfs, parityFile, parityChecksums, stripe,
+          codec.parityLength);
     } finally {
       parallelReader.shutdown();
     }

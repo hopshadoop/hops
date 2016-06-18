@@ -35,20 +35,12 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
   </dependencyManagement>
 
   <distributionManagement>
-    <repository>
-      <id>${distMgmtStagingId}</id>
-      <name>${distMgmtStagingName}</name>
-      <url>${distMgmtStagingUrl}</url>
-    </repository>
-    <snapshotRepository>
-      <id>${distMgmtSnapshotsId}</id>
-      <name>${distMgmtSnapshotsName}</name>
-      <url>${distMgmtSnapshotsUrl}</url>
-    </snapshotRepository>
-    <site>
-      <id>apache.website</id>
-      <url>scpexe://people.apache.org/www/hadoop.apache.org/docs/r${project.version}</url>
-    </site>
+     <repository>
+            <id>sics-release-repository</id>
+            <name>SICS Repository</name>
+            <url>scpexe://kompics.i.sics.se/home/maven/repository</url>
+        </repository>
+        <downloadUrl>http://kompics.sics.se/maven/repository</downloadUrl>
   </distributionManagement>
 
   <repositories>
@@ -114,6 +106,13 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
   </modules>
 
   <build>
+    <extensions>
+            <extension>
+                <groupId>org.apache.maven.wagon</groupId>
+                <artifactId>wagon-ssh-external</artifactId>
+                <version>1.0</version>
+            </extension>
+        </extensions>
     <pluginManagement>
       <plugins>
         <plugin>
@@ -518,8 +517,8 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         </dependency>
         <dependency>
           <groupId>com.mysql.ndb</groupId>
-          <artifactId>clusterj-platform</artifactId>
-          <version>7.4.4</version>
+          <artifactId>clusterj-native</artifactId>
+          <version>7.4.7</version>
           <classifier>natives-linux</classifier>
         </dependency>
       </dependencies>

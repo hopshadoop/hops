@@ -97,18 +97,19 @@ public class LeaseContext extends BaseEntityContext<String, Lease> {
   private Lease findByHolder(Lease.Finder lFinder, Object[] params)
       throws StorageCallPreventedException, StorageException {
     final String holder = (String) params[0];
+    final int holderId = (Integer) params[1];
     Lease result = null;
     if (contains(holder)) {
       result = get(holder);
-      hit(lFinder, result, "holder", holder);
+      hit(lFinder, result, "holder", holder, "holderId", holderId);
     } else {
       aboutToAccessStorage(lFinder, params);
-      result = dataAccess.findByPKey(holder);
+      result = dataAccess.findByPKey(holder, holderId);
       gotFromDB(holder, result);
       if (result != null) {
         idToLease.put(result.getHolderID(), result);
       }
-      miss(lFinder, result, "holder", holder);
+      miss(lFinder, result, "holder", holder, "holderId", holderId);
     }
     return result;
   }

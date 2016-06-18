@@ -61,7 +61,8 @@ public class BaseTest {
 
    static {
         String path = System.getProperty("java.library.path");
-        System.setProperty("java.library.path", "/Users/pushparaj.motamari/Desktop/ubuntu/github/mysql-cluster-gpl-7.4.4-osx10.9-x86_64/lib");
+        //System.setProperty("java.library.path", "/Users/pushparaj.motamari/Desktop/ubuntu/github/mysql-cluster-gpl-7.4.4-osx10.9-x86_64/lib");
+        System.setProperty("java.library.path", "/Users/pushparaj.motamari/Desktop/ubuntu/github/mysql-cluster-gpl-7.4.11-osx10.11-x86_64/lib");
         try {
             //http://blog.cedarsoft.com/2010/11/setting-java-library-path-programmatically/
             Field fieldSysPath = ClassLoader.class.getDeclaredField("sys_paths");
@@ -80,6 +81,8 @@ public class BaseTest {
 
         try {
             addToClassPath(DFSConfigKeys.DFS_STORAGE_DRIVER_JAR_FILE_DEFAULT);
+            addToClassPath("/Users/pushparaj.motamari/.m2/repository/com/mysql/ndb/clusterj-part-key-fix/7.4.7/clusterj-part-key-fix-7.4.7.jar");
+            Session s1;
             Properties propertyConf = new Properties();
             propertyConf.load(ClassLoader.getSystemResourceAsStream(DFSConfigKeys.DFS_STORAGE_DRIVER_CONFIG_FILE_DEFAULT));
 
@@ -163,7 +166,6 @@ public class BaseTest {
     }
 
     @After
-
     public void shutDownCluster() {
         cluster.shutdown();
     }

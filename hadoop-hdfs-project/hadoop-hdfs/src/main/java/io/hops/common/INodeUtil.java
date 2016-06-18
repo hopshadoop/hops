@@ -145,7 +145,7 @@ public class INodeUtil {
     HashSet<String> paths = new HashSet<String>();
     LeaseDataAccess<Lease> lda = (LeaseDataAccess) HdfsStorageFactory
         .getDataAccess(LeaseDataAccess.class);
-    Lease rcLease = lda.findByPKey(holder);
+    Lease rcLease = lda.findByPKey(holder,Lease.getHolderId(holder));
     if (rcLease == null) {
       return paths;
     }

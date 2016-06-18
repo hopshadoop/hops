@@ -17,9 +17,7 @@ package io.hops.erasure_coding;
 
 import junit.framework.TestCase;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 
 public abstract class ClusterTest extends TestCase {
@@ -34,22 +32,16 @@ public abstract class ClusterTest extends TestCase {
 
   @Override
   public void setUp() throws Exception {
-    cluster = new MiniDFSCluster.Builder(getConfig()).numDataNodes(numDatanode)
+    Configuration conf = getConfig();
+    cluster = new MiniDFSCluster.Builder(conf).numDataNodes(numDatanode)
         .build();
     cluster.waitActive();
-
-    fs = cluster.getFileSystem();
+    fs = FileSystem.get(conf);
   }
 
   @Override
   public void tearDown() throws Exception {
-    try {
-      FileStatus[] files = fs.globStatus(new Path("/*"));
-      for (FileStatus file : files) {
-        fs.delete(file.getPath(), true);
-      }
-      fs.close();
-    } finally {
+    if (cluster != null) {
       cluster.shutdown();
     }
   }

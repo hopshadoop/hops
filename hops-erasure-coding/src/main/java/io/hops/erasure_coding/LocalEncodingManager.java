@@ -35,8 +35,6 @@ public class LocalEncodingManager extends BaseEncodingManager {
 
   public static final Log LOG = LogFactory.getLog(LocalEncodingManager.class);
 
-  private boolean initialized = false;
-
   public LocalEncodingManager(Configuration conf) throws IOException {
     super(conf);
 
@@ -45,26 +43,19 @@ public class LocalEncodingManager extends BaseEncodingManager {
 
   @Override
   public void encodeFile(EncodingPolicy policy, Path sourceFile,
-      Path parityFile) {
-    if (!initialized) {
-      try {
-        cleanUpTempDirectory(conf);
-      } catch (IOException e) {
-        LOG.error("Cleanup tmp failed ", e);
-      }
-      initialized = true;
-    }
-
+      Path parityFile, boolean copy) {
     Codec codec = Codec.getCodec(policy.getCodec());
     PolicyInfo policyInfo = new PolicyInfo();
     try {
       policyInfo.setSrcPath(sourceFile.toUri().getPath());
       policyInfo.setCodecId(codec.getId());
-      policyInfo.setProperty("parityPath", parityFile.toUri().getPath());
-      policyInfo.setProperty("targetReplication",
+      policyInfo.setProperty(PolicyInfo.PROPERTY_PARITY_PATH,
+          parityFile.toUri().getPath());
+      policyInfo.setProperty(PolicyInfo.PROPERTY_REPLICATION,
           String.valueOf(policy.getTargetReplication()));
-      policyInfo.setProperty("metaReplication",
-          String.valueOf(policy.getTargetReplication()));
+      policyInfo.setProperty(PolicyInfo.PROPERTY_PARITY_REPLICATION,
+          String.valueOf(1));
+      policyInfo.setProperty(PolicyInfo.PROPERTY_COPY, String.valueOf(copy));
       doRaid(conf, policyInfo);
     } catch (IOException e) {
       LOG.error("Exception", e);

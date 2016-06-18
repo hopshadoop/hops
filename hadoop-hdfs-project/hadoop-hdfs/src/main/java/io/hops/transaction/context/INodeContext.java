@@ -18,6 +18,8 @@
 package io.hops.transaction.context;
 
 import com.google.common.base.Predicate;
+import com.google.common.collect.Lists;
+import com.google.common.primitives.Ints;
 import io.hops.exception.LockUpgradeException;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
@@ -28,12 +30,14 @@ import io.hops.transaction.lock.Lock;
 import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLocks;
 import org.apache.hadoop.hdfs.server.namenode.INode;
+import org.apache.hadoop.hdfs.server.namenode.INodeFile;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -81,6 +85,8 @@ public class INodeContext extends BaseEntityContext<Integer, INode> {
         return findByParentId(iFinder, params);
       case ByNamesAndParentIds:
         return findBatch(iFinder, params);
+      case ByNamesAndParentIdsCheckLocal:
+        return findBatchWithLocalCacheCheck(iFinder, params);
     }
     throw new RuntimeException(UNSUPPORTED_FINDER);
   }
@@ -262,6 +268,54 @@ public class INodeContext extends BaseEntityContext<Integer, INode> {
       throws TransactionContextException, StorageException {
     final String[] names = (String[]) params[0];
     final int[] parentIds = (int[]) params[1];
+    return findBatch(inodeFinder, names, parentIds);
+  }
+
+  private List<INode> findBatchWithLocalCacheCheck(INode.Finder inodeFinder,
+      Object[] params)
+      throws TransactionContextException, StorageException {
+    final String[] names = (String[]) params[0];
+    final int[] parentIds = (int[]) params[1];
+
+    List<String> namesRest = Lists.newArrayList();
+    List<Integer> parentIdsRest = Lists.newArrayList();
+    List<Integer> unpopulatedIndeces = Lists.newArrayList();
+
+    List<INode> result = new ArrayList<INode>(Collections.<INode>nCopies(names
+        .length, null));
+
+    for(int i=0; i<names.length; i++){
+      final String nameParentKey = INode.nameParentKey(parentIds[i], names[i]);
+      INode node = inodesNameParentIndex.get(nameParentKey);
+      if(node != null){
+        result.set(i, node);
+        hit(inodeFinder, node, "name", names[i], "pid", parentIds[i]);
+      }else{
+        namesRest.add(names[i]);
+        parentIdsRest.add(parentIds[i]);
+        unpopulatedIndeces.add(i);
+      }
+    }
+
+    if(unpopulatedIndeces.isEmpty()){
+      return result;
+    }
+
+    if(unpopulatedIndeces.size() == names.length){
+      return findBatch(inodeFinder, names, parentIds);
+    }else{
+      List<INode> batch = findBatch(inodeFinder, namesRest.toArray(new
+          String[namesRest.size()]), Ints.toArray(parentIdsRest));
+      Iterator<INode> batchIterator = batch.listIterator();
+      for(Integer i : unpopulatedIndeces){
+        result.set(i, batchIterator.next());
+      }
+      return result;
+    }
+  }
+
+  private List<INode> findBatch(INode.Finder inodeFinder, String[] names,
+      int[] parentIds) throws StorageException {
     List<INode> batch = dataAccess.getINodesPkBatched(names, parentIds);
     miss(inodeFinder, batch, "name", Arrays.toString(names), "pid",
         Arrays.toString(parentIds));
@@ -288,7 +342,7 @@ public class INodeContext extends BaseEntityContext<Integer, INode> {
         inodesNameParentIndex.put(key, inode);
       }
     }
-    Collections.sort(finalList, INode.Order.ByName);
+    //Collections.sort(finalList, INode.Order.ByName);
     return finalList;
   }
 

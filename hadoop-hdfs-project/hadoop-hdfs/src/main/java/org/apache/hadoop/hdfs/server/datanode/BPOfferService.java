@@ -121,6 +121,7 @@ class BPOfferService implements Runnable {
   private List<ActiveNode> nnList = new CopyOnWriteArrayList<ActiveNode>();
   private List<InetSocketAddress> blackListNN =
       new CopyOnWriteArrayList<InetSocketAddress>();
+  private Object nnListSync = new Object();
   private volatile int rpcRoundRobinIndex = 0;
       // you have bunch of NNs, which one to send the incremental block report
   private volatile int refreshNNRoundRobinIndex = 0;
@@ -403,7 +404,9 @@ class BPOfferService implements Runnable {
     // remove from nnList
     for (ActiveNode ann : nnList) {
       if (ann.getIpAddress().equals(actor.getNNSocketAddress())) {
-        nnList.remove(ann);
+        synchronized (nnListSync){
+          nnList.remove(ann);
+        }
         break;
       }
     }
@@ -886,12 +889,14 @@ class BPOfferService implements Runnable {
       bpServiceToActive = getAnActor(list.getLeader().getInetSocketAddress());
     }
 
-    nnList.clear();
-    nnList.addAll(list.getActiveNodes());
-    blackListNN.clear();
+    synchronized (nnListSync) {
+        nnList.clear();
+        nnList.addAll(list.getActiveNodes());
+        blackListNN.clear();
+    }
   }
 
-  boolean canUpdateNNList(InetSocketAddress address) {
+  synchronized boolean canUpdateNNList(InetSocketAddress address) {
     if (nnList == null || nnList.size() == 0) {
       return true; // for edge case, any one can update. after that actors will take trun in updating the nnlist
     }
@@ -901,10 +906,14 @@ class BPOfferService implements Runnable {
       refreshNNRoundRobinIndex = 0;
     }
     
-    ActiveNode an = nnList.get(refreshNNRoundRobinIndex);
-    if (an.getInetSocketAddress().equals(address)) {
-      return true;
-    } else {
+    try{  //shitty code as result of avoiding synchronized code blocks
+      ActiveNode an = nnList.get(refreshNNRoundRobinIndex);
+      if (an != null && an.getInetSocketAddress().equals(address)) {
+        return true;
+      } else {
+        return false;
+      }
+    }catch (IndexOutOfBoundsException e){
       return false;
     }
   }
@@ -1018,19 +1027,21 @@ class BPOfferService implements Runnable {
       return null;
     }
 
-    for (int i = 0; i < 10; i++) {
-      try {
-        rpcRoundRobinIndex = ++rpcRoundRobinIndex % nnList.size();
-        ActiveNode ann = nnList.get(rpcRoundRobinIndex);
-        if (!this.blackListNN.contains(ann.getInetSocketAddress())) {
-          BPServiceActor actor = getAnActor(ann.getInetSocketAddress());
-          if (actor != null) {
-            return actor;
+    synchronized (nnListSync){
+      for (int i = 0; i < 10; i++) {
+        try {
+          rpcRoundRobinIndex = ++rpcRoundRobinIndex % nnList.size();
+          ActiveNode ann = nnList.get(rpcRoundRobinIndex);
+          if (!this.blackListNN.contains(ann.getInetSocketAddress())) {
+            BPServiceActor actor = getAnActor(ann.getInetSocketAddress());
+            if (actor != null) {
+              return actor;
+            }
           }
+        } catch (Exception e) {
+          //any kind of exception try again
+          continue;
         }
-      } catch (Exception e) {
-        //any kind of exception try again
-        continue;
       }
     }
     return null;
@@ -1061,18 +1072,19 @@ class BPOfferService implements Runnable {
   }
   
   private void forwardRRIndex() {
-    if (nnList != null && !nnList.isEmpty()) {
-      // watch out for black listed NN
-      for (int i = 0; i < 10; i++) {
-        refreshNNRoundRobinIndex = ++refreshNNRoundRobinIndex % nnList.size();
-        ActiveNode ann = nnList.get(refreshNNRoundRobinIndex);
-        if (!this.blackListNN.contains(ann.getInetSocketAddress())) {
-          return;
+    synchronized (nnListSync) {
+      if (nnList != null && !nnList.isEmpty()) {
+        // watch out for black listed NN
+        for (int i = 0; i < 10; i++) {
+          refreshNNRoundRobinIndex = ++refreshNNRoundRobinIndex % nnList.size();
+          ActiveNode ann = nnList.get(refreshNNRoundRobinIndex);
+          if (!this.blackListNN.contains(ann.getInetSocketAddress())) {
+            return;
+          }
         }
+      } else {
+        refreshNNRoundRobinIndex = -1;
       }
-    } else {
-      refreshNNRoundRobinIndex = -1;
     }
   }
-
 }

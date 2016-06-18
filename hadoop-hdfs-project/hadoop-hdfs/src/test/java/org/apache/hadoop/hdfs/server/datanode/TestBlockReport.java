@@ -49,6 +49,7 @@ import org.apache.hadoop.util.Time;
 import org.apache.log4j.Level;
 import org.junit.After;
 import org.junit.Before;
+import static org.junit.Assert.fail;
 import org.junit.Test;
 import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
@@ -875,4 +876,41 @@ public class TestBlockReport {
     conf.setLong(DFSConfigKeys.DFS_DATANODE_DIRECTORYSCAN_INTERVAL_KEY,
         DN_RESCAN_INTERVAL);
   }
+  
+  
+   @Test
+  public void blockReportRegrssion() throws IOException {
+    final String METHOD_NAME = GenericTestUtils.getMethodName();
+    
+
+    ArrayList<Block> blocks = new ArrayList<Block>();
+    
+    for(int i = 0 ; i < 3; i++){
+      Path filePath = new Path("/" + METHOD_NAME +i+ ".dat");
+      DFSTestUtil
+        .createFile(fs, filePath, FILE_SIZE, REPL_FACTOR, rand.nextLong());
+      blocks.addAll(locatedToBlocks(cluster.getNameNodeRpc()
+        .getBlockLocations(filePath.toString(), FILE_START, FILE_SIZE)
+        .getLocatedBlocks(), null));
+    }
+    
+
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Number of blocks allocated " + blocks.size());
+    }
+
+    // all blocks belong to the same file, hence same BP
+    DataNode dn = cluster.getDataNodes().get(DN_N0);
+    String poolId = cluster.getNamesystem().getBlockPoolId();
+    DatanodeRegistration dnR = dn.getDNRegistrationForBP(poolId);
+    StorageBlockReport[] report =
+        {new StorageBlockReport(new DatanodeStorage(dnR.getStorageID()),
+            new BlockListAsLongs(blocks, null).getBlockListAsLongs())};
+    try{
+    cluster.getNameNodeRpc().blockReport(dnR, poolId, report);
+    }catch(Exception e){
+      fail("No exception was expected. Get "+e);
+    }
+  }
+   
 }

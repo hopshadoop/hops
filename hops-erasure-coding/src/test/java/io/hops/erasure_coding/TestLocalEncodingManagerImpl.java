@@ -69,9 +69,8 @@ public class TestLocalEncodingManagerImpl extends ClusterTest {
 
     Codec codec = Util.getCodec(Util.Codecs.SRC);
     BaseEncodingManager.Statistics stats = new BaseEncodingManager.Statistics();
-    assertTrue(encodingManager
-        .doFileRaid(conf, testFile, parityFile, codec, stats,
-            RaidUtils.NULL_PROGRESSABLE, 1, 1));
+    assertTrue(encodingManager.doFileRaid(conf, testFile, parityFile, codec,
+        stats, RaidUtils.NULL_PROGRESSABLE, 1, 1, false));
     try {
       dfs.open(parityFile);
     } catch (IOException e) {

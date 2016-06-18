@@ -185,7 +185,7 @@ public class LockFactory {
       TransactionLockTypes.INodeResolveType resolveType, boolean resolveLink,
       boolean ignoreLocalSubtreeLocks, String... paths) {
     return new INodeLock(lockType, resolveType, resolveLink,
-        ignoreLocalSubtreeLocks, nameNode.getId(),
+        ignoreLocalSubtreeLocks, false, nameNode.getId(),
         nameNode.getActiveNameNodes().getActiveNodes(), paths);
   }
 
@@ -201,6 +201,24 @@ public class LockFactory {
       TransactionLockTypes.INodeLockType lockType,
       TransactionLockTypes.INodeResolveType resolveType, String... paths) {
     return new INodeLock(lockType, resolveType,
+        nameNode.getActiveNameNodes().getActiveNodes(), paths);
+  }
+  
+  public Lock getINodeLock(boolean skipReadingQuotaAttr, NameNode nameNode,
+      TransactionLockTypes.INodeLockType lockType,
+      TransactionLockTypes.INodeResolveType resolveType, 
+      String... paths) {
+   return new INodeLock(lockType, resolveType, true,
+        false, skipReadingQuotaAttr, nameNode.getId(),
+        nameNode.getActiveNameNodes().getActiveNodes(), paths);
+  }
+  
+  public Lock getINodeLock(boolean skipReadingQuotaAttr, NameNode nameNode,
+      TransactionLockTypes.INodeLockType lockType,
+      TransactionLockTypes.INodeResolveType resolveType,  boolean resolveLink,
+      String... paths) {
+   return new INodeLock(lockType, resolveType, resolveLink,
+        false, skipReadingQuotaAttr, nameNode.getId(),
         nameNode.getActiveNameNodes().getActiveNodes(), paths);
   }
 
@@ -255,6 +273,11 @@ public class LockFactory {
   public Lock getLeasePathLock(TransactionLockTypes.LockType lockType) {
     return new LeasePathLock(lockType);
   }
+  
+  public Lock getLeasePathLock(TransactionLockTypes.LockType lockType,
+          String src) {
+    return new LeasePathLock(lockType, src);
+  }
 
   public Lock getNameNodeLeaseLock(TransactionLockTypes.LockType lockType) {
     return new NameNodeLeaseLock(lockType);
@@ -285,12 +308,10 @@ public class LockFactory {
     return lock;
   }
 
-  public List<Lock> getBlockReportingLocks(long[] blockIds, int storageId) {
+  public List<Lock> getBlockReportingLocks(long[] blockIds, int[] inodeIds, long[] unresolvedBlks, int storageId) {
     ArrayList<Lock> list = new ArrayList(3);
-    list.add(new BatchedBlockLock(blockIds));
-    list.add(new BatchedBlocksRelatedLock.BatchedReplicasLock(storageId));
-    list.add(new BatchedBlocksRelatedLock.BatchedInvalidatedBlocksLock(
-        storageId));
+    list.add(new BatchedBlockLock(blockIds,inodeIds, unresolvedBlks));
+    //list.add(new BatchedBlocksRelatedLock.BatchedInvalidatedBlocksLock(storageId));
     return list;
   }
 
@@ -303,6 +324,11 @@ public class LockFactory {
       TransactionLockTypes.LockType lockType, int inodeId) {
     return new BaseEncodingStatusLock.IndividualEncodingStatusLock(lockType,
         inodeId);
+  }
+  
+  public Lock getSubTreeOpsLock(TransactionLockTypes.LockType lockType, 
+          String pathPrefix) {
+    return new SubTreeOpLock(lockType, pathPrefix);
   }
   
   public Collection<Lock> getBlockRelated(BLK... relatedBlks) {
@@ -367,9 +393,12 @@ public class LockFactory {
 
 
   public void setConfiguration(Configuration conf) {
-    Lock.enableSetPartitionKey(
+    BaseINodeLock.enableSetPartitionKey(
         conf.getBoolean(DFSConfigKeys.DFS_SET_PARTITION_KEY_ENABLED,
             DFSConfigKeys.DFS_SET_PARTITION_KEY_ENABLED_DEFAULT));
+    BaseINodeLock.enableSetRandomPartitionKey(conf.getBoolean(DFSConfigKeys
+        .DFS_SET_RANDOM_PARTITION_KEY_ENABLED, DFSConfigKeys
+        .DFS_SET_RANDOM_PARTITION_KEY_ENABLED_DEFAULT));
     BaseINodeLock.setDefaultLockType(getPrecedingPathLockType(conf));
   }
   
