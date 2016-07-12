@@ -190,7 +190,7 @@ public class TestFileCreation {
     FileSystem fs = cluster.getFileSystem();
     try {
       for(int i = 0; i < NUM_FILES; i++) {
-        FSNamesystem.LOG.debug("Starting file iteration " + i);
+
         // create a new file in home directory. Do not close it.
         Path file = new Path("file_" + i + ".dat");
         FSDataOutputStream stm = createFile(fs, file, NUM_REPLICAS);
@@ -203,8 +203,6 @@ public class TestFileCreation {
         stm.write(buffer, 0, blockSize*NUM_BLOCKS_PER_FILE);
 
         stm.close();
-
-        FSNamesystem.LOG.debug("Finished file iteration " + i);
       }
     } finally {
       cluster.shutdown();

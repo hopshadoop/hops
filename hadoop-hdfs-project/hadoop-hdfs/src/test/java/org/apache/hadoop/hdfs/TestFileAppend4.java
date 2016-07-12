@@ -339,26 +339,23 @@ public class TestFileAppend4 {
    * showing insufficient locations.
    */
   @Test(timeout = 60000)
-  @Ignore   // TODO also fails in Hops without Bram's changes
   public void testAppendInsufficientLocations() throws Exception {
     Configuration conf = new Configuration();
     final String filename = "/testAppend";
 
     // lower heartbeat interval for fast recognition of DN
-    conf.setInt(DFSConfigKeys.DFS_NAMENODE_HEARTBEAT_RECHECK_INTERVAL_KEY,
-        1000);
+    conf.setInt(DFSConfigKeys.DFS_NAMENODE_HEARTBEAT_RECHECK_INTERVAL_KEY, 1000);
     conf.setInt(DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY, 1);
     conf.setInt(DFSConfigKeys.DFS_CLIENT_SOCKET_TIMEOUT_KEY, 3000);
 
-    cluster = new MiniDFSCluster.Builder(conf).numDataNodes(4)
-        .build();
+    cluster = new MiniDFSCluster.Builder(conf).numDataNodes(4).build();
     DistributedFileSystem fileSystem = null;
     try {
       // create a file with replication 3
       fileSystem = cluster.getFileSystem();
       Path f = new Path(filename);
       FSDataOutputStream create = fileSystem.create(f, (short) 2);
-      create.write("/testAppend".getBytes());
+      create.write("this is just some bogus text that will be written to the file...".getBytes());
       create.close();
 
       // Check for replications
