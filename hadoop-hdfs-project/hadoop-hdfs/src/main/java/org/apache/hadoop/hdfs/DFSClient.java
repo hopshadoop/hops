@@ -1508,13 +1508,12 @@ public class DFSClient implements java.io.Closeable {
       if (stat == null) { // No file to append to
         // New file needs to be created if create option is present
         if (!flag.contains(CreateFlag.CREATE)) {
-          throw new FileNotFoundException(
-              "failed to append to non-existent file " + src + " on client " +
-                  clientName);
+          throw new FileNotFoundException("failed to append to non-existent file "
+              + src + " on client " + clientName);
         }
         return null;
       }
-      return callAppend(stat, src, buffersize, progress);
+      return callAppend(src, buffersize, progress);
     }
     return null;
   }
@@ -1593,7 +1592,7 @@ public class DFSClient implements java.io.Closeable {
   /**
    * Method to get stream returned by append call
    */
-  private DFSOutputStream callAppend(HdfsFileStatus stat, final String src,
+  private DFSOutputStream callAppend(final String src,
       int buffersize, Progressable progress) throws IOException {
     LocatedBlock lastBlock = null;
     try {
@@ -1611,8 +1610,15 @@ public class DFSClient implements java.io.Closeable {
           DSQuotaExceededException.class, UnsupportedOperationException.class,
           UnresolvedPathException.class);
     }
-    return DFSOutputStream
-        .newStreamForAppend(this, src, buffersize, progress, lastBlock, stat,
+
+    HdfsFileStatus stat = getFileInfo(src);
+    if (stat == null) { // No file found
+      throw new FileNotFoundException(
+          "failed to append to non-existent file " + src + " on client " +
+              clientName);
+    }
+
+    return DFSOutputStream.newStreamForAppend(this, src, buffersize, progress, lastBlock, stat,
             dfsClientConf.createChecksum());
   }
   
@@ -1640,13 +1646,7 @@ public class DFSClient implements java.io.Closeable {
   private DFSOutputStream append(String src, int buffersize,
       Progressable progress) throws IOException {
     checkOpen();
-    HdfsFileStatus stat = getFileInfo(src);
-    if (stat == null) { // No file found
-      throw new FileNotFoundException(
-          "failed to append to non-existent file " + src + " on client " +
-              clientName);
-    }
-    final DFSOutputStream result = callAppend(stat, src, buffersize, progress);
+    final DFSOutputStream result = callAppend(src, buffersize, progress);
     beginFileLease(src, result);
     return result;
   }
