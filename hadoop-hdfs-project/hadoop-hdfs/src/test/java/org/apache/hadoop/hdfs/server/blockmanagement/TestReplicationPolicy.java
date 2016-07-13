@@ -27,24 +27,26 @@ import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLocks;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.DFSUtil;
+import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.LogVerificationAppender;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.hadoop.hdfs.StorageType;
 import org.apache.hadoop.hdfs.protocol.Block;
-import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
+import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.datanode.DataNodeTestUtils;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
+import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.apache.hadoop.net.NetworkTopology;
 import org.apache.hadoop.net.Node;
 import org.apache.hadoop.util.Time;
-import org.apache.log4j.AppenderSkeleton;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.log4j.spi.LoggingEvent;
@@ -57,7 +59,6 @@ import org.junit.rules.ExpectedException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
@@ -72,7 +73,7 @@ public class TestReplicationPolicy {
   private Random random = DFSUtil.getRandom();
   private static final int BLOCK_SIZE = 1024;
   private static final int NUM_OF_DATANODES = 6;
-  private static NetworkTopology cluster;
+  private static NetworkTopology topology;
   private static NameNode namenode;
   private static BlockPlacementPolicy replicator;
   private static final String filename = "/dummyfile.txt";
@@ -84,42 +85,60 @@ public class TestReplicationPolicy {
 
   @Rule
   public ExpectedException exception = ExpectedException.none();
-  
+
   @BeforeClass
   public static void setupCluster() throws Exception {
     Configuration conf = new HdfsConfiguration();
-    dataNodes = new DatanodeDescriptor[]{
-        DFSTestUtil.getDatanodeDescriptor("1.1.1.1", "/d1/r1"),
-        DFSTestUtil.getDatanodeDescriptor("2.2.2.2", "/d1/r1"),
-        DFSTestUtil.getDatanodeDescriptor("3.3.3.3", "/d1/r2"),
-        DFSTestUtil.getDatanodeDescriptor("4.4.4.4", "/d1/r2"),
-        DFSTestUtil.getDatanodeDescriptor("5.5.5.5", "/d2/r3"),
-        DFSTestUtil.getDatanodeDescriptor("6.6.6.6", "/d2/r3")};
 
-    FileSystem.setDefaultUri(conf, "hdfs://localhost:0");
     conf.set(DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY, "0.0.0.0:0");
-
-    conf.setBoolean(
-        DFSConfigKeys.DFS_NAMENODE_AVOID_STALE_DATANODE_FOR_READ_KEY, true);
-    conf.setBoolean(
-        DFSConfigKeys.DFS_NAMENODE_AVOID_STALE_DATANODE_FOR_WRITE_KEY, true);
-    
+    conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_AVOID_STALE_DATANODE_FOR_READ_KEY, true);
+    conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_AVOID_STALE_DATANODE_FOR_WRITE_KEY, true);
     conf.setInt(DFSConfigKeys.DFS_NAMENODE_REPLICATION_INTERVAL_KEY, 10);
-    DFSTestUtil.formatNameNode(conf);
-    namenode = new NameNode(conf);
 
-    final BlockManager bm = namenode.getNamesystem().getBlockManager();
+    final String[] racks = {
+        "/d1/r1",
+        "/d1/r1",
+        "/d1/r2",
+        "/d1/r2",
+        "/d2/r3",
+        "/d2/r3"};
+
+    final MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf)
+            .numDataNodes(NUM_OF_DATANODES)
+            .storagesPerDatanode(1)
+            .racks(racks)
+            .build();
+
+    cluster.waitActive();
+
+    final BlockManager bm = cluster.getNamesystem().getBlockManager();
+    namenode = cluster.getNameNode();
     replicator = bm.getBlockPlacementPolicy();
-    cluster = bm.getDatanodeManager().getNetworkTopology();
-    // construct network topology
-    for (int i=0; i < NUM_OF_DATANODES; i++) {
-      cluster.add(dataNodes[i]);
-      bm.getDatanodeManager().getHeartbeatManager().addDatanode(
-          dataNodes[i]);
+    topology = bm.getDatanodeManager().getNetworkTopology();
+
+    dataNodes = new DatanodeDescriptor[racks.length];
+    for(int i = 0; i < racks.length; i++) {
+      DatanodeInfo datanode = (DatanodeInfo) topology.getDatanodesInRack(racks[i]).get(i % 2);
+      dataNodes[i] = bm.getDatanodeManager().getDatanode(datanode);
     }
+
+    storages = new DatanodeStorageInfo[dataNodes.length];
+    for(int i = 0; i < dataNodes.length; i++) {
+      storages[i] = dataNodes[i].getStorageInfos()[0];
+    }
+
+    // create an extra storage for dn5.
+    DatanodeStorage extraStorage = new DatanodeStorage(
+        storages[5].getStorageID() + "-extra", DatanodeStorage.State.NORMAL,
+        StorageType.DEFAULT);
+
+    BlockManagerTestUtil.updateStorage(storages[5].getDatanodeDescriptor(),
+        extraStorage);
+
     resetHeartbeatForStorages();
   }
-  
+
   @After
   public void tearDown() {
     if (namenode != null) {
@@ -128,11 +147,11 @@ public class TestReplicationPolicy {
   }
 
   private static boolean isOnSameRack(DatanodeStorageInfo left, DatanodeDescriptor right) {
-    return cluster.isOnSameRack(left.getDatanodeDescriptor(), right);
+    return topology.isOnSameRack(left.getDatanodeDescriptor(), right);
   }
 
   private static boolean isOnSameRack(DatanodeStorageInfo left, DatanodeStorageInfo right) {
-    return cluster.isOnSameRack(left.getDatanodeDescriptor(), right.getDatanodeDescriptor());
+    return topology.isOnSameRack(left.getDatanodeDescriptor(), right.getDatanodeDescriptor());
   }
 
   /**
@@ -149,8 +168,7 @@ public class TestReplicationPolicy {
   public void testChooseTarget1() throws Exception {
     updateHeartbeatWithUsage(dataNodes[0],
         2*HdfsConstants.MIN_BLOCKS_FOR_WRITE*BLOCK_SIZE, 0L,
-        HdfsConstants.MIN_BLOCKS_FOR_WRITE*BLOCK_SIZE, 0L,
-        0L, 0L, 4, 0); // overloaded
+        HdfsConstants.MIN_BLOCKS_FOR_WRITE*BLOCK_SIZE, 0L, 4, 0); // overloaded
 
     DatanodeStorageInfo[] targets;
     targets = chooseTarget(0);
@@ -305,8 +323,7 @@ public class TestReplicationPolicy {
     // make data node 0 to be not qualified to choose
     updateHeartbeatWithUsage(dataNodes[0],
         2 * HdfsConstants.MIN_BLOCKS_FOR_WRITE * BLOCK_SIZE, 0L,
-        (HdfsConstants.MIN_BLOCKS_FOR_WRITE - 1) * BLOCK_SIZE, 0L,
-        0L, 0L, 0, 0); // no space
+        (HdfsConstants.MIN_BLOCKS_FOR_WRITE - 1) * BLOCK_SIZE, 0L, 0, 0); // no space
 
     DatanodeStorageInfo[] targets;
     targets = chooseTarget(0);
@@ -344,7 +361,7 @@ public class TestReplicationPolicy {
     for (int i=0; i < NUM_OF_DATANODES; i++) {
       updateHeartbeatWithUsage(dataNodes[i],
           2*HdfsConstants.MIN_BLOCKS_FOR_WRITE*BLOCK_SIZE, 0L,
-          2*HdfsConstants.MIN_BLOCKS_FOR_WRITE*BLOCK_SIZE, 0L, 0L, 0L, 0, 0);
+          2*HdfsConstants.MIN_BLOCKS_FOR_WRITE*BLOCK_SIZE, 0L, 0, 0);
     }
     // No available space in the extra storage of dn0
     updateHeartbeatForExtraStorage(0L, 0L, 0L, 0L);
@@ -352,10 +369,9 @@ public class TestReplicationPolicy {
 
   private static void updateHeartbeatWithUsage(DatanodeDescriptor dn,
       long capacity, long dfsUsed, long remaining, long blockPoolUsed,
-      long dnCacheCapacity, long dnCacheUsed, int xceiverCount, int volFailures) {
+      int xceiverCount, int volFailures) {
     dn.getStorageInfos()[0].setUtilizationForTesting(capacity, dfsUsed, remaining, blockPoolUsed);
-    dn.updateHeartbeat(
-        BlockManagerTestUtil.getStorageReportsForDatanode(dn), xceiverCount, volFailures);
+    dn.updateHeartbeat(BlockManagerTestUtil.getStorageReportsForDatanode(dn), xceiverCount, volFailures);
   }
 
   private static void updateHeartbeatForExtraStorage(long capacity,
@@ -365,7 +381,6 @@ public class TestReplicationPolicy {
     dn.updateHeartbeat(BlockManagerTestUtil.getStorageReportsForDatanode(dn), 0, 0);
   }
 
-  
   /**
    * In this testcase, client is dataNodes[0], but none of the nodes on rack 1
    * is qualified to be chosen. So the 1st replica should be placed on either
@@ -381,7 +396,7 @@ public class TestReplicationPolicy {
     for(int i=0; i<2; i++) {
       updateHeartbeatWithUsage(dataNodes[i],
           2 * HdfsConstants.MIN_BLOCKS_FOR_WRITE * BLOCK_SIZE, 0L,
-          (HdfsConstants.MIN_BLOCKS_FOR_WRITE-1)*BLOCK_SIZE, 0L, 0L, 0L, 0, 0);
+          (HdfsConstants.MIN_BLOCKS_FOR_WRITE-1)*BLOCK_SIZE, 0L, 0, 0);
     }
 
     DatanodeStorageInfo[] targets;
@@ -470,7 +485,7 @@ public class TestReplicationPolicy {
     bm.getDatanodeManager().getHeartbeatManager().addDatanode(newDn);
     updateHeartbeatWithUsage(newDn,
         2*HdfsConstants.MIN_BLOCKS_FOR_WRITE*BLOCK_SIZE, 0L,
-        2*HdfsConstants.MIN_BLOCKS_FOR_WRITE*BLOCK_SIZE, 0L, 0L, 0L, 0, 0);
+        2*HdfsConstants.MIN_BLOCKS_FOR_WRITE*BLOCK_SIZE, 0L, 0, 0);
 
     // Try picking three nodes. Only two should return.
     excludedNodes.clear();
@@ -506,7 +521,7 @@ public class TestReplicationPolicy {
           .setNumStaleNodes(0);
     }
   }
-  
+
   /**
    * In this testcase, it tries to choose more targets than available nodes and
    * check the result.
@@ -519,8 +534,7 @@ public class TestReplicationPolicy {
     for(int i=0; i<2; i++) {
       updateHeartbeatWithUsage(dataNodes[i],
           2 * HdfsConstants.MIN_BLOCKS_FOR_WRITE * BLOCK_SIZE, 0L,
-          (HdfsConstants.MIN_BLOCKS_FOR_WRITE - 1) * BLOCK_SIZE, 0L, 0L, 0L, 0,
-          0);
+          (HdfsConstants.MIN_BLOCKS_FOR_WRITE - 1) * BLOCK_SIZE, 0L, 0, 0);
     }
 
     final LogVerificationAppender appender = new LogVerificationAppender();
@@ -543,28 +557,6 @@ public class TestReplicationPolicy {
     assertTrue(((String)lastLogEntry.getMessage()).contains("in need of 2"));
 
     resetHeartbeatForStorages();
-  }
-  
-  class TestAppender extends AppenderSkeleton {
-    private final List<LoggingEvent> log = new ArrayList<LoggingEvent>();
-
-    @Override
-    public boolean requiresLayout() {
-      return false;
-    }
-
-    @Override
-    protected void append(final LoggingEvent loggingEvent) {
-      log.add(loggingEvent);
-    }
-
-    @Override
-    public void close() {
-    }
-
-    public List<LoggingEvent> getLog() {
-      return new ArrayList<LoggingEvent>(log);
-    }
   }
 
   private boolean containsWithinRange(DatanodeStorageInfo target,
@@ -590,7 +582,7 @@ public class TestReplicationPolicy {
     }
     return false;
   }
-  
+
   @Test
   public void testChooseTargetWithStaleNodes() throws Exception {
     // Set dataNodes[0] as stale
@@ -662,8 +654,8 @@ public class TestReplicationPolicy {
     assertTrue(containsWithinRange(dataNodes[4], targets, 0, 3));
     assertTrue(containsWithinRange(dataNodes[5], targets, 0, 3));
 
-    for (int i = 0; i < dataNodes.length; i++) {
-      dataNodes[i].setLastUpdate(Time.now());
+    for (DatanodeDescriptor dataNode : dataNodes) {
+      dataNode.setLastUpdate(Time.now());
     }
     namenode.getNamesystem().getBlockManager()
         .getDatanodeManager().getHeartbeatManager().heartbeatCheck();
@@ -683,9 +675,9 @@ public class TestReplicationPolicy {
         new MiniDFSCluster.Builder(conf).racks(racks).hosts(hosts)
             .numDataNodes(hosts.length).build();
     miniCluster.waitActive();
-    
+
     try {
-      // Step 1. Make two datanodes as stale, check whether the 
+      // Step 1. Make two datanodes as stale, check whether the
       // avoidStaleDataNodesForWrite calculation is correct.
       // First stop the heartbeat of host1 and host2
       for (int i = 0; i < 2; i++) {
@@ -695,7 +687,7 @@ public class TestReplicationPolicy {
             .getDatanodeManager().getDatanode(dn.getDatanodeId())
             .setLastUpdate(Time.now() - staleInterval - 1);
       }
-      // Instead of waiting, explicitly call heartbeatCheck to 
+      // Instead of waiting, explicitly call heartbeatCheck to
       // let heartbeat manager to detect stale nodes
       miniCluster.getNameNode().getNamesystem().getBlockManager()
           .getDatanodeManager().getHeartbeatManager().heartbeatCheck();
@@ -716,7 +708,7 @@ public class TestReplicationPolicy {
 
       assertEquals(targets.length, 3);
       assertFalse(isOnSameRack(targets[0], staleNodeInfo));
-      
+
       // Step 2. Set more than half of the datanodes as stale
       for (int i = 0; i < 4; i++) {
         DataNode dn = miniCluster.getDataNodes().get(i);
@@ -742,8 +734,8 @@ public class TestReplicationPolicy {
           BlockStoragePolicySuite.getDefaultPolicy());
       assertEquals(targets.length, 3);
       assertTrue(isOnSameRack(targets[0], staleNodeInfo));
-      
-      // Step 3. Set 2 stale datanodes back to healthy nodes, 
+
+      // Step 3. Set 2 stale datanodes back to healthy nodes,
       // still have 2 stale nodes
       for (int i = 2; i < 4; i++) {
         DataNode dn = miniCluster.getDataNodes().get(i);
@@ -769,7 +761,7 @@ public class TestReplicationPolicy {
       miniCluster.shutdown();
     }
   }
-  
+
   /**
    * This testcase tests re-replication, when dataNodes[0] is already chosen.
    * So the 1st replica can be placed on random rack.
@@ -866,7 +858,7 @@ public class TestReplicationPolicy {
     assertEquals(targets.length, 2);
     assertTrue(isOnSameRack(targets[0], dataNodes[2]));
   }
-  
+
   /**
    * Test for the high priority blocks are processed before the low priority
    * blocks.
@@ -877,18 +869,29 @@ public class TestReplicationPolicy {
     int HIGH_PRIORITY = 0;
     Configuration conf = new Configuration();
     conf.setInt(DFSConfigKeys.DFS_NAMENODE_REPLICATION_INTERVAL_KEY, 1);
-    MiniDFSCluster cluster =
-        new MiniDFSCluster.Builder(conf).numDataNodes(2).format(true).build();
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
+            .numDataNodes(2)
+            .format(true)
+            .build();
     try {
       cluster.waitActive();
+      DFSTestUtil.createRootFolder();
+      DistributedFileSystem dfs = cluster.getFileSystem();
+
+      // Create an inode (file) that we can have the blocks be a part of
+      dfs.create(new Path("/test-1.dat")).close();
+
+      // The inode id of /test.dat should be 2 (since it's the only non-root
+      // entry)
+      int inodeId = 2;
+
       final UnderReplicatedBlocks neededReplications =
           cluster.getNameNode().getNamesystem()
               .getBlockManager().neededReplications;
       for (int i = 0; i < 100; i++) {
         // Adding the blocks directly to normal priority
         int blkId = random.nextInt();
-        add(neededReplications, new BlockInfo(new Block(blkId), blkId), 2, 0,
-            3);
+        add(neededReplications, new BlockInfo(new Block(blkId), inodeId), 2, 0, 3);
       }
       // Lets wait for the replication interval, to start process normal
       // priority blocks
@@ -896,20 +899,21 @@ public class TestReplicationPolicy {
 
       // Adding the block directly to high priority list
       int blkId = random.nextInt();
-      add(neededReplications, new BlockInfo(new Block(blkId), blkId), 1, 0, 3);
+      add(neededReplications, new BlockInfo(new Block(blkId), inodeId), 1, 0, 3);
 
       // Lets wait for the replication interval
       Thread.sleep(3 * DFS_NAMENODE_REPLICATION_INTERVAL);
 
       // Check replication completed successfully. Need not wait till it process
       // all the 100 normal blocks.
+      // We waited for 3 periods; the high priority block should be removed by now
       assertFalse("Not able to clear the element from high priority list",
           neededReplications.iterator(HIGH_PRIORITY).hasNext());
     } finally {
       cluster.shutdown();
     }
   }
-  
+
   /**
    * Test for the ChooseUnderReplicatedBlocks are processed based on priority
    */
@@ -979,7 +983,7 @@ public class TestReplicationPolicy {
     chosenBlocks = underReplicatedBlocks.chooseUnderReplicatedBlocks(7);
     assertTheChosenBlocks(chosenBlocks, 6, 1, 0, 0, 0);
   }
-  
+
   /**
    * asserts the chosen blocks with expected priority blocks
    */
@@ -1010,7 +1014,7 @@ public class TestReplicationPolicy {
         chosenBlocks.get(UnderReplicatedBlocks.QUEUE_WITH_CORRUPT_BLOCKS)
             .size());
   }
-  
+
   /**
    * This testcase tests whether the default value returned by
    * DFSUtil.getInvalidateWorkPctPerIteration() is positive,
@@ -1028,18 +1032,18 @@ public class TestReplicationPolicy {
         "0.5f");
     blocksInvalidateWorkPct = DFSUtil.getInvalidateWorkPctPerIteration(conf);
     assertEquals(blocksInvalidateWorkPct, 0.5f, blocksInvalidateWorkPct * 1e-7);
-    
+
     conf.set(DFSConfigKeys.
         DFS_NAMENODE_INVALIDATE_WORK_PCT_PER_ITERATION, "1.0f");
     blocksInvalidateWorkPct = DFSUtil.getInvalidateWorkPctPerIteration(conf);
     assertEquals(blocksInvalidateWorkPct, 1.0f, blocksInvalidateWorkPct * 1e-7);
-    
+
     conf.set(DFSConfigKeys.
         DFS_NAMENODE_INVALIDATE_WORK_PCT_PER_ITERATION, "0.0f");
     exception.expect(IllegalArgumentException.class);
     blocksInvalidateWorkPct = DFSUtil.getInvalidateWorkPctPerIteration(conf);
   }
-  
+
   /**
    * This testcase tests whether an IllegalArgumentException
    * will be thrown when a negative value is retrieved by
@@ -1051,13 +1055,13 @@ public class TestReplicationPolicy {
     float blocksInvalidateWorkPct =
         DFSUtil.getInvalidateWorkPctPerIteration(conf);
     assertTrue(blocksInvalidateWorkPct > 0);
-    
+
     conf.set(DFSConfigKeys.
         DFS_NAMENODE_INVALIDATE_WORK_PCT_PER_ITERATION, "-0.5f");
     exception.expect(IllegalArgumentException.class);
     blocksInvalidateWorkPct = DFSUtil.getInvalidateWorkPctPerIteration(conf);
   }
-  
+
   /**
    * This testcase tests whether an IllegalArgumentException
    * will be thrown when a value greater than 1 is retrieved by
@@ -1069,7 +1073,7 @@ public class TestReplicationPolicy {
     float blocksInvalidateWorkPct =
         DFSUtil.getInvalidateWorkPctPerIteration(conf);
     assertTrue(blocksInvalidateWorkPct > 0);
-    
+
     conf.set(DFSConfigKeys.
         DFS_NAMENODE_INVALIDATE_WORK_PCT_PER_ITERATION, "1.5f");
     exception.expect(IllegalArgumentException.class);
@@ -1092,13 +1096,13 @@ public class TestReplicationPolicy {
         DFS_NAMENODE_REPLICATION_WORK_MULTIPLIER_PER_ITERATION, "3");
     blocksReplWorkMultiplier = DFSUtil.getReplWorkMultiplier(conf);
     assertEquals(blocksReplWorkMultiplier, 3);
-    
+
     conf.set(DFSConfigKeys.
         DFS_NAMENODE_REPLICATION_WORK_MULTIPLIER_PER_ITERATION, "-1");
     exception.expect(IllegalArgumentException.class);
     blocksReplWorkMultiplier = DFSUtil.getReplWorkMultiplier(conf);
   }
-  
+
   private boolean add(final UnderReplicatedBlocks queue, final BlockInfo block,
       final int curReplicas, final int decomissionedReplicas,
       final int expectedReplicas) throws IOException {

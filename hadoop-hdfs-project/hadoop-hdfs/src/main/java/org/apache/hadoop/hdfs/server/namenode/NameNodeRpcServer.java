@@ -877,6 +877,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
       String poolId, StorageReceivedDeletedBlocks[] receivedAndDeletedBlocks)
       throws IOException {
     verifyRequest(nodeReg);
+    metrics.incrBlockReceivedAndDeletedOps();
     if (blockStateChangeLog.isDebugEnabled()) {
       blockStateChangeLog.debug(
           "*BLOCK* NameNode.blockReceivedAndDeleted: " + "from " + nodeReg +

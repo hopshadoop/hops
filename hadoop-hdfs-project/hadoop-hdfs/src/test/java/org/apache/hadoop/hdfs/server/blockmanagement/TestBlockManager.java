@@ -24,6 +24,7 @@ import com.google.common.collect.Lists;
 import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
 import io.hops.metadata.HdfsStorageFactory;
+import io.hops.metadata.hdfs.dal.INodeAttributesDataAccess;
 import io.hops.metadata.hdfs.dal.INodeDataAccess;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.security.Users;
@@ -43,10 +44,12 @@ import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.BlockListAsLongs;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor.BlockTargetPair;
-import org.apache.hadoop.hdfs.server.datanode.DataStorage;
+import org.apache.hadoop.hdfs.server.namenode.FSDirectory;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.INode;
+import org.apache.hadoop.hdfs.server.namenode.INodeAttributes;
 import org.apache.hadoop.hdfs.server.namenode.INodeDirectory;
+import org.apache.hadoop.hdfs.server.namenode.INodeDirectoryWithQuota;
 import org.apache.hadoop.hdfs.server.namenode.INodeFile;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
@@ -91,7 +94,7 @@ public class TestBlockManager {
   
   private static final int BLOCK_SIZE = 64 * 1024;
   
-  private Configuration conf;
+  private Configuration conf = new HdfsConfiguration();
   private FSNamesystem fsn;
   private BlockManager bm;
 
@@ -100,7 +103,6 @@ public class TestBlockManager {
 
   @Before
   public void setupMockCluster() throws IOException {
-    conf = new HdfsConfiguration();
     HdfsStorageFactory.setConfiguration(conf);
     conf.set(DFSConfigKeys.NET_TOPOLOGY_SCRIPT_FILE_NAME_KEY,
         "need to set a dummy value here so it assumes a multi-rack cluster");
@@ -118,12 +120,14 @@ public class TestBlockManager {
     storages = DFSTestUtil.createDatanodeStorageInfos(racks);
     nodes = Arrays.asList(DFSTestUtil.toDatanodeDescriptor(storages));
 
-    for (int i = 0; i < nodes.size(); i++) {
-      nodes.get(i).setDatanodeUuidForTesting("DN-Name-" + DatanodeStorage.generateUuid());
+    for (DatanodeDescriptor node : nodes) {
+      node.setDatanodeUuidForTesting("DN-Name-" + DatanodeStorage.generateUuid());
     }
 
     rackA = nodes.subList(0, 3);
     rackB = nodes.subList(3, 6);
+
+    DFSTestUtil.createRootFolder();
   }
 
   private void formatStorage() throws IOException {
@@ -161,6 +165,7 @@ public class TestBlockManager {
   @Test
   public void testBasicReplication() throws Exception {
     addNodes(nodes);
+
     for (int i = 0; i < NUM_TEST_ITERS; i++) {
       doBasicTest(i);
     }
@@ -173,14 +178,9 @@ public class TestBlockManager {
 
     DatanodeStorageInfo[] pipeline = scheduleSingleReplication(blockInfo);
 
-    // Since
-    boolean isOnNode =
-        origStorages.get(0).equals(pipeline[0]) ||
-        origStorages.get(1).equals(pipeline[0]);
-
     assertTrue("Source of replication should be one of the nodes the block " +
-            "was on. (" + origStorages.toString() + ")" +
-            "Was: " + pipeline[0], origStorages.contains(pipeline[0]));
+            "was on (" + origStorages.toString() + "), but" +
+            "was on: " + pipeline[0], origStorages.contains(pipeline[0]));
 
     assertTrue("Destination of replication should be on the other rack. " +
         "Was: " + pipeline[1], rackB.contains(pipeline[1].getDatanodeDescriptor()));
@@ -320,8 +320,8 @@ public class TestBlockManager {
       if (rackB.contains(target.getDatanodeDescriptor())) {
         foundOneOnRackB = true;
       }
-      assertFalse(decomNodes.contains(target));
-      assertFalse(origNodes.contains(target));
+      assertFalse(decomNodes.contains(target.getDatanodeDescriptor()));
+      assertFalse(origNodes.contains(target.getDatanodeDescriptor()));
     }
 
     assertTrue("Should have at least one target on rack B. Pipeline: " +
@@ -501,7 +501,6 @@ public class TestBlockManager {
     }
     return nodes;
   }
-  
 
   private BlockInfo addBlockOnNodes(final long blockId,
       List<DatanodeDescriptor> nodes) throws IOException {

@@ -134,8 +134,6 @@ public class TestBlockHasMultipleReplicasOnSameDN {
     LogFactory.getLog("foooo").debug("HERE (3)");
     // Make sure that each block has two replicas, one on each DataNode.
     for (LocatedBlock locatedBlock : locatedBlocks.getLocatedBlocks()) {
-      // TODO it fails because we do not report unique datanodes, i.e. one of
-      // the datanodes will show up twice.
       DatanodeInfo[] locations = locatedBlock.getLocations();
       assertThat(locations.length, is((int) NUM_DATANODES));
       assertThat(locations[0].getDatanodeUuid(), not(locations[1].getDatanodeUuid()));

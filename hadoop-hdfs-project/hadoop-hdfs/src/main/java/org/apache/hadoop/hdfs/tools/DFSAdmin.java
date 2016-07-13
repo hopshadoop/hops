@@ -33,11 +33,14 @@ import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.NameNodeProxies;
+import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
 import org.apache.hadoop.hdfs.protocol.ClientDatanodeProtocol;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.SafeModeAction;
+import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RemoteException;
@@ -48,6 +51,7 @@ import org.apache.hadoop.security.authorize.RefreshAuthorizationPolicyProtocol;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.ToolRunner;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
@@ -490,6 +494,34 @@ public class DFSAdmin extends FsShell {
     return exitCode;
   }
 
+  public int setStoragePolicy(String[] argv) throws IOException {
+    DistributedFileSystem dfs = getDFS();
+    dfs.setStoragePolicy(new Path(argv[1]), argv[2]);
+    System.out.println("Set storage policy " + argv[2] + " on " + argv[1]);
+    return 0;
+  }
+
+  public int getStoragePolicy(String[] argv) throws IOException {
+    DistributedFileSystem dfs = getDFS();
+    HdfsFileStatus status = dfs.getClient().getFileInfo(argv[1]);
+    if (status == null) {
+      throw new FileNotFoundException("File/Directory does not exist: "
+          + argv[1]);
+    }
+    byte storagePolicyId = status.getStoragePolicy();
+    if (storagePolicyId == BlockStoragePolicySuite.ID_UNSPECIFIED) {
+      System.out.println("The storage policy of " + argv[1] + " is unspecified");
+      return 0;
+    }
+    BlockStoragePolicy[] policies = dfs.getStoragePolicies();
+    for (BlockStoragePolicy p : policies) {
+      if (p.getId() == storagePolicyId) {
+        System.out.println("The storage policy of " + argv[1] + ":\n" + p);
+        return 0;
+      }
+    }
+    throw new IOException("Cannot identify the storage policy for " + argv[1]);
+  }
 
   private void printHelp(String cmd) {
     String summary =
@@ -799,24 +831,23 @@ public class DFSAdmin extends FsShell {
           " [-setBalancerBandwidth <bandwidth in bytes per second>]");
     } else {
       System.err.println("Usage: java DFSAdmin");
-      System.err.println(
-          "Note: Administrative commands can only be run as the HDFS superuser.");
-      System.err.println("           [-report]");
-      System.err.println("           [-safemode enter | leave | get | wait]");
-      System.err.println("           [-refreshNodes]");
-      System.err.println("           [-refreshServiceAcl]");
-      System.err.println("           [-refreshUserToGroupsMappings]");
-      System.err.println("           [-refreshSuperUserGroupsConfiguration]");
-      System.err.println("           [-printTopology]");
-      System.err.println(
-          "           [-deleteBlockPool datanode-host:port blockpoolId [force]]");
-      System.err.println("           [" + SetQuotaCommand.USAGE + "]");
-      System.err.println("           [" + ClearQuotaCommand.USAGE + "]");
-      System.err.println("           [" + SetSpaceQuotaCommand.USAGE + "]");
-      System.err.println("           [" + ClearSpaceQuotaCommand.USAGE + "]");
-      System.err.println(
-          "           [-setBalancerBandwidth <bandwidth in bytes per second>]");
-      System.err.println("           [-help [cmd]]");
+      System.err.println("Note: Administrative commands can only be run as the HDFS superuser.");
+      System.err.println("\t[-report]");
+      System.err.println("\t[-safemode enter | leave | get | wait]");
+      System.err.println("\t[-refreshNodes]");
+      System.err.println("\t[-refreshServiceAcl]");
+      System.err.println("\t[-refreshUserToGroupsMappings]");
+      System.err.println("\t[-refreshSuperUserGroupsConfiguration]");
+      System.err.println("\t[-printTopology]");
+      System.err.println("\t[-deleteBlockPool datanode-host:port blockpoolId [force]]");
+      System.err.println("\t[" + SetQuotaCommand.USAGE + "]");
+      System.err.println("\t[" + ClearQuotaCommand.USAGE + "]");
+      System.err.println("\t[" + SetSpaceQuotaCommand.USAGE + "]");
+      System.err.println("\t[" + ClearSpaceQuotaCommand.USAGE + "]");
+      System.err.println("\t[-setBalancerBandwidth <bandwidth in bytes per second>]");
+      System.err.println("\t[-setStoragePolicy path policyName]\n");
+      System.err.println("\t[-getStoragePolicy path]\n");
+      System.err.println("\t[-help [cmd]]");
       System.err.println();
       ToolRunner.printGenericCommandUsage(System.err);
     }
@@ -884,6 +915,16 @@ public class DFSAdmin extends FsShell {
         printUsage(cmd);
         return exitCode;
       }
+    } else if ("-setStoragePolicy".equals(cmd)) {
+      if (argv.length != 3) {
+        printUsage(cmd);
+        return exitCode;
+      }
+    } else if ("-getStoragePolicy".equals(cmd)) {
+      if (argv.length != 2) {
+        printUsage(cmd);
+        return exitCode;
+      }
     }
     
     // initialize DFSAdmin
@@ -929,6 +970,10 @@ public class DFSAdmin extends FsShell {
         exitCode = deleteBlockPool(argv, i);
       } else if ("-setBalancerBandwidth".equals(cmd)) {
         exitCode = setBalancerBandwidth(argv, i);
+      } else if ("-setStoragePolicy".equals(cmd)) {
+        exitCode = setStoragePolicy(argv);
+      } else if ("-getStoragePolicy".equals(cmd)) {
+        exitCode = getStoragePolicy(argv);
       } else if ("-help".equals(cmd)) {
         if (i < argv.length) {
           printHelp(argv[i]);

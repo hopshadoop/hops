@@ -91,11 +91,12 @@ public class TestDataNodeVolumeFailureReporting {
 
   @After
   public void tearDown() throws Exception {
-    for (int i = 0; i < 3; i++) {
-      new File(dataDir, "data" + (2 * i + 1)).setExecutable(true);
-      new File(dataDir, "data" + (2 * i + 2)).setExecutable(true);
+    if (cluster != null) {
+      for (File dir : cluster.getAllInstanceStorageDirs()) {
+        dir.setExecutable(true);
+      }
+      cluster.shutdown();
     }
-    cluster.shutdown();
   }
 
   /**
@@ -123,10 +124,10 @@ public class TestDataNodeVolumeFailureReporting {
     final long origCapacity = DFSTestUtil.getLiveDatanodeCapacity(dm);
     long dnCapacity = DFSTestUtil.getDatanodeCapacity(dm, 0);
 
-    File dn1Vol1 = new File(dataDir, "data" + (2 * 0 + 1));
-    File dn2Vol1 = new File(dataDir, "data" + (2 * 1 + 1));
-    File dn3Vol1 = new File(dataDir, "data" + (2 * 2 + 1));
-    File dn3Vol2 = new File(dataDir, "data" + (2 * 2 + 2));
+    File dn1Vol1 = cluster.getInstanceStorageDir(0, 0);
+    File dn2Vol1 = cluster.getInstanceStorageDir(1, 0);
+    File dn3Vol1 = cluster.getInstanceStorageDir(2, 0);
+    File dn3Vol2 = cluster.getInstanceStorageDir(2, 1);
 
     /*
      * Make the 1st volume directories on the first two datanodes
@@ -266,8 +267,8 @@ public class TestDataNodeVolumeFailureReporting {
 
     // Fail the first volume on both datanodes (we have to keep the 
     // third healthy so one node in the pipeline will not fail). 
-    File dn1Vol1 = new File(dataDir, "data" + (2 * 0 + 1));
-    File dn2Vol1 = new File(dataDir, "data" + (2 * 1 + 1));
+    File dn1Vol1 = cluster.getInstanceStorageDir(0, 0);
+    File dn2Vol1 = cluster.getInstanceStorageDir(1, 0);
     assertTrue("Couldn't chmod local vol", dn1Vol1.setExecutable(false));
     assertTrue("Couldn't chmod local vol", dn2Vol1.setExecutable(false));
 

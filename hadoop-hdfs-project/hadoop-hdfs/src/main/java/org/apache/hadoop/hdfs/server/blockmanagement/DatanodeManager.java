@@ -506,7 +506,7 @@ public class DatanodeManager {
    */
   void addDatanode(final DatanodeDescriptor node) throws IOException {
     // To keep host2DatanodeMap consistent with datanodeMap,
-    // remove  from host2DatanodeMap the datanodeDescriptor removed
+    // remove from host2DatanodeMap the datanodeDescriptor removed
     // from datanodeMap before adding node to host2DatanodeMap.
     synchronized (datanodeMap) {
       host2DatanodeMap.remove(datanodeMap.put(node.getDatanodeUuid(), node));

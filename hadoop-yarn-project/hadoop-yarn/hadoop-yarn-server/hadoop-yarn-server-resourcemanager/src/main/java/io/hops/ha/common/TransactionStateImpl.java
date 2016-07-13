@@ -88,6 +88,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentSkipListMap;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.yarn.api.records.ContainerId;
+import org.apache.hadoop.yarn.api.records.ContainerState;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.impl.pb.ContainerPBImpl;
 import org.apache.hadoop.yarn.api.records.impl.pb.ContainerStatusPBImpl;
@@ -433,9 +434,18 @@ public class TransactionStateImpl extends TransactionState {
   public void addJustFinishedContainerToAdd(ContainerStatus status,
           ApplicationAttemptId appAttemptId) {
     justFinishedContainerToRemove.remove(status.getContainerId());
-    justFinishedContainerToAdd.put(status.getContainerId(),
-            new JustFinishedContainer(status.getContainerId().toString(),
-                    appAttemptId.toString(), ((ContainerStatusPBImpl) status).
+    ContainerStatus newStatus;
+    if(status.getDiagnostics().length()> 1000){
+      newStatus = ContainerStatus.newInstance(status.getContainerId(),
+              status.getState(), status.getDiagnostics().substring(
+                      0, 1000), status.getExitStatus());
+    }else{
+      newStatus = status;
+    }
+    
+    justFinishedContainerToAdd.put(newStatus.getContainerId(),
+            new JustFinishedContainer(newStatus.getContainerId().toString(),
+                    appAttemptId.toString(), ((ContainerStatusPBImpl) newStatus).
                     getProto().toByteArray()));
     appIds.add(appAttemptId.getApplicationId());
   }

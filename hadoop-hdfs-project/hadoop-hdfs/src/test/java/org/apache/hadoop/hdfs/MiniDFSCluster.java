@@ -1082,10 +1082,8 @@ public class MiniDFSCluster {
       }
       if (racks != null) {
         String name = hosts[i - curDatanodesNum];
-        LOG.info("Adding node with hostname : " + name + " to rack " +
-            racks[i-curDatanodesNum]);
-        StaticMapping.addNodeToRack(name,
-            racks[i-curDatanodesNum]);
+        LOG.info("Adding node with hostname : " + name + " to rack " + racks[i-curDatanodesNum]);
+        StaticMapping.addNodeToRack(name, racks[i-curDatanodesNum]);
       }
       Configuration newconf = new HdfsConfiguration(dnConf); // save config
       if (hosts != null) {
@@ -1102,19 +1100,15 @@ public class MiniDFSCluster {
           ex.printStackTrace();
         }
       }
-      DataNode dn =
-          DataNode.instantiateDataNode(dnArgs, dnConf, secureResources);
+      DataNode dn = DataNode.instantiateDataNode(dnArgs, dnConf, secureResources);
       if (dn == null) {
-        throw new IOException("Cannot start DataNode in " +
-            dnConf.get(DFS_DATANODE_DATA_DIR_KEY));
+        throw new IOException("Cannot start DataNode in " + dnConf.get(DFS_DATANODE_DATA_DIR_KEY));
       }
       //since the HDFS does things based on host|ip:port, we need to add the
       //mapping for the service to rackId
-      String service =
-          SecurityUtil.buildTokenService(dn.getXferAddress()).toString();
+      String service = SecurityUtil.buildTokenService(dn.getXferAddress()).toString();
       if (racks != null) {
-        LOG.info("Adding node with service : " + service +
-            " to rack " + racks[i-curDatanodesNum]);
+        LOG.info("Adding node with service : " + service + " to rack " + racks[i-curDatanodesNum]);
         StaticMapping.addNodeToRack(service,
             racks[i-curDatanodesNum]);
       }
@@ -1347,8 +1341,7 @@ public class MiniDFSCluster {
     LOG.info("Shutting down the Mini HDFS Cluster");
     if (checkExitOnShutdown) {
       if (ExitUtil.terminateCalled()) {
-        LOG.fatal("Test resulted in an unexpected exit",
-            ExitUtil.getFirstExitException());
+        LOG.fatal("Test resulted in an unexpected exit", ExitUtil.getFirstExitException());
         ExitUtil.resetFirstExitException();
         throw new AssertionError("Test resulted in an unexpected exit");
       }
@@ -2088,6 +2081,19 @@ public class MiniDFSCluster {
    */
   public File getInstanceStorageDir(int dnIndex, int dirIndex) {
     return new File(base_dir, getStorageDirPath(dnIndex, dirIndex));
+  }
+
+  /**
+   * Get all storage directories for this instance of the MiniCluster
+   */
+  public ArrayList<File> getAllInstanceStorageDirs() {
+    ArrayList<File> dirs = new ArrayList<File>();
+    for(int dirId = 0; dirId < this.numDataNodes; dirId++) {
+      for(int storageId = 0; storageId < this.storagesPerDatanode; storageId++) {
+        dirs.add(getInstanceStorageDir(dirId, storageId));
+      }
+    }
+    return dirs;
   }
 
   /**

@@ -75,7 +75,7 @@ import static org.junit.Assert.assertTrue;
 /**
  * This test simulates a variety of situations when blocks are being
  * intentionally corrupted, unexpectedly modified, and so on before a block
- * * report is happening.
+ * report is happening.
  *
  * For each test case it runs two variations:
  *  #1 - For a given DN, the first variation sends block reports for all

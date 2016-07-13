@@ -56,7 +56,7 @@ import java.util.logging.Logger;
 @InterfaceAudience.Private
 public abstract class INode implements Comparable<byte[]> {
   
-  static final List<INode> EMPTY_LIST =
+  public static final List<INode> EMPTY_LIST =
       Collections.unmodifiableList(new ArrayList<INode>());
 
 
@@ -470,10 +470,10 @@ public abstract class INode implements Comparable<byte[]> {
   }
 
   /**
-   * @return the latest block storage policy id of the INode. Specifically,
-   * if a storage policy is directly specified on the INode then return the ID
-   * of that policy. Otherwise follow the latest parental path and return the
-   * ID of the first specified storage policy.
+   * 1) If the file or directory is specificed with a storage policy, return it.
+   * 2) For an unspecified file or directory, if it is the root directory,
+   *    return the default storage policy. Otherwise, return its parent's
+   *    effective storage policy.
    */
   public byte getStoragePolicyID() throws TransactionContextException, StorageException {
     byte localPolicyId = getLocalStoragePolicyID();
@@ -483,9 +483,10 @@ public abstract class INode implements Comparable<byte[]> {
     }
 
     // if it is unspecified, check its parent
+    //
     INodeDirectory parent = getParent();
     return parent != null ? parent.getStoragePolicyID() :
-        BlockStoragePolicySuite.ID_UNSPECIFIED;
+        BlockStoragePolicySuite.getDefaultPolicy().getId();
   }
 
   /**

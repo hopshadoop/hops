@@ -1050,8 +1050,7 @@ public class FSNamesystem
 
               LocatedBlock lastBlock = blocks.getLastLocatedBlock();
               if (lastBlock != null) {
-                ArrayList<LocatedBlock> lastBlockList =
-                    new ArrayList<LocatedBlock>();
+                ArrayList<LocatedBlock> lastBlockList = new ArrayList<LocatedBlock>();
                 lastBlockList.add(lastBlock);
                 blockManager.getDatanodeManager()
                     .sortLocatedBlocks(clientMachine, lastBlockList);
@@ -1886,6 +1885,15 @@ public class FSNamesystem
 
       if (append && myFile != null) {
         final INodeFile f = INodeFile.valueOf(myFile, src);
+
+        final BlockInfo lastBlock = f.getLastBlock();
+        // Check that the block has at least minimum replication.
+        if(lastBlock != null && lastBlock.isComplete() &&
+            !getBlockManager().isSufficientlyReplicated(lastBlock)) {
+          throw new IOException("append: lastBlock=" + lastBlock +
+              " of src=" + src + " is not sufficiently replicated yet.");
+        }
+
         return prepareFileForWrite(src, f, holder, clientMachine, clientNode);
       } else {
         // Now we can add the name to the filesystem. This file has no
@@ -7417,8 +7425,11 @@ private void commitOrCompleteLastBlock(
 
     // We always want to store Erasure Coded files on RAID5 volumes, but can
     // fall back to DISK
-    byte storagePolicyID = HdfsConstants.RAID5_STORAGE_POLICY_ID;
+    // Always go for RAID 5 or do we just inherit it?
+//    byte storagePolicyID = HdfsConstants.RAID5_STORAGE_POLICY_ID;
+    byte storagePolicyID = getINode(sourcePath).getStoragePolicyID();
     BlockStoragePolicy policy = BlockStoragePolicySuite.getPolicy(storagePolicyID);
+
 
     BlockPlacementPolicyDefault placementPolicy = (BlockPlacementPolicyDefault)
         getBlockManager().getBlockPlacementPolicy();

@@ -103,23 +103,20 @@ public class TestGetBlocks {
   @Test
   public void testReadSelectNonStaleDatanode() throws Exception {
     HdfsConfiguration conf = new HdfsConfiguration();
-    conf.setBoolean(
-        DFSConfigKeys.DFS_NAMENODE_AVOID_STALE_DATANODE_FOR_READ_KEY, true);
+    conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_AVOID_STALE_DATANODE_FOR_READ_KEY, true);
     long staleInterval = 30 * 1000 * 60;
     conf.setLong(DFSConfigKeys.DFS_NAMENODE_STALE_DATANODE_INTERVAL_KEY,
         staleInterval);
-    MiniDFSCluster cluster =
-        new MiniDFSCluster.Builder(conf).numDataNodes(numDatanodes).racks(racks)
-            .build();
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
+        .numDataNodes(numDatanodes).racks(racks).build();
 
     cluster.waitActive();
-    InetSocketAddress addr =
-        new InetSocketAddress("localhost", cluster.getNameNodePort());
+    InetSocketAddress addr = new InetSocketAddress("localhost",
+        cluster.getNameNodePort());
     DFSClient client = new DFSClient(addr, conf);
-    List<DatanodeDescriptor> nodeInfoList =
-        cluster.getNameNode().getNamesystem().getBlockManager()
-            .getDatanodeManager()
-            .getDatanodeListForReport(DatanodeReportType.LIVE);
+    List<DatanodeDescriptor> nodeInfoList = cluster.getNameNode()
+        .getNamesystem().getBlockManager().getDatanodeManager()
+        .getDatanodeListForReport(DatanodeReportType.LIVE);
     assertEquals("Unexpected number of datanodes", numDatanodes,
         nodeInfoList.size());
     FileSystem fileSys = cluster.getFileSystem();
@@ -128,24 +125,21 @@ public class TestGetBlocks {
       // do the writing but do not close the FSDataOutputStream
       // in order to mimic the ongoing writing
       final Path fileName = new Path("/file1");
-      stm = fileSys.create(fileName, true, fileSys.getConf()
-              .getInt(CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096),
+      stm = fileSys.create(
+          fileName,
+          true,
+          fileSys.getConf().getInt(
+              CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096),
           (short) 3, blockSize);
       stm.write(new byte[(blockSize * 3) / 2]);
       // We do not close the stream so that
       // the writing seems to be still ongoing
       stm.hflush();
 
-      Thread.sleep(500);
-
-
-      LocatedBlocks blocks = client.getNamenode()
-          .getBlockLocations(fileName.toString(), 0, blockSize);
-
-
+      LocatedBlocks blocks = client.getNamenode().getBlockLocations(
+          fileName.toString(), 0, blockSize);
       DatanodeInfo[] nodes = blocks.get(0).getLocations();
-
-      assertEquals(3, nodes.length);
+      assertEquals(nodes.length, 3);
       DataNode staleNode = null;
       DatanodeDescriptor staleNodeInfo = null;
       // stop the heartbeat of the first node
@@ -153,11 +147,12 @@ public class TestGetBlocks {
       assertNotNull(staleNode);
       // set the first node as stale
       staleNodeInfo = cluster.getNameNode().getNamesystem().getBlockManager()
-          .getDatanodeManager().getDatanode(staleNode.getDatanodeId());
+          .getDatanodeManager()
+          .getDatanode(staleNode.getDatanodeId());
       staleNodeInfo.setLastUpdate(Time.now() - staleInterval - 1);
 
-      LocatedBlocks blocksAfterStale = client.getNamenode()
-          .getBlockLocations(fileName.toString(), 0, blockSize);
+      LocatedBlocks blocksAfterStale = client.getNamenode().getBlockLocations(
+          fileName.toString(), 0, blockSize);
       DatanodeInfo[] nodesAfterStale = blocksAfterStale.get(0).getLocations();
       assertEquals(nodesAfterStale.length, 3);
       assertEquals(nodesAfterStale[2].getHostName(), nodes[0].getHostName());
@@ -167,29 +162,30 @@ public class TestGetBlocks {
       // reset the first node as non-stale, so as to avoid two stale nodes
       staleNodeInfo.setLastUpdate(Time.now());
 
-      LocatedBlock lastBlock =
-          client.getLocatedBlocks(fileName.toString(), 0, Long.MAX_VALUE)
-              .getLastLocatedBlock();
+      LocatedBlock lastBlock = client.getLocatedBlocks(fileName.toString(), 0,
+          Long.MAX_VALUE).getLastLocatedBlock();
       nodes = lastBlock.getLocations();
-      assertEquals(3, nodes.length);
+      assertEquals(nodes.length, 3);
       // stop the heartbeat of the first node for the last block
       staleNode = this.stopDataNodeHeartbeat(cluster, nodes[0].getHostName());
       assertNotNull(staleNode);
-
       // set the node as stale
       cluster.getNameNode().getNamesystem().getBlockManager()
-          .getDatanodeManager().getDatanode(staleNode.getDatanodeId())
+          .getDatanodeManager()
+          .getDatanode(staleNode.getDatanodeId())
           .setLastUpdate(Time.now() - staleInterval - 1);
 
-      LocatedBlock lastBlockAfterStale =
-          client.getLocatedBlocks(fileName.toString(), 0, Long.MAX_VALUE)
-              .getLastLocatedBlock();
+      LocatedBlock lastBlockAfterStale = client.getLocatedBlocks(
+          fileName.toString(), 0, Long.MAX_VALUE).getLastLocatedBlock();
       nodesAfterStale = lastBlockAfterStale.getLocations();
       assertEquals(nodesAfterStale.length, 3);
-      assertEquals(nodes[0].getHostName(), nodesAfterStale[2].getHostName());
+      assertEquals(nodesAfterStale[2].getHostName(), nodes[0].getHostName());
     } finally {
       if (stm != null) {
         stm.close();
+      }
+      if (client != null) {
+        client.close();
       }
       cluster.shutdown();
     }

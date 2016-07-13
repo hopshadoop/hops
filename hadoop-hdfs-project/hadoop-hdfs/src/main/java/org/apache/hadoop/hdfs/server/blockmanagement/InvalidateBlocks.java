@@ -132,8 +132,10 @@ class InvalidateBlocks {
    * invalidatesSet
    */
   void remove(List<Integer> sids) throws IOException {
-    for(int sid : sids) {
-      removeInvBlocks(sid);
+    if(sids != null) {
+      for (int sid : sids) {
+        removeInvBlocks(sid);
+      }
     }
   }
 

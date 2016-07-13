@@ -29,10 +29,7 @@ import org.apache.hadoop.ipc.RPC;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
-import java.util.List;
-import java.util.Random;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
@@ -280,6 +277,7 @@ public class NamenodeSelector extends Thread {
         rrIndex = (++rrIndex) % nnList.size();
         NamenodeSelector.NamenodeHandle handle = nnList.get(rrIndex);
         if (!this.blackListedNamenodes.contains(handle)) {
+          LOG.debug("ROUND_ROBIN returning "+handle);
           return handle;
         }
       }
@@ -289,6 +287,7 @@ public class NamenodeSelector extends Thread {
       //stickyHandle
       if(stickyHandle != null && nnList.contains(stickyHandle) &&
           !blackListedNamenodes.contains(stickyHandle)){
+        LOG.debug("RANDOM_STICKY returning "+stickyHandle);
         return stickyHandle;
       } else { // stick to some other random alive NN
         stickyHandle = getRandomNNInternal();
@@ -307,6 +306,7 @@ public class NamenodeSelector extends Thread {
       int index = rand.nextInt(nnList.size());
       NamenodeSelector.NamenodeHandle handle = nnList.get(index);
       if (!this.blackListedNamenodes.contains(handle)) {
+        LOG.debug("RANDOM returning "+handle);
         return handle;
       }
     }
@@ -397,6 +397,7 @@ public class NamenodeSelector extends Thread {
    */
   private synchronized void periodicNamenodeClientsUpdate() throws IOException {
     SortedActiveNodeList anl = null;
+    LOG.debug("Fetching new list of namenodes");
     if (!nnList.isEmpty()) {
       for (NamenodeSelector.NamenodeHandle namenode : nnList) { //TODO dont try with black listed nodes
         try {
@@ -419,6 +420,7 @@ public class NamenodeSelector extends Thread {
     if (anl == null) { // try contacting default NNs
       createNamenodeClientsFromConfiguration();
     }
+
   }
 
 
@@ -462,6 +464,8 @@ public class NamenodeSelector extends Thread {
       }
     }
 
+
+    LOG.debug("nnList Size:"+nnList.size()+"  Handles: " + Arrays.toString(nnList.toArray()));
     //clear black listed nodes
     this.blackListedNamenodes.clear();
   }
@@ -524,6 +528,11 @@ public class NamenodeSelector extends Thread {
   public void blackListNamenode(NamenodeSelector.NamenodeHandle handle) {
     if (!this.blackListedNamenodes.contains(handle)) {
       this.blackListedNamenodes.add(handle);
+    }
+
+    if(policy == NamenodeSelector.NNSelectionPolicy.RANDOM_STICKY &&
+            stickyHandle != null && stickyHandle == handle  ){
+      stickyHandle = null;
     }
 
     //if a bad namenode is detected then update the list of Namenodes in the system

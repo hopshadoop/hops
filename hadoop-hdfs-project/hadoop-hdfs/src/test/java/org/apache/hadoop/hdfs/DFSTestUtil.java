@@ -22,11 +22,15 @@ import com.google.common.base.Charsets;
 import com.google.common.base.Joiner;
 import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
+import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.StorageMap;
+import io.hops.metadata.hdfs.dal.INodeAttributesDataAccess;
+import io.hops.metadata.hdfs.dal.INodeDataAccess;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.security.Users;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
+import io.hops.transaction.handler.LightWeightRequestHandler;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLocks;
 import org.apache.commons.logging.Log;
@@ -41,6 +45,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileSystem.Statistics;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.client.HdfsDataInputStream;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
@@ -54,6 +59,7 @@ import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.BlockOpResponseP
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.hdfs.security.token.block.ExportedBlockKeys;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockManagerTestUtil;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeManager;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
@@ -61,7 +67,12 @@ import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.StartupOption;
 import org.apache.hadoop.hdfs.server.common.StorageInfo;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.datanode.TestTransferRbw;
+import org.apache.hadoop.hdfs.server.namenode.FSDirectory;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
+import org.apache.hadoop.hdfs.server.namenode.INode;
+import org.apache.hadoop.hdfs.server.namenode.INodeAttributes;
+import org.apache.hadoop.hdfs.server.namenode.INodeDirectory;
+import org.apache.hadoop.hdfs.server.namenode.INodeDirectoryWithQuota;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
@@ -102,6 +113,7 @@ import static org.apache.hadoop.fs.CreateFlag.CREATE;
 import static org.apache.hadoop.fs.CreateFlag.OVERWRITE;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_KEY;
+import static org.apache.hadoop.hdfs.server.namenode.FSNamesystem.LOG;
 import static org.junit.Assert.assertEquals;
 
 /**
@@ -948,7 +960,7 @@ public class DFSTestUtil {
   }
 
   public static DatanodeDescriptor getLocalDatanodeDescriptor(boolean initializeStorage) {
-    DatanodeDescriptor dn = new DatanodeDescriptor(new StorageMap(),
+    DatanodeDescriptor dn = new DatanodeDescriptor(new StorageMap(false),
         getLocalDatanodeID());
     if (initializeStorage) {
       dn.updateStorage(new DatanodeStorage(DatanodeStorage.generateUuid()));
@@ -1056,14 +1068,42 @@ public class DFSTestUtil {
     final DatanodeStorage storage = new DatanodeStorage(storageID,
         DatanodeStorage.State.NORMAL, type);
     final DatanodeDescriptor dn = BlockManagerTestUtil.getDatanodeDescriptor(ip, rack, storage, hostname);
-    return BlockManagerTestUtil.newDatanodeStorageInfo(dn, storage);
-  }
-  
-  public static DatanodeRegistration getLocalDatanodeRegistration() {
-    return new DatanodeRegistration(getLocalDatanodeID(), new StorageInfo(),
-        new ExportedBlockKeys(), VersionInfo.getVersion());
+    return new DatanodeStorageInfo(dn, storage);
   }
 
+  public static void createRootFolder() throws IOException {
+    LightWeightRequestHandler addRootINode =
+        new LightWeightRequestHandler(HDFSOperationType.SET_ROOT) {
+          @Override
+          public Object performTask() throws IOException {
+            INodeDirectoryWithQuota newRootINode = null;
+            INodeDataAccess da = (INodeDataAccess) HdfsStorageFactory.getDataAccess(INodeDataAccess.class);
+
+            newRootINode = INodeDirectoryWithQuota.createRootDir(
+                new PermissionStatus("user", "grp", new FsPermission((short) 0755)));
+
+            // Set the block storage policy to DEFAULT
+            newRootINode.setBlockStoragePolicyIDNoPersistance(BlockStoragePolicySuite.getDefaultPolicy().getId());
+            List<INode> newINodes = new ArrayList<INode>();
+            newINodes.add(newRootINode);
+            da.prepare(INode.EMPTY_LIST, newINodes, INode.EMPTY_LIST);
+
+            INodeAttributes inodeAttributes =
+                new INodeAttributes(newRootINode.getId(), Long.MAX_VALUE, 1L,
+                    FSDirectory.UNKNOWN_DISK_SPACE, 0L);
+            INodeAttributesDataAccess ida =
+                (INodeAttributesDataAccess) HdfsStorageFactory
+                    .getDataAccess(INodeAttributesDataAccess.class);
+            List<INodeAttributes> attrList = new ArrayList<INodeAttributes>();
+            attrList.add(inodeAttributes);
+            ida.prepare(attrList, null);
+
+            return null;
+          }
+        };
+    addRootINode.handle();
+  }
+  
   public static class Builder {
     private int maxLevels = 3;
     private int maxSize = 8 * 1024;

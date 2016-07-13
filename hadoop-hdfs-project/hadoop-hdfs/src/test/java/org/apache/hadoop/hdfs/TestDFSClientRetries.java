@@ -197,6 +197,7 @@ public class TestDFSClientRetries {
       }
       // successfully read with write timeout on datanodes.
       in.close();
+      fs.close();
     } finally {
       cluster.shutdown();
     }
@@ -824,11 +825,13 @@ public class TestDFSClientRetries {
         5000);
 
     final short numDatanodes = 3;
-    final MiniDFSCluster cluster =
-        new MiniDFSCluster.Builder(conf).numDataNodes(numDatanodes).format(true)
-            .build();
+    final MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
+        .numDataNodes(numDatanodes)
+        .build();
+
     try {
       cluster.waitActive();
+
       final DistributedFileSystem dfs = cluster.getFileSystem();
       final FileSystem fs =
           isWebHDFS ? WebHdfsTestUtil.getWebHdfsFileSystem(conf) : dfs;
@@ -1031,15 +1034,15 @@ public class TestDFSClientRetries {
   }
 
   private static FileSystem createFsWithDifferentUsername(
-      final Configuration conf, final boolean isWebHDFS)
-      throws IOException, InterruptedException {
-    final String username =
-        UserGroupInformation.getCurrentUser().getShortUserName() + "_XXX";
-    final UserGroupInformation ugi = UserGroupInformation
-        .createUserForTesting(username, new String[]{"supergroup"});
+      final Configuration conf, final boolean isWebHDFS
+  ) throws IOException, InterruptedException {
+    final String username = UserGroupInformation.getCurrentUser(
+    ).getShortUserName() + "_XXX";
+    final UserGroupInformation ugi = UserGroupInformation.createUserForTesting(
+        username, new String[]{"supergroup"});
 
-    return isWebHDFS ? WebHdfsTestUtil.getWebHdfsFileSystemAs(ugi, conf) :
-        DFSTestUtil.getFileSystemAs(ugi, conf);
+    return isWebHDFS? WebHdfsTestUtil.getWebHdfsFileSystemAs(ugi, conf)
+        : DFSTestUtil.getFileSystemAs(ugi, conf);
   }
 
   @Test
@@ -1084,12 +1087,14 @@ public class TestDFSClientRetries {
   @Test
   public void testRetryOnChecksumFailure() throws Exception {
     HdfsConfiguration conf = new HdfsConfiguration();
-    MiniDFSCluster cluster =
-        new MiniDFSCluster.Builder(conf).format(true).numDataNodes(1).build();
+    MiniDFSCluster cluster = null;
+    DFSClient client = null;
+
 
     try {
       final short REPL_FACTOR = 1;
       final long FILE_LENGTH = 512L;
+      cluster = new MiniDFSCluster.Builder(conf).format(true).numDataNodes(1).build();
       cluster.waitActive();
       FileSystem fs = cluster.getFileSystem();
 
@@ -1105,7 +1110,7 @@ public class TestDFSClientRetries {
 
       InetSocketAddress nnAddr =
           new InetSocketAddress("localhost", cluster.getNameNodePort());
-      DFSClient client = new DFSClient(nnAddr, conf);
+      client = new DFSClient(nnAddr, conf);
       DFSInputStream dis = client.open(path.toString());
       byte[] arr = new byte[(int) FILE_LENGTH];
       for (int i = 0; i < 2; ++i) {
@@ -1117,7 +1122,12 @@ public class TestDFSClientRetries {
         }
       }
     } finally {
-      cluster.shutdown();
+      if(client != null) {
+        client.close();
+      }
+      if(cluster != null) {
+        cluster.shutdown();
+      }
     }
   }
 }

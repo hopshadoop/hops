@@ -110,7 +110,8 @@ public class TestDFSAddressConfig {
     selfSocketAddr = dn.getXferAddress().toString();
     System.out.println("DN Self Socket Addr == " + selfSocketAddr);
     // assert that default self socket address is 0.0.0.0
-    assertTrue(selfSocketAddr.contains("/0.0.0.0:"));
+    boolean isIPv6 = selfSocketAddr.contains("/0:0:0:0:0:0:0:0:");
+    assertTrue(selfSocketAddr.contains("/0.0.0.0:") || isIPv6);
 
     cluster.shutdown();
   }

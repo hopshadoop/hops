@@ -69,7 +69,8 @@ public interface BlockCollection {
   /**
    * @return the storage policy ID.
    */
-  public byte getStoragePolicyID();
+  public byte getStoragePolicyID() throws TransactionContextException,
+      StorageException;
 
   /**
    * Get the name of the collection.

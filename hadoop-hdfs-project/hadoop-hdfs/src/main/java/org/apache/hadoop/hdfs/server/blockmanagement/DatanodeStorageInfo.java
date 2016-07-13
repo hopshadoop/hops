@@ -124,7 +124,7 @@ public class DatanodeStorageInfo {
    */
   private boolean blockContentsStale = true;
 
-  DatanodeStorageInfo(DatanodeDescriptor dn, DatanodeStorage s) {
+  public DatanodeStorageInfo(DatanodeDescriptor dn, DatanodeStorage s) {
     this.dn = dn;
     this.storageID = s.getStorageID();
     this.storageType = s.getStorageType();

@@ -22,6 +22,8 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdfs.protocol.LocatedBlock;
+import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -131,100 +133,102 @@ public class TestConnCache {
     }
   }
 
-//  TODO
-//  In Hadoop 2.6.3, there are some extra tests:
-//
-//  /**
-//   * Test the SocketCache itself.
-//   */
-//  @Test
-//  public void testSocketCache() throws Exception {
-//    // Make a client
-//    InetSocketAddress nnAddr =
-//        new InetSocketAddress("localhost", cluster.getNameNodePort());
-//    DFSClient client = new DFSClient(nnAddr, conf);
-//
-//    // Find out the DN addr
-//    LocatedBlock block = client.getNamenode()
-//        .getBlockLocations(testFile.toString(), 0, FILE_SIZE).getLocatedBlocks()
-//        .get(0);
-//    DataNode dn = util.getDataNode(block);
-//    InetSocketAddress dnAddr = dn.getXferAddress();
-//
-//
-//    // Make some sockets to the DN
-//    Socket[] dnSockets = new Socket[CACHE_SIZE];
-//    for (int i = 0; i < dnSockets.length; ++i) {
-//      dnSockets[i] = client.socketFactory
-//          .createSocket(dnAddr.getAddress(), dnAddr.getPort());
-//    }
-//
-//
-//    // Insert a socket to the NN
-//    Socket nnSock = new Socket(nnAddr.getAddress(), nnAddr.getPort());
-//    cache.put(nnSock, null);
-//    assertSame("Read the write", nnSock, cache.get(nnAddr).sock);
-//    cache.put(nnSock, null);
-//
-//    // Insert DN socks
-//    for (Socket dnSock : dnSockets) {
-//      cache.put(dnSock, null);
-//    }
-//
-//    assertEquals("NN socket evicted", null, cache.get(nnAddr));
-//    assertTrue("Evicted socket closed", nnSock.isClosed());
-//
-//    // Lookup the DN socks
-//    for (Socket dnSock : dnSockets) {
-//      assertEquals("Retrieve cached sockets", dnSock, cache.get(dnAddr).sock);
-//      dnSock.close();
-//    }
-//
-//    assertEquals("Cache is empty", 0, cache.size());
-//  }
-//
-//
-//  /**
-//   * Test the SocketCache expiry.
-//   * Verify that socket cache entries expire after the set
-//   * expiry time.
-//   */
-//  @Test
-//  public void testSocketCacheExpiry() throws Exception {
-//    // Make a client
-//    InetSocketAddress nnAddr =
-//        new InetSocketAddress("localhost", cluster.getNameNodePort());
-//    DFSClient client = new DFSClient(nnAddr, conf);
-//
-//    // Find out the DN addr
-//    LocatedBlock block = client.getNamenode()
-//        .getBlockLocations(testFile.toString(), 0, FILE_SIZE).getLocatedBlocks()
-//        .get(0);
-//    DataNode dn = util.getDataNode(block);
-//    InetSocketAddress dnAddr = dn.getXferAddress();
-//
-//
-//    // Make some sockets to the DN and put in cache
-//    Socket[] dnSockets = new Socket[CACHE_SIZE];
-//    for (int i = 0; i < dnSockets.length; ++i) {
-//      dnSockets[i] = client.socketFactory
-//          .createSocket(dnAddr.getAddress(), dnAddr.getPort());
-//      cache.put(dnSockets[i], null);
-//    }
-//
-//    // Client side still has the sockets cached
-//    assertEquals(CACHE_SIZE, client.socketCache.size());
-//
-//    //sleep for a second and see if it expired
-//    Thread.sleep(CACHE_EXPIRY_MS + 1000);
-//
-//    // Client side has no sockets cached
-//    assertEquals(0, client.socketCache.size());
-//
-//    //sleep for another second and see if
-//    //the daemon thread runs fine on empty cache
-//    Thread.sleep(CACHE_EXPIRY_MS + 1000);
-//  }
+  /**
+   * Test the SocketCache itself.
+   */
+  @Test
+  public void testSocketCache() throws Exception {
+    HdfsConfiguration configuration = new HdfsConfiguration();
+    BlockReaderTestUtil util = new BlockReaderTestUtil(1, configuration);
+    final Path testFile = new Path("/testConnCache.dat");
+    util.writeFile(testFile, FILE_SIZE / 1024);
+    InetSocketAddress nnAddr = new InetSocketAddress("localhost",
+        util.getCluster().getNameNodePort());
+    DFSClient client = new DFSClient(nnAddr, util.getConf());
+
+    // Find out the DN addr
+    LocatedBlock block = client.getNamenode()
+        .getBlockLocations(testFile.toString(), 0, FILE_SIZE).getLocatedBlocks()
+        .get(0);
+    DataNode dn = util.getDataNode(block);
+    InetSocketAddress dnAddr = dn.getXferAddress();
+
+
+    // Make some sockets to the DN
+    Socket[] dnSockets = new Socket[CACHE_SIZE];
+    for (int i = 0; i < dnSockets.length; ++i) {
+      dnSockets[i] = client.socketFactory
+          .createSocket(dnAddr.getAddress(), dnAddr.getPort());
+    }
+
+    // Insert a socket to the NN
+    Socket nnSock = new Socket(nnAddr.getAddress(), nnAddr.getPort());
+    cache.put(nnSock, null);
+    assertSame("Read the write", nnSock, cache.get(nnAddr).sock);
+    cache.put(nnSock, null);
+
+    // Insert DN socks
+    for (Socket dnSock : dnSockets) {
+      cache.put(dnSock, null);
+    }
+
+    assertEquals("NN socket evicted", null, cache.get(nnAddr));
+    assertTrue("Evicted socket closed", nnSock.isClosed());
+
+    // Lookup the DN socks
+    for (Socket dnSock : dnSockets) {
+      assertEquals("Retrieve cached sockets", dnSock, cache.get(dnAddr).sock);
+      dnSock.close();
+    }
+
+    assertEquals("Cache is empty", 0, cache.size());
+  }
+
+
+  /**
+   * Test the SocketCache expiry.
+   * Verify that socket cache entries expire after the set
+   * expiry time.
+   */
+  @Test
+  public void testSocketCacheExpiry() throws Exception {
+    HdfsConfiguration configuration = new HdfsConfiguration();
+    BlockReaderTestUtil util = new BlockReaderTestUtil(1, configuration);
+    final Path testFile = new Path("/testConnCache.dat");
+    util.writeFile(testFile, FILE_SIZE / 1024);
+    DFSClient client = new DFSClient(
+        new InetSocketAddress("localhost",
+            util.getCluster().getNameNodePort()), util.getConf());
+
+    // Find out the DN addr
+    LocatedBlock block = client.getNamenode()
+        .getBlockLocations(testFile.toString(), 0, FILE_SIZE).getLocatedBlocks()
+        .get(0);
+    DataNode dn = util.getDataNode(block);
+    InetSocketAddress dnAddr = dn.getXferAddress();
+
+
+    // Make some sockets to the DN and put in cache
+    Socket[] dnSockets = new Socket[CACHE_SIZE];
+    for (int i = 0; i < dnSockets.length; ++i) {
+      dnSockets[i] = client.socketFactory
+          .createSocket(dnAddr.getAddress(), dnAddr.getPort());
+      cache.put(dnSockets[i], null);
+    }
+
+    // Client side still has the sockets cached
+    assertEquals(CACHE_SIZE, client.socketCache.size());
+
+    //sleep for a second and see if it expired
+    Thread.sleep(CACHE_EXPIRY_MS + 1000);
+
+    // Client side has no sockets cached
+    assertEquals(0, client.socketCache.size());
+
+    //sleep for another second and see if
+    //the daemon thread runs fine on empty cache
+    Thread.sleep(CACHE_EXPIRY_MS + 1000);
+  }
 
 
   /**
