@@ -7423,10 +7423,7 @@ private void commitOrCompleteLastBlock(
       }
     }
 
-    // We always want to store Erasure Coded files on RAID5 volumes, but can
-    // fall back to DISK
-    // Always go for RAID 5 or do we just inherit it?
-//    byte storagePolicyID = HdfsConstants.RAID5_STORAGE_POLICY_ID;
+    // Find which storage policy is used for this file.
     byte storagePolicyID = getINode(sourcePath).getStoragePolicyID();
     BlockStoragePolicy policy = BlockStoragePolicySuite.getPolicy(storagePolicyID);
 

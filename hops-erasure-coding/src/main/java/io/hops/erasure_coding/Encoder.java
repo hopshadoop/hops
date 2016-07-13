@@ -29,7 +29,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DFSClient;
 import org.apache.hadoop.hdfs.DFSOutputStream;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
-import org.apache.hadoop.hdfs.protocol.HdfsConstants;
+import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
 import org.apache.hadoop.util.Progressable;
 
 import java.io.File;
@@ -146,9 +146,12 @@ public class Encoder {
     FSDataOutputStream out = parityFs.create(parityFile, true,
         conf.getInt("io.file.buffer.size", 64 * 1024), tmpRepl, blockSize);
 
-    // Set the storage policy to RAID5 for disk-fault tolerance
     if(parityFs instanceof DistributedFileSystem) {
-      ((DistributedFileSystem) parityFs).setStoragePolicy(parityFile, HdfsConstants.RAID5_STORAGE_POLICY_NAME);
+      // Get the storage policy of the source file
+      BlockStoragePolicy policy = ((DistributedFileSystem) parityFs).getStoragePolicy(srcFile);
+
+      // And also apply it to the parity file
+      ((DistributedFileSystem) parityFs).setStoragePolicy(parityFile, policy.getName());
     }
 
     DFSOutputStream dfsOut = (DFSOutputStream) out.getWrappedStream();

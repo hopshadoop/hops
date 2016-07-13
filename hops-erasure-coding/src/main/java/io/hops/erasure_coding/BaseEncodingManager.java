@@ -250,14 +250,6 @@ public abstract class BaseEncodingManager extends EncodingManager {
         statistics.remainingSize += diskSpace;
         return false;
       }
-
-      // Set the storage policy to RAID5 for disk-fault tolerance
-      srcFs.setStoragePolicy(sourceFile, HdfsConstants.RAID5_STORAGE_POLICY_NAME);
-      // The policy is now updated, but did not change the locations of
-      // blocks yet. This only happens when we trigger the Mover.
-      // TODO
-      // Mover.trigger(sourceFile);
-
     } catch (IOException e) {
       if (out != null) {
         out.close();
