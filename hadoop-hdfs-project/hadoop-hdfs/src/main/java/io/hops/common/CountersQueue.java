@@ -39,6 +39,14 @@ public class CountersQueue {
       return current < end;
     }
 
+    public long getEnd() {
+      return end;
+    }
+
+    public long getStart() {
+      return start;
+    }
+
     @Override
     public String toString() {
       return "Counter{" + "end=" + end + ", current=" + current + '}';
@@ -81,7 +89,7 @@ public class CountersQueue {
   }
   
   public synchronized boolean has(int expectedNumOfIds) {
-    return available >= expectedNumOfIds;
+    return available >= expectedNumOfIds && expectedNumOfIds != 0;
   }
 
   @Override
