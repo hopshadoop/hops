@@ -52,7 +52,9 @@ public class InMemoryCache extends Cache{
   @Override
   protected void setInternal(String path, List<INode> inodes) {
     for(INode iNode : inodes){
-      cache.put(iNode.nameParentKey(), iNode.getId());
+      if(iNode != null) {
+        cache.put(iNode.nameParentKey(), iNode.getId());
+      }
     }
   }
 
