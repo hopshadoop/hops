@@ -114,7 +114,7 @@ public class RMStorageFactory {
     EntityManager.addContextInitializer(getContextInitializer());
     if(conf.getBoolean(CommonConfigurationKeys.HOPS_GROUPS_ENABLE, CommonConfigurationKeys
         .HOPS_GROUPS_ENABLE_DEFAULT)) {
-      UsersGroups.init(getConnector(), (UserDataAccess) getDataAccess
+      UsersGroups.init((UserDataAccess) getDataAccess
           (UserDataAccess.class), (UserGroupDataAccess) getDataAccess
           (UserGroupDataAccess.class), (GroupDataAccess) getDataAccess
           (GroupDataAccess.class), conf.getInt(CommonConfigurationKeys
