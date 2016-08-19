@@ -18,23 +18,23 @@
 
 package org.apache.hadoop.yarn.api.records.impl.pb;
 
-import org.apache.hadoop.yarn.api.records.SerializedException;
-import org.apache.hadoop.yarn.exceptions.YarnException;
-import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
-import org.apache.hadoop.yarn.proto.YarnProtos.SerializedExceptionProto;
-import org.apache.hadoop.yarn.proto.YarnProtos.SerializedExceptionProtoOrBuilder;
-
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 
+import org.apache.hadoop.yarn.api.records.SerializedException;
+import org.apache.hadoop.yarn.exceptions.YarnException;
+import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
+import org.apache.hadoop.yarn.proto.YarnProtos.SerializedExceptionProto;
+import org.apache.hadoop.yarn.proto.YarnProtos.SerializedExceptionProtoOrBuilder;
+
 public class SerializedExceptionPBImpl extends SerializedException {
 
-  SerializedExceptionProto proto =
-      SerializedExceptionProto.getDefaultInstance();
-  SerializedExceptionProto.Builder builder = null;
+  SerializedExceptionProto proto = null;
+  SerializedExceptionProto.Builder builder =
+      SerializedExceptionProto.newBuilder();
   boolean viaProto = false;
 
   public SerializedExceptionPBImpl() {
@@ -68,20 +68,17 @@ public class SerializedExceptionPBImpl extends SerializedException {
     PrintWriter pw = new PrintWriter(sw);
     t.printStackTrace(pw);
     pw.close();
-    if (sw.toString() != null) {
+    if (sw.toString() != null)
       builder.setTrace(sw.toString());
-    }
-    if (t.getMessage() != null) {
+    if (t.getMessage() != null)
       builder.setMessage(t.getMessage());
-    }
     builder.setClassName(t.getClass().getCanonicalName());
   }
 
   public void init(String message, Throwable t) {
     init(t);
-    if (message != null) {
+    if (message != null)
       builder.setMessage(message);
-    }
   }
 
   @SuppressWarnings("unchecked")
@@ -107,7 +104,7 @@ public class SerializedExceptionPBImpl extends SerializedException {
       classType = Exception.class;
     }
     return instantiateException(realClass.asSubclass(classType), getMessage(),
-        cause == null ? null : cause.deSerialize());
+      cause == null ? null : cause.deSerialize());
   }
 
   @Override
@@ -136,6 +133,22 @@ public class SerializedExceptionPBImpl extends SerializedException {
     proto = viaProto ? proto : builder.build();
     viaProto = true;
     return proto;
+  }
+
+  @Override
+  public int hashCode() {
+    return getProto().hashCode();
+  }
+
+  @Override
+  public boolean equals(Object other) {
+    if (other == null) {
+      return false;
+    }
+    if (other.getClass().isAssignableFrom(this.getClass())) {
+      return this.getProto().equals(this.getClass().cast(other).getProto());
+    }
+    return false;
   }
 
   private void maybeInitBuilder() {

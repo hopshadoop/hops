@@ -19,9 +19,13 @@
 package org.apache.hadoop.yarn.api.protocolrecords.impl.pb;
 
 
-import com.google.protobuf.TextFormat;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
+import org.apache.hadoop.security.proto.SecurityProtos.TokenProto;
 import org.apache.hadoop.yarn.api.protocolrecords.AllocateResponse;
 import org.apache.hadoop.yarn.api.records.AMCommand;
 import org.apache.hadoop.yarn.api.records.Container;
@@ -32,6 +36,7 @@ import org.apache.hadoop.yarn.api.records.NMToken;
 import org.apache.hadoop.yarn.api.records.NodeReport;
 import org.apache.hadoop.yarn.api.records.PreemptionMessage;
 import org.apache.hadoop.yarn.api.records.Resource;
+import org.apache.hadoop.yarn.api.records.Token;
 import org.apache.hadoop.yarn.api.records.impl.pb.ContainerPBImpl;
 import org.apache.hadoop.yarn.api.records.impl.pb.ContainerResourceDecreasePBImpl;
 import org.apache.hadoop.yarn.api.records.impl.pb.ContainerResourceIncreasePBImpl;
@@ -41,6 +46,7 @@ import org.apache.hadoop.yarn.api.records.impl.pb.NodeReportPBImpl;
 import org.apache.hadoop.yarn.api.records.impl.pb.PreemptionMessagePBImpl;
 import org.apache.hadoop.yarn.api.records.impl.pb.ProtoUtils;
 import org.apache.hadoop.yarn.api.records.impl.pb.ResourcePBImpl;
+import org.apache.hadoop.yarn.api.records.impl.pb.TokenPBImpl;
 import org.apache.hadoop.yarn.proto.YarnProtos.ContainerProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.ContainerResourceDecreaseProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.ContainerResourceIncreaseProto;
@@ -52,9 +58,7 @@ import org.apache.hadoop.yarn.proto.YarnServiceProtos.AllocateResponseProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.AllocateResponseProtoOrBuilder;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.NMTokenProto;
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
+import com.google.protobuf.TextFormat;
 
 @Private
 @Unstable
@@ -73,7 +77,7 @@ public class AllocateResponsePBImpl extends AllocateResponse {
 
   private List<NodeReport> updatedNodes = null;
   private PreemptionMessage preempt;
-  
+  private Token amrmToken = null;
   
   public AllocateResponsePBImpl() {
     builder = AllocateResponseProto.newBuilder();
@@ -85,7 +89,7 @@ public class AllocateResponsePBImpl extends AllocateResponse {
   }
   
   public synchronized AllocateResponseProto getProto() {
-    mergeLocalToProto();
+      mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
     viaProto = true;
     return proto;
@@ -98,9 +102,8 @@ public class AllocateResponsePBImpl extends AllocateResponse {
 
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -154,12 +157,14 @@ public class AllocateResponsePBImpl extends AllocateResponse {
           getChangeProtoIterable(this.decreasedContainers);
       builder.addAllDecreasedContainers(iterable);
     }
+    if (this.amrmToken != null) {
+      builder.setAmRmToken(convertToProtoFormat(this.amrmToken));
+    }
   }
 
   private synchronized void mergeLocalToProto() {
-    if (viaProto) {
+    if (viaProto) 
       maybeInitBuilder();
-    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
@@ -220,9 +225,8 @@ public class AllocateResponsePBImpl extends AllocateResponse {
   @Override
   public synchronized void setAvailableResources(Resource limit) {
     maybeInitBuilder();
-    if (limit == null) {
+    if (limit == null)
       builder.clearLimit();
-    }
     this.limit = limit;
   }
 
@@ -231,7 +235,6 @@ public class AllocateResponsePBImpl extends AllocateResponse {
     initLocalNewNodeReportList();
     return this.updatedNodes;
   }
-
   @Override
   public synchronized void setUpdatedNodes(
       final List<NodeReport> updatedNodes) {
@@ -252,9 +255,8 @@ public class AllocateResponsePBImpl extends AllocateResponse {
   @Override
   public synchronized void setAllocatedContainers(
       final List<Container> containers) {
-    if (containers == null) {
+    if (containers == null)
       return;
-    }
     // this looks like a bug because it results in append and not set
     initLocalNewContainerList();
     allocatedContainers.addAll(containers);
@@ -270,9 +272,8 @@ public class AllocateResponsePBImpl extends AllocateResponse {
   @Override
   public synchronized void setCompletedContainersStatuses(
       final List<ContainerStatus> containers) {
-    if (containers == null) {
+    if (containers == null)
       return;
-    }
     initLocalFinishedContainerList();
     completedContainersStatuses.addAll(containers);
   }
@@ -283,9 +284,7 @@ public class AllocateResponsePBImpl extends AllocateResponse {
       if (this.nmTokens != null) {
         this.nmTokens.clear();
       }
-      if(builder!=null){
-        builder.clearNmTokens();
-      }
+      builder.clearNmTokens();
       return;
     }
     // Implementing it as an append rather than set for consistency
@@ -342,9 +341,8 @@ public class AllocateResponsePBImpl extends AllocateResponse {
   @Override
   public synchronized void setIncreasedContainers(
       List<ContainerResourceIncrease> increasedContainers) {
-    if (increasedContainers == null) {
+    if (increasedContainers == null)
       return;
-    }
     initLocalIncreasedContainerList();
     this.increasedContainers.addAll(increasedContainers);
   }
@@ -363,6 +361,28 @@ public class AllocateResponsePBImpl extends AllocateResponse {
     }
     initLocalDecreasedContainerList();
     this.decreasedContainers.addAll(decreasedContainers);
+  }
+
+  @Override
+  public synchronized Token getAMRMToken() {
+    AllocateResponseProtoOrBuilder p = viaProto ? proto : builder;
+    if (amrmToken != null) {
+      return amrmToken;
+    }
+    if (!p.hasAmRmToken()) {
+      return null;
+    }
+    this.amrmToken = convertFromProtoFormat(p.getAmRmToken());
+    return amrmToken;
+  }
+
+  @Override
+  public synchronized void setAMRMToken(Token amRMToken) {
+    maybeInitBuilder();
+    if (amRMToken == null) {
+      builder.clearAmRmToken();
+    }
+    this.amrmToken = amRMToken;
   }
 
   private synchronized void initLocalIncreasedContainerList() {
@@ -433,16 +453,17 @@ public class AllocateResponsePBImpl extends AllocateResponse {
     }
   }
 
-  private synchronized Iterable<ContainerResourceIncreaseProto> getIncreaseProtoIterable(
-      final List<ContainerResourceIncrease> newContainersList) {
+  private synchronized Iterable<ContainerResourceIncreaseProto>
+      getIncreaseProtoIterable(
+          final List<ContainerResourceIncrease> newContainersList) {
     maybeInitBuilder();
     return new Iterable<ContainerResourceIncreaseProto>() {
       @Override
       public synchronized Iterator<ContainerResourceIncreaseProto> iterator() {
         return new Iterator<ContainerResourceIncreaseProto>() {
 
-          Iterator<ContainerResourceIncrease> iter =
-              newContainersList.iterator();
+          Iterator<ContainerResourceIncrease> iter = newContainersList
+              .iterator();
 
           @Override
           public synchronized boolean hasNext() {
@@ -464,16 +485,17 @@ public class AllocateResponsePBImpl extends AllocateResponse {
     };
   }
 
-  private synchronized Iterable<ContainerResourceDecreaseProto> getChangeProtoIterable(
-      final List<ContainerResourceDecrease> newContainersList) {
+  private synchronized Iterable<ContainerResourceDecreaseProto>
+      getChangeProtoIterable(
+          final List<ContainerResourceDecrease> newContainersList) {
     maybeInitBuilder();
     return new Iterable<ContainerResourceDecreaseProto>() {
       @Override
       public synchronized Iterator<ContainerResourceDecreaseProto> iterator() {
         return new Iterator<ContainerResourceDecreaseProto>() {
 
-          Iterator<ContainerResourceDecrease> iter =
-              newContainersList.iterator();
+          Iterator<ContainerResourceDecrease> iter = newContainersList
+              .iterator();
 
           @Override
           public synchronized boolean hasNext() {
@@ -555,7 +577,8 @@ public class AllocateResponsePBImpl extends AllocateResponse {
     };
   }
   
-  private synchronized Iterable<ContainerStatusProto> getContainerStatusProtoIterable(
+  private synchronized Iterable<ContainerStatusProto>
+  getContainerStatusProtoIterable(
       final List<ContainerStatus> newContainersList) {
     maybeInitBuilder();
     return new Iterable<ContainerStatusProto>() {
@@ -586,7 +609,8 @@ public class AllocateResponsePBImpl extends AllocateResponse {
     };
   }
   
-  private synchronized Iterable<NodeReportProto> getNodeReportProtoIterable(
+  private synchronized Iterable<NodeReportProto>
+  getNodeReportProtoIterable(
       final List<NodeReport> newNodeReportsList) {
     maybeInitBuilder();
     return new Iterable<NodeReportProto>() {
@@ -657,7 +681,7 @@ public class AllocateResponsePBImpl extends AllocateResponse {
   }
 
   private synchronized NodeReportProto convertToProtoFormat(NodeReport t) {
-    return ((NodeReportPBImpl) t).getProto();
+    return ((NodeReportPBImpl)t).getProto();
   }
 
   private synchronized ContainerPBImpl convertFromProtoFormat(
@@ -665,8 +689,9 @@ public class AllocateResponsePBImpl extends AllocateResponse {
     return new ContainerPBImpl(p);
   }
   
-  private synchronized ContainerProto convertToProtoFormat(Container t) {
-    return ((ContainerPBImpl) t).getProto();
+  private synchronized ContainerProto convertToProtoFormat(
+      Container t) {
+    return ((ContainerPBImpl)t).getProto();
   }
 
   private synchronized ContainerStatusPBImpl convertFromProtoFormat(
@@ -676,7 +701,7 @@ public class AllocateResponsePBImpl extends AllocateResponse {
 
   private synchronized ContainerStatusProto convertToProtoFormat(
       ContainerStatus t) {
-    return ((ContainerStatusPBImpl) t).getProto();
+    return ((ContainerStatusPBImpl)t).getProto();
   }
 
   private synchronized ResourcePBImpl convertFromProtoFormat(ResourceProto p) {
@@ -687,21 +712,27 @@ public class AllocateResponsePBImpl extends AllocateResponse {
     return ((ResourcePBImpl) r).getProto();
   }
 
-  private synchronized PreemptionMessagePBImpl convertFromProtoFormat(
-      PreemptionMessageProto p) {
+  private synchronized PreemptionMessagePBImpl convertFromProtoFormat(PreemptionMessageProto p) {
     return new PreemptionMessagePBImpl(p);
   }
 
-  private synchronized PreemptionMessageProto convertToProtoFormat(
-      PreemptionMessage r) {
-    return ((PreemptionMessagePBImpl) r).getProto();
+  private synchronized PreemptionMessageProto convertToProtoFormat(PreemptionMessage r) {
+    return ((PreemptionMessagePBImpl)r).getProto();
   }
   
   private synchronized NMTokenProto convertToProtoFormat(NMToken token) {
-    return ((NMTokenPBImpl) token).getProto();
+    return ((NMTokenPBImpl)token).getProto();
   }
   
   private synchronized NMToken convertFromProtoFormat(NMTokenProto proto) {
     return new NMTokenPBImpl(proto);
+  }
+
+  private TokenPBImpl convertFromProtoFormat(TokenProto p) {
+    return new TokenPBImpl(p);
+  }
+
+  private TokenProto convertToProtoFormat(Token t) {
+    return ((TokenPBImpl)t).getProto();
   }
 }  

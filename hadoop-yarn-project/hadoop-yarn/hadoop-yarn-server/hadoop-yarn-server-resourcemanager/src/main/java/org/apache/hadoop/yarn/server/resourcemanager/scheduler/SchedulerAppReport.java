@@ -18,14 +18,14 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler;
 
+import java.util.Collection;
+
 import org.apache.hadoop.classification.InterfaceAudience.LimitedPrivate;
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 
-import java.util.Collection;
-
 /**
- * Represents an application attempt, and the resources that the attempt is
+ * Represents an application attempt, and the resources that the attempt is 
  * using.
  */
 @Evolving
@@ -44,7 +44,6 @@ public class SchedulerAppReport {
   
   /**
    * Get the list of live containers
-   *
    * @return All of the live containers
    */
   public Collection<RMContainer> getLiveContainers() {
@@ -53,7 +52,6 @@ public class SchedulerAppReport {
   
   /**
    * Get the list of reserved containers
-   *
    * @return All of the reserved containers.
    */
   public Collection<RMContainer> getReservedContainers() {
@@ -62,7 +60,6 @@ public class SchedulerAppReport {
   
   /**
    * Is this application pending?
-   *
    * @return true if it is else false.
    */
   public boolean isPending() {

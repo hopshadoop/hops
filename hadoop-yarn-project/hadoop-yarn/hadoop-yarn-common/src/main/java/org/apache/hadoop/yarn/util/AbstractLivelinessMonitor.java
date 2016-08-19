@@ -1,32 +1,32 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Licensed to the Apache Software Foundation (ASF) under one
+* or more contributor license agreements.  See the NOTICE file
+* distributed with this work for additional information
+* regarding copyright ownership.  The ASF licenses this file
+* to you under the Apache License, Version 2.0 (the
+* "License"); you may not use this file except in compliance
+* with the License.  You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
 
 package org.apache.hadoop.yarn.util;
+
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.hadoop.service.AbstractService;
-
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
 
 /**
  * A simple liveliness monitor with which clients can register, trust the
@@ -37,16 +37,15 @@ import java.util.Map;
 @Evolving
 public abstract class AbstractLivelinessMonitor<O> extends AbstractService {
 
-  private static final Log LOG =
-      LogFactory.getLog(AbstractLivelinessMonitor.class);
+  private static final Log LOG = LogFactory.getLog(AbstractLivelinessMonitor.class);
 
   //thread which runs periodically to see the last time since a heartbeat is
   //received.
   private Thread checkerThread;
   private volatile boolean stopped;
-  public static final int DEFAULT_EXPIRE = 5 * 60 * 1000;//5 mins
+  public static final int DEFAULT_EXPIRE = 5*60*1000;//5 mins
   private int expireInterval = DEFAULT_EXPIRE;
-  private int monitorInterval = expireInterval / 3;
+  private int monitorInterval = expireInterval/3;
 
   private final Clock clock;
 
@@ -60,6 +59,7 @@ public abstract class AbstractLivelinessMonitor<O> extends AbstractService {
   @Override
   protected void serviceStart() throws Exception {
     assert !stopped : "starting when already stopped";
+    resetTimer();
     checkerThread = new Thread(new PingChecker());
     checkerThread.setName("Ping Checker");
     checkerThread.start();
@@ -100,13 +100,21 @@ public abstract class AbstractLivelinessMonitor<O> extends AbstractService {
     running.remove(ob);
   }
 
+  public synchronized void resetTimer() {
+    long time = clock.getTime();
+    for (O ob : running.keySet()) {
+      running.put(ob, time);
+    }
+  }
+
   private class PingChecker implements Runnable {
 
     @Override
     public void run() {
       while (!stopped && !Thread.currentThread().isInterrupted()) {
         synchronized (AbstractLivelinessMonitor.this) {
-          Iterator<Map.Entry<O, Long>> iterator = running.entrySet().iterator();
+          Iterator<Map.Entry<O, Long>> iterator = 
+            running.entrySet().iterator();
 
           //avoid calculating current time everytime in loop
           long currentTime = clock.getTime();
@@ -116,8 +124,8 @@ public abstract class AbstractLivelinessMonitor<O> extends AbstractService {
             if (currentTime > entry.getValue() + expireInterval) {
               iterator.remove();
               expire(entry.getKey());
-              LOG.info("Expired:" + entry.getKey().toString() +
-                  " Timed out after " + expireInterval / 1000 + " secs");
+              LOG.info("Expired:" + entry.getKey().toString() + 
+                      " Timed out after " + expireInterval/1000 + " secs");
             }
           }
         }

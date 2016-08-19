@@ -19,18 +19,18 @@
 package org.apache.hadoop.yarn.api.protocolrecords.impl.pb;
 
 
-import com.google.protobuf.TextFormat;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.protocolrecords.KillApplicationResponse;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.KillApplicationResponseProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.KillApplicationResponseProtoOrBuilder;
 
+import com.google.protobuf.TextFormat;
+
 @Private
 @Unstable
 public class KillApplicationResponsePBImpl extends KillApplicationResponse {
-  KillApplicationResponseProto proto =
-      KillApplicationResponseProto.getDefaultInstance();
+  KillApplicationResponseProto proto = KillApplicationResponseProto.getDefaultInstance();
   KillApplicationResponseProto.Builder builder = null;
   boolean viaProto = false;
   
@@ -56,9 +56,8 @@ public class KillApplicationResponsePBImpl extends KillApplicationResponse {
 
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -79,7 +78,8 @@ public class KillApplicationResponsePBImpl extends KillApplicationResponse {
 
   @Override
   public boolean getIsKillCompleted() {
-    KillApplicationResponseProtoOrBuilder p = viaProto ? proto : builder;
+    KillApplicationResponseProtoOrBuilder p =
+        viaProto ? proto : builder;
     return p.getIsKillCompleted();
   }
 

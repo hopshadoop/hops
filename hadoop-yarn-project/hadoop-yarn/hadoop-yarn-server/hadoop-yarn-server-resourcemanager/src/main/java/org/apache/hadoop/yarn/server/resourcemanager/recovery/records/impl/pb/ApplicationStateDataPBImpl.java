@@ -19,31 +19,18 @@
 package org.apache.hadoop.yarn.server.resourcemanager.recovery.records.impl.pb;
 
 import org.apache.hadoop.yarn.api.records.ApplicationSubmissionContext;
-import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.impl.pb.ApplicationSubmissionContextPBImpl;
-import org.apache.hadoop.yarn.api.records.impl.pb.NodeIdPBImpl;
-import org.apache.hadoop.yarn.api.records.impl.pb.ProtoBase;
-import org.apache.hadoop.yarn.api.records.impl.pb.ProtoUtils;
-import org.apache.hadoop.yarn.factories.RecordFactory;
-import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
-import org.apache.hadoop.yarn.proto.YarnProtos;
-import org.apache.hadoop.yarn.proto.YarnServerResourceManagerServiceProtos.ApplicationStateDataProto;
-import org.apache.hadoop.yarn.proto.YarnServerResourceManagerServiceProtos.ApplicationStateDataProtoOrBuilder;
-import org.apache.hadoop.yarn.proto.YarnServerResourceManagerServiceProtos.RMAppStateProto;
+import org.apache.hadoop.yarn.proto.YarnServerResourceManagerRecoveryProtos.ApplicationStateDataProto;
+import org.apache.hadoop.yarn.proto.YarnServerResourceManagerRecoveryProtos.ApplicationStateDataProtoOrBuilder;
+import org.apache.hadoop.yarn.proto.YarnServerResourceManagerRecoveryProtos.RMAppStateProto;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.ApplicationStateData;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppState;
 
-import java.util.ArrayList;
-import java.util.List;
+import com.google.protobuf.TextFormat;
 
-public class ApplicationStateDataPBImpl
-    extends ProtoBase<ApplicationStateDataProto>
-    implements ApplicationStateData {
-  private static final RecordFactory recordFactory =
-      RecordFactoryProvider.getRecordFactory(null);
-
-  ApplicationStateDataProto proto =
-      ApplicationStateDataProto.getDefaultInstance();
+public class ApplicationStateDataPBImpl extends ApplicationStateData {
+  ApplicationStateDataProto proto = 
+            ApplicationStateDataProto.getDefaultInstance();
   ApplicationStateDataProto.Builder builder = null;
   boolean viaProto = false;
   
@@ -53,11 +40,13 @@ public class ApplicationStateDataPBImpl
     builder = ApplicationStateDataProto.newBuilder();
   }
 
-  public ApplicationStateDataPBImpl(ApplicationStateDataProto proto) {
+  public ApplicationStateDataPBImpl(
+      ApplicationStateDataProto proto) {
     this.proto = proto;
     viaProto = true;
   }
-  
+
+  @Override
   public ApplicationStateDataProto getProto() {
     mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
@@ -68,15 +57,14 @@ public class ApplicationStateDataPBImpl
   private void mergeLocalToBuilder() {
     if (this.applicationSubmissionContext != null) {
       builder.setApplicationSubmissionContext(
-          ((ApplicationSubmissionContextPBImpl) applicationSubmissionContext)
-              .getProto());
+          ((ApplicationSubmissionContextPBImpl)applicationSubmissionContext)
+          .getProto());
     }
   }
 
   private void mergeLocalToProto() {
-    if (viaProto) {
+    if (viaProto) 
       maybeInitBuilder();
-    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
@@ -135,14 +123,15 @@ public class ApplicationStateDataPBImpl
   @Override
   public ApplicationSubmissionContext getApplicationSubmissionContext() {
     ApplicationStateDataProtoOrBuilder p = viaProto ? proto : builder;
-    if (applicationSubmissionContext != null) {
+    if(applicationSubmissionContext != null) {
       return applicationSubmissionContext;
     }
     if (!p.hasApplicationSubmissionContext()) {
       return null;
     }
-    applicationSubmissionContext = new ApplicationSubmissionContextPBImpl(
-        p.getApplicationSubmissionContext());
+    applicationSubmissionContext = 
+        new ApplicationSubmissionContextPBImpl(
+            p.getApplicationSubmissionContext());
     return applicationSubmissionContext;
   }
 
@@ -176,26 +165,6 @@ public class ApplicationStateDataPBImpl
   }
 
   @Override
-  public RMAppState getStateBeforeKilling() {
-    ApplicationStateDataProtoOrBuilder p = viaProto ? proto : builder;
-    if (!p.hasApplicationStateBeforeKilling()) {
-      return null;
-    }
-    return convertFromProtoFormat(p.getApplicationStateBeforeKilling());
-  }
-  
-  @Override
-  public void setStateBeforeKilling(RMAppState stateBeforeKilling) {
-    maybeInitBuilder();
-    if (stateBeforeKilling == null) {
-      builder.clearApplicationStateBeforeKilling();
-      return;
-    }
-    builder.setApplicationStateBeforeKilling(
-        convertToProtoFormat(stateBeforeKilling));
-  }
-  
-  @Override
   public String getDiagnostics() {
     ApplicationStateDataProtoOrBuilder p = viaProto ? proto : builder;
     if (!p.hasDiagnostics()) {
@@ -227,59 +196,30 @@ public class ApplicationStateDataPBImpl
   }
 
   @Override
-  public List<NodeId> getUpdatedNodesId() {
-    ApplicationStateDataProtoOrBuilder p = viaProto ? proto : builder;
-
-    List<NodeId> updatedNodesId = new ArrayList<NodeId>();
-    for (YarnProtos.NodeIdProto nodeIdProto : p.getUpdatedNodesIdList()) {
-      updatedNodesId.add(convertFromProtoFormat(nodeIdProto));
-    }
-    return updatedNodesId;
+  public int hashCode() {
+    return getProto().hashCode();
   }
-  
+
   @Override
-  public void setUpdatedNodesId(List<NodeId> updatedNodesId) {
-    if (updatedNodesId == null) {
-      return;
+  public boolean equals(Object other) {
+    if (other == null)
+      return false;
+    if (other.getClass().isAssignableFrom(this.getClass())) {
+      return this.getProto().equals(this.getClass().cast(other).getProto());
     }
-    maybeInitBuilder();
-    List<YarnProtos.NodeIdProto> updatedNodesIdProto =
-        new ArrayList<YarnProtos.NodeIdProto>();
-    for (NodeId nodeId : updatedNodesId) {
-      updatedNodesIdProto.add(((NodeIdPBImpl) nodeId).getProto());
-    }
-    builder.addAllUpdatedNodesId(updatedNodesIdProto);
+    return false;
   }
 
-  public static ApplicationStateData newApplicationStateData(long submitTime,
-      long startTime, String user,
-      ApplicationSubmissionContext submissionContext, RMAppState state,
-      String diagnostics, long finishTime, List<NodeId> updatedNodesId) {
-
-    ApplicationStateData appState =
-        recordFactory.newRecordInstance(ApplicationStateData.class);
-    appState.setSubmitTime(submitTime);
-    appState.setStartTime(startTime);
-    appState.setUser(user);
-    appState.setApplicationSubmissionContext(submissionContext);
-    appState.setState(state);
-    appState.setDiagnostics(diagnostics);
-    appState.setFinishTime(finishTime);
-    appState.setUpdatedNodesId(updatedNodesId);
-    return appState;
+  @Override
+  public String toString() {
+    return TextFormat.shortDebugString(getProto());
   }
 
   private static String RM_APP_PREFIX = "RMAPP_";
-
   public static RMAppStateProto convertToProtoFormat(RMAppState e) {
     return RMAppStateProto.valueOf(RM_APP_PREFIX + e.name());
   }
-
   public static RMAppState convertFromProtoFormat(RMAppStateProto e) {
     return RMAppState.valueOf(e.name().replace(RM_APP_PREFIX, ""));
-  }
-  
-  public static NodeId convertFromProtoFormat(YarnProtos.NodeIdProto n) {
-    return ProtoUtils.convertFromProtoFormat(n);
   }
 }

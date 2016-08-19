@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.yarn.server.applicationhistoryservice.records.impl.pb;
 
-import com.google.protobuf.TextFormat;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
 import org.apache.hadoop.yarn.api.records.YarnApplicationAttemptState;
@@ -31,11 +30,13 @@ import org.apache.hadoop.yarn.proto.YarnProtos.FinalApplicationStatusProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.YarnApplicationAttemptStateProto;
 import org.apache.hadoop.yarn.server.applicationhistoryservice.records.ApplicationAttemptFinishData;
 
-public class ApplicationAttemptFinishDataPBImpl
-    extends ApplicationAttemptFinishData {
+import com.google.protobuf.TextFormat;
 
-  ApplicationAttemptFinishDataProto proto =
-      ApplicationAttemptFinishDataProto.getDefaultInstance();
+public class ApplicationAttemptFinishDataPBImpl extends
+    ApplicationAttemptFinishData {
+
+  ApplicationAttemptFinishDataProto proto = ApplicationAttemptFinishDataProto
+    .getDefaultInstance();
   ApplicationAttemptFinishDataProto.Builder builder = null;
   boolean viaProto = false;
 
@@ -66,8 +67,8 @@ public class ApplicationAttemptFinishDataPBImpl
   }
 
   @Override
-  public void setApplicationAttemptId(
-      ApplicationAttemptId applicationAttemptId) {
+  public void
+      setApplicationAttemptId(ApplicationAttemptId applicationAttemptId) {
     maybeInitBuilder();
     if (applicationAttemptId == null) {
       builder.clearApplicationAttemptId();
@@ -130,8 +131,8 @@ public class ApplicationAttemptFinishDataPBImpl
       builder.clearFinalApplicationStatus();
       return;
     }
-    builder.setFinalApplicationStatus(
-        convertToProtoFormat(finalApplicationStatus));
+    builder
+      .setFinalApplicationStatus(convertToProtoFormat(finalApplicationStatus));
   }
 
   @Override
@@ -144,8 +145,7 @@ public class ApplicationAttemptFinishDataPBImpl
   }
 
   @Override
-  public void setYarnApplicationAttemptState(
-      YarnApplicationAttemptState state) {
+  public void setYarnApplicationAttemptState(YarnApplicationAttemptState state) {
     maybeInitBuilder();
     if (state == null) {
       builder.clearYarnApplicationAttemptState();
@@ -168,9 +168,8 @@ public class ApplicationAttemptFinishDataPBImpl
 
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -183,11 +182,11 @@ public class ApplicationAttemptFinishDataPBImpl
   }
 
   private void mergeLocalToBuilder() {
-    if (this.applicationAttemptId != null &&
-        !((ApplicationAttemptIdPBImpl) this.applicationAttemptId).getProto()
-            .equals(builder.getApplicationAttemptId())) {
-      builder.setApplicationAttemptId(
-          convertToProtoFormat(this.applicationAttemptId));
+    if (this.applicationAttemptId != null
+        && !((ApplicationAttemptIdPBImpl) this.applicationAttemptId).getProto()
+          .equals(builder.getApplicationAttemptId())) {
+      builder
+        .setApplicationAttemptId(convertToProtoFormat(this.applicationAttemptId));
     }
   }
 

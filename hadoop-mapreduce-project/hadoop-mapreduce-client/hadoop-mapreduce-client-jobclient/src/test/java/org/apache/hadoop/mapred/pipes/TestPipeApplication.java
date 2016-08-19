@@ -95,9 +95,9 @@ public class TestPipeApplication {
               new Counters.Counter(), new Progress());
       FileSystem fs = new RawLocalFileSystem();
       fs.setConf(conf);
-      Writer<IntWritable, Text> wr = new Writer<IntWritable, Text>(conf, fs,
-              new Path(workSpace + File.separator + "outfile"), IntWritable.class,
-              Text.class, null, null);
+      Writer<IntWritable, Text> wr = new Writer<IntWritable, Text>(conf, fs.create(
+              new Path(workSpace + File.separator + "outfile")), IntWritable.class,
+              Text.class, null, null, true);
       output.setWriter(wr);
       // stub for client
       File fCommand = getFileCommand("org.apache.hadoop.mapred.pipes.PipeApplicationRunnableStub");
@@ -177,11 +177,13 @@ public class TestPipeApplication {
               new Progress());
       FileSystem fs = new RawLocalFileSystem();
       fs.setConf(conf);
-      Writer<IntWritable, Text> wr = new Writer<IntWritable, Text>(conf, fs,
-              new Path(workSpace.getAbsolutePath() + File.separator + "outfile"),
-              IntWritable.class, Text.class, null, null);
+      Writer<IntWritable, Text> wr = new Writer<IntWritable, Text>(conf, fs.create(
+              new Path(workSpace.getAbsolutePath() + File.separator + "outfile")),
+              IntWritable.class, Text.class, null, null, true);
       output.setWriter(wr);
       conf.set(Submitter.PRESERVE_COMMANDFILE, "true");
+
+      initStdOut(conf);
 
       Application<WritableComparable<IntWritable>, Writable, IntWritable, Text> application = new Application<WritableComparable<IntWritable>, Writable, IntWritable, Text>(
               conf, rReader, output, reporter, IntWritable.class, Text.class);
@@ -306,7 +308,7 @@ public class TestPipeApplication {
       assertTrue(out.toString().contains(
               "-fs <local|namenode:port>      specify a namenode"));
       assertTrue(out.toString().contains(
-              "-jt <local|jobtracker:port>    specify a job tracker"));
+              "-jt <local|resourcemanager:port>    specify a ResourceManager"));
       assertTrue(out
               .toString()
               .contains(

@@ -44,6 +44,7 @@ import org.mockito.Mockito;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.List;
+import org.apache.hadoop.security.authorize.DefaultImpersonationProvider;
 
 import static org.junit.Assert.assertTrue;
 
@@ -63,8 +64,8 @@ public class TestReaddir {
   @BeforeClass
   public static void setup() throws Exception {
     String currentUser = System.getProperty("user.name");
-    config.set(ProxyUsers.getProxySuperuserGroupConfKey(currentUser), "*");
-    config.set(ProxyUsers.getProxySuperuserIpConfKey(currentUser), "*");
+    config.set(DefaultImpersonationProvider.getTestProvider().getProxySuperuserGroupConfKey(currentUser), "*");
+    config.set(DefaultImpersonationProvider.getTestProvider().getProxySuperuserIpConfKey(currentUser), "*");
     ProxyUsers.refreshSuperUserGroupsConfiguration(config);
     cluster = new MiniDFSCluster.Builder(config).numDataNodes(1).build();
     cluster.waitActive();

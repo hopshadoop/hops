@@ -39,6 +39,7 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import org.apache.hadoop.security.authorize.DefaultImpersonationProvider;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -153,8 +154,10 @@ public class TestRefreshUserMappings {
     final String[] GROUP_NAMES2 = new String[]{"gr3", "gr4"};
     
     //keys in conf
-    String userKeyGroups = ProxyUsers.getProxySuperuserGroupConfKey(SUPER_USER);
-    String userKeyHosts = ProxyUsers.getProxySuperuserIpConfKey(SUPER_USER);
+    String userKeyGroups = DefaultImpersonationProvider.getTestProvider().
+              getProxySuperuserGroupConfKey(SUPER_USER);
+    String userKeyHosts = DefaultImpersonationProvider.getTestProvider().
+            getProxySuperuserIpConfKey(SUPER_USER);
     
     config.set(userKeyGroups,
         "gr3,gr4,gr5"); // superuser can proxy for this group

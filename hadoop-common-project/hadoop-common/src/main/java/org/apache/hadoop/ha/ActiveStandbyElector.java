@@ -143,7 +143,6 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
 
   public static final Log LOG = LogFactory.getLog(ActiveStandbyElector.class);
 
-  static int NUM_RETRIES = 3;
   private static final int SLEEP_AFTER_FAILURE_TO_BECOME_ACTIVE = 1000;
 
   private static enum ConnectionState {
@@ -170,10 +169,13 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
   private final String zkLockFilePath;
   private final String zkBreadCrumbPath;
   private final String znodeWorkingDir;
+  private final int maxRetryNum;
 
   private Lock sessionReestablishLockForTests = new ReentrantLock();
   private boolean wantToBeInElection;
-  
+  private boolean monitorLockNodePending = false;
+  private ZooKeeper monitorLockNodeClient;
+
   /**
    * Create a new ActiveStandbyElector object <br/>
    * The elector is created by providing to it the Zookeeper configuration, the
@@ -207,7 +209,7 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
   public ActiveStandbyElector(String zookeeperHostPorts,
       int zookeeperSessionTimeout, String parentZnodeName, List<ACL> acl,
       List<ZKAuthInfo> authInfo,
-      ActiveStandbyElectorCallback app) throws IOException,
+      ActiveStandbyElectorCallback app, int maxRetryNum) throws IOException,
       HadoopIllegalArgumentException, KeeperException {
     if (app == null || acl == null || parentZnodeName == null
         || zookeeperHostPorts == null || zookeeperSessionTimeout <= 0) {
@@ -220,7 +222,8 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
     appClient = app;
     znodeWorkingDir = parentZnodeName;
     zkLockFilePath = znodeWorkingDir + "/" + LOCK_FILENAME;
-    zkBreadCrumbPath = znodeWorkingDir + "/" + BREADCRUMB_FILENAME;    
+    zkBreadCrumbPath = znodeWorkingDir + "/" + BREADCRUMB_FILENAME;
+    this.maxRetryNum = maxRetryNum;
 
     // createConnection for future API calls
     createConnection();
@@ -439,7 +442,7 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
     LOG.debug(errorMessage);
 
     if (shouldRetry(code)) {
-      if (createRetryCount < NUM_RETRIES) {
+      if (createRetryCount < maxRetryNum) {
         LOG.debug("Retrying createNode createRetryCount: " + createRetryCount);
         ++createRetryCount;
         createLockNodeAsync();
@@ -463,7 +466,8 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
   public synchronized void processResult(int rc, String path, Object ctx,
       Stat stat) {
     if (isStaleClient(ctx)) return;
-    
+    monitorLockNodePending = false;
+
     assert wantToBeInElection :
         "Got a StatNode result after quitting election";
     
@@ -500,7 +504,7 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
     LOG.debug(errorMessage);
 
     if (shouldRetry(code)) {
-      if (statRetryCount < NUM_RETRIES) {
+      if (statRetryCount < maxRetryNum) {
         ++statRetryCount;
         monitorLockNodeAsync();
         return;
@@ -732,10 +736,15 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
     return state;
   }
 
+  @VisibleForTesting
+  synchronized boolean isMonitorLockNodePending() {
+    return monitorLockNodePending;
+  }
+
   private boolean reEstablishSession() {
     int connectionRetryCount = 0;
     boolean success = false;
-    while(!success && connectionRetryCount < NUM_RETRIES) {
+    while(!success && connectionRetryCount < maxRetryNum) {
       LOG.debug("Establishing zookeeper connection for " + this);
       try {
         createConnection();
@@ -925,7 +934,13 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
   }
 
   private void monitorLockNodeAsync() {
-    zkClient.exists(zkLockFilePath, 
+    if (monitorLockNodePending && monitorLockNodeClient == zkClient) {
+      LOG.info("Ignore duplicate monitor lock-node request.");
+      return;
+    }
+    monitorLockNodePending = true;
+    monitorLockNodeClient = zkClient;
+    zkClient.exists(zkLockFilePath,
         watcher, this,
         zkClient);
   }
@@ -972,14 +987,14 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
     });
   }
 
-  private static <T> T zkDoWithRetries(ZKAction<T> action)
-      throws KeeperException, InterruptedException {
+  private <T> T zkDoWithRetries(ZKAction<T> action) throws KeeperException,
+      InterruptedException {
     int retry = 0;
     while (true) {
       try {
         return action.run();
       } catch (KeeperException ke) {
-        if (shouldRetry(ke.code()) && ++retry < NUM_RETRIES) {
+        if (shouldRetry(ke.code()) && ++retry < maxRetryNum) {
           continue;
         }
         throw ke;
@@ -1063,7 +1078,9 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
     public void process(WatchedEvent event) {
       hasReceivedEvent.countDown();
       try {
-        hasSetZooKeeper.await(zkSessionTimeout, TimeUnit.MILLISECONDS);
+        if (!hasSetZooKeeper.await(zkSessionTimeout, TimeUnit.MILLISECONDS)) {
+          LOG.debug("Event received with stale zk");
+        }
         ActiveStandbyElector.this.processWatchEvent(
             zk, event);
       } catch (Throwable t) {
@@ -1091,12 +1108,7 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
   }
 
   private static boolean shouldRetry(Code code) {
-    switch (code) {
-    case CONNECTIONLOSS:
-    case OPERATIONTIMEOUT:
-      return true;
-    }
-    return false;
+    return code == Code.CONNECTIONLOSS || code == Code.OPERATIONTIMEOUT;
   }
   
   @Override
@@ -1105,5 +1117,9 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
       " appData=" +
       ((appData == null) ? "null" : StringUtils.byteToHexString(appData)) + 
       " cb=" + appClient;
+  }
+
+  public String getHAZookeeperConnectionState() {
+    return this.zkConnectionState.name();
   }
 }

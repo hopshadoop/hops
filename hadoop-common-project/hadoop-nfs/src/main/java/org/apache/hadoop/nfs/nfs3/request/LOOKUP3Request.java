@@ -19,6 +19,7 @@ package org.apache.hadoop.nfs.nfs3.request;
 
 import java.io.IOException;
 
+import org.apache.commons.io.Charsets;
 import org.apache.hadoop.nfs.nfs3.FileHandle;
 import org.apache.hadoop.oncrpc.XDR;
 
@@ -35,9 +36,10 @@ public class LOOKUP3Request extends RequestWithHandle {
     this.name = name;
   }
   
-  public LOOKUP3Request(XDR xdr) throws IOException {
-    super(xdr);
-    name = xdr.readString();
+  public static LOOKUP3Request deserialize(XDR xdr) throws IOException {
+    FileHandle handle = readHandle(xdr);
+    String name = xdr.readString();
+    return new LOOKUP3Request(handle, name);
   }
 
   public String getName() {
@@ -51,8 +53,8 @@ public class LOOKUP3Request extends RequestWithHandle {
   @Override
   @VisibleForTesting
   public void serialize(XDR xdr) {
-    super.serialize(xdr);
-    xdr.writeInt(name.getBytes().length);
-    xdr.writeFixedOpaque(name.getBytes());
+    handle.serialize(xdr);
+    xdr.writeInt(name.getBytes(Charsets.UTF_8).length);
+    xdr.writeFixedOpaque(name.getBytes(Charsets.UTF_8));
   }
 }

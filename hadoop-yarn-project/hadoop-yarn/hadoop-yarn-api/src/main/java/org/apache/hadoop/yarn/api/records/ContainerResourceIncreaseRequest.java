@@ -30,8 +30,8 @@ public abstract class ContainerResourceIncreaseRequest {
   @Public
   public static ContainerResourceIncreaseRequest newInstance(
       ContainerId existingContainerId, Resource targetCapability) {
-    ContainerResourceIncreaseRequest context =
-        Records.newRecord(ContainerResourceIncreaseRequest.class);
+    ContainerResourceIncreaseRequest context = Records
+        .newRecord(ContainerResourceIncreaseRequest.class);
     context.setContainerId(existingContainerId);
     context.setCapability(targetCapability);
     return context;

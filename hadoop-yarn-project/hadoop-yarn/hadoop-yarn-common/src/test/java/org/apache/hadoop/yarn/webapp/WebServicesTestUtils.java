@@ -18,12 +18,12 @@
 
 package org.apache.hadoop.yarn.webapp;
 
+import static org.junit.Assert.assertTrue;
+
 import org.w3c.dom.Attr;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
-
-import static org.junit.Assert.assertTrue;
 
 public class WebServicesTestUtils {
 
@@ -73,21 +73,21 @@ public class WebServicesTestUtils {
     return null;
   }
 
-  public static void checkStringMatch(String print, String expected,
-      String got) {
-    assertTrue(print + " doesn't match, got: " + got + " expected: " + expected,
+  public static void checkStringMatch(String print, String expected, String got) {
+    assertTrue(
+        print + " doesn't match, got: " + got + " expected: " + expected,
         got.matches(expected));
   }
 
-  public static void checkStringContains(String print, String expected,
-      String got) {
-    assertTrue(print + " doesn't contain expected string, got: " + got +
-        " expected: " + expected, got.contains(expected));
+  public static void checkStringContains(String print, String expected, String got) {
+    assertTrue(
+        print + " doesn't contain expected string, got: " + got + " expected: " + expected,
+        got.contains(expected));
   }
 
-  public static void checkStringEqual(String print, String expected,
-      String got) {
-    assertTrue(print + " is not equal, got: " + got + " expected: " + expected,
+  public static void checkStringEqual(String print, String expected, String got) {
+    assertTrue(
+        print + " is not equal, got: " + got + " expected: " + expected,
         got.equals(expected));
   }
 

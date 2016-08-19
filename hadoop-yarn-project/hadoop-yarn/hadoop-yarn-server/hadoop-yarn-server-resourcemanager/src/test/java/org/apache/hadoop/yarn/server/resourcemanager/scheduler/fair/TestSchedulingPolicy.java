@@ -18,14 +18,14 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair;
 
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.policies.DominantResourceFairnessPolicy;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.policies.FairSharePolicy;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.policies.FifoPolicy;
 import org.junit.Test;
 import org.mockito.Mockito;
-
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 
 public class TestSchedulingPolicy {
 
@@ -34,13 +34,14 @@ public class TestSchedulingPolicy {
       throws AllocationConfigurationException {
 
     // Class name
-    SchedulingPolicy sm =
-        SchedulingPolicy.parse(FairSharePolicy.class.getName());
+    SchedulingPolicy sm = SchedulingPolicy
+        .parse(FairSharePolicy.class.getName());
     assertTrue("Invalid scheduler name",
         sm.getName().equals(FairSharePolicy.NAME));
 
     // Canonical name
-    sm = SchedulingPolicy.parse(FairSharePolicy.class.getCanonicalName());
+    sm = SchedulingPolicy.parse(FairSharePolicy.class
+        .getCanonicalName());
     assertTrue("Invalid scheduler name",
         sm.getName().equals(FairSharePolicy.NAME));
 
@@ -61,14 +62,15 @@ public class TestSchedulingPolicy {
 
     // Shortname - fifo
     sm = SchedulingPolicy.parse("fifo");
-    assertTrue("Invalid scheduler name", sm.getName().equals(FifoPolicy.NAME));
+    assertTrue("Invalid scheduler name",
+        sm.getName().equals(FifoPolicy.NAME));
   }
 
   /**
    * Trivial tests that make sure
    * {@link SchedulingPolicy#isApplicableTo(SchedulingPolicy, byte)} works as
    * expected for the possible values of depth
-   *
+   * 
    * @throws AllocationConfigurationException
    */
   @Test(timeout = 1000)
@@ -79,20 +81,18 @@ public class TestSchedulingPolicy {
     SchedulingPolicy policy = SchedulingPolicy.parse("fifo");
     assertTrue(ERR,
         SchedulingPolicy.isApplicableTo(policy, SchedulingPolicy.DEPTH_LEAF));
-    assertFalse(ERR, SchedulingPolicy
-        .isApplicableTo(SchedulingPolicy.parse("fifo"),
-            SchedulingPolicy.DEPTH_INTERMEDIATE));
-    assertFalse(ERR, SchedulingPolicy
-        .isApplicableTo(SchedulingPolicy.parse("fifo"),
-            SchedulingPolicy.DEPTH_ROOT));
+    assertFalse(ERR, SchedulingPolicy.isApplicableTo(
+        SchedulingPolicy.parse("fifo"), SchedulingPolicy.DEPTH_INTERMEDIATE));
+    assertFalse(ERR, SchedulingPolicy.isApplicableTo(
+        SchedulingPolicy.parse("fifo"), SchedulingPolicy.DEPTH_ROOT));
 
     
     // fair
-    policy = SchedulingPolicy.parse("fair");
+    policy = SchedulingPolicy.parse("fair"); 
     assertTrue(ERR,
         SchedulingPolicy.isApplicableTo(policy, SchedulingPolicy.DEPTH_LEAF));
-    assertTrue(ERR, SchedulingPolicy
-        .isApplicableTo(policy, SchedulingPolicy.DEPTH_INTERMEDIATE));
+    assertTrue(ERR, SchedulingPolicy.isApplicableTo(policy,
+        SchedulingPolicy.DEPTH_INTERMEDIATE));
     assertTrue(ERR,
         SchedulingPolicy.isApplicableTo(policy, SchedulingPolicy.DEPTH_ROOT));
     assertTrue(ERR,
@@ -101,11 +101,11 @@ public class TestSchedulingPolicy {
         SchedulingPolicy.isApplicableTo(policy, SchedulingPolicy.DEPTH_ANY));
     
     // drf
-    policy = SchedulingPolicy.parse("drf");
+    policy = SchedulingPolicy.parse("drf"); 
     assertTrue(ERR,
         SchedulingPolicy.isApplicableTo(policy, SchedulingPolicy.DEPTH_LEAF));
-    assertTrue(ERR, SchedulingPolicy
-        .isApplicableTo(policy, SchedulingPolicy.DEPTH_INTERMEDIATE));
+    assertTrue(ERR, SchedulingPolicy.isApplicableTo(policy,
+        SchedulingPolicy.DEPTH_INTERMEDIATE));
     assertTrue(ERR,
         SchedulingPolicy.isApplicableTo(policy, SchedulingPolicy.DEPTH_ROOT));
     assertTrue(ERR,
@@ -114,10 +114,10 @@ public class TestSchedulingPolicy {
         SchedulingPolicy.isApplicableTo(policy, SchedulingPolicy.DEPTH_ANY));
     
     policy = Mockito.mock(SchedulingPolicy.class);
-    Mockito.when(policy.getApplicableDepth())
-        .thenReturn(SchedulingPolicy.DEPTH_PARENT);
-    assertTrue(ERR, SchedulingPolicy
-        .isApplicableTo(policy, SchedulingPolicy.DEPTH_INTERMEDIATE));
+    Mockito.when(policy.getApplicableDepth()).thenReturn(
+        SchedulingPolicy.DEPTH_PARENT);
+    assertTrue(ERR, SchedulingPolicy.isApplicableTo(policy,
+        SchedulingPolicy.DEPTH_INTERMEDIATE));
     assertTrue(ERR,
         SchedulingPolicy.isApplicableTo(policy, SchedulingPolicy.DEPTH_ROOT));
     assertTrue(ERR,

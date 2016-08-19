@@ -18,21 +18,35 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.event;
 
-import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
+import org.apache.hadoop.yarn.api.records.ReservationId;
 
 public class AppAddedSchedulerEvent extends SchedulerEvent {
 
   private final ApplicationId applicationId;
   private final String queue;
   private final String user;
+  private final ReservationId reservationID;
+  private final boolean isAppRecovering;
+
+  public AppAddedSchedulerEvent(
+      ApplicationId applicationId, String queue, String user) {
+    this(applicationId, queue, user, false, null);
+  }
 
   public AppAddedSchedulerEvent(ApplicationId applicationId, String queue,
-      String user, TransactionState transactionState) {
-    super(SchedulerEventType.APP_ADDED, transactionState);
+      String user, ReservationId reservationID) {
+    this(applicationId, queue, user, false, reservationID);
+  }
+
+  public AppAddedSchedulerEvent(ApplicationId applicationId, String queue,
+      String user, boolean isAppRecovering, ReservationId reservationID) {
+    super(SchedulerEventType.APP_ADDED);
     this.applicationId = applicationId;
     this.queue = queue;
     this.user = user;
+    this.reservationID = reservationID;
+    this.isAppRecovering = isAppRecovering;
   }
 
   public ApplicationId getApplicationId() {
@@ -47,4 +61,11 @@ public class AppAddedSchedulerEvent extends SchedulerEvent {
     return user;
   }
 
+  public boolean getIsAppRecovering() {
+    return isAppRecovering;
+  }
+
+  public ReservationId getReservationID() {
+    return reservationID;
+  }
 }

@@ -18,13 +18,10 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.recovery;
 
-import io.hops.ha.common.TransactionState;
-import org.apache.hadoop.yarn.event.AbstractEventTransaction;
+import org.apache.hadoop.yarn.event.AbstractEvent;
 
-public class RMStateStoreEvent
-    extends AbstractEventTransaction<RMStateStoreEventType> {
-  public RMStateStoreEvent(RMStateStoreEventType type,
-      TransactionState transactionState) {
-    super(type, transactionState);
+public class RMStateStoreEvent extends AbstractEvent<RMStateStoreEventType> {
+  public RMStateStoreEvent(RMStateStoreEventType type) {
+    super(type);
   }
 }

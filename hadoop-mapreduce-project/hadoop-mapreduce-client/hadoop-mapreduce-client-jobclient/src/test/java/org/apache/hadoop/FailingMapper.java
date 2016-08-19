@@ -22,7 +22,6 @@ import java.io.IOException;
 
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Mapper;
-import org.apache.hadoop.util.ExitUtil;
 
 /**
  * Fails the Mapper. First attempt throws exception. Rest do System.exit.
@@ -55,7 +54,7 @@ public class FailingMapper extends Mapper<Text, Text, Text, Text> {
     } else {
       System.out.println("Attempt:" + context.getTaskAttemptID() + 
       " Exiting");
-      ExitUtil.terminate(-1);
+      System.exit(-1);
     }
   }
 }

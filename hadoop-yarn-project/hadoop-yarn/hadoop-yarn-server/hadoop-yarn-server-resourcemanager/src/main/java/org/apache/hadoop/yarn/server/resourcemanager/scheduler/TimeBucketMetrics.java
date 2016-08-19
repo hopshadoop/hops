@@ -20,7 +20,7 @@ package org.apache.hadoop.yarn.server.resourcemanager.scheduler;
 import java.util.HashMap;
 
 /**
- * Create a set of buckets that hold key-time pairs. When the values of the
+ * Create a set of buckets that hold key-time pairs. When the values of the 
  * buckets is queried, the number of objects with time differences in the
  * different buckets is returned.
  */
@@ -31,7 +31,7 @@ class TimeBucketMetrics<OBJ> {
   private final long[] cuts;
 
   /**
-   * Create a set of buckets based on a set of time points. The number of
+   * Create a set of buckets based on a set of time points. The number of 
    * buckets is one more than the number of points.
    */
   TimeBucketMetrics(long[] cuts) {
@@ -57,9 +57,9 @@ class TimeBucketMetrics<OBJ> {
    * Find the bucket based on the cut points.
    */
   private int findBucket(long val) {
-    for (int i = 0; i < cuts.length; ++i) {
+    for(int i=0; i < cuts.length; ++i) {
       if (val < cuts[i]) {
-        return i;
+	return i;
       }
     }
     return cuts.length;
@@ -70,10 +70,10 @@ class TimeBucketMetrics<OBJ> {
    * returned by each call to this method.
    */
   synchronized int[] getBucketCounts(long now) {
-    for (int i = 0; i < counts.length; ++i) {
+    for(int i=0; i < counts.length; ++i) {
       counts[i] = 0;
     }
-    for (Long time : map.values()) {
+    for(Long time: map.values()) {
       counts[findBucket(now - time)] += 1;
     }
     return counts;

@@ -120,8 +120,8 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
           <forkMode>always</forkMode>
-          <forkedProcessTimeoutInSeconds>3600</forkedProcessTimeoutInSeconds>
-          <argLine>-Xmx4096m</argLine>
+          <forkedProcessTimeoutInSeconds>600</forkedProcessTimeoutInSeconds>
+          <argLine>-Xmx1024m</argLine>
           <includes>
             <include>**/Test*.java</include>
           </includes>
@@ -192,21 +192,6 @@
           </execution>
         </executions>
       </plugin>
-      <!-- Disable generation of pdf using maven-pdf-plugin until v.1.2 is released.
-           See Hadoop 8064 for details. -->
-      <!--plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-pdf-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>pdf</id>
-            <phase>package</phase>
-            <goals>
-              <goal>pdf</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin-->
     </plugins>
   </build>
 </project>

@@ -17,18 +17,17 @@
  */
 package org.apache.hadoop.yarn.api.protocolrecords.impl.pb;
 
-import com.google.protobuf.TextFormat;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.protocolrecords.MoveApplicationAcrossQueuesResponse;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.MoveApplicationAcrossQueuesResponseProto;
 
+import com.google.protobuf.TextFormat;
+
 @Private
 @Unstable
-public class MoveApplicationAcrossQueuesResponsePBImpl
-    extends MoveApplicationAcrossQueuesResponse {
-  MoveApplicationAcrossQueuesResponseProto proto =
-      MoveApplicationAcrossQueuesResponseProto.getDefaultInstance();
+public class MoveApplicationAcrossQueuesResponsePBImpl extends MoveApplicationAcrossQueuesResponse {
+  MoveApplicationAcrossQueuesResponseProto proto = MoveApplicationAcrossQueuesResponseProto.getDefaultInstance();
   MoveApplicationAcrossQueuesResponseProto.Builder builder = null;
   boolean viaProto = false;
   
@@ -36,8 +35,7 @@ public class MoveApplicationAcrossQueuesResponsePBImpl
     builder = MoveApplicationAcrossQueuesResponseProto.newBuilder();
   }
 
-  public MoveApplicationAcrossQueuesResponsePBImpl(
-      MoveApplicationAcrossQueuesResponseProto proto) {
+  public MoveApplicationAcrossQueuesResponsePBImpl(MoveApplicationAcrossQueuesResponseProto proto) {
     this.proto = proto;
     viaProto = true;
   }
@@ -55,9 +53,8 @@ public class MoveApplicationAcrossQueuesResponsePBImpl
 
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }

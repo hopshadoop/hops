@@ -42,6 +42,8 @@
     <!-- These 2 versions are defined here becuase they are used -->
     <!-- JDIFF generation from embedded ant in the antrun plugin -->
     <jdiff.version>1.0.9</jdiff.version>
+    <!-- Version number for xerces used by JDiff -->
+    <xerces.jdiff.version>2.11.0</xerces.jdiff.version>
 
     <hadoop.assemblies.version>${project.version}</hadoop.assemblies.version>
 
@@ -61,10 +63,52 @@
     <!-- jersey version -->
     <jersey.version>1.9</jersey.version>
 
+    <!-- jackson versions -->
+    <jackson.version>1.9.13</jackson.version>
+    <jackson2.version>2.2.3</jackson2.version>
+
     <!-- ProtocolBuffer version, used to verify the protoc version and -->
     <!-- define the protobuf JAR version                               -->
     <protobuf.version>2.5.0</protobuf.version>
     <protoc.path>${env.HADOOP_PROTOC_PATH}</protoc.path>
+
+    <zookeeper.version>3.4.6</zookeeper.version>
+    <curator.version>2.7.1</curator.version>
+    <findbugs.version>3.0.0</findbugs.version>
+
+    <tomcat.version>6.0.41</tomcat.version>
+
+    <!-- define the Java language version used by the compiler -->
+    <javac.version>1.7</javac.version>
+
+    <!-- The java version enforced by the maven enforcer -->
+    <!-- more complex patterns can be used here, such as
+       [${javac.version})
+    for an open-ended enforcement
+    -->
+    <enforced.java.version>[${javac.version},)</enforced.java.version>
+    <enforced.maven.version>[3.0.2,)</enforced.maven.version>
+
+    <!-- Plugin versions and config -->
+    <maven-surefire-plugin.argLine>-Xmx4096m -XX:MaxPermSize=768m -XX:+HeapDumpOnOutOfMemoryError</maven-surefire-plugin.argLine>
+    <maven-surefire-plugin.version>2.17</maven-surefire-plugin.version>
+    <maven-surefire-report-plugin.version>${maven-surefire-plugin.version}</maven-surefire-report-plugin.version>
+    <maven-failsafe-plugin.version>${maven-surefire-plugin.version}</maven-failsafe-plugin.version>
+
+    <maven-clean-plugin.version>2.5</maven-clean-plugin.version>
+    <maven-compiler-plugin.version>3.1</maven-compiler-plugin.version>
+    <maven-install-plugin.version>2.5.1</maven-install-plugin.version>
+    <maven-resources-plugin.version>2.6</maven-resources-plugin.version>
+    <maven-jar-plugin.version>2.5</maven-jar-plugin.version>
+    <maven-war-plugin.version>2.4</maven-war-plugin.version>
+    <maven-source-plugin.version>2.3</maven-source-plugin.version>
+    <maven-checkstyle-plugin.version>2.12.1</maven-checkstyle-plugin.version>
+    <maven-project-info-reports-plugin.version>2.7</maven-project-info-reports-plugin.version>
+    <maven-pdf-plugin.version>1.2</maven-pdf-plugin.version>
+    <build-helper-maven-plugin.version>1.9</build-helper-maven-plugin.version>
+    <exec-maven-plugin.version>1.3.1</exec-maven-plugin.version>
+    <make-maven-plugin.version>1.0-beta-1</make-maven-plugin.version>
+    <native-maven-plugin.version>1.0-alpha-8</native-maven-plugin.version>
   </properties>
 
   <dependencyManagement>
@@ -99,6 +143,12 @@
         <groupId>io.hops</groupId>
         <artifactId>hadoop-auth</artifactId>
         <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.hops</groupId>
+        <artifactId>hadoop-auth</artifactId>
+        <version>${project.version}</version>
+        <type>test-jar</type>
       </dependency>
       <dependency>
         <groupId>io.hops</groupId>
@@ -208,6 +258,11 @@
 
       <dependency>
         <groupId>io.hops</groupId>
+        <artifactId>hadoop-yarn-registry</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.hops</groupId>
         <artifactId>hadoop-yarn-server-nodemanager</artifactId>
         <version>${project.version}</version>
       </dependency>
@@ -283,6 +338,11 @@
         <artifactId>hadoop-extras</artifactId>
         <version>${project.version}</version>
       </dependency>
+      <dependency>
+        <groupId>io.hops</groupId>
+        <artifactId>hadoop-ant</artifactId>
+        <version>${project.version}</version>
+      </dependency>
 
       <dependency>
         <groupId>io.hops</groupId>
@@ -312,11 +372,30 @@
         <artifactId>hops-leader-election</artifactId>
         <version>${project.version}</version>
       </dependency>
-          
+
+      <dependency>
+        <groupId>io.hops</groupId>
+        <artifactId>hadoop-kms</artifactId>
+        <version>${project.version}</version>
+        <classifier>classes</classifier>
+        <type>jar</type>
+      </dependency>
+      <dependency>
+        <groupId>io.hops</groupId>
+        <artifactId>hadoop-kms</artifactId>
+        <version>${project.version}</version>
+        <type>test-jar</type>
+      </dependency>
+
       <dependency>
         <groupId>com.google.guava</groupId>
         <artifactId>guava</artifactId>
         <version>11.0.2</version>
+      </dependency>
+      <dependency>
+        <groupId>com.google.code.gson</groupId>
+        <artifactId>gson</artifactId>
+        <version>2.2.4</version>
       </dependency>
       <dependency>
         <groupId>commons-cli</groupId>
@@ -383,6 +462,26 @@
         <groupId>org.mortbay.jetty</groupId>
         <artifactId>jetty-util</artifactId>
         <version>6.1.26</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.tomcat.embed</groupId>
+        <artifactId>tomcat-embed-core</artifactId>
+        <version>7.0.55</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.tomcat.embed</groupId>
+        <artifactId>tomcat-embed-logging-juli</artifactId>
+        <version>7.0.55</version>
+      </dependency>
+      <dependency>
+        <groupId>tomcat</groupId>
+        <artifactId>jasper-runtime</artifactId>
+        <version>5.5.23</version>
+      </dependency>
+      <dependency>
+        <groupId>javax.servlet.jsp</groupId>
+        <artifactId>jsp-api</artifactId>
+        <version>2.1</version>
       </dependency>
 
       <dependency>
@@ -472,6 +571,12 @@
       </dependency>
 
       <dependency>
+        <groupId>io.netty</groupId>
+        <artifactId>netty-all</artifactId>
+        <version>4.0.23.Final</version>
+      </dependency>
+
+      <dependency>
         <groupId>commons-io</groupId>
         <artifactId>commons-io</artifactId>
         <version>2.4</version>
@@ -481,36 +586,6 @@
         <groupId>org.mortbay.jetty</groupId>
         <artifactId>jetty-servlet-tester</artifactId>
         <version>6.1.26</version>
-      </dependency>
-      <dependency>
-        <groupId>tomcat</groupId>
-        <artifactId>jasper-compiler</artifactId>
-        <version>5.5.23</version>
-        <exclusions>
-          <exclusion>
-            <groupId>javax.servlet</groupId>
-            <artifactId>jsp-api</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>ant</groupId>
-            <artifactId>ant</artifactId>
-          </exclusion>
-        </exclusions>
-      </dependency>
-      <dependency>
-        <groupId>tomcat</groupId>
-        <artifactId>jasper-runtime</artifactId>
-        <version>5.5.23</version>
-      </dependency>
-      <dependency>
-        <groupId>javax.servlet.jsp</groupId>
-        <artifactId>jsp-api</artifactId>
-        <version>2.1</version>
-      </dependency>
-      <dependency>
-        <groupId>commons-el</groupId>
-        <artifactId>commons-el</artifactId>
-        <version>1.0</version>
       </dependency>
       <dependency>
         <groupId>commons-logging</groupId>
@@ -591,7 +666,7 @@
       <dependency>
         <groupId>junit</groupId>
         <artifactId>junit</artifactId>
-        <version>4.10</version>
+        <version>4.11</version>
       </dependency>
       <dependency>
         <groupId>commons-lang</groupId>
@@ -601,7 +676,7 @@
       <dependency>
         <groupId>commons-collections</groupId>
         <artifactId>commons-collections</artifactId>
-        <version>3.2.2</version>
+        <version>3.2.1</version>
       </dependency>
       <dependency>
         <groupId>commons-configuration</groupId>
@@ -611,12 +686,17 @@
       <dependency>
         <groupId>org.slf4j</groupId>
         <artifactId>slf4j-api</artifactId>
-        <version>1.7.5</version>
+        <version>1.7.10</version>
       </dependency>
       <dependency>
         <groupId>org.slf4j</groupId>
         <artifactId>slf4j-log4j12</artifactId>
-        <version>1.7.5</version>
+        <version>1.7.10</version>
+      </dependency>
+      <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>jul-to-slf4j</artifactId>
+        <version>1.7.10</version>
       </dependency>
       <dependency>
         <groupId>org.eclipse.jdt</groupId>
@@ -631,22 +711,37 @@
       <dependency>
         <groupId>org.codehaus.jackson</groupId>
         <artifactId>jackson-mapper-asl</artifactId>
-        <version>1.8.8</version>
+        <version>${jackson.version}</version>
       </dependency>
       <dependency>
         <groupId>org.codehaus.jackson</groupId>
         <artifactId>jackson-core-asl</artifactId>
-        <version>1.8.8</version>
+        <version>${jackson.version}</version>
       </dependency>
       <dependency>
         <groupId>org.codehaus.jackson</groupId>
         <artifactId>jackson-jaxrs</artifactId>
-        <version>1.8.8</version>
+        <version>${jackson.version}</version>
       </dependency>
       <dependency>
         <groupId>org.codehaus.jackson</groupId>
         <artifactId>jackson-xc</artifactId>
-        <version>1.8.8</version>
+        <version>${jackson.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-core</artifactId>
+        <version>${jackson2.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-databind</artifactId>
+        <version>${jackson2.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-annotations</artifactId>
+        <version>${jackson2.version}</version>
       </dependency>
       <dependency>
         <groupId>org.mockito</groupId>
@@ -684,6 +779,11 @@
         <version>0.1.42</version>
       </dependency>
       <dependency>
+        <groupId>org.apache.htrace</groupId>
+        <artifactId>htrace-core</artifactId>
+        <version>3.1.0-incubating</version>
+      </dependency>
+      <dependency>
         <groupId>org.jdom</groupId>
         <artifactId>jdom</artifactId>
         <version>1.1</version>
@@ -697,7 +797,7 @@
       <dependency>
         <groupId>org.apache.zookeeper</groupId>
         <artifactId>zookeeper</artifactId>
-        <version>3.4.5</version>
+        <version>${zookeeper.version}</version>
         <exclusions>
           <exclusion>
             <!-- otherwise seems to drag in junit 3.8.1 via jline -->
@@ -721,7 +821,7 @@
       <dependency>
         <groupId>org.apache.zookeeper</groupId>
         <artifactId>zookeeper</artifactId>
-        <version>3.4.5</version>
+        <version>${zookeeper.version}</version>
         <type>test-jar</type>
         <scope>test</scope>
         <exclusions>
@@ -729,12 +829,16 @@
             <groupId>org.jboss.netty</groupId>
             <artifactId>netty</artifactId>
           </exclusion>
+          <exclusion>
+            <groupId>jline</groupId>
+            <artifactId>jline</artifactId>
+          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
         <groupId>org.apache.bookkeeper</groupId>
         <artifactId>bookkeeper-server</artifactId>
-        <version>4.0.0</version>
+        <version>4.2.3</version>
         <scope>compile</scope>
       </dependency>
       <dependency>
@@ -745,7 +849,7 @@
       <dependency>
         <groupId>com.codahale.metrics</groupId>
         <artifactId>metrics-core</artifactId>
-        <version>3.0.0</version>
+        <version>3.0.1</version>
       </dependency>
       <dependency>
         <groupId>io.hops</groupId>
@@ -755,7 +859,7 @@
       <dependency>
         <groupId>com.google.code.findbugs</groupId>
         <artifactId>jsr305</artifactId>
-        <version>1.3.9</version>
+        <version>${findbugs.version}</version>
       </dependency>
       <dependency>
         <groupId>javax.xml.bind</groupId>
@@ -790,6 +894,62 @@
         <artifactId>leveldbjni-all</artifactId>
         <version>1.8</version>
       </dependency>
+
+      <dependency>
+        <groupId>org.apache.directory.server</groupId>
+        <artifactId>apacheds-kerberos-codec</artifactId>
+        <version>2.0.0-M15</version>
+      </dependency>
+
+      <dependency>
+        <groupId>xerces</groupId>
+        <artifactId>xercesImpl</artifactId>
+        <version>2.9.1</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.curator</groupId>
+        <artifactId>curator-framework</artifactId>
+        <version>2.6.0</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.curator</groupId>
+        <artifactId>curator-test</artifactId>
+        <version>2.6.0</version>
+      </dependency>
+
+     <dependency>
+       <groupId>org.apache.curator</groupId>
+       <artifactId>curator-recipes</artifactId>
+       <version>${curator.version}</version>
+     </dependency>
+     <dependency>
+       <groupId>org.apache.curator</groupId>
+       <artifactId>curator-client</artifactId>
+       <version>${curator.version}</version>
+     </dependency>
+     <dependency>
+       <groupId>org.apache.curator</groupId>
+       <artifactId>curator-framework</artifactId>
+       <version>${curator.version}</version>
+     </dependency>
+     <dependency>
+       <groupId>org.apache.curator</groupId>
+       <artifactId>curator-test</artifactId>
+       <version>${curator.version}</version>
+     </dependency>
+     <dependency>
+       <groupId>org.bouncycastle</groupId>
+       <artifactId>bcprov-jdk16</artifactId>
+       <version>1.46</version>
+       <scope>test</scope>
+     </dependency>
+      <dependency>
+        <groupId>com.microsoft.azure</groupId>
+        <artifactId>azure-storage</artifactId>
+        <version>2.0.0</version>
+    </dependency>
+      
     </dependencies>
   </dependencyManagement>
 
@@ -798,15 +958,15 @@
       <plugins>
         <plugin>
           <artifactId>maven-clean-plugin</artifactId>
-          <version>2.4.1</version>
+          <version>${maven-clean-plugin.version}</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-compiler-plugin</artifactId>
-          <version>2.5.1</version>
+          <version>${maven-compiler-plugin.version}</version>
           <configuration>
-            <source>1.6</source>
-            <target>1.6</target>
+            <source>${javac.version}</source>
+            <target>${javac.version}</target>
           </configuration>
         </plugin>
         <plugin>
@@ -817,22 +977,22 @@
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>build-helper-maven-plugin</artifactId>
-          <version>1.5</version>
+          <version>${build-helper-maven-plugin.version}</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-surefire-plugin</artifactId>
-          <version>2.17</version>
+          <version>${maven-surefire-plugin.version}</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-install-plugin</artifactId>
-          <version>2.3.1</version>
+          <version>${maven-install-plugin.version}</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-jar-plugin</artifactId>
-          <version>2.3.1</version>
+          <version>${maven-jar-plugin.version}</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
@@ -842,32 +1002,32 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-war-plugin</artifactId>
-          <version>2.1</version>
+          <version>${maven-war-plugin.version}</version>
         </plugin>
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>findbugs-maven-plugin</artifactId>
-          <version>2.3.2</version>
+          <version>${findbugs.version}</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-checkstyle-plugin</artifactId>
-          <version>2.6</version>
+          <version>${maven-checkstyle-plugin.version}</version>
         </plugin>
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>native-maven-plugin</artifactId>
-          <version>1.0-alpha-7</version>
+          <version>${native-maven-plugin.version}</version>
         </plugin>
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>make-maven-plugin</artifactId>
-          <version>1.0-beta-1</version>
+          <version>${make-maven-plugin.version}</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-source-plugin</artifactId>
-          <version>2.1.2</version>
+          <version>${maven-source-plugin.version}</version>
         </plugin>
         <plugin>
           <groupId>org.apache.avro</groupId>
@@ -882,22 +1042,22 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-project-info-reports-plugin</artifactId>
-          <version>2.4</version>
+          <version>${maven-project-info-reports-plugin.version}</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-resources-plugin</artifactId>
-          <version>2.2</version>
+          <version>${maven-resources-plugin.version}</version>
         </plugin>
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>exec-maven-plugin</artifactId>
-          <version>1.2</version>
+          <version>${exec-maven-plugin.version}</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-pdf-plugin</artifactId>
-          <version>1.1</version>
+          <version>${maven-pdf-plugin.version}</version>
         </plugin>
         <plugin>
           <groupId>io.hops</groupId>
@@ -975,8 +1135,8 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
           <reuseForks>false</reuseForks>
-          <forkedProcessTimeoutInSeconds>3600</forkedProcessTimeoutInSeconds>
-          <argLine>-Xmx4096m -XX:+HeapDumpOnOutOfMemoryError</argLine>
+          <forkedProcessTimeoutInSeconds>900</forkedProcessTimeoutInSeconds>
+          <argLine>${maven-surefire-plugin.argLine}</argLine>
           <environmentVariables>
             <!-- HADOOP_HOME required for tests on Windows to find winutils -->
             <HADOOP_HOME>${hadoop.common.build.dir}</HADOOP_HOME>
@@ -1078,6 +1238,7 @@
         <!-- attempt to open a file at this path. -->
         <java.security.egd>file:/dev/urandom</java.security.egd>
         <bundle.snappy.in.bin>true</bundle.snappy.in.bin>
+        <bundle.openssl.in.bin>true</bundle.openssl.in.bin>
       </properties>
       <build>
         <plugins>
@@ -1088,6 +1249,7 @@
               <environmentVariables>
                 <!-- Specify where to look for the native DLL on Windows -->
                 <PATH>${env.PATH};${hadoop.common.build.dir}/bin;${snappy.lib}</PATH>
+                <PATH>${env.PATH};${hadoop.common.build.dir}/bin;${openssl.lib}</PATH>
               </environmentVariables>
             </configuration>
           </plugin>
@@ -1106,8 +1268,8 @@
             <artifactId>maven-compiler-plugin</artifactId>
             <configuration>
               <fork>true</fork>
-              <source>1.6</source>
-              <target>1.6</target>
+              <source>${javac.version}</source>
+              <target>${javac.version}</target>
               <compilerArguments>
                 <Xlint/>
                 <Xmaxwarns>9999</Xmaxwarns>

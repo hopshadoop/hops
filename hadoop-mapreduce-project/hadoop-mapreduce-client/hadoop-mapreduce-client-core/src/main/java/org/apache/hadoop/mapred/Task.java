@@ -63,10 +63,10 @@ import org.apache.hadoop.mapreduce.lib.reduce.WrappedReducer;
 import org.apache.hadoop.mapreduce.task.ReduceContextImpl;
 import org.apache.hadoop.yarn.util.ResourceCalculatorProcessTree;
 import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.util.ExitUtil;
 import org.apache.hadoop.util.Progress;
 import org.apache.hadoop.util.Progressable;
 import org.apache.hadoop.util.ReflectionUtils;
+import org.apache.hadoop.util.ShutdownHookManager;
 import org.apache.hadoop.util.StringInterner;
 import org.apache.hadoop.util.StringUtils;
 
@@ -115,7 +115,7 @@ abstract public class Task implements Writable, Configurable {
    * BYTES_READ counter and second one is of the BYTES_WRITTEN counter.
    */
   protected static String[] getFileSystemCounterNames(String uriScheme) {
-    String scheme = uriScheme.toUpperCase();
+    String scheme = StringUtils.toUpperCase(uriScheme);
     return new String[]{scheme+"_BYTES_READ", scheme+"_BYTES_WRITTEN"};
   }
   
@@ -148,6 +148,8 @@ abstract public class Task implements Writable, Configurable {
   private String user;                            // user running the job
   private TaskAttemptID taskId;                   // unique, includes job id
   private int partition;                          // id within job
+  private byte[] encryptedSpillKey = new byte[] {0};  // Key Used to encrypt
+  // intermediate spills
   TaskStatus taskStatus;                          // current status of the task
   protected JobStatus.State jobRunStateForCleanup;
   protected boolean jobCleanup = false;
@@ -170,7 +172,7 @@ abstract public class Task implements Writable, Configurable {
     skipRanges.skipRangeIterator();
 
   private ResourceCalculatorProcessTree pTree;
-  private long initCpuCumulativeTime = 0;
+  private long initCpuCumulativeTime = ResourceCalculatorProcessTree.UNAVAILABLE;
 
   protected JobConf conf;
   protected MapOutputFile mapOutputFile;
@@ -256,6 +258,24 @@ abstract public class Task implements Writable, Configurable {
   }
 
   /**
+   * Get Encrypted spill key
+   * @return encrypted spill key
+   */
+  public byte[] getEncryptedSpillKey() {
+    return encryptedSpillKey;
+  }
+
+  /**
+   * Set Encrypted spill key
+   * @param encryptedSpillKey key
+   */
+  public void setEncryptedSpillKey(byte[] encryptedSpillKey) {
+    if (encryptedSpillKey != null) {
+      this.encryptedSpillKey = encryptedSpillKey;
+    }
+  }
+
+  /**
    * Get the job token secret
    * @return the token secret
    */
@@ -322,6 +342,11 @@ abstract public class Task implements Writable, Configurable {
   protected void reportFatalError(TaskAttemptID id, Throwable throwable, 
                                   String logMsg) {
     LOG.fatal(logMsg);
+    
+    if (ShutdownHookManager.get().isShutdownInProgress()) {
+      return;
+    }
+    
     Throwable tCause = throwable.getCause();
     String cause = tCause == null 
                    ? StringUtils.stringifyException(throwable)
@@ -330,7 +355,7 @@ abstract public class Task implements Writable, Configurable {
       umbilical.fatalError(id, cause);
     } catch (IOException ioe) {
       LOG.fatal("Failed to contact the tasktracker", ioe);
-      ExitUtil.terminate(-1);
+      System.exit(-1);
     }
   }
 
@@ -480,7 +505,9 @@ abstract public class Task implements Writable, Configurable {
     out.writeBoolean(writeSkipRecs);
     out.writeBoolean(taskCleanup);
     Text.writeString(out, user);
+    out.writeInt(encryptedSpillKey.length);
     extraData.write(out);
+    out.write(encryptedSpillKey);
   }
   
   public void readFields(DataInput in) throws IOException {
@@ -505,7 +532,10 @@ abstract public class Task implements Writable, Configurable {
       setPhase(TaskStatus.Phase.CLEANUP);
     }
     user = StringInterner.weakIntern(Text.readString(in));
+    int len = in.readInt();
+    encryptedSpillKey = new byte[len];
     extraData.readFields(in);
+    in.readFully(encryptedSpillKey);
   }
 
   @Override
@@ -742,7 +772,7 @@ abstract public class Task implements Writable, Configurable {
           if (!taskFound) {
             LOG.warn("Parent died.  Exiting "+taskId);
             resetDoneFlag();
-            ExitUtil.terminate(66);
+            System.exit(66);
           }
 
           sendProgress = resetProgressFlag(); 
@@ -755,7 +785,7 @@ abstract public class Task implements Writable, Configurable {
             ReflectionUtils.logThreadInfo(LOG, "Communication exception", 0);
             LOG.warn("Last retry, killing "+taskId);
             resetDoneFlag();
-            ExitUtil.terminate(65);
+            System.exit(65);
           }
         }
       }
@@ -839,13 +869,25 @@ abstract public class Task implements Writable, Configurable {
     }
     pTree.updateProcessTree();
     long cpuTime = pTree.getCumulativeCpuTime();
-    long pMem = pTree.getCumulativeRssmem();
-    long vMem = pTree.getCumulativeVmem();
+    long pMem = pTree.getRssMemorySize();
+    long vMem = pTree.getVirtualMemorySize();
     // Remove the CPU time consumed previously by JVM reuse
-    cpuTime -= initCpuCumulativeTime;
-    counters.findCounter(TaskCounter.CPU_MILLISECONDS).setValue(cpuTime);
-    counters.findCounter(TaskCounter.PHYSICAL_MEMORY_BYTES).setValue(pMem);
-    counters.findCounter(TaskCounter.VIRTUAL_MEMORY_BYTES).setValue(vMem);
+    if (cpuTime != ResourceCalculatorProcessTree.UNAVAILABLE &&
+        initCpuCumulativeTime != ResourceCalculatorProcessTree.UNAVAILABLE) {
+      cpuTime -= initCpuCumulativeTime;
+    }
+    
+    if (cpuTime != ResourceCalculatorProcessTree.UNAVAILABLE) {
+      counters.findCounter(TaskCounter.CPU_MILLISECONDS).setValue(cpuTime);
+    }
+    
+    if (pMem != ResourceCalculatorProcessTree.UNAVAILABLE) {
+      counters.findCounter(TaskCounter.PHYSICAL_MEMORY_BYTES).setValue(pMem);
+    }
+
+    if (vMem != ResourceCalculatorProcessTree.UNAVAILABLE) {
+      counters.findCounter(TaskCounter.VIRTUAL_MEMORY_BYTES).setValue(vMem);
+    }
   }
 
   /**
@@ -1012,7 +1054,7 @@ abstract public class Task implements Writable, Configurable {
           LOG.warn("Failure sending commit pending: " + 
                     StringUtils.stringifyException(ie));
           if (--retries == 0) {
-            ExitUtil.terminate(67);
+            System.exit(67);
           }
         }
       }
@@ -1057,7 +1099,7 @@ abstract public class Task implements Writable, Configurable {
       try {
         if (!umbilical.statusUpdate(getTaskID(), taskStatus)) {
           LOG.warn("Parent died.  Exiting "+taskId);
-          ExitUtil.terminate(66);
+          System.exit(66);
         }
         taskStatus.clearStatus();
         return;
@@ -1147,7 +1189,7 @@ abstract public class Task implements Writable, Configurable {
         if (--retries == 0) {
           //if it couldn't query successfully then delete the output
           discardOutput(taskContext);
-          ExitUtil.terminate(68);
+          System.exit(68);
         }
       }
     }

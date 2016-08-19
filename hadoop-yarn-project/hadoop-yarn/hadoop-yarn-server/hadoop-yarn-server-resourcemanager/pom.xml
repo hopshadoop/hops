@@ -13,8 +13,8 @@
   limitations under the License. See accompanying LICENSE file.
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
                       http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <artifactId>hadoop-yarn-server</artifactId>
@@ -34,16 +34,6 @@
 
   <dependencies>
     <dependency>
-      <groupId>io.hops</groupId>
-      <artifactId>hops-leader-election</artifactId>
-      <version>2.4.0</version>
-    </dependency>
-    <dependency>
-      <groupId>io.hops.metadata</groupId>
-      <artifactId>hops-metadata-dal</artifactId>
-      <version>1.0-SNAPSHOT</version>
-    </dependency>
-    <dependency>
       <groupId>javax.servlet</groupId>
       <artifactId>servlet-api</artifactId>
     </dependency>
@@ -52,24 +42,6 @@
       <groupId>io.hops</groupId>
       <artifactId>hadoop-common</artifactId>
       <scope>provided</scope>
-      <exclusions>
-        <exclusion>
-          <groupId>commons-el</groupId>
-          <artifactId>commons-el</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>tomcat</groupId>
-          <artifactId>jasper-runtime</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>tomcat</groupId>
-          <artifactId>jasper-compiler</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.mortbay.jetty</groupId>
-          <artifactId>jsp-2.1-jetty</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
 
     <dependency>
@@ -202,6 +174,19 @@
       <groupId>io.hops</groupId>
       <artifactId>hadoop-yarn-server-web-proxy</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.apache.zookeeper</groupId>
+      <artifactId>zookeeper</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.fusesource.leveldbjni</groupId>
+      <artifactId>leveldbjni-all</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.zookeeper</groupId>
+      <artifactId>zookeeper</artifactId>
+      <type>test-jar</type>
+    </dependency>
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
       <groupId>io.hops</groupId>
@@ -212,70 +197,44 @@
 
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
+      <groupId>io.hops</groupId>
+      <artifactId>hadoop-minikdc</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>io.hops</groupId>
+      <artifactId>hadoop-auth</artifactId>
+      <scope>test</scope>
+      <type>test-jar</type>
+      <version>${project.version}</version>
+    </dependency>
+
+    <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
+    <dependency>
       <groupId>com.sun.jersey.jersey-test-framework</groupId>
       <artifactId>jersey-test-framework-grizzly2</artifactId>
       <scope>test</scope>
     </dependency>
-    
-    <dependency>
-      <groupId>io.hops.streaming</groupId>
-      <artifactId>libhopsyarn</artifactId>
-      <version>1.0</version>
-      <type>so</type>
-    </dependency>
-        
   </dependencies>
 
   <build>
 
     <testResources>
-      <testResource>
-        <directory>${basedir}/src/test/resources</directory>
-      </testResource>
-      <testResource>
-        <directory>${basedir}/conf</directory>
-        <includes>
-          <include>capacity-scheduler.xml</include>
-        </includes>
-      </testResource>
+     <testResource>
+       <directory>${basedir}/src/test/resources</directory>
+     </testResource>
+     <testResource>
+       <directory>${basedir}/conf</directory>
+       <includes>
+         <include>capacity-scheduler.xml</include>
+       </includes>
+     </testResource>
     </testResources>
 
 
     <plugins>
 
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-dependency-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>copy-dependency</id>
-            <phase>compile</phase>
-            <goals>
-              <goal>copy</goal>
-            </goals>
-            <configuration>
-              <artifactItems>
-                <artifactItem>
-                  <groupId>io.hops.streaming</groupId>
-                  <artifactId>libhopsyarn</artifactId>
-                  <version>1.0</version>
-                  <type>so</type>
-                  <overWrite>true</overWrite>
-                  <outputDirectory>target/lib</outputDirectory>
-                </artifactItem>
-              </artifactItems>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
-
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-surefire-plugin</artifactId>
-        <configuration>
-          <argLine>-Djava.library.path=${java.library.path}:${basedir}/target/lib</argLine>         
-        </configuration>
-      </plugin>
       <!-- Publish tests jar -->
       <plugin>
         <artifactId>maven-jar-plugin</artifactId>
@@ -285,6 +244,68 @@
               <goal>test-jar</goal>
             </goals>
             <phase>test-compile</phase>
+            <configuration>
+              <archive>
+                <manifest>
+                  <mainClass>org.apache.hadoop.test.YarnTestDriver</mainClass>
+                </manifest>
+              </archive>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+     <plugin>
+        <groupId>io.hops</groupId>
+        <artifactId>hadoop-maven-plugins</artifactId>
+        <executions>
+          <execution>
+            <id>compile-protoc</id>
+            <phase>generate-sources</phase>
+            <goals>
+              <goal>protoc</goal>
+            </goals>
+            <configuration>
+              <protocVersion>${protobuf.version}</protocVersion>
+              <protocCommand>${protoc.path}</protocCommand>
+              <imports>
+                <param>${basedir}/../../../../hadoop-common-project/hadoop-common/src/main/proto</param>
+                <param>${basedir}/../../hadoop-yarn-api/src/main/proto</param>
+                <param>${basedir}/../../hadoop-yarn-common/src/main/proto/server/</param>
+                <param>${basedir}/../hadoop-yarn-server-common/src/main/proto</param>
+                <param>${basedir}/src/main/proto</param>
+              </imports>
+              <source>
+                <directory>${basedir}/src/main/proto</directory>
+                <includes>
+                  <include>yarn_server_resourcemanager_recovery.proto</include>
+                </includes>
+              </source>
+              <output>${project.build.directory}/generated-sources/java</output>
+            </configuration>
+          </execution>
+          <execution>
+            <id>compile-test-protoc</id>
+            <phase>generate-sources</phase>
+            <goals>
+              <goal>protoc</goal>
+            </goals>
+            <configuration>
+              <protocVersion>${protobuf.version}</protocVersion>
+              <protocCommand>${protoc.path}</protocCommand>
+              <imports>
+                <param>${basedir}/../../../../hadoop-common-project/hadoop-common/src/main/proto</param>
+                <param>${basedir}/../../hadoop-yarn-api/src/main/proto</param>
+                <param>${basedir}/src/test/proto</param>
+              </imports>
+              <source>
+                <directory>${basedir}/src/test/proto</directory>
+                <includes>
+                          <include>test_client_tokens.proto</include>
+                </includes>
+              </source>
+              <output>${project.build.directory}/generated-sources/java</output>
+            </configuration>
           </execution>
         </executions>
       </plugin>
@@ -309,18 +330,15 @@
                   <goal>java</goal>
                 </goals>
                 <configuration>
-                  <mainClass>
-                    org.apache.hadoop.yarn.state.VisualizeStateMachine
-                  </mainClass>
+                  <mainClass>org.apache.hadoop.yarn.state.VisualizeStateMachine</mainClass>
                   <classpathScope>compile</classpathScope>
                   <arguments>
                     <argument>ResourceManager</argument>
-                    <argument>
+                    <argument>org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore,
                       org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptImpl,
                       org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppImpl,
                       org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerImpl,
-                      org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeImpl
-                    </argument>
+                      org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeImpl</argument>
                     <argument>ResourceManager.gv</argument>
                   </arguments>
                 </configuration>

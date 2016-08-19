@@ -1,63 +1,61 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Licensed to the Apache Software Foundation (ASF) under one
+* or more contributor license agreements.  See the NOTICE file
+* distributed with this work for additional information
+* regarding copyright ownership.  The ASF licenses this file
+* to you under the Apache License, Version 2.0 (the
+* "License"); you may not use this file except in compliance
+* with the License.  You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
 
 package org.apache.hadoop.yarn.webapp.test;
 
-import com.google.inject.AbstractModule;
-import com.google.inject.Guice;
-import com.google.inject.Injector;
-import com.google.inject.Module;
-import com.google.inject.Provides;
-import com.google.inject.Scopes;
-import com.google.inject.servlet.RequestScoped;
 import org.apache.hadoop.yarn.webapp.Controller;
 import org.apache.hadoop.yarn.webapp.SubView;
 import org.apache.hadoop.yarn.webapp.View;
 import org.apache.hadoop.yarn.webapp.WebAppException;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
-import java.io.PrintWriter;
 import java.lang.reflect.Method;
 import java.util.Map;
 
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.when;
+import com.google.inject.Module;
+import com.google.inject.Scopes;
+import com.google.inject.servlet.RequestScoped;
+import com.google.inject.AbstractModule;
+import com.google.inject.Guice;
+import com.google.inject.Injector;
+import com.google.inject.Provides;
+
+import java.io.IOException;
+import java.io.PrintWriter;
+
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpServletRequest;
+
+
+import static org.mockito.Mockito.*;
 
 public class WebAppTests {
 
   /**
    * Create a mock injector for tests
-   *
-   * @param <T>
-   *     type of class/interface
-   * @param api
-   *     the interface class of the object to inject
-   * @param impl
-   *     the implementation object to inject
-   * @param modules
-   *     additional guice modules
+   * @param <T> type of class/interface
+   * @param api the interface class of the object to inject
+   * @param impl the implementation object to inject
+   * @param modules additional guice modules
    * @return an injector
    */
   public static <T> Injector createMockInjector(final Class<T> api,
-      final T impl, final Module... modules) {
+                                                final T impl,
+                                                final Module... modules) {
     return Guice.createInjector(new AbstractModule() {
       final PrintWriter writer = spy(new PrintWriter(System.out));
       final HttpServletRequest request = createRequest();
@@ -76,18 +74,15 @@ public class WebAppTests {
         }
       }
 
-      @Provides
-      HttpServletRequest request() {
+      @Provides HttpServletRequest request() {
         return request;
       }
 
-      @Provides
-      HttpServletResponse response() {
+      @Provides HttpServletResponse response() {
         return response;
       }
 
-      @Provides
-      PrintWriter writer() {
+      @Provides PrintWriter writer() {
         return writer;
       }
 
@@ -111,7 +106,7 @@ public class WebAppTests {
   // convenience
   @SuppressWarnings("unchecked")
   public static <T> Injector createMockInjector(T impl) {
-    return createMockInjector((Class<T>) impl.getClass(), impl);
+    return createMockInjector((Class<T>)impl.getClass(), impl);
   }
 
   public static void flushOutput(Injector injector) {
@@ -127,8 +122,8 @@ public class WebAppTests {
       String methodName, Class<T> api, T impl, Module... modules) {
     try {
       Injector injector = createMockInjector(api, impl, modules);
-      Method method = ctrlr.getMethod(methodName, (Class<?>[]) null);
-      method.invoke(injector.getInstance(ctrlr), (Object[]) null);
+      Method method = ctrlr.getMethod(methodName, (Class<?>[])null);
+      method.invoke(injector.getInstance(ctrlr), (Object[])null);
       return injector;
     } catch (Exception e) {
       throw new WebAppException(e);
@@ -141,11 +136,11 @@ public class WebAppTests {
   }
 
   public static <T> Injector testPage(Class<? extends View> page, Class<T> api,
-      T impl, Map<String, String> params, Module... modules) {
+                                      T impl, Map<String,String> params, Module... modules) {
     Injector injector = createMockInjector(api, impl, modules);
     View view = injector.getInstance(page);
-    if (params != null) {
-      for (Map.Entry<String, String> entry : params.entrySet()) {
+    if(params != null) {
+      for(Map.Entry<String, String> entry: params.entrySet()) {
         view.set(entry.getKey(), entry.getValue());
       }
     }
@@ -155,7 +150,7 @@ public class WebAppTests {
   }
   
   public static <T> Injector testPage(Class<? extends View> page, Class<T> api,
-      T impl, Module... modules) {
+                                      T impl, Module... modules) {
     return testPage(page, api, impl, null, modules);
   }
 
@@ -178,10 +173,8 @@ public class WebAppTests {
   }
   
   /**
-   * Convenience method to get the spy writer.
-   *
-   * @param injector
-   *     the injector used for the test.
+   * Convenience method to get the spy writer. 
+   * @param injector the injector used for the test.
    * @return The Spy writer.
    * @throws IOException
    */

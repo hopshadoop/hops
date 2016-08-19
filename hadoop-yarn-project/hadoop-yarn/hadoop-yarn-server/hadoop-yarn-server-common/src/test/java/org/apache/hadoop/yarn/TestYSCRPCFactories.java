@@ -18,7 +18,11 @@
 
 package org.apache.hadoop.yarn;
 
-import junit.framework.Assert;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+
+import org.junit.Assert;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.net.NetUtils;
@@ -33,10 +37,8 @@ import org.apache.hadoop.yarn.server.api.protocolrecords.RegisterNodeManagerRequ
 import org.apache.hadoop.yarn.server.api.protocolrecords.RegisterNodeManagerResponse;
 import org.junit.Test;
 
-import java.io.IOException;
-import java.net.InetSocketAddress;
-
 public class TestYSCRPCFactories {
+  
   
   
   @Test
@@ -47,14 +49,16 @@ public class TestYSCRPCFactories {
   }
   
   
+  
   private void testPbServerFactory() {
     InetSocketAddress addr = new InetSocketAddress(0);
     Configuration conf = new Configuration();
     ResourceTracker instance = new ResourceTrackerTestImpl();
     Server server = null;
     try {
-      server = RpcServerFactoryPBImpl.get()
-          .getServer(ResourceTracker.class, instance, addr, conf, null, 1);
+      server = 
+        RpcServerFactoryPBImpl.get().getServer(
+            ResourceTracker.class, instance, addr, conf, null, 1);
       server.start();
     } catch (YarnRuntimeException e) {
       e.printStackTrace();
@@ -72,17 +76,16 @@ public class TestYSCRPCFactories {
     ResourceTracker instance = new ResourceTrackerTestImpl();
     Server server = null;
     try {
-      server = RpcServerFactoryPBImpl.get()
-          .getServer(ResourceTracker.class, instance, addr, conf, null, 1);
+      server = 
+        RpcServerFactoryPBImpl.get().getServer(
+            ResourceTracker.class, instance, addr, conf, null, 1);
       server.start();
       System.err.println(server.getListenerAddress());
       System.err.println(NetUtils.getConnectAddress(server));
 
       ResourceTracker client = null;
       try {
-        client = (ResourceTracker) RpcClientFactoryPBImpl.get()
-            .getClient(ResourceTracker.class, 1,
-                NetUtils.getConnectAddress(server), conf);
+        client = (ResourceTracker) RpcClientFactoryPBImpl.get().getClient(ResourceTracker.class, 1, NetUtils.getConnectAddress(server), conf);
       } catch (YarnRuntimeException e) {
         e.printStackTrace();
         Assert.fail("Failed to create client");
@@ -93,14 +96,15 @@ public class TestYSCRPCFactories {
       Assert.fail("Failed to create server");
     } finally {
       server.stop();
-    }
+    }     
   }
 
   public class ResourceTrackerTestImpl implements ResourceTracker {
 
     @Override
     public RegisterNodeManagerResponse registerNodeManager(
-        RegisterNodeManagerRequest request) throws YarnException, IOException {
+        RegisterNodeManagerRequest request) throws YarnException,
+        IOException {
       // TODO Auto-generated method stub
       return null;
     }
@@ -111,7 +115,6 @@ public class TestYSCRPCFactories {
       // TODO Auto-generated method stub
       return null;
     }
-
     
   }
 }

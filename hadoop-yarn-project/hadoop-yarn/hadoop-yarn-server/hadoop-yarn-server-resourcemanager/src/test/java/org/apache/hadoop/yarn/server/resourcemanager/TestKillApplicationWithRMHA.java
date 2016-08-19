@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager;
 
+import static org.junit.Assert.fail;
+
+import java.io.IOException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -39,18 +42,15 @@ import org.apache.hadoop.yarn.server.security.ApplicationACLsManager;
 import org.junit.Assert;
 import org.junit.Test;
 
-import java.io.IOException;
 
-import static org.junit.Assert.fail;
+public class TestKillApplicationWithRMHA extends RMHATestBase{
 
+  public static final Log LOG = LogFactory
+      .getLog(TestKillApplicationWithRMHA.class);
 
-public class TestKillApplicationWithRMHA extends RMHATestBase {
-
-  public static final Log LOG =
-      LogFactory.getLog(TestKillApplicationWithRMHA.class);
-  
-  @Test(timeout = 20000)
-  public void testKillAppWhenFailoverHappensAtNewState() throws Exception {
+  @Test (timeout = 20000)
+  public void testKillAppWhenFailoverHappensAtNewState()
+      throws Exception {
     // create a customized RMAppManager
     // During the process of Application submission,
     // the RMAppState will always be NEW.
@@ -61,29 +61,34 @@ public class TestKillApplicationWithRMHA extends RMHATestBase {
     nm1.registerNode();
 
     // Submit the application
-    RMApp app0 = rm1.submitApp(200, "",
-        UserGroupInformation.getCurrentUser().getShortUserName(), null, false,
-        null, configuration.getInt(YarnConfiguration.RM_AM_MAX_ATTEMPTS,
-            YarnConfiguration.DEFAULT_RM_AM_MAX_ATTEMPTS), null, null, false,
-        false);
+    RMApp app0 =
+        rm1.submitApp(200, "", UserGroupInformation
+            .getCurrentUser().getShortUserName(), null, false, null,
+            configuration.getInt(YarnConfiguration.RM_AM_MAX_ATTEMPTS,
+                YarnConfiguration.DEFAULT_RM_AM_MAX_ATTEMPTS), null, null,
+            false, false);
 
     // failover and kill application
     // When FailOver happens, the state of this application is NEW,
-    // and ApplicationState is saved in RMStateStore. The active RM
-    // will load the ApplicationState of this application.
-    // Expected to get no exception
+    // and ApplicationState is not saved in RMStateStore. The active RM
+    // can not load the ApplicationState of this application.
+    // Expected to get ApplicationNotFoundException
+    // when receives the KillApplicationRequest
     try {
       failOverAndKillApp(app0.getApplicationId(), RMAppState.NEW);
+      fail("Should get an exception here");
     } catch (ApplicationNotFoundException ex) {
-      fail("Should not get an exception here " + ex);
+      Assert.assertTrue(ex.getMessage().contains(
+          "Trying to kill an absent application " + app0.getApplicationId()));
     }
   }
 
-  @Test(timeout = 20000)
-  public void testKillAppWhenFailoverHappensAtRunningState() throws Exception {
+  @Test (timeout = 20000)
+  public void testKillAppWhenFailoverHappensAtRunningState()
+      throws Exception {
     startRMs();
-    MockNM nm1 =
-        new MockNM("127.0.0.1:1234", 15120, rm1.getResourceTrackerService());
+    MockNM nm1 = new MockNM("127.0.0.1:1234", 15120,
+        rm1.getResourceTrackerService());
     nm1.registerNode();
 
     // create app and launch the AM
@@ -96,15 +101,17 @@ public class TestKillApplicationWithRMHA extends RMHATestBase {
     // will load the ApplicationState. After that, the application will be at
     // ACCEPTED State. Because the application is not at Final State,
     // KillApplicationResponse.getIsKillCompleted is expected to return false.
-    failOverAndKillApp(app0.getApplicationId(), am0.getApplicationAttemptId(),
-        RMAppState.RUNNING, RMAppAttemptState.RUNNING, RMAppState.RUNNING);
+    failOverAndKillApp(app0.getApplicationId(),
+        am0.getApplicationAttemptId(), RMAppState.RUNNING,
+        RMAppAttemptState.RUNNING, RMAppState.ACCEPTED);
   }
 
-  @Test(timeout = 20000)
-  public void testKillAppWhenFailoverHappensAtFinalState() throws Exception {
+  @Test (timeout = 20000)
+  public void testKillAppWhenFailoverHappensAtFinalState()
+      throws Exception {
     startRMs();
-    MockNM nm1 =
-        new MockNM("127.0.0.1:1234", 15120, rm1.getResourceTrackerService());
+    MockNM nm1 = new MockNM("127.0.0.1:1234", 15120,
+        rm1.getResourceTrackerService());
     nm1.registerNode();
 
     // create app and launch the AM
@@ -122,19 +129,20 @@ public class TestKillApplicationWithRMHA extends RMHATestBase {
     // active RM will load the ApplicationState whose RMAppState is killed.
     // Because this application is at Final State,
     // KillApplicationResponse.getIsKillCompleted is expected to return true.
-    failOverAndKillApp(app0.getApplicationId(), am0.getApplicationAttemptId(),
-        RMAppState.KILLED, RMAppAttemptState.KILLED, RMAppState.KILLED);
+    failOverAndKillApp(app0.getApplicationId(),
+        am0.getApplicationAttemptId(), RMAppState.KILLED,
+        RMAppAttemptState.KILLED, RMAppState.KILLED);
   }
 
-  @Test(timeout = 20000)
+  @Test (timeout = 20000)
   public void testKillAppWhenFailOverHappensDuringApplicationKill()
       throws Exception {
     // create a customized ClientRMService
     // When receives the killApplicationRequest, simply return the response
     // and make sure the application will not be KILLED State
     startRMsWithCustomizedClientRMService();
-    MockNM nm1 =
-        new MockNM("127.0.0.1:1234", 15120, rm1.getResourceTrackerService());
+    MockNM nm1 = new MockNM("127.0.0.1:1234", 15120,
+        rm1.getResourceTrackerService());
     nm1.registerNode();
 
     // create app and launch the AM
@@ -150,8 +158,9 @@ public class TestKillApplicationWithRMHA extends RMHATestBase {
     // failover happens before this application goes to final state.
     // The RMAppState that will be loaded by the active rm
     // should be ACCEPTED.
-    failOverAndKillApp(app0.getApplicationId(), am0.getApplicationAttemptId(),
-        RMAppState.RUNNING, RMAppAttemptState.RUNNING, RMAppState.RUNNING);
+    failOverAndKillApp(app0.getApplicationId(),
+        am0.getApplicationAttemptId(), RMAppState.RUNNING,
+        RMAppAttemptState.RUNNING, RMAppState.ACCEPTED);
 
   }
 
@@ -161,12 +170,9 @@ public class TestKillApplicationWithRMHA extends RMHATestBase {
       RMAppState expectedAppStateBeforeKillApp) throws Exception {
     Assert.assertEquals(initialRMAppState,
         rm1.getRMContext().getRMApps().get(appId).getState());
-    Assert.assertEquals(initialRMAppAttemptState,
-        rm1.getRMContext().getRMApps().get(appId).getAppAttempts()
-            .get(appAttemptId).getState());
+    Assert.assertEquals(initialRMAppAttemptState, rm1.getRMContext()
+        .getRMApps().get(appId).getAppAttempts().get(appAttemptId).getState());
     explicitFailover();
-    //WAIT for RPCs to be replayed
-    Thread.sleep(1000);
     Assert.assertEquals(expectedAppStateBeforeKillApp,
         rm2.getRMContext().getRMApps().get(appId).getState());
     killApplication(rm2, appId, appAttemptId, initialRMAppState);
@@ -177,6 +183,7 @@ public class TestKillApplicationWithRMHA extends RMHATestBase {
     Assert.assertEquals(initialRMAppState,
         rm1.getRMContext().getRMApps().get(appId).getState());
     explicitFailover();
+    Assert.assertTrue(rm2.getRMContext().getRMApps().get(appId) == null);
     killApplication(rm2, appId, null, initialRMAppState);
   }
 
@@ -188,8 +195,7 @@ public class TestKillApplicationWithRMHA extends RMHATestBase {
       protected ClientRMService createClientRMService() {
         return new MyClientRMService(this.rmContext, this.scheduler,
             this.rmAppManager, this.applicationACLsManager,
-            this.queueACLsManager,
-            getRMContext().getRMDelegationTokenSecretManager());
+            this.queueACLsManager, getRMContext().getRMDelegationTokenSecretManager());
       }
     };
 
@@ -241,7 +247,8 @@ public class TestKillApplicationWithRMHA extends RMHATestBase {
     KillApplicationResponse response = rm.killApp(appId);
     Assert
         .assertTrue(response.getIsKillCompleted() == isFinalState(rmAppState));
-    RMApp loadedApp0 = rm.getRMContext().getRMApps().get(appId);
+    RMApp loadedApp0 =
+        rm.getRMContext().getRMApps().get(appId);
     rm.waitForState(appId, RMAppState.KILLED);
     if (appAttemptId != null) {
       rm.waitForState(appAttemptId, RMAppAttemptState.KILLED);

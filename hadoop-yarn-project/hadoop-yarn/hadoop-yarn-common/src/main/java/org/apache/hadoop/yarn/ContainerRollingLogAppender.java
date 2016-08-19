@@ -27,17 +27,19 @@ import java.io.Flushable;
 
 /**
  * A simple log4j-appender for container's logs.
+ *
  */
 @Public
 @Unstable
 public class ContainerRollingLogAppender extends RollingFileAppender
-    implements Flushable {
+  implements Flushable {
   private String containerLogDir;
+  private String containerLogFile;
 
   @Override
   public void activateOptions() {
     synchronized (this) {
-      setFile(new File(this.containerLogDir, "syslog").toString());
+      setFile(new File(this.containerLogDir, containerLogFile).toString());
       setAppend(true);
       super.activateOptions();
     }
@@ -60,5 +62,13 @@ public class ContainerRollingLogAppender extends RollingFileAppender
 
   public void setContainerLogDir(String containerLogDir) {
     this.containerLogDir = containerLogDir;
+  }
+
+  public String getContainerLogFile() {
+    return containerLogFile;
+  }
+
+  public void setContainerLogFile(String containerLogFile) {
+    this.containerLogFile = containerLogFile;
   }
 }

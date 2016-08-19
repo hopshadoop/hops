@@ -26,7 +26,7 @@ import org.apache.hadoop.yarn.util.Records;
 
 /**
  * <p><code>YarnClusterMetrics</code> represents cluster metrics.</p>
- * <p/>
+ * 
  * <p>Currently only number of <code>NodeManager</code>s is provided.</p>
  */
 @Public
@@ -43,7 +43,6 @@ public abstract class YarnClusterMetrics {
 
   /**
    * Get the number of <code>NodeManager</code>s in the cluster.
-   *
    * @return number of <code>NodeManager</code>s in the cluster
    */
   @Public

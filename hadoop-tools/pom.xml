@@ -37,12 +37,12 @@
     <module>hadoop-rumen</module>
     <module>hadoop-gridmix</module>
     <module>hadoop-datajoin</module>
+    <module>hadoop-ant</module>
     <module>hadoop-tools-dist</module>
     <module>hadoop-extras</module>
     <module>hadoop-pipes</module>
     <module>hadoop-openstack</module>
     <module>hadoop-sls</module>
-    <module>distributedLoadSimulator</module>
   </modules>
 
   <build>

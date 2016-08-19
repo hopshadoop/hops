@@ -18,25 +18,29 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.event;
 
-import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
+import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptEventType;
 
 public class RMAppAttemptContainerFinishedEvent extends RMAppAttemptEvent {
 
   private final ContainerStatus containerStatus;
+  private final NodeId nodeId;
 
-  public RMAppAttemptContainerFinishedEvent(ApplicationAttemptId appAttemptId,
-      ContainerStatus containerStatus, TransactionState transactionState) {
-    super(appAttemptId, RMAppAttemptEventType.CONTAINER_FINISHED,
-        transactionState);
+  public RMAppAttemptContainerFinishedEvent(ApplicationAttemptId appAttemptId, 
+      ContainerStatus containerStatus, NodeId nodeId) {
+    super(appAttemptId, RMAppAttemptEventType.CONTAINER_FINISHED);
     this.containerStatus = containerStatus;
+    this.nodeId = nodeId;
   }
 
   public ContainerStatus getContainerStatus() {
     return this.containerStatus;
   }
 
+  public NodeId getNodeId() {
+    return this.nodeId;
+  }
 }

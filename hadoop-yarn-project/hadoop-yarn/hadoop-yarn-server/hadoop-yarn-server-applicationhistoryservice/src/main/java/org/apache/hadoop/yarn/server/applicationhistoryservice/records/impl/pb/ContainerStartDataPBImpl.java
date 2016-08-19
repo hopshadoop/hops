@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.yarn.server.applicationhistoryservice.records.impl.pb;
 
-import com.google.protobuf.TextFormat;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.Priority;
@@ -34,6 +33,8 @@ import org.apache.hadoop.yarn.proto.YarnProtos.NodeIdProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.PriorityProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.ResourceProto;
 import org.apache.hadoop.yarn.server.applicationhistoryservice.records.ContainerStartData;
+
+import com.google.protobuf.TextFormat;
 
 public class ContainerStartDataPBImpl extends ContainerStartData {
 
@@ -169,9 +170,8 @@ public class ContainerStartDataPBImpl extends ContainerStartData {
 
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -184,21 +184,24 @@ public class ContainerStartDataPBImpl extends ContainerStartData {
   }
 
   private void mergeLocalToBuilder() {
-    if (this.containerId != null &&
-        !((ContainerIdPBImpl) this.containerId).getProto()
-            .equals(builder.getContainerId())) {
+    if (this.containerId != null
+        && !((ContainerIdPBImpl) this.containerId).getProto().equals(
+          builder.getContainerId())) {
       builder.setContainerId(convertToProtoFormat(this.containerId));
     }
-    if (this.resource != null && !((ResourcePBImpl) this.resource).getProto()
-        .equals(builder.getAllocatedResource())) {
+    if (this.resource != null
+        && !((ResourcePBImpl) this.resource).getProto().equals(
+          builder.getAllocatedResource())) {
       builder.setAllocatedResource(convertToProtoFormat(this.resource));
     }
-    if (this.nodeId != null && !((NodeIdPBImpl) this.nodeId).getProto()
-        .equals(builder.getAssignedNodeId())) {
+    if (this.nodeId != null
+        && !((NodeIdPBImpl) this.nodeId).getProto().equals(
+          builder.getAssignedNodeId())) {
       builder.setAssignedNodeId(convertToProtoFormat(this.nodeId));
     }
-    if (this.priority != null && !((PriorityPBImpl) this.priority).getProto()
-        .equals(builder.getPriority())) {
+    if (this.priority != null
+        && !((PriorityPBImpl) this.priority).getProto().equals(
+          builder.getPriority())) {
       builder.setPriority(convertToProtoFormat(this.priority));
     }
   }
@@ -223,8 +226,8 @@ public class ContainerStartDataPBImpl extends ContainerStartData {
     return ((ContainerIdPBImpl) containerId).getProto();
   }
 
-  private ContainerIdPBImpl convertFromProtoFormat(
-      ContainerIdProto containerId) {
+  private ContainerIdPBImpl
+      convertFromProtoFormat(ContainerIdProto containerId) {
     return new ContainerIdPBImpl(containerId);
   }
 

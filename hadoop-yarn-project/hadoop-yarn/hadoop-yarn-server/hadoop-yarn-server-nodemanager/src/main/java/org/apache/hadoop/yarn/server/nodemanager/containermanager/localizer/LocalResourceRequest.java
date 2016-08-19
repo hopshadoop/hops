@@ -1,22 +1,24 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Licensed to the Apache Software Foundation (ASF) under one
+* or more contributor license agreements.  See the NOTICE file
+* distributed with this work for additional information
+* regarding copyright ownership.  The ASF licenses this file
+* to you under the Apache License, Version 2.0 (the
+* "License"); you may not use this file except in compliance
+* with the License.  You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
 
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer;
+
+import java.net.URISyntaxException;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.yarn.api.records.LocalResource;
@@ -25,10 +27,8 @@ import org.apache.hadoop.yarn.api.records.LocalResourceVisibility;
 import org.apache.hadoop.yarn.api.records.URL;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 
-import java.net.URISyntaxException;
-
-public class LocalResourceRequest extends LocalResource
-    implements Comparable<LocalResourceRequest> {
+public class LocalResourceRequest
+    extends LocalResource implements Comparable<LocalResourceRequest> {
 
   private final Path loc;
   private final long timestamp;
@@ -38,16 +38,15 @@ public class LocalResourceRequest extends LocalResource
 
   /**
    * Wrap API resource to match against cache of localized resources.
-   *
-   * @param resource
-   *     Resource requested by container
-   * @throws URISyntaxException
-   *     If the path is malformed
+   * @param resource Resource requested by container
+   * @throws URISyntaxException If the path is malformed
    */
   public LocalResourceRequest(LocalResource resource)
       throws URISyntaxException {
     this(ConverterUtils.getPathFromYarnURL(resource.getResource()),
-        resource.getTimestamp(), resource.getType(), resource.getVisibility(),
+        resource.getTimestamp(),
+        resource.getType(),
+        resource.getVisibility(),
         resource.getPattern());
   }
 
@@ -63,8 +62,9 @@ public class LocalResourceRequest extends LocalResource
   @Override
   public int hashCode() {
     int hash = loc.hashCode() ^
-        (int) ((timestamp >>> 32) ^ timestamp) * type.hashCode();
-    if (pattern != null) {
+      (int)((timestamp >>> 32) ^ timestamp) *
+      type.hashCode();
+    if(pattern != null) {
       hash = hash ^ pattern.hashCode();
     }
     return hash;
@@ -81,13 +81,12 @@ public class LocalResourceRequest extends LocalResource
     final LocalResourceRequest other = (LocalResourceRequest) o;
     String pattern = getPattern();
     String otherPattern = other.getPattern();
-    boolean patternEquals = (pattern == null && otherPattern == null) ||
-        (pattern != null && otherPattern != null &&
-            pattern.equals(otherPattern));
+    boolean patternEquals = (pattern == null && otherPattern == null) || 
+       (pattern != null && otherPattern != null && pattern.equals(otherPattern)); 
     return getPath().equals(other.getPath()) &&
-        getTimestamp() == other.getTimestamp() &&
-        getType() == other.getType() &&
-        patternEquals;
+           getTimestamp() == other.getTimestamp() &&
+           getType() == other.getType() &&
+           patternEquals;
   }
 
   @Override
@@ -97,7 +96,7 @@ public class LocalResourceRequest extends LocalResource
     }
     int ret = getPath().compareTo(other.getPath());
     if (0 == ret) {
-      ret = (int) (getTimestamp() - other.getTimestamp());
+      ret = (int)(getTimestamp() - other.getTimestamp());
       if (0 == ret) {
         ret = getType().ordinal() - other.getType().ordinal();
         if (0 == ret) {
@@ -110,7 +109,7 @@ public class LocalResourceRequest extends LocalResource
           } else if (otherPattern == null) {
             ret = 1;
           } else {
-            ret = pattern.compareTo(otherPattern);
+            ret = pattern.compareTo(otherPattern);    
           }
         }
       }
@@ -152,6 +151,17 @@ public class LocalResourceRequest extends LocalResource
     return pattern;
   }
   
+  @Override
+  public boolean getShouldBeUploadedToSharedCache() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public void setShouldBeUploadedToSharedCache(
+      boolean shouldBeUploadedToSharedCache) {
+    throw new UnsupportedOperationException();
+  }
+
   @Override
   public void setResource(URL resource) {
     throw new UnsupportedOperationException();

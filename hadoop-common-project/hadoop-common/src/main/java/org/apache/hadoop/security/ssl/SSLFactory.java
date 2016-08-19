@@ -22,6 +22,7 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.authentication.client.ConnectionConfigurator;
 import org.apache.hadoop.util.ReflectionUtils;
+import org.apache.hadoop.util.StringUtils;
 import static org.apache.hadoop.util.PlatformName.IBM_JAVA;
 
 import javax.net.ssl.HostnameVerifier;
@@ -66,12 +67,18 @@ public class SSLFactory implements ConnectionConfigurator {
   public static final String KEYSTORES_FACTORY_CLASS_KEY =
     "hadoop.ssl.keystores.factory.class";
 
+  public static final String SSL_ENABLED_PROTOCOLS =
+      "hadoop.ssl.enabled.protocols";
+  public static final String DEFAULT_SSL_ENABLED_PROTOCOLS = "TLSv1";
+
   private Configuration conf;
   private Mode mode;
   private boolean requireClientCert;
   private SSLContext context;
   private HostnameVerifier hostnameVerifier;
   private KeyStoresFactory keystoresFactory;
+
+  private String[] enabledProtocols = null;
 
   /**
    * Creates an SSLFactory.
@@ -94,6 +101,9 @@ public class SSLFactory implements ConnectionConfigurator {
       = conf.getClass(KEYSTORES_FACTORY_CLASS_KEY,
                       FileBasedKeyStoresFactory.class, KeyStoresFactory.class);
     keystoresFactory = ReflectionUtils.newInstance(klass, sslConf);
+
+    enabledProtocols = conf.getStrings(SSL_ENABLED_PROTOCOLS,
+        DEFAULT_SSL_ENABLED_PROTOCOLS);
   }
 
   private Configuration readSSLConfiguration(Mode mode) {
@@ -122,15 +132,19 @@ public class SSLFactory implements ConnectionConfigurator {
     context = SSLContext.getInstance("TLS");
     context.init(keystoresFactory.getKeyManagers(),
                  keystoresFactory.getTrustManagers(), null);
-
+    context.getDefaultSSLParameters().setProtocols(enabledProtocols);
     hostnameVerifier = getHostnameVerifier(conf);
   }
 
   private HostnameVerifier getHostnameVerifier(Configuration conf)
+      throws GeneralSecurityException, IOException {
+    return getHostnameVerifier(StringUtils.toUpperCase(
+        conf.get(SSL_HOSTNAME_VERIFIER_KEY, "DEFAULT").trim()));
+  }
+
+  public static HostnameVerifier getHostnameVerifier(String verifier)
     throws GeneralSecurityException, IOException {
     HostnameVerifier hostnameVerifier;
-    String verifier =
-      conf.get(SSL_HOSTNAME_VERIFIER_KEY, "DEFAULT").trim().toUpperCase();
     if (verifier.equals("DEFAULT")) {
       hostnameVerifier = SSLHostnameVerifier.DEFAULT;
     } else if (verifier.equals("DEFAULT_AND_LOCALHOST")) {
@@ -181,6 +195,7 @@ public class SSLFactory implements ConnectionConfigurator {
       sslEngine.setUseClientMode(false);
       sslEngine.setNeedClientAuth(requireClientCert);
     }
+    sslEngine.setEnabledProtocols(enabledProtocols);
     return sslEngine;
   }
 

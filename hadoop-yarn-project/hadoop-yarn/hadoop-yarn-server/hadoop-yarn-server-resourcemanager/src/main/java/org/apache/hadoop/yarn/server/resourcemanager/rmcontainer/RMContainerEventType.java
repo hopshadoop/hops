@@ -23,8 +23,7 @@ public enum RMContainerEventType {
   // Source: SchedulerApp
   START,
   ACQUIRED,
-  KILL,
-  // Also from Node on NodeRemoval
+  KILL, // Also from Node on NodeRemoval
   RESERVED,
 
   LAUNCHED,
@@ -34,5 +33,7 @@ public enum RMContainerEventType {
   RELEASED,
 
   // Source: ContainerAllocationExpirer  
-  EXPIRE
+  EXPIRE,
+
+  RECOVER
 }

@@ -1,22 +1,36 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Licensed to the Apache Software Foundation (ASF) under one
+* or more contributor license agreements.  See the NOTICE file
+* distributed with this work for additional information
+* regarding copyright ownership.  The ASF licenses this file
+* to you under the Apache License, Version 2.0 (the
+* "License"); you may not use this file except in compliance
+* with the License.  You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
 
 package org.apache.hadoop.yarn.webapp;
+
+import static com.google.common.base.Preconditions.checkNotNull;
+
+import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.http.HttpServer2;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.CharMatcher;
 import com.google.common.base.Splitter;
@@ -29,19 +43,6 @@ import com.sun.jersey.api.core.ResourceConfig;
 import com.sun.jersey.core.util.FeaturesAndProperties;
 import com.sun.jersey.guice.spi.container.servlet.GuiceContainer;
 import com.sun.jersey.spi.container.servlet.ServletContainer;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.http.HttpServer2;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.net.InetSocketAddress;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * @see WebApps for a usage example
@@ -50,15 +51,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 public abstract class WebApp extends ServletModule {
   private static final Logger LOG = LoggerFactory.getLogger(WebApp.class);
 
-  public enum HTTP {
-    GET,
-    POST,
-    HEAD,
-    PUT,
-    DELETE
-  }
-
-  ;
+  public enum HTTP { GET, POST, HEAD, PUT, DELETE };
 
   private volatile String name;
   private volatile List<String> servePathSpecs = new ArrayList<String>();
@@ -83,23 +76,19 @@ public abstract class WebApp extends ServletModule {
     httpServer = checkNotNull(server, "http server");
   }
 
-  @Provides
-  public HttpServer2 httpServer() {
-    return httpServer;
-  }
+  @Provides public HttpServer2 httpServer() { return httpServer; }
 
   /**
    * Get the address the http server is bound to
-   *
    * @return InetSocketAddress
    */
   public InetSocketAddress getListenerAddress() {
     return checkNotNull(httpServer, "httpServer").getConnectorAddress(0);
   }
-
+	
   public int port() {
-    InetSocketAddress addr =
-        checkNotNull(httpServer, "httpServer").getConnectorAddress(0);
+    InetSocketAddress addr = checkNotNull(httpServer, "httpServer")
+        .getConnectorAddress(0);
     return addr == null ? -1 : addr.getPort();
   }
 
@@ -107,7 +96,8 @@ public abstract class WebApp extends ServletModule {
     try {
       checkNotNull(httpServer, "httpServer").stop();
       checkNotNull(guiceFilter, "guiceFilter").destroy();
-    } catch (Exception e) {
+    }
+    catch (Exception e) {
       throw new WebAppException(e);
     }
   }
@@ -120,40 +110,23 @@ public abstract class WebApp extends ServletModule {
     }
   }
 
-  void setConf(Configuration conf) {
-    this.conf = conf;
-  }
+  void setConf(Configuration conf) { this.conf = conf; }
 
-  @Provides
-  public Configuration conf() {
-    return conf;
-  }
+  @Provides public Configuration conf() { return conf; }
 
-  @Provides
-  Router router() {
-    return router;
-  }
+  @Provides Router router() { return router; }
 
-  @Provides
-  WebApp webApp() {
-    return this;
-  }
+  @Provides WebApp webApp() { return this; }
 
-  void setName(String name) {
-    this.name = name;
-  }
+  void setName(String name) { this.name = name; }
 
-  public String name() {
-    return this.name;
-  }
+  public String name() { return this.name; }
 
   public String wsName() {
     return this.wsName;
   }
 
-  void addServePathSpec(String path) {
-    this.servePathSpecs.add(path);
-  }
+  void addServePathSpec(String path) { this.servePathSpecs.add(path); }
 
   public String[] getServePathSpecs() {
     return this.servePathSpecs.toArray(new String[this.servePathSpecs.size()]);
@@ -163,21 +136,15 @@ public abstract class WebApp extends ServletModule {
    * Set a path to redirect the user to if they just go to "/". For
    * instance "/" goes to "/yarn/apps". This allows the filters to
    * more easily differentiate the different webapps.
-   *
-   * @param path
-   *     the path to redirect to
+   * @param path  the path to redirect to
    */
   void setRedirectPath(String path) {
     this.redirectPath = path;
   }
 
-  void setWebServices(String name) {
-    this.wsName = name;
-  }
+  void setWebServices (String name) { this.wsName = name; }
 
-  public String getRedirectPath() {
-    return this.redirectPath;
-  }
+  public String getRedirectPath() { return this.redirectPath; }
 
   void setHostClass(Class<?> cls) {
     router.setHostClass(cls);
@@ -216,12 +183,9 @@ public abstract class WebApp extends ServletModule {
       Map<String, String> params = new HashMap<String, String>();
       params.put(ResourceConfig.FEATURE_IMPLICIT_VIEWABLES, "true");
       params.put(ServletContainer.FEATURE_FILTER_FORWARD_ON_404, "true");
-      params
-          .put(FeaturesAndProperties.FEATURE_XMLROOTELEMENT_PROCESSING, "true");
-      params.put(ResourceConfig.PROPERTY_CONTAINER_REQUEST_FILTERS,
-          GZIPContentEncodingFilter.class.getName());
-      params.put(ResourceConfig.PROPERTY_CONTAINER_RESPONSE_FILTERS,
-          GZIPContentEncodingFilter.class.getName());
+      params.put(FeaturesAndProperties.FEATURE_XMLROOTELEMENT_PROCESSING, "true");
+      params.put(ResourceConfig.PROPERTY_CONTAINER_REQUEST_FILTERS, GZIPContentEncodingFilter.class.getName());
+      params.put(ResourceConfig.PROPERTY_CONTAINER_RESPONSE_FILTERS, GZIPContentEncodingFilter.class.getName());
       filter("/*").through(getWebAppFilterClass(), params);
     }
   }
@@ -232,32 +196,27 @@ public abstract class WebApp extends ServletModule {
 
   /**
    * Setup of a webapp serving route.
-   *
-   * @param method
-   *     the http method for the route
-   * @param pathSpec
-   *     the path spec in the form of /controller/action/:args etc.
-   * @param cls
-   *     the controller class
-   * @param action
-   *     the controller method
+   * @param method  the http method for the route
+   * @param pathSpec  the path spec in the form of /controller/action/:args etc.
+   * @param cls the controller class
+   * @param action the controller method
    */
   public void route(HTTP method, String pathSpec,
-      Class<? extends Controller> cls, String action) {
+                    Class<? extends Controller> cls, String action) {
     List<String> res = parseRoute(pathSpec);
     router.add(method, res.get(R_PATH), cls, action,
-        res.subList(R_PARAMS, res.size()));
+               res.subList(R_PARAMS, res.size()));
   }
 
   public void route(String pathSpec, Class<? extends Controller> cls,
-      String action) {
+                    String action) {
     route(HTTP.GET, pathSpec, cls, action);
   }
 
   public void route(String pathSpec, Class<? extends Controller> cls) {
     List<String> res = parseRoute(pathSpec);
     router.add(HTTP.GET, res.get(R_PATH), cls, res.get(R_ACTION),
-        res.subList(R_PARAMS, res.size()));
+               res.subList(R_PARAMS, res.size()));
   }
 
 
@@ -305,7 +264,7 @@ public abstract class WebApp extends ServletModule {
       ++start;
     }
     if (pathSpec.charAt(start) != '/') {
-      throw new WebAppException("Path spec syntax error: " + pathSpec);
+      throw new WebAppException("Path spec syntax error: "+ pathSpec);
     }
     int ci = pathSpec.indexOf(':');
     if (ci == -1) {

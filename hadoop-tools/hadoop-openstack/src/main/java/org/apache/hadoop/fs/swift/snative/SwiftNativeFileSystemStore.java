@@ -22,6 +22,7 @@ import org.apache.commons.httpclient.HttpStatus;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.swift.exceptions.SwiftConfigurationException;
@@ -44,6 +45,7 @@ import java.io.InputStream;
 import java.io.InterruptedIOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.charset.Charset;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -351,8 +353,8 @@ public class SwiftNativeFileSystemStore {
     final CollectionType collectionType = JSONUtil.getJsonMapper().getTypeFactory().
             constructCollectionType(List.class, SwiftObjectFileStatus.class);
 
-    final List<SwiftObjectFileStatus> fileStatusList =
-            JSONUtil.toObject(new String(bytes), collectionType);
+    final List<SwiftObjectFileStatus> fileStatusList = JSONUtil.toObject(
+        new String(bytes, Charset.forName("UTF-8")), collectionType);
 
     //this can happen if user lists file /data/files/file
     //in this case swift will return empty array
@@ -446,7 +448,7 @@ public class SwiftNativeFileSystemStore {
       //no object location, return an empty list
       return new LinkedList<URI>();
     }
-    return extractUris(new String(objectLocation), path);
+    return extractUris(new String(objectLocation, Charset.forName("UTF-8")), path);
   }
 
   /**
@@ -516,7 +518,7 @@ public class SwiftNativeFileSystemStore {
    * Rename through copy-and-delete. this is a consequence of the
    * Swift filesystem using the path as the hash
    * into the Distributed Hash Table, "the ring" of filenames.
-   * <p/>
+   * <p>
    * Because of the nature of the operation, it is not atomic.
    *
    * @param src source file/dir
@@ -590,7 +592,7 @@ public class SwiftNativeFileSystemStore {
         } else {
           //outcome #1 dest it's a file: fail if differeent
           if (!renamingOnToSelf) {
-            throw new SwiftOperationFailedException(
+            throw new FileAlreadyExistsException(
                     "cannot rename a file over one that already exists");
           } else {
             //is mv self self where self is a file. this becomes a no-op
@@ -633,7 +635,7 @@ public class SwiftNativeFileSystemStore {
 
       if (destExists && !destIsDir) {
         // #1 destination is a file: fail
-        throw new SwiftOperationFailedException(
+        throw new FileAlreadyExistsException(
                 "the source is a directory, but not the destination");
       }
       Path targetPath;
@@ -845,7 +847,7 @@ public class SwiftNativeFileSystemStore {
   }
 
   /**
-   * Insert a throttled wait if the throttle delay >0
+   * Insert a throttled wait if the throttle delay &gt; 0
    * @throws InterruptedIOException if interrupted during sleep
    */
   public void throttle() throws InterruptedIOException {
@@ -876,7 +878,7 @@ public class SwiftNativeFileSystemStore {
    * raised. This lets the caller distinguish a file not found with
    * other reasons for failure, so handles race conditions in recursive
    * directory deletes better.
-   * <p/>
+   * <p>
    * The problem being addressed is: caller A requests a recursive directory
    * of directory /dir ; caller B requests a delete of a file /dir/file,
    * between caller A enumerating the files contents, and requesting a delete
@@ -927,7 +929,7 @@ public class SwiftNativeFileSystemStore {
     }
 
     if (LOG.isDebugEnabled()) {
-      SwiftUtils.debug(LOG, SwiftUtils.fileStatsToString(statuses, "\n"));
+      SwiftUtils.debug(LOG, "%s", SwiftUtils.fileStatsToString(statuses, "\n"));
     }
 
     if (filecount == 1 && swiftPath.equals(statuses[0].getPath())) {

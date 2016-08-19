@@ -17,15 +17,15 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.webapp.dao;
 
-import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
-import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.QueueMetrics;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler;
-
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.XmlTransient;
+
+import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
+import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.QueueMetrics;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler;
 
 @XmlRootElement(name = "userMetrics")
 @XmlAccessorType(XmlAccessType.FIELD)
@@ -43,6 +43,9 @@ public class UserMetricsInfo {
   protected long reservedMB;
   protected long pendingMB;
   protected long allocatedMB;
+  protected long reservedVirtualCores;
+  protected long pendingVirtualCores;
+  protected long allocatedVirtualCores;
 
   @XmlTransient
   protected boolean userMetricsAvailable;
@@ -50,8 +53,7 @@ public class UserMetricsInfo {
   public UserMetricsInfo() {
   } // JAXB needs this
 
-  public UserMetricsInfo(final ResourceManager rm, final RMContext rmContext,
-      final String user) {
+  public UserMetricsInfo(final ResourceManager rm, final String user) {
     ResourceScheduler rs = rm.getResourceScheduler();
     QueueMetrics metrics = rs.getRootQueueMetrics();
     QueueMetrics userMetrics = metrics.getUserMetrics(user);
@@ -59,21 +61,25 @@ public class UserMetricsInfo {
 
     if (userMetrics != null) {
       this.userMetricsAvailable = true;
-      
+
       this.appsSubmitted = userMetrics.getAppsSubmitted();
-      this.appsCompleted = metrics.getAppsCompleted();
-      this.appsPending = metrics.getAppsPending();
-      this.appsRunning = metrics.getAppsRunning();
-      this.appsFailed = metrics.getAppsFailed();
-      this.appsKilled = metrics.getAppsKilled();
+      this.appsCompleted = userMetrics.getAppsCompleted();
+      this.appsPending = userMetrics.getAppsPending();
+      this.appsRunning = userMetrics.getAppsRunning();
+      this.appsFailed = userMetrics.getAppsFailed();
+      this.appsKilled = userMetrics.getAppsKilled();
 
       this.runningContainers = userMetrics.getAllocatedContainers();
       this.pendingContainers = userMetrics.getPendingContainers();
       this.reservedContainers = userMetrics.getReservedContainers();
-      
+
       this.reservedMB = userMetrics.getReservedMB();
       this.pendingMB = userMetrics.getPendingMB();
       this.allocatedMB = userMetrics.getAllocatedMB();
+
+      this.reservedVirtualCores = userMetrics.getReservedVirtualCores();
+      this.pendingVirtualCores = userMetrics.getPendingVirtualCores();
+      this.allocatedVirtualCores = userMetrics.getAllocatedVirtualCores();
     }
   }
 
@@ -115,6 +121,18 @@ public class UserMetricsInfo {
 
   public long getPendingMB() {
     return this.pendingMB;
+  }
+
+  public long getReservedVirtualCores() {
+    return this.reservedVirtualCores;
+  }
+
+  public long getAllocatedVirtualCores() {
+    return this.allocatedVirtualCores;
+  }
+
+  public long getPendingVirtualCores() {
+    return this.pendingVirtualCores;
   }
 
   public int getReservedContainers() {

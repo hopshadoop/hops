@@ -24,13 +24,13 @@
 
 <configuration>
 
-  <!--- security properties -->
+<!--- security properties -->
 
-  <property>
-    <name>hadoop.security.authorization</name>
-    <value>true</value>
-    <description>Is service-level authorization enabled?</description>
-  </property>
+<property>
+  <name>hadoop.security.authorization</name>
+  <value>true</value>
+  <description>Is service-level authorization enabled?</description>
+</property>
 
 
 </configuration>

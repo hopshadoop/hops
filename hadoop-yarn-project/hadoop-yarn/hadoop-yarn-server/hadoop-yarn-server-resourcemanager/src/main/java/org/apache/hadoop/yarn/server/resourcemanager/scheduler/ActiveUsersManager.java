@@ -17,22 +17,22 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler;
 
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.server.utils.Lock;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-
 /**
  * {@link ActiveUsersManager} tracks active users in the system.
  * A user is deemed to be active if he has any running applications with
  * outstanding resource requests.
- * <p/>
+ * 
  * An active user is defined as someone with outstanding resource requests.
  */
 @Private
@@ -42,9 +42,9 @@ public class ActiveUsersManager {
   
   private final QueueMetrics metrics;
   
-  private int activeUsers = 0; //TORECOVER
-  private Map<String, Set<ApplicationId>> usersApplications =
-      new HashMap<String, Set<ApplicationId>>(); //TORECOVER
+  private int activeUsers = 0;
+  private Map<String, Set<ApplicationId>> usersApplications = 
+      new HashMap<String, Set<ApplicationId>>();
   
   public ActiveUsersManager(QueueMetrics metrics) {
     this.metrics = metrics;
@@ -52,22 +52,20 @@ public class ActiveUsersManager {
   
   /**
    * An application has new outstanding requests.
-   *
-   * @param user
-   *     application user
-   * @param applicationId
-   *     activated application
+   * 
+   * @param user application user 
+   * @param applicationId activated application
    */
   @Lock({Queue.class, SchedulerApplicationAttempt.class})
-  synchronized public void activateApplication(String user,
-      ApplicationId applicationId) {
+  synchronized public void activateApplication(
+      String user, ApplicationId applicationId) {
     Set<ApplicationId> userApps = usersApplications.get(user);
     if (userApps == null) {
       userApps = new HashSet<ApplicationId>();
       usersApplications.put(user, userApps);
       ++activeUsers;
       metrics.incrActiveUsers();
-      LOG.info("User " + user + " added to activeUsers, currently: " +
+      LOG.debug("User " + user + " added to activeUsers, currently: " + 
           activeUsers);
     }
     if (userApps.add(applicationId)) {
@@ -77,15 +75,13 @@ public class ActiveUsersManager {
   
   /**
    * An application has no more outstanding requests.
-   *
-   * @param user
-   *     application user
-   * @param applicationId
-   *     deactivated application
+   * 
+   * @param user application user 
+   * @param applicationId deactivated application
    */
   @Lock({Queue.class, SchedulerApplicationAttempt.class})
-  synchronized public void deactivateApplication(String user,
-      ApplicationId applicationId) {
+  synchronized public void deactivateApplication(
+      String user, ApplicationId applicationId) {
     Set<ApplicationId> userApps = usersApplications.get(user);
     if (userApps != null) {
       if (userApps.remove(applicationId)) {
@@ -95,7 +91,7 @@ public class ActiveUsersManager {
         usersApplications.remove(user);
         --activeUsers;
         metrics.decrActiveUsers();
-        LOG.debug("User " + user + " removed from activeUsers, currently: " +
+        LOG.debug("User " + user + " removed from activeUsers, currently: " + 
             activeUsers);
       }
     }
@@ -104,7 +100,6 @@ public class ActiveUsersManager {
   /**
    * Get number of active users i.e. users with applications which have pending
    * resource requests.
-   *
    * @return number of active users
    */
   @Lock({Queue.class, SchedulerApplicationAttempt.class})

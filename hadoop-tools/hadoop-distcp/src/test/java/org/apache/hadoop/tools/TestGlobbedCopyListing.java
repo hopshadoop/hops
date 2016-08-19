@@ -19,7 +19,6 @@
 package org.apache.hadoop.tools;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
@@ -111,7 +110,7 @@ public class TestGlobbedCopyListing {
     Path target = new Path(fileSystemPath.toString() + "/tmp/target");
     Path listingPath = new Path(fileSystemPath.toString() + "/tmp/META/fileList.seq");
     DistCpOptions options = new DistCpOptions(Arrays.asList(source), target);
-
+    options.setTargetPathExists(false);
     new GlobbedCopyListing(new Configuration(), CREDENTIALS).buildListing(listingPath, options);
 
     verifyContents(listingPath);
@@ -121,9 +120,14 @@ public class TestGlobbedCopyListing {
     SequenceFile.Reader reader = new SequenceFile.Reader(cluster.getFileSystem(),
                                               listingPath, new Configuration());
     Text key   = new Text();
-    FileStatus value = new FileStatus();
+    CopyListingFileStatus value = new CopyListingFileStatus();
     Map<String, String> actualValues = new HashMap<String, String>();
     while (reader.next(key, value)) {
+      if (value.isDirectory() && key.toString().equals("")) {
+        // ignore root with empty relPath, which is an entry to be 
+        // used for preserving root attributes etc.
+        continue;
+      }
       actualValues.put(value.getPath().toString(), key.toString());
     }
 

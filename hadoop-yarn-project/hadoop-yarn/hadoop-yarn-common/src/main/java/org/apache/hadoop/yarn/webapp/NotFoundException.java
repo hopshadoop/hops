@@ -18,10 +18,10 @@
 
 package org.apache.hadoop.yarn.webapp;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response.Status;
+
+import org.apache.hadoop.classification.InterfaceAudience;
 
 /*
  * Created our own NotFoundException because com.sun.jersey.api.NotFoundException

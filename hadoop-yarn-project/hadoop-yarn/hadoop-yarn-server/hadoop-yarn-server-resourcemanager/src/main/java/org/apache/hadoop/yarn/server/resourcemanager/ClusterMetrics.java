@@ -18,7 +18,10 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager;
 
-import com.google.common.annotations.VisibleForTesting;
+import static org.apache.hadoop.metrics2.lib.Interns.info;
+
+import java.util.concurrent.atomic.AtomicBoolean;
+
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsSystem;
@@ -27,38 +30,33 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
-
-import java.util.concurrent.atomic.AtomicBoolean;
-
-import static org.apache.hadoop.metrics2.lib.Interns.info;
+import org.apache.hadoop.metrics2.lib.MutableRate;
+import com.google.common.annotations.VisibleForTesting;
 
 @InterfaceAudience.Private
-@Metrics(context = "yarn")
+@Metrics(context="yarn")
 public class ClusterMetrics {
   
   private static AtomicBoolean isInitialized = new AtomicBoolean(false);
   
-  @Metric("# of active NMs")
-  MutableGaugeInt numActiveNMs;
-  @Metric("# of decommissioned NMs")
-  MutableGaugeInt numDecommissionedNMs;
-  @Metric("# of lost NMs")
-  MutableGaugeInt numLostNMs;
-  @Metric("# of unhealthy NMs")
-  MutableGaugeInt numUnhealthyNMs;
-  @Metric("# of Rebooted NMs")
-  MutableGaugeInt numRebootedNMs;
-  
-  private static final MetricsInfo RECORD_INFO =
-      info("ClusterMetrics", "Metrics for the Yarn Cluster");
+  @Metric("# of active NMs") MutableGaugeInt numActiveNMs;
+  @Metric("# of decommissioned NMs") MutableGaugeInt numDecommissionedNMs;
+  @Metric("# of lost NMs") MutableGaugeInt numLostNMs;
+  @Metric("# of unhealthy NMs") MutableGaugeInt numUnhealthyNMs;
+  @Metric("# of Rebooted NMs") MutableGaugeInt numRebootedNMs;
+  @Metric("AM container launch delay") MutableRate aMLaunchDelay;
+  @Metric("AM register delay") MutableRate aMRegisterDelay;
+
+  private static final MetricsInfo RECORD_INFO = info("ClusterMetrics",
+  "Metrics for the Yarn Cluster");
   
   private static volatile ClusterMetrics INSTANCE = null;
   private static MetricsRegistry registry;
   
   public static ClusterMetrics getMetrics() {
-    if (!isInitialized.get()) {
+    if(!isInitialized.get()){
       synchronized (ClusterMetrics.class) {
-        if (INSTANCE == null) {
+        if(INSTANCE == null){
           INSTANCE = new ClusterMetrics();
           registerMetrics();
           isInitialized.set(true);
@@ -150,6 +148,14 @@ public class ClusterMetrics {
 
   public void decrNumActiveNodes() {
     numActiveNMs.decr();
+  }
+
+  public void addAMLaunchDelay(long delay) {
+    aMLaunchDelay.add(delay);
+  }
+
+  public void addAMRegisterDelay(long delay) {
+    aMRegisterDelay.add(delay);
   }
 
 }

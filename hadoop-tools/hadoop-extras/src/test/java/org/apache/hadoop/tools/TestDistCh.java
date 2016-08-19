@@ -158,7 +158,7 @@ public class TestDistCh extends junit.framework.TestCase {
 
       args[3]="/test/testDistCh/sub3:sub1:sub2:447";
       newstatus[3] = new ChPermissionStatus(rootstatus, "sub1", "sub2", "447");
-
+ 
       args[4]="/test/testDistCh/sub4::sub5:437";
       newstatus[4] = new ChPermissionStatus(rootstatus, "", "sub5", "437");
 

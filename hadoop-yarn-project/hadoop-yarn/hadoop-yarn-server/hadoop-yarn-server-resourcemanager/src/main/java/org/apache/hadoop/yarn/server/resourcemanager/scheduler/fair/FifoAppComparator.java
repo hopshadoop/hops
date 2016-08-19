@@ -18,23 +18,22 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;
-import org.apache.hadoop.classification.InterfaceStability.Unstable;
-
 import java.io.Serializable;
 import java.util.Comparator;
 
+import org.apache.hadoop.classification.InterfaceAudience.Private;
+import org.apache.hadoop.classification.InterfaceStability.Unstable;
+
 /**
- * Order {@link AppSchedulable} objects by priority and then by submit time, as
+ * Order {@link FSAppAttempt} objects by priority and then by submit time, as
  * in the default scheduler in Hadoop.
  */
 @Private
 @Unstable
-public class FifoAppComparator
-    implements Comparator<AppSchedulable>, Serializable {
+public class FifoAppComparator implements Comparator<FSAppAttempt>, Serializable {
   private static final long serialVersionUID = 3428835083489547918L;
 
-  public int compare(AppSchedulable a1, AppSchedulable a2) {
+  public int compare(FSAppAttempt a1, FSAppAttempt a2) {
     int res = a1.getPriority().compareTo(a2.getPriority());
     if (res == 0) {
       if (a1.getStartTime() < a2.getStartTime()) {
@@ -45,8 +44,7 @@ public class FifoAppComparator
     }
     if (res == 0) {
       // If there is a tie, break it by app ID to get a deterministic order
-      res = a1.getApp().getApplicationId()
-          .compareTo(a2.getApp().getApplicationId());
+      res = a1.getApplicationId().compareTo(a2.getApplicationId());
     }
     return res;
   }

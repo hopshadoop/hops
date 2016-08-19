@@ -1,29 +1,33 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Licensed to the Apache Software Foundation (ASF) under one
+* or more contributor license agreements.  See the NOTICE file
+* distributed with this work for additional information
+* regarding copyright ownership.  The ASF licenses this file
+* to you under the Apache License, Version 2.0 (the
+* "License"); you may not use this file except in compliance
+* with the License.  You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
 
 package org.apache.hadoop.yarn.server.resourcemanager;
 
-import io.hops.exception.StorageInitializtionException;
-import io.hops.metadata.util.RMStorageFactory;
-import io.hops.metadata.util.RMUtilities;
-import io.hops.metadata.util.YarnAPIStorageFactory;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.ApplicationConstants;
 import org.apache.hadoop.yarn.api.ContainerManagementProtocol;
 import org.apache.hadoop.yarn.api.protocolrecords.AllocateResponse;
@@ -41,9 +45,18 @@ import org.apache.hadoop.yarn.api.records.ResourceRequest;
 import org.apache.hadoop.yarn.api.records.SerializedException;
 import org.apache.hadoop.yarn.api.records.Token;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import org.apache.hadoop.yarn.event.Dispatcher;
+import org.apache.hadoop.yarn.event.DrainDispatcher;
+import org.apache.hadoop.yarn.exceptions.ApplicationAttemptNotFoundException;
+import org.apache.hadoop.yarn.exceptions.ApplicationMasterNotRegisteredException;
+import org.apache.hadoop.yarn.exceptions.NMNotYetReadyException;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.ipc.RPCUtil;
+import org.apache.hadoop.yarn.ipc.YarnRPC;
 import org.apache.hadoop.yarn.security.ContainerTokenIdentifier;
+import org.apache.hadoop.yarn.server.resourcemanager.amlauncher.AMLauncher;
+import org.apache.hadoop.yarn.server.resourcemanager.amlauncher.AMLauncherEventType;
+import org.apache.hadoop.yarn.server.resourcemanager.amlauncher.ApplicationMasterLauncher;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptState;
@@ -52,30 +65,19 @@ import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.junit.Assert;
-import org.junit.Before;
 import org.junit.Test;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
+import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 public class TestApplicationMasterLauncher {
 
-  private static final Log LOG =
-      LogFactory.getLog(TestApplicationMasterLauncher.class);
+  private static final Log LOG = LogFactory
+      .getLog(TestApplicationMasterLauncher.class);
 
-  @Before
-  public void setup() throws StorageInitializtionException, IOException {
-    YarnConfiguration conf = new YarnConfiguration();
-    YarnAPIStorageFactory.setConfiguration(conf);
-    RMStorageFactory.setConfiguration(conf);
-    RMUtilities.InitializeDB();
-  }
-
-  private static final class MyContainerManagerImpl
-      implements ContainerManagementProtocol {
+  private static final class MyContainerManagerImpl implements
+      ContainerManagementProtocol {
 
     boolean launched = false;
     boolean cleanedup = false;
@@ -86,10 +88,10 @@ public class TestApplicationMasterLauncher {
     int maxAppAttempts;
 
     @Override
-    public StartContainersResponse startContainers(
-        StartContainersRequest requests) throws YarnException {
-      StartContainerRequest request =
-          requests.getStartContainerRequests().get(0);
+    public StartContainersResponse
+        startContainers(StartContainersRequest requests)
+            throws YarnException {
+      StartContainerRequest request = requests.getStartContainerRequests().get(0);
       LOG.info("Container started by MyContainerManager: " + request);
       launched = true;
       Map<String, String> env =
@@ -113,10 +115,9 @@ public class TestApplicationMasterLauncher {
           Long.parseLong(env.get(ApplicationConstants.APP_SUBMIT_TIME_ENV));
       maxAppAttempts =
           Integer.parseInt(env.get(ApplicationConstants.MAX_APP_ATTEMPTS_ENV));
-      return StartContainersResponse
-          .newInstance(new HashMap<String, ByteBuffer>(),
-              new ArrayList<ContainerId>(),
-              new HashMap<ContainerId, SerializedException>());
+      return StartContainersResponse.newInstance(
+        new HashMap<String, ByteBuffer>(), new ArrayList<ContainerId>(),
+        new HashMap<ContainerId, SerializedException>());
     }
 
     @Override
@@ -139,8 +140,8 @@ public class TestApplicationMasterLauncher {
     Logger rootLogger = LogManager.getRootLogger();
     rootLogger.setLevel(Level.DEBUG);
     MyContainerManagerImpl containerManager = new MyContainerManagerImpl();
-    MockRMWithCustomAMLauncher rm =
-        new MockRMWithCustomAMLauncher(containerManager);
+    MockRMWithCustomAMLauncher rm = new MockRMWithCustomAMLauncher(
+        containerManager);
     rm.start();
     MockNM nm1 = rm.registerNode("127.0.0.1:1234", 5120);
 
@@ -162,16 +163,16 @@ public class TestApplicationMasterLauncher {
         containerManager.attemptIdAtContainerManager);
     Assert.assertEquals(app.getSubmitTime(),
         containerManager.submitTimeAtContainerManager);
-    Assert.assertEquals(
-        app.getRMAppAttempt(appAttemptId).getMasterContainer().getId()
-            .toString(), containerManager.containerIdAtContainerManager);
+    Assert.assertEquals(app.getRMAppAttempt(appAttemptId)
+        .getMasterContainer().getId()
+        .toString(), containerManager.containerIdAtContainerManager);
     Assert.assertEquals(nm1.getNodeId().toString(),
-        containerManager.nmHostAtContainerManager);
+      containerManager.nmHostAtContainerManager);
     Assert.assertEquals(YarnConfiguration.DEFAULT_RM_AM_MAX_ATTEMPTS,
         containerManager.maxAppAttempts);
 
-    MockAM am = new MockAM(rm.getRMContext(), rm.getApplicationMasterService(),
-        appAttemptId);
+    MockAM am = new MockAM(rm.getRMContext(), rm
+        .getApplicationMasterService(), appAttemptId);
     am.registerAppAttempt();
     am.unregisterAppAttempt();
 
@@ -189,7 +190,61 @@ public class TestApplicationMasterLauncher {
     am.waitForState(RMAppAttemptState.FINISHED);
     rm.stop();
   }
-  
+
+  @Test
+  public void testRetriesOnFailures() throws Exception {
+    final ContainerManagementProtocol mockProxy =
+        mock(ContainerManagementProtocol.class);
+    final StartContainersResponse mockResponse =
+        mock(StartContainersResponse.class);
+    when(mockProxy.startContainers(any(StartContainersRequest.class)))
+        .thenThrow(new NMNotYetReadyException("foo")).thenReturn(mockResponse);
+    Configuration conf = new Configuration();
+    conf.setInt(YarnConfiguration.RM_AM_MAX_ATTEMPTS, 1);
+    conf.setInt(YarnConfiguration.CLIENT_NM_CONNECT_RETRY_INTERVAL_MS, 1);
+    final DrainDispatcher dispatcher = new DrainDispatcher();
+    MockRM rm = new MockRMWithCustomAMLauncher(conf, null) {
+      @Override
+      protected ApplicationMasterLauncher createAMLauncher() {
+        return new ApplicationMasterLauncher(getRMContext()) {
+          @Override
+          protected Runnable createRunnableLauncher(RMAppAttempt application,
+              AMLauncherEventType event) {
+            return new AMLauncher(context, application, event, getConfig()) {
+              @Override
+              protected YarnRPC getYarnRPC() {
+                YarnRPC mockRpc = mock(YarnRPC.class);
+
+                when(mockRpc.getProxy(
+                    any(Class.class),
+                    any(InetSocketAddress.class),
+                    any(Configuration.class)))
+                    .thenReturn(mockProxy);
+                return mockRpc;
+              }
+            };
+          }
+        };
+      }
+
+      @Override
+      protected Dispatcher createDispatcher() {
+        return dispatcher;
+      }
+    };
+    rm.start();
+    MockNM nm1 = rm.registerNode("127.0.0.1:1234", 5120);
+
+    RMApp app = rm.submitApp(2000);
+    final ApplicationAttemptId appAttemptId = app.getCurrentAppAttempt()
+        .getAppAttemptId();
+
+    // kick the scheduling
+    nm1.nodeHeartbeat(true);
+    dispatcher.await();
+
+    rm.waitForState(appAttemptId, RMAppAttemptState.LAUNCHED, 500);
+  }
 
   @SuppressWarnings("unused")
   @Test(timeout = 100000)
@@ -208,36 +263,46 @@ public class TestApplicationMasterLauncher {
 
     // request for containers
     int request = 2;
+    AllocateResponse ar = null;
     try {
-      AllocateResponse ar =
-          am.allocate("h1", 1000, request, new ArrayList<ContainerId>());
-    } catch (Exception e) {
-      Assert.assertEquals("Application Master is trying to allocate before " +
-              "registering for: " +
-              attempt.getAppAttemptId().getApplicationId(), e.getMessage());
-      thrown = true;
+      ar = am.allocate("h1", 1000, request, new ArrayList<ContainerId>());
+      Assert.fail();
+    } catch (ApplicationMasterNotRegisteredException e) {
     }
+
     // kick the scheduler
     nm1.nodeHeartbeat(true);
+
+    AllocateResponse amrs = null;
     try {
-      AllocateResponse amrs = am.allocate(new ArrayList<ResourceRequest>(),
+        amrs = am.allocate(new ArrayList<ResourceRequest>(),
           new ArrayList<ContainerId>());
-    } catch (Exception e) {
-      Assert.assertEquals("Application Master is trying to allocate before " +
-              "registering for: " +
-              attempt.getAppAttemptId().getApplicationId(), e.getMessage());
-      thrown = true;
+        Assert.fail();
+    } catch (ApplicationMasterNotRegisteredException e) {
     }
-    Assert.assertTrue(thrown);
+
     am.registerAppAttempt();
-    thrown = false;
     try {
       am.registerAppAttempt(false);
+      Assert.fail();
     } catch (Exception e) {
-      Assert.assertEquals("Application Master is already registered : " +
-              attempt.getAppAttemptId().getApplicationId(), e.getMessage());
-      thrown = true;
+      Assert.assertEquals("Application Master is already registered : "
+          + attempt.getAppAttemptId().getApplicationId(),
+        e.getMessage());
     }
-    Assert.assertTrue(thrown);
+
+    // Simulate an AM that was disconnected and app attempt was removed
+    // (responseMap does not contain attemptid)
+    am.unregisterAppAttempt();
+    nm1.nodeHeartbeat(attempt.getAppAttemptId(), 1,
+        ContainerState.COMPLETE);
+    am.waitForState(RMAppAttemptState.FINISHED);
+
+    try {
+      amrs = am.allocate(new ArrayList<ResourceRequest>(),
+        new ArrayList<ContainerId>());
+      Assert.fail();
+    } catch (ApplicationAttemptNotFoundException e) {
+    }
   }
 }

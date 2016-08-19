@@ -17,23 +17,22 @@
  */
 package org.apache.hadoop.yarn.state;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;
-
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
+
+import org.apache.hadoop.classification.InterfaceAudience.Private;
 
 @Private
 public class VisualizeStateMachine {
 
   /**
-   * @param classes
-   *     list of classes which have static field
-   *     stateMachineFactory of type StateMachineFactory
+   * @param classes list of classes which have static field
+   *                stateMachineFactory of type StateMachineFactory
    * @return graph represent this StateMachine
    */
-  public static Graph getGraphFromClasses(String graphName,
-      List<String> classes) throws Exception {
+  public static Graph getGraphFromClasses(String graphName, List<String> classes)
+      throws Exception {
     Graph ret = null;
     if (classes.size() != 1) {
       ret = new Graph(graphName);
@@ -42,32 +41,30 @@ public class VisualizeStateMachine {
       Class clz = Class.forName(className);
       Field factoryField = clz.getDeclaredField("stateMachineFactory");
       factoryField.setAccessible(true);
-      StateMachineFactory factory =
-          (StateMachineFactory) factoryField.get(null);
+      StateMachineFactory factory = (StateMachineFactory) factoryField.get(null);
       if (classes.size() == 1) {
         return factory.generateStateGraph(graphName);
       }
       String gname = clz.getSimpleName();
       if (gname.endsWith("Impl")) {
-        gname = gname.substring(0, gname.length() - 4);
+        gname = gname.substring(0, gname.length()-4);
       }
       ret.addSubGraph(factory.generateStateGraph(gname));
     }
     return ret;
   }
 
-  public static void main(String[] args) throws Exception {
+  public static void main(String [] args) throws Exception {
     if (args.length < 3) {
-      System.err
-          .printf("Usage: %s <GraphName> <class[,class[,...]]> <OutputFile>\n",
-              VisualizeStateMachine.class.getName());
+      System.err.printf("Usage: %s <GraphName> <class[,class[,...]]> <OutputFile>%n",
+          VisualizeStateMachine.class.getName());
       System.exit(1);
     }
-    String[] classes = args[1].split(",");
+    String [] classes = args[1].split(",");
     ArrayList<String> validClasses = new ArrayList<String>();
     for (String c : classes) {
       String vc = c.trim();
-      if (vc.length() > 0) {
+      if (vc.length()>0) {
         validClasses.add(vc);
       }
     }

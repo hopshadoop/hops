@@ -18,15 +18,19 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.webapp.dao;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Set;
+
+import javax.xml.bind.annotation.XmlAccessType;
+import javax.xml.bind.annotation.XmlAccessorType;
+import javax.xml.bind.annotation.XmlRootElement;
+
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.NodeState;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerNodeReport;
-
-import javax.xml.bind.annotation.XmlAccessType;
-import javax.xml.bind.annotation.XmlAccessorType;
-import javax.xml.bind.annotation.XmlRootElement;
 
 @XmlRootElement(name = "node")
 @XmlAccessorType(XmlAccessType.FIELD)
@@ -43,6 +47,9 @@ public class NodeInfo {
   protected int numContainers;
   protected long usedMemoryMB;
   protected long availMemoryMB;
+  protected long usedVirtualCores;
+  protected long availableVirtualCores;
+  protected ArrayList<String> nodeLabels = new ArrayList<String>();
 
   public NodeInfo() {
   } // JAXB needs this
@@ -57,6 +64,8 @@ public class NodeInfo {
       this.numContainers = report.getNumContainers();
       this.usedMemoryMB = report.getUsedResource().getMemory();
       this.availMemoryMB = report.getAvailableResource().getMemory();
+      this.usedVirtualCores = report.getUsedResource().getVirtualCores();
+      this.availableVirtualCores = report.getAvailableResource().getVirtualCores();
     }
     this.id = id.toString();
     this.rack = ni.getRackName();
@@ -66,6 +75,13 @@ public class NodeInfo {
     this.lastHealthUpdate = ni.getLastHealthReportTime();
     this.healthReport = String.valueOf(ni.getHealthReport());
     this.version = ni.getNodeManagerVersion();
+    
+    // add labels
+    Set<String> labelSet = ni.getNodeLabels();
+    if (labelSet != null) {
+      nodeLabels.addAll(labelSet);
+      Collections.sort(nodeLabels);
+    }
   }
 
   public String getRack() {
@@ -83,7 +99,7 @@ public class NodeInfo {
   public String getNodeHTTPAddress() {
     return this.nodeHTTPAddress;
   }
-  
+
   public void setNodeHTTPAddress(String nodeHTTPAddress) {
     this.nodeHTTPAddress = nodeHTTPAddress;
   }
@@ -112,4 +128,15 @@ public class NodeInfo {
     return this.availMemoryMB;
   }
 
+  public long getUsedVirtualCores() {
+    return this.usedVirtualCores;
+  }
+
+  public long getAvailableVirtualCores() {
+    return this.availableVirtualCores;
+  }
+
+  public ArrayList<String> getNodeLabels() {
+    return this.nodeLabels;
+  }
 }

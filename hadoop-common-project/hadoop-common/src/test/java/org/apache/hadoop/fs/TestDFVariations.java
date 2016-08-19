@@ -25,19 +25,37 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.StringReader;
-import java.util.EnumSet;
 import java.util.Random;
 
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.Shell;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
+
 import static org.junit.Assert.*;
 
 public class TestDFVariations {
+  private static final String TEST_ROOT_DIR =
+      System.getProperty("test.build.data","build/test/data") + "/TestDFVariations";
+  private static File test_root = null;
 
+  @Before
+  public void setup() throws IOException {
+    test_root = new File(TEST_ROOT_DIR);
+    test_root.mkdirs();
+  }
+  
+  @After
+  public void after() throws IOException {
+    FileUtil.setWritable(test_root, true);
+    FileUtil.fullyDelete(test_root);
+    assertTrue(!test_root.exists());
+  }
+  
   public static class XXDF extends DF {
     public XXDF() throws IOException {
-      super(new File(System.getProperty("test.build.data","/tmp")), 0L);
+      super(test_root, 0L);
     }
 
     @Override
@@ -47,16 +65,19 @@ public class TestDFVariations {
     }
   }
 
-  public void testMountAndFileSystem() throws Exception {
+  public void testMount() throws Exception {
     XXDF df = new XXDF();
     String expectedMount =
         Shell.WINDOWS ? df.getDirPath().substring(0, 2) : "/foo/bar";
-    String expectedFileSystem =
-        Shell.WINDOWS ? df.getDirPath().substring(0, 2) : "/dev/sda3";
-
     assertEquals("Invalid mount point",
         expectedMount, df.getMount());
+  }
 
+  @Test(timeout=5000)
+  public void testFileSystem() throws Exception {
+    XXDF df = new XXDF();
+    String expectedFileSystem =
+        Shell.WINDOWS ? df.getDirPath().substring(0, 2) : "/dev/sda3";
     assertEquals("Invalid filesystem",
         expectedFileSystem, df.getFilesystem());
   }

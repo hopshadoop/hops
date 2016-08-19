@@ -219,9 +219,9 @@ public class SwiftTestUtils extends org.junit.Assert {
         byte actual = dest[i];
         byte expected = src[i];
         String letter = toChar(actual);
-        String line = String.format("[%04d] %2x %s\n", i, actual, letter);
+        String line = String.format("[%04d] %2x %s%n", i, actual, letter);
         if (expected != actual) {
-          line = String.format("[%04d] %2x %s -expected %2x %s\n",
+          line = String.format("[%04d] %2x %s -expected %2x %s%n",
                                i,
                                actual,
                                letter,
@@ -236,7 +236,7 @@ public class SwiftTestUtils extends org.junit.Assert {
 
   /**
    * Convert a byte to a character for printing. If the
-   * byte value is < 32 -and hence unprintable- the byte is
+   * byte value is &lt; 32 -and hence unprintable- the byte is
    * returned as a two digit hex value
    * @param b byte
    * @return the printable character string

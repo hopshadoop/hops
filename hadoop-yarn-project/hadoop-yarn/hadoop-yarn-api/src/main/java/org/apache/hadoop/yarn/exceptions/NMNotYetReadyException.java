@@ -23,8 +23,7 @@ import org.apache.hadoop.yarn.api.protocolrecords.StartContainersRequest;
 
 /**
  * This exception is thrown on
- * {@link ContainerManagementProtocol#startContainers(StartContainersRequest)}
- * API
+ * {@link ContainerManagementProtocol#startContainers(StartContainersRequest)} API
  * when an NM starts from scratch but has not yet connected with RM.
  */
 public class NMNotYetReadyException extends YarnException {

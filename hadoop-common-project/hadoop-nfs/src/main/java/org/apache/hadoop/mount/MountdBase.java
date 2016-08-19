@@ -19,11 +19,15 @@ package org.apache.hadoop.mount;
 
 import java.io.IOException;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.oncrpc.RpcProgram;
 import org.apache.hadoop.oncrpc.SimpleTcpServer;
 import org.apache.hadoop.oncrpc.SimpleUdpServer;
 import org.apache.hadoop.portmap.PortmapMapping;
 import org.apache.hadoop.util.ShutdownHookManager;
+
+import static org.apache.hadoop.util.ExitUtil.terminate;
 
 /**
  * Main class for starting mountd daemon. This daemon implements the NFS
@@ -33,6 +37,7 @@ import org.apache.hadoop.util.ShutdownHookManager;
  * handle for requested directory and returns it to the client.
  */
 abstract public class MountdBase {
+  public static final Log LOG = LogFactory.getLog(MountdBase.class);
   private final RpcProgram rpcProgram;
   private int udpBoundPort; // Will set after server starts
   private int tcpBoundPort; // Will set after server starts
@@ -40,11 +45,11 @@ abstract public class MountdBase {
   public RpcProgram getRpcProgram() {
     return rpcProgram;
   }
-  
+
   /**
    * Constructor
    * @param program
-   * @throws IOException 
+   * @throws IOException
    */
   public MountdBase(RpcProgram program) throws IOException {
     rpcProgram = program;
@@ -55,7 +60,17 @@ abstract public class MountdBase {
     SimpleUdpServer udpServer = new SimpleUdpServer(rpcProgram.getPort(),
         rpcProgram, 1);
     rpcProgram.startDaemons();
-    udpServer.run();
+    try {
+      udpServer.run();
+    } catch (Throwable e) {
+      LOG.fatal("Failed to start the UDP server.", e);
+      if (udpServer.getBoundPort() > 0) {
+        rpcProgram.unregister(PortmapMapping.TRANSPORT_UDP,
+            udpServer.getBoundPort());
+      }
+      udpServer.shutdown();
+      terminate(1, e);
+    }
     udpBoundPort = udpServer.getBoundPort();
   }
 
@@ -64,7 +79,17 @@ abstract public class MountdBase {
     SimpleTcpServer tcpServer = new SimpleTcpServer(rpcProgram.getPort(),
         rpcProgram, 1);
     rpcProgram.startDaemons();
-    tcpServer.run();
+    try {
+      tcpServer.run();
+    } catch (Throwable e) {
+      LOG.fatal("Failed to start the TCP server.", e);
+      if (tcpServer.getBoundPort() > 0) {
+        rpcProgram.unregister(PortmapMapping.TRANSPORT_TCP,
+            tcpServer.getBoundPort());
+      }
+      tcpServer.shutdown();
+      terminate(1, e);
+    }
     tcpBoundPort = tcpServer.getBoundPort();
   }
 
@@ -74,11 +99,16 @@ abstract public class MountdBase {
     if (register) {
       ShutdownHookManager.get().addShutdownHook(new Unregister(),
           SHUTDOWN_HOOK_PRIORITY);
-      rpcProgram.register(PortmapMapping.TRANSPORT_UDP, udpBoundPort);
-      rpcProgram.register(PortmapMapping.TRANSPORT_TCP, tcpBoundPort);
+      try {
+        rpcProgram.register(PortmapMapping.TRANSPORT_UDP, udpBoundPort);
+        rpcProgram.register(PortmapMapping.TRANSPORT_TCP, tcpBoundPort);
+      } catch (Throwable e) {
+        LOG.fatal("Failed to register the MOUNT service.", e);
+        terminate(1, e);
+      }
     }
   }
-  
+
   /**
    * Priority of the mountd shutdown hook.
    */
@@ -91,5 +121,5 @@ abstract public class MountdBase {
       rpcProgram.unregister(PortmapMapping.TRANSPORT_TCP, tcpBoundPort);
     }
   }
-  
+
 }

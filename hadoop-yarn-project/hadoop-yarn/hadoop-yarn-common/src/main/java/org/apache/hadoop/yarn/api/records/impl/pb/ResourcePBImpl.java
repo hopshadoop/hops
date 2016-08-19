@@ -28,7 +28,6 @@ import org.apache.hadoop.yarn.proto.YarnProtos.ResourceProtoOrBuilder;
 @Private
 @Unstable
 public class ResourcePBImpl extends Resource {
-
   ResourceProto proto = ResourceProto.getDefaultInstance();
   ResourceProto.Builder builder = null;
   boolean viaProto = false;
@@ -54,7 +53,7 @@ public class ResourcePBImpl extends Resource {
     }
     viaProto = false;
   }
-
+    
   
   @Override
   public int getMemory() {

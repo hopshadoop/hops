@@ -17,14 +17,19 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.webapp.dao;
 
-import org.apache.hadoop.yarn.api.records.QueueState;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CSQueue;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Set;
 
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.XmlSeeAlso;
 import javax.xml.bind.annotation.XmlTransient;
+
+import org.apache.hadoop.yarn.api.records.QueueState;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CSQueue;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.PlanQueue;
 
 @XmlRootElement
 @XmlAccessorType(XmlAccessType.FIELD)
@@ -48,11 +53,11 @@ public class CapacitySchedulerQueueInfo {
   protected QueueState state;
   protected CapacitySchedulerQueueInfoList queues;
   protected ResourceInfo resourcesUsed;
+  private boolean hideReservationQueues = false;
+  protected ArrayList<String> nodeLabels = new ArrayList<String>();
 
   CapacitySchedulerQueueInfo() {
-  }
-
-  ;
+  };
 
   CapacitySchedulerQueueInfo(CSQueue q) {
     queuePath = q.getQueuePath();
@@ -60,9 +65,8 @@ public class CapacitySchedulerQueueInfo {
     usedCapacity = q.getUsedCapacity() * 100;
 
     maxCapacity = q.getMaximumCapacity();
-    if (maxCapacity < EPSILON || maxCapacity > 1f) {
+    if (maxCapacity < EPSILON || maxCapacity > 1f)
       maxCapacity = 1f;
-    }
     maxCapacity *= 100;
 
     absoluteCapacity = cap(q.getAbsoluteCapacity(), 0f, 1f) * 100;
@@ -72,6 +76,17 @@ public class CapacitySchedulerQueueInfo {
     queueName = q.getQueueName();
     state = q.getState();
     resourcesUsed = new ResourceInfo(q.getUsedResources());
+    if(q instanceof PlanQueue &&
+       !((PlanQueue)q).showReservationsAsQueues()) {
+      hideReservationQueues = true;
+    }
+    
+    // add labels
+    Set<String> labelSet = q.getAccessibleNodeLabels();
+    if (labelSet != null) {
+      nodeLabels.addAll(labelSet);
+      Collections.sort(nodeLabels);
+    }
   }
 
   public float getCapacity() {
@@ -115,6 +130,9 @@ public class CapacitySchedulerQueueInfo {
   }
 
   public CapacitySchedulerQueueInfoList getQueues() {
+    if(hideReservationQueues) {
+      return new CapacitySchedulerQueueInfoList();
+    }
     return this.queues;
   }
 
@@ -124,16 +142,16 @@ public class CapacitySchedulerQueueInfo {
 
   /**
    * Limit a value to a specified range.
-   *
-   * @param val
-   *     the value to be capped
-   * @param low
-   *     the lower bound of the range (inclusive)
-   * @param hi
-   *     the upper bound of the range (inclusive)
+   * @param val the value to be capped
+   * @param low the lower bound of the range (inclusive)
+   * @param hi the upper bound of the range (inclusive)
    * @return the capped value
    */
   static float cap(float val, float low, float hi) {
     return Math.min(Math.max(val, low), hi);
+  }
+  
+  public ArrayList<String> getNodeLabels() {
+    return this.nodeLabels;
   }
 }

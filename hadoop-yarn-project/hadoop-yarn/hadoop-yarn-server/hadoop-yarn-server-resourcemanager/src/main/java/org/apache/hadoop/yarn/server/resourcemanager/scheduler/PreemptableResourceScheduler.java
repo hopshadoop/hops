@@ -17,41 +17,34 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler;
 
-import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 
 /**
  * Interface for a scheduler that supports preemption/killing
+ *
  */
 public interface PreemptableResourceScheduler extends ResourceScheduler {
 
   /**
    * If the scheduler support container reservations, this method is used to
    * ask the scheduler to drop the reservation for the given container.
-   *
-   * @param container
-   *     Reference to reserved container allocation.
+   * @param container Reference to reserved container allocation.
    */
-  void dropContainerReservation(RMContainer container,
-      TransactionState transactionState);
+  void dropContainerReservation(RMContainer container);
 
   /**
    * Ask the scheduler to obtain back the container from a specific application
    * by issuing a preemption request
-   *
-   * @param aid
-   *     the application from which we want to get a container back
-   * @param container
-   *     the container we want back
+   * @param aid the application from which we want to get a container back
+   * @param container the container we want back
    */
   void preemptContainer(ApplicationAttemptId aid, RMContainer container);
 
   /**
    * Ask the scheduler to forcibly interrupt the container given as input
-   *
    * @param container
    */
-  void killContainer(RMContainer container, TransactionState transactionState);
+  void killContainer(RMContainer container);
 
 }

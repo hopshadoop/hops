@@ -18,19 +18,20 @@
 
 package org.apache.hadoop.yarn.api.protocolrecords.impl.pb;
 
-import com.google.protobuf.TextFormat;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.protocolrecords.GetQueueInfoRequest;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetQueueInfoRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetQueueInfoRequestProtoOrBuilder;
 
+import com.google.protobuf.TextFormat;
+
 @Private
 @Unstable
 public class GetQueueInfoRequestPBImpl extends GetQueueInfoRequest {
 
-  GetQueueInfoRequestProto proto =
-      GetQueueInfoRequestProto.getDefaultInstance();
+  GetQueueInfoRequestProto proto = 
+    GetQueueInfoRequestProto.getDefaultInstance();
   GetQueueInfoRequestProto.Builder builder = null;
   boolean viaProto = false;
 
@@ -115,9 +116,8 @@ public class GetQueueInfoRequestPBImpl extends GetQueueInfoRequest {
 
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }

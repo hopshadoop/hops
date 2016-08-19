@@ -28,23 +28,15 @@ import org.apache.hadoop.classification.InterfaceStability.Stable;
 @Stable
 public enum FinalApplicationStatus {
 
-  /**
-   * Undefined state when either the application has not yet finished
-   */
+  /** Undefined state when either the application has not yet finished */
   UNDEFINED,
 
-  /**
-   * Application which finished successfully.
-   */
+  /** Application which finished successfully. */
   SUCCEEDED,
 
-  /**
-   * Application which failed.
-   */
+  /** Application which failed. */
   FAILED,
 
-  /**
-   * Application which was terminated by a user or admin.
-   */
+  /** Application which was terminated by a user or admin. */
   KILLED
 }

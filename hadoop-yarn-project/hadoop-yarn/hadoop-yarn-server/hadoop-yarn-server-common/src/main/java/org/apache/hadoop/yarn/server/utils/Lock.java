@@ -22,10 +22,9 @@ import java.lang.annotation.Documented;
 /**
  * Annotation to document locking order.
  */
-@Documented
-public @interface Lock {
-  @SuppressWarnings({"rawtypes"}) Class[] value();
+@Documented public @interface Lock {
+  @SuppressWarnings({ "rawtypes" })
+  Class[] value();
   
-  public class NoLock {
-  }
+  public class NoLock{}
 }

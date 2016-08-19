@@ -134,7 +134,9 @@ public class TokenCache {
       Credentials binary;
       try {
         binary = Credentials.readTokenStorageFile(
-            new Path("file:///" +  binaryTokenFilename), conf);
+            FileSystem.getLocal(conf).makeQualified(
+                new Path(binaryTokenFilename)),
+            conf);
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
@@ -156,6 +158,7 @@ public class TokenCache {
   public static final String JOB_TOKENS_FILENAME = "mapreduce.job.jobTokenFile";
   private static final Text JOB_TOKEN = new Text("JobToken");
   private static final Text SHUFFLE_TOKEN = new Text("MapReduceShuffleToken");
+  private static final Text ENC_SPILL_KEY = new Text("MapReduceEncryptedSpillKey");
   
   /**
    * load job token from a file
@@ -224,6 +227,15 @@ public class TokenCache {
     return getSecretKey(credentials, SHUFFLE_TOKEN);
   }
 
+  @InterfaceAudience.Private
+  public static void setEncryptedSpillKey(byte[] key, Credentials credentials) {
+    credentials.addSecretKey(ENC_SPILL_KEY, key);
+  }
+
+  @InterfaceAudience.Private
+  public static byte[] getEncryptedSpillKey(Credentials credentials) {
+    return getSecretKey(credentials, ENC_SPILL_KEY);
+  }
   /**
    * @deprecated Use {@link Credentials#getToken(org.apache.hadoop.io.Text)}
    * instead, this method is included for compatibility against Hadoop-1

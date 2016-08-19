@@ -18,14 +18,16 @@
 
 package org.apache.hadoop.yarn.ipc;
 
-import com.google.protobuf.ServiceException;
-import junit.framework.Assert;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+
+import org.junit.Assert;
+
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.junit.Test;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
+import com.google.protobuf.ServiceException;
 
 public class TestRPCUtil {
 
@@ -123,7 +125,7 @@ public class TestRPCUtil {
     Throwable t = null;
     try {
       RPCUtil.unwrapAndThrowException(se);
-    } catch (Throwable thrown) {
+    }  catch (Throwable thrown) {
       t = thrown;
     }
 
@@ -134,7 +136,7 @@ public class TestRPCUtil {
   private void verifyRemoteExceptionUnwrapping(
       Class<? extends Throwable> expectedLocalException,
       String realExceptionClassName) {
-    String message = realExceptionClassName + "Message";
+  String message = realExceptionClassName + "Message";
     RemoteException re = new RemoteException(realExceptionClassName, message);
     ServiceException se = new ServiceException(re);
 
@@ -145,12 +147,11 @@ public class TestRPCUtil {
       t = thrown;
     }
 
+    Assert.assertTrue("Expected exception [" + expectedLocalException
+        + "] but found " + t, expectedLocalException.isInstance(t));
     Assert.assertTrue(
-        "Expected exception [" + expectedLocalException + "] but found " + t,
-        expectedLocalException.isInstance(t));
-    Assert.assertTrue(
-        "Expected message [" + message + "] but found " + t.getMessage(),
-        t.getMessage().contains(message));
+        "Expected message [" + message + "] but found " + t.getMessage(), t
+            .getMessage().contains(message));
   }
 
   private static class YarnTestException extends YarnException {
@@ -162,7 +163,8 @@ public class TestRPCUtil {
     }
   }
 
-  private static class YarnTestExceptionNoConstructor extends YarnException {
+  private static class YarnTestExceptionNoConstructor extends
+      YarnException {
     private static final long serialVersionUID = 1L;
 
   }

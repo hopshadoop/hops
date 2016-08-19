@@ -18,6 +18,12 @@
 
 package org.apache.hadoop.yarn.server.security;
 
+import java.net.InetSocketAddress;
+import java.security.SecureRandom;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -30,17 +36,13 @@ import org.apache.hadoop.yarn.api.records.Token;
 import org.apache.hadoop.yarn.security.NMTokenIdentifier;
 import org.apache.hadoop.yarn.server.api.records.MasterKey;
 
-import java.net.InetSocketAddress;
-import java.security.SecureRandom;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+public class BaseNMTokenSecretManager extends
+    SecretManager<NMTokenIdentifier> {
 
-public class BaseNMTokenSecretManager extends SecretManager<NMTokenIdentifier> {
+  private static Log LOG = LogFactory
+      .getLog(BaseNMTokenSecretManager.class);
 
-  private static Log LOG = LogFactory.getLog(BaseNMTokenSecretManager.class);
-
-  private int serialNo = new SecureRandom().nextInt();
+  protected int serialNo = new SecureRandom().nextInt();
 
   protected final ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
   protected final Lock readLock = readWriteLock.readLock();
@@ -70,10 +72,10 @@ public class BaseNMTokenSecretManager extends SecretManager<NMTokenIdentifier> {
   @Override
   protected byte[] createPassword(NMTokenIdentifier identifier) {
     if (LOG.isDebugEnabled()) {
-      LOG.debug(
-          "creating password for " + identifier.getApplicationAttemptId() +
-              " for user " + identifier.getApplicationSubmitter() +
-              " to run on NM " + identifier.getNodeId());
+      LOG.debug("creating password for "
+          + identifier.getApplicationAttemptId() + " for user "
+          + identifier.getApplicationSubmitter() + " to run on NM "
+          + identifier.getNodeId());
     }
     readLock.lock();
     try {
@@ -98,14 +100,13 @@ public class BaseNMTokenSecretManager extends SecretManager<NMTokenIdentifier> {
   protected byte[] retrivePasswordInternal(NMTokenIdentifier identifier,
       MasterKeyData masterKey) {
     if (LOG.isDebugEnabled()) {
-      LOG.debug(
-          "creating password for " + identifier.getApplicationAttemptId() +
-              " for user " + identifier.getApplicationSubmitter() +
-              " to run on NM " + identifier.getNodeId());
+      LOG.debug("creating password for "
+          + identifier.getApplicationAttemptId() + " for user "
+          + identifier.getApplicationSubmitter() + " to run on NM "
+          + identifier.getNodeId());
     }
     return createPassword(identifier.getBytes(), masterKey.getSecretKey());
   }
-
   /**
    * It is required for RPC
    */
@@ -124,9 +125,10 @@ public class BaseNMTokenSecretManager extends SecretManager<NMTokenIdentifier> {
     
     this.readLock.lock();
     try {
-      identifier = new NMTokenIdentifier(applicationAttemptId, nodeId,
-          applicationSubmitter,
-          this.currentMasterKey.getMasterKey().getKeyId());
+      identifier =
+          new NMTokenIdentifier(applicationAttemptId, nodeId,
+              applicationSubmitter, this.currentMasterKey.getMasterKey()
+                  .getKeyId());
       password = this.createPassword(identifier);
     } finally {
       this.readLock.unlock();
@@ -140,9 +142,10 @@ public class BaseNMTokenSecretManager extends SecretManager<NMTokenIdentifier> {
     // RPC layer client expects ip:port as service for tokens
     InetSocketAddress addr =
         NetUtils.createSocketAddrForHost(nodeId.getHost(), nodeId.getPort());
-    Token nmToken = Token
-        .newInstance(identifier.getBytes(), NMTokenIdentifier.KIND.toString(),
-            password, SecurityUtil.buildTokenService(addr).toString());
+    Token nmToken =
+        Token.newInstance(identifier.getBytes(),
+          NMTokenIdentifier.KIND.toString(), password, SecurityUtil
+            .buildTokenService(addr).toString());
     return nmToken;
   }
 }

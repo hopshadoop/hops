@@ -25,7 +25,7 @@ import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
 /**
  * Convenient API record utils
  */
-@LimitedPrivate({"MapReduce", "YARN"})
+@LimitedPrivate({ "MapReduce", "YARN" })
 @Unstable
 public class Records {
   // The default record factory

@@ -22,6 +22,7 @@ import java.lang.management.ManagementFactory;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -30,7 +31,6 @@ import org.apache.hadoop.conf.Configuration;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Stopwatch;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -62,10 +62,13 @@ public class JvmPauseMonitor {
       "jvm.pause.info-threshold.ms";
   private static final long INFO_THRESHOLD_DEFAULT = 1000;
 
-  
+  private long numGcWarnThresholdExceeded = 0;
+  private long numGcInfoThresholdExceeded = 0;
+  private long totalGcExtraSleepTime = 0;
+   
   private Thread monitorThread;
   private volatile boolean shouldRun = true;
-  
+
   public JvmPauseMonitor(Configuration conf) {
     this.warnThresholdMs = conf.getLong(WARN_THRESHOLD_KEY, WARN_THRESHOLD_DEFAULT);
     this.infoThresholdMs = conf.getLong(INFO_THRESHOLD_KEY, INFO_THRESHOLD_DEFAULT);
@@ -80,12 +83,30 @@ public class JvmPauseMonitor {
   
   public void stop() {
     shouldRun = false;
-    monitorThread.interrupt();
-    try {
-      monitorThread.join();
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
+    if (monitorThread != null) {
+      monitorThread.interrupt();
+      try {
+        monitorThread.join();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
     }
+  }
+
+  public boolean isStarted() {
+    return monitorThread != null;
+  }
+  
+  public long getNumGcWarnThreadholdExceeded() {
+    return numGcWarnThresholdExceeded;
+  }
+  
+  public long getNumGcInfoThresholdExceeded() {
+    return numGcInfoThresholdExceeded;
+  }
+  
+  public long getTotalGcExtraSleepTime() {
+    return totalGcExtraSleepTime;
   }
   
   private String formatMessage(long extraSleepTime,
@@ -153,7 +174,7 @@ public class JvmPauseMonitor {
   private class Monitor implements Runnable {
     @Override
     public void run() {
-      Stopwatch sw = new Stopwatch();
+      StopWatch sw = new StopWatch();
       Map<String, GcTimes> gcTimesBeforeSleep = getGcTimes();
       while (shouldRun) {
         sw.reset().start();
@@ -162,17 +183,19 @@ public class JvmPauseMonitor {
         } catch (InterruptedException ie) {
           return;
         }
-        long extraSleepTime = sw.elapsedMillis() - SLEEP_INTERVAL_MS;
+        long extraSleepTime = sw.now(TimeUnit.MILLISECONDS) - SLEEP_INTERVAL_MS;
         Map<String, GcTimes> gcTimesAfterSleep = getGcTimes();
 
         if (extraSleepTime > warnThresholdMs) {
+          ++numGcWarnThresholdExceeded;
           LOG.warn(formatMessage(
               extraSleepTime, gcTimesAfterSleep, gcTimesBeforeSleep));
         } else if (extraSleepTime > infoThresholdMs) {
+          ++numGcInfoThresholdExceeded;
           LOG.info(formatMessage(
               extraSleepTime, gcTimesAfterSleep, gcTimesBeforeSleep));
         }
-        
+        totalGcExtraSleepTime += extraSleepTime;
         gcTimesBeforeSleep = gcTimesAfterSleep;
       }
     }

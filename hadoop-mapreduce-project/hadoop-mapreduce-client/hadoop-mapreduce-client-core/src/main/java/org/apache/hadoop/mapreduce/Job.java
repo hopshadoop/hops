@@ -38,6 +38,7 @@ import org.apache.hadoop.mapreduce.protocol.ClientProtocol;
 import org.apache.hadoop.mapreduce.task.JobContextImpl;
 import org.apache.hadoop.mapreduce.util.ConfigUtil;
 import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.yarn.api.records.ReservationId;
 
 /**
  * The job submitter's view of the Job.
@@ -54,7 +55,7 @@ import org.apache.hadoop.util.StringUtils;
  * <p>Here is an example on how to submit a job:</p>
  * <p><blockquote><pre>
  *     // Create a new Job
- *     Job job = new Job(new Configuration());
+ *     Job job = Job.getInstance();
  *     job.setJarByClass(MyJob.class);
  *     
  *     // Specify various job-specific parameters     
@@ -68,7 +69,7 @@ import org.apache.hadoop.util.StringUtils;
  *
  *     // Submit the job, then poll for progress until the job is complete
  *     job.waitForCompletion(true);
- * </pre></blockquote></p>
+ * </pre></blockquote>
  * 
  * 
  */
@@ -97,9 +98,7 @@ public class Job extends JobContextImpl implements JobContext {
     "mapreduce.client.genericoptionsparser.used";
   public static final String SUBMIT_REPLICATION = 
     "mapreduce.client.submit.file.replication";
-  private static final String TASKLOG_PULL_TIMEOUT_KEY =
-           "mapreduce.client.tasklog.timeout";
-  private static final int DEFAULT_TASKLOG_TIMEOUT = 60000;
+  public static final int DEFAULT_SUBMIT_REPLICATION = 10;
 
   @InterfaceStability.Evolving
   public static enum TaskStatusFilter { NONE, KILLED, FAILED, SUCCEEDED, ALL }
@@ -112,20 +111,30 @@ public class Job extends JobContextImpl implements JobContext {
   private JobStatus status;
   private long statustime;
   private Cluster cluster;
+  private ReservationId reservationId;
 
+  /**
+   * @deprecated Use {@link #getInstance()}
+   */
   @Deprecated
   public Job() throws IOException {
-    this(new Configuration());
+    this(new JobConf(new Configuration()));
   }
 
+  /**
+   * @deprecated Use {@link #getInstance(Configuration)}
+   */
   @Deprecated
   public Job(Configuration conf) throws IOException {
     this(new JobConf(conf));
   }
 
+  /**
+   * @deprecated Use {@link #getInstance(Configuration, String)}
+   */
   @Deprecated
   public Job(Configuration conf, String jobName) throws IOException {
-    this(conf);
+    this(new JobConf(conf));
     setJobName(jobName);
   }
 
@@ -328,10 +337,6 @@ public class Job extends JobContextImpl implements JobContext {
     ensureState(JobState.RUNNING);
     updateStatus();
     return status;
-  }
-  
-  private void setStatus(JobStatus status) {
-    this.status = status;
   }
 
   /**
@@ -1382,46 +1387,6 @@ public class Job extends JobContextImpl implements JobContext {
     return success;
   }
 
-  /**
-   * @return true if the profile parameters indicate that this is using
-   * hprof, which generates profile files in a particular location
-   * that we can retrieve to the client.
-   */
-  private boolean shouldDownloadProfile() {
-    // Check the argument string that was used to initialize profiling.
-    // If this indicates hprof and file-based output, then we're ok to
-    // download.
-    String profileParams = getProfileParams();
-
-    if (null == profileParams) {
-      return false;
-    }
-
-    // Split this on whitespace.
-    String [] parts = profileParams.split("[ \\t]+");
-
-    // If any of these indicate hprof, and the use of output files, return true.
-    boolean hprofFound = false;
-    boolean fileFound = false;
-    for (String p : parts) {
-      if (p.startsWith("-agentlib:hprof") || p.startsWith("-Xrunhprof")) {
-        hprofFound = true;
-
-        // This contains a number of comma-delimited components, one of which
-        // may specify the file to write to. Make sure this is present and
-        // not empty.
-        String [] subparts = p.split(",");
-        for (String sub : subparts) {
-          if (sub.startsWith("file=") && sub.length() != "file=".length()) {
-            fileFound = true;
-          }
-        }
-      }
-    }
-
-    return hprofFound && fileFound;
-  }
-
   private void printTaskEvents(TaskCompletionEvent[] events,
       Job.TaskStatusFilter filter, boolean profiling, IntegerRanges mapRanges,
       IntegerRanges reduceRanges) throws IOException, InterruptedException {
@@ -1513,6 +1478,25 @@ public class Job extends JobContextImpl implements JobContext {
     ensureState(JobState.RUNNING);
     updateStatus();
     return status.isUber();
+  }
+
+  /**
+   * Get the reservation to which the job is submitted to, if any
+   *
+   * @return the reservationId the identifier of the job's reservation, null if
+   *         the job does not have any reservation associated with it
+   */
+  public ReservationId getReservationId() {
+    return reservationId;
+  }
+
+  /**
+   * Set the reservation to which the job is submitted to
+   *
+   * @param reservationId the reservationId to set
+   */
+  public void setReservationId(ReservationId reservationId) {
+    this.reservationId = reservationId;
   }
   
 }

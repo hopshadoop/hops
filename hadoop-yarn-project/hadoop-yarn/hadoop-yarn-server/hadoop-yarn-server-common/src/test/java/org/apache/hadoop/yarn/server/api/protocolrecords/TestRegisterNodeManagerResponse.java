@@ -18,32 +18,31 @@
 
 package org.apache.hadoop.yarn.server.api.protocolrecords;
 
-import org.apache.hadoop.yarn.factories.RecordFactory;
-import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
-import org.apache.hadoop.yarn.proto.YarnServerCommonServiceProtos.RegisterNodeManagerResponseProto;
-import org.apache.hadoop.yarn.server.api.protocolrecords.impl.pb.RegisterNodeManagerResponsePBImpl;
-import org.apache.hadoop.yarn.server.api.records.MasterKey;
-import org.apache.hadoop.yarn.server.api.records.NodeAction;
-import org.junit.Test;
+import static org.junit.Assert.*;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import org.apache.hadoop.yarn.factories.RecordFactory;
+import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
+import org.apache.hadoop.yarn.server.api.protocolrecords.impl.pb.RegisterNodeManagerResponsePBImpl;
+import org.apache.hadoop.yarn.server.api.records.MasterKey;
+import org.apache.hadoop.yarn.server.api.records.NodeAction;
+import org.junit.Test;
+
+import org.apache.hadoop.yarn.proto.YarnServerCommonServiceProtos.RegisterNodeManagerResponseProto;
 
 public class TestRegisterNodeManagerResponse {
-  private static final RecordFactory recordFactory =
-      RecordFactoryProvider.getRecordFactory(null);
+  private static final RecordFactory recordFactory = 
+    RecordFactoryProvider.getRecordFactory(null);
   
   @Test
   public void testRoundTrip() throws Exception {
-    RegisterNodeManagerResponse resp =
-        recordFactory.newRecordInstance(RegisterNodeManagerResponse.class);
+    RegisterNodeManagerResponse resp = recordFactory
+    .newRecordInstance(RegisterNodeManagerResponse.class);
 
-    byte b[] = {0, 1, 2, 3, 4, 5};
+    byte b [] = {0,1,2,3,4,5};
     
     MasterKey containerTokenMK =
         recordFactory.newRecordInstance(MasterKey.class);
@@ -51,7 +50,8 @@ public class TestRegisterNodeManagerResponse {
     containerTokenMK.setBytes(ByteBuffer.wrap(b));
     resp.setContainerTokenMasterKey(containerTokenMK);
 
-    MasterKey nmTokenMK = recordFactory.newRecordInstance(MasterKey.class);
+    MasterKey nmTokenMK =
+        recordFactory.newRecordInstance(MasterKey.class);
     nmTokenMK.setKeyId(12345);
     nmTokenMK.setBytes(ByteBuffer.wrap(b));
     resp.setNMTokenMasterKey(nmTokenMK);
@@ -70,8 +70,8 @@ public class TestRegisterNodeManagerResponse {
     assertEquals(NodeAction.NORMAL, respCopy.getNodeAction());
     assertNotNull(respCopy.getContainerTokenMasterKey());
     assertEquals(54321, respCopy.getContainerTokenMasterKey().getKeyId());
-    assertArrayEquals(b,
-        respCopy.getContainerTokenMasterKey().getBytes().array());
+    assertArrayEquals(b, respCopy.getContainerTokenMasterKey().getBytes()
+        .array());
     
     // Verifying nmTokenMasterKey
     assertNotNull(resp.getNMTokenMasterKey());
@@ -87,16 +87,13 @@ public class TestRegisterNodeManagerResponse {
     
   }
 
-  public static RegisterNodeManagerResponse serDe(
-      RegisterNodeManagerResponse orig) throws Exception {
-    RegisterNodeManagerResponsePBImpl asPB =
-        (RegisterNodeManagerResponsePBImpl) orig;
+  public static RegisterNodeManagerResponse serDe(RegisterNodeManagerResponse orig) throws Exception {
+    RegisterNodeManagerResponsePBImpl asPB = (RegisterNodeManagerResponsePBImpl)orig;
     RegisterNodeManagerResponseProto proto = asPB.getProto();
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     proto.writeTo(out);
     ByteArrayInputStream in = new ByteArrayInputStream(out.toByteArray());
-    RegisterNodeManagerResponseProto.Builder cp =
-        RegisterNodeManagerResponseProto.newBuilder();
+    RegisterNodeManagerResponseProto.Builder cp = RegisterNodeManagerResponseProto.newBuilder();
     cp.mergeFrom(in);
     return new RegisterNodeManagerResponsePBImpl(cp.build());
   }

@@ -18,38 +18,29 @@
 
 package org.apache.hadoop.yarn.server.webproxy.amfilter;
 
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import javax.servlet.*;
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import static org.junit.Assert.*;
+
+import org.apache.hadoop.yarn.server.webproxy.ProxyUtils;
 import org.apache.hadoop.yarn.server.webproxy.WebAppProxyServlet;
 import org.glassfish.grizzly.servlet.HttpServletResponseImpl;
 import org.junit.Test;
 import org.mockito.Mockito;
 
-import javax.servlet.Filter;
-import javax.servlet.FilterChain;
-import javax.servlet.FilterConfig;
-import javax.servlet.ServletContext;
-import javax.servlet.ServletException;
-import javax.servlet.ServletRequest;
-import javax.servlet.ServletResponse;
-import javax.servlet.http.Cookie;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
-import java.util.Collections;
-import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicBoolean;
-
-import static junit.framework.Assert.assertEquals;
-import static junit.framework.Assert.assertFalse;
-import static junit.framework.Assert.assertTrue;
-import static junit.framework.Assert.fail;
-
 /**
  * Test AmIpFilter. Requests to a no declared hosts should has way through
  * proxy. Another requests can be filtered with (without) user name.
+ * 
  */
 public class TestAmFilter {
 
@@ -113,8 +104,7 @@ public class TestAmFilter {
     FilterChain chain = new FilterChain() {
       @Override
       public void doFilter(ServletRequest servletRequest,
-          ServletResponse servletResponse)
-          throws IOException, ServletException {
+          ServletResponse servletResponse) throws IOException, ServletException {
         invoked.set(true);
       }
     };
@@ -145,8 +135,7 @@ public class TestAmFilter {
     FilterChain chain = new FilterChain() {
       @Override
       public void doFilter(ServletRequest servletRequest,
-          ServletResponse servletResponse)
-          throws IOException, ServletException {
+          ServletResponse servletResponse) throws IOException, ServletException {
         doFilterRequest = servletRequest.getClass().getName();
         if (servletRequest instanceof AmIpServletRequestWrapper) {
           servletWrapper = (AmIpServletRequestWrapper) servletRequest;
@@ -165,7 +154,7 @@ public class TestAmFilter {
       testFilter.doFilter(failRequest, response, chain);
       fail();
     } catch (ServletException e) {
-      assertEquals("This filter only works for HTTP/HTTPS", e.getMessage());
+      assertEquals(ProxyUtils.E_HTTP_HTTPS_ONLY, e.getMessage());
     }
 
     // request with HttpServletRequest
@@ -174,13 +163,15 @@ public class TestAmFilter {
     Mockito.when(request.getRequestURI()).thenReturn("/redirect");
     testFilter.doFilter(request, response, chain);
     // address "redirect" is not in host list
-    assertEquals("http://bogus/redirect", response.getRedirect());
+    assertEquals(302, response.status);
+    String redirect = response.getHeader(ProxyUtils.LOCATION);
+    assertEquals("http://bogus/redirect", redirect);
     // "127.0.0.1" contains in host list. Without cookie
     Mockito.when(request.getRemoteAddr()).thenReturn("127.0.0.1");
     testFilter.doFilter(request, response, chain);
 
-    assertTrue(
-        doFilterRequest.contains("javax.servlet.http.HttpServletRequest"));
+    assertTrue(doFilterRequest
+        .contains("javax.servlet.http.HttpServletRequest"));
     // cookie added
     Cookie[] cookies = new Cookie[1];
     cookies[0] = new Cookie(WebAppProxyServlet.PROXY_USER_COOKIE_NAME, "user");
@@ -200,6 +191,11 @@ public class TestAmFilter {
 
   private class HttpServletResponseForTest extends HttpServletResponseImpl {
     String redirectLocation = "";
+    int status;
+    private String contentType;
+    private final Map<String, String> headers = new HashMap<>(1);
+    private StringWriter body;
+
 
     public String getRedirect() {
       return redirectLocation;
@@ -215,6 +211,31 @@ public class TestAmFilter {
       return url;
     }
 
+    @Override
+    public void setStatus(int status) {
+      this.status = status;
+    }
+
+    @Override
+    public void setContentType(String type) {
+      this.contentType = type;
+    }
+
+    @Override
+    public void setHeader(String name, String value) {
+      headers.put(name, value);
+    }
+
+    public String getHeader(String name) {
+      return headers.get(name);
+    }
+
+    @Override
+    public PrintWriter getWriter() throws IOException {
+      body = new StringWriter();
+      return new PrintWriter(body);
+    }
   }
 
+  
 }

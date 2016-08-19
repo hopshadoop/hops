@@ -25,6 +25,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -50,6 +51,7 @@ import org.apache.hadoop.fs.Options.ChecksumOpt;
 import org.apache.hadoop.fs.Options.Rename;
 import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.AclStatus;
+import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.MultipleIOException;
 import org.apache.hadoop.io.Text;
@@ -63,6 +65,7 @@ import org.apache.hadoop.util.DataChecksum;
 import org.apache.hadoop.util.Progressable;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.ShutdownHookManager;
+import org.apache.hadoop.util.StringUtils;
 
 import com.google.common.annotations.VisibleForTesting;
 
@@ -1315,6 +1318,29 @@ public abstract class FileSystem extends Configured implements Closeable {
       throw new IOException("rename from " + src + " to " + dst + " failed.");
     }
   }
+
+  /**
+   * Truncate the file in the indicated path to the indicated size.
+   * <ul>
+   * <li>Fails if path is a directory.
+   * <li>Fails if path does not exist.
+   * <li>Fails if path is not closed.
+   * <li>Fails if new size is greater than current size.
+   * </ul>
+   * @param f The path to the file to be truncated
+   * @param newLength The size the file is to be truncated to
+   *
+   * @return <code>true</code> if the file has been truncated to the desired
+   * <code>newLength</code> and is immediately available to be reused for
+   * write operations such as <code>append</code>, or
+   * <code>false</code> if a background process of adjusting the length of
+   * the last block has been started, and clients should wait for it to
+   * complete before proceeding with further file updates.
+   */
+  public boolean truncate(Path f, long newLength) throws IOException {
+    throw new UnsupportedOperationException("Not implemented by the " +
+        getClass().getSimpleName() + " FileSystem implementation");
+  }
   
   /**
    * Delete a file 
@@ -1441,18 +1467,24 @@ public abstract class FileSystem extends Configured implements Closeable {
     FileStatus status = getFileStatus(f);
     if (status.isFile()) {
       // f is a file
-      return new ContentSummary(status.getLen(), 1, 0);
+      long length = status.getLen();
+      return new ContentSummary.Builder().length(length).
+          fileCount(1).directoryCount(0).spaceConsumed(length).build();
     }
     // f is a directory
     long[] summary = {0, 0, 1};
     for(FileStatus s : listStatus(f)) {
+      long length = s.getLen();
       ContentSummary c = s.isDirectory() ? getContentSummary(s.getPath()) :
-                                     new ContentSummary(s.getLen(), 1, 0);
+          new ContentSummary.Builder().length(length).
+          fileCount(1).directoryCount(0).spaceConsumed(length).build();
       summary[0] += c.getLength();
       summary[1] += c.getFileCount();
       summary[2] += c.getDirectoryCount();
     }
-    return new ContentSummary(summary[0], summary[1], summary[2]);
+    return new ContentSummary.Builder().length(summary[0]).
+        fileCount(summary[1]).directoryCount(summary[2]).
+        spaceConsumed(summary[0]).build();
   }
 
   final private static PathFilter DEFAULT_FILTER = new PathFilter() {
@@ -1695,6 +1727,36 @@ public abstract class FileSystem extends Configured implements Closeable {
             getFileBlockLocations(result.getPath(), 0, result.getLen()) :
             null;
         return new LocatedFileStatus(result, locs);
+      }
+    };
+  }
+
+  /**
+   * Returns a remote iterator so that followup calls are made on demand
+   * while consuming the entries. Each file system implementation should
+   * override this method and provide a more efficient implementation, if
+   * possible. 
+   *
+   * @param p target path
+   * @return remote iterator
+   */
+  public RemoteIterator<FileStatus> listStatusIterator(final Path p)
+  throws FileNotFoundException, IOException {
+    return new RemoteIterator<FileStatus>() {
+      private final FileStatus[] stats = listStatus(p);
+      private int i = 0;
+
+      @Override
+      public boolean hasNext() {
+        return i<stats.length;
+      }
+
+      @Override
+      public FileStatus next() throws IOException {
+        if (!hasNext()) {
+          throw new NoSuchElementException("No more entry in " + p);
+        }
+        return stats[i++];
       }
     };
   }
@@ -2074,6 +2136,71 @@ public abstract class FileSystem extends Configured implements Closeable {
   public abstract FileStatus getFileStatus(Path f) throws IOException;
 
   /**
+   * Checks if the user can access a path.  The mode specifies which access
+   * checks to perform.  If the requested permissions are granted, then the
+   * method returns normally.  If access is denied, then the method throws an
+   * {@link AccessControlException}.
+   * <p/>
+   * The default implementation of this method calls {@link #getFileStatus(Path)}
+   * and checks the returned permissions against the requested permissions.
+   * Note that the getFileStatus call will be subject to authorization checks.
+   * Typically, this requires search (execute) permissions on each directory in
+   * the path's prefix, but this is implementation-defined.  Any file system
+   * that provides a richer authorization model (such as ACLs) may override the
+   * default implementation so that it checks against that model instead.
+   * <p>
+   * In general, applications should avoid using this method, due to the risk of
+   * time-of-check/time-of-use race conditions.  The permissions on a file may
+   * change immediately after the access call returns.  Most applications should
+   * prefer running specific file system actions as the desired user represented
+   * by a {@link UserGroupInformation}.
+   *
+   * @param path Path to check
+   * @param mode type of access to check
+   * @throws AccessControlException if access is denied
+   * @throws FileNotFoundException if the path does not exist
+   * @throws IOException see specific implementation
+   */
+  @InterfaceAudience.LimitedPrivate({"HDFS", "Hive"})
+  public void access(Path path, FsAction mode) throws AccessControlException,
+      FileNotFoundException, IOException {
+    checkAccessPermissions(this.getFileStatus(path), mode);
+  }
+
+  /**
+   * This method provides the default implementation of
+   * {@link #access(Path, FsAction)}.
+   *
+   * @param stat FileStatus to check
+   * @param mode type of access to check
+   * @throws IOException for any error
+   */
+  @InterfaceAudience.Private
+  static void checkAccessPermissions(FileStatus stat, FsAction mode)
+      throws IOException {
+    FsPermission perm = stat.getPermission();
+    UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+    String user = ugi.getShortUserName();
+    List<String> groups = Arrays.asList(ugi.getGroupNames());
+    if (user.equals(stat.getOwner())) {
+      if (perm.getUserAction().implies(mode)) {
+        return;
+      }
+    } else if (groups.contains(stat.getGroup())) {
+      if (perm.getGroupAction().implies(mode)) {
+        return;
+      }
+    } else {
+      if (perm.getOtherAction().implies(mode)) {
+        return;
+      }
+    }
+    throw new AccessControlException(String.format(
+      "Permission denied: user=%s, path=\"%s\":%s:%s:%s%s", user, stat.getPath(),
+      stat.getOwner(), stat.getGroup(), stat.isDirectory() ? "d" : "-", perm));
+  }
+
+  /**
    * See {@link FileContext#fixRelativePart}
    */
   protected Path fixRelativePart(Path p) {
@@ -2141,9 +2268,21 @@ public abstract class FileSystem extends Configured implements Closeable {
    *  in the corresponding FileSystem.
    */
   public FileChecksum getFileChecksum(Path f) throws IOException {
+    return getFileChecksum(f, Long.MAX_VALUE);
+  }
+
+  /**
+   * Get the checksum of a file, from the beginning of the file till the
+   * specific length.
+   * @param f The file path
+   * @param length The length of the file range for checksum calculation
+   * @return The file checksum.
+   */
+  public FileChecksum getFileChecksum(Path f, final long length)
+      throws IOException {
     return null;
   }
-  
+
   /**
    * Set the verify checksum flag. This is only applicable if the 
    * corresponding FileSystem supports checksum. By default doesn't do anything.
@@ -2351,6 +2490,126 @@ public abstract class FileSystem extends Configured implements Closeable {
         + " doesn't support getAclStatus");
   }
 
+  /**
+   * Set an xattr of a file or directory.
+   * The name must be prefixed with the namespace followed by ".". For example,
+   * "user.attr".
+   * <p/>
+   * Refer to the HDFS extended attributes user documentation for details.
+   *
+   * @param path Path to modify
+   * @param name xattr name.
+   * @param value xattr value.
+   * @throws IOException
+   */
+  public void setXAttr(Path path, String name, byte[] value)
+      throws IOException {
+    setXAttr(path, name, value, EnumSet.of(XAttrSetFlag.CREATE,
+        XAttrSetFlag.REPLACE));
+  }
+
+  /**
+   * Set an xattr of a file or directory.
+   * The name must be prefixed with the namespace followed by ".". For example,
+   * "user.attr".
+   * <p/>
+   * Refer to the HDFS extended attributes user documentation for details.
+   *
+   * @param path Path to modify
+   * @param name xattr name.
+   * @param value xattr value.
+   * @param flag xattr set flag
+   * @throws IOException
+   */
+  public void setXAttr(Path path, String name, byte[] value,
+      EnumSet<XAttrSetFlag> flag) throws IOException {
+    throw new UnsupportedOperationException(getClass().getSimpleName()
+        + " doesn't support setXAttr");
+  }
+
+  /**
+   * Get an xattr name and value for a file or directory.
+   * The name must be prefixed with the namespace followed by ".". For example,
+   * "user.attr".
+   * <p/>
+   * Refer to the HDFS extended attributes user documentation for details.
+   *
+   * @param path Path to get extended attribute
+   * @param name xattr name.
+   * @return byte[] xattr value.
+   * @throws IOException
+   */
+  public byte[] getXAttr(Path path, String name) throws IOException {
+    throw new UnsupportedOperationException(getClass().getSimpleName()
+        + " doesn't support getXAttr");
+  }
+
+  /**
+   * Get all of the xattr name/value pairs for a file or directory.
+   * Only those xattrs which the logged-in user has permissions to view
+   * are returned.
+   * <p/>
+   * Refer to the HDFS extended attributes user documentation for details.
+   *
+   * @param path Path to get extended attributes
+   * @return Map<String, byte[]> describing the XAttrs of the file or directory
+   * @throws IOException
+   */
+  public Map<String, byte[]> getXAttrs(Path path) throws IOException {
+    throw new UnsupportedOperationException(getClass().getSimpleName()
+        + " doesn't support getXAttrs");
+  }
+
+  /**
+   * Get all of the xattrs name/value pairs for a file or directory.
+   * Only those xattrs which the logged-in user has permissions to view
+   * are returned.
+   * <p/>
+   * Refer to the HDFS extended attributes user documentation for details.
+   *
+   * @param path Path to get extended attributes
+   * @param names XAttr names.
+   * @return Map<String, byte[]> describing the XAttrs of the file or directory
+   * @throws IOException
+   */
+  public Map<String, byte[]> getXAttrs(Path path, List<String> names)
+      throws IOException {
+    throw new UnsupportedOperationException(getClass().getSimpleName()
+        + " doesn't support getXAttrs");
+  }
+
+  /**
+   * Get all of the xattr names for a file or directory.
+   * Only those xattr names which the logged-in user has permissions to view
+   * are returned.
+   * <p/>
+   * Refer to the HDFS extended attributes user documentation for details.
+   *
+   * @param path Path to get extended attributes
+   * @return List<String> of the XAttr names of the file or directory
+   * @throws IOException
+   */
+  public List<String> listXAttrs(Path path) throws IOException {
+    throw new UnsupportedOperationException(getClass().getSimpleName()
+            + " doesn't support listXAttrs");
+  }
+
+  /**
+   * Remove an xattr of a file or directory.
+   * The name must be prefixed with the namespace followed by ".". For example,
+   * "user.attr".
+   * <p/>
+   * Refer to the HDFS extended attributes user documentation for details.
+   *
+   * @param path Path to remove extended attribute
+   * @param name xattr name
+   * @throws IOException
+   */
+  public void removeXAttr(Path path, String name) throws IOException {
+    throw new UnsupportedOperationException(getClass().getSimpleName()
+        + " doesn't support removeXAttr");
+  }
+
   // making it volatile to be able to do a double checked locking
   private volatile static boolean FILE_SYSTEMS_LOADED = false;
 
@@ -2390,9 +2649,6 @@ public abstract class FileSystem extends Configured implements Closeable {
   private static FileSystem createFileSystem(URI uri, Configuration conf
       ) throws IOException {
     Class<?> clazz = getFileSystemClass(uri.getScheme(), conf);
-    if (clazz == null) {
-      throw new IOException("No FileSystem for scheme: " + uri.getScheme());
-    }
     FileSystem fs = (FileSystem)ReflectionUtils.newInstance(clazz, conf);
     fs.initialize(uri, conf);
     return fs;
@@ -2547,8 +2803,10 @@ public abstract class FileSystem extends Configured implements Closeable {
       }
 
       Key(URI uri, Configuration conf, long unique) throws IOException {
-        scheme = uri.getScheme()==null?"":uri.getScheme().toLowerCase();
-        authority = uri.getAuthority()==null?"":uri.getAuthority().toLowerCase();
+        scheme = uri.getScheme()==null ?
+            "" : StringUtils.toLowerCase(uri.getScheme());
+        authority = uri.getAuthority()==null ?
+            "" : StringUtils.toLowerCase(uri.getAuthority());
         this.unique = unique;
         
         this.ugi = UserGroupInformation.getCurrentUser();
@@ -2611,7 +2869,7 @@ public abstract class FileSystem extends Configured implements Closeable {
      * be perceived as atomic with respect to other threads, which is all we
      * need.
      */
-    private static class StatisticsData {
+    public static class StatisticsData {
       volatile long bytesRead;
       volatile long bytesWritten;
       volatile int readOps;
@@ -2655,6 +2913,26 @@ public abstract class FileSystem extends Configured implements Closeable {
         return bytesRead + " bytes read, " + bytesWritten + " bytes written, "
             + readOps + " read ops, " + largeReadOps + " large read ops, "
             + writeOps + " write ops";
+      }
+      
+      public long getBytesRead() {
+        return bytesRead;
+      }
+      
+      public long getBytesWritten() {
+        return bytesWritten;
+      }
+      
+      public int getReadOps() {
+        return readOps;
+      }
+      
+      public int getLargeReadOps() {
+        return largeReadOps;
+      }
+      
+      public int getWriteOps() {
+        return writeOps;
       }
     }
 
@@ -2714,7 +2992,7 @@ public abstract class FileSystem extends Configured implements Closeable {
     /**
      * Get or create the thread-local data associated with the current thread.
      */
-    private StatisticsData getThreadData() {
+    public StatisticsData getThreadStatistics() {
       StatisticsData data = threadData.get();
       if (data == null) {
         data = new StatisticsData(
@@ -2735,7 +3013,7 @@ public abstract class FileSystem extends Configured implements Closeable {
      * @param newBytes the additional bytes read
      */
     public void incrementBytesRead(long newBytes) {
-      getThreadData().bytesRead += newBytes;
+      getThreadStatistics().bytesRead += newBytes;
     }
     
     /**
@@ -2743,7 +3021,7 @@ public abstract class FileSystem extends Configured implements Closeable {
      * @param newBytes the additional bytes written
      */
     public void incrementBytesWritten(long newBytes) {
-      getThreadData().bytesWritten += newBytes;
+      getThreadStatistics().bytesWritten += newBytes;
     }
     
     /**
@@ -2751,7 +3029,7 @@ public abstract class FileSystem extends Configured implements Closeable {
      * @param count number of read operations
      */
     public void incrementReadOps(int count) {
-      getThreadData().readOps += count;
+      getThreadStatistics().readOps += count;
     }
 
     /**
@@ -2759,7 +3037,7 @@ public abstract class FileSystem extends Configured implements Closeable {
      * @param count number of large read operations
      */
     public void incrementLargeReadOps(int count) {
-      getThreadData().largeReadOps += count;
+      getThreadStatistics().largeReadOps += count;
     }
 
     /**
@@ -2767,7 +3045,7 @@ public abstract class FileSystem extends Configured implements Closeable {
      * @param count number of write operations
      */
     public void incrementWriteOps(int count) {
-      getThreadData().writeOps += count;
+      getThreadStatistics().writeOps += count;
     }
 
     /**

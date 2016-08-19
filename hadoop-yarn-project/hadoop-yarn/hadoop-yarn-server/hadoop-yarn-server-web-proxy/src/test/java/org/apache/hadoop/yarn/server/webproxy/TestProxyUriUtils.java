@@ -1,43 +1,42 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Licensed to the Apache Software Foundation (ASF) under one
+* or more contributor license agreements.  See the NOTICE file
+* distributed with this work for additional information
+* regarding copyright ownership.  The ASF licenses this file
+* to you under the Apache License, Version 2.0 (the
+* "License"); you may not use this file except in compliance
+* with the License.  You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
 
 package org.apache.hadoop.yarn.server.webproxy;
 
-import com.google.common.collect.Lists;
-import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.hadoop.yarn.server.utils.BuilderUtils;
-import org.apache.hadoop.yarn.util.TrackingUriPlugin;
-import org.junit.Test;
+import static org.junit.Assert.*;
 
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
+import org.apache.hadoop.yarn.api.records.ApplicationId;
+import org.apache.hadoop.yarn.server.utils.BuilderUtils;
+import org.apache.hadoop.yarn.util.TrackingUriPlugin;
+import org.junit.Test;
+
+import com.google.common.collect.Lists;
 
 public class TestProxyUriUtils {
   @Test
   public void testGetPathApplicationId() {
-    assertEquals("/proxy/application_100_0001",
+    assertEquals("/proxy/application_100_0001", 
         ProxyUriUtils.getPath(BuilderUtils.newApplicationId(100l, 1)));
-    assertEquals("/proxy/application_6384623_0005",
+    assertEquals("/proxy/application_6384623_0005", 
         ProxyUriUtils.getPath(BuilderUtils.newApplicationId(6384623l, 5)));
   }
 
@@ -48,28 +47,25 @@ public class TestProxyUriUtils {
   
   @Test
   public void testGetPathApplicationIdString() {
-    assertEquals("/proxy/application_6384623_0005", ProxyUriUtils
-        .getPath(BuilderUtils.newApplicationId(6384623l, 5), null));
-    assertEquals("/proxy/application_6384623_0005/static/app", ProxyUriUtils
-        .getPath(BuilderUtils.newApplicationId(6384623l, 5), "/static/app"));
-    assertEquals("/proxy/application_6384623_0005/",
+    assertEquals("/proxy/application_6384623_0005", 
+        ProxyUriUtils.getPath(BuilderUtils.newApplicationId(6384623l, 5), null));
+    assertEquals("/proxy/application_6384623_0005/static/app",
+        ProxyUriUtils.getPath(BuilderUtils.newApplicationId(6384623l, 5), "/static/app"));
+    assertEquals("/proxy/application_6384623_0005/", 
         ProxyUriUtils.getPath(BuilderUtils.newApplicationId(6384623l, 5), "/"));
-    assertEquals("/proxy/application_6384623_0005/some/path", ProxyUriUtils
-        .getPath(BuilderUtils.newApplicationId(6384623l, 5), "some/path"));
+    assertEquals("/proxy/application_6384623_0005/some/path", 
+        ProxyUriUtils.getPath(BuilderUtils.newApplicationId(6384623l, 5), "some/path"));
   }
   
-  @Test
+  @Test 
   public void testGetPathAndQuery() {
     assertEquals("/proxy/application_6384623_0005/static/app?foo=bar",
-        ProxyUriUtils
-            .getPathAndQuery(BuilderUtils.newApplicationId(6384623l, 5),
-                "/static/app", "?foo=bar", false));
+    ProxyUriUtils.getPathAndQuery(BuilderUtils.newApplicationId(6384623l, 5), "/static/app", 
+        "?foo=bar", false));
     
-    assertEquals(
-        "/proxy/application_6384623_0005/static/app?foo=bar&bad=good&proxyapproved=true",
-        ProxyUriUtils
-            .getPathAndQuery(BuilderUtils.newApplicationId(6384623l, 5),
-                "/static/app", "foo=bar&bad=good", true));
+    assertEquals("/proxy/application_6384623_0005/static/app?foo=bar&bad=good&proxyapproved=true",
+        ProxyUriUtils.getPathAndQuery(BuilderUtils.newApplicationId(6384623l, 5), "/static/app", 
+            "foo=bar&bad=good", true));
   }
 
   @Test
@@ -77,8 +73,7 @@ public class TestProxyUriUtils {
     URI originalUri = new URI("http://host.com/static/foo?bar=bar");
     URI proxyUri = new URI("http://proxy.net:8080/");
     ApplicationId id = BuilderUtils.newApplicationId(6384623l, 5);
-    URI expected = new URI(
-        "http://proxy.net:8080/proxy/application_6384623_0005/static/foo?bar=bar");
+    URI expected = new URI("http://proxy.net:8080/proxy/application_6384623_0005/static/foo?bar=bar");
     URI result = ProxyUriUtils.getProxyUri(originalUri, proxyUri, id);
     assertEquals(expected, result);
   }
@@ -89,8 +84,7 @@ public class TestProxyUriUtils {
     URI originalUri = null;
     URI proxyUri = new URI("http://proxy.net:8080/");
     ApplicationId id = BuilderUtils.newApplicationId(6384623l, 5);
-    URI expected =
-        new URI("http://proxy.net:8080/proxy/application_6384623_0005/");
+    URI expected = new URI("http://proxy.net:8080/proxy/application_6384623_0005/");
     URI result = ProxyUriUtils.getProxyUri(originalUri, proxyUri, id);
     assertEquals(expected, result);
   }
@@ -99,7 +93,8 @@ public class TestProxyUriUtils {
   public void testGetProxyUriFromPluginsReturnsNullIfNoPlugins()
       throws URISyntaxException {
     ApplicationId id = BuilderUtils.newApplicationId(6384623l, 5);
-    List<TrackingUriPlugin> list = Lists.newArrayListWithExpectedSize(0);
+    List<TrackingUriPlugin> list =
+        Lists.newArrayListWithExpectedSize(0);
     assertNull(ProxyUriUtils.getUriFromTrackingPlugins(id, list));
   }
 
@@ -107,7 +102,8 @@ public class TestProxyUriUtils {
   public void testGetProxyUriFromPluginsReturnsValidUriWhenAble()
       throws URISyntaxException {
     ApplicationId id = BuilderUtils.newApplicationId(6384623l, 5);
-    List<TrackingUriPlugin> list = Lists.newArrayListWithExpectedSize(2);
+    List<TrackingUriPlugin> list =
+        Lists.newArrayListWithExpectedSize(2);
     // Insert a plugin that returns null.
     list.add(new TrackingUriPlugin() {
       public URI getTrackingUri(ApplicationId id) throws URISyntaxException {

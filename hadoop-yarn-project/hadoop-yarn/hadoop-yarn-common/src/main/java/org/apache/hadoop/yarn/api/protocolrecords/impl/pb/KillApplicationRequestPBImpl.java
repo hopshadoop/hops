@@ -19,7 +19,6 @@
 package org.apache.hadoop.yarn.api.protocolrecords.impl.pb;
 
 
-import com.google.protobuf.TextFormat;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.protocolrecords.KillApplicationRequest;
@@ -29,11 +28,12 @@ import org.apache.hadoop.yarn.proto.YarnProtos.ApplicationIdProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.KillApplicationRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.KillApplicationRequestProtoOrBuilder;
 
+import com.google.protobuf.TextFormat;
+
 @Private
 @Unstable
 public class KillApplicationRequestPBImpl extends KillApplicationRequest {
-  KillApplicationRequestProto proto =
-      KillApplicationRequestProto.getDefaultInstance();
+  KillApplicationRequestProto proto = KillApplicationRequestProto.getDefaultInstance();
   KillApplicationRequestProto.Builder builder = null;
   boolean viaProto = false;
   
@@ -50,7 +50,7 @@ public class KillApplicationRequestPBImpl extends KillApplicationRequest {
   }
   
   public KillApplicationRequestProto getProto() {
-    mergeLocalToProto();
+      mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
     viaProto = true;
     return proto;
@@ -63,9 +63,8 @@ public class KillApplicationRequestPBImpl extends KillApplicationRequest {
 
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -84,9 +83,8 @@ public class KillApplicationRequestPBImpl extends KillApplicationRequest {
   }
 
   private void mergeLocalToProto() {
-    if (viaProto) {
+    if (viaProto) 
       maybeInitBuilder();
-    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
@@ -98,7 +96,7 @@ public class KillApplicationRequestPBImpl extends KillApplicationRequest {
     }
     viaProto = false;
   }
-
+    
   
   @Override
   public ApplicationId getApplicationId() {
@@ -116,9 +114,8 @@ public class KillApplicationRequestPBImpl extends KillApplicationRequest {
   @Override
   public void setApplicationId(ApplicationId applicationId) {
     maybeInitBuilder();
-    if (applicationId == null) {
+    if (applicationId == null) 
       builder.clearApplicationId();
-    }
     this.applicationId = applicationId;
   }
 
@@ -127,8 +124,9 @@ public class KillApplicationRequestPBImpl extends KillApplicationRequest {
   }
 
   private ApplicationIdProto convertToProtoFormat(ApplicationId t) {
-    return ((ApplicationIdPBImpl) t).getProto();
+    return ((ApplicationIdPBImpl)t).getProto();
   }
+
 
 
 }  

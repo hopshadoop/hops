@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.yarn.server.applicationhistoryservice;
 
+import java.io.IOException;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -29,17 +31,15 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.io.IOException;
-
-public class TestApplicationHistoryManagerImpl
-    extends ApplicationHistoryStoreTestUtils {
+public class TestApplicationHistoryManagerImpl extends
+    ApplicationHistoryStoreTestUtils {
   ApplicationHistoryManagerImpl applicationHistoryManagerImpl = null;
 
   @Before
   public void setup() throws Exception {
     Configuration config = new Configuration();
     config.setClass(YarnConfiguration.APPLICATION_HISTORY_STORE,
-        MemoryApplicationHistoryStore.class, ApplicationHistoryStore.class);
+      MemoryApplicationHistoryStore.class, ApplicationHistoryStore.class);
     applicationHistoryManagerImpl = new ApplicationHistoryManagerImpl();
     applicationHistoryManagerImpl.init(config);
     applicationHistoryManagerImpl.start();
@@ -65,8 +65,8 @@ public class TestApplicationHistoryManagerImpl
         applicationHistoryManagerImpl.getApplication(appId);
     Assert.assertNotNull(appReport);
     Assert.assertEquals(appId, appReport.getApplicationId());
-    Assert
-        .assertEquals(appAttemptId, appReport.getCurrentApplicationAttemptId());
+    Assert.assertEquals(appAttemptId,
+      appReport.getCurrentApplicationAttemptId());
     Assert.assertEquals(appAttemptId.toString(), appReport.getHost());
     Assert.assertEquals("test type", appReport.getApplicationType().toString());
     Assert.assertEquals("test queue", appReport.getQueue().toString());

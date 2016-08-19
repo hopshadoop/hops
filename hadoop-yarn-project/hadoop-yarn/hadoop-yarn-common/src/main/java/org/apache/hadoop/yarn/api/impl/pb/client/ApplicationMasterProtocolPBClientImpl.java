@@ -18,7 +18,10 @@
 
 package org.apache.hadoop.yarn.api.impl.pb.client;
 
-import com.google.protobuf.ServiceException;
+import java.io.Closeable;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
@@ -43,22 +46,19 @@ import org.apache.hadoop.yarn.proto.YarnServiceProtos.AllocateRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.FinishApplicationMasterRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.RegisterApplicationMasterRequestProto;
 
-import java.io.Closeable;
-import java.io.IOException;
-import java.net.InetSocketAddress;
+import com.google.protobuf.ServiceException;
 
 @Private
-public class ApplicationMasterProtocolPBClientImpl
-    implements ApplicationMasterProtocol, Closeable {
+public class ApplicationMasterProtocolPBClientImpl implements ApplicationMasterProtocol, Closeable {
 
   private ApplicationMasterProtocolPB proxy;
 
-  public ApplicationMasterProtocolPBClientImpl(long clientVersion,
-      InetSocketAddress addr, Configuration conf) throws IOException {
-    RPC.setProtocolEngine(conf, ApplicationMasterProtocolPB.class,
-        ProtobufRpcEngine.class);
-    proxy = (ApplicationMasterProtocolPB) RPC
-        .getProxy(ApplicationMasterProtocolPB.class, clientVersion, addr, conf);
+  public ApplicationMasterProtocolPBClientImpl(long clientVersion, InetSocketAddress addr,
+      Configuration conf) throws IOException {
+    RPC.setProtocolEngine(conf, ApplicationMasterProtocolPB.class, ProtobufRpcEngine.class);
+    proxy =
+        (ApplicationMasterProtocolPB) RPC.getProxy(ApplicationMasterProtocolPB.class, clientVersion,
+          addr, conf);
   }
 
   @Override
@@ -83,13 +83,13 @@ public class ApplicationMasterProtocolPBClientImpl
 
   @Override
   public FinishApplicationMasterResponse finishApplicationMaster(
-      FinishApplicationMasterRequest request)
-      throws YarnException, IOException {
+      FinishApplicationMasterRequest request) throws YarnException,
+      IOException {
     FinishApplicationMasterRequestProto requestProto =
         ((FinishApplicationMasterRequestPBImpl) request).getProto();
     try {
       return new FinishApplicationMasterResponsePBImpl(
-          proxy.finishApplicationMaster(null, requestProto));
+        proxy.finishApplicationMaster(null, requestProto));
     } catch (ServiceException e) {
       RPCUtil.unwrapAndThrowException(e);
       return null;
@@ -98,13 +98,13 @@ public class ApplicationMasterProtocolPBClientImpl
 
   @Override
   public RegisterApplicationMasterResponse registerApplicationMaster(
-      RegisterApplicationMasterRequest request)
-      throws YarnException, IOException {
+      RegisterApplicationMasterRequest request) throws YarnException,
+      IOException {
     RegisterApplicationMasterRequestProto requestProto =
         ((RegisterApplicationMasterRequestPBImpl) request).getProto();
     try {
       return new RegisterApplicationMasterResponsePBImpl(
-          proxy.registerApplicationMaster(null, requestProto));
+        proxy.registerApplicationMaster(null, requestProto));
     } catch (ServiceException e) {
       RPCUtil.unwrapAndThrowException(e);
       return null;

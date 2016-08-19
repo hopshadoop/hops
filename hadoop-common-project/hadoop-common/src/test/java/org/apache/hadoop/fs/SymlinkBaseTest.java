@@ -28,8 +28,6 @@ import org.apache.hadoop.test.GenericTestUtils;
 
 import static org.junit.Assert.*;
 import static org.junit.Assume.assumeTrue;
-
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.Before;
 import org.junit.After;
@@ -234,7 +232,6 @@ public abstract class SymlinkBaseTest {
     wrapper.delete(link, false);
   }
 
-  @Ignore("HOPS fails on vanilla")
   @Test(timeout=10000)
   /** Stat a link to a file */
   public void testStatLinkToFile() throws IOException {
@@ -276,7 +273,6 @@ public abstract class SymlinkBaseTest {
                  wrapper.getFileLinkStatus(linkToFile).getPath());
   }
 
-  @Ignore("HOPS fails on vanilla")
   @Test(timeout=10000)
   /** Stat a link to a directory */
   public void testStatLinkToDir() throws IOException {
@@ -295,7 +291,6 @@ public abstract class SymlinkBaseTest {
     assertEquals(dir, wrapper.getLinkTarget(linkToDir));
   }
 
-  @Ignore("HOPS fails on vanilla")
   @Test(timeout=10000)
   /** Stat a dangling link */
   public void testStatDanglingLink() throws IOException {
@@ -438,7 +433,6 @@ public abstract class SymlinkBaseTest {
     }
   }
 
-  @Ignore("HOPS fails on vanilla")
   @Test(timeout=10000)
   /** Test creating a symlink using relative paths */
   public void testCreateLinkUsingRelPaths() throws IOException {
@@ -465,7 +459,6 @@ public abstract class SymlinkBaseTest {
     readFile(linkViaDir2);
   }
 
-  @Ignore("HOPS fails on vanilla")
   @Test(timeout=10000)
   /** Test creating a symlink using absolute paths */
   public void testCreateLinkUsingAbsPaths() throws IOException {
@@ -493,7 +486,6 @@ public abstract class SymlinkBaseTest {
     }
   }
 
-  @Ignore("HOPS fails on vanilla")
   @Test(timeout=10000)
   /**
    * Test creating a symlink using fully and partially qualified paths.
@@ -589,7 +581,8 @@ public abstract class SymlinkBaseTest {
     } catch (IOException e) {
       // Expected
       if (wrapper instanceof FileContextTestWrapper) {
-        assertEquals("No AbstractFileSystem for scheme: null", e.getMessage());
+        GenericTestUtils.assertExceptionContains(
+            AbstractFileSystem.NO_ABSTRACT_FS_ERROR, e);
       } else if (wrapper instanceof FileSystemTestWrapper) {
         assertEquals("No FileSystem for scheme: null", e.getMessage());
       }
@@ -621,7 +614,6 @@ public abstract class SymlinkBaseTest {
     }
   }
 
-  @Ignore("HOPS fails on vanilla")
   @Test(timeout=10000)
   /** Test create symlink to a directory */
   public void testCreateLinkToDirectory() throws IOException {
@@ -668,7 +660,6 @@ public abstract class SymlinkBaseTest {
     assertFalse(wrapper.exists(subDir));
   }
 
-  @Ignore("HOPS fails on vanilla")
   @Test(timeout=10000)
   /** Create symlink through a symlink */
   public void testCreateLinkViaLink() throws IOException {
@@ -818,7 +809,6 @@ public abstract class SymlinkBaseTest {
     assertEquals(fileSize, wrapper.getFileStatus(fileViaLink).getLen());
   }
 
-  @Ignore("HOPS fails on vanilla")
   @Test(timeout=10000)
   /** Test create symlink to ../file */
   public void testCreateLinkToDotDotPrefix() throws IOException {
@@ -889,7 +879,6 @@ public abstract class SymlinkBaseTest {
     assertTrue(wrapper.exists(dirNewViaLink));
   }
 
-  @Ignore("HOPS fails on vanilla")
   @Test(timeout=10000)
   /** Similar tests as the previous ones but rename a symlink */
   public void testRenameSymlinkViaSymlink() throws IOException {
@@ -1036,7 +1025,6 @@ public abstract class SymlinkBaseTest {
     assertFalse(wrapper.getFileLinkStatus(link).isSymlink());
   }
 
-  @Ignore("HOPS fails on vanilla")
   @Test(timeout=10000)
   /** Rename a symlink to a new non-existant name */
   public void testRenameSymlinkNonExistantDest() throws IOException {
@@ -1053,7 +1041,6 @@ public abstract class SymlinkBaseTest {
     assertFalse(wrapper.exists(link1));
   }
 
-  @Ignore("HOPS fails on vanilla")
   @Test(timeout=10000)
   /** Rename a symlink to a file that exists */
   public void testRenameSymlinkToExistingFile() throws IOException {
@@ -1135,7 +1122,6 @@ public abstract class SymlinkBaseTest {
     }
   }
 
-  @Ignore("HOPS fails on vanilla")
   @Test(timeout=10000)
   /** Rename a symlink */
   public void testRenameSymlink() throws IOException {

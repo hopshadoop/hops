@@ -185,7 +185,7 @@ public class TestMiniMRChildTask {
     
     // Launch job with default option for temp dir. 
     // i.e. temp dir is ./tmp 
-    Job job = new Job(conf);
+    Job job = Job.getInstance(conf);
     job.addFileToClassPath(APP_JAR);
     job.setJarByClass(TestMiniMRChildTask.class);
     job.setMaxMapAttempts(1); // speed up failures
@@ -254,6 +254,19 @@ public class TestMiniMRChildTask {
       checkEnv("NEW_PATH", File.pathSeparator + "/tmp", "noappend");
       // check if X=$(tt's X var):/tmp for an old env variable inherited from 
       // the tt
+      if (Shell.WINDOWS) {
+        // On Windows, PATH is replaced one more time as part of default config
+        // of "mapreduce.admin.user.env", i.e. on Windows,
+        // "mapreduce.admin.user.env" is set to
+        // "PATH=%PATH%;%HADOOP_COMMON_HOME%\\bin"
+        String hadoopHome = System.getenv("HADOOP_COMMON_HOME");
+        if (hadoopHome == null) {
+          hadoopHome = "";
+        }
+        String hadoopLibLocation = hadoopHome + "\\bin";
+        path += File.pathSeparator + hadoopLibLocation;
+        path += File.pathSeparator + path;
+      }
       checkEnv("PATH",  path + File.pathSeparator + "/tmp", "noappend");
 
       String jobLocalDir = job.get(MRJobConfig.JOB_LOCAL_DIR);
@@ -308,6 +321,19 @@ public class TestMiniMRChildTask {
       checkEnv("NEW_PATH", File.pathSeparator + "/tmp", "noappend");
       // check if X=$(tt's X var):/tmp for an old env variable inherited from 
       // the tt
+      if (Shell.WINDOWS) {
+        // On Windows, PATH is replaced one more time as part of default config
+        // of "mapreduce.admin.user.env", i.e. on Windows,
+        // "mapreduce.admin.user.env"
+        // is set to "PATH=%PATH%;%HADOOP_COMMON_HOME%\\bin"
+        String hadoopHome = System.getenv("HADOOP_COMMON_HOME");
+        if (hadoopHome == null) {
+          hadoopHome = "";
+        }
+        String hadoopLibLocation = hadoopHome + "\\bin";
+        path += File.pathSeparator + hadoopLibLocation;
+        path += File.pathSeparator + path;
+      }
       checkEnv("PATH",  path + File.pathSeparator + "/tmp", "noappend");
 
     }
@@ -365,36 +391,7 @@ public class TestMiniMRChildTask {
       ioe.printStackTrace();           
     }
   }
-  
-  /**
-   * Tests task's temp directory.
-   * 
-   * In this test, we give different values to mapreduce.task.tmp.dir
-   * both relative and absolute. And check whether the temp directory 
-   * is created. We also check whether java.io.tmpdir value is same as 
-   * the directory specified. We create a temp file and check if is is 
-   * created in the directory specified.
-   */
-  @Test
-  public void testTaskTempDir(){
-    try {
-      JobConf conf = new JobConf(mr.getConfig());
-      
-      // intialize input, output directories
-      Path inDir = new Path("testing/wc/input");
-      Path outDir = new Path("testing/wc/output");
-      String input = "The input";
-      configure(conf, inDir, outDir, input, 
-          MapClass.class, IdentityReducer.class);
-      launchTest(conf, inDir, outDir, input);
-      
-    } catch(Exception e) {
-      e.printStackTrace();
-      fail("Exception in testing temp dir");
-      tearDown();
-    }
-  }
-
+ 
   /**
    * To test OS dependent setting of default execution path for a MapRed task.
    * Mainly that we can use MRJobConfig.DEFAULT_MAPRED_ADMIN_USER_ENV to set -
@@ -540,7 +537,7 @@ public class TestMiniMRChildTask {
     conf.set(mapTaskJavaOptsKey, mapTaskJavaOpts);
     conf.set(reduceTaskJavaOptsKey, reduceTaskJavaOpts);
 
-    Job job = new Job(conf);
+    Job job = Job.getInstance(conf);
     job.addFileToClassPath(APP_JAR);
     job.setJarByClass(TestMiniMRChildTask.class);
     job.setMaxMapAttempts(1); // speed up failures

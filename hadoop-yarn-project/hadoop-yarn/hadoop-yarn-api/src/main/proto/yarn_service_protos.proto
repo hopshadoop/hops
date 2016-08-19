@@ -23,17 +23,12 @@
  */
 
 option java_package = "org.apache.hadoop.yarn.proto";
-
 option java_outer_classname = "YarnServiceProtos";
-
 option java_generic_services = true;
-
 option java_generate_equals_and_hash = true;
-
 package hadoop.yarn;
 
 import "Security.proto";
-
 import "yarn_protos.proto";
 
 //////////////////////////////////////////////////////
@@ -52,6 +47,7 @@ message RegisterApplicationMasterResponseProto {
   repeated ContainerProto containers_from_previous_attempts = 4;
   optional string queue = 5;
   repeated NMTokenProto nm_tokens_from_previous_attempts = 6;
+  repeated SchedulerResourceTypes scheduler_resource_types = 7;
 }
 
 message FinishApplicationMasterRequestProto {
@@ -74,7 +70,7 @@ message AllocateRequestProto {
 }
 
 message NMTokenProto {
-  optional NodeIdProto nodeId = 1;
+  optional NodeIdProto nodeId = 1; 
   optional hadoop.common.TokenProto token = 2;
 }
 
@@ -90,6 +86,12 @@ message AllocateResponseProto {
   repeated NMTokenProto nm_tokens = 9;
   repeated ContainerResourceIncreaseProto increased_containers = 10;
   repeated ContainerResourceDecreaseProto decreased_containers = 11;
+  optional hadoop.common.TokenProto am_rm_token = 12;
+}
+
+enum SchedulerResourceTypes {
+  MEMORY = 0;
+  CPU = 1;
 }
 
 //////////////////////////////////////////////////////
@@ -113,7 +115,7 @@ message GetApplicationReportResponseProto {
 }
 
 message SubmitApplicationRequestProto {
-  optional ApplicationSubmissionContextProto application_submission_context = 1;
+  optional ApplicationSubmissionContextProto application_submission_context= 1;
 }
 
 message SubmitApplicationResponseProto {
@@ -192,6 +194,27 @@ message GetQueueUserAclsInfoResponseProto {
   repeated QueueUserACLInfoProto queueUserAcls = 1;
 }
 
+message GetNodesToLabelsRequestProto {
+}
+
+message GetNodesToLabelsResponseProto {
+  repeated NodeIdToLabelsProto nodeToLabels = 1;
+}
+
+message GetLabelsToNodesRequestProto {
+  repeated string nodeLabels = 1;
+}
+
+message GetLabelsToNodesResponseProto {
+  repeated LabelsToNodeIdsProto labelsToNodes = 1;
+}
+
+message GetClusterNodeLabelsRequestProto {
+}
+
+message GetClusterNodeLabelsResponseProto {
+  repeated string nodeLabels = 1;
+}
 
 //////////////////////////////////////////////////////
 /////// client_NM_Protocol ///////////////////////////
@@ -289,4 +312,64 @@ message GetContainersRequestProto {
 
 message GetContainersResponseProto {
   repeated ContainerReportProto containers = 1;
+}
+
+//////////////////////////////////////////////////////
+/////// client_SCM_Protocol //////////////////////////
+//////////////////////////////////////////////////////
+
+message UseSharedCacheResourceRequestProto {
+  optional ApplicationIdProto applicationId = 1;
+  optional string resourceKey = 2;
+}
+
+message UseSharedCacheResourceResponseProto {
+  optional string path = 1;
+}
+
+message ReleaseSharedCacheResourceRequestProto {
+  optional ApplicationIdProto applicationId = 1;
+  optional string resourceKey = 2;
+}
+
+message ReleaseSharedCacheResourceResponseProto {
+}
+
+//////////////////////////////////////////////////////
+//  reservation_protocol
+//////////////////////////////////////////////////////
+
+message ReservationSubmissionRequestProto {
+  optional string queue = 1;
+  optional ReservationDefinitionProto reservation_definition = 2;
+}
+
+message ReservationSubmissionResponseProto {
+    optional ReservationIdProto reservation_id = 1;
+}
+
+message ReservationUpdateRequestProto {
+  optional ReservationDefinitionProto reservation_definition = 1;
+  optional ReservationIdProto reservation_id = 2;
+}
+
+message ReservationUpdateResponseProto {   
+}
+
+message ReservationDeleteRequestProto {
+  optional ReservationIdProto reservation_id = 1;
+}
+
+message ReservationDeleteResponseProto {
+}
+
+//////////////////////////////////////////////////////
+/////// SCM_Admin_Protocol //////////////////////////
+//////////////////////////////////////////////////////
+
+message RunSharedCacheCleanerTaskRequestProto {
+}
+
+message RunSharedCacheCleanerTaskResponseProto {
+  optional bool accepted = 1;
 }

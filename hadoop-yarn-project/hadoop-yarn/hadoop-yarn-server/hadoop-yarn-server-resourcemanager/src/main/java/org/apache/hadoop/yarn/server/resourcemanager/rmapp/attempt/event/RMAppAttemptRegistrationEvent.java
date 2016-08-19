@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.event;
 
-import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptEventType;
@@ -31,9 +30,8 @@ public class RMAppAttemptRegistrationEvent extends RMAppAttemptEvent {
   private String trackingurl;
 
   public RMAppAttemptRegistrationEvent(ApplicationAttemptId appAttemptId,
-      String host, int rpcPort, String trackingUrl,
-      TransactionState transactionState) {
-    super(appAttemptId, RMAppAttemptEventType.REGISTERED, transactionState);
+      String host, int rpcPort, String trackingUrl) {
+    super(appAttemptId, RMAppAttemptEventType.REGISTERED);
     this.appAttemptId = appAttemptId;
     this.host = host;
     this.rpcport = rpcPort;

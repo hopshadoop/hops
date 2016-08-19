@@ -20,8 +20,6 @@ package org.apache.hadoop.metrics2.lib;
 
 import java.util.concurrent.atomic.AtomicReference;
 import javax.management.ObjectName;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
@@ -36,7 +34,7 @@ import org.apache.hadoop.metrics2.impl.MetricsSystemImpl;
 @InterfaceStability.Evolving
 public enum DefaultMetricsSystem {
   INSTANCE; // the singleton
-  private static final Log LOG = LogFactory.getLog(DefaultMetricsSystem.class);
+
   private AtomicReference<MetricsSystem> impl =
       new AtomicReference<MetricsSystem>(new MetricsSystemImpl());
   volatile boolean miniClusterMode = false;
@@ -73,7 +71,6 @@ public enum DefaultMetricsSystem {
   void shutdownInstance() {
     boolean last = impl.get().shutdown();
     if (last) synchronized(this) {
-      LOG.info("clear maps");
       mBeanNames.map.clear();
       sourceNames.map.clear();
     }
@@ -106,6 +103,11 @@ public enum DefaultMetricsSystem {
   }
 
   @InterfaceAudience.Private
+  public static void removeMBeanName(ObjectName name) {
+    INSTANCE.removeObjectName(name.toString());
+  }
+
+  @InterfaceAudience.Private
   public static String sourceName(String name, boolean dupOK) {
     return INSTANCE.newSourceName(name, dupOK);
   }
@@ -121,12 +123,15 @@ public enum DefaultMetricsSystem {
     }
   }
 
+  synchronized void removeObjectName(String name) {
+    mBeanNames.map.remove(name);
+  }
+
   synchronized String newSourceName(String name, boolean dupOK) {
     if (sourceNames.map.containsKey(name)) {
       if (dupOK) {
         return name;
       } else if (!miniClusterMode) {
-        LOG.info("Metrics source "+ name +" already exists!");
         throw new MetricsException("Metrics source "+ name +" already exists!");
       }
     }

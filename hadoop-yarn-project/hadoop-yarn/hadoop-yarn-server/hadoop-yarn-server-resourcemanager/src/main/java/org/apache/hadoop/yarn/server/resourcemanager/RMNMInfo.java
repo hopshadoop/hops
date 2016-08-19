@@ -19,6 +19,14 @@
 package org.apache.hadoop.yarn.server.resourcemanager;
 
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.List;
+
+import javax.management.NotCompliantMBeanException;
+import javax.management.StandardMBean;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.metrics2.util.MBeans;
@@ -26,13 +34,6 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerNodeReport;
 import org.mortbay.util.ajax.JSON;
-
-import javax.management.NotCompliantMBeanException;
-import javax.management.StandardMBean;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.LinkedHashMap;
-import java.util.List;
 
 /**
  * JMX bean listing statuses of all node managers.
@@ -44,11 +45,9 @@ public class RMNMInfo implements RMNMInfoBeans {
 
   /**
    * Constructor for RMNMInfo registers the bean with JMX.
-   *
-   * @param rmc
-   *     resource manager's context object
-   * @param sched
-   *     resource manager's scheduler object
+   * 
+   * @param rmc resource manager's context object
+   * @param sched resource manager's scheduler object
    */
   public RMNMInfo(RMContext rmc, ResourceScheduler sched) {
     this.rmContext = rmc;
@@ -56,10 +55,10 @@ public class RMNMInfo implements RMNMInfoBeans {
 
     StandardMBean bean;
     try {
-      bean = new StandardMBean(this, RMNMInfoBeans.class);
-      MBeans.register("ResourceManager", "RMNMInfo", bean);
+        bean = new StandardMBean(this,RMNMInfoBeans.class);
+        MBeans.register("ResourceManager", "RMNMInfo", bean);
     } catch (NotCompliantMBeanException e) {
-      LOG.warn("Error registering RMNMInfo MBean", e);
+        LOG.warn("Error registering RMNMInfo MBean", e);
     }
     LOG.info("Registered RMNMInfo MBean");
   }
@@ -71,33 +70,36 @@ public class RMNMInfo implements RMNMInfoBeans {
 
   /**
    * Implements getLiveNodeManagers()
-   *
+   * 
    * @return JSON formatted string containing statuses of all node managers
    */
   @Override // RMNMInfoBeans
   public String getLiveNodeManagers() {
-    Collection<RMNode> nodes = this.rmContext.getActiveRMNodes().values();
+    Collection<RMNode> nodes = this.rmContext.getRMNodes().values();
     List<InfoMap> nodesInfo = new ArrayList<InfoMap>();
 
     for (final RMNode ni : nodes) {
-      SchedulerNodeReport report = scheduler.getNodeReport(ni.getNodeID());
-      InfoMap info = new InfoMap();
-      info.put("HostName", ni.getHostName());
-      info.put("Rack", ni.getRackName());
-      info.put("State", ni.getState().toString());
-      info.put("NodeId", ni.getNodeID());
-      info.put("NodeHTTPAddress", ni.getHttpAddress());
-      info.put("LastHealthUpdate", ni.getLastHealthReportTime());
-      info.put("HealthReport", ni.getHealthReport());
-      info.put("NodeManagerVersion", ni.getNodeManagerVersion());
-      if (report != null) {
-        info.put("NumContainers", report.getNumContainers());
-        info.put("UsedMemoryMB", report.getUsedResource().getMemory());
-        info.put("AvailableMemoryMB",
-            report.getAvailableResource().getMemory());
-      }
+        SchedulerNodeReport report = scheduler.getNodeReport(ni.getNodeID());
+        InfoMap info = new InfoMap();
+        info.put("HostName", ni.getHostName());
+        info.put("Rack", ni.getRackName());
+        info.put("State", ni.getState().toString());
+        info.put("NodeId", ni.getNodeID());
+        info.put("NodeHTTPAddress", ni.getHttpAddress());
+        info.put("LastHealthUpdate",
+                        ni.getLastHealthReportTime());
+        info.put("HealthReport",
+                        ni.getHealthReport());
+        info.put("NodeManagerVersion",
+                ni.getNodeManagerVersion());
+        if(report != null) {
+          info.put("NumContainers", report.getNumContainers());
+          info.put("UsedMemoryMB", report.getUsedResource().getMemory());
+          info.put("AvailableMemoryMB",
+              report.getAvailableResource().getMemory());
+        }
 
-      nodesInfo.add(info);
+        nodesInfo.add(info);
     }
 
     return JSON.toString(nodesInfo);

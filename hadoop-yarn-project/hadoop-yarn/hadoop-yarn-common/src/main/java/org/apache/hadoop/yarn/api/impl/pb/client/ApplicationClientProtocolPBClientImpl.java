@@ -18,7 +18,10 @@
 
 package org.apache.hadoop.yarn.api.impl.pb.client;
 
-import com.google.protobuf.ServiceException;
+import java.io.Closeable;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
@@ -40,6 +43,8 @@ import org.apache.hadoop.yarn.api.protocolrecords.GetApplicationsRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetApplicationsResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetClusterMetricsRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetClusterMetricsResponse;
+import org.apache.hadoop.yarn.api.protocolrecords.GetClusterNodeLabelsRequest;
+import org.apache.hadoop.yarn.api.protocolrecords.GetClusterNodeLabelsResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetClusterNodesRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetClusterNodesResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetContainerReportRequest;
@@ -48,8 +53,12 @@ import org.apache.hadoop.yarn.api.protocolrecords.GetContainersRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetContainersResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetDelegationTokenRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetDelegationTokenResponse;
+import org.apache.hadoop.yarn.api.protocolrecords.GetLabelsToNodesRequest;
+import org.apache.hadoop.yarn.api.protocolrecords.GetLabelsToNodesResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetNewApplicationRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetNewApplicationResponse;
+import org.apache.hadoop.yarn.api.protocolrecords.GetNodesToLabelsRequest;
+import org.apache.hadoop.yarn.api.protocolrecords.GetNodesToLabelsResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetQueueInfoRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetQueueInfoResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetQueueUserAclsInfoRequest;
@@ -60,6 +69,12 @@ import org.apache.hadoop.yarn.api.protocolrecords.MoveApplicationAcrossQueuesReq
 import org.apache.hadoop.yarn.api.protocolrecords.MoveApplicationAcrossQueuesResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.RenewDelegationTokenRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.RenewDelegationTokenResponse;
+import org.apache.hadoop.yarn.api.protocolrecords.ReservationDeleteRequest;
+import org.apache.hadoop.yarn.api.protocolrecords.ReservationDeleteResponse;
+import org.apache.hadoop.yarn.api.protocolrecords.ReservationSubmissionRequest;
+import org.apache.hadoop.yarn.api.protocolrecords.ReservationSubmissionResponse;
+import org.apache.hadoop.yarn.api.protocolrecords.ReservationUpdateRequest;
+import org.apache.hadoop.yarn.api.protocolrecords.ReservationUpdateResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.SubmitApplicationRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.SubmitApplicationResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.CancelDelegationTokenRequestPBImpl;
@@ -74,6 +89,8 @@ import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetApplicationsRequest
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetApplicationsResponsePBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetClusterMetricsRequestPBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetClusterMetricsResponsePBImpl;
+import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetClusterNodeLabelsRequestPBImpl;
+import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetClusterNodeLabelsResponsePBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetClusterNodesRequestPBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetClusterNodesResponsePBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetContainerReportRequestPBImpl;
@@ -82,8 +99,12 @@ import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetContainersRequestPB
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetContainersResponsePBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetDelegationTokenRequestPBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetDelegationTokenResponsePBImpl;
+import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetLabelsToNodesRequestPBImpl;
+import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetLabelsToNodesResponsePBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetNewApplicationRequestPBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetNewApplicationResponsePBImpl;
+import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetNodesToLabelsRequestPBImpl;
+import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetNodesToLabelsResponsePBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetQueueInfoRequestPBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetQueueInfoResponsePBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetQueueUserAclsInfoRequestPBImpl;
@@ -94,15 +115,23 @@ import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.MoveApplicationAcrossQ
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.MoveApplicationAcrossQueuesResponsePBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.RenewDelegationTokenRequestPBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.RenewDelegationTokenResponsePBImpl;
+import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.ReservationDeleteRequestPBImpl;
+import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.ReservationDeleteResponsePBImpl;
+import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.ReservationSubmissionRequestPBImpl;
+import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.ReservationSubmissionResponsePBImpl;
+import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.ReservationUpdateRequestPBImpl;
+import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.ReservationUpdateResponsePBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.SubmitApplicationRequestPBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.SubmitApplicationResponsePBImpl;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.ipc.RPCUtil;
+import org.apache.hadoop.yarn.proto.YarnServiceProtos;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetApplicationAttemptReportRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetApplicationAttemptsRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetApplicationReportRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetApplicationsRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetClusterMetricsRequestProto;
+import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetClusterNodeLabelsRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetClusterNodesRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetContainerReportRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetContainersRequestProto;
@@ -111,24 +140,24 @@ import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetQueueInfoRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetQueueUserAclsInfoRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.KillApplicationRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.MoveApplicationAcrossQueuesRequestProto;
+import org.apache.hadoop.yarn.proto.YarnServiceProtos.ReservationDeleteRequestProto;
+import org.apache.hadoop.yarn.proto.YarnServiceProtos.ReservationSubmissionRequestProto;
+import org.apache.hadoop.yarn.proto.YarnServiceProtos.ReservationUpdateRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.SubmitApplicationRequestProto;
 
-import java.io.Closeable;
-import java.io.IOException;
-import java.net.InetSocketAddress;
+import com.google.protobuf.ServiceException;
 
 @Private
-public class ApplicationClientProtocolPBClientImpl
-    implements ApplicationClientProtocol, Closeable {
+public class ApplicationClientProtocolPBClientImpl implements ApplicationClientProtocol,
+    Closeable {
 
   private ApplicationClientProtocolPB proxy;
 
   public ApplicationClientProtocolPBClientImpl(long clientVersion,
       InetSocketAddress addr, Configuration conf) throws IOException {
     RPC.setProtocolEngine(conf, ApplicationClientProtocolPB.class,
-        ProtobufRpcEngine.class);
-    proxy = RPC.getProxy(ApplicationClientProtocolPB.class, clientVersion, addr,
-        conf);
+      ProtobufRpcEngine.class);
+    proxy = RPC.getProxy(ApplicationClientProtocolPB.class, clientVersion, addr, conf);
   }
 
   @Override
@@ -144,8 +173,8 @@ public class ApplicationClientProtocolPBClientImpl
     KillApplicationRequestProto requestProto =
         ((KillApplicationRequestPBImpl) request).getProto();
     try {
-      return new KillApplicationResponsePBImpl(
-          proxy.forceKillApplication(null, requestProto));
+      return new KillApplicationResponsePBImpl(proxy.forceKillApplication(null,
+        requestProto));
     } catch (ServiceException e) {
       RPCUtil.unwrapAndThrowException(e);
       return null;
@@ -154,12 +183,13 @@ public class ApplicationClientProtocolPBClientImpl
 
   @Override
   public GetApplicationReportResponse getApplicationReport(
-      GetApplicationReportRequest request) throws YarnException, IOException {
+      GetApplicationReportRequest request) throws YarnException,
+      IOException {
     GetApplicationReportRequestProto requestProto =
         ((GetApplicationReportRequestPBImpl) request).getProto();
     try {
-      return new GetApplicationReportResponsePBImpl(
-          proxy.getApplicationReport(null, requestProto));
+      return new GetApplicationReportResponsePBImpl(proxy.getApplicationReport(
+        null, requestProto));
     } catch (ServiceException e) {
       RPCUtil.unwrapAndThrowException(e);
       return null;
@@ -168,12 +198,13 @@ public class ApplicationClientProtocolPBClientImpl
 
   @Override
   public GetClusterMetricsResponse getClusterMetrics(
-      GetClusterMetricsRequest request) throws YarnException, IOException {
+      GetClusterMetricsRequest request) throws YarnException,
+      IOException {
     GetClusterMetricsRequestProto requestProto =
         ((GetClusterMetricsRequestPBImpl) request).getProto();
     try {
-      return new GetClusterMetricsResponsePBImpl(
-          proxy.getClusterMetrics(null, requestProto));
+      return new GetClusterMetricsResponsePBImpl(proxy.getClusterMetrics(null,
+        requestProto));
     } catch (ServiceException e) {
       RPCUtil.unwrapAndThrowException(e);
       return null;
@@ -182,12 +213,13 @@ public class ApplicationClientProtocolPBClientImpl
 
   @Override
   public GetNewApplicationResponse getNewApplication(
-      GetNewApplicationRequest request) throws YarnException, IOException {
+      GetNewApplicationRequest request) throws YarnException,
+      IOException {
     GetNewApplicationRequestProto requestProto =
         ((GetNewApplicationRequestPBImpl) request).getProto();
     try {
-      return new GetNewApplicationResponsePBImpl(
-          proxy.getNewApplication(null, requestProto));
+      return new GetNewApplicationResponsePBImpl(proxy.getNewApplication(null,
+        requestProto));
     } catch (ServiceException e) {
       RPCUtil.unwrapAndThrowException(e);
       return null;
@@ -196,12 +228,13 @@ public class ApplicationClientProtocolPBClientImpl
 
   @Override
   public SubmitApplicationResponse submitApplication(
-      SubmitApplicationRequest request) throws YarnException, IOException {
+      SubmitApplicationRequest request) throws YarnException,
+      IOException {
     SubmitApplicationRequestProto requestProto =
         ((SubmitApplicationRequestPBImpl) request).getProto();
     try {
-      return new SubmitApplicationResponsePBImpl(
-          proxy.submitApplication(null, requestProto));
+      return new SubmitApplicationResponsePBImpl(proxy.submitApplication(null,
+        requestProto));
     } catch (ServiceException e) {
       RPCUtil.unwrapAndThrowException(e);
       return null;
@@ -209,13 +242,14 @@ public class ApplicationClientProtocolPBClientImpl
   }
 
   @Override
-  public GetApplicationsResponse getApplications(GetApplicationsRequest request)
-      throws YarnException, IOException {
+  public GetApplicationsResponse getApplications(
+      GetApplicationsRequest request) throws YarnException,
+      IOException {
     GetApplicationsRequestProto requestProto =
         ((GetApplicationsRequestPBImpl) request).getProto();
     try {
-      return new GetApplicationsResponsePBImpl(
-          proxy.getApplications(null, requestProto));
+      return new GetApplicationsResponsePBImpl(proxy.getApplications(
+        null, requestProto));
     } catch (ServiceException e) {
       RPCUtil.unwrapAndThrowException(e);
       return null;
@@ -223,13 +257,14 @@ public class ApplicationClientProtocolPBClientImpl
   }
 
   @Override
-  public GetClusterNodesResponse getClusterNodes(GetClusterNodesRequest request)
-      throws YarnException, IOException {
+  public GetClusterNodesResponse
+      getClusterNodes(GetClusterNodesRequest request)
+          throws YarnException, IOException {
     GetClusterNodesRequestProto requestProto =
         ((GetClusterNodesRequestPBImpl) request).getProto();
     try {
-      return new GetClusterNodesResponsePBImpl(
-          proxy.getClusterNodes(null, requestProto));
+      return new GetClusterNodesResponsePBImpl(proxy.getClusterNodes(null,
+        requestProto));
     } catch (ServiceException e) {
       RPCUtil.unwrapAndThrowException(e);
       return null;
@@ -242,8 +277,8 @@ public class ApplicationClientProtocolPBClientImpl
     GetQueueInfoRequestProto requestProto =
         ((GetQueueInfoRequestPBImpl) request).getProto();
     try {
-      return new GetQueueInfoResponsePBImpl(
-          proxy.getQueueInfo(null, requestProto));
+      return new GetQueueInfoResponsePBImpl(proxy.getQueueInfo(null,
+        requestProto));
     } catch (ServiceException e) {
       RPCUtil.unwrapAndThrowException(e);
       return null;
@@ -252,12 +287,13 @@ public class ApplicationClientProtocolPBClientImpl
 
   @Override
   public GetQueueUserAclsInfoResponse getQueueUserAcls(
-      GetQueueUserAclsInfoRequest request) throws YarnException, IOException {
+      GetQueueUserAclsInfoRequest request) throws YarnException,
+      IOException {
     GetQueueUserAclsInfoRequestProto requestProto =
         ((GetQueueUserAclsInfoRequestPBImpl) request).getProto();
     try {
-      return new GetQueueUserAclsInfoResponsePBImpl(
-          proxy.getQueueUserAcls(null, requestProto));
+      return new GetQueueUserAclsInfoResponsePBImpl(proxy.getQueueUserAcls(
+        null, requestProto));
     } catch (ServiceException e) {
       RPCUtil.unwrapAndThrowException(e);
       return null;
@@ -266,12 +302,13 @@ public class ApplicationClientProtocolPBClientImpl
 
   @Override
   public GetDelegationTokenResponse getDelegationToken(
-      GetDelegationTokenRequest request) throws YarnException, IOException {
+      GetDelegationTokenRequest request) throws YarnException,
+      IOException {
     GetDelegationTokenRequestProto requestProto =
         ((GetDelegationTokenRequestPBImpl) request).getProto();
     try {
-      return new GetDelegationTokenResponsePBImpl(
-          proxy.getDelegationToken(null, requestProto));
+      return new GetDelegationTokenResponsePBImpl(proxy.getDelegationToken(
+        null, requestProto));
     } catch (ServiceException e) {
       RPCUtil.unwrapAndThrowException(e);
       return null;
@@ -280,12 +317,13 @@ public class ApplicationClientProtocolPBClientImpl
 
   @Override
   public RenewDelegationTokenResponse renewDelegationToken(
-      RenewDelegationTokenRequest request) throws YarnException, IOException {
-    RenewDelegationTokenRequestProto requestProto =
+      RenewDelegationTokenRequest request) throws YarnException,
+      IOException {
+    RenewDelegationTokenRequestProto requestProto = 
         ((RenewDelegationTokenRequestPBImpl) request).getProto();
     try {
-      return new RenewDelegationTokenResponsePBImpl(
-          proxy.renewDelegationToken(null, requestProto));
+      return new RenewDelegationTokenResponsePBImpl(proxy.renewDelegationToken(
+          null, requestProto));
     } catch (ServiceException e) {
       RPCUtil.unwrapAndThrowException(e);
       return null;
@@ -294,7 +332,8 @@ public class ApplicationClientProtocolPBClientImpl
 
   @Override
   public CancelDelegationTokenResponse cancelDelegationToken(
-      CancelDelegationTokenRequest request) throws YarnException, IOException {
+      CancelDelegationTokenRequest request) throws YarnException,
+      IOException {
     CancelDelegationTokenRequestProto requestProto =
         ((CancelDelegationTokenRequestPBImpl) request).getProto();
     try {
@@ -309,8 +348,8 @@ public class ApplicationClientProtocolPBClientImpl
   
   @Override
   public MoveApplicationAcrossQueuesResponse moveApplicationAcrossQueues(
-      MoveApplicationAcrossQueuesRequest request)
-      throws YarnException, IOException {
+      MoveApplicationAcrossQueuesRequest request) throws YarnException,
+      IOException {
     MoveApplicationAcrossQueuesRequestProto requestProto =
         ((MoveApplicationAcrossQueuesRequestPBImpl) request).getProto();
     try {
@@ -325,13 +364,13 @@ public class ApplicationClientProtocolPBClientImpl
   
   @Override
   public GetApplicationAttemptReportResponse getApplicationAttemptReport(
-      GetApplicationAttemptReportRequest request)
-      throws YarnException, IOException {
+      GetApplicationAttemptReportRequest request) throws YarnException,
+      IOException {
     GetApplicationAttemptReportRequestProto requestProto =
         ((GetApplicationAttemptReportRequestPBImpl) request).getProto();
     try {
       return new GetApplicationAttemptReportResponsePBImpl(
-          proxy.getApplicationAttemptReport(null, requestProto));
+        proxy.getApplicationAttemptReport(null, requestProto));
     } catch (ServiceException e) {
       RPCUtil.unwrapAndThrowException(e);
       return null;
@@ -345,7 +384,7 @@ public class ApplicationClientProtocolPBClientImpl
         ((GetApplicationAttemptsRequestPBImpl) request).getProto();
     try {
       return new GetApplicationAttemptsResponsePBImpl(
-          proxy.getApplicationAttempts(null, requestProto));
+        proxy.getApplicationAttempts(null, requestProto));
     } catch (ServiceException e) {
       RPCUtil.unwrapAndThrowException(e);
       return null;
@@ -358,8 +397,8 @@ public class ApplicationClientProtocolPBClientImpl
     GetContainerReportRequestProto requestProto =
         ((GetContainerReportRequestPBImpl) request).getProto();
     try {
-      return new GetContainerReportResponsePBImpl(
-          proxy.getContainerReport(null, requestProto));
+      return new GetContainerReportResponsePBImpl(proxy.getContainerReport(
+        null, requestProto));
     } catch (ServiceException e) {
       RPCUtil.unwrapAndThrowException(e);
       return null;
@@ -372,12 +411,100 @@ public class ApplicationClientProtocolPBClientImpl
     GetContainersRequestProto requestProto =
         ((GetContainersRequestPBImpl) request).getProto();
     try {
-      return new GetContainersResponsePBImpl(
-          proxy.getContainers(null, requestProto));
+      return new GetContainersResponsePBImpl(proxy.getContainers(null,
+        requestProto));
     } catch (ServiceException e) {
       RPCUtil.unwrapAndThrowException(e);
       return null;
     }
   }
 
+  @Override
+  public ReservationSubmissionResponse submitReservation(ReservationSubmissionRequest request)
+      throws YarnException, IOException {
+    ReservationSubmissionRequestProto requestProto =
+        ((ReservationSubmissionRequestPBImpl) request).getProto();
+    try {
+      return new ReservationSubmissionResponsePBImpl(proxy.submitReservation(null,
+          requestProto));
+    } catch (ServiceException e) {
+      RPCUtil.unwrapAndThrowException(e);
+      return null;
+    }
+  }
+
+  @Override
+  public ReservationUpdateResponse updateReservation(ReservationUpdateRequest request)
+      throws YarnException, IOException {
+    ReservationUpdateRequestProto requestProto =
+        ((ReservationUpdateRequestPBImpl) request).getProto();
+    try {
+      return new ReservationUpdateResponsePBImpl(proxy.updateReservation(null,
+          requestProto));
+    } catch (ServiceException e) {
+      RPCUtil.unwrapAndThrowException(e);
+      return null;
+    }
+  }
+
+  @Override
+  public ReservationDeleteResponse deleteReservation(ReservationDeleteRequest request)
+      throws YarnException, IOException {
+    ReservationDeleteRequestProto requestProto =
+        ((ReservationDeleteRequestPBImpl) request).getProto();
+    try {
+      return new ReservationDeleteResponsePBImpl(proxy.deleteReservation(null,
+          requestProto));
+    } catch (ServiceException e) {
+      RPCUtil.unwrapAndThrowException(e);
+      return null;
+    }
+  }
+
+
+  @Override
+  public GetNodesToLabelsResponse getNodeToLabels(
+      GetNodesToLabelsRequest request)
+      throws YarnException, IOException {
+    YarnServiceProtos.GetNodesToLabelsRequestProto
+        requestProto =
+        ((GetNodesToLabelsRequestPBImpl) request).getProto();
+    try {
+      return new GetNodesToLabelsResponsePBImpl(proxy.getNodeToLabels(
+          null, requestProto));
+    } catch (ServiceException e) {
+      RPCUtil.unwrapAndThrowException(e);
+      return null;
+    }
+  }
+
+  @Override
+  public GetLabelsToNodesResponse getLabelsToNodes(
+      GetLabelsToNodesRequest request)
+      throws YarnException, IOException {
+    YarnServiceProtos.GetLabelsToNodesRequestProto requestProto =
+        ((GetLabelsToNodesRequestPBImpl) request).getProto();
+    try {
+      return new GetLabelsToNodesResponsePBImpl(proxy.getLabelsToNodes(
+          null, requestProto));
+    } catch (ServiceException e) {
+      RPCUtil.unwrapAndThrowException(e);
+      return null;
+    }
+  }
+
+  @Override
+  public GetClusterNodeLabelsResponse getClusterNodeLabels(
+      GetClusterNodeLabelsRequest request) throws YarnException, IOException {
+      GetClusterNodeLabelsRequestProto
+        requestProto =
+        ((GetClusterNodeLabelsRequestPBImpl) request).getProto();
+    try {
+      return new GetClusterNodeLabelsResponsePBImpl(proxy.getClusterNodeLabels(
+          null, requestProto));
+    } catch (ServiceException e) {
+      RPCUtil.unwrapAndThrowException(e);
+      return null;
+    }
+  }
 }

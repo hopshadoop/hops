@@ -29,9 +29,6 @@ import java.util.TreeMap;
 import java.util.concurrent.TimeoutException;
 import java.util.zip.GZIPOutputStream;
 
-import junit.framework.Assert;
-import junit.framework.TestCase;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
@@ -60,7 +57,11 @@ import org.junit.Test;
 
 import com.google.common.collect.HashMultiset;
 
-public class TestCombineFileInputFormat extends TestCase {
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
+public class TestCombineFileInputFormat {
 
   private static final String rack1[] = new String[] {
     "/r1"
@@ -221,6 +222,7 @@ public class TestCombineFileInputFormat extends TestCase {
     }
   }
 
+  @Test
   public void testRecordReaderInit() throws InterruptedException, IOException {
     // Test that we properly initialize the child recordreader when
     // CombineFileInputFormat and CombineFileRecordReader are used.
@@ -258,6 +260,7 @@ public class TestCombineFileInputFormat extends TestCase {
       rr.getCurrentKey().toString());
   }
 
+  @Test
   public void testReinit() throws Exception {
     // Test that a split containing multiple files works correctly,
     // with the child RecordReader getting its initialize() method
@@ -296,6 +299,7 @@ public class TestCombineFileInputFormat extends TestCase {
     assertFalse(rr.nextKeyValue());
   }
 
+  @Test
   public void testSplitPlacement() throws Exception {
     MiniDFSCluster dfs = null;
     FileSystem fileSys = null;
@@ -725,6 +729,7 @@ public class TestCombineFileInputFormat extends TestCase {
     DFSTestUtil.waitReplication(fileSys, name, replication);
   }
 
+  @Test
   public void testNodeDistribution() throws IOException, InterruptedException {
     DummyInputFormat inFormat = new DummyInputFormat();
     int numBlocks = 60;
@@ -774,20 +779,21 @@ public class TestCombineFileInputFormat extends TestCase {
         maxSplitSize, minSizeNode, minSizeRack, splits);
 
     int expectedSplitCount = (int) (totLength / maxSplitSize);
-    Assert.assertEquals(expectedSplitCount, splits.size());
+    assertEquals(expectedSplitCount, splits.size());
 
     // Ensure 90+% of the splits have node local blocks.
     // 100% locality may not always be achieved.
     int numLocalSplits = 0;
     for (InputSplit inputSplit : splits) {
-      Assert.assertEquals(maxSplitSize, inputSplit.getLength());
+      assertEquals(maxSplitSize, inputSplit.getLength());
       if (inputSplit.getLocations().length == 1) {
         numLocalSplits++;
       }
     }
-    Assert.assertTrue(numLocalSplits >= 0.9 * splits.size());
+    assertTrue(numLocalSplits >= 0.9 * splits.size());
   }
-  
+
+  @Test
   public void testNodeInputSplit() throws IOException, InterruptedException {
     // Regression test for MAPREDUCE-4892. There are 2 nodes with all blocks on 
     // both nodes. The grouping ensures that both nodes get splits instead of 
@@ -826,18 +832,19 @@ public class TestCombineFileInputFormat extends TestCase {
                           maxSize, minSizeNode, minSizeRack, splits);
     
     int expectedSplitCount = (int)(totLength/maxSize);
-    Assert.assertEquals(expectedSplitCount, splits.size());
+    assertEquals(expectedSplitCount, splits.size());
     HashMultiset<String> nodeSplits = HashMultiset.create();
     for(int i=0; i<expectedSplitCount; ++i) {
       InputSplit inSplit = splits.get(i);
-      Assert.assertEquals(maxSize, inSplit.getLength());
-      Assert.assertEquals(1, inSplit.getLocations().length);
+      assertEquals(maxSize, inSplit.getLength());
+      assertEquals(1, inSplit.getLocations().length);
       nodeSplits.add(inSplit.getLocations()[0]);
     }
-    Assert.assertEquals(3, nodeSplits.count(locations[0]));
-    Assert.assertEquals(3, nodeSplits.count(locations[1]));
+    assertEquals(3, nodeSplits.count(locations[0]));
+    assertEquals(3, nodeSplits.count(locations[1]));
   }
-  
+
+  @Test
   public void testSplitPlacementForCompressedFiles() throws Exception {
     MiniDFSCluster dfs = null;
     FileSystem fileSys = null;
@@ -1190,6 +1197,7 @@ public class TestCombineFileInputFormat extends TestCase {
   /**
    * Test that CFIF can handle missing blocks.
    */
+  @Test
   public void testMissingBlocks() throws Exception {
     String namenode = null;
     MiniDFSCluster dfs = null;
@@ -1272,6 +1280,57 @@ public class TestCombineFileInputFormat extends TestCase {
     assertEquals(0, fileSplit.getLength(0));
 
     fileSys.delete(file.getParent(), true);
+  }
+
+  /**
+   * Test that directories do not get included as part of getSplits()
+   */
+  @Test
+  public void testGetSplitsWithDirectory() throws Exception {
+    MiniDFSCluster dfs = null;
+    try {
+      Configuration conf = new Configuration();
+      dfs = new MiniDFSCluster.Builder(conf).racks(rack1).hosts(hosts1)
+          .build();
+      dfs.waitActive();
+
+      FileSystem fileSys = dfs.getFileSystem();
+
+      // Set up the following directory structure:
+      // /dir1/: directory
+      // /dir1/file: regular file
+      // /dir1/dir2/: directory
+      Path dir1 = new Path("/dir1");
+      Path file = new Path("/dir1/file1");
+      Path dir2 = new Path("/dir1/dir2");
+      if (!fileSys.mkdirs(dir1)) {
+        throw new IOException("Mkdirs failed to create " + dir1.toString());
+      }
+      FSDataOutputStream out = fileSys.create(file);
+      out.write(new byte[0]);
+      out.close();
+      if (!fileSys.mkdirs(dir2)) {
+        throw new IOException("Mkdirs failed to create " + dir2.toString());
+      }
+
+      // split it using a CombinedFile input format
+      DummyInputFormat inFormat = new DummyInputFormat();
+      Job job = Job.getInstance(conf);
+      FileInputFormat.setInputPaths(job, "/dir1");
+      List<InputSplit> splits = inFormat.getSplits(job);
+
+      // directories should be omitted from getSplits() - we should only see file1 and not dir2
+      assertEquals(1, splits.size());
+      CombineFileSplit fileSplit = (CombineFileSplit) splits.get(0);
+      assertEquals(1, fileSplit.getNumPaths());
+      assertEquals(file.getName(), fileSplit.getPath(0).getName());
+      assertEquals(0, fileSplit.getOffset(0));
+      assertEquals(0, fileSplit.getLength(0));
+    } finally {
+      if (dfs != null) {
+        dfs.shutdown();
+      }
+    }
   }
 
   /**

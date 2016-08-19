@@ -18,9 +18,12 @@
 
 package org.apache.hadoop.yarn.api;
 
+import java.io.IOException;
+
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Stable;
 import org.apache.hadoop.io.retry.AtMostOnce;
+import org.apache.hadoop.io.retry.Idempotent;
 import org.apache.hadoop.yarn.api.protocolrecords.AllocateRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.AllocateResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.FinishApplicationMasterRequest;
@@ -35,12 +38,10 @@ import org.apache.hadoop.yarn.exceptions.InvalidResourceBlacklistRequestExceptio
 import org.apache.hadoop.yarn.exceptions.InvalidResourceRequestException;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 
-import java.io.IOException;
-
 /**
- * <p>The protocol between a live instance of <code>ApplicationMaster</code>
+ * <p>The protocol between a live instance of <code>ApplicationMaster</code> 
  * and the <code>ResourceManager</code>.</p>
- * <p/>
+ * 
  * <p>This is used by the <code>ApplicationMaster</code> to register/unregister
  * and to request and obtain resources in the cluster from the
  * <code>ResourceManager</code>.</p>
@@ -51,54 +52,52 @@ public interface ApplicationMasterProtocol {
 
   /**
    * <p>
-   * The interface used by a new <code>ApplicationMaster</code> to register
-   * with
+   * The interface used by a new <code>ApplicationMaster</code> to register with
    * the <code>ResourceManager</code>.
    * </p>
-   * <p/>
+   * 
    * <p>
    * The <code>ApplicationMaster</code> needs to provide details such as RPC
    * Port, HTTP tracking url etc. as specified in
    * {@link RegisterApplicationMasterRequest}.
    * </p>
-   * <p/>
+   * 
    * <p>
    * The <code>ResourceManager</code> responds with critical details such as
    * maximum resource capabilities in the cluster as specified in
    * {@link RegisterApplicationMasterResponse}.
    * </p>
-   *
+   * 
    * @param request
-   *     registration request
+   *          registration request
    * @return registration respose
    * @throws YarnException
    * @throws IOException
    * @throws InvalidApplicationMasterRequestException
-   *     The exception is thrown when an ApplicationMaster tries to
-   *     register more then once.
+   *           The exception is thrown when an ApplicationMaster tries to
+   *           register more then once.
    * @see RegisterApplicationMasterRequest
    * @see RegisterApplicationMasterResponse
    */
-  //TODO make this idempotent
   @Public
   @Stable
+  @Idempotent
   public RegisterApplicationMasterResponse registerApplicationMaster(
-      RegisterApplicationMasterRequest request)
-      throws YarnException, IOException;
+      RegisterApplicationMasterRequest request) 
+  throws YarnException, IOException;
   
   /**
-   * <p>The interface used by an <code>ApplicationMaster</code> to notify the
+   * <p>The interface used by an <code>ApplicationMaster</code> to notify the 
    * <code>ResourceManager</code> about its completion (success or failed).</p>
-   * <p/>
-   * <p>The <code>ApplicationMaster</code> has to provide details such as
-   * final state, diagnostics (in case of failures) etc. as specified in
+   * 
+   * <p>The <code>ApplicationMaster</code> has to provide details such as 
+   * final state, diagnostics (in case of failures) etc. as specified in 
    * {@link FinishApplicationMasterRequest}.</p>
-   * <p/>
-   * <p>The <code>ResourceManager</code> responds with
+   * 
+   * <p>The <code>ResourceManager</code> responds with 
    * {@link FinishApplicationMasterResponse}.</p>
-   *
-   * @param request
-   *     completion request
+   * 
+   * @param request completion request
    * @return completion response
    * @throws YarnException
    * @throws IOException
@@ -107,25 +106,25 @@ public interface ApplicationMasterProtocol {
    */
   @Public
   @Stable
-  //TODO make this idempotent
+  @AtMostOnce
   public FinishApplicationMasterResponse finishApplicationMaster(
-      FinishApplicationMasterRequest request) throws YarnException, IOException;
+      FinishApplicationMasterRequest request) 
+  throws YarnException, IOException;
 
   /**
    * <p>
    * The main interface between an <code>ApplicationMaster</code> and the
    * <code>ResourceManager</code>.
    * </p>
-   * <p/>
+   * 
    * <p>
-   * The <code>ApplicationMaster</code> uses this interface to provide a list
-   * of
+   * The <code>ApplicationMaster</code> uses this interface to provide a list of
    * {@link ResourceRequest} and returns unused {@link Container} allocated to
    * it via {@link AllocateRequest}. Optionally, the
    * <code>ApplicationMaster</code> can also <em>blacklist</em> resources which
    * it doesn't want to use.
    * </p>
-   * <p/>
+   * 
    * <p>
    * This also doubles up as a <em>heartbeat</em> to let the
    * <code>ResourceManager</code> know that the <code>ApplicationMaster</code>
@@ -134,41 +133,40 @@ public interface ApplicationMasterProtocol {
    * {@link YarnConfiguration#RM_AM_EXPIRY_INTERVAL_MS} which defaults to
    * {@link YarnConfiguration#DEFAULT_RM_AM_EXPIRY_INTERVAL_MS}.
    * </p>
-   * <p/>
+   * 
    * <p>
    * The <code>ResourceManager</code> responds with list of allocated
    * {@link Container}, status of completed containers and headroom information
    * for the application.
    * </p>
-   * <p/>
+   * 
    * <p>
    * The <code>ApplicationMaster</code> can use the available headroom
-   * (resources) to decide how to utilized allocated resources and make
-   * informed
+   * (resources) to decide how to utilized allocated resources and make informed
    * decisions about future resource requests.
    * </p>
-   *
+   * 
    * @param request
-   *     allocation request
+   *          allocation request
    * @return allocation response
    * @throws YarnException
    * @throws IOException
    * @throws InvalidApplicationMasterRequestException
-   *     This exception is thrown when an ApplicationMaster calls allocate
-   *     without registering first.
+   *           This exception is thrown when an ApplicationMaster calls allocate
+   *           without registering first.
    * @throws InvalidResourceBlacklistRequestException
-   *     This exception is thrown when an application provides an invalid
-   *     specification for blacklist of resources.
+   *           This exception is thrown when an application provides an invalid
+   *           specification for blacklist of resources.
    * @throws InvalidResourceRequestException
-   *     This exception is thrown when a {@link ResourceRequest} is out of
-   *     the range of the configured lower and upper limits on the
-   *     resources.
+   *           This exception is thrown when a {@link ResourceRequest} is out of
+   *           the range of the configured lower and upper limits on the
+   *           resources.
    * @see AllocateRequest
    * @see AllocateResponse
    */
   @Public
   @Stable
   @AtMostOnce
-  public AllocateResponse allocate(AllocateRequest request)
-      throws YarnException, IOException;
+  public AllocateResponse allocate(AllocateRequest request) 
+  throws YarnException, IOException;
 }

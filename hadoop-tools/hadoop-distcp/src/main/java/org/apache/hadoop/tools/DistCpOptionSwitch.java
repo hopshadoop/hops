@@ -37,16 +37,23 @@ public enum DistCpOptionSwitch {
   /**
    * Preserves status of file/path in the target.
    * Default behavior with -p, is to preserve replication,
-   * block size, user, group, permission and checksum type on the target file.
-   * Note that when preserving checksum type, block size is also preserved.
+   * block size, user, group, permission, checksum type and timestamps on the 
+   * target file. Note that when preserving checksum type, block size is also 
+   * preserved.
    *
-   * If any of the optional switches are present among rbugpc, then
+   * If any of the optional switches are present among rbugpcaxt, then
    * only the corresponding file attribute is preserved.
-   *
    */
   PRESERVE_STATUS(DistCpConstants.CONF_LABEL_PRESERVE_STATUS,
-      new Option("p", true, "preserve status (rbugpc)" +
-          "(replication, block-size, user, group, permission, checksum-type)")),
+      new Option("p", true, "preserve status (rbugpcaxt)(replication, " +
+          "block-size, user, group, permission, checksum-type, ACL, XATTR, " +
+          "timestamps). If -p is specified with no <arg>, then preserves " +
+          "replication, block size, user, group, permission, checksum type " +
+          "and timestamps. " +
+          "raw.* xattrs are preserved when both the source and destination " +
+          "paths are in the /.reserved/raw hierarchy (HDFS only). raw.* xattr" +
+          "preservation is independent of the -p flag. " +
+          "Refer to the DistCp documentation for more details.")),
 
   /**
    * Update target location by copying only files that are missing
@@ -96,7 +103,7 @@ public enum DistCpOptionSwitch {
    * Copy all the source files and commit them atomically to the target
    * This is typically useful in cases where there is a process
    * polling for availability of a file/dir. This option is incompatible
-   * with SYNC_FOLDERS & DELETE_MISSING
+   * with SYNC_FOLDERS and DELETE_MISSING
    */
   ATOMIC_COMMIT(DistCpConstants.CONF_LABEL_ATOMIC_COPY,
       new Option("atomic", false, "Commit all changes or none")),
@@ -136,6 +143,15 @@ public enum DistCpOptionSwitch {
       new Option("overwrite", false, "Choose to overwrite target files " +
           "unconditionally, even if they exist.")),
 
+  APPEND(DistCpConstants.CONF_LABEL_APPEND,
+      new Option("append", false,
+          "Reuse existing data in target files and append new data to them if possible")),
+
+  DIFF(DistCpConstants.CONF_LABEL_DIFF,
+      new Option("diff", false,
+      "Use snapshot diff report to identify the difference between source and target"),
+      2),
+
   /**
    * Should DisctpExecution be blocking
    */
@@ -156,12 +172,18 @@ public enum DistCpOptionSwitch {
   BANDWIDTH(DistCpConstants.CONF_LABEL_BANDWIDTH_MB,
       new Option("bandwidth", true, "Specify bandwidth per map in MB"));
 
+  public static final String PRESERVE_STATUS_DEFAULT = "-prbugpct";
   private final String confLabel;
   private final Option option;
 
   DistCpOptionSwitch(String confLabel, Option option) {
     this.confLabel = confLabel;
     this.option = option;
+  }
+
+  DistCpOptionSwitch(String confLabel, Option option, int argNum) {
+    this(confLabel, option);
+    this.option.setArgs(argNum);
   }
 
   /**

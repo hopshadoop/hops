@@ -18,6 +18,7 @@
 package org.apache.hadoop.yarn.client;
 
 
+
 import org.apache.hadoop.security.proto.SecurityProtos.CancelDelegationTokenRequestProto;
 import org.apache.hadoop.security.proto.SecurityProtos.RenewDelegationTokenRequestProto;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.CancelDelegationTokenRequestPBImpl;
@@ -29,16 +30,12 @@ import org.apache.hadoop.yarn.api.records.Token;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
 import org.junit.Test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNotSame;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 
 public class TestYarnApiClasses {
-  private final org.apache.hadoop.yarn.factories.RecordFactory recordFactory =
-      RecordFactoryProvider.getRecordFactory(null);
+  private final org.apache.hadoop.yarn.factories.RecordFactory recordFactory = RecordFactoryProvider
+          .getRecordFactory(null);
 
   /**
    * Simple test Resource request.
@@ -50,11 +47,9 @@ public class TestYarnApiClasses {
     Resource resource = recordFactory.newRecordInstance(Resource.class);
     Priority priority = recordFactory.newRecordInstance(Priority.class);
 
-    ResourceRequest original =
-        ResourceRequest.newInstance(priority, "localhost", resource, 2);
+    ResourceRequest original = ResourceRequest.newInstance(priority, "localhost", resource, 2) ;
 
-    ResourceRequest copy =
-        ResourceRequest.newInstance(priority, "localhost", resource, 2);
+    ResourceRequest copy = ResourceRequest.newInstance(priority, "localhost", resource, 2);
 
     assertTrue(original.equals(copy));
     assertEquals(0, original.compareTo(copy));
@@ -69,21 +64,19 @@ public class TestYarnApiClasses {
   }
 
   /**
-   * Test CancelDelegationTokenRequestPBImpl.
-   * Test a transformation to prototype and back
-   */
+  * Test CancelDelegationTokenRequestPBImpl.
+  * Test a transformation to prototype and back
+  */
   @Test
   public void testCancelDelegationTokenRequestPBImpl() {
 
     Token token = getDelegationToken();
 
-    CancelDelegationTokenRequestPBImpl original =
-        new CancelDelegationTokenRequestPBImpl();
+    CancelDelegationTokenRequestPBImpl original = new CancelDelegationTokenRequestPBImpl();
     original.setDelegationToken(token);
     CancelDelegationTokenRequestProto protoType = original.getProto();
 
-    CancelDelegationTokenRequestPBImpl copy =
-        new CancelDelegationTokenRequestPBImpl(protoType);
+    CancelDelegationTokenRequestPBImpl copy = new CancelDelegationTokenRequestPBImpl(protoType);
     assertNotNull(copy.getDelegationToken());
     //compare source and converted
     assertEquals(token, copy.getDelegationToken());
@@ -91,29 +84,27 @@ public class TestYarnApiClasses {
   }
 
   /**
-   * Test RenewDelegationTokenRequestPBImpl.
-   * Test a transformation to prototype and back
-   */
+  * Test RenewDelegationTokenRequestPBImpl.
+  * Test a transformation to prototype and back
+  */
 
   @Test
   public void testRenewDelegationTokenRequestPBImpl() {
 
     Token token = getDelegationToken();
 
-    RenewDelegationTokenRequestPBImpl original =
-        new RenewDelegationTokenRequestPBImpl();
+    RenewDelegationTokenRequestPBImpl original = new RenewDelegationTokenRequestPBImpl();
     original.setDelegationToken(token);
     RenewDelegationTokenRequestProto protoType = original.getProto();
 
-    RenewDelegationTokenRequestPBImpl copy =
-        new RenewDelegationTokenRequestPBImpl(protoType);
+    RenewDelegationTokenRequestPBImpl copy = new RenewDelegationTokenRequestPBImpl(protoType);
     assertNotNull(copy.getDelegationToken());
     //compare source and converted
     assertEquals(token, copy.getDelegationToken());
 
   }
 
-
+ 
   private Token getDelegationToken() {
     return Token.newInstance(new byte[0], "", new byte[0], "");
   }

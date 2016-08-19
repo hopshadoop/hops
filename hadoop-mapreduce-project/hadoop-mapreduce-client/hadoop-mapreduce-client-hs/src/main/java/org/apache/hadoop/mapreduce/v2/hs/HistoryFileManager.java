@@ -263,6 +263,10 @@ public class HistoryFileManager extends AbstractService {
     public HistoryFileInfo get(JobId jobId) {
       return cache.get(jobId);
     }
+
+    public boolean isFull() {
+      return cache.size() >= maxSize;
+    }
   }
 
   /**
@@ -299,8 +303,9 @@ public class HistoryFileManager extends AbstractService {
     private JobIndexInfo jobIndexInfo;
     private HistoryInfoState state;
 
-    private HistoryFileInfo(Path historyFile, Path confFile, Path summaryFile,
-        JobIndexInfo jobIndexInfo, boolean isInDone) {
+    @VisibleForTesting
+    protected HistoryFileInfo(Path historyFile, Path confFile,
+        Path summaryFile, JobIndexInfo jobIndexInfo, boolean isInDone) {
       this.historyFile = historyFile;
       this.confFile = confFile;
       this.summaryFile = summaryFile;
@@ -333,7 +338,8 @@ public class HistoryFileManager extends AbstractService {
              + " historyFile = " + historyFile;
     }
 
-    private synchronized void moveToDone() throws IOException {
+    @VisibleForTesting
+    synchronized void moveToDone() throws IOException {
       if (LOG.isDebugEnabled()) {
         LOG.debug("moveToDone: " + historyFile);
       }
@@ -364,7 +370,8 @@ public class HistoryFileManager extends AbstractService {
           paths.add(confFile);
         }
 
-        if (summaryFile == null) {
+        if (summaryFile == null || !intermediateDoneDirFc.util().exists(
+            summaryFile)) {
           LOG.info("No summary file for job: " + jobId);
         } else {
           String jobSummaryString = getJobSummary(intermediateDoneDirFc,
@@ -668,6 +675,10 @@ public class HistoryFileManager extends AbstractService {
     for (FileStatus fs : timestampedDirList) {
       // TODO Could verify the correct format for these directories.
       addDirectoryToSerialNumberIndex(fs.getPath());
+    }
+    for (int i= timestampedDirList.size() - 1;
+        i >= 0 && !jobListCache.isFull(); i--) {
+      FileStatus fs = timestampedDirList.get(i); 
       addDirectoryToJobListCache(fs.getPath());
     }
   }
@@ -732,17 +743,22 @@ public class HistoryFileManager extends AbstractService {
     }
   }
 
-  private static List<FileStatus> scanDirectory(Path path, FileContext fc,
+  @VisibleForTesting
+  protected static List<FileStatus> scanDirectory(Path path, FileContext fc,
       PathFilter pathFilter) throws IOException {
     path = fc.makeQualified(path);
     List<FileStatus> jhStatusList = new ArrayList<FileStatus>();
-    RemoteIterator<FileStatus> fileStatusIter = fc.listStatus(path);
-    while (fileStatusIter.hasNext()) {
-      FileStatus fileStatus = fileStatusIter.next();
-      Path filePath = fileStatus.getPath();
-      if (fileStatus.isFile() && pathFilter.accept(filePath)) {
-        jhStatusList.add(fileStatus);
+    try {
+      RemoteIterator<FileStatus> fileStatusIter = fc.listStatus(path);
+      while (fileStatusIter.hasNext()) {
+        FileStatus fileStatus = fileStatusIter.next();
+        Path filePath = fileStatus.getPath();
+        if (fileStatus.isFile() && pathFilter.accept(filePath)) {
+          jhStatusList.add(fileStatus);
+        }
       }
+    } catch (FileNotFoundException fe) {
+      LOG.error("Error while scanning directory " + path, fe);
     }
     return jhStatusList;
   }
@@ -848,7 +864,7 @@ public class HistoryFileManager extends AbstractService {
             }
           });
         }
-      } else if (old != null && !old.isMovePending()) {
+      } else if (!old.isMovePending()) {
         //This is a duplicate so just delete it
         if (LOG.isDebugEnabled()) {
           LOG.debug("Duplicate: deleting");
@@ -950,9 +966,16 @@ public class HistoryFileManager extends AbstractService {
 
   private String getJobSummary(FileContext fc, Path path) throws IOException {
     Path qPath = fc.makeQualified(path);
-    FSDataInputStream in = fc.open(qPath);
-    String jobSummaryString = in.readUTF();
-    in.close();
+    FSDataInputStream in = null;
+    String jobSummaryString = null;
+    try {
+      in = fc.open(qPath);
+      jobSummaryString = in.readUTF();
+    } finally {
+      if (in != null) {
+        in.close();
+      }
+    }
     return jobSummaryString;
   }
 

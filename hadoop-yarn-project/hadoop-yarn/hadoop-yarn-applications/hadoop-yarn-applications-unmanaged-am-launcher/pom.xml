@@ -13,8 +13,8 @@
   limitations under the License. See accompanying LICENSE file.
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
                       http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <artifactId>hadoop-yarn-applications</artifactId>
@@ -50,24 +50,6 @@
       <groupId>io.hops</groupId>
       <artifactId>hadoop-common</artifactId>
       <scope>provided</scope>
-      <exclusions>
-        <exclusion>
-          <groupId>commons-el</groupId>
-          <artifactId>commons-el</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>tomcat</groupId>
-          <artifactId>jasper-runtime</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>tomcat</groupId>
-          <artifactId>jasper-compiler</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.mortbay.jetty</groupId>
-          <artifactId>jsp-2.1-jetty</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
@@ -102,13 +84,11 @@
       <plugin>
         <artifactId>maven-jar-plugin</artifactId>
         <configuration>
-          <archive>
-            <manifest>
-              <mainClass>
-                org.apache.hadoop.yarn.applications.unmanagedamlauncher.UnmanagedAMLauncher
-              </mainClass>
-            </manifest>
-          </archive>
+           <archive>
+             <manifest>
+               <mainClass>org.apache.hadoop.yarn.applications.unmanagedamlauncher.UnmanagedAMLauncher</mainClass>
+             </manifest>
+           </archive>
         </configuration>
       </plugin>
       <plugin>
@@ -118,7 +98,7 @@
           <environmentVariables>
             <JAVA_HOME>${java.home}</JAVA_HOME>
           </environmentVariables>
-        </configuration>
+       </configuration>
       </plugin>
     </plugins>
   </build>

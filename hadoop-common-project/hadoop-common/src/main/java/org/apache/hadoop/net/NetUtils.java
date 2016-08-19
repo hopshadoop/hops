@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.net;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -188,6 +189,7 @@ public class NetUtils {
       throw new IllegalArgumentException("Target address cannot be null." +
           helpText);
     }
+    target = target.trim();
     boolean hasScheme = target.contains("://");    
     URI uri = null;
     try {
@@ -286,8 +288,8 @@ public class NetUtils {
     if (fqHost == null) {
       try {
         fqHost = SecurityUtil.getByName(host).getHostName();
-        // slight race condition, but won't hurt 
-        canonicalizedHostCache.put(host, fqHost);
+        // slight race condition, but won't hurt
+        canonicalizedHostCache.putIfAbsent(host, fqHost);
       } catch (UnknownHostException e) {
         fqHost = host;
       }
@@ -558,10 +560,6 @@ public class NetUtils {
    */
   public static String normalizeHostName(String name) {
     try {
-      //trick to make sls more efficient
-      if (name.contains(".smile.com")) {
-        return "72.52.4.119";
-      }
       return InetAddress.getByName(name).getHostAddress();
     } catch (UnknownHostException e) {
       return name;
@@ -720,7 +718,7 @@ public class NetUtils {
                                           final int localPort,
                                           final IOException exception) {
     if (exception instanceof BindException) {
-      return new BindException(
+      return wrapWithMessage(exception,
           "Problem binding to ["
               + localHost
               + ":"
@@ -763,6 +761,13 @@ public class NetUtils {
               + " failed on socket timeout exception: " + exception
               + ";"
               + see("NoRouteToHost"));
+    } else if (exception instanceof EOFException) {
+      return wrapWithMessage(exception,
+          "End of File Exception between "
+              + getHostDetailsAsString(destHost,  destPort, localHost)
+              + ": " + exception
+              + ";"
+              + see("EOFException"));
     }
     else {
       return (IOException) new IOException("Failed on local exception: "

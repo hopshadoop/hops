@@ -18,10 +18,11 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair;
 
-import io.hops.metadata.util.RMStorageFactory;
-import io.hops.metadata.util.RMUtilities;
-import io.hops.metadata.util.YarnAPIStorageFactory;
-import junit.framework.Assert;
+import java.io.File;
+import java.io.IOException;
+
+import org.junit.Assert;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.event.AsyncDispatcher;
@@ -30,9 +31,6 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-
-import java.io.File;
-import java.io.IOException;
 
 public class TestFairSchedulerEventLog {
   private File logFile;
@@ -50,14 +48,12 @@ public class TestFairSchedulerEventLog {
 
     // All tests assume only one assignment per node update
     conf.set(FairSchedulerConfiguration.ASSIGN_MULTIPLE, "false");
-    YarnAPIStorageFactory.setConfiguration(conf);
-    RMStorageFactory.setConfiguration(conf);
-    RMUtilities.InitializeDB();
-    
     resourceManager = new ResourceManager();
     resourceManager.init(conf);
-    ((AsyncDispatcher) resourceManager.getRMContext().getDispatcher()).start();
-    scheduler.reinitialize(conf, resourceManager.getRMContext(), null);
+    ((AsyncDispatcher)resourceManager.getRMContext().getDispatcher()).start();
+    scheduler.init(conf);
+    scheduler.start();
+    scheduler.reinitialize(conf, resourceManager.getRMContext());
   }
 
   /**
@@ -75,7 +71,13 @@ public class TestFairSchedulerEventLog {
   public void tearDown() {
     logFile.delete();
     logFile.getParentFile().delete(); // fairscheduler/
-    scheduler = null;
-    resourceManager = null;
+    if (scheduler != null) {
+      scheduler.stop();
+      scheduler = null;
+    }
+    if (resourceManager != null) {
+      resourceManager.stop();
+      resourceManager = null;
+    }
   }
 }

@@ -17,6 +17,12 @@
  */
 package org.apache.hadoop.yarn.server.api.protocolrecords.impl.pb;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.ResourceOption;
 import org.apache.hadoop.yarn.api.records.impl.pb.NodeIdPBImpl;
@@ -28,15 +34,9 @@ import org.apache.hadoop.yarn.proto.YarnServerResourceManagerServiceProtos.Updat
 import org.apache.hadoop.yarn.proto.YarnServerResourceManagerServiceProtos.UpdateNodeResourceRequestProtoOrBuilder;
 import org.apache.hadoop.yarn.server.api.protocolrecords.UpdateNodeResourceRequest;
 
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-
 public class UpdateNodeResourceRequestPBImpl extends UpdateNodeResourceRequest {
 
-  UpdateNodeResourceRequestProto proto =
-      UpdateNodeResourceRequestProto.getDefaultInstance();
+  UpdateNodeResourceRequestProto proto = UpdateNodeResourceRequestProto.getDefaultInstance();
   UpdateNodeResourceRequestProto.Builder builder = null;
   boolean viaProto = false;
   
@@ -81,9 +81,8 @@ public class UpdateNodeResourceRequestPBImpl extends UpdateNodeResourceRequest {
   }
 
   private void mergeLocalToProto() {
-    if (viaProto) {
+    if (viaProto) 
       maybeInitBuilder();
-    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
@@ -95,11 +94,11 @@ public class UpdateNodeResourceRequestPBImpl extends UpdateNodeResourceRequest {
     }
     UpdateNodeResourceRequestProtoOrBuilder p = viaProto ? proto : builder;
     List<NodeResourceMapProto> list = p.getNodeResourceMapList();
-    this.nodeResourceMap = new HashMap<NodeId, ResourceOption>(list.size());
+    this.nodeResourceMap = new HashMap<NodeId, ResourceOption>(list
+        .size());
     for (NodeResourceMapProto nodeResourceProto : list) {
-      this.nodeResourceMap
-          .put(convertFromProtoFormat(nodeResourceProto.getNodeId()),
-              convertFromProtoFormat(nodeResourceProto.getResourceOption()));
+      this.nodeResourceMap.put(convertFromProtoFormat(nodeResourceProto.getNodeId()), 
+          convertFromProtoFormat(nodeResourceProto.getResourceOption()));
     }
   }
   
@@ -111,7 +110,7 @@ public class UpdateNodeResourceRequestPBImpl extends UpdateNodeResourceRequest {
   }
   
   private NodeIdProto convertToProtoFormat(NodeId nodeId) {
-    return ((NodeIdPBImpl) nodeId).getProto();
+    return ((NodeIdPBImpl)nodeId).getProto();
   }
   
   private NodeId convertFromProtoFormat(NodeIdProto proto) {
@@ -123,7 +122,7 @@ public class UpdateNodeResourceRequestPBImpl extends UpdateNodeResourceRequest {
   }
   
   private ResourceOptionProto convertToProtoFormat(ResourceOption c) {
-    return ((ResourceOptionPBImpl) c).getProto();
+    return ((ResourceOptionPBImpl)c).getProto();
   }
   
   private void addNodeResourceMap() {
@@ -132,37 +131,50 @@ public class UpdateNodeResourceRequestPBImpl extends UpdateNodeResourceRequest {
     if (nodeResourceMap == null) {
       return;
     }
-    Iterable<? extends NodeResourceMapProto> values =
-        new Iterable<NodeResourceMapProto>() {
+    Iterable<? extends NodeResourceMapProto> values
+        = new Iterable<NodeResourceMapProto>() {
+
+      @Override
+      public Iterator<NodeResourceMapProto> iterator() {
+        return new Iterator<NodeResourceMapProto>() {
+          Iterator<NodeId> nodeIterator = nodeResourceMap
+              .keySet().iterator();
 
           @Override
-          public Iterator<NodeResourceMapProto> iterator() {
-            return new Iterator<NodeResourceMapProto>() {
-              Iterator<NodeId> nodeIterator =
-                  nodeResourceMap.keySet().iterator();
+          public boolean hasNext() {
+            return nodeIterator.hasNext();
+          }
 
-              @Override
-              public boolean hasNext() {
-                return nodeIterator.hasNext();
-              }
+          @Override
+          public NodeResourceMapProto next() {
+            NodeId nodeId = nodeIterator.next();
+            return NodeResourceMapProto.newBuilder().setNodeId(
+                convertToProtoFormat(nodeId)).setResourceOption(
+                convertToProtoFormat(nodeResourceMap.get(nodeId))).build();
+          }
 
-              @Override
-              public NodeResourceMapProto next() {
-                NodeId nodeId = nodeIterator.next();
-                return NodeResourceMapProto.newBuilder()
-                    .setNodeId(convertToProtoFormat(nodeId)).setResourceOption(
-                        convertToProtoFormat(nodeResourceMap.get(nodeId)))
-                    .build();
-              }
-
-              @Override
-              public void remove() {
-                throw new UnsupportedOperationException();
-              }
-            };
+          @Override
+          public void remove() {
+            throw new UnsupportedOperationException();
           }
         };
+      }
+    };
     this.builder.addAllNodeResourceMap(values);
   }
-  
+
+  @Override
+  public int hashCode() {
+    return getProto().hashCode();
+  }
+
+  @Override
+  public boolean equals(Object other) {
+    if (other == null)
+      return false;
+    if (other.getClass().isAssignableFrom(this.getClass())) {
+      return this.getProto().equals(this.getClass().cast(other).getProto());
+    }
+    return false;
+  }
 }

@@ -42,6 +42,8 @@ public class DistCpConstants {
   public static final String CONF_LABEL_LOG_PATH = "distcp.log.path";
   public static final String CONF_LABEL_IGNORE_FAILURES = "distcp.ignore.failures";
   public static final String CONF_LABEL_PRESERVE_STATUS = "distcp.preserve.status";
+  public static final String CONF_LABEL_PRESERVE_RAWXATTRS =
+      "distcp.preserve.rawxattrs";
   public static final String CONF_LABEL_SYNC_FOLDERS = "distcp.sync.folders";
   public static final String CONF_LABEL_DELETE_MISSING = "distcp.delete.missing.source";
   public static final String CONF_LABEL_SSL_CONF = "distcp.keystore.resource";
@@ -50,8 +52,19 @@ public class DistCpConstants {
   public static final String CONF_LABEL_COPY_STRATEGY = "distcp.copy.strategy";
   public static final String CONF_LABEL_SKIP_CRC = "distcp.skip.crc";
   public static final String CONF_LABEL_OVERWRITE = "distcp.copy.overwrite";
+  public static final String CONF_LABEL_APPEND = "distcp.copy.append";
+  public static final String CONF_LABEL_DIFF = "distcp.copy.diff";
   public static final String CONF_LABEL_BANDWIDTH_MB = "distcp.map.bandwidth.mb";
-
+  
+  public static final String CONF_LABEL_MAX_CHUNKS_TOLERABLE =
+      "distcp.dynamic.max.chunks.tolerable";
+  public static final String CONF_LABEL_MAX_CHUNKS_IDEAL =
+      "distcp.dynamic.max.chunks.ideal";
+  public static final String CONF_LABEL_MIN_RECORDS_PER_CHUNK =
+      "distcp.dynamic.min.records_per_chunk";
+  public static final String CONF_LABEL_SPLIT_RATIO =
+      "distcp.dynamic.split.ratio";
+  
   /* Total bytes to be copied. Updated by copylisting. Unfiltered count */
   public static final String CONF_LABEL_TOTAL_BYTES_TO_BE_COPIED = "mapred.total.bytes.expected";
 
@@ -74,6 +87,9 @@ public class DistCpConstants {
    */
   public static final String CONF_LABEL_TARGET_FINAL_PATH = "distcp.target.final.path";
 
+  /* Boolean to indicate whether the target of distcp exists. */
+  public static final String CONF_LABEL_TARGET_PATH_EXISTS = "distcp.target.path.exists";
+  
   /**
    * DistCp job id for consumers of the Disctp 
    */
@@ -81,6 +97,9 @@ public class DistCpConstants {
 
   /* Meta folder where the job's intermediate data is kept */
   public static final String CONF_LABEL_META_FOLDER = "distcp.meta.folder";
+
+  /* DistCp CopyListing class override param */
+  public static final String CONF_LABEL_COPY_LISTING_CLASS = "distcp.copy.listing.class";
 
   /**
    * Conf label for SSL Trust-store location.
@@ -100,5 +119,22 @@ public class DistCpConstants {
   public static final int SUCCESS = 0;
   public static final int INVALID_ARGUMENT = -1;
   public static final int DUPLICATE_INPUT = -2;
+  public static final int ACLS_NOT_SUPPORTED = -3;
+  public static final int XATTRS_NOT_SUPPORTED = -4;
   public static final int UNKNOWN_ERROR = -999;
+  
+  /**
+   * Constants for DistCp default values of configurable values
+   */
+  public static final int MAX_CHUNKS_TOLERABLE_DEFAULT = 400;
+  public static final int MAX_CHUNKS_IDEAL_DEFAULT     = 100;
+  public static final int MIN_RECORDS_PER_CHUNK_DEFAULT = 5;
+  public static final int SPLIT_RATIO_DEFAULT  = 2;
+
+  /**
+   * Value of reserved raw HDFS directory when copying raw.* xattrs.
+   */
+  static final String HDFS_RESERVED_RAW_DIRECTORY_NAME = "/.reserved/raw";
+
+  static final String HDFS_DISTCP_DIFF_DIRECTORY_NAME = ".distcp.diff.tmp";
 }

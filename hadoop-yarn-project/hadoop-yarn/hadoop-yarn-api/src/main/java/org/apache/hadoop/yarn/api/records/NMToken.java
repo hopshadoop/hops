@@ -28,12 +28,10 @@ import org.apache.hadoop.yarn.util.Records;
 /**
  * <p>The NMToken is used for authenticating communication with
  * <code>NodeManager</code></p>
- * <p>It is issued by <code>ResourceMananger</code> when
- * <code>ApplicationMaster</code>
+ * <p>It is issued by <code>ResourceMananger</code> when <code>ApplicationMaster</code>
  * negotiates resource with <code>ResourceManager</code> and
  * validated on <code>NodeManager</code> side.</p>
- *
- * @see AllocateResponse#getNMTokens()
+ * @see  AllocateResponse#getNMTokens()
  */
 @Public
 @Stable
@@ -49,10 +47,8 @@ public abstract class NMToken {
   }
 
   /**
-   * Get the {@link NodeId} of the <code>NodeManager</code> for which the
-   * NMToken
+   * Get the {@link NodeId} of the <code>NodeManager</code> for which the NMToken
    * is used to authenticate.
-   *
    * @return the {@link NodeId} of the <code>NodeManager</code> for which the
    * NMToken is used to authenticate.
    */
@@ -66,9 +62,7 @@ public abstract class NMToken {
 
   /**
    * Get the {@link Token} used for authenticating with <code>NodeManager</code>
-   *
-   * @return the {@link Token} used for authenticating with
-   * <code>NodeManager</code>
+   * @return the {@link Token} used for authenticating with <code>NodeManager</code>
    */
   @Public
   @Stable
@@ -92,30 +86,23 @@ public abstract class NMToken {
 
   @Override
   public boolean equals(Object obj) {
-    if (this == obj) {
+    if (this == obj)
       return true;
-    }
-    if (obj == null) {
+    if (obj == null)
       return false;
-    }
-    if (getClass() != obj.getClass()) {
+    if (getClass() != obj.getClass())
       return false;
-    }
     NMToken other = (NMToken) obj;
     if (getNodeId() == null) {
-      if (other.getNodeId() != null) {
+      if (other.getNodeId() != null)
         return false;
-      }
-    } else if (!getNodeId().equals(other.getNodeId())) {
+    } else if (!getNodeId().equals(other.getNodeId()))
       return false;
-    }
     if (getToken() == null) {
-      if (other.getToken() != null) {
+      if (other.getToken() != null)
         return false;
-      }
-    } else if (!getToken().equals(other.getToken())) {
+    } else if (!getToken().equals(other.getToken()))
       return false;
-    }
     return true;
   }
 }

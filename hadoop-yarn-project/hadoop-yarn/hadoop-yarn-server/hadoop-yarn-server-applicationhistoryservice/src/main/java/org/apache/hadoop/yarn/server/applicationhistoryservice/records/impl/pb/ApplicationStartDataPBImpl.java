@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.yarn.server.applicationhistoryservice.records.impl.pb;
 
-import com.google.protobuf.TextFormat;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.impl.pb.ApplicationIdPBImpl;
 import org.apache.hadoop.yarn.proto.ApplicationHistoryServerProtos.ApplicationStartDataProto;
@@ -26,10 +25,12 @@ import org.apache.hadoop.yarn.proto.ApplicationHistoryServerProtos.ApplicationSt
 import org.apache.hadoop.yarn.proto.YarnProtos.ApplicationIdProto;
 import org.apache.hadoop.yarn.server.applicationhistoryservice.records.ApplicationStartData;
 
+import com.google.protobuf.TextFormat;
+
 public class ApplicationStartDataPBImpl extends ApplicationStartData {
 
-  ApplicationStartDataProto proto =
-      ApplicationStartDataProto.getDefaultInstance();
+  ApplicationStartDataProto proto = ApplicationStartDataProto
+    .getDefaultInstance();
   ApplicationStartDataProto.Builder builder = null;
   boolean viaProto = false;
 
@@ -180,9 +181,8 @@ public class ApplicationStartDataPBImpl extends ApplicationStartData {
 
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -195,9 +195,9 @@ public class ApplicationStartDataPBImpl extends ApplicationStartData {
   }
 
   private void mergeLocalToBuilder() {
-    if (this.applicationId != null &&
-        !((ApplicationIdPBImpl) this.applicationId).getProto()
-            .equals(builder.getApplicationId())) {
+    if (this.applicationId != null
+        && !((ApplicationIdPBImpl) this.applicationId).getProto().equals(
+          builder.getApplicationId())) {
       builder.setApplicationId(convertToProtoFormat(this.applicationId));
     }
   }

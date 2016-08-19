@@ -17,11 +17,11 @@
  */
 package org.apache.hadoop.yarn.server.applicationhistoryservice.webapp;
 
-import org.apache.hadoop.yarn.webapp.SubView;
-import org.apache.hadoop.yarn.webapp.log.AggregatedLogsBlock;
-
 import static org.apache.hadoop.yarn.webapp.YarnWebParams.CONTAINER_ID;
 import static org.apache.hadoop.yarn.webapp.YarnWebParams.ENTITY_STRING;
+
+import org.apache.hadoop.yarn.webapp.SubView;
+import org.apache.hadoop.yarn.webapp.log.AggregatedLogsBlock;
 
 public class AHSLogsPage extends AHSView {
   /*
@@ -45,7 +45,7 @@ public class AHSLogsPage extends AHSView {
 
   /**
    * The content of this page is the AggregatedLogsBlock
-   *
+   * 
    * @return AggregatedLogsBlock.class
    */
   @Override

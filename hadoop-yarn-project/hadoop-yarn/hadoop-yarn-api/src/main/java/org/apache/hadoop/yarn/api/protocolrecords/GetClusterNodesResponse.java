@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.yarn.api.protocolrecords;
 
+import java.util.List;
+
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Stable;
@@ -26,16 +28,14 @@ import org.apache.hadoop.yarn.api.ApplicationClientProtocol;
 import org.apache.hadoop.yarn.api.records.NodeReport;
 import org.apache.hadoop.yarn.util.Records;
 
-import java.util.List;
-
 /**
  * <p>The response sent by the <code>ResourceManager</code> to a client
  * requesting a {@link NodeReport} for all nodes.</p>
- * <p/>
- * <p>The <code>NodeReport</code> contains per-node information such as
+ * 
+ * <p>The <code>NodeReport</code> contains per-node information such as 
  * available resources, number of containers, tracking url, rack name, health
  * status etc.
- *
+ * 
  * @see NodeReport
  * @see ApplicationClientProtocol#getClusterNodes(GetClusterNodesRequest)
  */
@@ -45,8 +45,8 @@ public abstract class GetClusterNodesResponse {
 
   @Private
   @Unstable
-  public static GetClusterNodesResponse newInstance(
-      List<NodeReport> nodeReports) {
+  public static GetClusterNodesResponse
+      newInstance(List<NodeReport> nodeReports) {
     GetClusterNodesResponse response =
         Records.newRecord(GetClusterNodesResponse.class);
     response.setNodeReports(nodeReports);
@@ -55,7 +55,6 @@ public abstract class GetClusterNodesResponse {
 
   /**
    * Get <code>NodeReport</code> for all nodes in the cluster.
-   *
    * @return <code>NodeReport</code> for all nodes in the cluster
    */
   @Public

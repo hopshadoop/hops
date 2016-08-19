@@ -61,7 +61,8 @@ public class TestGangliaMetrics {
   public void testTagsForPrefix() throws Exception {
     ConfigBuilder cb = new ConfigBuilder()
       .add("test.sink.ganglia.tagsForPrefix.all", "*")
-      .add("test.sink.ganglia.tagsForPrefix.some", "NumActiveSinks, NumActiveSources")
+      .add("test.sink.ganglia.tagsForPrefix.some", "NumActiveSinks, " +
+              "NumActiveSources")
       .add("test.sink.ganglia.tagsForPrefix.none", "");
     GangliaSink30 sink = new GangliaSink30();
     sink.init(cb.subset("test.sink.ganglia"));

@@ -28,31 +28,32 @@ import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 @Unstable
 /**
  * Factory for {@link ConfigurationProvider} implementations.
- */ public class ConfigurationProviderFactory {
+ */
+public class ConfigurationProviderFactory {
   /**
    * Creates an instance of {@link ConfigurationProvider} using given
    * configuration.
-   *
    * @param bootstrapConf
    * @return configurationProvider
    */
   @SuppressWarnings("unchecked")
-  public static ConfigurationProvider getConfigurationProvider(
-      Configuration bootstrapConf) {
+  public static ConfigurationProvider
+      getConfigurationProvider(Configuration bootstrapConf) {
     Class<? extends ConfigurationProvider> defaultProviderClass;
     try {
-      defaultProviderClass = (Class<? extends ConfigurationProvider>) Class
-          .forName(YarnConfiguration.DEFAULT_RM_CONFIGURATION_PROVIDER_CLASS);
+      defaultProviderClass = (Class<? extends ConfigurationProvider>)
+          Class.forName(
+              YarnConfiguration.DEFAULT_RM_CONFIGURATION_PROVIDER_CLASS);
     } catch (Exception e) {
       throw new YarnRuntimeException(
-          "Invalid default configuration provider class" +
-              YarnConfiguration.DEFAULT_RM_CONFIGURATION_PROVIDER_CLASS, e);
+          "Invalid default configuration provider class"
+              + YarnConfiguration.DEFAULT_RM_CONFIGURATION_PROVIDER_CLASS, e);
     }
-    ConfigurationProvider configurationProvider = ReflectionUtils.newInstance(
-        bootstrapConf
-            .getClass(YarnConfiguration.RM_CONFIGURATION_PROVIDER_CLASS,
-                defaultProviderClass, ConfigurationProvider.class),
-        bootstrapConf);
+    ConfigurationProvider configurationProvider =
+        ReflectionUtils.newInstance(bootstrapConf.getClass(
+            YarnConfiguration.RM_CONFIGURATION_PROVIDER_CLASS,
+            defaultProviderClass, ConfigurationProvider.class),
+            bootstrapConf);
     return configurationProvider;
   }
 }

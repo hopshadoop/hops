@@ -18,19 +18,21 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair;
 
+import java.io.File;
+import java.io.IOException;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.log4j.DailyRollingFileAppender;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.log4j.PatternLayout;
 import org.apache.log4j.spi.LoggingEvent;
-
-import java.io.File;
-import java.io.IOException;
 
 /**
  * Event log used by the fair scheduler for machine-readable debug info.
@@ -44,7 +46,7 @@ import java.io.IOException;
  * internal scheduler variables, rather than trying to make the log human
  * readable. The fair scheduler also logs human readable messages in the
  * JobTracker's main log.
- * <p/>
+ *
  * Constructing this class creates a disabled log. It must be initialized
  * using {@link FairSchedulerEventLog#init(Configuration, String)} to begin
  * writing to the file.
@@ -52,12 +54,9 @@ import java.io.IOException;
 @Private
 @Unstable
 class FairSchedulerEventLog {
-  private static final Log LOG =
-      LogFactory.getLog(FairSchedulerEventLog.class.getName());
+  private static final Log LOG = LogFactory.getLog(FairSchedulerEventLog.class.getName());
 
-  /**
-   * Set to true if logging is disabled due to an error.
-   */
+  /** Set to true if logging is disabled due to an error. */
   private boolean logDisabled = true;
 
   /**
@@ -72,9 +71,7 @@ class FairSchedulerEventLog {
    */
   private String logFile;
 
-  /**
-   * Log4j appender used to write to the log file
-   */
+  /** Log4j appender used to write to the log file */
   private DailyRollingFileAppender appender;
 
   boolean init(FairSchedulerConfiguration conf) {
@@ -89,13 +86,11 @@ class FairSchedulerEventLog {
           }
         }
         String username = System.getProperty("user.name");
-        logFile = String
-            .format("%s%shadoop-%s-fairscheduler.log", logDir, File.separator,
-                username);
+        logFile = String.format("%s%shadoop-%s-fairscheduler.log",
+            logDir, File.separator, username);
         logDisabled = false;
         PatternLayout layout = new PatternLayout("%d{ISO8601}\t%m%n");
-        appender =
-            new DailyRollingFileAppender(layout, logFile, "'.'yyyy-MM-dd");
+        appender = new DailyRollingFileAppender(layout, logFile, "'.'yyyy-MM-dd");
         appender.activateOptions();
         LOG.info("Initialized fair scheduler event log, logging to " + logFile);
       } catch (IOException e) {
@@ -117,12 +112,11 @@ class FairSchedulerEventLog {
    */
   synchronized void log(String eventType, Object... params) {
     try {
-      if (logDisabled) {
+      if (logDisabled)
         return;
-      }
       StringBuffer buffer = new StringBuffer();
       buffer.append(eventType);
-      for (Object param : params) {
+      for (Object param: params) {
         buffer.append("\t");
         buffer.append(param);
       }
@@ -140,9 +134,8 @@ class FairSchedulerEventLog {
    */
   synchronized void shutdown() {
     try {
-      if (appender != null) {
+      if (appender != null)
         appender.close();
-      }
     } catch (Exception e) {
       LOG.error("Failed to close fair scheduler event log", e);
       logDisabled = true;

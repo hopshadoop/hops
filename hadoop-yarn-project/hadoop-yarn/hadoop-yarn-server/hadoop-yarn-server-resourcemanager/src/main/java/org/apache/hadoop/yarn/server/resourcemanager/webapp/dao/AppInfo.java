@@ -17,24 +17,30 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.webapp.dao;
 
-import com.google.common.base.Joiner;
-import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.hadoop.yarn.api.records.ApplicationResourceUsageReport;
-import org.apache.hadoop.yarn.api.records.Container;
-import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
-import org.apache.hadoop.yarn.api.records.Resource;
-import org.apache.hadoop.yarn.api.records.YarnApplicationState;
-import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
-import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
-import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
-import org.apache.hadoop.yarn.util.ConverterUtils;
-import org.apache.hadoop.yarn.util.Times;
-import org.apache.hadoop.yarn.webapp.util.WebAppUtils;
+import java.util.List;
 
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.XmlTransient;
+
+import org.apache.hadoop.yarn.api.records.ApplicationId;
+import org.apache.hadoop.yarn.api.records.ApplicationResourceUsageReport;
+import org.apache.hadoop.yarn.api.records.Container;
+import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
+import org.apache.hadoop.yarn.api.records.Resource;
+import org.apache.hadoop.yarn.api.records.ResourceRequest;
+import org.apache.hadoop.yarn.api.records.YarnApplicationState;
+import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppMetrics;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.AbstractYarnScheduler;
+import org.apache.hadoop.yarn.util.ConverterUtils;
+import org.apache.hadoop.yarn.util.Times;
+import org.apache.hadoop.yarn.webapp.util.WebAppUtils;
+
+import com.google.common.base.Joiner;
 
 @XmlRootElement(name = "app")
 @XmlAccessorType(XmlAccessType.FIELD)
@@ -77,26 +83,38 @@ public class AppInfo {
   protected int allocatedMB;
   protected int allocatedVCores;
   protected int runningContainers;
+  protected long memorySeconds;
+  protected long vcoreSeconds;
+  
+  // preemption info fields
+  protected int preemptedResourceMB;
+  protected int preemptedResourceVCores;
+  protected int numNonAMContainerPreempted;
+  protected int numAMContainerPreempted;
+
+  protected List<ResourceRequest> resourceRequests;
 
   public AppInfo() {
   } // JAXB needs this
 
-  public AppInfo(RMApp app, Boolean hasAccess, String schemePrefix) {
+  @SuppressWarnings({ "rawtypes", "unchecked" })
+  public AppInfo(ResourceManager rm, RMApp app, Boolean hasAccess,
+      String schemePrefix) {
     this.schemePrefix = schemePrefix;
     if (app != null) {
       String trackingUrl = app.getTrackingUrl();
       this.state = app.createApplicationState();
-      this.trackingUrlIsNotReady =
-          trackingUrl == null || trackingUrl.isEmpty() ||
-              YarnApplicationState.NEW == this.state ||
-              YarnApplicationState.NEW_SAVING == this.state ||
-              YarnApplicationState.SUBMITTED == this.state ||
-              YarnApplicationState.ACCEPTED == this.state;
-      this.trackingUI = this.trackingUrlIsNotReady ? "UNASSIGNED" :
-          (app.getFinishTime() == 0 ? "ApplicationMaster" : "History");
+      this.trackingUrlIsNotReady = trackingUrl == null || trackingUrl.isEmpty()
+          || YarnApplicationState.NEW == this.state
+          || YarnApplicationState.NEW_SAVING == this.state
+          || YarnApplicationState.SUBMITTED == this.state
+          || YarnApplicationState.ACCEPTED == this.state;
+      this.trackingUI = this.trackingUrlIsNotReady ? "UNASSIGNED" : (app
+          .getFinishTime() == 0 ? "ApplicationMaster" : "History");
       if (!trackingUrlIsNotReady) {
         this.trackingUrl =
-            WebAppUtils.getURLWithScheme(schemePrefix, trackingUrl);
+            WebAppUtils.getURLWithScheme(schemePrefix,
+                trackingUrl);
         this.trackingUrlPretty = this.trackingUrl;
       } else {
         this.trackingUrlPretty = "UNASSIGNED";
@@ -113,8 +131,7 @@ public class AppInfo {
       if (diagnostics == null || diagnostics.isEmpty()) {
         this.diagnostics = "";
       }
-      if (app.getApplicationTags() != null &&
-          !app.getApplicationTags().isEmpty()) {
+      if (app.getApplicationTags() != null && !app.getApplicationTags().isEmpty()) {
         this.applicationTags = Joiner.on(',').join(app.getApplicationTags());
       }
       this.finalStatus = app.getFinalApplicationStatus();
@@ -122,8 +139,8 @@ public class AppInfo {
       if (hasAccess) {
         this.startedTime = app.getStartTime();
         this.finishedTime = app.getFinishTime();
-        this.elapsedTime =
-            Times.elapsed(app.getStartTime(), app.getFinishTime());
+        this.elapsedTime = Times.elapsed(app.getStartTime(),
+            app.getFinishTime());
 
         RMAppAttempt attempt = app.getCurrentAppAttempt();
         if (attempt != null) {
@@ -137,16 +154,32 @@ public class AppInfo {
             this.amHostHttpAddress = masterContainer.getNodeHttpAddress();
           }
           
-          ApplicationResourceUsageReport resourceReport =
-              attempt.getApplicationResourceUsageReport();
+          ApplicationResourceUsageReport resourceReport = attempt
+              .getApplicationResourceUsageReport();
           if (resourceReport != null) {
             Resource usedResources = resourceReport.getUsedResources();
             allocatedMB = usedResources.getMemory();
             allocatedVCores = usedResources.getVirtualCores();
             runningContainers = resourceReport.getNumUsedContainers();
           }
+          resourceRequests =
+              ((AbstractYarnScheduler) rm.getRMContext().getScheduler())
+                .getPendingResourceRequestsForAttempt(attempt.getAppAttemptId());
         }
       }
+
+      // copy preemption info fields
+      RMAppMetrics appMetrics = app.getRMAppMetrics();
+      numAMContainerPreempted =
+          appMetrics.getNumAMContainersPreempted();
+      preemptedResourceMB =
+          appMetrics.getResourcePreempted().getMemory();
+      numNonAMContainerPreempted =
+          appMetrics.getNumNonAMContainersPreempted();
+      preemptedResourceVCores =
+          appMetrics.getResourcePreempted().getVirtualCores();
+      memorySeconds = appMetrics.getMemorySeconds();
+      vcoreSeconds = appMetrics.getVcoreSeconds();
     }
   }
 
@@ -178,8 +211,8 @@ public class AppInfo {
     return this.name;
   }
 
-  public String getState() {
-    return this.state.toString();
+  public YarnApplicationState getState() {
+    return this.state;
   }
 
   public float getProgress() {
@@ -194,8 +227,8 @@ public class AppInfo {
     return this.diagnostics;
   }
 
-  public String getFinalStatus() {
-    return this.finalStatus.toString();
+  public FinalApplicationStatus getFinalStatus() {
+    return this.finalStatus;
   }
 
   public String getTrackingUrl() {
@@ -254,4 +287,31 @@ public class AppInfo {
     return this.allocatedVCores;
   }
   
+  public int getPreemptedMB() {
+    return preemptedResourceMB;
+  }
+
+  public int getPreemptedVCores() {
+    return preemptedResourceVCores;
+  }
+
+  public int getNumNonAMContainersPreempted() {
+    return numNonAMContainerPreempted;
+  }
+  
+  public int getNumAMContainersPreempted() {
+    return numAMContainerPreempted;
+  }
+ 
+  public long getMemorySeconds() {
+    return memorySeconds;
+  }
+
+  public long getVcoreSeconds() {
+    return vcoreSeconds;
+  }
+
+  public List<ResourceRequest> getResourceRequests() {
+    return this.resourceRequests;
+  }
 }

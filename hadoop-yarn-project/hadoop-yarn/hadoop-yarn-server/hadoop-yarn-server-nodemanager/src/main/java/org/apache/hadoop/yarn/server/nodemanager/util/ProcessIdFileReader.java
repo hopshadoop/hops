@@ -17,16 +17,17 @@
  */
 package org.apache.hadoop.yarn.server.nodemanager.util;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.util.Shell;
 import org.apache.hadoop.yarn.util.ConverterUtils;
-
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
 
 /**
  * Helper functionality to read the pid from a file.
@@ -39,7 +40,6 @@ public class ProcessIdFileReader {
    * Get the process id from specified file path.
    * Parses each line to find a valid number
    * and returns the first one found.
-   *
    * @return Process Id if obtained from path specified else null
    * @throws IOException
    */
@@ -50,20 +50,20 @@ public class ProcessIdFileReader {
     
     LOG.debug("Accessing pid from pid file " + path);
     String processId = null;
-    FileReader fileReader = null;
     BufferedReader bufReader = null;
 
     try {
       File file = new File(path.toString());
       if (file.exists()) {
-        fileReader = new FileReader(file);
-        bufReader = new BufferedReader(fileReader);
+        FileInputStream fis = new FileInputStream(file);
+        bufReader = new BufferedReader(new InputStreamReader(fis, "UTF-8"));
+
         while (true) {
           String line = bufReader.readLine();
           if (line == null) {
             break;
           }
-          String temp = line.trim();
+          String temp = line.trim(); 
           if (!temp.isEmpty()) {
             if (Shell.WINDOWS) {
               // On Windows, pid is expected to be a container ID, so find first
@@ -75,7 +75,8 @@ public class ProcessIdFileReader {
               } catch (Exception e) {
                 // do nothing
               }
-            } else {
+            }
+            else {
               // Otherwise, find first line containing a numeric pid.
               try {
                 Long pid = Long.valueOf(temp);
@@ -91,16 +92,13 @@ public class ProcessIdFileReader {
         }
       }
     } finally {
-      if (fileReader != null) {
-        fileReader.close();
-      }
       if (bufReader != null) {
         bufReader.close();
       }
     }
-    LOG.debug(
-        "Got pid " + (processId != null ? processId : "null") + " from path " +
-            path);
+    LOG.debug("Got pid " 
+        + (processId != null? processId : "null")  
+        + " from path " + path);
     return processId;
   }
 

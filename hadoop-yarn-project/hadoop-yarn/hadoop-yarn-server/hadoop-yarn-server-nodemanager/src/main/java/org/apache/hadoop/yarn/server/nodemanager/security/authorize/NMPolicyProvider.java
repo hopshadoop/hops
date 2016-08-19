@@ -32,12 +32,14 @@ import org.apache.hadoop.yarn.server.nodemanager.api.LocalizationProtocolPB;
 @InterfaceStability.Unstable
 public class NMPolicyProvider extends PolicyProvider {
   
-  private static final Service[] nodeManagerServices = new Service[]{
-      new Service(
-          YarnConfiguration.YARN_SECURITY_SERVICE_AUTHORIZATION_CONTAINER_MANAGEMENT_PROTOCOL,
-          ContainerManagementProtocolPB.class), new Service(
-      YarnConfiguration.YARN_SECURITY_SERVICE_AUTHORIZATION_RESOURCE_LOCALIZER,
-      LocalizationProtocolPB.class)};
+  private static final Service[] nodeManagerServices = 
+      new Service[] {
+    new Service(
+        YarnConfiguration.YARN_SECURITY_SERVICE_AUTHORIZATION_CONTAINER_MANAGEMENT_PROTOCOL, 
+        ContainerManagementProtocolPB.class),
+    new Service(YarnConfiguration.YARN_SECURITY_SERVICE_AUTHORIZATION_RESOURCE_LOCALIZER, 
+        LocalizationProtocolPB.class)
+  };
 
   @Override
   public Service[] getServices() {

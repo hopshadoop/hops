@@ -101,7 +101,9 @@ public final class DomainSocketWatcher implements Closeable {
    */
   private class NotificationHandler implements Handler {
     public boolean handle(DomainSocket sock) {
+      assert(lock.isHeldByCurrentThread());
       try {
+        kicked = false;
         if (LOG.isTraceEnabled()) {
           LOG.trace(this + ": NotificationHandler: doing a read on " +
             sock.fd);
@@ -227,8 +229,17 @@ public final class DomainSocketWatcher implements Closeable {
    * Whether or not this DomainSocketWatcher is closed.
    */
   private boolean closed = false;
+  
+  /**
+   * True if we have written a byte to the notification socket. We should not
+   * write anything else to the socket until the notification handler has had a
+   * chance to run. Otherwise, our thread might block, causing deadlock. 
+   * See HADOOP-11333 for details.
+   */
+  private boolean kicked = false;
 
-  public DomainSocketWatcher(int interruptCheckPeriodMs) throws IOException {
+  public DomainSocketWatcher(int interruptCheckPeriodMs, String src)
+      throws IOException {
     if (loadingFailureReason != null) {
       throw new UnsupportedOperationException(loadingFailureReason);
     }
@@ -236,6 +247,14 @@ public final class DomainSocketWatcher implements Closeable {
     this.interruptCheckPeriodMs = interruptCheckPeriodMs;
     notificationSockets = DomainSocket.socketpair();
     watcherThread.setDaemon(true);
+    watcherThread.setName(src + " DomainSocketWatcher");
+    watcherThread
+        .setUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
+          @Override
+          public void uncaughtException(Thread thread, Throwable t) {
+            LOG.error(thread + " terminating on unexpected exception", t);
+          }
+        });
     watcherThread.start();
   }
 
@@ -346,8 +365,15 @@ public final class DomainSocketWatcher implements Closeable {
    * Wake up the DomainSocketWatcher thread.
    */
   private void kick() {
+    assert(lock.isHeldByCurrentThread());
+    
+    if (kicked) {
+      return;
+    }
+    
     try {
       notificationSockets[0].getOutputStream().write(0);
+      kicked = true;
     } catch (IOException e) {
       if (!closed) {
         LOG.error(this + ": error writing to notificationSockets[0]", e);
@@ -355,7 +381,17 @@ public final class DomainSocketWatcher implements Closeable {
     }
   }
 
-  private void sendCallback(String caller, TreeMap<Integer, Entry> entries,
+  /**
+   * Send callback and return whether or not the domain socket was closed as a
+   * result of processing.
+   *
+   * @param caller reason for call
+   * @param entries mapping of file descriptor to entry
+   * @param fdSet set of file descriptors
+   * @param fd file descriptor
+   * @return true if the domain socket was closed as a result of processing
+   */
+  private boolean sendCallback(String caller, TreeMap<Integer, Entry> entries,
       FdSet fdSet, int fd) {
     if (LOG.isTraceEnabled()) {
       LOG.trace(this + ": " + caller + " starting sendCallback for fd " + fd);
@@ -384,13 +420,30 @@ public final class DomainSocketWatcher implements Closeable {
             "still in the poll(2) loop.");
       }
       IOUtils.cleanup(LOG, sock);
-      entries.remove(fd);
       fdSet.remove(fd);
+      return true;
     } else {
       if (LOG.isTraceEnabled()) {
         LOG.trace(this + ": " + caller + ": sendCallback not " +
             "closing fd " + fd);
       }
+      return false;
+    }
+  }
+
+  /**
+   * Send callback, and if the domain socket was closed as a result of
+   * processing, then also remove the entry for the file descriptor.
+   *
+   * @param caller reason for call
+   * @param entries mapping of file descriptor to entry
+   * @param fdSet set of file descriptors
+   * @param fd file descriptor
+   */
+  private void sendCallbackAndRemove(String caller,
+      TreeMap<Integer, Entry> entries, FdSet fdSet, int fd) {
+    if (sendCallback(caller, entries, fdSet, fd)) {
+      entries.remove(fd);
     }
   }
 
@@ -410,7 +463,8 @@ public final class DomainSocketWatcher implements Closeable {
           lock.lock();
           try {
             for (int fd : fdSet.getAndClearReadableFds()) {
-              sendCallback("getAndClearReadableFds", entries, fdSet, fd);
+              sendCallbackAndRemove("getAndClearReadableFds", entries, fdSet,
+                  fd);
             }
             if (!(toAdd.isEmpty() && toRemove.isEmpty())) {
               // Handle pending additions (before pending removes).
@@ -431,7 +485,7 @@ public final class DomainSocketWatcher implements Closeable {
               while (true) {
                 Map.Entry<Integer, DomainSocket> entry = toRemove.firstEntry();
                 if (entry == null) break;
-                sendCallback("handlePendingRemovals",
+                sendCallbackAndRemove("handlePendingRemovals",
                     entries, fdSet, entry.getValue().fd);
               }
               processedCond.signalAll();
@@ -458,15 +512,22 @@ public final class DomainSocketWatcher implements Closeable {
         }
       } catch (InterruptedException e) {
         LOG.info(toString() + " terminating on InterruptedException");
-      } catch (IOException e) {
-        LOG.error(toString() + " terminating on IOException", e);
+      } catch (Throwable e) {
+        LOG.error(toString() + " terminating on exception", e);
       } finally {
-        kick(); // allow the handler for notificationSockets[0] to read a byte
-        for (Entry entry : entries.values()) {
-          sendCallback("close", entries, fdSet, entry.getDomainSocket().fd);
+        lock.lock();
+        try {
+          kick(); // allow the handler for notificationSockets[0] to read a byte
+          for (Entry entry : entries.values()) {
+            // We do not remove from entries as we iterate, because that can
+            // cause a ConcurrentModificationException.
+            sendCallback("close", entries, fdSet, entry.getDomainSocket().fd);
+          }
+          entries.clear();
+          fdSet.close();
+        } finally {
+          lock.unlock();
         }
-        entries.clear();
-        fdSet.close();
       }
     }
   });

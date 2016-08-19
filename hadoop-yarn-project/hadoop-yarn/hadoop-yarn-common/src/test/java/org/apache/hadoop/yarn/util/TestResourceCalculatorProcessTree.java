@@ -19,11 +19,9 @@ package org.apache.hadoop.yarn.util;
 
 import org.apache.hadoop.conf.Configuration;
 import org.junit.Test;
-
-import static org.hamcrest.core.IsInstanceOf.instanceOf;
-import static org.hamcrest.core.IsSame.sameInstance;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertThat;
+import static org.junit.Assert.*;
+import static org.hamcrest.core.IsInstanceOf.*;
+import static org.hamcrest.core.IsSame.*;
 
 /**
  * A JUnit test to test {@link ResourceCalculatorPlugin}
@@ -43,16 +41,31 @@ public class TestResourceCalculatorProcessTree {
       return "Empty tree for testing";
     }
 
+    public long getRssMemorySize(int age) {
+      return 0;
+    }
+    
+    @SuppressWarnings("deprecation")
     public long getCumulativeRssmem(int age) {
       return 0;
     }
 
+    public long getVirtualMemorySize(int age) {
+      return 0;
+    }
+    
+    @SuppressWarnings("deprecation")
     public long getCumulativeVmem(int age) {
       return 0;
     }
 
     public long getCumulativeCpuTime() {
       return 0;
+    }
+
+    @Override
+    public float getCpuUsagePercent() {
+      return CpuTimeTracker.UNAVAILABLE;
     }
 
     public boolean checkPidPgrpidForMatch() {
@@ -63,9 +76,7 @@ public class TestResourceCalculatorProcessTree {
   @Test
   public void testCreateInstance() {
     ResourceCalculatorProcessTree tree;
-    tree = ResourceCalculatorProcessTree
-        .getResourceCalculatorProcessTree("1", EmptyProcessTree.class,
-            new Configuration());
+    tree = ResourceCalculatorProcessTree.getResourceCalculatorProcessTree("1", EmptyProcessTree.class, new Configuration());
     assertNotNull(tree);
     assertThat(tree, instanceOf(EmptyProcessTree.class));
   }
@@ -74,9 +85,8 @@ public class TestResourceCalculatorProcessTree {
   public void testCreatedInstanceConfigured() {
     ResourceCalculatorProcessTree tree;
     Configuration conf = new Configuration();
-    tree = ResourceCalculatorProcessTree
-        .getResourceCalculatorProcessTree("1", EmptyProcessTree.class, conf);
+    tree = ResourceCalculatorProcessTree.getResourceCalculatorProcessTree("1", EmptyProcessTree.class, conf);
     assertNotNull(tree);
     assertThat(tree.getConf(), sameInstance(conf));
-  }
+  } 
 }

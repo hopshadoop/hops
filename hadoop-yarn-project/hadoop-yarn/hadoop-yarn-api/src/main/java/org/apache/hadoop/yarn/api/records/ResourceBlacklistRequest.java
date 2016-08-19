@@ -17,18 +17,18 @@
  */
 package org.apache.hadoop.yarn.api.records;
 
+import java.util.List;
+
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Stable;
 import org.apache.hadoop.yarn.api.ApplicationMasterProtocol;
 import org.apache.hadoop.yarn.util.Records;
 
-import java.util.List;
-
 /**
- * {@link ResourceBlacklistRequest} encapsulates the list of resource-names
- * which should be added or removed from the <em>blacklist</em> of resources
+ * {@link ResourceBlacklistRequest} encapsulates the list of resource-names 
+ * which should be added or removed from the <em>blacklist</em> of resources 
  * for the application.
- *
+ * 
  * @see ResourceRequest
  * @see ApplicationMasterProtocol#allocate(org.apache.hadoop.yarn.api.protocolrecords.AllocateRequest)
  */
@@ -38,9 +38,9 @@ public abstract class ResourceBlacklistRequest {
 
   @Public
   @Stable
-  public static ResourceBlacklistRequest newInstance(List<String> additions,
-      List<String> removals) {
-    ResourceBlacklistRequest blacklistRequest =
+  public static ResourceBlacklistRequest newInstance(
+      List<String> additions, List<String> removals) {
+    ResourceBlacklistRequest blacklistRequest = 
         Records.newRecord(ResourceBlacklistRequest.class);
     blacklistRequest.setBlacklistAdditions(additions);
     blacklistRequest.setBlacklistRemovals(removals);
@@ -48,46 +48,43 @@ public abstract class ResourceBlacklistRequest {
   }
   
   /**
-   * Get the list of resource-names which should be added to the
+   * Get the list of resource-names which should be added to the 
    * application blacklist.
-   *
-   * @return list of resource-names which should be added to the
-   * application blacklist
+   * 
+   * @return list of resource-names which should be added to the 
+   *         application blacklist
    */
   @Public
   @Stable
   public abstract List<String> getBlacklistAdditions();
   
   /**
-   * Set list of resource-names which should be added to the application
-   * blacklist.
-   *
-   * @param resourceNames
-   *     list of resource-names which should be added to the
-   *     application blacklist
+   * Set list of resource-names which should be added to the application blacklist.
+   * 
+   * @param resourceNames list of resource-names which should be added to the 
+   *                  application blacklist
    */
   @Public
   @Stable
   public abstract void setBlacklistAdditions(List<String> resourceNames);
   
   /**
-   * Get the list of resource-names which should be removed from the
+   * Get the list of resource-names which should be removed from the 
    * application blacklist.
-   *
-   * @return list of resource-names which should be removed from the
-   * application blacklist
+   * 
+   * @return list of resource-names which should be removed from the 
+   *         application blacklist
    */
   @Public
   @Stable
   public abstract List<String> getBlacklistRemovals();
   
   /**
-   * Set list of resource-names which should be removed from the
+   * Set list of resource-names which should be removed from the 
    * application blacklist.
-   *
-   * @param resourceNames
-   *     list of resource-names which should be removed from the
-   *     application blacklist
+   * 
+   * @param resourceNames list of resource-names which should be removed from the 
+   *                  application blacklist
    */
   @Public
   @Stable

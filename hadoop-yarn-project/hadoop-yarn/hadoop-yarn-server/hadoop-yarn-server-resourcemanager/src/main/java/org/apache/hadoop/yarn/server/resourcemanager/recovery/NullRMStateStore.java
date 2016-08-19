@@ -15,7 +15,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.yarn.server.resourcemanager.recovery;
+
 
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
@@ -23,13 +25,10 @@ import org.apache.hadoop.security.token.delegation.DelegationKey;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.security.client.RMDelegationTokenIdentifier;
-import org.apache.hadoop.yarn.server.api.records.MasterKey;
-import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.RMStateVersion;
-import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.impl.pb.ApplicationAttemptStateDataPBImpl;
-import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.impl.pb.ApplicationStateDataPBImpl;
-
-import java.io.IOException;
-import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
+import org.apache.hadoop.yarn.server.records.Version;
+import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.AMRMTokenSecretManagerState;
+import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.ApplicationAttemptStateData;
+import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.ApplicationStateData;
 
 @Unstable
 public class NullRMStateStore extends RMStateStore {
@@ -50,72 +49,72 @@ public class NullRMStateStore extends RMStateStore {
   }
 
   @Override
-  public RMState loadState(RMContext rmContext) throws Exception {
-    throw new UnsupportedOperationException(
-        "Cannot load state from null store");
+  public synchronized long getAndIncrementEpoch() throws Exception {
+    return 0L;
+  }
+
+  @Override
+  public RMState loadState() throws Exception {
+    throw new UnsupportedOperationException("Cannot load state from null store");
   }
 
   @Override
   protected void storeApplicationStateInternal(ApplicationId appId,
-      ApplicationStateDataPBImpl appStateData) throws Exception {
+      ApplicationStateData appStateData) throws Exception {
     // Do nothing
   }
 
   @Override
-  protected void storeApplicationAttemptStateInternal(
-      ApplicationAttemptId attemptId,
-      ApplicationAttemptStateDataPBImpl attemptStateData) throws Exception {
+  protected void storeApplicationAttemptStateInternal(ApplicationAttemptId attemptId,
+      ApplicationAttemptStateData attemptStateData) throws Exception {
     // Do nothing
   }
 
   @Override
-  protected void removeApplicationStateInternal(ApplicationState appState)
+  protected void removeApplicationStateInternal(ApplicationStateData appState)
       throws Exception {
     // Do nothing
   }
 
   @Override
-  public void storeRMDelegationTokenAndSequenceNumberState(
-      RMDelegationTokenIdentifier rmDTIdentifier, Long renewDate,
-      int latestSequenceNumber) throws Exception {
-    // Do nothing
-  }
-
-  @Override
-  public void removeRMDelegationTokenState(
-      RMDelegationTokenIdentifier rmDTIdentifier) throws Exception {
-    // Do nothing
-  }
-
-  @Override
-  protected void updateRMDelegationTokenAndSequenceNumberInternal(
-      RMDelegationTokenIdentifier rmDTIdentifier, Long renewDate,
-      int latestSequenceNumber) throws Exception {
-    // Do nothing
-  }
-
-  @Override
-  public void storeRMDTMasterKeyState(DelegationKey delegationKey)
+  public void storeRMDelegationTokenState(
+      RMDelegationTokenIdentifier rmDTIdentifier, Long renewDate)
       throws Exception {
     // Do nothing
   }
 
   @Override
-  public void removeRMDTMasterKeyState(DelegationKey delegationKey)
+  public void removeRMDelegationTokenState(RMDelegationTokenIdentifier rmDTIdentifier)
       throws Exception {
+    // Do nothing
+  }
+
+  @Override
+  protected void updateRMDelegationTokenState(
+      RMDelegationTokenIdentifier rmDTIdentifier, Long renewDate)
+      throws Exception {
+    // Do nothing
+  }
+
+  @Override
+  public void storeRMDTMasterKeyState(DelegationKey delegationKey) throws Exception {
+    // Do nothing
+  }
+
+  @Override
+  public void removeRMDTMasterKeyState(DelegationKey delegationKey) throws Exception {
     // Do nothing
   }
 
   @Override
   protected void updateApplicationStateInternal(ApplicationId appId,
-      ApplicationStateDataPBImpl appStateData) throws Exception {
+      ApplicationStateData appStateData) throws Exception {
     // Do nothing 
   }
 
   @Override
-  protected void updateApplicationAttemptStateInternal(
-      ApplicationAttemptId attemptId,
-      ApplicationAttemptStateDataPBImpl attemptStateData) throws Exception {
+  protected void updateApplicationAttemptStateInternal(ApplicationAttemptId attemptId,
+      ApplicationAttemptStateData attemptStateData) throws Exception {
   }
 
   @Override
@@ -124,7 +123,7 @@ public class NullRMStateStore extends RMStateStore {
   }
 
   @Override
-  protected RMStateVersion loadVersion() throws Exception {
+  protected Version loadVersion() throws Exception {
     // Do nothing
     return null;
   }
@@ -135,20 +134,19 @@ public class NullRMStateStore extends RMStateStore {
   }
 
   @Override
-  protected RMStateVersion getCurrentVersion() {
+  protected Version getCurrentVersion() {
     // Do nothing
     return null;
   }
 
   @Override
-  protected void storeRMTokenSecretManagerMasterKeyState(MasterKey key,
-      KeyType keyType) throws IOException {
-    // Do nothing
+  public void storeOrUpdateAMRMTokenSecretManagerState(
+      AMRMTokenSecretManagerState state, boolean isUpdate) {
+    //DO Nothing
   }
 
   @Override
-  protected void removeRMTokenSecretManagerMasterKeyState(KeyType keyType)
-      throws IOException {
+  public void deleteStore() throws Exception {
     // Do nothing
   }
 

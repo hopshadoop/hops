@@ -18,6 +18,10 @@
 
 package org.apache.hadoop.yarn.client;
 
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.security.PrivilegedAction;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -25,10 +29,6 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.ipc.YarnRPC;
-
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.security.PrivilegedAction;
 
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
@@ -38,8 +38,7 @@ public class AHSProxy<T> {
   private static final Log LOG = LogFactory.getLog(AHSProxy.class);
 
   public static <T> T createAHSProxy(final Configuration conf,
-      final Class<T> protocol, InetSocketAddress ahsAddress)
-      throws IOException {
+      final Class<T> protocol, InetSocketAddress ahsAddress) throws IOException {
     LOG.info("Connecting to Application History server at " + ahsAddress);
     return (T) getProxy(conf, protocol, ahsAddress);
   }
@@ -47,13 +46,12 @@ public class AHSProxy<T> {
   protected static <T> T getProxy(final Configuration conf,
       final Class<T> protocol, final InetSocketAddress rmAddress)
       throws IOException {
-    return UserGroupInformation.getCurrentUser()
-        .doAs(new PrivilegedAction<T>() {
-              @Override
-              public T run() {
-                return (T) YarnRPC.create(conf)
-                    .getProxy(protocol, rmAddress, conf);
-              }
-            });
+    return UserGroupInformation.getCurrentUser().doAs(
+      new PrivilegedAction<T>() {
+        @Override
+        public T run() {
+          return (T) YarnRPC.create(conf).getProxy(protocol, rmAddress, conf);
+        }
+      });
   }
 }

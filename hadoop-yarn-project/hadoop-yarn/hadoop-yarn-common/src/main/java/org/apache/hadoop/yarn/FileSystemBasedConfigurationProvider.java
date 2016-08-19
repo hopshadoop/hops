@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.yarn;
 
+import java.io.IOException;
+import java.io.InputStream;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -29,23 +32,20 @@ import org.apache.hadoop.yarn.conf.ConfigurationProvider;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 
-import java.io.IOException;
-import java.io.InputStream;
-
 @Private
 @Unstable
 public class FileSystemBasedConfigurationProvider
     extends ConfigurationProvider {
 
-  private static final Log LOG =
-      LogFactory.getLog(FileSystemBasedConfigurationProvider.class);
+  private static final Log LOG = LogFactory
+      .getLog(FileSystemBasedConfigurationProvider.class);
   private FileSystem fs;
   private Path configDir;
 
   @Override
   public synchronized InputStream getConfigurationInputStream(
-      Configuration bootstrapConf, String name)
-      throws IOException, YarnException {
+      Configuration bootstrapConf, String name) throws IOException,
+      YarnException {
     if (name == null || name.isEmpty()) {
       throw new YarnException(
           "Illegal argument! The parameter should not be null or empty");
@@ -70,8 +70,8 @@ public class FileSystemBasedConfigurationProvider
   @Override
   public synchronized void initInternal(Configuration bootstrapConf)
       throws Exception {
-    configDir = new Path(bootstrapConf
-        .get(YarnConfiguration.FS_BASED_RM_CONF_STORE,
+    configDir =
+        new Path(bootstrapConf.get(YarnConfiguration.FS_BASED_RM_CONF_STORE,
             YarnConfiguration.DEFAULT_FS_BASED_RM_CONF_STORE));
     fs = configDir.getFileSystem(bootstrapConf);
     if (!fs.exists(configDir)) {

@@ -27,7 +27,6 @@ import org.apache.hadoop.yarn.proto.ContainerManagementProtocol.ContainerManagem
 @ProtocolInfo(
     protocolName = "org.apache.hadoop.yarn.api.ContainerManagementProtocolPB",
     protocolVersion = 1)
-public interface ContainerManagementProtocolPB
-    extends ContainerManagementProtocolService.BlockingInterface {
+public interface ContainerManagementProtocolPB extends ContainerManagementProtocolService.BlockingInterface {
 
 }

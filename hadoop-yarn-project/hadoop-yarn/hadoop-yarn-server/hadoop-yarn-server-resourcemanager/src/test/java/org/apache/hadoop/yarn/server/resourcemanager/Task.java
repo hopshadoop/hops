@@ -1,25 +1,28 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Licensed to the Apache Software Foundation (ASF) under one
+* or more contributor license agreements.  See the NOTICE file
+* distributed with this work for additional information
+* regarding copyright ownership.  The ASF licenses this file
+* to you under the Apache License, Version 2.0 (the
+* "License"); you may not use this file except in compliance
+* with the License.  You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
 
 /**
- *
+ * 
  */
 package org.apache.hadoop.yarn.server.resourcemanager;
+
+import java.util.HashSet;
+import java.util.Set;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -29,20 +32,10 @@ import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.ResourceRequest;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.NodeType;
 
-import java.util.HashSet;
-import java.util.Set;
-
 public class Task {
   private static final Log LOG = LogFactory.getLog(Task.class);
   
-  public enum State {
-    PENDING,
-    ALLOCATED,
-    RUNNING,
-    COMPLETE
-  }
-
-  ;
+  public enum State {PENDING, ALLOCATED, RUNNING, COMPLETE};
   
   final private ApplicationId applicationId;
   final private int taskId;
@@ -64,13 +57,14 @@ public class Task {
     state = State.PENDING;
     
     // Special case: Don't care about locality
-    if (!(hosts.length == 1 && hosts[0].equals(ResourceRequest.ANY))) {
+    if (!(hosts.length == 1 && 
+        hosts[0].equals(ResourceRequest.ANY))) {
       for (String host : hosts) {
         this.hosts.add(host);
         this.racks.add(Application.resolve(host));
       }
     }
-    LOG.info("Task " + taskId + " added to application " + this.applicationId +
+    LOG.info("Task " + taskId + " added to application " + this.applicationId + 
         " with " + this.hosts.size() + " hosts, " + racks.size() + " racks");
   }
   
@@ -103,11 +97,11 @@ public class Task {
   }
   
   public boolean canSchedule(NodeType type, String hostName) {
-    if (type == NodeType.NODE_LOCAL) {
+    if (type == NodeType.NODE_LOCAL) { 
       return hosts.contains(hostName);
     } else if (type == NodeType.RACK_LOCAL) {
       return racks.contains(Application.resolve(hostName));
-    }
+    } 
     
     return true;
   }
@@ -120,7 +114,7 @@ public class Task {
   
   public void stop() {
     if (getState() != State.RUNNING) {
-      throw new IllegalStateException("Trying to stop a non-running task: " +
+      throw new IllegalStateException("Trying to stop a non-running task: " + 
           getTaskId() + " of application " + getApplicationID());
     }
     this.nodeManager = null;
@@ -139,7 +133,7 @@ public class Task {
   @Override
   public boolean equals(Object obj) {
     if (obj instanceof Task) {
-      return ((Task) obj).taskId == this.taskId;
+      return ((Task)obj).taskId == this.taskId;
     }
     return super.equals(obj);
   }

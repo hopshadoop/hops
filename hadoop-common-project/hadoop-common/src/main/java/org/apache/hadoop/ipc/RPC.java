@@ -33,6 +33,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.net.SocketFactory;
 
@@ -407,11 +408,18 @@ public class RPC {
         throw ioe;
       }
 
+      if (Thread.currentThread().isInterrupted()) {
+        // interrupted during some IO; this may not have been caught
+        throw new InterruptedIOException("Interrupted waiting for the proxy");
+      }
+
       // wait for retry
       try {
         Thread.sleep(1000);
       } catch (InterruptedException ie) {
-        // IGNORE
+        Thread.currentThread().interrupt();
+        throw (IOException) new InterruptedIOException(
+            "Interrupted waiting for the proxy").initCause(ioe);
       }
     }
   }
@@ -520,6 +528,7 @@ public class RPC {
    * @param conf configuration
    * @param factory socket factory
    * @param rpcTimeout max time for each rpc; 0 means no timeout
+   * @param connectionRetryPolicy retry policy
    * @return the proxy
    * @throws IOException if any error occurs
    */
@@ -531,11 +540,43 @@ public class RPC {
                                 SocketFactory factory,
                                 int rpcTimeout,
                                 RetryPolicy connectionRetryPolicy) throws IOException {    
+     return getProtocolProxy(protocol, clientVersion, addr, ticket,
+       conf, factory, rpcTimeout, connectionRetryPolicy, null);
+   }
+
+  /**
+   * Get a protocol proxy that contains a proxy connection to a remote server
+   * and a set of methods that are supported by the server
+   *
+   * @param protocol protocol
+   * @param clientVersion client's version
+   * @param addr server address
+   * @param ticket security ticket
+   * @param conf configuration
+   * @param factory socket factory
+   * @param rpcTimeout max time for each rpc; 0 means no timeout
+   * @param connectionRetryPolicy retry policy
+   * @param fallbackToSimpleAuth set to true or false during calls to indicate if
+   *   a secure client falls back to simple auth
+   * @return the proxy
+   * @throws IOException if any error occurs
+   */
+   public static <T> ProtocolProxy<T> getProtocolProxy(Class<T> protocol,
+                                long clientVersion,
+                                InetSocketAddress addr,
+                                UserGroupInformation ticket,
+                                Configuration conf,
+                                SocketFactory factory,
+                                int rpcTimeout,
+                                RetryPolicy connectionRetryPolicy,
+                                AtomicBoolean fallbackToSimpleAuth)
+       throws IOException {
     if (UserGroupInformation.isSecurityEnabled()) {
       SaslRpcServer.init(conf);
     }
-    return getProtocolEngine(protocol,conf).getProxy(protocol, clientVersion,
-        addr, ticket, conf, factory, rpcTimeout, connectionRetryPolicy);
+    return getProtocolEngine(protocol, conf).getProxy(protocol, clientVersion,
+        addr, ticket, conf, factory, rpcTimeout, connectionRetryPolicy,
+        fallbackToSimpleAuth);
   }
 
    /**

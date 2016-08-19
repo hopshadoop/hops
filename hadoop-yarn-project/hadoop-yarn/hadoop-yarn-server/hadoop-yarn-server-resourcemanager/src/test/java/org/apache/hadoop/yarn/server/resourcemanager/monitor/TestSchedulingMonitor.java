@@ -18,29 +18,16 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.monitor;
 
-import io.hops.exception.StorageInitializtionException;
-import io.hops.metadata.util.RMStorageFactory;
-import io.hops.metadata.util.YarnAPIStorageFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
 import org.apache.hadoop.yarn.server.resourcemanager.monitor.capacity.ProportionalCapacityPreemptionPolicy;
-import org.junit.Before;
 import org.junit.Test;
-
-import java.io.IOException;
 
 import static org.junit.Assert.fail;
 
 public class TestSchedulingMonitor {
 
-  @Before
-  public void setup() throws StorageInitializtionException, IOException {
-    Configuration conf = new YarnConfiguration();
-    YarnAPIStorageFactory.setConfiguration(conf);
-    RMStorageFactory.setConfiguration(conf);
-  }
-  
   @Test(timeout = 10000)
   public void testRMStarts() {
     Configuration conf = new YarnConfiguration();

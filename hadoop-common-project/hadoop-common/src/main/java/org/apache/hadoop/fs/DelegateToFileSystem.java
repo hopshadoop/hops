@@ -29,7 +29,6 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Options.ChecksumOpt;
-import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Progressable;
@@ -47,10 +46,25 @@ public abstract class DelegateToFileSystem extends AbstractFileSystem {
       Configuration conf, String supportedScheme, boolean authorityRequired)
       throws IOException, URISyntaxException {
     super(theUri, supportedScheme, authorityRequired, 
-        FileSystem.getDefaultUri(conf).getPort());
+        getDefaultPortIfDefined(theFsImpl));
     fsImpl = theFsImpl;
     fsImpl.initialize(theUri, conf);
     fsImpl.statistics = getStatistics();
+  }
+
+  /**
+   * Returns the default port if the file system defines one.
+   * {@link FileSystem#getDefaultPort()} returns 0 to indicate the default port
+   * is undefined.  However, the logic that consumes this value expects to
+   * receive -1 to indicate the port is undefined, which agrees with the
+   * contract of {@link URI#getPort()}.
+   *
+   * @param theFsImpl file system to check for default port
+   * @return default port, or -1 if default port is undefined
+   */
+  private static int getDefaultPortIfDefined(FileSystem theFsImpl) {
+    int defaultPort = theFsImpl.getDefaultPort();
+    return defaultPort != 0 ? defaultPort : -1;
   }
 
   @Override
@@ -129,6 +143,11 @@ public abstract class DelegateToFileSystem extends AbstractFileSystem {
   }
 
   @Override
+  public FsStatus getFsStatus(final Path f) throws IOException {
+    return fsImpl.getStatus(f);
+  }
+
+  @Override
   public FsServerDefaults getServerDefaults() throws IOException {
     return fsImpl.getServerDefaults();
   }
@@ -162,6 +181,12 @@ public abstract class DelegateToFileSystem extends AbstractFileSystem {
   public FSDataInputStream open(Path f, int bufferSize) throws IOException {
     checkPath(f);
     return fsImpl.open(f, bufferSize);
+  }
+
+  @Override
+  public boolean truncate(Path f, long newLength) throws IOException {
+    checkPath(f);
+    return fsImpl.truncate(f, newLength);
   }
 
   @Override

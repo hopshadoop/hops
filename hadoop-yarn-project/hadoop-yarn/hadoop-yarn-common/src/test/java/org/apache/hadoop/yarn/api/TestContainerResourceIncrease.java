@@ -18,7 +18,10 @@
 
 package org.apache.hadoop.yarn.api;
 
-import junit.framework.Assert;
+import java.util.Arrays;
+
+import org.junit.Assert;
+
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerId;
@@ -29,39 +32,37 @@ import org.apache.hadoop.yarn.api.records.impl.pb.ContainerResourceIncreasePBImp
 import org.apache.hadoop.yarn.proto.YarnProtos.ContainerResourceIncreaseProto;
 import org.junit.Test;
 
-import java.util.Arrays;
-
 public class TestContainerResourceIncrease {
   @Test
   public void testResourceIncreaseContext() {
-    byte[] identifier = new byte[]{1, 2, 3, 4};
+    byte[] identifier = new byte[] { 1, 2, 3, 4 };
     Token token = Token.newInstance(identifier, "", "".getBytes(), "");
-    ContainerId containerId = ContainerId.newInstance(
-        ApplicationAttemptId.newInstance(ApplicationId.newInstance(1234, 3), 3),
-        7);
+    ContainerId containerId = ContainerId
+        .newContainerId(ApplicationAttemptId.newInstance(
+            ApplicationId.newInstance(1234, 3), 3), 7);
     Resource resource = Resource.newInstance(1023, 3);
-    ContainerResourceIncrease ctx =
-        ContainerResourceIncrease.newInstance(containerId, resource, token);
+    ContainerResourceIncrease ctx = ContainerResourceIncrease.newInstance(
+        containerId, resource, token);
 
     // get proto and recover to ctx
-    ContainerResourceIncreaseProto proto =
+    ContainerResourceIncreaseProto proto = 
         ((ContainerResourceIncreasePBImpl) ctx).getProto();
     ctx = new ContainerResourceIncreasePBImpl(proto);
 
     // check values
     Assert.assertEquals(ctx.getCapability(), resource);
     Assert.assertEquals(ctx.getContainerId(), containerId);
-    Assert.assertTrue(Arrays
-        .equals(ctx.getContainerToken().getIdentifier().array(), identifier));
+    Assert.assertTrue(Arrays.equals(ctx.getContainerToken().getIdentifier()
+        .array(), identifier));
   }
   
   @Test
   public void testResourceIncreaseContextWithNull() {
-    ContainerResourceIncrease ctx =
-        ContainerResourceIncrease.newInstance(null, null, null);
+    ContainerResourceIncrease ctx = ContainerResourceIncrease.newInstance(null,
+        null, null);
     
     // get proto and recover to ctx;
-    ContainerResourceIncreaseProto proto =
+    ContainerResourceIncreaseProto proto = 
         ((ContainerResourceIncreasePBImpl) ctx).getProto();
     ctx = new ContainerResourceIncreasePBImpl(proto);
 

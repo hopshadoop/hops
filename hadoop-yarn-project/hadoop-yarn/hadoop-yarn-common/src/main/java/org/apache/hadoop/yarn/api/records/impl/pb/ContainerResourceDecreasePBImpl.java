@@ -27,8 +27,8 @@ import org.apache.hadoop.yarn.proto.YarnProtos.ContainerResourceDecreaseProtoOrB
 import org.apache.hadoop.yarn.proto.YarnProtos.ResourceProto;
 
 public class ContainerResourceDecreasePBImpl extends ContainerResourceDecrease {
-  ContainerResourceDecreaseProto proto =
-      ContainerResourceDecreaseProto.getDefaultInstance();
+  ContainerResourceDecreaseProto proto = ContainerResourceDecreaseProto
+      .getDefaultInstance();
   ContainerResourceDecreaseProto.Builder builder = null;
   boolean viaProto = false;
 

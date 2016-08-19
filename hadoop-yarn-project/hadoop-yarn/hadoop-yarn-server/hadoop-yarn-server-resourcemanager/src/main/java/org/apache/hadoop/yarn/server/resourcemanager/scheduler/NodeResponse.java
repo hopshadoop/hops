@@ -18,14 +18,14 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler;
 
+import java.util.List;
+
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.Container;
 
-import java.util.List;
-
 
 /**
- * The class that encapsulates response from clusterinfo for
+ * The class that encapsulates response from clusterinfo for 
  * updates from the node managers.
  */
 public class NodeResponse {
@@ -39,15 +39,12 @@ public class NodeResponse {
     this.completed = completed;
     this.toCleanUp = toKill;
   }
-
   public List<ApplicationId> getFinishedApplications() {
     return this.finishedApplications;
   }
-
   public List<Container> getCompletedContainers() {
     return this.completed;
   }
-
   public List<Container> getContainersToCleanUp() {
     return this.toCleanUp;
   }

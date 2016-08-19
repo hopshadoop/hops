@@ -17,12 +17,25 @@
  */
 package org.apache.hadoop.yarn.client.cli;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
+import java.nio.charset.Charset;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.MissingArgumentException;
 import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.time.DateFormatUtils;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
@@ -33,19 +46,11 @@ import org.apache.hadoop.yarn.api.records.NodeState;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.util.Date;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-
 @Private
 @Unstable
 public class NodeCLI extends YarnCLI {
-  private static final String NODES_PATTERN =
-      "%16s\t%15s\t%17s\t%28s" + System.getProperty("line.separator");
+  private static final String NODES_PATTERN = "%16s\t%15s\t%17s\t%28s" +
+    System.getProperty("line.separator");
 
   private static final String NODE_STATE_CMD = "states";
   private static final String NODE_ALL = "all";
@@ -63,6 +68,7 @@ public class NodeCLI extends YarnCLI {
   public int run(String[] args) throws Exception {
 
     Options opts = new Options();
+    opts.addOption(HELP_CMD, false, "Displays help for all commands.");
     opts.addOption(STATUS_CMD, true, "Prints the status report of the node.");
     opts.addOption(LIST_CMD, false, "List all running nodes. " +
         "Supports optional use of -states to filter nodes " +
@@ -73,8 +79,8 @@ public class NodeCLI extends YarnCLI {
     nodeStateOpt.setArgs(Option.UNLIMITED_VALUES);
     nodeStateOpt.setArgName("States");
     opts.addOption(nodeStateOpt);
-    Option allOpt =
-        new Option(NODE_ALL, false, "Works with -list to list all nodes.");
+    Option allOpt = new Option(NODE_ALL, false,
+        "Works with -list to list all nodes.");
     opts.addOption(allOpt);
     opts.getOption(STATUS_CMD).setArgName("NodeId");
 
@@ -105,7 +111,8 @@ public class NodeCLI extends YarnCLI {
         if (types != null) {
           for (String type : types) {
             if (!type.trim().isEmpty()) {
-              nodeStates.add(NodeState.valueOf(type.trim().toUpperCase()));
+              nodeStates.add(NodeState.valueOf(
+                  org.apache.hadoop.util.StringUtils.toUpperCase(type.trim())));
             }
           }
         }
@@ -113,6 +120,9 @@ public class NodeCLI extends YarnCLI {
         nodeStates.add(NodeState.RUNNING);
       }
       listClusterNodes(nodeStates);
+    } else if (cliParser.hasOption(HELP_CMD)) {
+      printUsage(opts);
+      return 0;
     } else {
       syserr.println("Invalid Command Usage : ");
       printUsage(opts);
@@ -122,7 +132,7 @@ public class NodeCLI extends YarnCLI {
 
   /**
    * It prints the usage of the command
-   *
+   * 
    * @param opts
    */
   private void printUsage(Options opts) {
@@ -131,40 +141,42 @@ public class NodeCLI extends YarnCLI {
 
   /**
    * Lists the nodes matching the given node states
-   *
+   * 
    * @param nodeStates
    * @throws YarnException
    * @throws IOException
    */
-  private void listClusterNodes(Set<NodeState> nodeStates)
-      throws YarnException, IOException {
-    PrintWriter writer = new PrintWriter(sysout);
-    List<NodeReport> nodesReport =
-        client.getNodeReports(nodeStates.toArray(new NodeState[0]));
+  private void listClusterNodes(Set<NodeState> nodeStates) 
+            throws YarnException, IOException {
+    PrintWriter writer = new PrintWriter(
+        new OutputStreamWriter(sysout, Charset.forName("UTF-8")));
+    List<NodeReport> nodesReport = client.getNodeReports(
+                                       nodeStates.toArray(new NodeState[0]));
     writer.println("Total Nodes:" + nodesReport.size());
     writer.printf(NODES_PATTERN, "Node-Id", "Node-State", "Node-Http-Address",
         "Number-of-Running-Containers");
     for (NodeReport nodeReport : nodesReport) {
-      writer.printf(NODES_PATTERN, nodeReport.getNodeId(),
-          nodeReport.getNodeState(), nodeReport.getHttpAddress(),
-          nodeReport.getNumContainers());
+      writer.printf(NODES_PATTERN, nodeReport.getNodeId(), nodeReport
+          .getNodeState(), nodeReport.getHttpAddress(), nodeReport
+          .getNumContainers());
     }
     writer.flush();
   }
 
   /**
    * Prints the node report for node id.
-   *
+   * 
    * @param nodeIdStr
    * @throws YarnException
    */
-  private void printNodeStatus(String nodeIdStr)
-      throws YarnException, IOException {
+  private void printNodeStatus(String nodeIdStr) throws YarnException,
+      IOException {
     NodeId nodeId = ConverterUtils.toNodeId(nodeIdStr);
     List<NodeReport> nodesReport = client.getNodeReports();
     // Use PrintWriter.println, which uses correct platform line ending.
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
-    PrintWriter nodeReportStr = new PrintWriter(baos);
+    PrintWriter nodeReportStr = new PrintWriter(
+        new OutputStreamWriter(baos, Charset.forName("UTF-8")));
     NodeReport nodeReport = null;
     for (NodeReport report : nodesReport) {
       if (!report.getNodeId().equals(nodeId)) {
@@ -181,29 +193,36 @@ public class NodeCLI extends YarnCLI {
       nodeReportStr.print("\tNode-Http-Address : ");
       nodeReportStr.println(nodeReport.getHttpAddress());
       nodeReportStr.print("\tLast-Health-Update : ");
-      nodeReportStr.println(DateFormatUtils
-          .format(new Date(nodeReport.getLastHealthReportTime()),
-              "E dd/MMM/yy hh:mm:ss:SSzz"));
+      nodeReportStr.println(DateFormatUtils.format(
+          new Date(nodeReport.getLastHealthReportTime()),
+            "E dd/MMM/yy hh:mm:ss:SSzz"));
       nodeReportStr.print("\tHealth-Report : ");
-      nodeReportStr.println(nodeReport.getHealthReport());
+      nodeReportStr
+          .println(nodeReport.getHealthReport());
       nodeReportStr.print("\tContainers : ");
       nodeReportStr.println(nodeReport.getNumContainers());
       nodeReportStr.print("\tMemory-Used : ");
-      nodeReportStr.println((nodeReport.getUsed() == null) ? "0MB" :
-          (nodeReport.getUsed().getMemory() + "MB"));
+      nodeReportStr.println((nodeReport.getUsed() == null) ? "0MB"
+          : (nodeReport.getUsed().getMemory() + "MB"));
       nodeReportStr.print("\tMemory-Capacity : ");
       nodeReportStr.println(nodeReport.getCapability().getMemory() + "MB");
       nodeReportStr.print("\tCPU-Used : ");
-      nodeReportStr.println((nodeReport.getUsed() == null) ? "0 vcores" :
-          (nodeReport.getUsed().getVirtualCores() + " vcores"));
+      nodeReportStr.println((nodeReport.getUsed() == null) ? "0 vcores"
+          : (nodeReport.getUsed().getVirtualCores() + " vcores"));
       nodeReportStr.print("\tCPU-Capacity : ");
-      nodeReportStr
-          .println(nodeReport.getCapability().getVirtualCores() + " vcores");
+      nodeReportStr.println(nodeReport.getCapability().getVirtualCores() + " vcores");
+      nodeReportStr.print("\tNode-Labels : ");
+      
+      // Create a List for node labels since we need it get sorted
+      List<String> nodeLabelsList =
+          new ArrayList<String>(report.getNodeLabels());
+      Collections.sort(nodeLabelsList);
+      nodeReportStr.println(StringUtils.join(nodeLabelsList.iterator(), ','));
     }
 
     if (nodeReport == null) {
-      nodeReportStr
-          .print("Could not find the node report for node id : " + nodeIdStr);
+      nodeReportStr.print("Could not find the node report for node id : "
+          + nodeIdStr);
     }
     nodeReportStr.close();
     sysout.println(baos.toString("UTF-8"));

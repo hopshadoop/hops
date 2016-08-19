@@ -1,20 +1,20 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Licensed to the Apache Software Foundation (ASF) under one
+* or more contributor license agreements.  See the NOTICE file
+* distributed with this work for additional information
+* regarding copyright ownership.  The ASF licenses this file
+* to you under the Apache License, Version 2.0 (the
+* "License"); you may not use this file except in compliance
+* with the License.  You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
 
 package org.apache.hadoop.yarn.api.records.impl.pb;
 
@@ -58,7 +58,7 @@ public class ContainerPBImpl extends Container {
   }
   
   public ContainerProto getProto() {
-
+  
     mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
     viaProto = true;
@@ -72,9 +72,8 @@ public class ContainerPBImpl extends Container {
 
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -82,33 +81,36 @@ public class ContainerPBImpl extends Container {
   }
 
   private void mergeLocalToBuilder() {
-    if (this.containerId != null &&
-        !((ContainerIdPBImpl) containerId).getProto().equals(builder.getId())) {
+    if (this.containerId != null
+        && !((ContainerIdPBImpl) containerId).getProto().equals(
+            builder.getId())) {
       builder.setId(convertToProtoFormat(this.containerId));
     }
-    if (this.nodeId != null &&
-        !((NodeIdPBImpl) nodeId).getProto().equals(builder.getNodeId())) {
+    if (this.nodeId != null
+        && !((NodeIdPBImpl) nodeId).getProto().equals(
+            builder.getNodeId())) {
       builder.setNodeId(convertToProtoFormat(this.nodeId));
     }
-    if (this.resource != null && !((ResourcePBImpl) this.resource).getProto()
-        .equals(builder.getResource())) {
+    if (this.resource != null
+        && !((ResourcePBImpl) this.resource).getProto().equals(
+            builder.getResource())) {
       builder.setResource(convertToProtoFormat(this.resource));
     }
-    if (this.priority != null && !((PriorityPBImpl) this.priority).getProto()
-        .equals(builder.getPriority())) {
+    if (this.priority != null && 
+        !((PriorityPBImpl) this.priority).getProto().equals(
+            builder.getPriority())) {
       builder.setPriority(convertToProtoFormat(this.priority));
     }
-    if (this.containerToken != null &&
-        !((TokenPBImpl) this.containerToken).getProto()
-            .equals(builder.getContainerToken())) {
+    if (this.containerToken != null
+        && !((TokenPBImpl) this.containerToken).getProto().equals(
+            builder.getContainerToken())) {
       builder.setContainerToken(convertToProtoFormat(this.containerToken));
     }
   }
 
   private void mergeLocalToProto() {
-    if (viaProto) {
+    if (viaProto) 
       maybeInitBuilder();
-    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
@@ -137,9 +139,8 @@ public class ContainerPBImpl extends Container {
   @Override
   public void setNodeId(NodeId nodeId) {
     maybeInitBuilder();
-    if (nodeId == null) {
+    if (nodeId == null)
       builder.clearNodeId();
-    }
     this.nodeId = nodeId;
   }
 
@@ -159,9 +160,8 @@ public class ContainerPBImpl extends Container {
   @Override
   public void setId(ContainerId id) {
     maybeInitBuilder();
-    if (id == null) {
+    if (id == null)
       builder.clearId();
-    }
     this.containerId = id;
   }
 
@@ -200,9 +200,8 @@ public class ContainerPBImpl extends Container {
   @Override
   public void setResource(Resource resource) {
     maybeInitBuilder();
-    if (resource == null) {
+    if (resource == null)
       builder.clearResource();
-    }
     this.resource = resource;
   }
   
@@ -244,9 +243,8 @@ public class ContainerPBImpl extends Container {
   @Override
   public void setContainerToken(Token containerToken) {
     maybeInitBuilder();
-    if (containerToken == null) {
+    if (containerToken == null) 
       builder.clearContainerToken();
-    }
     this.containerToken = containerToken;
   }
 
@@ -259,11 +257,11 @@ public class ContainerPBImpl extends Container {
   }
 
   private ContainerIdProto convertToProtoFormat(ContainerId t) {
-    return ((ContainerIdPBImpl) t).getProto();
+    return ((ContainerIdPBImpl)t).getProto();
   }
 
   private NodeIdProto convertToProtoFormat(NodeId t) {
-    return ((NodeIdPBImpl) t).getProto();
+    return ((NodeIdPBImpl)t).getProto();
   }
 
   private ResourcePBImpl convertFromProtoFormat(ResourceProto p) {
@@ -271,7 +269,7 @@ public class ContainerPBImpl extends Container {
   }
 
   private ResourceProto convertToProtoFormat(Resource t) {
-    return ((ResourcePBImpl) t).getProto();
+    return ((ResourcePBImpl)t).getProto();
   }
 
   private PriorityPBImpl convertFromProtoFormat(PriorityProto p) {
@@ -279,7 +277,7 @@ public class ContainerPBImpl extends Container {
   }
 
   private PriorityProto convertToProtoFormat(Priority p) {
-    return ((PriorityPBImpl) p).getProto();
+    return ((PriorityPBImpl)p).getProto();
   }
   
   private TokenPBImpl convertFromProtoFormat(TokenProto p) {
@@ -287,7 +285,7 @@ public class ContainerPBImpl extends Container {
   }
 
   private TokenProto convertToProtoFormat(Token t) {
-    return ((TokenPBImpl) t).getProto();
+    return ((TokenPBImpl)t).getProto();
   }
 
   public String toString() {

@@ -18,9 +18,11 @@
 
 package org.apache.hadoop.metrics2.sink;
 
+import java.io.Closeable;
 import java.io.File;
-import java.io.FileWriter;
-import java.io.PrintWriter;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.PrintStream;
 
 import org.apache.commons.configuration.SubsetConfiguration;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -36,19 +38,18 @@ import org.apache.hadoop.metrics2.MetricsTag;
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
-public class FileSink implements MetricsSink {
+public class FileSink implements MetricsSink, Closeable {
   private static final String FILENAME_KEY = "filename";
-  private PrintWriter writer;
+  private PrintStream writer;
 
   @Override
   public void init(SubsetConfiguration conf) {
     String filename = conf.getString(FILENAME_KEY);
     try {
-      writer = filename == null
-          ? new PrintWriter(System.out)
-          : new PrintWriter(new FileWriter(new File(filename), true));
-    }
-    catch (Exception e) {
+      writer = filename == null ? System.out
+          : new PrintStream(new FileOutputStream(new File(filename)),
+                            true, "UTF-8");
+    } catch (Exception e) {
       throw new MetricsException("Error creating "+ filename, e);
     }
   }
@@ -81,5 +82,10 @@ public class FileSink implements MetricsSink {
   @Override
   public void flush() {
     writer.flush();
+  }
+
+  @Override
+  public void close() throws IOException {
+    writer.close();
   }
 }

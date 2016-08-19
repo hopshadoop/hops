@@ -27,9 +27,9 @@ import org.apache.hadoop.yarn.proto.YarnProtos.ContainerResourceIncreaseRequestP
 import org.apache.hadoop.yarn.proto.YarnProtos.ResourceProto;
 
 
-public class ContainerResourceIncreaseRequestPBImpl
-    extends ContainerResourceIncreaseRequest {
-  ContainerResourceIncreaseRequestProto proto =
+public class ContainerResourceIncreaseRequestPBImpl extends
+    ContainerResourceIncreaseRequest {
+  ContainerResourceIncreaseRequestProto proto = 
       ContainerResourceIncreaseRequestProto.getDefaultInstance();
   ContainerResourceIncreaseRequestProto.Builder builder = null;
   boolean viaProto = false;
@@ -56,8 +56,8 @@ public class ContainerResourceIncreaseRequestPBImpl
 
   @Override
   public ContainerId getContainerId() {
-    ContainerResourceIncreaseRequestProtoOrBuilder p =
-        viaProto ? proto : builder;
+    ContainerResourceIncreaseRequestProtoOrBuilder p = viaProto ? proto
+        : builder;
     if (this.existingContainerId != null) {
       return this.existingContainerId;
     }
@@ -78,8 +78,8 @@ public class ContainerResourceIncreaseRequestPBImpl
 
   @Override
   public Resource getCapability() {
-    ContainerResourceIncreaseRequestProtoOrBuilder p =
-        viaProto ? proto : builder;
+    ContainerResourceIncreaseRequestProtoOrBuilder p = viaProto ? proto
+        : builder;
     if (this.targetCapability != null) {
       return this.targetCapability;
     }

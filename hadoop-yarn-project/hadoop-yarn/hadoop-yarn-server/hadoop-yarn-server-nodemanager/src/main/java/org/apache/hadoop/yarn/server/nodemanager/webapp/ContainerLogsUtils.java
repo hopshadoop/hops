@@ -1,21 +1,29 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Licensed to the Apache Software Foundation (ASF) under one
+* or more contributor license agreements.  See the NOTICE file
+* distributed with this work for additional information
+* regarding copyright ownership.  The ASF licenses this file
+* to you under the Apache License, Version 2.0 (the
+* "License"); you may not use this file except in compliance
+* with the License.  You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
 package org.apache.hadoop.yarn.server.nodemanager.webapp;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.SecureIOUtils;
@@ -35,20 +43,11 @@ import org.apache.hadoop.yarn.webapp.NotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.util.ArrayList;
-import java.util.List;
-
 /**
  * Contains utilities for fetching a user's log file in a secure fashion.
  */
 public class ContainerLogsUtils {
-  public static final Logger LOG =
-      LoggerFactory.getLogger(ContainerLogsUtils.class);
+  public static final Logger LOG = LoggerFactory.getLogger(ContainerLogsUtils.class);
   
   /**
    * Finds the local directories that logs for the given container are stored
@@ -75,16 +74,12 @@ public class ContainerLogsUtils {
   
   static List<File> getContainerLogDirs(ContainerId containerId,
       LocalDirsHandlerService dirsHandler) throws YarnException {
-    List<String> logDirs = dirsHandler.getLogDirs();
+    List<String> logDirs = dirsHandler.getLogDirsForRead();
     List<File> containerLogDirs = new ArrayList<File>(logDirs.size());
     for (String logDir : logDirs) {
-      try {
-        logDir = new URI(logDir).getPath();
-      } catch (URISyntaxException e) {
-        throw new YarnException("Internal error", e);
-      }
-      String appIdStr = ConverterUtils
-          .toString(containerId.getApplicationAttemptId().getApplicationId());
+      logDir = new File(logDir).toURI().getPath();
+      String appIdStr = ConverterUtils.toString(containerId
+          .getApplicationAttemptId().getApplicationId());
       File appLogDir = new File(logDir, appIdStr);
       containerLogDirs.add(new File(appLogDir, containerId.toString()));
     }
@@ -95,8 +90,7 @@ public class ContainerLogsUtils {
    * Finds the log file with the given filename for the given container.
    */
   public static File getContainerLogFile(ContainerId containerId,
-      String fileName, String remoteUser, Context context)
-      throws YarnException {
+      String fileName, String remoteUser, Context context) throws YarnException {
     Container container = context.getContainers().get(containerId);
     
     Application application = getApplicationForContainer(containerId, context);
@@ -107,16 +101,13 @@ public class ContainerLogsUtils {
     
     try {
       LocalDirsHandlerService dirsHandler = context.getLocalDirsHandler();
-      String relativeContainerLogDir = ContainerLaunch
-          .getRelativeContainerLogDir(application.getAppId().toString(),
-              containerId.toString());
+      String relativeContainerLogDir = ContainerLaunch.getRelativeContainerLogDir(
+          application.getAppId().toString(), containerId.toString());
       Path logPath = dirsHandler.getLogPathToRead(
           relativeContainerLogDir + Path.SEPARATOR + fileName);
-      URI logPathURI = new URI(logPath.toString());
+      URI logPathURI = new File(logPath.toString()).toURI();
       File logFile = new File(logPathURI.getPath());
       return logFile;
-    } catch (URISyntaxException e) {
-      throw new YarnException("Internal error", e);
     } catch (IOException e) {
       LOG.warn("Failed to find log file", e);
       throw new NotFoundException("Cannot find this log on the local disk.");
@@ -125,15 +116,16 @@ public class ContainerLogsUtils {
   
   private static Application getApplicationForContainer(ContainerId containerId,
       Context context) {
-    ApplicationId applicationId =
-        containerId.getApplicationAttemptId().getApplicationId();
-    Application application = context.getApplications().get(applicationId);
+    ApplicationId applicationId = containerId.getApplicationAttemptId()
+        .getApplicationId();
+    Application application = context.getApplications().get(
+        applicationId);
     
     if (application == null) {
       throw new NotFoundException(
-          "Unknown container. Container either has not started or " +
-              "has already completed or " +
-              "doesn't belong to this node at all.");
+          "Unknown container. Container either has not started or "
+              + "has already completed or "
+              + "doesn't belong to this node at all.");
     }
     return application;
   }
@@ -144,47 +136,51 @@ public class ContainerLogsUtils {
     if (remoteUser != null) {
       callerUGI = UserGroupInformation.createRemoteUser(remoteUser);
     }
-    if (callerUGI != null && !context.getApplicationACLsManager()
-        .checkAccess(callerUGI, ApplicationAccessType.VIEW_APP,
-            application.getUser(), application.getAppId())) {
-      throw new YarnException("User [" + remoteUser +
-          "] is not authorized to view the logs for application " +
-          application.getAppId());
+    if (callerUGI != null
+        && !context.getApplicationACLsManager().checkAccess(callerUGI,
+            ApplicationAccessType.VIEW_APP, application.getUser(),
+            application.getAppId())) {
+      throw new YarnException(
+          "User [" + remoteUser
+              + "] is not authorized to view the logs for application "
+              + application.getAppId());
     }
   }
   
   private static void checkState(ContainerState state) {
     if (state == ContainerState.NEW || state == ContainerState.LOCALIZING ||
         state == ContainerState.LOCALIZED) {
-      throw new NotFoundException(
-          "Container is not yet running. Current state is " + state);
+      throw new NotFoundException("Container is not yet running. Current state is "
+          + state);
     }
     if (state == ContainerState.LOCALIZATION_FAILED) {
-      throw new NotFoundException(
-          "Container wasn't started. Localization failed.");
+      throw new NotFoundException("Container wasn't started. Localization failed.");
     }
   }
   
-  public static FileInputStream openLogFileForRead(String containerIdStr,
-      File logFile, Context context) throws IOException {
+  public static FileInputStream openLogFileForRead(String containerIdStr, File logFile,
+      Context context) throws IOException {
     ContainerId containerId = ConverterUtils.toContainerId(containerIdStr);
-    ApplicationId applicationId =
-        containerId.getApplicationAttemptId().getApplicationId();
-    String user = context.getApplications().get(applicationId).getUser();
+    ApplicationId applicationId = containerId.getApplicationAttemptId()
+        .getApplicationId();
+    String user = context.getApplications().get(
+        applicationId).getUser();
     
     try {
       return SecureIOUtils.openForRead(logFile, user, null);
     } catch (IOException e) {
-      if (e.getMessage()
-          .contains("did not match expected owner '" + user + "'")) {
-        LOG.error("Exception reading log file " + logFile.getAbsolutePath(), e);
-        throw new IOException(
-            "Exception reading log file. Application submitted by '" + user +
-                "' doesn't own requested log file : " + logFile.getName(), e);
+      if (e.getMessage().contains(
+        "did not match expected owner '" + user
+            + "'")) {
+        LOG.error(
+            "Exception reading log file " + logFile.getAbsolutePath(), e);
+        throw new IOException("Exception reading log file. Application submitted by '"
+            + user
+            + "' doesn't own requested log file : "
+            + logFile.getName(), e);
       } else {
-        throw new IOException(
-            "Exception reading log file. It might be because log " +
-                "file was aggregated : " + logFile.getName(), e);
+        throw new IOException("Exception reading log file. It might be because log "
+            + "file was aggregated : " + logFile.getName(), e);
       }
     }
   }

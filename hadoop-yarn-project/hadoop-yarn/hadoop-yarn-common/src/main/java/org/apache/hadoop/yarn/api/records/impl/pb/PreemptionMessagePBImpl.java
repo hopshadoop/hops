@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.yarn.api.records.impl.pb;
 
-import com.google.protobuf.TextFormat;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.records.PreemptionContract;
@@ -27,6 +26,8 @@ import org.apache.hadoop.yarn.proto.YarnProtos.PreemptionContractProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.PreemptionMessageProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.PreemptionMessageProtoOrBuilder;
 import org.apache.hadoop.yarn.proto.YarnProtos.StrictPreemptionContractProto;
+
+import com.google.protobuf.TextFormat;
 
 @Private
 @Unstable
@@ -62,9 +63,8 @@ public class PreemptionMessagePBImpl extends PreemptionMessage {
 
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -77,9 +77,8 @@ public class PreemptionMessagePBImpl extends PreemptionMessage {
   }
 
   private void mergeLocalToProto() {
-    if (viaProto) {
+    if (viaProto)
       maybeInitBuilder();
-    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
@@ -152,7 +151,7 @@ public class PreemptionMessagePBImpl extends PreemptionMessage {
 
   private StrictPreemptionContractProto convertToProtoFormat(
       StrictPreemptionContract t) {
-    return ((StrictPreemptionContractPBImpl) t).getProto();
+    return ((StrictPreemptionContractPBImpl)t).getProto();
   }
 
   private PreemptionContractPBImpl convertFromProtoFormat(
@@ -160,8 +159,9 @@ public class PreemptionMessagePBImpl extends PreemptionMessage {
     return new PreemptionContractPBImpl(p);
   }
 
-  private PreemptionContractProto convertToProtoFormat(PreemptionContract t) {
-    return ((PreemptionContractPBImpl) t).getProto();
+  private PreemptionContractProto convertToProtoFormat(
+      PreemptionContract t) {
+    return ((PreemptionContractPBImpl)t).getProto();
   }
 
 }

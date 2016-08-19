@@ -19,6 +19,7 @@
 package org.apache.hadoop.yarn.conf;
 
 import org.apache.hadoop.conf.Configuration;
+
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.junit.Before;
@@ -35,8 +36,7 @@ import static org.junit.Assert.fail;
 public class TestHAUtil {
   private Configuration conf;
 
-  private static final String RM1_ADDRESS_UNTRIMMED =
-      "  \t\t\n 1.2.3.4:8021  \n\t ";
+  private static final String RM1_ADDRESS_UNTRIMMED = "  \t\t\n 1.2.3.4:8021  \n\t ";
   private static final String RM1_ADDRESS = RM1_ADDRESS_UNTRIMMED.trim();
   private static final String RM2_ADDRESS = "localhost:8022";
   private static final String RM3_ADDRESS = "localhost:8033";
@@ -45,8 +45,7 @@ public class TestHAUtil {
   private static final String RM2_NODE_ID = "rm2";
   private static final String RM3_NODE_ID = "rm3";
   private static final String RM_INVALID_NODE_ID = ".rm";
-  private static final String RM_NODE_IDS_UNTRIMMED =
-      RM1_NODE_ID_UNTRIMMED + "," + RM2_NODE_ID;
+  private static final String RM_NODE_IDS_UNTRIMMED = RM1_NODE_ID_UNTRIMMED + "," + RM2_NODE_ID;
   private static final String RM_NODE_IDS = RM1_NODE_ID + "," + RM2_NODE_ID;
 
   @Before
@@ -76,16 +75,15 @@ public class TestHAUtil {
   @Test
   public void testGetRMId() throws Exception {
     conf.set(YarnConfiguration.RM_HA_ID, RM1_NODE_ID);
-    assertEquals("Does not honor " + YarnConfiguration.RM_HA_ID, RM1_NODE_ID,
-        HAUtil.getRMHAId(conf));
+    assertEquals("Does not honor " + YarnConfiguration.RM_HA_ID,
+      RM1_NODE_ID, HAUtil.getRMHAId(conf));
 
     conf.clear();
-    assertNull("Return null when " + YarnConfiguration.RM_HA_ID + " is not set",
-        HAUtil.getRMHAId(conf));
+    assertNull("Return null when " + YarnConfiguration.RM_HA_ID
+        + " is not set", HAUtil.getRMHAId(conf));
   }
 
-  //TODO update test to not verify deprecated things
-  //  @Test
+  @Test
   public void testVerifyAndSetConfiguration() throws Exception {
     try {
       HAUtil.verifyAndSetConfiguration(conf);
@@ -94,12 +92,12 @@ public class TestHAUtil {
     }
 
     assertEquals("Should be saved as Trimmed collection",
-        StringUtils.getStringCollection(RM_NODE_IDS), HAUtil.getRMHAIds(conf));
-    assertEquals("Should be saved as Trimmed string", RM1_NODE_ID,
-        HAUtil.getRMHAId(conf));
+      StringUtils.getStringCollection(RM_NODE_IDS), HAUtil.getRMHAIds(conf));
+    assertEquals("Should be saved as Trimmed string",
+      RM1_NODE_ID, HAUtil.getRMHAId(conf));
     for (String confKey : YarnConfiguration.getServiceAddressConfKeys(conf)) {
-      assertEquals("RPC address not set for " + confKey, RM1_ADDRESS,
-          conf.get(confKey));
+      assertEquals("RPC address not set for " + confKey,
+        RM1_ADDRESS, conf.get(confKey));
     }
 
     conf.clear();
@@ -108,15 +106,17 @@ public class TestHAUtil {
       HAUtil.verifyAndSetConfiguration(conf);
     } catch (YarnRuntimeException e) {
       assertEquals("YarnRuntimeException by verifyAndSetRMHAIds()",
-          HAUtil.BAD_CONFIG_MESSAGE_PREFIX + HAUtil
-              .getInvalidValueMessage(YarnConfiguration.RM_HA_IDS,
-                  conf.get(YarnConfiguration.RM_HA_IDS) +
-                      "\nHA mode requires atleast two RMs"), e.getMessage());
+        HAUtil.BAD_CONFIG_MESSAGE_PREFIX +
+          HAUtil.getInvalidValueMessage(YarnConfiguration.RM_HA_IDS,
+              conf.get(YarnConfiguration.RM_HA_IDS) +
+              "\nHA mode requires atleast two RMs"),
+        e.getMessage());
     }
 
     conf.clear();
     // simulate the case YarnConfiguration.RM_HA_ID is not set
-    conf.set(YarnConfiguration.RM_HA_IDS, RM1_NODE_ID + "," + RM2_NODE_ID);
+    conf.set(YarnConfiguration.RM_HA_IDS, RM1_NODE_ID + ","
+        + RM2_NODE_ID);
     for (String confKey : YarnConfiguration.getServiceAddressConfKeys(conf)) {
       conf.set(HAUtil.addSuffix(confKey, RM1_NODE_ID), RM1_ADDRESS);
       conf.set(HAUtil.addSuffix(confKey, RM2_NODE_ID), RM2_ADDRESS);
@@ -125,15 +125,15 @@ public class TestHAUtil {
       HAUtil.verifyAndSetConfiguration(conf);
     } catch (YarnRuntimeException e) {
       assertEquals("YarnRuntimeException by getRMId()",
-          HAUtil.BAD_CONFIG_MESSAGE_PREFIX +
-              HAUtil.getNeedToSetValueMessage(YarnConfiguration.RM_HA_ID),
-          e.getMessage());
+        HAUtil.BAD_CONFIG_MESSAGE_PREFIX +
+          HAUtil.getNeedToSetValueMessage(YarnConfiguration.RM_HA_ID),
+        e.getMessage());
     }
 
     conf.clear();
     conf.set(YarnConfiguration.RM_HA_ID, RM_INVALID_NODE_ID);
-    conf.set(YarnConfiguration.RM_HA_IDS,
-        RM_INVALID_NODE_ID + "," + RM1_NODE_ID);
+    conf.set(YarnConfiguration.RM_HA_IDS, RM_INVALID_NODE_ID + ","
+        + RM1_NODE_ID);
     for (String confKey : YarnConfiguration.getServiceAddressConfKeys(conf)) {
       // simulate xml with invalid node id
       conf.set(confKey + RM_INVALID_NODE_ID, RM_INVALID_NODE_ID);
@@ -142,9 +142,10 @@ public class TestHAUtil {
       HAUtil.verifyAndSetConfiguration(conf);
     } catch (YarnRuntimeException e) {
       assertEquals("YarnRuntimeException by addSuffix()",
-          HAUtil.BAD_CONFIG_MESSAGE_PREFIX + HAUtil
-              .getInvalidValueMessage(YarnConfiguration.RM_HA_ID,
-                  RM_INVALID_NODE_ID), e.getMessage());
+        HAUtil.BAD_CONFIG_MESSAGE_PREFIX +
+          HAUtil.getInvalidValueMessage(YarnConfiguration.RM_HA_ID,
+            RM_INVALID_NODE_ID),
+        e.getMessage());
     }
 
     conf.clear();
@@ -156,11 +157,11 @@ public class TestHAUtil {
       fail("Should throw YarnRuntimeException. by Configuration#set()");
     } catch (YarnRuntimeException e) {
       String confKey =
-          HAUtil.addSuffix(YarnConfiguration.RM_ADDRESS, RM1_NODE_ID);
+        HAUtil.addSuffix(YarnConfiguration.RM_ADDRESS, RM1_NODE_ID);
       assertEquals("YarnRuntimeException by Configuration#set()",
-          HAUtil.BAD_CONFIG_MESSAGE_PREFIX + HAUtil.getNeedToSetValueMessage(
-              HAUtil.addSuffix(YarnConfiguration.RM_HOSTNAME, RM1_NODE_ID) +
-                  " or " + confKey), e.getMessage());
+        HAUtil.BAD_CONFIG_MESSAGE_PREFIX + HAUtil.getNeedToSetValueMessage(
+            HAUtil.addSuffix(YarnConfiguration.RM_HOSTNAME, RM1_NODE_ID)
+            + " or " + confKey), e.getMessage());
     }
 
     // simulate the case YarnConfiguration.RM_HA_IDS doesn't contain
@@ -177,9 +178,9 @@ public class TestHAUtil {
       HAUtil.verifyAndSetConfiguration(conf);
     } catch (YarnRuntimeException e) {
       assertEquals("YarnRuntimeException by getRMId()'s validation",
-          HAUtil.BAD_CONFIG_MESSAGE_PREFIX + HAUtil
-              .getRMHAIdNeedToBeIncludedMessage("[rm2, rm3]", RM1_NODE_ID),
-          e.getMessage());
+        HAUtil.BAD_CONFIG_MESSAGE_PREFIX +
+        HAUtil.getRMHAIdNeedToBeIncludedMessage("[rm2, rm3]", RM1_NODE_ID),
+        e.getMessage());
     }
   }
 

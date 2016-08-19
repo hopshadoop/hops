@@ -29,6 +29,23 @@
 #                                    by doing 
 #                                    export HADOOP_USER_CLASSPATH_FIRST=true
 #
+#   HADOOP_USE_CLIENT_CLASSLOADER    When defined, HADOOP_CLASSPATH and the jar
+#                                    as the hadoop jar argument are handled by
+#                                    by a separate isolated client classloader.
+#                                    If it is set, HADOOP_USER_CLASSPATH_FIRST
+#                                    is ignored. Can be defined by doing
+#                                    export HADOOP_USE_CLIENT_CLASSLOADER=true
+#
+#   HADOOP_CLIENT_CLASSLOADER_SYSTEM_CLASSES
+#                                    When defined, it overrides the default
+#                                    definition of system classes for the client
+#                                    classloader when
+#                                    HADOOP_USE_CLIENT_CLASSLOADER is enabled.
+#                                    Names ending in '.' (period) are treated as
+#                                    package names, and names starting with a
+#                                    '-' are treated as negative matches.
+#                                    For example,
+#                                    export HADOOP_CLIENT_CLASSLOADER_SYSTEM_CLASSES="-org.apache.hadoop.UserClass,java.,javax.,org.apache.hadoop."
 
 this="${BASH_SOURCE-$0}"
 common_bin=$(cd -P -- "$(dirname -- "$this")" && pwd -P)
@@ -68,6 +85,18 @@ then
 	      HADOOP_CONF_DIR=$confdir
     fi
 fi
+
+# Set log level. Default to INFO.
+if [ $# -gt 1 ]
+then
+  if [ "--loglevel" = "$1" ]
+  then
+    shift
+    HADOOP_LOGLEVEL=$1
+    shift
+  fi
+fi
+HADOOP_LOGLEVEL="${HADOOP_LOGLEVEL:-INFO}"
  
 # Allow alternate conf dir location.
 if [ -e "${HADOOP_PREFIX}/conf/hadoop-env.sh" ]; then
@@ -93,7 +122,7 @@ then
     if [ "--hosts" = "$1" ]
     then
         shift
-        export HADOOP_SLAVES="${HADOOP_CONF_DIR}/$$1"
+        export HADOOP_SLAVES="${HADOOP_CONF_DIR}/$1"
         shift
     elif [ "--hostnames" = "$1" ]
     then
@@ -115,6 +144,11 @@ fi
 if [ -f "${HADOOP_CONF_DIR}/hadoop-env.sh" ]; then
   . "${HADOOP_CONF_DIR}/hadoop-env.sh"
 fi
+
+cygwin=false
+case "$(uname)" in
+CYGWIN*) cygwin=true;;
+esac
 
 # check if net.ipv6.bindv6only is set to 1
 bindv6only=$(/sbin/sysctl -n net.ipv6.bindv6only 2> /dev/null)
@@ -216,10 +250,20 @@ TOOL_PATH="${TOOL_PATH:-$HADOOP_PREFIX/share/hadoop/tools/lib/*}"
 
 HADOOP_OPTS="$HADOOP_OPTS -Dhadoop.log.dir=$HADOOP_LOG_DIR"
 HADOOP_OPTS="$HADOOP_OPTS -Dhadoop.log.file=$HADOOP_LOGFILE"
-HADOOP_OPTS="$HADOOP_OPTS -Dhadoop.home.dir=$HADOOP_PREFIX"
+
+if [ "$cygwin" = true ]; then
+  HADOOP_HOME=$(cygpath -w "$HADOOP_PREFIX" 2>/dev/null)
+  HADOOP_OPTS="$HADOOP_OPTS -Dhadoop.home.dir=$HADOOP_HOME"
+  export HADOOP_HOME
+else
+  HADOOP_OPTS="$HADOOP_OPTS -Dhadoop.home.dir=$HADOOP_PREFIX"
+fi
 HADOOP_OPTS="$HADOOP_OPTS -Dhadoop.id.str=$HADOOP_IDENT_STRING"
-HADOOP_OPTS="$HADOOP_OPTS -Dhadoop.root.logger=${HADOOP_ROOT_LOGGER:-INFO,console}"
+HADOOP_OPTS="$HADOOP_OPTS -Dhadoop.root.logger=${HADOOP_ROOT_LOGGER:-${HADOOP_LOGLEVEL},console}"
 if [ "x$JAVA_LIBRARY_PATH" != "x" ]; then
+  if $cygwin; then
+    JAVA_LIBRARY_PATH=$(cygpath -w "$JAVA_LIBRARY_PATH" 2>/dev/null)
+  fi
   HADOOP_OPTS="$HADOOP_OPTS -Djava.library.path=$JAVA_LIBRARY_PATH"
   export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$JAVA_LIBRARY_PATH
 fi  
@@ -284,7 +328,9 @@ fi
 # Add the user-specified CLASSPATH via HADOOP_CLASSPATH
 # Add it first or last depending on if user has
 # set env-var HADOOP_USER_CLASSPATH_FIRST
-if [ "$HADOOP_CLASSPATH" != "" ]; then
+# if the user set HADOOP_USE_CLIENT_CLASSLOADER, HADOOP_CLASSPATH is not added
+# to the classpath
+if [[ ( "$HADOOP_CLASSPATH" != "" ) && ( "$HADOOP_USE_CLIENT_CLASSLOADER" = "" ) ]]; then
   # Prefix it if its to be preceded
   if [ "$HADOOP_USER_CLASSPATH_FIRST" != "" ]; then
     CLASSPATH=${HADOOP_CLASSPATH}:${CLASSPATH}

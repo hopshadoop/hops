@@ -18,15 +18,20 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager;
 
-import io.hops.ha.common.TransactionStateManager;
+import java.nio.ByteBuffer;
+import java.util.concurrent.ConcurrentMap;
+
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ha.HAServiceProtocol.HAServiceState;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.conf.ConfigurationProvider;
 import org.apache.hadoop.yarn.event.Dispatcher;
 import org.apache.hadoop.yarn.server.resourcemanager.ahs.RMApplicationHistoryWriter;
+import org.apache.hadoop.yarn.server.resourcemanager.metrics.SystemMetricsPublisher;
+import org.apache.hadoop.yarn.server.resourcemanager.nodelabels.RMNodeLabelsManager;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
-import org.apache.hadoop.yarn.server.resourcemanager.recovery.Recoverable;
+import org.apache.hadoop.yarn.server.resourcemanager.reservation.ReservationSystem;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.AMLivelinessMonitor;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.ContainerAllocationExpirer;
@@ -39,34 +44,26 @@ import org.apache.hadoop.yarn.server.resourcemanager.security.NMTokenSecretManag
 import org.apache.hadoop.yarn.server.resourcemanager.security.RMContainerTokenSecretManager;
 import org.apache.hadoop.yarn.server.resourcemanager.security.RMDelegationTokenSecretManager;
 
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ConcurrentSkipListSet;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.quota.QuotaService;
-
 /**
  * Context of the ResourceManager.
  */
-public interface RMContext extends Recoverable {
+public interface RMContext {
 
   Dispatcher getDispatcher();
 
   boolean isHAEnabled();
 
-  boolean isLeadingRT();
-  
-  boolean isLeader();
-  
-  boolean isDistributedEnabled();
-  
   HAServiceState getHAServiceState();
 
   RMStateStore getStateStore();
 
   ConcurrentMap<ApplicationId, RMApp> getRMApps();
   
+  ConcurrentMap<ApplicationId, ByteBuffer> getSystemCredentialsForApps();
+
   ConcurrentMap<String, RMNode> getInactiveRMNodes();
 
-  ConcurrentMap<NodeId, RMNode> getActiveRMNodes();
+  ConcurrentMap<NodeId, RMNode> getRMNodes();
 
   AMLivelinessMonitor getAMLivelinessMonitor();
 
@@ -90,18 +87,12 @@ public interface RMContext extends Recoverable {
 
   AdminService getRMAdminService();
 
-  GroupMembershipService getGroupMembershipService();
-  
   ClientRMService getClientRMService();
 
   ApplicationMasterService getApplicationMasterService();
 
   ResourceTrackerService getResourceTrackerService();
-  
-  ContainersLogsService getContainersLogsService();
-  
-  QuotaService getQuotaService();
-  
+
   void setClientRMService(ClientRMService clientRMService);
 
   RMDelegationTokenSecretManager getRMDelegationTokenSecretManager();
@@ -114,7 +105,23 @@ public interface RMContext extends Recoverable {
   void setRMApplicationHistoryWriter(
       RMApplicationHistoryWriter rmApplicationHistoryWriter);
 
+  void setSystemMetricsPublisher(SystemMetricsPublisher systemMetricsPublisher);
+
+  SystemMetricsPublisher getSystemMetricsPublisher();
+
   ConfigurationProvider getConfigurationProvider();
+
+  boolean isWorkPreservingRecoveryEnabled();
   
-  public TransactionStateManager getTransactionStateManager();
+  RMNodeLabelsManager getNodeLabelManager();
+  
+  public void setNodeLabelManager(RMNodeLabelsManager mgr);
+
+  long getEpoch();
+
+  ReservationSystem getReservationSystem();
+
+  boolean isSchedulerReadyForAllocatingContainers();
+  
+  Configuration getYarnConfiguration();
 }
