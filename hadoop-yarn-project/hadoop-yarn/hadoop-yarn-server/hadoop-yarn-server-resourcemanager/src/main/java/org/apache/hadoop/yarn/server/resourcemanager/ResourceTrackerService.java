@@ -72,6 +72,7 @@ import org.apache.hadoop.yarn.util.RackResolver;
 import org.apache.hadoop.yarn.util.YarnVersionInfo;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeImplDist;
 
 public class ResourceTrackerService extends AbstractService implements
     ResourceTracker {
@@ -301,9 +302,15 @@ public class ResourceTrackerService extends AbstractService implements
     response.setNMTokenMasterKey(nmTokenSecretManager
         .getCurrentKey());    
 
-    RMNode rmNode = new RMNodeImpl(nodeId, rmContext, host, cmPort, httpPort,
-        resolve(host), capability, nodeManagerVersion);
-
+    //TODO get the class to use from the config file
+    RMNode rmNode;
+    if (!rmContext.isDistributed()) {
+      rmNode = new RMNodeImpl(nodeId, rmContext, host, cmPort, httpPort,
+              resolve(host), capability, nodeManagerVersion);
+    } else {
+      rmNode = new RMNodeImplDist(nodeId, rmContext, host, cmPort, httpPort,
+              resolve(host), capability, nodeManagerVersion);
+    }
     RMNode oldNode = this.rmContext.getRMNodes().putIfAbsent(nodeId, rmNode);
     if (oldNode == null) {
       this.rmContext.getDispatcher().getEventHandler().handle(

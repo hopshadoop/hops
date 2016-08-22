@@ -124,4 +124,8 @@ public interface RMContext {
   boolean isSchedulerReadyForAllocatingContainers();
   
   Configuration getYarnConfiguration();
+  
+  boolean isLeader();
+  
+  boolean isDistributed();
 }
