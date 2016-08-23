@@ -22,6 +22,8 @@ import io.hops.util.ToCommitHB;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.net.Node;
@@ -48,6 +50,14 @@ import org.apache.hadoop.yarn.state.SingleArcTransition;
 public class RMNodeImplDist extends RMNodeImpl {
 
   private static final Log LOG = LogFactory.getLog(RMNodeImplDist.class);
+
+  // Used by RT streaming receiver
+  public static enum KeyType {
+    CURRENTNMTOKENMASTERKEY,
+    NEXTNMTOKENMASTERKEY,
+    CURRENTCONTAINERTOKENMASTERKEY,
+    NEXTCONTAINERTOKENMASTERKEY
+  }
 
   public RMNodeImplDist(NodeId nodeId, RMContext context, String hostName,
           int cmPort, int httpPort, Node node, Resource capability,
@@ -244,5 +254,35 @@ public class RMNodeImplDist extends RMNodeImpl {
     this.nextHeartBeat = true;
     DBUtility.addNextHB(true);
     return latestContainerInfoList;
+  }
+
+  public void setContainersToCleanUp(Set<ContainerId> containersToCleanUp) {
+    super.writeLock.lock();
+
+    try {
+      super.containersToClean.addAll(containersToCleanUp);
+    } finally {
+      super.writeLock.unlock();
+    }
+  }
+
+  public void setAppsToCleanUp(List<ApplicationId> appsToCleanUp) {
+    super.writeLock.lock();
+
+    try {
+      super.finishedApplications.addAll(appsToCleanUp);
+    } finally {
+      super.writeLock.unlock();
+    }
+  }
+
+  public void setNextHeartbeat(boolean nextHeartbeat) {
+    super.writeLock.lock();
+
+    try {
+      super.nextHeartBeat = nextHeartbeat;
+    } finally {
+      super.writeLock.unlock();
+    }
   }
 }
