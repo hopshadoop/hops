@@ -29,6 +29,8 @@ import org.apache.hadoop.yarn.client.RMProxy;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 
 import com.google.common.base.Preconditions;
+import io.hops.util.GroupMembership;
+import org.apache.hadoop.net.NetUtils;
 
 public class ServerRMProxy<T> extends RMProxy<T> {
   private static final Log LOG = LogFactory.getLog(ServerRMProxy.class);
@@ -60,10 +62,43 @@ public class ServerRMProxy<T> extends RMProxy<T> {
         YarnConfiguration.RM_RESOURCE_TRACKER_ADDRESS,
         YarnConfiguration.DEFAULT_RM_RESOURCE_TRACKER_ADDRESS,
         YarnConfiguration.DEFAULT_RM_RESOURCE_TRACKER_PORT);
+    } else if (protocol == GroupMembership.class) {
+      return conf.getSocketAddr(YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS,
+              YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_ADDRESS,
+              YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_PORT);
     } else {
       String message = "Unsupported protocol found when creating the proxy " +
           "connection to ResourceManager: " +
           ((protocol != null) ? protocol.getClass().getName() : "null");
+      LOG.error(message);
+      throw new IllegalStateException(message);
+    }
+  }
+
+  @InterfaceAudience.Private
+  @Override
+  protected InetSocketAddress getRMAddress(YarnConfiguration conf,
+          Class<?> protocol, String host, int referencePort) {
+    if (protocol == ResourceTracker.class) {
+      int port = referencePort - (conf
+              .getInt(YarnConfiguration.RM_GROUP_MEMBERSHIP_PORT,
+                      YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_PORT)
+              - conf.getInt(YarnConfiguration.RM_RESOURCE_TRACKER_PORT,
+                      YarnConfiguration.DEFAULT_RM_RESOURCE_TRACKER_PORT));
+      return NetUtils.createSocketAddrForHost(host, port);
+
+    } else if (protocol == GroupMembership.class) {
+      int port = referencePort - (conf
+              .getInt(YarnConfiguration.RM_GROUP_MEMBERSHIP_PORT,
+                      YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_PORT)
+              - conf.getInt(YarnConfiguration.RM_GROUP_MEMBERSHIP_PORT,
+                      YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_PORT));
+      return NetUtils.createSocketAddrForHost(host, port);
+
+    } else {
+      String message = "Unsupported protocol found when creating the proxy "
+              + "connection to ResourceManager: " + ((protocol != null)
+                      ? protocol.getClass().getName() : "null");
       LOG.error(message);
       throw new IllegalStateException(message);
     }

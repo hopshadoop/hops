@@ -77,21 +77,21 @@ public abstract class PendingEventRetrieval {
             }
         });
 
-        if (pendingEvent.getType() == TablesDef.PendingEventTableDef.NODE_ADDED) {
+        if (pendingEvent.getType().equals(PendingEvent.Type.NODE_ADDED)) {
             LOG.debug("HOP :: PendingEventRetrieval event NodeAdded: " + pendingEvent);
             rmContext.getDispatcher().getEventHandler().handle(
                     new NodeAddedSchedulerEvent(rmNode));
-        } else if (pendingEvent.getType() == TablesDef.PendingEventTableDef.NODE_REMOVED) {
+        } else if (pendingEvent.getType().equals(PendingEvent.Type.NODE_REMOVED)) {
             LOG.debug("HOP :: PendingEventRetrieval event NodeRemoved: " + pendingEvent);
             rmContext.getDispatcher().getEventHandler().handle(
                     new NodeRemovedSchedulerEvent(rmNode));
-        } else if (pendingEvent.getType() == TablesDef.PendingEventTableDef.NODE_UPDATED) {
-            if (pendingEvent.getStatus() == TablesDef.PendingEventTableDef.SCHEDULER_FINISHED_PROCESSING) {
+        } else if (pendingEvent.getType().equals(PendingEvent.Type.NODE_UPDATED)) {
+            if (pendingEvent.getStatus().equals(PendingEvent.Status.SCHEDULER_FINISHED_PROCESSING)) {
                 LOG.debug("HOP :: NodeUpdate event - event_scheduler - finished_processing RMNode: " +
                         rmNode.getNodeID() + " pending event: " + pendingEvent.getId().getEventId());
                 rmContext.getDispatcher().getEventHandler().handle(
                         new NodeUpdateSchedulerEvent(rmNode));
-            } else if (pendingEvent.getStatus() == TablesDef.PendingEventTableDef.SCHEDULER_NOT_FINISHED_PROCESSING) {
+            } else if (pendingEvent.getStatus().equals(PendingEvent.Status.SCHEDULER_NOT_FINISHED_PROCESSING)) {
                 LOG.debug("NodeUpdate event - event_scheduler - NOT_finished_processing RMNode: " +
                         rmNode.getNodeID() + " pending event: " + pendingEvent.getId().getEventId());
             }

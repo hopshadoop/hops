@@ -34,6 +34,16 @@
 
   <dependencies>
     <dependency>
+      <groupId>io.hops</groupId>
+      <artifactId>hops-leader-election</artifactId>
+      <version>2.4.0</version>
+    </dependency>
+    <dependency>
+      <groupId>io.hops.metadata</groupId>
+      <artifactId>hops-metadata-dal</artifactId>
+      <version>1.0-SNAPSHOT</version>
+    </dependency>
+    <dependency>
       <groupId>javax.servlet</groupId>
       <artifactId>servlet-api</artifactId>
     </dependency>
@@ -216,13 +226,6 @@
       <artifactId>jersey-test-framework-grizzly2</artifactId>
       <scope>test</scope>
     </dependency>
-    
-    <dependency>
-      <groupId>io.hops.metadata</groupId>
-      <artifactId>hops-metadata-dal</artifactId>
-      <version>1.0-SNAPSHOT</version>
-    </dependency>
-    
   </dependencies>
 
   <build>

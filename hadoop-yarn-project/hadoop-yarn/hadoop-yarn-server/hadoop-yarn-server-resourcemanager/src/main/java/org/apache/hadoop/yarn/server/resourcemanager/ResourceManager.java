@@ -19,6 +19,9 @@
 package org.apache.hadoop.yarn.server.resourcemanager;
 
 import com.google.common.annotations.VisibleForTesting;
+import io.hops.util.GroupMembershipService;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -137,7 +140,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
    * RM is active when (1) HA is disabled, or (2) HA is enabled and the RM is
    * in Active state.
    */
-  protected RMActiveServices activeServices;
+  protected RMSchedulerServices schedulerServices;
   protected RMSecretManagerService rmSecretManagerService;
 
   protected ResourceScheduler scheduler;
@@ -162,6 +165,10 @@ public class ResourceManager extends CompositeService implements Recoverable {
 
   private UserGroupInformation rmLoginUGI;
   
+  private ResourceTrackingServices resourceTrackingService;
+  
+  protected GroupMembershipService groupMembershipService;
+  
   public ResourceManager() {
     super("ResourceManager");
   }
@@ -183,6 +190,10 @@ public class ResourceManager extends CompositeService implements Recoverable {
   protected void serviceInit(Configuration conf) throws Exception {
     this.conf = conf;
     this.rmContext = new RMContextImpl();
+    
+    this.rmContext.setIsDistributed(conf.getBoolean(
+            YarnConfiguration.DISTRIBUTED_RM,
+            YarnConfiguration.DEFAULT_DISTRIBUTED_RM));
     
     this.configurationProvider =
         ConfigurationProviderFactory.getConfigurationProvider(conf);
@@ -221,6 +232,9 @@ public class ResourceManager extends CompositeService implements Recoverable {
     this.rmContext.setHAEnabled(HAUtil.isHAEnabled(this.conf));
     if (this.rmContext.isHAEnabled()) {
       HAUtil.verifyAndSetConfiguration(this.conf);
+      groupMembershipService = createGroupMembershipService();
+      addService(groupMembershipService);
+      rmContext.setRMGroupMembershipService(groupMembershipService);
     }
     
     // Set UGI and do login
@@ -244,7 +258,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
 
     rmContext.setYarnConfiguration(conf);
     
-    createAndInitActiveServices();
+    createAndInitSchedulerServices();
 
     webAppAddress = WebAppUtils.getWebAppBindURL(this.conf,
                       YarnConfiguration.RM_BIND_HOST,
@@ -386,31 +400,26 @@ public class ResourceManager extends CompositeService implements Recoverable {
     }
   }
 
-  /**
-   * RMActiveServices handles all the Active services in the RM.
-   */
   @Private
-  public class RMActiveServices extends CompositeService {
-
-    private DelegationTokenRenewer delegationTokenRenewer;
-    private EventHandler<SchedulerEvent> schedulerDispatcher;
-    private ApplicationMasterLauncher applicationMasterLauncher;
+  class ResourceTrackingServices extends CompositeService {
     private ContainerAllocationExpirer containerAllocationExpirer;
-    private ResourceManager rm;
     private boolean recoveryEnabled;
     private RMActiveServiceContext activeServiceContext;
-
-    RMActiveServices(ResourceManager rm) {
-      super("RMActiveServices");
+    private ResourceManager rm;
+    
+    public ResourceTrackingServices(ResourceManager rm) {
+      super("ResourceTrackingServices");
+      LOG.info("create resourceTrackingService");
       this.rm = rm;
     }
 
     @Override
     protected void serviceInit(Configuration configuration) throws Exception {
+      LOG.info("init resourceTrackingService");
+      conf.setBoolean(Dispatcher.DISPATCHER_EXIT_ON_ERROR_KEY, true);
       activeServiceContext = new RMActiveServiceContext();
       rmContext.setActiveServiceContext(activeServiceContext);
-
-      conf.setBoolean(Dispatcher.DISPATCHER_EXIT_ON_ERROR_KEY, true);
+      
       rmSecretManagerService = createRMSecretManagerService();
       addService(rmSecretManagerService);
 
@@ -462,17 +471,82 @@ public class ResourceManager extends CompositeService implements Recoverable {
       }
       rmContext.setStateStore(rmStore);
 
-      if (UserGroupInformation.isSecurityEnabled()) {
-        delegationTokenRenewer = createDelegationTokenRenewer();
-        rmContext.setDelegationTokenRenewer(delegationTokenRenewer);
-      }
-
       // Register event handler for NodesListManager
       nodesListManager = new NodesListManager(rmContext);
       rmDispatcher.register(NodesListManagerEventType.class, nodesListManager);
       addService(nodesListManager);
       rmContext.setNodesListManager(nodesListManager);
 
+      // Register event handler for RmNodes
+      rmDispatcher.register(
+          RMNodeEventType.class, new NodeEventDispatcher(rmContext));
+
+      nmLivelinessMonitor = createNMLivelinessMonitor();
+      addService(nmLivelinessMonitor);
+
+      resourceTracker = createResourceTrackerService();
+      addService(resourceTracker);
+      rmContext.setResourceTrackerService(resourceTracker);
+
+      DefaultMetricsSystem.initialize("ResourceManager");
+      JvmMetrics.initSingleton("ResourceManager", null);
+
+      super.serviceInit(conf);
+    }
+    
+    @Override
+    protected void serviceStart() throws Exception {
+      LOG.info("starting resourceTrackingService");
+      RMStateStore rmStore = rmContext.getStateStore();
+      // The state store needs to start irrespective of recoveryEnabled as apps
+      // need events to move to further states.
+      rmStore.start();
+
+      if(recoveryEnabled) {
+        try {
+          LOG.info("Recovery started");
+          rmStore.checkVersion();
+          if (rmContext.isWorkPreservingRecoveryEnabled()) {
+            rmContext.setEpoch(rmStore.getAndIncrementEpoch());
+          }
+          RMState state = rmStore.loadState();
+          recover(state);
+          LOG.info("Recovery ended");
+        } catch (Exception e) {
+          // the Exception from loadState() needs to be handled for
+          // HA and we need to give up master status if we got fenced
+          LOG.error("Failed to load/recover state", e);
+          throw e;
+        }
+      }
+      super.serviceStart();
+    }
+  }
+  
+  /**
+   * RMActiveServices handles all the Active services in the RM.
+   */
+  @Private
+  public class RMSchedulerServices extends CompositeService {
+
+    private DelegationTokenRenewer delegationTokenRenewer;
+    private EventHandler<SchedulerEvent> schedulerDispatcher;
+    private ApplicationMasterLauncher applicationMasterLauncher;
+   
+
+    RMSchedulerServices() {
+      super("RMActiveServices");
+    }
+
+    @Override
+    protected void serviceInit(Configuration configuration) throws Exception {
+      createAndInitResourceTrackingServices();
+ 
+      if (UserGroupInformation.isSecurityEnabled()) {
+        delegationTokenRenewer = createDelegationTokenRenewer();
+        rmContext.setDelegationTokenRenewer(delegationTokenRenewer);
+      }
+      
       // Initialize the scheduler
       scheduler = createScheduler();
       scheduler.setRMContext(rmContext);
@@ -490,20 +564,6 @@ public class ResourceManager extends CompositeService implements Recoverable {
       // Register event handler for RmAppAttemptEvents
       rmDispatcher.register(RMAppAttemptEventType.class,
           new ApplicationAttemptEventDispatcher(rmContext));
-
-      // Register event handler for RmNodes
-      rmDispatcher.register(
-          RMNodeEventType.class, new NodeEventDispatcher(rmContext));
-
-      nmLivelinessMonitor = createNMLivelinessMonitor();
-      addService(nmLivelinessMonitor);
-
-      resourceTracker = createResourceTrackerService();
-      addService(resourceTracker);
-      rmContext.setResourceTrackerService(resourceTracker);
-
-      DefaultMetricsSystem.initialize("ResourceManager");
-      JvmMetrics.initSingleton("ResourceManager", null);
 
       // Initialize the Reservation system
       if (conf.getBoolean(YarnConfiguration.RM_RESERVATION_SYSTEM_ENABLE,
@@ -553,29 +613,8 @@ public class ResourceManager extends CompositeService implements Recoverable {
 
     @Override
     protected void serviceStart() throws Exception {
-      RMStateStore rmStore = rmContext.getStateStore();
-      // The state store needs to start irrespective of recoveryEnabled as apps
-      // need events to move to further states.
-      rmStore.start();
-
-      if(recoveryEnabled) {
-        try {
-          LOG.info("Recovery started");
-          rmStore.checkVersion();
-          if (rmContext.isWorkPreservingRecoveryEnabled()) {
-            rmContext.setEpoch(rmStore.getAndIncrementEpoch());
-          }
-          RMState state = rmStore.loadState();
-          recover(state);
-          LOG.info("Recovery ended");
-        } catch (Exception e) {
-          // the Exception from loadState() needs to be handled for
-          // HA and we need to give up master status if we got fenced
-          LOG.error("Failed to load/recover state", e);
-          throw e;
-        }
-      }
-
+      
+      resourceTrackingService.start();
       super.serviceStart();
     }
 
@@ -945,34 +984,50 @@ public class ResourceManager extends CompositeService implements Recoverable {
   }
 
   /**
-   * Helper method to create and init {@link #activeServices}. This creates an
+   * Helper method to create and init {@link #schedulerServices}. This creates an
    * instance of {@link RMActiveServices} and initializes it.
    * @throws Exception
    */
-  protected void createAndInitActiveServices() throws Exception {
-    activeServices = new RMActiveServices(this);
-    activeServices.init(conf);
+  protected void createAndInitSchedulerServices() throws Exception {
+    schedulerServices = new RMSchedulerServices();
+    schedulerServices.init(conf);
+  }
+  
+  void createAndInitResourceTrackingServices() {
+    resourceTrackingService = new ResourceTrackingServices(this);
+    resourceTrackingService.init(conf);
   }
 
   /**
-   * Helper method to start {@link #activeServices}.
+   * Helper method to start {@link #schedulerServices}.
    * @throws Exception
    */
-  void startActiveServices() throws Exception {
-    if (activeServices != null) {
+  void startSchedulerServices() throws Exception {
+    if (schedulerServices != null) {
       clusterTimeStamp = System.currentTimeMillis();
-      activeServices.start();
+      schedulerServices.start();
     }
   }
 
   /**
-   * Helper method to stop {@link #activeServices}.
+   * Helper method to stop {@link #schedulerServices}.
    * @throws Exception
    */
-  void stopActiveServices() throws Exception {
-    if (activeServices != null) {
-      activeServices.stop();
-      activeServices = null;
+  void stopSchedulerServices() throws Exception {
+    if (schedulerServices != null) {
+      schedulerServices.stop();
+      schedulerServices = null;
+      //do we need any of the following??
+//      rmContext.getRMNodes().clear();
+//      rmContext.getInactiveRMNodes().clear();
+//      rmContext.getRMApps().clear();
+//      ClusterMetrics.destroy();
+//      QueueMetrics.clearQueueMetrics();    
+//
+//      if (eventRetriever != null) {
+//        LOG.info("NDB Event streaming is stoping now ..");
+//        eventRetriever.finish();
+//      }
     }
   }
 
@@ -981,16 +1036,19 @@ public class ResourceManager extends CompositeService implements Recoverable {
     QueueMetrics.clearQueueMetrics();
     if (initialize) {
       resetDispatcher();
-      createAndInitActiveServices();
+      createAndInitSchedulerServices();
+      if (rmContext.isDistributed()) {
+        resourceTrackingService.start();
+      }
     }
   }
 
   @VisibleForTesting
-  protected boolean areActiveServicesRunning() {
-    return activeServices != null && activeServices.isInState(STATE.STARTED);
+  public boolean areSchedulerServicesRunning() {
+    return schedulerServices != null && schedulerServices.isInState(STATE.STARTED);
   }
 
-  synchronized void transitionToActive() throws Exception {
+  public synchronized void transitionToActive() throws Exception {
     if (rmContext.getHAServiceState() == HAServiceProtocol.HAServiceState.ACTIVE) {
       LOG.info("Already in active state");
       return;
@@ -998,11 +1056,21 @@ public class ResourceManager extends CompositeService implements Recoverable {
 
     LOG.info("Transitioning to active state");
 
+    stopSchedulerServices();
+    resourceTrackingService.stop();
+    resetDispatcher();
+    createAndInitSchedulerServices();
+//    if (rmContext.isDistributed()) {
+//      LOG.info("streaming porcessor is straring for scheduler");
+//      RMStorageFactory.kickTheNdbEventStreamingAPI(true, conf);
+//      eventProcessor = new NdbEventStreamingProcessor(rmContext, conf);
+//    }
+      
     this.rmLoginUGI.doAs(new PrivilegedExceptionAction<Void>() {
       @Override
       public Void run() throws Exception {
         try {
-          startActiveServices();
+          startSchedulerServices();
           return null;
         } catch (Exception e) {
           reinitialize(true);
@@ -1010,12 +1078,16 @@ public class ResourceManager extends CompositeService implements Recoverable {
         }
       }
     });
+    
+//    if (rmContext.isDistributed()) {
+//      eventProcessor.start();
+//    }
 
     rmContext.setHAServiceState(HAServiceProtocol.HAServiceState.ACTIVE);
     LOG.info("Transitioned to active state");
   }
 
-  synchronized void transitionToStandby(boolean initialize)
+  public synchronized void transitionToStandby(boolean initialize)
       throws Exception {
     if (rmContext.getHAServiceState() ==
         HAServiceProtocol.HAServiceState.STANDBY) {
@@ -1027,7 +1099,11 @@ public class ResourceManager extends CompositeService implements Recoverable {
     HAServiceState state = rmContext.getHAServiceState();
     rmContext.setHAServiceState(HAServiceProtocol.HAServiceState.STANDBY);
     if (state == HAServiceProtocol.HAServiceState.ACTIVE) {
-      stopActiveServices();
+      stopSchedulerServices();
+      resourceTrackingService.stop();
+      if (this.rmContext.isHAEnabled() && rmContext.isLeader()) {
+        groupMembershipService.relinquishId();
+      }
       reinitialize(initialize);
     }
     LOG.info("Transitioned to standby state");
@@ -1037,6 +1113,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
   protected void serviceStart() throws Exception {
     if (this.rmContext.isHAEnabled()) {
       transitionToStandby(true);
+      groupMembershipService.start();
     } else {
       transitionToActive();
     }
@@ -1046,6 +1123,9 @@ public class ResourceManager extends CompositeService implements Recoverable {
         false)) {
       int port = webApp.port();
       WebAppUtils.setRMWebAppPort(conf, port);
+    }
+    if (rmContext.isDistributed()) {
+      resourceTrackingService.start();
     }
     super.serviceStart();
   }
@@ -1071,6 +1151,9 @@ public class ResourceManager extends CompositeService implements Recoverable {
     }
     if (configurationProvider != null) {
       configurationProvider.close();
+    }
+    if (resourceTrackingService != null) {
+      resourceTrackingService.stop();
     }
     super.serviceStop();
     transitionToStandby(false);
@@ -1102,6 +1185,10 @@ public class ResourceManager extends CompositeService implements Recoverable {
     return new RMSecretManagerService(conf, rmContext);
   }
 
+  protected GroupMembershipService createGroupMembershipService() {
+    return new GroupMembershipService(this, rmContext);
+  }
+ 
   @Private
   public ClientRMService getClientRMService() {
     return this.clientRM;
@@ -1164,6 +1251,8 @@ public class ResourceManager extends CompositeService implements Recoverable {
     StringUtils.startupShutdownMessage(ResourceManager.class, argv, LOG);
     try {
       Configuration conf = new YarnConfiguration();
+      YarnAPIStorageFactory.setConfiguration(conf);
+      RMStorageFactory.setConfiguration(conf);
       GenericOptionsParser hParser = new GenericOptionsParser(conf, argv);
       argv = hParser.getRemainingArgs();
       // If -format-state-store, then delete RMStateStore; else startup normally

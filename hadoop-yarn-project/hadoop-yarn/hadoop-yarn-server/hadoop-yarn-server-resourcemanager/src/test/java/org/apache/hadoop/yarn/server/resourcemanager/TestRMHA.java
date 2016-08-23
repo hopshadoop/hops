@@ -119,7 +119,7 @@ public class TestRMHA {
     assertEquals(STATE_ERR, HAServiceState.STANDBY,
         rm.adminService.getServiceStatus().getState());
     assertFalse("Active RM services are started",
-        rm.areActiveServicesRunning());
+        rm.areSchedulerServicesRunning());
     assertTrue("RM is not ready to become active",
         rm.adminService.getServiceStatus().isReadyToBecomeActive());
   }
@@ -128,7 +128,7 @@ public class TestRMHA {
     assertEquals(STATE_ERR, HAServiceState.ACTIVE,
         rm.adminService.getServiceStatus().getState());
     assertTrue("Active RM services aren't started",
-        rm.areActiveServicesRunning());
+        rm.areSchedulerServicesRunning());
     assertTrue("RM is not ready to become active",
         rm.adminService.getServiceStatus().isReadyToBecomeActive());
 
@@ -241,7 +241,7 @@ public class TestRMHA {
     assertFalse("RM is ready to become active even after it is stopped",
         rm.adminService.getServiceStatus().isReadyToBecomeActive());
     assertFalse("Active RM services are started",
-        rm.areActiveServicesRunning());
+        rm.areSchedulerServicesRunning());
     checkMonitorHealth();
   }
 
@@ -471,9 +471,9 @@ public class TestRMHA {
     memStore.init(conf);
     rm = new MockRM(conf, memStore) {
       @Override
-      void stopActiveServices() throws Exception {
+      void stopSchedulerServices() throws Exception {
         Thread.sleep(10000);
-        super.stopActiveServices();
+        super.stopSchedulerServices();
       }
     };
     rm.init(conf);

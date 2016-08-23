@@ -256,6 +256,7 @@
                 <directory>${basedir}/src/main/proto/server</directory>
                 <includes>
                   <include>yarn_security_token.proto</include>
+                  <include>yarn_GroupMembership_service.proto</include>
                 </includes>
               </source>
               <output>${project.build.directory}/generated-sources/java</output>

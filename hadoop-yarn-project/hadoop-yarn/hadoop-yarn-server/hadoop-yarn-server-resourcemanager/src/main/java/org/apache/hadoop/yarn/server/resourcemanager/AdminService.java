@@ -279,7 +279,7 @@ public class AdminService extends CompositeService implements
   public synchronized void monitorHealth()
       throws IOException {
     checkAccess("monitorHealth");
-    if (isRMActive() && !rm.areActiveServicesRunning()) {
+    if (isRMActive() && !rm.areSchedulerServicesRunning()) {
       throw new HealthCheckFailedException(
           "Active ResourceManager services are not running!");
     }

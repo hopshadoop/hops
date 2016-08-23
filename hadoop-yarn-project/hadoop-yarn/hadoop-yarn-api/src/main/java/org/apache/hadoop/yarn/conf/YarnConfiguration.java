@@ -130,6 +130,7 @@ public class YarnConfiguration extends Configuration {
   /** The address of the applications manager interface in the RM.*/
   public static final String RM_ADDRESS = 
     RM_PREFIX + "address";
+  public static final String RM_PORT = RM_PREFIX + "port";
   public static final int DEFAULT_RM_PORT = 8032;
   public static final String DEFAULT_RM_ADDRESS =
     "0.0.0.0:" + DEFAULT_RM_PORT;
@@ -160,6 +161,7 @@ public class YarnConfiguration extends Configuration {
   /** The address of the scheduler interface.*/
   public static final String RM_SCHEDULER_ADDRESS = 
     RM_PREFIX + "scheduler.address";
+  public static final String RM_SCHEDULER_PORT = RM_PREFIX + "scheduler.port";
   public static final int DEFAULT_RM_SCHEDULER_PORT = 8030;
   public static final String DEFAULT_RM_SCHEDULER_ADDRESS = "0.0.0.0:" +
     DEFAULT_RM_SCHEDULER_PORT;
@@ -251,6 +253,8 @@ public class YarnConfiguration extends Configuration {
   
   public static final String RM_RESOURCE_TRACKER_ADDRESS =
     RM_PREFIX + "resource-tracker.address";
+  public static final String RM_RESOURCE_TRACKER_PORT =
+RM_PREFIX + "resource-tracker.port";
   public static final int DEFAULT_RM_RESOURCE_TRACKER_PORT = 8031;
   public static final String DEFAULT_RM_RESOURCE_TRACKER_ADDRESS =
     "0.0.0.0:" + DEFAULT_RM_RESOURCE_TRACKER_PORT;
@@ -293,6 +297,7 @@ public class YarnConfiguration extends Configuration {
   /** The address of the RM admin interface.*/
   public static final String RM_ADMIN_ADDRESS = 
     RM_PREFIX + "admin.address";
+  public static final String RM_ADMIN_PORT = RM_PREFIX + "admin.port";
   public static final int DEFAULT_RM_ADMIN_PORT = 8033;
   public static final String DEFAULT_RM_ADMIN_ADDRESS = "0.0.0.0:" +
       DEFAULT_RM_ADMIN_PORT;
@@ -477,18 +482,18 @@ public class YarnConfiguration extends Configuration {
       + "authorization-provider";
   private static final List<String> RM_SERVICES_ADDRESS_CONF_KEYS_HTTP =
       Collections.unmodifiableList(Arrays.asList(
-          RM_ADDRESS,
-          RM_SCHEDULER_ADDRESS,
-          RM_ADMIN_ADDRESS,
-          RM_RESOURCE_TRACKER_ADDRESS,
+          RM_ADDRESS, RM_PORT,
+          RM_SCHEDULER_ADDRESS, RM_SCHEDULER_PORT,
+          RM_ADMIN_ADDRESS, RM_ADMIN_PORT,
+          RM_RESOURCE_TRACKER_ADDRESS, RM_RESOURCE_TRACKER_PORT,
           RM_WEBAPP_ADDRESS));
 
   private static final List<String> RM_SERVICES_ADDRESS_CONF_KEYS_HTTPS =
       Collections.unmodifiableList(Arrays.asList(
-          RM_ADDRESS,
-          RM_SCHEDULER_ADDRESS,
-          RM_ADMIN_ADDRESS,
-          RM_RESOURCE_TRACKER_ADDRESS,
+          RM_ADDRESS, RM_PORT,
+          RM_SCHEDULER_ADDRESS, RM_SCHEDULER_PORT,
+          RM_ADMIN_ADDRESS, RM_ADMIN_PORT,
+          RM_RESOURCE_TRACKER_ADDRESS,RM_RESOURCE_TRACKER_PORT,
           RM_WEBAPP_HTTPS_ADDRESS));
 
   public static final String AUTO_FAILOVER_PREFIX =
@@ -1900,4 +1905,41 @@ public class YarnConfiguration extends Configuration {
     }
     return clusterId;
   }
+  
+  public static final String HOPS_RM_PREFIX = "hops.yarn.resourcemanager.";
+
+  public static int DEFAULT_HOPS_NDB_EVENT_STREAMING_DB_PORT = 1186;
+  public static final String HOPS_NDB_EVENT_STREAMING_DB_PORT = HOPS_RM_PREFIX
+          + "ndb-event-streaming.db.port";
+
+  public static final String EVENT_SHEDULER_CONFIG_PATH = HOPS_RM_PREFIX
+          + "event.scheduler.config.path";
+  public static final String DEFAULT_EVENT_SHEDULER_CONFIG_PATH
+          = "etc/hadoop/RM_EventAPIConfig.ini";
+
+  public static final String EVENT_RT_CONFIG_PATH = HOPS_RM_PREFIX
+          + "event.rt.config.path";
+  public static final String DEFAULT_EVENT_RT_CONFIG_PATH
+          = "etc/hadoop/RT_EventAPIConfig.ini";
+
+  /**
+   * The address of the RM group membership interface.
+   */
+  public static final String RM_GROUP_MEMBERSHIP_ADDRESS = RM_PREFIX
+          + "groupMembership.address";
+  public static final String RM_GROUP_MEMBERSHIP_PORT = RM_PREFIX
+          + "groupMembership.port";
+  public static final int DEFAULT_RM_GROUP_MEMBERSHIP_PORT = 8034;
+  public static final String DEFAULT_RM_GROUP_MEMBERSHIP_ADDRESS = "localhost:"
+          + DEFAULT_RM_GROUP_MEMBERSHIP_PORT;
+  /**
+   * Number of threads used to handle RM group membership interface.
+   */
+  public static final String RM_GROUP_MEMBERSHIP_CLIENT_THREAD_COUNT = RM_PREFIX
+          + "admin.client.thread-count";
+  public static final int DEFAULT_RM_GROUP_MEMBERSHIP_CLIENT_THREAD_COUNT = 1;
+
+  public static final String DISTRIBUTED_RM = CLIENT_FAILOVER_PREFIX
+          + "distributed";
+  public static final Boolean DEFAULT_DISTRIBUTED_RM = false;
 }

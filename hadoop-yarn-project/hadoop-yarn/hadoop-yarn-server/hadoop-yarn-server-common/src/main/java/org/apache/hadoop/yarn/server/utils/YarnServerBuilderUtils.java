@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.yarn.server.utils;
 
+import io.hops.util.LiveRMsResponse;
+import io.hops.util.SortedActiveRMList;
 import java.util.List;
 
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -57,6 +59,13 @@ public class YarnServerBuilderUtils {
     if(applicationsToCleanUp != null) {
       response.addAllApplicationsToCleanup(applicationsToCleanUp);
     }
+    return response;
+  }
+
+  public static LiveRMsResponse newLiveRMsResponse(SortedActiveRMList list) {
+    LiveRMsResponse response = recordFactory.newRecordInstance(
+            LiveRMsResponse.class);
+    response.setLiveRMsList(list);
     return response;
   }
 }

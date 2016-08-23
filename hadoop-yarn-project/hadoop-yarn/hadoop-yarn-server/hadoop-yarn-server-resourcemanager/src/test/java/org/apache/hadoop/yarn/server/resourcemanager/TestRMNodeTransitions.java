@@ -48,6 +48,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeCleanContainer
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeImpl;
+import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeImplNotDist;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeReconnectEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeResourceUpdateEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeStartedEvent;
@@ -137,7 +138,7 @@ public class TestRMNodeTransitions {
         new TestNodeListManagerEventDispatcher());
 
     NodeId nodeId = BuilderUtils.newNodeId("localhost", 0);
-    node = new RMNodeImpl(nodeId, rmContext, null, 0, 0, null, null, null);
+    node = new RMNodeImplNotDist(nodeId, rmContext, null, 0, 0, null, null, null);
     nodesListManagerEvent =  null;
 
   }
@@ -194,7 +195,7 @@ public class TestRMNodeTransitions {
     node.handle(new RMNodeStartedEvent(null, null, null));
     
     NodeId nodeId = BuilderUtils.newNodeId("localhost:1", 1);
-    RMNodeImpl node2 = new RMNodeImpl(nodeId, rmContext, null, 0, 0, null, null, null);
+    RMNodeImpl node2 = new RMNodeImplNotDist(nodeId, rmContext, null, 0, 0, null, null, null);
     node2.handle(new RMNodeStartedEvent(null, null, null));
     
     ContainerId completedContainerIdFromNode1 = BuilderUtils.newContainerId(
@@ -464,7 +465,7 @@ public class TestRMNodeTransitions {
   private RMNodeImpl getRunningNode(String nmVersion) {
     NodeId nodeId = BuilderUtils.newNodeId("localhost", 0);
     Resource capability = Resource.newInstance(4096, 4);
-    RMNodeImpl node = new RMNodeImpl(nodeId, rmContext,null, 0, 0,
+    RMNodeImpl node = new RMNodeImplNotDist(nodeId, rmContext,null, 0, 0,
         null, capability, nmVersion);
     node.handle(new RMNodeStartedEvent(node.getNodeID(), null, null));
     Assert.assertEquals(NodeState.RUNNING, node.getState());
@@ -484,13 +485,13 @@ public class TestRMNodeTransitions {
 
   private RMNodeImpl getNewNode() {
     NodeId nodeId = BuilderUtils.newNodeId("localhost", 0);
-    RMNodeImpl node = new RMNodeImpl(nodeId, rmContext, null, 0, 0, null, null, null);
+    RMNodeImpl node = new RMNodeImplNotDist(nodeId, rmContext, null, 0, 0, null, null, null);
     return node;
   }
   
   private RMNodeImpl getNewNode(Resource capability) {
     NodeId nodeId = BuilderUtils.newNodeId("localhost", 0);
-    RMNodeImpl node = new RMNodeImpl(nodeId, rmContext, null, 0, 0, null, 
+    RMNodeImpl node = new RMNodeImplNotDist(nodeId, rmContext, null, 0, 0, null, 
         capability, null);
     return node;
   }
@@ -498,7 +499,7 @@ public class TestRMNodeTransitions {
   private RMNodeImpl getRebootedNode() {
     NodeId nodeId = BuilderUtils.newNodeId("localhost", 0);
     Resource capability = Resource.newInstance(4096, 4);
-    RMNodeImpl node = new RMNodeImpl(nodeId, rmContext,null, 0, 0,
+    RMNodeImpl node = new RMNodeImplNotDist(nodeId, rmContext,null, 0, 0,
         null, capability, null);
     node.handle(new RMNodeStartedEvent(node.getNodeID(), null, null));
     Assert.assertEquals(NodeState.RUNNING, node.getState());

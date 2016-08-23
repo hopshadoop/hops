@@ -76,6 +76,12 @@ public class RMProxy<T> {
         "from an instance of ClientRMProxy or ServerRMProxy");
   }
 
+  @Private
+  protected InetSocketAddress getRMAddress(YarnConfiguration conf,
+      Class<?> protocol, String Host, int referencePort) throws IOException {
+    throw new UnsupportedOperationException("This method should be invoked " +
+        "from an instance of ClientRMProxy or ServerRMProxy");
+  }
   /**
    * Create a proxy for the specified protocol. For non-HA,
    * this is a direct connection to the ResourceManager address. When HA is

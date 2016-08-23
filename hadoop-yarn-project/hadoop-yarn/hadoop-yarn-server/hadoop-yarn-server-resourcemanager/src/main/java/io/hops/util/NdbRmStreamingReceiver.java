@@ -98,15 +98,14 @@ public class NdbRmStreamingReceiver {
 
     public void buildHopRMNode() {
         hopRMNode = new RMNode(hopRMNodeNodeId, hopRMNodeHostName, hopRMNodeCommandPort,
-                hopRMNodeHttpPort, hopRMNodeNodeAddress, hopRMNodeHttpAddress,
-                hopRMNodeHealthReport, hopRMNodeLastHealthReportTime, hopRMNodeCurrentState,
-                hopRMNodeNodeManagerVersion, hopRMNodeOvercommitTimeout, hopRMNodePendingEventId);
+                hopRMNodeHttpPort, hopRMNodeHealthReport, hopRMNodeLastHealthReportTime, hopRMNodeCurrentState,
+                hopRMNodeNodeManagerVersion, hopRMNodePendingEventId);
     }
 
     // Build Hops Pending Event
     private String hopPendingEventRMNodeId = "";
-    private int hopPendingEventType = 0;
-    private int hopPendingEventStatus = 0;
+    private PendingEvent.Type hopPendingEventType;
+    private PendingEvent.Status hopPendingEventStatus;
     // Used to order the events when retrieved by the scheduler
     private int hopPendingEventId = 0;
 
@@ -114,12 +113,12 @@ public class NdbRmStreamingReceiver {
         this.hopPendingEventRMNodeId = hopPendingEventRMNodeId;
     }
 
-    public void setHopPendingEventType(int hopPendingEventType) {
-        this.hopPendingEventType = hopPendingEventType;
+    public void setHopPendingEventType(String hopPendingEventType) {
+        this.hopPendingEventType = PendingEvent.Type.valueOf(hopPendingEventType);
     }
 
-    public void setHopPendingEventStatus(int hopPendingEventStatus) {
-        this.hopPendingEventStatus = hopPendingEventStatus;
+    public void setHopPendingEventStatus(String hopPendingEventStatus) {
+        this.hopPendingEventStatus = PendingEvent.Status.valueOf(hopPendingEventStatus);
     }
 
     public void setHopPendingEventId(int hopPendingEventId) {
@@ -164,8 +163,7 @@ public class NdbRmStreamingReceiver {
     }
 
     public void buildHopResource() {
-        hopResource = new Resource(hopResourceId, hopResourceType,
-                hopResourceParent, hopResourceMemory,
+        hopResource = new Resource(hopResourceId, hopResourceMemory,
                 hopResourceVirtualCores, hopResourcePendingEventId);
     }
 

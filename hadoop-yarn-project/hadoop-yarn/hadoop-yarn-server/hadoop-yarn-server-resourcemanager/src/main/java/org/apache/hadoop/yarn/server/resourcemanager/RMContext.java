@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager;
 
+import io.hops.util.GroupMembershipService;
 import java.nio.ByteBuffer;
 import java.util.concurrent.ConcurrentMap;
 
@@ -128,4 +129,6 @@ public interface RMContext {
   boolean isLeader();
   
   boolean isDistributed();
+  
+  GroupMembershipService getGroupMembershipService();
 }

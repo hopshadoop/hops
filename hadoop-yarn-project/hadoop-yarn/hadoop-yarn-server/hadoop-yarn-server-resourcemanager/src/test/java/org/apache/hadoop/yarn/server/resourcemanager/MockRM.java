@@ -705,7 +705,7 @@ public class MockRM extends ResourceManager {
       .getMetrics().clearQueueMetrics();
   }
   
-  public RMActiveServices getRMActiveService() {
-    return activeServices;
+  public RMSchedulerServices getRMActiveService() {
+    return schedulerServices;
   }
 }
