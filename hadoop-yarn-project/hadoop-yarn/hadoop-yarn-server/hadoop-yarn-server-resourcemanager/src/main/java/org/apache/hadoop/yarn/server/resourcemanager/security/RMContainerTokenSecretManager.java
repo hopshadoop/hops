@@ -50,7 +50,7 @@ public class RMContainerTokenSecretManager extends
   private static Log LOG = LogFactory
       .getLog(RMContainerTokenSecretManager.class);
 
-  private MasterKeyData nextMasterKey;
+  protected MasterKeyData nextMasterKey;
 
   private final Timer timer;
   private final long rollingInterval;
