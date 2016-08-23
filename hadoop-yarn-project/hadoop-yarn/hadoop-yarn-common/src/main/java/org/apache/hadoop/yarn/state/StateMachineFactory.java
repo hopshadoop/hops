@@ -29,6 +29,8 @@ import java.util.Stack;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
 
+import javax.annotation.OverridingMethodsMustInvokeSuper;
+
 /**
  * State machine topology.
  * This object is semantically immutable.  If you have a
@@ -440,6 +442,11 @@ final public class StateMachineFactory
     @Override
     public synchronized STATE getCurrentState() {
       return currentState;
+    }
+
+    @Override
+    public synchronized void setCurrentState(STATE currentState) {
+      this.currentState = currentState;
     }
 
     @Override

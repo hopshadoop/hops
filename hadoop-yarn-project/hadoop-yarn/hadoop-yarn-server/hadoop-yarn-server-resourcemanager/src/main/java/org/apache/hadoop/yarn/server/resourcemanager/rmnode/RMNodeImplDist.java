@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -284,5 +285,19 @@ public class RMNodeImplDist extends RMNodeImpl {
     } finally {
       super.writeLock.unlock();
     }
+  }
+
+  public void setState(String state) {
+    super.writeLock.lock();
+    try {
+      super.stateMachine.setCurrentState(NodeState.valueOf(state));
+    } finally {
+      super.writeLock.unlock();
+    }
+  }
+
+  public void setUpdatedContainerInfo(ConcurrentLinkedQueue<UpdatedContainerInfo>
+          updatedContainerInfo) {
+    super.nodeUpdateQueue.addAll(updatedContainerInfo);
   }
 }

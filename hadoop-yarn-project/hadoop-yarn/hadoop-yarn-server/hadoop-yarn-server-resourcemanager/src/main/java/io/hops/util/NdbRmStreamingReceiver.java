@@ -17,7 +17,7 @@ public class NdbRmStreamingReceiver {
     private static final Log LOG = LogFactory.getLog(NdbRmStreamingReceiver.class);
 
     private static final int queueCapacity = 100000;
-    private static final BlockingQueue<RMNodeComps> receivedEvents =
+    public static final BlockingQueue<RMNodeComps> receivedEvents =
             new ArrayBlockingQueue<>(queueCapacity);
 
     public NdbRmStreamingReceiver() {
