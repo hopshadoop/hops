@@ -269,7 +269,7 @@
                   <version>1.0</version>
                   <type>so</type>
                   <overWrite>true</overWrite>
-                  <outputDirectory>target/lib</outputDirectory>
+                  <outputDirectory>target/native/target/usr/local/lib</outputDirectory>
                 </artifactItem>
               </artifactItems>
             </configuration>

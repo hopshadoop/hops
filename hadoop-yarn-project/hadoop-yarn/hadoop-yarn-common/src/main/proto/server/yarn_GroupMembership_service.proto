@@ -16,12 +16,9 @@
  * limitations under the License.
  */
 
-option java_package = "io.hops.util";
-
-option java_outer_classname = "YarnGroupMembershipService";
-
+option java_package = "org.apache.hadoop.yarn.proto";
+option java_outer_classname = "GroupMembership";
 option java_generic_services = true;
-
 option java_generate_equals_and_hash = true;
 
 package hops.yarnGroupMembership;

@@ -17,23 +17,21 @@ package io.hops.util;
 
 import io.hops.exception.StorageException;
 import io.hops.metadata.yarn.dal.ContainerStatusDataAccess;
-import io.hops.metadata.yarn.dal.FinishedApplicationsDataAccess;
+import io.hops.metadata.yarn.dal.NextHeartbeatDataAccess;
 import io.hops.metadata.yarn.dal.PendingEventDataAccess;
 import io.hops.metadata.yarn.dal.RMNodeDataAccess;
 import io.hops.metadata.yarn.dal.ResourceDataAccess;
 import io.hops.metadata.yarn.dal.UpdatedContainerInfoDataAccess;
 import io.hops.metadata.yarn.dal.util.YARNOperationType;
 import io.hops.metadata.yarn.entity.ContainerStatus;
-import io.hops.metadata.yarn.entity.FinishedApplications;
+import io.hops.metadata.yarn.entity.NextHeartbeat;
 import io.hops.metadata.yarn.entity.PendingEvent;
 import io.hops.metadata.yarn.entity.RMNode;
-import io.hops.metadata.yarn.entity.UpdatedContainerInfoToAdd;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.NodeState;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo;
@@ -138,6 +136,12 @@ public class ToCommitHB {
                 .getDataAccess(PendingEventDataAccess.class);
         peDA.add(pendingEvent);
 
+        if (pendingEvent.getType().equals(PendingEvent.Type.NODE_ADDED)){
+          NextHeartbeatDataAccess nhbDA
+                  = (NextHeartbeatDataAccess) RMStorageFactory.getDataAccess(
+                          NextHeartbeatDataAccess.class);
+          nhbDA.update(new NextHeartbeat(nodeId, true));
+        }
         if (!uciToAdd.isEmpty()) {
           UpdatedContainerInfoDataAccess uciDA
                   = (UpdatedContainerInfoDataAccess) RMStorageFactory

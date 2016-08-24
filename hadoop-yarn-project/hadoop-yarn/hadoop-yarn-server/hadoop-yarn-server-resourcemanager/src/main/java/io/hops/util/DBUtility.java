@@ -21,6 +21,7 @@ import io.hops.metadata.yarn.dal.ContainerIdToCleanDataAccess;
 import io.hops.metadata.yarn.dal.ContainerStatusDataAccess;
 import io.hops.metadata.yarn.dal.FinishedApplicationsDataAccess;
 import io.hops.metadata.yarn.dal.NextHeartbeatDataAccess;
+import io.hops.metadata.yarn.entity.NextHeartbeat;
 import io.hops.metadata.yarn.dal.RMLoadDataAccess;
 import io.hops.metadata.yarn.dal.UpdatedContainerInfoDataAccess;
 import io.hops.metadata.yarn.dal.util.YARNOperationType;
@@ -69,7 +70,7 @@ public class DBUtility {
           containersToClean.add(new io.hops.metadata.yarn.entity.ContainerId(
                   nodeId.toString(), cid.toString()));
         }
-        ctcDA.removeAll(containers);
+        ctcDA.removeAll(containersToClean);
         connector.commit();
         return null;
       }
@@ -265,13 +266,7 @@ public class DBUtility {
     return rmNode;
   }
   
-  public static void addNextHB(final boolean nextHB, final String nodeId) throws
-          IOException {
-    addNextHB(nextHB, nodeId, -1);
-  }
-
-  public static void addNextHB(final boolean nextHB, final String nodeId,
-          final int pendingEventId) throws IOException {
+  public static void addNextHB(final boolean nextHB, final String nodeId) throws IOException {
     LightWeightRequestHandler addNextHB
             = new LightWeightRequestHandler(
                     YARNOperationType.TEST) {
@@ -282,7 +277,7 @@ public class DBUtility {
         NextHeartbeatDataAccess nhbDA
                 = (NextHeartbeatDataAccess) RMStorageFactory
                 .getDataAccess(NextHeartbeatDataAccess.class);
-        nhbDA.update(new NextHeartbeat(nodeId, nextHB, pendingEventId));
+        nhbDA.update(new NextHeartbeat(nodeId, nextHB));
         connector.commit();
         return null;
       }
@@ -387,5 +382,17 @@ public class DBUtility {
       }
     };
     updateLoadHandler.handle();
+  }
+ 
+  public static void InitializeDB() throws IOException {
+    LightWeightRequestHandler setRMDTMasterKeyHandler
+            = new LightWeightRequestHandler(YARNOperationType.TEST) {
+      @Override
+      public Object performTask() throws IOException {
+        connector.formatStorage();
+        return null;
+      }
+    };
+    setRMDTMasterKeyHandler.handle();
   }
 }

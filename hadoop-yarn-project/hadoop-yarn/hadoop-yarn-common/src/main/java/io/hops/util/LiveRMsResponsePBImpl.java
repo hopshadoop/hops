@@ -16,26 +16,29 @@
 package io.hops.util;
 
 import org.apache.hadoop.yarn.api.records.impl.pb.ProtoBase;
+import org.apache.hadoop.yarn.proto.GroupMembership.ActiveRMListResponseProto;
+import org.apache.hadoop.yarn.proto.GroupMembership.ActiveRMListRequestProto;
+import org.apache.hadoop.yarn.proto.GroupMembership.ActiveRMListResponseProtoOrBuilder;
 
 //TODO change it to avoid going through the proto when it is not needed
-public class LiveRMsResponsePBImpl extends ProtoBase<YarnGroupMembershipService.ActiveRMListResponseProto>
+public class LiveRMsResponsePBImpl extends ProtoBase<ActiveRMListResponseProto>
     implements LiveRMsResponse {
-  YarnGroupMembershipService.ActiveRMListResponseProto proto =
-      YarnGroupMembershipService.ActiveRMListResponseProto.getDefaultInstance();
-  YarnGroupMembershipService.ActiveRMListResponseProto.Builder builder = null;
+  ActiveRMListResponseProto proto =
+      ActiveRMListResponseProto.getDefaultInstance();
+  ActiveRMListResponseProto.Builder builder = null;
   boolean viaProto = false;
 
 
   public LiveRMsResponsePBImpl() {
-    builder = YarnGroupMembershipService.ActiveRMListResponseProto.newBuilder();
+    builder = ActiveRMListResponseProto.newBuilder();
   }
 
-  public LiveRMsResponsePBImpl(YarnGroupMembershipService.ActiveRMListResponseProto proto) {
+  public LiveRMsResponsePBImpl(ActiveRMListResponseProto proto) {
     this.proto = proto;
     viaProto = true;
   }
 
-  public YarnGroupMembershipService.ActiveRMListResponseProto getProto() {
+  public ActiveRMListResponseProto getProto() {
     mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
     viaProto = true;
@@ -52,14 +55,14 @@ public class LiveRMsResponsePBImpl extends ProtoBase<YarnGroupMembershipService.
 
   private void maybeInitBuilder() {
     if (viaProto || builder == null) {
-      builder = YarnGroupMembershipService.ActiveRMListResponseProto.newBuilder(proto);
+      builder = ActiveRMListResponseProto.newBuilder(proto);
     }
     viaProto = false;
   }
 
   @Override
   public SortedActiveRMList getLiveRMsList() {
-    YarnGroupMembershipService.ActiveRMListResponseProtoOrBuilder p = viaProto ? proto : builder;
+    ActiveRMListResponseProtoOrBuilder p = viaProto ? proto : builder;
 
     return new SortedActiveRMList(p.getActiveRmsList());
   }

@@ -19,7 +19,7 @@ import io.hops.leader_election.node.ActiveNodePBImpl;
 import io.hops.leader_election.proto.ActiveNodeProtos.ActiveNodeProto;
 import io.hops.leader_election.proto.ActiveNodeProtos.ActiveNodeProtoOrBuilder;
 import io.hops.util.ActiveRM;
-import io.hops.util.YarnGroupMembershipService;
+import org.apache.hadoop.yarn.proto.GroupMembership;
 
 //TODO change it to avoid going through the proto when it is not needed
 public class ActiveRMPBImpl extends ActiveNodePBImpl implements ActiveRM {
@@ -32,13 +32,13 @@ public class ActiveRMPBImpl extends ActiveNodePBImpl implements ActiveRM {
       String httpAddress, long load) {
     super(id, hostname, ipAddress, port, httpAddress);
     maybeInitBuilder();
-    builder.setExtension(YarnGroupMembershipService.load, load);
+    builder.setExtension(GroupMembership.load, load);
   }
 
   @Override
   public long getLoad() {
     ActiveNodeProtoOrBuilder p = viaProto ? proto : builder;
-    return p.getExtension(YarnGroupMembershipService.load);
+    return p.getExtension(GroupMembership.load);
   }
 
   @Override
