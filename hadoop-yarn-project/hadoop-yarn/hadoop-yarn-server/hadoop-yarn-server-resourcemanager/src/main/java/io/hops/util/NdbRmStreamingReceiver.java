@@ -249,7 +249,7 @@ public class NdbRmStreamingReceiver {
 
     // This will be called by the C++ library
     public void onEventMethod() throws InterruptedException {
-        RMNodeComps hopRMNodeDBObj = new RMNodeComps(hopRMNode, hopNextHeartbeat, null,
+        RMNodeComps hopRMNodeDBObj = new RMNodeComps(hopRMNode, hopNextHeartbeat, 
                 hopNodeHBResponse, hopResource, hopPendingEvent, hopUpdatedContainerInfoList,
                 hopContainerIdsToCleanList, hopFinishedApplicationsList, hopContainerStatusList,
                 hopPendingEvent.getId().getNodeId());
@@ -262,7 +262,7 @@ public class NdbRmStreamingReceiver {
 
     // These two methods will be used by the multi-threaded version of C++ library
     RMNodeComps buildCompositeClass() {
-        return new RMNodeComps(hopRMNode, hopNextHeartbeat, null,
+        return new RMNodeComps(hopRMNode, hopNextHeartbeat, 
                 hopNodeHBResponse, hopResource, hopPendingEvent, hopUpdatedContainerInfoList,
                 hopContainerIdsToCleanList, hopFinishedApplicationsList, hopContainerStatusList,
                 hopPendingEvent.getId().getNodeId());

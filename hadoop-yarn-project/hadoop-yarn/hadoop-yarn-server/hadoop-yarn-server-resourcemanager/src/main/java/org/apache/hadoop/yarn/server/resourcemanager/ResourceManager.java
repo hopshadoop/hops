@@ -20,6 +20,8 @@ package org.apache.hadoop.yarn.server.resourcemanager;
 
 import com.google.common.annotations.VisibleForTesting;
 import io.hops.util.GroupMembershipService;
+import io.hops.util.NdbRmStreamingProcessor;
+import io.hops.util.NdbRtStreamingProcessor;
 import io.hops.util.RMStorageFactory;
 import io.hops.util.YarnAPIStorageFactory;
 import org.apache.commons.logging.Log;
@@ -502,6 +504,22 @@ public class ResourceManager extends CompositeService implements Recoverable {
       // need events to move to further states.
       rmStore.start();
 
+      if (rmContext.isDistributed()) {
+        if (!rmContext.isLeader()) {
+          LOG.info("streaming porcessor is straring for resource tracker");
+          RMStorageFactory.kickTheNdbEventStreamingAPI(false, conf);
+          NdbRtStreamingProcessor rtStreamingProcessor = new NdbRtStreamingProcessor(rmContext);
+          Thread rtStreamingProcessorThread = new Thread(rtStreamingProcessor);
+          rtStreamingProcessorThread.setName("rt streaming processor");
+          rtStreamingProcessorThread.start();
+        } else {
+          LOG.info("streaming porcessor is straring for scheduler");
+          RMStorageFactory.kickTheNdbEventStreamingAPI(true, conf);
+          NdbRmStreamingProcessor eventProcessor = new NdbRmStreamingProcessor(rmContext, conf);
+          eventProcessor.start();
+        }
+      }
+      
       if(recoveryEnabled) {
         try {
           LOG.info("Recovery started");
@@ -1060,11 +1078,6 @@ public class ResourceManager extends CompositeService implements Recoverable {
     resourceTrackingService.stop();
     resetDispatcher();
     createAndInitSchedulerServices();
-//    if (rmContext.isDistributed()) {
-//      LOG.info("streaming porcessor is straring for scheduler");
-//      RMStorageFactory.kickTheNdbEventStreamingAPI(true, conf);
-//      eventProcessor = new NdbEventStreamingProcessor(rmContext, conf);
-//    }
       
     this.rmLoginUGI.doAs(new PrivilegedExceptionAction<Void>() {
       @Override

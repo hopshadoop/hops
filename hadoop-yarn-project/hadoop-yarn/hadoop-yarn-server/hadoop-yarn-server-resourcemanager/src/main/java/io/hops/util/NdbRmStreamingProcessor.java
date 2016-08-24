@@ -41,12 +41,6 @@ public class NdbRmStreamingProcessor extends PendingEventRetrieval {
                     getHopRMNode().getNodeId() + "| peinding id : "
                     + hopRMNodeNDBCompObject.getHopRMNode().getPendingEventId());
         }
-        //print hopnode
-        if (hopRMNodeNDBCompObject.getHopNode() != null) {
-            LOG.debug("<EvtProcessor> [node] id : " + hopRMNodeNDBCompObject.
-                    getHopNode().getId() + "| level : " + hopRMNodeNDBCompObject.
-                    getHopNode().getLevel());
-        }
         //print hopresource
         if (hopRMNodeNDBCompObject.getHopResource() != null) {
             LOG.debug("<EvtProcessor> [resource] id : " + hopRMNodeNDBCompObject.
