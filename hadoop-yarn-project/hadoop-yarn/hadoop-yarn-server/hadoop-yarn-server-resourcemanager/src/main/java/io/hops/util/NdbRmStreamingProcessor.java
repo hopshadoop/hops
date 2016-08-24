@@ -22,7 +22,8 @@ public class NdbRmStreamingProcessor extends PendingEventRetrieval {
     public void start() {
         if (!active) {
             active = true;
-            LOG.info("HOP :: Start retrieving thread");
+            System.out.println("Starting NdbRMStreaming");
+            LOG.debug("HOP :: Start retrieving thread");
             retrievingThread = new Thread(new RetrievingThread());
             retrievingThread.setName("event retriever");
             retrievingThread.start();
