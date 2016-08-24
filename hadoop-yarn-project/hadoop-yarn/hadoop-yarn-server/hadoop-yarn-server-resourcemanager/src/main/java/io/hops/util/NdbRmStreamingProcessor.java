@@ -20,7 +20,15 @@ public class NdbRmStreamingProcessor extends PendingEventRetrieval {
 
     @Override
     public void start() {
-
+        if (!active) {
+            active = true;
+            LOG.info("HOP :: Start retrieving thread");
+            retrievingThread = new Thread(new RetrievingThread());
+            retrievingThread.setName("event retriever");
+            retrievingThread.start();
+        } else {
+            LOG.error("HOP :: NDB event retriever is already active");
+        }
     }
 
     public void printHopsRMNodeComps(RMNodeComps hopRMNodeNDBCompObject) {
