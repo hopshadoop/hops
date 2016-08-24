@@ -21,9 +21,9 @@ import io.hops.util.GroupMembership;
 import io.hops.util.GroupMembershipPB;
 import io.hops.util.LiveRMsResponse;
 import io.hops.util.LiveRMsResponsePBImpl;
-import io.hops.util.YarnGroupMembershipService;
 import org.apache.hadoop.yarn.exceptions.YarnException;
-
+import org.apache.hadoop.yarn.proto.GroupMembership.ActiveRMListResponseProto;
+import org.apache.hadoop.yarn.proto.GroupMembership.ActiveRMListRequestProto;
 import java.io.IOException;
 
 public class GroupMembershipPBServiceImpl implements GroupMembershipPB {
@@ -35,8 +35,8 @@ public class GroupMembershipPBServiceImpl implements GroupMembershipPB {
   }
 
   @Override
-  public YarnGroupMembershipService.ActiveRMListResponseProto getLiveRMList(RpcController controller,
-          YarnGroupMembershipService.ActiveRMListRequestProto proto) throws ServiceException {
+  public ActiveRMListResponseProto getLiveRMList(RpcController controller,
+          ActiveRMListRequestProto proto) throws ServiceException {
 
     try {
       LiveRMsResponse response = real.getLiveRMList();

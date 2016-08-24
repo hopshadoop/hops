@@ -21,6 +21,6 @@ import org.apache.hadoop.ipc.ProtocolInfo;
     protocolName = "org.apache.hadoop.yarn.server.api.GroupMembershipPB",
     protocolVersion = 1)
 public interface GroupMembershipPB
-    extends YarnGroupMembershipService.GroupMembershipService.BlockingInterface {
+    extends org.apache.hadoop.yarn.proto.GroupMembership.GroupMembershipService.BlockingInterface {
 
 }

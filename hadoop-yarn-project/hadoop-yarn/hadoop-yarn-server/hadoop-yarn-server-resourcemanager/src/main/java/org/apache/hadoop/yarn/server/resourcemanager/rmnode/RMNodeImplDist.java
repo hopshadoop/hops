@@ -96,18 +96,18 @@ public class RMNodeImplDist extends RMNodeImpl {
               + remoteNodeHealthStatus.getHealthReport());
       rmNode.nodeUpdateQueue.clear();
       // Inform the scheduler
-      if (rmNode.context.isDistributed() && !rmNode.context.isLeader()) {
+//      if (rmNode.context.isDistributed() && !rmNode.context.isLeader()) {
         //Add NodeRemovedSchedulerEvent to TransactionState
         LOG.debug("HOP :: Added Pending event to TransactionState");
         toCommit.addPendingEvent(PendingEvent.Type.NODE_REMOVED,
                 PendingEvent.Status.NEW);
-      } else {
-        rmNode.context.getDispatcher().getEventHandler().handle(
-                new NodeRemovedSchedulerEvent(rmNode));
+//      } else {
+//        rmNode.context.getDispatcher().getEventHandler().handle(
+//                new NodeRemovedSchedulerEvent(rmNode));
         rmNode.context.getDispatcher().getEventHandler().handle(
                 new NodesListManagerEvent(
                         NodesListManagerEventType.NODE_UNUSABLE, rmNode));
-      }
+//      }
 
       // Update metrics
       rmNode.updateMetricsForDeactivatedNode(rmNode.getState(),
@@ -124,17 +124,17 @@ public class RMNodeImplDist extends RMNodeImpl {
       } catch (IOException ex) {
         LOG.error(ex, ex);
       }
-      if (rmNode.context.isDistributed() && !rmNode.context.isLeader()) {
+//      if (rmNode.context.isDistributed() && !rmNode.context.isLeader()) {
         //Add NodeUpdatedSchedulerEvent to TransactionState
-
         toCommit.addPendingEvent(PendingEvent.Type.NODE_UPDATED,
                 PendingEvent.Status.SCHEDULER_FINISHED_PROCESSING);
-      } else {
-        rmNode.context.getDispatcher().getEventHandler().handle(
-                new NodeUpdateSchedulerEvent(rmNode));
-      }
-    } else if (rmNode.context.isDistributed() && !rmNode.context.
-            isLeader()) {
+//      } else {
+//        rmNode.context.getDispatcher().getEventHandler().handle(
+//                new NodeUpdateSchedulerEvent(rmNode));
+//      }
+    } else if (rmNode.context.isDistributed() 
+//            && !rmNode.context.isLeader()
+            ) {
 
       toCommit.addPendingEvent(PendingEvent.Type.NODE_UPDATED,
               PendingEvent.Status.SCHEDULER_NOT_FINISHED_PROCESSING);
@@ -365,17 +365,17 @@ public class RMNodeImplDist extends RMNodeImpl {
       }
     }
 
-    if (rmNode.context.isDistributed() && !rmNode.context.isLeader()) {
+//    if (rmNode.context.isDistributed() && !rmNode.context.isLeader()) {
       //Add NodeAddedSchedulerEvent to TransactionState
       toCommit.addPendingEvent(PendingEvent.Type.NODE_ADDED,
               PendingEvent.Status.NEW);
-    } else {
-      rmNode.context.getDispatcher().getEventHandler()
-              .handle(new NodeAddedSchedulerEvent(rmNode, containers));
+//    } else {
+//      rmNode.context.getDispatcher().getEventHandler()
+//              .handle(new NodeAddedSchedulerEvent(rmNode, containers));
       rmNode.context.getDispatcher().getEventHandler().handle(
               new NodesListManagerEvent(
                       NodesListManagerEventType.NODE_USABLE, rmNode));
-    }
+//    }
   }
 
   protected void reconnectNodeTransitionInternal(RMNodeImpl rmNode,
@@ -390,15 +390,15 @@ public class RMNodeImplDist extends RMNodeImpl {
     // cleaning up old container info.
     if (noRunningApps) {
       rmNode.nodeUpdateQueue.clear();
-      if (rmNode.context.isDistributed() && !rmNode.context.isLeader()) {
+//      if (rmNode.context.isDistributed() && !rmNode.context.isLeader()) {
         //Add NodeRemovedSchedulerEvent to TransactionState
         LOG.debug("HOP :: Added Pending event to TransactionState");
         toCommit.addPendingEvent(PendingEvent.Type.NODE_REMOVED,
                 PendingEvent.Status.NEW);
-      } else {
-        rmNode.context.getDispatcher().getEventHandler().handle(
-                new NodeRemovedSchedulerEvent(rmNode));
-      }
+//      } else {
+//        rmNode.context.getDispatcher().getEventHandler().handle(
+//                new NodeRemovedSchedulerEvent(rmNode));
+//      }
       if (rmNode.getHttpPort() == newNode.getHttpPort()) {
         if (!rmNode.getTotalCapability().equals(
                 newNode.getTotalCapability())) {
@@ -406,8 +406,9 @@ public class RMNodeImplDist extends RMNodeImpl {
         }
         if (rmNode.getState().equals(NodeState.RUNNING)) {
           // Only add old node if old state is RUNNING
-          if (rmNode.context.isDistributed() && !rmNode.context.
-                  isLeader()) {
+          if (rmNode.context.isDistributed() 
+//                  && !rmNode.context.isLeader()
+                  ) {
             //Add NodeAddedSchedulerEvent to TransactionState
             LOG.debug("HOP :: Added Pending event to TransactionState");
             toCommit.addPendingEvent(PendingEvent.Type.NODE_ADDED,
@@ -474,15 +475,15 @@ public class RMNodeImplDist extends RMNodeImpl {
     // Scheduler
     NodeState initialState = rmNode.getState();
     if (!initialState.equals(NodeState.UNHEALTHY)) {
-      if (rmNode.context.isDistributed() && !rmNode.context.isLeader()) {
+//      if (rmNode.context.isDistributed() && !rmNode.context.isLeader()) {
         //Add NodeRemovedSchedulerEvent to TransactionState
         LOG.debug("HOP :: Added Pending event to TransactionState");
         toCommit.addPendingEvent(PendingEvent.Type.NODE_REMOVED,
                 PendingEvent.Status.NEW);
-      } else {
-        rmNode.context.getDispatcher().getEventHandler()
-                .handle(new NodeRemovedSchedulerEvent(rmNode));
-      }
+//      } else {
+//        rmNode.context.getDispatcher().getEventHandler()
+//                .handle(new NodeRemovedSchedulerEvent(rmNode));
+//      }
     }
     rmNode.context.getDispatcher().getEventHandler().handle(
             new NodesListManagerEvent(
@@ -509,19 +510,19 @@ public class RMNodeImplDist extends RMNodeImpl {
     rmNode.setLastHealthReportTime(
             remoteNodeHealthStatus.getLastHealthReportTime());
     if (remoteNodeHealthStatus.getIsNodeHealthy()) {
-      if (rmNode.context.isDistributed() && !rmNode.context.isLeader()) {
+//      if (rmNode.context.isDistributed() && !rmNode.context.isLeader()) {
         //Add NodeAddedSchedulerEvent to TransactionState
         LOG.debug("HOP :: Added Pending event to TransactionState");
         toCommit.addPendingEvent(PendingEvent.Type.NODE_ADDED,
                 PendingEvent.Status.NEW);
 
-      } else {
-        rmNode.context.getDispatcher().getEventHandler().handle(
-                new NodeAddedSchedulerEvent(rmNode));
+//      } else {
+//        rmNode.context.getDispatcher().getEventHandler().handle(
+//                new NodeAddedSchedulerEvent(rmNode));
         rmNode.context.getDispatcher().getEventHandler().handle(
                 new NodesListManagerEvent(
                         NodesListManagerEventType.NODE_USABLE, rmNode));
-      }
+//      }
       // ??? how about updating metrics before notifying to ensure that
       // notifiers get update metadata because they will very likely query it
       // upon notification

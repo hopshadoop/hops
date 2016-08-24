@@ -25,7 +25,7 @@ import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.ipc.RPCUtil;
-import io.hops.util.YarnGroupMembershipService.ActiveRMListRequestProto;
+import org.apache.hadoop.yarn.proto.GroupMembership.ActiveRMListRequestProto;
 
 import java.io.Closeable;
 import java.io.IOException;
