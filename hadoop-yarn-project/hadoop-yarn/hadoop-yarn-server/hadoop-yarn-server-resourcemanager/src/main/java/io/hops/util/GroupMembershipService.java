@@ -42,6 +42,7 @@ import org.apache.hadoop.yarn.ipc.RPCUtil;
 import org.apache.hadoop.yarn.ipc.YarnRPC;
 import org.apache.hadoop.yarn.server.api.protocolrecords.RefreshAdminAclsResponse;
 import org.apache.hadoop.yarn.server.utils.YarnServerBuilderUtils;
+import io.hops.util.impl.ActiveRMPBImpl;
 
 import java.io.IOException;
 import java.io.InputStream;

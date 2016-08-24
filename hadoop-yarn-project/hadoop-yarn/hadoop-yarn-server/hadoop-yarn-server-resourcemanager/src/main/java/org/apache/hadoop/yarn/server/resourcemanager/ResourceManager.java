@@ -237,8 +237,11 @@ public class ResourceManager extends CompositeService implements Recoverable {
       groupMembershipService = createGroupMembershipService();
       addService(groupMembershipService);
       rmContext.setRMGroupMembershipService(groupMembershipService);
+    }else if(this.rmContext.isDistributed()){
+      groupMembershipService = createGroupMembershipService();
+      addService(groupMembershipService);
+      rmContext.setRMGroupMembershipService(groupMembershipService);
     }
-    
     // Set UGI and do login
     // If security is enabled, use login user
     // If security is not enabled, use current user

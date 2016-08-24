@@ -17,7 +17,7 @@ package org.apache.hadoop.yarn.client;
 
 import io.hops.leader_election.node.ActiveNode;
 import io.hops.util.GroupMembership;
-import io.hops.util.GroupMembershipPBClientImpl;
+import io.hops.util.impl.pb.client.GroupMembershipPBClientImpl;
 import io.hops.util.LiveRMsResponse;
 import io.hops.util.SortedActiveRMList;
 import org.apache.commons.logging.Log;

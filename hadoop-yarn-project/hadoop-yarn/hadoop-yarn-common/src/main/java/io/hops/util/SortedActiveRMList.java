@@ -20,6 +20,7 @@ import io.hops.leader_election.node.ActiveNodePBImpl;
 import io.hops.leader_election.node.SortedActiveNodeList;
 import io.hops.leader_election.node.SortedActiveNodeListPBImpl;
 import io.hops.leader_election.proto.ActiveNodeProtos;
+import io.hops.util.impl.ActiveRMPBImpl;
 
 import java.net.InetSocketAddress;
 import java.util.List;

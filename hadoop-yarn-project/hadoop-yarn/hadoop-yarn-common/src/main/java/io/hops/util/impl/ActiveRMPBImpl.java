@@ -13,11 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.hops.util;
+package io.hops.util.impl;
 
 import io.hops.leader_election.node.ActiveNodePBImpl;
 import io.hops.leader_election.proto.ActiveNodeProtos.ActiveNodeProto;
 import io.hops.leader_election.proto.ActiveNodeProtos.ActiveNodeProtoOrBuilder;
+import io.hops.util.ActiveRM;
+import io.hops.util.YarnGroupMembershipService;
 
 //TODO change it to avoid going through the proto when it is not needed
 public class ActiveRMPBImpl extends ActiveNodePBImpl implements ActiveRM {
