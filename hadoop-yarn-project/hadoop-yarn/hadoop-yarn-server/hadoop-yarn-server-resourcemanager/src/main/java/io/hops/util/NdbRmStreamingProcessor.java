@@ -22,7 +22,6 @@ public class NdbRmStreamingProcessor extends PendingEventRetrieval {
     public void start() {
         if (!active) {
             active = true;
-            System.out.println("Starting NdbRMStreaming");
             LOG.debug("HOP :: Start retrieving thread");
             retrievingThread = new Thread(new RetrievingThread());
             retrievingThread.setName("event retriever");
@@ -79,6 +78,7 @@ public class NdbRmStreamingProcessor extends PendingEventRetrieval {
             while (active) {
                 try {
                     RMNodeComps hopRMNodeCompObj = null;
+                    LOG.debug("Size of the events queue: " + NdbRmStreamingReceiver.receivedEvents.size());
                     hopRMNodeCompObj = NdbRmStreamingReceiver.receivedEvents.take();
                     if (hopRMNodeCompObj != null) {
                         if (LOG.isDebugEnabled()) {

@@ -18,9 +18,10 @@ public class NdbRmStreamingReceiver {
 
     private static final int queueCapacity = 100000;
     public static final BlockingQueue<RMNodeComps> receivedEvents =
-            new ArrayBlockingQueue<>(queueCapacity);
+            new ArrayBlockingQueue<>(queueCapacity, true);
 
     public NdbRmStreamingReceiver() {
+        LOG.info("HOP :: Created RM streaming receiver");
     }
 
     private PendingEvent hopPendingEvent = null;
@@ -48,23 +49,25 @@ public class NdbRmStreamingReceiver {
     private int hopRMNodeOvercommitTimeout = 0;
     private int hopRMNodePendingEventId = 0;
 
-    private void setHopRMNodeNodeId(String hopRMNodeNodeId) {
+    public void setHopRMNodeNodeId(String hopRMNodeNodeId) {
+        LOG.debug("setHopRMNodeNodeId - " + hopRMNodeNodeId);
         this.hopRMNodeNodeId = hopRMNodeNodeId;
     }
 
-    private void setHopRMNodeHostName(String hopRMNodeHostName) {
+    public void setHopRMNodeHostName(String hopRMNodeHostName) {
+        LOG.debug("setHopRMNodeHostName - " + hopRMNodeHostName);
         this.hopRMNodeHostName = hopRMNodeHostName;
     }
 
-    private void setHopRMNodeCommandPort(int hopRMNodeCommandPort) {
+    public void setHopRMNodeCommandPort(int hopRMNodeCommandPort) {
         this.hopRMNodeCommandPort = hopRMNodeCommandPort;
     }
 
-    private void setHopRMNodeHttpPort(int hopRMNodeHttpPort) {
+    public void setHopRMNodeHttpPort(int hopRMNodeHttpPort) {
         this.hopRMNodeHttpPort = hopRMNodeHttpPort;
     }
 
-    private void setHopRMNodeNodeAddress(String hopRMNodeNodeAddress) {
+    public void setHopRMNodeNodeAddress(String hopRMNodeNodeAddress) {
         this.hopRMNodeNodeAddress = hopRMNodeNodeAddress;
     }
 
@@ -97,6 +100,7 @@ public class NdbRmStreamingReceiver {
     }
 
     public void buildHopRMNode() {
+        LOG.debug("buildHopRMNode - " + hopRMNodeNodeId);
         hopRMNode = new RMNode(hopRMNodeNodeId, hopRMNodeHostName, hopRMNodeCommandPort,
                 hopRMNodeHttpPort, hopRMNodeHealthReport, hopRMNodeLastHealthReportTime, hopRMNodeCurrentState,
                 hopRMNodeNodeManagerVersion, hopRMNodePendingEventId);
@@ -249,7 +253,9 @@ public class NdbRmStreamingReceiver {
 
     // This will be called by the C++ library
     public void onEventMethod() throws InterruptedException {
-        RMNodeComps hopRMNodeDBObj = new RMNodeComps(hopRMNode, hopNextHeartbeat, 
+        LOG.debug("HOP :: Received event from NDB");
+        LOG.debug("Size of Received Events Queue is: " + receivedEvents.size());
+        RMNodeComps hopRMNodeDBObj = new RMNodeComps(hopRMNode, hopNextHeartbeat,
                 hopNodeHBResponse, hopResource, hopPendingEvent, hopUpdatedContainerInfoList,
                 hopContainerIdsToCleanList, hopFinishedApplicationsList, hopContainerStatusList,
                 hopPendingEvent.getId().getNodeId());
