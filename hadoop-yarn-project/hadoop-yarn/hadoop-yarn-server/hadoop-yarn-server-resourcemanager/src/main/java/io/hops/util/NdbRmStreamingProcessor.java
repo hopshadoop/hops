@@ -1,5 +1,6 @@
 package io.hops.util;
 
+import com.google.protobuf.InvalidProtocolBufferException;
 import io.hops.metadata.yarn.entity.ContainerStatus;
 import io.hops.metadata.yarn.entity.RMNodeComps;
 import io.hops.metadata.yarn.entity.UpdatedContainerInfo;
@@ -7,6 +8,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 
+import java.io.IOException;
 import java.util.List;
 
 /**
@@ -95,8 +97,18 @@ public class NdbRmStreamingProcessor extends PendingEventRetrieval {
                                     updateRMContext(rmNode);
                                     triggerEvent(rmNode, hopRMNodeCompObj.getPendingEvent());
                                 }
-                            } catch (Exception ex) {
+
+                                DBUtility.removePendingEvent(hopRMNodeCompObj.getHopRMNode().getNodeId(),
+                                        hopRMNodeCompObj.getPendingEvent().getType(),
+                                        hopRMNodeCompObj.getPendingEvent().getStatus(),
+                                        hopRMNodeCompObj.getPendingEvent().getId().getEventId());
+
+
+                                DBUtility.removeContainerStatuses(hopRMNodeCompObj.getHopContainersStatus());
+                            } catch (InvalidProtocolBufferException ex) {
                                 LOG.error("HOP :: Error retrieving RMNode: " + ex, ex);
+                            } catch (IOException ex) {
+                                LOG.error("HOP :: Error removing from DB: " + ex, ex);
                             }
                         }
                     }

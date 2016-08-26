@@ -1,10 +1,8 @@
 package io.hops;
 
-import io.hops.metadata.yarn.dal.NextHeartbeatDataAccess;
-import io.hops.metadata.yarn.dal.PendingEventDataAccess;
-import io.hops.metadata.yarn.dal.RMNodeDataAccess;
-import io.hops.metadata.yarn.dal.ResourceDataAccess;
+import io.hops.metadata.yarn.dal.*;
 import io.hops.metadata.yarn.dal.util.YARNOperationType;
+import io.hops.metadata.yarn.entity.ContainerStatus;
 import io.hops.metadata.yarn.entity.NextHeartbeat;
 import io.hops.metadata.yarn.entity.PendingEvent;
 import io.hops.transaction.handler.LightWeightRequestHandler;
@@ -204,7 +202,7 @@ public class TestStreamingLibrary {
 
         // Update Node with newly launched containers
     }
-    
+
     private FullRMNode generateHopRMNode(int id, PendingEvent.Type type, PendingEvent.Status status,
             NodeState state) {
 
@@ -247,7 +245,27 @@ public class TestStreamingLibrary {
         NextHeartbeat nextHB = new NextHeartbeat(rmNode.getNodeID().toString(),
                 true, id);
 
-        return new FullRMNode(rmNode, hopRMNode, pendingEvent, hopResource, nextHB, id);
+        return new FullRMNode(rmNode, hopRMNode, pendingEvent, hopResource, nextHB, id,
+                generateContainerStatuses(10, rmNode.getNodeID().toString(),pendingEvent.getId().getEventId()));
+    }
+
+    private List<ContainerStatus> generateContainerStatuses(int numOfContainers, String rmNodeId,
+            int pendingEventId) {
+        List<ContainerStatus> containerStatuses = new ArrayList<>();
+
+        for (int i = 0; i < numOfContainers; ++i) {
+            ContainerStatus contStat = new ContainerStatus(
+                    rmNodeId + "_" + i,
+                    "RUNNING",
+                    "HEALTHY",
+                    1,
+                    rmNodeId,
+                    pendingEventId,
+                    ContainerStatus.Type.UCI);
+            containerStatuses.add(contStat);
+        }
+
+        return containerStatuses;
     }
 
     private class FullRMNode {
@@ -257,15 +275,22 @@ public class TestStreamingLibrary {
         private final PendingEvent pendingEvent;
         private final io.hops.metadata.yarn.entity.Resource resource;
         private final NextHeartbeat nextHeartbeat;
+        private final List<ContainerStatus> containerStatuses;
 
         public FullRMNode(RMNode yarnRMNode, io.hops.metadata.yarn.entity.RMNode rmNode, PendingEvent pendingEvent,
-                io.hops.metadata.yarn.entity.Resource resource, NextHeartbeat nextHeartbeat, int id) {
+                io.hops.metadata.yarn.entity.Resource resource, NextHeartbeat nextHeartbeat, int id,
+                List<ContainerStatus> containerStatuses) {
             this.yarnRMNode = yarnRMNode;
             this.rmNode = rmNode;
             this.pendingEvent = pendingEvent;
             this.resource = resource;
             this.nextHeartbeat = nextHeartbeat;
             this.id = id;
+            this.containerStatuses = containerStatuses;
+        }
+
+        public List<ContainerStatus> getContainerStatuses() {
+            return containerStatuses;
         }
 
         public int getId() {
@@ -310,6 +335,8 @@ public class TestStreamingLibrary {
                     .getDataAccess(RMNodeDataAccess.class);
             rmNodeDAO.add(toCommit.getRmNode());
 
+            connector.flush();
+
             PendingEventDataAccess pendingEventDAO = (PendingEventDataAccess) RMStorageFactory
                     .getDataAccess(PendingEventDataAccess.class);
             pendingEventDAO.add(toCommit.getPendingEvent());
@@ -321,6 +348,10 @@ public class TestStreamingLibrary {
             NextHeartbeatDataAccess nextHBDAO = (NextHeartbeatDataAccess) RMStorageFactory
                     .getDataAccess(NextHeartbeatDataAccess.class);
             nextHBDAO.update(toCommit.getNextHeartbeat());
+
+            ContainerStatusDataAccess contStatDAO = (ContainerStatusDataAccess) RMStorageFactory
+                    .getDataAccess(ContainerStatusDataAccess.class);
+            contStatDAO.addAll(toCommit.getContainerStatuses());
 
             connector.commit();
             return null;
