@@ -19,11 +19,7 @@
 package org.apache.hadoop.yarn.server.resourcemanager;
 
 import com.google.common.annotations.VisibleForTesting;
-import io.hops.util.GroupMembershipService;
-import io.hops.util.NdbRmStreamingProcessor;
-import io.hops.util.NdbRtStreamingProcessor;
-import io.hops.util.RMStorageFactory;
-import io.hops.util.YarnAPIStorageFactory;
+import io.hops.util.*;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -509,17 +505,15 @@ public class ResourceManager extends CompositeService implements Recoverable {
 
       if (rmContext.isDistributed()) {
         if (!rmContext.isLeader()) {
-          LOG.info("streaming porcessor is straring for resource tracker");
+          LOG.info("streaming processor is starting for resource tracker");
           RMStorageFactory.kickTheNdbEventStreamingAPI(false, conf);
-          NdbRtStreamingProcessor rtStreamingProcessor = new NdbRtStreamingProcessor(rmContext);
-          Thread rtStreamingProcessorThread = new Thread(rtStreamingProcessor);
-          rtStreamingProcessorThread.setName("rt streaming processor");
-          rtStreamingProcessorThread.start();
+          NdbStreamingReceiver rtStreamingProcessor = new NdbRtStreamingProcessor(rmContext);
+          rtStreamingProcessor.start();
         } else {
-          LOG.info("streaming porcessor is straring for scheduler");
+          LOG.info("streaming processor is starting for scheduler");
           RMStorageFactory.kickTheNdbEventStreamingAPI(true, conf);
-          NdbRmStreamingProcessor eventProcessor = new NdbRmStreamingProcessor(rmContext, conf);
-          eventProcessor.start();
+          NdbStreamingReceiver rmStreamingProcessor = new NdbRmStreamingProcessor(rmContext);
+          rmStreamingProcessor.start();
         }
       }
       
