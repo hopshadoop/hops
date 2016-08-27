@@ -1,6 +1,6 @@
 # Hops
 
-[![Join the chat at https://gitter.im/hopshadoop](https://badges.gitter.im/linkedin/dr-elephant.svg)](https://badges.gitter.im/hopshadoop)
+[![Join the chat at https://gitter.im/hopshadoop](https://badges.gitter.im/hopshadoop/services.png)](https://gitter.im/hopshadoop)
 
 <a href=""><img src="http://www.hops.io/sites/default/files/hops-50x50.png" align="left" hspace="10" vspace="6"></a>
 
