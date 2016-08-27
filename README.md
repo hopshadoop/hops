@@ -1,7 +1,13 @@
-Hops
-===
+# Hops
 
-Hadoop Open Platform-as-a-Service (Hops) is a new distribution of Apache Hadoop with scalable, highly available, customizable metadata.
+[![Join the chat at https://gitter.im/hopshadoop](https://badges.gitter.im/linkedin/dr-elephant.svg)](https://gitter.im/linkedin/dr-elephant?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
+<a href=""><img src="http://www.hops.io/sites/default/files/hops-50x50.png" align="left" hspace="10" vspace="6"></a>
+
+**Hops** (Hadoop Open Platform-as-a-Service) is a new distribution of Apache Hadoop with scalable, highly available, customizable metadata. HopsFS is a next generation distribution of the Hadoop Distributed File System (HDFS) that replaces HDFS’ single node in-memory metadata service with a distributed metadata service built on a NewSQL database (MySQL Cluster). HopsYARN is a next generation distribution of YARN that replaces YARN's single node in-memory cluster state  with a distributed metadata service built on a NewSQL database (MySQL Cluster). Together, HopsFS and HopsYARN enable Hadoop clusters to scale to larger volumes and higher throughput.
+
+## Information
+
 <ul>
 <li><a href="https://twitter.com/hopshadoop">Follow our Twitter account.</a></li>
 <li><a href="https://gitter.im/hopshadoop">Chat with Hops developers in Gitter.</a></li>
