@@ -131,8 +131,12 @@ public class NdbRtStreamingReceiver {
         nodeIds.add(nodeId);
     }
 
-    public void setNextHeartbeat(boolean nextHeartbeat) {
-        this.nextHeartbeat = nextHeartbeat;
+    public void setNextHeartbeat(int nextHeartbeat) {
+      if(nextHeartbeat==0){
+        this.nextHeartbeat = false;
+      }else{
+        this.nextHeartbeat = true;
+      }
     }
 
     public void addNextHeartbeat() {

@@ -27,6 +27,7 @@ import io.hops.metadata.yarn.entity.ContainerStatus;
 import io.hops.metadata.yarn.entity.NextHeartbeat;
 import io.hops.metadata.yarn.entity.PendingEvent;
 import io.hops.metadata.yarn.entity.RMNode;
+import io.hops.transaction.handler.AsyncLightWeightRequestHandler;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -53,6 +54,7 @@ public class ToCommitHB {
   int pendingEventId;
   RMNode rmNode = null;
   io.hops.metadata.yarn.entity.Resource rmNodeResource = null;
+  NextHeartbeat nextHeartBeat = null;
 
   public ToCommitHB(String nodeId) {
     this.nodeId = nodeId;
@@ -120,14 +122,18 @@ public class ToCommitHB {
             pendingEventId);
   }
 
+  public void addNextHeartBeat(boolean nextHeartBeat){
+    this.nextHeartBeat = new NextHeartbeat(nodeId, nextHeartBeat);
+  }
+  
   public void commit() throws IOException {
     if (pendingEventType == null) {
       return;
     }
     final PendingEvent pendingEvent = new PendingEvent(nodeId, pendingEventType,
             pendingEventStatus, pendingEventId);
-    LightWeightRequestHandler commitHeartbeat
-            = new LightWeightRequestHandler(
+    AsyncLightWeightRequestHandler commitHeartbeat
+            = new AsyncLightWeightRequestHandler(
                     YARNOperationType.TEST) {
       @Override
       public Object performTask() throws StorageException {
@@ -166,23 +172,16 @@ public class ToCommitHB {
                   .getDataAccess(ResourceDataAccess.class);
           rDA.add(rmNodeResource);
         }
+        if(nextHeartBeat!=null){
+          NextHeartbeatDataAccess nhbDA
+                  = (NextHeartbeatDataAccess) RMStorageFactory.getDataAccess(
+                          NextHeartbeatDataAccess.class);
+          nhbDA.update(nextHeartBeat);
+        }
         connector.commit();
         return null;
       }
     };
-    LOG.debug("committing pending event");
     commitHeartbeat.handle();
-    LOG.debug("committed pending event");
-    reset();
-    LOG.debug("reseted toCommit");
-  }
-
-  private void reset() {
-    pendingEventId = nextPendingEventId.incrementAndGet();
-    pendingEventStatus = null;
-    pendingEventType = null;
-    uciToAdd.clear();
-    containerStatusToAdd.clear();
-    rmNode = null;
   }
 }

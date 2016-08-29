@@ -243,7 +243,7 @@ public class TestStreamingLibrary {
                 id);
 
         NextHeartbeat nextHB = new NextHeartbeat(rmNode.getNodeID().toString(),
-                true, id);
+                true);
 
         return new FullRMNode(rmNode, hopRMNode, pendingEvent, hopResource, nextHB, id,
                 generateContainerStatuses(10, rmNode.getNodeID().toString(),pendingEvent.getId().getEventId()));

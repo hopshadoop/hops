@@ -22,7 +22,7 @@ import io.hops.metadata.yarn.entity.NextHeartbeat;
 import io.hops.metadata.yarn.dal.util.YARNOperationType;
 import io.hops.metadata.yarn.entity.*;
 import io.hops.metadata.yarn.entity.NodeId;
-import io.hops.transaction.handler.LightWeightRequestHandler;
+import io.hops.transaction.handler.AsyncLightWeightRequestHandler;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -42,6 +42,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo;
 import io.hops.metadata.yarn.entity.ContainerStatus;
+import io.hops.transaction.handler.LightWeightRequestHandler;
 
 public class DBUtility {
 
@@ -49,8 +50,8 @@ public class DBUtility {
 
   public static void removeContainersToClean(final Set<ContainerId> containers,
           final org.apache.hadoop.yarn.api.records.NodeId nodeId) throws IOException {
-    LightWeightRequestHandler removeContainerToClean
-            = new LightWeightRequestHandler(
+    AsyncLightWeightRequestHandler removeContainerToClean
+            = new AsyncLightWeightRequestHandler(
                     YARNOperationType.TEST) {
       @Override
       public Object performTask() throws StorageException {
@@ -76,8 +77,8 @@ public class DBUtility {
   public static void removeFinishedApplications(
           final List<ApplicationId> finishedApplications, final org.apache.hadoop.yarn.api.records.NodeId nodeId)
           throws IOException {
-    LightWeightRequestHandler removeFinishedApplication
-            = new LightWeightRequestHandler(
+    AsyncLightWeightRequestHandler removeFinishedApplication
+            = new AsyncLightWeightRequestHandler(
                     YARNOperationType.TEST) {
       @Override
       public Object performTask() throws StorageException {
@@ -103,8 +104,8 @@ public class DBUtility {
   public static void addFinishedApplication(final ApplicationId appId,
           final org.apache.hadoop.yarn.api.records.NodeId nodeId) throws
           IOException {
-    LightWeightRequestHandler addFinishedApplication
-            = new LightWeightRequestHandler(
+    AsyncLightWeightRequestHandler addFinishedApplication
+            = new AsyncLightWeightRequestHandler(
                     YARNOperationType.TEST) {
       @Override
       public Object performTask() throws StorageException {
@@ -124,8 +125,8 @@ public class DBUtility {
   public static void addContainerToClean(final ContainerId containerId,
           final org.apache.hadoop.yarn.api.records.NodeId nodeId) throws
           IOException {
-    LightWeightRequestHandler addContainerToClean
-            = new LightWeightRequestHandler(
+    AsyncLightWeightRequestHandler addContainerToClean
+            = new AsyncLightWeightRequestHandler(
                     YARNOperationType.TEST) {
       @Override
       public Object performTask() throws StorageException {
@@ -262,8 +263,8 @@ public class DBUtility {
   }
   
   public static void addNextHB(final boolean nextHB, final String nodeId) throws IOException {
-    LightWeightRequestHandler addNextHB
-            = new LightWeightRequestHandler(
+    AsyncLightWeightRequestHandler addNextHB
+            = new AsyncLightWeightRequestHandler(
                     YARNOperationType.TEST) {
       @Override
       public Object performTask() throws StorageException {
@@ -320,8 +321,8 @@ public class DBUtility {
       }
     }
 
-    LightWeightRequestHandler removeUCIHandler
-            = new LightWeightRequestHandler(
+    AsyncLightWeightRequestHandler removeUCIHandler
+            = new AsyncLightWeightRequestHandler(
                     YARNOperationType.TEST) {
       @Override
       public Object performTask() throws StorageException {
@@ -362,7 +363,7 @@ public class DBUtility {
   }
   
   public static void updateLoad(final Load load) throws IOException {
-    LightWeightRequestHandler updateLoadHandler = new LightWeightRequestHandler(
+    AsyncLightWeightRequestHandler updateLoadHandler = new AsyncLightWeightRequestHandler(
             YARNOperationType.TEST) {
 
       @Override
@@ -384,7 +385,7 @@ public class DBUtility {
 
     final PendingEvent pendingEvent = new PendingEvent(rmNodeId, type, status, id);
 
-    LightWeightRequestHandler removePendingEvents = new LightWeightRequestHandler(YARNOperationType.TEST) {
+    AsyncLightWeightRequestHandler removePendingEvents = new AsyncLightWeightRequestHandler(YARNOperationType.TEST) {
       @Override
       public Object performTask() throws IOException {
         connector.beginTransaction();
@@ -408,7 +409,7 @@ public class DBUtility {
       return;
     }
 
-    LightWeightRequestHandler removeContainerStatuses = new LightWeightRequestHandler(YARNOperationType.TEST) {
+    AsyncLightWeightRequestHandler removeContainerStatuses = new AsyncLightWeightRequestHandler(YARNOperationType.TEST) {
       @Override
       public Object performTask() throws IOException {
         connector.beginTransaction();
@@ -425,8 +426,8 @@ public class DBUtility {
   }
 
   public static void InitializeDB() throws IOException {
-    LightWeightRequestHandler setRMDTMasterKeyHandler
-            = new LightWeightRequestHandler(YARNOperationType.TEST) {
+    AsyncLightWeightRequestHandler setRMDTMasterKeyHandler
+            = new AsyncLightWeightRequestHandler(YARNOperationType.TEST) {
       @Override
       public Object performTask() throws IOException {
         connector.formatStorage();

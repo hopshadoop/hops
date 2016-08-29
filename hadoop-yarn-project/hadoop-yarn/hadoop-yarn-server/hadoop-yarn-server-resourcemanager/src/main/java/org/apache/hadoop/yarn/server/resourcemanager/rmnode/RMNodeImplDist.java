@@ -59,7 +59,7 @@ import org.apache.hadoop.yarn.state.SingleArcTransition;
 public class RMNodeImplDist extends RMNodeImpl {
 
   private static final Log LOG = LogFactory.getLog(RMNodeImplDist.class);
-  private final ToCommitHB toCommit = new ToCommitHB(this.nodeId.toString());
+  private ToCommitHB toCommit = new ToCommitHB(this.nodeId.toString());
 
   // Used by RT streaming receiver
   public static enum KeyType {
@@ -120,11 +120,7 @@ public class RMNodeImplDist extends RMNodeImpl {
 
     if (rmNode.nextHeartBeat) {
       rmNode.nextHeartBeat = false;
-      try {
-        DBUtility.addNextHB(rmNode.nextHeartBeat, rmNode.nodeId.toString());
-      } catch (IOException ex) {
-        LOG.error(ex, ex);
-      }
+      toCommit.addNextHeartBeat(rmNode.nextHeartBeat);
 //      if (rmNode.context.isDistributed() && !rmNode.context.isLeader()) {
         //Add NodeUpdatedSchedulerEvent to TransactionState
         toCommit.addPendingEvent(PendingEvent.Type.NODE_UPDATED,
@@ -283,7 +279,7 @@ public class RMNodeImplDist extends RMNodeImpl {
       }
       DBUtility.removeUCI(latestContainerInfoList, this.nodeId.toString());
       this.nextHeartBeat = true;
-      DBUtility.addNextHB(nextHeartBeat, this.nodeId.toString());
+      DBUtility.addNextHB(this.nextHeartBeat, this.nodeId.toString());
     } catch (IOException ex) {
       LOG.error(ex, ex);
     }
@@ -559,6 +555,7 @@ if(rmNode.context.isLeader()){
       }
       try {
         toCommit.commit();
+        toCommit = new ToCommitHB(this.nodeId.toString());
       } catch (IOException ex) {
         LOG.error(ex, ex);
       }
