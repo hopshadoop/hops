@@ -17,13 +17,8 @@ package io.hops.util;
 
 import com.google.protobuf.InvalidProtocolBufferException;
 import io.hops.exception.StorageException;
-import io.hops.metadata.yarn.dal.ContainerIdToCleanDataAccess;
-import io.hops.metadata.yarn.dal.ContainerStatusDataAccess;
-import io.hops.metadata.yarn.dal.FinishedApplicationsDataAccess;
-import io.hops.metadata.yarn.dal.NextHeartbeatDataAccess;
+import io.hops.metadata.yarn.dal.*;
 import io.hops.metadata.yarn.entity.NextHeartbeat;
-import io.hops.metadata.yarn.dal.RMLoadDataAccess;
-import io.hops.metadata.yarn.dal.UpdatedContainerInfoDataAccess;
 import io.hops.metadata.yarn.dal.util.YARNOperationType;
 import io.hops.metadata.yarn.entity.*;
 import io.hops.metadata.yarn.entity.NodeId;
@@ -383,7 +378,52 @@ public class DBUtility {
     };
     updateLoadHandler.handle();
   }
- 
+
+  public static void removePendingEvent(String rmNodeId, PendingEvent.Type type,
+          PendingEvent.Status status, int id) throws IOException {
+
+    final PendingEvent pendingEvent = new PendingEvent(rmNodeId, type, status, id);
+
+    LightWeightRequestHandler removePendingEvents = new LightWeightRequestHandler(YARNOperationType.TEST) {
+      @Override
+      public Object performTask() throws IOException {
+        connector.beginTransaction();
+        connector.writeLock();
+
+        PendingEventDataAccess pendingEventDAO = (PendingEventDataAccess) YarnAPIStorageFactory
+                .getDataAccess(PendingEventDataAccess.class);
+        pendingEventDAO.removePendingEvent(pendingEvent);
+        connector.commit();
+
+        return null;
+      }
+    };
+    removePendingEvents.handle();
+  }
+
+  public static void removeContainerStatuses(final List<ContainerStatus> containerStatuses)
+    throws IOException {
+
+    if (containerStatuses.isEmpty()) {
+      return;
+    }
+
+    LightWeightRequestHandler removeContainerStatuses = new LightWeightRequestHandler(YARNOperationType.TEST) {
+      @Override
+      public Object performTask() throws IOException {
+        connector.beginTransaction();
+        connector.writeLock();
+
+        ContainerStatusDataAccess contStatusDAO = (ContainerStatusDataAccess) YarnAPIStorageFactory
+                .getDataAccess(ContainerStatusDataAccess.class);
+        contStatusDAO.removeAll(containerStatuses);
+        connector.commit();
+        return null;
+      }
+    };
+    removeContainerStatuses.handle();
+  }
+
   public static void InitializeDB() throws IOException {
     LightWeightRequestHandler setRMDTMasterKeyHandler
             = new LightWeightRequestHandler(YARNOperationType.TEST) {

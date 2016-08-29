@@ -40,6 +40,8 @@ import io.hops.transaction.context.ContextInitializer;
 import io.hops.transaction.context.EntityContext;
 import io.hops.transaction.context.LeSnapshot;
 import io.hops.transaction.context.VariableContext;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 
@@ -57,6 +59,8 @@ import java.util.Properties;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 
 public class RMStorageFactory {
+
+  private static final Log LOG = LogFactory.getLog(RMStorageFactory.class);
 
   private static boolean isInitialized = false;
   private static DalStorageFactory dStorageFactory;
