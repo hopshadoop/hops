@@ -107,6 +107,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * The ResourceManager is the main class that is a set of components.
@@ -124,6 +126,8 @@ public class ResourceManager extends CompositeService implements Recoverable {
   private static final Log LOG = LogFactory.getLog(ResourceManager.class);
   private static long clusterTimeStamp = System.currentTimeMillis();
 
+  private Lock resourceTrackingServiceStartStopLock = new ReentrantLock(true);
+  
   /**
    * "Always On" services. Services that need to run always irrespective of
    * the HA state of the RM.
@@ -541,6 +545,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
         }
       }
       super.serviceStart();
+      LOG.info("started resourceTrackingService");
     }
   }
   
@@ -634,9 +639,16 @@ public class ResourceManager extends CompositeService implements Recoverable {
 
     @Override
     protected void serviceStart() throws Exception {
-      
-      resourceTrackingService.start();
-      super.serviceStart();
+      resourceTrackingServiceStartStopLock.lock();
+      LOG.info("locked resourceTrackingServiceStart");
+      try{
+        LOG.info("starting SchedulerService");
+        resourceTrackingService.start();
+        super.serviceStart();
+      }finally{
+        LOG.info("unlocked resourceTrackingServiceStart");
+        resourceTrackingServiceStartStopLock.unlock();
+      }
     }
 
     @Override
@@ -794,7 +806,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
   }
 
   public void handleTransitionToStandBy() {
-    if (rmContext.isHAEnabled()) {
+    if (rmContext.isHAEnabled() || rmContext.isDistributed()) {
       try {
         // Transition to standby and reinit active services
         LOG.info("Transitioning RM to Standby mode");
@@ -888,7 +900,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
   }
   
   protected void startWepApp() {
-
+    LOG.info("+");
     // Use the customized yarn filter instead of the standard kerberos filter to
     // allow users to authenticate using delegation tokens
     // 4 conditions need to be satisfied -
@@ -898,26 +910,30 @@ public class ResourceManager extends CompositeService implements Recoverable {
     // 4. hadoop.http.filter.initializers container AuthenticationFilterInitializer
 
     Configuration conf = getConfig();
+    LOG.info("+");
     boolean enableCorsFilter =
         conf.getBoolean(YarnConfiguration.RM_WEBAPP_ENABLE_CORS_FILTER,
             YarnConfiguration.DEFAULT_RM_WEBAPP_ENABLE_CORS_FILTER);
+    LOG.info("+");
     boolean useYarnAuthenticationFilter =
         conf.getBoolean(
           YarnConfiguration.RM_WEBAPP_DELEGATION_TOKEN_AUTH_FILTER,
           YarnConfiguration.DEFAULT_RM_WEBAPP_DELEGATION_TOKEN_AUTH_FILTER);
+    LOG.info("+");
     String authPrefix = "hadoop.http.authentication.";
     String authTypeKey = authPrefix + "type";
     String filterInitializerConfKey = "hadoop.http.filter.initializers";
     String actualInitializers = "";
+    LOG.info("+");
     Class<?>[] initializersClasses =
         conf.getClasses(filterInitializerConfKey);
-
+LOG.info("+");
     // setup CORS
     if (enableCorsFilter) {
       conf.setBoolean(HttpCrossOriginFilterInitializer.PREFIX
           + HttpCrossOriginFilterInitializer.ENABLED_SUFFIX, true);
     }
-
+LOG.info("+");
     boolean hasHadoopAuthFilterInitializer = false;
     boolean hasRMAuthFilterInitializer = false;
     if (initializersClasses != null) {
@@ -956,7 +972,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
         conf.set(filterInitializerConfKey, actualInitializers);
       }
     }
-
+LOG.info("+");
     // if security is not enabled and the default filter initializer has not 
     // been set, set the initializer to include the
     // RMAuthenticationFilterInitializer which in turn will set up the simple
@@ -975,7 +991,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
         conf.set(authTypeKey, "simple");
       }
     }
-
+LOG.info("+");
     Builder<ApplicationMasterService> builder = 
         WebApps
             .$for("cluster", ApplicationMasterService.class, masterService,
@@ -1001,7 +1017,9 @@ public class ResourceManager extends CompositeService implements Recoverable {
       builder.withAttribute(WebAppProxy.PROXY_HOST_ATTRIBUTE, proxyParts[0]);
 
     }
+    LOG.info("+");
     webApp = builder.start(new RMWebApp(this));
+    LOG.info("+");
   }
 
   /**
@@ -1070,6 +1088,9 @@ public class ResourceManager extends CompositeService implements Recoverable {
   }
 
   public synchronized void transitionToActive() throws Exception {
+    resourceTrackingServiceStartStopLock.lock();
+    LOG.info("locked resourceTrackingServiceStart");
+    try{
     if (rmContext.getHAServiceState() == HAServiceProtocol.HAServiceState.ACTIVE) {
       LOG.info("Already in active state");
       return;
@@ -1101,10 +1122,17 @@ public class ResourceManager extends CompositeService implements Recoverable {
 
     rmContext.setHAServiceState(HAServiceProtocol.HAServiceState.ACTIVE);
     LOG.info("Transitioned to active state");
+    }finally{
+      LOG.info("unlocked resourceTrackingServiceStart");
+      resourceTrackingServiceStartStopLock.unlock();
+    }
   }
 
   public synchronized void transitionToStandby(boolean initialize)
       throws Exception {
+    resourceTrackingServiceStartStopLock.lock();
+    LOG.info("locked resourceTrackingServiceStart");
+    try{
     if (rmContext.getHAServiceState() ==
         HAServiceProtocol.HAServiceState.STANDBY) {
       LOG.info("Already in standby state");
@@ -1117,23 +1145,31 @@ public class ResourceManager extends CompositeService implements Recoverable {
     if (state == HAServiceProtocol.HAServiceState.ACTIVE) {
       stopSchedulerServices();
       resourceTrackingService.stop();
-      if (this.rmContext.isHAEnabled() && rmContext.isLeader()) {
+      if ((this.rmContext.isHAEnabled()|| this.rmContext.isDistributed()) && rmContext.isLeader()) {
         groupMembershipService.relinquishId();
       }
       reinitialize(initialize);
     }
     LOG.info("Transitioned to standby state");
+    }finally{
+      LOG.info("unlocked resourceTrackingServiceStart");
+      resourceTrackingServiceStartStopLock.unlock();
+    }
   }
 
   @Override
   protected void serviceStart() throws Exception {
-    if (this.rmContext.isHAEnabled()) {
+    resourceTrackingServiceStartStopLock.lock();
+    LOG.info("locked resourceTrackingServiceStart");
+    try{
+    if (this.rmContext.isHAEnabled() || this.rmContext.isDistributed()) {
       transitionToStandby(true);
+      LOG.info("start gms");
       groupMembershipService.start();
     } else {
       transitionToActive();
     }
-
+    LOG.info("start webapp");
     startWepApp();
     if (getConfig().getBoolean(YarnConfiguration.IS_MINI_YARN_CLUSTER,
         false)) {
@@ -1143,7 +1179,12 @@ public class ResourceManager extends CompositeService implements Recoverable {
     if (rmContext.isDistributed()) {
       resourceTrackingService.start();
     }
+    LOG.info("start super");
     super.serviceStart();
+    }finally{
+      LOG.info("unlocked resourceTrackingServiceStart");
+      resourceTrackingServiceStartStopLock.unlock();
+    }
   }
   
   protected void doSecureLogin() throws IOException {
@@ -1159,6 +1200,9 @@ public class ResourceManager extends CompositeService implements Recoverable {
 
   @Override
   protected void serviceStop() throws Exception {
+    resourceTrackingServiceStartStopLock.lock();
+    LOG.info("locked resourceTrackingServiceStart");
+    try{
     if (webApp != null) {
       webApp.stop();
     }
@@ -1174,6 +1218,10 @@ public class ResourceManager extends CompositeService implements Recoverable {
     super.serviceStop();
     transitionToStandby(false);
     rmContext.setHAServiceState(HAServiceState.STOPPING);
+    }finally{
+      LOG.info("unlocked resourceTrackingServiceStart");
+      resourceTrackingServiceStartStopLock.unlock();
+    }
   }
   
   protected ResourceTrackerService createResourceTrackerService() {

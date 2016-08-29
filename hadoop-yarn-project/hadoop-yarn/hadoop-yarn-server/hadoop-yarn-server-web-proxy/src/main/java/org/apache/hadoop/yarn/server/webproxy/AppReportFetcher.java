@@ -62,7 +62,7 @@ public class AppReportFetcher {
     this.conf = conf;
     try {
       applicationsManager = ClientRMProxy.createRMProxy(conf,
-          ApplicationClientProtocol.class);
+          ApplicationClientProtocol.class, true);
       if (isAHSEnabled) {
         historyManager = getAHSProxy(conf);
       } else {

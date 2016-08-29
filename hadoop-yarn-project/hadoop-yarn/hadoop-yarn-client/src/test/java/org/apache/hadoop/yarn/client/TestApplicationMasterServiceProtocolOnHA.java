@@ -55,7 +55,7 @@ public class TestApplicationMasterServiceProtocolOnHA
     startHACluster(0, false, false, true);
     attemptId = this.cluster.createFakeApplicationAttemptId();
     amClient = ClientRMProxy
-        .createRMProxy(this.conf, ApplicationMasterProtocol.class);
+        .createRMProxy(this.conf, ApplicationMasterProtocol.class, true);
 
     Token<AMRMTokenIdentifier> appToken =
         this.cluster.getResourceManager().getRMContext()

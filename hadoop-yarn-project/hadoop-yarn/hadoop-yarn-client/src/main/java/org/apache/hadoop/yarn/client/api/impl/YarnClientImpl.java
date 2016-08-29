@@ -185,7 +185,7 @@ public class YarnClientImpl extends YarnClient {
   protected void serviceStart() throws Exception {
     try {
       rmClient = ClientRMProxy.createRMProxy(getConfig(),
-          ApplicationClientProtocol.class);
+          ApplicationClientProtocol.class, true);
       if (historyServiceEnabled) {
         historyClient.start();
       }

@@ -20,7 +20,7 @@ import com.google.protobuf.ServiceException;
 import io.hops.util.GroupMembership;
 import io.hops.util.GroupMembershipPB;
 import io.hops.util.LiveRMsResponse;
-import io.hops.util.LiveRMsResponsePBImpl;
+import io.hops.util.impl.pb.LiveRMsResponsePBImpl;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.proto.GroupMembership.ActiveRMListResponseProto;
 import org.apache.hadoop.yarn.proto.GroupMembership.ActiveRMListRequestProto;

@@ -13,8 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.hops.util;
+package io.hops.util.impl.pb;
 
+import io.hops.util.ActiveRM;
+import io.hops.util.LiveRMsResponse;
+import io.hops.util.SortedActiveRMList;
 import org.apache.hadoop.yarn.api.records.impl.pb.ProtoBase;
 import org.apache.hadoop.yarn.proto.GroupMembership.ActiveRMListResponseProto;
 import org.apache.hadoop.yarn.proto.GroupMembership.ActiveRMListRequestProto;

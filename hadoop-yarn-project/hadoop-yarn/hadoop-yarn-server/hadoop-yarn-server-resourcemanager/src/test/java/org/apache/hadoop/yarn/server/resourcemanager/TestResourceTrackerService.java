@@ -28,6 +28,7 @@ import io.hops.metadata.yarn.entity.PendingEvent;
 import io.hops.metadata.yarn.entity.UpdatedContainerInfo;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import io.hops.util.DBUtility;
+import io.hops.util.DBUtilityTests;
 import io.hops.util.RMStorageFactory;
 import io.hops.util.YarnAPIStorageFactory;
 import static org.mockito.Matchers.any;
@@ -79,6 +80,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptI
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeImplDist;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.QueueMetrics;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.SchedulerEvent;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.apache.hadoop.yarn.util.Records;
@@ -366,22 +368,22 @@ public class TestResourceTrackerService {
     //load
     Assert.assertEquals(1, DBUtility.getAllLoads().get(rm.getRMContext().getGroupMembershipService().getHostname()).getLoad());
     //rmnode
-    Map<String, io.hops.metadata.yarn.entity.RMNode> rmNodesInDb= getAllRMNodess();
+    Map<String, io.hops.metadata.yarn.entity.RMNode> rmNodesInDb= DBUtilityTests.getAllRMNodess();
     Assert.assertEquals(1, rmNodesInDb.size());
     io.hops.metadata.yarn.entity.RMNode rmNode = rmNodesInDb.get(nodeId.toString());
     Assert.assertEquals("RUNNING", rmNode.getCurrentState());
     //resource
-    Map<String, io.hops.metadata.yarn.entity.Resource> resourcesInDb = getAllResources();
+    Map<String, io.hops.metadata.yarn.entity.Resource> resourcesInDb = DBUtilityTests.getAllResources();
     Assert.assertEquals(1, resourcesInDb.size());
     io.hops.metadata.yarn.entity.Resource resource = resourcesInDb.get(nodeId.toString());
     Assert.assertEquals(1024, resource.getMemory());
     Assert.assertEquals(1, resource.getVirtualCores());
     //pending event
-    List<PendingEvent> pendingEventsInDb = getAllPendingEvents();
+    List<PendingEvent> pendingEventsInDb = DBUtilityTests.getAllPendingEvents();
     Assert.assertEquals(1, pendingEventsInDb.size());
     PendingEvent pendingEvent = pendingEventsInDb.get(0);
     Assert.assertEquals(PendingEvent.Type.NODE_ADDED, pendingEvent.getType());
-    Assert.assertEquals(PendingEvent.Status.NEW, pendingEvent.getStatus());    
+    Assert.assertEquals(PendingEvent.Status.NEW, pendingEvent.getStatus()); 
   }
   
   @Test
@@ -413,7 +415,7 @@ public class TestResourceTrackerService {
     resourceTrackerService.nodeHeartbeat(request);
     Thread.sleep(100);
     
-    List<PendingEvent> pendingEventsInDB = getAllPendingEvents();
+    List<PendingEvent> pendingEventsInDB = DBUtilityTests.getAllPendingEvents();
     Assert.assertEquals(3, pendingEventsInDB.size());
     for (PendingEvent pendingEvent: pendingEventsInDB){
       if(pendingEvent.getId().getEventId()==2){
@@ -426,7 +428,7 @@ public class TestResourceTrackerService {
       }
     }
     
-    Map<String, Map<Integer, List<UpdatedContainerInfo>>> uciInDB = getAllUCIs();
+    Map<String, Map<Integer, List<UpdatedContainerInfo>>> uciInDB = DBUtilityTests.getAllUCIs();
     Assert.assertEquals(1, uciInDB.size());
     Map<Integer, List<UpdatedContainerInfo>> subMap = uciInDB.get(nodeId.toString());
     Assert.assertEquals(1, subMap.size());
@@ -436,7 +438,7 @@ public class TestResourceTrackerService {
     Assert.assertEquals(3, uci.getPendingEventId());
     Assert.assertEquals(containerStatus.getContainerId().toString(), uci.getContainerId());
     
-    Map<String, io.hops.metadata.yarn.entity.ContainerStatus> containersStatusInDB = getAllContainerStatus();
+    Map<String, io.hops.metadata.yarn.entity.ContainerStatus> containersStatusInDB = DBUtilityTests.getAllContainerStatus();
     Assert.assertEquals(1, containersStatusInDB.size());
     io.hops.metadata.yarn.entity.ContainerStatus cs = containersStatusInDB.get(
             containerStatus.getContainerId().toString());
@@ -444,101 +446,7 @@ public class TestResourceTrackerService {
     Assert.assertEquals(containerStatus.getState().toString(), cs.getState());
     Assert.assertEquals(3, cs.getPendingEventId());
   }
-  
-  public static Map<String, io.hops.metadata.yarn.entity.RMNode> getAllRMNodess() throws IOException {
-    LightWeightRequestHandler getRMNodesHandler = new LightWeightRequestHandler(
-            YARNOperationType.TEST) {
-
-      @Override
-      public Object performTask() throws IOException {
-        connector.beginTransaction();
-        connector.readCommitted();
-        RMNodeDataAccess DA = (RMNodeDataAccess) YarnAPIStorageFactory.
-                getDataAccess(RMNodeDataAccess.class);
-        Map<String, io.hops.metadata.yarn.entity.RMNode> res = DA.getAll();
-        connector.commit();
-        return res;
-      }
-    };
-    return (Map<String, io.hops.metadata.yarn.entity.RMNode>) getRMNodesHandler.handle();
-  }
-  
-  public static Map<String, io.hops.metadata.yarn.entity.Resource> getAllResources() throws IOException {
-    LightWeightRequestHandler getResourcesHandler = new LightWeightRequestHandler(
-            YARNOperationType.TEST) {
-
-      @Override
-      public Object performTask() throws IOException {
-        connector.beginTransaction();
-        connector.readCommitted();
-        ResourceDataAccess DA = (ResourceDataAccess) YarnAPIStorageFactory.
-                getDataAccess(ResourceDataAccess.class);
-        Map<String, io.hops.metadata.yarn.entity.Resource> res = DA.getAll();
-        connector.commit();
-        return res;
-      }
-    };
-    return (Map<String, io.hops.metadata.yarn.entity.Resource>) getResourcesHandler.handle();
-  }
-  
-    public static List<PendingEvent> getAllPendingEvents() throws IOException {
-    LightWeightRequestHandler getPendingEventsHandler = new LightWeightRequestHandler(
-            YARNOperationType.TEST) {
-
-      @Override
-      public Object performTask() throws IOException {
-        connector.beginTransaction();
-        connector.readCommitted();
-        PendingEventDataAccess DA = (PendingEventDataAccess) YarnAPIStorageFactory.
-                getDataAccess(PendingEventDataAccess.class);
-        List<PendingEvent> res = DA.getAll();
-        connector.commit();
-        return res;
-      }
-    };
-    return (List<PendingEvent>) getPendingEventsHandler.handle();
-  }
-
-  public static Map<String, Map<Integer, List<UpdatedContainerInfo>>> getAllUCIs()
-          throws IOException {
-    LightWeightRequestHandler getUCIHandler = new LightWeightRequestHandler(
-            YARNOperationType.TEST) {
-
-      @Override
-      public Object performTask() throws IOException {
-        connector.beginTransaction();
-        connector.readCommitted();
-        UpdatedContainerInfoDataAccess DA = (UpdatedContainerInfoDataAccess) YarnAPIStorageFactory.
-                getDataAccess(UpdatedContainerInfoDataAccess.class);
-        Map<String, Map<Integer, List<UpdatedContainerInfo>>> res = DA.getAll();
-        connector.commit();
-        return res;
-      }
-    };
-    return (Map<String, Map<Integer, List<UpdatedContainerInfo>>>) getUCIHandler.
-            handle();
-  }
-  
-  public static Map<String, io.hops.metadata.yarn.entity.ContainerStatus> getAllContainerStatus()
-          throws IOException {
-    LightWeightRequestHandler getContainerStatusHandler = new LightWeightRequestHandler(
-            YARNOperationType.TEST) {
-
-      @Override
-      public Object performTask() throws IOException {
-        connector.beginTransaction();
-        connector.readCommitted();
-        ContainerStatusDataAccess DA = (ContainerStatusDataAccess) YarnAPIStorageFactory.
-                getDataAccess(ContainerStatusDataAccess.class);
-        Map<String,io.hops.metadata.yarn.entity.ContainerStatus> res = DA.getAll();
-        connector.commit();
-        return res;
-      }
-    };
-    return (Map<String,io.hops.metadata.yarn.entity.ContainerStatus>) getContainerStatusHandler.
-            handle();
-  }
-  
+   
   @Test
   public void testNodeRegistrationVersionLessThanRM() throws Exception {
     writeToHostsFile("host2");

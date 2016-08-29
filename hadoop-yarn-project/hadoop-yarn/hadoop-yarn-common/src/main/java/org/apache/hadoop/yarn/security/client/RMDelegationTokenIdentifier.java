@@ -151,7 +151,8 @@ public class RMDelegationTokenIdentifier extends YARNDelegationTokenIdentifier {
           }
         }
       }
-      return ClientRMProxy.createRMProxy(conf, ApplicationClientProtocol.class);
+      return ClientRMProxy.createRMProxy(conf, ApplicationClientProtocol.class, 
+              false);
     }
 
     // get renewer so we can always renew our own tokens

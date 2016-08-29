@@ -43,6 +43,7 @@
     <module>hadoop-pipes</module>
     <module>hadoop-openstack</module>
     <module>hadoop-sls</module>
+    <module>distributedLoadSimulator</module>
   </modules>
 
   <build>

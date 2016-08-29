@@ -634,4 +634,8 @@ public abstract class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
   }
 
   abstract protected void handleContainerStatus(List<ContainerStatus> containerStatuses);
+  
+  public boolean getNextHeartbeat(){
+    return nextHeartBeat;
+  }
  }

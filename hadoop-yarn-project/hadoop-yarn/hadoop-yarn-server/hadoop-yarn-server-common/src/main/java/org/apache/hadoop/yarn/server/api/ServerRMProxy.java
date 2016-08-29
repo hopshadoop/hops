@@ -49,8 +49,8 @@ public class ServerRMProxy<T> extends RMProxy<T> {
    * @throws IOException
    */
   public static <T> T createRMProxy(final Configuration configuration,
-      final Class<T> protocol) throws IOException {
-    return createRMProxy(configuration, protocol, INSTANCE);
+      final Class<T> protocol, boolean toLeader) throws IOException {
+    return createRMProxy(configuration, protocol, INSTANCE, toLeader);
 }
 
   @InterfaceAudience.Private

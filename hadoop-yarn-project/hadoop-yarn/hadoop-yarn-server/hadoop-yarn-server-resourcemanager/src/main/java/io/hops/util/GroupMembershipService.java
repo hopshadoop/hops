@@ -100,11 +100,8 @@ public class GroupMembershipService extends CompositeService
     
     LOG.info("init groupMembershipService " + this.hostname);
 
-    if (rmContext.isHAEnabled()) {
-      autoFailoverEnabled = HAUtil.isAutomaticFailoverEnabled(conf);
-      if (autoFailoverEnabled) {
-        initLEandGM(conf);
-      }
+    if (rmContext.isHAEnabled() || rmContext.isDistributed()) {
+      initLEandGM(conf);
     }
   }
 

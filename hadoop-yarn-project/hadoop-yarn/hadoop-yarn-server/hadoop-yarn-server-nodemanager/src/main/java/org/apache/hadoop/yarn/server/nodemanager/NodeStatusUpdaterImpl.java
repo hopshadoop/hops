@@ -246,7 +246,9 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
   @VisibleForTesting
   protected ResourceTracker getRMClient() throws IOException {
     Configuration conf = getConfig();
-    return ServerRMProxy.createRMProxy(conf, ResourceTracker.class);
+    return ServerRMProxy.createRMProxy(conf, ResourceTracker.class, 
+            conf.getBoolean(YarnConfiguration.DISTRIBUTED_RM,
+            YarnConfiguration.DEFAULT_DISTRIBUTED_RM));
   }
 
   @VisibleForTesting

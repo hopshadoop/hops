@@ -16,8 +16,10 @@
 package org.apache.hadoop.yarn.server.resourcemanager;
 
 import io.hops.util.DBUtility;
+import io.hops.util.DBUtilityTests;
 import io.hops.util.RMStorageFactory;
 import io.hops.util.YarnAPIStorageFactory;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.hadoop.conf.Configuration;
@@ -139,7 +141,7 @@ public class TestDistributedScheduler {
   }
   
   @Test(timeout=200000)
-  public void testUpdateHeartbeatResponseForCleanup() {
+  public void testUpdateHeartbeatResponseForCleanup() throws IOException {
     RMNodeImpl node = getRunningNode();
     NodeId nodeId = node.getNodeID();
 
@@ -149,32 +151,43 @@ public class TestDistributedScheduler {
 						BuilderUtils.newApplicationId(0, 0), 0), 0);
     node.handle(new RMNodeCleanContainerEvent(nodeId, completedContainerId));
     Assert.assertEquals(1, node.getContainersToCleanUp().size());
-    //check container id to clean 
-    
-    //check next heartbeat
-    
+    //check DB
+    Assert.assertEquals(1, DBUtilityTests.getAllContainersToCleanUp().size());
+    Assert.assertEquals(1, DBUtilityTests.getAllContainersToCleanUp().get(node.getNodeID().toString()).size());
+    Assert.assertEquals(1, DBUtilityTests.getAllNextHeartbeat().size());
     
     // Finish an application
     ApplicationId finishedAppId = BuilderUtils.newApplicationId(0, 1);
     node.handle(new RMNodeCleanAppEvent(nodeId, finishedAppId));
     Assert.assertEquals(1, node.getAppsToCleanup().size());
-
+    //check DB
+    Assert.assertEquals(1, DBUtilityTests.getAllAppsToCleanup().size());
+    Assert.assertEquals(1, DBUtilityTests.getAllAppsToCleanup().get(node.getNodeID().toString()).size());
+    
     // Verify status update does not clear containers/apps to cleanup
     // but updating heartbeat response for cleanup does
     RMNodeStatusEvent statusEvent = getMockRMNodeStatusEvent();
     node.handle(statusEvent);
     Assert.assertEquals(1, node.getContainersToCleanUp().size());
     Assert.assertEquals(1, node.getAppsToCleanup().size());
-    //check that still in db
+    //Check DB
+    Assert.assertEquals(1, DBUtilityTests.getAllContainersToCleanUp().size());
+    Assert.assertEquals(1, DBUtilityTests.getAllContainersToCleanUp().get(node.getNodeID().toString()).size());
+    Assert.assertEquals(1, DBUtilityTests.getAllAppsToCleanup().size());
+    Assert.assertEquals(1, DBUtilityTests.getAllAppsToCleanup().get(node.getNodeID().toString()).size());
+    Assert.assertEquals(0, DBUtilityTests.getAllNextHeartbeat().size());
+    
     NodeHeartbeatResponse hbrsp = Records.newRecord(NodeHeartbeatResponse.class);
     node.updateNodeHeartbeatResponseForCleanup(hbrsp);
-    //check that removed from db
     Assert.assertEquals(0, node.getContainersToCleanUp().size());
     Assert.assertEquals(0, node.getAppsToCleanup().size());
     Assert.assertEquals(1, hbrsp.getContainersToCleanup().size());
     Assert.assertEquals(completedContainerId, hbrsp.getContainersToCleanup().get(0));
     Assert.assertEquals(1, hbrsp.getApplicationsToCleanup().size());
     Assert.assertEquals(finishedAppId, hbrsp.getApplicationsToCleanup().get(0));
+    //Check DB
+    Assert.assertEquals(0, DBUtilityTests.getAllContainersToCleanUp().size());
+    Assert.assertEquals(0, DBUtilityTests.getAllAppsToCleanup().size());
   }
   
   private RMNodeImpl getRunningNode() {

@@ -19,7 +19,7 @@ import com.google.protobuf.ServiceException;
 import io.hops.util.GroupMembership;
 import io.hops.util.GroupMembershipPB;
 import io.hops.util.LiveRMsResponse;
-import io.hops.util.LiveRMsResponsePBImpl;
+import io.hops.util.impl.pb.LiveRMsResponsePBImpl;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;

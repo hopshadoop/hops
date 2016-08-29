@@ -259,7 +259,7 @@ public class RMAdminCLI extends HAAdmin {
     // Get the current configuration
     final YarnConfiguration conf = new YarnConfiguration(getConf());
     return ClientRMProxy.createRMProxy(conf,
-        ResourceManagerAdministrationProtocol.class);
+        ResourceManagerAdministrationProtocol.class, true);
   }
   
   private int refreshQueues() throws IOException, YarnException {

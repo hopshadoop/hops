@@ -104,10 +104,11 @@ public class RMNodeImplDist extends RMNodeImpl {
 //      } else {
 //        rmNode.context.getDispatcher().getEventHandler().handle(
 //                new NodeRemovedSchedulerEvent(rmNode));
+      if(rmNode.context.isLeader()){
         rmNode.context.getDispatcher().getEventHandler().handle(
                 new NodesListManagerEvent(
                         NodesListManagerEventType.NODE_UNUSABLE, rmNode));
-//      }
+      }
 
       // Update metrics
       rmNode.updateMetricsForDeactivatedNode(rmNode.getState(),
@@ -372,10 +373,11 @@ public class RMNodeImplDist extends RMNodeImpl {
 //    } else {
 //      rmNode.context.getDispatcher().getEventHandler()
 //              .handle(new NodeAddedSchedulerEvent(rmNode, containers));
+if(rmNode.context.isLeader()){
       rmNode.context.getDispatcher().getEventHandler().handle(
               new NodesListManagerEvent(
                       NodesListManagerEventType.NODE_USABLE, rmNode));
-//    }
+    }
   }
 
   protected void reconnectNodeTransitionInternal(RMNodeImpl rmNode,
@@ -485,10 +487,11 @@ public class RMNodeImplDist extends RMNodeImpl {
 //                .handle(new NodeRemovedSchedulerEvent(rmNode));
 //      }
     }
+    if(rmNode.context.isLeader()){
     rmNode.context.getDispatcher().getEventHandler().handle(
             new NodesListManagerEvent(
                     NodesListManagerEventType.NODE_UNUSABLE, rmNode));
-
+    }
     // Deactivate the node
     rmNode.context.getRMNodes().remove(rmNode.nodeId);
     LOG.info("Deactivating Node " + rmNode.nodeId + " as it is now "
@@ -519,10 +522,11 @@ public class RMNodeImplDist extends RMNodeImpl {
 //      } else {
 //        rmNode.context.getDispatcher().getEventHandler().handle(
 //                new NodeAddedSchedulerEvent(rmNode));
+if(rmNode.context.isLeader()){
         rmNode.context.getDispatcher().getEventHandler().handle(
                 new NodesListManagerEvent(
                         NodesListManagerEventType.NODE_USABLE, rmNode));
-//      }
+      }
       // ??? how about updating metrics before notifying to ensure that
       // notifiers get update metadata because they will very likely query it
       // upon notification

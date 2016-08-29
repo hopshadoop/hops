@@ -32,12 +32,14 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.yarn.api.records.NodeState;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo;
 
 public class ToCommitHB {
-
+  private static final Log LOG = LogFactory.getLog(ToCommitHB.class);
   private static AtomicInteger nextPendingEventId = new AtomicInteger(0);
 
   final String nodeId;
@@ -168,8 +170,11 @@ public class ToCommitHB {
         return null;
       }
     };
+    LOG.debug("committing pending event");
     commitHeartbeat.handle();
+    LOG.debug("committed pending event");
     reset();
+    LOG.debug("reseted toCommit");
   }
 
   private void reset() {

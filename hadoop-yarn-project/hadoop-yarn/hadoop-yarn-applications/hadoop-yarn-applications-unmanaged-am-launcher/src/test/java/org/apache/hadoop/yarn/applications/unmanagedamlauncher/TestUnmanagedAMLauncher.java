@@ -203,7 +203,7 @@ public class TestUnmanagedAMLauncher {
   public static void main(String[] args) throws Exception {
     if (args[0].equals("success")) {
       ApplicationMasterProtocol client = ClientRMProxy.createRMProxy(conf,
-          ApplicationMasterProtocol.class);
+          ApplicationMasterProtocol.class, true);
       client.registerApplicationMaster(RegisterApplicationMasterRequest
           .newInstance(NetUtils.getHostname(), -1, ""));
       Thread.sleep(1000);

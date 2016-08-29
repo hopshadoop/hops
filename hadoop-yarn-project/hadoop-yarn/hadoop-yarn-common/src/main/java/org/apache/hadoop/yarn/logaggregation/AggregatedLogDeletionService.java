@@ -265,7 +265,7 @@ public class AggregatedLogDeletionService extends AbstractService {
   @VisibleForTesting
   protected ApplicationClientProtocol creatRMClient() throws IOException {
     return ClientRMProxy.createRMProxy(getConfig(),
-      ApplicationClientProtocol.class);
+      ApplicationClientProtocol.class, false);
   }
 
   @VisibleForTesting

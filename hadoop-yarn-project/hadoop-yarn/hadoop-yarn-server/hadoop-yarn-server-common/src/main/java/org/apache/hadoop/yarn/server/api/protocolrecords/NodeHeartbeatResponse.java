@@ -67,4 +67,8 @@ public interface NodeHeartbeatResponse {
 
   void setSystemCredentialsForApps(
       Map<ApplicationId, ByteBuffer> systemCredentials);
+  
+  boolean getNextheartbeat();
+  
+  public void setNextheartbeat(boolean nextHeartbeat);
 }

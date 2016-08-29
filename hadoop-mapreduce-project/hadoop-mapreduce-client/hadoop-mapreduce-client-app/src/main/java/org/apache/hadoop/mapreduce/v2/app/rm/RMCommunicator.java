@@ -310,7 +310,7 @@ public abstract class RMCommunicator extends AbstractService
     final Configuration conf = getConfig();
 
     try {
-      return ClientRMProxy.createRMProxy(conf, ApplicationMasterProtocol.class);
+      return ClientRMProxy.createRMProxy(conf, ApplicationMasterProtocol.class,true);
     } catch (IOException e) {
       throw new YarnRuntimeException(e);
     }

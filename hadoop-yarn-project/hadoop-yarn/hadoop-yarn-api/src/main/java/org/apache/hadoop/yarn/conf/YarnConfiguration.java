@@ -514,10 +514,15 @@ RM_PREFIX + "resource-tracker.port";
 
   public static final String CLIENT_FAILOVER_PREFIX =
       YARN_PREFIX + "client.failover-";
-  public static final String CLIENT_FAILOVER_PROXY_PROVIDER =
-      CLIENT_FAILOVER_PREFIX + "proxy-provider";
-  public static final String DEFAULT_CLIENT_FAILOVER_PROXY_PROVIDER =
-      "org.apache.hadoop.yarn.client.ConfiguredRMFailoverProxyProvider";
+  public static final String LEADER_CLIENT_FAILOVER_PROXY_PROVIDER =
+      CLIENT_FAILOVER_PREFIX + "leader-proxy-provider";
+  public static final String DEFAULT_LEADER_CLIENT_FAILOVER_PROXY_PROVIDER =
+      "org.apache.hadoop.yarn.client.ConfiguredLeaderFailoverHAProxyProvider";
+
+  public static final String LEAST_LOADED_CLIENT_FAILOVER_PROXY_PROVIDER
+          = CLIENT_FAILOVER_PREFIX + "least-loadedproxy-provider";
+  public static final String DEFAULT_LEAST_LOADED_CLIENT_FAILOVER_PROXY_PROVIDER
+          = "org.apache.hadoop.yarn.client.ConfiguredLeastLoadedRMFailoverHAProxyProvider";
 
   public static final String CLIENT_FAILOVER_MAX_ATTEMPTS =
       CLIENT_FAILOVER_PREFIX + "max-attempts";
