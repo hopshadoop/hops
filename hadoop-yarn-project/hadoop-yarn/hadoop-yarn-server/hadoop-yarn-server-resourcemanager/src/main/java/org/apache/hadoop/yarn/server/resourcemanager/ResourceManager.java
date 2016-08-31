@@ -411,6 +411,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
     private boolean recoveryEnabled;
     private RMActiveServiceContext activeServiceContext;
     private ResourceManager rm;
+    private NdbStreamingReceiver streamingReceiver;
     
     public ResourceTrackingServices(ResourceManager rm) {
       super("ResourceTrackingServices");
@@ -511,13 +512,13 @@ public class ResourceManager extends CompositeService implements Recoverable {
         if (!rmContext.isLeader()) {
           LOG.info("streaming processor is starting for resource tracker");
           RMStorageFactory.kickTheNdbEventStreamingAPI(false, conf);
-          NdbStreamingReceiver rtStreamingProcessor = new NdbRtStreamingProcessor(rmContext);
-          rtStreamingProcessor.start();
+          streamingReceiver = new NdbRtStreamingProcessor(rmContext);
+          streamingReceiver.start();
         } else {
           LOG.info("streaming processor is starting for scheduler");
           RMStorageFactory.kickTheNdbEventStreamingAPI(true, conf);
-          NdbStreamingReceiver rmStreamingProcessor = new NdbRmStreamingProcessor(rmContext);
-          rmStreamingProcessor.start();
+          streamingReceiver = new NdbRmStreamingProcessor(rmContext);
+          streamingReceiver.start();
         }
       }
       
@@ -540,6 +541,15 @@ public class ResourceManager extends CompositeService implements Recoverable {
       }
       super.serviceStart();
       LOG.info("started resourceTrackingService");
+    }
+    
+    @Override
+    protected void serviceStop() throws Exception {
+      if (streamingReceiver != null) {
+        streamingReceiver.stop();
+        RMStorageFactory.stopTheNdbEventStreamingAPI();
+      }
+      super.serviceStop();
     }
   }
   

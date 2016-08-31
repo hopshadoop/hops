@@ -16,6 +16,7 @@ public abstract class NdbStreamingReceiver {
     protected final RMContext rmContext;
     private Runnable retrievingRunnable;
     private final String threadName;
+    protected boolean running = false;
 
     public NdbStreamingReceiver(RMContext rmContext, String threadName) {
         this.rmContext = rmContext;
@@ -28,6 +29,7 @@ public abstract class NdbStreamingReceiver {
 
     public void start() {
         if (retrievingThread == null) {
+          running = true;
             LOG.debug("HOP :: Creating " + threadName);
             retrievingThread = new Thread(retrievingRunnable);
             retrievingThread.setName(threadName);
@@ -38,6 +40,7 @@ public abstract class NdbStreamingReceiver {
     }
 
     public void stop() {
+      running =false;
         if (retrievingThread != null) {
             retrievingThread.interrupt();
         }

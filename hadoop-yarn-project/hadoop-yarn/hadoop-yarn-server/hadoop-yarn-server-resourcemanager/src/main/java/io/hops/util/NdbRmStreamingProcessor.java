@@ -132,7 +132,7 @@ public class NdbRmStreamingProcessor extends NdbStreamingReceiver {
 
         @Override
         public void run() {
-            while (!Thread.currentThread().isInterrupted()) {
+            while (running) {
                 try {
                     RMNodeComps hopRMNodeCompObj = null;
                     LOG.debug("Size of the events queue: " + NdbRmStreamingReceiver.receivedEvents.size());

@@ -61,7 +61,7 @@ public class NdbRtStreamingProcessor extends NdbStreamingReceiver {
 
         @Override
         public void run() {
-            while (!Thread.currentThread().isInterrupted()) {
+            while (running) {
                 if (!rmContext.isLeader()) {
                     try {
                         StreamingRTComps streamingRTComps = null;

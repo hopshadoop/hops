@@ -67,6 +67,8 @@ public class TestStreamingLibrary {
         DBUtility.InitializeDB();
         rm = new MockRM(conf);
         rm.start();
+        //wait for the node to have completely started (can be slow on some machines).
+        Thread.sleep(10000);
     }
 
     @After
