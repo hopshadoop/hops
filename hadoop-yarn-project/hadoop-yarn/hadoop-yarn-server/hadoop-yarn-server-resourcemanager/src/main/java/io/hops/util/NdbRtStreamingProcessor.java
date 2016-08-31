@@ -20,15 +20,13 @@ import java.util.Set;
 /**
  * Created by antonis on 8/22/16.
  */
-public class NdbRtStreamingProcessor implements Runnable {
+public class NdbRtStreamingProcessor extends NdbStreamingReceiver {
 
-    private static final Log LOG = LogFactory.getLog(NdbRtStreamingProcessor.class);
-    private boolean running = false;
-    private final RMContext context;
     private RMNode rmNode;
 
-    public NdbRtStreamingProcessor(RMContext context) {
-        this.context = context;
+    public NdbRtStreamingProcessor(RMContext rmContext) {
+        super(rmContext, "RT Event retriever");
+        setRetrievingRunnable(new RetrievingThread());
     }
 
     public void printStreamingRTComps(StreamingRTComps streamingRTComps) {
@@ -56,77 +54,76 @@ public class NdbRtStreamingProcessor implements Runnable {
             }
         }
     }
+    
+    private class RetrievingThread implements Runnable {
+        @Override
+        public void run() {
+            while (!Thread.currentThread().isInterrupted()) {
+                if (!rmContext.isLeader()) {
+                    try {
+                        StreamingRTComps streamingRTComps = null;
+                        streamingRTComps = NdbRtStreamingReceiver.receivedRTEvents
+                                .take();
 
-    @Override
-    public void run() {
-        running = true;
-        while (running) {
-            if (!context.isLeader()) {
-                try {
-                    StreamingRTComps streamingRTComps = null;
-                    streamingRTComps = (StreamingRTComps) NdbRtStreamingReceiver.receivedRTEvents
-                            .take();
+                        if (streamingRTComps != null) {
+                            if (LOG.isDebugEnabled()) {
+                                printStreamingRTComps(streamingRTComps);
+                            }
 
-                    if (streamingRTComps != null) {
-                        if (LOG.isDebugEnabled()) {
-                            printStreamingRTComps(streamingRTComps);
-                        }
+                            if (streamingRTComps.getNodeIds() != null) {
+                                for (String streamingRTCompsNodeId : streamingRTComps.getNodeIds()) {
+                                    NodeId nodeId = ConverterUtils.toNodeId(streamingRTCompsNodeId);
+                                    rmNode = rmContext.getRMNodes().get(nodeId);
 
-                        if (streamingRTComps.getNodeIds() != null) {
-                            for (String streamingRTCompsNodeId : streamingRTComps.getNodeIds()) {
-                                NodeId nodeId = ConverterUtils.toNodeId(streamingRTCompsNodeId);
-                                rmNode = context.getRMNodes().get(nodeId);
+                                    if (rmNode != null) {
+                                        if (streamingRTComps
+                                                .getContainersToCleanByNodeId(streamingRTCompsNodeId) != null) {
+                                            ((RMNodeImplDist) rmNode).setContainersToCleanUp(
+                                                    streamingRTComps.getContainersToCleanByNodeId(
+                                                            streamingRTCompsNodeId));
+                                        }
 
-                                if (rmNode != null) {
-                                    if (streamingRTComps
-                                            .getContainersToCleanByNodeId(streamingRTCompsNodeId) != null) {
-                                        ((RMNodeImplDist) rmNode).setContainersToCleanUp(
-                                                streamingRTComps.getContainersToCleanByNodeId(streamingRTCompsNodeId));
-                                    }
+                                        if (streamingRTComps
+                                                .getFinishedAppsByNodeId(streamingRTCompsNodeId) != null) {
+                                            ((RMNodeImplDist) rmNode).setAppsToCleanUp(streamingRTComps
+                                                    .getFinishedAppsByNodeId(streamingRTCompsNodeId));
+                                        }
 
-                                    if (streamingRTComps
-                                            .getFinishedAppsByNodeId(streamingRTCompsNodeId) != null) {
-                                        ((RMNodeImplDist) rmNode).setAppsToCleanUp(streamingRTComps
-                                                .getFinishedAppsByNodeId(streamingRTCompsNodeId));
-                                    }
-
-                                    if (streamingRTComps.isNextHeartbeatForNodeId(
-                                            streamingRTCompsNodeId) != null) {
-                                        ((RMNodeImplDist) rmNode).setNextHeartbeat(streamingRTComps
-                                                .isNextHeartbeatForNodeId(streamingRTCompsNodeId));
+                                        if (streamingRTComps.isNextHeartbeatForNodeId(
+                                                streamingRTCompsNodeId) != null) {
+                                            ((RMNodeImplDist) rmNode).setNextHeartbeat(streamingRTComps
+                                                    .isNextHeartbeatForNodeId(streamingRTCompsNodeId));
+                                        }
                                     }
                                 }
                             }
-                        }
 
-                        if (streamingRTComps.getCurrentNMMasterKey() != null) {
-                            ((NMTokenSecretManagerInRMDist) context.getNMTokenSecretManager())
-                                    .setCurrentMasterKey(streamingRTComps.getCurrentNMMasterKey());
-                        }
+                            if (streamingRTComps.getCurrentNMMasterKey() != null) {
+                                ((NMTokenSecretManagerInRMDist) rmContext.getNMTokenSecretManager())
+                                        .setCurrentMasterKey(streamingRTComps.getCurrentNMMasterKey());
+                            }
 
-                        if (streamingRTComps.getNextNMMasterKey() != null) {
-                            ((NMTokenSecretManagerInRMDist) context.getNMTokenSecretManager())
-                                    .setNextMasterKey(streamingRTComps.getNextNMMasterKey());
-                        }
+                            if (streamingRTComps.getNextNMMasterKey() != null) {
+                                ((NMTokenSecretManagerInRMDist) rmContext.getNMTokenSecretManager())
+                                        .setNextMasterKey(streamingRTComps.getNextNMMasterKey());
+                            }
 
-                        if (streamingRTComps.getCurrentRMContainerMasterKey() != null) {
-                            ((RMContainerTokenSecretManagerDist) context.getContainerTokenSecretManager())
-                                    .setCurrentMasterKey(streamingRTComps.getCurrentRMContainerMasterKey());
-                        }
+                            if (streamingRTComps.getCurrentRMContainerMasterKey() != null) {
+                                ((RMContainerTokenSecretManagerDist) rmContext.getContainerTokenSecretManager())
+                                        .setCurrentMasterKey(streamingRTComps.getCurrentRMContainerMasterKey());
+                            }
 
-                        if (streamingRTComps.getNextRMContainerMasterKey() != null) {
-                            ((RMContainerTokenSecretManagerDist) context.getContainerTokenSecretManager())
-                                    .setNextMasterKey(streamingRTComps.getNextRMContainerMasterKey());
+                            if (streamingRTComps.getNextRMContainerMasterKey() != null) {
+                                ((RMContainerTokenSecretManagerDist) rmContext.getContainerTokenSecretManager())
+                                        .setNextMasterKey(streamingRTComps.getNextRMContainerMasterKey());
+                            }
                         }
+                    } catch (InterruptedException ex) {
+                        LOG.error(ex, ex);
                     }
-                } catch (InterruptedException ex) {
-                    LOG.error(ex, ex);
                 }
             }
+            LOG.info("HOP :: RT Event retriever interrupted");
         }
-    }
-
-    public void stop() {
-        running = false;
     }
 }
