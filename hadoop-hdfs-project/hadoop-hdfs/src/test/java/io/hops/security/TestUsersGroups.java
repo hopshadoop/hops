@@ -20,7 +20,6 @@ import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.UserDataAccess;
 import io.hops.metadata.hdfs.entity.Group;
 import io.hops.metadata.hdfs.entity.User;
-import io.hops.metadata.ndb.dalimpl.hdfs.UserClusterj;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.hadoop.conf.Configuration;
