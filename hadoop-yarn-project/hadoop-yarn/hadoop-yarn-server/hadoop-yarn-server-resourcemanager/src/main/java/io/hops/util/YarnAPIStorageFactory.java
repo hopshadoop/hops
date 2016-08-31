@@ -20,6 +20,7 @@ import io.hops.DalStorageFactory;
 import io.hops.StorageConnector;
 import io.hops.exception.StorageException;
 import io.hops.exception.StorageInitializtionException;
+import io.hops.leaderElection.VarsRegister;
 import io.hops.metadata.common.EntityDataAccess;
 import io.hops.metadata.hdfs.dal.GroupDataAccess;
 import io.hops.metadata.hdfs.dal.UserDataAccess;
@@ -91,6 +92,7 @@ public class YarnAPIStorageFactory {
           .HOPS_USERS_LRU_THRESHOLD, CommonConfigurationKeys
           .HOPS_USERS_LRU_THRESHOLD_DEFAULT));
     }
+    VarsRegister.registerYarnDefaultValues();
     isInitialized = true;
   }
 
