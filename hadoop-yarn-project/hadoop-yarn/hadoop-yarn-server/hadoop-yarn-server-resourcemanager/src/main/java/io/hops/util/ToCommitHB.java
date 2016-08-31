@@ -33,6 +33,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import io.hops.transaction.handler.RequestHandler;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.yarn.api.records.NodeState;
@@ -85,7 +87,8 @@ public class ToCommitHB {
                 containerStatus.getState().toString(),
                 containerStatus.getDiagnostics(),
                 containerStatus.getExitStatus(), nodeId, pendingEventId,
-                ContainerStatus.Type.UCI);
+                ContainerStatus.Type.UCI,
+                uciID);
         containerStatusToAdd.add(hopConStatus);
       }
     }
@@ -104,7 +107,8 @@ public class ToCommitHB {
                 containerStatus.getState().toString(),
                 containerStatus.getDiagnostics(),
                 containerStatus.getExitStatus(), nodeId, pendingEventId,
-                ContainerStatus.Type.UCI);
+                ContainerStatus.Type.UCI,
+                uciID);
         containerStatusToAdd.add(hopConStatus);
       }
     }
@@ -132,56 +136,112 @@ public class ToCommitHB {
     }
     final PendingEvent pendingEvent = new PendingEvent(nodeId, pendingEventType,
             pendingEventStatus, pendingEventId);
-    AsyncLightWeightRequestHandler commitHeartbeat
-            = new AsyncLightWeightRequestHandler(
-                    YARNOperationType.TEST) {
-      @Override
-      public Object performTask() throws StorageException {
-        connector.beginTransaction();
-        connector.writeLock();
-        PendingEventDataAccess peDA
-                = (PendingEventDataAccess) RMStorageFactory
-                .getDataAccess(PendingEventDataAccess.class);
-        peDA.add(pendingEvent);
+    RequestHandler handler = null;
 
-        if (pendingEvent.getType().equals(PendingEvent.Type.NODE_ADDED)){
-          NextHeartbeatDataAccess nhbDA
-                  = (NextHeartbeatDataAccess) RMStorageFactory.getDataAccess(
-                          NextHeartbeatDataAccess.class);
-          nhbDA.update(new NextHeartbeat(nodeId, true));
-        }
-        if (!uciToAdd.isEmpty()) {
-          UpdatedContainerInfoDataAccess uciDA
-                  = (UpdatedContainerInfoDataAccess) RMStorageFactory
-                  .getDataAccess(UpdatedContainerInfoDataAccess.class);
-          uciDA.addAll(uciToAdd);
+    if (pendingEvent.getType().equals(PendingEvent.Type.NODE_ADDED)) {
+      handler = new LightWeightRequestHandler(
+              YARNOperationType.TEST) {
+        @Override
+        public Object performTask() throws StorageException {
+          connector.beginTransaction();
+          connector.writeLock();
+          PendingEventDataAccess peDA
+                  = (PendingEventDataAccess) RMStorageFactory
+                  .getDataAccess(PendingEventDataAccess.class);
+          peDA.add(pendingEvent);
 
-          ContainerStatusDataAccess csDA
-                  = (ContainerStatusDataAccess) RMStorageFactory
-                  .getDataAccess(ContainerStatusDataAccess.class);
-          csDA.addAll(containerStatusToAdd);
-        }
-        if (rmNode != null) {
-          RMNodeDataAccess rmnDA
-                  = (RMNodeDataAccess) RMStorageFactory
-                  .getDataAccess(RMNodeDataAccess.class);
-          rmnDA.add(rmNode);
 
-          ResourceDataAccess rDA
-                  = (ResourceDataAccess) RMStorageFactory
-                  .getDataAccess(ResourceDataAccess.class);
-          rDA.add(rmNodeResource);
+          if (pendingEvent.getType().equals(PendingEvent.Type.NODE_ADDED)){
+            NextHeartbeatDataAccess nhbDA
+                    = (NextHeartbeatDataAccess) RMStorageFactory.getDataAccess(
+                    NextHeartbeatDataAccess.class);
+            nhbDA.update(new NextHeartbeat(nodeId, true));
+          }
+          if (!uciToAdd.isEmpty()) {
+            UpdatedContainerInfoDataAccess uciDA
+                    = (UpdatedContainerInfoDataAccess) RMStorageFactory
+                    .getDataAccess(UpdatedContainerInfoDataAccess.class);
+            uciDA.addAll(uciToAdd);
+
+            ContainerStatusDataAccess csDA
+                    = (ContainerStatusDataAccess) RMStorageFactory
+                    .getDataAccess(ContainerStatusDataAccess.class);
+            csDA.addAll(containerStatusToAdd);
+          }
+          if (rmNode != null) {
+            RMNodeDataAccess rmnDA
+                    = (RMNodeDataAccess) RMStorageFactory
+                    .getDataAccess(RMNodeDataAccess.class);
+            rmnDA.add(rmNode);
+
+            ResourceDataAccess rDA
+                    = (ResourceDataAccess) RMStorageFactory
+                    .getDataAccess(ResourceDataAccess.class);
+            rDA.add(rmNodeResource);
+          }
+          if(nextHeartBeat!=null){
+            NextHeartbeatDataAccess nhbDA
+                    = (NextHeartbeatDataAccess) RMStorageFactory.getDataAccess(
+                    NextHeartbeatDataAccess.class);
+            nhbDA.update(nextHeartBeat);
+          }
+          connector.commit();
+          return null;
         }
-        if(nextHeartBeat!=null){
-          NextHeartbeatDataAccess nhbDA
-                  = (NextHeartbeatDataAccess) RMStorageFactory.getDataAccess(
-                          NextHeartbeatDataAccess.class);
-          nhbDA.update(nextHeartBeat);
+      };
+    } else {
+      handler = new AsyncLightWeightRequestHandler(
+              YARNOperationType.TEST) {
+        @Override
+        public Object performTask() throws StorageException {
+          connector.beginTransaction();
+          connector.writeLock();
+          PendingEventDataAccess peDA
+                  = (PendingEventDataAccess) RMStorageFactory
+                  .getDataAccess(PendingEventDataAccess.class);
+          peDA.add(pendingEvent);
+
+
+          if (pendingEvent.getType().equals(PendingEvent.Type.NODE_ADDED)){
+            NextHeartbeatDataAccess nhbDA
+                    = (NextHeartbeatDataAccess) RMStorageFactory.getDataAccess(
+                    NextHeartbeatDataAccess.class);
+            nhbDA.update(new NextHeartbeat(nodeId, true));
+          }
+          if (!uciToAdd.isEmpty()) {
+            UpdatedContainerInfoDataAccess uciDA
+                    = (UpdatedContainerInfoDataAccess) RMStorageFactory
+                    .getDataAccess(UpdatedContainerInfoDataAccess.class);
+            uciDA.addAll(uciToAdd);
+
+            ContainerStatusDataAccess csDA
+                    = (ContainerStatusDataAccess) RMStorageFactory
+                    .getDataAccess(ContainerStatusDataAccess.class);
+            csDA.addAll(containerStatusToAdd);
+          }
+          if (rmNode != null) {
+            RMNodeDataAccess rmnDA
+                    = (RMNodeDataAccess) RMStorageFactory
+                    .getDataAccess(RMNodeDataAccess.class);
+            rmnDA.add(rmNode);
+
+            ResourceDataAccess rDA
+                    = (ResourceDataAccess) RMStorageFactory
+                    .getDataAccess(ResourceDataAccess.class);
+            rDA.add(rmNodeResource);
+          }
+          if(nextHeartBeat!=null){
+            NextHeartbeatDataAccess nhbDA
+                    = (NextHeartbeatDataAccess) RMStorageFactory.getDataAccess(
+                    NextHeartbeatDataAccess.class);
+            nhbDA.update(nextHeartBeat);
+          }
+          connector.commit();
+          return null;
         }
-        connector.commit();
-        return null;
-      }
-    };
-    commitHeartbeat.handle();
-  }
+      };
+
+    }
+    handler.handle();
+    }
 }

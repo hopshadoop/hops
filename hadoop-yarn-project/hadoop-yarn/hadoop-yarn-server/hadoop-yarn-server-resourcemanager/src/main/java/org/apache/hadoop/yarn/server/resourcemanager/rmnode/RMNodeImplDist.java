@@ -21,10 +21,7 @@ import io.hops.metadata.yarn.entity.PendingEvent;
 import io.hops.util.DBUtility;
 import io.hops.util.ToCommitHB;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.apache.commons.logging.Log;
@@ -208,9 +205,23 @@ public class RMNodeImplDist extends RMNodeImpl {
       response.addAllApplicationsToCleanup(this.finishedApplications);
       response.addContainersToBeRemovedFromNM(
               new ArrayList<ContainerId>(this.containersToBeRemovedFromNM));
-      DBUtility.removeContainersToClean(containersToClean, this.nodeId);
+
+      // We need to make a deep copy of containersToClean and finishedApplications
+      // since DBUtility is async and we get ConcurrentModificationException
+      Set<ContainerId> copyContainersToClean = new HashSet<>(this.containersToClean.size());
+      for (ContainerId cid : this.containersToClean) {
+        copyContainersToClean.add(ContainerId.newContainerId(cid.getApplicationAttemptId(),
+                cid.getContainerId()));
+      }
+      DBUtility.removeContainersToClean(copyContainersToClean, this.nodeId);
+
+      List<ApplicationId> copyFinishedApplications = new ArrayList<>(this.finishedApplications.size());
+      for (ApplicationId appId : this.finishedApplications) {
+        copyFinishedApplications.add(ApplicationId.newInstance(appId.getClusterTimestamp(),
+                appId.getId()));
+      }
+      DBUtility.removeFinishedApplications(copyFinishedApplications, this.nodeId);
       this.containersToClean.clear();
-      DBUtility.removeFinishedApplications(finishedApplications, this.nodeId);
       this.finishedApplications.clear();
       this.containersToBeRemovedFromNM.clear();
     } catch (IOException ex) {

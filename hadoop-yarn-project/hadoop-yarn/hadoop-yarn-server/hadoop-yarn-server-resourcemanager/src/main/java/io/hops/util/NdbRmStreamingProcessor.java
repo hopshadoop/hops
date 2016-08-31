@@ -26,7 +26,7 @@ public class NdbRmStreamingProcessor extends PendingEventRetrieval {
             active = true;
             LOG.debug("HOP :: Start retrieving thread");
             retrievingThread = new Thread(new RetrievingThread());
-            retrievingThread.setName("event retriever");
+            //retrievingThread.setName("event retriever");
             retrievingThread.start();
         } else {
             LOG.error("HOP :: NDB event retriever is already active");
@@ -75,6 +75,8 @@ public class NdbRmStreamingProcessor extends PendingEventRetrieval {
 
     private class RetrievingThread implements Runnable {
 
+        long lastTimestamp = 0;
+        int numOfEvents = 0;
         @Override
         public void run() {
             while (active) {
@@ -91,6 +93,7 @@ public class NdbRmStreamingProcessor extends PendingEventRetrieval {
 
                             try {
                                 rmNode = DBUtility.processHopRMNodeCompsForScheduler(hopRMNodeCompObj, rmContext);
+
                                 LOG.debug("HOP :: RetrievingThread RMNode: " + rmNode);
 
                                 if (rmNode != null) {
@@ -102,9 +105,14 @@ public class NdbRmStreamingProcessor extends PendingEventRetrieval {
                                         hopRMNodeCompObj.getPendingEvent().getType(),
                                         hopRMNodeCompObj.getPendingEvent().getStatus(),
                                         hopRMNodeCompObj.getPendingEvent().getId().getEventId());
-
-
-                                DBUtility.removeContainerStatuses(hopRMNodeCompObj.getHopContainersStatus());
+                                // ContainerStatuses and UpdatedContainerInfo are removed
+                                // in RMNodeImplDist#pullContainerUpdates
+                                if ((System.currentTimeMillis() - lastTimestamp) >= 1000) {
+                                    LOG.error("***<Profiler> Processed " + numOfEvents + " per second");
+                                    numOfEvents = 0;
+                                    lastTimestamp = System.currentTimeMillis();
+                                }
+                                numOfEvents++;
                             } catch (InvalidProtocolBufferException ex) {
                                 LOG.error("HOP :: Error retrieving RMNode: " + ex, ex);
                             } catch (IOException ex) {

@@ -192,6 +192,7 @@ public class NdbRtStreamingReceiver {
     private int hopContainerStatusExitStatus = 0;
     private String hopContainerStatusRMNodeId = "";
     private int hopContainerStatusPendingId = 0;
+    private int hopContainerStatusUciId = 0;
 
     public void setHopContainerStatusContainerId(
             String hopContainerStatusContainerId) {
@@ -218,6 +219,10 @@ public class NdbRtStreamingReceiver {
         this.hopContainerStatusRMNodeId = hopContainerStatusRMNodeId;
     }
 
+    public void setHopContainerStatusUciId(int hopContainerStatusUciId) {
+        this.hopContainerStatusUciId = hopContainerStatusUciId;
+    }
+
     public void buildHopContainerStatus() {
         hopContainerStatusList = new ArrayList<>();
     }
@@ -227,7 +232,8 @@ public class NdbRtStreamingReceiver {
                 hopContainerStatusContainerId, hopContainerStatusState,
                 hopContainerStatusDiagnostics, hopContainerStatusExitStatus,
                 hopContainerStatusRMNodeId, hopContainerStatusPendingId,
-                ContainerStatus.Type.UCI);
+                ContainerStatus.Type.UCI,
+                hopContainerStatusUciId);
         hopContainerStatusList.add(hopContainerStatus);
     }
 

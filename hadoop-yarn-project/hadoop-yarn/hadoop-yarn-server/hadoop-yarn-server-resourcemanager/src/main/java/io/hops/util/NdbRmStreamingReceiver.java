@@ -213,6 +213,7 @@ public class NdbRmStreamingReceiver {
     private int hopContainerStatusExitStatus = 0;
     private String hopContainerStatusRMNodeId = "";
     private int hopContainerStatusPendingId = 0;
+    private int hopContainerStatusUciId = 0;
 
     public void buildHopContainerStatus() {
         hopContainerStatusList = new ArrayList<>();
@@ -242,14 +243,22 @@ public class NdbRmStreamingReceiver {
         this.hopContainerStatusRMNodeId = hopContainerStatusRMNodeId;
     }
 
+    public void setHopContainerStatusUciId(int hopContainerStatusUciId) {
+        this.hopContainerStatusUciId = hopContainerStatusUciId;
+    }
+
     public void addHopContainerStatus() {
         ContainerStatus containerStatus = new ContainerStatus(
                 hopContainerStatusContainerId, hopContainerStatusState,
                 hopContainerStatusDiagnostics, hopContainerStatusExitStatus,
                 hopContainerStatusRMNodeId, hopContainerStatusPendingId,
-                ContainerStatus.Type.UCI);
+                ContainerStatus.Type.UCI,
+                hopContainerStatusUciId);
         hopContainerStatusList.add(containerStatus);
     }
+
+    int numOfEvents = 0;
+    long lastTimestamp = 0;
 
     // This will be called by the C++ library
     public void onEventMethod() throws InterruptedException {
@@ -259,11 +268,18 @@ public class NdbRmStreamingReceiver {
                 hopNodeHBResponse, hopResource, hopPendingEvent, hopUpdatedContainerInfoList,
                 hopContainerIdsToCleanList, hopFinishedApplicationsList, hopContainerStatusList,
                 hopPendingEvent.getId().getNodeId());
+
         if (LOG.isDebugEnabled()) {
             LOG.debug("<Receiver> Put event in the queue: " + hopRMNodeDBObj.getPendingEvent()
                     .getId() + " : " + hopRMNodeDBObj.getPendingEvent().getId().getNodeId());
         }
+        if ((System.currentTimeMillis() - lastTimestamp) >= 1000) {
+            LOG.error("***<Profiler> Put " + numOfEvents + " per second");
+            numOfEvents = 0;
+            lastTimestamp = System.currentTimeMillis();
+        }
         receivedEvents.put(hopRMNodeDBObj);
+        numOfEvents++;
     }
 
     // These two methods will be used by the multi-threaded version of C++ library
