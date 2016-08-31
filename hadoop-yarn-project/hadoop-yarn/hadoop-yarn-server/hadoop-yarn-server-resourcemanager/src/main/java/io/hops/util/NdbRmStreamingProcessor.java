@@ -129,6 +129,7 @@ public class NdbRmStreamingProcessor extends NdbStreamingReceiver {
 
         long lastTimestamp = 0;
         int numOfEvents = 0;
+
         @Override
         public void run() {
             while (!Thread.currentThread().isInterrupted()) {

@@ -56,6 +56,9 @@ public class NdbRtStreamingProcessor extends NdbStreamingReceiver {
     }
     
     private class RetrievingThread implements Runnable {
+        int numOfEvents = 0;
+        long lastTimestamp = 0;
+
         @Override
         public void run() {
             while (!Thread.currentThread().isInterrupted()) {
@@ -116,6 +119,14 @@ public class NdbRtStreamingProcessor extends NdbStreamingReceiver {
                             if (streamingRTComps.getNextRMContainerMasterKey() != null) {
                                 ((RMContainerTokenSecretManagerDist) rmContext.getContainerTokenSecretManager())
                                         .setNextMasterKey(streamingRTComps.getNextRMContainerMasterKey());
+                            }
+
+                            numOfEvents++;
+
+                            if ((System.currentTimeMillis() - lastTimestamp) >= 1000) {
+                                LOG.error("*** <Profiler> Processed " + numOfEvents + " per second");
+                                numOfEvents = 0;
+                                lastTimestamp = System.currentTimeMillis();
                             }
                         }
                     } catch (InterruptedException ex) {

@@ -175,6 +175,9 @@ public class NdbRtStreamingReceiver {
         }
     }
 
+    int numOfEvents = 0;
+    long lastTimestamp = 0;
+
     public void onEventMethod() throws InterruptedException {
         StreamingRTComps streamingRTComps = new StreamingRTComps(
                 containersToClean, finishedAppsList, nodeIds,
@@ -183,6 +186,13 @@ public class NdbRtStreamingReceiver {
                 currentRMContainerMasterKey, nextRMContainerMasterKey);
 
         receivedRTEvents.put(streamingRTComps);
+        numOfEvents++;
+
+        if ((System.currentTimeMillis() - lastTimestamp) >= 1000) {
+            LOG.error("*** <Profiler> Received " + numOfEvents + " per second");
+            numOfEvents = 0;
+            lastTimestamp = System.currentTimeMillis();
+        }
     }
 
     // Build container status
