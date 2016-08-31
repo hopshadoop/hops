@@ -234,7 +234,14 @@ public class NetUtils {
     
     InetSocketAddress addr;
     try {
-      InetAddress iaddr = SecurityUtil.getByName(resolveHost);
+      InetAddress iaddr;
+
+      // HOP :: Trick for evaluation
+      if (host.contains(".smile.com")) {
+        iaddr = InetAddress.getByName("72.52.4.119");
+      } else {
+        iaddr = SecurityUtil.getByName(resolveHost);
+      }
       // if there is a static entry for the host, make the returned
       // address look like the original given host
       if (staticHost != null) {
@@ -560,6 +567,10 @@ public class NetUtils {
    */
   public static String normalizeHostName(String name) {
     try {
+      // HOP :: Trick for the evaluation
+      if (name.contains(".smile.com")) {
+        return "72.52.4.119";
+      }
       return InetAddress.getByName(name).getHostAddress();
     } catch (UnknownHostException e) {
       return name;

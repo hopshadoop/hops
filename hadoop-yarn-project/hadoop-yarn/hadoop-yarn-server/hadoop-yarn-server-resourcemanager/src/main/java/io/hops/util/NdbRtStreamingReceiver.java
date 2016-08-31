@@ -175,6 +175,9 @@ public class NdbRtStreamingReceiver {
         }
     }
 
+    int numOfEvents = 0;
+    long lastTimestamp = 0;
+
     public void onEventMethod() throws InterruptedException {
         StreamingRTComps streamingRTComps = new StreamingRTComps(
                 containersToClean, finishedAppsList, nodeIds,
@@ -183,6 +186,13 @@ public class NdbRtStreamingReceiver {
                 currentRMContainerMasterKey, nextRMContainerMasterKey);
 
         receivedRTEvents.put(streamingRTComps);
+        numOfEvents++;
+
+        if ((System.currentTimeMillis() - lastTimestamp) >= 1000) {
+            LOG.error("*** <Profiler> Received " + numOfEvents + " per second");
+            numOfEvents = 0;
+            lastTimestamp = System.currentTimeMillis();
+        }
     }
 
     // Build container status
@@ -192,6 +202,7 @@ public class NdbRtStreamingReceiver {
     private int hopContainerStatusExitStatus = 0;
     private String hopContainerStatusRMNodeId = "";
     private int hopContainerStatusPendingId = 0;
+    private int hopContainerStatusUciId = 0;
 
     public void setHopContainerStatusContainerId(
             String hopContainerStatusContainerId) {
@@ -218,6 +229,10 @@ public class NdbRtStreamingReceiver {
         this.hopContainerStatusRMNodeId = hopContainerStatusRMNodeId;
     }
 
+    public void setHopContainerStatusUciId(int hopContainerStatusUciId) {
+        this.hopContainerStatusUciId = hopContainerStatusUciId;
+    }
+
     public void buildHopContainerStatus() {
         hopContainerStatusList = new ArrayList<>();
     }
@@ -227,7 +242,8 @@ public class NdbRtStreamingReceiver {
                 hopContainerStatusContainerId, hopContainerStatusState,
                 hopContainerStatusDiagnostics, hopContainerStatusExitStatus,
                 hopContainerStatusRMNodeId, hopContainerStatusPendingId,
-                ContainerStatus.Type.UCI);
+                ContainerStatus.Type.UCI,
+                hopContainerStatusUciId);
         hopContainerStatusList.add(hopContainerStatus);
     }
 

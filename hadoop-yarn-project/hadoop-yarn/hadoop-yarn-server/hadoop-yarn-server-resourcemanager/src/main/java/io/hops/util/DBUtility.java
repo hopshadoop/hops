@@ -300,7 +300,8 @@ public class DBUtility {
           uciToRemove.add(hopUCI);
 
           ContainerStatus hopConStatus = new ContainerStatus(containerStatus.
-                  getContainerId().toString(), nodeId, ContainerStatus.Type.UCI);
+                  getContainerId().toString(), nodeId, ContainerStatus.Type.UCI,
+                  uci.getUciId());
           containerStatusToRemove.add(hopConStatus);
         }
       }
@@ -315,7 +316,8 @@ public class DBUtility {
                           getUciId());
           uciToRemove.add(hopUCI);
           ContainerStatus hopConStatus = new ContainerStatus(containerStatus.
-                  getContainerId().toString(), nodeId, ContainerStatus.Type.UCI);
+                  getContainerId().toString(), nodeId, ContainerStatus.Type.UCI,
+                  uci.getUciId());
           containerStatusToRemove.add(hopConStatus);
         }
       }
@@ -402,35 +404,13 @@ public class DBUtility {
     removePendingEvents.handle();
   }
 
-  public static void removeContainerStatuses(final List<ContainerStatus> containerStatuses)
-    throws IOException {
-
-    if (containerStatuses.isEmpty()) {
-      return;
-    }
-
-    AsyncLightWeightRequestHandler removeContainerStatuses = new AsyncLightWeightRequestHandler(YARNOperationType.TEST) {
-      @Override
-      public Object performTask() throws IOException {
-        connector.beginTransaction();
-        connector.writeLock();
-
-        ContainerStatusDataAccess contStatusDAO = (ContainerStatusDataAccess) YarnAPIStorageFactory
-                .getDataAccess(ContainerStatusDataAccess.class);
-        contStatusDAO.removeAll(containerStatuses);
-        connector.commit();
-        return null;
-      }
-    };
-    removeContainerStatuses.handle();
-  }
-
   public static void InitializeDB() throws IOException {
-    AsyncLightWeightRequestHandler setRMDTMasterKeyHandler
-            = new AsyncLightWeightRequestHandler(YARNOperationType.TEST) {
+    LightWeightRequestHandler setRMDTMasterKeyHandler
+            = new LightWeightRequestHandler(YARNOperationType.TEST) {
       @Override
       public Object performTask() throws IOException {
         connector.formatStorage();
+        LOG.debug("HOP :: Format storage has been completed");
         return null;
       }
     };
