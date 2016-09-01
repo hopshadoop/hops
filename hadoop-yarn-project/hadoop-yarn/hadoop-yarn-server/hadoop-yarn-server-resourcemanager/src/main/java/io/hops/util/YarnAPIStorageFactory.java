@@ -25,7 +25,6 @@ import io.hops.metadata.common.EntityDataAccess;
 import io.hops.metadata.hdfs.dal.GroupDataAccess;
 import io.hops.metadata.hdfs.dal.UserDataAccess;
 import io.hops.metadata.hdfs.dal.UserGroupDataAccess;
-import io.hops.metadata.yarn.dal.YarnVariablesDataAccess;
 import io.hops.security.UsersGroups;
 import io.hops.transaction.EntityManager;
 import io.hops.transaction.context.ContextInitializer;

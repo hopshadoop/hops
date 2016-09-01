@@ -27,7 +27,6 @@ public class NdbRmStreamingReceiver {
     private PendingEvent hopPendingEvent = null;
     private RMNode hopRMNode = null;
     private NextHeartbeat hopNextHeartbeat = null;
-    private NodeHBResponse hopNodeHBResponse = null;
     private Resource hopResource = null;
 
     private List<UpdatedContainerInfo> hopUpdatedContainerInfoList = null;
@@ -265,7 +264,7 @@ public class NdbRmStreamingReceiver {
         LOG.debug("HOP :: Received event from NDB");
         LOG.debug("Size of Received Events Queue is: " + receivedEvents.size());
         RMNodeComps hopRMNodeDBObj = new RMNodeComps(hopRMNode, hopNextHeartbeat,
-                hopNodeHBResponse, hopResource, hopPendingEvent, hopUpdatedContainerInfoList,
+                hopResource, hopPendingEvent, hopUpdatedContainerInfoList,
                 hopContainerIdsToCleanList, hopFinishedApplicationsList, hopContainerStatusList,
                 hopPendingEvent.getId().getNodeId());
 
@@ -285,7 +284,7 @@ public class NdbRmStreamingReceiver {
     // These two methods will be used by the multi-threaded version of C++ library
     RMNodeComps buildCompositeClass() {
         return new RMNodeComps(hopRMNode, hopNextHeartbeat, 
-                hopNodeHBResponse, hopResource, hopPendingEvent, hopUpdatedContainerInfoList,
+                hopResource, hopPendingEvent, hopUpdatedContainerInfoList,
                 hopContainerIdsToCleanList, hopFinishedApplicationsList, hopContainerStatusList,
                 hopPendingEvent.getId().getNodeId());
     }
@@ -297,7 +296,6 @@ public class NdbRmStreamingReceiver {
     public void resetObjects() {
         hopRMNode = null;
         hopNextHeartbeat = null;
-        hopNodeHBResponse = null;
         hopResource = null;
         hopPendingEvent = null;
         hopUpdatedContainerInfoList = null;

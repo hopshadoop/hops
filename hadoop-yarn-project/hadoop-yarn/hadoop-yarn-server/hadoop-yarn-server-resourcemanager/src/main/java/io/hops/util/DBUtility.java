@@ -21,7 +21,6 @@ import io.hops.metadata.yarn.dal.*;
 import io.hops.metadata.yarn.entity.NextHeartbeat;
 import io.hops.metadata.yarn.dal.util.YARNOperationType;
 import io.hops.metadata.yarn.entity.*;
-import io.hops.metadata.yarn.entity.NodeId;
 import io.hops.transaction.handler.AsyncLightWeightRequestHandler;
 import java.io.IOException;
 import java.util.*;
@@ -34,7 +33,6 @@ import org.apache.hadoop.yarn.api.records.*;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.Resource;
-import org.apache.hadoop.yarn.api.records.impl.pb.ResourcePBImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.ResourceTrackerService;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.*;
@@ -50,6 +48,7 @@ public class DBUtility {
 
   public static void removeContainersToClean(final Set<ContainerId> containers,
           final org.apache.hadoop.yarn.api.records.NodeId nodeId) throws IOException {
+    long start = System.currentTimeMillis();
     AsyncLightWeightRequestHandler removeContainerToClean
             = new AsyncLightWeightRequestHandler(
                     YARNOperationType.TEST) {
@@ -72,11 +71,16 @@ public class DBUtility {
       }
     };
     removeContainerToClean.handle();
+    long duration = System.currentTimeMillis() - start;
+    if(duration>100){
+      LOG.error("too long " + duration);
+    }
   }
 
   public static void removeFinishedApplications(
           final List<ApplicationId> finishedApplications, final org.apache.hadoop.yarn.api.records.NodeId nodeId)
           throws IOException {
+    long start = System.currentTimeMillis();
     AsyncLightWeightRequestHandler removeFinishedApplication
             = new AsyncLightWeightRequestHandler(
                     YARNOperationType.TEST) {
@@ -99,11 +103,16 @@ public class DBUtility {
       }
     };
     removeFinishedApplication.handle();
+    long duration = System.currentTimeMillis() - start;
+    if(duration>100){
+      LOG.error("too long " + duration);
+    }
   }
 
   public static void addFinishedApplication(final ApplicationId appId,
           final org.apache.hadoop.yarn.api.records.NodeId nodeId) throws
           IOException {
+    long start = System.currentTimeMillis();
     AsyncLightWeightRequestHandler addFinishedApplication
             = new AsyncLightWeightRequestHandler(
                     YARNOperationType.TEST) {
@@ -120,11 +129,16 @@ public class DBUtility {
       }
     };
     addFinishedApplication.handle();
+    long duration = System.currentTimeMillis() - start;
+    if(duration>100){
+      LOG.error("too long " + duration);
+    }
   }
 
   public static void addContainerToClean(final ContainerId containerId,
           final org.apache.hadoop.yarn.api.records.NodeId nodeId) throws
           IOException {
+    long start = System.currentTimeMillis();
     AsyncLightWeightRequestHandler addContainerToClean
             = new AsyncLightWeightRequestHandler(
                     YARNOperationType.TEST) {
@@ -143,6 +157,10 @@ public class DBUtility {
       }
     };
     addContainerToClean.handle();
+    long duration = System.currentTimeMillis() - start;
+    if(duration>100){
+      LOG.error("too long " + duration);
+    }
   }
 
   public static RMNode processHopRMNodeCompsForScheduler(RMNodeComps hopRMNodeComps, RMContext rmContext)
@@ -263,6 +281,7 @@ public class DBUtility {
   }
   
   public static void addNextHB(final boolean nextHB, final String nodeId) throws IOException {
+           long start = System.currentTimeMillis();
     AsyncLightWeightRequestHandler addNextHB
             = new AsyncLightWeightRequestHandler(
                     YARNOperationType.TEST) {
@@ -279,10 +298,15 @@ public class DBUtility {
       }
     };
     addNextHB.handle();
+    long duration = System.currentTimeMillis() - start;
+    if(duration>100){
+      LOG.error("too long " + duration);
+    }
   }
 
   public static void removeUCI(List<UpdatedContainerInfo> ContainerInfoList,
           String nodeId) throws IOException {
+    long start = System.currentTimeMillis();
     final List<io.hops.metadata.yarn.entity.UpdatedContainerInfo> uciToRemove
             = new ArrayList<io.hops.metadata.yarn.entity.UpdatedContainerInfo>();
     final List<ContainerStatus> containerStatusToRemove
@@ -344,6 +368,10 @@ public class DBUtility {
       }
     };
     removeUCIHandler.handle();
+    long duration = System.currentTimeMillis() - start;
+    if(duration>100){
+      LOG.error("too long " + duration);
+    }
   }
   
   public static Map<String, Load> getAllLoads() throws IOException {
@@ -384,7 +412,7 @@ public class DBUtility {
 
   public static void removePendingEvent(String rmNodeId, PendingEvent.Type type,
           PendingEvent.Status status, int id) throws IOException {
-
+long start = System.currentTimeMillis();
     final PendingEvent pendingEvent = new PendingEvent(rmNodeId, type, status, id);
 
     AsyncLightWeightRequestHandler removePendingEvents = new AsyncLightWeightRequestHandler(YARNOperationType.TEST) {
@@ -402,6 +430,10 @@ public class DBUtility {
       }
     };
     removePendingEvents.handle();
+    long duration = System.currentTimeMillis() - start;
+    if(duration>100){
+      LOG.error("too long " + duration);
+    }
   }
 
   public static void InitializeDB() throws IOException {
