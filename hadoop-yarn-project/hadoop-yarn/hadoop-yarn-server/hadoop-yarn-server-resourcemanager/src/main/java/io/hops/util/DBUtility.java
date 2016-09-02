@@ -72,7 +72,7 @@ public class DBUtility {
     };
     removeContainerToClean.handle();
     long duration = System.currentTimeMillis() - start;
-    if(duration>100){
+    if(duration>10){
       LOG.error("too long " + duration);
     }
   }
@@ -104,7 +104,7 @@ public class DBUtility {
     };
     removeFinishedApplication.handle();
     long duration = System.currentTimeMillis() - start;
-    if(duration>100){
+    if(duration>10){
       LOG.error("too long " + duration);
     }
   }
@@ -130,7 +130,7 @@ public class DBUtility {
     };
     addFinishedApplication.handle();
     long duration = System.currentTimeMillis() - start;
-    if(duration>100){
+    if(duration>10){
       LOG.error("too long " + duration);
     }
   }
@@ -158,7 +158,7 @@ public class DBUtility {
     };
     addContainerToClean.handle();
     long duration = System.currentTimeMillis() - start;
-    if(duration>100){
+    if(duration>10){
       LOG.error("too long " + duration);
     }
   }
@@ -299,7 +299,7 @@ public class DBUtility {
     };
     addNextHB.handle();
     long duration = System.currentTimeMillis() - start;
-    if(duration>100){
+    if(duration>10){
       LOG.error("too long " + duration);
     }
   }
@@ -369,7 +369,7 @@ public class DBUtility {
     };
     removeUCIHandler.handle();
     long duration = System.currentTimeMillis() - start;
-    if(duration>100){
+    if(duration>10){
       LOG.error("too long " + duration);
     }
   }
@@ -431,7 +431,7 @@ long start = System.currentTimeMillis();
     };
     removePendingEvents.handle();
     long duration = System.currentTimeMillis() - start;
-    if(duration>100){
+    if(duration>10){
       LOG.error("too long " + duration);
     }
   }

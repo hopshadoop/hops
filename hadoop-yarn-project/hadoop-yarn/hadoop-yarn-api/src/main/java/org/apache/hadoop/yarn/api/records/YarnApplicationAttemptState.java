@@ -58,6 +58,7 @@ public enum YarnApplicationAttemptState {
   FINISHED,
 
   /** AppAttempt was terminated by a user or admin. */
-  KILLED
+  KILLED,
 
+  LAUNCHED_UNMANAGED_SAVING, FINAL_SAVING
 }
