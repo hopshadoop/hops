@@ -517,8 +517,17 @@ public class ResourceTrackerService extends AbstractService
       Map<String, byte[]> containersStatuses = new HashMap<String, byte[]>();
       for (ContainerStatus status : request.getNodeStatus().
               getContainersStatuses()) {
-        containersStatuses.put(status.getContainerId().toString(),
-                ((ContainerStatusPBImpl) status).getProto().toByteArray());
+        byte[] containerStatus = 
+                ((ContainerStatusPBImpl) status).getProto().toByteArray();
+        if(containerStatus.length>3000){
+          ContainerStatusPBImpl csi = new ContainerStatusPBImpl();
+          csi.setContainerId(status.getContainerId());
+          csi.setExitStatus(status.getExitStatus());
+          csi.setState(status.getState());
+          csi.setDiagnostics(status.getDiagnostics().substring(0, 1000));
+          containerStatus = csi.getProto().toByteArray();
+        }
+        containersStatuses.put(status.getContainerId().toString(),containerStatus);
       }
 
       List<String> keepAliveApplications = new ArrayList<String>();
