@@ -127,15 +127,11 @@ public class NdbRmStreamingProcessor extends NdbStreamingReceiver {
 
     private class RetrievingThread implements Runnable {
 
-        long lastTimestamp = 0;
-        int numOfEvents = 0;
-
         @Override
         public void run() {
             while (running) {
                 try {
                     RMNodeComps hopRMNodeCompObj = null;
-                    LOG.debug("Size of the events queue: " + NdbRmStreamingReceiver.receivedEvents.size());
                     hopRMNodeCompObj = NdbRmStreamingReceiver.receivedEvents.take();
                     if (hopRMNodeCompObj != null) {
                         if (LOG.isDebugEnabled()) {
@@ -159,12 +155,6 @@ public class NdbRmStreamingProcessor extends NdbStreamingReceiver {
                                         hopRMNodeCompObj.getPendingEvent().getId().getEventId());
                                 // ContainerStatuses and UpdatedContainerInfo are removed
                                 // in RMNodeImplDist#pullContainerUpdates
-                                if ((System.currentTimeMillis() - lastTimestamp) >= 1000) {
-                                    LOG.error("***<Profiler> Processed " + numOfEvents + " per second");
-                                    numOfEvents = 0;
-                                    lastTimestamp = System.currentTimeMillis();
-                                }
-                                numOfEvents++;
                             } catch (InvalidProtocolBufferException ex) {
                                 LOG.error("HOP :: Error retrieving RMNode: " + ex, ex);
                             } catch (IOException ex) {

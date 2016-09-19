@@ -257,13 +257,9 @@ public class NdbRmStreamingReceiver {
         hopContainerStatusList.add(containerStatus);
     }
 
-    int numOfEvents = 0;
-    long lastTimestamp = 0;
-
     // This will be called by the C++ library
     public void onEventMethod() throws InterruptedException {
         LOG.debug("HOP :: Received event from NDB");
-        LOG.debug("Size of Received Events Queue is: " + receivedEvents.size());
         RMNodeComps hopRMNodeDBObj = new RMNodeComps(hopRMNode, hopNextHeartbeat,
                 hopNodeHBResponse, hopResource, hopPendingEvent, hopUpdatedContainerInfoList,
                 hopContainerIdsToCleanList, hopFinishedApplicationsList, hopContainerStatusList,
@@ -273,13 +269,7 @@ public class NdbRmStreamingReceiver {
             LOG.debug("<Receiver> Put event in the queue: " + hopRMNodeDBObj.getPendingEvent()
                     .getId() + " : " + hopRMNodeDBObj.getPendingEvent().getId().getNodeId());
         }
-        if ((System.currentTimeMillis() - lastTimestamp) >= 1000) {
-            LOG.error("***<Profiler> Put " + numOfEvents + " per second");
-            numOfEvents = 0;
-            lastTimestamp = System.currentTimeMillis();
-        }
         receivedEvents.put(hopRMNodeDBObj);
-        numOfEvents++;
     }
 
     // These two methods will be used by the multi-threaded version of C++ library
