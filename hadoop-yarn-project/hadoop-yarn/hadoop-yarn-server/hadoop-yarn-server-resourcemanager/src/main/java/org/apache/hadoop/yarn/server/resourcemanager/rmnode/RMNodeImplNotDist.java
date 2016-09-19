@@ -225,22 +225,19 @@ public class RMNodeImplNotDist extends RMNodeImpl {
     List<NMContainerStatus> containers = null;
 
     String host = rmNode.nodeId.getHost();
-    if (rmNode.context.getInactiveRMNodes().containsKey(host)) {
-      // Old node rejoining
-      RMNode previouRMNode = rmNode.context.getInactiveRMNodes().get(host);
-      rmNode.context.getInactiveRMNodes().remove(host);
-      rmNode.updateMetricsForRejoinedNode(previouRMNode.getState());
+    RMNode previousRMNode = rmNode.context.getInactiveRMNodes().remove(host);
+    if (previousRMNode != null) {
+      if (previousRMNode.getNodeID().getPort() != -1) {
+        // Old node rejoining
+        rmNode.updateMetricsForRejoinedNode(previousRMNode.getState());
+      } else {
+        // An old excluded node rejoining
+        ClusterMetrics.getMetrics().decrDecommisionedNMs();
+        containers = updateNewNodeMetricsAndContainers(rmNode, startEvent);
+      }
     } else {
       // Increment activeNodes explicitly because this is a new node.
-      ClusterMetrics.getMetrics().incrNumActiveNodes();
-      containers = startEvent.getNMContainerStatuses();
-      if (containers != null && !containers.isEmpty()) {
-        for (NMContainerStatus container : containers) {
-          if (container.getContainerState() == ContainerState.RUNNING) {
-            rmNode.launchedContainers.add(container.getContainerId());
-          }
-        }
-      }
+      containers = updateNewNodeMetricsAndContainers(rmNode, startEvent);
     }
 
     if (null != startEvent.getRunningApplications()) {
