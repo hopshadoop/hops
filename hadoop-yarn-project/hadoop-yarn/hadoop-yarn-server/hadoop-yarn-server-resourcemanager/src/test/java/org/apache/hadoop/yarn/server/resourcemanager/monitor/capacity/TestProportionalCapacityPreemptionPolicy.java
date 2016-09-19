@@ -1032,8 +1032,8 @@ public class TestProportionalCapacityPreemptionPolicy {
     LeafQueue lq = mock(LeafQueue.class);
     List<ApplicationAttemptId> appAttemptIdList = 
         new ArrayList<ApplicationAttemptId>();
-    when(lq.getTotalResourcePending()).thenReturn(
-        Resource.newInstance(pending[i], 0));
+    when(lq.getTotalPendingResourcesConsideringUserLimit(isA(Resource.class)))
+        .thenReturn(Resource.newInstance(pending[i], 0));
     // consider moving where CapacityScheduler::comparator accessible
     NavigableSet<FiCaSchedulerApp> qApps = new TreeSet<FiCaSchedulerApp>(
       new Comparator<FiCaSchedulerApp>() {
@@ -1145,7 +1145,8 @@ public class TestProportionalCapacityPreemptionPolicy {
       }
     } else {
       System.out.println(indent + nq.getQueueName()
-          + " pen:" + ((LeafQueue) nq).getTotalResourcePending()
+          + " pen:" + ((LeafQueue) nq)
+              .getTotalPendingResourcesConsideringUserLimit(isA(Resource.class))
           + " cur:" + nq.getAbsoluteUsedCapacity()
           + " guar:" + nq.getAbsoluteCapacity()
           );
