@@ -18,6 +18,7 @@ package io.hops.util;
 import com.google.protobuf.InvalidProtocolBufferException;
 import io.hops.exception.StorageException;
 import io.hops.metadata.yarn.dal.*;
+import io.hops.metadata.yarn.entity.Container;
 import io.hops.metadata.yarn.entity.NextHeartbeat;
 import io.hops.metadata.yarn.dal.util.YARNOperationType;
 import io.hops.metadata.yarn.entity.*;
@@ -26,7 +27,15 @@ import io.hops.transaction.handler.AsyncLightWeightRequestHandler;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import io.hops.transaction.handler.ThreadPool;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.net.NetUtils;
@@ -52,7 +61,7 @@ public class DBUtility {
           final org.apache.hadoop.yarn.api.records.NodeId nodeId) throws IOException {
     AsyncLightWeightRequestHandler removeContainerToClean
             = new AsyncLightWeightRequestHandler(
-                    YARNOperationType.TEST) {
+            YARNOperationType.TEST) {
       @Override
       public Object performTask() throws StorageException {
         connector.beginTransaction();
@@ -71,6 +80,7 @@ public class DBUtility {
         return null;
       }
     };
+
     removeContainerToClean.handle();
   }
 
@@ -79,7 +89,7 @@ public class DBUtility {
           throws IOException {
     AsyncLightWeightRequestHandler removeFinishedApplication
             = new AsyncLightWeightRequestHandler(
-                    YARNOperationType.TEST) {
+            YARNOperationType.TEST) {
       @Override
       public Object performTask() throws StorageException {
         connector.beginTransaction();
@@ -95,9 +105,11 @@ public class DBUtility {
         }
         faDA.removeAll(finishedApps);
         connector.commit();
+
         return null;
       }
     };
+
     removeFinishedApplication.handle();
   }
 
@@ -106,7 +118,7 @@ public class DBUtility {
           IOException {
     AsyncLightWeightRequestHandler addFinishedApplication
             = new AsyncLightWeightRequestHandler(
-                    YARNOperationType.TEST) {
+            YARNOperationType.TEST) {
       @Override
       public Object performTask() throws StorageException {
         connector.beginTransaction();
@@ -116,37 +128,18 @@ public class DBUtility {
                 .getDataAccess(FinishedApplicationsDataAccess.class);
         faDA.add(new FinishedApplications(nodeId.toString(), appId.toString()));
         connector.commit();
+
         return null;
       }
     };
+
     addFinishedApplication.handle();
   }
 
-  public static void addContainerToClean(final ContainerId containerId,
-          final org.apache.hadoop.yarn.api.records.NodeId nodeId) throws
-          IOException {
-    AsyncLightWeightRequestHandler addContainerToClean
-            = new AsyncLightWeightRequestHandler(
-                    YARNOperationType.TEST) {
-      @Override
-      public Object performTask() throws StorageException {
-        connector.beginTransaction();
-        connector.writeLock();
-        ContainerIdToCleanDataAccess ctcDA
-                = (ContainerIdToCleanDataAccess) RMStorageFactory
-                .getDataAccess(ContainerIdToCleanDataAccess.class);
-        ctcDA.add(
-                new io.hops.metadata.yarn.entity.ContainerId(nodeId.toString(),
-                        containerId.toString()));
-        connector.commit();
-        return null;
-      }
-    };
-    addContainerToClean.handle();
-  }
+
 
   public static RMNode processHopRMNodeCompsForScheduler(RMNodeComps hopRMNodeComps, RMContext rmContext)
-    throws InvalidProtocolBufferException {
+          throws InvalidProtocolBufferException {
     org.apache.hadoop.yarn.api.records.NodeId nodeId;
     RMNode rmNode = null;
     if (hopRMNodeComps != null) {
@@ -162,7 +155,7 @@ public class DBUtility {
         Resource resource = null;
         if (hopRMNodeComps.getHopResource() != null) {
           resource = Resource.newInstance(hopRMNodeComps.getHopResource().getMemory(),
-                          hopRMNodeComps.getHopResource().getVirtualCores());
+                  hopRMNodeComps.getHopResource().getVirtualCores());
         } else {
           LOG.error("ResourceOption should not be null");
           resource = Resource.newInstance(0, 0);
@@ -261,23 +254,174 @@ public class DBUtility {
 
     return rmNode;
   }
-  
-  public static void addNextHB(final boolean nextHB, final String nodeId) throws IOException {
-    AsyncLightWeightRequestHandler addNextHB
-            = new AsyncLightWeightRequestHandler(
-                    YARNOperationType.TEST) {
-      @Override
-      public Object performTask() throws StorageException {
-        connector.beginTransaction();
-        connector.writeLock();
-        NextHeartbeatDataAccess nhbDA
-                = (NextHeartbeatDataAccess) RMStorageFactory
-                .getDataAccess(NextHeartbeatDataAccess.class);
-        nhbDA.update(new NextHeartbeat(nodeId, nextHB));
-        connector.commit();
-        return null;
+
+  private final static ConcurrentLinkedQueue<PendingEvent> pendingEventsToRemove =
+          new ConcurrentLinkedQueue<>();
+  private static Thread pendingEventsCommitter = null;
+  private final static Semaphore pendingEventsSem =
+          new Semaphore(0, true);
+  private final static int MIN_NUM_OF_PENDING_EVENTS = 200;
+
+  public static void removePendingEvent(String rmNodeId, PendingEvent.Type type,
+          PendingEvent.Status status, int id) {
+
+    pendingEventsToRemove.add(new PendingEvent(rmNodeId, type, status, id));
+    pendingEventsSem.release();
+
+    if (pendingEventsCommitter == null) {
+      synchronized (DBUtility.class) {
+        if (pendingEventsCommitter == null) {
+          pendingEventsCommitter = new Thread(new PendingEventsCommitter());
+          pendingEventsCommitter.setName("RemovePendingEvents");
+          pendingEventsCommitter.start();
+          LOG.info("HOP :: RemovePendingEvents committer thread started");
+        }
       }
-    };
+    }
+  }
+
+  private static class PendingEventsCommitter implements Runnable {
+
+    @Override
+    public void run() {
+      while (!Thread.currentThread().isInterrupted()) {
+        try {
+          pendingEventsSem.tryAcquire(MIN_NUM_OF_PENDING_EVENTS,
+                  500, TimeUnit.MILLISECONDS);
+          commitRemovePendingEvents();
+        } catch (IOException ex) {
+          LOG.error(ex, ex);
+        } catch (InterruptedException ex) {
+          LOG.error(ex, ex);
+          Thread.currentThread().interrupt();
+        }
+      }
+    }
+  }
+
+  private static void commitRemovePendingEvents() throws IOException {
+    final Iterator<PendingEvent> peIt = pendingEventsToRemove.iterator();
+    final List<PendingEvent> toCommit = new ArrayList<>();
+    while (peIt.hasNext()) {
+      toCommit.add(peIt.next());
+    }
+
+    if (!toCommit.isEmpty()) {
+      AsyncLightWeightRequestHandler removePendingEvents =
+              new AsyncLightWeightRequestHandler(YARNOperationType.TEST) {
+                @Override
+                public Object performTask() throws IOException {
+                  connector.beginTransaction();
+                  connector.writeLock();
+
+                  PendingEventDataAccess peDA = (PendingEventDataAccess) RMStorageFactory
+                          .getDataAccess(PendingEventDataAccess.class);
+                  peDA.removeAll(toCommit);
+                  connector.commit();
+
+                  return null;
+                }
+              };
+      removePendingEvents.handle();
+
+      pendingEventsToRemove.removeAll(toCommit);
+    }
+  }
+
+
+
+  private final static ConcurrentLinkedQueue<io.hops.metadata.yarn.entity.ContainerId> toCommitCidToClean =
+          new ConcurrentLinkedQueue<>();
+  private static Thread cidToCleanCommitter = null;
+  private final static Semaphore toCommitSemaphore = new Semaphore(0, true);
+  private final static int MIN_NUM_OF_CONTAINERS = 50;
+
+  public static void addContainerToClean(ContainerId containerId,
+          org.apache.hadoop.yarn.api.records.NodeId nodeId) {
+
+    toCommitCidToClean.add(new io.hops.metadata.yarn.entity.ContainerId(nodeId.toString(),
+            containerId.toString()));
+    toCommitSemaphore.release();
+
+    if (cidToCleanCommitter == null) {
+      synchronized (DBUtility.class) {
+        if (cidToCleanCommitter == null) {
+          cidToCleanCommitter = new Thread(new ContainerToCleanCommitter());
+          cidToCleanCommitter.setName("cidToCleanCommitter");
+          cidToCleanCommitter.start();
+          LOG.info("HOP :: Started ContainerToClean committer thread");
+        }
+      }
+    }
+  }
+
+  private static class ContainerToCleanCommitter implements Runnable {
+
+    @Override
+    public void run() {
+      while (!Thread.currentThread().isInterrupted()) {
+
+        try {
+          toCommitSemaphore.tryAcquire(MIN_NUM_OF_CONTAINERS,
+                  200, TimeUnit.MILLISECONDS);
+          persistCidToClean();
+        } catch (IOException ex) {
+          LOG.error(ex, ex);
+        } catch (InterruptedException ex) {
+          LOG.error(ex, ex);
+          Thread.currentThread().interrupt();
+        }
+      }
+    }
+  }
+
+  private static void persistCidToClean() throws IOException {
+    final Iterator<io.hops.metadata.yarn.entity.ContainerId> cidIt =
+            toCommitCidToClean.iterator();
+    final List<io.hops.metadata.yarn.entity.ContainerId> toCommit =
+            new ArrayList<>();
+    while (cidIt.hasNext()) {
+      toCommit.add(cidIt.next());
+    }
+
+    if (!toCommit.isEmpty()) {
+      LightWeightRequestHandler addCidToClean =
+              new LightWeightRequestHandler(YARNOperationType.TEST) {
+                @Override
+                public Object performTask() throws IOException {
+                  connector.beginTransaction();
+                  connector.writeLock();
+
+                  ContainerIdToCleanDataAccess cidToCleanDA = (ContainerIdToCleanDataAccess)
+                          RMStorageFactory.getDataAccess(ContainerIdToCleanDataAccess.class);
+                  cidToCleanDA.addAll(toCommit);
+                  connector.commit();
+
+                  return null;
+                }
+              };
+
+      addCidToClean.handle();
+      toCommitCidToClean.removeAll(toCommit);
+    }
+  }
+
+  public static void addNextHB(final boolean nextHB, final String nodeId) throws IOException {
+    AsyncLightWeightRequestHandler addNextHB =
+            new AsyncLightWeightRequestHandler(YARNOperationType.TEST) {
+              @Override
+              public Object performTask() throws IOException {
+                connector.beginTransaction();
+                connector.writeLock();
+
+                NextHeartbeatDataAccess nhbDA = (NextHeartbeatDataAccess) RMStorageFactory
+                        .getDataAccess(NextHeartbeatDataAccess.class);
+                nhbDA.update(new NextHeartbeat(nodeId, nextHB));
+                connector.commit();
+                return null;
+              }
+            };
+
     addNextHB.handle();
   }
 
@@ -295,8 +439,8 @@ public class DBUtility {
                 .getNewlyLaunchedContainers()) {
           io.hops.metadata.yarn.entity.UpdatedContainerInfo hopUCI
                   = new io.hops.metadata.yarn.entity.UpdatedContainerInfo(nodeId,
-                          containerStatus.getContainerId().toString(), uci.
-                          getUciId());
+                  containerStatus.getContainerId().toString(), uci.
+                  getUciId());
           uciToRemove.add(hopUCI);
 
           ContainerStatus hopConStatus = new ContainerStatus(containerStatus.
@@ -312,8 +456,8 @@ public class DBUtility {
                 .getCompletedContainers()) {
           io.hops.metadata.yarn.entity.UpdatedContainerInfo hopUCI
                   = new io.hops.metadata.yarn.entity.UpdatedContainerInfo(nodeId,
-                          containerStatus.getContainerId().toString(), uci.
-                          getUciId());
+                  containerStatus.getContainerId().toString(), uci.
+                  getUciId());
           uciToRemove.add(hopUCI);
           ContainerStatus hopConStatus = new ContainerStatus(containerStatus.
                   getContainerId().toString(), nodeId, ContainerStatus.Type.UCI,
@@ -325,7 +469,7 @@ public class DBUtility {
 
     AsyncLightWeightRequestHandler removeUCIHandler
             = new AsyncLightWeightRequestHandler(
-                    YARNOperationType.TEST) {
+            YARNOperationType.TEST) {
       @Override
       public Object performTask() throws StorageException {
         connector.beginTransaction();
@@ -345,7 +489,7 @@ public class DBUtility {
     };
     removeUCIHandler.handle();
   }
-  
+
   public static Map<String, Load> getAllLoads() throws IOException {
     LightWeightRequestHandler getLoadHandler = new LightWeightRequestHandler(
             YARNOperationType.TEST) {
@@ -363,7 +507,7 @@ public class DBUtility {
     };
     return (Map<String, Load>) getLoadHandler.handle();
   }
-  
+
   public static void updateLoad(final Load load) throws IOException {
     AsyncLightWeightRequestHandler updateLoadHandler = new AsyncLightWeightRequestHandler(
             YARNOperationType.TEST) {
@@ -380,28 +524,6 @@ public class DBUtility {
       }
     };
     updateLoadHandler.handle();
-  }
-
-  public static void removePendingEvent(String rmNodeId, PendingEvent.Type type,
-          PendingEvent.Status status, int id) throws IOException {
-
-    final PendingEvent pendingEvent = new PendingEvent(rmNodeId, type, status, id);
-
-    AsyncLightWeightRequestHandler removePendingEvents = new AsyncLightWeightRequestHandler(YARNOperationType.TEST) {
-      @Override
-      public Object performTask() throws IOException {
-        connector.beginTransaction();
-        connector.writeLock();
-
-        PendingEventDataAccess pendingEventDAO = (PendingEventDataAccess) YarnAPIStorageFactory
-                .getDataAccess(PendingEventDataAccess.class);
-        pendingEventDAO.removePendingEvent(pendingEvent);
-        connector.commit();
-
-        return null;
-      }
-    };
-    removePendingEvents.handle();
   }
 
   public static void InitializeDB() throws IOException {
