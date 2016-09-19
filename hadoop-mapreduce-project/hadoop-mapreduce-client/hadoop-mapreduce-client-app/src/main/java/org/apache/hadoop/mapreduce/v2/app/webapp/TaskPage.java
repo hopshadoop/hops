@@ -30,6 +30,7 @@ import java.util.Collection;
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.MRConfig;
+import org.apache.hadoop.mapreduce.v2.api.records.TaskId;
 import org.apache.hadoop.mapreduce.v2.app.job.TaskAttempt;
 import org.apache.hadoop.mapreduce.v2.app.webapp.dao.TaskAttemptInfo;
 import org.apache.hadoop.mapreduce.v2.util.MRWebAppUtil;
@@ -127,8 +128,9 @@ public class TaskPage extends AppView {
 
         String nodeHttpAddr = ta.getNode();
         String diag = ta.getNote() == null ? "" : ta.getNote();
+        TaskId taskId = attempt.getID().getTaskId();
         attemptsTableData.append("[\"")
-        .append(ta.getId()).append("\",\"")
+        .append(getAttemptId(taskId, ta)).append("\",\"")
         .append(progress).append("\",\"")
         .append(ta.getState().toString()).append("\",\"")
         .append(StringEscapeUtils.escapeJavaScript(
@@ -172,6 +174,10 @@ public class TaskPage extends AppView {
 
     }
 
+    protected String getAttemptId(TaskId taskId, TaskAttemptInfo ta) {
+      return ta.getId();
+    }
+
     protected boolean isValidRequest() {
       return app.getTask() != null;
     }
@@ -204,6 +210,9 @@ public class TaskPage extends AppView {
     //logs column should not filterable (it includes container ID which may pollute searches)
     .append("\n{'aTargets': [ 5 ]")
     .append(", 'bSearchable': false }")
+
+    .append("\n, {'sType':'string', 'aTargets': [ 0 ]")
+    .append(", 'mRender': parseHadoopID }")
 
     .append("\n, {'sType':'numeric', 'aTargets': [ 6, 7")
     .append(" ], 'mRender': renderHadoopDate }")
