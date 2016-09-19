@@ -271,12 +271,8 @@ public class RMNodeImplDist extends RMNodeImpl {
           RMNodeEvent event) {
     rmNode.containersToClean.add(((RMNodeCleanContainerEvent) event).
             getContainerId());
-    try {
-      DBUtility.addContainerToClean(((RMNodeCleanContainerEvent) event).
-              getContainerId(), rmNode.getNodeID());
-    } catch (IOException ex) {
-      LOG.error(ex, ex);
-    }
+    DBUtility.addContainerToClean(((RMNodeCleanContainerEvent) event).
+            getContainerId(), rmNode.getNodeID());
   }
 
   @Override
