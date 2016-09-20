@@ -460,8 +460,8 @@ public class TestRMNodeTransitions {
 
   @Test
   public void testUnknownNodeId() {
-    NodesListManager.UnknownNodeId nodeId =
-            new NodesListManager.UnknownNodeId("host1");
+    NodeId nodeId =
+            NodesListManager.createUnknownNodeId("host1");
     RMNodeImpl node =
             new RMNodeImplNotDist(nodeId, rmContext, null, 0, 0, null, null, null);
     rmContext.getInactiveRMNodes().putIfAbsent(nodeId.getHost(), node);
