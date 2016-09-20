@@ -24,6 +24,8 @@ import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.hdfs.HdfsConfiguration;
+import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -286,6 +288,63 @@ public class TestUsersGroups {
     assertEquals(Arrays.asList("group3",
         "group1", "group2"), UsersGroups.getGroups("user"));
   }
+
+  @Test
+  public void testGroupMappingsRefresh() throws IOException {
+    Configuration conf = new HdfsConfiguration();
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1)
+        .build();
+    cluster.waitActive();
+
+    cluster.getNameNode().getRpcServer().refreshUserToGroupsMappings();
+
+    UsersGroups.addUserToGroupsTx("user", new String[]{"group1", "group2"});
+
+    int userId = UsersGroups.getUserID("user");
+    assertNotSame(0, userId);
+    assertEquals(UsersGroups.getUser(userId), "user");
+
+    int groupId = UsersGroups.getGroupID("group1");
+    assertNotSame(0, groupId);
+    assertEquals(UsersGroups.getGroup(groupId), "group1");
+
+    assertEquals(UsersGroups.getGroups("user"), Arrays.asList("group1",
+        "group2"));
+
+    removeUser(userId);
+
+    userId = UsersGroups.getUserID("user");
+    assertNotSame(0, userId);
+
+    cluster.getNameNode().getRpcServer().refreshUserToGroupsMappings();
+
+    userId = UsersGroups.getUserID("user");
+    assertEquals(0, userId);
+    assertNull(UsersGroups.getGroups("user"));
+
+    UsersGroups.addUserToGroupsTx("user", new String[]{"group1",
+        "group2"});
+
+    userId = UsersGroups.getUserID("user");
+    assertNotSame(0, userId);
+
+    assertEquals(Arrays.asList("group1", "group2"), UsersGroups.getGroups("user"));
+
+    removeUser(userId);
+
+    UsersGroups.addUserToGroupsTx("user", new String[]{"group3"});
+
+    int newUserId = UsersGroups.getUserID("user");
+    assertNotSame(0, userId);
+    assertEquals(userId, newUserId);
+
+    UsersGroups.addUserToGroupsTx("user", new String[]{"group1",
+        "group2"});
+
+    assertEquals(Arrays.asList("group3",
+        "group1", "group2"), UsersGroups.getGroups("user"));
+  }
+
 
   private void removeUser(final int userId) throws IOException {
     new LightWeightRequestHandler(

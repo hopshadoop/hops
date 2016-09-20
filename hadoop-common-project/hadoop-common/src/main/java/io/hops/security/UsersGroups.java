@@ -106,7 +106,10 @@ public class UsersGroups {
 
     List<String> groups = cache.getGroups(user);
     if (groups == null) {
+      LOG.debug("Fetching groups for (" + user + ") from db");
       groups = getGroupsFromDBAndUpdateCached(user);
+    }else{
+      LOG.debug("Returning fetched groups from cache for (" + user + ")" );
     }
     return groups;
   }
@@ -122,15 +125,19 @@ public class UsersGroups {
 
     Integer userId = cache.getUserId(userName);
     if (userId != null) {
+      LOG.debug("Returning user id from cache (" + userName + ")");
       return userId;
     }
 
     User user = getUserFromDB(userName, null);
     if (user == null) {
+      LOG.debug("Removing user (" + userName + ")");
       cache.removeUser(userName);
       return 0;
     }
 
+    LOG.debug("Adding user (" + userName +  "," + user.getId()  + ") to " +
+        "cache");
     cache.addUser(user);
     return user.getId();
   }
@@ -146,15 +153,19 @@ public class UsersGroups {
 
     Integer groupId = cache.getGroupId(groupName);
     if (groupId != null) {
+      LOG.debug("Returning group id from cache (" + groupName + ")");
       return groupId;
     }
 
     Group group = getGroupFromDB(groupName, null);
     if (group == null) {
+      LOG.debug("Removing group (" + groupName + ")");
       cache.removeGroup(groupName);
       return 0;
     }
 
+    LOG.debug("Adding group (" + groupName +  "," + group.getId()  + ") to " +
+        "cache");
     cache.addGroup(group);
     return group.getId();
   }
@@ -169,15 +180,19 @@ public class UsersGroups {
     }
     String userName = cache.getUserName(userId);
     if (userName != null) {
+      LOG.debug("Returning user from cache (" + userId + ")");
       return userName;
     }
 
     User user = getUserFromDB(null, userId);
     if (user == null) {
+      LOG.debug("Removing user (" + userId + ")");
       cache.removeUser(userId);
       return null;
     }
 
+    LOG.debug("Adding user (" + user.getName() +  "," + userId  + ") to " +
+        "cache");
     cache.addUser(user);
     return user.getName();
   }
@@ -192,15 +207,19 @@ public class UsersGroups {
     }
     String groupName = cache.getGroupName(groupId);
     if (groupName != null) {
+      LOG.debug("Returning group from cache (" + groupId + ")");
       return groupName;
     }
 
     Group group = getGroupFromDB(null, groupId);
     if (group == null) {
+      LOG.debug("Removing group (" + groupId + ")");
       cache.removeGroup(groupId);
       return null;
     }
 
+    LOG.debug("Adding group (" + group.getName() +  "," + groupId  + ") to " +
+        "cache");
     cache.addGroup(group);
     return group.getName();
   }
@@ -298,6 +317,8 @@ public class UsersGroups {
     if (!isConfigured) {
       return;
     }
+    LOG.debug("Adding user (" + user  + ") to groups (" + Arrays.toString
+        (groups) + ")" );
 
     try {
       addUserToGroupsInt(user, groups, transaction);
@@ -377,4 +398,8 @@ public class UsersGroups {
     }
   }
 
+  static void clearCache(){
+    LOG.debug("clear usersgroups cache");
+    cache.clear();
+  }
 }
