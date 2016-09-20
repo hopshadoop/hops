@@ -767,6 +767,9 @@ public class LeafQueue extends AbstractCSQueue {
       }
     }
     
+    Resource initAmountNeededUnreserve =
+        currentResourceLimits.getAmountNeededUnreserve();
+
     // Try to assign containers to applications in order
     for (FiCaSchedulerApp application : activeApplications) {
       
@@ -819,6 +822,9 @@ public class LeafQueue extends AbstractCSQueue {
               computeUserLimitAndSetHeadroom(application, clusterResource, 
                   required, requestedNodeLabels);          
           
+          currentResourceLimits.setAmountNeededUnreserve(
+              initAmountNeededUnreserve);
+
           // Check queue max-capacity limit
           if (!super.canAssignToThisQueue(clusterResource, node.getLabels(),
               currentResourceLimits, required, application.getCurrentReservation())) {
