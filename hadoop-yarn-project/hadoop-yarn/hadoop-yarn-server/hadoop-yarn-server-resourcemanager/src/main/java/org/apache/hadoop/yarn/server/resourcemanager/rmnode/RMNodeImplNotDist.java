@@ -329,6 +329,11 @@ public class RMNodeImplNotDist extends RMNodeImpl {
   @Override
   protected void deactivateNodeTransitionInternal(RMNodeImpl rmNode,
           RMNodeEvent event, final NodeState finalState) {
+    //check for UnknownNodeId
+    if (rmNode.getNodeID().getPort() == -1) {
+      rmNode.updateMetricsForDeactivatedNode(rmNode.getState(), finalState);
+      return;
+    }
     // Inform the scheduler
     rmNode.nodeUpdateQueue.clear();
     // If the current state is NodeState.UNHEALTHY
