@@ -246,7 +246,7 @@ public class CommonConfigurationKeysPublic {
     "hadoop.security.groups.cache.secs";
   /** See <a href="{@docRoot}/../core-default.html">core-default.xml</a> */
   public static final long HADOOP_SECURITY_GROUPS_CACHE_SECS_DEFAULT =
-    300;
+    0;
   /** See <a href="{@docRoot}/../core-default.html">core-default.xml</a> */
   public static final String HADOOP_SECURITY_GROUPS_CACHE_WARN_AFTER_MS =
     "hadoop.security.groups.cache.warn.after.ms";
