@@ -7,7 +7,7 @@ import io.hops.metadata.yarn.entity.NextHeartbeat;
 import io.hops.metadata.yarn.entity.PendingEvent;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import io.hops.util.DBUtility;
-import io.hops.util.NdbRmStreamingProcessor;
+import io.hops.util.RmStreamingProcessor;
 import io.hops.util.RMStorageFactory;
 import io.hops.util.YarnAPIStorageFactory;
 import org.apache.commons.logging.Log;
@@ -107,11 +107,11 @@ public class TestStreamingLibrary {
 
         TimeUnit.SECONDS.sleep(1);
 
-        rmNodeWriter = new RMNodeWriter(generateHopRMNode(getId(), PendingEvent.Type.NODE_ADDED,
-                PendingEvent.Status.SCHEDULER_FINISHED_PROCESSING, NodeState.NEW));
-        rmNodeWriter.handle();
-        LOG.debug("Persisted dummy RMNode");
-        TimeUnit.SECONDS.sleep(1);
+//        rmNodeWriter = new RMNodeWriter(generateHopRMNode(getId(), PendingEvent.Type.NODE_ADDED,
+//                PendingEvent.Status.SCHEDULER_FINISHED_PROCESSING, NodeState.NEW));
+//        rmNodeWriter.handle();
+//        LOG.debug("Persisted dummy RMNode");
+//        TimeUnit.SECONDS.sleep(1);
 
         // Node should be added to RM nodes list
         Assert.assertTrue("Node " + toCommit.getYarnRMNode().getNodeID(), rm.getRMContext().getRMNodes().containsKey(
@@ -154,13 +154,6 @@ public class TestStreamingLibrary {
         FullRMNode decNode = generateHopRMNode(addedNode.getId(), PendingEvent.Type.NODE_REMOVED,
                 PendingEvent.Status.SCHEDULER_FINISHED_PROCESSING, NodeState.DECOMMISSIONED);
         rmNodeWriter = new RMNodeWriter(decNode);
-        rmNodeWriter.handle();
-
-        TimeUnit.SECONDS.sleep(1);
-
-        // Dummy insert
-        rmNodeWriter = new RMNodeWriter(generateHopRMNode(getId(), PendingEvent.Type.NODE_ADDED,
-                PendingEvent.Status.SCHEDULER_FINISHED_PROCESSING, NodeState.NEW));
         rmNodeWriter.handle();
 
         TimeUnit.SECONDS.sleep(3);
@@ -207,7 +200,7 @@ public class TestStreamingLibrary {
 
     private FullRMNode generateHopRMNode(int id, PendingEvent.Type type, PendingEvent.Status status,
             NodeState state) {
-
+        int contains =0;
         RMNode rmNode = new RMNodeImplDist(
                 NodeId.newInstance("host" + id, 1234),
                 rm.getRMContext(),
@@ -217,7 +210,7 @@ public class TestStreamingLibrary {
                 new NodeBase("name", "/location"),
                 Resource.newInstance(6 * GB, 6),
                 "1.0");
-
+        
         if (!NodeState.NEW.equals(state)) {
             ((RMNodeImplDist) rmNode).setState(state.name());
         }
@@ -232,23 +225,31 @@ public class TestStreamingLibrary {
                 rmNode.getState().name(),
                 rmNode.getNodeManagerVersion(),
                 id);
-
-        PendingEvent pendingEvent = new PendingEvent(rmNode.getNodeID().toString(),
-                type,
-                status,
-                id);
+        contains ++;
+        
 
         io.hops.metadata.yarn.entity.Resource hopResource = new io.hops.metadata.yarn.entity.Resource(
                 rmNode.getNodeID().toString(),
                 rmNode.getTotalCapability().getMemory(),
                 rmNode.getTotalCapability().getVirtualCores(),
                 id);
-
+        contains ++;
+        
         NextHeartbeat nextHB = new NextHeartbeat(rmNode.getNodeID().toString(),
                 true);
 
+        
+        PendingEvent pendingEvent = new PendingEvent(rmNode.getNodeID().toString(),
+                type,
+                status,
+                id,contains);
+        contains ++;
+        
+        List<ContainerStatus> containerStatuses = generateContainerStatuses(1, rmNode.getNodeID().toString(),pendingEvent.getId().getEventId());
+        contains++;
+        pendingEvent.setContains(contains);
         return new FullRMNode(rmNode, hopRMNode, pendingEvent, hopResource, nextHB, id,
-                generateContainerStatuses(10, rmNode.getNodeID().toString(),pendingEvent.getId().getEventId()));
+                containerStatuses);
     }
 
     private List<ContainerStatus> generateContainerStatuses(int numOfContainers, String rmNodeId,

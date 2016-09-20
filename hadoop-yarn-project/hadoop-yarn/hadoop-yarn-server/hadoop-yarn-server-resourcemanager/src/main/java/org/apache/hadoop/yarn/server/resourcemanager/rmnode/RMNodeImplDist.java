@@ -46,12 +46,8 @@ import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppRunningOnNodeEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeAddedSchedulerEvent;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeRemovedSchedulerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeResourceUpdateSchedulerEvent;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeUpdateSchedulerEvent;
 import org.apache.hadoop.yarn.state.InvalidStateTransitonException;
-import org.apache.hadoop.yarn.state.MultipleArcTransition;
-import org.apache.hadoop.yarn.state.SingleArcTransition;
 
 public class RMNodeImplDist extends RMNodeImpl {
 
@@ -71,9 +67,6 @@ public class RMNodeImplDist extends RMNodeImpl {
           String nodeManagerVersion) {
     super(nodeId, context, hostName, cmPort, httpPort, node, capability,
             nodeManagerVersion);
-    toCommit.addRMNode(hostName, commandPort, httpPort, totalCapability,
-            nodeManagerVersion, getState(), getHealthReport(),
-            getLastHealthReportTime());
   }
 
   protected NodeState statusUpdateWhenHealthyTransitionInternal(
@@ -189,7 +182,6 @@ public class RMNodeImplDist extends RMNodeImpl {
       UpdatedContainerInfo uci = new UpdatedContainerInfo(
               newlyLaunchedContainers,
               completedContainers);
-      nodeUpdateQueue.add(uci);
       toCommit.addNodeUpdateQueue(uci);
     }
   }
@@ -264,7 +256,7 @@ public class RMNodeImplDist extends RMNodeImpl {
               rmNode.getNodeID());
     } catch (IOException ex) {
       LOG.error(ex, ex);
-    }
+  }
   }
 
   protected void cleanUpContainerTransitionInternal(RMNodeImpl rmNode,
@@ -276,7 +268,7 @@ public class RMNodeImplDist extends RMNodeImpl {
               getContainerId(), rmNode.getNodeID());
     } catch (IOException ex) {
       LOG.error(ex, ex);
-    }
+  }
   }
 
   @Override
@@ -307,6 +299,16 @@ public class RMNodeImplDist extends RMNodeImpl {
     }
   }
 
+  public void addContainersToCleanUp(ContainerId containerToCleanUp) {
+    super.writeLock.lock();
+
+    try {
+      super.containersToClean.add(containerToCleanUp);
+    } finally {
+      super.writeLock.unlock();
+    }
+  }
+  
   public void setAppsToCleanUp(List<ApplicationId> appsToCleanUp) {
     super.writeLock.lock();
 
@@ -317,6 +319,16 @@ public class RMNodeImplDist extends RMNodeImpl {
     }
   }
 
+  public void addAppToCleanUp(ApplicationId appToCleanUp) {
+    super.writeLock.lock();
+
+    try {
+      super.finishedApplications.add(appToCleanUp);
+    } finally {
+      super.writeLock.unlock();
+    }
+  }
+  
   public void setNextHeartbeat(boolean nextHeartbeat) {
     super.writeLock.lock();
 

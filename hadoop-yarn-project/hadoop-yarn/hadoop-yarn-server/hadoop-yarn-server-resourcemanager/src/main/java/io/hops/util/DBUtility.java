@@ -411,9 +411,10 @@ public class DBUtility {
   }
 
   public static void removePendingEvent(String rmNodeId, PendingEvent.Type type,
-          PendingEvent.Status status, int id) throws IOException {
+          PendingEvent.Status status, int id, int contains) throws IOException {
 long start = System.currentTimeMillis();
-    final PendingEvent pendingEvent = new PendingEvent(rmNodeId, type, status, id);
+    final PendingEvent pendingEvent = new PendingEvent(rmNodeId, type, status,
+            id, contains);
 
     AsyncLightWeightRequestHandler removePendingEvents = new AsyncLightWeightRequestHandler(YARNOperationType.TEST) {
       @Override

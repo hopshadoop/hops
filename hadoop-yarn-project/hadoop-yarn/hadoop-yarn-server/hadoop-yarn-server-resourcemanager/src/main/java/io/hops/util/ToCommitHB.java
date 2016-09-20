@@ -48,6 +48,8 @@ public class ToCommitHB {
   final String nodeId;
   PendingEvent.Type pendingEventType = null;
   PendingEvent.Status pendingEventStatus;
+  int pendingEventContains = 0;
+  
   final List<io.hops.metadata.yarn.entity.UpdatedContainerInfo> uciToAdd
           = new ArrayList<>();
   final List<ContainerStatus> containerStatusToAdd
@@ -67,8 +69,9 @@ public class ToCommitHB {
           PendingEvent.Status pendingEventStatus) {
     this.pendingEventStatus = pendingEventStatus;
     this.pendingEventType = pendingEventType;
+    this.pendingEventContains++;
   }
-
+  
   public void addNodeUpdateQueue(UpdatedContainerInfo uci) {
     this.uciID = uci.getUciId();
     if (uci.getNewlyLaunchedContainers() != null
@@ -81,7 +84,8 @@ public class ToCommitHB {
                         containerStatus.getContainerId().
                         toString(), uciID, pendingEventId);
         uciToAdd.add(hopUCI);
-
+        this.pendingEventContains++;
+        
         ContainerStatus hopConStatus = new ContainerStatus(containerStatus.
                 getContainerId().toString(),
                 containerStatus.getState().toString(),
@@ -90,6 +94,7 @@ public class ToCommitHB {
                 ContainerStatus.Type.UCI,
                 uciID);
         containerStatusToAdd.add(hopConStatus);
+        this.pendingEventContains++;
       }
     }
     if (uci.getCompletedContainers() != null
@@ -102,6 +107,7 @@ public class ToCommitHB {
                         containerStatus.getContainerId().
                         toString(), uciID, pendingEventId);
         uciToAdd.add(hopUCI);
+        this.pendingEventContains++;
         ContainerStatus hopConStatus = new ContainerStatus(containerStatus.
                 getContainerId().toString(),
                 containerStatus.getState().toString(),
@@ -110,6 +116,7 @@ public class ToCommitHB {
                 ContainerStatus.Type.UCI,
                 uciID);
         containerStatusToAdd.add(hopConStatus);
+        this.pendingEventContains++;
       }
     }
   }
@@ -121,9 +128,11 @@ public class ToCommitHB {
     rmNode = new RMNode(nodeId, hostName, commandPort, httpPort,
             healthReport, lastHealthReportTime, currentState.name(),
             nodeManagerVersion, pendingEventId);
+    this.pendingEventContains++;
     rmNodeResource = new io.hops.metadata.yarn.entity.Resource(nodeId,
             totalCapability.getMemory(), totalCapability.getVirtualCores(),
             pendingEventId);
+    this.pendingEventContains++;
   }
 
   public void addNextHeartBeat(boolean nextHeartBeat){
@@ -135,7 +144,7 @@ public class ToCommitHB {
       return;
     }
     final PendingEvent pendingEvent = new PendingEvent(nodeId, pendingEventType,
-            pendingEventStatus, pendingEventId);
+            pendingEventStatus, pendingEventId, pendingEventContains);
     RequestHandler handler = null;
 
     if (pendingEvent.getType().equals(PendingEvent.Type.NODE_ADDED)) {
