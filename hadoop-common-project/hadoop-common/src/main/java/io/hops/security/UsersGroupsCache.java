@@ -291,4 +291,13 @@ public class UsersGroupsCache {
     return idsToGroups.get(groupId);
   }
 
+  void clear(){
+    usersToGroups.clear();
+    groupsToUsers.clear();
+    idsToUsers.clear();
+    usersToIds.clear();
+    idsToGroups.clear();
+    groupsToIds.clear();
+  }
+
 }
