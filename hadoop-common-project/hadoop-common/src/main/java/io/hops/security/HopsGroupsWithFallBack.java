@@ -32,4 +32,11 @@ public class HopsGroupsWithFallBack extends
 
     return super.getGroups(user);
   }
+
+  @Override
+  public void cacheGroupsRefresh() throws IOException {
+    super.cacheGroupsRefresh();
+    UsersGroups.clearCache();
+  }
+
 }
