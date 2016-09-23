@@ -17,10 +17,13 @@ package io.hops.security;
 
 import com.google.common.collect.Lists;
 import com.googlecode.concurrentlinkedhashmap.ConcurrentLinkedHashMap;
+import com.googlecode.concurrentlinkedhashmap.EvictionListener;
 import io.hops.metadata.hdfs.entity.Group;
 import io.hops.metadata.hdfs.entity.User;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -33,23 +36,78 @@ public class UsersGroupsCache {
   private ConcurrentLinkedHashMap<Integer, String> idsToGroups;
   private ConcurrentLinkedHashMap<String, Integer> groupsToIds;
 
+  private EvictionListener usersToGroupsEvictionListener = new EvictionListener() {
+    @Override
+    public void onEviction(Object key, Object value) {
+      String user = (String) key;
+      List<String> groups = (List<String>) value;
+      removeUser(user);
+      cleanCacheOnUserRemoval(user, groups);
+    }
+  };
+
+  private EvictionListener groupsToUsersEvictionListener = new EvictionListener() {
+    @Override
+    public void onEviction(Object key, Object value) {
+      String group = (String) key;
+      List<String> users = (List<String>) value;
+      removeGroup(group);
+      for(String user: users){
+        removeUser(user);
+      }
+    }
+  };
+
+  private EvictionListener idsToUsersEvictionListener = new EvictionListener() {
+    @Override
+    public void onEviction(Object key, Object value) {
+      removeUser(new User((Integer)key, (String)value));
+    }
+  };
+
+  private EvictionListener usersToIdsEvictionListener = new EvictionListener() {
+    @Override
+    public void onEviction(Object key, Object value) {
+      removeUser(new User((Integer)value, (String)key));
+    }
+  };
+
+  private EvictionListener idsToGroupsEvictionListener = new EvictionListener
+      () {
+    @Override
+    public void onEviction(Object key, Object value) {
+      removeGroup(new Group((Integer)key, (String) value), true);
+    }
+  };
+
+  private EvictionListener groupsToIdsEvictionListener = new EvictionListener
+      () {
+    @Override
+    public void onEviction(Object key, Object value) {
+      removeGroup(new Group((Integer)value, (String) key), true);
+    }
+  };
+
+
   public UsersGroupsCache(int lrumax){
     usersToGroups = new ConcurrentLinkedHashMap.Builder().maximumWeightedCapacity
-        (lrumax).build();
+        (lrumax).listener(usersToGroupsEvictionListener).build();
     groupsToUsers = new ConcurrentLinkedHashMap.Builder().maximumWeightedCapacity
-        (lrumax).build();
+        (lrumax).listener(groupsToUsersEvictionListener).build();
     idsToUsers = new ConcurrentLinkedHashMap.Builder().maximumWeightedCapacity
-        (lrumax).build();
+        (lrumax).listener(idsToUsersEvictionListener).build();
     usersToIds = new ConcurrentLinkedHashMap.Builder().maximumWeightedCapacity
-        (lrumax).build();
+        (lrumax).listener(usersToIdsEvictionListener).build();
     idsToGroups = new ConcurrentLinkedHashMap.Builder().maximumWeightedCapacity
-        (lrumax).build();
+        (lrumax).listener(idsToGroupsEvictionListener).build();
     groupsToIds = new ConcurrentLinkedHashMap.Builder().maximumWeightedCapacity
-        (lrumax).build();
+        (lrumax).listener(groupsToIdsEvictionListener).build();
   }
 
 
   List<String> getGroups(String user){
+    if(user == null)
+      return null;
     return usersToGroups.get(user);
   }
 
@@ -83,7 +141,24 @@ public class UsersGroupsCache {
     }
   }
 
+  void removeGroup(Group group){
+    removeGroup(group, false);
+  }
+
   void removeGroup(String groupName){
+    removeGroup(groupName, false);
+  }
+
+  void removeGroup(Integer groupId){
+    removeGroup(groupId, false);
+  }
+
+  private void removeGroup(Group group, boolean removeUsers){
+    removeGroup(group.getId(), removeUsers);
+    removeGroup(group.getName(), removeUsers);
+  }
+
+  private void removeGroup(String groupName, boolean removeUsers){
     if(groupName == null)
       return;
 
@@ -91,22 +166,25 @@ public class UsersGroupsCache {
     if(groupId != null){
       idsToGroups.remove(groupId);
     }
-    cleanCacheOnGroupRemoval(groupName);
+    cleanCacheOnGroupRemoval(groupName, removeUsers);
   }
 
-  void removeGroup(Integer groupId){
+  private void removeGroup(Integer groupId, boolean removeUsers){
     if(groupId == null)
       return;
 
     String groupName = idsToGroups.remove(groupId);
     if(groupName != null){
       groupsToIds.remove(groupName);
-      cleanCacheOnGroupRemoval(groupName);
+      cleanCacheOnGroupRemoval(groupName, removeUsers);
     }
   }
 
   private void cleanCacheOnUserRemoval(String userName){
-    List<String> groups = usersToGroups.remove(userName);
+    cleanCacheOnUserRemoval(userName, usersToGroups.remove(userName));
+  }
+
+  private void cleanCacheOnUserRemoval(String userName, List<String> groups){
     if(groups == null)
       return;
 
@@ -121,17 +199,21 @@ public class UsersGroupsCache {
     }
   }
 
-  private void cleanCacheOnGroupRemoval(String groupName){
+  private void cleanCacheOnGroupRemoval(String groupName, boolean removeUsers){
     List<String> users = groupsToUsers.remove(groupName);
     if(users == null)
       return;
 
     for(String user : users){
-      List<String> userGroups = usersToGroups.get(user);
-      if(userGroups != null){
-        userGroups.remove(groupName);
-        if(userGroups.isEmpty()){
-          removeUser(user);
+      if(removeUsers){
+        removeUser(user);
+      }else {
+        List<String> userGroups = usersToGroups.get(user);
+        if(userGroups != null){
+          userGroups.remove(groupName);
+          if(userGroups.isEmpty()){
+            removeUser(user);
+          }
         }
       }
     }
@@ -145,8 +227,29 @@ public class UsersGroupsCache {
       groupsToUsers.get(group.getName()).add(user.getName());
     }
     addUser(user);
-    usersToGroups.putIfAbsent(user.getName(), groupNames);
+    usersToGroups.put(user.getName(), groupNames);
     return groupNames;
+  }
+
+  void appendUserGroups(String user, Collection<String> groups){
+    List<String> currentGroups = usersToGroups.get(user);
+    if(currentGroups == null){
+      currentGroups = new ArrayList<String>();
+    }
+
+    Set<String> newGroups = new HashSet<String>();
+
+    newGroups.addAll(groups);
+    newGroups.removeAll(currentGroups);
+
+
+    for(String group : newGroups){
+      groupsToUsers.putIfAbsent(group, new ArrayList<String>());
+      groupsToUsers.get(group).add(user);
+    }
+
+    currentGroups.addAll(newGroups);
+    usersToGroups.put(user, currentGroups);
   }
 
   void addUser(User user){
@@ -164,14 +267,37 @@ public class UsersGroupsCache {
     groupsToUsers.putIfAbsent(group.getName(), new ArrayList<String>());
   }
 
-  Integer getUserId(String userName){ return usersToIds.get(userName); }
+  Integer getUserId(String userName){
+    if(userName == null)
+      return null;
+    return usersToIds.get(userName);
+  }
 
   Integer getGroupId(String groupName){
+    if(groupName == null)
+      return null;
     return groupsToIds.get(groupName);
   }
 
-  String getUserName(Integer userId) { return idsToUsers.get(userId); }
+  String getUserName(Integer userId) {
+    if(userId == null)
+      return null;
+    return idsToUsers.get(userId);
+  }
 
-  String getGroupName(Integer groupId) { return idsToGroups.get(groupId); }
+  String getGroupName(Integer groupId) {
+    if(groupId == null)
+      return null;
+    return idsToGroups.get(groupId);
+  }
+
+  void clear(){
+    usersToGroups.clear();
+    groupsToUsers.clear();
+    idsToUsers.clear();
+    usersToIds.clear();
+    idsToGroups.clear();
+    groupsToIds.clear();
+  }
 
 }

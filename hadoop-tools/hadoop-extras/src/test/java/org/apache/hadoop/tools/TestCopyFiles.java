@@ -894,13 +894,13 @@ public class TestCopyFiles extends TestCase {
   public void testHftpAccessControl() throws Exception {
     MiniDFSCluster cluster = null;
     try {
-      final UserGroupInformation DFS_UGI = createUGI("dfs", true); 
-      final UserGroupInformation USER_UGI = createUGI("user", false); 
-
       //start cluster by DFS_UGI
       final Configuration dfsConf = new Configuration();
       cluster = new MiniDFSCluster.Builder(dfsConf).numDataNodes(2).build();
       cluster.waitActive();
+
+      final UserGroupInformation DFS_UGI = createUGI("dfs", true);
+      final UserGroupInformation USER_UGI = createUGI("user", false);
 
       final String httpAdd = dfsConf.get("dfs.http.address");
       final URI nnURI = FileSystem.getDefaultUri(dfsConf);

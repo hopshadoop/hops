@@ -1240,7 +1240,7 @@ public class UserGroupInformation {
 
   private static void createHopsUser(String user, String[] groups){
     try {
-      UsersGroups.addUserToGroups(user, groups);
+      UsersGroups.addUserToGroupsTx(user, groups);
     }catch (IOException ex){
       throw new RuntimeException(ex);
     }
