@@ -377,7 +377,6 @@ public class NamenodeSelector extends Thread {
           }
         } catch (Exception e) {
           LOG.error(e);
-          e.printStackTrace();
           if (handle != null) {
             RPC.stopProxy(handle);
           }
