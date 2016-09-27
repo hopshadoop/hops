@@ -23,6 +23,8 @@ import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import junit.framework.TestCase;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
@@ -370,6 +372,59 @@ public class TestMetadataLog extends TestCase {
       int folderId = TestUtil.getINodeId(cluster.getNameNode(), folder);
       assertTrue(checkLog(folderId, MetadataLogEntry.Operation.ADD));
       assertTrue(checkLog(inodeId, MetadataLogEntry.Operation.ADD));
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
+
+  @Test
+  public void testDeleteFileWhileOpen() throws Exception {
+    Configuration conf = new HdfsConfiguration();
+
+    final int BYTES_PER_CHECKSUM = 1;
+    final int PACKET_SIZE = BYTES_PER_CHECKSUM;
+    final int BLOCK_SIZE = 1 * PACKET_SIZE;
+    conf.setInt(DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY, BYTES_PER_CHECKSUM);
+    conf.setLong(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE);
+    conf.setInt(DFSConfigKeys.DFS_CLIENT_WRITE_PACKET_SIZE_KEY, PACKET_SIZE);
+
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
+        .numDataNodes(1)
+        .build();
+    try {
+      FileSystem fs = cluster.getFileSystem();
+      DistributedFileSystem dfs = (DistributedFileSystem) FileSystem
+          .newInstance(fs.getUri(), fs.getConf());
+
+      Path projects = new Path("/projects");
+      Path project = new Path(projects, "project");
+      Path dataset = new Path(project, "dataset");
+      Path folder = new Path(dataset, "folder");
+      Path file = new Path(folder, "file");
+      dfs.mkdirs(folder, FsPermission.getDefault());
+      dfs.setMetaEnabled(dataset, true);
+
+      FSDataOutputStream out = dfs.create(file);
+      out.writeByte(0);
+
+      int inodeId = TestUtil.getINodeId(cluster.getNameNode(), file);
+      int folderId = TestUtil.getINodeId(cluster.getNameNode(), folder);
+      assertTrue(checkLog(folderId, MetadataLogEntry.Operation.ADD));
+      assertFalse(checkLog(inodeId, MetadataLogEntry.Operation.ADD));
+
+      DistributedFileSystem dfs2 = (DistributedFileSystem) FileSystem
+          .newInstance(fs.getUri(), fs.getConf());
+
+      try {
+        dfs2.delete(file, false);
+      }catch (Exception ex){
+        fail("we shouldn't have any exception: " + ex.getMessage());
+      }
+
+      assertFalse(checkLog(inodeId, MetadataLogEntry.Operation.DELETE));
+
     } finally {
       if (cluster != null) {
         cluster.shutdown();
