@@ -207,7 +207,7 @@ public class SLSRunner implements AMNMCommonObject {
     }
   }
   long lastMonitoring = 0;
-
+  
   public void startHbMonitorThread() {
     LOG.info("start Heartbeat monitor");
     Thread hbExperimentalMonitoring = new Thread() {
@@ -220,12 +220,23 @@ public class SLSRunner implements AMNMCommonObject {
             java.util.logging.Logger.getLogger(SLSRunner.class.getName()).log(
                     Level.SEVERE, null, ex);
           }
-          int totalHb = 0;
-          int trueTotalHb = 0;
-          for (NMSimulator nm : nmMap.values()) {
-            totalHb += nm.getTotalHeartBeat();
-            trueTotalHb += nm.getTotalTrueHeartBeat();
+
+          int hb[] = getHandledHeartBeats();
+          int nbNM = getNumberNodeManager();
+          for (String conId : remoteConnections.keySet()) {
+            try{
+            AMNMCommonObject remoteCon = remoteConnections.get(conId);
+            int remoteHb[] = remoteCon.getHandledHeartBeats();
+            hb[0] += remoteHb[0];
+            hb[1] += remoteHb[1];
+            nbNM += remoteCon.getNumberNodeManager();
+            }catch(RemoteException e){
+              LOG.error(e,e);
+            }
           }
+          
+          int totalHb = hb[0];
+          int trueTotalHb = hb[1];
           if (totalHb != 0) {
             float hbExperimentailResponsePercentage = (float) ((trueTotalHb
                     - lastLocalSCHB) * 100) / (totalHb - lastLocalRTHB);

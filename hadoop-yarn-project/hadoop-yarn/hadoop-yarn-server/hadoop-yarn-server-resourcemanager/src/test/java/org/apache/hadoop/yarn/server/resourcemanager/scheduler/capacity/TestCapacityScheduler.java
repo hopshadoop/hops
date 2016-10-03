@@ -77,6 +77,7 @@ import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
 import org.apache.hadoop.yarn.ipc.YarnRPC;
+import org.apache.hadoop.yarn.server.api.protocolrecords.NMContainerStatus;
 import org.apache.hadoop.yarn.server.api.protocolrecords.RegisterNodeManagerRequest;
 import org.apache.hadoop.yarn.server.api.protocolrecords.UpdateNodeResourceRequest;
 import org.apache.hadoop.yarn.server.resourcemanager.AdminService;
@@ -110,6 +111,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerState;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeEventType;
+import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeImplNotDist;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.AbstractYarnScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.Allocation;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler;
@@ -375,7 +377,7 @@ public class TestCapacityScheduler {
     NodeUpdateSchedulerEvent nodeUpdate = new NodeUpdateSchedulerEvent(node);
     resourceManager.getResourceScheduler().handle(nodeUpdate);
   }
-  
+   
   private CapacitySchedulerConfiguration setupQueueConfiguration(
       CapacitySchedulerConfiguration conf) {
     
@@ -2941,5 +2943,130 @@ public class TestCapacityScheduler {
     Assert.assertEquals("Cluster resources don't match", newCapability,
         resourceManager.getResourceScheduler().getClusterResource());
     privateResourceTrackerService.stop();
+  }
+  
+  
+  @Test
+  public void testCapacitySchedulerTh() throws Exception {
+    for(int j=20; j<100; j+=10){
+    float total=0;
+    for(int i=0; i<5;i++){
+      total+=testCapacitySchedulerThInt(j);
+      tearDown();
+      setUp();
+    }
+    float result = total/5;
+      LOG.error("avg nb heartbeats handled per seconds " + j + "\t" + result);
+    }
+  }
+  
+  
+  public float testCapacitySchedulerThInt(int nbTasks) throws Exception {
+
+    LOG.info("--- START: testCapacityScheduler ---");
+
+    // Register node1
+    String host_0 = "host_0";
+    org.apache.hadoop.yarn.server.resourcemanager.NodeManager nm_0
+            = registerNode(host_0, 1234, 2345, NetworkTopology.DEFAULT_RACK,
+                    Resources.createResource((nbTasks+4) * GB, 1));
+
+    // ResourceRequest priorities
+    Priority priority_1
+            = org.apache.hadoop.yarn.server.resourcemanager.resource.Priority.
+            create(1);
+
+    // Submit an application
+    Application application_1 = new Application("user_1", "b2", resourceManager);
+    application_1.submit();
+
+    application_1.addNodeManager(host_0, 1234, nm_0);
+
+    Resource capability_1_0 = Resources.createResource(1 * GB, 1);
+    application_1.addResourceRequestSpec(priority_1, capability_1_0);
+
+    Task task_1_0 = new Task(application_1, priority_1,
+            new String[]{host_0});
+    application_1.addTask(task_1_0);
+
+    // Send resource requests to the scheduler
+    application_1.schedule();
+
+    // Send a heartbeat to kick the tires on the Scheduler
+    LOG.info("Kick!");
+
+    // task_0_0 and task_1_0 allocated, used=4G
+    nodeUpdate(nm_0);
+
+    // Get allocations from the scheduler
+
+    application_1.schedule();     // task_1_0
+    checkApplicationResourceUsage(1 * GB, application_1);
+
+    checkNodeResourceUsage(1 * GB, nm_0);
+
+    long start = System.currentTimeMillis();
+    int nbHb = 0;
+    long duration = 0;
+    long totalTimeInHB = 0;
+    do {
+      checkApplicationResourceUsage(1 * GB, application_1);
+      List<Task> tasks = new ArrayList<>();
+      for(int i = 0; i<nbTasks; i++){
+        Task task = new Task(application_1, priority_1,
+              new String[]{ResourceRequest.ANY});
+        application_1.addTask(task);
+        tasks.add(task);
+      }
+      application_1.schedule();
+      // Send a heartbeat to kick the tires on the Scheduler
+      // nothing new, used=4G
+      long s= System.nanoTime();
+      nodeUpdate(nm_0);
+      totalTimeInHB += System.nanoTime()-s;
+      nbHb++;
+
+      // task_0_1 is prefer as locality, used=2G
+
+      // Get allocations from the scheduler
+      while (!allTasksRunning(tasks)) {
+        application_1.schedule();
+//      checkApplicationResourceUsage(5 * GB, application_1);
+
+        s = System.nanoTime();
+        nodeUpdate(nm_0);
+        totalTimeInHB += System.nanoTime() - s;
+        nbHb++;
+      }
+
+      for(Task task: tasks){
+        application_1.finishTask(task);
+      }
+      application_1.schedule();
+
+      s = System.nanoTime();
+      nodeUpdate(nm_0);
+      totalTimeInHB += System.nanoTime() - s;
+      nbHb++;
+
+//      checkNodeResourceUsage(4 * GB, nm_0);
+//      checkNodeResourceUsage(0 * GB, nm_1);
+      duration = System.currentTimeMillis() - start;
+    } while (duration < 10000);
+    float avgHBDur = (float)totalTimeInHB/nbHb;
+    float nbHbps = 1000000000/avgHBDur;
+    LOG.error("nb heartbeats handled per seconds: " + nbHbps + " (" + avgHBDur + ")");
+    return nbHbps;
+//
+//    LOG.info("--- END: testCapacityScheduler ---");
+  }
+  
+  private boolean allTasksRunning(List<Task> tasks){
+    for(Task task: tasks){
+      if(!task.getState().equals(Task.State.RUNNING)){
+        return false;
+      }
+    }
+    return true;
   }
 }
