@@ -155,6 +155,7 @@ public class AppSchedulingInfo {
         // which is needed during deactivate.
         if (request.getNumContainers() > 0) {
           activeUsersManager.activateApplication(user, applicationId);
+          queue.activateApplication(applicationId);
         }
       }
 
@@ -166,7 +167,7 @@ public class AppSchedulingInfo {
         this.priorities.add(priority);
       }
       lastRequest = asks.get(resourceName);
-
+    
       if (recoverPreemptedRequest && lastRequest != null) {
         // Increment the number of containers to 1, as it is recovering a
         // single container.
@@ -377,7 +378,7 @@ public class AppSchedulingInfo {
       checkForDeactivation();
     }
   }
-  
+
   synchronized private void checkForDeactivation() {
     boolean deactivate = true;
     for (Priority priority : getPriorities()) {
@@ -391,6 +392,7 @@ public class AppSchedulingInfo {
     }
     if (deactivate) {
       activeUsersManager.deactivateApplication(user, applicationId);
+      queue.deactivateApplication(applicationId);
     }
   }
   
@@ -409,10 +411,12 @@ public class AppSchedulingInfo {
     oldMetrics.moveAppFrom(this);
     newMetrics.moveAppTo(this);
     activeUsersManager.deactivateApplication(user, applicationId);
+    queue.deactivateApplication(applicationId);
     activeUsersManager = newQueue.getActiveUsersManager();
     activeUsersManager.activateApplication(user, applicationId);
     this.queue = newQueue;
     this.queueName = newQueue.getQueueName();
+    queue.activateApplication(applicationId);
   }
 
   synchronized public void stop(RMAppAttemptState rmAppAttemptFinalState) {

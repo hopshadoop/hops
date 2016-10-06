@@ -94,7 +94,9 @@ public class LeafQueue extends AbstractCSQueue {
   
   private int nodeLocalityDelay;
 
-  Set<FiCaSchedulerApp> activeApplications;
+  Map<ApplicationId, FiCaSchedulerApp> activeApplications;
+  Set<FiCaSchedulerApp> activeApplicationsWithRequests;
+  
   Map<ApplicationAttemptId, FiCaSchedulerApp> applicationAttemptMap = 
       new HashMap<ApplicationAttemptId, FiCaSchedulerApp>();
   
@@ -138,8 +140,10 @@ public class LeafQueue extends AbstractCSQueue {
         cs.getApplicationComparator();
     this.pendingApplications = 
         new TreeSet<FiCaSchedulerApp>(applicationComparator);
-    this.activeApplications = new TreeSet<FiCaSchedulerApp>(applicationComparator);
-    
+    this.activeApplications = new HashMap<>();
+    this.activeApplicationsWithRequests = new TreeSet<FiCaSchedulerApp>(
+            applicationComparator);
+
     setupQueueConfigs(cs.getClusterResource());
   }
 
@@ -638,7 +642,7 @@ public class LeafQueue extends AbstractCSQueue {
         }
       }
       user.activateApplication();
-      activeApplications.add(application);
+      activeApplications.put(application.getApplicationId(),application);
       queueUsage.incAMUsed(application.getAMResource());
       user.getResourceUsage().incAMUsed(application.getAMResource());
       i.remove();
@@ -687,7 +691,9 @@ public class LeafQueue extends AbstractCSQueue {
 
   public synchronized void removeApplicationAttempt(
       FiCaSchedulerApp application, User user) {
-    boolean wasActive = activeApplications.remove(application);
+    deactivateApplication(application.getApplicationId());
+    boolean wasActive = (activeApplications.remove(application.
+            getApplicationId()) != null);
     if (!wasActive) {
       pendingApplications.remove(application);
     } else {
@@ -741,10 +747,23 @@ public class LeafQueue extends AbstractCSQueue {
   }
   
   @Override
+  synchronized public void activateApplication(ApplicationId app){
+    activeApplicationsWithRequests.add(activeApplications.get(app));
+  }
+  
+  @Override
+  synchronized public void deactivateApplication(ApplicationId appId){
+    FiCaSchedulerApp app = activeApplications.get(appId);
+    if(app!=null){
+      activeApplicationsWithRequests.remove(app);
+    }
+  }
+
+  @Override
   public synchronized CSAssignment assignContainers(Resource clusterResource,
       FiCaSchedulerNode node, ResourceLimits currentResourceLimits) {
     updateCurrentResourceLimits(currentResourceLimits, clusterResource);
-    
+                
     if(LOG.isDebugEnabled()) {
       LOG.debug("assignContainers: node=" + node.getNodeName()
         + " #applications=" + activeApplications.size());
@@ -755,7 +774,7 @@ public class LeafQueue extends AbstractCSQueue {
         node.getLabels())) {
       return NULL_ASSIGNMENT;
     }
-    
+              
     // Check for reserved resources
     RMContainer reservedContainer = node.getReservedContainer();
     if (reservedContainer != null) {
@@ -768,8 +787,8 @@ public class LeafQueue extends AbstractCSQueue {
     }
     
     // Try to assign containers to applications in order
-    for (FiCaSchedulerApp application : activeApplications) {
-      
+    for (FiCaSchedulerApp application : activeApplicationsWithRequests) {
+
       if(LOG.isDebugEnabled()) {
         LOG.debug("pre-assignContainers for application "
         + application.getApplicationId());
@@ -805,7 +824,7 @@ public class LeafQueue extends AbstractCSQueue {
               continue;
             }
           }
-          
+
           Set<String> requestedNodeLabels =
               getRequestLabelSetByExpression(anyRequest
                   .getNodeLabelExpression());
@@ -817,7 +836,7 @@ public class LeafQueue extends AbstractCSQueue {
           //       before all higher priority ones are serviced.
           Resource userLimit = 
               computeUserLimitAndSetHeadroom(application, clusterResource, 
-                  required, requestedNodeLabels);          
+                  required, requestedNodeLabels);
           
           // Check queue max-capacity limit
           if (!super.canAssignToThisQueue(clusterResource, node.getLabels(),
@@ -830,7 +849,7 @@ public class LeafQueue extends AbstractCSQueue {
               application, requestedNodeLabels, currentResourceLimits)) {
             break;
           }
-
+          
           // Inform the application it is about to get a scheduling opportunity
           application.addSchedulingOpportunity(priority);
           
@@ -1710,7 +1729,7 @@ public class LeafQueue extends AbstractCSQueue {
     activateApplications();
 
     // Update application properties
-    for (FiCaSchedulerApp application : activeApplications) {
+    for (FiCaSchedulerApp application : activeApplications.values()) {
       synchronized (application) {
         computeUserLimitAndSetHeadroom(application, clusterResource, 
             Resources.none(), null);
@@ -1822,13 +1841,17 @@ public class LeafQueue extends AbstractCSQueue {
    */
   public Set<FiCaSchedulerApp> getApplications() {
     // need to access the list of apps from the preemption monitor
-    return activeApplications;
+    Comparator<FiCaSchedulerApp> applicationComparator =
+        scheduler.getApplicationComparator();
+    Set<FiCaSchedulerApp> result = new TreeSet<FiCaSchedulerApp>(applicationComparator);
+    result.addAll(activeApplications.values());
+    return result;
   }
 
   // return a single Resource capturing the overal amount of pending resources
   public synchronized Resource getTotalResourcePending() {
     Resource ret = BuilderUtils.newResource(0, 0);
-    for (FiCaSchedulerApp f : activeApplications) {
+    for (FiCaSchedulerApp f : activeApplicationsWithRequests) {
       Resources.addTo(ret, f.getTotalPendingRequests());
     }
     return ret;
@@ -1840,7 +1863,7 @@ public class LeafQueue extends AbstractCSQueue {
     for (FiCaSchedulerApp pendingApp : pendingApplications) {
       apps.add(pendingApp.getApplicationAttemptId());
     }
-    for (FiCaSchedulerApp app : activeApplications) {
+    for (FiCaSchedulerApp app : activeApplications.values()) {
       apps.add(app.getApplicationAttemptId());
     }
   }

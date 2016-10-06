@@ -173,7 +173,7 @@ public class FiCaSchedulerApp extends SchedulerApplicationAttempt {
     }
     RMAuditLogger.logSuccess(getUser(), 
         AuditConstants.ALLOC_CONTAINER, "SchedulerApp", 
-        getApplicationId(), container.getId());
+            getApplicationId(), container.getId());
     
     return rmContainer;
   }

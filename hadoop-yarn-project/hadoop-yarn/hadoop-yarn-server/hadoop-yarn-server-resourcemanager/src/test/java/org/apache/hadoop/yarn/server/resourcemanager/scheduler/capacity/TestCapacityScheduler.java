@@ -3053,8 +3053,8 @@ public class TestCapacityScheduler {
 //      checkNodeResourceUsage(0 * GB, nm_1);
       duration = System.currentTimeMillis() - start;
     } while (duration < 10000);
-    float avgHBDur = (float)totalTimeInHB/nbHb;
-    float nbHbps = 1000000000/avgHBDur;
+    float avgHBDur = (float)totalTimeInHB/nbHb/1000000;
+    float nbHbps = 1000/avgHBDur;
     LOG.error("nb heartbeats handled per seconds: " + nbHbps + " (" + avgHBDur + ")");
     return nbHbps;
 //

@@ -695,4 +695,12 @@ public class ParentQueue extends AbstractCSQueue {
   public synchronized int getNumApplications() {
     return numApplications;
   }
+  
+  @Override
+  public void activateApplication(ApplicationId app) {
+  }
+
+  @Override
+  public void deactivateApplication(ApplicationId app) {
+  }
 }

@@ -201,6 +201,14 @@ public class FifoScheduler extends
       // TODO add implementation for FIFO scheduler
       return null;
     }
+
+    @Override
+    public void activateApplication(ApplicationId app) {
+    }
+
+    @Override
+    public void deactivateApplication(ApplicationId app) {
+    }
   };
 
   public FifoScheduler() {

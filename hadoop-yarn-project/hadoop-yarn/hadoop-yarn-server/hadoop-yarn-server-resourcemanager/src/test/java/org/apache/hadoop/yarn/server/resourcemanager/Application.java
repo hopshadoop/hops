@@ -308,9 +308,6 @@ public class Application {
     Allocation allocation = resourceManager.getResourceScheduler().allocate(
         applicationAttemptId, new ArrayList<ResourceRequest>(ask),
         new ArrayList<ContainerId>(), null, null);
-    System.out.println("-=======" + applicationAttemptId);
-    System.out.println("----------" + resourceManager.getRMContext().getRMApps()
-        .get(applicationId).getRMAppAttempt(applicationAttemptId));
     List<Container> containers = allocation.getContainers();
 
     // Clear state for next interaction with ResourceManager

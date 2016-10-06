@@ -34,6 +34,7 @@ import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
+import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.QueueACL;
 import org.apache.hadoop.yarn.api.records.QueueUserACLInfo;
 import org.apache.hadoop.yarn.api.records.Resource;
@@ -558,5 +559,13 @@ public class FSLeafQueue extends FSQueue {
         scheduler.getClusterResource(), share, getDemand());
     return Resources.lessThan(scheduler.getResourceCalculator(),
         scheduler.getClusterResource(), getResourceUsage(), desiredShare);
+  }
+  
+  @Override
+  public void activateApplication(ApplicationId app) {
+  }
+
+  @Override
+  public void deactivateApplication(ApplicationId app) {
   }
 }
