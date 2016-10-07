@@ -18,21 +18,22 @@
 package org.apache.hadoop.io.erasurecode.rawcoder;
 
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.io.erasurecode.ErasureCoderOptions;
 
 /**
- * A raw coder factory for raw Reed-Solomon coder in Java.
+ * A raw coder factory for raw Reed-Solomon coder in native using Intel ISA-L.
  */
 
 @InterfaceAudience.Private
-public class NativeRSRawErasureCoderFactory { //implements RawErasureCoderFactory {
+public class NativeRSRawErasureCoderFactory implements RawErasureCoderFactory {
 
-  //@Override
-  public NativeRSRawEncoder createEncoder(int numDataUnits, int numParityUnits) {
-    return new NativeRSRawEncoder(numDataUnits, numParityUnits);
+  @Override
+  public RawErasureEncoder createEncoder(ErasureCoderOptions coderOptions) {
+    return new NativeRSRawEncoder(coderOptions);
   }
 
-  //@Override
-  public NativeRSRawDecoder createDecoder(int numDataUnits, int numParityUnits) {
-    return new NativeRSRawDecoder(numDataUnits, numParityUnits);
+  @Override
+  public RawErasureDecoder createDecoder(ErasureCoderOptions coderOptions) {
+    return new NativeRSRawDecoder(coderOptions);
   }
 }

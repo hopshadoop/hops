@@ -99,7 +99,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <module>hadoop-yarn-project</module>
     <module>hadoop-mapreduce-project</module>
     <module>hadoop-tools</module>
-    <module>hops-erasure-coding</module>
+    <module>hops-erasure-coding-project</module>
     <module>hadoop-dist</module>
     <module>hadoop-client</module>
     <module>hadoop-minicluster</module>

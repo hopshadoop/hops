@@ -19,32 +19,40 @@ package org.apache.hadoop.io.erasurecode.rawcoder;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.io.erasurecode.ErasureCodeNative;
+import org.apache.hadoop.io.erasurecode.ErasureCoderOptions;
 
 import java.nio.ByteBuffer;
 
+/**
+ * A Reed-Solomon raw encoder using Intel ISA-L library.
+ */
 @InterfaceAudience.Private
-public class NativeRSRawEncoder {
+public class NativeRSRawEncoder extends AbstractNativeRawEncoder {
 
- 
-  private long __native_coder;
-  private long __native_verbose = 0;
-  
   static {
-      ErasureCodeNative.checkNativeCodeLoaded();
+    ErasureCodeNative.checkNativeCodeLoaded();
   }
 
-  public NativeRSRawEncoder(int numDataUnits, int numParityUnits) {
-    this.initImpl(numDataUnits, numParityUnits);
+  public NativeRSRawEncoder(ErasureCoderOptions coderOptions) {
+    super(coderOptions);
+    initImpl(coderOptions.getNumDataUnits(), coderOptions.getNumParityUnits());
   }
-  
+
+  @Override
   public void performEncodeImpl(
           ByteBuffer[] inputs, int[] inputOffsets, int dataLen,
           ByteBuffer[] outputs, int[] outputOffsets) {
     encodeImpl(inputs, inputOffsets, dataLen, outputs, outputOffsets);
   }
 
+  @Override
   public void release() {
     destroyImpl();
+  }
+
+  @Override
+  public boolean preferDirectBuffer() {
+    return true;
   }
 
   private native void initImpl(int numDataUnits, int numParityUnits);

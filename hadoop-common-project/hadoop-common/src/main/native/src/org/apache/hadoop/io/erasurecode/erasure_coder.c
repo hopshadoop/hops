@@ -19,21 +19,22 @@
 #include "erasure_code.h"
 #include "gf_util.h"
 #include "erasure_coder.h"
+#include "dump.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-void initCoder(CoderState* pCoderState, int numDataUnits, int numParityUnits) {
-  pCoderState->verbose = 1;
-  pCoderState->numParityUnits = numParityUnits;
-  pCoderState->numDataUnits = numDataUnits;
-  pCoderState->numAllUnits = numDataUnits + numParityUnits;
+void initCoder(IsalCoder* pCoder, int numDataUnits, int numParityUnits) {
+  pCoder->verbose = 0;
+  pCoder->numParityUnits = numParityUnits;
+  pCoder->numDataUnits = numDataUnits;
+  pCoder->numAllUnits = numDataUnits + numParityUnits;
 }
 
 // 0 not to verbose, 1 to verbose
-void allowVerbose(CoderState* pCoderState, int flag) {
-  pCoderState->verbose = flag;
+void allowVerbose(IsalCoder* pCoder, int flag) {
+  pCoder->verbose = flag;
 }
 
 static void initEncodeMatrix(int numDataUnits, int numParityUnits,
@@ -43,46 +44,42 @@ static void initEncodeMatrix(int numDataUnits, int numParityUnits,
                           numDataUnits + numParityUnits, numDataUnits);
 }
 
-void initEncoder(EncoderState* pCoderState, int numDataUnits,
+void initEncoder(IsalEncoder* pCoder, int numDataUnits,
                             int numParityUnits) {
-  initCoder((CoderState*)pCoderState, numDataUnits, numParityUnits);
+  initCoder(&pCoder->coder, numDataUnits, numParityUnits);
 
-  initEncodeMatrix(numDataUnits, numParityUnits, pCoderState->encodeMatrix);
+  initEncodeMatrix(numDataUnits, numParityUnits, pCoder->encodeMatrix);
 
   // Generate gftbls from encode matrix
   h_ec_init_tables(numDataUnits, numParityUnits,
-               &pCoderState->encodeMatrix[numDataUnits * numDataUnits],
-               pCoderState->gftbls);
+               &pCoder->encodeMatrix[numDataUnits * numDataUnits],
+               pCoder->gftbls);
 
-  if (((CoderState*)pCoderState)->verbose > 0) {
-    //dumpEncoder(pCoderState);
+  if (pCoder->coder.verbose > 0) {
+    dumpEncoder(pCoder);
   }
 }
 
-void initDecoder(DecoderState* pCoderState, int numDataUnits,
+void initDecoder(IsalDecoder* pCoder, int numDataUnits,
                                   int numParityUnits) {
-  initCoder((CoderState*)pCoderState, numDataUnits, numParityUnits);
+  initCoder(&pCoder->coder, numDataUnits, numParityUnits);
 
-  initEncodeMatrix(numDataUnits, numParityUnits, pCoderState->encodeMatrix);
+  initEncodeMatrix(numDataUnits, numParityUnits, pCoder->encodeMatrix);
 }
 
-int encode(EncoderState* pCoderState, unsigned char** dataUnits,
+int encode(IsalEncoder* pCoder, unsigned char** dataUnits,
     unsigned char** parityUnits, int chunkSize) {
-  int numDataUnits = ((CoderState*)pCoderState)->numDataUnits;
-  int numParityUnits = ((CoderState*)pCoderState)->numParityUnits;
+  int numDataUnits = pCoder->coder.numDataUnits;
+  int numParityUnits = pCoder->coder.numParityUnits;
   int i;
 
   for (i = 0; i < numParityUnits; i++) {
     memset(parityUnits[i], 0, chunkSize);
   }
 
-  //dumpDataUnits(numDataUnits,dataUnits,chunkSize);
-
   h_ec_encode_data(chunkSize, numDataUnits, numParityUnits,
-                         pCoderState->gftbls, dataUnits, parityUnits);
+                         pCoder->gftbls, dataUnits, parityUnits);
 
-  //dumpParity(numParityUnits,parityUnits,chunkSize);
-  
   return 0;
 }
 
@@ -102,10 +99,10 @@ static int compare(int* arr1, int len1, int* arr2, int len2) {
   return 1;
 }
 
-static int processErasures(DecoderState* pCoderState, unsigned char** inputs,
+static int processErasures(IsalDecoder* pCoder, unsigned char** inputs,
                                     int* erasedIndexes, int numErased) {
   int i, r, ret, index;
-  int numDataUnits = ((CoderState*)pCoderState)->numDataUnits;
+  int numDataUnits = pCoder->coder.numDataUnits;
   int isChanged = 0;
 
   for (i = 0, r = 0; i < numDataUnits; i++, r++) {
@@ -113,71 +110,71 @@ static int processErasures(DecoderState* pCoderState, unsigned char** inputs,
       r++;
     }
 
-    if (pCoderState->decodeIndex[i] != r) {
-      pCoderState->decodeIndex[i] = r;
+    if (pCoder->decodeIndex[i] != r) {
+      pCoder->decodeIndex[i] = r;
       isChanged = 1;
     }
   }
 
   for (i = 0; i < numDataUnits; i++) {
-    pCoderState->realInputs[i] = inputs[pCoderState->decodeIndex[i]];
+    pCoder->realInputs[i] = inputs[pCoder->decodeIndex[i]];
   }
 
   if (isChanged == 0 &&
-          compare(pCoderState->erasedIndexes, pCoderState->numErased,
+          compare(pCoder->erasedIndexes, pCoder->numErased,
                            erasedIndexes, numErased) == 0) {
     return 0; // Optimization, nothing to do
   }
 
-  clearDecoder(pCoderState);
+  clearDecoder(pCoder);
 
   for (i = 0; i < numErased; i++) {
     index = erasedIndexes[i];
-    pCoderState->erasedIndexes[i] = index;
-    pCoderState->erasureFlags[index] = 1;
+    pCoder->erasedIndexes[i] = index;
+    pCoder->erasureFlags[index] = 1;
     if (index < numDataUnits) {
-      pCoderState->numErasedDataUnits++;
+      pCoder->numErasedDataUnits++;
     }
   }
 
-  pCoderState->numErased = numErased;
+  pCoder->numErased = numErased;
 
-  ret = generateDecodeMatrix(pCoderState);
+  ret = generateDecodeMatrix(pCoder);
   if (ret != 0) {
     printf("Failed to generate decode matrix\n");
     return -1;
   }
 
-  h_ec_init_tables(numDataUnits, pCoderState->numErased,
-                      pCoderState->decodeMatrix, pCoderState->gftbls);
+  h_ec_init_tables(numDataUnits, pCoder->numErased,
+                      pCoder->decodeMatrix, pCoder->gftbls);
 
-  if (((CoderState*)pCoderState)->verbose > 0) {
-    dumpDecoder(pCoderState);
+  if (pCoder->coder.verbose > 0) {
+    dumpDecoder(pCoder);
   }
 
   return 0;
 }
 
-int decode(DecoderState* pCoderState, unsigned char** inputs,
+int decode(IsalDecoder* pCoder, unsigned char** inputs,
                   int* erasedIndexes, int numErased,
                    unsigned char** outputs, int chunkSize) {
-  int numDataUnits = ((CoderState*)pCoderState)->numDataUnits;
+  int numDataUnits = pCoder->coder.numDataUnits;
   int i;
 
-  processErasures(pCoderState, inputs, erasedIndexes, numErased);
+  processErasures(pCoder, inputs, erasedIndexes, numErased);
 
   for (i = 0; i < numErased; i++) {
     memset(outputs[i], 0, chunkSize);
   }
 
-  h_ec_encode_data(chunkSize, numDataUnits, pCoderState->numErased,
-      pCoderState->gftbls, pCoderState->realInputs, outputs);
+  h_ec_encode_data(chunkSize, numDataUnits, pCoder->numErased,
+      pCoder->gftbls, pCoder->realInputs, outputs);
 
   return 0;
 }
 
 // Clear variables used per decode call
-void clearDecoder(DecoderState* decoder) {
+void clearDecoder(IsalDecoder* decoder) {
   decoder->numErasedDataUnits = 0;
   decoder->numErased = 0;
   memset(decoder->gftbls, 0, sizeof(decoder->gftbls));
@@ -189,144 +186,45 @@ void clearDecoder(DecoderState* decoder) {
 }
 
 // Generate decode matrix from encode matrix
-int generateDecodeMatrix(DecoderState* pCoderState) {
+int generateDecodeMatrix(IsalDecoder* pCoder) {
   int i, j, r, p;
   unsigned char s;
   int numDataUnits;
 
-  numDataUnits = ((CoderState*)pCoderState)->numDataUnits;
+  numDataUnits = pCoder->coder.numDataUnits;
 
   // Construct matrix b by removing error rows
   for (i = 0; i < numDataUnits; i++) {
-    r = pCoderState->decodeIndex[i];
+    r = pCoder->decodeIndex[i];
     for (j = 0; j < numDataUnits; j++) {
-      pCoderState->tmpMatrix[numDataUnits * i + j] =
-                pCoderState->encodeMatrix[numDataUnits * r + j];
+      pCoder->tmpMatrix[numDataUnits * i + j] =
+                pCoder->encodeMatrix[numDataUnits * r + j];
     }
   }
 
-  h_gf_invert_matrix(pCoderState->tmpMatrix,
-                                pCoderState->invertMatrix, numDataUnits);
+  h_gf_invert_matrix(pCoder->tmpMatrix,
+                                pCoder->invertMatrix, numDataUnits);
 
-  for (i = 0; i < pCoderState->numErasedDataUnits; i++) {
+  for (i = 0; i < pCoder->numErasedDataUnits; i++) {
     for (j = 0; j < numDataUnits; j++) {
-      pCoderState->decodeMatrix[numDataUnits * i + j] =
-                      pCoderState->invertMatrix[numDataUnits *
-                      pCoderState->erasedIndexes[i] + j];
+      pCoder->decodeMatrix[numDataUnits * i + j] =
+                      pCoder->invertMatrix[numDataUnits *
+                      pCoder->erasedIndexes[i] + j];
     }
   }
 
-  for (p = pCoderState->numErasedDataUnits; p < pCoderState->numErased; p++) {
+  for (p = pCoder->numErasedDataUnits; p < pCoder->numErased; p++) {
     for (i = 0; i < numDataUnits; i++) {
       s = 0;
       for (j = 0; j < numDataUnits; j++) {
-        s ^= h_gf_mul(pCoderState->invertMatrix[j * numDataUnits + i],
-          pCoderState->encodeMatrix[numDataUnits *
-                                        pCoderState->erasedIndexes[p] + j]);
+        s ^= h_gf_mul(pCoder->invertMatrix[j * numDataUnits + i],
+          pCoder->encodeMatrix[numDataUnits *
+                                        pCoder->erasedIndexes[p] + j]);
       }
 
-      pCoderState->decodeMatrix[numDataUnits * p + i] = s;
+      pCoder->decodeMatrix[numDataUnits * p + i] = s;
     }
   }
 
   return 0;
 }
-
-void dumpDataUnits(int num, unsigned char** parityUnits,int len){
-    int i,j;
-    printf(" -Parity Units- ");
-    for (i = 0; i < num; i++) {
-    	for (j = 0; j < len; j++) {
-      		printf(" %2x", parityUnits[i][j]);
-    	}
-    	printf("\n");
-    }
-   printf("\n");
-}
-
-void dumpParity(int num, unsigned char** parityUnits,int len){
-    int i,j;
-    printf(" -Parity Units- ");
-    for (i = 0; i < num; i++) {
-    	for (j = 0; j < len; j++) {
-      		printf(" %2x", parityUnits[i][j]);
-    	}
-    	printf("\n");
-    }
-   printf("\n");
-}
-void dumpEncoder(EncoderState* pCoderState) {
-  int numDataUnits = ((CoderState*)pCoderState)->numDataUnits;
-  int numParityUnits = ((CoderState*)pCoderState)->numParityUnits;
-  int numAllUnits = ((CoderState*)pCoderState)->numAllUnits;
-
-  printf("Encoding (QQnumAlnumParityUnitslUnits = %d, numDataUnits = %d)\n",
-                                    numParityUnits, numDataUnits);
-
-  printf("\n\nEncodeMatrix:\n");
-  dumpCodingMatrix((unsigned char*) pCoderState->encodeMatrix,
-                                           numDataUnits, numAllUnits);
-}
-
-void dumpDecoder(DecoderState* pCoderState) {
-  int i, j;
-  int numDataUnits = ((CoderState*)pCoderState)->numDataUnits;
-  int numAllUnits = ((CoderState*)pCoderState)->numAllUnits;
-
-  printf("Recovering (numAllUnits = %d, numDataUnits = %d, numErased = %d)\n",
-                       numAllUnits, numDataUnits, pCoderState->numErased);
-
-  printf(" - ErasedIndexes = ");
-  for (j = 0; j < pCoderState->numErased; j++) {
-    printf(" %d", pCoderState->erasedIndexes[j]);
-  }
-  printf("       - DecodeIndex = ");
-  for (i = 0; i < numDataUnits; i++) {
-    printf(" %d", pCoderState->decodeIndex[i]);
-  }
-
-  printf("\n\nEncodeMatrix:\n");
-  dumpCodingMatrix((unsigned char*) pCoderState->encodeMatrix,
-                                    numDataUnits, numAllUnits);
-
-  printf("InvertMatrix:\n");
-  dumpCodingMatrix((unsigned char*) pCoderState->invertMatrix,
-                                   numDataUnits, numDataUnits);
-
-  printf("DecodeMatrix:\n");
-  dumpCodingMatrix((unsigned char*) pCoderState->decodeMatrix,
-                                    numDataUnits, numAllUnits);
-}
-
-void dump(unsigned char* buf, int len) {
-  int i;
-  for (i = 0; i < len;) {
-    printf(" %2x", 0xff & buf[i++]);
-    if (i % 32 == 0)
-      printf("\n");
-  }
-}
-
-void dumpMatrix(unsigned char** buf, int n1, int n2) {
-  int i, j;
-  for (i = 0; i < n1; i++) {
-    for (j = 0; j < n2; j++) {
-      printf(" %2x", buf[i][j]);
-    }
-    printf("\n");
-  }
-  printf("\n");
-}
-
-void dumpCodingMatrix(unsigned char* buf, int n1, int n2) {
-  int i, j;
-  for (i = 0; i < n1; i++) {
-    for (j = 0; j < n2; j++) {
-      printf(" %d", 0xff & buf[j + (i * n2)]);
-    }
-    printf("\n");
-  }
-  printf("\n");
-}
-
-
