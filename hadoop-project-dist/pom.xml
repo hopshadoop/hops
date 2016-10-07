@@ -41,6 +41,8 @@
     <hadoop.component>UNDEF</hadoop.component>
     <bundle.snappy>false</bundle.snappy>
     <bundle.snappy.in.bin>false</bundle.snappy.in.bin>
+    <isal.lib></isal.lib>
+    <bundle.isal>false</bundle.isal>
   </properties>
   
   <dependencies>
