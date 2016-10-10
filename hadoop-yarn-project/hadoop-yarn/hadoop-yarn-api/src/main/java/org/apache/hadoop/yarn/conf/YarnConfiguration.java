@@ -568,6 +568,13 @@ RM_PREFIX + "resource-tracker.port";
   public static final String RM_LEVELDB_STORE_PATH = RM_PREFIX
       + "leveldb-state-store.path";
 
+  /** The time in seconds between full compactions of the leveldb database.
+   *  Setting the interval to zero disables the full compaction cycles.
+   */
+  public static final String RM_LEVELDB_COMPACTION_INTERVAL_SECS = RM_PREFIX
+      + "leveldb-state-store.compaction-interval-secs";
+  public static final long DEFAULT_RM_LEVELDB_COMPACTION_INTERVAL_SECS = 3600;
+
   /** The maximum number of completed applications RM keeps. */ 
   public static final String RM_MAX_COMPLETED_APPLICATIONS =
     RM_PREFIX + "max-completed-applications";
@@ -1137,6 +1144,13 @@ RM_PREFIX + "resource-tracker.port";
 
   public static final String NM_RECOVERY_DIR = NM_RECOVERY_PREFIX + "dir";
 
+  /** The time in seconds between full compactions of the NM state database.
+   *  Setting the interval to zero disables the full compaction cycles.
+   */
+  public static final String NM_RECOVERY_COMPACTION_INTERVAL_SECS =
+      NM_RECOVERY_PREFIX + "compaction-interval-secs";
+  public static final int DEFAULT_NM_RECOVERY_COMPACTION_INTERVAL_SECS = 3600;
+
   ////////////////////////////////
   // Web Proxy Configs
   ////////////////////////////////
@@ -1327,6 +1341,9 @@ RM_PREFIX + "resource-tracker.port";
   public static final String TIMELINE_SERVICE_PREFIX =
       YARN_PREFIX + "timeline-service.";
 
+  public static final String TIMELINE_SERVICE_VERSION = TIMELINE_SERVICE_PREFIX
+      + "version";
+  public static final float DEFAULT_TIMELINE_SERVICE_VERSION = 1.0f;
   /**
    * Comma seperated list of names for UIs hosted in the timeline server
    * (For pluggable UIs).

@@ -418,6 +418,13 @@ public class ApplicationHistoryManagerOnTimelineStore extends AbstractService
                     AppAttemptMetricsConstants.STATE_EVENT_INFO)
                     .toString());
           }
+          if (eventInfo
+              .containsKey(AppAttemptMetricsConstants.MASTER_CONTAINER_EVENT_INFO)) {
+            amContainerId =
+                ConverterUtils.toContainerId(eventInfo.get(
+                    AppAttemptMetricsConstants.MASTER_CONTAINER_EVENT_INFO)
+                    .toString());
+          }
         }
       }
     }
@@ -510,19 +517,22 @@ public class ApplicationHistoryManagerOnTimelineStore extends AbstractService
         }
       }
     }
-    NodeId allocatedNode = NodeId.newInstance(allocatedHost, allocatedPort);
     ContainerId containerId =
         ConverterUtils.toContainerId(entity.getEntityId());
-    String logUrl = WebAppUtils.getAggregatedLogURL(
-        serverHttpAddress,
-        allocatedNode.toString(),
-        containerId.toString(),
-        containerId.toString(),
-        user);
+    String logUrl = null;
+    NodeId allocatedNode = null;
+    if (allocatedHost != null) {
+      allocatedNode = NodeId.newInstance(allocatedHost, allocatedPort);
+      logUrl = WebAppUtils.getAggregatedLogURL(
+          serverHttpAddress,
+          allocatedNode.toString(),
+          containerId.toString(),
+          containerId.toString(),
+          user);
+    }
     return ContainerReport.newInstance(
         ConverterUtils.toContainerId(entity.getEntityId()),
-        Resource.newInstance(allocatedMem, allocatedVcore),
-        NodeId.newInstance(allocatedHost, allocatedPort),
+        Resource.newInstance(allocatedMem, allocatedVcore), allocatedNode,
         Priority.newInstance(allocatedPriority),
         createdTime, finishedTime, diagnosticsInfo, logUrl, exitStatus, state,
         nodeHttpAddress);

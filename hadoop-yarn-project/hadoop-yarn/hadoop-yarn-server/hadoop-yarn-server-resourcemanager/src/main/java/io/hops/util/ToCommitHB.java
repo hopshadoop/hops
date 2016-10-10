@@ -154,46 +154,7 @@ public class ToCommitHB {
         public Object performTask() throws StorageException {
           connector.beginTransaction();
           connector.writeLock();
-          PendingEventDataAccess peDA
-                  = (PendingEventDataAccess) RMStorageFactory
-                  .getDataAccess(PendingEventDataAccess.class);
-          peDA.add(pendingEvent);
-
-
-          if (pendingEvent.getType().equals(PendingEvent.Type.NODE_ADDED)){
-            NextHeartbeatDataAccess nhbDA
-                    = (NextHeartbeatDataAccess) RMStorageFactory.getDataAccess(
-                    NextHeartbeatDataAccess.class);
-            nhbDA.update(new NextHeartbeat(nodeId, true));
-          }
-          if (!uciToAdd.isEmpty()) {
-            UpdatedContainerInfoDataAccess uciDA
-                    = (UpdatedContainerInfoDataAccess) RMStorageFactory
-                    .getDataAccess(UpdatedContainerInfoDataAccess.class);
-            uciDA.addAll(uciToAdd);
-
-            ContainerStatusDataAccess csDA
-                    = (ContainerStatusDataAccess) RMStorageFactory
-                    .getDataAccess(ContainerStatusDataAccess.class);
-            csDA.addAll(containerStatusToAdd);
-          }
-          if (rmNode != null) {
-            RMNodeDataAccess rmnDA
-                    = (RMNodeDataAccess) RMStorageFactory
-                    .getDataAccess(RMNodeDataAccess.class);
-            rmnDA.add(rmNode);
-
-            ResourceDataAccess rDA
-                    = (ResourceDataAccess) RMStorageFactory
-                    .getDataAccess(ResourceDataAccess.class);
-            rDA.add(rmNodeResource);
-          }
-          if(nextHeartBeat!=null){
-            NextHeartbeatDataAccess nhbDA
-                    = (NextHeartbeatDataAccess) RMStorageFactory.getDataAccess(
-                    NextHeartbeatDataAccess.class);
-            nhbDA.update(nextHeartBeat);
-          }
+          persistHeartbeat(pendingEvent);
           connector.commit();
           return null;
         }
@@ -205,52 +166,49 @@ public class ToCommitHB {
         public Object performTask() throws StorageException {
           connector.beginTransaction();
           connector.writeLock();
-          PendingEventDataAccess peDA
-                  = (PendingEventDataAccess) RMStorageFactory
-                  .getDataAccess(PendingEventDataAccess.class);
-          peDA.add(pendingEvent);
-
-
-          if (pendingEvent.getType().equals(PendingEvent.Type.NODE_ADDED)){
-            NextHeartbeatDataAccess nhbDA
-                    = (NextHeartbeatDataAccess) RMStorageFactory.getDataAccess(
-                    NextHeartbeatDataAccess.class);
-            nhbDA.update(new NextHeartbeat(nodeId, true));
-          }
-          if (!uciToAdd.isEmpty()) {
-            UpdatedContainerInfoDataAccess uciDA
-                    = (UpdatedContainerInfoDataAccess) RMStorageFactory
-                    .getDataAccess(UpdatedContainerInfoDataAccess.class);
-            uciDA.addAll(uciToAdd);
-
-            ContainerStatusDataAccess csDA
-                    = (ContainerStatusDataAccess) RMStorageFactory
-                    .getDataAccess(ContainerStatusDataAccess.class);
-            csDA.addAll(containerStatusToAdd);
-          }
-          if (rmNode != null) {
-            RMNodeDataAccess rmnDA
-                    = (RMNodeDataAccess) RMStorageFactory
-                    .getDataAccess(RMNodeDataAccess.class);
-            rmnDA.add(rmNode);
-
-            ResourceDataAccess rDA
-                    = (ResourceDataAccess) RMStorageFactory
-                    .getDataAccess(ResourceDataAccess.class);
-            rDA.add(rmNodeResource);
-          }
-          if(nextHeartBeat!=null){
-            NextHeartbeatDataAccess nhbDA
-                    = (NextHeartbeatDataAccess) RMStorageFactory.getDataAccess(
-                    NextHeartbeatDataAccess.class);
-            nhbDA.update(nextHeartBeat);
-          }
+          persistHeartbeat(pendingEvent);
           connector.commit();
           return null;
         }
       };
 
     }
+
     handler.handle();
+  }
+
+  private void persistHeartbeat(PendingEvent pendingEvent) throws StorageException {
+    PendingEventDataAccess peDA = (PendingEventDataAccess) RMStorageFactory
+            .getDataAccess(PendingEventDataAccess.class);
+    NextHeartbeatDataAccess nextHBDA = (NextHeartbeatDataAccess) RMStorageFactory
+            .getDataAccess(NextHeartbeatDataAccess.class);
+    UpdatedContainerInfoDataAccess uciDA = (UpdatedContainerInfoDataAccess)
+            RMStorageFactory.getDataAccess(UpdatedContainerInfoDataAccess.class);
+    ContainerStatusDataAccess contStatDA = (ContainerStatusDataAccess)
+            RMStorageFactory.getDataAccess(ContainerStatusDataAccess.class);
+    RMNodeDataAccess rmNodeDA = (RMNodeDataAccess) RMStorageFactory
+            .getDataAccess(RMNodeDataAccess.class);
+    ResourceDataAccess resourceDA = (ResourceDataAccess) RMStorageFactory
+            .getDataAccess(ResourceDataAccess.class);
+
+    peDA.add(pendingEvent);
+
+    if (pendingEvent.getType().equals(PendingEvent.Type.NODE_ADDED)) {
+      nextHBDA.update(new NextHeartbeat(nodeId, true));
     }
+
+    if (!uciToAdd.isEmpty()) {
+      uciDA.addAll(uciToAdd);
+      contStatDA.addAll(containerStatusToAdd);
+    }
+
+    if (rmNode != null) {
+      rmNodeDA.add(rmNode);
+      resourceDA.add(rmNodeResource);
+    }
+
+    if (nextHeartBeat != null) {
+      nextHBDA.update(nextHeartBeat);
+    }
+  }
 }

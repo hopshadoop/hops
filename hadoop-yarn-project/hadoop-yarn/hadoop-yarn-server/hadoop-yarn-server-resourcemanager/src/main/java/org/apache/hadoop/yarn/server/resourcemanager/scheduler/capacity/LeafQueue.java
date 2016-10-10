@@ -173,8 +173,8 @@ public class LeafQueue extends AbstractCSQueue {
       maxApplications =
           (int) (maxSystemApps * queueCapacities.getAbsoluteCapacity());
     }
-    maxApplicationsPerUser = 
-      (int)(maxApplications * (userLimit / 100.0f) * userLimitFactor);
+    maxApplicationsPerUser = Math.min(maxApplications,
+        (int)(maxApplications * (userLimit / 100.0f) * userLimitFactor));
     
     maxAMResourcePerQueuePercent =
         conf.getMaximumApplicationMasterResourcePerQueuePercent(getQueuePath());
@@ -426,13 +426,33 @@ public class LeafQueue extends AbstractCSQueue {
     ArrayList<UserInfo> usersToReturn = new ArrayList<UserInfo>();
     for (Map.Entry<String, User> entry : users.entrySet()) {
       User user = entry.getValue();
-      usersToReturn.add(new UserInfo(entry.getKey(), Resources.clone(user
-          .getUsed()), user.getActiveApplications(), user
+      Resource usedRes = Resource.newInstance(0, 0);
+      for (String nl : getAccessibleLabelSet()) {
+        Resources.addTo(usedRes, user.getUsed(nl));
+      }
+      usersToReturn.add(new UserInfo(entry.getKey(), usedRes,
+          user.getActiveApplications(), user
           .getPendingApplications(), Resources.clone(user
           .getConsumedAMResources()), Resources.clone(user
           .getUserResourceLimit())));
     }
     return usersToReturn;
+  }
+
+  /**
+   * Gets the labels which are accessible by this queue. If ANY label can be
+   * accessed, put all labels in the set.
+   * @return accessiglbe node labels
+   */
+  protected final Set<String> getAccessibleLabelSet() {
+    Set<String> nodeLabels = new HashSet<String>();
+    if (this.getAccessibleNodeLabels().contains(RMNodeLabelsManager.ANY)) {
+      nodeLabels.addAll(labelManager.getClusterNodeLabels());
+    } else {
+      nodeLabels.addAll(this.getAccessibleNodeLabels());
+    }
+    nodeLabels.add(RMNodeLabelsManager.NO_LABEL);
+    return nodeLabels;
   }
 
   @Override
@@ -786,6 +806,9 @@ public class LeafQueue extends AbstractCSQueue {
       }
     }
     
+    Resource initAmountNeededUnreserve =
+        currentResourceLimits.getAmountNeededUnreserve();
+
     // Try to assign containers to applications in order
     for (FiCaSchedulerApp application : activeApplicationsWithRequests) {
 
@@ -838,6 +861,9 @@ public class LeafQueue extends AbstractCSQueue {
               computeUserLimitAndSetHeadroom(application, clusterResource, 
                   required, requestedNodeLabels);
           
+          currentResourceLimits.setAmountNeededUnreserve(
+              initAmountNeededUnreserve);
+
           // Check queue max-capacity limit
           if (!super.canAssignToThisQueue(clusterResource, node.getLabels(),
               currentResourceLimits, required, application.getCurrentReservation())) {
@@ -1855,6 +1881,36 @@ public class LeafQueue extends AbstractCSQueue {
       Resources.addTo(ret, f.getTotalPendingRequests());
     }
     return ret;
+  }
+
+  // Consider the headroom for each user in the queue.
+  // Total pending for the queue =
+  //   sum for each user(min( (user's headroom), sum(user's pending requests) ))
+  //  NOTE: Used for calculating pedning resources in the preemption monitor.
+  public synchronized Resource getTotalPendingResourcesConsideringUserLimit(
+      Resource resources) {
+    Map<String, Resource> userNameToHeadroom = new HashMap<String, Resource>();
+    Resource pendingConsideringUserLimit = Resource.newInstance(0, 0);
+
+    for (FiCaSchedulerApp app : activeApplications.values()) {
+      String userName = app.getUser();
+      if (!userNameToHeadroom.containsKey(userName)) {
+        User user = getUser(userName);
+        Resource headroom = Resources.subtract(
+            computeUserLimit(app, resources, minimumAllocation, user, null),
+            user.getUsed());
+        // Make sure none of the the components of headroom is negative.
+        headroom = Resources.componentwiseMax(headroom, Resources.none());
+        userNameToHeadroom.put(userName, headroom);
+      }
+      Resource minpendingConsideringUserLimit =
+          Resources.componentwiseMin(userNameToHeadroom.get(userName),
+                                     app.getTotalPendingRequests());
+      Resources.addTo(pendingConsideringUserLimit, minpendingConsideringUserLimit);
+      Resources.subtractFrom(userNameToHeadroom.get(userName),
+                             minpendingConsideringUserLimit);
+    }
+    return pendingConsideringUserLimit;
   }
 
   @Override

@@ -188,6 +188,11 @@ public class ResourceManager extends CompositeService implements Recoverable {
     clusterTimeStamp = timestamp;
   }
 
+  @VisibleForTesting
+  Dispatcher getRmDispatcher() {
+    return rmDispatcher;
+  }
+
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
     this.conf = conf;
@@ -704,6 +709,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
     private final ResourceScheduler scheduler;
     private final BlockingQueue<SchedulerEvent> eventQueue =
       new LinkedBlockingQueue<SchedulerEvent>();
+    private volatile int lastEventQueueSizeLogged = 0;
     private final Thread eventProcessor;
     private volatile boolean stopped = false;
     private boolean shouldExitOnError = false;
@@ -781,7 +787,9 @@ public class ResourceManager extends CompositeService implements Recoverable {
     public void handle(SchedulerEvent event) {
       try {
         int qSize = eventQueue.size();
-        if (qSize !=0 && qSize %1000 == 0) {
+        if (qSize != 0 && qSize % 1000 == 0
+            && lastEventQueueSizeLogged != qSize) {
+          lastEventQueueSizeLogged = qSize;
           LOG.info("Size of scheduler event-queue is " + qSize);
         }
         int remCapacity = eventQueue.remainingCapacity();

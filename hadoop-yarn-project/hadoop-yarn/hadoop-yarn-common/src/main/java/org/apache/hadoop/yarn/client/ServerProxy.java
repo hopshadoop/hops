@@ -53,19 +53,20 @@ public class ServerProxy {
     long maxWaitTime = conf.getLong(maxWaitTimeStr, defMaxWaitTime);
     long retryIntervalMS =
         conf.getLong(connectRetryIntervalStr, defRetryInterval);
+    RetryPolicy retryPolicy = null;
     if (maxWaitTime == -1) {
       // wait forever.
-      return RetryPolicies.RETRY_FOREVER;
+      retryPolicy = RetryPolicies.RETRY_FOREVER;
+    } else {
+      retryPolicy =
+          RetryPolicies.retryUpToMaximumTimeWithFixedSleep(maxWaitTime,
+              retryIntervalMS, TimeUnit.MILLISECONDS);
     }
 
-    Preconditions.checkArgument(maxWaitTime > 0, "Invalid Configuration. "
-        + maxWaitTimeStr + " should be a positive value.");
+    Preconditions.checkArgument((maxWaitTime == -1 || maxWaitTime > 0), "Invalid Configuration. "
+        + maxWaitTimeStr + " should be either positive value or -1.");
     Preconditions.checkArgument(retryIntervalMS > 0, "Invalid Configuration. "
         + connectRetryIntervalStr + "should be a positive value.");
-
-    RetryPolicy retryPolicy =
-        RetryPolicies.retryUpToMaximumTimeWithFixedSleep(maxWaitTime,
-          retryIntervalMS, TimeUnit.MILLISECONDS);
 
     Map<Class<? extends Exception>, RetryPolicy> exceptionToPolicyMap =
         new HashMap<Class<? extends Exception>, RetryPolicy>();
@@ -73,6 +74,7 @@ public class ServerProxy {
     exceptionToPolicyMap.put(ConnectException.class, retryPolicy);
     exceptionToPolicyMap.put(NoRouteToHostException.class, retryPolicy);
     exceptionToPolicyMap.put(UnknownHostException.class, retryPolicy);
+    exceptionToPolicyMap.put(ConnectTimeoutException.class, retryPolicy);
     exceptionToPolicyMap.put(RetriableException.class, retryPolicy);
     exceptionToPolicyMap.put(SocketException.class, retryPolicy);
     exceptionToPolicyMap.put(NMNotYetReadyException.class, retryPolicy);

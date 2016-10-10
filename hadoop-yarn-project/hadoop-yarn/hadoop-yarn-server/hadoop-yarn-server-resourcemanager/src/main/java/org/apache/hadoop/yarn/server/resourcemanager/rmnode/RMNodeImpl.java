@@ -53,6 +53,7 @@ import org.apache.hadoop.yarn.server.api.records.NodeHealthStatus;
 import org.apache.hadoop.yarn.server.resourcemanager.ClusterMetrics;
 import org.apache.hadoop.yarn.server.resourcemanager.NodesListManagerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.NodesListManagerEventType;
+import org.apache.hadoop.yarn.server.resourcemanager.NodesListManager;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.nodelabels.RMNodeLabelsManager;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
@@ -142,6 +143,9 @@ public abstract class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
      .addTransition(NodeState.NEW, NodeState.NEW,
          RMNodeEventType.RESOURCE_UPDATE, 
          new UpdateNodeResourceWhenUnusableTransition())
+     .addTransition(NodeState.NEW, NodeState.DECOMMISSIONED,
+         RMNodeEventType.DECOMMISSION,
+         new DeactivateNodeTransition(NodeState.DECOMMISSIONED))
 
      //Transitions from RUNNING state
      .addTransition(NodeState.RUNNING,
@@ -452,6 +456,8 @@ public abstract class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
     case UNHEALTHY:
       metrics.incrNumUnhealthyNMs();
       break;
+    case NEW:
+      break;
     default:
       LOG.debug("Unexpected final state");
     }
@@ -477,6 +483,21 @@ public abstract class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
   }
 
   protected abstract void addNodeTransitionInternal(RMNodeImpl rmNode, RMNodeEvent event);
+
+  protected static List<NMContainerStatus> updateNewNodeMetricsAndContainers(
+          RMNodeImpl rmNode, RMNodeStartedEvent startEvent) {
+    List<NMContainerStatus> containers;
+    ClusterMetrics.getMetrics().incrNumActiveNodes();
+    containers = startEvent.getNMContainerStatuses();
+    if (containers != null && !containers.isEmpty()) {
+      for (NMContainerStatus container : containers) {
+        if (container.getContainerState() == ContainerState.RUNNING) {
+          rmNode.launchedContainers.add(container.getContainerId());
+        }
+      }
+    }
+    return containers;
+  }
   
   protected abstract void reconnectNodeTransitionInternal(RMNodeImpl rmNode, RMNodeEvent event);
   

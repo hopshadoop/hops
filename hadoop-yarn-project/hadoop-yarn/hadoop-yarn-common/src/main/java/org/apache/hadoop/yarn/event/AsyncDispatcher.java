@@ -50,6 +50,7 @@ public class AsyncDispatcher extends AbstractService implements Dispatcher {
   private static final Log LOG = LogFactory.getLog(AsyncDispatcher.class);
 
   private final BlockingQueue<Event> eventQueue;
+  private volatile int lastEventQueueSizeLogged = 0;
   private volatile boolean stopped = false;
 
   // Configuration flag for enabling/disabling draining dispatcher's events on
@@ -64,7 +65,7 @@ public class AsyncDispatcher extends AbstractService implements Dispatcher {
   // For drainEventsOnStop enabled only, block newly coming events into the
   // queue while stopping.
   private volatile boolean blockNewEvents = false;
-  private EventHandler handlerInstance = null;
+  private final EventHandler handlerInstance = new GenericEventHandler();
 
   private Thread eventHandlingThread;
   protected final Map<Class<? extends Enum>, EventHandler> eventDispatchers;
@@ -99,16 +100,6 @@ public class AsyncDispatcher extends AbstractService implements Dispatcher {
           Event event;
           try {
             event = eventQueue.take();
-            
-            if (queueContentRemoved.containsKey(event.getType().name())) {
-              queueContentRemoved.put(event.getType().name(),
-                      queueContentRemoved.get(
-                              event.getType().name())
-                      + 1);
-            } else {
-              queueContentRemoved.
-                      put(event.getType().name(), 1);
-            }
           } catch(InterruptedException ie) {
             if (!stopped) {
               LOG.warn("AsyncDispatcher thread interrupted", ie);
@@ -234,14 +225,9 @@ public class AsyncDispatcher extends AbstractService implements Dispatcher {
 
   @Override
   public EventHandler getEventHandler() {
-    if (handlerInstance == null) {
-      handlerInstance = new GenericEventHandler();
-    }
     return handlerInstance;
   }
 
-  Map<String, Integer> queueContent = new HashMap<>();
-  Map<String, Integer> queueContentRemoved = new HashMap<>();
   class GenericEventHandler implements EventHandler<Event> {
     public void handle(Event event) {
       if (blockNewEvents) {
@@ -251,17 +237,10 @@ public class AsyncDispatcher extends AbstractService implements Dispatcher {
 
       /* all this method does is enqueue all the events onto the queue */
       int qSize = eventQueue.size();
-      if (qSize !=0 && qSize %1000 == 0) {
-        synchronized(queueContent){
+      if (qSize != 0 && qSize % 1000 == 0
+          && lastEventQueueSizeLogged != qSize) {
+        lastEventQueueSizeLogged = qSize;
         LOG.info("Size of event-queue is " + qSize);
-        for(String key: queueContent.keySet()){
-          LOG.info("inqueue " + key + ": " + queueContent.get(key));
-        }
-        for(String key: queueContentRemoved.keySet()){
-          LOG.info("removed " + key + ": " + queueContentRemoved.get(key));
-        }
-        }
-      
       }
       int remCapacity = eventQueue.remainingCapacity();
       if (remCapacity < 1000) {
@@ -269,12 +248,6 @@ public class AsyncDispatcher extends AbstractService implements Dispatcher {
             + remCapacity);
       }
       try {
-        if(queueContent.containsKey(event.getType().name())){
-          queueContent.put(event.getType().name(), queueContent.get(
-                  event.getType().name())+1);
-        }else{
-          queueContent.put(event.getType().name(), 1);
-        }
         eventQueue.put(event);
       } catch (InterruptedException e) {
         if (!stopped) {

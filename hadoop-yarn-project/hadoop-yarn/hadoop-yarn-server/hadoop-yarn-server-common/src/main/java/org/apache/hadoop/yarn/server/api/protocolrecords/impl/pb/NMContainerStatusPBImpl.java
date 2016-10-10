@@ -81,7 +81,16 @@ public class NMContainerStatusPBImpl extends NMContainerStatus {
 
   @Override
   public String toString() {
-    return TextFormat.shortDebugString(getProto());
+    StringBuilder sb = new StringBuilder();
+    sb.append("[").append(getContainerId()).append(", ")
+        .append("CreateTime: ").append(getCreationTime()).append(", ")
+        .append("State: ").append(getContainerState()).append(", ")
+        .append("Capability: ").append(getAllocatedResource()).append(", ")
+        .append("Diagnostics: ").append(getDiagnostics()).append(", ")
+        .append("ExitStatus: ").append(getContainerExitStatus()).append(", ")
+        .append("Priority: ").append(getPriority())
+        .append("]");
+    return sb.toString();
   }
 
   @Override
