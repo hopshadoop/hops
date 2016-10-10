@@ -334,7 +334,17 @@ public class HdfsStorageFactory {
     Cache.getInstance().flush();
     return dStorageFactory.getConnector().formatStorage();
   }
-  
+
+  public static boolean formatHdfsStorage() throws StorageException {
+    Cache.getInstance().flush();
+    return dStorageFactory.getConnector().formatHDFSStorage();
+  }
+
+  public static boolean formatHdfsStorageNonTransactional() throws StorageException {
+    Cache.getInstance().flush();
+    return dStorageFactory.getConnector().formatHDFSStorageNonTransactional();
+  }
+
   public static boolean formatAllStorageNonTransactional()
       throws StorageException {
     Cache.getInstance().flush();

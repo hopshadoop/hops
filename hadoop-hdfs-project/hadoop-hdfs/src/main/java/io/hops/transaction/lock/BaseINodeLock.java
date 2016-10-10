@@ -18,6 +18,7 @@ package io.hops.transaction.lock;
 import com.google.common.collect.Iterables;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
+import io.hops.metadata.hdfs.dal.INodeDataAccess;
 import io.hops.resolvingcache.Cache;
 import io.hops.metadata.hdfs.dal.BlockInfoDataAccess;
 import io.hops.metadata.hdfs.entity.INodeCandidatePrimaryKey;
@@ -42,15 +43,16 @@ public abstract class BaseINodeLock extends Lock {
   private final Map<INode, TransactionLockTypes.INodeLockType>
       allLockedInodesInTx;
   private final ResolvedINodesMap resolvedINodesMap;
+  private boolean isPartitionKeyAlreaySet = false;
 
   protected static TransactionLockTypes.INodeLockType DEFAULT_INODE_LOCK_TYPE =
       TransactionLockTypes.INodeLockType.READ_COMMITTED;
 
-  private static boolean setPartitionKeyEnabled = false;
+  protected static boolean setPartitionKeyEnabled = false;
 
-  private static boolean setRandomParitionKeyEnabled = false;
+  protected static boolean setRandomParitionKeyEnabled = false;
 
-  private static Random rand = new Random(System.currentTimeMillis());
+  protected static Random rand = new Random(System.currentTimeMillis());
 
   public static void setDefaultLockType(
       TransactionLockTypes.INodeLockType defaultLockType) {
@@ -183,20 +185,20 @@ public abstract class BaseINodeLock extends Lock {
   }
 
   protected INode find(TransactionLockTypes.INodeLockType lock, String name,
-      int parentId, int possibleINodeId)
+      int parentId, int partitionId, int possibleINodeId)
       throws StorageException, TransactionContextException {
     setINodeLockType(lock);
     INode inode = EntityManager
-        .find(INode.Finder.ByNameAndParentId, name, parentId, possibleINodeId);
+        .find(INode.Finder.ByNameParentIdAndPartitionId, name, parentId, partitionId, possibleINodeId);
     addLockedINodes(inode, lock);
     return inode;
   }
 
   protected INode find(TransactionLockTypes.INodeLockType lock, String name,
-      int parentId) throws StorageException, TransactionContextException {
+      int parentId, int partitionId) throws StorageException, TransactionContextException {
     setINodeLockType(lock);
     INode inode =
-        EntityManager.find(INode.Finder.ByNameAndParentId, name, parentId);
+        EntityManager.find(INode.Finder.ByNameParentIdAndPartitionId, name, parentId, partitionId);
     addLockedINodes(inode, lock);
     return inode;
   }
@@ -204,18 +206,18 @@ public abstract class BaseINodeLock extends Lock {
   protected INode find(TransactionLockTypes.INodeLockType lock, int id)
       throws StorageException, TransactionContextException {
     setINodeLockType(lock);
-    INode inode = EntityManager.find(INode.Finder.ByINodeId, id);
+    INode inode = EntityManager.find(INode.Finder.ByINodeIdFTIS, id);
     addLockedINodes(inode, lock);
     return inode;
   }
 
   protected List<INode> find(TransactionLockTypes.INodeLockType lock,
-      String[] names, int[] parentIds, boolean checkLocalCache)
+      String[] names, int[] parentIds, int[] partitionIds, boolean checkLocalCache)
       throws StorageException, TransactionContextException {
     setINodeLockType(lock);
     List<INode> inodes = (List<INode>) EntityManager.findList(checkLocalCache ? INode.Finder
-                .ByNamesAndParentIdsCheckLocal : INode.Finder
-                .ByNamesAndParentIds, names, parentIds);
+                .ByNamesParentIdsAndPartitionIdsCheckLocal : INode.Finder
+                .ByNamesParentIdsAndPartitionIds, names, parentIds, partitionIds);
     if(inodes != null) {
       for (INode inode : inodes) {
         addLockedINodes(inode, lock);
@@ -265,32 +267,20 @@ public abstract class BaseINodeLock extends Lock {
     acquireLockList(DEFAULT_LOCK_TYPE, INodeAttributes.Finder.ByINodeIds, pks);
   }
 
-  protected void setPartitioningKey(Integer inodeId)
-      throws StorageException, TransactionContextException {
-    if (!setPartitionKeyEnabled) {
+  protected void setPartitioningKey(Integer partitionId)
+          throws StorageException, TransactionContextException {
+    if (setPartitionKeyEnabled && partitionId != null && !isPartitionKeyAlreaySet ) {
+      //set partitioning key
+      Object[] key = new Object[3];
+      key[0] = partitionId;
+      key[1] = 0;
+      key[2] = "";
+      EntityManager.setPartitionKey(INodeDataAccess.class, key);
+      isPartitionKeyAlreaySet=true; //to avoid setting partition key multiple times. It can happen during rename
+      LOG.debug("Setting PartitionKey to be " + partitionId);
+    } else {
       LOG.debug("Transaction PartitionKey is not Set");
-      return;
     }
-
-    if(setRandomParitionKeyEnabled && inodeId == null){
-      LOG.debug("Setting Random PartitionKey");
-      inodeId = Math.abs(rand.nextInt());
-    }
-
-    if(inodeId == null){
-      LOG.debug("Transaction PartitionKey is not Set");
-      return;
-    }
-
-    //set partitioning key
-    Object[] key = new Object[2];
-    key[0] = inodeId;
-    key[1] = new Long(0);
-
-    EntityManager.setPartitionKey(BlockInfoDataAccess.class, key);
-    LOG.debug("Setting PartitionKey to be " + inodeId);
-    //EntityManager.find(BlockInfo.Finder.ByBlockIdAndINodeId, key[1],
-    // key[0]);
   }
 
   @Override

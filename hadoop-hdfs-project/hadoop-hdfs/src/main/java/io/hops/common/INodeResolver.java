@@ -20,6 +20,7 @@ import io.hops.exception.TransactionContextException;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.UnresolvedPathException;
 import org.apache.hadoop.hdfs.server.namenode.INode;
+import org.apache.hadoop.hdfs.server.namenode.INodeDirectory;
 import org.apache.hadoop.hdfs.server.namenode.INodeSymlink;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 
@@ -31,6 +32,7 @@ public class INodeResolver {
   private final boolean transactional;
   private INode currentInode;
   private int count = 0;
+  private int depth = INodeDirectory.ROOT_DIR_DEPTH;
 
   public INodeResolver(byte[][] components, INode baseINode,
       boolean resolveLink, boolean transactional) {
@@ -44,6 +46,7 @@ public class INodeResolver {
       boolean resolveLink, boolean transactional, int initialCount) {
     this(components, baseINode, resolveLink, transactional);
     this.count = initialCount;
+    this.depth = INodeDirectory.ROOT_DIR_DEPTH + (initialCount);
   }
 
   public boolean hasNext() {
@@ -81,8 +84,12 @@ public class INodeResolver {
           "Trying to read more components than available");
     }
 
+    depth++;
+    count++;
+    int partitionId = INode.calculatePartitionId(currentInode.getId(), DFSUtil.bytes2String(components[count]), (short) depth);
+
     currentInode = INodeUtil
-        .getNode(components[++count], currentInode.getId(), transactional);
+        .getNode(components[count], currentInode.getId(), partitionId, transactional);
     return currentInode;
   }
 
