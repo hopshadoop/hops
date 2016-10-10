@@ -161,6 +161,15 @@ public class LockFactory {
     return new IndividualINodeLock(lockType, inodeIdentifier);
   }
 
+  public Lock getINodeLock(boolean skipReadingQuotaAttr, NameNode nameNode,
+      TransactionLockTypes.INodeLockType lockType,
+      TransactionLockTypes.INodeResolveType resolveType, boolean resolveLink,
+      boolean ignoreLocalSubtreeLocks, String... paths) {
+    return new INodeLock(lockType, resolveType, resolveLink,
+        ignoreLocalSubtreeLocks, skipReadingQuotaAttr, nameNode.getId(),
+        nameNode.getActiveNameNodes().getActiveNodes(), paths);
+  }
+
   public Lock getINodeLock(NameNode nameNode,
       TransactionLockTypes.INodeLockType lockType,
       TransactionLockTypes.INodeResolveType resolveType, boolean resolveLink,
@@ -174,7 +183,7 @@ public class LockFactory {
       TransactionLockTypes.INodeLockType lockType,
       TransactionLockTypes.INodeResolveType resolveType, boolean resolveLink,
       String... paths) {
-    return new INodeLock(lockType, resolveType, resolveLink,
+    return new INodeLock(false, lockType, resolveType, resolveLink,
         nameNode.getActiveNameNodes().getActiveNodes(), paths);
   }
 
@@ -227,6 +236,23 @@ public class LockFactory {
     return new RenameINodeLock(lockType, resolveType, ignoreLocalSubtreeLocks,
         nameNode.getId(), nameNode.getActiveNameNodes().getActiveNodes(), src,
         dst, true);
+  }
+
+  public Lock getLegacyRenameINodeLock(boolean skipReadingQuotaAttr,NameNode nameNode,
+      TransactionLockTypes.INodeLockType lockType,
+      TransactionLockTypes.INodeResolveType resolveType,
+      boolean ignoreLocalSubtreeLocks, String src, String dst) {
+    return new RenameINodeLock(skipReadingQuotaAttr,lockType, resolveType, ignoreLocalSubtreeLocks,
+        nameNode.getId(), nameNode.getActiveNameNodes().getActiveNodes(), src,
+        dst, true);
+  }
+
+  public Lock getLegacyRenameINodeLock(boolean skipReadingQuotaAttr,NameNode nameNode,
+      TransactionLockTypes.INodeLockType lockType,
+      TransactionLockTypes.INodeResolveType resolveType, String src,
+      String dst) {
+    return new RenameINodeLock(skipReadingQuotaAttr, lockType, resolveType,
+        nameNode.getActiveNameNodes().getActiveNodes(), src, dst, true);
   }
 
   public Lock getLegacyRenameINodeLock(NameNode nameNode,
@@ -301,6 +327,10 @@ public class LockFactory {
     return new BaseEncodingStatusLock.EncodingStatusLock(lockType, targets);
   }
 
+  public Lock getEncodingStatusLock(boolean includeChildren, TransactionLockTypes.LockType lockType,
+      String... targets) {
+    return new BaseEncodingStatusLock.EncodingStatusLock(includeChildren, lockType, targets);
+  }
   public Lock getIndivdualEncodingStatusLock(
       TransactionLockTypes.LockType lockType, int inodeId) {
     return new BaseEncodingStatusLock.IndividualEncodingStatusLock(lockType,

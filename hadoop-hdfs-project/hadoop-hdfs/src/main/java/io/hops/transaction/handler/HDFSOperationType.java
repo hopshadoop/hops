@@ -304,6 +304,6 @@ public enum HDFSOperationType implements OperationType {
   GET_USER_GROUPS,
   GET_USERS_AND_GROUPS_BATCH,
   // Block Report Load Balancing
-  GET_BR_LB_MAX_BLKS_PER_TU,
-  SET_BR_LB_MAX_BLKS_PER_MIN
+  GET_BR_LB_MAX_BLKS_PER_TW,
+  SET_BR_LB_MAX_BLKS_PER_TW
 }

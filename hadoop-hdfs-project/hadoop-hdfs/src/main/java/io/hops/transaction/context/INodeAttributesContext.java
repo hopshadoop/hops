@@ -24,11 +24,14 @@ import io.hops.metadata.common.FinderType;
 import io.hops.metadata.hdfs.dal.INodeAttributesDataAccess;
 import io.hops.metadata.hdfs.entity.INodeCandidatePrimaryKey;
 import io.hops.transaction.lock.TransactionLocks;
+import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
+import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 import org.apache.hadoop.hdfs.server.namenode.INodeAttributes;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 
@@ -47,9 +50,13 @@ public class INodeAttributesContext
       throws TransactionContextException {
     if (iNodeAttributes.getInodeId() != INode.NON_EXISTING_ID) {
       super.update(iNodeAttributes);
-      log("updated-attributes", "id", iNodeAttributes.getInodeId(), "DS", iNodeAttributes.getDiskspace(), "NS", iNodeAttributes.getNsCount());
+      if(isLogDebugEnabled()){
+        log("updated-attributes", "id", iNodeAttributes.getInodeId(), "DSQ", iNodeAttributes.getDsQuota(),"DS", iNodeAttributes.getDiskspace(), "NSQ", iNodeAttributes.getNsQuota(), "NS", iNodeAttributes.getNsCount());
+      }
     } else {
-      log("updated-attributes -- IGNORED as id is not set");
+      if(isLogDebugEnabled()) {
+        log("updated-attributes -- IGNORED as id is not set");
+      }
     }
   }
 
@@ -57,7 +64,12 @@ public class INodeAttributesContext
   public void remove(INodeAttributes iNodeAttributes)
       throws TransactionContextException {
     super.remove(iNodeAttributes);
-    log("removed-attributes", "id", iNodeAttributes.getInodeId());
+    if(isLogDebugEnabled()) {
+      log("removed-attributes", "id", iNodeAttributes.getInodeId());
+      for(int i = 0; i < Thread.currentThread().getStackTrace().length;i++){
+       System.out.println(Thread.currentThread().getStackTrace()[i]) ;
+      }
+    }
   }
 
   @Override
@@ -149,6 +161,12 @@ public class INodeAttributesContext
       result = dataAccess.findAttributesByPkList(inodePks);
       gotFromDB(result);
       miss(qfinder, result, "inodeids", inodePks);
+      if(result!=null){
+        for(INodeAttributes iNodeAttributes:result){
+          log("read-attributes", "id", iNodeAttributes.getInodeId(), "DSQ", iNodeAttributes.getDsQuota(),"DS", iNodeAttributes.getDiskspace(), "NSQ", iNodeAttributes.getNsQuota(), "NS", iNodeAttributes.getNsCount());
+        }
+
+      }
     }
     return result;
   }
@@ -183,12 +201,16 @@ public class INodeAttributesContext
         INodeAttributes toBeAdded = clone(toBeDeleted, trg_param.getInodeId());
 
         remove(toBeDeleted);
-        log("snapshot-maintenance-removed-inode-attribute", "inodeId",
-            toBeDeleted.getInodeId());
+        if(isLogDebugEnabled()) {
+          log("snapshot-maintenance-removed-inode-attribute", "inodeId",
+                  toBeDeleted.getInodeId());
+        }
 
         add(toBeAdded);
-        log("snapshot-maintenance-added-inode-attribute", "inodeId",
-            toBeAdded.getInodeId());
+        if(isLogDebugEnabled()) {
+          log("snapshot-maintenance-added-inode-attribute", "inodeId",
+                  toBeAdded.getInodeId());
+        }
       }
     }
   }

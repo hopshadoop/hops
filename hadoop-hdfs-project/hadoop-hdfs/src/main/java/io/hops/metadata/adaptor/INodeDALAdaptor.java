@@ -30,10 +30,6 @@ import org.apache.hadoop.hdfs.server.namenode.INodeDirectoryWithQuota;
 import org.apache.hadoop.hdfs.server.namenode.INodeFile;
 import org.apache.hadoop.hdfs.server.namenode.INodeFileUnderConstruction;
 import org.apache.hadoop.hdfs.server.namenode.INodeSymlink;
-import org.apache.hadoop.hdfs.util.MD5FileUtils;
-import org.apache.hadoop.io.DataInputBuffer;
-import org.apache.hadoop.io.DataOutputBuffer;
-import org.apache.hadoop.io.MD5Hash;
 
 import java.io.IOException;
 import java.util.Collection;
@@ -51,43 +47,63 @@ public class INodeDALAdaptor
   }
 
   @Override
-  public org.apache.hadoop.hdfs.server.namenode.INode indexScanfindInodeById(
+  public org.apache.hadoop.hdfs.server.namenode.INode findInodeByIdFTIS(
       int inodeId) throws StorageException {
-    return convertDALtoHDFS(dataAccess.indexScanfindInodeById(inodeId));
+    return convertDALtoHDFS(dataAccess.findInodeByIdFTIS(inodeId));
   }
 
   @Override
-  public List<org.apache.hadoop.hdfs.server.namenode.INode> indexScanFindInodesByParentId(
+  public List<org.apache.hadoop.hdfs.server.namenode.INode> findInodesByParentIdFTIS(
       int parentId) throws StorageException {
     List<org.apache.hadoop.hdfs.server.namenode.INode> list =
         (List) convertDALtoHDFS(
-            dataAccess.indexScanFindInodesByParentId(parentId));
+            dataAccess.findInodesByParentIdFTIS(parentId));
     Collections
         .sort(list, org.apache.hadoop.hdfs.server.namenode.INode.Order.ByName);
     return list;
   }
 
   @Override
-  public List<ProjectedINode> findInodesForSubtreeOperationsWithWriteLock(
-      int parentId) throws StorageException {
+  public List<org.apache.hadoop.hdfs.server.namenode.INode> findInodesByParentIdAndPartitionIdPPIS(
+          int parentId, int partitionId) throws StorageException {
+    List<org.apache.hadoop.hdfs.server.namenode.INode> list =
+            (List) convertDALtoHDFS(
+                    dataAccess.findInodesByParentIdAndPartitionIdPPIS(parentId, partitionId));
+    Collections
+            .sort(list, org.apache.hadoop.hdfs.server.namenode.INode.Order.ByName);
+    return list;
+  }
+
+  @Override
+  public List<ProjectedINode> findInodesForSubtreeOperationsWithWriteLockPPIS(
+          int parentId, int partitionId) throws StorageException {
     List<ProjectedINode> list =
-        dataAccess.findInodesForSubtreeOperationsWithWriteLock(parentId);
+            dataAccess.findInodesForSubtreeOperationsWithWriteLockPPIS(parentId, partitionId);
     Collections.sort(list);
     return list;
   }
 
   @Override
-  public org.apache.hadoop.hdfs.server.namenode.INode pkLookUpFindInodeByNameAndParentId(
-      String name, int parentId) throws StorageException {
+  public List<ProjectedINode> findInodesForSubtreeOperationsWithWriteLockFTIS(
+      int parentId) throws StorageException {
+    List<ProjectedINode> list =
+        dataAccess.findInodesForSubtreeOperationsWithWriteLockFTIS(parentId);
+    Collections.sort(list);
+    return list;
+  }
+
+  @Override
+  public org.apache.hadoop.hdfs.server.namenode.INode findInodeByNameParentIdAndPartitionIdPK(
+      String name, int parentId, int partitionId) throws StorageException {
     return convertDALtoHDFS(
-        dataAccess.pkLookUpFindInodeByNameAndParentId(name, parentId));
+        dataAccess.findInodeByNameParentIdAndPartitionIdPK(name, parentId, partitionId));
   }
 
   @Override
   public List<org.apache.hadoop.hdfs.server.namenode.INode> getINodesPkBatched(
-      String[] names, int[] parentIds) throws StorageException {
+      String[] names, int[] parentIds, int[] partitionIds) throws StorageException {
     return (List<org.apache.hadoop.hdfs.server.namenode.INode>) convertDALtoHDFS(
-        dataAccess.getINodesPkBatched(names, parentIds));
+        dataAccess.getINodesPkBatched(names, parentIds, partitionIds));
   }
 
   @Override
@@ -139,8 +155,8 @@ public class INodeDALAdaptor
   }
   
   @Override
-  public boolean hasChildren(int parentId) throws StorageException {
-    return dataAccess.hasChildren(parentId);
+  public boolean hasChildren(int parentId, boolean areChildrenRandomlyPartitioned ) throws StorageException {
+    return dataAccess.hasChildren(parentId, areChildrenRandomlyPartitioned);
   }
   
   //Only for testing
@@ -168,6 +184,8 @@ public class INodeDALAdaptor
       hopINode.setPermission(inode.getFsPermission().toShort());
       hopINode.setParentId(inode.getParentId());
       hopINode.setId(inode.getId());
+      hopINode.setIsDir(inode.isDirectory());
+      hopINode.setPartitionId(inode.getPartitionId());
 
       if (inode.isDirectory()) {
         hopINode.setUnderConstruction(false);
@@ -179,7 +197,6 @@ public class INodeDALAdaptor
         hopINode
             .setUnderConstruction(inode.isUnderConstruction() ? true : false);
         hopINode.setDirWithQuota(false);
-        hopINode.setHeader(((INodeFile) inode).getHeader());
         if (inode instanceof INodeFileUnderConstruction) {
           hopINode.setClientName(
               ((INodeFileUnderConstruction) inode).getClientName());
@@ -204,6 +221,7 @@ public class INodeDALAdaptor
       hopINode.setSubtreeLocked(inode.isSubtreeLocked());
       hopINode.setSubtreeLockOwner(inode.getSubtreeLockOwner());
     }
+    hopINode.setHeader(inode.getHeader());
     return hopINode;
   }
 
@@ -215,7 +233,7 @@ public class INodeDALAdaptor
       if (hopINode != null) {
         PermissionStatus ps = new PermissionStatus(null, null, new FsPermission
             (hopINode.getPermission()));
-        if (hopINode.isDir()) {
+        if (hopINode.isDirectory()) {
           if (hopINode.isDirWithQuota()) {
             inode = new INodeDirectoryWithQuota(hopINode.getName(), ps);
           } else {
@@ -251,6 +269,7 @@ public class INodeDALAdaptor
           ((INodeFile) inode).setGenerationStampNoPersistence(
               hopINode.getGenerationStamp());
           ((INodeFile) inode).setSizeNoPersistence(hopINode.getFileSize());
+          ((INodeFile) inode).setHasBlocksNoPersistance(INodeFile.hasBlocks(hopINode.getHeader()));
         }
         inode.setIdNoPersistance(hopINode.getId());
         inode.setLocalNameNoPersistance(hopINode.getName());
@@ -259,6 +278,8 @@ public class INodeDALAdaptor
         inode.setSubtreeLockOwner(hopINode.getSubtreeLockOwner());
         inode.setUserIDNoPersistance(hopINode.getUserID());
         inode.setGroupIDNoPersistance(hopINode.getGroupID());
+        inode.setHeaderNoPersistance(hopINode.getHeader());
+        inode.setPartitionIdNoPersistance(hopINode.getPartitionId());
       }
       return inode;
     }catch (IOException ex){

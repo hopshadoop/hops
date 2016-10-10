@@ -23,10 +23,8 @@ import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.resolvingcache.Cache;
 import io.hops.metadata.HdfsStorageFactory;
-import io.hops.metadata.hdfs.dal.AccessTimeLogDataAccess;
 import io.hops.metadata.hdfs.dal.INodeAttributesDataAccess;
 import io.hops.metadata.hdfs.dal.INodeDataAccess;
-import io.hops.metadata.hdfs.entity.AccessTimeLogEntry;
 import io.hops.metadata.hdfs.entity.INodeCandidatePrimaryKey;
 import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.metadata.hdfs.entity.QuotaUpdate;
@@ -74,7 +72,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 
 import static org.apache.hadoop.hdfs.server.namenode.FSNamesystem.LOG;
 import static org.apache.hadoop.util.Time.now;
@@ -310,6 +307,7 @@ public class FSDirectory implements Closeable {
             BlockUCState.UNDER_CONSTRUCTION, targets);
     getBlockManager().addBlockCollection(blockInfo, fileINode);
     fileINode.addBlock(blockInfo);
+    fileINode.setHasBlocks(true);
 
     if (NameNode.stateChangeLog.isDebugEnabled()) {
       NameNode.stateChangeLog.debug(
@@ -505,7 +503,9 @@ public class FSDirectory implements Closeable {
         INodeDataAccess ida = (INodeDataAccess) HdfsStorageFactory
                 .getDataAccess(INodeDataAccess.class);
 
-        if (ida.hasChildren(dstInode.getId())) {
+        Short depth = dstInode.myDepth();
+        boolean areChildrenRandomlyPartitioned = INode.isTreeLevelRandomPartitioned((short) (depth+1));
+        if (ida.hasChildren(dstInode.getId(), areChildrenRandomlyPartitioned)) {
           error =
                   "rename cannot overwrite non empty destination directory " + dst;
           NameNode.stateChangeLog
@@ -722,7 +722,6 @@ public class FSDirectory implements Closeable {
         // update moved leases with new filename
         getFSNamesystem().unprotectedChangeLease(src, dst);
 
-        
         EntityManager.snapshotMaintenance(
             HdfsTransactionContextMaintenanceCmds.INodePKChanged, srcClone,
             dstChild);
@@ -1286,11 +1285,7 @@ public class FSDirectory implements Closeable {
   /**
    * Delete a path from the name space
    * Update the count at each ancestor directory with quota
-   * <br>
-   * Note: This is to be used by {@link FSEditLog} only.
-   * <br>
-   *
-   * @param src
+  * @param src
    *     a string representation of a path to an inode
    * @param mtime
    *     the time the inode is removed
@@ -1338,6 +1333,10 @@ public class FSDirectory implements Closeable {
           " because the root is not allowed to be deleted");
       return 0;
     }
+
+    // Add metadata log entry for all deleted childred.
+    addMetaDataLogForDirDeletion(targetNode);
+
     int pos = inodes.length - 1;
     // Remove the node from the namespace
     targetNode = removeChild(inodes, pos);
@@ -1346,13 +1345,27 @@ public class FSDirectory implements Closeable {
     }
     // set the parent's modification time
     inodes[pos - 1].setModificationTime(mtime);
-    
+
     int filesRemoved = targetNode.collectSubtreeBlocksAndClear(collectedBlocks);
     if (NameNode.stateChangeLog.isDebugEnabled()) {
       NameNode.stateChangeLog
           .debug("DIR* FSDirectory.unprotectedDelete: " + src + " is removed");
     }
     return filesRemoved;
+  }
+
+  private void addMetaDataLogForDirDeletion(INode targetNode) throws TransactionContextException, StorageException {
+    if (targetNode.isDirectory()) {
+      List<INode> children = ((INodeDirectory) targetNode).getChildren();
+      for(INode child : children){
+       if(child.isDirectory()){
+         addMetaDataLogForDirDeletion(child);
+       }else{
+         child.logMetadataEvent(MetadataLogEntry.Operation.DELETE);
+       }
+      }
+    }
+    targetNode.logMetadataEvent(MetadataLogEntry.Operation.DELETE);
   }
 
   /**
@@ -1463,7 +1476,6 @@ public class FSDirectory implements Closeable {
    * deepest INodes. The array size will be the number of expected
    * components in the path, and non existing components will be
    * filled with null
-   * @see INodeDirectory#getExistingPathINodes(byte[][], INode[])
    */
   INode[] getExistingPathINodes(String path)
       throws UnresolvedLinkException, StorageException,
@@ -1522,9 +1534,7 @@ public class FSDirectory implements Closeable {
    *     the delta change of diskspace
    * @throws QuotaExceededException
    *     if the new count violates any quota limit
-   * @throws FileNotFound
-   *     if path does not exist.
-   */
+  */
   void updateSpaceConsumed(String path, long nsDelta, long dsDelta)
       throws QuotaExceededException, FileNotFoundException,
       UnresolvedLinkException, StorageException, TransactionContextException {
@@ -1661,11 +1671,6 @@ public class FSDirectory implements Closeable {
    *     string representation of the path to the directory
    * @param permissions
    *     the permission of the directory
-   * @param isAutocreate
-   *     if the permission of the directory should inherit
-   *     from its parent or not. u+wx is implicitly added to
-   *     the automatically created directories, and to the
-   *     given directory if inheritPermission is true
    * @param now
    *     creation time
    * @return true if the operation succeeds false otherwise
@@ -2095,10 +2100,15 @@ public class FSDirectory implements Closeable {
   INode removeChild(INode[] pathComponents, int pos, boolean forRename)
       throws StorageException, TransactionContextException {
     INode removedNode = null;
+    INode.DirCounts counts = new INode.DirCounts();
     if (forRename) {
       removedNode = pathComponents[pos];
       removedNode.logMetadataEvent(MetadataLogEntry.Operation.DELETE);
     } else {
+      if(isQuotaEnabled()){
+        INode nodeToBeRemored = pathComponents[pos];
+        nodeToBeRemored.spaceConsumedInTree(counts);
+      }
       removedNode = ((INodeDirectory) pathComponents[pos - 1])
           .removeChild(pathComponents[pos]);
     }
@@ -2111,8 +2121,6 @@ public class FSDirectory implements Closeable {
         nsDelta += update.getNamespaceDelta();
         dsDelta += update.getDiskspaceDelta();
       }
-      INode.DirCounts counts = new INode.DirCounts();
-      removedNode.spaceConsumedInTree(counts);
       updateCountNoQuotaCheck(pathComponents, pos,
           -counts.getNsCount() + nsDelta, -counts.getDsCount() + dsDelta);
     }
@@ -2240,7 +2248,7 @@ public class FSDirectory implements Closeable {
    *
    * @param dir
    *     the root of the tree that represents the directory
-   * @param counters
+   * @param counts
    *     counters for name space and disk space
    * @param nodesInPath
    *     INodes for the each of components in the path.
@@ -2691,8 +2699,8 @@ public class FSDirectory implements Closeable {
             INodeDataAccess da = (INodeDataAccess) HdfsStorageFactory
                 .getDataAccess(INodeDataAccess.class);
             INodeDirectoryWithQuota rootInode = (INodeDirectoryWithQuota) da
-                .pkLookUpFindInodeByNameAndParentId(INodeDirectory.ROOT_NAME,
-                    INodeDirectory.ROOT_PARENT_ID);
+                .findInodeByNameParentIdAndPartitionIdPK(INodeDirectory.ROOT_NAME,
+                    INodeDirectory.ROOT_PARENT_ID, INodeDirectory.getRootDirPartitionKey());
             if (rootInode == null || overwrite == true) {
               newRootINode = INodeDirectoryWithQuota.createRootDir(ps);
               List<INode> newINodes = new ArrayList();
@@ -2729,10 +2737,7 @@ public class FSDirectory implements Closeable {
           ((INodeSymlink) inode).getModificationTime(),
           ((INodeSymlink) inode).getAccessTime(),
           ((INodeSymlink) inode).getPermissionStatus());
-      clone.setLocalNameNoPersistance(inode.getLocalName());
-      clone.setIdNoPersistance(inode.getId());
-      clone.setParentIdNoPersistance(inode.getParentId());
-      clone.setUser(inode.getUserName());
+
     } else if (inode instanceof INodeFileUnderConstruction) {
       int id = ((INodeFileUnderConstruction) inode).getId();
       int pid = ((INodeFileUnderConstruction) inode).getParentId();
@@ -2755,23 +2760,29 @@ public class FSDirectory implements Closeable {
           new INodeFileUnderConstruction(name, replication, modificationTime,
               preferredBlockSize, blocks, permissionStatus, clientName,
               clientMachineName, datanodeID, id, pid);
-
+      ((INodeFileUnderConstruction)clone).setHasBlocksNoPersistance(((INodeFileUnderConstruction)inode).hasBlocks());
     } else if (inode instanceof INodeFile) {
       clone = new INodeFile((INodeFile) inode);
     } else if (inode instanceof INodeDirectory) {
       clone = new INodeDirectory((INodeDirectory) inode);
     }
+    clone.setHeaderNoPersistance(inode.getHeader());
+    clone.setPartitionIdNoPersistance(inode.getPartitionId());
+    clone.setLocalNameNoPersistance(inode.getLocalName());
+    clone.setIdNoPersistance(inode.getId());
+    clone.setParentIdNoPersistance(inode.getParentId());
+    clone.setUser(inode.getUserName());
     return clone;
   }
 
-  public boolean hasChildren(final int parentId) throws IOException {
+  public boolean hasChildren(final int parentId, final boolean areChildrenRandomlyPartitioned) throws IOException {
     LightWeightRequestHandler hasChildrenHandler =
             new LightWeightRequestHandler(HDFSOperationType.HAS_CHILDREN) {
       @Override
       public Object performTask() throws IOException {
         INodeDataAccess ida = (INodeDataAccess) HdfsStorageFactory
                 .getDataAccess(INodeDataAccess.class);
-        return ida.hasChildren(parentId);
+        return ida.hasChildren(parentId, areChildrenRandomlyPartitioned);
       }
     };
     return (Boolean) hasChildrenHandler.handle();

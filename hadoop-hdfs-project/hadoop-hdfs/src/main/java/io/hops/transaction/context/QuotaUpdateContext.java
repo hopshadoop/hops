@@ -46,7 +46,9 @@ public class QuotaUpdateContext
   public void update(QuotaUpdate quotaUpdate)
       throws TransactionContextException {
     super.update(quotaUpdate);
-    log("added-quotaUpdate", "id", quotaUpdate.getId(), "inodeId", quotaUpdate.getInodeId(), "dsDeltea",quotaUpdate.getDiskspaceDelta(),"nsDelta",quotaUpdate.getNamespaceDelta());
+    if(isLogDebugEnabled()) {
+      log("added-quotaUpdate", "id", quotaUpdate.getId(), "inodeId", quotaUpdate.getInodeId(), "dsDeltea", quotaUpdate.getDiskspaceDelta(), "nsDelta", quotaUpdate.getNamespaceDelta());
+    }
   }
 
   @Override
@@ -58,7 +60,9 @@ public class QuotaUpdateContext
       }
     }
     super.remove(quotaUpdate);
-    log("removed-quotaUpdate", "id", quotaUpdate.getId());
+    if(isLogDebugEnabled()) {
+      log("removed-quotaUpdate", "id", quotaUpdate.getId());
+    }
   }
 
   @Override
