@@ -128,6 +128,10 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
       "dfs.transaction.stats.writerround";
   public static final int DFS_TRANSACTION_STATS_WRITER_ROUND_DEFAULT = 120;
 
+  public static final String  DFS_DIR_DELETE_BATCH_SIZE=
+      "dfs.dir.delete.batch.size";
+  public static final int DFS_DIR_DELETE_BATCH_SIZE_DEFAULT = 50;
+
   /*for client failover api*/
   // format {ip:port, ip:port, ip:port} comma separated
   public static final String DFS_NAMENODES_RPC_ADDRESS_KEY =
@@ -264,16 +268,15 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
 
   public static final String DFS_BR_LB_MAX_BLK_PER_TW =
           "dfs.block.report.load.balancing.max.blks.per.time.window";
-  public static final long DFS_BR_LB_MAX_BLK_PER_TU_DEFAULT = 1000000;
+  public static final long DFS_BR_LB_MAX_BLK_PER_TW_DEFAULT = 1000000;
   
   public static final String DFS_BR_LB_TIME_WINDOW_SIZE =
           "dfs.block.report.load.balancing.time.window.size";
   public static final long DFS_BR_LB_TIME_WINDOW_SIZE_DEFAULT = 60*1000; //1 min
   
-  public static final String DFS_BR_LB_UPDATE_THRESHOLD_TIME =
-          "dfs.blk.report.load.balancing.update.threashold.time";
-  public static final long DFS_BR_LB_UPDATE_THRESHOLD_TIME_DEFAULT = 60*1000;
-  
+  public static final String DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD =
+          "dfs.blk.report.load.balancing.db.var.update.threashold";
+  public static final long DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD_DEFAULT = 60*1000;
 
 
   public static final String DFS_BLOCK_SIZE_KEY = "dfs.blocksize";

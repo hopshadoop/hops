@@ -94,7 +94,9 @@ public class IDsGeneratorFactory {
   }
 
   public int getUniqueINodeID(){
-    return (int)iDsGenerators.get(0).getUniqueID();
+    int id = (int)iDsGenerators.get(0).getUniqueID();
+    LOG.debug("Unique INode generated. id="+id);
+    return id;
   }
 
   public long getUniqueBlockID(){
