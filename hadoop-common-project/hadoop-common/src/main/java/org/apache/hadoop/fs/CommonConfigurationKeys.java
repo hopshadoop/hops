@@ -321,4 +321,14 @@ public class CommonConfigurationKeys extends CommonConfigurationKeysPublic {
   public static final String HOPS_GROUPS_ENABLE =
       "hops.groups.updater.round";
   public static final boolean HOPS_GROUPS_ENABLE_DEFAULT = true;
+  
+  /**
+   * Timeout value for RPC client on waiting for response.
+   */
+  public static final String IPC_CLIENT_RPC_TIMEOUT_KEY
+          = "ipc.client.rpc-timeout.ms";
+  /**
+   * Default value for IPC_CLIENT_RPC_TIMEOUT_KEY.
+   */
+  public static final int IPC_CLIENT_RPC_TIMEOUT_DEFAULT = 0;
 }

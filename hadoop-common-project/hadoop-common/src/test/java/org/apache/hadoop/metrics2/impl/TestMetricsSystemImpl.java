@@ -441,6 +441,7 @@ public class TestMetricsSystemImpl {
   @Test
   public void testQSize() throws Exception {
     new ConfigBuilder().add("*.period", 8)
+        .add("*.queue.capacity", 2)
         .add("test.sink.test.class", TestSink.class.getName())
         .save(TestMetricsConfig.getTestFilename("hadoop-metrics2-test"));
     MetricsSystemImpl ms = new MetricsSystemImpl("Test");
@@ -542,6 +543,19 @@ public class TestMetricsSystemImpl {
     } finally {
       ms.stop();
     }
+  }
+
+  @Test
+  public void testRegisterSourceJmxCacheTTL() {
+    MetricsSystem ms = new MetricsSystemImpl();
+    ms.init("TestMetricsSystem");
+    TestSource ts = new TestSource("ts");
+    ms.register(ts);
+    MetricsSourceAdapter sa = ((MetricsSystemImpl) ms)
+        .getSourceAdapter("TestSource");
+    assertEquals(MetricsConfig.PERIOD_DEFAULT * 1000 + 1,
+        sa.getJmxCacheTTL());
+    ms.shutdown();
   }
 
   @Metrics(context="test")

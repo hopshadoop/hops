@@ -56,6 +56,7 @@ import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.Time;
 
 import com.google.protobuf.BlockingService;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
 
 /** A simple RPC mechanism.
  *
@@ -343,7 +344,8 @@ public class RPC {
                              long clientVersion,
                              InetSocketAddress addr, Configuration conf,
                              long connTimeout) throws IOException { 
-    return waitForProtocolProxy(protocol, clientVersion, addr, conf, 0, null, connTimeout);
+    return waitForProtocolProxy(protocol, clientVersion, addr, conf,
+        getRpcTimeout(conf), null, connTimeout);
   }
   
   /**
@@ -487,8 +489,8 @@ public class RPC {
                                 UserGroupInformation ticket,
                                 Configuration conf,
                                 SocketFactory factory) throws IOException {
-    return getProtocolProxy(
-        protocol, clientVersion, addr, ticket, conf, factory, 0, null);
+    return getProtocolProxy(protocol, clientVersion, addr, ticket, conf,
+        factory, getRpcTimeout(conf), null);
   }
   
   /**
@@ -683,6 +685,18 @@ public class RPC {
             + proxy.getClass());
   }
 
+  /**
+   * Get the RPC time from configuration;
+   * If not set in the configuration, return the default value.
+   *
+   * @param conf Configuration
+   * @return the RPC timeout (ms)
+   */
+  public static int getRpcTimeout(Configuration conf) {
+    return conf.getInt(CommonConfigurationKeys.IPC_CLIENT_RPC_TIMEOUT_KEY,
+        CommonConfigurationKeys.IPC_CLIENT_RPC_TIMEOUT_DEFAULT);
+  }
+  
   /**
    * Class to construct instances of RPC server with specific options.
    */
