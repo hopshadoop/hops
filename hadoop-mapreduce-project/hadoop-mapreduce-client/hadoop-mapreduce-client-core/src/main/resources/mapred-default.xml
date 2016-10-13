@@ -300,17 +300,28 @@
   </description>
 </property>
 
-<property>
-  <name>mapreduce.job.reducer.preempt.delay.sec</name>
-  <value>0</value>
-  <description>The threshold in terms of seconds after which an unsatisfied mapper 
-  request triggers reducer preemption to free space. Default 0 implies that the 
-  reduces should be preempted immediately after allocation if there is currently no
-  room for newly allocated mappers.
-  </description>
-</property>
+  <property>
+    <name>mapreduce.job.reducer.preempt.delay.sec</name>
+    <value>0</value>
+    <description>The threshold (in seconds) after which an unsatisfied
+      mapper request triggers reducer preemption when there is no anticipated
+      headroom. If set to 0 or a negative value, the reducer is preempted as
+      soon as lack of headroom is detected. Default is 0.
+    </description>
+  </property>
 
-<property>
+  <property>
+    <name>mapreduce.job.reducer.unconditional-preempt.delay.sec</name>
+    <value>300</value>
+    <description>The threshold (in seconds) after which an unsatisfied
+      mapper request triggers a forced reducer preemption irrespective of the
+      anticipated headroom. By default, it is set to 5 mins. Setting it to 0
+      leads to immediate reducer preemption. Setting to -1 disables this
+      preemption altogether.
+    </description>
+  </property>
+
+  <property>
     <name>mapreduce.job.max.split.locations</name>
     <value>10</value>
     <description>The max number of block locations to store for each split for 
@@ -2034,7 +2045,32 @@
 <property>
   <name>mapreduce.jobhistory.loadedjobs.cache.size</name>
   <value>5</value>
-  <description>Size of the loaded job cache</description>
+  <description>Size of the loaded job cache.  This property is ignored if
+  the property mapreduce.jobhistory.loadedtasks.cache.size is set to a
+  positive value.
+  </description>
+</property>
+
+<property>
+  <name>mapreduce.jobhistory.loadedtasks.cache.size</name>
+  <value></value>
+  <description>Change the job history cache limit to be set in terms
+  of total task count.  If the total number of tasks loaded exceeds
+  this value, then the job cache will be shrunk down until it is
+  under this limit (minimum 1 job in cache).  If this value is empty
+  or nonpositive then the cache reverts to using the property
+  mapreduce.jobhistory.loadedjobs.cache.size as a job cache size.
+
+  Two recommendations for the mapreduce.jobhistory.loadedtasks.cache.size
+  property:
+  1) For every 100k of cache size, set the heap size of the Job History
+     Server to 1.2GB. For example,
+     mapreduce.jobhistory.loadedtasks.cache.size=500000, heap size=6GB.
+  2) Make sure that the cache size is larger than the number of tasks
+     required for the largest job run on the cluster. It might be a good
+     idea to set the value slightly higher (say, 20%) in order to allow
+     for job size growth.
+  </description>
 </property>
 
 <property>

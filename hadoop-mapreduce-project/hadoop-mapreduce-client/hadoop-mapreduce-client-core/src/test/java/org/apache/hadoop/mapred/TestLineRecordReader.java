@@ -110,6 +110,43 @@ public class TestLineRecordReader {
         numRecordsNoSplits, numRecordsFirstSplit + numRecordsRemainingSplits);
   }
 
+  private void testLargeSplitRecordForFile(Configuration conf,
+      long firstSplitLength, long testFileSize, Path testFilePath)
+      throws IOException {
+    conf.setInt(org.apache.hadoop.mapreduce.lib.input.
+        LineRecordReader.MAX_LINE_LENGTH, Integer.MAX_VALUE);
+    assertTrue("unexpected firstSplitLength:" + firstSplitLength,
+        testFileSize < firstSplitLength);
+    String delimiter = conf.get("textinputformat.record.delimiter");
+    byte[] recordDelimiterBytes = null;
+    if (null != delimiter) {
+      recordDelimiterBytes = delimiter.getBytes(Charsets.UTF_8);
+    }
+    // read the data without splitting to count the records
+    FileSplit split = new FileSplit(testFilePath, 0, testFileSize,
+        (String[])null);
+    LineRecordReader reader = new LineRecordReader(conf, split,
+        recordDelimiterBytes);
+    LongWritable key = new LongWritable();
+    Text value = new Text();
+    int numRecordsNoSplits = 0;
+    while (reader.next(key, value)) {
+      ++numRecordsNoSplits;
+    }
+    reader.close();
+
+    // count the records in the first split
+    split = new FileSplit(testFilePath, 0, firstSplitLength, (String[])null);
+    reader = new LineRecordReader(conf, split, recordDelimiterBytes);
+    int numRecordsFirstSplit = 0;
+    while (reader.next(key, value)) {
+      ++numRecordsFirstSplit;
+    }
+    reader.close();
+    assertEquals("Unexpected number of records in split",
+        numRecordsNoSplits, numRecordsFirstSplit);
+  }
+
   @Test
   public void testBzip2SplitEndsAtCR() throws IOException {
     // the test data contains a carriage-return at the end of the first
@@ -322,6 +359,22 @@ public class TestLineRecordReader {
       writer.close();
     }
     return file;
+  }
+
+  @Test
+  public void testUncompressedInputWithLargeSplitSize() throws Exception {
+    Configuration conf = new Configuration();
+    // single char delimiter
+    String inputData = "abcde +fghij+ klmno+pqrst+uvwxyz";
+    Path inputFile = createInputFile(conf, inputData);
+    conf.set("textinputformat.record.delimiter", "+");
+    // split size over max value of integer
+    long longSplitSize = (long)Integer.MAX_VALUE + 1;
+    for (int bufferSize = 1; bufferSize <= inputData.length(); bufferSize++) {
+      conf.setInt("io.file.buffer.size", bufferSize);
+      testLargeSplitRecordForFile(conf, longSplitSize, inputData.length(),
+          inputFile);
+    }
   }
 
   @Test
@@ -593,5 +646,34 @@ public class TestLineRecordReader {
     assertEquals(12, reader.getPos());
     assertFalse(reader.next(key, value));
     assertEquals(12, reader.getPos());
+  }
+
+  @Test
+  public void testBzipWithMultibyteDelimiter() throws IOException {
+    String testFileName = "compressedMultibyteDelimiter.txt.bz2";
+    // firstSplitLength < (headers + blockMarker) will pass always since no
+    // records will be read (in the test file that is byte 0..9)
+    // firstSplitlength > (compressed file length - one compressed block
+    // size + 1) will also always pass since the second split will be empty
+    // (833 bytes is the last block start in the used data file)
+    int firstSplitLength = 100;
+    URL testFileUrl = getClass().getClassLoader().getResource(testFileName);
+    assertNotNull("Cannot find " + testFileName, testFileUrl);
+    File testFile = new File(testFileUrl.getFile());
+    long testFileSize = testFile.length();
+    Path testFilePath = new Path(testFile.getAbsolutePath());
+    assertTrue("Split size is smaller than header length",
+        firstSplitLength > 9);
+    assertTrue("Split size is larger than compressed file size " +
+        testFilePath, testFileSize > firstSplitLength);
+
+    Configuration conf = new Configuration();
+    conf.setInt(org.apache.hadoop.mapreduce.lib.input.
+        LineRecordReader.MAX_LINE_LENGTH, Integer.MAX_VALUE);
+
+    String delimiter = "<E-LINE>\r\r\n";
+    conf.set("textinputformat.record.delimiter", delimiter);
+    testSplitRecordsForFile(conf, firstSplitLength, testFileSize,
+        testFilePath);
   }
 }

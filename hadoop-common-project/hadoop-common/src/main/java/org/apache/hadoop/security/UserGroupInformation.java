@@ -71,6 +71,7 @@ import org.apache.hadoop.util.Shell;
 import org.apache.hadoop.util.Time;
 
 import com.google.common.annotations.VisibleForTesting;
+import io.hops.security.UsersGroups;
 import org.apache.hadoop.util.StringUtils;
 
 /**
@@ -1244,6 +1245,7 @@ public class UserGroupInformation {
     subject.getPrincipals().add(new User(user));
     UserGroupInformation result = new UserGroupInformation(subject);
     result.setAuthenticationMethod(authMethod);
+    createHopsUser(user);
     return result;
   }
 
@@ -1321,6 +1323,7 @@ public class UserGroupInformation {
     principals.add(new RealUser(realUser));
     UserGroupInformation result =new UserGroupInformation(subject);
     result.setAuthenticationMethod(AuthenticationMethod.PROXY);
+    createHopsUser(user);
     return result;
   }
 
@@ -1366,6 +1369,19 @@ public class UserGroupInformation {
 
     private void setUserGroups(String user, String[] groups) {
       userToGroupsMapping.put(user, Arrays.asList(groups));
+      createHopsUser(user, groups);
+    }
+  }
+
+  private static void createHopsUser(String user){
+    createHopsUser(user, null);
+  }
+
+  private static void createHopsUser(String user, String[] groups){
+    try {
+      UsersGroups.addUserToGroups(user, groups);
+    }catch (IOException ex){
+      throw new RuntimeException(ex);
     }
   }
 

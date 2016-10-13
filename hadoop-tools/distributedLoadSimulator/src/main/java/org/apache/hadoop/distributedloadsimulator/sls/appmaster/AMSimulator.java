@@ -63,6 +63,7 @@ import org.apache.hadoop.distributedloadsimulator.sls.scheduler.ContainerSimulat
 import org.apache.hadoop.distributedloadsimulator.sls.SLSRunner;
 import org.apache.hadoop.distributedloadsimulator.sls.scheduler.TaskRunner;
 import org.apache.hadoop.distributedloadsimulator.sls.utils.SLSUtils;
+import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.SaslRpcServer;
 import org.apache.hadoop.security.SecurityUtil;
@@ -293,6 +294,7 @@ public abstract class AMSimulator extends TaskRunner.Task {
                   ApplicationMasterProtocol appMasterProtocol = ClientRMProxy.
                   createRMProxy(conf, ApplicationMasterProtocol.class, true);
                   appMasterProtocol.finishApplicationMaster(finishAMRequest);
+                  RPC.stopProxy(appMasterProtocol);
                   return null;
                 }
               });
@@ -382,6 +384,7 @@ public abstract class AMSimulator extends TaskRunner.Task {
                 RegisterApplicationMasterResponse response
                 = appMasterProtocol.registerApplicationMaster(
                         amRegisterRequest);
+                RPC.stopProxy(appMasterProtocol);
                 return response;
               }
             });

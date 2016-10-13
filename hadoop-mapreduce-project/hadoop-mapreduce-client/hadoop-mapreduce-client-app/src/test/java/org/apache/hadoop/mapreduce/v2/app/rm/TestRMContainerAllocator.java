@@ -123,6 +123,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.MemoryRMStateStore;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppState;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.Allocation;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.SchedulerEvent;
@@ -426,7 +427,7 @@ public class TestRMContainerAllocator {
         MRBuilderUtils.newJobReport(jobId, "job", "user", JobState.RUNNING, 0,
             0, 0, 0, 0, 0, 0, "jobfile", null, false, ""));
     final MyContainerAllocator allocator = new MyContainerAllocator(rm, conf,
-        appAttemptId, mockJob);
+        appAttemptId, mockJob, new SystemClock());
     // add resources to scheduler
     dispatcher.await();
 
@@ -560,6 +561,69 @@ public class TestRMContainerAllocator {
         assignedRequests.preemptionWaitingReduces.size());
   }
 
+  @Test(timeout = 30000)
+  public void testUnconditionalPreemptReducers() throws Exception {
+    LOG.info("Running testForcePreemptReducers");
+
+    int forcePreemptThresholdSecs = 2;
+    Configuration conf = new Configuration();
+    conf.setInt(MRJobConfig.MR_JOB_REDUCER_PREEMPT_DELAY_SEC,
+        2 * forcePreemptThresholdSecs);
+    conf.setInt(MRJobConfig.MR_JOB_REDUCER_UNCONDITIONAL_PREEMPT_DELAY_SEC,
+        forcePreemptThresholdSecs);
+
+    MyResourceManager rm = new MyResourceManager(conf);
+    rm.start();
+    rm.getMyFifoScheduler().forceResourceLimit(Resource.newInstance(8192, 8));
+    DrainDispatcher dispatcher = (DrainDispatcher) rm.getRMContext()
+        .getDispatcher();
+
+    // Submit the application
+    RMApp app = rm.submitApp(1024);
+    dispatcher.await();
+
+    MockNM amNodeManager = rm.registerNode("amNM:1234", 2048);
+    amNodeManager.nodeHeartbeat(true);
+    dispatcher.await();
+
+    ApplicationAttemptId appAttemptId = app.getCurrentAppAttempt()
+        .getAppAttemptId();
+    rm.sendAMLaunched(appAttemptId);
+    dispatcher.await();
+
+    JobId jobId = MRBuilderUtils.newJobId(appAttemptId.getApplicationId(), 0);
+    Job mockJob = mock(Job.class);
+    when(mockJob.getReport()).thenReturn(
+        MRBuilderUtils.newJobReport(jobId, "job", "user", JobState.RUNNING, 0,
+            0, 0, 0, 0, 0, 0, "jobfile", null, false, ""));
+    ControlledClock clock = new ControlledClock(null);
+    clock.setTime(1);
+    MyContainerAllocator allocator = new MyContainerAllocator(rm, conf,
+        appAttemptId, mockJob, clock);
+    allocator.setMapResourceRequest(BuilderUtils.newResource(1024, 1));
+    allocator.setReduceResourceRequest(BuilderUtils.newResource(1024, 1));
+    RMContainerAllocator.AssignedRequests assignedRequests =
+        allocator.getAssignedRequests();
+    RMContainerAllocator.ScheduledRequests scheduledRequests =
+        allocator.getScheduledRequests();
+    ContainerRequestEvent event1 =
+        createReq(jobId, 1, 2048, new String[] { "h1" }, false, false);
+    scheduledRequests.maps.put(mock(TaskAttemptId.class),
+        new RMContainerRequestor.ContainerRequest(event1, null, clock.getTime()));
+    assignedRequests.reduces.put(mock(TaskAttemptId.class),
+        mock(Container.class));
+
+    clock.setTime(clock.getTime() + 1);
+    allocator.preemptReducesIfNeeded();
+    Assert.assertEquals("The reducer is preeempted too soon", 0,
+        assignedRequests.preemptionWaitingReduces.size());
+
+    clock.setTime(clock.getTime() + 1000 * forcePreemptThresholdSecs);
+    allocator.preemptReducesIfNeeded();
+    Assert.assertEquals("The reducer is not preeempted", 1,
+        assignedRequests.preemptionWaitingReduces.size());
+  }
+
   @Test
   public void testMapReduceScheduling() throws Exception {
 
@@ -590,7 +654,7 @@ public class TestRMContainerAllocator {
         MRBuilderUtils.newJobReport(jobId, "job", "user", JobState.RUNNING, 0,
             0, 0, 0, 0, 0, 0, "jobfile", null, false, ""));
     MyContainerAllocator allocator = new MyContainerAllocator(rm, conf,
-        appAttemptId, mockJob);
+        appAttemptId, mockJob, new SystemClock());
 
     // add resources to scheduler
     MockNM nodeManager1 = rm.registerNode("h1:1234", 1024);
@@ -1482,6 +1546,7 @@ public class TestRMContainerAllocator {
     List<ContainerId> lastRelease = null;
     List<String> lastBlacklistAdditions;
     List<String> lastBlacklistRemovals;
+    Resource forceResourceLimit = null;
     
     // override this to copy the objects otherwise FifoScheduler updates the
     // numContainers in same objects as kept by RMContainerAllocator
@@ -1501,9 +1566,18 @@ public class TestRMContainerAllocator {
       lastRelease = release;
       lastBlacklistAdditions = blacklistAdditions;
       lastBlacklistRemovals = blacklistRemovals;
-      return super.allocate(
+      Allocation allocation = super.allocate(
           applicationAttemptId, askCopy, release, 
           blacklistAdditions, blacklistRemovals);
+      if (forceResourceLimit != null) {
+        // Test wants to force the non-default resource limit
+        allocation.setResourceLimit(forceResourceLimit);
+      }
+      return allocation;
+    }
+
+    public void forceResourceLimit(Resource resource) {
+      this.forceResourceLimit = resource;
     }
   }
 
@@ -1621,6 +1695,8 @@ public class TestRMContainerAllocator {
       when(context.getApplicationID()).thenReturn(appId);
       when(context.getApplicationAttemptId()).thenReturn(appAttemptId);
       when(context.getJob(isA(JobId.class))).thenReturn(job);
+      when(context.getClock()).thenReturn(
+        new ControlledClock(new SystemClock()));
       when(context.getClusterInfo()).thenReturn(
         new ClusterInfo(Resource.newInstance(10240, 1)));
       when(context.getEventHandler()).thenReturn(new EventHandler() {
@@ -2469,7 +2545,7 @@ public class TestRMContainerAllocator {
             0, 0, 0, 0, 0, 0, "jobfile", null, false, ""));
     final MockScheduler mockScheduler = new MockScheduler(appAttemptId);
     MyContainerAllocator allocator = new MyContainerAllocator(null, conf,
-        appAttemptId, mockJob) {
+        appAttemptId, mockJob, new SystemClock()) {
           @Override
           protected void register() {
           }
@@ -2607,8 +2683,257 @@ public class TestRMContainerAllocator {
 
     // Now kill the application
     rm.killApp(app.getApplicationId());
+    rm.waitForState(app.getApplicationId(), RMAppState.KILLED);
+    allocator.schedule();
+  }
+
+  @Test
+  public void testUpdateAskOnRampDownAllReduces() throws Exception {
+    LOG.info("Running testUpdateAskOnRampDownAllReduces");
+    Configuration conf = new Configuration();
+    MyResourceManager rm = new MyResourceManager(conf);
+    rm.start();
+    DrainDispatcher dispatcher =
+        (DrainDispatcher) rm.getRMContext().getDispatcher();
+
+    // Submit the application
+    RMApp app = rm.submitApp(1024);
+    dispatcher.await();
+
+    MockNM amNodeManager = rm.registerNode("amNM:1234", 1260);
+    amNodeManager.nodeHeartbeat(true);
+    dispatcher.await();
+
+    ApplicationAttemptId appAttemptId = app.getCurrentAppAttempt()
+        .getAppAttemptId();
+    rm.sendAMLaunched(appAttemptId);
+    dispatcher.await();
+
+    JobId jobId = MRBuilderUtils.newJobId(appAttemptId.getApplicationId(), 0);
+    Job mockJob = mock(Job.class);
+    when(mockJob.getReport()).thenReturn(
+        MRBuilderUtils.newJobReport(jobId, "job", "user", JobState.RUNNING, 0,
+            0, 0, 0, 0, 0, 0, "jobfile", null, false, ""));
+    MyContainerAllocator allocator = new MyContainerAllocator(rm, conf,
+        appAttemptId, mockJob);
+    // Use a controlled clock to advance time for test.
+    ControlledClock clock = (ControlledClock)allocator.getContext().getClock();
+    clock.setTime(System.currentTimeMillis());
+
+    // Register nodes to RM.
+    MockNM nodeManager = rm.registerNode("h1:1234", 1024);
+    dispatcher.await();
+
+    // Request 2 maps and 1 reducer(sone on nodes which are not registered).
+    ContainerRequestEvent event1 =
+        createReq(jobId, 1, 1024, new String[] { "h1" });
+    allocator.sendRequest(event1);
+    ContainerRequestEvent event2 =
+        createReq(jobId, 2, 1024, new String[] { "h2" });
+    allocator.sendRequest(event2);
+    ContainerRequestEvent event3 =
+        createReq(jobId, 3, 1024, new String[] { "h2" }, false, true);
+    allocator.sendRequest(event3);
+
+    // This will tell the scheduler about the requests but there will be no
+    // allocations as nodes are not added.
+    allocator.schedule();
+    dispatcher.await();
+
+    // Advance clock so that maps can be considered as hanging.
+    clock.setTime(System.currentTimeMillis() + 500000L);
+
+    // Request for another reducer on h3 which has not registered.
+    ContainerRequestEvent event4 =
+        createReq(jobId, 4, 1024, new String[] { "h3" }, false, true);
+    allocator.sendRequest(event4);
 
     allocator.schedule();
+    dispatcher.await();
+
+    // Update resources in scheduler through node heartbeat from h1.
+    nodeManager.nodeHeartbeat(true);
+    dispatcher.await();
+
+    rm.getMyFifoScheduler().forceResourceLimit(Resource.newInstance(1024, 1));
+    allocator.schedule();
+    dispatcher.await();
+
+    // One map is assigned.
+    Assert.assertEquals(1, allocator.getAssignedRequests().maps.size());
+    // Send deallocate request for map so that no maps are assigned after this.
+    ContainerAllocatorEvent deallocate = createDeallocateEvent(jobId, 1, false);
+    allocator.sendDeallocate(deallocate);
+    // Now one reducer should be scheduled and one should be pending.
+    Assert.assertEquals(1, allocator.getScheduledRequests().reduces.size());
+    Assert.assertEquals(1, allocator.getNumOfPendingReduces());
+    // No map should be assigned and one should be scheduled.
+    Assert.assertEquals(1, allocator.getScheduledRequests().maps.size());
+    Assert.assertEquals(0, allocator.getAssignedRequests().maps.size());
+
+    Assert.assertEquals(6, allocator.getAsk().size());
+    for (ResourceRequest req : allocator.getAsk()) {
+      boolean isReduce =
+          req.getPriority().equals(RMContainerAllocator.PRIORITY_REDUCE);
+      if (isReduce) {
+        // 1 reducer each asked on h2, * and default-rack
+        Assert.assertTrue((req.getResourceName().equals("*") ||
+            req.getResourceName().equals("/default-rack") ||
+            req.getResourceName().equals("h2")) && req.getNumContainers() == 1);
+      } else { //map
+        // 0 mappers asked on h1 and 1 each on * and default-rack
+        Assert.assertTrue(((req.getResourceName().equals("*") ||
+            req.getResourceName().equals("/default-rack")) &&
+            req.getNumContainers() == 1) || (req.getResourceName().equals("h1")
+            && req.getNumContainers() == 0));
+      }
+    }
+    // On next allocate request to scheduler, headroom reported will be 0.
+    rm.getMyFifoScheduler().forceResourceLimit(Resource.newInstance(0, 0));
+    allocator.schedule();
+    dispatcher.await();
+    // After allocate response from scheduler, all scheduled reduces are ramped
+    // down and move to pending. 3 asks are also updated with 0 containers to
+    // indicate ramping down of reduces to scheduler.
+    Assert.assertEquals(0, allocator.getScheduledRequests().reduces.size());
+    Assert.assertEquals(2, allocator.getNumOfPendingReduces());
+    Assert.assertEquals(3, allocator.getAsk().size());
+    for (ResourceRequest req : allocator.getAsk()) {
+      Assert.assertEquals(
+          RMContainerAllocator.PRIORITY_REDUCE, req.getPriority());
+      Assert.assertTrue(req.getResourceName().equals("*") ||
+          req.getResourceName().equals("/default-rack") ||
+          req.getResourceName().equals("h2"));
+      Assert.assertEquals(Resource.newInstance(1024, 1), req.getCapability());
+      Assert.assertEquals(0, req.getNumContainers());
+    }
+  }
+
+
+  @Test
+  public void testAvoidAskMoreReducersWhenReducerPreemptionIsRequired()
+      throws Exception {
+    LOG.info("Running testAvoidAskMoreReducersWhenReducerPreemptionIsRequired");
+    Configuration conf = new Configuration();
+    MyResourceManager rm = new MyResourceManager(conf);
+    rm.start();
+    DrainDispatcher dispatcher =
+        (DrainDispatcher) rm.getRMContext().getDispatcher();
+
+    // Submit the application
+    RMApp app = rm.submitApp(1024);
+    dispatcher.await();
+
+    MockNM amNodeManager = rm.registerNode("amNM:1234", 1260);
+    amNodeManager.nodeHeartbeat(true);
+    dispatcher.await();
+
+    ApplicationAttemptId appAttemptId = app.getCurrentAppAttempt()
+        .getAppAttemptId();
+    rm.sendAMLaunched(appAttemptId);
+    dispatcher.await();
+
+    JobId jobId = MRBuilderUtils.newJobId(appAttemptId.getApplicationId(), 0);
+    Job mockJob = mock(Job.class);
+    when(mockJob.getReport()).thenReturn(
+        MRBuilderUtils.newJobReport(jobId, "job", "user", JobState.RUNNING, 0,
+            0, 0, 0, 0, 0, 0, "jobfile", null, false, ""));
+    MyContainerAllocator allocator = new MyContainerAllocator(rm, conf,
+        appAttemptId, mockJob);
+    // Use a controlled clock to advance time for test.
+    ControlledClock clock = (ControlledClock)allocator.getContext().getClock();
+    clock.setTime(System.currentTimeMillis());
+
+    // Register nodes to RM.
+    MockNM nodeManager = rm.registerNode("h1:1234", 1024);
+    dispatcher.await();
+
+    // Request 2 maps and 1 reducer(sone on nodes which are not registered).
+    ContainerRequestEvent event1 =
+        createReq(jobId, 1, 1024, new String[] { "h1" });
+    allocator.sendRequest(event1);
+    ContainerRequestEvent event2 =
+        createReq(jobId, 2, 1024, new String[] { "h2" });
+    allocator.sendRequest(event2);
+    ContainerRequestEvent event3 =
+        createReq(jobId, 3, 1024, new String[] { "h2" }, false, true);
+    allocator.sendRequest(event3);
+
+    // This will tell the scheduler about the requests but there will be no
+    // allocations as nodes are not added.
+    allocator.schedule();
+    dispatcher.await();
+
+    // Advance clock so that maps can be considered as hanging.
+    clock.setTime(System.currentTimeMillis() + 500000L);
+
+    // Request for another reducer on h3 which has not registered.
+    ContainerRequestEvent event4 =
+        createReq(jobId, 4, 1024, new String[] { "h3" }, false, true);
+    allocator.sendRequest(event4);
+
+    allocator.schedule();
+    dispatcher.await();
+
+    // Update resources in scheduler through node heartbeat from h1.
+    nodeManager.nodeHeartbeat(true);
+    dispatcher.await();
+
+    rm.getMyFifoScheduler().forceResourceLimit(Resource.newInstance(1024, 1));
+    allocator.schedule();
+    dispatcher.await();
+
+    // One map is assigned.
+    Assert.assertEquals(1, allocator.getAssignedRequests().maps.size());
+    // Send deallocate request for map so that no maps are assigned after this.
+    ContainerAllocatorEvent deallocate = createDeallocateEvent(jobId, 1, false);
+    allocator.sendDeallocate(deallocate);
+    // Now one reducer should be scheduled and one should be pending.
+    Assert.assertEquals(1, allocator.getScheduledRequests().reduces.size());
+    Assert.assertEquals(1, allocator.getNumOfPendingReduces());
+    // No map should be assigned and one should be scheduled.
+    Assert.assertEquals(1, allocator.getScheduledRequests().maps.size());
+    Assert.assertEquals(0, allocator.getAssignedRequests().maps.size());
+
+    Assert.assertEquals(6, allocator.getAsk().size());
+    for (ResourceRequest req : allocator.getAsk()) {
+      boolean isReduce =
+          req.getPriority().equals(RMContainerAllocator.PRIORITY_REDUCE);
+      if (isReduce) {
+        // 1 reducer each asked on h2, * and default-rack
+        Assert.assertTrue((req.getResourceName().equals("*") ||
+            req.getResourceName().equals("/default-rack") ||
+            req.getResourceName().equals("h2")) && req.getNumContainers() == 1);
+      } else { //map
+        // 0 mappers asked on h1 and 1 each on * and default-rack
+        Assert.assertTrue(((req.getResourceName().equals("*") ||
+            req.getResourceName().equals("/default-rack")) &&
+            req.getNumContainers() == 1) || (req.getResourceName().equals("h1")
+            && req.getNumContainers() == 0));
+      }
+    }
+
+    clock.setTime(System.currentTimeMillis() + 500000L + 10 * 60 * 1000);
+
+    // On next allocate request to scheduler, headroom reported will be 2048.
+    rm.getMyFifoScheduler().forceResourceLimit(Resource.newInstance(2048, 0));
+    allocator.schedule();
+    dispatcher.await();
+    // After allocate response from scheduler, all scheduled reduces are ramped
+    // down and move to pending. 3 asks are also updated with 0 containers to
+    // indicate ramping down of reduces to scheduler.
+    Assert.assertEquals(0, allocator.getScheduledRequests().reduces.size());
+    Assert.assertEquals(2, allocator.getNumOfPendingReduces());
+    Assert.assertEquals(3, allocator.getAsk().size());
+    for (ResourceRequest req : allocator.getAsk()) {
+      Assert.assertEquals(
+          RMContainerAllocator.PRIORITY_REDUCE, req.getPriority());
+      Assert.assertTrue(req.getResourceName().equals("*") ||
+          req.getResourceName().equals("/default-rack") ||
+          req.getResourceName().equals("h2"));
+      Assert.assertEquals(Resource.newInstance(1024, 1), req.getCapability());
+      Assert.assertEquals(0, req.getNumContainers());
+    }
   }
 
   private static class MockScheduler implements ApplicationMasterProtocol {

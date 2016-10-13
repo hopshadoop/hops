@@ -50,6 +50,7 @@ import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.apache.hadoop.distributedloadsimulator.sls.scheduler.ContainerSimulator;
 import org.apache.hadoop.distributedloadsimulator.sls.SLSRunner;
 import org.apache.hadoop.distributedloadsimulator.sls.conf.SLSConfiguration;
+import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.security.SaslRpcServer;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -247,6 +248,7 @@ public class MRAMSimulator extends AMSimulator {
         ApplicationMasterProtocol appMasterProtocol = ClientRMProxy.
                 createRMProxy(conf, ApplicationMasterProtocol.class, true);
         AllocateResponse response = appMasterProtocol.allocate(request);
+        RPC.stopProxy(appMasterProtocol);
         return response;
       }
     });
@@ -498,6 +500,7 @@ public class MRAMSimulator extends AMSimulator {
         ApplicationMasterProtocol appMasterProtocol = ClientRMProxy.
                 createRMProxy(conf, ApplicationMasterProtocol.class, true);
         AllocateResponse response = appMasterProtocol.allocate(request);
+        RPC.stopProxy(appMasterProtocol);
         return response;
       }
     });
