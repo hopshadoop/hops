@@ -18,7 +18,9 @@ package io.hops.security;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Collections2;
 import com.google.common.collect.Lists;
+import io.hops.exception.ForeignKeyConstraintViolationException;
 import io.hops.exception.StorageException;
+import io.hops.exception.UniqueKeyConstraintViolationException;
 import io.hops.metadata.hdfs.dal.GroupDataAccess;
 import io.hops.metadata.hdfs.dal.UserDataAccess;
 import io.hops.metadata.hdfs.dal.UserGroupDataAccess;
@@ -303,42 +305,34 @@ public class UsersGroups {
 
   public static void addUserToGroupsTx(final String user, final String[]
       groups) throws IOException {
-    addUserToGroups(user, groups, true);
+
+    if(!isConfigured)
+      return;
+
+    try {
+      addUserToGroupsInternalTx(user, groups);
+    } catch (ForeignKeyConstraintViolationException ex) {
+      flushUser(user);
+      for (String group : groups) {
+        flushGroup(group);
+      }
+      addUserToGroupsInternalTx(user, groups);
+    } catch (UniqueKeyConstraintViolationException ex){
+      LOG.debug("User/Group was already added: " + ex);
+    }
   }
 
   public static void addUserToGroups(final String user, final String[]
       groups) throws IOException {
-    addUserToGroups(user, groups, false);
-  }
 
-  private static void addUserToGroups(final String user, final String[]
-      groups, boolean transaction)
-      throws IOException {
-    if (!isConfigured) {
+    if(!isConfigured)
       return;
-    }
-    LOG.debug("Adding user (" + user  + ") to groups (" + Arrays.toString
-        (groups) + ")" );
 
-    try {
-      addUserToGroupsInt(user, groups, transaction);
-    } catch (IOException ex) {
-      if (ex.getMessage()
-          .contains("Foreign key constraint violated: No parent row found")) {
-        cache.removeUser(user);
-        for (String group : groups) {
-          cache.removeGroup(group);
-        }
-        addUserToGroupsInt(user, groups, transaction);
-      } else {
-        throw ex;
-      }
-    }
+    addUserToGroupsInternal(user, groups);
   }
 
-  private static void addUserToGroupsInt(final String user, final String[]
-      grps, boolean transaction) throws IOException {
-    if(transaction){
+  private static void addUserToGroupsInternalTx(final String user, final
+  String[] grps) throws IOException {
       new LightWeightRequestHandler(UsersOperationsType.ADD_USER) {
         @Override
         public Object performTask() throws StorageException, IOException {
@@ -346,9 +340,6 @@ public class UsersGroups {
           return null;
         }
       }.handle();
-    }else {
-      addUserToGroupsInternal(user, grps);
-    }
   }
 
   private static void addUserToGroupsInternal(final String user, final
@@ -396,6 +387,16 @@ public class UsersGroups {
         cache.appendUserGroups(user, groups);
       }
     }
+  }
+
+  static void flushUser(String userName){
+    LOG.debug("remove user (" + userName + ") from the cache");
+    cache.removeUser(userName);
+  }
+
+  static void flushGroup(String groupName){
+    LOG.debug("remove user (" + groupName + ") from the cache");
+    cache.removeGroup(groupName);
   }
 
   static void clearCache(){

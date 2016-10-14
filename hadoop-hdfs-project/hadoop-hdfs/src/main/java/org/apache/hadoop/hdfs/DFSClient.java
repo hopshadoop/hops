@@ -3116,6 +3116,20 @@ public class DFSClient implements java.io.Closeable {
     doClientActionToAll(handler, "changeConf");
   }
 
+  public void flushCache(final String userName, final String groupName)
+      throws IOException{
+    ClientActionHandler handler = new ClientActionHandler() {
+
+      @Override
+      public Object doAction(ClientProtocol namenode)
+          throws RemoteException, IOException {
+        namenode.flushCache(userName, groupName);
+        return null;
+      }
+    };
+    doClientActionToAll(handler, "flushCache");
+  }
+
   /**
    * Send the client request to all namenodes in the cluster
    * @param handler

@@ -47,6 +47,7 @@ import io.hops.metadata.hdfs.entity.ProjectedINode;
 import io.hops.metadata.hdfs.entity.SizeLogEntry;
 import io.hops.metadata.hdfs.entity.SubTreeOperation;
 import io.hops.resolvingcache.Cache;
+import io.hops.security.Users;
 import io.hops.transaction.EntityManager;
 import io.hops.transaction.context.RootINodeCache;
 import io.hops.transaction.handler.EncodingStatusOperationType;
@@ -5584,6 +5585,10 @@ private void commitOrCompleteLastBlock(
             " is not supported yet");
       }
     }
+  }
+
+  public void flushCache(String userName, String groupName){
+    Users.flushCache(userName, groupName);
   }
 
   public class FNode implements Comparable<FNode> {
