@@ -1156,6 +1156,42 @@ public class DistributedFileSystem extends FileSystem {
   }
 
 
+  /**
+   * Flush the users/groups cache in all Namenodes
+   */
+  public void flushCacheAll() throws IOException {
+    flushCache(null, null);
+  }
+
+  /**
+   * Flush all user related cache data in all Namenodes
+   * @param user
+   *    the user name
+   * @throws IOException
+   */
+  public void flushCacheUser(String user) throws IOException {
+    flushCache(user, null);
+  }
+
+  /**
+   * Flush all group related cache data in all Namenodes
+   * @param group
+   * @throws IOException
+   */
+  public void flushCacheGroup(String group) throws IOException {
+    flushCache(null, group);
+  }
+
+  /**
+   * Flush all user and group related cache data in all Namenodes
+   * @param user
+   * @param group
+   * @throws IOException
+   */
+  public void flushCache(String user, String group) throws IOException {
+    dfs.flushCache(user, group);
+  }
+
   public void enableMemcached() throws IOException {
     changeConf(DFSConfigKeys.DFS_RESOLVING_CACHE_ENABLED, String.valueOf(true));
   }

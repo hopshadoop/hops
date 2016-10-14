@@ -17,6 +17,7 @@ package io.hops.security;
 
 import com.google.common.collect.Lists;
 import io.hops.metadata.HdfsStorageFactory;
+import io.hops.metadata.hdfs.dal.GroupDataAccess;
 import io.hops.metadata.hdfs.dal.UserDataAccess;
 import io.hops.metadata.hdfs.entity.Group;
 import io.hops.metadata.hdfs.entity.User;
@@ -24,8 +25,11 @@ import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.hadoop.ipc.RemoteException;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -280,7 +284,9 @@ public class TestUsersGroups {
 
     int newUserId = UsersGroups.getUserID("user");
     assertNotSame(0, userId);
-    assertEquals(userId, newUserId);
+
+    //Auto incremented Ids
+    assertTrue(newUserId > userId);
 
     UsersGroups.addUserToGroupsTx("user", new String[]{"group1",
         "group2"});
@@ -336,7 +342,9 @@ public class TestUsersGroups {
 
     int newUserId = UsersGroups.getUserID("user");
     assertNotSame(0, userId);
-    assertEquals(userId, newUserId);
+    
+    //Auto incremented Ids
+    assertTrue(newUserId > userId);
 
     UsersGroups.addUserToGroupsTx("user", new String[]{"group1",
         "group2"});
@@ -346,6 +354,28 @@ public class TestUsersGroups {
   }
 
 
+  @Test
+  public void setOwnerMultipleTimes() throws IOException {
+    Configuration conf = new HdfsConfiguration();
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1)
+        .build();
+    cluster.waitActive();
+
+    DistributedFileSystem dfs = cluster.getFileSystem();
+
+    Path base = new Path("/projects/project1");
+    dfs.mkdirs(base);
+    Path child = new Path(base, "dataset");
+    dfs.mkdirs(child);
+
+    dfs.setOwner(base, "testUser", "testGroup");
+
+    removeGroup(UsersGroups.getGroupID("testGroup"));
+    dfs.flushCacheGroup("testGroup");
+
+    dfs.setOwner(base, "testUser", "testGroup");
+  }
+
   private void removeUser(final int userId) throws IOException {
     new LightWeightRequestHandler(
         HDFSOperationType.TEST) {
@@ -354,6 +384,19 @@ public class TestUsersGroups {
         UserDataAccess da = (UserDataAccess) HdfsStorageFactory.getDataAccess(UserDataAccess
             .class);
         da.removeUser(userId);
+        return null;
+      }
+    }.handle();
+  }
+
+  private void removeGroup(final int groupId) throws IOException {
+    new LightWeightRequestHandler(
+        HDFSOperationType.TEST) {
+      @Override
+      public Object performTask() throws IOException {
+        GroupDataAccess da = (GroupDataAccess) HdfsStorageFactory.getDataAccess
+            (GroupDataAccess.class);
+        da.removeGroup(groupId);
         return null;
       }
     }.handle();
