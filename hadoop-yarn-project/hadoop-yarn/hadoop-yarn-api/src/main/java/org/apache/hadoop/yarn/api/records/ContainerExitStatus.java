@@ -71,5 +71,8 @@ public class ContainerExitStatus {
    * Container was terminated after the application finished.
    */
   public static final int KILLED_AFTER_APP_COMPLETION = -107;
+  
+  public static final int CONTAINER_RUNNING_STATE = -201;
 
+  public static final int UNKNOWN_CONTAINER_EXIT  = -404;
 }

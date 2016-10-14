@@ -436,7 +436,6 @@ public class TestResourceTrackerService {
     Assert.assertEquals(1, containersStatusInDB.size());
     io.hops.metadata.yarn.entity.ContainerStatus cs = containersStatusInDB.get(
             containerStatus.getContainerId().toString());
-    Assert.assertEquals(io.hops.metadata.yarn.entity.ContainerStatus.Type.UCI, cs.getType());
     Assert.assertEquals(containerStatus.getState().toString(), cs.getState());
     Assert.assertEquals(3, cs.getPendingEventId());
   }

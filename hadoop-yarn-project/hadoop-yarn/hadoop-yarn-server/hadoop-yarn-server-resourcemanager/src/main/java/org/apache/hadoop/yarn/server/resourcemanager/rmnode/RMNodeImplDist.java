@@ -140,12 +140,15 @@ public class RMNodeImplDist extends RMNodeImpl {
 
   }
 
+  @Override
   protected void handleContainerStatus(List<ContainerStatus> containerStatuses) {
     // Filter the map to only obtain just launched containers and finished
     // containers.
     List<ContainerStatus> newlyLaunchedContainers
-            = new ArrayList<ContainerStatus>();
-    List<ContainerStatus> completedContainers = new ArrayList<ContainerStatus>();
+            = new ArrayList<>();
+    List<ContainerStatus> completedContainers = new ArrayList<>();
+    List<io.hops.metadata.yarn.entity.ContainerStatus> containerToLog
+            = new ArrayList<>();
     for (ContainerStatus remoteContainer : containerStatuses) {
       ContainerId containerId = remoteContainer.getContainerId();
 
@@ -177,12 +180,19 @@ public class RMNodeImplDist extends RMNodeImpl {
         launchedContainers.remove(containerId);
         completedContainers.add(remoteContainer);
       }
+      containerToLog.add(new io.hops.metadata.yarn.entity.ContainerStatus(
+              remoteContainer.getContainerId().toString(), remoteContainer.
+              getState().name(), remoteContainer.getDiagnostics(),
+              remoteContainer.getExitStatus(), nodeId.toString()));
     }
-    if (newlyLaunchedContainers.size() != 0 || completedContainers.size() != 0) {
+    if (!newlyLaunchedContainers.isEmpty() || !completedContainers.isEmpty()) {
       UpdatedContainerInfo uci = new UpdatedContainerInfo(
               newlyLaunchedContainers,
               completedContainers);
       toCommit.addNodeUpdateQueue(uci);
+    }
+    if(context.getContainersLogsService()!=null && !containerToLog.isEmpty()){
+      context.getContainersLogsService().insertEvent(containerToLog);
     }
   }
 
@@ -193,10 +203,10 @@ public class RMNodeImplDist extends RMNodeImpl {
 
     try {
       response.addAllContainersToCleanup(
-              new ArrayList<ContainerId>(this.containersToClean));
+              new ArrayList<>(this.containersToClean));
       response.addAllApplicationsToCleanup(this.finishedApplications);
       response.addContainersToBeRemovedFromNM(
-              new ArrayList<ContainerId>(this.containersToBeRemovedFromNM));
+              new ArrayList<>(this.containersToBeRemovedFromNM));
 
       // We need to make a deep copy of containersToClean and finishedApplications
       // since DBUtility is async and we get ConcurrentModificationException

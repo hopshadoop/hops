@@ -116,6 +116,8 @@ public class RMNodeImplNotDist extends RMNodeImpl {
     List<ContainerStatus> newlyLaunchedContainers
             = new ArrayList<ContainerStatus>();
     List<ContainerStatus> completedContainers = new ArrayList<ContainerStatus>();
+    List<io.hops.metadata.yarn.entity.ContainerStatus> containerToLog
+            = new ArrayList<>();
     for (ContainerStatus remoteContainer : containerStatuses) {
       ContainerId containerId = remoteContainer.getContainerId();
 
@@ -147,10 +149,17 @@ public class RMNodeImplNotDist extends RMNodeImpl {
         launchedContainers.remove(containerId);
         completedContainers.add(remoteContainer);
       }
+      containerToLog.add(new io.hops.metadata.yarn.entity.ContainerStatus(
+              remoteContainer.getContainerId().toString(), remoteContainer.
+              getState().name(), remoteContainer.getDiagnostics(),
+              remoteContainer.getExitStatus(), nodeId.toString()));
     }
     if (newlyLaunchedContainers.size() != 0 || completedContainers.size() != 0) {
       nodeUpdateQueue.add(new UpdatedContainerInfo(newlyLaunchedContainers,
               completedContainers));
+    }
+    if(!containerToLog.isEmpty()){
+      context.getContainersLogsService().insertEvent(containerToLog);
     }
   }
 

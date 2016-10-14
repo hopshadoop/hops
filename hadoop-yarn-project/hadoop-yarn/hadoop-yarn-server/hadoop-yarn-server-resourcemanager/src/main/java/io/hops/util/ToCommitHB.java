@@ -91,7 +91,6 @@ public class ToCommitHB {
                 containerStatus.getState().toString(),
                 containerStatus.getDiagnostics(),
                 containerStatus.getExitStatus(), nodeId, pendingEventId,
-                ContainerStatus.Type.UCI,
                 uciID);
         containerStatusToAdd.add(hopConStatus);
         this.pendingEventContains++;
@@ -113,7 +112,6 @@ public class ToCommitHB {
                 containerStatus.getState().toString(),
                 containerStatus.getDiagnostics(),
                 containerStatus.getExitStatus(), nodeId, pendingEventId,
-                ContainerStatus.Type.UCI,
                 uciID);
         containerStatusToAdd.add(hopConStatus);
         this.pendingEventContains++;

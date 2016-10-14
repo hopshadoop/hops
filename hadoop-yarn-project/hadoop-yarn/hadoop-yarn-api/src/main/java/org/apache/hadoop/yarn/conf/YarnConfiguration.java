@@ -1964,4 +1964,37 @@ RM_PREFIX + "resource-tracker.port";
   public static final String DISTRIBUTED_RM = CLIENT_FAILOVER_PREFIX
           + "distributed";
   public static final Boolean DEFAULT_DISTRIBUTED_RM = false;
+  
+  
+  /*
+   * Quota
+   */
+  public static final String QUOTA_PREFIX = RM_PREFIX + "quota.";
+  public static final String QUOTA_MIN_TICKS_CHARGE = QUOTA_PREFIX + "minTicksCharge";
+  public static int DEFAULT_QUOTA_MIN_TICKS_CHARGE = 10;
+  public static final String QUOTA_BATCH_TIME = QUOTA_PREFIX + "batch.time";
+  public static long DEFAULT_QUOTA_BATCH_TIME = 500;
+  public static final String QUOTA_BATCH_SIZE = QUOTA_PREFIX + "batch.size";
+  public static int DEFAULT_QUOTA_BATCH_SIZE = 100;
+  public static final String QUOTA_BASE_PRICE = QUOTA_PREFIX + "price.base";
+  public static float DEFAULT_QUOTA_BASE_PRICE = 1;
+  public static final String QUOTA_MULTIPLICATOR_THRESHOLD = QUOTA_PREFIX + "multiplicator.threshold";
+  public static float DEFAULT_QUOTA_MULTIPLICATOR_THRESHOLD = new Float(0.2);
+  public static final String QUOTA_INCREMENT_FACTOR = QUOTA_PREFIX + "multiplicator.increment";
+  public static float DEFAULT_QUOTA_INCREMENT_FACTOR = 1;
+  public static final String QUOTA_PRICE_MULTIPLICATOR_INTERVAL = QUOTA_PREFIX + "multiplicator.interval";
+  public static long DEFAULT_QUOTA_PRICE_MULTIPLICATOR_INTERVAL=1000;
+  public static final String QUOTA_CONTAINERS_LOGS_MONITOR_INTERVAL = QUOTA_PREFIX + "containers.log.period";
+  public static long DEFAULT_QUOTA_CONTAINERS_LOGS_MONITOR_INTERVAL = 1000;
+  public static final String QUOTA_CONTAINERS_LOGS_CHECKPOINTS_ENABLED = QUOTA_PREFIX + "containers.log.checkpoints.enabled";
+  public static boolean DEFAULT_QUOTA_CONTAINERS_LOGS_CHECKPOINTS_ENABLED = true;
+  public static final String QUOTA_CONTAINERS_LOGS_CHECKPOINTS_MINTICKS = QUOTA_PREFIX + "containers.log.checkpoints.period"; //this period is a multiple of the min charge period
+  public static int DEFAULT_QUOTA_CONTAINERS_LOGS_CHECKPOINTS_MINTICKS = 6;
+  public static final String QUOTA_CONTAINERS_LOGS_ALERT_THRESHOLD = QUOTA_PREFIX + "containers.log.alert.threshold";
+  public static int DEFAULT_QUOTA_CONTAINERS_LOGS_ALERT_THRESHOLD=1000;
+  public static final String QUOTA_FIXED_MULTIPLICATOR_PERIOD = QUOTA_PREFIX + "multiplicator.fixed.period";
+  public static long DEFAULT_QUOTA_FIXED_MULTIPLICATOR_PERIOD = 10;
+  public static final String QUOTA_MINIMUM_CHARGED_MB = QUOTA_PREFIX + "minimum.charged.mv";
+  public static int DEFAULT_QUOTA_MINIMUM_CHARGED_MB=10240;
+  
 }

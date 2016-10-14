@@ -330,8 +330,7 @@ public class DBUtility {
           uciToRemove.add(hopUCI);
 
           ContainerStatus hopConStatus = new ContainerStatus(containerStatus.
-                  getContainerId().toString(), nodeId, ContainerStatus.Type.UCI,
-                  uci.getUciId());
+                  getContainerId().toString(), nodeId, uci.getUciId());
           containerStatusToRemove.add(hopConStatus);
         }
       }
@@ -346,8 +345,7 @@ public class DBUtility {
                   getUciId());
           uciToRemove.add(hopUCI);
           ContainerStatus hopConStatus = new ContainerStatus(containerStatus.
-                  getContainerId().toString(), nodeId, ContainerStatus.Type.UCI,
-                  uci.getUciId());
+                  getContainerId().toString(), nodeId, uci.getUciId());
           containerStatusToRemove.add(hopConStatus);
         }
       }

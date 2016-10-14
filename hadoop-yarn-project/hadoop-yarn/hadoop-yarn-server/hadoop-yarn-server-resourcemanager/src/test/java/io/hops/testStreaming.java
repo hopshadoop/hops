@@ -184,8 +184,7 @@ public class testStreaming {
                 .getDataAccess(ContainerStatusDataAccess.class);
         List<ContainerStatus> toAdd = new ArrayList<>();
         toAdd.add(new ContainerStatus("containerid", "state", "diagnostics",
-                0, "rmnodeid", 1, ContainerStatus.Type.UCI,
-                2));
+                0, "rmnodeid", 1, 2));
         DA.addAll(toAdd);
 
         connector.commit();

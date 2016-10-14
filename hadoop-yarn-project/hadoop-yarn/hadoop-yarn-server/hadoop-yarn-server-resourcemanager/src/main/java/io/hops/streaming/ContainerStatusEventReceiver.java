@@ -25,11 +25,11 @@ public class ContainerStatusEventReceiver {
           ContainerStatusEventReceiver.class);
 
   public void createAndAddToQueue(String containerId, String rmnodeId,
-          String type, String state, String diagnostics, int exitStatus,
+          String state, String diagnostics, int exitStatus,
           int uciId, int pendingEventId) {
 
     ContainerStatusEvent event = new ContainerStatusEvent(containerId, rmnodeId,
-            type, state, diagnostics, exitStatus, uciId, pendingEventId);
+            state, diagnostics, exitStatus, uciId, pendingEventId);
     receivedEvents.add(event);
 
   }

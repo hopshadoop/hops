@@ -105,6 +105,9 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import org.apache.hadoop.yarn.server.resourcemanager.quota.ContainersLogsService;
+import org.apache.hadoop.yarn.server.resourcemanager.quota.PriceMultiplicatiorService;
+import org.apache.hadoop.yarn.server.resourcemanager.quota.QuotaService;
 
 /**
  * The ResourceManager is the main class that is a set of components.
@@ -146,6 +149,9 @@ public class ResourceManager extends CompositeService implements Recoverable {
   protected RMSecretManagerService rmSecretManagerService;
 
   protected ResourceScheduler scheduler;
+  protected QuotaService quotaService;
+  protected ContainersLogsService containersLogsService;
+  protected PriceMultiplicatiorService priceMultiplicatiorService;
   protected ReservationSystem reservationSystem;
   private ClientRMService clientRM;
   protected ApplicationMasterService masterService;
@@ -611,6 +617,19 @@ public class ResourceManager extends CompositeService implements Recoverable {
           LOG.info("Initialized Reservation system");
         }
       }
+
+      // Initialize the container logger system
+      containersLogsService = new ContainersLogsService(rmContext);
+      addIfService(containersLogsService);
+      rmContext.setContainersLogsService(containersLogsService);
+      
+      // Initialize the quota service
+      quotaService = new QuotaService();
+      addIfService(quotaService);
+      rmContext.setQuotaService(quotaService);
+      
+      priceMultiplicatiorService = new PriceMultiplicatiorService(rmContext);
+      addIfService(priceMultiplicatiorService);
 
       // creating monitors that handle preemption
       createPolicyMonitors();

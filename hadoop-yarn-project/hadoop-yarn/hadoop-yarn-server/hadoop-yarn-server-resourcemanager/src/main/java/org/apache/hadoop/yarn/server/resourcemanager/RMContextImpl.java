@@ -51,6 +51,8 @@ import org.apache.hadoop.yarn.util.Clock;
 
 import com.google.common.annotations.VisibleForTesting;
 import io.hops.util.GroupMembershipService;
+import org.apache.hadoop.yarn.server.resourcemanager.quota.ContainersLogsService;
+import org.apache.hadoop.yarn.server.resourcemanager.quota.QuotaService;
 
 public class RMContextImpl implements RMContext {
 
@@ -197,6 +199,16 @@ public class RMContextImpl implements RMContext {
   }
 
   @Override
+  public ContainersLogsService getContainersLogsService() {
+    return activeServiceContext.getContainersLogsService();
+  }
+  
+  @Override
+  public QuotaService getQuotaService() {
+    return activeServiceContext.getQuotaService();
+  }
+  
+  @Override
   public ReservationSystem getReservationSystem() {
     return activeServiceContext.getReservationSystem();
   }
@@ -299,6 +311,14 @@ public class RMContextImpl implements RMContext {
     activeServiceContext.setScheduler(scheduler);
   }
 
+  void setContainersLogsService(ContainersLogsService containersLogsService) {
+    activeServiceContext.setContainersLogsService(containersLogsService);
+  }
+  
+  void setQuotaService(QuotaService quotaService) {
+    activeServiceContext.setQuotaService(quotaService);
+  }
+  
   void setReservationSystem(ReservationSystem reservationSystem) {
     activeServiceContext.setReservationSystem(reservationSystem);
   }

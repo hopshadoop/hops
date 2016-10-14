@@ -24,13 +24,13 @@ public class ContainerStatusEvent implements DBEvent {
   private static final Log LOG = LogFactory.getLog(ContainerStatusEvent.class);
   private final ContainerStatus containerStatus;
 
-  public ContainerStatusEvent(String containerId, String rmnodeId, String type,
+  public ContainerStatusEvent(String containerId, String rmnodeId,
           String state, String diagnostics, int exitStatus, int uciId,
           int pendingEventId) {
 
     containerStatus = new ContainerStatus(containerId, state, diagnostics,
             exitStatus,
-            rmnodeId, pendingEventId, ContainerStatus.Type.valueOf(type), uciId);
+            rmnodeId, pendingEventId, uciId);
   }
 
   public ContainerStatus getContainerStatus() {

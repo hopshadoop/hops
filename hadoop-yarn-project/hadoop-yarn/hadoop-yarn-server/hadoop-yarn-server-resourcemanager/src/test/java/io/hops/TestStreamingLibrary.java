@@ -264,7 +264,6 @@ public class TestStreamingLibrary {
                     1,
                     rmNodeId,
                     pendingEventId,
-                    ContainerStatus.Type.UCI,
                     // This is the UpdatedContainerInfo ID
                     pendingEventId);
             containerStatuses.add(contStat);
