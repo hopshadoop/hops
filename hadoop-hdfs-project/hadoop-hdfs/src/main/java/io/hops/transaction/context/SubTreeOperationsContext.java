@@ -49,16 +49,20 @@ public class SubTreeOperationsContext extends BaseEntityContext<String, SubTreeO
       throws TransactionContextException {
     super.update(hopSubTeeOperation);
     addInternal(hopSubTeeOperation);
-    log("updated-sub-tree-op", "path", hopSubTeeOperation.getPath(), "nnid",
-        hopSubTeeOperation.getNameNodeId(), "op", hopSubTeeOperation.getOpType());
+    if(isLogDebugEnabled()) {
+      log("updated-sub-tree-op", "path", hopSubTeeOperation.getPath(), "nnid",
+              hopSubTeeOperation.getNameNodeId(), "op", hopSubTeeOperation.getOpType());
+    }
   }
 
   @Override
   public void remove(SubTreeOperation hopSubTeeOperation)
       throws TransactionContextException {
     super.forceRemove(hopSubTeeOperation);
-    log("removed-sub-tree-op", "path", hopSubTeeOperation.getPath(), "nnid",
-        hopSubTeeOperation.getNameNodeId(), "op", hopSubTeeOperation.getOpType());
+    if(isLogDebugEnabled()) {
+      log("removed-sub-tree-op", "path", hopSubTeeOperation.getPath(), "nnid",
+              hopSubTeeOperation.getNameNodeId(), "op", hopSubTeeOperation.getOpType());
+    }
   }
 
   @Override

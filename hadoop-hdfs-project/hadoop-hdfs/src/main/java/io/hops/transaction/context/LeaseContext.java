@@ -42,7 +42,9 @@ public class LeaseContext extends BaseEntityContext<String, Lease> {
   public void update(Lease lease) throws TransactionContextException {
     super.update(lease);
     idToLease.put(lease.getHolderID(), lease);
-    log("added-lease", "holder", lease.getHolder(), "hid", lease.getHolderID());
+    if(isLogDebugEnabled()) {
+      log("added-lease", "holder", lease.getHolder(), "hid", lease.getHolderID());
+    }
   }
 
   @Override
@@ -51,7 +53,9 @@ public class LeaseContext extends BaseEntityContext<String, Lease> {
     Lease.Counter lCounter = (Lease.Counter) counter;
     switch (lCounter) {
       case All:
-        log("count-all-leases");
+        if(isLogDebugEnabled()) {
+          log("count-all-leases");
+        }
         return dataAccess.countAll();
     }
     throw new RuntimeException(UNSUPPORTED_COUNTER);
@@ -74,7 +78,9 @@ public class LeaseContext extends BaseEntityContext<String, Lease> {
   public void remove(Lease lease) throws TransactionContextException {
     super.remove(lease);
     idToLease.remove(lease.getHolderID());
-    log("removed-lease", "holder", lease.getHolder());
+    if(isLogDebugEnabled()) {
+      log("removed-lease", "holder", lease.getHolder());
+    }
   }
 
   @Override

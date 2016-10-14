@@ -157,7 +157,6 @@ public class StorageInfo {
 
   public static void storeStorageInfoToDB(final String clusterId) throws
       IOException { // should only be called by the format function once during the life time of the cluster.
-    // FIXME [S] it can cause problems in the future when we try to run multiple NN
     // Solution. call format on only one namenode or every one puts the same values.
     
     new HopsTransactionalRequestHandler(HDFSOperationType.ADD_STORAGE_INFO) {

@@ -259,7 +259,9 @@ public class NameNodeBlockTokenSecretManager extends BlockTokenSecretManager {
         Map<Integer, BlockKey> keys =
             HdfsVariables.getAllBlockTokenKeysByType();
         if (keys.isEmpty()) {
-          log.debug("keys is not generated yet to be updated");
+          if(LOG.isDebugEnabled()) {
+            LOG.debug("keys is not generated yet to be updated");
+          }
           return false;
         }
         // set final expiry date of retiring currentKey
