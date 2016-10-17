@@ -20,6 +20,9 @@ package org.apache.hadoop.yarn.server.resourcemanager;
 
 import java.io.IOException;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ha.ClientBaseWithFixes;
 import org.apache.hadoop.ha.HAServiceProtocol;
@@ -77,10 +80,19 @@ public class RMHATestBase extends ClientBaseWithFixes{
           + (base + 40));
       base = base * 2;
     }
+
+    RMStorageFactory.setConfiguration(configuration);
+    YarnAPIStorageFactory.setConfiguration(configuration);
+    DBUtility.InitializeDB();
+
     confForRM1 = new Configuration(configuration);
     confForRM1.set(YarnConfiguration.RM_HA_ID, "rm1");
+    confForRM1.set(YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS,
+            "localhost:8034");
     confForRM2 = new Configuration(configuration);
     confForRM2.set(YarnConfiguration.RM_HA_ID, "rm2");
+    confForRM2.set(YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS,
+            "localhost:8035");
   }
 
   @After
