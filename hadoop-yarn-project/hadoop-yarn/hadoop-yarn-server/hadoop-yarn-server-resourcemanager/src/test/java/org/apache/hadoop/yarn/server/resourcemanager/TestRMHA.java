@@ -28,6 +28,9 @@ import java.net.InetSocketAddress;
 
 import javax.ws.rs.core.MediaType;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -101,6 +104,11 @@ public class TestRMHA {
     // Enable webapp to test web-services also
     configuration.setBoolean(MockRM.ENABLE_WEBAPP, true);
     configuration.setBoolean(YarnConfiguration.YARN_ACL_ENABLE, true);
+
+    RMStorageFactory.setConfiguration(configuration);
+    YarnAPIStorageFactory.setConfiguration(configuration);
+    DBUtility.InitializeDB();
+
     ClusterMetrics.destroy();
     QueueMetrics.clearQueueMetrics();
     DefaultMetricsSystem.shutdown();
