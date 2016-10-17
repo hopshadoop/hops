@@ -45,15 +45,19 @@ public class PendingBlockContext
   public void update(PendingBlockInfo pendingBlockInfo)
       throws TransactionContextException {
     super.update(pendingBlockInfo);
-    log("added-pending", "bid", pendingBlockInfo.getBlockId(), "numInProgress",
-        pendingBlockInfo.getNumReplicas());
+    if(isLogDebugEnabled()) {
+      log("added-pending", "bid", pendingBlockInfo.getBlockId(), "numInProgress",
+              pendingBlockInfo.getNumReplicas());
+    }
   }
 
   @Override
   public void remove(PendingBlockInfo pendingBlockInfo)
       throws TransactionContextException {
     super.remove(pendingBlockInfo);
-    log("removed-pending", "bid", pendingBlockInfo.getBlockId());
+    if(isLogDebugEnabled()) {
+      log("removed-pending", "bid", pendingBlockInfo.getBlockId());
+    }
   }
 
   @Override

@@ -34,6 +34,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.security.token.block.BlockKey;
 import org.apache.hadoop.hdfs.server.common.StorageInfo;
+import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -233,14 +234,15 @@ public class HdfsVariables {
   }
 
   public static void setBrLbMasBlkPerMin(final long value) throws IOException {
-    new LightWeightRequestHandler(HDFSOperationType.SET_BR_LB_MAX_BLKS_PER_MIN) {
+    new LightWeightRequestHandler(HDFSOperationType.SET_BR_LB_MAX_BLKS_PER_TW) {
       @Override
       public Object performTask() throws IOException {
         return handleVariableWithWriteLock(new Handler() {
           @Override
           public Object handle(VariableDataAccess<Variable, Variable.Finder> vd)
               throws StorageException {
-            vd.setVariable(new LongVariable(Variable.Finder.BrLbMaxBlkPerTU, value));
+            vd.setVariable(new LongVariable(Variable.Finder.BrLbMaxBlkPerTW, value));
+            LOG.debug("Set block report max blocks per time window is : "+ value);
             return null;
           }
         });
@@ -248,9 +250,9 @@ public class HdfsVariables {
     }.handle();
   }
 
-  public static long getBrLbMasBlkPerMin() throws IOException {
+  public static long getBrLbMaxBlkPerTW() throws IOException {
     return (Long) new LightWeightRequestHandler(
-            HDFSOperationType.GET_BR_LB_MAX_BLKS_PER_TU) {
+            HDFSOperationType.GET_BR_LB_MAX_BLKS_PER_TW) {
       @Override
       public Object performTask() throws IOException {
         return handleVariableWithReadLock(new Handler() {
@@ -258,7 +260,7 @@ public class HdfsVariables {
           public Object handle(VariableDataAccess<Variable, Variable.Finder> vd)
               throws StorageException {
             LongVariable var =
-                (LongVariable) vd.getVariable(Variable.Finder.BrLbMaxBlkPerTU);
+                (LongVariable) vd.getVariable(Variable.Finder.BrLbMaxBlkPerTW);
             return var.getValue();
           }
         });
@@ -419,9 +421,9 @@ public class HdfsVariables {
         new IntVariable(1).getBytes());
     Variable.registerVariableDefaultValue(Variable.Finder.QuotaUpdateID,
         new IntVariable(0).getBytes());
-    Variable.registerVariableDefaultValue(Variable.Finder.BrLbMaxBlkPerTU,
+    Variable.registerVariableDefaultValue(Variable.Finder.BrLbMaxBlkPerTW,
             new LongVariable(conf.getLong(DFSConfigKeys.DFS_BR_LB_MAX_BLK_PER_TW,
-                    DFSConfigKeys.DFS_BR_LB_MAX_BLK_PER_TU_DEFAULT)).getBytes());
+                    DFSConfigKeys.DFS_BR_LB_MAX_BLK_PER_TW_DEFAULT)).getBytes());
     VarsRegister.registerHdfsDefaultValues();
     // This is a workaround that is needed until HA-YARN has its own format command
     VarsRegister.registerYarnDefaultValues();

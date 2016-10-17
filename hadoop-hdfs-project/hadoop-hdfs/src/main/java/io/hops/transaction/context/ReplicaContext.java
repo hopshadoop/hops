@@ -43,16 +43,20 @@ public class ReplicaContext
   public void update(Replica replica)
       throws TransactionContextException {
     super.update(replica);
-    log("updated-replica", "bid", replica.getBlockId(), "sid",
-        replica.getStorageId());
+    if(isLogDebugEnabled()) {
+      log("updated-replica", "bid", replica.getBlockId(), "sid",
+              replica.getStorageId());
+    }
   }
 
   @Override
   public void remove(Replica replica)
       throws TransactionContextException {
     super.remove(replica);
-    log("removed-replica", "bid", replica.getBlockId(), "sid",
-        replica.getStorageId());
+    if(isLogDebugEnabled()) {
+      log("removed-replica", "bid", replica.getBlockId(), "sid",
+              replica.getStorageId());
+    }
   }
 
 

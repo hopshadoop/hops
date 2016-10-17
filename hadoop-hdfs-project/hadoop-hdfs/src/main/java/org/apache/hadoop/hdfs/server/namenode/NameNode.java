@@ -427,8 +427,8 @@ public class NameNode {
     
     HdfsStorageFactory.setConfiguration(conf);
 
-    this.brTrackingService = new BRTrackingService(conf.getLong(DFSConfigKeys.DFS_BR_LB_UPDATE_THRESHOLD_TIME,
-            DFSConfigKeys.DFS_BR_LB_UPDATE_THRESHOLD_TIME_DEFAULT),
+    this.brTrackingService = new BRTrackingService(conf.getLong(DFSConfigKeys.DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD,
+            DFSConfigKeys.DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD_DEFAULT),
             conf.getLong(DFSConfigKeys.DFS_BR_LB_TIME_WINDOW_SIZE,
                     DFSConfigKeys.DFS_BR_LB_TIME_WINDOW_SIZE_DEFAULT));
 
@@ -592,26 +592,6 @@ public class NameNode {
    * <ul>
    * <li>{@link StartupOption#REGULAR REGULAR} - normal name node startup</li>
    * <li>{@link StartupOption#FORMAT FORMAT} - format name node</li>
-   * <li>{@link StartupOption#BACKUP BACKUP} - start backup node</li>
-   * <li>{@link StartupOption#CHECKPOINT CHECKPOINT} - start checkpoint
-   * node</li>
-   * <li>{@link StartupOption#UPGRADE UPGRADE} - start the cluster upgrade and
-   * create a snapshot of the current file system state</li>
-   * <li>{@link StartupOption#RECOVERY RECOVERY} - recover name node
-   * metadata</li>
-   * <li>{@link StartupOption#ROLLBACK ROLLBACK} - roll the cluster back to
-   * the previous state</li>
-   * <li>{@link StartupOption#FINALIZE FINALIZE} - finalize previous
-   * upgrade</li>
-   * <li>{@link StartupOption#IMPORT IMPORT} - import checkpoint</li>
-   * </ul>
-   * The option is passed via configuration field:
-   * <tt>dfs.namenode.startup</tt>
-   * <p/>
-   * The conf will be modified to reflect the actual ports on which the
-   * NameNode is up and running if the user passes the port as
-   * <code>zero</code> in the conf.
-   *
    * @param conf
    *     confirguration
    * @throws IOException
@@ -747,9 +727,9 @@ public class NameNode {
     try {
       HdfsStorageFactory.setConfiguration(conf);
       if (force) {
-        HdfsStorageFactory.formatAllStorageNonTransactional();
+        HdfsStorageFactory.formatHdfsStorageNonTransactional();
       } else {
-        HdfsStorageFactory.formatStorage();
+        HdfsStorageFactory.formatHdfsStorage();
       }
       StorageInfo
           .storeStorageInfoToDB(clusterId);  //this adds new row to the db

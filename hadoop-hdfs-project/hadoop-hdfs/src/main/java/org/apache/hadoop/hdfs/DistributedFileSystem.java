@@ -481,7 +481,11 @@ public class DistributedFileSystem extends FileSystem {
     statistics.incrementWriteOps(1);
     dfs.setMetaEnabled(getPathName(src), metaEnabled);
   }
-  
+
+  public int getNameNodesCount()
+      throws IOException {
+    return dfs.getNameNodesCount();
+  }
   /**
    * Move blocks from srcs to trg
    * and delete srcs afterwards

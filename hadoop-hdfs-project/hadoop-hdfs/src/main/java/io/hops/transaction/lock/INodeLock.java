@@ -20,10 +20,12 @@ import io.hops.common.INodeResolver;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.leader_election.node.ActiveNode;
+import io.hops.metadata.hdfs.dal.INodeDataAccess;
 import io.hops.resolvingcache.Cache;
 import io.hops.resolvingcache.OptimalMemcache;
 import io.hops.resolvingcache.PathMemcache;
 import io.hops.security.Users;
+import io.hops.transaction.EntityManager;
 import org.apache.commons.math3.stat.StatUtils;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DFSUtil;
@@ -47,7 +49,7 @@ class INodeLock extends BaseINodeLock {
   private final Collection<ActiveNode> activeNamenodes;
   private final boolean ignoreLocalSubtreeLocks;
   private final long namenodeId;
-  private final boolean skipReadingQuotaAttr;
+  protected final boolean skipReadingQuotaAttr;
 
 
   INodeLock(TransactionLockTypes.INodeLockType lockType,
@@ -65,10 +67,10 @@ class INodeLock extends BaseINodeLock {
     this.skipReadingQuotaAttr = skipReadingQuotaAttr;
   }
 
-  INodeLock(TransactionLockTypes.INodeLockType lockType,
+  INodeLock(boolean skipReadingQuotaAttr, TransactionLockTypes.INodeLockType lockType,
       TransactionLockTypes.INodeResolveType resolveType, boolean resolveLink,
       Collection<ActiveNode> activeNamenodes, String... paths) {
-    this(lockType, resolveType, resolveLink, false, false, -1, activeNamenodes, paths);
+    this(lockType, resolveType, resolveLink, false, skipReadingQuotaAttr, -1, activeNamenodes, paths);
   }
 
   INodeLock(TransactionLockTypes.INodeLockType lockType,
@@ -94,8 +96,7 @@ class INodeLock extends BaseINodeLock {
   }
 
   private abstract class CacheResolver {
-    abstract List<INode> fetchINodes(String path,
-        boolean tryToSetParitionKey) throws IOException;
+    abstract List<INode> fetchINodes(String path) throws IOException;
 
     protected int verifyINodesFull(final List<INode> inodes, final String[]
         names, final int[] parentIds, final int[] inodeIds) throws IOException {
@@ -138,31 +139,44 @@ class INodeLock extends BaseINodeLock {
       return parentIds;
     }
 
-    protected void setPartitionKey(int[] inodeIds, boolean partial)
-        throws TransactionContextException, StorageException {
-      setPartitionKey(partial ? null : inodeIds);
-    }
-
-    protected void setPartitionKey(int[] inodeIds)
-        throws TransactionContextException, StorageException {
-      setPartitioningKey(inodeIds == null ? null : inodeIds[inodeIds.length - 1]);
+    protected void setPartitionKey(int[] inodeIds, int parentIds[], int partitionIds[], boolean partial)
+            throws TransactionContextException, StorageException {
+      Integer partId = null;
+      if(partial){
+        if (setRandomParitionKeyEnabled && partId == null) {
+          LOG.debug("Setting Random PartitionKey");
+          partId = Math.abs(rand.nextInt());
+        }
+      }else{
+          partId = inodeIds[inodeIds.length - 1];
+       }
+      setPartitioningKey(partId);
     }
   }
 
   private class FullPathResolver extends CacheResolver {
 
     @Override
-    List<INode> fetchINodes(String path, boolean tryToSetParitionKey) throws IOException {
+    List<INode> fetchINodes(String path) throws IOException {
       int[] inodeIds = Cache.getInstance().get(path);
       if (inodeIds != null) {
-        if (tryToSetParitionKey) {
-          setPartitionKey(inodeIds);
-        }
         final String[] names = INode.getPathNames(path);
+        final boolean partial = names.length > inodeIds.length;
+
         final int[] parentIds = getParentIds(inodeIds);
+        final int[] partitionIds = new int[parentIds.length];
+
+        short depth = INodeDirectory.ROOT_DIR_DEPTH;
+        partitionIds[0] = INodeDirectory.getRootDirPartitionKey();
+        for(int i = 1; i < partitionIds.length; i++){
+          depth++;
+          partitionIds[i] = INode.calculatePartitionId(parentIds[i], names[i], depth);
+        }
+
+        setPartitionKey(inodeIds,parentIds,partitionIds,partial);
 
         List<INode> inodes = readINodesWhileRespectingLocks(path,names,
-            parentIds);
+            parentIds,partitionIds);
         if (inodes != null) {
           if (verifyINodes(inodes, names, parentIds, inodeIds)) {
             addPathINodes(path, inodes);
@@ -182,7 +196,7 @@ class INodeLock extends BaseINodeLock {
     }
 
     protected List<INode> readINodesWhileRespectingLocks(final String path,
-        final String[] names, final int[] parentIds)
+        final String[] names, final int[] parentIds, final int[] partitionIds)
         throws TransactionContextException, StorageException,
         UnresolvedPathException {
       int rowsToReadWithDefaultLock = names.length;
@@ -202,7 +216,8 @@ class INodeLock extends BaseINodeLock {
       if (rowsToReadWithDefaultLock > 0) {
         inodes = find(DEFAULT_INODE_LOCK_TYPE,
             Arrays.copyOf(names, rowsToReadWithDefaultLock),
-            Arrays.copyOf(parentIds, rowsToReadWithDefaultLock), true);
+            Arrays.copyOf(parentIds, rowsToReadWithDefaultLock),
+            Arrays.copyOf(partitionIds, rowsToReadWithDefaultLock), true);
       }
 
       if(inodes != null) {
@@ -247,21 +262,27 @@ class INodeLock extends BaseINodeLock {
   private class PartialPathResolver extends FullPathResolver {
 
     @Override
-    List<INode> fetchINodes(String path, boolean tryToSetParitionKey) throws
+    List<INode> fetchINodes(String path) throws
         IOException {
       int[] inodeIds = Cache.getInstance().get(path);
       if (inodeIds != null) {
         final String[] names = INode.getPathNames(path);
         final boolean partial = names.length > inodeIds.length;
+        final int[] parentIds = getParentIds(inodeIds, partial);
+        final int[] partitionIds = new int[parentIds.length];
 
-        if (tryToSetParitionKey) {
-            setPartitionKey(inodeIds, partial);
+        short depth = INodeDirectory.ROOT_DIR_DEPTH;
+        partitionIds[0] = INodeDirectory.getRootDirPartitionKey();
+        for(int i = 1; i < partitionIds.length;i++){
+          depth++;
+          partitionIds[i] = INode.calculatePartitionId(parentIds[i], names[i], depth);
         }
 
-        final int[] parentIds = getParentIds(inodeIds, partial);
+        setPartitionKey(inodeIds, parentIds, partitionIds, partial);
+
 
         List<INode> inodes = readINodesWhileRespectingLocks(path, names,
-            parentIds);
+            parentIds, partitionIds);
         if (inodes != null && !inodes.isEmpty()) {
           final int unverifiedInode = verifyINodesPartial(inodes, names,
               parentIds, inodeIds);
@@ -357,18 +378,20 @@ class INodeLock extends BaseINodeLock {
       throw new IllegalArgumentException("Unknown type " + resolveType.name());
     }
 
-    boolean tryToSetParitionKey = true;
-
     for (int i = 0; i < paths.length; i++) {
       String path = paths[i];
-      List<INode> resolvedINodes =
-          resolveUsingMemcache(path, tryToSetParitionKey);
+      List<INode> resolvedINodes = resolveUsingMemcache(path);
       if (resolvedINodes == null) {
+        // path not found in the cache
+        // set random partition key if enabled
+        if(setRandomParitionKeyEnabled){
+          setPartitioningKey(rand.nextInt());
+        }
         resolvedINodes = acquireINodeLockByPath(path);
         addPathINodesAndUpdateResolvingCache(path, resolvedINodes);
       }
-      if (resolvedINodes.size() > 0) {
 
+      if (resolvedINodes.size() > 0) {
         INode lastINode = resolvedINodes.get(resolvedINodes.size() - 1);
         if (resolveType ==
             TransactionLockTypes.INodeResolveType.PATH_AND_IMMEDIATE_CHILDREN) {
@@ -380,18 +403,14 @@ class INodeLock extends BaseINodeLock {
           addChildINodes(path, children);
         }
       }
-
-      tryToSetParitionKey = false;
     }
   }
 
-  private List<INode> resolveUsingMemcache(String path,
-      boolean tryToSetParitionKey) throws IOException {
+  private List<INode> resolveUsingMemcache(String path) throws IOException {
     CacheResolver memcacheResolver = getCacheResolver();
     if(memcacheResolver == null)
       return null;
-    List<INode> resolvedINodes = memcacheResolver.fetchINodes(path,
-        tryToSetParitionKey);
+    List<INode> resolvedINodes = memcacheResolver.fetchINodes(path);
     if (resolvedINodes != null) {
       for (INode iNode : resolvedINodes) {
         checkSubtreeLock(iNode);
@@ -471,8 +490,9 @@ class INodeLock extends BaseINodeLock {
     if (SubtreeLockHelper
         .isSubtreeLocked(iNode.isSubtreeLocked(), iNode.getSubtreeLockOwner(),
             activeNamenodes)) {
-      if (!ignoreLocalSubtreeLocks &&
-          namenodeId != iNode.getSubtreeLockOwner()) {
+      if (!ignoreLocalSubtreeLocks
+//         && namenodeId != iNode.getSubtreeLockOwner()
+         ) {
         throw new SubtreeLockedException(iNode.getLocalName(), activeNamenodes);
       }
     }
@@ -496,9 +516,11 @@ class INodeLock extends BaseINodeLock {
         inodeToReread = resolvedINodes.get(resolvedINodes.size() - 1);
       }
 
-      if (inodeToReread != null) {
+     if (inodeToReread != null) {
+        int partitionIdOfINodeToBeReRead = INode.calculatePartitionId(inodeToReread.getParentId(), inodeToReread
+        .getLocalName(), inodeToReread.myDepth());
         INode inode = find(lockType, inodeToReread.getLocalName(),
-            inodeToReread.getParentId());
+            inodeToReread.getParentId(), partitionIdOfINodeToBeReRead);
         if (inode != null) {
           // re-read after taking write lock to make sure that no one has created the same inode.
           addLockedINodes(inode, lockType);
@@ -539,7 +561,7 @@ class INodeLock extends BaseINodeLock {
     List<INode> children = new ArrayList<INode>();
     if (lastINode != null) {
       if (lastINode instanceof INodeDirectory) {
-        setINodeLockType(lockType);
+        setINodeLockType(TransactionLockTypes.INodeLockType.READ_COMMITTED); //if the parent is locked then taking lock on all children is not necessary
         children.addAll(((INodeDirectory) lastINode).getChildren());
       }
     }
@@ -560,7 +582,7 @@ class INodeLock extends BaseINodeLock {
     while (!unCheckedDirs.isEmpty()) {
       INode next = unCheckedDirs.poll();
       if (next instanceof INodeDirectory) {
-        setINodeLockType(lockType);
+        setINodeLockType(TransactionLockTypes.INodeLockType.READ_COMMITTED); //locking the parent is sufficient
         List<INode> clist = ((INodeDirectory) next).getChildren();
         unCheckedDirs.addAll(clist);
         children.addAll(clist);
@@ -573,7 +595,7 @@ class INodeLock extends BaseINodeLock {
   private INode acquireLockOnRoot(TransactionLockTypes.INodeLockType lock)
       throws StorageException, TransactionContextException {
     LOG.debug("Acquiring " + lock + " on the root node");
-    return find(lock, INodeDirectory.ROOT_NAME, INodeDirectory.ROOT_PARENT_ID);
+    return find(lock, INodeDirectory.ROOT_NAME, INodeDirectory.ROOT_PARENT_ID, INodeDirectory.getRootDirPartitionKey());
   }
 
   private String buildPath(String path, int size) {
@@ -594,8 +616,8 @@ class INodeLock extends BaseINodeLock {
     return builder.toString();
   }
   
-  protected INode find(String name, int parentId)
+  protected INode find(String name, int parentId, int partitionId)
       throws StorageException, TransactionContextException {
-    return find(lockType, name, parentId);
+    return find(lockType, name, parentId, partitionId);
   }
 }

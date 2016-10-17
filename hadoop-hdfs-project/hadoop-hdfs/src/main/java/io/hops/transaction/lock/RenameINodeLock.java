@@ -41,13 +41,31 @@ final class RenameINodeLock extends INodeLock {
   };
   private final boolean legacyRename;
 
+  public RenameINodeLock(boolean skipReadingQuotaAttr,TransactionLockTypes.INodeLockType lockType,
+      TransactionLockTypes.INodeResolveType resolveType,
+      boolean ignoreLocalSubtreeLocks, long namenodeId,
+      Collection<ActiveNode> activeNamenodes, String src, String dst,
+      boolean legacyRename) {
+    super(lockType, resolveType, false, ignoreLocalSubtreeLocks, skipReadingQuotaAttr, namenodeId,
+        activeNamenodes, src, dst);
+    this.legacyRename = legacyRename;
+  }
+
   public RenameINodeLock(TransactionLockTypes.INodeLockType lockType,
       TransactionLockTypes.INodeResolveType resolveType,
       boolean ignoreLocalSubtreeLocks, long namenodeId,
       Collection<ActiveNode> activeNamenodes, String src, String dst,
       boolean legacyRename) {
-    super(lockType, resolveType, false,false, ignoreLocalSubtreeLocks, namenodeId,
+    super(lockType, resolveType, false, ignoreLocalSubtreeLocks, false, namenodeId,
         activeNamenodes, src, dst);
+    this.legacyRename = legacyRename;
+  }
+
+  public RenameINodeLock(boolean skipReadingQuotaAttr, TransactionLockTypes.INodeLockType lockType,
+      TransactionLockTypes.INodeResolveType resolveType,
+      Collection<ActiveNode> activeNamenodes, String src, String dst,
+      boolean legacyRename) {
+    super(skipReadingQuotaAttr, lockType, resolveType, false, activeNamenodes, src, dst);
     this.legacyRename = legacyRename;
   }
 
@@ -55,7 +73,7 @@ final class RenameINodeLock extends INodeLock {
       TransactionLockTypes.INodeResolveType resolveType,
       Collection<ActiveNode> activeNamenodes, String src, String dst,
       boolean legacyRename) {
-    super(lockType, resolveType, false, activeNamenodes, src, dst);
+    super(false, lockType, resolveType, false, activeNamenodes, src, dst);
     this.legacyRename = legacyRename;
   }
 
@@ -75,7 +93,7 @@ final class RenameINodeLock extends INodeLock {
 
   @Override
   protected void acquire(TransactionLocks locks) throws IOException {
-    //[S] consider src = /a/b/c and dst = /d
+    //consider src = /a/b/c and dst = /d
     //during the acquire lock of src write locks will be acquired on parent of c and c
     //during the acquire lock of dst write lock on the root will be acquired but the snapshot 
     //layer will not let the request go to the db as it has already cached the root inode
@@ -95,10 +113,14 @@ final class RenameINodeLock extends INodeLock {
 
       if (dstINodes.size() == dstComponents.length && lastComp.isDirectory()) {
         //the dst exist and is a directory.
-        find(srcComponents[srcComponents.length - 1], lastComp.getId());
+        int parttitionId = INode.calculatePartitionId(lastComp.getId(), srcComponents[srcComponents.length - 1],
+            (short)(lastComp.myDepth()+1));
+        find(srcComponents[srcComponents.length - 1], lastComp.getId(), parttitionId);
       }
     }
-    
-    acquireINodeAttributes();
+
+    if(!skipReadingQuotaAttr) {
+      acquireINodeAttributes();
+    }
   }
 }
