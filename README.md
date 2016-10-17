@@ -61,6 +61,7 @@ Due to the complexity of installing and configuring all Hops’ services, we rec
     * Google Compute Engine (GCE)
     * OpenStack
     * On-premises (bare metal)
+
 For more information on how to configure cloud-based installations,  go to help documentation at http://www.karamel.io. For on-premises installations, we provide some additional installation details and tips later in this section.
 
 ###On-Premises (baremetal) Installation
