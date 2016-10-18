@@ -17,6 +17,9 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -25,6 +28,7 @@ import org.apache.hadoop.ha.ServiceFailedException;
 import org.apache.hadoop.yarn.conf.HAUtil;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -78,6 +82,10 @@ public class TestRMEmbeddedElector extends ClientBaseWithFixes {
 
     conf.setLong(YarnConfiguration.CLIENT_FAILOVER_SLEEPTIME_BASE_MS, 100L);
 
+    RMStorageFactory.setConfiguration(conf);
+    YarnAPIStorageFactory.setConfiguration(conf);
+    DBUtility.InitializeDB();
+
     callbackCalled = new AtomicBoolean(false);
   }
 
@@ -88,6 +96,7 @@ public class TestRMEmbeddedElector extends ClientBaseWithFixes {
    *
    * The test times out if there is a deadlock.
    */
+  @Ignore
   @Test (timeout = 10000)
   public void testDeadlockShutdownBecomeActive() throws InterruptedException {
     MockRM rm = new MockRMWithElector(conf, 1000);

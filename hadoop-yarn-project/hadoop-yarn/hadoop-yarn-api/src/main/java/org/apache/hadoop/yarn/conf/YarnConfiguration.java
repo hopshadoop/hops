@@ -482,18 +482,18 @@ RM_PREFIX + "resource-tracker.port";
       + "authorization-provider";
   private static final List<String> RM_SERVICES_ADDRESS_CONF_KEYS_HTTP =
       Collections.unmodifiableList(Arrays.asList(
-          RM_ADDRESS, RM_PORT,
-          RM_SCHEDULER_ADDRESS, RM_SCHEDULER_PORT,
-          RM_ADMIN_ADDRESS, RM_ADMIN_PORT,
-          RM_RESOURCE_TRACKER_ADDRESS, RM_RESOURCE_TRACKER_PORT,
+          RM_ADDRESS,
+          RM_SCHEDULER_ADDRESS,
+          RM_ADMIN_ADDRESS,
+          RM_RESOURCE_TRACKER_ADDRESS,
           RM_WEBAPP_ADDRESS));
 
   private static final List<String> RM_SERVICES_ADDRESS_CONF_KEYS_HTTPS =
       Collections.unmodifiableList(Arrays.asList(
-          RM_ADDRESS, RM_PORT,
-          RM_SCHEDULER_ADDRESS, RM_SCHEDULER_PORT,
-          RM_ADMIN_ADDRESS, RM_ADMIN_PORT,
-          RM_RESOURCE_TRACKER_ADDRESS,RM_RESOURCE_TRACKER_PORT,
+          RM_ADDRESS,
+          RM_SCHEDULER_ADDRESS,
+          RM_ADMIN_ADDRESS,
+          RM_RESOURCE_TRACKER_ADDRESS,
           RM_WEBAPP_HTTPS_ADDRESS));
 
   public static final String AUTO_FAILOVER_PREFIX =

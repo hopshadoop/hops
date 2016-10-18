@@ -309,6 +309,7 @@ public class TestRMHA {
     }
     checkMonitorHealth();
     checkActiveRMFunctionality();
+    rm.stop();
   }
 
   @Test
@@ -403,6 +404,8 @@ public class TestRMHA {
       Assert.assertTrue(ex.getMessage().contains(
           "Invalid configuration! Can not find valid RM_HA_ID."));
     }
+
+    rm.stop();
   }
 
   @Test
@@ -462,6 +465,8 @@ public class TestRMHA {
     rm.adminService.transitionToActive(requestInfo);
     checkMonitorHealth();
     checkActiveRMFunctionality();
+
+    rm.stop();
   }
 
   @Test(timeout = 90000)
@@ -586,6 +591,8 @@ public class TestRMHA {
     verifyClusterMetrics(0, 0, 0, 0, 0, 0);
     assertEquals(0, rm.getRMContext().getRMNodes().size());
     assertEquals(0, rm.getRMContext().getRMApps().size());
+
+    rm.stop();
   }
 
   @Test(timeout = 90000)
@@ -636,6 +643,8 @@ public class TestRMHA {
     assertEquals(HAServiceState.ACTIVE, rm.getRMContext().getHAServiceState());
     rm.adminService.transitionToStandby(requestInfo);
     assertEquals(HAServiceState.STANDBY, rm.getRMContext().getHAServiceState());
+
+    rm.stop();
   }
 
   public void innerTestHAWithRMHostName(boolean includeBindHost) {
@@ -700,6 +709,8 @@ public class TestRMHA {
     } catch (YarnRuntimeException e) {
       fail("Should not throw any exceptions.");
     }
+
+    rm.stop();
   }
   
   private void verifyClusterMetrics(int activeNodes, int appsSubmitted,

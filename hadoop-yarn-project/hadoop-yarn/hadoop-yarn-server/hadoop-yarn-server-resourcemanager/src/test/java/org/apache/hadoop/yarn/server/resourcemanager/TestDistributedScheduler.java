@@ -141,7 +141,7 @@ public class TestDistributedScheduler {
   }
   
   @Test(timeout=200000)
-  public void testUpdateHeartbeatResponseForCleanup() throws IOException {
+  public void testUpdateHeartbeatResponseForCleanup() throws Exception {
     RMNodeImpl node = getRunningNode();
     NodeId nodeId = node.getNodeID();
 
@@ -160,6 +160,8 @@ public class TestDistributedScheduler {
     ApplicationId finishedAppId = BuilderUtils.newApplicationId(0, 1);
     node.handle(new RMNodeCleanAppEvent(nodeId, finishedAppId));
     Assert.assertEquals(1, node.getAppsToCleanup().size());
+
+    Thread.sleep(500);
     //check DB
     Assert.assertEquals(1, DBUtilityTests.getAllAppsToCleanup().size());
     Assert.assertEquals(1, DBUtilityTests.getAllAppsToCleanup().get(node.getNodeID().toString()).size());

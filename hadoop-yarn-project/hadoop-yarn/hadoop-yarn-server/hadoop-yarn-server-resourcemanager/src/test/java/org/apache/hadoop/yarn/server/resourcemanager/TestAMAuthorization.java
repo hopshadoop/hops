@@ -27,6 +27,9 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -60,6 +63,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptS
 import org.apache.hadoop.yarn.util.Records;
 import org.junit.After;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -86,6 +90,15 @@ public class TestAMAuthorization {
   public TestAMAuthorization(Configuration conf) {
     this.conf = conf;
     UserGroupInformation.setConfiguration(conf);
+  }
+
+  @Before
+  public void setUp() throws Exception {
+    if (conf != null) {
+      RMStorageFactory.setConfiguration(conf);
+      YarnAPIStorageFactory.setConfiguration(conf);
+      DBUtility.InitializeDB();
+    }
   }
 
   @After
