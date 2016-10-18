@@ -96,6 +96,7 @@ public class LeafQueue extends AbstractCSQueue {
 
   Map<ApplicationId, FiCaSchedulerApp> activeApplications;
   Set<FiCaSchedulerApp> activeApplicationsWithRequests;
+  Set<ApplicationId> pendingApplicationsWithRequests;
   
   Map<ApplicationAttemptId, FiCaSchedulerApp> applicationAttemptMap = 
       new HashMap<ApplicationAttemptId, FiCaSchedulerApp>();
@@ -143,7 +144,8 @@ public class LeafQueue extends AbstractCSQueue {
     this.activeApplications = new HashMap<>();
     this.activeApplicationsWithRequests = new TreeSet<FiCaSchedulerApp>(
             applicationComparator);
-
+    this.pendingApplicationsWithRequests = new HashSet<>();
+    
     setupQueueConfigs(cs.getClusterResource());
   }
 
@@ -663,6 +665,9 @@ public class LeafQueue extends AbstractCSQueue {
       }
       user.activateApplication();
       activeApplications.put(application.getApplicationId(),application);
+      if(pendingApplicationsWithRequests.remove(application.getApplicationId())){
+        activeApplicationsWithRequests.add(application);
+      }
       queueUsage.incAMUsed(application.getAMResource());
       user.getResourceUsage().incAMUsed(application.getAMResource());
       i.remove();
@@ -768,7 +773,12 @@ public class LeafQueue extends AbstractCSQueue {
   
   @Override
   synchronized public void activateApplication(ApplicationId app){
-    activeApplicationsWithRequests.add(activeApplications.get(app));
+    FiCaSchedulerApp application = activeApplications.get(app);
+    if(application!=null){
+      activeApplicationsWithRequests.add(application);
+    }else{
+      pendingApplicationsWithRequests.add(app);
+    }
   }
   
   @Override
@@ -776,6 +786,8 @@ public class LeafQueue extends AbstractCSQueue {
     FiCaSchedulerApp app = activeApplications.get(appId);
     if(app!=null){
       activeApplicationsWithRequests.remove(app);
+    }else{
+      pendingApplicationsWithRequests.remove(appId);
     }
   }
 

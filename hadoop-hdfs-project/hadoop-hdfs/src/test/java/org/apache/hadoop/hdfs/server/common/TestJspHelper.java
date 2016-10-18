@@ -49,6 +49,7 @@ import javax.xml.parsers.ParserConfigurationException;
 import java.io.IOException;
 import java.io.StringReader;
 import java.net.InetSocketAddress;
+import org.apache.hadoop.security.authorize.DefaultImpersonationProvider;
 
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -298,7 +299,7 @@ public class TestJspHelper {
     }
   }
   
-  @Test
+    @Test
   public void testGetProxyUgi() throws IOException {
     conf.set(DFSConfigKeys.FS_DEFAULT_NAME_KEY, "hdfs://localhost:4321/");
     ServletContext context = mock(ServletContext.class);
@@ -306,8 +307,10 @@ public class TestJspHelper {
     String user = "TheNurse";
     conf.set(DFSConfigKeys.HADOOP_SECURITY_AUTHENTICATION, "kerberos");
     
-    conf.set(ProxyUsers.CONF_HADOOP_PROXYUSER + realUser + ".groups", "*");
-    conf.set(ProxyUsers.CONF_HADOOP_PROXYUSER + realUser + ".hosts", "*");
+    conf.set(DefaultImpersonationProvider.getTestProvider().
+        getProxySuperuserGroupConfKey(realUser), "*");
+    conf.set(DefaultImpersonationProvider.getTestProvider().
+        getProxySuperuserIpConfKey(realUser), "*");
     ProxyUsers.refreshSuperUserGroupsConfiguration(conf);
     UserGroupInformation.setConfiguration(conf);
     UserGroupInformation ugi;
@@ -319,18 +322,18 @@ public class TestJspHelper {
       JspHelper.getUGI(context, request, conf);
       Assert.fail("bad request allowed");
     } catch (IOException ioe) {
-      Assert
-          .assertEquals("Security enabled but user not authenticated by filter",
-              ioe.getMessage());
+      Assert.assertEquals(
+          "Security enabled but user not authenticated by filter",
+          ioe.getMessage());
     }
     request = getMockRequest(null, realUser, user);
     try {
       JspHelper.getUGI(context, request, conf);
       Assert.fail("bad request allowed");
     } catch (IOException ioe) {
-      Assert
-          .assertEquals("Security enabled but user not authenticated by filter",
-              ioe.getMessage());
+      Assert.assertEquals(
+          "Security enabled but user not authenticated by filter",
+          ioe.getMessage());
     }
     
     // proxy ugi for user via remote user
@@ -356,7 +359,7 @@ public class TestJspHelper {
       Assert.fail("bad request allowed");
     } catch (IOException ioe) {
       Assert.assertEquals(
-          "Usernames not matched: name=" + user + " != expected=" + realUser,
+          "Usernames not matched: name="+user+" != expected="+realUser,
           ioe.getMessage());
     }
     
@@ -368,7 +371,7 @@ public class TestJspHelper {
     } catch (AuthorizationException ae) {
       Assert.assertEquals(
           "User: " + user + " is not allowed to impersonate " + realUser,
-          ae.getMessage());
+           ae.getMessage());
     }
     try {
       request = getMockRequest(user, user, realUser);
@@ -377,7 +380,7 @@ public class TestJspHelper {
     } catch (AuthorizationException ae) {
       Assert.assertEquals(
           "User: " + user + " is not allowed to impersonate " + realUser,
-          ae.getMessage());
+           ae.getMessage());
     }
   }
 
