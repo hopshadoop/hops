@@ -45,16 +45,20 @@ public class InvalidatedBlockContext
   public void update(InvalidatedBlock hopInvalidatedBlock)
       throws TransactionContextException {
     super.update(hopInvalidatedBlock);
-    log("added-invblock", "bid", hopInvalidatedBlock.getBlockId(), "sid",
-        hopInvalidatedBlock.getStorageId());
+    if(isLogDebugEnabled()) {
+      log("added-invblock", "bid", hopInvalidatedBlock.getBlockId(), "sid",
+              hopInvalidatedBlock.getStorageId());
+    }
   }
 
   @Override
   public void remove(InvalidatedBlock hopInvalidatedBlock)
       throws TransactionContextException {
     super.remove(hopInvalidatedBlock);
-    log("removed-invblock", "bid", hopInvalidatedBlock.getBlockId(), "sid",
-        hopInvalidatedBlock.getStorageId());
+    if(isLogDebugEnabled()) {
+      log("removed-invblock", "bid", hopInvalidatedBlock.getBlockId(), "sid",
+              hopInvalidatedBlock.getStorageId());
+    }
   }
 
   @Override

@@ -15,7 +15,6 @@
  */
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
-import com.google.common.collect.Sets;
 import io.hops.leader_election.node.ActiveNode;
 import io.hops.leader_election.node.SortedActiveNodeList;
 import java.io.IOException;
@@ -69,7 +68,6 @@ public class BRTrackingService {
     this.BR_LB_TIME_WINDOW_SIZE = BR_LB_TIME_WINDOW_SIZE;
   }
 
-
   private int getRRIndex(final SortedActiveNodeList nnList){
       if(rrIndex < 0 || rrIndex >= nnList.size()){
           rrIndex = 0;
@@ -78,7 +76,6 @@ public class BRTrackingService {
   }
 
   private boolean canProcessMoreBR(long noOfBlks) throws IOException {
-
     //first remove the old history
     long timePoint = (System.currentTimeMillis() - BR_LB_TIME_WINDOW_SIZE);
 
@@ -101,7 +98,7 @@ public class BRTrackingService {
     }
 
     LOG.debug("Currently processing at "+ongoingWork+" blks /"+(BR_LB_TIME_WINDOW_SIZE/(double)1000)+" sec");
-    if ((ongoingWork + noOfBlks) > getBrLbMaxBlkPerMin(DB_VAR_UPDATE_THRESHOLD)) {
+    if ((ongoingWork + noOfBlks) > getBrLbMaxBlkPerTW(DB_VAR_UPDATE_THRESHOLD)) {
       return false;
     } else {
       return true;
@@ -109,18 +106,17 @@ public class BRTrackingService {
   }
 
   private static long lastChecked = 0;
-  private static long cachedBrLbMaxBlkPerMin = -1;
-  private static long getBrLbMaxBlkPerMin(long DB_VAR_UPDATE_THRESHOLD) throws IOException {
+  private static long cachedBrLbMaxBlkPerTW = -1;
+  private static long getBrLbMaxBlkPerTW(long DB_VAR_UPDATE_THRESHOLD) throws IOException {
     if ((System.currentTimeMillis() - lastChecked) > DB_VAR_UPDATE_THRESHOLD) {
-      cachedBrLbMaxBlkPerMin = HdfsVariables.getBrLbMasBlkPerMin();
+      cachedBrLbMaxBlkPerTW = HdfsVariables.getBrLbMaxBlkPerTW();
       lastChecked = System.currentTimeMillis();
+      LOG.debug("BRTrackingService. Processing "+cachedBrLbMaxBlkPerTW+" per time window");
     }
-    return cachedBrLbMaxBlkPerMin;
+    return cachedBrLbMaxBlkPerTW;
   }
 
-
   public synchronized ActiveNode assignWork(final SortedActiveNodeList nnList, long noOfBlks) throws IOException {
-
     if(canProcessMoreBR(noOfBlks)){
       int index = getRRIndex(nnList);
       if(index >= 0 && index < nnList.size()){
@@ -133,6 +129,5 @@ public class BRTrackingService {
     }
     LOG.info("Work ("+noOfBlks+" blks) could not be assigned");
     throw new BRLoadBalancingException("Work ("+noOfBlks+" blks) could not be assigned. System is fully loaded now");
-
   }
 }

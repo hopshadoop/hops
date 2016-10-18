@@ -380,7 +380,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
       public Object performTask() throws StorageException, IOException {
         InvalidateBlockDataAccess da = (InvalidateBlockDataAccess) HdfsStorageFactory
             .getDataAccess(InvalidateBlockDataAccess.class);
-        return da.findInvalidatedBlockByStorageIdUsingMySQLServer(getSId());
+        return da.findInvalidatedBlockAndGenStampByStorageId(getSId());
       }
     };
     return (Map<Long,Long>)findBlocksHandler.handle();

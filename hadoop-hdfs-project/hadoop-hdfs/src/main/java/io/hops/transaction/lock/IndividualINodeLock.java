@@ -62,7 +62,7 @@ final class IndividualINodeLock extends BaseINodeLock {
     if (inodeIdentifier.getName() != null && inodeIdentifier.getPid() != null) {
       inode =
           find(lockType, inodeIdentifier.getName(), inodeIdentifier.getPid(),
-              inodeIdentifier.getInodeId());
+              inodeIdentifier.getPartitionId(), inodeIdentifier.getInodeId());
     } else if (inodeIdentifier.getInodeId() != null) {
       inode = find(lockType, inodeIdentifier.getInodeId());
     } else {

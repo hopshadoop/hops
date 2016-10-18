@@ -20,6 +20,7 @@ import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 import org.apache.hadoop.hdfs.server.namenode.INodeFile;
+import org.apache.hadoop.hdfs.server.namenode.INodeFileUnderConstruction;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -48,9 +49,12 @@ final class BlockLock extends IndividualBlockLock {
     Iterable blks = Collections.EMPTY_LIST;
     for (INode inode : inodeLock.getAllResolvedINodes()) {
       if (inode instanceof INodeFile) {
-        Collection<BlockInfo> inodeBlocks =
-            acquireLockList(DEFAULT_LOCK_TYPE, BlockInfo.Finder.ByINodeId,
-                inode.getId());
+        Collection<BlockInfo> inodeBlocks = Collections.EMPTY_LIST;
+        if(((INodeFile) inode).hasBlocks()) {
+          inodeBlocks =
+                  acquireLockList(DEFAULT_LOCK_TYPE, BlockInfo.Finder.ByINodeId,
+                          inode.getId());
+        }
 
         if(!individualBlockAlreadyRead){
           individualBlockAlreadyRead = inode.getId() == inodeId;
