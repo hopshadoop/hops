@@ -18,6 +18,10 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
+import java.io.IOException;
 import org.junit.Before;
 import static org.mockito.Matchers.argThat;
 import static org.mockito.Mockito.doNothing;
@@ -96,8 +100,11 @@ public class TestRM extends ParameterizedSchedulerTestBase {
   }
 
   @Before
-  public void setup() {
+  public void setup() throws IOException {
     conf = getConf();
+    YarnAPIStorageFactory.setConfiguration(conf);
+    RMStorageFactory.setConfiguration(conf);
+    DBUtility.InitializeDB();
   }
 
   @After
