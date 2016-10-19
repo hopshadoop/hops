@@ -77,6 +77,7 @@ import org.apache.hadoop.yarn.server.utils.Lock.NoLock;
 import org.apache.hadoop.yarn.util.resource.Resources;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.concurrent.ConcurrentSkipListSet;
 
 @Private
 @Unstable
@@ -95,6 +96,8 @@ public class LeafQueue extends AbstractCSQueue {
   private int nodeLocalityDelay;
 
   Map<ApplicationId, FiCaSchedulerApp> activeApplications;
+  Set<ApplicationId> applicationsToActivate;
+  Set<ApplicationId> applicationsToDeactivate;
   Set<FiCaSchedulerApp> activeApplicationsWithRequests;
   Set<ApplicationId> pendingApplicationsWithRequests;
   
@@ -145,7 +148,8 @@ public class LeafQueue extends AbstractCSQueue {
     this.activeApplicationsWithRequests = new TreeSet<FiCaSchedulerApp>(
             applicationComparator);
     this.pendingApplicationsWithRequests = new HashSet<>();
-    
+    applicationsToActivate = new ConcurrentSkipListSet<>();
+    applicationsToDeactivate = new ConcurrentSkipListSet<>();
     setupQueueConfigs(cs.getClusterResource());
   }
 
@@ -772,23 +776,15 @@ public class LeafQueue extends AbstractCSQueue {
   }
   
   @Override
-  synchronized public void activateApplication(ApplicationId app){
-    FiCaSchedulerApp application = activeApplications.get(app);
-    if(application!=null){
-      activeApplicationsWithRequests.add(application);
-    }else{
-      pendingApplicationsWithRequests.add(app);
-    }
+  public void activateApplication(ApplicationId app){
+    applicationsToActivate.add(app);
+    applicationsToDeactivate.remove(app);
   }
   
   @Override
-  synchronized public void deactivateApplication(ApplicationId appId){
-    FiCaSchedulerApp app = activeApplications.get(appId);
-    if(app!=null){
-      activeApplicationsWithRequests.remove(app);
-    }else{
-      pendingApplicationsWithRequests.remove(appId);
-    }
+  public void deactivateApplication(ApplicationId appId){
+    applicationsToDeactivate.add(appId);
+    applicationsToActivate.remove(appId);
   }
 
   @Override
@@ -820,7 +816,30 @@ public class LeafQueue extends AbstractCSQueue {
     
     Resource initAmountNeededUnreserve =
         currentResourceLimits.getAmountNeededUnreserve();
-
+    
+    LOG.info("to activate size: " + applicationsToActivate.size() + " to deactivate size " + applicationsToDeactivate.size());
+    List<ApplicationId> toRemove = new ArrayList<>();
+    for (ApplicationId appId : applicationsToActivate) {
+      toRemove.add(appId);
+      FiCaSchedulerApp application = activeApplications.get(appId);
+      if (application != null) {
+        activeApplicationsWithRequests.add(application);
+      } else {
+        pendingApplicationsWithRequests.add(appId);
+      }
+    }
+    applicationsToActivate.removeAll(toRemove);
+    toRemove.clear();
+    for (ApplicationId appId : applicationsToDeactivate) {
+      toRemove.add(appId);
+      FiCaSchedulerApp app = activeApplications.get(appId);
+      if (app != null) {
+        activeApplicationsWithRequests.remove(app);
+      } else {
+        pendingApplicationsWithRequests.remove(appId);
+      }
+    }
+    applicationsToDeactivate.removeAll(toRemove);
     // Try to assign containers to applications in order
     for (FiCaSchedulerApp application : activeApplicationsWithRequests) {
 
@@ -1889,7 +1908,7 @@ public class LeafQueue extends AbstractCSQueue {
   // return a single Resource capturing the overal amount of pending resources
   public synchronized Resource getTotalResourcePending() {
     Resource ret = BuilderUtils.newResource(0, 0);
-    for (FiCaSchedulerApp f : activeApplicationsWithRequests) {
+    for (FiCaSchedulerApp f : activeApplications.values()) {
       Resources.addTo(ret, f.getTotalPendingRequests());
     }
     return ret;

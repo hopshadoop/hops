@@ -299,6 +299,12 @@ public class MiniYARNCluster extends CompositeService {
     if (HAUtil.isHAEnabled(conf)) {
       conf.set(YarnConfiguration.RM_HA_ID, rmIds[index]);
     }
+    String[] gmAddrPort = conf.get(YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS,
+            YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_ADDRESS).split(":");
+
+    conf.set(YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS,
+            "localhost:" + (Integer.parseInt(gmAddrPort[1]) + index));
+
     resourceManagers[index].init(conf);
     resourceManagers[index].getRMContext().getDispatcher().register(
         RMAppAttemptEventType.class,

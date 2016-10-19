@@ -419,7 +419,7 @@ public class DBRMStateStore extends RMStateStore {
     final String appId = appAttemptId.getApplicationId().toString();
     final String attemptId = appAttemptId.toString();
     final byte[] attemptData = attemptStateDataPB.getProto().toByteArray();
-    final String trakingURL = attemptStateDataPB.getFinalTrackingUrl();
+    final String trakingURL = attemptStateDataPB.getTrackingUrl();
     LightWeightRequestHandler setApplicationAttemptIdHandler
             = new LightWeightRequestHandler(YARNOperationType.TEST) {
       @Override
