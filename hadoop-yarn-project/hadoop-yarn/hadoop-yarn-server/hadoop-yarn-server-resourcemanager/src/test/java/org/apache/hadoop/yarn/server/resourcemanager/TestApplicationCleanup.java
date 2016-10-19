@@ -31,6 +31,7 @@ import io.hops.util.RMStorageFactory;
 import io.hops.util.YarnAPIStorageFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.api.protocolrecords.AllocateRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.AllocateResponse;
@@ -60,6 +61,7 @@ import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -172,7 +174,7 @@ public class TestApplicationCleanup {
 
     Logger rootLogger = LogManager.getRootLogger();
     rootLogger.setLevel(Level.DEBUG);
-    final DrainDispatcher dispatcher = new DrainDispatcher();
+    /*final DrainDispatcher dispatcher = new DrainDispatcher();
     MockRM rm = new MockRM() {
       @Override
       protected EventHandler<SchedulerEvent> createSchedulerEventDispatcher() {
@@ -188,7 +190,8 @@ public class TestApplicationCleanup {
       protected Dispatcher createDispatcher() {
         return dispatcher;
       }
-    };
+    };*/
+    MockRM rm = new MockRM();
     rm.start();
 
     MockNM nm1 = rm.registerNode("127.0.0.1:1234", 5000);
@@ -206,7 +209,8 @@ public class TestApplicationCleanup {
     int request = 2;
     am.allocate("127.0.0.1" , 1000, request, 
         new ArrayList<ContainerId>());
-    dispatcher.await();
+    ((DrainDispatcher)rm.getRmDispatcher()).await();
+    //dispatcher.await();
     
     //kick the scheduler
     nm1.nodeHeartbeat(true);
@@ -220,7 +224,8 @@ public class TestApplicationCleanup {
       Thread.sleep(100);
       conts = am.allocate(new ArrayList<ResourceRequest>(),
           new ArrayList<ContainerId>()).getAllocatedContainers();
-      dispatcher.await();
+      ((DrainDispatcher)rm.getRmDispatcher()).await();
+      //dispatcher.await();
       contReceived += conts.size();
       nm1.nodeHeartbeat(true);
     }
@@ -230,7 +235,8 @@ public class TestApplicationCleanup {
     ArrayList<ContainerId> release = new ArrayList<ContainerId>();
     release.add(conts.get(0).getId());
     am.allocate(new ArrayList<ResourceRequest>(), release);
-    dispatcher.await();
+    ((DrainDispatcher)rm.getRmDispatcher()).await();
+    //dispatcher.await();
 
     // Send one more heartbeat with a fake running container. This is to
     // simulate the situation that can happen if the NM reports that container
@@ -244,7 +250,7 @@ public class TestApplicationCleanup {
     containerStatuses.put(app.getApplicationId(), containerStatusList);
 
     NodeHeartbeatResponse resp = nm1.nodeHeartbeat(containerStatuses, true);
-    waitForContainerCleanup(dispatcher, nm1, resp);
+    waitForContainerCleanup((DrainDispatcher)rm.getRmDispatcher(), nm1, resp);
 
     // Now to test the case when RM already gave cleanup, and NM suddenly
     // realizes that the container is running.
@@ -259,7 +265,7 @@ public class TestApplicationCleanup {
     resp = nm1.nodeHeartbeat(containerStatuses, true);
     // The cleanup list won't be instantaneous as it is given out by scheduler
     // and not RMNodeImpl.
-    waitForContainerCleanup(dispatcher, nm1, resp);
+    waitForContainerCleanup((DrainDispatcher)rm.getRmDispatcher(), nm1, resp);
 
     rm.stop();
   }
@@ -323,6 +329,7 @@ public class TestApplicationCleanup {
 
     // start RM
     MockRM rm1 = new MockRM(conf, memStore);
+    rm1.init(conf);
     rm1.start();
     MockNM nm1 =
         new MockNM("127.0.0.1:1234", 15120, rm1.getResourceTrackerService());
@@ -335,7 +342,10 @@ public class TestApplicationCleanup {
     rm1.waitForState(app0.getApplicationId(), RMAppState.FAILED);
 
     // start new RM
-    MockRM rm2 = new MockRM(conf, memStore);
+    Configuration conf2 = new YarnConfiguration(conf);
+    conf2.set(YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS,
+            "localhost:8035");
+    MockRM rm2 = new MockRM(conf2, memStore);
     rm2.start();
     
     // nm1 register to rm2, and do a heartbeat
@@ -345,7 +355,7 @@ public class TestApplicationCleanup {
     
     // wait for application cleanup message received
     waitForAppCleanupMessageRecved(nm1, app0.getApplicationId());
-    
+
     rm1.stop();
     rm2.stop();
   }

@@ -20,6 +20,9 @@ package org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity;
 import java.io.IOException;
 import java.util.HashMap;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
@@ -75,6 +78,10 @@ public class TestQueueMappings {
     setupQueueConfiguration(csConf);
     YarnConfiguration conf = new YarnConfiguration(csConf);
     CapacityScheduler cs = new CapacityScheduler();
+
+    RMStorageFactory.setConfiguration(conf);
+    YarnAPIStorageFactory.setConfiguration(conf);
+    DBUtility.InitializeDB();
 
     RMContext rmContext = TestUtils.getMockRMContext();
     cs.setConf(conf);

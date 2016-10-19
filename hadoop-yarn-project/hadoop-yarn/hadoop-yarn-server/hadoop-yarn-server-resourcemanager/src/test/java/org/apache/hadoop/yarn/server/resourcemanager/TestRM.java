@@ -22,7 +22,9 @@ import io.hops.util.DBUtility;
 import io.hops.util.RMStorageFactory;
 import io.hops.util.YarnAPIStorageFactory;
 import java.io.IOException;
-import org.junit.Before;
+
+import org.junit.*;
+
 import static org.mockito.Matchers.argThat;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doAnswer;
@@ -36,8 +38,6 @@ import java.util.Map;
 
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.QueueMetrics;
-import org.junit.After;
-import org.junit.Assert;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -81,7 +81,6 @@ import org.apache.hadoop.yarn.server.resourcemanager.security.NMTokenSecretManag
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
-import org.junit.Test;
 import org.mockito.ArgumentMatcher;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
@@ -577,7 +576,7 @@ public class TestRM extends ParameterizedSchedulerTestBase {
   @Test (timeout = 60000)
   public void testApplicationKillAtAcceptedState() throws Exception {
 
-    final Dispatcher dispatcher = new AsyncDispatcher() {
+    /*final Dispatcher dispatcher = new AsyncDispatcher() {
       @Override
       public EventHandler getEventHandler() {
 
@@ -598,12 +597,33 @@ public class TestRM extends ParameterizedSchedulerTestBase {
         doNothing().when(handler).handle(argThat(new EventArgMatcher()));
         return handler;
       }
-    };
+    };*/
 
     MockRM rm = new MockRM(conf) {
       @Override
       protected Dispatcher createDispatcher() {
-        return dispatcher;
+        return new AsyncDispatcher() {
+          @Override
+          public EventHandler getEventHandler() {
+
+            class EventArgMatcher extends ArgumentMatcher<AbstractEvent> {
+              @Override
+              public boolean matches(Object argument) {
+                if (argument instanceof RMAppAttemptEvent) {
+                  if (((RMAppAttemptEvent) argument).getType().equals(
+                          RMAppAttemptEventType.KILL)) {
+                    return true;
+                  }
+                }
+                return false;
+              }
+            }
+
+            EventHandler handler = spy(super.getEventHandler());
+            doNothing().when(handler).handle(argThat(new EventArgMatcher()));
+            return handler;
+          }
+        };
       }
     };
 
@@ -658,7 +678,7 @@ public class TestRM extends ParameterizedSchedulerTestBase {
   public void testKillFinishingApp() throws Exception{
 
     // this dispatcher ignores RMAppAttemptEventType.KILL event
-    final Dispatcher dispatcher = new AsyncDispatcher() {
+    /*final Dispatcher dispatcher = new AsyncDispatcher() {
       @Override
       public EventHandler getEventHandler() {
 
@@ -679,12 +699,33 @@ public class TestRM extends ParameterizedSchedulerTestBase {
         doNothing().when(handler).handle(argThat(new EventArgMatcher()));
         return handler;
       }
-    };
+    };*/
 
     MockRM rm1 = new MockRM(conf){
       @Override
       protected Dispatcher createDispatcher() {
-        return dispatcher;
+        return new AsyncDispatcher() {
+          @Override
+          public EventHandler getEventHandler() {
+
+            class EventArgMatcher extends ArgumentMatcher<AbstractEvent> {
+              @Override
+              public boolean matches(Object argument) {
+                if (argument instanceof RMAppAttemptEvent) {
+                  if (((RMAppAttemptEvent) argument).getType().equals(
+                          RMAppAttemptEventType.KILL)) {
+                    return true;
+                  }
+                }
+                return false;
+              }
+            }
+
+            EventHandler handler = spy(super.getEventHandler());
+            doNothing().when(handler).handle(argThat(new EventArgMatcher()));
+            return handler;
+          }
+        };
       }
     };
     rm1.start();
@@ -712,7 +753,7 @@ public class TestRM extends ParameterizedSchedulerTestBase {
   public void testKillFailingApp() throws Exception{
 
     // this dispatcher ignores RMAppAttemptEventType.KILL event
-    final Dispatcher dispatcher = new AsyncDispatcher() {
+    /*final Dispatcher dispatcher = new AsyncDispatcher() {
       @Override
       public EventHandler getEventHandler() {
 
@@ -733,12 +774,33 @@ public class TestRM extends ParameterizedSchedulerTestBase {
         doNothing().when(handler).handle(argThat(new EventArgMatcher()));
         return handler;
       }
-    };
+    };*/
 
     MockRM rm1 = new MockRM(conf){
       @Override
       protected Dispatcher createDispatcher() {
-        return dispatcher;
+        return new AsyncDispatcher() {
+          @Override
+          public EventHandler getEventHandler() {
+
+            class EventArgMatcher extends ArgumentMatcher<AbstractEvent> {
+              @Override
+              public boolean matches(Object argument) {
+                if (argument instanceof RMAppAttemptEvent) {
+                  if (((RMAppAttemptEvent) argument).getType().equals(
+                          RMAppAttemptEventType.KILL)) {
+                    return true;
+                  }
+                }
+                return false;
+              }
+            }
+
+            EventHandler handler = spy(super.getEventHandler());
+            doNothing().when(handler).handle(argThat(new EventArgMatcher()));
+            return handler;
+          }
+        };
       }
     };
     rm1.start();
