@@ -470,7 +470,7 @@ public class TestApplicationLimits {
     assertEquals(0, queue.getNumPendingApplications());
     assertEquals(1, queue.getNumActiveApplications(user_0));
     assertEquals(0, queue.getNumPendingApplications(user_0));
-    assertTrue(queue.activeApplications.containsKey(app_0));
+    assertTrue(queue.activeApplications.containsKey(app_0.getApplicationId()));
 
     // Submit second application
     FiCaSchedulerApp app_1 = getMockApplication(APPLICATION_ID++, user_0,
@@ -480,7 +480,7 @@ public class TestApplicationLimits {
     assertEquals(0, queue.getNumPendingApplications());
     assertEquals(2, queue.getNumActiveApplications(user_0));
     assertEquals(0, queue.getNumPendingApplications(user_0));
-    assertTrue(queue.activeApplications.containsKey(app_1));
+    assertTrue(queue.activeApplications.containsKey(app_1.getApplicationId()));
 
     // Submit third application, should remain pending
     FiCaSchedulerApp app_2 = getMockApplication(APPLICATION_ID++, user_0,
@@ -509,7 +509,7 @@ public class TestApplicationLimits {
     assertEquals(2, queue.getNumActiveApplications(user_0));
     assertEquals(1, queue.getNumPendingApplications(user_0));
     assertFalse(queue.pendingApplications.contains(app_2));
-    assertFalse(queue.activeApplications.containsKey(app_2));
+    assertFalse(queue.activeApplications.containsKey(app_2.getApplicationId()));
 
     // Finish 1st application, app_3 should become active
     queue.finishApplicationAttempt(app_0, A);
@@ -517,9 +517,9 @@ public class TestApplicationLimits {
     assertEquals(0, queue.getNumPendingApplications());
     assertEquals(2, queue.getNumActiveApplications(user_0));
     assertEquals(0, queue.getNumPendingApplications(user_0));
-    assertTrue(queue.activeApplications.containsKey(app_3));
+    assertTrue(queue.activeApplications.containsKey(app_3.getApplicationId()));
     assertFalse(queue.pendingApplications.contains(app_3));
-    assertFalse(queue.activeApplications.containsKey(app_0));
+    assertFalse(queue.activeApplications.containsKey(app_0.getApplicationId()));
 
     // Finish 2nd application
     queue.finishApplicationAttempt(app_1, A);
@@ -527,7 +527,7 @@ public class TestApplicationLimits {
     assertEquals(0, queue.getNumPendingApplications());
     assertEquals(1, queue.getNumActiveApplications(user_0));
     assertEquals(0, queue.getNumPendingApplications(user_0));
-    assertFalse(queue.activeApplications.containsKey(app_1));
+    assertFalse(queue.activeApplications.containsKey(app_1.getApplicationId()));
 
     // Finish 4th application
     queue.finishApplicationAttempt(app_3, A);
@@ -535,7 +535,7 @@ public class TestApplicationLimits {
     assertEquals(0, queue.getNumPendingApplications());
     assertEquals(0, queue.getNumActiveApplications(user_0));
     assertEquals(0, queue.getNumPendingApplications(user_0));
-    assertFalse(queue.activeApplications.containsKey(app_3));
+    assertFalse(queue.activeApplications.containsKey(app_3.getApplicationId()));
   }
 
   @Test

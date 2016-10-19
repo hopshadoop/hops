@@ -24,6 +24,9 @@ import java.security.PrivilegedExceptionAction;
 import java.util.HashMap;
 import java.util.Map;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import org.junit.Assert;
 
 import org.apache.commons.logging.Log;
@@ -81,6 +84,10 @@ public abstract class QueueACLsTestBase {
     
     AccessControlList adminACL = new AccessControlList("");
     conf.set(YarnConfiguration.YARN_ADMIN_ACL, adminACL.getAclString());
+
+    RMStorageFactory.setConfiguration(conf);
+    YarnAPIStorageFactory.setConfiguration(conf);
+    DBUtility.InitializeDB();
 
     resourceManager = new MockRM(conf) {
       protected ClientRMService createClientRMService() {

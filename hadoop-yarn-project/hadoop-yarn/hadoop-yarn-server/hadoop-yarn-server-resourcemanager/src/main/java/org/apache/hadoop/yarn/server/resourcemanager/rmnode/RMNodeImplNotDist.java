@@ -158,7 +158,7 @@ public class RMNodeImplNotDist extends RMNodeImpl {
       nodeUpdateQueue.add(new UpdatedContainerInfo(newlyLaunchedContainers,
               completedContainers));
     }
-    if(!containerToLog.isEmpty()){
+    if(!containerToLog.isEmpty() && context.getContainersLogsService() != null){
       context.getContainersLogsService().insertEvent(containerToLog);
     }
   }

@@ -32,6 +32,9 @@ import java.util.List;
 
 import javax.crypto.SecretKey;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -268,6 +271,9 @@ public class TestZKRMStateStore extends RMStateStoreTestBase {
     // Start RM with HA enabled
     Configuration conf = createHARMConf("rm1,rm2", "rm1", 1234);
     conf.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, false);
+    RMStorageFactory.setConfiguration(conf);
+    YarnAPIStorageFactory.setConfiguration(conf);
+    DBUtility.InitializeDB();
     ResourceManager rm = new MockRM(conf);
     rm.start();
     rm.getRMContext().getRMAdminService().transitionToActive(req);
@@ -326,6 +332,8 @@ public class TestZKRMStateStore extends RMStateStoreTestBase {
 
     Configuration conf2 = createHARMConf("rm1,rm2", "rm2", 5678);
     conf2.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, false);
+    conf2.set(YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS,
+            "localhost:8035");
     ResourceManager rm2 = new ResourceManager();
     rm2.init(conf2);
     rm2.start();
