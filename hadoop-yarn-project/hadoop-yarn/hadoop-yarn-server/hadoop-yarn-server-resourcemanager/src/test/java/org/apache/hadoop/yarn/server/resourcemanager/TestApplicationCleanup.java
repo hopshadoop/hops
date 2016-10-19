@@ -78,7 +78,7 @@ public class TestApplicationCleanup {
   private YarnConfiguration conf;
   private FileSystem fs;
   private Path tmpDir;
-  
+
   @Before
   public void setup() throws UnknownHostException, IOException {
     Logger rootLogger = LogManager.getRootLogger();
