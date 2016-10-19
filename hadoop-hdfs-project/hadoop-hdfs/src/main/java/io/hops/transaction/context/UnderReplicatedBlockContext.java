@@ -43,17 +43,21 @@ public class UnderReplicatedBlockContext
   public void update(UnderReplicatedBlock hopUnderReplicatedBlock)
       throws TransactionContextException {
     super.update(hopUnderReplicatedBlock);
-    log("added-urblock", "bid", hopUnderReplicatedBlock.getBlockId(), "level",
-        hopUnderReplicatedBlock.getLevel(), "inodeId",
-        hopUnderReplicatedBlock.getInodeId());
+    if(isLogDebugEnabled()) {
+      log("added-urblock", "bid", hopUnderReplicatedBlock.getBlockId(), "level",
+              hopUnderReplicatedBlock.getLevel(), "inodeId",
+              hopUnderReplicatedBlock.getInodeId());
+    }
   }
 
   @Override
   public void remove(UnderReplicatedBlock hopUnderReplicatedBlock)
       throws TransactionContextException {
     super.remove(hopUnderReplicatedBlock);
-    log("removed-urblock", "bid", hopUnderReplicatedBlock.getBlockId(), "level",
-        hopUnderReplicatedBlock.getLevel());
+    if(isLogDebugEnabled()) {
+      log("removed-urblock", "bid", hopUnderReplicatedBlock.getBlockId(), "level",
+              hopUnderReplicatedBlock.getLevel());
+    }
   }
 
   @Override

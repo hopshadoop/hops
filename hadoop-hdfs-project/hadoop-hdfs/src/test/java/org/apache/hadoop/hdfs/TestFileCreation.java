@@ -26,26 +26,11 @@ import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLocks;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
-import org.apache.hadoop.fs.CreateFlag;
-import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.*;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.FsServerDefaults;
-import org.apache.hadoop.fs.InvalidPathException;
-import org.apache.hadoop.fs.LocatedFileStatus;
-import org.apache.hadoop.fs.Options;
-import org.apache.hadoop.fs.ParentNotDirectoryException;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.client.HdfsDataOutputStream;
-import org.apache.hadoop.hdfs.protocol.Block;
-import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
-import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
-import org.apache.hadoop.hdfs.protocol.HdfsConstants;
-import org.apache.hadoop.hdfs.protocol.LocatedBlock;
-import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
+import org.apache.hadoop.hdfs.protocol.*;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.datanode.DataNodeTestUtils;
 import org.apache.hadoop.hdfs.server.datanode.SimulatedFSDataset;
@@ -60,37 +45,18 @@ import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.Time;
 import org.junit.Test;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
-import java.io.IOException;
+import java.io.*;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.UnknownHostException;
 import java.security.PrivilegedExceptionAction;
 import java.util.EnumSet;
 import java.util.logging.Logger;
-import org.apache.commons.io.FileUtils;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_KEY;
-import org.apache.hadoop.fs.FileStatus;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_WRITE_PACKET_SIZE_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_WRITE_PACKET_SIZE_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_SYNCONCLOSE_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_HEARTBEAT_RECHECK_INTERVAL_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_REPLICATION_MIN_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_REPLICATION_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_REPLICATION_KEY;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.*;
+import static org.junit.Assert.*;
 import static org.junit.Assume.assumeTrue;
 
 /**
@@ -1267,6 +1233,26 @@ public class TestFileCreation {
   }
 
   @Test
+  public void testDeleteDirs() throws Exception {
+
+    Configuration conf = new HdfsConfiguration();
+    MiniDFSCluster cluster =
+            new MiniDFSCluster.Builder(conf).format(true).build();
+    FileSystem fs = cluster.getFileSystem();
+    DistributedFileSystem dfs = (DistributedFileSystem) FileSystem
+            .newInstance(fs.getUri(), fs.getConf());
+
+    try {
+      fs.mkdirs(new Path("/A"));
+      fs.mkdirs(new Path("/A/B"));
+      fs.mkdirs(new Path("/A/C"));
+      assertTrue(fs.delete(new Path("/A"), true));
+    } finally {
+      cluster.shutdown();
+    }
+  }
+
+  @Test
   public void testRename() throws Exception {
 
     Configuration conf = new HdfsConfiguration();
@@ -1622,28 +1608,44 @@ public class TestFileCreation {
     }
   
   @Test
-  public void testFilesWithLotsOfBlocks() throws IOException {
+  public void eyeBallTest() throws IOException {
     MiniDFSCluster cluster = null;
     try {
       Configuration conf = new HdfsConfiguration();
       final int BLOCK_SIZE = 1024;
       conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE); // 4 byte
-      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
+      conf.setBoolean(DFSConfigKeys.ERASURE_CODING_ENABLED_KEY, false);
+      conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_QUOTA_ENABLED_KEY,false);
+
+      cluster = new MiniDFSCluster.Builder(conf).format(true).numDataNodes(1).build();
       cluster.waitActive();
 
       DistributedFileSystem dfs = cluster.getFileSystem();
-      
-      FSDataOutputStream out = dfs.create(new Path("/test.file"), (short)3);
-      for(int i = 0; i < 1000; i++){
-        byte data[] = new byte[BLOCK_SIZE];
-        out.write(data);
-      }
-      out.close();
-      
+
+
+      Path dir = new Path("/dir");
+      Path file = new Path("/dir/file");
+      dfs.mkdirs(dir);
+      dfs.create(file).close();
+      dfs.open(file).close();
+      dfs.append(file).close();
+      dfs.listStatus(file);
+      dfs.listStatus(dir);
+      dfs.getFileStatus(file);
+      dfs.getFileStatus(dir);
+      dfs.setPermission(file,new FsPermission((short)0777));
+      dfs.setPermission(dir,new FsPermission((short)0777));
+      dfs.setOwner(file, System.getProperty("user.name"), System.getProperty("user.name"));
+      dfs.setOwner(dir, System.getProperty("user.name"), System.getProperty("user.name"));
+      dfs.setReplication(file, (short)3);
+      dfs.rename(file, new Path("/dir/file2"));
+      dfs.delete(new Path("/dir/file2"));
+      dfs.delete(dir);
     } finally {
       if (cluster != null) {
         cluster.shutdown();
       }
+
     }
   }
   
@@ -1679,7 +1681,38 @@ public class TestFileCreation {
       }
     }
   }
-  
+
+  @Test
+  public void testStatAfterRestart() throws IOException {
+    MiniDFSCluster cluster = null;
+    try {
+      Configuration conf = new HdfsConfiguration();
+      final int BLOCK_SIZE = 1024;
+      conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE); // 4 byte
+      cluster = new MiniDFSCluster.Builder(conf).format(true).numDataNodes(0).build();
+      cluster.waitActive();
+
+      DistributedFileSystem dfs = cluster.getFileSystem();
+      Path file = new Path("/dir/dir/file.txt");
+      dfs.create(file,(short)3).close();
+
+      cluster.shutdown();
+      cluster = new MiniDFSCluster.Builder(conf).format(false).numDataNodes(0).build();
+      cluster.waitActive();
+
+      dfs = cluster.getFileSystem();
+
+      dfs.listStatus(file);
+
+    } catch(Exception e) {
+      fail(e.toString());
+    }
+     finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
   @Test
   public void testLS() throws IOException {
     MiniDFSCluster cluster = null;

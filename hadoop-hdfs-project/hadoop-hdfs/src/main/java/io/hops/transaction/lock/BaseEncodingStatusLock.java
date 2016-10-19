@@ -17,11 +17,14 @@
  */
 package io.hops.transaction.lock;
 
+import io.hops.exception.StorageException;
+import io.hops.exception.TransactionContextException;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.List;
 
 abstract class BaseEncodingStatusLock extends Lock {
   private final TransactionLockTypes.LockType lockType;
@@ -41,11 +44,20 @@ abstract class BaseEncodingStatusLock extends Lock {
 
   final static class EncodingStatusLock extends BaseEncodingStatusLock {
     private final String[] targets;
+    private final boolean includeChildren;
 
     EncodingStatusLock(TransactionLockTypes.LockType lockType,
         String... targets) {
       super(lockType);
       this.targets = targets;
+      this.includeChildren = false;
+    }
+
+    EncodingStatusLock(boolean includeChildren, TransactionLockTypes.LockType lockType,
+                       String... targets) {
+      super(lockType);
+      this.targets = targets;
+      this.includeChildren = includeChildren;
     }
 
     @Override
@@ -54,19 +66,33 @@ abstract class BaseEncodingStatusLock extends Lock {
       Arrays.sort(targets);
       for (String target : targets) {
         INode iNode = iNodeLock.getTargetINode(target);
-        EncodingStatus status = acquireLock(getLockType(),
-            EncodingStatus.Finder.ByInodeId,
-            iNode.getId());
-        if (status != null) {
-          // It's a source file
-          return;
+        acquireLocks(iNode);
+        if(includeChildren){
+          List<INode> children = iNodeLock.getChildINodes(target);
+          if(children!=null){
+            for(INode child:children){
+              acquireLocks(child);
+            }
+          }
         }
-        // It's a parity file
-        acquireLock(getLockType(), EncodingStatus.Finder.ByParityInodeId,
-            iNode.getId());
       }
     }
+
+    private void acquireLocks(INode iNode) throws TransactionContextException, StorageException {
+      EncodingStatus status = acquireLock(getLockType(),
+              EncodingStatus.Finder.ByInodeId,
+              iNode.getId());
+      if (status != null) {
+        // It's a source file
+        return;
+      }
+      // It's a parity file
+      acquireLock(getLockType(), EncodingStatus.Finder.ByParityInodeId,
+              iNode.getId());
+    }
+
   }
+
 
   final static class IndividualEncodingStatusLock
       extends BaseEncodingStatusLock {
