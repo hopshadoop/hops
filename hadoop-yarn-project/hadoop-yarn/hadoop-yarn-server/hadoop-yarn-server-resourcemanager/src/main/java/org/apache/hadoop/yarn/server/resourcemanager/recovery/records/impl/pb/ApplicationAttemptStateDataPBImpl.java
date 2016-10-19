@@ -207,6 +207,25 @@ public class ApplicationAttemptStateDataPBImpl extends
     builder.setFinalTrackingUrl(url);
   }
 
+   @Override
+  public String getTrackingUrl() {
+    ApplicationAttemptStateDataProtoOrBuilder p = viaProto ? proto : builder;
+    if (!p.hasTrackingUrl()) {
+      return null;
+    }
+    return p.getTrackingUrl();
+  }
+
+  @Override
+  public void setTrackingUrl(String url) {
+    maybeInitBuilder();
+    if (url == null) {
+      builder.clearTrackingUrl();
+      return;
+    }
+    builder.setTrackingUrl(url);
+  }
+  
   @Override
   public String getDiagnostics() {
     ApplicationAttemptStateDataProtoOrBuilder p = viaProto ? proto : builder;
