@@ -35,6 +35,11 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.minikdc.MiniKdc;
@@ -89,6 +94,8 @@ import com.sun.jersey.test.framework.WebAppDescriptor;
 
 @RunWith(Parameterized.class)
 public class TestRMWebServicesDelegationTokens extends JerseyTestBase {
+
+  private final Log LOG = LogFactory.getLog(TestRMWebServicesDelegationTokens.class);
 
   private static File testRootDir;
   private static File httpSpnegoKeytabFile = new File(
@@ -154,6 +161,14 @@ public class TestRMWebServicesDelegationTokens extends JerseyTestBase {
       rmconf.setClass(YarnConfiguration.RM_SCHEDULER, FifoScheduler.class,
         ResourceScheduler.class);
       rmconf.setBoolean(YarnConfiguration.YARN_ACL_ENABLE, true);
+
+      try {
+        RMStorageFactory.setConfiguration(rmconf);
+        YarnAPIStorageFactory.setConfiguration(rmconf);
+        DBUtility.InitializeDB();
+      } catch (IOException ex) {
+        LOG.error(ex, ex);
+      }
       rm = new MockRM(rmconf);
       bind(ResourceManager.class).toInstance(rm);
       if (isKerberosAuth == true) {

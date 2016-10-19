@@ -18,16 +18,28 @@
 
 package org.apache.hadoop.yarn.server;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
+
+import java.io.IOException;
 
 public class TestMiniYarnCluster {
 
+  private Configuration conf;
+
+  @Before
+  public void setUp() throws IOException {
+    conf = new YarnConfiguration();
+  }
+
   @Test
   public void testTimelineServiceStartInMiniCluster() throws Exception {
-    Configuration conf = new YarnConfiguration();
     int numNodeManagers = 1;
     int numLocalDirs = 1;
     int numLogDirs = 1;

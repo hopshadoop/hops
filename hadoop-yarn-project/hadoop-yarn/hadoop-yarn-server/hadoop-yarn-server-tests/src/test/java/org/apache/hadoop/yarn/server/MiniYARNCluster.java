@@ -19,6 +19,7 @@
 package org.apache.hadoop.yarn.server;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -26,6 +27,9 @@ import java.util.Collection;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -108,6 +112,7 @@ public class MiniYARNCluster extends CompositeService {
   private NodeManager[] nodeManagers;
   private ResourceManager[] resourceManagers;
   private String[] rmIds;
+  private Configuration[] rmConfs;
 
   private ApplicationHistoryServer appHistoryServer;
 
@@ -188,6 +193,7 @@ public class MiniYARNCluster extends CompositeService {
 
     resourceManagers = new ResourceManager[numResourceManagers];
     nodeManagers = new NodeManager[numNodeManagers];
+    rmConfs = new Configuration[numResourceManagers];
   }
 
   /**
@@ -225,6 +231,10 @@ public class MiniYARNCluster extends CompositeService {
     failoverTimeout = conf.getInt(YarnConfiguration.RM_ZK_TIMEOUT_MS,
         YarnConfiguration.DEFAULT_RM_ZK_TIMEOUT_MS);
 
+    RMStorageFactory.setConfiguration(conf);
+    YarnAPIStorageFactory.setConfiguration(conf);
+    DBUtility.InitializeDB();
+
     if (useRpc && !useFixedPorts) {
       throw new YarnRuntimeException("Invalid configuration!" +
           " Minicluster can use rpc only when configured to use fixed ports");
@@ -249,11 +259,12 @@ public class MiniYARNCluster extends CompositeService {
 
     for (int i = 0; i < resourceManagers.length; i++) {
       resourceManagers[i] = createResourceManager();
+      rmConfs[i] = new YarnConfiguration(conf);
       if (!useFixedPorts) {
-        if (HAUtil.isHAEnabled(conf)) {
-          setHARMConfigurationWithEphemeralPorts(i, conf);
+        if (HAUtil.isHAEnabled(rmConfs[i])) {
+          setHARMConfigurationWithEphemeralPorts(i, rmConfs[i]);
         } else {
-          setNonHARMConfigurationWithEphemeralPorts(conf);
+          setNonHARMConfigurationWithEphemeralPorts(rmConfs[i]);
         }
       }
       addService(new ResourceManagerWrapper(i));
@@ -290,8 +301,10 @@ public class MiniYARNCluster extends CompositeService {
 
   private void setHARMConfigurationWithEphemeralPorts(final int index, Configuration conf) {
     String hostname = MiniYARNCluster.getHostname();
-    for (String confKey : YarnConfiguration.getServiceAddressConfKeys(conf)) {
-      conf.set(HAUtil.addSuffix(confKey, rmIds[index]), hostname + ":0");
+    for (int i = 0; i < resourceManagers.length; ++i) {
+      for (String confKey : YarnConfiguration.getServiceAddressConfKeys(conf)) {
+        conf.set(HAUtil.addSuffix(confKey, rmIds[i]), hostname + ":0");
+      }
     }
   }
 
@@ -444,8 +457,8 @@ public class MiniYARNCluster extends CompositeService {
     @Override
     protected synchronized void serviceInit(Configuration conf)
         throws Exception {
-      initResourceManager(index, conf);
-      super.serviceInit(conf);
+      initResourceManager(index, rmConfs[index]);
+      super.serviceInit(rmConfs[index]);
     }
 
     @Override

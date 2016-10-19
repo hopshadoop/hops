@@ -21,12 +21,18 @@ package org.apache.hadoop.yarn.server.resourcemanager.webapp;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import java.io.IOException;
 import java.io.StringReader;
 
 import javax.ws.rs.core.MediaType;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.resourcemanager.MockRM;
@@ -60,6 +66,8 @@ import com.sun.jersey.guice.spi.container.servlet.GuiceContainer;
 import com.sun.jersey.test.framework.WebAppDescriptor;
 
 public class TestRMWebServicesCapacitySched extends JerseyTestBase {
+
+  private final Log LOG = LogFactory.getLog(TestRMWebServicesCapacitySched.class);
 
   private static MockRM rm;
   private CapacitySchedulerConfiguration csConf;
@@ -98,6 +106,14 @@ public class TestRMWebServicesCapacitySched extends JerseyTestBase {
       conf = new YarnConfiguration(csConf);
       conf.setClass(YarnConfiguration.RM_SCHEDULER, CapacityScheduler.class,
 		    ResourceScheduler.class);
+
+      try {
+        RMStorageFactory.setConfiguration(conf);
+        YarnAPIStorageFactory.setConfiguration(conf);
+        DBUtility.InitializeDB();
+      } catch (IOException ex) {
+        LOG.error(ex, ex);
+      }
       rm = new MockRM(conf);
       bind(ResourceManager.class).toInstance(rm);
       serve("/*").with(GuiceContainer.class);

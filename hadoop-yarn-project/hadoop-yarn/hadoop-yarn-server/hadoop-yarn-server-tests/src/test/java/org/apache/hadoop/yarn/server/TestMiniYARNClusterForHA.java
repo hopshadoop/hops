@@ -42,10 +42,6 @@ public class TestMiniYARNClusterForHA {
     conf.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, false);
     conf.set(YarnConfiguration.RM_WEBAPP_ADDRESS, "localhost:0");
 
-    RMStorageFactory.setConfiguration(conf);
-    YarnAPIStorageFactory.setConfiguration(conf);
-    DBUtility.InitializeDB();
-
     cluster = new MiniYARNCluster(TestMiniYARNClusterForHA.class.getName(),
         2, 1, 1, 1);
     cluster.init(conf);

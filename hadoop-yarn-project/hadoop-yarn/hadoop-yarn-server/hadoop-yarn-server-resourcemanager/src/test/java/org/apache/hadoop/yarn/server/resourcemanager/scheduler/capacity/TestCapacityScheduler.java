@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.TimeUnit;
 
 import io.hops.util.DBUtility;
 import io.hops.util.RMStorageFactory;
@@ -1126,6 +1127,9 @@ public class TestCapacityScheduler {
   
   @Test(timeout = 30000)
   public void testRecoverRequestAfterPreemption() throws Exception {
+    /*DeadlockDetector deadlockDetector = new DeadlockDetector(new DeadlockHandlerImpl(), 1, TimeUnit.SECONDS);
+    deadlockDetector.start();*/
+
     Configuration conf = new Configuration();
     conf.setClass(YarnConfiguration.RM_SCHEDULER, CapacityScheduler.class,
         ResourceScheduler.class);

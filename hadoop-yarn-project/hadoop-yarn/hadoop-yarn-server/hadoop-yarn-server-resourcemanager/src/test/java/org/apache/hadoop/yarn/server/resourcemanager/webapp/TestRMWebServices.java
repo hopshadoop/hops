@@ -26,6 +26,7 @@ import static org.mockito.Matchers.isA;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.io.StringReader;
 import java.util.Arrays;
 import java.util.Collections;
@@ -37,6 +38,11 @@ import javax.ws.rs.core.MediaType;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.service.Service.STATE;
 import org.apache.hadoop.util.VersionInfo;
@@ -61,6 +67,7 @@ import org.apache.hadoop.yarn.webapp.JerseyTestBase;
 import org.apache.hadoop.yarn.webapp.WebServicesTestUtils;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -83,6 +90,7 @@ import com.sun.jersey.test.framework.WebAppDescriptor;
 public class TestRMWebServices extends JerseyTestBase {
 
   private static MockRM rm;
+  private final Log LOG = LogFactory.getLog(TestRMWebServices.class);
 
   private Injector injector = Guice.createInjector(new ServletModule() {
     @Override
@@ -93,6 +101,15 @@ public class TestRMWebServices extends JerseyTestBase {
       Configuration conf = new Configuration();
       conf.setClass(YarnConfiguration.RM_SCHEDULER, FifoScheduler.class,
           ResourceScheduler.class);
+
+      try {
+        RMStorageFactory.setConfiguration(conf);
+        YarnAPIStorageFactory.setConfiguration(conf);
+        DBUtility.InitializeDB();
+      } catch (IOException ex) {
+        LOG.error(ex, ex);
+      }
+
       rm = new MockRM(conf);
       bind(ResourceManager.class).toInstance(rm);
       serve("/*").with(GuiceContainer.class);

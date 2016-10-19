@@ -22,6 +22,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.io.IOException;
 import java.io.StringReader;
 import java.util.Collection;
 
@@ -29,6 +30,11 @@ import javax.ws.rs.core.MediaType;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.api.records.ContainerState;
@@ -51,6 +57,7 @@ import org.apache.hadoop.yarn.webapp.WebServicesTestUtils;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.w3c.dom.Document;
@@ -72,6 +79,8 @@ import com.sun.jersey.test.framework.WebAppDescriptor;
 
 public class TestRMWebServicesApps extends JerseyTestBase {
 
+  private final Log LOG = LogFactory.getLog(TestRMWebServicesApps.class);
+
   private static MockRM rm;
   
   private static final int CONTAINER_MB = 1024;
@@ -87,6 +96,14 @@ public class TestRMWebServicesApps extends JerseyTestBase {
           YarnConfiguration.DEFAULT_RM_AM_MAX_ATTEMPTS);
       conf.setClass(YarnConfiguration.RM_SCHEDULER, FifoScheduler.class,
           ResourceScheduler.class);
+
+      try {
+        RMStorageFactory.setConfiguration(conf);
+        YarnAPIStorageFactory.setConfiguration(conf);
+        DBUtility.InitializeDB();
+      } catch (IOException ex) {
+        LOG.error(ex, ex);
+      }
       rm = new MockRM(conf);
       bind(ResourceManager.class).toInstance(rm);
       serve("/*").with(GuiceContainer.class);
