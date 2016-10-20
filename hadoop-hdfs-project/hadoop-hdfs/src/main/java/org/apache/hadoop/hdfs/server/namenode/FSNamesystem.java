@@ -7423,7 +7423,10 @@ private void commitOrCompleteLastBlock(
       }
     }
 
-    byte storagePolicyID = getINode(sourcePath).getLocalStoragePolicyID();
+    // Find which storage policy is used for this file.
+    byte storagePolicyID = getINode(sourcePath).getStoragePolicyID();
+    BlockStoragePolicy policy = BlockStoragePolicySuite.getPolicy(storagePolicyID);
+
 
     BlockPlacementPolicyDefault placementPolicy = (BlockPlacementPolicyDefault)
         getBlockManager().getBlockPlacementPolicy();
@@ -7432,8 +7435,7 @@ private void commitOrCompleteLastBlock(
     DatanodeStorageInfo[] descriptors = placementPolicy
         .chooseTarget(isParity ? parityPath : sourcePath,
             isParity ? 1 : status.getEncodingPolicy().getTargetReplication(),
-            null, chosenStorages, false, excluded, block.getBlockSize(),
-            BlockStoragePolicySuite.getPolicy(storagePolicyID));
+            null, chosenStorages, false, excluded, block.getBlockSize(), policy);
 
     return new LocatedBlock(block.getBlock(), descriptors);
   }
