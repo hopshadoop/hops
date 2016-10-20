@@ -71,6 +71,7 @@ import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.metadata.hdfs.entity.QuotaUpdate;
 import io.hops.metadata.hdfs.entity.SubTreeOperation;
 import io.hops.metadata.hdfs.entity.UnderReplicatedBlock;
+import io.hops.security.Users;
 import io.hops.security.UsersGroups;
 import io.hops.transaction.EntityManager;
 import io.hops.transaction.context.BlockChecksumContext;
@@ -332,6 +333,7 @@ public class HdfsStorageFactory {
   
   public static boolean formatStorage() throws StorageException {
     Cache.getInstance().flush();
+    Users.flushCache();
     return dStorageFactory.getConnector().formatStorage();
   }
 

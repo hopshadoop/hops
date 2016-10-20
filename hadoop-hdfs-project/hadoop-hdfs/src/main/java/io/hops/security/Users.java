@@ -24,4 +24,16 @@ public class Users {
     UsersGroups.addUserToGroups(user, new String[]{group});
   }
 
+  public static void flushCache(){
+    flushCache(null, null);
+  }
+
+  public static void flushCache(String user, String group){
+    if(user == null && group == null){
+      UsersGroups.clearCache();
+    }else{
+      UsersGroups.flushUser(user);
+      UsersGroups.flushGroup(group);
+    }
+  }
 }

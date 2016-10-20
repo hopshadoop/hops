@@ -1005,6 +1005,11 @@ class NameNodeRpcServer implements NamenodeProtocols {
     namesystem.changeConf(props, newVals);
   }
 
+  @Override
+  public void flushCache(String userName, String groupName) throws IOException {
+    namesystem.flushCache(userName, groupName);
+  }
+
   @Override // ClientProtocol
   public HdfsFileStatus create(String src, FsPermission masked,
       String clientName, EnumSetWritable<CreateFlag> flag, boolean createParent,
