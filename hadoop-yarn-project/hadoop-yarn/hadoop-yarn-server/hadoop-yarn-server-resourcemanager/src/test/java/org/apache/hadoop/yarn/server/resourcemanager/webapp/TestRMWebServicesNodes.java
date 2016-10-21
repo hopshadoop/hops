@@ -22,6 +22,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.io.IOException;
 import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -30,6 +31,11 @@ import javax.ws.rs.core.MediaType;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.NodeState;
@@ -69,15 +75,25 @@ import com.sun.jersey.test.framework.WebAppDescriptor;
 
 public class TestRMWebServicesNodes extends JerseyTestBase {
 
+  private final Log LOG = LogFactory.getLog(TestRMWebServicesNodes.class);
+
   private static MockRM rm;
 
   private Injector injector = Guice.createInjector(new ServletModule() {
     @Override
     protected void configureServlets() {
+      Configuration conf = new Configuration();
+      try {
+        RMStorageFactory.setConfiguration(conf);
+        YarnAPIStorageFactory.setConfiguration(conf);
+        DBUtility.InitializeDB();
+      } catch (IOException ex) {
+        LOG.error(ex, ex);
+      }
       bind(JAXBContextResolver.class);
       bind(RMWebServices.class);
       bind(GenericExceptionHandler.class);
-      rm = new MockRM(new Configuration());
+      rm = new MockRM(conf);
       rm.getRMContext().getContainerTokenSecretManager().rollMasterKey();
       rm.getRMContext().getNMTokenSecretManager().rollMasterKey();
       bind(ResourceManager.class).toInstance(rm);

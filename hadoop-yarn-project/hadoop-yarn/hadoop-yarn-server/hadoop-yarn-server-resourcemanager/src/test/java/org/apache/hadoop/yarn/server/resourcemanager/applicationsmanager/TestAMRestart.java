@@ -60,6 +60,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.AbstractYarnSched
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicationAttempt;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fifo.FifoScheduler;
 import org.apache.hadoop.yarn.util.ControlledClock;
 import org.apache.hadoop.yarn.util.Records;
 import org.apache.hadoop.yarn.util.SystemClock;
@@ -81,13 +82,13 @@ public class TestAMRestart {
     DBUtility.InitializeDB();
   }
 
-  @Test(timeout = 300000)
+  @Test(timeout = 30000)
   public void testAMRestartWithExistingContainers() throws Exception {
     conf.setInt(YarnConfiguration.RM_AM_MAX_ATTEMPTS, 2);
 
     MockRM rm1 = new MockRM(conf);
     rm1.start();
-    MockNM nm1 =
+    final MockNM nm1 =
         new MockNM("127.0.0.1:1234", 10240, rm1.getResourceTrackerService());
     nm1.registerNode();
     MockNM nm2 =
@@ -122,7 +123,6 @@ public class TestAMRestart {
         ContainerId.newContainerId(am1.getApplicationAttemptId(), 2);
     rm1.waitForState(nm1, containerId2, RMContainerState.RUNNING);
 
-    LOG.error("containerId2 RUNNING");
     // launch the 3rd container, for testing container allocated by previous
     // attempt is completed by the next new attempt/
     nm1.nodeHeartbeat(am1.getApplicationAttemptId(), 3, ContainerState.RUNNING);
@@ -130,14 +130,12 @@ public class TestAMRestart {
         ContainerId.newContainerId(am1.getApplicationAttemptId(), 3);
     rm1.waitForState(nm1, containerId3, RMContainerState.RUNNING);
 
-    LOG.error("containerId3 RUNNING");
     // 4th container still in AQUIRED state. for testing Acquired container is
     // always killed.
     ContainerId containerId4 =
         ContainerId.newContainerId(am1.getApplicationAttemptId(), 4);
     rm1.waitForState(nm1, containerId4, RMContainerState.ACQUIRED);
 
-    LOG.error("containerId4 ACQUIRED");
     // 5th container is in Allocated state. for testing allocated container is
     // always killed.
     am1.allocate("127.0.0.1", 1024, 1, new ArrayList<ContainerId>());
@@ -147,7 +145,6 @@ public class TestAMRestart {
     rm1.waitForContainerAllocated(nm1, containerId5);
     rm1.waitForState(nm1, containerId5, RMContainerState.ALLOCATED);
 
-    LOG.error("containerId5 ALLOCATED");
     // 6th container is in Reserved state.
     am1.allocate("127.0.0.1", 6000, 1, new ArrayList<ContainerId>());
     ContainerId containerId6 =
@@ -162,7 +159,6 @@ public class TestAMRestart {
       nm1.nodeHeartbeat(true);
       Thread.sleep(200);
     }
-    LOG.error("containerId6 RESERVED");
     // assert containerId6 is reserved.
     Assert.assertEquals(containerId6, schedulerAttempt.getReservedContainers()
       .get(0).getContainerId());
@@ -171,12 +167,10 @@ public class TestAMRestart {
     nm1.nodeHeartbeat(am1.getApplicationAttemptId(), 1, ContainerState.COMPLETE);
     am1.waitForState(RMAppAttemptState.FAILED);
 
-    LOG.error("RMAppAttempt FAILED");
     // wait for some time. previous AM's running containers should still remain
     // in scheduler even though am failed
     Thread.sleep(3000);
     rm1.waitForState(nm1, containerId2, RMContainerState.RUNNING);
-    LOG.error("containerId2 still RUNNING");
 
     // acquired/allocated containers are cleaned up.
     Assert.assertNull(rm1.getResourceScheduler().getRMContainer(containerId4));
@@ -184,7 +178,6 @@ public class TestAMRestart {
 
     // wait for app to start a new attempt.
     rm1.waitForState(app1.getApplicationId(), RMAppState.ACCEPTED);
-    LOG.error("RMAppAttempt is now ACCEPTED");
 
     // assert this is a new AM.
     ApplicationAttemptId newAttemptId =
@@ -194,12 +187,12 @@ public class TestAMRestart {
     // launch the new AM
     RMAppAttempt attempt2 = app1.getCurrentAppAttempt();
     nm1.nodeHeartbeat(true);
+
     MockAM am2 = rm1.sendAMLaunched(attempt2.getAppAttemptId());
-    LOG.error("New AM sendAMLaunched");
+
     RegisterApplicationMasterResponse registerResponse =
         am2.registerAppAttempt();
 
-    LOG.error("New AM has been launched");
     // Assert two containers are running: container2 and container3;
     Assert.assertEquals(2, registerResponse.getContainersFromPreviousAttempts()
       .size());
@@ -286,7 +279,6 @@ public class TestAMRestart {
 
   @Test(timeout = 30000)
   public void testNMTokensRebindOnAMRestart() throws Exception {
-    YarnConfiguration conf = new YarnConfiguration();
     conf.setInt(YarnConfiguration.RM_AM_MAX_ATTEMPTS, 3);
 
     MockRM rm1 = new MockRM(conf);
@@ -496,7 +488,6 @@ public class TestAMRestart {
   // re-launch the AM.
   @Test(timeout = 20000)
   public void testPreemptedAMRestartOnRMRestart() throws Exception {
-    YarnConfiguration conf = new YarnConfiguration();
     conf.setClass(YarnConfiguration.RM_SCHEDULER, CapacityScheduler.class,
       ResourceScheduler.class);
     conf.setBoolean(YarnConfiguration.RECOVERY_ENABLED, true);

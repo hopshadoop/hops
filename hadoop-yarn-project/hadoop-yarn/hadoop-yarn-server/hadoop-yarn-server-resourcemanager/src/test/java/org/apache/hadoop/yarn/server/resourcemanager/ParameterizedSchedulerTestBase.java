@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FairScheduler;
@@ -60,12 +63,18 @@ public abstract class ParameterizedSchedulerTestBase {
   @Parameterized.Parameters
   public static Collection<SchedulerType[]> getParameters() {
     return Arrays.asList(new SchedulerType[][]{
-        {SchedulerType.CAPACITY}, {SchedulerType.FAIR}});
+        //{SchedulerType.CAPACITY}, {SchedulerType.FAIR}
+            {SchedulerType.CAPACITY}
+    });
   }
 
   @Before
   public void configureScheduler() throws IOException {
     conf = new YarnConfiguration();
+    RMStorageFactory.setConfiguration(conf);
+    YarnAPIStorageFactory.setConfiguration(conf);
+    DBUtility.InitializeDB();
+
     switch (schedulerType) {
       case CAPACITY:
         conf.set(YarnConfiguration.RM_SCHEDULER,

@@ -77,6 +77,8 @@ import org.apache.hadoop.yarn.server.utils.Lock.NoLock;
 import org.apache.hadoop.yarn.util.resource.Resources;
 
 import com.google.common.annotations.VisibleForTesting;
+
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 
 @Private
@@ -617,7 +619,7 @@ public class LeafQueue extends AbstractCSQueue {
     //limit of allowed resource usage for application masters
     Resource amLimit = getAMResourceLimit();
     Resource userAMLimit = getUserAMResourceLimit();
-        
+
     for (Iterator<FiCaSchedulerApp> i=pendingApplications.iterator(); 
          i.hasNext(); ) {
       FiCaSchedulerApp application = i.next();
@@ -779,17 +781,32 @@ public class LeafQueue extends AbstractCSQueue {
   public void activateApplication(ApplicationId app){
     applicationsToActivate.add(app);
     applicationsToDeactivate.remove(app);
+    LOG.error("Activated application: " + app.toString());
+    /*FiCaSchedulerApp ficaapp = activeApplications.get(app);
+    if (ficaapp != null) {
+      activeApplicationsWithRequests.add(ficaapp);
+    } else {
+      pendingApplicationsWithRequests.add(app);
+    }*/
   }
   
   @Override
   public void deactivateApplication(ApplicationId appId){
     applicationsToDeactivate.add(appId);
     applicationsToActivate.remove(appId);
+    LOG.error("Deactivated application: " + appId.toString());
+    /*FiCaSchedulerApp ficaapp = activeApplications.get(appId);
+    if (ficaapp != null) {
+      activeApplicationsWithRequests.remove(ficaapp);
+    } else {
+      pendingApplicationsWithRequests.remove(appId);
+    }*/
   }
 
   @Override
   public synchronized CSAssignment assignContainers(Resource clusterResource,
       FiCaSchedulerNode node, ResourceLimits currentResourceLimits) {
+
     updateCurrentResourceLimits(currentResourceLimits, clusterResource);
                 
     if(LOG.isDebugEnabled()) {
@@ -816,15 +833,17 @@ public class LeafQueue extends AbstractCSQueue {
     
     Resource initAmountNeededUnreserve =
         currentResourceLimits.getAmountNeededUnreserve();
-    
+
     LOG.info("to activate size: " + applicationsToActivate.size() + " to deactivate size " + applicationsToDeactivate.size());
     List<ApplicationId> toRemove = new ArrayList<>();
     for (ApplicationId appId : applicationsToActivate) {
       toRemove.add(appId);
       FiCaSchedulerApp application = activeApplications.get(appId);
       if (application != null) {
+        LOG.error("Adding " + appId.toString() + " to active apps with requests");
         activeApplicationsWithRequests.add(application);
       } else {
+        LOG.error("Adding " + appId.toString() + " to pending apps with requests");
         pendingApplicationsWithRequests.add(appId);
       }
     }
@@ -834,15 +853,17 @@ public class LeafQueue extends AbstractCSQueue {
       toRemove.add(appId);
       FiCaSchedulerApp app = activeApplications.get(appId);
       if (app != null) {
+        LOG.error("Removing " + appId.toString() + " from active apps with requests");
         activeApplicationsWithRequests.remove(app);
       } else {
+        LOG.error("Removing " + appId.toString() + " from pending apps with requests");
         pendingApplicationsWithRequests.remove(appId);
       }
     }
     applicationsToDeactivate.removeAll(toRemove);
+
     // Try to assign containers to applications in order
     for (FiCaSchedulerApp application : activeApplicationsWithRequests) {
-
       if(LOG.isDebugEnabled()) {
         LOG.debug("pre-assignContainers for application "
         + application.getApplicationId());
@@ -941,11 +962,13 @@ public class LeafQueue extends AbstractCSQueue {
               }
               application.resetSchedulingOpportunities(priority);
             }
-            
+
+            LOG.error("DONE return assignment");
             // Done
             return assignment;
           } else {
             // Do not assign out of order w.r.t priorities
+            LOG.error("BREAK!!!");
             break;
           }
         }
