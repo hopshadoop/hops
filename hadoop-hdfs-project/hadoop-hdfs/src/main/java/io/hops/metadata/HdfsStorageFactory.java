@@ -71,6 +71,7 @@ import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.metadata.hdfs.entity.QuotaUpdate;
 import io.hops.metadata.hdfs.entity.SubTreeOperation;
 import io.hops.metadata.hdfs.entity.UnderReplicatedBlock;
+import io.hops.security.Users;
 import io.hops.security.UsersGroups;
 import io.hops.transaction.EntityManager;
 import io.hops.transaction.context.BlockChecksumContext;
@@ -162,7 +163,7 @@ public class HdfsStorageFactory {
       EntityManager.addContextInitializer(getContextInitializer());
       if(conf.getBoolean(CommonConfigurationKeys.HOPS_GROUPS_ENABLE, CommonConfigurationKeys
           .HOPS_GROUPS_ENABLE_DEFAULT)) {
-        UsersGroups.init(getConnector(), (UserDataAccess) getDataAccess
+        UsersGroups.init((UserDataAccess) getDataAccess
             (UserDataAccess.class), (UserGroupDataAccess) getDataAccess
             (UserGroupDataAccess.class), (GroupDataAccess) getDataAccess
             (GroupDataAccess.class), conf.getInt(CommonConfigurationKeys
@@ -332,9 +333,20 @@ public class HdfsStorageFactory {
   
   public static boolean formatStorage() throws StorageException {
     Cache.getInstance().flush();
+    Users.flushCache();
     return dStorageFactory.getConnector().formatStorage();
   }
-  
+
+  public static boolean formatHdfsStorage() throws StorageException {
+    Cache.getInstance().flush();
+    return dStorageFactory.getConnector().formatHDFSStorage();
+  }
+
+  public static boolean formatHdfsStorageNonTransactional() throws StorageException {
+    Cache.getInstance().flush();
+    return dStorageFactory.getConnector().formatHDFSStorageNonTransactional();
+  }
+
   public static boolean formatAllStorageNonTransactional()
       throws StorageException {
     Cache.getInstance().flush();

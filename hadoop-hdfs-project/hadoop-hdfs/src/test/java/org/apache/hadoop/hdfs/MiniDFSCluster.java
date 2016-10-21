@@ -646,6 +646,7 @@ public class MiniDFSCluster {
     if (format) {
       try {
         // this should be done before creating namenodes
+        LOG.debug("MiniDFSClustring Formatting the Cluster");
         assert (HdfsStorageFactory.formatStorage());
       } catch (StorageException ex) {
         throw new IOException(ex);

@@ -976,4 +976,21 @@ public class ClientNamenodeProtocolTranslatorPB
       throw ProtobufHelper.getRemoteException(ex);
     }
   }
+
+  @Override
+  public void flushCache(String userName, String groupName) throws IOException {
+    try {
+      ClientNamenodeProtocolProtos.FlushUsersCacheRequestProto.Builder req =
+          ClientNamenodeProtocolProtos.FlushUsersCacheRequestProto.newBuilder();
+      if(userName != null) {
+        req.setUserName(userName);
+      }
+      if(groupName != null) {
+        req.setGroupName(groupName);
+      }
+      rpcProxy.flushCache(null, req.build());
+    } catch (ServiceException ex) {
+      throw ProtobufHelper.getRemoteException(ex);
+    }
+  }
 }

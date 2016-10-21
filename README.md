@@ -2,7 +2,15 @@ Hops
 ===
 
 Hadoop Open Platform-as-a-Service (Hops) is a new distribution of Apache Hadoop with scalable, highly available, customizable metadata.
+<ul>
+<li><a href="https://twitter.com/hopshadoop">Follow our Twitter account.</a></li>
+<li><a href="https://gitter.im/hopshadoop">Chat with Hops developers in Gitter.</a></li>
+<li><a href="https://groups.google.com/forum/#!forum/hopshadoop">Join our developer mailing list.</a></li>
+<li><a href="https://cloud17.sics.se/jenkins/view/develop/">Checkout the current build status.</a></li>
+</ul>
 
+Introduction
+====
 Hops consists internally of two main sub projects, Hops-Fs and Hops-Yarn. Hops-FS is a new implementation of the the Hadoop Filesystem (HDFS), that supports multiple stateless NameNodes, where the metadata is stored in an in-memory distributed database (MySQL Cluster). Hops-FS enables more scalable clusters than Apache HDFS (up to ten times larger clusters), and enables NameNode metadata to be both customized and analyzed, because it can now be easily accessed via a SQL API. Hops-YARN introduces a distributed stateless Resource Manager, whose state is migrated to MySQL Cluster, a replicated, partitioned, in-memory NewSQL database. This enables our YARN architecture to have no down-time, with failover of a ResourceManager happening in a few seconds. 
 
 For the latest information about Hops, please visit our website at:

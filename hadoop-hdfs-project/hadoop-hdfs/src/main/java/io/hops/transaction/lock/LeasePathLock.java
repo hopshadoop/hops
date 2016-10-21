@@ -80,6 +80,7 @@ public final class LeasePathLock extends Lock {
 
   private void acquireLeasePaths(Lease lease)
       throws StorageException, TransactionContextException {
+    setLockMode(lockType);
     Collection<LeasePath> result =
         acquireLockList(lockType, LeasePath.Finder.ByHolderId,
             lease.getHolderID());

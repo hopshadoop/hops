@@ -18,9 +18,7 @@
 package org.apache.hadoop.hdfs.server.namenode;
 
 import com.google.common.primitives.SignedBytes;
-import io.hops.security.Users;
 import io.hops.erasure_coding.ErasureCodingManager;
-import io.hops.exception.HopsException;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.HdfsStorageFactory;
@@ -63,11 +61,12 @@ public abstract class INode implements Comparable<byte[]> {
 
   public static enum Finder implements FinderType<INode> {
 
-    ByINodeId,
-    ByParentId,
-    ByNameAndParentId,
-    ByNamesAndParentIdsCheckLocal,
-    ByNamesAndParentIds;
+    ByINodeIdFTIS,//FTIS full table index scan
+    ByParentIdFTIS,
+    ByParentIdAndPartitionId,
+    ByNameParentIdAndPartitionId,
+    ByNamesParentIdsAndPartitionIdsCheckLocal,
+    ByNamesParentIdsAndPartitionIds;
 
     @Override
     public Class getType() {
@@ -77,15 +76,17 @@ public abstract class INode implements Comparable<byte[]> {
     @Override
     public Annotation getAnnotated() {
       switch (this) {
-        case ByINodeId:
+        case ByINodeIdFTIS:
           return Annotation.IndexScan;
-        case ByParentId:
+        case ByParentIdFTIS:
+          return Annotation.IndexScan;
+        case ByParentIdAndPartitionId:
           return Annotation.PrunedIndexScan;
-        case ByNameAndParentId:
+        case ByNameParentIdAndPartitionId:
           return Annotation.PrimaryKey;
-        case ByNamesAndParentIds:
+        case ByNamesParentIdsAndPartitionIds:
           return Annotation.Batched;
-        case ByNamesAndParentIdsCheckLocal:
+        case ByNamesParentIdsAndPartitionIdsCheckLocal:CheckLocal:
           return Annotation.Batched;
         default:
           throw new IllegalStateException();
@@ -133,10 +134,28 @@ public abstract class INode implements Comparable<byte[]> {
   public static final int NON_EXISTING_ID = 0;
   protected int id = NON_EXISTING_ID;
   protected int parentId = NON_EXISTING_ID;
+  public static int RANDOM_PARTITIONING_MAX_LEVEL=1;
+  protected int partitionId;
 
   protected boolean subtreeLocked;
   protected long subtreeLockOwner;
 
+
+  //Number of bits for Block size
+  final static short BLOCK_BITS = 48;
+  final static short REPLICATION_BITS = 8;
+  final static short BOOLEAN_BITS = 8;
+  final static short HAS_BLKS_BITS = 1; // this is out of the 8 bits for the storing booleans
+  //Header mask 64-bit representation
+  //Format:[8 bits for flags][8 bits for replication degree][48 bits for PreferredBlockSize]
+  final static long BLOCK_SIZE_MASK =  0x0000FFFFFFFFFFFFL;
+  final static long REPLICATION_MASK = 0x00FF000000000000L;
+  final static long FLAGS_MASK =       0xFF00000000000000L;
+  final static long HAS_BLKS_MASK =    0x0100000000000000L;
+  //[8 bits for flags]
+  //0 bit : 1 if the file has blocks. 0 blocks
+  //remaining bits are not yet used
+  long header;
 
   /**
    * Simple wrapper for two counters :
@@ -429,7 +448,7 @@ public abstract class INode implements Comparable<byte[]> {
     }
     if (parent == null) {
       parent = (INodeDirectory) EntityManager
-          .find(INode.Finder.ByINodeId, getParentId());
+          .find(INode.Finder.ByINodeIdFTIS, getParentId());
     }
 
     return this.parent;
@@ -765,8 +784,11 @@ public abstract class INode implements Comparable<byte[]> {
     return !isDirectory() && !isSymlink();
   }
 
-  void logMetadataEvent(MetadataLogEntry.Operation operation)
+  public void logMetadataEvent(MetadataLogEntry.Operation operation)
       throws StorageException, TransactionContextException {
+    if(isUnderConstruction()){
+      return;
+    }
     if (isPathMetaEnabled()) {
       INodeDirectory datasetDir = getMetaEnabledParent();
       EntityManager.add(new MetadataLogEntry(datasetDir.getId(), getId(),
@@ -788,5 +810,138 @@ public abstract class INode implements Comparable<byte[]> {
       dir = dir.getParent();
     }
     return null;
+  }
+
+  public int getPartitionId(){
+    return  partitionId;
+  }
+
+  public void setPartitionIdNoPersistance(int partitionId){
+    this.partitionId = partitionId;
+  }
+
+  public void setPartitionId(int partitionId) throws TransactionContextException, StorageException {
+    setPartitionIdNoPersistance(partitionId);
+    save();
+  }
+
+  public void calculateAndSetPartitionIdNoPersistance(int parentId, String name, short depth){
+    setPartitionIdNoPersistance(calculatePartitionId(parentId,name,depth));
+  }
+
+  public void calculateAndSetPartitionId(int parentId, String name, short depth)
+      throws TransactionContextException, StorageException {
+    setPartitionIdNoPersistance(calculatePartitionId(parentId,name,depth));
+    save();
+  }
+  public static int calculatePartitionId(int parentId, String name, short depth){
+    if(isTreeLevelRandomPartitioned(depth)){
+      return partitionIdHashFunction(parentId,name,depth);
+    }else{
+      return parentId;
+    }
+  }
+
+  private static int partitionIdHashFunction(int parentId, String name, short depth){
+    if(depth == INodeDirectory.ROOT_DIR_DEPTH){
+      return INodeDirectory.ROOT_DIR_PARTITION_KEY;
+    }else{
+      return (name+parentId).hashCode();
+      //    String partitionid = String.format("%04d%04d",parentId,depth);
+      //    return Integer.parseInt(partitionid);
+    }
+  }
+
+  public static boolean isTreeLevelRandomPartitioned(short depth){
+    if(depth > RANDOM_PARTITIONING_MAX_LEVEL){
+      return false;
+    }else{
+      return true;
+    }
+  }
+
+  public static short getBlockReplication(long header) {
+    long val = (header & REPLICATION_MASK);
+    long val2 = val >> BLOCK_BITS;
+    return (short) val2;
+  }
+
+  void setReplicationNoPersistance(short replication) {
+    if (replication <= 0 || replication > (Math.pow(2, REPLICATION_BITS) - 1)) {
+      throw new IllegalArgumentException("Unexpected value for the " +
+          "replication [" + replication + "]. Expected [1:" + (Math.pow(2, REPLICATION_BITS) - 1) + "]");
+    }
+    header = ((long) replication << BLOCK_BITS) | (header & ~REPLICATION_MASK);
+  }
+
+  public static long getPreferredBlockSize(long header) {
+    return header & BLOCK_SIZE_MASK;
+  }
+
+  protected void setPreferredBlockSizeNoPersistance(long preferredBlkSize) {
+    if ((preferredBlkSize < 0) || (preferredBlkSize > (Math.pow(2, BLOCK_BITS) - 1))) {
+      throw new IllegalArgumentException("Unexpected value for the block " +
+          "size [" + preferredBlkSize + "]. Expected [1:" + (Math.pow(2, BLOCK_BITS) - 1) + "]");
+    }
+    header = (header & ~BLOCK_SIZE_MASK) | (preferredBlkSize & BLOCK_SIZE_MASK);
+  }
+
+  public long getHeader() {
+    return header;
+  }
+
+  public void setHeaderNoPersistance(long header) {
+    long preferecBlkSize = getPreferredBlockSize(header);
+    short replication = getBlockReplication(header);
+    if (preferecBlkSize < 0) {
+      throw new IllegalArgumentException("Unexpected value for the " +
+          "block size [" + preferecBlkSize + "]");
+    }
+
+    if (replication < 0) {
+      throw new IllegalArgumentException("Unexpected value for the " +
+          "replication [" + replication + "]");
+    }
+
+    this.header = header;
+  }
+
+  public void setHasBlocks(boolean hasBlocks) throws TransactionContextException, StorageException {
+    setHasBlocksNoPersistance(hasBlocks);
+    save();
+  }
+
+  public void setHasBlocksNoPersistance(boolean hasBlocks) {
+    long val = (hasBlocks) ? 1 : 0;
+    header = ((long) val << (BLOCK_BITS + REPLICATION_BITS)) | (header & ~HAS_BLKS_MASK);
+  }
+
+  public static boolean hasBlocks(long header) {
+    long val = (header & HAS_BLKS_MASK);
+    long val2 = val >> (BLOCK_BITS + REPLICATION_BITS);
+    if (val2 == 1) {
+      return true;
+    } else if (val2 == 0) {
+      return false;
+    } else {
+      throw new IllegalStateException("Flags in the inode header are messed up");
+    }
+  }
+
+  public boolean hasBlocks(){
+   return hasBlocks(header);
+  }
+
+  public short myDepth() throws TransactionContextException, StorageException {
+    if(id == NON_EXISTING_ID){
+      throw new IllegalStateException("INode is not connected to the file system tree yet");
+    }
+
+    if(id == INodeDirectory.ROOT_ID){
+      return INodeDirectory.ROOT_DIR_DEPTH;
+    }
+
+    INode parentInode = EntityManager.find(Finder.ByINodeIdFTIS, getParentId());
+    return (short) (parentInode.myDepth()+1);
   }
 }

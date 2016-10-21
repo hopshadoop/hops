@@ -15,8 +15,12 @@
  */
 package io.hops.security;
 
-import io.hops.StorageConnector;
+import com.google.common.base.Predicates;
+import com.google.common.collect.Collections2;
+import com.google.common.collect.Lists;
+import io.hops.exception.ForeignKeyConstraintViolationException;
 import io.hops.exception.StorageException;
+import io.hops.exception.UniqueKeyConstraintViolationException;
 import io.hops.metadata.hdfs.dal.GroupDataAccess;
 import io.hops.metadata.hdfs.dal.UserDataAccess;
 import io.hops.metadata.hdfs.dal.UserGroupDataAccess;
@@ -30,6 +34,8 @@ import org.apache.commons.math3.util.Pair;
 import org.apache.hadoop.classification.InterfaceAudience;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
@@ -67,7 +73,6 @@ public class UsersGroups {
     }
   }
 
-  private static StorageConnector storageConnector;
   private static UserGroupDataAccess userGroupDataAccess;
   private static GroupDataAccess<Group> groupDataAccess;
   private static UserDataAccess<User> userDataAccess;
@@ -78,15 +83,14 @@ public class UsersGroups {
   private static Thread th = null;
   private static boolean isConfigured = false;
 
-  public static void init(StorageConnector connector, UserDataAccess uda,
-      UserGroupDataAccess ugda, GroupDataAccess gda, int gutime, int lrumax) {
-    storageConnector = connector;
+  public static void init(UserDataAccess uda, UserGroupDataAccess ugda,
+      GroupDataAccess gda, int gutime, int lrumax) {
     userDataAccess = uda;
     userGroupDataAccess = ugda;
     groupDataAccess = gda;
     groupUpdateTime = gutime;
     cache = new UsersGroupsCache(lrumax);
-    if (storageConnector != null && userGroupDataAccess != null &&
+    if (userGroupDataAccess != null &&
         userDataAccess != null && groupDataAccess != null && th ==
         null) {
       th = new Thread(new GroupsUpdater(), "GroupsUpdater");
@@ -104,7 +108,10 @@ public class UsersGroups {
 
     List<String> groups = cache.getGroups(user);
     if (groups == null) {
+      LOG.debug("Fetching groups for (" + user + ") from db");
       groups = getGroupsFromDBAndUpdateCached(user);
+    }else{
+      LOG.debug("Returning fetched groups from cache for (" + user + ")" );
     }
     return groups;
   }
@@ -120,15 +127,19 @@ public class UsersGroups {
 
     Integer userId = cache.getUserId(userName);
     if (userId != null) {
+      LOG.debug("Returning user id from cache (" + userName + ")");
       return userId;
     }
 
     User user = getUserFromDB(userName, null);
     if (user == null) {
+      LOG.debug("Removing user (" + userName + ")");
       cache.removeUser(userName);
       return 0;
     }
 
+    LOG.debug("Adding user (" + userName +  "," + user.getId()  + ") to " +
+        "cache");
     cache.addUser(user);
     return user.getId();
   }
@@ -144,15 +155,19 @@ public class UsersGroups {
 
     Integer groupId = cache.getGroupId(groupName);
     if (groupId != null) {
+      LOG.debug("Returning group id from cache (" + groupName + ")");
       return groupId;
     }
 
     Group group = getGroupFromDB(groupName, null);
     if (group == null) {
+      LOG.debug("Removing group (" + groupName + ")");
       cache.removeGroup(groupName);
       return 0;
     }
 
+    LOG.debug("Adding group (" + groupName +  "," + group.getId()  + ") to " +
+        "cache");
     cache.addGroup(group);
     return group.getId();
   }
@@ -167,15 +182,19 @@ public class UsersGroups {
     }
     String userName = cache.getUserName(userId);
     if (userName != null) {
+      LOG.debug("Returning user from cache (" + userId + ")");
       return userName;
     }
 
     User user = getUserFromDB(null, userId);
     if (user == null) {
+      LOG.debug("Removing user (" + userId + ")");
       cache.removeUser(userId);
       return null;
     }
 
+    LOG.debug("Adding user (" + user.getName() +  "," + userId  + ") to " +
+        "cache");
     cache.addUser(user);
     return user.getName();
   }
@@ -190,15 +209,19 @@ public class UsersGroups {
     }
     String groupName = cache.getGroupName(groupId);
     if (groupName != null) {
+      LOG.debug("Returning group from cache (" + groupId + ")");
       return groupName;
     }
 
     Group group = getGroupFromDB(null, groupId);
     if (group == null) {
+      LOG.debug("Removing group (" + groupId + ")");
       cache.removeGroup(groupId);
       return null;
     }
 
+    LOG.debug("Adding group (" + group.getName() +  "," + groupId  + ") to " +
+        "cache");
     cache.addGroup(group);
     return group.getName();
   }
@@ -233,7 +256,10 @@ public class UsersGroups {
           connector.beginTransaction();
         }
 
-        User user = userDataAccess.getUser(userName);
+        Integer userId = cache.getUserId(userName);
+        User user = userId == null ? userDataAccess.getUser(userName) :
+            userDataAccess.getUser(userId);
+
         if (user == null) {
           return null;
         }
@@ -241,7 +267,7 @@ public class UsersGroups {
         List<Group> groups = userGroupDataAccess.getGroupsForUser(user.getId());
 
         if (!transactionActive) {
-          storageConnector.commit();
+          connector.commit();
         }
 
         return new Pair<User, List<Group>>(user, groups);
@@ -277,36 +303,104 @@ public class UsersGroups {
     }.handle();
   }
 
-  public static void addUserToGroups(final String user, final String[] groups)
-      throws IOException {
-    if (!isConfigured) {
+  public static void addUserToGroupsTx(final String user, final String[]
+      groups) throws IOException {
+
+    if(!isConfigured)
       return;
+
+    try {
+      addUserToGroupsInternalTx(user, groups);
+    } catch (ForeignKeyConstraintViolationException ex) {
+      flushUser(user);
+      for (String group : groups) {
+        flushGroup(group);
+      }
+      addUserToGroupsInternalTx(user, groups);
+    } catch (UniqueKeyConstraintViolationException ex){
+      LOG.debug("User/Group was already added: " + ex);
+    }
+  }
+
+  public static void addUserToGroups(final String user, final String[]
+      groups) throws IOException {
+
+    if(!isConfigured)
+      return;
+
+    addUserToGroupsInternal(user, groups);
+  }
+
+  private static void addUserToGroupsInternalTx(final String user, final
+  String[] grps) throws IOException {
+      new LightWeightRequestHandler(UsersOperationsType.ADD_USER) {
+        @Override
+        public Object performTask() throws StorageException, IOException {
+          addUserToGroupsInternal(user, grps);
+          return null;
+        }
+      }.handle();
+  }
+
+  private static void addUserToGroupsInternal(final String user, final
+      String[] grps) throws StorageException {
+
+    Collection<String> groups = null;
+
+    if(grps != null) {
+      groups = Collections2.filter(Arrays.asList(grps), Predicates
+          .<String>notNull());
     }
 
-    new LightWeightRequestHandler(UsersOperationsType.ADD_USER) {
-      @Override
-      public Object performTask() throws StorageException, IOException {
-
-        User addedUser = null;
-        if(user != null){
-          addedUser = userDataAccess.addUser(user);
-          cache.addUser(addedUser);
-        }
-
-        if (groups != null) {
-          for (String group : groups) {
-            if (group != null) {
-              Group addedGroup = groupDataAccess.addGroup(group);
-              if(addedUser != null && addedGroup != null) {
-                userGroupDataAccess.addUserToGroup(addedUser.getId(),
-                    addedGroup.getId());
-              }
-              cache.addGroup(addedGroup);
-            }
-          }
-        }
-        return null;
+    List<String> availableGroups = cache.getGroups(user);
+    if(availableGroups != null && groups != null){
+      if(availableGroups.containsAll(groups)){
+        return;
       }
-    }.handle();
+    }
+
+    Integer userId = cache.getUserId(user);
+
+    if(userId == null && user != null) {
+      User addedUser = userDataAccess.addUser(user);
+      cache.addUser(addedUser);
+      userId = addedUser.getId();
+    }
+
+    if(groups != null){
+      for(String group : groups){
+        List<Integer> groupIds = Lists.newArrayList();
+        Integer groupId = cache.getGroupId(group);
+        if(groupId == null){
+          Group addedGroup = groupDataAccess.addGroup(group);
+          cache.addGroup(addedGroup);
+          groupId = addedGroup.getId();
+        }
+        groupIds.add(groupId);
+
+        if(userId != null) {
+          userGroupDataAccess.addUserToGroups(userId, groupIds);
+        }
+      }
+
+      if(user != null){
+        cache.appendUserGroups(user, groups);
+      }
+    }
+  }
+
+  static void flushUser(String userName){
+    LOG.debug("remove user (" + userName + ") from the cache");
+    cache.removeUser(userName);
+  }
+
+  static void flushGroup(String groupName){
+    LOG.debug("remove user (" + groupName + ") from the cache");
+    cache.removeGroup(groupName);
+  }
+
+  static void clearCache(){
+    LOG.debug("clear usersgroups cache");
+    cache.clear();
   }
 }

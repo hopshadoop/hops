@@ -181,7 +181,7 @@ public class BlockInfo extends Block {
     //if we call get block collection op of that copy then it should return null
 
     BlockCollection bc = (BlockCollection) EntityManager
-        .find(INodeFile.Finder.ByINodeId, inodeId);
+        .find(INodeFile.Finder.ByINodeIdFTIS, inodeId);
     this.bc = bc;
     if (bc == null) {
       this.inodeId = INode.NON_EXISTING_ID;

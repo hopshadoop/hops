@@ -62,25 +62,25 @@ public class INodeUtil {
     return buf.toString();
   }
 
-  public static INode getNode(byte[] name, int parentId, boolean transactional)
+  public static INode getNode(byte[] name, int parentId, int partitionId, boolean transactional)
       throws StorageException, TransactionContextException {
     String nameString = DFSUtil.bytes2String(name);
     if (transactional) {
       return EntityManager
-          .find(INode.Finder.ByNameAndParentId, nameString, parentId);
+          .find(INode.Finder.ByNameParentIdAndPartitionId, nameString, parentId, partitionId);
     } else {
-      return findINodeWithNoTransaction(nameString, parentId);
+      return findINodeWithNoTransaction(nameString, parentId, partitionId);
     }
   }
 
-  private static INode findINodeWithNoTransaction(String name, int parentId)
+  private static INode findINodeWithNoTransaction(String name, int parentId, int partitionId)
       throws StorageException {
     LOG.debug(String
-        .format("Read inode with no transaction by parent-id=%d, name=%s",
-            parentId, name));
+        .format("Read inode with no transaction by parent_id=%d, name=%s, partitionId=%s",
+            parentId, name, parentId));
     INodeDataAccess<INode> da = (INodeDataAccess) HdfsStorageFactory
         .getDataAccess(INodeDataAccess.class);
-    return da.pkLookUpFindInodeByNameAndParentId(name, parentId);
+    return da.findInodeByNameParentIdAndPartitionIdPK(name, parentId, partitionId);
   }
 
   public static void resolvePathWithNoTransaction(String path,
@@ -161,14 +161,14 @@ public class INodeUtil {
   private static INode getRoot()
       throws StorageException, TransactionContextException {
     return getNode(INodeDirectory.ROOT_NAME.getBytes(),
-        INodeDirectory.ROOT_PARENT_ID, false);
+        INodeDirectory.ROOT_PARENT_ID, INodeDirectory.getRootDirPartitionKey(), false);
   }
 
   public static INode indexINodeScanById(int id) throws StorageException {
     LOG.debug(String.format("Read inode with no transaction by id=%d", id));
     INodeDataAccess<INode> da = (INodeDataAccess) HdfsStorageFactory
         .getDataAccess(INodeDataAccess.class);
-    return da.indexScanfindInodeById(id);
+    return da.findInodeByIdFTIS(id);
   }
 
   //puts the indoes in the list in reverse order
@@ -203,10 +203,11 @@ public class INodeUtil {
         INodeIdentifier inodeIdent = new INodeIdentifier(blu.getInodeId());
         INodeDALAdaptor ida = (INodeDALAdaptor) HdfsStorageFactory
             .getDataAccess(INodeDataAccess.class);
-        INode inode = ida.indexScanfindInodeById(blu.getInodeId());
+        INode inode = ida.findInodeByIdFTIS(blu.getInodeId());
         if (inode != null) {
           inodeIdent.setName(inode.getLocalName());
           inodeIdent.setPid(inode.getParentId());
+          inodeIdent.setPartitionId(inode.getPartitionId());
         }
         return inodeIdent;
       }
@@ -227,10 +228,11 @@ public class INodeUtil {
           new INodeIdentifier(((BlockInfo) b).getInodeId());
       INodeDALAdaptor ida = (INodeDALAdaptor) HdfsStorageFactory
           .getDataAccess(INodeDataAccess.class);
-      INode inode = ida.indexScanfindInodeById(((BlockInfo) b).getInodeId());
+      INode inode = ida.findInodeByIdFTIS(((BlockInfo) b).getInodeId());
       if (inode != null) {
         inodeIden.setName(inode.getLocalName());
         inodeIden.setPid(inode.getParentId());
+        inodeIden.setPartitionId(inode.getPartitionId());
       }
       return inodeIden;
     } else {
@@ -268,11 +270,12 @@ public class INodeUtil {
           public Object performTask() throws StorageException, IOException {
             INodeDALAdaptor ida = (INodeDALAdaptor) HdfsStorageFactory
                 .getDataAccess(INodeDataAccess.class);
-            INode inode = ida.indexScanfindInodeById(id);
+            INode inode = ida.findInodeByIdFTIS(id);
             INodeIdentifier inodeIdent = new INodeIdentifier(id);
             if (inode != null) {
               inodeIdent.setName(inode.getLocalName());
               inodeIdent.setPid(inode.getParentId());
+              inodeIdent.setPartitionId(inode.getPartitionId());
             }
             return inodeIdent;
           }

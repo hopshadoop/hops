@@ -37,6 +37,7 @@ import java.net.URI;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.hadoop.fs.FileStatus;
 
 public class TestGlobbedCopyListing {
 
@@ -120,7 +121,7 @@ public class TestGlobbedCopyListing {
     SequenceFile.Reader reader = new SequenceFile.Reader(cluster.getFileSystem(),
                                               listingPath, new Configuration());
     Text key   = new Text();
-    CopyListingFileStatus value = new CopyListingFileStatus();
+    FileStatus value = new FileStatus();
     Map<String, String> actualValues = new HashMap<String, String>();
     while (reader.next(key, value)) {
       if (value.isDirectory() && key.toString().equals("")) {

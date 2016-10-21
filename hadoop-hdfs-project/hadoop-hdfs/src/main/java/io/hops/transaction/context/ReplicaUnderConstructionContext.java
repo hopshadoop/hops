@@ -42,16 +42,20 @@ public class ReplicaUnderConstructionContext
   public void update(ReplicaUnderConstruction replica)
       throws TransactionContextException {
     super.update(replica);
-    log("added-replicauc", "bid", replica.getBlockId(), "sid",
-        replica.getStorageId(), "state", replica.getState().name());
+    if(isLogDebugEnabled()) {
+      log("added-replicauc", "bid", replica.getBlockId(), "sid",
+              replica.getStorageId(), "state", replica.getState().name());
+    }
   }
 
   @Override
   public void remove(ReplicaUnderConstruction replica)
       throws TransactionContextException {
     super.remove(replica);
-    log("removed-replicauc", "bid", replica.getBlockId(), "sid",
-        replica.getStorageId(), "state", replica.getState().name());
+    if(isLogDebugEnabled()) {
+      log("removed-replicauc", "bid", replica.getBlockId(), "sid",
+              replica.getStorageId(), "state", replica.getState().name());
+    }
   }
 
   @Override

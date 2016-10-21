@@ -84,6 +84,10 @@ public class MetadataLogContext
       key.timestamp = logEntry.updateTimestamp();
     }
     super.add(logEntry);
+    log("metadata-log-added","baseDirId", logEntry.getDatasetId(), "inodeId",logEntry.getInodeId(),"name", logEntry.getInodeName(), "pid", logEntry.getInodeParentId(), "Operation", logEntry.getOperation());
+          for(int i = 0;i < Thread.currentThread().getStackTrace().length;i++){
+        System.out.println((Thread.currentThread().getStackTrace()[i]));
+      }
   }
 
   @Override
