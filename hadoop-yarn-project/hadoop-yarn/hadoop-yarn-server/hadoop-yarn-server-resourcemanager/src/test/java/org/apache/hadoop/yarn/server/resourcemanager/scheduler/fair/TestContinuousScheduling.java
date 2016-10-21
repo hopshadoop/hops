@@ -40,6 +40,7 @@ import static org.junit.Assert.assertTrue;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -58,7 +59,8 @@ public class TestContinuousScheduling extends FairSchedulerTestBase {
   }
 
   @Before
-  public void setup() {
+  public void setup() throws IOException {
+    super.setUp();
     mockClock = new MockClock();
     conf = createConfiguration();
     resourceManager = new MockRM(conf);

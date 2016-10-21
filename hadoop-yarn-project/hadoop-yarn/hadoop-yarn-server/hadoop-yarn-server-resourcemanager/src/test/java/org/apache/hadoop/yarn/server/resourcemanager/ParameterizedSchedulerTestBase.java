@@ -63,8 +63,7 @@ public abstract class ParameterizedSchedulerTestBase {
   @Parameterized.Parameters
   public static Collection<SchedulerType[]> getParameters() {
     return Arrays.asList(new SchedulerType[][]{
-        //{SchedulerType.CAPACITY}, {SchedulerType.FAIR}
-            {SchedulerType.CAPACITY}
+        {SchedulerType.CAPACITY}, {SchedulerType.FAIR}
     });
   }
 

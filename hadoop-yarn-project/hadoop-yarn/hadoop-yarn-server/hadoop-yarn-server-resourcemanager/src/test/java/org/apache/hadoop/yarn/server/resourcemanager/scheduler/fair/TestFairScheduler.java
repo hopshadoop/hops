@@ -120,8 +120,8 @@ public class TestFairScheduler extends FairSchedulerTestBase {
 
   @Before
   public void setUp() throws IOException {
+    super.setUp();
     scheduler = new FairScheduler();
-    conf = createConfiguration();
     resourceManager = new ResourceManager();
     resourceManager.init(conf);
 

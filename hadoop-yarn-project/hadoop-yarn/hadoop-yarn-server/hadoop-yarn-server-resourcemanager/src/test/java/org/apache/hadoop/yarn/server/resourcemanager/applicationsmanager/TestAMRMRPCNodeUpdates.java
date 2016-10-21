@@ -18,9 +18,14 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.applicationsmanager;
 
+import java.io.IOException;
 import java.security.PrivilegedExceptionAction;
 import java.util.List;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.junit.Assert;
 
 import org.apache.hadoop.conf.Configuration;
@@ -50,11 +55,14 @@ import org.junit.Test;
 public class TestAMRMRPCNodeUpdates {
   private MockRM rm;
   ApplicationMasterService amService = null;
-  DrainDispatcher dispatcher = null;
 
   @Before
-  public void setUp() {
-    dispatcher = new DrainDispatcher();
+  public void setUp() throws IOException {
+    Configuration conf = new YarnConfiguration();
+    RMStorageFactory.setConfiguration(conf);
+    YarnAPIStorageFactory.setConfiguration(conf);
+    DBUtility.InitializeDB();
+
     this.rm = new MockRM() {
       @Override
       public void init(Configuration conf) {
@@ -75,7 +83,7 @@ public class TestAMRMRPCNodeUpdates {
 
       @Override
       protected Dispatcher createDispatcher() {
-        return dispatcher;
+        return new DrainDispatcher();
       }
     };
     rm.start();
@@ -91,14 +99,14 @@ public class TestAMRMRPCNodeUpdates {
   
   private void syncNodeHeartbeat(MockNM nm, boolean health) throws Exception {
     nm.nodeHeartbeat(health);
-    dispatcher.await();
+    ((DrainDispatcher) rm.getRMContext().getDispatcher()).await();
   }
   
   private void syncNodeLost(MockNM nm) throws Exception {
     rm.sendNodeStarted(nm);
     rm.NMwaitForState(nm.getNodeId(), NodeState.RUNNING);
     rm.sendNodeLost(nm);
-    dispatcher.await();
+    ((DrainDispatcher) rm.getRMContext().getDispatcher()).await();
   }
 
   private AllocateResponse allocate(final ApplicationAttemptId attemptId,
@@ -124,7 +132,7 @@ public class TestAMRMRPCNodeUpdates {
     MockNM nm2 = rm.registerNode("127.0.0.2:1234", 10000);
     MockNM nm3 = rm.registerNode("127.0.0.3:1234", 10000);
     MockNM nm4 = rm.registerNode("127.0.0.4:1234", 10000);
-    dispatcher.await();
+    ((DrainDispatcher) rm.getRMContext().getDispatcher()).await();
 
     RMApp app1 = rm.submitApp(2000);
 

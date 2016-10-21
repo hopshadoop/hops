@@ -37,6 +37,8 @@ import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
 
+import java.io.IOException;
+
 public class TestFSAppAttempt extends FairSchedulerTestBase {
 
   private class MockClock implements Clock {
@@ -53,8 +55,8 @@ public class TestFSAppAttempt extends FairSchedulerTestBase {
   }
 
   @Before
-  public void setup() {
-    Configuration conf = createConfiguration();
+  public void setup() throws IOException {
+    super.setUp();
     resourceManager = new MockRM(conf);
     resourceManager.start();
     scheduler = (FairScheduler) resourceManager.getResourceScheduler();
