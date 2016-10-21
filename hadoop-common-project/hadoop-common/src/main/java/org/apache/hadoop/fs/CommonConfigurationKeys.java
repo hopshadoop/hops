@@ -21,6 +21,9 @@ package org.apache.hadoop.fs;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.http.lib.StaticUserWebFilter;
+import org.apache.hadoop.io.erasurecode.rawcoder.RSRawErasureCoderFactory;
+import org.apache.hadoop.io.erasurecode.rawcoder.RSRawErasureCoderFactoryLegacy;
+import org.apache.hadoop.io.erasurecode.rawcoder.XORRawErasureCoderFactory;
 
 /** 
  * This class contains constants for configuration keys used
@@ -285,4 +288,23 @@ public class CommonConfigurationKeys extends CommonConfigurationKeysPublic {
   public static final String HOPS_GROUPS_ENABLE =
       "hops.groups.updater.round";
   public static final boolean HOPS_GROUPS_ENABLE_DEFAULT = true;
+  
+  /** Raw coder factory for the RS default codec. */
+  public static final String IO_ERASURECODE_CODEC_RS_DEFAULT_RAWCODER_KEY =
+      "io.erasurecode.codec.rs-default.rawcoder";
+  public static final String IO_ERASURECODE_CODEC_RS_DEFAULT_RAWCODER_DEFAULT =
+      RSRawErasureCoderFactory.class.getCanonicalName();
+  
+   /** Raw coder factory for the RS legacy codec. */
+  public static final String IO_ERASURECODE_CODEC_RS_LEGACY_RAWCODER_KEY =
+      "io.erasurecode.codec.rs-legacy.rawcoder";
+  public static final String IO_ERASURECODE_CODEC_RS_LEGACY_RAWCODER_DEFAULT =
+      RSRawErasureCoderFactoryLegacy.class.getCanonicalName();
+  
+   /** Raw coder factory for the XOR codec. */
+  public static final String IO_ERASURECODE_CODEC_XOR_RAWCODER_KEY =
+      "io.erasurecode.codec.xor.rawcoder";
+  public static final String IO_ERASURECODE_CODEC_XOR_RAWCODER_DEFAULT =
+      XORRawErasureCoderFactory.class.getCanonicalName();
+
 }

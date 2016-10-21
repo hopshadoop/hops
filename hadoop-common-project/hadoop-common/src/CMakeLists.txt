@@ -20,8 +20,13 @@ cmake_minimum_required(VERSION 2.6 FATAL_ERROR)
 
 # Default to release builds
 set(CMAKE_BUILD_TYPE, Release)
-
 include(JNIFlags.cmake NO_POLICY_SCOPE)
+
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/..)
+include(HadoopCommon)
+
+set(SRC main/native/src/org/apache/hadoop)
+set(TST main/native/src/test/org/apache/hadoop)
 
 # Compile a library with both shared and static variants
 function(add_dual_library LIBNAME)
@@ -145,6 +150,42 @@ else (SNAPPY_LIBRARY AND SNAPPY_INCLUDE_DIR)
     ENDIF(REQUIRE_SNAPPY)
 endif (SNAPPY_LIBRARY AND SNAPPY_INCLUDE_DIR)
 
+set(STORED_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
+hadoop_set_find_shared_library_version("2")
+find_library(ISAL_LIBRARY
+    NAMES isal
+     PATHS ${CUSTOM_ISAL_PREFIX} ${CUSTOM_ISAL_PREFIX}/lib
+              ${CUSTOM_ISAL_PREFIX}/lib64 ${CUSTOM_ISAL_LIB})
+set(CMAKE_FIND_LIBRARY_SUFFIXES ${STORED_CMAKE_FIND_LIBRARY_SUFFIXES})
+if (ISAL_LIBRARY)
+    GET_FILENAME_COMPONENT(HADOOP_ISAL_LIBRARY ${ISAL_LIBRARY} NAME)
+    set(ISAL_INCLUDE_DIR ${SRC}/io/erasurecode)
+    set(ISAL_SOURCE_FILES
+        ${SRC}/io/erasurecode/isal_load.c
+        ${SRC}/io/erasurecode/erasure_code.c
+        ${SRC}/io/erasurecode/gf_util.c
+        ${SRC}/io/erasurecode/dump.c
+        ${SRC}/io/erasurecode/erasure_coder.c
+        ${SRC}/io/erasurecode/jni_erasure_code_native.c
+        ${SRC}/io/erasurecode/jni_common.c
+        ${SRC}/io/erasurecode/jni_rs_encoder.c
+        ${SRC}/io/erasurecode/jni_rs_decoder.c)
+
+        add_executable(erasure_code_test
+        ${SRC}/io/erasurecode/isal_load.c
+        ${SRC}/io/erasurecode/erasure_code.c
+        ${SRC}/io/erasurecode/gf_util.c
+        ${SRC}/io/erasurecode/dump.c
+        ${SRC}/io/erasurecode/erasure_coder.c
+        ${TST}/io/erasurecode/erasure_code_test.c
+        )
+        target_link_libraries(erasure_code_test ${CMAKE_DL_LIBS})
+else (ISAL_LIBRARY)
+    IF(REQUIRE_ISAL)
+        MESSAGE(FATAL_ERROR "Required ISA-L library could not be found.  ISAL_LIBRARY=${ISAL_LIBRARY}, CUSTOM_ISAL_PREFIX=${CUSTOM_ISAL_PREFIX}")
+    ENDIF(REQUIRE_ISAL)
+endif (ISAL_LIBRARY)
+
 include_directories(
     ${GENERATED_JAVAH}
     main/native/src
@@ -155,6 +196,7 @@ include_directories(
     ${ZLIB_INCLUDE_DIRS}
     ${BZIP2_INCLUDE_DIR}
     ${SNAPPY_INCLUDE_DIR}
+    ${ISAL_INCLUDE_DIR}
     ${D}/util
 )
 CONFIGURE_FILE(${CMAKE_SOURCE_DIR}/config.h.cmake ${CMAKE_BINARY_DIR}/config.h)
@@ -171,6 +213,7 @@ add_dual_library(hadoop
     ${D}/io/compress/lz4/Lz4Decompressor.c
     ${D}/io/compress/lz4/lz4.c
     ${D}/io/compress/lz4/lz4hc.c
+    ${ISAL_SOURCE_FILES}
     ${SNAPPY_SOURCE_FILES}
     ${D}/io/compress/zlib/ZlibCompressor.c
     ${D}/io/compress/zlib/ZlibDecompressor.c
