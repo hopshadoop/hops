@@ -51,8 +51,10 @@ public class LeasePathContext extends BaseEntityContext
       throws TransactionContextException {
     super.update(hopLeasePath);
     addToHIdToLPsMap(hopLeasePath);
-    log("added-lpath", "path", hopLeasePath.getPath(), "hid",
-        hopLeasePath.getHolderId());
+    if(isLogDebugEnabled()) {
+      log("added-lpath", "path", hopLeasePath.getPath(), "hid",
+              hopLeasePath.getHolderId());
+    }
   }
 
   @Override
@@ -60,8 +62,10 @@ public class LeasePathContext extends BaseEntityContext
       throws TransactionContextException {
     super.remove(hopLeasePath);
     removeFromHIdToLPsMap(hopLeasePath);
-    log("removed-lpath", "path", hopLeasePath.getPath(), 
-            "holderId ", hopLeasePath.getHolderId());
+    if(isLogDebugEnabled()) {
+      log("removed-lpath", "path", hopLeasePath.getPath(),
+              "holderId ", hopLeasePath.getHolderId());
+    }
   }
 
   @Override

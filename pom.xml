@@ -513,12 +513,12 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <dependency>
           <groupId>io.hops.metadata</groupId>
           <artifactId>hops-metadata-dal-impl-ndb</artifactId>
-          <version>1.0-SNAPSHOT</version>
+          <version>1.0</version>
         </dependency>
         <dependency>
           <groupId>com.mysql.ndb</groupId>
           <artifactId>clusterj-native</artifactId>
-          <version>7.4.7</version>
+          <version>7.5.4</version>
           <classifier>natives-linux</classifier>
         </dependency>
       </dependencies>

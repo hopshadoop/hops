@@ -20,6 +20,7 @@ package org.apache.hadoop.hdfs.server.namenode;
 import io.hops.common.IDsGeneratorFactory;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
+import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.transaction.EntityManager;
 import org.apache.hadoop.fs.UnresolvedLinkException;
@@ -27,6 +28,7 @@ import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.UnresolvedPathException;
+import org.tukaani.xz.UnsupportedOptionsException;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -56,6 +58,8 @@ public class INodeDirectory extends INode {
 
   public final static int ROOT_ID = 1;
   public final static int ROOT_PARENT_ID = NON_EXISTING_ID;
+  public static final int ROOT_DIR_PARTITION_KEY = ROOT_PARENT_ID;
+  public static final short ROOT_DIR_DEPTH =0;
 
   private boolean metaEnabled;
 
@@ -111,7 +115,6 @@ public class INodeDirectory extends INode {
     INode existingInode = getChildINode(node.getLocalNameBytes());
     if (existingInode != null) {
       remove(existingInode);
-      existingInode.logMetadataEvent(MetadataLogEntry.Operation.DELETE);
       return existingInode;
     }
     return null;
@@ -134,6 +137,9 @@ public class INodeDirectory extends INode {
       if (existingINode.getParentId() != newChild.getParentId()) {
         throw new IllegalArgumentException("Invalid parentid");
       }
+      short depth = myDepth();
+      int childPartitionKey  = INode.calculatePartitionId(getId(), newChild.getLocalName(), (short) (myDepth()+1));
+      newChild.setPartitionId(childPartitionKey);
       EntityManager.update(newChild);
     }
   }
@@ -145,9 +151,11 @@ public class INodeDirectory extends INode {
 
   private INode getChildINode(byte[] name)
       throws StorageException, TransactionContextException {
+    short myDepth = myDepth();
+    int childPartitionId = INode.calculatePartitionId(getId(), DFSUtil.bytes2String(name), (short)(myDepth+1));
     INode existingInode = EntityManager
-        .find(INode.Finder.ByNameAndParentId, DFSUtil.bytes2String(name),
-            getId());
+        .find(Finder.ByNameParentIdAndPartitionId, DFSUtil.bytes2String(name),
+            getId(), childPartitionId);
     if (existingInode != null && existingInode.exists()) {
       return existingInode;
     }
@@ -281,7 +289,6 @@ public class INodeDirectory extends INode {
    * deepest INodes. The array size will be the number of expected
    * components in the path, and non existing components will be
    * filled with null
-   * @see #getExistingPathINodes(byte[][], INode[])
    */
   INode[] getExistingPathINodes(String path, boolean resolveLink)
       throws UnresolvedLinkException, StorageException,
@@ -336,14 +343,18 @@ public class INodeDirectory extends INode {
       Integer inodeID = IDsGeneratorFactory.getInstance().getUniqueINodeID();
       node.setIdNoPersistance(inodeID);
       node.setParentNoPersistance(this);
+      short childDepth = (short)(myDepth()+1);
+      node.setPartitionIdNoPersistance(INode.calculatePartitionId(node.getParentId(), node.getLocalName(), childDepth));
       EntityManager.add(node);
       //add the INodeAttributes if it is Directory with Quota
-      if (this instanceof INodeDirectoryWithQuota) {
-        ((INodeDirectoryWithQuota) this).persistAttributes();
-      }
+//      if (this instanceof INodeDirectoryWithQuota) { // [S] I think this is not necessary now. Quota update manager will take care of this
+//        ((INodeDirectoryWithQuota) this).persistAttributes();
+//      }
     } else {
       node.setParent(this);
     }
+
+
     // update modification time of the parent directory
     if (setModTime) {
       setModificationTime(node.getModificationTime());
@@ -513,8 +524,15 @@ public class INodeDirectory extends INode {
     if (getId() == INode.NON_EXISTING_ID) {
       return null;
     }
-    return (List<INode>) EntityManager
-        .findList(INode.Finder.ByParentId, getId());
+
+    short childrenDepth = ((short)(myDepth()+1));
+    if(INode.isTreeLevelRandomPartitioned(childrenDepth)){
+       return (List<INode>) EntityManager
+        .findList(INode.Finder.ByParentIdFTIS, getId());
+    }else{
+      return (List<INode>) EntityManager
+        .findList(Finder.ByParentIdAndPartitionId, getId(), getId()/*partition id for all the childred is the parent id*/);
+    }
   }
 
   @Override
@@ -530,11 +548,23 @@ public class INodeDirectory extends INode {
     }
     
     parent = null;
-    
-    remove(this);
+
     for (INode child : children) {
       remove(child);
     }
+    remove(this);
+
     return total;
+  }
+
+  public static int getRootDirPartitionKey(){
+    return INode.calculatePartitionId(ROOT_PARENT_ID,ROOT_NAME,ROOT_DIR_DEPTH);
+  }
+
+  public static INodeIdentifier getRootIdentifier(){
+    INodeIdentifier rootINodeIdentifier = new INodeIdentifier(INodeDirectory.ROOT_ID,INodeDirectory.ROOT_PARENT_ID, INodeDirectory.ROOT_NAME,
+        INodeDirectory.getRootDirPartitionKey());
+    rootINodeIdentifier.setDepth(INodeDirectory.ROOT_DIR_DEPTH);
+    return rootINodeIdentifier;
   }
 }

@@ -276,7 +276,12 @@ public class DFSClient implements java.io.Closeable {
           conf.getLongBytes(DFS_BLOCK_SIZE_KEY, DFS_BLOCK_SIZE_DEFAULT);
       defaultReplication =
           (short) conf.getInt(DFS_REPLICATION_KEY, DFS_REPLICATION_DEFAULT);
-      taskId = conf.get("mapreduce.task.attempt.id", "NONMAPREDUCE");
+      String machineName = "";
+      try {
+        machineName = InetAddress.getLocalHost().getHostName() + "_";
+      } catch (UnknownHostException e) {
+      }
+      taskId = conf.get("mapreduce.task.attempt.id", machineName+"NONMAPREDUCE");
       socketCacheCapacity = conf.getInt(DFS_CLIENT_SOCKET_CACHE_CAPACITY_KEY,
           DFS_CLIENT_SOCKET_CACHE_CAPACITY_DEFAULT);
       socketCacheExpiry = conf.getLong(DFS_CLIENT_SOCKET_CACHE_EXPIRY_MSEC_KEY,
@@ -2200,10 +2205,6 @@ public class DFSClient implements java.io.Closeable {
    * with older HDFS versions which did not include the checksum type in
    * OpBlockChecksumResponseProto.
    *
-   * @param in
-   *     input stream from datanode
-   * @param out
-   *     output stream to datanode
    * @param lb
    *     the located block
    * @param clientName
@@ -3115,6 +3116,20 @@ public class DFSClient implements java.io.Closeable {
     doClientActionToAll(handler, "changeConf");
   }
 
+  public void flushCache(final String userName, final String groupName)
+      throws IOException{
+    ClientActionHandler handler = new ClientActionHandler() {
+
+      @Override
+      public Object doAction(ClientProtocol namenode)
+          throws RemoteException, IOException {
+        namenode.flushCache(userName, groupName);
+        return null;
+      }
+    };
+    doClientActionToAll(handler, "flushCache");
+  }
+
   /**
    * Send the client request to all namenodes in the cluster
    * @param handler
@@ -3178,5 +3193,9 @@ public class DFSClient implements java.io.Closeable {
       }
     }
     return null;
+  }
+
+  public int getNameNodesCount() throws IOException {
+    return namenodeSelector.getNameNodesCount();
   }
 }

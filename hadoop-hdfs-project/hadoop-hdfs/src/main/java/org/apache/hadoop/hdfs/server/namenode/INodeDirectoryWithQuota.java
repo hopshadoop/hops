@@ -214,13 +214,15 @@ public class INodeDirectoryWithQuota extends INodeDirectory {
         new INodeDirectoryWithQuota(ROOT_NAME, permissions);
     newRootINode.setIdNoPersistance(ROOT_ID);
     newRootINode.setParentIdNoPersistance(ROOT_PARENT_ID);
+    newRootINode.setPartitionIdNoPersistance(getRootDirPartitionKey());
     return newRootINode;
   }
 
   public static INodeDirectoryWithQuota getRootDir()
       throws StorageException, TransactionContextException {
-    return (INodeDirectoryWithQuota) EntityManager
-        .find(INode.Finder.ByINodeId, ROOT_ID);
+    INode inode = EntityManager
+        .find(INode.Finder.ByINodeIdFTIS, ROOT_ID);
+    return (INodeDirectoryWithQuota) inode;
   }
   
   public INodeAttributes getINodeAttributes()
@@ -239,10 +241,13 @@ public class INodeDirectoryWithQuota extends INodeDirectory {
       throws StorageException, TransactionContextException {
     getINodeAttributes().saveAttributes();
   }
-  
+
   protected void removeAttributes()
       throws StorageException, TransactionContextException {
-    getINodeAttributes().removeAttributes();
+    INodeAttributes attributes = getINodeAttributes();
+    if(attributes!=null){
+      attributes.removeAttributes();
+    }
   }
   
   protected void changeAttributesPkNoPersistance(Integer id)

@@ -59,10 +59,10 @@ public final class LeaseLock extends Lock {
         }
       }
     }
-    
+
+    setLockMode(lockType);
     List<String> holders = new ArrayList<String>(hldrs);
     Collections.sort(holders);
-    
     for (String h : holders) {
       Lease lease = acquireLock(lockType, Lease.Finder.ByHolder, h, Lease.getHolderId(h));
       if (lease != null) {
