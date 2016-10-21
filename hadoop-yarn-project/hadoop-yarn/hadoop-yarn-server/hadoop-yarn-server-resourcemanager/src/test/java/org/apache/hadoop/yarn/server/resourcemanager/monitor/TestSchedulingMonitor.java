@@ -18,22 +18,31 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.monitor;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
 import org.apache.hadoop.yarn.server.resourcemanager.monitor.capacity.ProportionalCapacityPreemptionPolicy;
 import org.junit.Test;
 
+import java.io.IOException;
+
 import static org.junit.Assert.fail;
 
 public class TestSchedulingMonitor {
 
   @Test(timeout = 10000)
-  public void testRMStarts() {
+  public void testRMStarts() throws IOException {
     Configuration conf = new YarnConfiguration();
     conf.setBoolean(YarnConfiguration.RM_SCHEDULER_ENABLE_MONITORS, true);
     conf.set(YarnConfiguration.RM_SCHEDULER_MONITOR_POLICIES,
         ProportionalCapacityPreemptionPolicy.class.getCanonicalName());
+
+    RMStorageFactory.setConfiguration(conf);
+    YarnAPIStorageFactory.setConfiguration(conf);
+    DBUtility.InitializeDB();
 
     ResourceManager rm = new ResourceManager();
     try {

@@ -69,6 +69,7 @@ public class TestFairSchedulerPreemption extends FairSchedulerTestBase {
 
   @Before
   public void setup() throws IOException {
+    super.setUp();
     conf = createConfiguration();
     clock = new MockClock();
   }

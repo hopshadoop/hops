@@ -24,6 +24,9 @@ import static org.junit.Assert.fail;
 import java.io.IOException;
 import java.util.Collection;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -57,6 +60,10 @@ public class TestResourceManager {
   @Before
   public void setUp() throws Exception {
     Configuration conf = new YarnConfiguration();
+    RMStorageFactory.setConfiguration(conf);
+    YarnAPIStorageFactory.setConfiguration(conf);
+    DBUtility.InitializeDB();
+
     UserGroupInformation.setConfiguration(conf);
     resourceManager = new ResourceManager();
     resourceManager.init(conf);

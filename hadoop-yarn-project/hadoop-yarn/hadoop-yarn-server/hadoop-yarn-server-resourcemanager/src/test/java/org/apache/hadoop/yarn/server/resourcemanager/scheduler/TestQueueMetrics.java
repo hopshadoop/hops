@@ -27,6 +27,9 @@ import static org.junit.Assert.assertNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
@@ -44,6 +47,8 @@ import org.apache.hadoop.yarn.util.resource.Resources;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+
+import java.io.IOException;
 
 public class TestQueueMetrics {
   static final int GB = 1024; // MB
@@ -303,8 +308,12 @@ public class TestQueueMetrics {
   }
 
   @Test
-  public void testMetricsInitializedOnRMInit() {
+  public void testMetricsInitializedOnRMInit() throws IOException {
     YarnConfiguration conf = new YarnConfiguration();
+    RMStorageFactory.setConfiguration(conf);
+    YarnAPIStorageFactory.setConfiguration(conf);
+    DBUtility.InitializeDB();
+
     conf.setClass(YarnConfiguration.RM_SCHEDULER,
       FifoScheduler.class, ResourceScheduler.class);
     MockRM rm = new MockRM(conf);
