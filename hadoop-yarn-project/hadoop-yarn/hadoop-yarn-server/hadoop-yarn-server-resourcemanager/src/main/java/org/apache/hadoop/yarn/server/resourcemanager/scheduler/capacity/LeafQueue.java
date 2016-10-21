@@ -776,9 +776,8 @@ public class LeafQueue extends AbstractCSQueue {
   }
   
   @Override
-  public void activateApplication(ApplicationId app){
-    applicationsToActivate.add(app);
-    applicationsToDeactivate.remove(app);
+  public void activateApplication(ApplicationId appId){
+    applicationsToActivate.add(appId);
   }
   
   @Override
@@ -817,19 +816,7 @@ public class LeafQueue extends AbstractCSQueue {
     Resource initAmountNeededUnreserve =
         currentResourceLimits.getAmountNeededUnreserve();
     
-    LOG.info("to activate size: " + applicationsToActivate.size() + " to deactivate size " + applicationsToDeactivate.size());
     List<ApplicationId> toRemove = new ArrayList<>();
-    for (ApplicationId appId : applicationsToActivate) {
-      toRemove.add(appId);
-      FiCaSchedulerApp application = activeApplications.get(appId);
-      if (application != null) {
-        activeApplicationsWithRequests.add(application);
-      } else {
-        pendingApplicationsWithRequests.add(appId);
-      }
-    }
-    applicationsToActivate.removeAll(toRemove);
-    toRemove.clear();
     for (ApplicationId appId : applicationsToDeactivate) {
       toRemove.add(appId);
       FiCaSchedulerApp app = activeApplications.get(appId);
@@ -840,6 +827,20 @@ public class LeafQueue extends AbstractCSQueue {
       }
     }
     applicationsToDeactivate.removeAll(toRemove);
+    toRemove.clear();
+
+    for (ApplicationId appId : applicationsToActivate) {
+      toRemove.add(appId);
+      FiCaSchedulerApp application = activeApplications.get(appId);
+      if (application != null) {
+        activeApplicationsWithRequests.add(application);
+      } else {
+        pendingApplicationsWithRequests.add(appId);
+      }
+    }
+    applicationsToActivate.removeAll(toRemove);
+
+
     // Try to assign containers to applications in order
     for (FiCaSchedulerApp application : activeApplicationsWithRequests) {
 
