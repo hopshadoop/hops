@@ -41,6 +41,15 @@
       "priority" : 200,
       "description" : "SimpleRegeneratingCode code"
       },
+      {
+      "id" : "nrs",
+      "parity_dir" : "/raidnrs",
+      "stripe_length" : 10,
+      "parity_length" : 4,
+      "priority" : 50,
+      "erasure_code" : "io.hops.erasure_coding.NativeReedSolomonCode",
+      "description" : "Native ReedSolomonCode code"
+      }
       ]
     </value>
     <description>JSon string that contains all erasure coding codecs</description>
