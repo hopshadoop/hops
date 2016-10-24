@@ -124,7 +124,7 @@
                       run cp -r $ROOT/hadoop-tools/hadoop-tools-dist/target/hadoop-tools-dist-${project.version}/* .
                       echo
                       echo "Hops-specific copying of jars..."
-                      run cp -r $ROOT/hops-erasure-coding/target/erasure-coding-${project.version}.jar ./share/hadoop/common/lib
+                      run cp -r $ROOT/hops-erasure-coding-project/hops-erasure-coding/target/erasure-coding-${project.version}.jar ./share/hadoop/common/lib
                       echo
                       echo "Hadoop dist layout available at: ${project.build.directory}/hadoop-${project.version}"
                       echo

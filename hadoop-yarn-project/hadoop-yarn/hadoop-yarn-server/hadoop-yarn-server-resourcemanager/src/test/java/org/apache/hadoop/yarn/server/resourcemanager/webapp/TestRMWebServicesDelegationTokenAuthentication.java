@@ -39,6 +39,9 @@ import javax.ws.rs.core.MediaType;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.Marshaller;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
@@ -160,6 +163,11 @@ public class TestRMWebServicesDelegationTokenAuthentication {
     rmconf.setBoolean("mockrm.webapp.enabled", true);
     rmconf.set("yarn.resourcemanager.proxyuser.client.hosts", "*");
     rmconf.set("yarn.resourcemanager.proxyuser.client.groups", "*");
+
+    RMStorageFactory.setConfiguration(rmconf);
+    YarnAPIStorageFactory.setConfiguration(rmconf);
+    DBUtility.InitializeDB();
+
     UserGroupInformation.setConfiguration(rmconf);
     rm = new MockRM(rmconf);
     rm.start();

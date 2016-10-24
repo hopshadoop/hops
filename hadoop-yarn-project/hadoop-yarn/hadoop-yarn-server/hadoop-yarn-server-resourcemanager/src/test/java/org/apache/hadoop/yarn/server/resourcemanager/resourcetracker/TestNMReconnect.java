@@ -21,6 +21,9 @@ package org.apache.hadoop.yarn.server.resourcemanager.resourcetracker;
 import java.util.ArrayList;
 import java.util.List;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import org.apache.hadoop.yarn.api.records.NodeState;
 import org.apache.hadoop.yarn.event.DrainDispatcher;
 import org.apache.hadoop.yarn.server.resourcemanager.MockNM;
@@ -200,11 +203,16 @@ public class TestNMReconnect {
     // The node(127.0.0.1:1234) reconnected with RM. When it registered with
     // RM, RM set its lastNodeHeartbeatResponse's id to 0 asynchronously. But
     // the node's heartbeat come before RM succeeded setting the id to 0.
-    final DrainDispatcher dispatcher = new DrainDispatcher();
+    //final DrainDispatcher dispatcher = new DrainDispatcher();
+    Configuration conf = new YarnConfiguration();
+    RMStorageFactory.setConfiguration(conf);
+    YarnAPIStorageFactory.setConfiguration(conf);
+    DBUtility.InitializeDB();
+
     MockRM rm = new MockRM(){
       @Override
       protected Dispatcher createDispatcher() {
-        return dispatcher;
+        return new DrainDispatcher();
       }
     };
     rm.start();
@@ -214,7 +222,7 @@ public class TestNMReconnect {
     int i = 0;
     while(i < 3) {
       nm1.nodeHeartbeat(true);
-      dispatcher.await();
+      ((DrainDispatcher)rm.getRMContext().getDispatcher()).await();
       i++;
     }
 
@@ -223,7 +231,7 @@ public class TestNMReconnect {
     nm2.registerNode();
     RMNode rmNode = rm.getRMContext().getRMNodes().get(nm2.getNodeId());
     nm2.nodeHeartbeat(true);
-    dispatcher.await();
+    ((DrainDispatcher)rm.getRMContext().getDispatcher()).await();
     Assert.assertEquals("Node is Not in Running state.", NodeState.RUNNING,
         rmNode.getState());
     rm.stop();
