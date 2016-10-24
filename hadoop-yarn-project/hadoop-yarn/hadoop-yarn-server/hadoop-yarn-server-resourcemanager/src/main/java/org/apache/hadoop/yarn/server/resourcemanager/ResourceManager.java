@@ -1133,6 +1133,7 @@ LOG.info("+");
     if(resourceTrackingService.isInState(STATE.STARTED)){
       resourceTrackingService.stop();
     }
+    reinitialize(false);
     resetDispatcher();
     createAndInitSchedulerServices();
       
