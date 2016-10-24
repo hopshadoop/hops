@@ -54,6 +54,7 @@ public final class HdfsServerConstants {
     FORMAT("-format"),
     DROP_AND_CREATE_DB("-dropAndCreateDB"),
     SET_BLOCK_REPORT_PROCESS_SIZE("-setBlkRptProcessSize"),
+    FORMAT_ALL("-formatAll"),
     CLUSTERID("-clusterid"),
     GENCLUSTERID("-genclusterid"),
     REGULAR("-regular"),
