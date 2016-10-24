@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
+import com.google.common.annotations.VisibleForTesting;
 import io.hops.security.Users;
 import io.hops.exception.StorageException;
 import io.hops.leaderElection.HdfsLeDescriptorFactory;
@@ -173,6 +174,7 @@ public class NameNode {
           //StartupOption.RECOVER.getName() + " [ " +
           //StartupOption.FORCE.getName() + " ] ] | [ "+
           StartupOption.SET_BLOCK_REPORT_PROCESS_SIZE.getName() + " noOfBlks ] | [" +
+          StartupOption.FORMAT_ALL.getName() + " ] | [" +
           StartupOption.DROP_AND_CREATE_DB.getName() + "]" ;
 
   public long getProtocolVersion(String protocol, long clientVersion)
@@ -239,7 +241,7 @@ public class NameNode {
    * at this location.  *
    */
   public static void format(Configuration conf) throws IOException {
-    format(conf, false, true);
+    formatHdfs(conf, false, true);
   }
 
   static NameNodeMetrics metrics;
@@ -704,7 +706,7 @@ public class NameNode {
    * @return true if formatting was aborted, false otherwise
    * @throws IOException
    */
-  private static boolean format(Configuration conf, boolean force,
+  private static boolean formatHdfs(Configuration conf, boolean force,
       boolean isInteractive) throws IOException {
     initializeGenericKeys(conf);
     checkAllowFormat(conf);
@@ -733,6 +735,37 @@ public class NameNode {
       }
       StorageInfo
           .storeStorageInfoToDB(clusterId);  //this adds new row to the db
+    } catch (StorageException e) {
+      throw new RuntimeException(e.getMessage());
+    }
+
+    return false;
+  }
+
+  @VisibleForTesting
+  public static boolean formatAll(Configuration conf) throws IOException {
+    System.out.println("Formatting HopsFS and HopsYarn");
+    initializeGenericKeys(conf);
+
+    if (UserGroupInformation.isSecurityEnabled()) {
+      InetSocketAddress socAddr = getAddress(conf);
+      SecurityUtil
+              .login(conf, DFS_NAMENODE_KEYTAB_FILE_KEY, DFS_NAMENODE_USER_NAME_KEY,
+                      socAddr.getHostName());
+    }
+
+    // if clusterID is not provided - see if you can find the current one
+    String clusterId = StartupOption.FORMAT.getClusterId();
+    if (clusterId == null || clusterId.equals("")) {
+      //Generate a new cluster id
+      clusterId = StorageInfo.newClusterID();
+    }
+
+    try {
+      HdfsStorageFactory.setConfiguration(conf);
+//      HdfsStorageFactory.formatAllStorageNonTransactional();
+      HdfsStorageFactory.formatStorage();
+      StorageInfo.storeStorageInfoToDB(clusterId);  //this adds new row to the db
     } catch (StorageException e) {
       throw new RuntimeException(e.getMessage());
     }
@@ -820,6 +853,8 @@ public class NameNode {
         }
       } else if (StartupOption.DROP_AND_CREATE_DB.getName().equalsIgnoreCase(cmd)) {
         startOpt = StartupOption.DROP_AND_CREATE_DB;
+      } else if (StartupOption.FORMAT_ALL.getName().equalsIgnoreCase(cmd)) {
+        startOpt = StartupOption.FORMAT_ALL;
       } else if (StartupOption.GENCLUSTERID.getName().equalsIgnoreCase(cmd)) {
         startOpt = StartupOption.GENCLUSTERID;
       } else if (StartupOption.REGULAR.getName().equalsIgnoreCase(cmd)) {
@@ -914,8 +949,13 @@ public class NameNode {
         LOG.fatal("Set block processing size to "+startOpt.getMaxBlkRptProcessSize());
         return null;
       case FORMAT: {
-        boolean aborted = format(conf, startOpt.getForceFormat(),
+        boolean aborted = formatHdfs(conf, startOpt.getForceFormat(),
             startOpt.getInteractiveFormat());
+        terminate(aborted ? 1 : 0);
+        return null; // avoid javac warning
+      }
+      case FORMAT_ALL: {
+        boolean aborted = formatAll(conf);
         terminate(aborted ? 1 : 0);
         return null; // avoid javac warning
       }
