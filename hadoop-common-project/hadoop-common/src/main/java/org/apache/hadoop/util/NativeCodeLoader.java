@@ -22,8 +22,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
 
 /**
  * A helper to load the native hadoop code i.e. libhadoop.so.
@@ -33,7 +31,7 @@ import org.apache.hadoop.fs.CommonConfigurationKeys;
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
-public class NativeCodeLoader {
+public final class NativeCodeLoader {
 
   private static final Log LOG =
     LogFactory.getLog(NativeCodeLoader.class);
@@ -43,17 +41,21 @@ public class NativeCodeLoader {
   static {
     // Try to load native hadoop library and set fallback flag appropriately
     if(LOG.isDebugEnabled()) {
-      LOG.debug("Trying to load the custom-built native-hadoop library...");
+      LOG.warn("Trying to load the custom-built native-hadoop library...");
     }
     try {
       System.loadLibrary("hadoop");
-      LOG.debug("Loaded the native-hadoop library");
+      LOG.warn("Loaded the native-hadoop library");
       nativeCodeLoaded = true;
     } catch (Throwable t) {
+        System.out.println(t);
+              String javaLibPath = System.getProperty("java.library.path");
+        System.out.println(javaLibPath);
       // Ignore failure to load
       if(LOG.isDebugEnabled()) {
-        LOG.debug("Failed to load native-hadoop with error: " + t);
-        LOG.debug("java.library.path=" +
+        System.out.println(t);
+        LOG.warn("Failed to load native-hadoop with error: " + t);
+        LOG.warn("java.library.path=" +
             System.getProperty("java.library.path"));
       }
     }
@@ -63,6 +65,8 @@ public class NativeCodeLoader {
                "using builtin-java classes where applicable");
     }
   }
+
+  private NativeCodeLoader() {}
 
   /**
    * Check if native-hadoop code is loaded for this platform.
@@ -79,30 +83,16 @@ public class NativeCodeLoader {
    */
   public static native boolean buildSupportsSnappy();
 
-  public static native String getLibraryName();
+  /**
+   * Returns true only if this build was compiled with support for ISA-L.
+   */
+  public static native boolean buildSupportsIsal();
 
   /**
-   * Return if native hadoop libraries, if present, can be used for this job.
-   * @param conf configuration
-   * 
-   * @return <code>true</code> if native hadoop libraries, if present, can be 
-   *         used for this job; <code>false</code> otherwise.
+   * Returns true only if this build was compiled with support for openssl.
    */
-  public boolean getLoadNativeLibraries(Configuration conf) {
-    return conf.getBoolean(CommonConfigurationKeys.IO_NATIVE_LIB_AVAILABLE_KEY, 
-                           CommonConfigurationKeys.IO_NATIVE_LIB_AVAILABLE_DEFAULT);
-  }
-  
-  /**
-   * Set if native hadoop libraries, if present, can be used for this job.
-   * 
-   * @param conf configuration
-   * @param loadNativeLibraries can native hadoop libraries be loaded
-   */
-  public void setLoadNativeLibraries(Configuration conf, 
-                                     boolean loadNativeLibraries) {
-    conf.setBoolean(CommonConfigurationKeys.IO_NATIVE_LIB_AVAILABLE_KEY,
-                    loadNativeLibraries);
-  }
+  public static native boolean buildSupportsOpenssl();
+
+  public static native String getLibraryName();
 
 }
