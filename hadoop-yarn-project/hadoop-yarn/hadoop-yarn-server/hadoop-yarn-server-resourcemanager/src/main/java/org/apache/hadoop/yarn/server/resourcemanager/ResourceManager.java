@@ -1381,13 +1381,13 @@ LOG.info("+");
   }
 
   private void resetDispatcher() {
+    removeService((Service)rmDispatcher);
+    ((Service) rmDispatcher).stop();
     Dispatcher dispatcher = setupDispatcher();
     ((Service)dispatcher).init(this.conf);
     ((Service)dispatcher).start();
-    removeService((Service)rmDispatcher);
     // Need to stop previous rmDispatcher before assigning new dispatcher
     // otherwise causes "AsyncDispatcher event handler" thread leak
-    ((Service) rmDispatcher).stop();
     rmDispatcher = dispatcher;
     addIfService(rmDispatcher);
     rmContext.setDispatcher(rmDispatcher);

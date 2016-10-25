@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.security;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import static org.mockito.Mockito.isA;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
@@ -69,6 +72,7 @@ import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.hadoop.yarn.util.Records;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -93,11 +97,14 @@ public class TestAMRMTokens {
     return Arrays.asList(new Object[][] {{ conf }, { confWithSecurity } });
   }
 
-  public TestAMRMTokens(Configuration conf) {
+  public TestAMRMTokens(Configuration conf) throws IOException {
     this.conf = conf;
+    YarnAPIStorageFactory.setConfiguration(conf);
+    RMStorageFactory.setConfiguration(conf);
+    DBUtility.InitializeDB();
     UserGroupInformation.setConfiguration(conf);
   }
-
+  
   /**
    * Validate that application tokens are unusable after the
    * application-finishes.

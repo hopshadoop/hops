@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.security;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.resourcemanager
     .ParameterizedSchedulerTestBase;
@@ -55,6 +58,7 @@ import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.security.token.TokenInfo;
 import org.apache.hadoop.security.token.TokenSelector;
 import org.apache.hadoop.service.AbstractService;
+import org.apache.hadoop.service.Service;
 import org.apache.hadoop.yarn.api.ContainerManagementProtocol;
 import org.apache.hadoop.yarn.api.protocolrecords.GetApplicationReportRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetApplicationReportResponse;
@@ -89,8 +93,11 @@ public class TestClientToAMTokens extends ParameterizedSchedulerTestBase {
   }
 
   @Before
-  public void setup() {
+  public void setup() throws IOException {
     conf = getConf();
+    YarnAPIStorageFactory.setConfiguration(conf);
+    RMStorageFactory.setConfiguration(conf);
+    DBUtility.InitializeDB();
   }
 
   private interface CustomProtocol {
@@ -187,7 +194,7 @@ public class TestClientToAMTokens extends ParameterizedSchedulerTestBase {
     StartContainersResponse mockResponse = mock(StartContainersResponse.class);
     when(containerManager.startContainers((StartContainersRequest) any()))
       .thenReturn(mockResponse);
-    final DrainDispatcher dispatcher = new DrainDispatcher();
+    final DrainDispatcher[] dispatcher = {new DrainDispatcher()};
 
     MockRM rm = new MockRMWithCustomAMLauncher(conf, containerManager) {
       protected ClientRMService createClientRMService() {
@@ -198,7 +205,10 @@ public class TestClientToAMTokens extends ParameterizedSchedulerTestBase {
 
       @Override
       protected Dispatcher createDispatcher() {
-        return dispatcher;
+        if(dispatcher[0].getServiceState().equals(Service.STATE.STOPPED)){
+          dispatcher[0]= new DrainDispatcher();
+        }
+        return dispatcher[0];
       }
 
       @Override
@@ -213,11 +223,11 @@ public class TestClientToAMTokens extends ParameterizedSchedulerTestBase {
     // Set up a node.
     MockNM nm1 = rm.registerNode("localhost:1234", 3072);
     nm1.nodeHeartbeat(true);
-    dispatcher.await();
+    dispatcher[0].await();
     
 
     nm1.nodeHeartbeat(true);
-    dispatcher.await();
+    dispatcher[0].await();
 
     ApplicationAttemptId appAttempt = app.getCurrentAppAttempt().getAppAttemptId();
     final MockAM mockAM =
@@ -428,7 +438,7 @@ public class TestClientToAMTokens extends ParameterizedSchedulerTestBase {
     StartContainersResponse mockResponse = mock(StartContainersResponse.class);
     when(containerManager.startContainers((StartContainersRequest) any()))
       .thenReturn(mockResponse);
-    final DrainDispatcher dispatcher = new DrainDispatcher();
+    final DrainDispatcher[] dispatcher = {new DrainDispatcher()};
 
     MockRM rm = new MockRMWithCustomAMLauncher(conf, containerManager) {
       protected ClientRMService createClientRMService() {
@@ -439,7 +449,10 @@ public class TestClientToAMTokens extends ParameterizedSchedulerTestBase {
 
       @Override
       protected Dispatcher createDispatcher() {
-        return dispatcher;
+        if(dispatcher[0].getServiceState().equals(Service.STATE.STOPPED)){
+          dispatcher[0]= new DrainDispatcher();
+        }
+        return dispatcher[0];
       }
 
       @Override
@@ -454,10 +467,10 @@ public class TestClientToAMTokens extends ParameterizedSchedulerTestBase {
     // Set up a node.
     MockNM nm1 = rm.registerNode("localhost:1234", 3072);
     nm1.nodeHeartbeat(true);
-    dispatcher.await();
+    dispatcher[0].await();
 
     nm1.nodeHeartbeat(true);
-    dispatcher.await();
+    dispatcher[0].await();
 
     ApplicationAttemptId appAttempt = app.getCurrentAppAttempt().getAppAttemptId();
     final MockAM mockAM =
