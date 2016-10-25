@@ -32,6 +32,9 @@ import java.util.Iterator;
 import java.util.Random;
 import java.util.Arrays;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.fs.Path;
@@ -163,6 +166,9 @@ public class SLSRunner {
     rmConf.set(YarnConfiguration.RM_SCHEDULER,
             ResourceSchedulerWrapper.class.getName());
     rmConf.set(SLSConfiguration.METRICS_OUTPUT_DIR, metricsOutputDir);
+    RMStorageFactory.setConfiguration(rmConf);
+    YarnAPIStorageFactory.setConfiguration(rmConf);
+    DBUtility.InitializeDB();
     rm = new ResourceManager();
     rm.init(rmConf);
     rm.start();
