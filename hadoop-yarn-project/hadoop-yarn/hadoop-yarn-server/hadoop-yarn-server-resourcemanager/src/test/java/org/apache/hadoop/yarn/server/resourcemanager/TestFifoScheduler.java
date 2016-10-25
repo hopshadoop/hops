@@ -21,12 +21,16 @@ package org.apache.hadoop.yarn.server.resourcemanager;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -68,6 +72,7 @@ import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -80,17 +85,20 @@ public class TestFifoScheduler {
   private final int GB = 1024;
   private static YarnConfiguration conf;
 
-  @BeforeClass
-  public static void setup() {
+  @Before
+  public void setup() throws IOException {
     conf = new YarnConfiguration();
     conf.setClass(YarnConfiguration.RM_SCHEDULER, 
         FifoScheduler.class, ResourceScheduler.class);
+
+    RMStorageFactory.setConfiguration(conf);
+    YarnAPIStorageFactory.setConfiguration(conf);
+    DBUtility.InitializeDB();
   }
 
   @Test (timeout = 30000)
   public void testConfValidation() throws Exception {
     FifoScheduler scheduler = new FifoScheduler();
-    Configuration conf = new YarnConfiguration();
     conf.setInt(YarnConfiguration.RM_SCHEDULER_MINIMUM_ALLOCATION_MB, 2048);
     conf.setInt(YarnConfiguration.RM_SCHEDULER_MAXIMUM_ALLOCATION_MB, 1024);
     try {
@@ -339,10 +347,6 @@ public class TestFifoScheduler {
   
   @Test (timeout = 50000)
   public void testBlackListNodes() throws Exception {
-
-    Configuration conf = new Configuration();
-    conf.setClass(YarnConfiguration.RM_SCHEDULER, FifoScheduler.class,
-        ResourceScheduler.class);
     MockRM rm = new MockRM(conf);
     rm.start();
     FifoScheduler fs = (FifoScheduler) rm.getResourceScheduler();
@@ -458,10 +462,6 @@ public class TestFifoScheduler {
   
   @Test (timeout = 50000)
   public void testHeadroom() throws Exception {
-    
-    Configuration conf = new Configuration();
-    conf.setClass(YarnConfiguration.RM_SCHEDULER, FifoScheduler.class,
-        ResourceScheduler.class);
     MockRM rm = new MockRM(conf);
     rm.start();
     FifoScheduler fs = (FifoScheduler) rm.getResourceScheduler();

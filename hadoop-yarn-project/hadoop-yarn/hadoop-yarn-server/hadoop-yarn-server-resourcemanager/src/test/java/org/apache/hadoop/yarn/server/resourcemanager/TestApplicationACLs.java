@@ -23,6 +23,7 @@ import static org.mockito.Mockito.when;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyString;
 
+import java.awt.image.DataBuffer;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.security.PrivilegedExceptionAction;
@@ -30,6 +31,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import org.junit.Assert;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -102,6 +106,10 @@ public class TestApplicationACLs {
     AccessControlList adminACL = new AccessControlList("");
     adminACL.addGroup(SUPER_GROUP);
     conf.set(YarnConfiguration.YARN_ADMIN_ACL, adminACL.getAclString());
+    RMStorageFactory.setConfiguration(conf);
+    YarnAPIStorageFactory.setConfiguration(conf);
+    DBUtility.InitializeDB();
+
     resourceManager = new MockRM(conf) {
 
       @Override

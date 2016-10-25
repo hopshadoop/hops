@@ -46,6 +46,9 @@ import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CyclicBarrier;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -151,10 +154,7 @@ import org.apache.hadoop.yarn.util.UTCClock;
 import org.apache.hadoop.yarn.util.resource.DefaultResourceCalculator;
 import org.apache.hadoop.yarn.util.resource.ResourceCalculator;
 import org.apache.hadoop.yarn.util.resource.Resources;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.*;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
@@ -167,6 +167,8 @@ public class TestClientRMService {
       .getRecordFactory(null);
 
   private String appType = "MockApp";
+
+  private YarnConfiguration conf;
 
   private static RMDelegationTokenSecretManager dtsm;
   
@@ -191,7 +193,15 @@ public class TestClientRMService {
       dtsm.stopThreads();
     }
   }
-  
+
+  @Before
+  public void setUp() throws IOException {
+    conf = new YarnConfiguration();
+    RMStorageFactory.setConfiguration(conf);
+    YarnAPIStorageFactory.setConfiguration(conf);
+    DBUtility.InitializeDB();
+  }
+
   @Test
   public void testGetClusterNodes() throws Exception {
     MockRM rm = new MockRM() {
@@ -221,7 +231,6 @@ public class TestClientRMService {
     rm.sendNodeLost(lostNode);
 
     // Create a client.
-    Configuration conf = new Configuration();
     YarnRPC rpc = YarnRPC.create(conf);
     InetSocketAddress rmAddress = rm.getClientRMService().getBindAddress();
     LOG.info("Connecting to ResourceManager at " + rmAddress);
@@ -372,9 +381,8 @@ public class TestClientRMService {
         });
     ApplicationSubmissionContext asContext = 
         mock(ApplicationSubmissionContext.class);
-    YarnConfiguration config = new YarnConfiguration();
     RMAppAttemptImpl rmAppAttemptImpl = new RMAppAttemptImpl(attemptId,
-        rmContext, yarnScheduler, null, asContext, config, false, null);
+        rmContext, yarnScheduler, null, asContext, conf, false, null);
     ApplicationResourceUsageReport report = rmAppAttemptImpl
         .getApplicationResourceUsageReport();
     assertEquals(report, RMServerUtils.DUMMY_APPLICATION_RESOURCE_USAGE_REPORT);
@@ -490,7 +498,6 @@ public class TestClientRMService {
 
   @Test
   public void testForceKillApplication() throws Exception {
-    YarnConfiguration conf = new YarnConfiguration();
     MockRM rm = new MockRM();
     rm.init(conf);
     rm.start();
@@ -1174,7 +1181,7 @@ public class TestClientRMService {
     when(rmContext.getRMApplicationHistoryWriter()).thenReturn(writer);
     SystemMetricsPublisher publisher = mock(SystemMetricsPublisher.class);
     when(rmContext.getSystemMetricsPublisher()).thenReturn(publisher);
-    when(rmContext.getYarnConfiguration()).thenReturn(new YarnConfiguration());
+    when(rmContext.getYarnConfiguration()).thenReturn(conf);
     ConcurrentHashMap<ApplicationId, RMApp> apps = getRMApps(rmContext,
         yarnScheduler);
     when(rmContext.getRMApps()).thenReturn(apps);
@@ -1191,13 +1198,12 @@ public class TestClientRMService {
     ApplicationId applicationId1 = getApplicationId(1);
     ApplicationId applicationId2 = getApplicationId(2);
     ApplicationId applicationId3 = getApplicationId(3);
-    YarnConfiguration config = new YarnConfiguration();
     apps.put(applicationId1, getRMApp(rmContext, yarnScheduler, applicationId1,
-        config, "testqueue", 10, 3));
+        conf, "testqueue", 10, 3));
     apps.put(applicationId2, getRMApp(rmContext, yarnScheduler, applicationId2,
-        config, "a", 20, 2));
+        conf, "a", 20, 2));
     apps.put(applicationId3, getRMApp(rmContext, yarnScheduler, applicationId3,
-        config, "testqueue", 40, 5));
+        conf, "testqueue", 40, 5));
     return apps;
   }
   
@@ -1534,7 +1540,6 @@ public class TestClientRMService {
   public void testRMStartWithDecommissionedNode() throws Exception {
     String excludeFile = "excludeFile";
     createExcludeFile(excludeFile);
-    YarnConfiguration conf = new YarnConfiguration();
     conf.set(YarnConfiguration.RM_NODES_EXCLUDE_FILE_PATH,
         excludeFile);
     MockRM rm = new MockRM(conf) {

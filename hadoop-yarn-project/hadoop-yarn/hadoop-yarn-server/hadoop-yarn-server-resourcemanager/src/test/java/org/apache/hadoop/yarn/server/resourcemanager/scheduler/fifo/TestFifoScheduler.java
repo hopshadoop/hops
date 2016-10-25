@@ -30,6 +30,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -80,10 +83,8 @@ import org.apache.hadoop.yarn.server.resourcemanager.security.NMTokenSecretManag
 import org.apache.hadoop.yarn.server.resourcemanager.security.RMContainerTokenSecretManager;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.apache.hadoop.yarn.util.resource.Resources;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.classpath.icedtea.Config;
+import org.junit.*;
 
 public class TestFifoScheduler {
   private static final Log LOG = LogFactory.getLog(TestFifoScheduler.class);
@@ -93,13 +94,20 @@ public class TestFifoScheduler {
   
   private static final RecordFactory recordFactory = 
       RecordFactoryProvider.getRecordFactory(null);
-  
+
+  private Configuration conf;
+
   @Before
   public void setUp() throws Exception {
+    conf = new YarnConfiguration();
+    conf.setClass(YarnConfiguration.RM_SCHEDULER,
+            FifoScheduler.class, ResourceScheduler.class);
+
+    RMStorageFactory.setConfiguration(conf);
+    YarnAPIStorageFactory.setConfiguration(conf);
+    DBUtility.InitializeDB();
+
     resourceManager = new ResourceManager();
-    Configuration conf = new Configuration();
-    conf.setClass(YarnConfiguration.RM_SCHEDULER, 
-        FifoScheduler.class, ResourceScheduler.class);
     resourceManager.init(conf);
   }
 
@@ -155,7 +163,6 @@ public class TestFifoScheduler {
     ((RMContextImpl) rmContext).setSystemMetricsPublisher(
         mock(SystemMetricsPublisher.class));
 
-    Configuration conf = new Configuration();
     scheduler.setRMContext(rmContext);
     scheduler.init(conf);
     scheduler.start();
@@ -186,7 +193,6 @@ public class TestFifoScheduler {
   @Test(timeout=2000)
   public void testNodeLocalAssignment() throws Exception {
     AsyncDispatcher dispatcher = new InlineDispatcher();
-    Configuration conf = new Configuration();
     RMContainerTokenSecretManager containerTokenSecretManager =
         new RMContainerTokenSecretManager(conf);
     containerTokenSecretManager.rollMasterKey();
@@ -201,12 +207,12 @@ public class TestFifoScheduler {
     rmContext.setSystemMetricsPublisher(mock(SystemMetricsPublisher.class));
     rmContext.setRMApplicationHistoryWriter(
         mock(RMApplicationHistoryWriter.class));
-    ((RMContextImpl) rmContext).setYarnConfiguration(new YarnConfiguration());
+    ((RMContextImpl) rmContext).setYarnConfiguration(conf);
 
     scheduler.setRMContext(rmContext);
     scheduler.init(conf);
     scheduler.start();
-    scheduler.reinitialize(new Configuration(), rmContext);
+    scheduler.reinitialize(conf, rmContext);
 
     RMNode node0 = MockNodes.newNodeInfo(1,
         Resources.createResource(1024 * 64), 1, "127.0.0.1");
@@ -263,7 +269,7 @@ public class TestFifoScheduler {
   @Test(timeout=2000)
   public void testUpdateResourceOnNode() throws Exception {
     AsyncDispatcher dispatcher = new InlineDispatcher();
-    Configuration conf = new Configuration();
+
     RMContainerTokenSecretManager containerTokenSecretManager =
         new RMContainerTokenSecretManager(conf);
     containerTokenSecretManager.rollMasterKey();
@@ -282,12 +288,12 @@ public class TestFifoScheduler {
         null, containerTokenSecretManager, nmTokenSecretManager, null, scheduler);
     rmContext.setSystemMetricsPublisher(mock(SystemMetricsPublisher.class));
     rmContext.setRMApplicationHistoryWriter(mock(RMApplicationHistoryWriter.class));
-    ((RMContextImpl) rmContext).setYarnConfiguration(new YarnConfiguration());
+    ((RMContextImpl) rmContext).setYarnConfiguration(conf);
 
     scheduler.setRMContext(rmContext);
     scheduler.init(conf);
     scheduler.start();
-    scheduler.reinitialize(new Configuration(), rmContext);
+    scheduler.reinitialize(conf, rmContext);
     RMNode node0 = MockNodes.newNodeInfo(1,
         Resources.createResource(2048, 4), 1, "127.0.0.1");
     NodeAddedSchedulerEvent nodeEvent1 = new NodeAddedSchedulerEvent(node0);
@@ -360,7 +366,8 @@ public class TestFifoScheduler {
     Assert.assertEquals(1.0f, queueInfo.getCurrentCapacity(), 0.0f);
   }
   
-//  @Test
+  @Test
+  @Ignore
   public void testFifoScheduler() throws Exception {
 
     LOG.info("--- START: testFifoScheduler ---");
@@ -569,9 +576,6 @@ public class TestFifoScheduler {
 
   @Test
   public void testBlackListNodes() throws Exception {
-    Configuration conf = new Configuration();
-    conf.setClass(YarnConfiguration.RM_SCHEDULER, FifoScheduler.class,
-        ResourceScheduler.class);
     MockRM rm = new MockRM(conf);
     rm.start();
     FifoScheduler fs = (FifoScheduler) rm.getResourceScheduler();
@@ -627,9 +631,9 @@ public class TestFifoScheduler {
 
   @Test
   public void testAddAndRemoveAppFromFiFoScheduler() throws Exception {
-    Configuration conf = new Configuration();
+    /*Configuration conf = new Configuration();
     conf.setClass(YarnConfiguration.RM_SCHEDULER, FifoScheduler.class,
-      ResourceScheduler.class);
+      ResourceScheduler.class);*/
     MockRM rm = new MockRM(conf);
     @SuppressWarnings("unchecked")
     AbstractYarnScheduler<SchedulerApplicationAttempt, SchedulerNode> fs =

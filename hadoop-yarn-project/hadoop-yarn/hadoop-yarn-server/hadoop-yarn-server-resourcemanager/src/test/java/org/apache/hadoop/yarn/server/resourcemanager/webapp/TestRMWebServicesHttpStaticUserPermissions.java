@@ -31,6 +31,9 @@ import java.net.URL;
 import java.util.Map;
 import java.util.HashMap;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.minikdc.MiniKdc;
@@ -108,6 +111,11 @@ public class TestRMWebServicesHttpStaticUserPermissions {
     rmconf.set("yarn.resourcemanager.keytab",
         spnegoKeytabFile.getAbsolutePath());
     rmconf.setBoolean("mockrm.webapp.enabled", true);
+
+    RMStorageFactory.setConfiguration(rmconf);
+    YarnAPIStorageFactory.setConfiguration(rmconf);
+    DBUtility.InitializeDB();
+
     UserGroupInformation.setConfiguration(rmconf);
     rm = new MockRM(rmconf);
     rm.start();

@@ -17,6 +17,9 @@
  */
 package org.apache.hadoop.yarn.sls.nodemanager;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
@@ -29,19 +32,25 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.io.IOException;
+
 public class TestNMSimulator {
   private final int GB = 1024;
   private ResourceManager rm;
   private YarnConfiguration conf;
 
   @Before
-  public void setup() {
+  public void setup() throws IOException {
     conf = new YarnConfiguration();
     conf.set(YarnConfiguration.RM_SCHEDULER,
         "org.apache.hadoop.yarn.sls.scheduler.ResourceSchedulerWrapper");
     conf.set(SLSConfiguration.RM_SCHEDULER,
         "org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FairScheduler");
     conf.setBoolean(SLSConfiguration.METRICS_SWITCH, false);
+    RMStorageFactory.setConfiguration(conf);
+    YarnAPIStorageFactory.setConfiguration(conf);
+    DBUtility.InitializeDB();
+
     rm = new ResourceManager();
     rm.init(conf);
     rm.start();

@@ -17,6 +17,9 @@
  */
 package org.apache.hadoop.yarn.sls.appmaster;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
@@ -36,13 +39,18 @@ public class TestAMSimulator {
   private YarnConfiguration conf;
 
   @Before
-  public void setup() {
+  public void setup() throws IOException {
     conf = new YarnConfiguration();
     conf.set(YarnConfiguration.RM_SCHEDULER,
         "org.apache.hadoop.yarn.sls.scheduler.ResourceSchedulerWrapper");
     conf.set(SLSConfiguration.RM_SCHEDULER,
         "org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FairScheduler");
     conf.setBoolean(SLSConfiguration.METRICS_SWITCH, false);
+
+    RMStorageFactory.setConfiguration(conf);
+    YarnAPIStorageFactory.setConfiguration(conf);
+    DBUtility.InitializeDB();
+
     rm = new ResourceManager();
     rm.init(conf);
     rm.start();

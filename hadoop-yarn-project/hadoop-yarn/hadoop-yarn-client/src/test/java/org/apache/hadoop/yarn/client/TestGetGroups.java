@@ -21,6 +21,9 @@ package org.apache.hadoop.yarn.client;
 import java.io.IOException;
 import java.io.PrintStream;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -44,6 +47,10 @@ public class TestGetGroups extends GetGroupsTestBase {
   @BeforeClass
   public static void setUpResourceManager() throws IOException, InterruptedException {
     conf = new YarnConfiguration();
+    RMStorageFactory.setConfiguration(conf);
+    YarnAPIStorageFactory.setConfiguration(conf);
+    DBUtility.InitializeDB();
+
     resourceManager = new ResourceManager() {
       @Override
       protected void doSecureLogin() throws IOException {

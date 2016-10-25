@@ -24,6 +24,9 @@ import static org.junit.Assert.fail;
 import java.security.AccessControlException;
 import java.security.PrivilegedExceptionAction;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.api.protocolrecords.KillApplicationRequest;
@@ -52,6 +55,11 @@ public class TestMoveApplication {
         FifoSchedulerWithMove.class);
     conf.set(YarnConfiguration.YARN_ADMIN_ACL, " ");
     conf.setBoolean(YarnConfiguration.YARN_ACL_ENABLE, true);
+
+    RMStorageFactory.setConfiguration(conf);
+    YarnAPIStorageFactory.setConfiguration(conf);
+    DBUtility.InitializeDB();
+
     resourceManager = new ResourceManager();
     resourceManager.init(conf);
     resourceManager.getRMContext().getContainerTokenSecretManager().rollMasterKey();

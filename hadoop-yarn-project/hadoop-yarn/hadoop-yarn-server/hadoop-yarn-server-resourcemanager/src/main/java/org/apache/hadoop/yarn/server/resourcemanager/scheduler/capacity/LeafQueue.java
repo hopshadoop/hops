@@ -815,7 +815,7 @@ public class LeafQueue extends AbstractCSQueue {
     
     Resource initAmountNeededUnreserve =
         currentResourceLimits.getAmountNeededUnreserve();
-    
+
     List<ApplicationId> toRemove = new ArrayList<>();
     for (ApplicationId appId : applicationsToDeactivate) {
       toRemove.add(appId);

@@ -17,6 +17,9 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.service.Service;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
@@ -41,6 +44,11 @@ public class TestAMLivelinessMonitor {
     conf.set(YarnConfiguration.RM_STORE, MemoryRMStateStore.class.getName());
     conf.setBoolean(YarnConfiguration.RM_WORK_PRESERVING_RECOVERY_ENABLED, true);
     conf.setInt(YarnConfiguration.RM_AM_EXPIRY_INTERVAL_MS, 6000);
+
+    RMStorageFactory.setConfiguration(conf);
+    YarnAPIStorageFactory.setConfiguration(conf);
+    DBUtility.InitializeDB();
+
     final ControlledClock clock = new ControlledClock(new SystemClock());
     clock.setTime(0);
     MemoryRMStateStore memStore = new MemoryRMStateStore() {

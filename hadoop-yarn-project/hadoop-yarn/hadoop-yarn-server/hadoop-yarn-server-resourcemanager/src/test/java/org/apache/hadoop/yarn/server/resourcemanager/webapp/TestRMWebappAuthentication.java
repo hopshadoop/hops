@@ -31,6 +31,9 @@ import java.util.Collection;
 
 import javax.ws.rs.core.MediaType;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
@@ -106,6 +109,9 @@ public class TestRMWebappAuthentication {
   @BeforeClass
   public static void setUp() {
     try {
+      RMStorageFactory.setConfiguration(simpleConf);
+      YarnAPIStorageFactory.setConfiguration(simpleConf);
+      DBUtility.InitializeDB();
       testMiniKDC = new MiniKdc(MiniKdc.createConf(), testRootDir);
       setupKDC();
     } catch (Exception e) {

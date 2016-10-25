@@ -24,6 +24,9 @@ import static org.mockito.Mockito.spy;
 
 import java.util.ArrayList;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerState;
 import org.apache.hadoop.yarn.api.records.Resource;
@@ -57,12 +60,16 @@ public class TestNodesListManager {
   public void testNodeUsableEvent() throws Exception {
     Logger rootLogger = LogManager.getRootLogger();
     rootLogger.setLevel(Level.DEBUG);
-    final Dispatcher dispatcher = getDispatcher();
     YarnConfiguration conf = new YarnConfiguration();
+
+    RMStorageFactory.setConfiguration(conf);
+    YarnAPIStorageFactory.setConfiguration(conf);
+    DBUtility.InitializeDB();
+
     MockRM rm = new MockRM(conf) {
       @Override
       protected Dispatcher createDispatcher() {
-        return dispatcher;
+        return getDispatcher();
       }
     };
     rm.start();

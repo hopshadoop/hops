@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.client.api.impl;
 
+import java.io.File;
 import java.io.IOException;
 import java.security.PrivilegedAction;
 import java.util.ArrayList;
@@ -25,7 +26,12 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.net.NetworkTopology;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -56,6 +62,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.ApplicationMasterService;
 import org.apache.hadoop.yarn.server.resourcemanager.MockNM;
 import org.apache.hadoop.yarn.server.resourcemanager.MockRM;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
+import org.apache.hadoop.yarn.server.resourcemanager.recovery.FileSystemRMStateStore;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.MemoryRMStateStore;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
@@ -67,24 +74,38 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.SchedulerEv
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fifo.FifoScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.security.AMRMTokenSecretManager;
 import org.apache.hadoop.yarn.util.Records;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.*;
 
 public class TestAMRMClientOnRMRestart {
   static Configuration conf = null;
   static final int rolling_interval_sec = 13;
   static final long am_expire_ms = 4000;
+  private FileSystem fs;
+  private Path tmpDir;
 
-  @BeforeClass
-  public static void setup() throws Exception {
+  @Before
+  public void setup() throws Exception {
     conf = new Configuration();
     conf.set(YarnConfiguration.RECOVERY_ENABLED, "true");
-    conf.set(YarnConfiguration.RM_STORE, MemoryRMStateStore.class.getName());
     conf.setInt(YarnConfiguration.RM_AM_MAX_ATTEMPTS,
         YarnConfiguration.DEFAULT_RM_AM_MAX_ATTEMPTS);
     conf.setBoolean(YarnConfiguration.RM_WORK_PRESERVING_RECOVERY_ENABLED, true);
     conf.setLong(YarnConfiguration.RM_WORK_PRESERVING_RECOVERY_SCHEDULING_WAIT_MS, 0);
+    conf.set(YarnConfiguration.RM_STORE, FileSystemRMStateStore.class.getName());
+    fs = FileSystem.get(conf);
+    tmpDir = new Path(new File("target", this.getClass().getSimpleName()
+            + "-tmpDir").getAbsolutePath());
+    fs.delete(tmpDir, true);
+    fs.mkdirs(tmpDir);
+    conf.set(YarnConfiguration.FS_RM_STATE_STORE_URI, tmpDir.toString());
+    RMStorageFactory.setConfiguration(conf);
+    YarnAPIStorageFactory.setConfiguration(conf);
+    DBUtility.InitializeDB();
+  }
+
+  @After
+  public void tearDown() throws IOException {
+    fs.delete(tmpDir, true);
   }
 
   // Test does major 6 steps verification.
@@ -101,11 +122,8 @@ public class TestAMRMClientOnRMRestart {
   public void testAMRMClientResendsRequestsOnRMRestart() throws Exception {
 
     UserGroupInformation.setLoginUser(null);
-    MemoryRMStateStore memStore = new MemoryRMStateStore();
-    memStore.init(conf);
-
     // Phase-1 Start 1st RM
-    MyResourceManager rm1 = new MyResourceManager(conf, memStore);
+    MyResourceManager rm1 = new MyResourceManager(conf, null);
     rm1.start();
     DrainDispatcher dispatcher =
         (DrainDispatcher) rm1.getRMContext().getDispatcher();
@@ -214,7 +232,7 @@ public class TestAMRMClientOnRMRestart {
     pendingRelease -= completedContainer;
 
     // Phase-2 start 2nd RM is up
-    MyResourceManager rm2 = new MyResourceManager(conf, memStore);
+    MyResourceManager rm2 = new MyResourceManager(conf, null);
     rm2.start();
     nm1.setResourceTrackerService(rm2.getResourceTrackerService());
     ((MyAMRMClientImpl) amClient).updateRMProxy(rm2);
@@ -301,12 +319,8 @@ public class TestAMRMClientOnRMRestart {
   // 2. AM register to RM, and try to unregister immediately after RM restart
   @Test(timeout = 60000)
   public void testAMRMClientForUnregisterAMOnRMRestart() throws Exception {
-
-    MemoryRMStateStore memStore = new MemoryRMStateStore();
-    memStore.init(conf);
-
     // Phase-1 Start 1st RM
-    MyResourceManager rm1 = new MyResourceManager(conf, memStore);
+    MyResourceManager rm1 = new MyResourceManager(conf, null);
     rm1.start();
     DrainDispatcher dispatcher =
         (DrainDispatcher) rm1.getRMContext().getDispatcher();
@@ -339,7 +353,7 @@ public class TestAMRMClientOnRMRestart {
     amClient.allocate(0.1f);
 
     // Phase-2 start 2nd RM is up
-    MyResourceManager rm2 = new MyResourceManager(conf, memStore);
+    MyResourceManager rm2 = new MyResourceManager(conf, null);
     rm2.start();
     nm1.setResourceTrackerService(rm2.getResourceTrackerService());
     ((MyAMRMClientImpl) amClient).updateRMProxy(rm2);
@@ -383,11 +397,9 @@ public class TestAMRMClientOnRMRestart {
       YarnConfiguration.RM_AMRM_TOKEN_MASTER_KEY_ROLLING_INTERVAL_SECS,
       rolling_interval_sec);
     conf.setLong(YarnConfiguration.RM_AM_EXPIRY_INTERVAL_MS, am_expire_ms);
-    MemoryRMStateStore memStore = new MemoryRMStateStore();
-    memStore.init(conf);
 
     // start first RM
-    MyResourceManager2 rm1 = new MyResourceManager2(conf, memStore);
+    MyResourceManager2 rm1 = new MyResourceManager2(conf, null);
     rm1.start();
     DrainDispatcher dispatcher =
         (DrainDispatcher) rm1.getRMContext().getDispatcher();
@@ -458,7 +470,7 @@ public class TestAMRMClientOnRMRestart {
 
     // start 2nd RM
     conf.set(YarnConfiguration.RM_SCHEDULER_ADDRESS, "0.0.0.0:9030");
-    final MyResourceManager2 rm2 = new MyResourceManager2(conf, memStore);
+    final MyResourceManager2 rm2 = new MyResourceManager2(conf, null);
     rm2.start();
     nm1.setResourceTrackerService(rm2.getResourceTrackerService());
     ((MyAMRMClientImpl) amClient).updateRMProxy(rm2);

@@ -27,12 +27,16 @@ import java.io.StringWriter;
 
 import javax.ws.rs.core.MediaType;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.resourcemanager.MockRM;
 import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
+import org.apache.hadoop.yarn.server.resourcemanager.security.RMContainerTokenSecretManager;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.NodeLabelsInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.NodeToLabelsInfo;
 import org.apache.hadoop.yarn.webapp.GenericExceptionHandler;
@@ -80,6 +84,14 @@ public class TestRMWebServicesNodeLabels extends JerseyTestBase {
       notUserName = userName + "abc123";
       conf = new YarnConfiguration();
       conf.set(YarnConfiguration.YARN_ADMIN_ACL, userName);
+
+      try {
+        RMStorageFactory.setConfiguration(conf);
+        YarnAPIStorageFactory.setConfiguration(conf);
+        DBUtility.InitializeDB();
+      } catch (IOException ex) {
+        LOG.error(ex, ex);
+      }
       rm = new MockRM(conf);
       bind(ResourceManager.class).toInstance(rm);
       filter("/*").through(

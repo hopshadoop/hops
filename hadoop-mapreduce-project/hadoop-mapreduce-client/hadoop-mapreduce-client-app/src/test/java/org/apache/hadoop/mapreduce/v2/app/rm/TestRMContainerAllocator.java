@@ -30,6 +30,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.PrivilegedExceptionAction;
@@ -45,9 +46,14 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.v2.api.records.JobId;
@@ -120,6 +126,7 @@ import org.apache.hadoop.yarn.server.api.records.NodeAction;
 import org.apache.hadoop.yarn.server.resourcemanager.MockNM;
 import org.apache.hadoop.yarn.server.resourcemanager.MockRM;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
+import org.apache.hadoop.yarn.server.resourcemanager.recovery.FileSystemRMStateStore;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.MemoryRMStateStore;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
@@ -148,8 +155,16 @@ public class TestRMContainerAllocator {
   static final RecordFactory recordFactory = RecordFactoryProvider
       .getRecordFactory(null);
 
+  private Configuration conf;
+  private FileSystem fs;
+  private Path tmpDir;
+
   @Before
-  public void setup() {
+  public void setup() throws IOException {
+    conf = new YarnConfiguration();
+    RMStorageFactory.setConfiguration(conf);
+    YarnAPIStorageFactory.setConfiguration(conf);
+    DBUtility.InitializeDB();
     MyContainerAllocator.getJobUpdatedNodeEvents().clear();
     MyContainerAllocator.getTaskAttemptKillEvents().clear();
 
@@ -158,7 +173,10 @@ public class TestRMContainerAllocator {
   }
 
   @After
-  public void tearDown() {
+  public void tearDown() throws IOException {
+    if (fs != null && tmpDir != null) {
+      fs.delete(tmpDir, true);
+    }
     DefaultMetricsSystem.shutdown();
   }
 
@@ -167,7 +185,6 @@ public class TestRMContainerAllocator {
 
     LOG.info("Running testSimple");
 
-    Configuration conf = new Configuration();
     MyResourceManager rm = new MyResourceManager(conf);
     rm.start();
     DrainDispatcher dispatcher = (DrainDispatcher) rm.getRMContext()
@@ -244,7 +261,8 @@ public class TestRMContainerAllocator {
     // check that the assigned container requests are cancelled
     assigned = allocator.schedule();
     dispatcher.await();
-    Assert.assertEquals(5, rm.getMyFifoScheduler().lastAsk.size());    
+    Assert.assertEquals(5, rm.getMyFifoScheduler().lastAsk.size());
+    rm.stop();
   }
   
   @Test 
@@ -257,7 +275,6 @@ public class TestRMContainerAllocator {
     // Regression test for MAPREDUCE-4893
     LOG.info("Running testMapNodeLocality");
 
-    Configuration conf = new Configuration();
     MyResourceManager rm = new MyResourceManager(conf);
     rm.start();
     DrainDispatcher dispatcher = (DrainDispatcher) rm.getRMContext()
@@ -331,6 +348,7 @@ public class TestRMContainerAllocator {
     }
     checkAssignments(new ContainerRequestEvent[] { event1, event2},
         assigned, true);
+    rm.stop();
   }
 
   @Test
@@ -338,7 +356,6 @@ public class TestRMContainerAllocator {
 
     LOG.info("Running testResource");
 
-    Configuration conf = new Configuration();
     MyResourceManager rm = new MyResourceManager(conf);
     rm.start();
     DrainDispatcher dispatcher = (DrainDispatcher) rm.getRMContext()
@@ -397,13 +414,13 @@ public class TestRMContainerAllocator {
     dispatcher.await();
     checkAssignments(new ContainerRequestEvent[] { event1, event2 },
         assigned, false);
+    rm.stop();
   }
 
   @Test(timeout = 30000)
   public void testReducerRampdownDiagnostics() throws Exception {
     LOG.info("Running tesReducerRampdownDiagnostics");
 
-    final Configuration conf = new Configuration();
     conf.setFloat(MRJobConfig.COMPLETED_MAPS_FOR_REDUCE_SLOWSTART, 0.0f);
     final MyResourceManager rm = new MyResourceManager(conf);
     rm.start();
@@ -450,13 +467,13 @@ public class TestRMContainerAllocator {
         .getMessage();
     Assert.assertTrue("No reducer rampDown preemption message",
         killEventMessage.contains(RMContainerAllocator.RAMPDOWN_DIAGNOSTIC));
+    rm.stop();
   }
 
   @Test(timeout = 30000)
   public void testPreemptReducers() throws Exception {
     LOG.info("Running testPreemptReducers");
 
-    Configuration conf = new Configuration();
     MyResourceManager rm = new MyResourceManager(conf);
     rm.start();
     DrainDispatcher dispatcher = (DrainDispatcher) rm.getRMContext()
@@ -498,6 +515,7 @@ public class TestRMContainerAllocator {
     allocator.preemptReducesIfNeeded();
     Assert.assertEquals("The reducer is not preempted",
         1, assignedRequests.preemptionWaitingReduces.size());
+    rm.stop();
   }
 
   @Test(timeout = 30000)
@@ -505,7 +523,6 @@ public class TestRMContainerAllocator {
     LOG.info("Running testNonAggressivelyPreemptReducers");
 
     final int preemptThreshold = 2; //sec
-    Configuration conf = new Configuration();
     conf.setInt(
         MRJobConfig.MR_JOB_REDUCER_PREEMPT_DELAY_SEC,
         preemptThreshold);
@@ -559,6 +576,7 @@ public class TestRMContainerAllocator {
     allocator.preemptReducesIfNeeded();
     Assert.assertEquals("The reducer is not preeempted", 1,
         assignedRequests.preemptionWaitingReduces.size());
+    rm.stop();
   }
 
   @Test(timeout = 30000)
@@ -566,7 +584,6 @@ public class TestRMContainerAllocator {
     LOG.info("Running testForcePreemptReducers");
 
     int forcePreemptThresholdSecs = 2;
-    Configuration conf = new Configuration();
     conf.setInt(MRJobConfig.MR_JOB_REDUCER_PREEMPT_DELAY_SEC,
         2 * forcePreemptThresholdSecs);
     conf.setInt(MRJobConfig.MR_JOB_REDUCER_UNCONDITIONAL_PREEMPT_DELAY_SEC,
@@ -622,6 +639,7 @@ public class TestRMContainerAllocator {
     allocator.preemptReducesIfNeeded();
     Assert.assertEquals("The reducer is not preeempted", 1,
         assignedRequests.preemptionWaitingReduces.size());
+    rm.stop();
   }
 
   @Test
@@ -629,7 +647,6 @@ public class TestRMContainerAllocator {
 
     LOG.info("Running testMapReduceScheduling");
 
-    Configuration conf = new Configuration();
     MyResourceManager rm = new MyResourceManager(conf);
     rm.start();
     DrainDispatcher dispatcher = (DrainDispatcher) rm.getRMContext()
@@ -700,6 +717,7 @@ public class TestRMContainerAllocator {
       Assert.assertFalse("Assigned count not correct", "h1".equals(assig
           .getContainer().getNodeId().getHost()));
     }
+    rm.stop();
   }
 
   private static class MyResourceManager extends MockRM {
@@ -752,7 +770,6 @@ public class TestRMContainerAllocator {
 
     LOG.info("Running testReportedAppProgress");
 
-    Configuration conf = new Configuration();
     final MyResourceManager rm = new MyResourceManager(conf);
     rm.start();
     DrainDispatcher rmDispatcher = (DrainDispatcher) rm.getRMContext()
@@ -872,6 +889,7 @@ public class TestRMContainerAllocator {
     // Remaining is JobCleanup
     Assert.assertEquals(0.95f, job.getProgress(), 0.001f);
     Assert.assertEquals(0.95f, rmApp.getProgress(), 0.001f);
+    rm.stop();
   }
 
   private void finishNextNTasks(DrainDispatcher rmDispatcher, MockNM node,
@@ -904,7 +922,6 @@ public class TestRMContainerAllocator {
 
     LOG.info("Running testReportedAppProgressWithOnlyMaps");
 
-    Configuration conf = new Configuration();
     final MyResourceManager rm = new MyResourceManager(conf);
     rm.start();
     DrainDispatcher rmDispatcher = (DrainDispatcher) rm.getRMContext()
@@ -995,11 +1012,11 @@ public class TestRMContainerAllocator {
     rmDispatcher.await();
     Assert.assertEquals(0.95f, job.getProgress(), 0.001f);
     Assert.assertEquals(0.95f, rmApp.getProgress(), 0.001f);
+    rm.stop();
   }
   
   @Test
   public void testUpdatedNodes() throws Exception {
-    Configuration conf = new Configuration();
     MyResourceManager rm = new MyResourceManager(conf);
     rm.start();
     DrainDispatcher dispatcher = (DrainDispatcher) rm.getRMContext()
@@ -1080,6 +1097,7 @@ public class TestRMContainerAllocator {
     // no updated nodes reported
     Assert.assertTrue(allocator.getJobUpdatedNodeEvents().isEmpty());
     Assert.assertTrue(allocator.getTaskAttemptKillEvents().isEmpty());
+    rm.stop();
   }
 
   @Test
@@ -1087,7 +1105,6 @@ public class TestRMContainerAllocator {
     
     LOG.info("Running testBlackListedNodes");
 
-    Configuration conf = new Configuration();
     conf.setBoolean(MRJobConfig.MR_AM_JOB_NODE_BLACKLISTING_ENABLE, true);
     conf.setInt(MRJobConfig.MAX_TASK_FAILURES_PER_TRACKER, 1);
     conf.setInt(
@@ -1186,13 +1203,13 @@ public class TestRMContainerAllocator {
       Assert.assertTrue("Assigned container host not correct", "h3".equals(assig
           .getContainer().getNodeId().getHost()));
     }
+    rm.stop();
   }
   
   @Test
   public void testIgnoreBlacklisting() throws Exception {
     LOG.info("Running testIgnoreBlacklisting");
 
-    Configuration conf = new Configuration();
     conf.setBoolean(MRJobConfig.MR_AM_JOB_NODE_BLACKLISTING_ENABLE, true);
     conf.setInt(MRJobConfig.MAX_TASK_FAILURES_PER_TRACKER, 1);
     conf.setInt(
@@ -1340,6 +1357,7 @@ public class TestRMContainerAllocator {
         getContainerOnHost(jobId, 20, 1024, new String[] { "h3" },
             nodeManagers[2], dispatcher, allocator, 0, 0, 0, 0, rm);
     Assert.assertEquals("No of assignments must be 0", 0, assigned.size());
+    rm.stop();
   }
 
   private MockNM registerNodeManager(int i, MyResourceManager rm,
@@ -1382,7 +1400,6 @@ public class TestRMContainerAllocator {
   public void testBlackListedNodesWithSchedulingToThatNode() throws Exception {
     LOG.info("Running testBlackListedNodesWithSchedulingToThatNode");
 
-    Configuration conf = new Configuration();
     conf.setBoolean(MRJobConfig.MR_AM_JOB_NODE_BLACKLISTING_ENABLE, true);
     conf.setInt(MRJobConfig.MAX_TASK_FAILURES_PER_TRACKER, 1);
     conf.setInt(
@@ -1512,6 +1529,7 @@ public class TestRMContainerAllocator {
       Assert.assertEquals("Assigned container " + assig.getContainer().getId()
           + " host not correct", "h3", assig.getContainer().getNodeId().getHost());
     }
+    rm.stop();
   }
 
   private static void assertBlacklistAdditionsAndRemovals(
@@ -2012,7 +2030,6 @@ public class TestRMContainerAllocator {
   public void testCompletedTasksRecalculateSchedule() throws Exception {
     LOG.info("Running testCompletedTasksRecalculateSchedule");
 
-    Configuration conf = new Configuration();
     final MyResourceManager rm = new MyResourceManager(conf);
     rm.start();
     DrainDispatcher dispatcher = (DrainDispatcher) rm.getRMContext()
@@ -2053,13 +2070,13 @@ public class TestRMContainerAllocator {
     allocator.schedule();
     Assert.assertTrue("Expected recalculate of reduce schedule",
         allocator.recalculatedReduceSchedule);
+    rm.stop();
   }
 
   @Test
   public void testHeartbeatHandler() throws Exception {
     LOG.info("Running testHeartbeatHandler");
 
-    Configuration conf = new Configuration();
     conf.setInt(MRJobConfig.MR_AM_TO_RM_HEARTBEAT_INTERVAL_MS, 1);
     ControlledClock clock = new ControlledClock(new SystemClock());
     AppContext appContext = mock(AppContext.class);
@@ -2162,7 +2179,6 @@ public class TestRMContainerAllocator {
   
   @Test
   public void testUnregistrationOnlyIfRegistered() throws Exception {
-    Configuration conf = new Configuration();
     final MyResourceManager rm = new MyResourceManager(conf);
     rm.start();
     DrainDispatcher rmDispatcher =
@@ -2203,8 +2219,9 @@ public class TestRMContainerAllocator {
     Assert.assertTrue(allocator.isApplicationMasterRegistered());
     mrApp.stop();
     Assert.assertTrue(allocator.isUnregistered());
+    rm.stop();
   }
-  
+
   // Step-1 : AM send allocate request for 2 ContainerRequests and 1
   // blackListeNode
   // Step-2 : 2 containers are allocated by RM.
@@ -2221,9 +2238,7 @@ public class TestRMContainerAllocator {
   public void testRMContainerAllocatorResendsRequestsOnRMRestart()
       throws Exception {
 
-    Configuration conf = new Configuration();
     conf.set(YarnConfiguration.RECOVERY_ENABLED, "true");
-    conf.set(YarnConfiguration.RM_STORE, MemoryRMStateStore.class.getName());
     conf.setInt(YarnConfiguration.RM_AM_MAX_ATTEMPTS,
         YarnConfiguration.DEFAULT_RM_AM_MAX_ATTEMPTS);
     conf.setBoolean(YarnConfiguration.RM_WORK_PRESERVING_RECOVERY_ENABLED, true);
@@ -2233,10 +2248,15 @@ public class TestRMContainerAllocator {
     conf.setInt(
         MRJobConfig.MR_AM_IGNORE_BLACKLISTING_BLACKLISTED_NODE_PERECENT, -1);
 
-    MemoryRMStateStore memStore = new MemoryRMStateStore();
-    memStore.init(conf);
+    conf.set(YarnConfiguration.RM_STORE, FileSystemRMStateStore.class.getName());
+    fs = FileSystem.get(conf);
+    tmpDir = new Path(new File("target", this.getClass().getSimpleName()
+            + "-tmpDir").getAbsolutePath());
+    fs.delete(tmpDir, true);
+    fs.mkdirs(tmpDir);
+    conf.set(YarnConfiguration.FS_RM_STATE_STORE_URI, tmpDir.toString());
 
-    MyResourceManager rm1 = new MyResourceManager(conf, memStore);
+    MyResourceManager rm1 = new MyResourceManager(conf, null);
     rm1.start();
     DrainDispatcher dispatcher =
         (DrainDispatcher) rm1.getRMContext().getDispatcher();
@@ -2325,7 +2345,7 @@ public class TestRMContainerAllocator {
     assertBlacklistAdditionsAndRemovals(0, 0, rm1);
 
     // Phase-2 start 2nd RM is up
-    MyResourceManager rm2 = new MyResourceManager(conf, memStore);
+    MyResourceManager rm2 = new MyResourceManager(conf, null);
     rm2.start();
     nm1.setResourceTrackerService(rm2.getResourceTrackerService());
     allocator.updateSchedulerProxy(rm2);
@@ -2398,7 +2418,6 @@ public class TestRMContainerAllocator {
   @Test
   public void testRMUnavailable()
       throws Exception {
-    Configuration conf = new Configuration();
     conf.setInt(
       MRJobConfig.MR_AM_TO_RM_WAIT_INTERVAL_MS, 0);
     MyResourceManager rm1 = new MyResourceManager(conf);
@@ -2437,6 +2456,7 @@ public class TestRMContainerAllocator {
         allocator.jobEvents.size());
     JobEvent event = allocator.jobEvents.get(0); 
     Assert.assertTrue("Should Reboot", event.getType().equals(JobEventType.JOB_AM_REBOOT));
+    rm1.stop();
   }
 
   @Test(timeout=60000)
@@ -2444,7 +2464,6 @@ public class TestRMContainerAllocator {
     LOG.info("Running testAMRMTokenUpdate");
 
     final String rmAddr = "somermaddress:1234";
-    final Configuration conf = new YarnConfiguration();
     conf.setLong(
       YarnConfiguration.RM_AMRM_TOKEN_MASTER_KEY_ROLLING_INTERVAL_SECS, 8);
     conf.setLong(YarnConfiguration.RM_AM_EXPIRY_INTERVAL_MS, 2000);
@@ -2524,6 +2543,7 @@ public class TestRMContainerAllocator {
         newToken.getPassword(), ugiToken.getPassword());
     Assert.assertEquals("AMRM token service not updated",
         new Text(rmAddr), ugiToken.getService());
+    rm.stop();
   }
 
   @Test
@@ -2531,7 +2551,6 @@ public class TestRMContainerAllocator {
     final int MAP_LIMIT = 3;
     final int REDUCE_LIMIT = 1;
     LOG.info("Running testConcurrentTaskLimits");
-    Configuration conf = new Configuration();
     conf.setInt(MRJobConfig.JOB_RUNNING_MAP_LIMIT, MAP_LIMIT);
     conf.setInt(MRJobConfig.JOB_RUNNING_REDUCE_LIMIT, REDUCE_LIMIT);
     conf.setFloat(MRJobConfig.COMPLETED_MAPS_FOR_REDUCE_SLOWSTART, 1.0f);
@@ -2654,7 +2673,6 @@ public class TestRMContainerAllocator {
   public void testAttemptNotFoundCausesRMCommunicatorException()
       throws Exception {
 
-    Configuration conf = new Configuration();
     MyResourceManager rm = new MyResourceManager(conf);
     rm.start();
     DrainDispatcher dispatcher = (DrainDispatcher) rm.getRMContext()
@@ -2685,12 +2703,12 @@ public class TestRMContainerAllocator {
     rm.killApp(app.getApplicationId());
     rm.waitForState(app.getApplicationId(), RMAppState.KILLED);
     allocator.schedule();
+    rm.stop();
   }
 
   @Test
   public void testUpdateAskOnRampDownAllReduces() throws Exception {
     LOG.info("Running testUpdateAskOnRampDownAllReduces");
-    Configuration conf = new Configuration();
     MyResourceManager rm = new MyResourceManager(conf);
     rm.start();
     DrainDispatcher dispatcher =
@@ -2807,6 +2825,7 @@ public class TestRMContainerAllocator {
       Assert.assertEquals(Resource.newInstance(1024, 1), req.getCapability());
       Assert.assertEquals(0, req.getNumContainers());
     }
+    rm.stop();
   }
 
 
@@ -2814,7 +2833,6 @@ public class TestRMContainerAllocator {
   public void testAvoidAskMoreReducersWhenReducerPreemptionIsRequired()
       throws Exception {
     LOG.info("Running testAvoidAskMoreReducersWhenReducerPreemptionIsRequired");
-    Configuration conf = new Configuration();
     MyResourceManager rm = new MyResourceManager(conf);
     rm.start();
     DrainDispatcher dispatcher =
@@ -2934,6 +2952,7 @@ public class TestRMContainerAllocator {
       Assert.assertEquals(Resource.newInstance(1024, 1), req.getCapability());
       Assert.assertEquals(0, req.getNumContainers());
     }
+    rm.stop();
   }
 
   private static class MockScheduler implements ApplicationMasterProtocol {

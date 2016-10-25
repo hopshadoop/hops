@@ -370,7 +370,7 @@ public class MiniYARNCluster extends CompositeService {
     }
     Configuration conf = getConfig();
     resourceManagers[index] = new ResourceManager();
-    initResourceManager(index, getConfig());
+    initResourceManager(index, rmConfs[index]);
     startResourceManager(index);
   }
 

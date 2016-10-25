@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.applicationsmanager;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -30,6 +31,8 @@ import io.hops.util.RMStorageFactory;
 import io.hops.util.YarnAPIStorageFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.yarn.api.protocolrecords.AllocateResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterResponse;
 import org.apache.hadoop.yarn.api.records.ApplicationAccessType;
@@ -47,6 +50,7 @@ import org.apache.hadoop.yarn.server.api.protocolrecords.NMContainerStatus;
 import org.apache.hadoop.yarn.server.resourcemanager.MockAM;
 import org.apache.hadoop.yarn.server.resourcemanager.MockNM;
 import org.apache.hadoop.yarn.server.resourcemanager.MockRM;
+import org.apache.hadoop.yarn.server.resourcemanager.recovery.FileSystemRMStateStore;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.MemoryRMStateStore;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.ApplicationStateData;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
@@ -63,6 +67,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.Capacity
 import org.apache.hadoop.yarn.util.ControlledClock;
 import org.apache.hadoop.yarn.util.Records;
 import org.apache.hadoop.yarn.util.SystemClock;
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -72,22 +77,36 @@ public class TestAMRestart {
   private final Log LOG = LogFactory.getLog(TestAMRestart.class);
 
   YarnConfiguration conf;
+  private FileSystem fs;
+  private Path tmpDir;
 
   @Before
   public void setUp() throws IOException {
     conf = new YarnConfiguration();
+    conf.set(YarnConfiguration.RM_STORE, FileSystemRMStateStore.class.getName());
+    fs = FileSystem.get(conf);
+    tmpDir = new Path(new File("target", this.getClass().getSimpleName()
+            + "-tmpDir").getAbsolutePath());
+    fs.delete(tmpDir, true);
+    fs.mkdirs(tmpDir);
+    conf.set(YarnConfiguration.FS_RM_STATE_STORE_URI, tmpDir.toString());
     RMStorageFactory.setConfiguration(conf);
     YarnAPIStorageFactory.setConfiguration(conf);
     DBUtility.InitializeDB();
   }
 
-  @Test(timeout = 300000)
+  @After
+  public void tearDown() throws IOException {
+    fs.delete(tmpDir, true);
+  }
+
+  @Test(timeout = 30000)
   public void testAMRestartWithExistingContainers() throws Exception {
     conf.setInt(YarnConfiguration.RM_AM_MAX_ATTEMPTS, 2);
 
     MockRM rm1 = new MockRM(conf);
     rm1.start();
-    MockNM nm1 =
+    final MockNM nm1 =
         new MockNM("127.0.0.1:1234", 10240, rm1.getResourceTrackerService());
     nm1.registerNode();
     MockNM nm2 =
@@ -122,7 +141,6 @@ public class TestAMRestart {
         ContainerId.newContainerId(am1.getApplicationAttemptId(), 2);
     rm1.waitForState(nm1, containerId2, RMContainerState.RUNNING);
 
-    LOG.error("containerId2 RUNNING");
     // launch the 3rd container, for testing container allocated by previous
     // attempt is completed by the next new attempt/
     nm1.nodeHeartbeat(am1.getApplicationAttemptId(), 3, ContainerState.RUNNING);
@@ -130,14 +148,12 @@ public class TestAMRestart {
         ContainerId.newContainerId(am1.getApplicationAttemptId(), 3);
     rm1.waitForState(nm1, containerId3, RMContainerState.RUNNING);
 
-    LOG.error("containerId3 RUNNING");
     // 4th container still in AQUIRED state. for testing Acquired container is
     // always killed.
     ContainerId containerId4 =
         ContainerId.newContainerId(am1.getApplicationAttemptId(), 4);
     rm1.waitForState(nm1, containerId4, RMContainerState.ACQUIRED);
 
-    LOG.error("containerId4 ACQUIRED");
     // 5th container is in Allocated state. for testing allocated container is
     // always killed.
     am1.allocate("127.0.0.1", 1024, 1, new ArrayList<ContainerId>());
@@ -147,7 +163,6 @@ public class TestAMRestart {
     rm1.waitForContainerAllocated(nm1, containerId5);
     rm1.waitForState(nm1, containerId5, RMContainerState.ALLOCATED);
 
-    LOG.error("containerId5 ALLOCATED");
     // 6th container is in Reserved state.
     am1.allocate("127.0.0.1", 6000, 1, new ArrayList<ContainerId>());
     ContainerId containerId6 =
@@ -162,7 +177,6 @@ public class TestAMRestart {
       nm1.nodeHeartbeat(true);
       Thread.sleep(200);
     }
-    LOG.error("containerId6 RESERVED");
     // assert containerId6 is reserved.
     Assert.assertEquals(containerId6, schedulerAttempt.getReservedContainers()
       .get(0).getContainerId());
@@ -171,12 +185,10 @@ public class TestAMRestart {
     nm1.nodeHeartbeat(am1.getApplicationAttemptId(), 1, ContainerState.COMPLETE);
     am1.waitForState(RMAppAttemptState.FAILED);
 
-    LOG.error("RMAppAttempt FAILED");
     // wait for some time. previous AM's running containers should still remain
     // in scheduler even though am failed
     Thread.sleep(3000);
     rm1.waitForState(nm1, containerId2, RMContainerState.RUNNING);
-    LOG.error("containerId2 still RUNNING");
 
     // acquired/allocated containers are cleaned up.
     Assert.assertNull(rm1.getResourceScheduler().getRMContainer(containerId4));
@@ -184,7 +196,6 @@ public class TestAMRestart {
 
     // wait for app to start a new attempt.
     rm1.waitForState(app1.getApplicationId(), RMAppState.ACCEPTED);
-    LOG.error("RMAppAttempt is now ACCEPTED");
 
     // assert this is a new AM.
     ApplicationAttemptId newAttemptId =
@@ -194,12 +205,12 @@ public class TestAMRestart {
     // launch the new AM
     RMAppAttempt attempt2 = app1.getCurrentAppAttempt();
     nm1.nodeHeartbeat(true);
+
     MockAM am2 = rm1.sendAMLaunched(attempt2.getAppAttemptId());
-    LOG.error("New AM sendAMLaunched");
+
     RegisterApplicationMasterResponse registerResponse =
         am2.registerAppAttempt();
 
-    LOG.error("New AM has been launched");
     // Assert two containers are running: container2 and container3;
     Assert.assertEquals(2, registerResponse.getContainersFromPreviousAttempts()
       .size());
@@ -286,7 +297,6 @@ public class TestAMRestart {
 
   @Test(timeout = 30000)
   public void testNMTokensRebindOnAMRestart() throws Exception {
-    YarnConfiguration conf = new YarnConfiguration();
     conf.setInt(YarnConfiguration.RM_AM_MAX_ATTEMPTS, 3);
 
     MockRM rm1 = new MockRM(conf);
@@ -389,16 +399,13 @@ public class TestAMRestart {
   // should not be counted towards AM max retry count.
   @Test(timeout = 100000)
   public void testShouldNotCountFailureToMaxAttemptRetry() throws Exception {
-    YarnConfiguration conf = new YarnConfiguration();
     conf.setClass(YarnConfiguration.RM_SCHEDULER, CapacityScheduler.class,
       ResourceScheduler.class);
     // explicitly set max-am-retry count as 1.
     conf.setInt(YarnConfiguration.RM_AM_MAX_ATTEMPTS, 1);
     conf.setBoolean(YarnConfiguration.RECOVERY_ENABLED, true);
-    conf.set(YarnConfiguration.RM_STORE, MemoryRMStateStore.class.getName());
-    MemoryRMStateStore memStore = new MemoryRMStateStore();
-    memStore.init(conf);
-    MockRM rm1 = new MockRM(conf, memStore);
+
+    MockRM rm1 = new MockRM(conf);
     rm1.start();
     MockNM nm1 =
         new MockNM("127.0.0.1:1234", 8000, rm1.getResourceTrackerService());
@@ -406,6 +413,7 @@ public class TestAMRestart {
     RMApp app1 = rm1.submitApp(200);
     RMAppAttempt attempt1 = app1.getCurrentAppAttempt();
     MockAM am1 = MockRM.launchAndRegisterAM(app1, rm1, nm1);
+
     CapacityScheduler scheduler =
         (CapacityScheduler) rm1.getResourceScheduler();
     ContainerId amContainer =
@@ -414,10 +422,10 @@ public class TestAMRestart {
     scheduler.killContainer(scheduler.getRMContainer(amContainer));
 
     am1.waitForState(RMAppAttemptState.FAILED);
+
     Assert.assertTrue(! attempt1.shouldCountTowardsMaxAttemptRetry());
     rm1.waitForState(app1.getApplicationId(), RMAppState.ACCEPTED);
-    ApplicationStateData appState =
-        memStore.getState().getApplicationState().get(app1.getApplicationId());
+
     // AM should be restarted even though max-am-attempt is 1.
     MockAM am2 =
         rm1.waitForNewAMToLaunchAndRegister(app1.getApplicationId(), 2, nm1);
@@ -451,6 +459,10 @@ public class TestAMRestart {
 
     am3.waitForState(RMAppAttemptState.FAILED);
     Assert.assertTrue(! attempt3.shouldCountTowardsMaxAttemptRetry());
+
+    ApplicationStateData appState =
+            rm1.getRMContext().getStateStore().loadState()
+                    .getApplicationState().get(app1.getApplicationId());
     Assert.assertEquals(ContainerExitStatus.DISKS_FAILED,
       appState.getAttempt(am3.getApplicationAttemptId())
         .getAMContainerExitStatus());
@@ -470,6 +482,10 @@ public class TestAMRestart {
     nm1.nodeHeartbeat(false);
     am4.waitForState(RMAppAttemptState.FAILED);
     Assert.assertTrue(! attempt4.shouldCountTowardsMaxAttemptRetry());
+
+    appState =
+            rm1.getRMContext().getStateStore().loadState()
+                    .getApplicationState().get(app1.getApplicationId());
     Assert.assertEquals(ContainerExitStatus.ABORTED,
       appState.getAttempt(am4.getApplicationAttemptId())
         .getAMContainerExitStatus());
@@ -496,19 +512,15 @@ public class TestAMRestart {
   // re-launch the AM.
   @Test(timeout = 20000)
   public void testPreemptedAMRestartOnRMRestart() throws Exception {
-    YarnConfiguration conf = new YarnConfiguration();
     conf.setClass(YarnConfiguration.RM_SCHEDULER, CapacityScheduler.class,
       ResourceScheduler.class);
     conf.setBoolean(YarnConfiguration.RECOVERY_ENABLED, true);
     conf.setBoolean(YarnConfiguration.RM_WORK_PRESERVING_RECOVERY_ENABLED, false);
 
-    conf.set(YarnConfiguration.RM_STORE, MemoryRMStateStore.class.getName());
     // explicitly set max-am-retry count as 1.
     conf.setInt(YarnConfiguration.RM_AM_MAX_ATTEMPTS, 1);
-    MemoryRMStateStore memStore = new MemoryRMStateStore();
-    memStore.init(conf);
 
-    MockRM rm1 = new MockRM(conf, memStore);
+    MockRM rm1 = new MockRM(conf);
     rm1.start();
     MockNM nm1 =
         new MockNM("127.0.0.1:1234", 8000, rm1.getResourceTrackerService());
@@ -530,26 +542,30 @@ public class TestAMRestart {
 
     // state store has 1 attempt stored.
     ApplicationStateData appState =
-        memStore.getState().getApplicationState().get(app1.getApplicationId());
+        rm1.getRMContext().getStateStore().loadState().getApplicationState().get(app1.getApplicationId());
     Assert.assertEquals(1, appState.getAttemptCount());
     // attempt stored has the preempted container exit status.
     Assert.assertEquals(ContainerExitStatus.PREEMPTED,
       appState.getAttempt(am1.getApplicationAttemptId())
         .getAMContainerExitStatus());
     // Restart rm.
-    MockRM rm2 = new MockRM(conf, memStore);
+    MockRM rm2 = new MockRM(conf);
+    rm2.start();
     nm1.setResourceTrackerService(rm2.getResourceTrackerService());
     nm1.registerNode();
-    rm2.start();
 
     // Restarted RM should re-launch the am.
+    LOG.error("Waiting for new AM to Launch nad register");
     MockAM am2 =
         rm2.waitForNewAMToLaunchAndRegister(app1.getApplicationId(), 2, nm1);
+    LOG.error("New AM launched and registered");
     MockRM.finishAMAndVerifyAppState(app1, rm2, nm1, am2);
     RMAppAttempt attempt2 =
         rm2.getRMContext().getRMApps().get(app1.getApplicationId())
           .getCurrentAppAttempt();
     Assert.assertTrue(attempt2.shouldCountTowardsMaxAttemptRetry());
+
+    appState = rm2.getRMContext().getStateStore().loadState().getApplicationState().get(app1.getApplicationId());
     Assert.assertEquals(ContainerExitStatus.INVALID,
       appState.getAttempt(am2.getApplicationAttemptId())
         .getAMContainerExitStatus());
@@ -563,20 +579,17 @@ public class TestAMRestart {
   @Test(timeout = 50000)
   public void testRMRestartOrFailoverNotCountedForAMFailures()
       throws Exception {
-    YarnConfiguration conf = new YarnConfiguration();
     conf.setClass(YarnConfiguration.RM_SCHEDULER, CapacityScheduler.class,
       ResourceScheduler.class);
     conf.setBoolean(YarnConfiguration.RECOVERY_ENABLED, true);
     conf.setBoolean(YarnConfiguration.RM_WORK_PRESERVING_RECOVERY_ENABLED, false);
 
-    conf.set(YarnConfiguration.RM_STORE, MemoryRMStateStore.class.getName());
     // explicitly set max-am-retry count as 1.
     conf.setInt(YarnConfiguration.RM_AM_MAX_ATTEMPTS, 1);
-    MemoryRMStateStore memStore = new MemoryRMStateStore();
-    memStore.init(conf);
 
-    MockRM rm1 = new MockRM(conf, memStore);
+    MockRM rm1 = new MockRM(conf);
     rm1.start();
+
     MockNM nm1 =
         new MockNM("127.0.0.1:1234", 8000, rm1.getResourceTrackerService());
     nm1.registerNode();
@@ -587,10 +600,9 @@ public class TestAMRestart {
     Assert.assertTrue(((RMAppAttemptImpl) attempt1).mayBeLastAttempt());
 
     // Restart rm.
-    MockRM rm2 = new MockRM(conf, memStore);
+    MockRM rm2 = new MockRM(conf);
     rm2.start();
-    ApplicationStateData appState =
-        memStore.getState().getApplicationState().get(app1.getApplicationId());
+
     // re-register the NM
     nm1.setResourceTrackerService(rm2.getResourceTrackerService());
     NMContainerStatus status = Records.newRecord(NMContainerStatus.class);
@@ -602,9 +614,14 @@ public class TestAMRestart {
     nm1.registerNode(Collections.singletonList(status), null);
 
     rm2.waitForState(attempt1.getAppAttemptId(), RMAppAttemptState.FAILED);
+
+    ApplicationStateData appState =
+            rm2.getRMContext().getStateStore().loadState()
+                    .getApplicationState().get(app1.getApplicationId());
     Assert.assertEquals(ContainerExitStatus.KILLED_BY_RESOURCEMANAGER,
       appState.getAttempt(am1.getApplicationAttemptId())
         .getAMContainerExitStatus());
+
     // Will automatically start a new AppAttempt in rm2
     rm2.waitForState(app1.getApplicationId(), RMAppState.ACCEPTED);
     MockAM am2 =
@@ -614,6 +631,10 @@ public class TestAMRestart {
         rm2.getRMContext().getRMApps().get(app1.getApplicationId())
           .getCurrentAppAttempt();
     Assert.assertTrue(attempt3.shouldCountTowardsMaxAttemptRetry());
+
+    appState =
+            rm2.getRMContext().getStateStore().loadState()
+                    .getApplicationState().get(app1.getApplicationId());
     Assert.assertEquals(ContainerExitStatus.INVALID,
       appState.getAttempt(am2.getApplicationAttemptId())
         .getAMContainerExitStatus());
@@ -624,19 +645,15 @@ public class TestAMRestart {
 
   @Test (timeout = 50000)
   public void testRMAppAttemptFailuresValidityInterval() throws Exception {
-    YarnConfiguration conf = new YarnConfiguration();
     conf.setClass(YarnConfiguration.RM_SCHEDULER, CapacityScheduler.class,
       ResourceScheduler.class);
     conf.setBoolean(YarnConfiguration.RECOVERY_ENABLED, true);
     conf.setBoolean(YarnConfiguration.RM_WORK_PRESERVING_RECOVERY_ENABLED, false);
 
-    conf.set(YarnConfiguration.RM_STORE, MemoryRMStateStore.class.getName());
     // explicitly set max-am-retry count as 2.
     conf.setInt(YarnConfiguration.RM_AM_MAX_ATTEMPTS, 2);
-    MemoryRMStateStore memStore = new MemoryRMStateStore();
-    memStore.init(conf);
 
-    MockRM rm1 = new MockRM(conf, memStore);
+    MockRM rm1 = new MockRM(conf);
     rm1.start();
     MockNM nm1 =
         new MockNM("127.0.0.1:1234", 8000, rm1.getResourceTrackerService());
@@ -702,7 +719,7 @@ public class TestAMRestart {
 
     // Restart rm.
     @SuppressWarnings("resource")
-    MockRM rm2 = new MockRM(conf, memStore);
+    MockRM rm2 = new MockRM(conf);
     rm2.start();
 
     // re-register the NM

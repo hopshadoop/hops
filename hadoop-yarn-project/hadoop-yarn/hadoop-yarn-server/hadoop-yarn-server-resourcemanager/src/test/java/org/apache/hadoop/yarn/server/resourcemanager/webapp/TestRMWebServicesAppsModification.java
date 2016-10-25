@@ -44,7 +44,12 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
 import com.sun.jersey.api.client.config.DefaultClientConfig;
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.Credentials;
@@ -108,6 +113,9 @@ import com.sun.jersey.test.framework.WebAppDescriptor;
 
 @RunWith(Parameterized.class)
 public class TestRMWebServicesAppsModification extends JerseyTestBase {
+
+  private final Log LOG = LogFactory.getLog(TestRMWebServicesAppsModification.class);
+
   private static MockRM rm;
 
   private static final int CONTAINER_MB = 1024;
@@ -165,12 +173,20 @@ public class TestRMWebServicesAppsModification extends JerseyTestBase {
 
     @Override
     protected void configureServlets() {
+      try {
+        RMStorageFactory.setConfiguration(conf);
+        YarnAPIStorageFactory.setConfiguration(conf);
+        DBUtility.InitializeDB();
+      } catch (IOException ex) {
+        LOG.error(ex, ex);
+      }
       configureScheduler();
       bind(JAXBContextResolver.class);
       bind(RMWebServices.class);
       bind(GenericExceptionHandler.class);
       conf.setInt(YarnConfiguration.RM_AM_MAX_ATTEMPTS,
         YarnConfiguration.DEFAULT_RM_AM_MAX_ATTEMPTS);
+
       rm = new MockRM(conf);
       bind(ResourceManager.class).toInstance(rm);
       if (setAuthFilter) {

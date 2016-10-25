@@ -144,9 +144,6 @@ public class TestWorkPreservingRMRestart extends ParameterizedSchedulerTestBase 
     conf.set(YarnConfiguration.FS_RM_STATE_STORE_URI,tmpDir.toString());
     conf.setBoolean(YarnConfiguration.RM_WORK_PRESERVING_RECOVERY_ENABLED, true);
     conf.setLong(YarnConfiguration.RM_WORK_PRESERVING_RECOVERY_SCHEDULING_WAIT_MS, 0);
-    YarnAPIStorageFactory.setConfiguration(conf);
-    RMStorageFactory.setConfiguration(conf);
-    DBUtility.InitializeDB();
     DefaultMetricsSystem.setMiniClusterMode(true);
   }
 

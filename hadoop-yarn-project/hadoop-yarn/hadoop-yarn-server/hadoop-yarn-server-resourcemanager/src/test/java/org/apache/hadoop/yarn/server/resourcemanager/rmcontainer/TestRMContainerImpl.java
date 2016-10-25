@@ -30,10 +30,14 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -64,6 +68,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerUtils;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Matchers;
@@ -71,6 +76,16 @@ import org.mockito.Mockito;
 
 @SuppressWarnings({ "unchecked", "rawtypes" })
 public class TestRMContainerImpl {
+
+  private Configuration conf;
+
+  @Before
+  public void setUp() throws IOException {
+    conf = new YarnConfiguration();
+    RMStorageFactory.setConfiguration(conf);
+    YarnAPIStorageFactory.setConfiguration(conf);
+    DBUtility.InitializeDB();
+  }
 
   @Test
   public void testReleaseWhileRunning() {
@@ -81,7 +96,7 @@ public class TestRMContainerImpl {
     drainDispatcher.register(RMAppAttemptEventType.class,
         appAttemptEventHandler);
     drainDispatcher.register(RMNodeEventType.class, generic);
-    drainDispatcher.init(new YarnConfiguration());
+    drainDispatcher.init(conf);
     drainDispatcher.start();
     NodeId nodeId = BuilderUtils.newNodeId("host", 3425);
     ApplicationId appId = BuilderUtils.newApplicationId(1, 1);
@@ -177,7 +192,7 @@ public class TestRMContainerImpl {
     drainDispatcher.register(RMAppAttemptEventType.class,
         appAttemptEventHandler);
     drainDispatcher.register(RMNodeEventType.class, generic);
-    drainDispatcher.init(new YarnConfiguration());
+    drainDispatcher.init(conf);
     drainDispatcher.start();
     NodeId nodeId = BuilderUtils.newNodeId("host", 3425);
     ApplicationId appId = BuilderUtils.newApplicationId(1, 1);
@@ -243,7 +258,6 @@ public class TestRMContainerImpl {
   
   @Test
   public void testExistenceOfResourceRequestInRMContainer() throws Exception {
-    Configuration conf = new Configuration();
     MockRM rm1 = new MockRM(conf);
     rm1.start();
     MockNM nm1 = rm1.registerNode("unknownhost:1234", 8000);
@@ -271,12 +285,12 @@ public class TestRMContainerImpl {
     // be empty
     Assert.assertNull(scheduler.getRMContainer(containerId2)
         .getResourceRequests());
+
+    rm1.stop();
   }
 
   @Test (timeout = 180000)
   public void testStoreAllContainerMetrics() throws Exception {
-    Configuration conf = new Configuration();
-    conf.setInt(YarnConfiguration.RM_AM_MAX_ATTEMPTS, 1);
     MockRM rm1 = new MockRM(conf);
 
     SystemMetricsPublisher publisher = mock(SystemMetricsPublisher.class);
@@ -311,7 +325,6 @@ public class TestRMContainerImpl {
 
   @Test (timeout = 180000)
   public void testStoreOnlyAMContainerMetrics() throws Exception {
-    Configuration conf = new Configuration();
     conf.setInt(YarnConfiguration.RM_AM_MAX_ATTEMPTS, 1);
     conf.setBoolean(
         YarnConfiguration.APPLICATION_HISTORY_SAVE_NON_AM_CONTAINER_META_INFO,
