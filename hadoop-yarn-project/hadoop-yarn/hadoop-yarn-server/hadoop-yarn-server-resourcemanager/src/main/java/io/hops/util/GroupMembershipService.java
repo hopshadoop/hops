@@ -115,9 +115,17 @@ public class GroupMembershipService extends CompositeService
   
   @Override
   protected synchronized void serviceStart() throws Exception {
-    LOG.info("start groupMembershipService " + this.hostname);
     startGroupMembership();
     startServer();
+    getConfig().updateConnectAddr(YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS,
+            server.getListenerAddress());
+
+    // TODO: For the moment this is needed, otherwise tests fail, I should check it later
+    getConfig().set(YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS,
+            this.server.getListenerAddress().getHostName() + ":" + this.server.getPort());
+    getConfig().setInt(YarnConfiguration.RM_GROUP_MEMBERSHIP_PORT, this.server.getPort());
+    LOG.info("Started GMS on " + this.server.getListenerAddress().getHostName()
+        + ":" + this.server.getPort());
     super.serviceStart();
   }
 
@@ -158,8 +166,6 @@ public class GroupMembershipService extends CompositeService
         conf.getInt(YarnConfiguration.RM_GROUP_MEMBERSHIP_CLIENT_THREAD_COUNT,
             YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_CLIENT_THREAD_COUNT));
     this.server.start();
-    conf.updateConnectAddr(YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS,
-        server.getListenerAddress());
   }
 
   protected void stopServer() throws Exception {

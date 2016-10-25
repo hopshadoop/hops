@@ -828,6 +828,7 @@ public class ResourceSchedulerWrapper
   public void serviceStop() throws Exception {
     ((AbstractYarnScheduler<SchedulerApplicationAttempt, SchedulerNode>)
         scheduler).stop();
+    web.stop();
     super.serviceStop();
   }
 

@@ -112,7 +112,6 @@ public class MiniYARNCluster extends CompositeService {
   private NodeManager[] nodeManagers;
   private ResourceManager[] resourceManagers;
   private String[] rmIds;
-  private Configuration[] rmConfs;
 
   private ApplicationHistoryServer appHistoryServer;
 
@@ -193,7 +192,6 @@ public class MiniYARNCluster extends CompositeService {
 
     resourceManagers = new ResourceManager[numResourceManagers];
     nodeManagers = new NodeManager[numNodeManagers];
-    rmConfs = new Configuration[numResourceManagers];
   }
 
   /**
@@ -233,7 +231,7 @@ public class MiniYARNCluster extends CompositeService {
 
     RMStorageFactory.setConfiguration(conf);
     YarnAPIStorageFactory.setConfiguration(conf);
-    DBUtility.InitializeDB();
+    //DBUtility.InitializeDB();
 
     if (useRpc && !useFixedPorts) {
       throw new YarnRuntimeException("Invalid configuration!" +
@@ -259,12 +257,11 @@ public class MiniYARNCluster extends CompositeService {
 
     for (int i = 0; i < resourceManagers.length; i++) {
       resourceManagers[i] = createResourceManager();
-      rmConfs[i] = new YarnConfiguration(conf);
       if (!useFixedPorts) {
-        if (HAUtil.isHAEnabled(rmConfs[i])) {
-          setHARMConfigurationWithEphemeralPorts(i, rmConfs[i]);
+        if (HAUtil.isHAEnabled(conf)) {
+          setHARMConfigurationWithEphemeralPorts(i, conf);
         } else {
-          setNonHARMConfigurationWithEphemeralPorts(rmConfs[i]);
+          setNonHARMConfigurationWithEphemeralPorts(conf);
         }
       }
       addService(new ResourceManagerWrapper(i));
@@ -296,27 +293,22 @@ public class MiniYARNCluster extends CompositeService {
     conf.set(YarnConfiguration.RM_ADMIN_ADDRESS, hostname + ":0");
     conf.set(YarnConfiguration.RM_SCHEDULER_ADDRESS, hostname + ":0");
     conf.set(YarnConfiguration.RM_RESOURCE_TRACKER_ADDRESS, hostname + ":0");
+    conf.set(YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS, "localhost:0");
     WebAppUtils.setRMWebAppHostnameAndPort(conf, hostname, 0);
   }
 
   private void setHARMConfigurationWithEphemeralPorts(final int index, Configuration conf) {
     String hostname = MiniYARNCluster.getHostname();
-    for (int i = 0; i < resourceManagers.length; ++i) {
       for (String confKey : YarnConfiguration.getServiceAddressConfKeys(conf)) {
-        conf.set(HAUtil.addSuffix(confKey, rmIds[i]), hostname + ":0");
+        conf.set(HAUtil.addSuffix(confKey, rmIds[index]), hostname + ":0");
       }
-    }
+    conf.set(YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS, "localhost:0");
   }
 
   private synchronized void initResourceManager(int index, Configuration conf) {
     if (HAUtil.isHAEnabled(conf)) {
       conf.set(YarnConfiguration.RM_HA_ID, rmIds[index]);
     }
-    String[] gmAddrPort = conf.get(YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS,
-            YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_ADDRESS).split(":");
-
-    conf.set(YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS,
-            "localhost:" + (Integer.parseInt(gmAddrPort[1]) + index));
 
     resourceManagers[index].init(conf);
     resourceManagers[index].getRMContext().getDispatcher().register(
@@ -370,7 +362,7 @@ public class MiniYARNCluster extends CompositeService {
     }
     Configuration conf = getConfig();
     resourceManagers[index] = new ResourceManager();
-    initResourceManager(index, rmConfs[index]);
+    initResourceManager(index, conf);
     startResourceManager(index);
   }
 
@@ -457,8 +449,8 @@ public class MiniYARNCluster extends CompositeService {
     @Override
     protected synchronized void serviceInit(Configuration conf)
         throws Exception {
-      initResourceManager(index, rmConfs[index]);
-      super.serviceInit(rmConfs[index]);
+      initResourceManager(index, conf);
+      super.serviceInit(conf);
     }
 
     @Override
