@@ -172,7 +172,7 @@ public class TestDistCh extends junit.framework.TestCase {
       System.out.println("newstatus=" + Arrays.asList(newstatus).toString().replace(",", ",\n  "));
 
       //run DistCh
-      new DistCh(MiniMRClientClusterFactory.create(this.getClass(), 2, conf).getConfig()).run(args);
+      new DistCh(MiniMRClientClusterFactory.create(this.getClass(), 2, conf, false).getConfig()).run(args);
       runLsr(shell, tree.root, 0);
 
       //check results

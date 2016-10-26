@@ -70,7 +70,7 @@ public class TestNonExistentJob extends TestCase {
     int numDirs = 1;
     String[] racks = null;
     String[] hosts = null;
-    mrCluster = new MiniMRCluster(0, 0, taskTrackers, nnURI, numDirs, racks, hosts, null, conf);
+    mrCluster = new MiniMRCluster(0, 0, taskTrackers, nnURI, numDirs, racks, hosts, null, conf, false);
     ProxyUsers.refreshSuperUserGroupsConfiguration(conf);
   }
 

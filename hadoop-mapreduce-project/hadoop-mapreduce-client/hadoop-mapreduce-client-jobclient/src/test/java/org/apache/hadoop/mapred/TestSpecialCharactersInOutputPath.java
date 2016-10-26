@@ -109,7 +109,7 @@ public class TestSpecialCharactersInOutputPath extends TestCase {
       dfs = new MiniDFSCluster.Builder(conf).build();
       fileSys = dfs.getFileSystem();
       namenode = fileSys.getUri().toString();
-      mr = new MiniMRCluster(taskTrackers, namenode, 2);
+      mr = new MiniMRCluster(taskTrackers, namenode, 2, false);
       JobConf jobConf = new JobConf();
       boolean result;
       result = launchJob(fileSys.getUri(), jobConf, 3, 1);

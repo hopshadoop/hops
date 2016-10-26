@@ -188,7 +188,7 @@ public class TestBinaryTokenFile {
     builder.racks(null);
     dfsCluster = builder.build();
     
-    mrCluster = new MiniMRYarnCluster(TestBinaryTokenFile.class.getName(), noOfNMs);
+    mrCluster = new MiniMRYarnCluster(TestBinaryTokenFile.class.getName(), noOfNMs, false);
     mrCluster.init(conf);
     mrCluster.start();
 

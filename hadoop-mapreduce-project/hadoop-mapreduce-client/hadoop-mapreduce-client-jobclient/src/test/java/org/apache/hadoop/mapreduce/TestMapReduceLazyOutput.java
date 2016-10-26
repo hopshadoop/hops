@@ -134,7 +134,8 @@ public class TestMapReduceLazyOutput extends TestCase {
       dfs = new MiniDFSCluster.Builder(conf).numDataNodes(NUM_HADOOP_SLAVES)
           .build();
       fileSys = dfs.getFileSystem();
-      mr = new MiniMRCluster(NUM_HADOOP_SLAVES, fileSys.getUri().toString(), 1);
+      mr = new MiniMRCluster(NUM_HADOOP_SLAVES, fileSys.getUri().toString(), 1,
+      false);
 
       int numReducers = 2;
       int numMappers = NUM_HADOOP_SLAVES * NUM_MAPS_PER_NODE;

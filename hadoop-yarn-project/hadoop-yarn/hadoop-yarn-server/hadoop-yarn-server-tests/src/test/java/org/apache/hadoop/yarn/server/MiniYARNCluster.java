@@ -129,7 +129,7 @@ public class MiniYARNCluster extends CompositeService {
   // Number of nm-log-dirs per nodemanager
   private int numLogDirs;
   private boolean enableAHS;
-
+  private boolean formatDB;
   /**
    * @param testName name of the test
    * @param numResourceManagers the number of resource managers in the cluster
@@ -140,11 +140,12 @@ public class MiniYARNCluster extends CompositeService {
    */
   public MiniYARNCluster(
       String testName, int numResourceManagers, int numNodeManagers,
-      int numLocalDirs, int numLogDirs, boolean enableAHS) {
+      int numLocalDirs, int numLogDirs, boolean enableAHS, boolean formatDB) {
     super(testName.replace("$", ""));
     this.numLocalDirs = numLocalDirs;
     this.numLogDirs = numLogDirs;
     this.enableAHS = enableAHS;
+    this.formatDB = formatDB;
     String testSubDir = testName.replace("$", "");
     File targetWorkDir = new File("target", testSubDir);
     try {
@@ -194,6 +195,13 @@ public class MiniYARNCluster extends CompositeService {
     nodeManagers = new NodeManager[numNodeManagers];
   }
 
+  public MiniYARNCluster(
+      String testName, int numResourceManagers, int numNodeManagers,
+      int numLocalDirs, int numLogDirs, boolean enableAHS) {
+    this(testName, numResourceManagers, numNodeManagers, numLocalDirs,
+            numLogDirs, enableAHS, true);
+  }
+  
   /**
    * @param testName name of the test
    * @param numResourceManagers the number of resource managers in the cluster
@@ -229,9 +237,11 @@ public class MiniYARNCluster extends CompositeService {
     failoverTimeout = conf.getInt(YarnConfiguration.RM_ZK_TIMEOUT_MS,
         YarnConfiguration.DEFAULT_RM_ZK_TIMEOUT_MS);
 
-    /*RMStorageFactory.setConfiguration(conf);
+    RMStorageFactory.setConfiguration(conf);
     YarnAPIStorageFactory.setConfiguration(conf);
-    DBUtility.InitializeDB();*/
+    if(formatDB){
+      DBUtility.InitializeDB();
+    }
 
     if (useRpc && !useFixedPorts) {
       throw new YarnRuntimeException("Invalid configuration!" +

@@ -95,7 +95,7 @@ public class TestMiniMRWithDFSWithDistinctUsers {
     mrConf.set(JTConfig.JT_STAGING_AREA_ROOT, "/staging");
 
     mr = new MiniMRCluster(0, 0, 4, dfs.getFileSystem().getUri().toString(),
-                           1, null, null, MR_UGI, mrConf);
+                           1, null, null, MR_UGI, mrConf, false);
   }
 
   @After

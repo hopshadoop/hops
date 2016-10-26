@@ -148,46 +148,29 @@ public class ClientRMProxy<T> extends RMProxy<T>  {
   @InterfaceAudience.Private
   @Override
   protected InetSocketAddress getRMAddress(YarnConfiguration conf,
-          Class<?> protocol, String Host, int referencePort) throws IOException {
+          Class<?> protocol, String host, int referencePort) throws IOException {
     if (protocol == ApplicationClientProtocol.class) {
-      int port = referencePort - (conf
-              .getInt(YarnConfiguration.RM_GROUP_MEMBERSHIP_PORT,
-                      YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_PORT)
-              - conf.getInt(YarnConfiguration.RM_PORT,
-                      YarnConfiguration.DEFAULT_RM_PORT));
-      return NetUtils.createSocketAddrForHost(Host, port);
+      return conf.getSocketAddr(YarnConfiguration.RM_ADDRESS,
+          YarnConfiguration.DEFAULT_RM_ADDRESS,
+          YarnConfiguration.DEFAULT_RM_PORT, host);
     } else if (protocol == ResourceManagerAdministrationProtocol.class) {
-      int port = referencePort - (conf
-              .getInt(YarnConfiguration.RM_GROUP_MEMBERSHIP_PORT,
-                      YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_PORT)
-              - conf.getInt(YarnConfiguration.RM_ADMIN_PORT,
-                      YarnConfiguration.DEFAULT_RM_ADMIN_PORT));
-      return NetUtils.createSocketAddrForHost(Host, port);
-
+      return conf.getSocketAddr(
+          YarnConfiguration.RM_ADMIN_ADDRESS,
+          YarnConfiguration.DEFAULT_RM_ADMIN_ADDRESS,
+          YarnConfiguration.DEFAULT_RM_ADMIN_PORT, host);
     } else if (protocol == ApplicationMasterProtocol.class) {
-      int port = referencePort - (conf
-              .getInt(YarnConfiguration.RM_GROUP_MEMBERSHIP_PORT,
-                      YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_PORT)
-              - conf.getInt(YarnConfiguration.RM_SCHEDULER_PORT,
-                      YarnConfiguration.DEFAULT_RM_SCHEDULER_PORT));
-      InetSocketAddress serviceAddr = NetUtils.createSocketAddrForHost(Host,
-              port);
-
-      setupTokens(serviceAddr);
-      return serviceAddr;
+      setAMRMTokenService(conf);
+      return conf.getSocketAddr(YarnConfiguration.RM_SCHEDULER_ADDRESS,
+          YarnConfiguration.DEFAULT_RM_SCHEDULER_ADDRESS,
+          YarnConfiguration.DEFAULT_RM_SCHEDULER_PORT, host);
     } else if (protocol == GroupMembership.class) {
-      int port = referencePort - (conf
-              .getInt(YarnConfiguration.RM_GROUP_MEMBERSHIP_PORT,
-                      YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_PORT)
-              - conf.getInt(YarnConfiguration.RM_GROUP_MEMBERSHIP_PORT,
-                      YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_PORT));
-
-      return NetUtils.createSocketAddrForHost(Host, port);
-
+      return conf.getSocketAddr(YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS,
+          YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_ADDRESS,
+          YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_PORT, host);
     } else {
-      String message = "Unsupported protocol found when creating the proxy "
-              + "connection to ResourceManager: " + ((protocol != null)
-                      ? protocol.getClass().getName() : "null");
+      String message = "Unsupported protocol found when creating the proxy " +
+          "connection to ResourceManager: " +
+          ((protocol != null) ? protocol.getClass().getName() : "null");
       LOG.error(message);
       throw new IllegalStateException(message);
     }

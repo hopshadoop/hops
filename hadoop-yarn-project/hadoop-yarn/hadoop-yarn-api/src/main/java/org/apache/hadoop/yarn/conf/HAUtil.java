@@ -205,7 +205,7 @@ public class HAUtil {
     }
     return currentRMId;
   }
-
+  
   @VisibleForTesting
   static String getNeedToSetValueMessage(String confKey) {
     return confKey + " needs to be set in a HA configuration.";
@@ -245,6 +245,29 @@ public class HAUtil {
     }
   }
 
+  @InterfaceAudience.Private
+  @VisibleForTesting
+  static String getConfKeyForRMInstance(String prefix, Configuration conf, String RMId) {
+    if (!YarnConfiguration.getServiceAddressConfKeys(conf).contains(prefix)) {
+      return prefix;
+    } else {
+      checkAndSetRMRPCAddress(prefix, RMId, conf);
+      return addSuffix(prefix, RMId);
+    }
+  }
+  
+  public static String getConfValueForRMInstance(String prefix,
+                                                 Configuration conf, String host) {
+    String confKey = getConfKeyForRMInstance(prefix, conf, host);
+    String retVal = conf.getTrimmed(confKey);
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("getConfValueForRMInstance: prefix = " + prefix +
+          "; confKey being looked up = " + confKey +
+          "; value being set to = " + retVal);
+    }
+    return retVal;
+  }
+
   public static String getConfValueForRMInstance(String prefix,
                                                  Configuration conf) {
     String confKey = getConfKeyForRMInstance(prefix, conf);
@@ -256,7 +279,12 @@ public class HAUtil {
     }
     return retVal;
   }
-
+  
+  public static String getConfValueForRMInstance(
+      String prefix, String defaultValue, Configuration conf, String host) {
+    String value = getConfValueForRMInstance(prefix, conf, host);
+    return (value == null) ? defaultValue : value;
+  }
   public static String getConfValueForRMInstance(
       String prefix, String defaultValue, Configuration conf) {
     String value = getConfValueForRMInstance(prefix, conf);

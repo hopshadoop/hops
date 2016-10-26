@@ -132,6 +132,12 @@ public class MiniMRCluster {
       throws IOException {
     this(0, 0, numTaskTrackers, namenode, numDir);
   }
+  
+  public MiniMRCluster(int numTaskTrackers, String namenode, int numDir, 
+          boolean formatDB)
+      throws IOException {
+    this(0, 0, numTaskTrackers, namenode, numDir, formatDB);
+  }
 
   public MiniMRCluster(int jobTrackerPort, int taskTrackerPort,
       int numTaskTrackers, String namenode, int numDir) throws IOException {
@@ -145,7 +151,7 @@ public class MiniMRCluster {
     this(jobTrackerPort, taskTrackerPort, numTaskTrackers, namenode, numDir,
         racks, null);
   }
-
+    
   public MiniMRCluster(int jobTrackerPort, int taskTrackerPort,
       int numTaskTrackers, String namenode, int numDir, String[] racks,
       String[] hosts) throws IOException {
@@ -159,7 +165,7 @@ public class MiniMRCluster {
     this(jobTrackerPort, taskTrackerPort, numTaskTrackers, namenode, numDir,
         racks, hosts, ugi, null);
   }
-
+    
   public MiniMRCluster(int jobTrackerPort, int taskTrackerPort,
       int numTaskTrackers, String namenode, int numDir, String[] racks,
       String[] hosts, UserGroupInformation ugi, JobConf conf)
@@ -167,25 +173,73 @@ public class MiniMRCluster {
     this(jobTrackerPort, taskTrackerPort, numTaskTrackers, namenode, numDir,
         racks, hosts, ugi, conf, 0);
   }
-
+    
   public MiniMRCluster(int jobTrackerPort, int taskTrackerPort,
       int numTaskTrackers, String namenode, int numDir, String[] racks,
       String[] hosts, UserGroupInformation ugi, JobConf conf,
       int numTrackerToExclude) throws IOException {
     this(jobTrackerPort, taskTrackerPort, numTaskTrackers, namenode, numDir,
-        racks, hosts, ugi, conf, numTrackerToExclude, new Clock());
+        racks, hosts, ugi, conf, numTrackerToExclude, new Clock(), true);
+  }
+  
+  public MiniMRCluster(int numTaskTrackers, String namenode, int numDir,
+      String[] racks, String[] hosts, JobConf conf, boolean formatDB) throws IOException {
+    this(0, 0, numTaskTrackers, namenode, numDir, racks, hosts, null, conf, formatDB);
+  }
+  
+  public MiniMRCluster(int jobTrackerPort, int taskTrackerPort,
+      int numTaskTrackers, String namenode, int numDir, boolean formatDB) throws IOException {
+    this(jobTrackerPort, taskTrackerPort, numTaskTrackers, namenode, numDir,
+        null, formatDB);
+  }
+  
+  public MiniMRCluster(int jobTrackerPort, int taskTrackerPort,
+      int numTaskTrackers, String namenode, int numDir, String[] racks, boolean formatDB)
+      throws IOException {
+    this(jobTrackerPort, taskTrackerPort, numTaskTrackers, namenode, numDir,
+        racks, null, formatDB);
+  }
+
+  public MiniMRCluster(int jobTrackerPort, int taskTrackerPort,
+      int numTaskTrackers, String namenode, int numDir, String[] racks,
+      String[] hosts, boolean formatDB) throws IOException {
+    this(jobTrackerPort, taskTrackerPort, numTaskTrackers, namenode, numDir,
+        racks, hosts, null, formatDB);
+  }
+  
+  public MiniMRCluster(int jobTrackerPort, int taskTrackerPort,
+      int numTaskTrackers, String namenode, int numDir, String[] racks,
+      String[] hosts, UserGroupInformation ugi, boolean formatDB) throws IOException {
+    this(jobTrackerPort, taskTrackerPort, numTaskTrackers, namenode, numDir,
+        racks, hosts, ugi, null, formatDB);
+  }
+    
+  public MiniMRCluster(int jobTrackerPort, int taskTrackerPort,
+      int numTaskTrackers, String namenode, int numDir, String[] racks,
+      String[] hosts, UserGroupInformation ugi, JobConf conf, boolean formatDB)
+      throws IOException {
+    this(jobTrackerPort, taskTrackerPort, numTaskTrackers, namenode, numDir,
+        racks, hosts, ugi, conf, 0, formatDB);
+  }
+  
+  public MiniMRCluster(int jobTrackerPort, int taskTrackerPort,
+      int numTaskTrackers, String namenode, int numDir, String[] racks,
+      String[] hosts, UserGroupInformation ugi, JobConf conf,
+      int numTrackerToExclude, boolean formatDB) throws IOException {
+    this(jobTrackerPort, taskTrackerPort, numTaskTrackers, namenode, numDir,
+        racks, hosts, ugi, conf, numTrackerToExclude, new Clock(), formatDB);
   }
 
   public MiniMRCluster(int jobTrackerPort, int taskTrackerPort,
       int numTaskTrackers, String namenode, int numDir, String[] racks,
       String[] hosts, UserGroupInformation ugi, JobConf conf,
-      int numTrackerToExclude, Clock clock) throws IOException {
+      int numTrackerToExclude, Clock clock, boolean formatDB) throws IOException {
     if (conf == null) conf = new JobConf();
     FileSystem.setDefaultUri(conf, namenode);
     String identifier = this.getClass().getSimpleName() + "_"
         + Integer.toString(new Random().nextInt(Integer.MAX_VALUE));
     mrClientCluster = MiniMRClientClusterFactory.create(this.getClass(),
-        identifier, numTaskTrackers, conf);
+        identifier, numTaskTrackers, conf, formatDB);
   }
 
   public UserGroupInformation getUgi() {

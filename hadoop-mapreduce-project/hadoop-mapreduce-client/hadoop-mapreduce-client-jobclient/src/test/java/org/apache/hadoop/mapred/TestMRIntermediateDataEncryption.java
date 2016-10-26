@@ -88,7 +88,7 @@ public class TestMRIntermediateDataEncryption {
           .numDataNodes(numNodes).build();
       fileSystem = dfsCluster.getFileSystem();
       mrCluster = MiniMRClientClusterFactory.create(this.getClass(),
-                                                 numNodes, conf);
+                                                 numNodes, conf, false);
       // Generate input.
       createInput(fileSystem, numMappers, numLines);
       // Run the test.

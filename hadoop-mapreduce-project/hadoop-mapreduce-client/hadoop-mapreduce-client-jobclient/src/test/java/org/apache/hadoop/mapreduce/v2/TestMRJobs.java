@@ -150,7 +150,7 @@ public class TestMRJobs {
 
     if (mrCluster == null) {
       mrCluster = new MiniMRYarnCluster(TestMRJobs.class.getName(),
-          NUM_NODE_MGRS);
+          NUM_NODE_MGRS, false);
       Configuration conf = new Configuration();
       conf.set("fs.defaultFS", remoteFs.getUri().toString());   // use HDFS
       conf.set(MRJobConfig.MR_AM_STAGING_DIR, "/apps_staging_dir");
