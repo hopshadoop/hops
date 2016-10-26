@@ -229,9 +229,9 @@ public class MiniYARNCluster extends CompositeService {
     failoverTimeout = conf.getInt(YarnConfiguration.RM_ZK_TIMEOUT_MS,
         YarnConfiguration.DEFAULT_RM_ZK_TIMEOUT_MS);
 
-    RMStorageFactory.setConfiguration(conf);
+    /*RMStorageFactory.setConfiguration(conf);
     YarnAPIStorageFactory.setConfiguration(conf);
-    //DBUtility.InitializeDB();
+    DBUtility.InitializeDB();*/
 
     if (useRpc && !useFixedPorts) {
       throw new YarnRuntimeException("Invalid configuration!" +
@@ -293,7 +293,7 @@ public class MiniYARNCluster extends CompositeService {
     conf.set(YarnConfiguration.RM_ADMIN_ADDRESS, hostname + ":0");
     conf.set(YarnConfiguration.RM_SCHEDULER_ADDRESS, hostname + ":0");
     conf.set(YarnConfiguration.RM_RESOURCE_TRACKER_ADDRESS, hostname + ":0");
-    conf.set(YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS, "localhost:0");
+    conf.set(YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS, hostname + ":0");
     WebAppUtils.setRMWebAppHostnameAndPort(conf, hostname, 0);
   }
 
@@ -302,14 +302,12 @@ public class MiniYARNCluster extends CompositeService {
       for (String confKey : YarnConfiguration.getServiceAddressConfKeys(conf)) {
         conf.set(HAUtil.addSuffix(confKey, rmIds[index]), hostname + ":0");
       }
-    conf.set(YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS, "localhost:0");
   }
 
   private synchronized void initResourceManager(int index, Configuration conf) {
     if (HAUtil.isHAEnabled(conf)) {
       conf.set(YarnConfiguration.RM_HA_ID, rmIds[index]);
     }
-
     resourceManagers[index].init(conf);
     resourceManagers[index].getRMContext().getDispatcher().register(
         RMAppAttemptEventType.class,
