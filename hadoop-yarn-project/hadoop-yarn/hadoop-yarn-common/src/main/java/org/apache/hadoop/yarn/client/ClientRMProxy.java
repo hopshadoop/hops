@@ -118,21 +118,21 @@ public class ClientRMProxy<T> extends RMProxy<T>  {
   protected InetSocketAddress getRMAddress(YarnConfiguration conf,
           Class<?> protocol, String host) throws IOException {
     if (protocol == ApplicationClientProtocol.class) {
-      return conf.getHopSocketAddr(YarnConfiguration.RM_ADDRESS,
+      return conf.getSocketAddr(YarnConfiguration.RM_ADDRESS,
               YarnConfiguration.DEFAULT_RM_ADDRESS,
               YarnConfiguration.DEFAULT_RM_PORT, host);
     } else if (protocol == ResourceManagerAdministrationProtocol.class) {
-      return conf.getHopSocketAddr(
+      return conf.getSocketAddr(
               YarnConfiguration.RM_ADMIN_ADDRESS,
               YarnConfiguration.DEFAULT_RM_ADMIN_ADDRESS,
               YarnConfiguration.DEFAULT_RM_ADMIN_PORT, host);
     } else if (protocol == ApplicationMasterProtocol.class) {
       setAMRMTokenService(conf);
-      return conf.getHopSocketAddr(YarnConfiguration.RM_SCHEDULER_ADDRESS,
+      return conf.getSocketAddr(YarnConfiguration.RM_SCHEDULER_ADDRESS,
               YarnConfiguration.DEFAULT_RM_SCHEDULER_ADDRESS,
               YarnConfiguration.DEFAULT_RM_SCHEDULER_PORT, host);
     } else if (protocol == GroupMembership.class) {
-      return conf.getHopSocketAddr(YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS,
+      return conf.getSocketAddr(YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS,
               YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_ADDRESS,
               YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_PORT, host);
     } else {
