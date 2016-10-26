@@ -457,13 +457,13 @@ abstract class AbstractFileTree {
         boolean quotaEnabledBranch) {
       if (srcDataset != null) {
         metadataLogEntries.add(new MetadataLogEntry(srcDataset.getId(),
-            node.getId(), node.getParentId(), node.getName(), MetadataLogEntry
-            .Operation.DELETE));
+            node.getId(), node.getPartitionId(), node.getParentId(), node
+            .getName(), MetadataLogEntry.Operation.DELETE));
       }
       if (dstDataset != null) {
         metadataLogEntries.add(new MetadataLogEntry(dstDataset.getId(),
-            node.getId(), node.getParentId(), node.getName(), MetadataLogEntry
-            .Operation.ADD));
+            node.getId(), node.getPartitionId(), node.getParentId(), node
+            .getName(), MetadataLogEntry.Operation.ADD));
       }
       super.addChildNode(level, node, quotaEnabledBranch);
     }

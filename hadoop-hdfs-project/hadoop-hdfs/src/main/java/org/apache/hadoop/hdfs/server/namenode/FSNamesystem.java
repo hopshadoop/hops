@@ -1586,7 +1586,8 @@ public class FSNamesystem
     ProjectedINode datasetDir = fileTree.getSubtreeRoot();
     for (ProjectedINode node : fileTree.getAllChildren()) {
       MetadataLogEntry logEntry = new MetadataLogEntry(datasetDir.getId(),
-          node.getId(), node.getParentId(), node.getName(), operation);
+          node.getId(), node.getPartitionId(), node.getParentId(), node
+          .getName(), operation);
       EntityManager.add(logEntry);
     }
   }

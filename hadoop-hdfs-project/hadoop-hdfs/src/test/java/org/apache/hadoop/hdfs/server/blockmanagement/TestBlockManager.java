@@ -475,6 +475,7 @@ public class TestBlockManager {
                 System.currentTimeMillis(), System.currentTimeMillis(), 1000l);
             file.setLocalNameNoPersistance("hop");
             file.setParentIdNoPersistance(INodeDirectory.ROOT_ID);
+            file.setPartitionIdNoPersistance(INodeDirectory.ROOT_ID);
             file.setIdNoPersistance(inode_id);
             List<INode> newed = new ArrayList<INode>();
             newed.add(file);
