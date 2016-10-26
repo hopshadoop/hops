@@ -480,21 +480,6 @@ RM_PREFIX + "resource-tracker.port";
 
   public static final String YARN_AUTHORIZATION_PROVIDER = YARN_PREFIX
       + "authorization-provider";
-  private static final List<String> RM_SERVICES_ADDRESS_CONF_KEYS_HTTP =
-      Collections.unmodifiableList(Arrays.asList(
-          RM_ADDRESS,
-          RM_SCHEDULER_ADDRESS,
-          RM_ADMIN_ADDRESS,
-          RM_RESOURCE_TRACKER_ADDRESS,
-          RM_WEBAPP_ADDRESS));
-
-  private static final List<String> RM_SERVICES_ADDRESS_CONF_KEYS_HTTPS =
-      Collections.unmodifiableList(Arrays.asList(
-          RM_ADDRESS,
-          RM_SCHEDULER_ADDRESS,
-          RM_ADMIN_ADDRESS,
-          RM_RESOURCE_TRACKER_ADDRESS,
-          RM_WEBAPP_HTTPS_ADDRESS));
 
   public static final String AUTO_FAILOVER_PREFIX =
       RM_HA_PREFIX + "automatic-failover.";
@@ -1872,6 +1857,24 @@ RM_PREFIX + "resource-tracker.port";
     return NetUtils.createSocketAddr(address, defaultPort, name);
   }
 
+  public InetSocketAddress getHopSocketAddr(String name, String defaultAddress, int defaultPort, String host) {
+    String[] rmHAIds = this.get(YarnConfiguration.RM_HA_IDS).split(",");
+
+    String address = null;
+    for (int i = 0; i < rmHAIds.length; ++i) {
+      address = this.get(HAUtil.addSuffix(name, rmHAIds[i]));
+
+      if (address != null && address.equals(host)) {
+        break;
+      }
+    }
+
+    if (address != null) {
+      return NetUtils.createSocketAddr(address, defaultPort, name);
+    }
+
+    return null;
+  }
   @Override
   public InetSocketAddress updateConnectAddr(String name,
                                              InetSocketAddress addr) {
@@ -1996,5 +1999,22 @@ RM_PREFIX + "resource-tracker.port";
   public static long DEFAULT_QUOTA_FIXED_MULTIPLICATOR_PERIOD = 10;
   public static final String QUOTA_MINIMUM_CHARGED_MB = QUOTA_PREFIX + "minimum.charged.mv";
   public static int DEFAULT_QUOTA_MINIMUM_CHARGED_MB=10240;
-  
+
+  private static final List<String> RM_SERVICES_ADDRESS_CONF_KEYS_HTTP =
+          Collections.unmodifiableList(Arrays.asList(
+                  RM_ADDRESS,
+                  RM_SCHEDULER_ADDRESS,
+                  RM_ADMIN_ADDRESS,
+                  RM_RESOURCE_TRACKER_ADDRESS,
+                  RM_WEBAPP_ADDRESS,
+                  RM_GROUP_MEMBERSHIP_ADDRESS));
+
+  private static final List<String> RM_SERVICES_ADDRESS_CONF_KEYS_HTTPS =
+          Collections.unmodifiableList(Arrays.asList(
+                  RM_ADDRESS,
+                  RM_SCHEDULER_ADDRESS,
+                  RM_ADMIN_ADDRESS,
+                  RM_RESOURCE_TRACKER_ADDRESS,
+                  RM_WEBAPP_HTTPS_ADDRESS,
+                  RM_GROUP_MEMBERSHIP_ADDRESS));
 }

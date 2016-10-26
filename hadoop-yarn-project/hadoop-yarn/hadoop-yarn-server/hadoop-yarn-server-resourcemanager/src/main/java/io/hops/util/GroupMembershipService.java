@@ -117,15 +117,25 @@ public class GroupMembershipService extends CompositeService
   protected synchronized void serviceStart() throws Exception {
     startGroupMembership();
     startServer();
-    getConfig().updateConnectAddr(YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS,
-            server.getListenerAddress());
+    /*getConfig().updateConnectAddr(YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS,
+            server.getListenerAddress());*/
+
+    /*getConfig().updateConnectAddr(YarnConfiguration.RM_BIND_HOST,
+            YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS,
+            YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_ADDRESS,
+            server.getListenerAddress());*/
 
     // TODO: For the moment this is needed, otherwise tests fail, I should check it later
-    getConfig().set(YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS,
-            this.server.getListenerAddress().getHostName() + ":" + this.server.getPort());
-    getConfig().setInt(YarnConfiguration.RM_GROUP_MEMBERSHIP_PORT, this.server.getPort());
     LOG.info("Started GMS on " + this.server.getListenerAddress().getHostName()
-        + ":" + this.server.getPort());
+            + ":" + this.server.getPort());
+    /*getConfig().set(YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS,
+            this.server.getListenerAddress().getHostName() + ":" + this.server.getPort());
+    getConfig().setInt(YarnConfiguration.RM_GROUP_MEMBERSHIP_PORT, this.server.getPort());*/
+
+    getConfig().updateConnectAddr(YarnConfiguration.RM_BIND_HOST,
+            YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS,
+            YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_ADDRESS,
+            server.getListenerAddress());
     super.serviceStart();
   }
 
