@@ -76,13 +76,6 @@ public class RMProxy<T> {
         "from an instance of ClientRMProxy or ServerRMProxy");
   }
 
-  @Private
-  protected InetSocketAddress getRMAddress(YarnConfiguration conf,
-      Class<?> protocol, String Host, int referencePort) throws IOException {
-    throw new UnsupportedOperationException("This method should be invoked " +
-        "from an instance of ClientRMProxy or ServerRMProxy");
-  }
-
   protected InetSocketAddress getRMAddress(YarnConfiguration conf,
           Class<?> protocol, String Host) throws IOException {
     throw new UnsupportedOperationException("This method should be invoked " +
