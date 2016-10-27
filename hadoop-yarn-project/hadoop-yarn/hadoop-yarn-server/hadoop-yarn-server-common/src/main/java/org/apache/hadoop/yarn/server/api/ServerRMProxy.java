@@ -75,26 +75,24 @@ public class ServerRMProxy<T> extends RMProxy<T> {
     }
   }
 
-  @InterfaceAudience.Private
-  @Override
   protected InetSocketAddress getRMAddress(YarnConfiguration conf,
-          Class<?> protocol, String host, int referencePort) {
+          Class<?> protocol, String host) {
     if (protocol == ResourceTracker.class) {
       return conf.getSocketAddr(
-        YarnConfiguration.RM_RESOURCE_TRACKER_ADDRESS,
-        YarnConfiguration.DEFAULT_RM_RESOURCE_TRACKER_ADDRESS,
-        YarnConfiguration.DEFAULT_RM_RESOURCE_TRACKER_PORT, host);
+              YarnConfiguration.RM_RESOURCE_TRACKER_ADDRESS,
+              YarnConfiguration.DEFAULT_RM_RESOURCE_TRACKER_ADDRESS,
+              YarnConfiguration.DEFAULT_RM_RESOURCE_TRACKER_PORT, host);
     } else if (protocol == GroupMembership.class) {
       return conf.getSocketAddr(YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS,
-          YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_ADDRESS,
-          YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_PORT, host);
+              YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_ADDRESS,
+              YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_PORT, host);
     } else {
       String message = "Unsupported protocol found when creating the proxy " +
-          "connection to ResourceManager: " +
-          ((protocol != null) ? protocol.getClass().getName() : "null");
+              "connection to ResourceManager: " +
+              ((protocol != null) ? protocol.getClass().getName() : "null");
       LOG.error(message);
       throw new IllegalStateException(message);
-}
+    }
   }
 
   @InterfaceAudience.Private

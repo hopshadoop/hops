@@ -396,10 +396,10 @@ public class GroupMembershipService extends CompositeService
 
     private void switchLeaderRole(boolean role) throws Exception {
       if (role) {
-        LOG.info(groupMembership.getCurrentId() + " switching to active ");
+        LOG.info(hostname + " id: " + groupMembership.getCurrentId() + " switching to active ");
         rm.transitionToActive();
       } else {
-        LOG.info(groupMembership.getCurrentId() + " switching to standby ");
+        LOG.info(hostname + " id: " + groupMembership.getCurrentId() + " switching to standby ");
         rm.transitionToStandby(true);
       }
     }
