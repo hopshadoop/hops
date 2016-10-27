@@ -78,7 +78,7 @@ public class ServerRMProxy<T> extends RMProxy<T> {
   @InterfaceAudience.Private
   @Override
   protected InetSocketAddress getRMAddress(YarnConfiguration conf,
-          Class<?> protocol, String host, int referencePort) {
+          Class<?> protocol, String host) {
     if (protocol == ResourceTracker.class) {
       return conf.getSocketAddr(
         YarnConfiguration.RM_RESOURCE_TRACKER_ADDRESS,
