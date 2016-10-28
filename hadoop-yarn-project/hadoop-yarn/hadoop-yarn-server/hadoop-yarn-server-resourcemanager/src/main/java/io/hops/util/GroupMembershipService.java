@@ -157,8 +157,11 @@ public class GroupMembershipService extends CompositeService
 
   @Override
   protected synchronized void serviceStop() throws Exception {
+    LOG.info("stopping group membership service server");
     stopServer();
+    LOG.info("stopping group membership service service");
     stopGroupMembership();
+    LOG.info("stopped group membership service");
     super.serviceStop();
   }
 

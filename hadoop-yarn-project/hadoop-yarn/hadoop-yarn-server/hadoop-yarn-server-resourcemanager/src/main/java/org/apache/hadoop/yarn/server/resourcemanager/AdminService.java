@@ -606,6 +606,7 @@ public class AdminService extends CompositeService implements
         refreshServiceAcls(RefreshServiceAclsRequest.newInstance());
       }
     } catch (Exception ex) {
+      LOG.error(ex,ex);
       throw new ServiceFailedException(ex.getMessage());
     }
   }
@@ -687,6 +688,14 @@ public class AdminService extends CompositeService implements
 
   private void checkRMStatus(String user, String argName, String msg)
       throws StandbyException {
+    int retry=0;
+    while(!isRMActive() && retry < 10){
+      try {
+        Thread.sleep(100);
+      } catch (InterruptedException ex) {
+        LOG.warn(ex);
+      }
+    }
     if (!isRMActive()) {
       RMAuditLogger.logFailure(user, argName, "", 
           "AdminService", "ResourceManager is not active. Can not " + msg);

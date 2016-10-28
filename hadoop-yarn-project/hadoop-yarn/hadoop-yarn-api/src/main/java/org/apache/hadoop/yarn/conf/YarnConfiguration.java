@@ -1908,6 +1908,8 @@ RM_PREFIX + "resource-tracker.port";
       return YarnConfiguration.DEFAULT_RM_RESOURCE_TRACKER_PORT;
     } else if (addressPrefix.equals(YarnConfiguration.RM_ADMIN_ADDRESS)) {
       return YarnConfiguration.DEFAULT_RM_ADMIN_PORT;
+    } else if (addressPrefix.equals(YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS)){
+      return YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_PORT;
     } else {
       throw new HadoopIllegalArgumentException(
           "Invalid RM RPC address Prefix: " + addressPrefix
