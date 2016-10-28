@@ -363,9 +363,7 @@ public class INodeDirectory extends INode {
       node.setGroup(getGroupName());
     }
 
-    if (!node.isUnderConstruction()) {
-      node.logMetadataEvent(MetadataLogEntry.Operation.ADD);
-    }
+    node.logMetadataEvent(MetadataLogEntry.Operation.ADD);
 
     return node;
   }

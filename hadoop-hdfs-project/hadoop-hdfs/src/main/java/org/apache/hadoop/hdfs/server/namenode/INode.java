@@ -135,7 +135,7 @@ public abstract class INode implements Comparable<byte[]> {
   protected int id = NON_EXISTING_ID;
   protected int parentId = NON_EXISTING_ID;
   public static int RANDOM_PARTITIONING_MAX_LEVEL=1;
-  protected int partitionId;
+  protected Integer partitionId;
 
   protected boolean subtreeLocked;
   protected long subtreeLockOwner;
@@ -790,9 +790,13 @@ public abstract class INode implements Comparable<byte[]> {
       return;
     }
     if (isPathMetaEnabled()) {
+      if(getPartitionId() == null){
+        throw new RuntimeException("Trying to log metadata for an inode that " +
+            "wasn't commited to the database");
+      }
       INodeDirectory datasetDir = getMetaEnabledParent();
       EntityManager.add(new MetadataLogEntry(datasetDir.getId(), getId(),
-          getParentId(), getLocalName(), operation));
+          getPartitionId(), getParentId(), getLocalName(), operation));
     }
   }
 
@@ -812,15 +816,16 @@ public abstract class INode implements Comparable<byte[]> {
     return null;
   }
 
-  public int getPartitionId(){
+  public Integer getPartitionId(){
     return  partitionId;
   }
 
-  public void setPartitionIdNoPersistance(int partitionId){
+  public void setPartitionIdNoPersistance(Integer partitionId){
     this.partitionId = partitionId;
   }
 
-  public void setPartitionId(int partitionId) throws TransactionContextException, StorageException {
+  public void setPartitionId(Integer partitionId) throws
+      TransactionContextException, StorageException {
     setPartitionIdNoPersistance(partitionId);
     save();
   }
