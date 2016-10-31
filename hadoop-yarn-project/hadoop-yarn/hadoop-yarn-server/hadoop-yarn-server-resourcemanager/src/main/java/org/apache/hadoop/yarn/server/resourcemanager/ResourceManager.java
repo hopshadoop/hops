@@ -1236,23 +1236,23 @@ LOG.info("+");
   protected void serviceStop() throws Exception {
     resourceTrackingServiceStartStopLock.lock();
     LOG.info("locked resourceTrackingServiceStart");
-    try{
-    if (webApp != null) {
-      webApp.stop();
-    }
-    if (fetcher != null) {
-      fetcher.stop();
-    }
-    if (configurationProvider != null) {
-      configurationProvider.close();
-    }
-    if (resourceTrackingService != null) {
-      resourceTrackingService.stop();
-    }
-    super.serviceStop();
-    transitionToStandby(false);
-    rmContext.setHAServiceState(HAServiceState.STOPPING);
-    }finally{
+    try {
+      if (webApp != null) {
+        webApp.stop();
+      }
+      if (fetcher != null) {
+        fetcher.stop();
+      }
+      if (configurationProvider != null) {
+        configurationProvider.close();
+      }
+      if (resourceTrackingService != null) {
+        resourceTrackingService.stop();
+      }
+      super.serviceStop();
+      transitionToStandby(false);
+      rmContext.setHAServiceState(HAServiceState.STOPPING);
+    } finally {
       LOG.info("unlocked resourceTrackingServiceStart");
       resourceTrackingServiceStartStopLock.unlock();
     }

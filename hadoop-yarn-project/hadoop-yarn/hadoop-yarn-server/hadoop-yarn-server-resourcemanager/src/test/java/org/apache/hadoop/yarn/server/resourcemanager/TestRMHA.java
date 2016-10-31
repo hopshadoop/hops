@@ -480,7 +480,7 @@ public class TestRMHA {
     rm.stop();
   }
 
-  @Test(timeout = 90000)
+  @Test(timeout = 130000)
   public void testTransitionedToStandbyShouldNotHang() throws Exception {
     configuration.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, false);
     Configuration conf = new YarnConfiguration(configuration);

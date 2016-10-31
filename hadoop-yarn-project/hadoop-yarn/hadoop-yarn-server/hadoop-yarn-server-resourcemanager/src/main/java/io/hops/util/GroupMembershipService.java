@@ -377,7 +377,7 @@ public class GroupMembershipService extends CompositeService
     @Override
     public void run() {
       try {
-        while (true && groupMembership.isRunning()) {
+        while (groupMembership.isRunning()) {
           boolean currentLeaderRole = isLeader();
           if (previousLeaderRole == null ||
               currentLeaderRole != previousLeaderRole) {
