@@ -18,7 +18,7 @@
 package org.apache.hadoop.yarn.api.records.timeline;
 
 import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Unstable;
+import org.apache.hadoop.classification.InterfaceStability.Evolving;
 
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
@@ -28,17 +28,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * A class that holds a list of put errors. This is the response returned when
- * a
- * list of {@link TimelineEntity} objects is added to the timeline. If there are
- * errors
+ * A class that holds a list of put errors. This is the response returned when a
+ * list of {@link TimelineEntity} objects is added to the timeline. If there are errors
  * in storing individual entity objects, they will be indicated in the list of
  * errors.
  */
 @XmlRootElement(name = "response")
 @XmlAccessorType(XmlAccessType.NONE)
 @Public
-@Unstable
+@Evolving
 public class TimelinePutResponse {
 
   private List<TimelinePutError> errors = new ArrayList<TimelinePutError>();
@@ -49,7 +47,7 @@ public class TimelinePutResponse {
 
   /**
    * Get a list of {@link TimelinePutError} instances
-   *
+   * 
    * @return a list of {@link TimelinePutError} instances
    */
   @XmlElement(name = "errors")
@@ -59,9 +57,9 @@ public class TimelinePutResponse {
 
   /**
    * Add a single {@link TimelinePutError} instance into the existing list
-   *
+   * 
    * @param error
-   *     a single {@link TimelinePutError} instance
+   *          a single {@link TimelinePutError} instance
    */
   public void addError(TimelinePutError error) {
     errors.add(error);
@@ -69,9 +67,9 @@ public class TimelinePutResponse {
 
   /**
    * Add a list of {@link TimelinePutError} instances into the existing list
-   *
+   * 
    * @param errors
-   *     a list of {@link TimelinePutError} instances
+   *          a list of {@link TimelinePutError} instances
    */
   public void addErrors(List<TimelinePutError> errors) {
     this.errors.addAll(errors);
@@ -79,9 +77,9 @@ public class TimelinePutResponse {
 
   /**
    * Set the list to the given list of {@link TimelinePutError} instances
-   *
+   * 
    * @param errors
-   *     a list of {@link TimelinePutError} instances
+   *          a list of {@link TimelinePutError} instances
    */
   public void setErrors(List<TimelinePutError> errors) {
     this.errors.clear();
@@ -94,7 +92,7 @@ public class TimelinePutResponse {
   @XmlRootElement(name = "error")
   @XmlAccessorType(XmlAccessType.NONE)
   @Public
-  @Unstable
+  @Evolving
   public static class TimelinePutError {
 
     /**
@@ -109,13 +107,35 @@ public class TimelinePutResponse {
      */
     public static final int IO_EXCEPTION = 2;
 
+    /**
+     * Error code returned if the user specifies the timeline system reserved
+     * filter key
+     */
+    public static final int SYSTEM_FILTER_CONFLICT = 3;
+
+    /**
+     * Error code returned if the user is denied to access the timeline data
+     */
+    public static final int ACCESS_DENIED = 4;
+
+    /**
+     * Error code returned if the entity doesn't have an valid domain ID
+     */
+    public static final int NO_DOMAIN = 5;
+
+    /**
+     * Error code returned if the user is denied to relate the entity to another
+     * one in different domain
+     */
+    public static final int FORBIDDEN_RELATION = 6;
+
     private String entityId;
     private String entityType;
     private int errorCode;
 
     /**
      * Get the entity Id
-     *
+     * 
      * @return the entity Id
      */
     @XmlElement(name = "entity")
@@ -125,9 +145,9 @@ public class TimelinePutResponse {
 
     /**
      * Set the entity Id
-     *
+     * 
      * @param entityId
-     *     the entity Id
+     *          the entity Id
      */
     public void setEntityId(String entityId) {
       this.entityId = entityId;
@@ -135,7 +155,7 @@ public class TimelinePutResponse {
 
     /**
      * Get the entity type
-     *
+     * 
      * @return the entity type
      */
     @XmlElement(name = "entitytype")
@@ -145,9 +165,9 @@ public class TimelinePutResponse {
 
     /**
      * Set the entity type
-     *
+     * 
      * @param entityType
-     *     the entity type
+     *          the entity type
      */
     public void setEntityType(String entityType) {
       this.entityType = entityType;
@@ -155,7 +175,7 @@ public class TimelinePutResponse {
 
     /**
      * Get the error code
-     *
+     * 
      * @return an error code
      */
     @XmlElement(name = "errorcode")
@@ -165,9 +185,9 @@ public class TimelinePutResponse {
 
     /**
      * Set the error code to the given error code
-     *
+     * 
      * @param errorCode
-     *     an error code
+     *          an error code
      */
     public void setErrorCode(int errorCode) {
       this.errorCode = errorCode;

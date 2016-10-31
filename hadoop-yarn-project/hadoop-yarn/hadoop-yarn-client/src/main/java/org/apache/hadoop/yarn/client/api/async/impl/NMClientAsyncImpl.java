@@ -18,8 +18,24 @@
 
 package org.apache.hadoop.yarn.client.api.async.impl;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.EnumSet;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -45,23 +61,8 @@ import org.apache.hadoop.yarn.state.SingleArcTransition;
 import org.apache.hadoop.yarn.state.StateMachine;
 import org.apache.hadoop.yarn.state.StateMachineFactory;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.EnumSet;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 @Private
 @Unstable
@@ -100,9 +101,9 @@ public class NMClientAsyncImpl extends NMClientAsync {
 
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
-    this.maxThreadPoolSize =
-        conf.getInt(YarnConfiguration.NM_CLIENT_ASYNC_THREAD_POOL_MAX_SIZE,
-            YarnConfiguration.DEFAULT_NM_CLIENT_ASYNC_THREAD_POOL_MAX_SIZE);
+    this.maxThreadPoolSize = conf.getInt(
+        YarnConfiguration.NM_CLIENT_ASYNC_THREAD_POOL_MAX_SIZE,
+        YarnConfiguration.DEFAULT_NM_CLIENT_ASYNC_THREAD_POOL_MAX_SIZE);
     LOG.info("Upper bound of the thread pool size is " + maxThreadPoolSize);
 
     client.init(conf);
@@ -113,15 +114,13 @@ public class NMClientAsyncImpl extends NMClientAsync {
   protected void serviceStart() throws Exception {
     client.start();
 
-    ThreadFactory tf = new ThreadFactoryBuilder()
-        .setNameFormat(this.getClass().getName() + " #%d").setDaemon(true)
-        .build();
+    ThreadFactory tf = new ThreadFactoryBuilder().setNameFormat(
+        this.getClass().getName() + " #%d").setDaemon(true).build();
 
     // Start with a default core-pool size and change it dynamically.
     int initSize = Math.min(INITIAL_THREAD_POOL_SIZE, maxThreadPoolSize);
-    threadPool =
-        new ThreadPoolExecutor(initSize, Integer.MAX_VALUE, 1, TimeUnit.HOURS,
-            new LinkedBlockingQueue<Runnable>(), tf);
+    threadPool = new ThreadPoolExecutor(initSize, Integer.MAX_VALUE, 1,
+        TimeUnit.HOURS, new LinkedBlockingQueue<Runnable>(), tf);
 
     eventDispatcherThread = new Thread() {
       @Override
@@ -159,8 +158,8 @@ public class NMClientAsyncImpl extends NMClientAsync {
               int newThreadPoolSize = Math.min(maxThreadPoolSize,
                   idealThreadPoolSize + INITIAL_THREAD_POOL_SIZE);
               LOG.info("Set NMClientAsync thread pool size to " +
-                  newThreadPoolSize + " as the number of nodes to talk to is " +
-                  nodeNum);
+                  newThreadPoolSize + " as the number of nodes to talk to is "
+                  + nodeNum);
               threadPool.setCorePoolSize(newThreadPoolSize);
             }
           }
@@ -193,7 +192,7 @@ public class NMClientAsyncImpl extends NMClientAsync {
         eventDispatcherThread.join();
       } catch (InterruptedException e) {
         LOG.error("The thread of " + eventDispatcherThread.getName() +
-            " didn't finish normally.", e);
+                  " didn't finish normally.", e);
       }
     }
     if (threadPool != null) {
@@ -213,8 +212,8 @@ public class NMClientAsyncImpl extends NMClientAsync {
     super.serviceStop();
   }
 
-  public void startContainerAsync(Container container,
-      ContainerLaunchContext containerLaunchContext) {
+  public void startContainerAsync(
+      Container container, ContainerLaunchContext containerLaunchContext) {
     if (containers.putIfAbsent(container.getId(),
         new StatefulContainer(this, container.getId())) != null) {
       callbackHandler.onStartContainerError(container.getId(),
@@ -246,7 +245,7 @@ public class NMClientAsyncImpl extends NMClientAsync {
     }
   }
 
-  public void getContainerStatusAsync(ContainerId containerId, NodeId nodeId) {
+ public void getContainerStatusAsync(ContainerId containerId, NodeId nodeId) {
     try {
       events.put(new ContainerEvent(containerId, nodeId, null,
           ContainerEventType.QUERY_CONTAINER));
@@ -258,10 +257,7 @@ public class NMClientAsyncImpl extends NMClientAsync {
   }
 
   protected static enum ContainerState {
-    PREP,
-    FAILED,
-    RUNNING,
-    DONE,
+    PREP, FAILED, RUNNING, DONE,
   }
 
   protected boolean isCompletelyDone(StatefulContainer container) {
@@ -284,7 +280,7 @@ public class NMClientAsyncImpl extends NMClientAsync {
   }
 
   protected static class ContainerEvent
-      extends AbstractEvent<ContainerEventType> {
+      extends AbstractEvent<ContainerEventType>{
     private ContainerId containerId;
     private NodeId nodeId;
     private Token containerToken;
@@ -331,21 +327,21 @@ public class NMClientAsyncImpl extends NMClientAsync {
     }
   }
 
-  protected static class StatefulContainer
-      implements EventHandler<ContainerEvent> {
+  protected static class StatefulContainer implements
+      EventHandler<ContainerEvent> {
 
-    protected final static StateMachineFactory<StatefulContainer, ContainerState, ContainerEventType, ContainerEvent>
-        stateMachineFactory =
-        new StateMachineFactory<StatefulContainer, ContainerState, ContainerEventType, ContainerEvent>(
-            ContainerState.PREP)
+    protected final static StateMachineFactory<StatefulContainer,
+        ContainerState, ContainerEventType, ContainerEvent> stateMachineFactory
+            = new StateMachineFactory<StatefulContainer, ContainerState,
+                ContainerEventType, ContainerEvent>(ContainerState.PREP)
 
             // Transitions from PREP state
             .addTransition(ContainerState.PREP,
                 EnumSet.of(ContainerState.RUNNING, ContainerState.FAILED),
                 ContainerEventType.START_CONTAINER,
-                new StartContainerTransition()).addTransition(
-            ContainerState.PREP, ContainerState.DONE,
-            ContainerEventType.STOP_CONTAINER, new OutOfOrderTransition())
+                new StartContainerTransition())
+            .addTransition(ContainerState.PREP, ContainerState.DONE,
+                ContainerEventType.STOP_CONTAINER, new OutOfOrderTransition())
 
             // Transitions from RUNNING state
             // RUNNING -> RUNNING should be the invalid transition
@@ -354,22 +350,23 @@ public class NMClientAsyncImpl extends NMClientAsync {
                 ContainerEventType.STOP_CONTAINER,
                 new StopContainerTransition())
 
-                // Transition from DONE state
-            .addTransition(ContainerState.DONE, ContainerState.DONE, EnumSet
-                    .of(ContainerEventType.START_CONTAINER,
-                        ContainerEventType.STOP_CONTAINER))
+            // Transition from DONE state
+            .addTransition(ContainerState.DONE, ContainerState.DONE,
+                EnumSet.of(ContainerEventType.START_CONTAINER,
+                    ContainerEventType.STOP_CONTAINER))
 
-                // Transition from FAILED state
-            .addTransition(ContainerState.FAILED, ContainerState.FAILED, EnumSet
-                    .of(ContainerEventType.START_CONTAINER,
-                        ContainerEventType.STOP_CONTAINER));
+            // Transition from FAILED state
+            .addTransition(ContainerState.FAILED, ContainerState.FAILED,
+                EnumSet.of(ContainerEventType.START_CONTAINER,
+                    ContainerEventType.STOP_CONTAINER));
 
     protected static class StartContainerTransition implements
-        MultipleArcTransition<StatefulContainer, ContainerEvent, ContainerState> {
+        MultipleArcTransition<StatefulContainer, ContainerEvent,
+        ContainerState> {
 
       @Override
-      public ContainerState transition(StatefulContainer container,
-          ContainerEvent event) {
+      public ContainerState transition(
+          StatefulContainer container, ContainerEvent event) {
         ContainerId containerId = event.getContainerId();
         try {
           StartContainerEvent scEvent = null;
@@ -378,17 +375,15 @@ public class NMClientAsyncImpl extends NMClientAsync {
           }
           assert scEvent != null;
           Map<String, ByteBuffer> allServiceResponse =
-              container.nmClientAsync.getClient()
-                  .startContainer(scEvent.getContainer(),
-                      scEvent.getContainerLaunchContext());
+              container.nmClientAsync.getClient().startContainer(
+                  scEvent.getContainer(), scEvent.getContainerLaunchContext());
           try {
-            container.nmClientAsync.getCallbackHandler()
-                .onContainerStarted(containerId, allServiceResponse);
+            container.nmClientAsync.getCallbackHandler().onContainerStarted(
+                containerId, allServiceResponse);
           } catch (Throwable thr) {
             // Don't process user created unchecked exception
-            LOG.info(
-                "Unchecked exception is thrown from onContainerStarted for " +
-                    "Container " + containerId, thr);
+            LOG.info("Unchecked exception is thrown from onContainerStarted for "
+                + "Container " + containerId, thr);
           }
           return ContainerState.RUNNING;
         } catch (YarnException e) {
@@ -403,8 +398,8 @@ public class NMClientAsyncImpl extends NMClientAsync {
       private ContainerState onExceptionRaised(StatefulContainer container,
           ContainerEvent event, Throwable t) {
         try {
-          container.nmClientAsync.getCallbackHandler()
-              .onStartContainerError(event.getContainerId(), t);
+          container.nmClientAsync.getCallbackHandler().onStartContainerError(
+              event.getContainerId(), t);
         } catch (Throwable thr) {
           // Don't process user created unchecked exception
           LOG.info(
@@ -416,23 +411,23 @@ public class NMClientAsyncImpl extends NMClientAsync {
     }
 
     protected static class StopContainerTransition implements
-        MultipleArcTransition<StatefulContainer, ContainerEvent, ContainerState> {
+        MultipleArcTransition<StatefulContainer, ContainerEvent,
+        ContainerState> {
 
       @Override
-      public ContainerState transition(StatefulContainer container,
-          ContainerEvent event) {
+      public ContainerState transition(
+          StatefulContainer container, ContainerEvent event) {
         ContainerId containerId = event.getContainerId();
         try {
-          container.nmClientAsync.getClient()
-              .stopContainer(containerId, event.getNodeId());
-          try {
-            container.nmClientAsync.getCallbackHandler()
-                .onContainerStopped(event.getContainerId());
+         container.nmClientAsync.getClient().stopContainer(
+              containerId, event.getNodeId());
+         try {
+            container.nmClientAsync.getCallbackHandler().onContainerStopped(
+                event.getContainerId());
           } catch (Throwable thr) {
             // Don't process user created unchecked exception
-            LOG.info(
-                "Unchecked exception is thrown from onContainerStopped for " +
-                    "Container " + event.getContainerId(), thr);
+            LOG.info("Unchecked exception is thrown from onContainerStopped for "
+                + "Container " + event.getContainerId(), thr);
           }
           return ContainerState.DONE;
         } catch (YarnException e) {
@@ -447,31 +442,29 @@ public class NMClientAsyncImpl extends NMClientAsync {
       private ContainerState onExceptionRaised(StatefulContainer container,
           ContainerEvent event, Throwable t) {
         try {
-          container.nmClientAsync.getCallbackHandler()
-              .onStopContainerError(event.getContainerId(), t);
+          container.nmClientAsync.getCallbackHandler().onStopContainerError(
+              event.getContainerId(), t);
         } catch (Throwable thr) {
           // Don't process user created unchecked exception
-          LOG.info(
-              "Unchecked exception is thrown from onStopContainerError for " +
-                  "Container " + event.getContainerId(), thr);
+          LOG.info("Unchecked exception is thrown from onStopContainerError for "
+              + "Container " + event.getContainerId(), thr);
         }
         return ContainerState.FAILED;
       }
     }
 
-    protected static class OutOfOrderTransition
-        implements SingleArcTransition<StatefulContainer, ContainerEvent> {
+    protected static class OutOfOrderTransition implements
+        SingleArcTransition<StatefulContainer, ContainerEvent> {
 
       protected static final String STOP_BEFORE_START_ERROR_MSG =
           "Container was killed before it was launched";
 
       @Override
-      public void transition(StatefulContainer container,
-          ContainerEvent event) {
+      public void transition(StatefulContainer container, ContainerEvent event) {
         try {
-          container.nmClientAsync.getCallbackHandler()
-              .onStartContainerError(event.getContainerId(),
-                  RPCUtil.getRemoteException(STOP_BEFORE_START_ERROR_MSG));
+          container.nmClientAsync.getCallbackHandler().onStartContainerError(
+              event.getContainerId(),
+              RPCUtil.getRemoteException(STOP_BEFORE_START_ERROR_MSG));
         } catch (Throwable thr) {
           // Don't process user created unchecked exception
           LOG.info(
@@ -483,8 +476,8 @@ public class NMClientAsyncImpl extends NMClientAsync {
 
     private final NMClientAsync nmClientAsync;
     private final ContainerId containerId;
-    private final StateMachine<ContainerState, ContainerEventType, ContainerEvent>
-        stateMachine;
+    private final StateMachine<ContainerState, ContainerEventType,
+        ContainerEvent> stateMachine;
     private final ReadLock readLock;
     private final WriteLock writeLock;
 
@@ -538,11 +531,11 @@ public class NMClientAsyncImpl extends NMClientAsync {
       LOG.info("Processing Event " + event + " for Container " + containerId);
       if (event.getType() == ContainerEventType.QUERY_CONTAINER) {
         try {
-          ContainerStatus containerStatus =
-              client.getContainerStatus(containerId, event.getNodeId());
+          ContainerStatus containerStatus = client.getContainerStatus(
+              containerId, event.getNodeId());
           try {
-            callbackHandler
-                .onContainerStatusReceived(containerId, containerStatus);
+            callbackHandler.onContainerStatusReceived(
+                containerId, containerStatus);
           } catch (Throwable thr) {
             // Don't process user created unchecked exception
             LOG.info(
@@ -559,8 +552,7 @@ public class NMClientAsyncImpl extends NMClientAsync {
       } else {
         StatefulContainer container = containers.get(containerId);
         if (container == null) {
-          LOG.info(
-              "Container " + containerId + " is already stopped or failed");
+          LOG.info("Container " + containerId + " is already stopped or failed");
         } else {
           container.handle(event);
           if (isCompletelyDone(container)) {
@@ -575,9 +567,8 @@ public class NMClientAsyncImpl extends NMClientAsync {
         callbackHandler.onGetContainerStatusError(containerId, t);
       } catch (Throwable thr) {
         // Don't process user created unchecked exception
-        LOG.info(
-            "Unchecked exception is thrown from onGetContainerStatusError" +
-                " for Container " + containerId, thr);
+        LOG.info("Unchecked exception is thrown from onGetContainerStatusError" +
+            " for Container " + containerId, thr);
       }
     }
   }

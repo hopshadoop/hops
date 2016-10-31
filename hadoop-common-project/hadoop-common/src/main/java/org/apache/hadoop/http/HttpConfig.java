@@ -17,11 +17,8 @@
  */
 package org.apache.hadoop.http;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 
 /**
  * Singleton to get access to Http related configuration.
@@ -29,15 +26,6 @@ import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public class HttpConfig {
-  private static boolean sslEnabled;
-
-  static {
-    Configuration conf = new Configuration();
-    sslEnabled = conf.getBoolean(
-        CommonConfigurationKeysPublic.HADOOP_SSL_ENABLED_KEY,
-        CommonConfigurationKeysPublic.HADOOP_SSL_ENABLED_DEFAULT);
-  }
-
   public enum Policy {
     HTTP_ONLY,
     HTTPS_ONLY,
@@ -60,18 +48,5 @@ public class HttpConfig {
     public boolean isHttpsEnabled() {
       return this == HTTPS_ONLY || this == HTTP_AND_HTTPS;
     }
-  }
-
-  @VisibleForTesting
-  static void setSecure(boolean secure) {
-    sslEnabled = secure;
-  }
-
-  public static boolean isSecure() {
-    return sslEnabled;
-  }
-
-  public static String getSchemePrefix() {
-    return (isSecure()) ? "https://" : "http://";
   }
 }

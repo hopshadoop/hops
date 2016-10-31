@@ -25,6 +25,7 @@ import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.EOFException;
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -88,6 +89,7 @@ import org.apache.hadoop.util.ProtoUtil;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
+import org.apache.htrace.Trace;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -192,9 +194,10 @@ public class Client {
             clientExecutor.shutdownNow();
           }
         } catch (InterruptedException e) {
-          LOG.error("Interrupted while waiting for clientExecutor" +
-              "to stop", e);
+          LOG.warn("Interrupted while waiting for clientExecutor" +
+              " to stop");
           clientExecutor.shutdownNow();
+          Thread.currentThread().interrupt();
         }
         clientExecutor = null;
       }
@@ -209,7 +212,7 @@ public class Client {
    * @param conf Configuration
    * @param pingInterval the ping interval
    */
-  final public static void setPingInterval(Configuration conf, int pingInterval) {
+  static final void setPingInterval(Configuration conf, int pingInterval) {
     conf.setInt(CommonConfigurationKeys.IPC_PING_INTERVAL_KEY, pingInterval);
   }
 
@@ -220,7 +223,7 @@ public class Client {
    * @param conf Configuration
    * @return the ping interval
    */
-  final public static int getPingInterval(Configuration conf) {
+  static final int getPingInterval(Configuration conf) {
     return conf.getInt(CommonConfigurationKeys.IPC_PING_INTERVAL_KEY,
         CommonConfigurationKeys.IPC_PING_INTERVAL_DEFAULT);
   }
@@ -235,7 +238,8 @@ public class Client {
    * @return the timeout period in milliseconds. -1 if no timeout value is set
    */
   final public static int getTimeout(Configuration conf) {
-    if (!conf.getBoolean(CommonConfigurationKeys.IPC_CLIENT_PING_KEY, true)) {
+    if (!conf.getBoolean(CommonConfigurationKeys.IPC_CLIENT_PING_KEY,
+        CommonConfigurationKeys.IPC_CLIENT_PING_DEFAULT)) {
       return getPingInterval(conf);
     }
     return -1;
@@ -250,6 +254,10 @@ public class Client {
     conf.setInt(CommonConfigurationKeys.IPC_CLIENT_CONNECT_TIMEOUT_KEY, timeout);
   }
 
+  @VisibleForTesting
+  public static final ExecutorService getClientExecutor() {
+    return Client.clientExcecutorFactory.clientExecutor;
+  }
   /**
    * Increment this client's reference count
    *
@@ -278,7 +286,7 @@ public class Client {
   /** Check the rpc response header. */
   void checkResponse(RpcResponseHeaderProto header) throws IOException {
     if (header == null) {
-      throw new IOException("Response is null.");
+      throw new EOFException("Response is null.");
     }
     if (header.hasClientId()) {
       // check client IDs
@@ -379,6 +387,7 @@ public class Client {
     private int maxIdleTime; //connections will be culled if it was idle for 
     //maxIdleTime msecs
     private final RetryPolicy connectionRetryPolicy;
+    private final int maxRetriesOnSasl;
     private int maxRetriesOnSocketTimeouts;
     private boolean tcpNoDelay; // if T then disable Nagle's Algorithm
     private boolean doPing; //do we need to send ping message
@@ -406,6 +415,7 @@ public class Client {
       this.rpcTimeout = remoteId.getRpcTimeout();
       this.maxIdleTime = remoteId.getMaxIdleTime();
       this.connectionRetryPolicy = remoteId.connectionRetryPolicy;
+      this.maxRetriesOnSasl = remoteId.getMaxRetriesOnSasl();
       this.maxRetriesOnSocketTimeouts = remoteId.getMaxRetriesOnSocketTimeouts();
       this.tcpNoDelay = remoteId.getTcpNoDelay();
       this.doPing = remoteId.getDoPing();
@@ -652,7 +662,7 @@ public class Client {
               // try re-login
               if (UserGroupInformation.isLoginKeytabBased()) {
                 UserGroupInformation.getLoginUser().reloginFromKeytab();
-              } else {
+              } else if (UserGroupInformation.isLoginTicketBased()) {
                 UserGroupInformation.getLoginUser().reloginFromTicketCache();
               }
               // have granularity of milliseconds
@@ -665,7 +675,7 @@ public class Client {
               String msg = "Couldn't setup connection for "
                   + UserGroupInformation.getLoginUser().getUserName() + " to "
                   + remoteId;
-              LOG.warn(msg);
+              LOG.warn(msg, ex);
               throw (IOException) new IOException(msg).initCause(ex);
             }
           } else {
@@ -684,7 +694,8 @@ public class Client {
      * a header to the server and starts
      * the connection thread that waits for responses.
      */
-    private synchronized void setupIOstreams() {
+    private synchronized void setupIOstreams(
+        AtomicBoolean fallbackToSimpleAuth) {
       if (socket != null || shouldCloseConnection.get()) {
         return;
       } 
@@ -692,8 +703,10 @@ public class Client {
         if (LOG.isDebugEnabled()) {
           LOG.debug("Connecting to "+server);
         }
+        if (Trace.isTracing()) {
+          Trace.addTimelineAnnotation("IPC client connecting to " + server);
+        }
         short numRetries = 0;
-        final short MAX_RETRIES = 5;
         Random rand = null;
         while (true) {
           setupConnection();
@@ -721,8 +734,8 @@ public class Client {
               if (rand == null) {
                 rand = new Random();
               }
-              handleSaslConnectionFailure(numRetries++, MAX_RETRIES, ex, rand,
-                  ticket);
+              handleSaslConnectionFailure(numRetries++, maxRetriesOnSasl, ex,
+                  rand, ticket);
               continue;
             }
             if (authMethod != AuthMethod.SIMPLE) {
@@ -733,11 +746,18 @@ public class Client {
               remoteId.saslQop =
                   (String)saslRpcClient.getNegotiatedProperty(Sasl.QOP);
               LOG.debug("Negotiated QOP is :" + remoteId.saslQop);
-            } else if (UserGroupInformation.isSecurityEnabled() &&
-                       !fallbackAllowed) {
-              throw new IOException("Server asks us to fall back to SIMPLE " +
-                  "auth, but this client is configured to only allow secure " +
-                  "connections.");
+              if (fallbackToSimpleAuth != null) {
+                fallbackToSimpleAuth.set(false);
+              }
+            } else if (UserGroupInformation.isSecurityEnabled()) {
+              if (!fallbackAllowed) {
+                throw new IOException("Server asks us to fall back to SIMPLE " +
+                    "auth, but this client is configured to only allow secure " +
+                    "connections.");
+              }
+              if (fallbackToSimpleAuth != null) {
+                fallbackToSimpleAuth.set(true);
+              }
             }
           }
         
@@ -756,6 +776,10 @@ public class Client {
 
           // update last activity time
           touch();
+
+          if (Trace.isTracing()) {
+            Trace.addTimelineAnnotation("IPC client connected to " + server);
+          }
 
           // start the receiver thread after the socket connection has been set
           // up
@@ -829,6 +853,12 @@ public class Client {
           LOG.warn("Failed to connect to server: " + server + ": "
               + action.reason, ioe);
         }
+        throw ioe;
+      }
+
+      // Throw the exception if the thread is interrupted
+      if (Thread.currentThread().isInterrupted()) {
+        LOG.warn("Interrupted while trying for connection");
         throw ioe;
       }
 
@@ -1366,6 +1396,26 @@ public class Client {
   /** 
    * Make a call, passing <code>rpcRequest</code>, to the IPC server defined by
    * <code>remoteId</code>, returning the rpc respond.
+   *
+   * @param rpcKind
+   * @param rpcRequest -  contains serialized method and method parameters
+   * @param remoteId - the target rpc server
+   * @param fallbackToSimpleAuth - set to true or false during this method to
+   *   indicate if a secure client falls back to simple auth
+   * @returns the rpc response
+   * Throws exceptions if there are network problems or if the remote code
+   * threw an exception.
+   */
+  public Writable call(RPC.RpcKind rpcKind, Writable rpcRequest,
+      ConnectionId remoteId, AtomicBoolean fallbackToSimpleAuth)
+      throws IOException {
+    return call(rpcKind, rpcRequest, remoteId, RPC.RPC_SERVICE_CLASS_DEFAULT,
+      fallbackToSimpleAuth);
+  }
+
+  /**
+   * Make a call, passing <code>rpcRequest</code>, to the IPC server defined by
+   * <code>remoteId</code>, returning the rpc response.
    * 
    * @param rpcKind
    * @param rpcRequest -  contains serialized method and method parameters
@@ -1377,8 +1427,29 @@ public class Client {
    */
   public Writable call(RPC.RpcKind rpcKind, Writable rpcRequest,
       ConnectionId remoteId, int serviceClass) throws IOException {
+    return call(rpcKind, rpcRequest, remoteId, serviceClass, null);
+  }
+
+  /**
+   * Make a call, passing <code>rpcRequest</code>, to the IPC server defined by
+   * <code>remoteId</code>, returning the rpc response.
+   *
+   * @param rpcKind
+   * @param rpcRequest -  contains serialized method and method parameters
+   * @param remoteId - the target rpc server
+   * @param serviceClass - service class for RPC
+   * @param fallbackToSimpleAuth - set to true or false during this method to
+   *   indicate if a secure client falls back to simple auth
+   * @returns the rpc response
+   * Throws exceptions if there are network problems or if the remote code
+   * threw an exception.
+   */
+  public Writable call(RPC.RpcKind rpcKind, Writable rpcRequest,
+      ConnectionId remoteId, int serviceClass,
+      AtomicBoolean fallbackToSimpleAuth) throws IOException {
     final Call call = createCall(rpcKind, rpcRequest);
-    Connection connection = getConnection(remoteId, call, serviceClass);
+    Connection connection = getConnection(remoteId, call, serviceClass,
+      fallbackToSimpleAuth);
     try {
       connection.sendRpcRequest(call);                 // send the rpc request
     } catch (RejectedExecutionException e) {
@@ -1389,20 +1460,14 @@ public class Client {
       throw new IOException(e);
     }
 
-    boolean interrupted = false;
     synchronized (call) {
       while (!call.done) {
         try {
           call.wait();                           // wait for the result
         } catch (InterruptedException ie) {
-          // save the fact that we were interrupted
-          interrupted = true;
+          Thread.currentThread().interrupt();
+          throw new InterruptedIOException("Call interrupted");
         }
-      }
-
-      if (interrupted) {
-        // set the interrupt flag now that we are done waiting
-        Thread.currentThread().interrupt();
       }
 
       if (call.error != null) {
@@ -1435,7 +1500,8 @@ public class Client {
   /** Get a connection from the pool, or create a new one and add it to the
    * pool.  Connections to a given ConnectionId are reused. */
   private Connection getConnection(ConnectionId remoteId,
-      Call call, int serviceClass) throws IOException {
+      Call call, int serviceClass, AtomicBoolean fallbackToSimpleAuth)
+      throws IOException {
     if (!running.get()) {
       // the client is stopped
       throw new IOException("The client is stopped");
@@ -1459,7 +1525,7 @@ public class Client {
     //block above. The reason for that is if the server happens to be slow,
     //it will take longer to establish a connection and that will slow the
     //entire system down.
-    connection.setupIOstreams();
+    connection.setupIOstreams(fallbackToSimpleAuth);
     return connection;
   }
   
@@ -1478,6 +1544,7 @@ public class Client {
     private final int maxIdleTime; //connections will be culled if it was idle for 
     //maxIdleTime msecs
     private final RetryPolicy connectionRetryPolicy;
+    private final int maxRetriesOnSasl;
     // the max. no. of retries for socket connections on time out exceptions
     private final int maxRetriesOnSocketTimeouts;
     private final boolean tcpNoDelay; // if T then disable Nagle's Algorithm
@@ -1498,6 +1565,9 @@ public class Client {
       this.maxIdleTime = conf.getInt(
           CommonConfigurationKeysPublic.IPC_CLIENT_CONNECTION_MAXIDLETIME_KEY,
           CommonConfigurationKeysPublic.IPC_CLIENT_CONNECTION_MAXIDLETIME_DEFAULT);
+      this.maxRetriesOnSasl = conf.getInt(
+          CommonConfigurationKeys.IPC_CLIENT_CONNECT_MAX_RETRIES_ON_SASL_KEY,
+          CommonConfigurationKeys.IPC_CLIENT_CONNECT_MAX_RETRIES_ON_SASL_DEFAULT);
       this.maxRetriesOnSocketTimeouts = conf.getInt(
           CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_ON_SOCKET_TIMEOUTS_KEY,
           CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_ON_SOCKET_TIMEOUTS_DEFAULT);
@@ -1531,6 +1601,10 @@ public class Client {
       return maxIdleTime;
     }
     
+    public int getMaxRetriesOnSasl() {
+      return maxRetriesOnSasl;
+    }
+
     /** max connection retries on socket time outs */
     public int getMaxRetriesOnSocketTimeouts() {
       return maxRetriesOnSocketTimeouts;

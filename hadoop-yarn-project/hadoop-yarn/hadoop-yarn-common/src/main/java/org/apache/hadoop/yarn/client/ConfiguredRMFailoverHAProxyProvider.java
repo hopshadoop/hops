@@ -86,8 +86,9 @@ public abstract class ConfiguredRMFailoverHAProxyProvider<T>
     try {
 
       final InetSocketAddress rmAddress = rmProxy
-          .getRMAddress(conf, protocol, leader.getIpAddress(),
-              leader.getPort());
+          //.getRMAddress(conf, protocol, leader.getIpAddress(),
+          //    leader.getPort());
+          .getRMAddress(conf, protocol, leader.getIpAddress());
       LOG.info("creating proxy from active nodes " + currentRMId + " " +
           rmAddress.getPort());
       return RMProxy.getProxy(conf, protocol, rmAddress);
@@ -128,7 +129,7 @@ public abstract class ConfiguredRMFailoverHAProxyProvider<T>
             try {
               //TODO put base time and max time as parameters
               Thread.sleep(
-                      RetryPolicies.calculateExponentialTime(500, nbTry, 10000));
+                      RetryPolicies.calculateExponentialTime(500L, nbTry, 10000L));
             } catch (Exception e) {
               LOG.error(e);
             }

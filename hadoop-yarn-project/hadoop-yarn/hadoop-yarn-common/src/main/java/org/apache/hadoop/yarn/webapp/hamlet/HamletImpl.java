@@ -1,48 +1,47 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Licensed to the Apache Software Foundation (ASF) under one
+* or more contributor license agreements.  See the NOTICE file
+* distributed with this work for additional information
+* regarding copyright ownership.  The ASF licenses this file
+* to you under the Apache License, Version 2.0 (the
+* "License"); you may not use this file except in compliance
+* with the License.  You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
 
 package org.apache.hadoop.yarn.webapp.hamlet;
 
 import com.google.common.base.Joiner;
+import static com.google.common.base.Preconditions.*;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
+
+import java.io.PrintWriter;
+import java.util.EnumSet;
+import static java.util.EnumSet.*;
+import java.util.Iterator;
+
+import static org.apache.commons.lang.StringEscapeUtils.*;
+import static org.apache.hadoop.yarn.webapp.hamlet.HamletImpl.EOpt.*;
+
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.yarn.webapp.SubView;
 import org.apache.hadoop.yarn.webapp.WebAppException;
 
-import java.io.PrintWriter;
-import java.util.EnumSet;
-import java.util.Iterator;
-
-import static com.google.common.base.Preconditions.checkState;
-import static java.util.EnumSet.of;
-import static org.apache.commons.lang.StringEscapeUtils.escapeHtml;
-import static org.apache.hadoop.yarn.webapp.hamlet.HamletImpl.EOpt.ENDTAG;
-import static org.apache.hadoop.yarn.webapp.hamlet.HamletImpl.EOpt.INLINE;
-import static org.apache.hadoop.yarn.webapp.hamlet.HamletImpl.EOpt.PRE;
-
 
 /**
  * A simple unbuffered generic hamlet implementation.
- * <p/>
+ *
  * Zero copy but allocation on every element, which could be
  * optimized to use a thread-local element pool.
- * <p/>
+ *
  * Prints HTML as it builds. So the order is important.
  */
 @InterfaceAudience.Private
@@ -65,27 +64,17 @@ public class HamletImpl extends HamletSpec {
    * Element options. (whether it needs end tag, is inline etc.)
    */
   public enum EOpt {
-    /**
-     * needs end(close) tag
-     */
+    /** needs end(close) tag */
     ENDTAG,
-    /**
-     * The content is inline
-     */
+    /** The content is inline */
     INLINE,
-    /**
-     * The content is preformatted
-     */
+    /** The content is preformatted */
     PRE
-  }
-
-  ;
+  };
 
   /**
    * The base class for elements
-   *
-   * @param <T>
-   *     type of the parent (containing) element for the element
+   * @param <T> type of the parent (containing) element for the element
    */
   public class EImp<T extends _> implements _Child {
     private final String name;
@@ -104,7 +93,7 @@ public class HamletImpl extends HamletSpec {
     @Override
     public T _() {
       closeAttrs();
-      --nestLevel;
+      --nestLevel;  
       printEndTag(name, opts);
       return parent;
     }
@@ -115,7 +104,8 @@ public class HamletImpl extends HamletSpec {
         if (!opts.contains(PRE)) {
           indent(opts);
         }
-        out.print(quote ? escapeHtml(String.valueOf(s)) : String.valueOf(s));
+        out.print(quote ? escapeHtml(String.valueOf(s))
+                        : String.valueOf(s));
         if (!opts.contains(INLINE) && !opts.contains(PRE)) {
           out.println();
         }
@@ -263,16 +253,13 @@ public class HamletImpl extends HamletSpec {
   /**
    * Create a root-level generic element.
    * Mostly for testing purpose.
-   *
-   * @param <T>
-   *     type of the parent element
-   * @param name
-   *     of the element
-   * @param opts
-   *     {@link EOpt element options}
+   * @param <T> type of the parent element
+   * @param name of the element
+   * @param opts {@link EOpt element options}
    * @return the element
    */
-  public <T extends _> Generic<T> root(String name, EnumSet<EOpt> opts) {
+  public <T extends _>
+  Generic<T> root(String name, EnumSet<EOpt> opts) {
     return new Generic<T>(name, null, opts);
   }
 
@@ -327,9 +314,7 @@ public class HamletImpl extends HamletSpec {
 
   /**
    * Sub-classes should override this to do something interesting.
-   *
-   * @param cls
-   *     the sub-view class
+   * @param cls the sub-view class
    */
   protected void subView(Class<? extends SubView> cls) {
     indent(of(ENDTAG)); // not an inline view
@@ -340,13 +325,10 @@ public class HamletImpl extends HamletSpec {
 
   /**
    * Parse selector into id and classes
-   *
-   * @param selector
-   *     in the form of (#id)?(.class)*
+   * @param selector in the form of (#id)?(.class)*
    * @return an two element array [id, "space-separated classes"].
-   * Either element could be null.
-   * @throws WebAppException
-   *     when both are null or syntax error.
+   *         Either element could be null.
+   * @throws WebAppException when both are null or syntax error.
    */
   public static String[] parseSelector(String selector) {
     String[] result = new String[]{null, null};
@@ -364,18 +346,14 @@ public class HamletImpl extends HamletSpec {
       }
       return result;
     }
-    throw new WebAppException("Error parsing selector: " + selector);
+    throw new WebAppException("Error parsing selector: "+ selector);
   }
 
   /**
    * Set id and/or class attributes for an element.
-   *
-   * @param <E>
-   *     type of the element
-   * @param e
-   *     the element
-   * @param selector
-   *     Haml form of "(#id)?(.class)*"
+   * @param <E> type of the element
+   * @param e the element
+   * @param selector Haml form of "(#id)?(.class)*"
    * @return the element
    */
   public static <E extends CoreAttrs> E setSelector(E e, String selector) {

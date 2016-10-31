@@ -19,12 +19,10 @@ package org.apache.hadoop.distributedloadsimulator.sls;
  *
  * @author sri
  */
-import io.hops.metadata.util.RMStorageFactory;
-import io.hops.metadata.util.YarnAPIStorageFactory;
-import io.hops.metadata.yarn.dal.YarnProjectsQuotaDataAccess;
 import io.hops.metadata.yarn.dal.util.YARNOperationType;
-import io.hops.metadata.yarn.entity.YarnProjectsQuota;
 import io.hops.transaction.handler.LightWeightRequestHandler;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileReader;
@@ -70,7 +68,6 @@ import org.codehaus.jackson.map.ObjectMapper;
 import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.distributedloadsimulator.sls.conf.SLSConfiguration;
 import org.apache.hadoop.distributedloadsimulator.sls.nodemanager.NMSimulator;
-import org.apache.hadoop.distributedloadsimulator.sls.scheduler.ResourceSchedulerWrapper;
 import org.apache.hadoop.distributedloadsimulator.sls.scheduler.TaskRunner;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.yarn.client.api.YarnClient;
@@ -127,7 +124,9 @@ public class SLSRunner implements AMNMCommonObject {
   protected YarnClient rmClient;
 
   private static float hbResponsePercentage;
-  private String listOfRMIIpAddress = null;
+  private String[] listOfRMIIpAddress = null;
+  private int rmiPort;
+  
   Map<String, AMNMCommonObject> remoteConnections
           = new HashMap<String, AMNMCommonObject>();
 
@@ -143,7 +142,7 @@ public class SLSRunner implements AMNMCommonObject {
           boolean distributedMode,
           boolean loadSimMode, String resourceTrackerAddress,
           String resourceManagerAddress,
-          String rmiAddress, boolean isLeader, long simulationDuration)
+          String rmiAddress,int rmiPort, boolean isLeader, long simulationDuration)
           throws IOException, ClassNotFoundException {
     this.rm = null;
     this.isLeader = isLeader;
@@ -163,7 +162,8 @@ public class SLSRunner implements AMNMCommonObject {
     this.trackedApps = trackedApps;
     this.printSimulation = printsimulation;
     metricsOutputDir = outputDir;
-    this.listOfRMIIpAddress = rmiAddress;
+    this.listOfRMIIpAddress = rmiAddress.split(",");
+    this.rmiPort = rmiPort;
 
     nmMap = new HashMap<NodeId, NMSimulator>();
     queueAppNumMap = new HashMap<String, Integer>();
@@ -193,10 +193,6 @@ public class SLSRunner implements AMNMCommonObject {
             SLSConfiguration.CONTAINER_MEMORY_MB_DEFAULT);
   }
 
-  private String[] getRMIAddress() {
-    return this.listOfRMIIpAddress.split(",");
-  }
-
   public void initializeYarnClientForAMSimulation() {
     YarnConfiguration yarnConf = new YarnConfiguration();
     rmClient = YarnClient.createYarnClient();
@@ -211,7 +207,7 @@ public class SLSRunner implements AMNMCommonObject {
     }
   }
   long lastMonitoring = 0;
-
+  
   public void startHbMonitorThread() {
     LOG.info("start Heartbeat monitor");
     Thread hbExperimentalMonitoring = new Thread() {
@@ -224,12 +220,23 @@ public class SLSRunner implements AMNMCommonObject {
             java.util.logging.Logger.getLogger(SLSRunner.class.getName()).log(
                     Level.SEVERE, null, ex);
           }
-          int totalHb = 0;
-          int trueTotalHb = 0;
-          for (NMSimulator nm : nmMap.values()) {
-            totalHb += nm.getTotalHeartBeat();
-            trueTotalHb += nm.getTotalTrueHeartBeat();
+
+          int hb[] = getHandledHeartBeats();
+          int nbNM = getNumberNodeManager();
+          for (String conId : remoteConnections.keySet()) {
+            try{
+            AMNMCommonObject remoteCon = remoteConnections.get(conId);
+            int remoteHb[] = remoteCon.getHandledHeartBeats();
+            hb[0] += remoteHb[0];
+            hb[1] += remoteHb[1];
+            nbNM += remoteCon.getNumberNodeManager();
+            }catch(RemoteException e){
+              LOG.error(e,e);
+            }
           }
+          
+          int totalHb = hb[0];
+          int trueTotalHb = hb[1];
           if (totalHb != 0) {
             float hbExperimentailResponsePercentage = (float) ((trueTotalHb
                     - lastLocalSCHB) * 100) / (totalHb - lastLocalRTHB);
@@ -286,10 +293,6 @@ public class SLSRunner implements AMNMCommonObject {
       // before start the rm , let rm to read and get to know about number of applications
       startAMFromSLSTraces();
       startRM();
-      ((ResourceSchedulerWrapper) rm.getResourceScheduler())
-              .setQueueSet(this.queueAppNumMap.keySet());
-      ((ResourceSchedulerWrapper) rm.getResourceScheduler())
-              .setTrackedAppSet(this.trackedApps);
     }
     printSimulationInfo();
     nodeRunner.start();
@@ -301,7 +304,6 @@ public class SLSRunner implements AMNMCommonObject {
 
     rmConf.setBoolean(YarnConfiguration.RM_HA_ENABLED, true);
     rmConf.setBoolean(YarnConfiguration.DISTRIBUTED_RM, true);
-    rmConf.setBoolean(YarnConfiguration.HOPS_NDB_EVENT_STREAMING_ENABLED, true);
     rmConf.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, true);
     LOG.info(
             "HOP :: Load simulator is starting resource manager in distributed mode ######################### ");
@@ -311,8 +313,6 @@ public class SLSRunner implements AMNMCommonObject {
 
     String schedulerClass = rmConf.get(YarnConfiguration.RM_SCHEDULER);
     rmConf.set(SLSConfiguration.RM_SCHEDULER, schedulerClass);
-    rmConf.set(YarnConfiguration.RM_SCHEDULER,
-            ResourceSchedulerWrapper.class.getName());
     rmConf.set(SLSConfiguration.METRICS_OUTPUT_DIR, metricsOutputDir);
     rm = new ResourceManager();
     rm.init(rmConf);
@@ -320,12 +320,11 @@ public class SLSRunner implements AMNMCommonObject {
   }
 
   private void getAllRemoteConnections() {
-    String[] listOfIp = getRMIAddress();
     Registry remoteRegistry = null;
-    for (String rmiIp : listOfIp) {
+    for (String rmiIp : listOfRMIIpAddress) {
       while (true) {
         try {
-          remoteRegistry = LocateRegistry.getRegistry(rmiIp);
+          remoteRegistry = LocateRegistry.getRegistry(rmiIp,rmiPort);
           AMNMCommonObject remoteConnection = (AMNMCommonObject) remoteRegistry.
                   lookup("AMNMCommonObject");
           remoteConnections.put(rmiIp, remoteConnection);
@@ -439,7 +438,7 @@ public class SLSRunner implements AMNMCommonObject {
           if (amSim != null) {
             amSim.init(AM_ID++, heartbeatInterval, tasks, rm, this,
                     jobStartTime, jobFinishTime, user, queue, false, oldAppId,
-                    getRMIAddress(), rmClient, new Configuration(conf));
+                    listOfRMIIpAddress, rmiPort, rmClient, new Configuration(conf));
 
             applicationRunner.schedule(amSim);
             maxRuntime = Math.max(maxRuntime, jobFinishTime);
@@ -538,7 +537,7 @@ public class SLSRunner implements AMNMCommonObject {
     options.addOption("isLeader", false, "leading slsRunner for the measurer");
     options.addOption("simulationDuration", true,
             "duration of the simulation only needed by the leader");
-
+    options.addOption("rmiport",true,"port for the rmi server");
     CommandLineParser parser = new GnuParser();
     CommandLine cmd = parser.parse(options, args);
 
@@ -550,6 +549,8 @@ public class SLSRunner implements AMNMCommonObject {
     boolean isLeader = cmd.hasOption("isLeader");
     System.out.println(isLeader);
     long simulationDuration = 0;
+    int rmiPort = 0;
+    
     if (isLeader) {
       System.out.println(cmd.getOptionValue("simulationDuration"));
       simulationDuration = Long.parseLong(cmd.getOptionValue(
@@ -592,10 +593,13 @@ public class SLSRunner implements AMNMCommonObject {
       //  then we need rmi address
       rmiAddress = cmd.getOptionValue("rmiaddress"); // currently we support only two simulator in parallel
     }
+    if (cmd.hasOption("rmiport")) {
+        rmiPort = Integer.parseInt(cmd.getOptionValue("rmiport"));
+    }
     SLSRunner sls = new SLSRunner(inputFiles, nodeFile, output,
             trackedJobSet, cmd.hasOption("printsimulation"), cmd.hasOption(
                     "yarnnode"), cmd.hasOption("distributedmode"), cmd.
-            hasOption("loadsimulatormode"), rtAddress, rmAddress, rmiAddress,
+            hasOption("loadsimulatormode"), rtAddress, rmAddress, rmiAddress, rmiPort,
             isLeader, simulationDuration
     );
     if (!cmd.hasOption("distributedmode")) {
@@ -603,9 +607,9 @@ public class SLSRunner implements AMNMCommonObject {
         AMNMCommonObject stub = (AMNMCommonObject) UnicastRemoteObject.
                 exportObject(sls, 0);
         // Bind the remote object's stub in the registry
-        Registry registry = LocateRegistry.getRegistry();
+        Registry registry = LocateRegistry.getRegistry(rmiPort);
         registry.bind("AMNMCommonObject", stub);
-        LOG.info("HOP ::  SLS RMI Server ready on default RMI port ");
+        LOG.info("HOP ::  SLS RMI Server ready on port " + rmiPort);
         sls.start();
       } catch (Exception e) {
         System.err.println("Server exception: " + e.toString());
@@ -721,7 +725,7 @@ public class SLSRunner implements AMNMCommonObject {
   public void simulationFinished() throws RemoteException {
     int finished = nbFinished.incrementAndGet();
     LOG.info("finish simulation " + finished);
-    if (finished == getRMIAddress().length + 1) {
+    if (finished == listOfRMIIpAddress.length + 1) {
       computAndPrintStats();
       System.exit(0);
     }
@@ -788,39 +792,11 @@ public class SLSRunner implements AMNMCommonObject {
 
     try {
       
-      LightWeightRequestHandler logsHandler
-              = new LightWeightRequestHandler(
-                      YARNOperationType.TEST) {
-                        @Override
-                        public Object performTask() throws IOException {
-                          connector.beginTransaction();
-                          connector.writeLock();
-                          YarnProjectsQuotaDataAccess _pqDA
-                                    = (YarnProjectsQuotaDataAccess) RMStorageFactory.
-                                    getDataAccess(
-                                            YarnProjectsQuotaDataAccess.class);
-                                    Map<String, YarnProjectsQuota> hopYarnProjectsQuotaMap
-                                    = _pqDA.getAll();
-                            connector.commit();
-                            return hopYarnProjectsQuotaMap;
-                          
-                        }
-                      };
-              final Map<String, YarnProjectsQuota> hopContainersLogs
-                        = (Map<String, YarnProjectsQuota>) logsHandler.handle();
-              long totalQuota=0;
-      for(YarnProjectsQuota quota: hopContainersLogs.values()){
-        totalQuota+=quota.getTotalUsedQuota();
-      }
-      long quotaDifNodeManagers = totalQuota-totalClusterUsageFromStart;
-      float quotaErrorNodeManagers = (float) quotaDifNodeManagers/totalClusterUsageFromStart;
       
       long totalClusterUsageAm = 0;
       for(AMSimulator am: amMap.values()){
         totalClusterUsageAm = totalClusterUsageAm + (am.getTotalContainersDuration()/1000);
       }
-      long quotaDifAm = totalQuota-totalClusterUsageAm;
-      float quotaErrorAm = (float) quotaDifAm/totalClusterUsageAm;
       
       File file = new File("simulationsDuration");
       if (!file.exists()) {
@@ -833,8 +809,7 @@ public class SLSRunner implements AMNMCommonObject {
               + scHBRatio + /*" (" + scHbDetail + ")" +*/ "\t"
               + avgApplicationWaitTime + "\t"
               + avgContainerAllocationWaitTime + "\t" + avgContainerStartTime
-              + "\t" + nbContainers + "\t" + avgClusterUsage + "\t" + 
-               quotaErrorNodeManagers + "\t" + quotaErrorAm + "\n");
+              + "\t" + nbContainers + "\t" + avgClusterUsage + "\n");
       bufferWritter.close();
 
       file = new File("clusterUsageDetail");

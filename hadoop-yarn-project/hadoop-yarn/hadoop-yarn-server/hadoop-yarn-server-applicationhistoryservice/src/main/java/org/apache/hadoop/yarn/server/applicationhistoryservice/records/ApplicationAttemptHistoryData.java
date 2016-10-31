@@ -53,8 +53,8 @@ public class ApplicationAttemptHistoryData {
   @Unstable
   public static ApplicationAttemptHistoryData newInstance(
       ApplicationAttemptId appAttemptId, String host, int rpcPort,
-      ContainerId masterContainerId, String diagnosticsInfo, String trackingURL,
-      FinalApplicationStatus finalApplicationStatus,
+      ContainerId masterContainerId, String diagnosticsInfo,
+      String trackingURL, FinalApplicationStatus finalApplicationStatus,
       YarnApplicationAttemptState yarnApplicationAttemptState) {
     ApplicationAttemptHistoryData appAttemptHD =
         new ApplicationAttemptHistoryData();
@@ -77,8 +77,8 @@ public class ApplicationAttemptHistoryData {
 
   @Public
   @Unstable
-  public void setApplicationAttemptId(
-      ApplicationAttemptId applicationAttemptId) {
+  public void
+      setApplicationAttemptId(ApplicationAttemptId applicationAttemptId) {
     this.applicationAttemptId = applicationAttemptId;
   }
 

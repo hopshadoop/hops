@@ -18,7 +18,10 @@
 
 package org.apache.hadoop.yarn.api.protocolrecords.impl.pb;
 
-import com.google.protobuf.TextFormat;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.protocolrecords.GetQueueUserAclsInfoResponse;
@@ -28,19 +31,16 @@ import org.apache.hadoop.yarn.proto.YarnProtos.QueueUserACLInfoProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetQueueUserAclsInfoResponseProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetQueueUserAclsInfoResponseProtoOrBuilder;
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
+import com.google.protobuf.TextFormat;
 
 @Private
 @Unstable
-public class GetQueueUserAclsInfoResponsePBImpl
-    extends GetQueueUserAclsInfoResponse {
+public class GetQueueUserAclsInfoResponsePBImpl extends GetQueueUserAclsInfoResponse {
 
   List<QueueUserACLInfo> queueUserAclsInfoList;
 
-  GetQueueUserAclsInfoResponseProto proto =
-      GetQueueUserAclsInfoResponseProto.getDefaultInstance();
+  GetQueueUserAclsInfoResponseProto proto = 
+    GetQueueUserAclsInfoResponseProto.getDefaultInstance();
   GetQueueUserAclsInfoResponseProto.Builder builder = null;
   boolean viaProto = false;
 
@@ -82,9 +82,8 @@ public class GetQueueUserAclsInfoResponsePBImpl
 
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -103,9 +102,8 @@ public class GetQueueUserAclsInfoResponsePBImpl
   }
 
   private void mergeLocalToProto() {
-    if (viaProto) {
+    if (viaProto) 
       maybeInitBuilder();
-    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
@@ -136,47 +134,43 @@ public class GetQueueUserAclsInfoResponsePBImpl
   private void addLocalQueueUserACLInfosToProto() {
     maybeInitBuilder();
     builder.clearQueueUserAcls();
-    if (queueUserAclsInfoList == null) {
+    if (queueUserAclsInfoList == null)
       return;
-    }
-    Iterable<QueueUserACLInfoProto> iterable =
-        new Iterable<QueueUserACLInfoProto>() {
+    Iterable<QueueUserACLInfoProto> iterable = new Iterable<QueueUserACLInfoProto>() {
+      @Override
+      public Iterator<QueueUserACLInfoProto> iterator() {
+        return new Iterator<QueueUserACLInfoProto>() {
+
+          Iterator<QueueUserACLInfo> iter = queueUserAclsInfoList.iterator();
+
           @Override
-          public Iterator<QueueUserACLInfoProto> iterator() {
-            return new Iterator<QueueUserACLInfoProto>() {
+          public boolean hasNext() {
+            return iter.hasNext();
+          }
 
-              Iterator<QueueUserACLInfo> iter =
-                  queueUserAclsInfoList.iterator();
+          @Override
+          public QueueUserACLInfoProto next() {
+            return convertToProtoFormat(iter.next());
+          }
 
-              @Override
-              public boolean hasNext() {
-                return iter.hasNext();
-              }
-
-              @Override
-              public QueueUserACLInfoProto next() {
-                return convertToProtoFormat(iter.next());
-              }
-
-              @Override
-              public void remove() {
-                throw new UnsupportedOperationException();
-
-              }
-            };
+          @Override
+          public void remove() {
+            throw new UnsupportedOperationException();
 
           }
         };
+
+      }
+    };
     builder.addAllQueueUserAcls(iterable);
   }
 
-  private QueueUserACLInfoPBImpl convertFromProtoFormat(
-      QueueUserACLInfoProto p) {
+  private QueueUserACLInfoPBImpl convertFromProtoFormat(QueueUserACLInfoProto p) {
     return new QueueUserACLInfoPBImpl(p);
   }
 
   private QueueUserACLInfoProto convertToProtoFormat(QueueUserACLInfo t) {
-    return ((QueueUserACLInfoPBImpl) t).getProto();
+    return ((QueueUserACLInfoPBImpl)t).getProto();
   }
 
 }

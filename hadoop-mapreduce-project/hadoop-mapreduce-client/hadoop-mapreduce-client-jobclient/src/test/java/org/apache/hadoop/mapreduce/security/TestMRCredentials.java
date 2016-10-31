@@ -62,7 +62,7 @@ public class TestMRCredentials {
         .build();
     jConf = new JobConf(conf);
     FileSystem.setDefaultUri(conf, dfsCluster.getFileSystem().getUri().toString());
-    mrCluster = MiniMRClientClusterFactory.create(TestMRCredentials.class, 1, jConf);
+    mrCluster = MiniMRClientClusterFactory.create(TestMRCredentials.class, 1, jConf, false);
     createKeysAsJson("keys.json");
   }
 

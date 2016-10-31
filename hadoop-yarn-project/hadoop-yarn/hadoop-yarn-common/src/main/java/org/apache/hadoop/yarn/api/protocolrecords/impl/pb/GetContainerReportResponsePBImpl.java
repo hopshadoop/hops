@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.yarn.api.protocolrecords.impl.pb;
 
-import com.google.protobuf.TextFormat;
 import org.apache.hadoop.yarn.api.protocolrecords.GetContainerReportResponse;
 import org.apache.hadoop.yarn.api.records.ContainerReport;
 import org.apache.hadoop.yarn.api.records.impl.pb.ContainerReportPBImpl;
@@ -26,11 +25,13 @@ import org.apache.hadoop.yarn.proto.YarnProtos.ContainerReportProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetContainerReportResponseProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetContainerReportResponseProtoOrBuilder;
 
-public class GetContainerReportResponsePBImpl
-    extends GetContainerReportResponse {
+import com.google.protobuf.TextFormat;
 
-  GetContainerReportResponseProto proto =
-      GetContainerReportResponseProto.getDefaultInstance();
+public class GetContainerReportResponsePBImpl extends
+    GetContainerReportResponse {
+
+  GetContainerReportResponseProto proto = GetContainerReportResponseProto
+    .getDefaultInstance();
   GetContainerReportResponseProto.Builder builder = null;
   boolean viaProto = false;
 
@@ -40,8 +41,7 @@ public class GetContainerReportResponsePBImpl
     builder = GetContainerReportResponseProto.newBuilder();
   }
 
-  public GetContainerReportResponsePBImpl(
-      GetContainerReportResponseProto proto) {
+  public GetContainerReportResponsePBImpl(GetContainerReportResponseProto proto) {
     this.proto = proto;
     viaProto = true;
   }
@@ -60,9 +60,8 @@ public class GetContainerReportResponsePBImpl
 
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -81,9 +80,8 @@ public class GetContainerReportResponsePBImpl
   }
 
   private void mergeLocalToProto() {
-    if (viaProto) {
+    if (viaProto)
       maybeInitBuilder();
-    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;

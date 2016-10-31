@@ -18,8 +18,8 @@
 
 package org.apache.hadoop.yarn.api.impl.pb.service;
 
-import com.google.protobuf.RpcController;
-import com.google.protobuf.ServiceException;
+import java.io.IOException;
+
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.yarn.api.ApplicationMasterProtocol;
 import org.apache.hadoop.yarn.api.ApplicationMasterProtocolPB;
@@ -40,16 +40,15 @@ import org.apache.hadoop.yarn.proto.YarnServiceProtos.FinishApplicationMasterRes
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.RegisterApplicationMasterRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.RegisterApplicationMasterResponseProto;
 
-import java.io.IOException;
+import com.google.protobuf.RpcController;
+import com.google.protobuf.ServiceException;
 
 @Private
-public class ApplicationMasterProtocolPBServiceImpl
-    implements ApplicationMasterProtocolPB {
+public class ApplicationMasterProtocolPBServiceImpl implements ApplicationMasterProtocolPB {
 
   private ApplicationMasterProtocol real;
   
-  public ApplicationMasterProtocolPBServiceImpl(
-      ApplicationMasterProtocol impl) {
+  public ApplicationMasterProtocolPBServiceImpl(ApplicationMasterProtocol impl) {
     this.real = impl;
   }
   
@@ -59,7 +58,7 @@ public class ApplicationMasterProtocolPBServiceImpl
     AllocateRequestPBImpl request = new AllocateRequestPBImpl(proto);
     try {
       AllocateResponse response = real.allocate(request);
-      return ((AllocateResponsePBImpl) response).getProto();
+      return ((AllocateResponsePBImpl)response).getProto();
     } catch (YarnException e) {
       throw new ServiceException(e);
     } catch (IOException e) {
@@ -71,12 +70,10 @@ public class ApplicationMasterProtocolPBServiceImpl
   public FinishApplicationMasterResponseProto finishApplicationMaster(
       RpcController arg0, FinishApplicationMasterRequestProto proto)
       throws ServiceException {
-    FinishApplicationMasterRequestPBImpl request =
-        new FinishApplicationMasterRequestPBImpl(proto);
+    FinishApplicationMasterRequestPBImpl request = new FinishApplicationMasterRequestPBImpl(proto);
     try {
-      FinishApplicationMasterResponse response =
-          real.finishApplicationMaster(request);
-      return ((FinishApplicationMasterResponsePBImpl) response).getProto();
+      FinishApplicationMasterResponse response = real.finishApplicationMaster(request);
+      return ((FinishApplicationMasterResponsePBImpl)response).getProto();
     } catch (YarnException e) {
       throw new ServiceException(e);
     } catch (IOException e) {
@@ -88,12 +85,10 @@ public class ApplicationMasterProtocolPBServiceImpl
   public RegisterApplicationMasterResponseProto registerApplicationMaster(
       RpcController arg0, RegisterApplicationMasterRequestProto proto)
       throws ServiceException {
-    RegisterApplicationMasterRequestPBImpl request =
-        new RegisterApplicationMasterRequestPBImpl(proto);
+    RegisterApplicationMasterRequestPBImpl request = new RegisterApplicationMasterRequestPBImpl(proto);
     try {
-      RegisterApplicationMasterResponse response =
-          real.registerApplicationMaster(request);
-      return ((RegisterApplicationMasterResponsePBImpl) response).getProto();
+      RegisterApplicationMasterResponse response = real.registerApplicationMaster(request);
+      return ((RegisterApplicationMasterResponsePBImpl)response).getProto();
     } catch (YarnException e) {
       throw new ServiceException(e);
     } catch (IOException e) {

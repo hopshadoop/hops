@@ -182,12 +182,23 @@ public class FileOutputCommitter extends OutputCommitter {
   throws IOException {
     return getWrapped(context).needsTaskCommit(context, getTaskAttemptPath(context));
   }
-  
+
   @Override
+  @Deprecated
   public boolean isRecoverySupported() {
     return true;
   }
-  
+
+  @Override
+  public boolean isCommitJobRepeatable(JobContext context) throws IOException {
+    return getWrapped(context).isCommitJobRepeatable(context);
+  }
+
+  @Override
+  public boolean isRecoverySupported(JobContext context) throws IOException {
+    return getWrapped(context).isRecoverySupported(context);
+  }
+
   @Override
   public void recoverTask(TaskAttemptContext context)
       throws IOException {

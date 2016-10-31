@@ -57,7 +57,7 @@ public class GridmixTestUtils {
         .build();// MiniDFSCluster(conf, 3, true, null);
     dfs = dfsCluster.getFileSystem();
     conf.set(JTConfig.JT_RETIREJOBS, "false");
-    mrvl = MiniMRClientClusterFactory.create(caller, 2, conf);
+    mrvl = MiniMRClientClusterFactory.create(caller, 2, conf,false);
     
     conf = mrvl.getConfig();
     String[] files = conf.getStrings(MRJobConfig.CACHE_FILES);

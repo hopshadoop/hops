@@ -36,6 +36,7 @@ import org.apache.hadoop.mapred.MapOutputFile;
 import org.apache.hadoop.mapred.Reporter;
 import org.apache.hadoop.mapred.SpillRecord;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
+import org.apache.hadoop.mapreduce.CryptoUtils;
 
 /**
  * LocalFetcher is used by LocalJobRunner to perform a local filesystem
@@ -126,6 +127,9 @@ class LocalFetcher<K,V> extends Fetcher<K, V> {
     long compressedLength = ir.partLength;
     long decompressedLength = ir.rawLength;
 
+    compressedLength -= CryptoUtils.cryptoPadding(job);
+    decompressedLength -= CryptoUtils.cryptoPadding(job);
+
     // Get the location for the map output - either in-memory or on-disk
     MapOutput<K, V> mapOutput = merger.reserve(mapTaskId, decompressedLength,
         id);
@@ -145,9 +149,11 @@ class LocalFetcher<K,V> extends Fetcher<K, V> {
     // now read the file, seek to the appropriate section, and send it.
     FileSystem localFs = FileSystem.getLocal(job).getRaw();
     FSDataInputStream inStream = localFs.open(mapOutputFileName);
-    try {
-      inStream.seek(ir.startOffset);
 
+    inStream = CryptoUtils.wrapIfNecessary(job, inStream);
+
+    try {
+      inStream.seek(ir.startOffset + CryptoUtils.cryptoPadding(job));
       mapOutput.shuffle(LOCALHOST, inStream, compressedLength, decompressedLength, metrics, reporter);
     } finally {
       try {
@@ -158,7 +164,7 @@ class LocalFetcher<K,V> extends Fetcher<K, V> {
       }
     }
 
-    scheduler.copySucceeded(mapTaskId, LOCALHOST, compressedLength, 0,
+    scheduler.copySucceeded(mapTaskId, LOCALHOST, compressedLength, 0, 0,
         mapOutput);
     return true; // successful fetch.
   }

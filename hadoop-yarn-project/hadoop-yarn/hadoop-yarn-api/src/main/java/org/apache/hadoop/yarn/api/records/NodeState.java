@@ -27,34 +27,22 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 @Public
 @Unstable
 public enum NodeState {
-  /**
-   * New node
-   */
-  NEW,
+  /** New node */
+  NEW, 
   
-  /**
-   * Running node
-   */
-  RUNNING,
+  /** Running node */
+  RUNNING, 
   
-  /**
-   * Node is unhealthy
-   */
-  UNHEALTHY,
+  /** Node is unhealthy */
+  UNHEALTHY, 
   
-  /**
-   * Node is out of service
-   */
-  DECOMMISSIONED,
+  /** Node is out of service */
+  DECOMMISSIONED, 
   
-  /**
-   * Node has not sent a heartbeat for some configured time threshold
-   */
-  LOST,
+  /** Node has not sent a heartbeat for some configured time threshold*/
+  LOST, 
   
-  /**
-   * Node has rebooted
-   */
+  /** Node has rebooted */
   REBOOTED;
   
   public boolean isUnusable() {

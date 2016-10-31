@@ -29,8 +29,7 @@ import org.apache.hadoop.yarn.server.api.records.impl.pb.MasterKeyPBImpl;
 import org.apache.hadoop.yarn.server.api.records.impl.pb.NodeStatusPBImpl;
 
 public class NodeHeartbeatRequestPBImpl extends NodeHeartbeatRequest {
-  NodeHeartbeatRequestProto proto =
-      NodeHeartbeatRequestProto.getDefaultInstance();
+  NodeHeartbeatRequestProto proto = NodeHeartbeatRequestProto.getDefaultInstance();
   NodeHeartbeatRequestProto.Builder builder = null;
   boolean viaProto = false;
   
@@ -48,7 +47,7 @@ public class NodeHeartbeatRequestPBImpl extends NodeHeartbeatRequest {
   }
   
   public NodeHeartbeatRequestProto getProto() {
-    mergeLocalToProto();
+      mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
     viaProto = true;
     return proto;
@@ -61,9 +60,8 @@ public class NodeHeartbeatRequestPBImpl extends NodeHeartbeatRequest {
   
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -85,9 +83,8 @@ public class NodeHeartbeatRequestPBImpl extends NodeHeartbeatRequest {
   }
 
   private void mergeLocalToProto() {
-    if (viaProto) {
+    if (viaProto) 
       maybeInitBuilder();
-    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
@@ -99,7 +96,7 @@ public class NodeHeartbeatRequestPBImpl extends NodeHeartbeatRequest {
     }
     viaProto = false;
   }
-
+    
   
   @Override
   public NodeStatus getNodeStatus() {
@@ -117,9 +114,8 @@ public class NodeHeartbeatRequestPBImpl extends NodeHeartbeatRequest {
   @Override
   public void setNodeStatus(NodeStatus nodeStatus) {
     maybeInitBuilder();
-    if (nodeStatus == null) {
+    if (nodeStatus == null) 
       builder.clearNodeStatus();
-    }
     this.nodeStatus = nodeStatus;
   }
 
@@ -140,9 +136,8 @@ public class NodeHeartbeatRequestPBImpl extends NodeHeartbeatRequest {
   @Override
   public void setLastKnownContainerTokenMasterKey(MasterKey masterKey) {
     maybeInitBuilder();
-    if (masterKey == null) {
+    if (masterKey == null) 
       builder.clearLastKnownContainerTokenMasterKey();
-    }
     this.lastKnownContainerTokenMasterKey = masterKey;
   }
 
@@ -163,9 +158,8 @@ public class NodeHeartbeatRequestPBImpl extends NodeHeartbeatRequest {
   @Override
   public void setLastKnownNMTokenMasterKey(MasterKey masterKey) {
     maybeInitBuilder();
-    if (masterKey == null) {
+    if (masterKey == null) 
       builder.clearLastKnownNmTokenMasterKey();
-    }
     this.lastKnownNMTokenMasterKey = masterKey;
   }
 
@@ -174,7 +168,7 @@ public class NodeHeartbeatRequestPBImpl extends NodeHeartbeatRequest {
   }
 
   private NodeStatusProto convertToProtoFormat(NodeStatus t) {
-    return ((NodeStatusPBImpl) t).getProto();
+    return ((NodeStatusPBImpl)t).getProto();
   }
 
   private MasterKeyPBImpl convertFromProtoFormat(MasterKeyProto p) {
@@ -182,6 +176,6 @@ public class NodeHeartbeatRequestPBImpl extends NodeHeartbeatRequest {
   }
 
   private MasterKeyProto convertToProtoFormat(MasterKey t) {
-    return ((MasterKeyPBImpl) t).getProto();
+    return ((MasterKeyPBImpl)t).getProto();
   }
 }  

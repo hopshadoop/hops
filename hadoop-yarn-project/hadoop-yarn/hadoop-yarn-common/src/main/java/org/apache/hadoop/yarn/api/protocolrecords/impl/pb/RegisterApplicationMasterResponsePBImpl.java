@@ -19,8 +19,9 @@
 package org.apache.hadoop.yarn.api.protocolrecords.impl.pb;
 
 
-import com.google.protobuf.ByteString;
-import com.google.protobuf.TextFormat;
+import java.nio.ByteBuffer;
+import java.util.*;
+
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterResponse;
@@ -38,21 +39,18 @@ import org.apache.hadoop.yarn.proto.YarnProtos.ResourceProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.NMTokenProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.RegisterApplicationMasterResponseProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.RegisterApplicationMasterResponseProtoOrBuilder;
+import org.apache.hadoop.yarn.proto.YarnServiceProtos.SchedulerResourceTypes;
 
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import com.google.protobuf.ByteString;
+import com.google.protobuf.TextFormat;
 
 
 @Private
 @Unstable
-public class RegisterApplicationMasterResponsePBImpl
-    extends RegisterApplicationMasterResponse {
+public class RegisterApplicationMasterResponsePBImpl extends
+    RegisterApplicationMasterResponse {
   RegisterApplicationMasterResponseProto proto =
-      RegisterApplicationMasterResponseProto.getDefaultInstance();
+    RegisterApplicationMasterResponseProto.getDefaultInstance();
   RegisterApplicationMasterResponseProto.Builder builder = null;
   boolean viaProto = false;
 
@@ -60,13 +58,13 @@ public class RegisterApplicationMasterResponsePBImpl
   private Map<ApplicationAccessType, String> applicationACLS = null;
   private List<Container> containersFromPreviousAttempts = null;
   private List<NMToken> nmTokens = null;
+  private EnumSet<SchedulerResourceTypes> schedulerResourceTypes = null;
 
   public RegisterApplicationMasterResponsePBImpl() {
     builder = RegisterApplicationMasterResponseProto.newBuilder();
   }
 
-  public RegisterApplicationMasterResponsePBImpl(
-      RegisterApplicationMasterResponseProto proto) {
+  public RegisterApplicationMasterResponsePBImpl(RegisterApplicationMasterResponseProto proto) {
     this.proto = proto;
     viaProto = true;
   }
@@ -85,9 +83,8 @@ public class RegisterApplicationMasterResponsePBImpl
 
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -100,9 +97,8 @@ public class RegisterApplicationMasterResponsePBImpl
   }
 
   private void mergeLocalToProto() {
-    if (viaProto) {
+    if (viaProto)
       maybeInitBuilder();
-    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
@@ -124,6 +120,9 @@ public class RegisterApplicationMasterResponsePBImpl
       Iterable<NMTokenProto> iterable = getTokenProtoIterable(nmTokens);
       builder.addAllNmTokensFromPreviousAttempts(iterable);
     }
+    if(schedulerResourceTypes != null) {
+      addSchedulerResourceTypes();
+    }
   }
 
 
@@ -140,21 +139,19 @@ public class RegisterApplicationMasterResponsePBImpl
       return this.maximumResourceCapability;
     }
 
-    RegisterApplicationMasterResponseProtoOrBuilder p =
-        viaProto ? proto : builder;
+    RegisterApplicationMasterResponseProtoOrBuilder p = viaProto ? proto : builder;
     if (!p.hasMaximumCapability()) {
       return null;
     }
 
-    this.maximumResourceCapability =
-        convertFromProtoFormat(p.getMaximumCapability());
+    this.maximumResourceCapability = convertFromProtoFormat(p.getMaximumCapability());
     return this.maximumResourceCapability;
   }
 
   @Override
   public void setMaximumResourceCapability(Resource capability) {
     maybeInitBuilder();
-    if (maximumResourceCapability == null) {
+    if(maximumResourceCapability == null) {
       builder.clearMaximumCapability();
     }
     this.maximumResourceCapability = capability;
@@ -170,16 +167,15 @@ public class RegisterApplicationMasterResponsePBImpl
     if (this.applicationACLS != null) {
       return;
     }
-    RegisterApplicationMasterResponseProtoOrBuilder p =
-        viaProto ? proto : builder;
+    RegisterApplicationMasterResponseProtoOrBuilder p = viaProto ? proto
+        : builder;
     List<ApplicationACLMapProto> list = p.getApplicationACLsList();
-    this.applicationACLS =
-        new HashMap<ApplicationAccessType, String>(list.size());
+    this.applicationACLS = new HashMap<ApplicationAccessType, String>(list
+        .size());
 
     for (ApplicationACLMapProto aclProto : list) {
-      this.applicationACLS
-          .put(ProtoUtils.convertFromProtoFormat(aclProto.getAccessType()),
-              aclProto.getAcl());
+      this.applicationACLS.put(ProtoUtils.convertFromProtoFormat(aclProto
+          .getAccessType()), aclProto.getAcl());
     }
   }
 
@@ -189,45 +185,43 @@ public class RegisterApplicationMasterResponsePBImpl
     if (applicationACLS == null) {
       return;
     }
-    Iterable<? extends ApplicationACLMapProto> values =
-        new Iterable<ApplicationACLMapProto>() {
+    Iterable<? extends ApplicationACLMapProto> values
+        = new Iterable<ApplicationACLMapProto>() {
+
+      @Override
+      public Iterator<ApplicationACLMapProto> iterator() {
+        return new Iterator<ApplicationACLMapProto>() {
+          Iterator<ApplicationAccessType> aclsIterator = applicationACLS
+              .keySet().iterator();
 
           @Override
-          public Iterator<ApplicationACLMapProto> iterator() {
-            return new Iterator<ApplicationACLMapProto>() {
-              Iterator<ApplicationAccessType> aclsIterator =
-                  applicationACLS.keySet().iterator();
+          public boolean hasNext() {
+            return aclsIterator.hasNext();
+          }
 
-              @Override
-              public boolean hasNext() {
-                return aclsIterator.hasNext();
-              }
+          @Override
+          public ApplicationACLMapProto next() {
+            ApplicationAccessType key = aclsIterator.next();
+            return ApplicationACLMapProto.newBuilder().setAcl(
+                applicationACLS.get(key)).setAccessType(
+                ProtoUtils.convertToProtoFormat(key)).build();
+          }
 
-              @Override
-              public ApplicationACLMapProto next() {
-                ApplicationAccessType key = aclsIterator.next();
-                return ApplicationACLMapProto.newBuilder()
-                    .setAcl(applicationACLS.get(key))
-                    .setAccessType(ProtoUtils.convertToProtoFormat(key))
-                    .build();
-              }
-
-              @Override
-              public void remove() {
-                throw new UnsupportedOperationException();
-              }
-            };
+          @Override
+          public void remove() {
+            throw new UnsupportedOperationException();
           }
         };
+      }
+    };
     this.builder.addAllApplicationACLs(values);
   }
 
   @Override
   public void setApplicationACLs(
       final Map<ApplicationAccessType, String> appACLs) {
-    if (appACLs == null) {
+    if (appACLs == null)
       return;
-    }
     initApplicationACLs();
     this.applicationACLS.clear();
     this.applicationACLS.putAll(appACLs);
@@ -235,11 +229,11 @@ public class RegisterApplicationMasterResponsePBImpl
   
   @Override
   public void setClientToAMTokenMasterKey(ByteBuffer key) {
+    maybeInitBuilder();
     if (key == null) {
       builder.clearClientToAmTokenMasterKey();
       return;
     }
-    maybeInitBuilder();
     builder.setClientToAmTokenMasterKey(ByteString.copyFrom(key));
   }
   
@@ -261,8 +255,8 @@ public class RegisterApplicationMasterResponsePBImpl
   }
 
   @Override
-  public void setContainersFromPreviousAttempts(
-      final List<Container> containers) {
+  public void
+      setContainersFromPreviousAttempts(final List<Container> containers) {
     if (containers == null) {
       return;
     }
@@ -272,8 +266,7 @@ public class RegisterApplicationMasterResponsePBImpl
   
   @Override
   public String getQueue() {
-    RegisterApplicationMasterResponseProtoOrBuilder p =
-        viaProto ? proto : builder;
+    RegisterApplicationMasterResponseProtoOrBuilder p = viaProto ? proto : builder;
     if (!p.hasQueue()) {
       return null;
     }
@@ -323,6 +316,7 @@ public class RegisterApplicationMasterResponsePBImpl
   
   @Override
   public void setNMTokensFromPreviousAttempts(final List<NMToken> nmTokens) {
+    maybeInitBuilder();
     if (nmTokens == null || nmTokens.isEmpty()) {
       if (this.nmTokens != null) {
         this.nmTokens.clear();
@@ -335,8 +329,7 @@ public class RegisterApplicationMasterResponsePBImpl
   }
 
   private synchronized void initLocalNewNMTokenList() {
-    RegisterApplicationMasterResponseProtoOrBuilder p =
-        viaProto ? proto : builder;
+    RegisterApplicationMasterResponseProtoOrBuilder p = viaProto ? proto : builder;
     List<NMTokenProto> list = p.getNmTokensFromPreviousAttemptsList();
     nmTokens = new ArrayList<NMToken>();
     for (NMTokenProto t : list) {
@@ -373,12 +366,79 @@ public class RegisterApplicationMasterResponsePBImpl
     };
   }
 
+  @Override
+  public EnumSet<SchedulerResourceTypes> getSchedulerResourceTypes() {
+    initSchedulerResourceTypes();
+    return this.schedulerResourceTypes;
+  }
+
+  private void initSchedulerResourceTypes() {
+    if (this.schedulerResourceTypes != null) {
+      return;
+    }
+    RegisterApplicationMasterResponseProtoOrBuilder p =
+        viaProto ? proto : builder;
+
+    List<SchedulerResourceTypes> list = p.getSchedulerResourceTypesList();
+    if (list.isEmpty()) {
+      this.schedulerResourceTypes =
+          EnumSet.noneOf(SchedulerResourceTypes.class);
+    } else {
+      this.schedulerResourceTypes = EnumSet.copyOf(list);
+    }
+  }
+
+  private void addSchedulerResourceTypes() {
+    maybeInitBuilder();
+    builder.clearSchedulerResourceTypes();
+    if (schedulerResourceTypes == null) {
+      return;
+    }
+    Iterable<? extends SchedulerResourceTypes> values =
+        new Iterable<SchedulerResourceTypes>() {
+
+          @Override
+          public Iterator<SchedulerResourceTypes> iterator() {
+            return new Iterator<SchedulerResourceTypes>() {
+              Iterator<SchedulerResourceTypes> settingsIterator =
+                  schedulerResourceTypes.iterator();
+
+              @Override
+              public boolean hasNext() {
+                return settingsIterator.hasNext();
+              }
+
+              @Override
+              public SchedulerResourceTypes next() {
+                return settingsIterator.next();
+              }
+
+              @Override
+              public void remove() {
+                throw new UnsupportedOperationException();
+              }
+            };
+          }
+        };
+    this.builder.addAllSchedulerResourceTypes(values);
+  }
+
+  @Override
+  public void setSchedulerResourceTypes(EnumSet<SchedulerResourceTypes> types) {
+    if (types == null) {
+      return;
+    }
+    initSchedulerResourceTypes();
+    this.schedulerResourceTypes.clear();
+    this.schedulerResourceTypes.addAll(types);
+  }
+
   private Resource convertFromProtoFormat(ResourceProto resource) {
     return new ResourcePBImpl(resource);
   }
 
   private ResourceProto convertToProtoFormat(Resource resource) {
-    return ((ResourcePBImpl) resource).getProto();
+    return ((ResourcePBImpl)resource).getProto();
   }
 
   private ContainerPBImpl convertFromProtoFormat(ContainerProto p) {

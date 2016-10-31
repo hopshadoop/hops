@@ -1,13 +1,13 @@
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements. See the NOTICE file
+ * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
- * regarding copyright ownership. The ASF licenses this file
+ * regarding copyright ownership.  The ASF licenses this file
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
- * with the License. You may obtain a copy of the License at
+ * with the License.  You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,16 +15,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.yarn.client;
 
-import io.hops.metadata.util.RMStorageFactory;
-import io.hops.metadata.util.RMUtilities;
-import io.hops.metadata.util.YarnAPIStorageFactory;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.fail;
+
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.URL;
+
+import javax.servlet.http.HttpServletResponse;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ha.ClientBaseWithFixes;
 import org.apache.hadoop.ha.HAServiceProtocol;
+import org.apache.hadoop.ha.HAServiceProtocol.HAServiceState;
 import org.apache.hadoop.service.Service.STATE;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.client.api.YarnClient;
@@ -33,27 +44,17 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.server.MiniYARNCluster;
 import org.apache.hadoop.yarn.server.resourcemanager.AdminService;
+import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
 import org.apache.hadoop.yarn.server.webproxy.WebAppProxyServer;
+import org.apache.hadoop.yarn.webapp.YarnWebParams;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.io.IOException;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.util.List;
-import java.util.Map;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 public class TestRMFailover extends ClientBaseWithFixes {
-
-  private static final Log LOG = LogFactory.getLog(TestRMFailover.class.
-      getName());
+  private static final Log LOG =
+      LogFactory.getLog(TestRMFailover.class.getName());
   private static final HAServiceProtocol.StateChangeRequestInfo req =
       new HAServiceProtocol.StateChangeRequestInfo(
           HAServiceProtocol.RequestSource.REQUEST_BY_USER);
@@ -67,27 +68,24 @@ public class TestRMFailover extends ClientBaseWithFixes {
   private MiniYARNCluster cluster;
   private ApplicationId fakeAppId;
 
+
   private void setConfForRM(String rmId, String prefix, String value) {
     conf.set(HAUtil.addSuffix(prefix, rmId), value);
   }
 
   private void setRpcAddressForRM(String rmId, int base) {
-    setConfForRM(rmId, YarnConfiguration.RM_ADDRESS,
-        "127.0.0.1:" + (base + YarnConfiguration.DEFAULT_RM_PORT));
-    setConfForRM(rmId, YarnConfiguration.RM_SCHEDULER_ADDRESS,
-        "127.0.0.1:" + (base + YarnConfiguration.DEFAULT_RM_SCHEDULER_PORT));
-    setConfForRM(rmId, YarnConfiguration.RM_ADMIN_ADDRESS,
-        "127.0.0.1:" + (base + YarnConfiguration.DEFAULT_RM_ADMIN_PORT));
-    setConfForRM(rmId, YarnConfiguration.RM_RESOURCE_TRACKER_ADDRESS,
-        "127.0.0.1:" +
-            (base + YarnConfiguration.DEFAULT_RM_RESOURCE_TRACKER_PORT));
-    setConfForRM(rmId, YarnConfiguration.RM_WEBAPP_ADDRESS,
-        "127.0.0.1:" + (base + YarnConfiguration.DEFAULT_RM_WEBAPP_PORT));
-    setConfForRM(rmId, YarnConfiguration.RM_WEBAPP_HTTPS_ADDRESS,
-        "127.0.0.1:" + (base + YarnConfiguration.DEFAULT_RM_WEBAPP_HTTPS_PORT));
-    setConfForRM(rmId, YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS,
-        "127.0.0.1:" +
-            (base + YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_PORT));
+    setConfForRM(rmId, YarnConfiguration.RM_ADDRESS, "0.0.0.0:" +
+        (base + YarnConfiguration.DEFAULT_RM_PORT));
+    setConfForRM(rmId, YarnConfiguration.RM_SCHEDULER_ADDRESS, "0.0.0.0:" +
+        (base + YarnConfiguration.DEFAULT_RM_SCHEDULER_PORT));
+    setConfForRM(rmId, YarnConfiguration.RM_ADMIN_ADDRESS, "0.0.0.0:" +
+        (base + YarnConfiguration.DEFAULT_RM_ADMIN_PORT));
+    setConfForRM(rmId, YarnConfiguration.RM_RESOURCE_TRACKER_ADDRESS, "0.0.0.0:" +
+        (base + YarnConfiguration.DEFAULT_RM_RESOURCE_TRACKER_PORT));
+    setConfForRM(rmId, YarnConfiguration.RM_WEBAPP_ADDRESS, "0.0.0.0:" +
+        (base + YarnConfiguration.DEFAULT_RM_WEBAPP_PORT));
+    setConfForRM(rmId, YarnConfiguration.RM_WEBAPP_HTTPS_ADDRESS, "0.0.0.0:" +
+        (base + YarnConfiguration.DEFAULT_RM_WEBAPP_HTTPS_PORT));
   }
 
   @Before
@@ -103,14 +101,8 @@ public class TestRMFailover extends ClientBaseWithFixes {
 
     conf.setBoolean(YarnConfiguration.YARN_MINICLUSTER_FIXED_PORTS, true);
     conf.setBoolean(YarnConfiguration.YARN_MINICLUSTER_USE_RPC, true);
-    
-    YarnAPIStorageFactory.setConfiguration(conf);
-    RMStorageFactory.setConfiguration(conf);
-    RMUtilities.InitializeDB();
+
     cluster = new MiniYARNCluster(TestRMFailover.class.getName(), 2, 1, 1, 1);
-    YarnAPIStorageFactory.setConfiguration(conf);
-    RMStorageFactory.setConfiguration(conf);
-    RMUtilities.InitializeDB();
   }
 
   @After
@@ -120,7 +112,7 @@ public class TestRMFailover extends ClientBaseWithFixes {
 
   private void verifyClientConnection() {
     int numRetries = 3;
-    while (numRetries-- > 0) {
+    while(numRetries-- > 0) {
       Configuration conf = new YarnConfiguration(this.conf);
       YarnClient client = YarnClient.createYarnClient();
       client.init(conf);
@@ -139,7 +131,7 @@ public class TestRMFailover extends ClientBaseWithFixes {
 
   private void verifyConnections() throws InterruptedException, YarnException {
     assertTrue("NMs failed to connect to the RM",
-        cluster.waitForNodeManagersToConnect(2000000));
+        cluster.waitForNodeManagersToConnect(20000));
     verifyClientConnection();
   }
 
@@ -151,20 +143,16 @@ public class TestRMFailover extends ClientBaseWithFixes {
     int activeRMIndex = cluster.getActiveRMIndex();
     int newActiveRMIndex = (activeRMIndex + 1) % 2;
     getAdminService(activeRMIndex).transitionToStandby(req);
-    //HOPS :: InitializeDB because during standby rmcontext node info is purged
-    RMUtilities.InitializeDB();
     getAdminService(newActiveRMIndex).transitionToActive(req);
-    assertEquals("Failover failed", newActiveRMIndex,
-        cluster.getActiveRMIndex());
+    assertEquals("Failover failed", newActiveRMIndex, cluster.getActiveRMIndex());
   }
 
   private void failover()
       throws IOException, InterruptedException, YarnException {
     int activeRMIndex = cluster.getActiveRMIndex();
     cluster.stopResourceManager(activeRMIndex);
-    assertEquals("Failover failed", (activeRMIndex + 1) % 2,
-        cluster.getActiveRMIndex());
-    
+    assertEquals("Failover failed",
+        (activeRMIndex + 1) % 2, cluster.getActiveRMIndex());
     cluster.restartResourceManager(activeRMIndex);
   }
 
@@ -172,11 +160,8 @@ public class TestRMFailover extends ClientBaseWithFixes {
   public void testExplicitFailover()
       throws YarnException, InterruptedException, IOException {
     conf.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, false);
-    conf.set(YarnConfiguration.CLIENT_FAILOVER_PROXY_PROVIDER,
-        "org.apache.hadoop.yarn.client.ConfiguredRMFailoverProxyProvider");
     cluster.init(conf);
     cluster.start();
-    getAdminService(0).transitionToActive(req);
     assertFalse("RM never turned active", -1 == cluster.getActiveRMIndex());
     verifyConnections();
 
@@ -193,8 +178,7 @@ public class TestRMFailover extends ClientBaseWithFixes {
     conf.set(YarnConfiguration.RM_CLUSTER_ID, "yarn-test-cluster");
     conf.set(YarnConfiguration.RM_ZK_ADDRESS, hostPort);
     conf.setInt(YarnConfiguration.RM_ZK_TIMEOUT_MS, 2000);
-    conf.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, true);
-    
+
     cluster.init(conf);
     cluster.start();
     assertFalse("RM never turned active", -1 == cluster.getActiveRMIndex());
@@ -205,17 +189,31 @@ public class TestRMFailover extends ClientBaseWithFixes {
 
     failover();
     verifyConnections();
+
+    // Make the current Active handle an RMFatalEvent,
+    // so it transitions to standby.
+    ResourceManager rm = cluster.getResourceManager(
+        cluster.getActiveRMIndex());
+    rm.handleTransitionToStandBy();
+    int maxWaitingAttempts = 2000;
+    while (maxWaitingAttempts-- > 0 ) {
+      if (rm.getRMContext().getHAServiceState() == HAServiceState.STANDBY) {
+        break;
+      }
+      Thread.sleep(1);
+    }
+    Assert.assertFalse("RM didn't transition to Standby ",
+        maxWaitingAttempts == 0);
+    verifyConnections();
   }
 
   @Test
-  public void testWebAppProxyInStandAloneMode()
-      throws YarnException, InterruptedException, IOException {
+  public void testWebAppProxyInStandAloneMode() throws YarnException,
+      InterruptedException, IOException {
     conf.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, false);
-    conf.set(YarnConfiguration.CLIENT_FAILOVER_PROXY_PROVIDER,
-        "org.apache.hadoop.yarn.client.ConfiguredRMFailoverProxyProvider");
     WebAppProxyServer webAppProxyServer = new WebAppProxyServer();
     try {
-      conf.set(YarnConfiguration.PROXY_ADDRESS, "127.0.0.1:9099");
+      conf.set(YarnConfiguration.PROXY_ADDRESS, "0.0.0.0:9099");
       cluster.init(conf);
       cluster.start();
       getAdminService(0).transitionToActive(req);
@@ -230,9 +228,9 @@ public class TestRMFailover extends ClientBaseWithFixes {
 
       // send httpRequest with fakeApplicationId
       // expect to get "Not Found" response and 404 response code
-      URL wrongUrl = new URL("http://127.0.0.1:9099/proxy/" + fakeAppId);
-      HttpURLConnection proxyConn =
-          (HttpURLConnection) wrongUrl.openConnection();
+      URL wrongUrl = new URL("http://0.0.0.0:9099/proxy/" + fakeAppId);
+      HttpURLConnection proxyConn = (HttpURLConnection) wrongUrl
+          .openConnection();
 
       proxyConn.connect();
       verifyResponse(proxyConn);
@@ -247,21 +245,19 @@ public class TestRMFailover extends ClientBaseWithFixes {
   }
 
   @Test
-  public void testEmbeddedWebAppProxy()
-      throws YarnException, InterruptedException, IOException {
+  public void testEmbeddedWebAppProxy() throws YarnException,
+      InterruptedException, IOException {
     conf.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, false);
-    conf.set(YarnConfiguration.CLIENT_FAILOVER_PROXY_PROVIDER,
-        "org.apache.hadoop.yarn.client.ConfiguredRMFailoverProxyProvider");
     cluster.init(conf);
     cluster.start();
-    getAdminService(0).transitionToActive(req);
     assertFalse("RM never turned active", -1 == cluster.getActiveRMIndex());
     verifyConnections();
 
     // send httpRequest with fakeApplicationId
     // expect to get "Not Found" response and 404 response code
-    URL wrongUrl = new URL("http://127.0.0.1:18088/proxy/" + fakeAppId);
-    HttpURLConnection proxyConn = (HttpURLConnection) wrongUrl.openConnection();
+    URL wrongUrl = new URL("http://0.0.0.0:18088/proxy/" + fakeAppId);
+    HttpURLConnection proxyConn = (HttpURLConnection) wrongUrl
+        .openConnection();
 
     proxyConn.connect();
     verifyResponse(proxyConn);
@@ -272,52 +268,104 @@ public class TestRMFailover extends ClientBaseWithFixes {
     verifyResponse(proxyConn);
   }
 
-  private void verifyResponse(HttpURLConnection response) throws IOException {
+  private void verifyResponse(HttpURLConnection response)
+      throws IOException {
     assertEquals("Not Found", response.getResponseMessage());
     assertEquals(404, response.getResponseCode());
   }
 
   @Test
-  public void testRMWebAppRedirect()
-      throws YarnException, InterruptedException, IOException {
+  public void testRMWebAppRedirect() throws YarnException,
+      InterruptedException, IOException {
     cluster = new MiniYARNCluster(TestRMFailover.class.getName(), 2, 0, 1, 1);
     conf.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, false);
-    conf.set(YarnConfiguration.CLIENT_FAILOVER_PROXY_PROVIDER,
-        "org.apache.hadoop.yarn.client.ConfiguredRMFailoverProxyProvider");
 
     cluster.init(conf);
     cluster.start();
     getAdminService(0).transitionToActive(req);
-    String rm1Url = "http://127.0.0.1:18088";
-    String rm1UrlAlt = "http://localhost:18088";
-    String rm2Url = "http://127.0.0.1:28088";
-    String header = getHeader("Refresh", rm2Url);
-    assertTrue("wrong header: " + header, header.contains("; url=" + rm1Url) ||
-        header.contains("; url=" + rm1UrlAlt));
+    String rm1Url = "http://0.0.0.0:18088";
+    String rm2Url = "http://0.0.0.0:28088";
 
-    header = getHeader("Refresh", rm2Url + "/cluster/cluster");
-    assertEquals(null, header);
+    String redirectURL = getRedirectURL(rm2Url);
+    // if uri is null, RMWebAppFilter will append a slash at the trail of the redirection url
+    assertEquals(redirectURL,rm1Url+"/");
 
-    header = getHeader("Refresh", rm2Url + "/ws/v1/cluster/info");
-    assertEquals(null, header);
+    redirectURL = getRedirectURL(rm2Url + "/metrics");
+    assertEquals(redirectURL,rm1Url + "/metrics");
 
-    header = getHeader("Refresh", rm2Url + "/ws/v1/cluster/apps");
-    assertTrue(header.contains("; url=" + rm1Url) ||
-        header.contains("; url=" + rm1UrlAlt));
+    redirectURL = getRedirectURL(rm2Url + "/jmx");
+    assertEquals(redirectURL,rm1Url + "/jmx");
 
-    // Due to the limitation of MiniYARNCluster and dispatcher is a singleton,
-    // we couldn't add the test case after explicitFailover();
+    // standby RM links /conf, /stacks, /logLevel, /static, /logs,
+    // /cluster/cluster as well as webService
+    // /ws/v1/cluster/info should not be redirected to active RM
+    redirectURL = getRedirectURL(rm2Url + "/cluster/cluster");
+    assertNull(redirectURL);
+
+    redirectURL = getRedirectURL(rm2Url + "/conf");
+    assertNull(redirectURL);
+
+    redirectURL = getRedirectURL(rm2Url + "/stacks");
+    assertNull(redirectURL);
+
+    redirectURL = getRedirectURL(rm2Url + "/logLevel");
+    assertNull(redirectURL);
+
+    redirectURL = getRedirectURL(rm2Url + "/static");
+    assertNull(redirectURL);
+
+    redirectURL = getRedirectURL(rm2Url + "/logs");
+    assertNull(redirectURL);
+
+    redirectURL = getRedirectURL(rm2Url + "/ws/v1/cluster/info");
+    assertNull(redirectURL);
+
+    redirectURL = getRedirectURL(rm2Url + "/ws/v1/cluster/apps");
+    assertEquals(redirectURL, rm1Url + "/ws/v1/cluster/apps");
+
+    redirectURL = getRedirectURL(rm2Url + "/proxy/" + fakeAppId);
+    assertNull(redirectURL);
+
+    // transit the active RM to standby
+    // Both of RMs are in standby mode
+    getAdminService(0).transitionToStandby(req);
+    // RM2 is expected to send the httpRequest to itself.
+    // The Header Field: Refresh is expected to be set.
+    redirectURL = getRefreshURL(rm2Url);
+    assertTrue(redirectURL != null
+        && redirectURL.contains(YarnWebParams.NEXT_REFRESH_INTERVAL)
+        && redirectURL.contains(rm2Url));
+
   }
 
-  static String getHeader(String field, String url) {
-    String fieldHeader = null;
+  // set up http connection with the given url and get the redirection url from the response
+  // return null if the url is not redirected
+  static String getRedirectURL(String url) {
+    String redirectUrl = null;
     try {
-      Map<String, List<String>> map = new URL(url).openConnection().
-          getHeaderFields();
-      fieldHeader = map.get(field).get(0);
+      HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
+      // do not automatically follow the redirection
+      // otherwise we get too many redirections exception
+      conn.setInstanceFollowRedirects(false);
+      if(conn.getResponseCode() == HttpServletResponse.SC_TEMPORARY_REDIRECT)
+        redirectUrl = conn.getHeaderField("Location");
     } catch (Exception e) {
+      // throw new RuntimeException(e);
     }
-    return fieldHeader;
+    return redirectUrl;
   }
 
+  static String getRefreshURL(String url) {
+    String redirectUrl = null;
+    try {
+      HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
+      // do not automatically follow the redirection
+      // otherwise we get too many redirections exception
+      conn.setInstanceFollowRedirects(false);
+      redirectUrl = conn.getHeaderField("Refresh");
+    } catch (Exception e) {
+      // throw new RuntimeException(e);
+    }
+    return redirectUrl;
+  }
 }

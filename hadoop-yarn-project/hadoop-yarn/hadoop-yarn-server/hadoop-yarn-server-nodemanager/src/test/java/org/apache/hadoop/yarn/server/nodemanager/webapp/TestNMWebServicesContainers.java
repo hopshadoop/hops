@@ -18,17 +18,20 @@
 
 package org.apache.hadoop.yarn.server.nodemanager.webapp;
 
-import com.google.inject.Guice;
-import com.google.inject.Injector;
-import com.google.inject.servlet.GuiceServletContextListener;
-import com.google.inject.servlet.ServletModule;
-import com.sun.jersey.api.client.ClientResponse;
-import com.sun.jersey.api.client.ClientResponse.Status;
-import com.sun.jersey.api.client.UniformInterfaceException;
-import com.sun.jersey.api.client.WebResource;
-import com.sun.jersey.guice.spi.container.servlet.GuiceContainer;
-import com.sun.jersey.test.framework.JerseyTest;
-import com.sun.jersey.test.framework.WebAppDescriptor;
+import static org.apache.hadoop.yarn.util.StringHelper.ujoin;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.StringReader;
+import java.util.HashMap;
+
+import javax.ws.rs.core.MediaType;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
@@ -48,11 +51,13 @@ import org.apache.hadoop.yarn.server.security.ApplicationACLsManager;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.hadoop.yarn.webapp.GenericExceptionHandler;
+import org.apache.hadoop.yarn.webapp.JerseyTestBase;
 import org.apache.hadoop.yarn.webapp.WebApp;
 import org.apache.hadoop.yarn.webapp.WebServicesTestUtils;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
+import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Test;
@@ -61,20 +66,18 @@ import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 import org.xml.sax.InputSource;
 
-import javax.ws.rs.core.MediaType;
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import java.io.File;
-import java.io.IOException;
-import java.io.StringReader;
-import java.util.HashMap;
+import com.google.inject.Guice;
+import com.google.inject.Injector;
+import com.google.inject.servlet.GuiceServletContextListener;
+import com.google.inject.servlet.ServletModule;
+import com.sun.jersey.api.client.ClientResponse;
+import com.sun.jersey.api.client.ClientResponse.Status;
+import com.sun.jersey.api.client.UniformInterfaceException;
+import com.sun.jersey.api.client.WebResource;
+import com.sun.jersey.guice.spi.container.servlet.GuiceContainer;
+import com.sun.jersey.test.framework.WebAppDescriptor;
 
-import static org.apache.hadoop.yarn.util.StringHelper.ujoin;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
-public class TestNMWebServicesContainers extends JerseyTest {
+public class TestNMWebServicesContainers extends JerseyTestBase {
 
   private static Context nmContext;
   private static ResourceView resourceView;
@@ -83,8 +86,8 @@ public class TestNMWebServicesContainers extends JerseyTest {
   private static WebApp nmWebApp;
   private static Configuration conf = new Configuration();
 
-  private static final File testRootDir =
-      new File("target", TestNMWebServicesContainers.class.getSimpleName());
+  private static final File testRootDir = new File("target",
+      TestNMWebServicesContainers.class.getSimpleName());
   private static File testLogDir = new File("target",
       TestNMWebServicesContainers.class.getSimpleName() + "LogDir");
 
@@ -105,6 +108,11 @@ public class TestNMWebServicesContainers extends JerseyTest {
         }
 
         @Override
+        public long getVCoresAllocatedForContainers() {
+          return new Long("4000");
+        }
+
+        @Override
         public boolean isVmemCheckEnabled() {
           return true;
         }
@@ -120,20 +128,16 @@ public class TestNMWebServicesContainers extends JerseyTest {
       healthChecker.init(conf);
       dirsHandler = healthChecker.getDiskHandler();
       aclsManager = new ApplicationACLsManager(conf);
-      nmContext =
-          new NodeManager.NMContext(null, null, dirsHandler, aclsManager) {
-            public NodeId getNodeId() {
-              return NodeId.newInstance("testhost.foo.com", 8042);
-            }
+      nmContext = new NodeManager.NMContext(null, null, dirsHandler,
+          aclsManager, null) {
+        public NodeId getNodeId() {
+          return NodeId.newInstance("testhost.foo.com", 8042);
+        };
 
-            ;
-
-            public int getHttpPort() {
-              return 1234;
-            }
-
-            ;
-          };
+        public int getHttpPort() {
+          return 1234;
+        };
+      };
       nmWebApp = new NMWebApp(resourceView, aclsManager, dirsHandler);
       bind(JAXBContextResolver.class);
       bind(NMWebServices.class);
@@ -181,35 +185,35 @@ public class TestNMWebServicesContainers extends JerseyTest {
   @Test
   public void testNodeContainersNone() throws JSONException, Exception {
     WebResource r = resource();
-    ClientResponse response =
-        r.path("ws").path("v1").path("node").path("containers")
-            .accept(MediaType.APPLICATION_JSON).get(ClientResponse.class);
+    ClientResponse response = r.path("ws").path("v1").path("node")
+        .path("containers").accept(MediaType.APPLICATION_JSON)
+        .get(ClientResponse.class);
     assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
     JSONObject json = response.getEntity(JSONObject.class);
     assertEquals("apps isn't NULL", JSONObject.NULL, json.get("containers"));
   }
 
-  private HashMap<String, String> addAppContainers(Application app)
+  private HashMap<String, String> addAppContainers(Application app) 
       throws IOException {
     Dispatcher dispatcher = new AsyncDispatcher();
-    ApplicationAttemptId appAttemptId =
-        BuilderUtils.newApplicationAttemptId(app.getAppId(), 1);
-    Container container1 =
-        new MockContainer(appAttemptId, dispatcher, conf, app.getUser(),
-            app.getAppId(), 1);
-    Container container2 =
-        new MockContainer(appAttemptId, dispatcher, conf, app.getUser(),
-            app.getAppId(), 2);
-    nmContext.getContainers().put(container1.getContainerId(), container1);
-    nmContext.getContainers().put(container2.getContainerId(), container2);
+    ApplicationAttemptId appAttemptId = BuilderUtils.newApplicationAttemptId(
+        app.getAppId(), 1);
+    Container container1 = new MockContainer(appAttemptId, dispatcher, conf,
+        app.getUser(), app.getAppId(), 1);
+    Container container2 = new MockContainer(appAttemptId, dispatcher, conf,
+        app.getUser(), app.getAppId(), 2);
+    nmContext.getContainers()
+        .put(container1.getContainerId(), container1);
+    nmContext.getContainers()
+        .put(container2.getContainerId(), container2);
 
     app.getContainers().put(container1.getContainerId(), container1);
     app.getContainers().put(container2.getContainerId(), container2);
     HashMap<String, String> hash = new HashMap<String, String>();
-    hash.put(container1.getContainerId().toString(),
-        container1.getContainerId().toString());
-    hash.put(container2.getContainerId().toString(),
-        container2.getContainerId().toString());
+    hash.put(container1.getContainerId().toString(), container1
+        .getContainerId().toString());
+    hash.put(container2.getContainerId().toString(), container2
+        .getContainerId().toString());
     return hash;
   }
 
@@ -230,8 +234,8 @@ public class TestNMWebServicesContainers extends JerseyTest {
 
   }
 
-  public void testNodeHelper(String path, String media)
-      throws JSONException, Exception {
+  public void testNodeHelper(String path, String media) throws JSONException,
+      Exception {
     WebResource r = resource();
     Application app = new MockApp(1);
     nmContext.getApplications().put(app.getAppId(), app);
@@ -240,9 +244,8 @@ public class TestNMWebServicesContainers extends JerseyTest {
     nmContext.getApplications().put(app2.getAppId(), app2);
     addAppContainers(app2);
 
-    ClientResponse response =
-        r.path("ws").path("v1").path("node").path(path).accept(media)
-            .get(ClientResponse.class);
+    ClientResponse response = r.path("ws").path("v1").path("node").path(path)
+        .accept(media).get(ClientResponse.class);
     assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
     JSONObject json = response.getEntity(JSONObject.class);
     JSONObject info = json.getJSONObject("containers");
@@ -251,9 +254,11 @@ public class TestNMWebServicesContainers extends JerseyTest {
     assertEquals("incorrect number of elements", 4, conInfo.length());
 
     for (int i = 0; i < conInfo.length(); i++) {
-      verifyNodeContainerInfo(conInfo.getJSONObject(i),
-          nmContext.getContainers().get(ConverterUtils
-                  .toContainerId(conInfo.getJSONObject(i).getString("id"))));
+      verifyNodeContainerInfo(
+          conInfo.getJSONObject(i),
+          nmContext.getContainers().get(
+              ConverterUtils.toContainerId(conInfo.getJSONObject(i).getString(
+                  "id"))));
     }
   }
 
@@ -268,8 +273,7 @@ public class TestNMWebServicesContainers extends JerseyTest {
   }
 
   @Test
-  public void testNodeSingleContainersDefault()
-      throws JSONException, Exception {
+  public void testNodeSingleContainersDefault() throws JSONException, Exception {
     testNodeSingleContainersHelper("");
   }
 
@@ -284,13 +288,12 @@ public class TestNMWebServicesContainers extends JerseyTest {
     addAppContainers(app2);
 
     for (String id : hash.keySet()) {
-      ClientResponse response =
-          r.path("ws").path("v1").path("node").path("containers").path(id)
-              .accept(media).get(ClientResponse.class);
+      ClientResponse response = r.path("ws").path("v1").path("node")
+          .path("containers").path(id).accept(media).get(ClientResponse.class);
       assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
       JSONObject json = response.getEntity(JSONObject.class);
-      verifyNodeContainerInfo(json.getJSONObject("container"),
-          nmContext.getContainers().get(ConverterUtils.toContainerId(id)));
+      verifyNodeContainerInfo(json.getJSONObject("container"), nmContext
+          .getContainers().get(ConverterUtils.toContainerId(id)));
     }
   }
 
@@ -321,8 +324,8 @@ public class TestNMWebServicesContainers extends JerseyTest {
       WebServicesTestUtils.checkStringMatch("exception message",
           "java.lang.Exception: invalid container id, container_foo_1234",
           message);
-      WebServicesTestUtils
-          .checkStringMatch("exception type", "BadRequestException", type);
+      WebServicesTestUtils.checkStringMatch("exception type",
+          "BadRequestException", type);
       WebServicesTestUtils.checkStringMatch("exception classname",
           "org.apache.hadoop.yarn.webapp.BadRequestException", classname);
     }
@@ -355,8 +358,8 @@ public class TestNMWebServicesContainers extends JerseyTest {
       WebServicesTestUtils.checkStringMatch("exception message",
           "java.lang.Exception: invalid container id, container_1234_0001",
           message);
-      WebServicesTestUtils
-          .checkStringMatch("exception type", "BadRequestException", type);
+      WebServicesTestUtils.checkStringMatch("exception type",
+          "BadRequestException", type);
       WebServicesTestUtils.checkStringMatch("exception classname",
           "org.apache.hadoop.yarn.webapp.BadRequestException", classname);
     }
@@ -386,11 +389,13 @@ public class TestNMWebServicesContainers extends JerseyTest {
       String message = exception.getString("message");
       String type = exception.getString("exception");
       String classname = exception.getString("javaClassName");
-      WebServicesTestUtils.checkStringMatch("exception message",
-          "java.lang.Exception: container with id, container_1234_0001_01_000005, not found",
-          message);
       WebServicesTestUtils
-          .checkStringMatch("exception type", "NotFoundException", type);
+          .checkStringMatch(
+              "exception message",
+              "java.lang.Exception: container with id, container_1234_0001_01_000005, not found",
+              message);
+      WebServicesTestUtils.checkStringMatch("exception type",
+          "NotFoundException", type);
       WebServicesTestUtils.checkStringMatch("exception classname",
           "org.apache.hadoop.yarn.webapp.NotFoundException", classname);
     }
@@ -407,9 +412,9 @@ public class TestNMWebServicesContainers extends JerseyTest {
     addAppContainers(app2);
 
     for (String id : hash.keySet()) {
-      ClientResponse response =
-          r.path("ws").path("v1").path("node").path("containers").path(id)
-              .accept(MediaType.APPLICATION_XML).get(ClientResponse.class);
+      ClientResponse response = r.path("ws").path("v1").path("node")
+          .path("containers").path(id).accept(MediaType.APPLICATION_XML)
+          .get(ClientResponse.class);
       assertEquals(MediaType.APPLICATION_XML_TYPE, response.getType());
       String xml = response.getEntity(String.class);
       DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
@@ -435,9 +440,9 @@ public class TestNMWebServicesContainers extends JerseyTest {
     nmContext.getApplications().put(app2.getAppId(), app2);
     addAppContainers(app2);
 
-    ClientResponse response =
-        r.path("ws").path("v1").path("node").path("containers")
-            .accept(MediaType.APPLICATION_XML).get(ClientResponse.class);
+    ClientResponse response = r.path("ws").path("v1").path("node")
+        .path("containers").accept(MediaType.APPLICATION_XML)
+        .get(ClientResponse.class);
     assertEquals(MediaType.APPLICATION_XML_TYPE, response.getType());
     String xml = response.getEntity(String.class);
     DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
@@ -462,42 +467,49 @@ public class TestNMWebServicesContainers extends JerseyTest {
           WebServicesTestUtils.getXmlString(element, "diagnostics"),
           WebServicesTestUtils.getXmlString(element, "nodeId"),
           WebServicesTestUtils.getXmlInt(element, "totalMemoryNeededMB"),
+          WebServicesTestUtils.getXmlInt(element, "totalVCoresNeeded"),
           WebServicesTestUtils.getXmlString(element, "containerLogsLink"));
     }
   }
 
   public void verifyNodeContainerInfo(JSONObject info, Container cont)
       throws JSONException, Exception {
-    assertEquals("incorrect number of elements", 8, info.length());
+    assertEquals("incorrect number of elements", 9, info.length());
 
     verifyNodeContainerInfoGeneric(cont, info.getString("id"),
         info.getString("state"), info.getString("user"),
         info.getInt("exitCode"), info.getString("diagnostics"),
         info.getString("nodeId"), info.getInt("totalMemoryNeededMB"),
+        info.getInt("totalVCoresNeeded"),
         info.getString("containerLogsLink"));
   }
 
   public void verifyNodeContainerInfoGeneric(Container cont, String id,
       String state, String user, int exitCode, String diagnostics,
-      String nodeId, int totalMemoryNeededMB, String logsLink)
+      String nodeId, int totalMemoryNeededMB, int totalVCoresNeeded,
+      String logsLink)
       throws JSONException, Exception {
-    WebServicesTestUtils
-        .checkStringMatch("id", cont.getContainerId().toString(), id);
-    WebServicesTestUtils
-        .checkStringMatch("state", cont.getContainerState().toString(), state);
-    WebServicesTestUtils
-        .checkStringMatch("user", cont.getUser().toString(), user);
+    WebServicesTestUtils.checkStringMatch("id", cont.getContainerId()
+        .toString(), id);
+    WebServicesTestUtils.checkStringMatch("state", cont.getContainerState()
+        .toString(), state);
+    WebServicesTestUtils.checkStringMatch("user", cont.getUser().toString(),
+        user);
     assertEquals("exitCode wrong", 0, exitCode);
     WebServicesTestUtils
         .checkStringMatch("diagnostics", "testing", diagnostics);
 
-    WebServicesTestUtils
-        .checkStringMatch("nodeId", nmContext.getNodeId().toString(), nodeId);
+    WebServicesTestUtils.checkStringMatch("nodeId", nmContext.getNodeId()
+        .toString(), nodeId);
     assertEquals("totalMemoryNeededMB wrong",
-        YarnConfiguration.DEFAULT_RM_SCHEDULER_MINIMUM_ALLOCATION_MB,
-        totalMemoryNeededMB);
-    String shortLink = ujoin("containerlogs", cont.getContainerId().toString(),
-        cont.getUser());
+      YarnConfiguration.DEFAULT_RM_SCHEDULER_MINIMUM_ALLOCATION_MB,
+      totalMemoryNeededMB);
+    assertEquals("totalVCoresNeeded wrong",
+      YarnConfiguration.DEFAULT_RM_SCHEDULER_MINIMUM_ALLOCATION_VCORES,
+      totalVCoresNeeded);
+    String shortLink =
+        ujoin("containerlogs", cont.getContainerId().toString(),
+            cont.getUser());
     assertTrue("containerLogsLink wrong", logsLink.contains(shortLink));
   }
 

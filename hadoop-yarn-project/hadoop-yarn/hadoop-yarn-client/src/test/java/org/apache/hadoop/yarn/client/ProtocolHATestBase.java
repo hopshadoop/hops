@@ -1,27 +1,47 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements. See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership. The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
- */
+* Licensed to the Apache Software Foundation (ASF) under one
+* or more contributor license agreements.  See the NOTICE file
+* distributed with this work for additional information
+* regarding copyright ownership.  The ASF licenses this file
+* to you under the Apache License, Version 2.0 (the
+* "License"); you may not use this file except in compliance
+* with the License.  You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
+
 package org.apache.hadoop.yarn.client;
 
-import io.hops.metadata.util.RMStorageFactory;
-import io.hops.metadata.util.RMUtilities;
-import io.hops.metadata.util.YarnAPIStorageFactory;
-import junit.framework.Assert;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import java.nio.ByteBuffer;
+import java.util.HashMap;
+import java.util.Map;
+
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
+import org.apache.hadoop.yarn.api.protocolrecords.FinishApplicationMasterRequest;
+import org.apache.hadoop.yarn.api.protocolrecords.FinishApplicationMasterResponse;
+import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterRequest;
+import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterResponse;
+import org.apache.hadoop.yarn.api.records.ApplicationAccessType;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import org.junit.Assert;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ha.ClientBaseWithFixes;
 import org.apache.hadoop.ha.HAServiceProtocol;
@@ -61,7 +81,6 @@ import org.apache.hadoop.yarn.api.protocolrecords.RenewDelegationTokenRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.RenewDelegationTokenResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.SubmitApplicationRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.SubmitApplicationResponse;
-import org.apache.hadoop.yarn.api.records.AMCommand;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptReport;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -113,19 +132,24 @@ import org.apache.hadoop.yarn.util.Records;
 import org.junit.After;
 import org.junit.Before;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
+/**
+ * Test Base for ResourceManager's Protocol on HA.
+ *
+ * Limited scope:
+ * For all the test cases, we only test whether the method will be re-entered
+ * when failover happens. Does not cover the entire logic of test.
+ *
+ * Test strategy:
+ * Create a separate failover thread with a trigger flag,
+ * override all APIs that are added trigger flag.
+ * When the APIs are called, we will set trigger flag as true to kick off
+ * the failover. So We can make sure the failover happens during process
+ * of the method. If this API is marked as @Idempotent or @AtMostOnce,
+ * the test cases will pass; otherwise, they will throw the exception.
+ *
+ */
 public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
-
-  private static final Log LOG = LogFactory.getLog(ProtocolHATestBase.class);
   protected static final HAServiceProtocol.StateChangeRequestInfo req =
       new HAServiceProtocol.StateChangeRequestInfo(
           HAServiceProtocol.RequestSource.REQUEST_BY_USER);
@@ -145,42 +169,20 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
     conf.set(HAUtil.addSuffix(prefix, rmId), value);
   }
 
-  private void setConfForRM(String rmId, String prefix, int value) {
-    conf.setInt(HAUtil.addSuffix(prefix, rmId), value);
-  }
-
   private void setRpcAddressForRM(String rmId, int base) {
-    setConfForRM(rmId, YarnConfiguration.RM_ADDRESS,
-        "0.0.0.0:" + (base + YarnConfiguration.DEFAULT_RM_PORT));
-    setConfForRM(rmId, YarnConfiguration.RM_PORT,
+    setConfForRM(rmId, YarnConfiguration.RM_ADDRESS, "0.0.0.0:" +
         (base + YarnConfiguration.DEFAULT_RM_PORT));
-
-    setConfForRM(rmId, YarnConfiguration.RM_SCHEDULER_ADDRESS,
-        "0.0.0.0:" + (base + YarnConfiguration.DEFAULT_RM_SCHEDULER_PORT));
-    setConfForRM(rmId, YarnConfiguration.RM_SCHEDULER_PORT,
+    setConfForRM(rmId, YarnConfiguration.RM_SCHEDULER_ADDRESS, "0.0.0.0:" +
         (base + YarnConfiguration.DEFAULT_RM_SCHEDULER_PORT));
-
-    setConfForRM(rmId, YarnConfiguration.RM_ADMIN_ADDRESS,
-        "0.0.0.0:" + (base + YarnConfiguration.DEFAULT_RM_ADMIN_PORT));
-    setConfForRM(rmId, YarnConfiguration.RM_ADMIN_PORT,
+    setConfForRM(rmId, YarnConfiguration.RM_ADMIN_ADDRESS, "0.0.0.0:" +
         (base + YarnConfiguration.DEFAULT_RM_ADMIN_PORT));
-
     setConfForRM(rmId, YarnConfiguration.RM_RESOURCE_TRACKER_ADDRESS,
-        "0.0.0.0:" +
-            (base + YarnConfiguration.DEFAULT_RM_RESOURCE_TRACKER_PORT));
-    setConfForRM(rmId, YarnConfiguration.RM_RESOURCE_TRACKER_PORT,
-        (base + YarnConfiguration.DEFAULT_RM_RESOURCE_TRACKER_PORT));
-
-    setConfForRM(rmId, YarnConfiguration.RM_WEBAPP_ADDRESS,
-        "0.0.0.0:" + (base + YarnConfiguration.DEFAULT_RM_WEBAPP_PORT));
-    setConfForRM(rmId, YarnConfiguration.RM_WEBAPP_HTTPS_ADDRESS,
-        "0.0.0.0:" + (base + YarnConfiguration.DEFAULT_RM_WEBAPP_HTTPS_PORT));
-
-    setConfForRM(rmId, YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS,
-        "0.0.0.0:" +
-            (base + YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_PORT));
-    setConfForRM(rmId, YarnConfiguration.RM_GROUP_MEMBERSHIP_PORT,
-        (base + YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_PORT));
+        "0.0.0.0:" + (base + YarnConfiguration
+            .DEFAULT_RM_RESOURCE_TRACKER_PORT));
+    setConfForRM(rmId, YarnConfiguration.RM_WEBAPP_ADDRESS, "0.0.0.0:" +
+        (base + YarnConfiguration.DEFAULT_RM_WEBAPP_PORT));
+    setConfForRM(rmId, YarnConfiguration.RM_WEBAPP_HTTPS_ADDRESS, "0.0.0.0:" +
+        (base + YarnConfiguration.DEFAULT_RM_WEBAPP_HTTPS_PORT));
   }
 
   @Before
@@ -198,6 +200,9 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
 
     conf.setBoolean(YarnConfiguration.YARN_MINICLUSTER_FIXED_PORTS, true);
     conf.setBoolean(YarnConfiguration.YARN_MINICLUSTER_USE_RPC, true);
+    RMStorageFactory.setConfiguration(conf);
+    YarnAPIStorageFactory.setConfiguration(conf);
+    DBUtility.InitializeDB();
   }
 
   @After
@@ -215,7 +220,8 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
   }
 
   protected AdminService getAdminService(int index) {
-    return cluster.getResourceManager(index).getRMContext().getRMAdminService();
+    return cluster.getResourceManager(index).getRMContext()
+        .getRMAdminService();
   }
 
   protected void explicitFailover() throws IOException {
@@ -235,16 +241,16 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
     return client;
   }
 
-  protected void verifyConnections()
-      throws InterruptedException, YarnException {
+  protected void verifyConnections() throws InterruptedException,
+      YarnException {
     assertTrue("NMs failed to connect to the RM",
-        cluster.waitForNodeManagersToConnect(20000));
+        cluster.waitForNodeManagersToConnect(5000));
     verifyClientConnection();
   }
 
   protected void verifyClientConnection() {
     int numRetries = 3;
-    while (numRetries-- > 0) {
+    while(numRetries-- > 0) {
       Configuration conf = new YarnConfiguration(this.conf);
       YarnClient client = createAndStartYarnClient(conf);
       try {
@@ -291,20 +297,15 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
   protected void startHACluster(int numOfNMs, boolean overrideClientRMService,
       boolean overrideRTS, boolean overrideApplicationMasterService)
       throws Exception {
+    conf.setBoolean(YarnConfiguration.RECOVERY_ENABLED, true);
     conf.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, false);
-    conf.set(YarnConfiguration.CLIENT_FAILOVER_PROXY_PROVIDER,
-        "org.apache.hadoop.yarn.client.ConfiguredRMFailoverProxyProvider");
-    YarnAPIStorageFactory.setConfiguration(conf);
-    RMStorageFactory.setConfiguration(conf);
-    RMUtilities.InitializeDB();
-
-    cluster = new MiniYARNClusterForHATesting(TestRMFailover.class.getName(), 2,
-        numOfNMs, 1, 1, false, overrideClientRMService, overrideRTS,
-        overrideApplicationMasterService);
+    cluster =
+        new MiniYARNClusterForHATesting(TestRMFailover.class.getName(), 2,
+            numOfNMs, 1, 1, false, overrideClientRMService, overrideRTS,
+            overrideApplicationMasterService);
     cluster.resetStartFailoverFlag(false);
     cluster.init(conf);
     cluster.start();
-    getAdminService(0).transitionToActive(req);
     assertFalse("RM never turned active", -1 == cluster.getActiveRMIndex());
     verifyConnections();
 
@@ -328,10 +329,10 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
     private final AtomicBoolean startFailover = new AtomicBoolean(false);
     private final AtomicBoolean failoverTriggered = new AtomicBoolean(false);
 
-    public MiniYARNClusterForHATesting(String testName, int numResourceManagers,
-        int numNodeManagers, int numLocalDirs, int numLogDirs,
-        boolean enableAHS, boolean overrideClientRMService, boolean overrideRTS,
-        boolean overrideApplicationMasterService) {
+    public MiniYARNClusterForHATesting(String testName,
+        int numResourceManagers, int numNodeManagers, int numLocalDirs,
+        int numLogDirs, boolean enableAHS, boolean overrideClientRMService,
+        boolean overrideRTS, boolean overrideApplicationMasterService) {
       super(testName, numResourceManagers, numNodeManagers, numLocalDirs,
           numLogDirs, enableAHS);
       this.overrideClientRMService = overrideClientRMService;
@@ -378,9 +379,8 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
       return new ResourceManager() {
         @Override
         protected void doSecureLogin() throws IOException {
-          // Don't try to in using keytab in the testcases.
+          // Don't try to login using keytab in the testcases.
         }
-
         @Override
         protected ClientRMService createClientRMService() {
           if (overrideClientRMService) {
@@ -391,7 +391,6 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
           }
           return super.createClientRMService();
         }
-
         @Override
         protected ResourceTrackerService createResourceTrackerService() {
           if (overrideRTS) {
@@ -402,7 +401,6 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
           }
           return super.createResourceTrackerService();
         }
-
         @Override
         protected ApplicationMasterService createApplicationMasterService() {
           if (overrideApplicationMasterService) {
@@ -415,7 +413,6 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
     }
 
     private class CustomedClientRMService extends ClientRMService {
-
       public CustomedClientRMService(RMContext rmContext,
           YarnScheduler scheduler, RMAppManager rmAppManager,
           ApplicationACLsManager applicationACLsManager,
@@ -434,8 +431,9 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
         Assert.assertTrue(waittingForFailOver());
 
         // create the GetNewApplicationResponse with fake applicationId
-        GetNewApplicationResponse response = GetNewApplicationResponse
-            .newInstance(createFakeAppId(), null, null);
+        GetNewApplicationResponse response =
+            GetNewApplicationResponse.newInstance(
+                createFakeAppId(), null, null);
         return response;
       }
 
@@ -463,8 +461,9 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
         Assert.assertTrue(waittingForFailOver());
 
         // create GetClusterMetricsResponse with fake YarnClusterMetrics
-        GetClusterMetricsResponse response = GetClusterMetricsResponse
-            .newInstance(createFakeYarnClusterMetrics());
+        GetClusterMetricsResponse response =
+            GetClusterMetricsResponse.newInstance(
+                createFakeYarnClusterMetrics());
         return response;
       }
 
@@ -484,7 +483,8 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
 
       @Override
       public GetClusterNodesResponse getClusterNodes(
-          GetClusterNodesRequest request) throws YarnException {
+          GetClusterNodesRequest request)
+          throws YarnException {
         resetStartFailoverFlag(true);
 
         // make sure failover has been triggered
@@ -523,8 +523,8 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
 
       @Override
       public GetApplicationAttemptReportResponse getApplicationAttemptReport(
-          GetApplicationAttemptReportRequest request)
-          throws YarnException, IOException {
+          GetApplicationAttemptReportRequest request) throws YarnException,
+          IOException {
         resetStartFailoverFlag(true);
 
         // make sure failover has been triggered
@@ -537,8 +537,8 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
 
       @Override
       public GetApplicationAttemptsResponse getApplicationAttempts(
-          GetApplicationAttemptsRequest request)
-          throws YarnException, IOException {
+          GetApplicationAttemptsRequest request) throws YarnException,
+          IOException {
         resetStartFailoverFlag(true);
 
         // make sure failover has been triggered
@@ -551,7 +551,8 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
 
       @Override
       public GetContainerReportResponse getContainerReport(
-          GetContainerReportRequest request) throws YarnException, IOException {
+          GetContainerReportRequest request) throws YarnException,
+              IOException {
         resetStartFailoverFlag(true);
 
         // make sure failover has been triggered
@@ -576,7 +577,7 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
 
       @Override
       public SubmitApplicationResponse submitApplication(
-          SubmitApplicationRequest request) throws YarnException, IOException {
+          SubmitApplicationRequest request) throws YarnException {
         resetStartFailoverFlag(true);
 
         // make sure failover has been triggered
@@ -647,10 +648,10 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
       ApplicationAttemptId attemptId =
           ApplicationAttemptId.newInstance(appId, 1);
       // create a fake application report
-      ApplicationReport report = ApplicationReport
-          .newInstance(appId, attemptId, "fakeUser", "fakeQueue",
-              "fakeApplicationName", "localhost", 0, null,
-              YarnApplicationState.FAILED, "fake an application report", "",
+      ApplicationReport report =
+          ApplicationReport.newInstance(appId, attemptId, "fakeUser",
+              "fakeQueue", "fakeApplicationName", "localhost", 0, null,
+              YarnApplicationState.FINISHED, "fake an application report", "",
               1000l, 1200l, FinalApplicationStatus.FAILED, null, "", 50f,
               "fakeApplicationType", null);
       return report;
@@ -671,7 +672,7 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
     }
 
     public ContainerId createFakeContainerId() {
-      return ContainerId.newInstance(createFakeApplicationAttemptId(), 0);
+      return ContainerId.newContainerId(createFakeApplicationAttemptId(), 0);
     }
 
     public YarnClusterMetrics createFakeYarnClusterMetrics() {
@@ -680,18 +681,17 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
 
     public List<NodeReport> createFakeNodeReports() {
       NodeId nodeId = NodeId.newInstance("localhost", 0);
-      NodeReport report = NodeReport
-          .newInstance(nodeId, NodeState.RUNNING, "localhost", "rack1", null,
-              null, 4, null, 1000l);
+      NodeReport report =
+          NodeReport.newInstance(nodeId, NodeState.RUNNING, "localhost",
+              "rack1", null, null, 4, null, 1000l, null);
       List<NodeReport> reports = new ArrayList<NodeReport>();
       reports.add(report);
       return reports;
     }
 
     public QueueInfo createFakeQueueInfo() {
-      return QueueInfo
-          .newInstance("root", 100f, 100f, 50f, null, createFakeAppReports(),
-              QueueState.RUNNING);
+      return QueueInfo.newInstance("root", 100f, 100f, 50f, null,
+          createFakeAppReports(), QueueState.RUNNING, null, null);
     }
 
     public List<QueueUserACLInfo> createFakeQueueUserACLInfoList() {
@@ -704,12 +704,13 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
     }
 
     public ApplicationAttemptReport createFakeApplicationAttemptReport() {
-      return ApplicationAttemptReport
-          .newInstance(createFakeApplicationAttemptId(), "localhost", 0, "", "",
-              YarnApplicationAttemptState.RUNNING, createFakeContainerId());
+      return ApplicationAttemptReport.newInstance(
+          createFakeApplicationAttemptId(), "localhost", 0, "", "", "",
+          YarnApplicationAttemptState.RUNNING, createFakeContainerId());
     }
 
-    public List<ApplicationAttemptReport> createFakeApplicationAttemptReports() {
+    public List<ApplicationAttemptReport>
+        createFakeApplicationAttemptReports() {
       List<ApplicationAttemptReport> reports =
           new ArrayList<ApplicationAttemptReport>();
       reports.add(createFakeApplicationAttemptReport());
@@ -719,11 +720,13 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
     public ContainerReport createFakeContainerReport() {
       return ContainerReport.newInstance(createFakeContainerId(), null,
           NodeId.newInstance("localhost", 0), null, 1000l, 1200l, "", "", 0,
-          ContainerState.COMPLETE);
+          ContainerState.COMPLETE,
+          "http://" + NodeId.newInstance("localhost", 0).toString());
     }
 
     public List<ContainerReport> createFakeContainerReports() {
-      List<ContainerReport> reports = new ArrayList<ContainerReport>();
+      List<ContainerReport> reports =
+          new ArrayList<ContainerReport>();
       reports.add(createFakeContainerReport());
       return reports;
     }
@@ -731,8 +734,8 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
     public Token createFakeToken() {
       String identifier = "fake Token";
       String password = "fake token passwd";
-      Token token = Token
-          .newInstance(identifier.getBytes(), " ", password.getBytes(), " ");
+      Token token = Token.newInstance(
+          identifier.getBytes(), " ", password.getBytes(), " ");
       return token;
     }
 
@@ -740,9 +743,8 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
       return "fake Token".getBytes().length;
     }
 
-    private class CustomedResourceTrackerService
-        extends ResourceTrackerService {
-
+    private class CustomedResourceTrackerService extends
+        ResourceTrackerService {
       public CustomedResourceTrackerService(RMContext rmContext,
           NodesListManager nodesListManager,
           NMLivelinessMonitor nmLivelinessMonitor,
@@ -754,8 +756,8 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
 
       @Override
       public RegisterNodeManagerResponse registerNodeManager(
-          RegisterNodeManagerRequest request)
-          throws YarnException, IOException {
+          RegisterNodeManagerRequest request) throws YarnException,
+          IOException {
         resetStartFailoverFlag(true);
         // make sure failover has been triggered
         Assert.assertTrue(waittingForFailOver());
@@ -772,9 +774,8 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
       }
     }
 
-    private class CustomedApplicationMasterService
-        extends ApplicationMasterService {
-
+    private class CustomedApplicationMasterService extends
+        ApplicationMasterService {
       public CustomedApplicationMasterService(RMContext rmContext,
           YarnScheduler scheduler) {
         super(rmContext, scheduler);
@@ -789,13 +790,52 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
         return createFakeAllocateResponse();
       }
 
+      @Override
+      public RegisterApplicationMasterResponse registerApplicationMaster(
+          RegisterApplicationMasterRequest request) throws YarnException,
+          IOException {
+        resetStartFailoverFlag(true);
+        // make sure failover has been triggered
+        Assert.assertTrue(waittingForFailOver());
+        return createFakeRegisterApplicationMasterResponse();
+      }
+
+      @Override
+      public FinishApplicationMasterResponse finishApplicationMaster(
+          FinishApplicationMasterRequest request) throws YarnException,
+          IOException {
+        resetStartFailoverFlag(true);
+        // make sure failover has been triggered
+        Assert.assertTrue(waittingForFailOver());
+        return createFakeFinishApplicationMasterResponse();
+      }
+    }
+
+    public RegisterApplicationMasterResponse
+    createFakeRegisterApplicationMasterResponse() {
+      Resource minCapability = Resource.newInstance(2048, 2);
+      Resource maxCapability = Resource.newInstance(4096, 4);
+      Map<ApplicationAccessType, String> acls =
+          new HashMap<ApplicationAccessType, String>();
+      acls.put(ApplicationAccessType.MODIFY_APP, "*");
+      ByteBuffer key = ByteBuffer.wrap("fake_key".getBytes());
+      return RegisterApplicationMasterResponse.newInstance(minCapability,
+          maxCapability, acls, key, new ArrayList<Container>(), "root",
+          new ArrayList<NMToken>());
+    }
+
+    public FinishApplicationMasterResponse
+    createFakeFinishApplicationMasterResponse() {
+      return FinishApplicationMasterResponse.newInstance(true);
     }
 
     public AllocateResponse createFakeAllocateResponse() {
-      return AllocateResponse.newInstance(-1, new ArrayList<ContainerStatus>(),
+      return AllocateResponse.newInstance(-1,
+          new ArrayList<ContainerStatus>(),
           new ArrayList<Container>(), new ArrayList<NodeReport>(),
-          Resource.newInstance(1024, 2), AMCommand.AM_RESYNC, 1, null,
-          new ArrayList<NMToken>());
+          Resource.newInstance(1024, 2), null, 1,
+          null, new ArrayList<NMToken>());
     }
   }
+
 }

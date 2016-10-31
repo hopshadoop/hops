@@ -17,17 +17,12 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.resource;
 
+import static org.apache.hadoop.yarn.util.resource.Resources.*;
+import static org.junit.Assert.*;
 import org.junit.Test;
 
-import static org.apache.hadoop.yarn.util.resource.Resources.componentwiseMin;
-import static org.apache.hadoop.yarn.util.resource.Resources.createResource;
-import static org.apache.hadoop.yarn.util.resource.Resources.fitsIn;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-
 public class TestResources {
-  @Test(timeout = 1000)
+  @Test(timeout=1000)
   public void testFitsIn() {
     assertTrue(fitsIn(createResource(1, 1), createResource(2, 2)));
     assertTrue(fitsIn(createResource(2, 2), createResource(2, 2)));
@@ -36,7 +31,7 @@ public class TestResources {
     assertFalse(fitsIn(createResource(2, 1), createResource(1, 2)));
   }
   
-  @Test(timeout = 1000)
+  @Test(timeout=1000)
   public void testComponentwiseMin() {
     assertEquals(createResource(1, 1),
         componentwiseMin(createResource(1, 1), createResource(2, 2)));

@@ -41,7 +41,6 @@ public abstract class RenewDelegationTokenRequest {
 
   /**
    * Get the delegation token requested to be renewed by the client.
-   *
    * @return the delegation token requested to be renewed by the client.
    */
   @Private

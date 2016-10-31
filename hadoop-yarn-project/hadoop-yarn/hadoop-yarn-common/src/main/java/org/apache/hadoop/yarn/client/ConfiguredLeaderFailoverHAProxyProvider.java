@@ -16,11 +16,17 @@
 package org.apache.hadoop.yarn.client;
 
 import io.hops.leader_election.node.ActiveNode;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 public class ConfiguredLeaderFailoverHAProxyProvider<T>
     extends ConfiguredRMFailoverHAProxyProvider<Object> {
+  private static final Log LOG = LogFactory.getLog(
+          ConfiguredLeaderFailoverHAProxyProvider.class);
 
   protected ActiveNode getActiveNode() {
-    return groupMembership.getLeader();
+    ActiveNode node = groupMembership.getLeader();
+    LOG.info("geting leader : " + node.getHostname());
+    return node;
   }
 }

@@ -28,15 +28,16 @@ import org.apache.hadoop.yarn.util.Records;
 public abstract class ResourceOption {
 
   public static ResourceOption newInstance(Resource resource,
-      int overCommitTimeout) {
+      int overCommitTimeout){
     ResourceOption resourceOption = Records.newRecord(ResourceOption.class);
     resourceOption.setResource(resource);
+    resourceOption.setOverCommitTimeout(overCommitTimeout);
+    resourceOption.build();
     return resourceOption;
   }
 
   /**
    * Get the <em>resource</em> of the ResourceOption.
-   *
    * @return <em>resource</em> of the ResourceOption
    */
   @Private
@@ -51,7 +52,6 @@ public abstract class ResourceOption {
    * Get timeout for tolerant of resource over-commitment
    * Note: negative value means no timeout so that allocated containers will
    * keep running until the end even under resource over-commitment cases.
-   *
    * @return <em>overCommitTimeout</em> of the ResourceOption
    */
   @Private
@@ -62,12 +62,14 @@ public abstract class ResourceOption {
   @Evolving
   protected abstract void setOverCommitTimeout(int overCommitTimeout);
   
+  @Private
+  @Evolving
   protected abstract void build();
   
   @Override
   public String toString() {
-    return "Resource:" + getResource().toString() + ", overCommitTimeout:" +
-        getOverCommitTimeout();
+    return "Resource:" + getResource().toString() 
+        + ", overCommitTimeout:" + getOverCommitTimeout();
   }
   
 }

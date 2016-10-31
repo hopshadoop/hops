@@ -18,6 +18,18 @@
 
 package org.apache.hadoop.yarn.logaggregation;
 
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.PrintWriter;
+import java.io.Writer;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.servlet.http.HttpServletRequest;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
@@ -37,24 +49,13 @@ import org.apache.hadoop.yarn.webapp.view.HtmlBlock;
 import org.apache.hadoop.yarn.webapp.view.HtmlBlockForTest;
 import org.junit.Test;
 
-import javax.servlet.http.HttpServletRequest;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.PrintWriter;
-import java.io.Writer;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import static org.junit.Assert.assertTrue;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
+import static org.junit.Assert.*;
 
 /**
  * Test AggregatedLogsBlock. AggregatedLogsBlock should check user, aggregate a
  * logs into one file and show this logs or errors into html code
+ * 
  */
 public class TestAggregatedLogsBlock {
   /**
@@ -70,9 +71,8 @@ public class TestAggregatedLogsBlock {
 
     writeLog(configuration, "owner");
 
-    AggregatedLogsBlockForTest aggregatedBlock =
-        getAggregatedLogsBlockForTest(configuration, "owner",
-            "container_0_0001_01_000001");
+    AggregatedLogsBlockForTest aggregatedBlock = getAggregatedLogsBlockForTest(
+        configuration, "owner", "container_0_0001_01_000001");
     ByteArrayOutputStream data = new ByteArrayOutputStream();
     PrintWriter printWriter = new PrintWriter(data);
     HtmlBlock html = new HtmlBlockForTest();
@@ -81,14 +81,14 @@ public class TestAggregatedLogsBlock {
 
     block.getWriter().flush();
     String out = data.toString();
-    assertTrue(out.contains(
-        "User [owner] is not authorized to view the logs for entity"));
+    assertTrue(out
+        .contains("User [owner] is not authorized to view the logs for entity"));
 
   }
 
   /**
    * try to read bad logs
-   *
+   * 
    * @throws Exception
    */
   @Test
@@ -101,9 +101,8 @@ public class TestAggregatedLogsBlock {
 
     writeLog(configuration, "owner");
 
-    AggregatedLogsBlockForTest aggregatedBlock =
-        getAggregatedLogsBlockForTest(configuration, "admin",
-            "container_0_0001_01_000001");
+    AggregatedLogsBlockForTest aggregatedBlock = getAggregatedLogsBlockForTest(
+        configuration, "admin", "container_0_0001_01_000001");
     ByteArrayOutputStream data = new ByteArrayOutputStream();
     PrintWriter printWriter = new PrintWriter(data);
     HtmlBlock html = new HtmlBlockForTest();
@@ -112,14 +111,14 @@ public class TestAggregatedLogsBlock {
 
     block.getWriter().flush();
     String out = data.toString();
-    assertTrue(out.contains(
-        "Logs not available for entity. Aggregation may not be complete, Check back later or try the nodemanager at localhost:1234"));
+    assertTrue(out
+        .contains("Logs not available for entity. Aggregation may not be complete, Check back later or try the nodemanager at localhost:1234"));
 
   }
 
   /**
    * All ok and the AggregatedLogsBlockFor should aggregate logs and show it.
-   *
+   * 
    * @throws Exception
    */
   @Test
@@ -132,9 +131,8 @@ public class TestAggregatedLogsBlock {
 
     writeLog(configuration, "admin");
 
-    AggregatedLogsBlockForTest aggregatedBlock =
-        getAggregatedLogsBlockForTest(configuration, "admin",
-            "container_0_0001_01_000001");
+    AggregatedLogsBlockForTest aggregatedBlock = getAggregatedLogsBlockForTest(
+        configuration, "admin", "container_0_0001_01_000001");
     ByteArrayOutputStream data = new ByteArrayOutputStream();
     PrintWriter printWriter = new PrintWriter(data);
     HtmlBlock html = new HtmlBlockForTest();
@@ -148,10 +146,8 @@ public class TestAggregatedLogsBlock {
     assertTrue(out.contains("test log3"));
 
   }
-
   /**
    * Log files was deleted.
-   *
    * @throws Exception
    */
   @Test
@@ -160,16 +156,14 @@ public class TestAggregatedLogsBlock {
     FileUtil.fullyDelete(new File("target/logs"));
     Configuration configuration = getConfiguration();
 
-    File f = new File(
-        "target/logs/logs/application_0_0001/container_0_0001_01_000001");
+    File f = new File("target/logs/logs/application_0_0001/container_0_0001_01_000001");
     if (!f.exists()) {
       assertTrue(f.mkdirs());
     }
     writeLog(configuration, "admin");
 
-    AggregatedLogsBlockForTest aggregatedBlock =
-        getAggregatedLogsBlockForTest(configuration, "admin",
-            "container_0_0001_01_000001");
+    AggregatedLogsBlockForTest aggregatedBlock = getAggregatedLogsBlockForTest(
+        configuration, "admin", "container_0_0001_01_000001");
     ByteArrayOutputStream data = new ByteArrayOutputStream();
     PrintWriter printWriter = new PrintWriter(data);
     HtmlBlock html = new HtmlBlockForTest();
@@ -178,8 +172,7 @@ public class TestAggregatedLogsBlock {
 
     block.getWriter().flush();
     String out = data.toString();
-    assertTrue(out.contains(
-        "No logs available for container container_0_0001_01_000001"));
+    assertTrue(out.contains("No logs available for container container_0_0001_01_000001"));
 
   }
   
@@ -197,12 +190,12 @@ public class TestAggregatedLogsBlock {
       Configuration configuration, String user, String containerId) {
     HttpServletRequest request = mock(HttpServletRequest.class);
     when(request.getRemoteUser()).thenReturn(user);
-    AggregatedLogsBlockForTest aggregatedBlock =
-        new AggregatedLogsBlockForTest(configuration);
+    AggregatedLogsBlockForTest aggregatedBlock = new AggregatedLogsBlockForTest(
+        configuration);
     aggregatedBlock.setRequest(request);
     aggregatedBlock.moreParams().put(YarnWebParams.CONTAINER_ID, containerId);
-    aggregatedBlock.moreParams()
-        .put(YarnWebParams.NM_NODENAME, "localhost:1234");
+    aggregatedBlock.moreParams().put(YarnWebParams.NM_NODENAME,
+        "localhost:1234");
     aggregatedBlock.moreParams().put(YarnWebParams.APP_OWNER, user);
     aggregatedBlock.moreParams().put("start", "");
     aggregatedBlock.moreParams().put("end", "");
@@ -212,32 +205,29 @@ public class TestAggregatedLogsBlock {
 
   private void writeLog(Configuration configuration, String user)
       throws Exception {
-    ApplicationId appId = ApplicationIdPBImpl.newInstance(0, 1);
-    ApplicationAttemptId appAttemptId =
-        ApplicationAttemptIdPBImpl.newInstance(appId, 1);
-    ContainerId containerId = ContainerIdPBImpl.newInstance(appAttemptId, 1);
+    ApplicationId appId =  ApplicationIdPBImpl.newInstance(0, 1);
+    ApplicationAttemptId appAttemptId =  ApplicationAttemptIdPBImpl.newInstance(appId, 1);
+    ContainerId containerId = ContainerIdPBImpl.newContainerId(appAttemptId, 1);
 
-    String path =
-        "target/logs/" + user + "/logs/application_0_0001/localhost_1234";
+    String path = "target/logs/" + user
+        + "/logs/application_0_0001/localhost_1234";
     File f = new File(path);
     if (!f.getParentFile().exists()) {
-      assertTrue(f.getParentFile().mkdirs());
+     assertTrue(f.getParentFile().mkdirs());
     }
     List<String> rootLogDirs = Arrays.asList("target/logs/logs");
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
 
-    AggregatedLogFormat.LogWriter writer =
-        new AggregatedLogFormat.LogWriter(configuration, new Path(path), ugi);
+    AggregatedLogFormat.LogWriter writer = new AggregatedLogFormat.LogWriter(
+        configuration, new Path(path), ugi);
     writer.writeApplicationOwner(ugi.getUserName());
 
-    Map<ApplicationAccessType, String> appAcls =
-        new HashMap<ApplicationAccessType, String>();
+    Map<ApplicationAccessType, String> appAcls = new HashMap<ApplicationAccessType, String>();
     appAcls.put(ApplicationAccessType.VIEW_APP, ugi.getUserName());
     writer.writeApplicationACLs(appAcls);
 
     writer.append(new AggregatedLogFormat.LogKey("container_0_0001_01_000001"),
-        new AggregatedLogFormat.LogValue(rootLogDirs, containerId,
-            UserGroupInformation.getCurrentUser().getShortUserName()));
+        new AggregatedLogFormat.LogValue(rootLogDirs, containerId,UserGroupInformation.getCurrentUser().getShortUserName()));
     writer.close();
   }
 

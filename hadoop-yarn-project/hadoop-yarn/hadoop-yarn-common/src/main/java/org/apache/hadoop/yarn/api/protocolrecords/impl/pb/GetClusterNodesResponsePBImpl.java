@@ -18,7 +18,10 @@
 
 package org.apache.hadoop.yarn.api.protocolrecords.impl.pb;
 
-import com.google.protobuf.TextFormat;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.protocolrecords.GetClusterNodesResponse;
@@ -28,16 +31,14 @@ import org.apache.hadoop.yarn.proto.YarnProtos.NodeReportProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetClusterNodesResponseProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetClusterNodesResponseProtoOrBuilder;
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
+import com.google.protobuf.TextFormat;
 
 @Private
 @Unstable
 public class GetClusterNodesResponsePBImpl extends GetClusterNodesResponse {
 
-  GetClusterNodesResponseProto proto =
-      GetClusterNodesResponseProto.getDefaultInstance();
+  GetClusterNodesResponseProto proto = 
+    GetClusterNodesResponseProto.getDefaultInstance();
   GetClusterNodesResponseProto.Builder builder = null;
   boolean viaProto = false;
 
@@ -53,7 +54,7 @@ public class GetClusterNodesResponsePBImpl extends GetClusterNodesResponse {
   }
 
   @Override
-  public List<NodeReport> getNodeReports() {
+  public List<NodeReport> getNodeReports() {    
     initLocalNodeManagerInfosList();
     return this.nodeManagerInfoList;
   }
@@ -66,7 +67,7 @@ public class GetClusterNodesResponsePBImpl extends GetClusterNodesResponse {
     this.nodeManagerInfoList = nodeManagers;
   }
 
-  public GetClusterNodesResponseProto getProto() {
+  public GetClusterNodesResponseProto getProto() {    
     mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
     viaProto = true;
@@ -80,9 +81,8 @@ public class GetClusterNodesResponsePBImpl extends GetClusterNodesResponse {
 
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -101,9 +101,8 @@ public class GetClusterNodesResponsePBImpl extends GetClusterNodesResponse {
   }
 
   private void mergeLocalToProto() {
-    if (viaProto) {
+    if (viaProto) 
       maybeInitBuilder();
-    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
@@ -134,9 +133,8 @@ public class GetClusterNodesResponsePBImpl extends GetClusterNodesResponse {
   private void addLocalNodeManagerInfosToProto() {
     maybeInitBuilder();
     builder.clearNodeReports();
-    if (nodeManagerInfoList == null) {
+    if (nodeManagerInfoList == null)
       return;
-    }
     Iterable<NodeReportProto> iterable = new Iterable<NodeReportProto>() {
       @Override
       public Iterator<NodeReportProto> iterator() {
@@ -171,7 +169,7 @@ public class GetClusterNodesResponsePBImpl extends GetClusterNodesResponse {
   }
 
   private NodeReportProto convertToProtoFormat(NodeReport t) {
-    return ((NodeReportPBImpl) t).getProto();
+    return ((NodeReportPBImpl)t).getProto();
   }
 
 }

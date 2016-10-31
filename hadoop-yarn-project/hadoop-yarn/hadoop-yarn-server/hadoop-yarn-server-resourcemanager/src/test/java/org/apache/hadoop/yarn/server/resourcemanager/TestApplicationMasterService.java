@@ -18,31 +18,45 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager;
 
-import io.hops.exception.StorageInitializtionException;
-import io.hops.metadata.util.RMStorageFactory;
-import io.hops.metadata.util.RMUtilities;
-import io.hops.metadata.util.YarnAPIStorageFactory;
-import junit.framework.Assert;
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
+import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterResponse;
+import org.apache.hadoop.yarn.proto.YarnServiceProtos.SchedulerResourceTypes;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacitySchedulerConfiguration;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FairScheduler;
+import org.apache.hadoop.yarn.util.resource.DominantResourceCalculator;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.yarn.api.protocolrecords.AllocateResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.FinishApplicationMasterRequest;
-import org.apache.hadoop.yarn.api.records.Container;
-import org.apache.hadoop.yarn.api.records.ContainerId;
-import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
+
+import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.AllocateRequestPBImpl;
+import org.apache.hadoop.yarn.api.records.*;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
-import org.apache.hadoop.yarn.exceptions.InvalidApplicationMasterRequestException;
+import org.apache.hadoop.yarn.exceptions.ApplicationMasterNotRegisteredException;
 import org.apache.hadoop.yarn.exceptions.InvalidContainerReleaseException;
 import org.apache.hadoop.yarn.security.ContainerTokenIdentifier;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
-import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.*;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fifo.FifoScheduler;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
-import org.junit.Before;
+
+import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.Assert;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import static java.lang.Thread.sleep;
 
 public class TestApplicationMasterService {
   private static final Log LOG = LogFactory.getLog(TestFifoScheduler.class);
@@ -50,16 +64,15 @@ public class TestApplicationMasterService {
   private final int GB = 1024;
   private static YarnConfiguration conf;
 
-  @Before
-  public void setup() throws StorageInitializtionException, IOException {
+  @BeforeClass
+  public static void setup() throws IOException {
     conf = new YarnConfiguration();
-    YarnAPIStorageFactory.setConfiguration(conf);
-    RMStorageFactory.setConfiguration(conf);
     conf.setClass(YarnConfiguration.RM_SCHEDULER, FifoScheduler.class,
-        ResourceScheduler.class);
-    RMUtilities.InitializeDB();
+      ResourceScheduler.class);
+    RMStorageFactory.setConfiguration(conf);
+    YarnAPIStorageFactory.setConfiguration(conf);
+    DBUtility.InitializeDB();
   }
-
 
   @Test(timeout = 3000000)
   public void testRMIdentifierOnContainerAllocation() throws Exception {
@@ -78,27 +91,28 @@ public class TestApplicationMasterService {
     MockAM am1 = rm.sendAMLaunched(attempt1.getAppAttemptId());
     am1.registerAppAttempt();
 
-    am1.addRequests(new String[]{"127.0.0.1"}, GB, 1, 1);
+    am1.addRequests(new String[] { "127.0.0.1" }, GB, 1, 1);
     AllocateResponse alloc1Response = am1.schedule(); // send the request
 
     // kick the scheduler
     nm1.nodeHeartbeat(true);
     while (alloc1Response.getAllocatedContainers().size() < 1) {
       LOG.info("Waiting for containers to be created for app 1...");
-      Thread.sleep(1000);
+      sleep(1000);
       alloc1Response = am1.schedule();
     }
 
     // assert RMIdentifer is set properly in allocated containers
     Container allocatedContainer =
         alloc1Response.getAllocatedContainers().get(0);
-    ContainerTokenIdentifier tokenId = BuilderUtils
-        .newContainerTokenIdentifier(allocatedContainer.getContainerToken());
-    Assert.assertEquals(MockRM.getClusterTimeStamp(), tokenId.getRMIdentifer());
+    ContainerTokenIdentifier tokenId =
+        BuilderUtils.newContainerTokenIdentifier(allocatedContainer
+          .getContainerToken());
+    Assert.assertEquals(MockRM.getClusterTimeStamp(), tokenId.getRMIdentifier());
     rm.stop();
   }
   
-  @Test(timeout = 600000)
+  @Test(timeout=600000)
   public void testInvalidContainerReleaseRequest() throws Exception {
     MockRM rm = new MockRM(conf);
     
@@ -117,14 +131,14 @@ public class TestApplicationMasterService {
       MockAM am1 = rm.sendAMLaunched(attempt1.getAppAttemptId());
       am1.registerAppAttempt();
       
-      am1.addRequests(new String[]{"127.0.0.1"}, GB, 1, 1);
+      am1.addRequests(new String[] { "127.0.0.1" }, GB, 1, 1);
       AllocateResponse alloc1Response = am1.schedule(); // send the request
 
       // kick the scheduler
       nm1.nodeHeartbeat(true);
       while (alloc1Response.getAllocatedContainers().size() < 1) {
         LOG.info("Waiting for containers to be created for app 1...");
-        Thread.sleep(1000);
+        sleep(1000);
         alloc1Response = am1.schedule();
       }
       
@@ -156,8 +170,73 @@ public class TestApplicationMasterService {
       }
     }
   }
+
+  @Test(timeout=1200000)
+  public void testProgressFilter() throws Exception{
+    MockRM rm = new MockRM(conf);
+    rm.start();
+
+    // Register node1
+    MockNM nm1 = rm.registerNode("127.0.0.1:1234", 6 * GB);
+
+      // Submit an application
+    RMApp app1 = rm.submitApp(2048);
+
+    nm1.nodeHeartbeat(true);
+    RMAppAttempt attempt1 = app1.getCurrentAppAttempt();
+    MockAM am1 = rm.sendAMLaunched(attempt1.getAppAttemptId());
+    am1.registerAppAttempt();
+
+    AllocateRequestPBImpl allocateRequest = new AllocateRequestPBImpl();
+    List<ContainerId> release = new ArrayList<ContainerId>();
+    List<ResourceRequest> ask = new ArrayList<ResourceRequest>();
+    allocateRequest.setReleaseList(release);
+    allocateRequest.setAskList(ask);
+
+    allocateRequest.setProgress(Float.POSITIVE_INFINITY);
+    am1.allocate(allocateRequest);
+    while(attempt1.getProgress()!=1){
+      LOG.info("Waiting for allocate event to be handled ...");
+      sleep(100);
+    }
+
+    allocateRequest.setProgress(Float.NaN);
+    am1.allocate(allocateRequest);
+    while(attempt1.getProgress()!=0){
+      LOG.info("Waiting for allocate event to be handled ...");
+      sleep(100);
+    }
+
+    allocateRequest.setProgress((float)9);
+    am1.allocate(allocateRequest);
+    while(attempt1.getProgress()!=1){
+      LOG.info("Waiting for allocate event to be handled ...");
+      sleep(100);
+    }
+
+    allocateRequest.setProgress(Float.NEGATIVE_INFINITY);
+    am1.allocate(allocateRequest);
+    while(attempt1.getProgress()!=0){
+      LOG.info("Waiting for allocate event to be handled ...");
+      sleep(100);
+    }
+
+    allocateRequest.setProgress((float)0.5);
+    am1.allocate(allocateRequest);
+    while(attempt1.getProgress()!=0.5){
+      LOG.info("Waiting for allocate event to be handled ...");
+      sleep(100);
+    }
+
+    allocateRequest.setProgress((float)-1);
+    am1.allocate(allocateRequest);
+    while(attempt1.getProgress()!=0){
+      LOG.info("Waiting for allocate event to be handled ...");
+      sleep(100);
+    }
+  }
   
-  @Test(timeout = 1200000)
+  @Test(timeout=1200000)
   public void testFinishApplicationMasterBeforeRegistering() throws Exception {
     MockRM rm = new MockRM(conf);
     try {
@@ -167,24 +246,73 @@ public class TestApplicationMasterService {
       // Submit an application
       RMApp app1 = rm.submitApp(2048);
       MockAM am1 = MockRM.launchAM(app1, rm, nm1);
-      FinishApplicationMasterRequest req = FinishApplicationMasterRequest
-          .newInstance(FinalApplicationStatus.FAILED, "", "");
-      Throwable cause = null;
+      FinishApplicationMasterRequest req =
+          FinishApplicationMasterRequest.newInstance(
+              FinalApplicationStatus.FAILED, "", "");
       try {
         am1.unregisterAppAttempt(req, false);
+        Assert.fail("ApplicationMasterNotRegisteredException should be thrown");
+      } catch (ApplicationMasterNotRegisteredException e) {
+        Assert.assertNotNull(e);
+        Assert.assertNotNull(e.getMessage());
+        Assert.assertTrue(e.getMessage().contains(
+            "Application Master is trying to unregister before registering for:"
+        ));
       } catch (Exception e) {
-        cause = e.getCause();
+        Assert.fail("ApplicationMasterNotRegisteredException should be thrown");
       }
-      Assert.assertNotNull(cause);
-      Assert.assertTrue(
-          cause instanceof InvalidApplicationMasterRequestException);
-      Assert.assertNotNull(cause.getMessage());
-      Assert.assertTrue(cause.getMessage().contains(
-          "Application Master is trying to unregister before registering for:"));
+
+      am1.registerAppAttempt();
+
+      am1.unregisterAppAttempt(req, false);
+      am1.waitForState(RMAppAttemptState.FINISHING);
     } finally {
       if (rm != null) {
         rm.stop();
       }
+    }
+  }
+
+  @Test(timeout = 3000000)
+  public void testResourceTypes() throws Exception {
+    HashMap<YarnConfiguration, EnumSet<SchedulerResourceTypes>> driver =
+        new HashMap<YarnConfiguration, EnumSet<SchedulerResourceTypes>>();
+
+    CapacitySchedulerConfiguration csconf =
+        new CapacitySchedulerConfiguration();
+    csconf.setResourceComparator(DominantResourceCalculator.class);
+    YarnConfiguration testCapacityDRConf = new YarnConfiguration(csconf);
+    testCapacityDRConf.setClass(YarnConfiguration.RM_SCHEDULER,
+      CapacityScheduler.class, ResourceScheduler.class);
+    YarnConfiguration testCapacityDefConf = new YarnConfiguration();
+    testCapacityDefConf.setClass(YarnConfiguration.RM_SCHEDULER,
+      CapacityScheduler.class, ResourceScheduler.class);
+    YarnConfiguration testFairDefConf = new YarnConfiguration();
+    testFairDefConf.setClass(YarnConfiguration.RM_SCHEDULER,
+      FairScheduler.class, ResourceScheduler.class);
+
+    driver.put(conf, EnumSet.of(SchedulerResourceTypes.MEMORY));
+    driver.put(testCapacityDRConf,
+      EnumSet.of(SchedulerResourceTypes.CPU, SchedulerResourceTypes.MEMORY));
+    driver.put(testCapacityDefConf, EnumSet.of(SchedulerResourceTypes.MEMORY));
+    driver.put(testFairDefConf,
+      EnumSet.of(SchedulerResourceTypes.MEMORY, SchedulerResourceTypes.CPU));
+
+    for (Map.Entry<YarnConfiguration, EnumSet<SchedulerResourceTypes>> entry : driver
+      .entrySet()) {
+      EnumSet<SchedulerResourceTypes> expectedValue = entry.getValue();
+      MockRM rm = new MockRM(entry.getKey());
+      rm.start();
+      MockNM nm1 = rm.registerNode("127.0.0.1:1234", 6 * GB);
+      RMApp app1 = rm.submitApp(2048);
+      nm1.nodeHeartbeat(true);
+      RMAppAttempt attempt1 = app1.getCurrentAppAttempt();
+      MockAM am1 = rm.sendAMLaunched(attempt1.getAppAttemptId());
+      RegisterApplicationMasterResponse resp = am1.registerAppAttempt();
+      EnumSet<SchedulerResourceTypes> types = resp.getSchedulerResourceTypes();
+      LOG.info("types = " + types.toString());
+      Assert.assertEquals(expectedValue, types);
+      rm.stop();
     }
   }
 }

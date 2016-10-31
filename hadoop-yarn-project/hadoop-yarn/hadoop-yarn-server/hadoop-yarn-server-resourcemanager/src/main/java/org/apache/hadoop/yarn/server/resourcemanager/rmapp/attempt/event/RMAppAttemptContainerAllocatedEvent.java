@@ -18,16 +18,14 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.event;
 
-import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
+import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptEventType;
 
 public class RMAppAttemptContainerAllocatedEvent extends RMAppAttemptEvent {
 
-  public RMAppAttemptContainerAllocatedEvent(ApplicationAttemptId appAttemptId,
-      TransactionState transactionState) {
-    super(appAttemptId, RMAppAttemptEventType.CONTAINER_ALLOCATED,
-        transactionState);
+  public RMAppAttemptContainerAllocatedEvent(ApplicationAttemptId appAttemptId) {
+    super(appAttemptId, RMAppAttemptEventType.CONTAINER_ALLOCATED);
   }
 }

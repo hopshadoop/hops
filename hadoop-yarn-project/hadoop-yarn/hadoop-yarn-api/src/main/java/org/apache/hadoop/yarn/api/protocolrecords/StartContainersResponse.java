@@ -18,6 +18,10 @@
 
 package org.apache.hadoop.yarn.api.protocolrecords;
 
+import java.nio.ByteBuffer;
+import java.util.List;
+import java.util.Map;
+
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Stable;
@@ -27,17 +31,13 @@ import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.SerializedException;
 import org.apache.hadoop.yarn.util.Records;
 
-import java.nio.ByteBuffer;
-import java.util.List;
-import java.util.Map;
-
 /**
  * <p>
  * The response sent by the <code>NodeManager</code> to the
  * <code>ApplicationMaster</code> when asked to <em>start</em> an allocated
  * container.
  * </p>
- *
+ * 
  * @see ContainerManagementProtocol#startContainers(StartContainersRequest)
  */
 @Public
@@ -61,9 +61,9 @@ public abstract class StartContainersResponse {
   /**
    * Get the list of <code>ContainerId</code> s of the containers that are
    * started successfully.
-   *
+   * 
    * @return the list of <code>ContainerId</code> s of the containers that are
-   * started successfully.
+   *         started successfully.
    * @see ContainerManagementProtocol#startContainers(StartContainersRequest)
    */
   @Public
@@ -76,8 +76,7 @@ public abstract class StartContainersResponse {
       List<ContainerId> succeededContainers);
 
   /**
-   * Get the containerId-to-exception map in which the exception indicates
-   * error
+   * Get the containerId-to-exception map in which the exception indicates error
    * from per container for failed requests
    */
   @Public
@@ -85,8 +84,7 @@ public abstract class StartContainersResponse {
   public abstract Map<ContainerId, SerializedException> getFailedRequests();
 
   /**
-   * Set the containerId-to-exception map in which the exception indicates
-   * error
+   * Set the containerId-to-exception map in which the exception indicates error
    * from per container for failed requests
    */
   @Private
@@ -104,14 +102,14 @@ public abstract class StartContainersResponse {
    * their corresponding per service meta-data as an opaque blob
    * <code>ByteBuffer</code>
    * </p>
-   * <p/>
+   * 
    * <p>
    * To be able to interpret the per-service meta-data, you should consult the
    * documentation for the Auxiliary-service configured on the NodeManager
    * </p>
-   *
+   * 
    * @return a Map between the names of auxiliary services and their
-   * corresponding meta-data
+   *         corresponding meta-data
    */
   @Public
   @Stable
@@ -121,10 +119,10 @@ public abstract class StartContainersResponse {
    * Set to the list of auxiliary services which have been started on the
    * <code>NodeManager</code>. This is done only once when the
    * <code>NodeManager</code> starts up
-   *
+   * 
    * @param allServicesMetaData
-   *     A map from auxiliary service names to the opaque blob
-   *     <code>ByteBuffer</code> for that auxiliary service
+   *          A map from auxiliary service names to the opaque blob
+   *          <code>ByteBuffer</code> for that auxiliary service
    */
   @Private
   @Unstable

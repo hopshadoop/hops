@@ -30,12 +30,13 @@ import org.apache.hadoop.yarn.api.records.ApplicationSubmissionContext;
  * Holder for the {@link GetNewApplicationResponse} and {@link
  * ApplicationSubmissionContext} objects created via {@link org.apache.hadoop
  * .yarn.client.api.YarnClient#createApplication()}
- */ public class YarnClientApplication {
+ */
+public  class YarnClientApplication {
   private final GetNewApplicationResponse newAppResponse;
   private final ApplicationSubmissionContext appSubmissionContext;
 
   public YarnClientApplication(GetNewApplicationResponse newAppResponse,
-      ApplicationSubmissionContext appContext) {
+                               ApplicationSubmissionContext appContext) {
     this.newAppResponse = newAppResponse;
     this.appSubmissionContext = appContext;
   }

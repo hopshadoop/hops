@@ -24,10 +24,8 @@ import org.apache.hadoop.yarn.proto.ApplicationMasterProtocol.ApplicationMasterP
 
 @Private
 @Unstable
-@ProtocolInfo(
-    protocolName = "org.apache.hadoop.yarn.api.ApplicationMasterProtocolPB",
+@ProtocolInfo(protocolName = "org.apache.hadoop.yarn.api.ApplicationMasterProtocolPB",
     protocolVersion = 1)
-public interface ApplicationMasterProtocolPB
-    extends ApplicationMasterProtocolService.BlockingInterface {
+public interface ApplicationMasterProtocolPB extends ApplicationMasterProtocolService.BlockingInterface {
 
 }

@@ -1,24 +1,23 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Licensed to the Apache Software Foundation (ASF) under one
+* or more contributor license agreements.  See the NOTICE file
+* distributed with this work for additional information
+* regarding copyright ownership.  The ASF licenses this file
+* to you under the Apache License, Version 2.0 (the
+* "License"); you may not use this file except in compliance
+* with the License.  You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
 package org.apache.hadoop.yarn.api.records.impl.pb;
 
 
-import com.google.protobuf.TextFormat;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.records.LocalResource;
@@ -30,6 +29,8 @@ import org.apache.hadoop.yarn.proto.YarnProtos.LocalResourceProtoOrBuilder;
 import org.apache.hadoop.yarn.proto.YarnProtos.LocalResourceTypeProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.LocalResourceVisibilityProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.URLProto;
+
+import com.google.protobuf.TextFormat;
 
 @Private
 @Unstable
@@ -63,9 +64,8 @@ public class LocalResourcePBImpl extends LocalResource {
 
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -79,8 +79,8 @@ public class LocalResourcePBImpl extends LocalResource {
 
   private synchronized void mergeLocalToBuilder() {
     LocalResourceProtoOrBuilder l = viaProto ? proto : builder;
-    if (this.url != null &&
-        !(l.getResource().equals(((URLPBImpl) url).getProto()))) {
+    if (this.url != null
+        && !(l.getResource().equals(((URLPBImpl) url).getProto()))) {
       maybeInitBuilder();
       l = builder;
       builder.setResource(convertToProtoFormat(this.url));
@@ -105,7 +105,6 @@ public class LocalResourcePBImpl extends LocalResource {
     maybeInitBuilder();
     builder.setSize((size));
   }
-
   @Override
   public synchronized long getTimestamp() {
     LocalResourceProtoOrBuilder p = viaProto ? proto : builder;
@@ -117,7 +116,6 @@ public class LocalResourcePBImpl extends LocalResource {
     maybeInitBuilder();
     builder.setTimestamp((timestamp));
   }
-
   @Override
   public synchronized LocalResourceType getType() {
     LocalResourceProtoOrBuilder p = viaProto ? proto : builder;
@@ -136,7 +134,6 @@ public class LocalResourcePBImpl extends LocalResource {
     }
     builder.setType(convertToProtoFormat(type));
   }
-
   @Override
   public synchronized URL getResource() {
     LocalResourceProtoOrBuilder p = viaProto ? proto : builder;
@@ -153,12 +150,10 @@ public class LocalResourcePBImpl extends LocalResource {
   @Override
   public synchronized void setResource(URL resource) {
     maybeInitBuilder();
-    if (resource == null) {
+    if (resource == null) 
       builder.clearResource();
-    }
     this.url = resource;
   }
-
   @Override
   public synchronized LocalResourceVisibility getVisibility() {
     LocalResourceProtoOrBuilder p = viaProto ? proto : builder;
@@ -197,6 +192,26 @@ public class LocalResourcePBImpl extends LocalResource {
     builder.setPattern(pattern);
   }
 
+  @Override
+  public synchronized boolean getShouldBeUploadedToSharedCache() {
+    LocalResourceProtoOrBuilder p = viaProto ? proto : builder;
+    if (!p.hasShouldBeUploadedToSharedCache()) {
+      return false;
+    }
+    return p.getShouldBeUploadedToSharedCache();
+  }
+
+  @Override
+  public synchronized void setShouldBeUploadedToSharedCache(
+      boolean shouldBeUploadedToSharedCache) {
+    maybeInitBuilder();
+    if (!shouldBeUploadedToSharedCache) {
+      builder.clearShouldBeUploadedToSharedCache();
+      return;
+    }
+    builder.setShouldBeUploadedToSharedCache(shouldBeUploadedToSharedCache);
+  }
+
   private LocalResourceTypeProto convertToProtoFormat(LocalResourceType e) {
     return ProtoUtils.convertToProtoFormat(e);
   }
@@ -210,16 +225,14 @@ public class LocalResourcePBImpl extends LocalResource {
   }
 
   private URLProto convertToProtoFormat(URL t) {
-    return ((URLPBImpl) t).getProto();
+    return ((URLPBImpl)t).getProto();
   }
 
-  private LocalResourceVisibilityProto convertToProtoFormat(
-      LocalResourceVisibility e) {
+  private LocalResourceVisibilityProto convertToProtoFormat(LocalResourceVisibility e) {
     return ProtoUtils.convertToProtoFormat(e);
   }
 
-  private LocalResourceVisibility convertFromProtoFormat(
-      LocalResourceVisibilityProto e) {
+  private LocalResourceVisibility convertFromProtoFormat(LocalResourceVisibilityProto e) {
     return ProtoUtils.convertFromProtoFormat(e);
   }
 }  

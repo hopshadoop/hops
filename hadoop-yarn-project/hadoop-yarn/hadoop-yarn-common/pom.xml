@@ -13,8 +13,8 @@
   limitations under the License. See accompanying LICENSE file.
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
                       http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <artifactId>hadoop-yarn</artifactId>
@@ -30,6 +30,8 @@
   <properties>
     <!-- Needed for generating FindBugs warnings using parent pom -->
     <yarn.basedir>${project.parent.basedir}</yarn.basedir>
+    <should.run.jdiff>true</should.run.jdiff>
+    <dev-support.relative.dir>../dev-support</dev-support.relative.dir>
   </properties>
 
   <dependencies>
@@ -38,24 +40,6 @@
       <groupId>io.hops</groupId>
       <artifactId>hadoop-common</artifactId>
       <scope>provided</scope>
-      <exclusions>
-        <exclusion>
-          <groupId>commons-el</groupId>
-          <artifactId>commons-el</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>tomcat</groupId>
-          <artifactId>jasper-runtime</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>tomcat</groupId>
-          <artifactId>jasper-compiler</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.mortbay.jetty</groupId>
-          <artifactId>jsp-2.1-jetty</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
 
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
@@ -85,12 +69,32 @@
       <artifactId>commons-codec</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.mortbay.jetty</groupId>
+      <artifactId>jetty-util</artifactId>
+    </dependency>
+    <dependency>
       <groupId>com.sun.jersey</groupId>
       <artifactId>jersey-core</artifactId>
     </dependency>
     <dependency>
+      <groupId>com.sun.jersey</groupId>
+      <artifactId>jersey-client</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.codehaus.jackson</groupId>
-      <artifactId>jackson-mapper-asl</artifactId>
+      <artifactId>jackson-core-asl</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.codehaus.jackson</groupId>
+        <artifactId>jackson-mapper-asl</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.codehaus.jackson</groupId>
+        <artifactId>jackson-jaxrs</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.codehaus.jackson</groupId>
+        <artifactId>jackson-xc</artifactId>
     </dependency>
     <dependency>
       <groupId>com.google.guava</groupId>
@@ -141,6 +145,16 @@
       <scope>test</scope>
     </dependency>
     <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcprov-jdk16</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.sun.jersey.jersey-test-framework</groupId>
+      <artifactId>jersey-test-framework-grizzly2</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>commons-io</groupId>
       <artifactId>commons-io</artifactId>
     </dependency>
@@ -161,8 +175,8 @@
       <artifactId>jersey-guice</artifactId>
     </dependency>
     <dependency>
-      <groupId>log4j</groupId>
-      <artifactId>log4j</artifactId>
+     <groupId>log4j</groupId>
+     <artifactId>log4j</artifactId>
     </dependency>
   </dependencies>
 
@@ -191,7 +205,7 @@
       </resource>
     </resources>
     <plugins>
-      <plugin>
+     <plugin>
         <groupId>org.apache.rat</groupId>
         <artifactId>apache-rat-plugin</artifactId>
         <configuration>
@@ -204,14 +218,10 @@
             <exclude>src/main/resources/webapps/test/.keep</exclude>
             <exclude>src/main/resources/webapps/proxy/.keep</exclude>
             <exclude>src/main/resources/webapps/node/.keep</exclude>
-            <exclude>src/main/resources/webapps/static/dt-1.9.4/css/jui-dt.css
-            </exclude>
-            <exclude>
-              src/main/resources/webapps/static/dt-1.9.4/css/demo_table.css
-            </exclude>
-            <exclude>
-              src/main/resources/webapps/static/jquery/themes-1.9.1/base/jquery-ui.css
-            </exclude>
+            <exclude>src/main/resources/webapps/static/dt-1.9.4/css/jui-dt.css</exclude>
+            <exclude>src/main/resources/webapps/static/dt-1.9.4/css/demo_table.css</exclude>
+            <exclude>src/main/resources/webapps/static/dt-1.9.4/images/Sorting icons.psd</exclude>
+            <exclude>src/main/resources/webapps/static/jquery/themes-1.9.1/base/jquery-ui.css</exclude>
           </excludes>
         </configuration>
       </plugin>
@@ -235,6 +245,31 @@
               </source>
             </configuration>
           </execution>
+          <execution>
+            <id>compile-protoc</id>
+            <phase>generate-sources</phase>
+            <goals>
+              <goal>protoc</goal>
+            </goals>
+            <configuration>
+              <protocVersion>${protobuf.version}</protocVersion>
+              <protocCommand>${protoc.path}</protocCommand>
+              <imports>
+                <param>${basedir}/../../../hadoop-common-project/hadoop-common/src/main/proto</param>
+                <param>${basedir}/../hadoop-yarn-api/src/main/proto</param>
+                <param>${basedir}/src/main/proto</param>
+              </imports>
+              <source>
+                <directory>${basedir}/src/main/proto/server</directory>
+                <includes>
+                  <include>yarn_security_token.proto</include>
+                  <include>yarn_GroupMembership_service.proto</include>
+                </includes>
+              </source>
+              <output>${project.build.directory}/generated-sources/java</output>
+            </configuration>
+          </execution>
+
         </executions>
       </plugin>
       <plugin>
@@ -248,7 +283,7 @@
           </execution>
         </executions>
       </plugin>
-
+     
       <plugin>
         <artifactId>maven-antrun-plugin</artifactId>
         <executions>
@@ -259,46 +294,14 @@
             </goals>
             <configuration>
               <tasks>
-                <copy file="src/main/resources/yarn-default.xml"
-                      todir="src/site/resources"/>
-                <copy file="src/main/xsl/configuration.xsl"
-                      todir="src/site/resources"/>
+                <copy file="src/main/resources/yarn-default.xml" todir="src/site/resources"/>
+                <copy file="src/main/xsl/configuration.xsl" todir="src/site/resources"/>
               </tasks>
             </configuration>
           </execution>
         </executions>
       </plugin>
 
-      <plugin>
-        <groupId>io.hops</groupId>
-        <artifactId>hadoop-maven-plugins</artifactId>
-        <executions>
-          <execution>
-            <id>compile-protoc</id>
-            <phase>generate-sources</phase>
-            <goals>
-              <goal>protoc</goal>
-            </goals>
-            <configuration>
-              <protocVersion>${protobuf.version}</protocVersion>
-              <protocCommand>${protoc.path}</protocCommand>
-              <imports>
-                <param>${basedir}/src/main/proto</param>
-                <param>
-                  ${basedir}/../../../hadoop-common-project/hadoop-common/src/main/proto
-                </param>
-              </imports>
-              <source>
-                <directory>${basedir}/src/main/proto/</directory>
-                <includes>
-                  <include>yarn_GroupMembership_service.proto</include>
-                </includes>
-              </source>
-              <output>${project.build.directory}/generated-sources/java</output>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
     </plugins>
   </build>
 </project>

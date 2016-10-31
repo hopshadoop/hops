@@ -23,23 +23,22 @@ import org.apache.hadoop.classification.InterfaceStability.Stable;
 import org.apache.hadoop.yarn.api.ContainerManagementProtocol;
 
 /**
- * <p><code>LocalResourceVisibility</code> specifies the <em>visibility</em>
- * of a resource localized by the <code>NodeManager</code>.</p>
- * <p/>
- * <p>The <em>visibility</em> can be one of:
+ * {@code LocalResourceVisibility} specifies the <em>visibility</em>
+ * of a resource localized by the {@code NodeManager}.
+ * <p>
+ * The <em>visibility</em> can be one of:
  * <ul>
- * <li>{@link #PUBLIC} - Shared by all users on the node.</li>
- * <li>
- * {@link #PRIVATE} - Shared among all applications of the
- * <em>same user</em> on the node.
- * </li>
- * <li>
- * {@link #APPLICATION} - Shared only among containers of the
- * <em>same application</em> on the node.
- * </li>
+ *   <li>{@link #PUBLIC} - Shared by all users on the node.</li>
+ *   <li>
+ *     {@link #PRIVATE} - Shared among all applications of the
+ *     <em>same user</em> on the node.
+ *   </li>
+ *   <li>
+ *     {@link #APPLICATION} - Shared only among containers of the
+ *     <em>same application</em> on the node.
+ *   </li>
  * </ul>
- * </p>
- *
+ * 
  * @see LocalResource
  * @see ContainerLaunchContext
  * @see ApplicationSubmissionContext
@@ -48,17 +47,17 @@ import org.apache.hadoop.yarn.api.ContainerManagementProtocol;
 @Public
 @Stable
 public enum LocalResourceVisibility {
-  /**
+  /** 
    * Shared by all users on the node.
    */
-  PUBLIC,
+  PUBLIC, 
   
-  /**
+  /** 
    * Shared among all applications of the <em>same user</em> on the node.
    */
-  PRIVATE,
+  PRIVATE, 
   
-  /**
+  /** 
    * Shared only among containers of the <em>same application</em> on the node.
    */
   APPLICATION

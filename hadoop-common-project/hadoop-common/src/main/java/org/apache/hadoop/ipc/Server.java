@@ -68,6 +68,7 @@ import javax.security.sasl.Sasl;
 import javax.security.sasl.SaslException;
 import javax.security.sasl.SaslServer;
 
+import org.apache.commons.io.Charsets;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -78,6 +79,7 @@ import org.apache.hadoop.conf.Configuration.IntegerRanges;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.io.DataOutputBuffer;
+import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.ipc.ProtobufRpcEngine.RpcResponseMessageWrapper;
@@ -114,6 +116,10 @@ import org.apache.hadoop.util.ProtoUtil;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
+import org.apache.htrace.Span;
+import org.apache.htrace.Trace;
+import org.apache.htrace.TraceInfo;
+import org.apache.htrace.TraceScope;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ByteString;
@@ -174,7 +180,7 @@ public abstract class Server {
    * and send back a nicer response.
    */
   private static final ByteBuffer HTTP_GET_BYTES = ByteBuffer.wrap(
-      "GET ".getBytes());
+      "GET ".getBytes(Charsets.UTF_8));
   
   /**
    * An HTTP response to send back if we detect an HTTP request to our IPC
@@ -352,8 +358,8 @@ public abstract class Server {
   private int readThreads;                        // number of read threads
   private int readerPendingConnectionQueue;         // number of connections to queue per read thread
   private Class<? extends Writable> rpcRequestClass;   // class used for deserializing the rpc request
-  protected RpcMetrics rpcMetrics;
-  protected RpcDetailedMetrics rpcDetailedMetrics;
+  final protected RpcMetrics rpcMetrics;
+  final protected RpcDetailedMetrics rpcDetailedMetrics;
   
   private Configuration conf;
   private String portRangeConfig = null;
@@ -503,6 +509,7 @@ public abstract class Server {
     private ByteBuffer rpcResponse;       // the response for this call
     private final RPC.RpcKind rpcKind;
     private final byte[] clientId;
+    private final Span traceSpan; // the tracing span on the server side
 
     public Call(int id, int retryCount, Writable param, 
         Connection connection) {
@@ -512,6 +519,11 @@ public abstract class Server {
 
     public Call(int id, int retryCount, Writable param, Connection connection,
         RPC.RpcKind kind, byte[] clientId) {
+      this(id, retryCount, param, connection, kind, clientId, null);
+    }
+
+    public Call(int id, int retryCount, Writable param, Connection connection,
+        RPC.RpcKind kind, byte[] clientId, Span span) {
       this.callId = id;
       this.retryCount = retryCount;
       this.rpcRequest = param;
@@ -520,6 +532,7 @@ public abstract class Server {
       this.rpcResponse = null;
       this.rpcKind = kind;
       this.clientId = clientId;
+      this.traceSpan = span;
     }
     
     @Override
@@ -650,7 +663,8 @@ public abstract class Server {
         assert !running;
         readSelector.wakeup();
         try {
-          join();
+          super.interrupt();
+          super.join();
         } catch (InterruptedException ie) {
           Thread.currentThread().interrupt();
         }
@@ -733,6 +747,13 @@ public abstract class Server {
         
         Reader reader = getReader();
         Connection c = connectionManager.register(channel);
+        // If the connectionManager can't take it, close the connection.
+        if (c == null) {
+          if (channel.isOpen()) {
+            IOUtils.cleanup(null, channel);
+          }
+          continue;
+        }
         key.attach(c);  // so closeCurrentConnection can get the object
         reader.addConnection(c);
       }
@@ -1104,7 +1125,8 @@ public abstract class Server {
     private ByteBuffer data;
     private ByteBuffer dataLengthBuffer;
     private LinkedList<Call> responseQueue;
-    private volatile int rpcCount = 0; // number of outstanding rpcs
+    // number of outstanding rpcs
+    private AtomicInteger rpcCount = new AtomicInteger();
     private long lastContact;
     private int dataLength;
     private Socket socket;
@@ -1189,17 +1211,17 @@ public abstract class Server {
 
     /* Return true if the connection has no outstanding rpc */
     private boolean isIdle() {
-      return rpcCount == 0;
+      return rpcCount.get() == 0;
     }
     
     /* Decrement the outstanding RPC count */
     private void decRpcCount() {
-      rpcCount--;
+      rpcCount.decrementAndGet();
     }
     
     /* Increment the outstanding RPC count */
     private void incRpcCount() {
-      rpcCount++;
+      rpcCount.incrementAndGet();
     }
     
     private UserGroupInformation getAuthorizedUgi(String authorizedId)
@@ -1215,7 +1237,7 @@ public abstract class Server {
         ugi.addTokenIdentifier(tokenId);
         return ugi;
       } else {
-        return UserGroupInformation.createRemoteUser(authorizedId);
+        return UserGroupInformation.createRemoteUser(authorizedId, authMethod);
       }
     }
 
@@ -1625,7 +1647,7 @@ public abstract class Server {
     private void setupHttpRequestOnIpcPortResponse() throws IOException {
       Call fakeCall = new Call(0, RpcConstants.INVALID_RETRY_COUNT, null, this);
       fakeCall.setResponse(ByteBuffer.wrap(
-          RECEIVED_HTTP_REQ_RESPONSE.getBytes()));
+          RECEIVED_HTTP_REQ_RESPONSE.getBytes(Charsets.UTF_8)));
       responder.doRespond(fakeCall);
     }
 
@@ -1836,9 +1858,18 @@ public abstract class Server {
             RpcErrorCodeProto.FATAL_DESERIALIZING_REQUEST, err);
       }
         
+      Span traceSpan = null;
+      if (header.hasTraceInfo()) {
+        // If the incoming RPC included tracing info, always continue the trace
+        TraceInfo parentSpan = new TraceInfo(header.getTraceInfo().getTraceId(),
+                                             header.getTraceInfo().getParentId());
+        traceSpan = Trace.startSpan(rpcRequest.toString(), parentSpan).detach();
+      }
+
       Call call = new Call(header.getCallId(), header.getRetryCount(),
-          rpcRequest, this, ProtoUtil.convert(header.getRpcKind()), header
-              .getClientId().toByteArray());
+          rpcRequest, this, ProtoUtil.convert(header.getRpcKind()),
+          header.getClientId().toByteArray(), traceSpan);
+
       callQueue.put(call);              // queue the call; maybe blocked here
       incRpcCount();  // Increment the rpc count
     }
@@ -1897,7 +1928,7 @@ public abstract class Server {
         // authentication
         if (user != null && user.getRealUser() != null
             && (authMethod != AuthMethod.TOKEN)) {
-          ProxyUsers.authorize(user, this.getHostAddress(), conf);
+          ProxyUsers.authorize(user, this.getHostAddress());
         }
         authorize(user, protocolName, getHostInetAddress());
         if (LOG.isDebugEnabled()) {
@@ -1961,9 +1992,9 @@ public abstract class Server {
         LOG.debug("Ignoring socket shutdown exception", e);
       }
       if (channel.isOpen()) {
-        try {channel.close();} catch(Exception e) {}
+        IOUtils.cleanup(null, channel);
       }
-      try {socket.close();} catch(Exception e) {}
+      IOUtils.cleanup(null, socket);
     }
   }
 
@@ -1981,6 +2012,7 @@ public abstract class Server {
       ByteArrayOutputStream buf = 
         new ByteArrayOutputStream(INITIAL_RESP_BUF_SIZE);
       while (running) {
+        TraceScope traceScope = null;
         try {
           final Call call = callQueue.take(); // pop the queue; maybe blocked here
           if (LOG.isDebugEnabled()) {
@@ -1997,6 +2029,10 @@ public abstract class Server {
           Writable value = null;
 
           CurCall.set(call);
+          if (call.traceSpan != null) {
+            traceScope = Trace.continueSpan(call.traceSpan);
+          }
+
           try {
             // Make the call as the user via Subject.doAs, thus associating
             // the call with the Subject
@@ -2021,16 +2057,15 @@ public abstract class Server {
             if (e instanceof UndeclaredThrowableException) {
               e = e.getCause();
             }
-            String logMsg = Thread.currentThread().getName() + ", call " + call + ": error: " + e;
-            if (e instanceof RuntimeException || e instanceof Error) {
+            String logMsg = Thread.currentThread().getName() + ", call " + call;
+            if (exceptionsHandler.isTerse(e.getClass())) {
+              // Don't log the whole stack trace. Way too noisy!
+              LOG.info(logMsg + ": " + e);
+            } else if (e instanceof RuntimeException || e instanceof Error) {
               // These exception types indicate something is probably wrong
               // on the server side, as opposed to just a normal exceptional
               // result.
               LOG.warn(logMsg, e);
-            } else if (exceptionsHandler.isTerse(e.getClass())) {
-             // Don't log the whole stack trace of these exceptions.
-              // Way too noisy!
-              LOG.info(logMsg);
             } else {
               LOG.info(logMsg, e);
             }
@@ -2071,9 +2106,22 @@ public abstract class Server {
         } catch (InterruptedException e) {
           if (running) {                          // unexpected -- log it
             LOG.info(Thread.currentThread().getName() + " unexpectedly interrupted", e);
+            if (Trace.isTracing()) {
+              traceScope.getSpan().addTimelineAnnotation("unexpectedly interrupted: " +
+                  StringUtils.stringifyException(e));
+            }
           }
         } catch (Exception e) {
           LOG.info(Thread.currentThread().getName() + " caught an exception", e);
+          if (Trace.isTracing()) {
+            traceScope.getSpan().addTimelineAnnotation("Exception: " +
+                StringUtils.stringifyException(e));
+          }
+        } finally {
+          if (traceScope != null) {
+            traceScope.close();
+          }
+          IOUtils.cleanup(LOG, traceScope);
         }
       }
       LOG.debug(Thread.currentThread().getName() + ": exiting");
@@ -2404,42 +2452,13 @@ public abstract class Server {
           handlers[i].interrupt();
         }
       }
-      for (int i = 0; i < handlerCount; i++) {
-        if (handlers[i] != null) {
-          try {
-            boolean success = false;
-            int nbTry=0;
-            while (!success && nbTry<10) {
-              handlers[i].join(10);
-              if (handlers[i].isAlive()) {
-                String stack = "";
-                for(StackTraceElement elem: handlers[i].getStackTrace()){
-                  stack = stack + "\n\t" + elem.toString();
-                }
-                LOG.info("server handler not finishing " + port + " thread" + 
-                        handlers[i].getName() + " " + stack);
-                handlers[i].interrupt();
-              }else{
-                success=true;
-              }
-            }
-          } catch (InterruptedException ex) {
-            LOG.error(ex,ex);
-          }
-        }
-      }
     }
     listener.interrupt();
     listener.doStop();
     responder.interrupt();
     notifyAll();
-    if (this.rpcMetrics != null) {
-      this.rpcMetrics.shutdown();
-    }
-    if (this.rpcDetailedMetrics != null) {
-      this.rpcDetailedMetrics.shutdown();
-    }
-    LOG.info("stopped server on " + port);
+    this.rpcMetrics.shutdown();
+    this.rpcDetailedMetrics.shutdown();
   }
 
   /** Wait for the server to be stopped.
@@ -2634,6 +2653,7 @@ public abstract class Server {
     final private int idleScanInterval;
     final private int maxIdleTime;
     final private int maxIdleToClose;
+    final private int maxConnections;
     
     ConnectionManager() {
       this.idleScanTimer = new Timer(
@@ -2650,6 +2670,9 @@ public abstract class Server {
       this.maxIdleToClose = conf.getInt(
           CommonConfigurationKeysPublic.IPC_CLIENT_KILL_MAX_KEY,
           CommonConfigurationKeysPublic.IPC_CLIENT_KILL_MAX_DEFAULT);
+      this.maxConnections = conf.getInt(
+          CommonConfigurationKeysPublic.IPC_SERVER_MAX_CONNECTIONS_KEY,
+          CommonConfigurationKeysPublic.IPC_SERVER_MAX_CONNECTIONS_DEFAULT);
       // create a set with concurrency -and- a thread-safe iterator, add 2
       // for listener and idle closer threads
       this.connections = Collections.newSetFromMap(
@@ -2677,11 +2700,19 @@ public abstract class Server {
       return count.get();
     }
 
+    boolean isFull() {
+      // The check is disabled when maxConnections <= 0.
+      return ((maxConnections > 0) && (size() >= maxConnections));
+    }
+
     Connection[] toArray() {
       return connections.toArray(new Connection[0]);
     }
 
     Connection register(SocketChannel channel) {
+      if (isFull()) {
+        return null;
+      }
       Connection connection = new Connection(channel, Time.now());
       add(connection);
       if (LOG.isDebugEnabled()) {

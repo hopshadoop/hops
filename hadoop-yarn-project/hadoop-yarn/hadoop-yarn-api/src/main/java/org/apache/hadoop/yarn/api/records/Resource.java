@@ -25,26 +25,25 @@ import org.apache.hadoop.yarn.api.ApplicationMasterProtocol;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * <p><code>Resource</code> models a set of computer resources in the
+ * <p><code>Resource</code> models a set of computer resources in the 
  * cluster.</p>
- * <p/>
+ * 
  * <p>Currently it models both <em>memory</em> and <em>CPU</em>.</p>
- * <p/>
+ * 
  * <p>The unit for memory is megabytes. CPU is modeled with virtual cores
  * (vcores), a unit for expressing parallelism. A node's capacity should
  * be configured with virtual cores equal to its number of physical cores. A
  * container should be requested with the number of cores it can saturate, i.e.
  * the average number of threads it expects to have runnable at a time.</p>
- * <p/>
+ * 
  * <p>Virtual cores take integer values and thus currently CPU-scheduling is
- * very coarse.  A complementary axis for CPU requests that represents
- * processing
+ * very coarse.  A complementary axis for CPU requests that represents processing
  * power will likely be added in the future to enable finer-grained resource
  * configuration.</p>
- * <p/>
+ * 
  * <p>Typically, applications request <code>Resource</code> of suitable
  * capability to run their component tasks.</p>
- *
+ * 
  * @see ResourceRequest
  * @see ApplicationMasterProtocol#allocate(org.apache.hadoop.yarn.api.protocolrecords.AllocateRequest)
  */
@@ -63,7 +62,6 @@ public abstract class Resource implements Comparable<Resource> {
 
   /**
    * Get <em>memory</em> of the resource.
-   *
    * @return <em>memory</em> of the resource
    */
   @Public
@@ -72,9 +70,7 @@ public abstract class Resource implements Comparable<Resource> {
   
   /**
    * Set <em>memory</em> of the resource.
-   *
-   * @param memory
-   *     <em>memory</em> of the resource
+   * @param memory <em>memory</em> of the resource
    */
   @Public
   @Stable
@@ -83,14 +79,12 @@ public abstract class Resource implements Comparable<Resource> {
 
   /**
    * Get <em>number of virtual cpu cores</em> of the resource.
-   * <p/>
+   * 
    * Virtual cores are a unit for expressing CPU parallelism. A node's capacity
-   * should be configured with virtual cores equal to its number of physical
-   * cores.
-   * A container should be requested with the number of cores it can saturate,
-   * i.e.
+   * should be configured with virtual cores equal to its number of physical cores.
+   * A container should be requested with the number of cores it can saturate, i.e.
    * the average number of threads it expects to have runnable at a time.
-   *
+   *   
    * @return <em>num of virtual cpu cores</em> of the resource
    */
   @Public
@@ -99,16 +93,13 @@ public abstract class Resource implements Comparable<Resource> {
   
   /**
    * Set <em>number of virtual cpu cores</em> of the resource.
-   * <p/>
+   * 
    * Virtual cores are a unit for expressing CPU parallelism. A node's capacity
-   * should be configured with virtual cores equal to its number of physical
-   * cores.
-   * A container should be requested with the number of cores it can saturate,
-   * i.e.
+   * should be configured with virtual cores equal to its number of physical cores.
+   * A container should be requested with the number of cores it can saturate, i.e.
    * the average number of threads it expects to have runnable at a time.
-   *
-   * @param vCores
-   *     <em>number of virtual cpu cores</em> of the resource
+   *    
+   * @param vCores <em>number of virtual cpu cores</em> of the resource
    */
   @Public
   @Evolving
@@ -125,17 +116,14 @@ public abstract class Resource implements Comparable<Resource> {
 
   @Override
   public boolean equals(Object obj) {
-    if (this == obj) {
+    if (this == obj)
       return true;
-    }
-    if (obj == null) {
+    if (obj == null)
       return false;
-    }
-    if (!(obj instanceof Resource)) {
+    if (!(obj instanceof Resource))
       return false;
-    }
     Resource other = (Resource) obj;
-    if (getMemory() != other.getMemory() ||
+    if (getMemory() != other.getMemory() || 
         getVirtualCores() != other.getVirtualCores()) {
       return false;
     }

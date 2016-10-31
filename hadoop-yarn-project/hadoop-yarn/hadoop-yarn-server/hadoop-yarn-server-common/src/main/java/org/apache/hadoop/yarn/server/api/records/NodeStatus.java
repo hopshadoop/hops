@@ -17,12 +17,12 @@
  */
 package org.apache.hadoop.yarn.server.api.records;
 
+import java.util.List;
+
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.util.Records;
-
-import java.util.List;
 
 
 public abstract class NodeStatus {
@@ -41,23 +41,18 @@ public abstract class NodeStatus {
   }
 
   public abstract NodeId getNodeId();
-
   public abstract int getResponseId();
   
   public abstract List<ContainerStatus> getContainersStatuses();
-
   public abstract void setContainersStatuses(
       List<ContainerStatus> containersStatuses);
 
   public abstract List<ApplicationId> getKeepAliveApplications();
-
   public abstract void setKeepAliveApplications(List<ApplicationId> appIds);
   
   public abstract NodeHealthStatus getNodeHealthStatus();
-
   public abstract void setNodeHealthStatus(NodeHealthStatus healthStatus);
 
   public abstract void setNodeId(NodeId nodeId);
-
   public abstract void setResponseId(int responseId);
 }

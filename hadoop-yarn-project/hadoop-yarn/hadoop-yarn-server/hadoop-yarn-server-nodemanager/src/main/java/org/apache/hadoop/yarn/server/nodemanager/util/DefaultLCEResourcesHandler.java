@@ -27,7 +27,8 @@ import org.apache.hadoop.yarn.server.nodemanager.LinuxContainerExecutor;
 
 public class DefaultLCEResourcesHandler implements LCEResourcesHandler {
 
-  final static Log LOG = LogFactory.getLog(DefaultLCEResourcesHandler.class);
+  final static Log LOG = LogFactory
+      .getLog(DefaultLCEResourcesHandler.class);
 
   private Configuration conf;
   
@@ -35,12 +36,12 @@ public class DefaultLCEResourcesHandler implements LCEResourcesHandler {
   }
   
   public void setConf(Configuration conf) {
-    this.conf = conf;
+        this.conf = conf;
   }
 
   @Override
   public Configuration getConf() {
-    return conf;
+    return  conf;
   }
   
   public void init(LinuxContainerExecutor lce) {

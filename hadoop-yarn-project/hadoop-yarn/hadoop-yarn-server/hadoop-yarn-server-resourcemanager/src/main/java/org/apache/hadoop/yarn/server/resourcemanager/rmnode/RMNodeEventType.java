@@ -24,6 +24,9 @@ public enum RMNodeEventType {
   
   // Source: AdminService
   DECOMMISSION,
+  
+  // Source: AdminService, ResourceTrackerService
+  RESOURCE_UPDATE,
 
   // ResourceTrackerService
   STATUS_UPDATE,
@@ -36,6 +39,9 @@ public enum RMNodeEventType {
   // Source: Container
   CONTAINER_ALLOCATED,
   CLEANUP_CONTAINER,
+
+  // Source: RMAppAttempt
+  FINISHED_CONTAINERS_PULLED_BY_AM,
 
   // Source: NMLivelinessMonitor
   EXPIRE

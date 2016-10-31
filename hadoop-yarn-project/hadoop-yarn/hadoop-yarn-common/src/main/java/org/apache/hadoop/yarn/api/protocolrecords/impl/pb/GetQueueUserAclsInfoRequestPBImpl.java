@@ -18,19 +18,19 @@
 
 package org.apache.hadoop.yarn.api.protocolrecords.impl.pb;
 
-import com.google.protobuf.TextFormat;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.protocolrecords.GetQueueUserAclsInfoRequest;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetQueueUserAclsInfoRequestProto;
 
+import com.google.protobuf.TextFormat;
+
 @Private
 @Unstable
-public class GetQueueUserAclsInfoRequestPBImpl
-    extends GetQueueUserAclsInfoRequest {
+public class GetQueueUserAclsInfoRequestPBImpl extends GetQueueUserAclsInfoRequest {
 
-  GetQueueUserAclsInfoRequestProto proto =
-      GetQueueUserAclsInfoRequestProto.getDefaultInstance();
+  GetQueueUserAclsInfoRequestProto proto = 
+    GetQueueUserAclsInfoRequestProto.getDefaultInstance();
   GetQueueUserAclsInfoRequestProto.Builder builder = null;
   boolean viaProto = false;
 
@@ -38,8 +38,7 @@ public class GetQueueUserAclsInfoRequestPBImpl
     builder = GetQueueUserAclsInfoRequestProto.newBuilder();
   }
 
-  public GetQueueUserAclsInfoRequestPBImpl(
-      GetQueueUserAclsInfoRequestProto proto) {
+  public GetQueueUserAclsInfoRequestPBImpl(GetQueueUserAclsInfoRequestProto proto) {
     this.proto = proto;
     viaProto = true;
   }
@@ -57,9 +56,8 @@ public class GetQueueUserAclsInfoRequestPBImpl
 
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }

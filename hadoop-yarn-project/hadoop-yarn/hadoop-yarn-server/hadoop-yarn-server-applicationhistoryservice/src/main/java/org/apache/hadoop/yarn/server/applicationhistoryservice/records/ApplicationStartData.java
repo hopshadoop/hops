@@ -34,8 +34,8 @@ public abstract class ApplicationStartData {
   @Public
   @Unstable
   public static ApplicationStartData newInstance(ApplicationId applicationId,
-      String applicationName, String applicationType, String queue, String user,
-      long submitTime, long startTime) {
+      String applicationName, String applicationType, String queue,
+      String user, long submitTime, long startTime) {
     ApplicationStartData appSD = Records.newRecord(ApplicationStartData.class);
     appSD.setApplicationId(applicationId);
     appSD.setApplicationName(applicationName);

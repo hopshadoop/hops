@@ -18,19 +18,20 @@
 
 package org.apache.hadoop.yarn.webapp;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
+
+import org.apache.hadoop.classification.InterfaceAudience;
 
 /**
  * Contains the exception information from an exception thrown
  * by the web service REST API's.
  * Fields include:
- * exception - exception type
- * javaClassName - java class name of the exception
- * message - a detailed message explaining the exception
+ *   exception - exception type
+ *   javaClassName - java class name of the exception
+ *   message - a detailed message explaining the exception
+ *
  */
 @InterfaceAudience.LimitedPrivate({"YARN", "MapReduce"})
 @XmlRootElement(name = "RemoteException")

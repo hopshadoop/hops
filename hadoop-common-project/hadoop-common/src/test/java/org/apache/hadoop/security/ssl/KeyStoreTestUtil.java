@@ -19,17 +19,10 @@
 package org.apache.hadoop.security.ssl;
 
 import org.apache.hadoop.conf.Configuration;
-import sun.security.x509.AlgorithmId;
-import sun.security.x509.CertificateAlgorithmId;
-import sun.security.x509.CertificateIssuerName;
-import sun.security.x509.CertificateSerialNumber;
-import sun.security.x509.CertificateSubjectName;
-import sun.security.x509.CertificateValidity;
-import sun.security.x509.CertificateVersion;
-import sun.security.x509.CertificateX509Key;
-import sun.security.x509.X500Name;
-import sun.security.x509.X509CertImpl;
-import sun.security.x509.X509CertInfo;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.security.alias.CredentialProvider;
+import org.apache.hadoop.security.alias.CredentialProviderFactory;
+import org.apache.hadoop.security.alias.JavaKeyStoreProvider;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -52,6 +45,15 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
+import java.security.InvalidKeyException;
+import java.security.NoSuchProviderException;
+import java.security.SignatureException;
+import java.security.cert.CertificateEncodingException;
+import java.security.cert.CertificateException;
+import java.security.cert.CertificateFactory;
+import javax.security.auth.x500.X500Principal;
+import org.bouncycastle.x509.X509V1CertificateGenerator;
+
 public class KeyStoreTestUtil {
 
   public static String getClasspathDir(Class klass) throws Exception {
@@ -63,70 +65,58 @@ public class KeyStoreTestUtil {
     return baseDir;
   }
 
+  @SuppressWarnings("deprecation")
   /**
    * Create a self-signed X.509 Certificate.
-   * From http://bfo.com/blog/2011/03/08/odds_and_ends_creating_a_new_x_509_certificate.html.
    *
    * @param dn the X.509 Distinguished Name, eg "CN=Test, L=London, C=GB"
    * @param pair the KeyPair
    * @param days how many days from now the Certificate is valid for
    * @param algorithm the signing algorithm, eg "SHA1withRSA"
    * @return the self-signed certificate
-   * @throws IOException thrown if an IO error ocurred.
-   * @throws GeneralSecurityException thrown if an Security error ocurred.
    */
-  public static X509Certificate generateCertificate(String dn, KeyPair pair,
-                                                    int days, String algorithm)
-    throws GeneralSecurityException, IOException {
-    PrivateKey privkey = pair.getPrivate();
-    X509CertInfo info = new X509CertInfo();
+  public static X509Certificate generateCertificate(String dn, KeyPair pair, int days, String algorithm)
+      throws CertificateEncodingException,
+             InvalidKeyException,
+             IllegalStateException,
+             NoSuchProviderException, NoSuchAlgorithmException, SignatureException{
+
     Date from = new Date();
     Date to = new Date(from.getTime() + days * 86400000l);
-    CertificateValidity interval = new CertificateValidity(from, to);
     BigInteger sn = new BigInteger(64, new SecureRandom());
-    X500Name owner = new X500Name(dn);
+    KeyPair keyPair = pair;
+    X509V1CertificateGenerator certGen = new X509V1CertificateGenerator();
+    X500Principal  dnName = new X500Principal(dn);
 
-    info.set(X509CertInfo.VALIDITY, interval);
-    info.set(X509CertInfo.SERIAL_NUMBER, new CertificateSerialNumber(sn));
-    info.set(X509CertInfo.SUBJECT, new CertificateSubjectName(owner));
-    info.set(X509CertInfo.ISSUER, new CertificateIssuerName(owner));
-    info.set(X509CertInfo.KEY, new CertificateX509Key(pair.getPublic()));
-    info
-      .set(X509CertInfo.VERSION, new CertificateVersion(CertificateVersion.V3));
-    AlgorithmId algo = new AlgorithmId(AlgorithmId.md5WithRSAEncryption_oid);
-    info.set(X509CertInfo.ALGORITHM_ID, new CertificateAlgorithmId(algo));
+    certGen.setSerialNumber(sn);
+    certGen.setIssuerDN(dnName);
+    certGen.setNotBefore(from);
+    certGen.setNotAfter(to);
+    certGen.setSubjectDN(dnName);
+    certGen.setPublicKey(keyPair.getPublic());
+    certGen.setSignatureAlgorithm(algorithm);
 
-    // Sign the cert to identify the algorithm that's used.
-    X509CertImpl cert = new X509CertImpl(info);
-    cert.sign(privkey, algorithm);
-
-    // Update the algorith, and resign.
-    algo = (AlgorithmId) cert.get(X509CertImpl.SIG_ALG);
-    info
-      .set(CertificateAlgorithmId.NAME + "." + CertificateAlgorithmId.ALGORITHM,
-           algo);
-    cert = new X509CertImpl(info);
-    cert.sign(privkey, algorithm);
+    X509Certificate cert = certGen.generate(pair.getPrivate());
     return cert;
   }
 
   public static KeyPair generateKeyPair(String algorithm)
-    throws NoSuchAlgorithmException {
+      throws NoSuchAlgorithmException {
     KeyPairGenerator keyGen = KeyPairGenerator.getInstance(algorithm);
     keyGen.initialize(1024);
     return keyGen.genKeyPair();
   }
 
   private static KeyStore createEmptyKeyStore()
-    throws GeneralSecurityException, IOException {
+      throws GeneralSecurityException, IOException {
     KeyStore ks = KeyStore.getInstance("JKS");
     ks.load(null, null); // initialize
     return ks;
   }
 
   private static void saveKeyStore(KeyStore ks, String filename,
-                                   String password)
-    throws GeneralSecurityException, IOException {
+      String password)
+      throws GeneralSecurityException, IOException {
     FileOutputStream out = new FileOutputStream(filename);
     try {
       ks.store(out, password.toCharArray());
@@ -136,18 +126,18 @@ public class KeyStoreTestUtil {
   }
 
   public static void createKeyStore(String filename,
-                                    String password, String alias,
-                                    Key privateKey, Certificate cert)
-    throws GeneralSecurityException, IOException {
+      String password, String alias,
+      Key privateKey, Certificate cert)
+      throws GeneralSecurityException, IOException {
     KeyStore ks = createEmptyKeyStore();
     ks.setKeyEntry(alias, privateKey, password.toCharArray(),
-                   new Certificate[]{cert});
+        new Certificate[]{cert});
     saveKeyStore(ks, filename, password);
   }
 
   /**
    * Creates a keystore with a single key and saves it to a file.
-   * 
+   *
    * @param filename String file to save
    * @param password String store password to set on keystore
    * @param keyPassword String key password to set on key
@@ -158,27 +148,27 @@ public class KeyStoreTestUtil {
    * @throws IOException if there is an I/O error saving the file
    */
   public static void createKeyStore(String filename,
-                                    String password, String keyPassword, String alias,
-                                    Key privateKey, Certificate cert)
-    throws GeneralSecurityException, IOException {
+      String password, String keyPassword, String alias,
+      Key privateKey, Certificate cert)
+      throws GeneralSecurityException, IOException {
     KeyStore ks = createEmptyKeyStore();
     ks.setKeyEntry(alias, privateKey, keyPassword.toCharArray(),
-                   new Certificate[]{cert});
+        new Certificate[]{cert});
     saveKeyStore(ks, filename, password);
   }
 
   public static void createTrustStore(String filename,
-                                      String password, String alias,
-                                      Certificate cert)
-    throws GeneralSecurityException, IOException {
+      String password, String alias,
+      Certificate cert)
+      throws GeneralSecurityException, IOException {
     KeyStore ks = createEmptyKeyStore();
     ks.setCertificateEntry(alias, cert);
     saveKeyStore(ks, filename, password);
   }
 
   public static <T extends Certificate> void createTrustStore(
-    String filename, String password, Map<String, T> certs)
-    throws GeneralSecurityException, IOException {
+      String filename, String password, Map<String, T> certs)
+      throws GeneralSecurityException, IOException {
     KeyStore ks = createEmptyKeyStore();
     for (Map.Entry<String, T> cert : certs.entrySet()) {
       ks.setCertificateEntry(cert.getKey(), cert.getValue());
@@ -187,7 +177,7 @@ public class KeyStoreTestUtil {
   }
 
   public static void cleanupSSLConfig(String keystoresDir, String sslConfDir)
-    throws Exception {
+      throws Exception {
     File f = new File(keystoresDir + "/clientKS.jks");
     f.delete();
     f = new File(keystoresDir + "/serverKS.jks");
@@ -196,7 +186,7 @@ public class KeyStoreTestUtil {
     f.delete();
     f = new File(sslConfDir + "/ssl-client.xml");
     f.delete();
-    f = new File(sslConfDir +  "/ssl-server.xml");
+    f = new File(sslConfDir + "/ssl-server.xml");
     f.delete();
   }
 
@@ -205,22 +195,42 @@ public class KeyStoreTestUtil {
    * SSLFactory.  This includes keys, certs, keystores, truststores, the server
    * SSL configuration file, the client SSL configuration file, and the master
    * configuration file read by the SSLFactory.
-   * 
+   *
    * @param keystoresDir String directory to save keystores
    * @param sslConfDir String directory to save SSL configuration files
    * @param conf Configuration master configuration to be used by an SSLFactory,
-   *   which will be mutated by this method
+   * which will be mutated by this method
    * @param useClientCert boolean true to make the client present a cert in the
-   *   SSL handshake
+   * SSL handshake
    */
   public static void setupSSLConfig(String keystoresDir, String sslConfDir,
-                                    Configuration conf, boolean useClientCert)
+      Configuration conf, boolean useClientCert) throws Exception {
+    setupSSLConfig(keystoresDir, sslConfDir, conf, useClientCert, true);
+  }
+
+  /**
+   * Performs complete setup of SSL configuration in preparation for testing an
+   * SSLFactory.  This includes keys, certs, keystores, truststores, the server
+   * SSL configuration file, the client SSL configuration file, and the master
+   * configuration file read by the SSLFactory.
+   *
+   * @param keystoresDir String directory to save keystores
+   * @param sslConfDir String directory to save SSL configuration files
+   * @param conf Configuration master configuration to be used by an SSLFactory,
+   * which will be mutated by this method
+   * @param useClientCert boolean true to make the client present a cert in the
+   * SSL handshake
+   * @param trustStore boolean true to create truststore, false not to create it
+   */
+  public static void setupSSLConfig(String keystoresDir, String sslConfDir,
+                                    Configuration conf, boolean useClientCert,
+      boolean trustStore)
     throws Exception {
     String clientKS = keystoresDir + "/clientKS.jks";
     String clientPassword = "clientP";
     String serverKS = keystoresDir + "/serverKS.jks";
     String serverPassword = "serverP";
-    String trustKS = keystoresDir + "/trustKS.jks";
+    String trustKS = null;
     String trustPassword = "trustP";
 
     File sslClientConfFile = new File(sslConfDir + "/ssl-client.xml");
@@ -246,7 +256,10 @@ public class KeyStoreTestUtil {
                                     sKP.getPrivate(), sCert);
     certs.put("server", sCert);
 
-    KeyStoreTestUtil.createTrustStore(trustKS, trustPassword, certs);
+    if (trustStore) {
+      trustKS = keystoresDir + "/trustKS.jks";
+      KeyStoreTestUtil.createTrustStore(trustKS, trustPassword, certs);
+    }
 
     Configuration clientSSLConf = createClientSSLConfig(clientKS, clientPassword,
       clientPassword, trustKS);
@@ -357,6 +370,44 @@ public class KeyStoreTestUtil {
       conf.writeXml(writer);
     } finally {
       writer.close();
+    }
+  }
+
+  public static void provisionPasswordsToCredentialProvider() throws Exception {
+    File testDir = new File(System.getProperty("test.build.data",
+        "target/test-dir"));
+
+    Configuration conf = new Configuration();
+    final Path jksPath = new Path(testDir.toString(), "test.jks");
+    final String ourUrl =
+    JavaKeyStoreProvider.SCHEME_NAME + "://file" + jksPath.toUri();
+
+    File file = new File(testDir, "test.jks");
+    file.delete();
+    conf.set(CredentialProviderFactory.CREDENTIAL_PROVIDER_PATH, ourUrl);
+
+    CredentialProvider provider =
+        CredentialProviderFactory.getProviders(conf).get(0);
+    char[] keypass = {'k', 'e', 'y', 'p', 'a', 's', 's'};
+    char[] storepass = {'s', 't', 'o', 'r', 'e', 'p', 'a', 's', 's'};
+
+    // create new aliases
+    try {
+      provider.createCredentialEntry(
+          FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
+              FileBasedKeyStoresFactory.SSL_KEYSTORE_PASSWORD_TPL_KEY),
+              storepass);
+
+      provider.createCredentialEntry(
+          FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
+              FileBasedKeyStoresFactory.SSL_KEYSTORE_KEYPASSWORD_TPL_KEY),
+              keypass);
+
+      // write out so that it can be found in checks
+      provider.flush();
+    } catch (Exception e) {
+      e.printStackTrace();
+      throw e;
     }
   }
 }

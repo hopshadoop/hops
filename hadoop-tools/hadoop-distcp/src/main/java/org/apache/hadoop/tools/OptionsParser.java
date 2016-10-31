@@ -18,13 +18,22 @@
 
 package org.apache.hadoop.tools;
 
-import org.apache.commons.cli.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.CommandLineParser;
+import org.apache.commons.cli.GnuParser;
+import org.apache.commons.cli.HelpFormatter;
+import org.apache.commons.cli.Options;
+import org.apache.commons.cli.ParseException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.tools.DistCpOptions.FileAttribute;
 
-import java.util.*;
+import com.google.common.base.Preconditions;
 
 /**
  * The OptionsParser parses out the command-line options passed to DistCp,
@@ -50,7 +59,7 @@ public class OptionsParser {
     protected String[] flatten(Options options, String[] arguments, boolean stopAtNonOption) {
       for (int index = 0; index < arguments.length; index++) {
         if (arguments[index].equals("-" + DistCpOptionSwitch.PRESERVE_STATUS.getSwitch())) {
-          arguments[index] = "-prbugpc";
+          arguments[index] = DistCpOptionSwitch.PRESERVE_STATUS_DEFAULT;
         }
       }
       return super.flatten(options, arguments, stopAtNonOption);
@@ -63,7 +72,7 @@ public class OptionsParser {
    * @param args Command-line arguments (excluding the options consumed
    *              by the GenericOptionsParser).
    * @return The Options object, corresponding to the specified command-line.
-   * @throws IllegalArgumentException: Thrown if the parse fails.
+   * @throws IllegalArgumentException Thrown if the parse fails.
    */
   public static DistCpOptions parse(String args[]) throws IllegalArgumentException {
 
@@ -138,6 +147,10 @@ public class OptionsParser {
 
     if (command.hasOption(DistCpOptionSwitch.OVERWRITE.getSwitch())) {
       option.setOverwrite(true);
+    }
+
+    if (command.hasOption(DistCpOptionSwitch.APPEND.getSwitch())) {
+      option.setAppend(true);
     }
 
     if (command.hasOption(DistCpOptionSwitch.DELETE_MISSING.getSwitch())) {
@@ -241,6 +254,10 @@ public class OptionsParser {
     } else {
       return optionValue.trim();
     }
+  }
+
+  private static String[] getVals(CommandLine command, String option) {
+    return command.getOptionValues(option);
   }
 
   public static void usage() {

@@ -37,7 +37,6 @@ import org.apache.hadoop.ipc.ProtocolTranslator;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RpcConstants;
 import org.apache.hadoop.ipc.RpcInvocationHandler;
-import org.apache.hadoop.util.ThreadUtil;
 
 import com.google.common.annotations.VisibleForTesting;
 
@@ -104,6 +103,10 @@ public class RetryInvocationHandler<T> implements RpcInvocationHandler {
         hasMadeASuccessfulCall = true;
         return ret;
       } catch (Exception e) {
+        if (Thread.currentThread().isInterrupted()) {
+          // If interrupted, do not retry.
+          throw e;
+        }
         boolean isIdempotentOrAtMostOnce = proxyProvider.getInterface()
             .getMethod(method.getName(), method.getParameterTypes())
             .isAnnotationPresent(Idempotent.class);
@@ -138,9 +141,7 @@ public class RetryInvocationHandler<T> implements RpcInvocationHandler {
               msg += " after " + invocationFailoverCount + " fail over attempts"; 
             }
             msg += ". Trying to fail over " + formatSleepMessage(action.delayMillis);
-            if (LOG.isDebugEnabled()) {
-              LOG.debug(msg, e);
-            }
+            LOG.info(msg, e);
           } else {
             if(LOG.isDebugEnabled()) {
               LOG.debug("Exception while invoking " + method.getName()
@@ -151,7 +152,7 @@ public class RetryInvocationHandler<T> implements RpcInvocationHandler {
           }
           
           if (action.delayMillis > 0) {
-            ThreadUtil.sleepAtLeastIgnoreInterrupts(action.delayMillis);
+            Thread.sleep(action.delayMillis);
           }
           
           if (action.action == RetryAction.RetryDecision.FAILOVER_AND_RETRY) {
@@ -161,11 +162,11 @@ public class RetryInvocationHandler<T> implements RpcInvocationHandler {
               if (invocationAttemptFailoverCount == proxyProviderFailoverCount) {
                 proxyProvider.performFailover(currentProxy.proxy);
                 proxyProviderFailoverCount++;
-                currentProxy = proxyProvider.getProxy();
               } else {
                 LOG.warn("A failover has occurred since the start of this method"
                     + " invocation attempt.");
               }
+              currentProxy = proxyProvider.getProxy();
             }
             invocationFailoverCount++;
           }

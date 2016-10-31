@@ -18,7 +18,6 @@
 package org.apache.hadoop.ha;
 
 import static org.junit.Assert.*;
-import static org.junit.Assume.assumeTrue;
 
 import java.security.NoSuchAlgorithmException;
 
@@ -29,7 +28,6 @@ import org.apache.hadoop.ha.HAServiceProtocol.StateChangeRequestInfo;
 import org.apache.hadoop.ha.HealthMonitor.State;
 import org.apache.hadoop.ha.MiniZKFCCluster.DummyZKFC;
 import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.hadoop.util.Shell;
 import org.apache.hadoop.util.Time;
 import org.apache.log4j.Level;
 import org.apache.zookeeper.KeeperException;
@@ -68,8 +66,6 @@ public class TestZKFailoverController extends ClientBaseWithFixes {
   
   @Before
   public void setupConfAndServices() {
-    // skip tests on Windows until after resolution of ZooKeeper client bug
-    assumeTrue(!Shell.WINDOWS);
     conf = new Configuration();
     conf.set(ZKFailoverController.ZK_ACL_KEY, TEST_ACL);
     conf.set(ZKFailoverController.ZK_AUTH_KEY, TEST_AUTH_GOOD);
@@ -215,8 +211,8 @@ public class TestZKFailoverController extends ClientBaseWithFixes {
       LOG.info("Faking svc0 unhealthy, should failover to svc1");
       cluster.setHealthy(0, false);
       
-      LOG.info("Waiting for svc0 to enter standby state");
-      cluster.waitForHAState(0, HAServiceState.STANDBY);
+      LOG.info("Waiting for svc0 to enter initializing state");
+      cluster.waitForHAState(0, HAServiceState.INITIALIZING);
       cluster.waitForHAState(1, HAServiceState.ACTIVE);
   
       LOG.info("Allowing svc0 to be healthy again, making svc1 unreachable " +
@@ -228,6 +224,27 @@ public class TestZKFailoverController extends ClientBaseWithFixes {
       cluster.waitForHAState(0, HAServiceState.ACTIVE);
       // and fence svc1
       Mockito.verify(svc1.fencer).fence(Mockito.same(svc1));
+    } finally {
+      cluster.stop();
+    }
+  }
+
+  /**
+   * Test that, when the health monitor indicates bad health status,
+   * failover is triggered. Also ensures that graceful active->standby
+   * transition is used when possible, falling back to fencing when
+   * the graceful approach fails.
+   */
+  @Test(timeout=15000)
+  public void testAutoFailoverOnBadState() throws Exception {
+    try {
+      cluster.start();
+      DummyHAService svc0 = cluster.getService(0);
+      LOG.info("Faking svc0 to change the state, should failover to svc1");
+      svc0.state = HAServiceState.STANDBY;
+      
+      // Should fail back to svc0 at this point
+      cluster.waitForHAState(1, HAServiceState.ACTIVE);
     } finally {
       cluster.stop();
     }
@@ -315,7 +332,7 @@ public class TestZKFailoverController extends ClientBaseWithFixes {
       Mockito.verify(svc1.proxy, Mockito.timeout(2000).atLeastOnce())
         .transitionToActive(Mockito.<StateChangeRequestInfo>any());
 
-      cluster.waitForHAState(0, HAServiceState.STANDBY);
+      cluster.waitForHAState(0, HAServiceState.INITIALIZING);
       cluster.waitForHAState(1, HAServiceState.STANDBY);
       
       LOG.info("Faking svc0 healthy again, should go back to svc0");
@@ -570,12 +587,12 @@ public class TestZKFailoverController extends ClientBaseWithFixes {
 
       // Failover by bad health
       cluster.setHealthy(0, false);
-      cluster.waitForHAState(0, HAServiceState.STANDBY);
+      cluster.waitForHAState(0, HAServiceState.INITIALIZING);
       cluster.waitForHAState(1, HAServiceState.ACTIVE);
       cluster.setHealthy(1, true);
       cluster.setHealthy(0, false);
       cluster.waitForHAState(1, HAServiceState.ACTIVE);
-      cluster.waitForHAState(0, HAServiceState.STANDBY);
+      cluster.waitForHAState(0, HAServiceState.INITIALIZING);
       cluster.setHealthy(0, true);
       
       cluster.waitForHealthState(0, State.SERVICE_HEALTHY);

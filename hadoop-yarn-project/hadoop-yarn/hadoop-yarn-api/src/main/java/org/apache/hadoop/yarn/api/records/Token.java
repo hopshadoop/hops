@@ -18,13 +18,13 @@
 
 package org.apache.hadoop.yarn.api.records;
 
+import java.nio.ByteBuffer;
+
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Stable;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.util.Records;
-
-import java.nio.ByteBuffer;
 
 /**
  * <p><code>Token</code> is the security entity used by the framework
@@ -36,8 +36,8 @@ public abstract class Token {
 
   @Private
   @Unstable
-  public static Token newInstance(byte[] identifier, String kind,
-      byte[] password, String service) {
+  public static Token newInstance(byte[] identifier, String kind, byte[] password,
+      String service) {
     Token token = Records.newRecord(Token.class);
     token.setIdentifier(ByteBuffer.wrap(identifier));
     token.setKind(kind);
@@ -48,7 +48,6 @@ public abstract class Token {
 
   /**
    * Get the token identifier.
-   *
    * @return token identifier
    */
   @Public
@@ -61,7 +60,6 @@ public abstract class Token {
 
   /**
    * Get the token password
-   *
    * @return token password
    */
   @Public
@@ -74,7 +72,6 @@ public abstract class Token {
 
   /**
    * Get the token kind.
-   *
    * @return token kind
    */
   @Public
@@ -87,7 +84,6 @@ public abstract class Token {
 
   /**
    * Get the service to which the token is allocated.
-   *
    * @return service to which the token is allocated
    */
   @Public

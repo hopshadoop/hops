@@ -18,16 +18,17 @@
 
 package org.apache.hadoop.yarn.util;
 
+import java.net.URI;
+import java.net.URISyntaxException;
+
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 
-import java.net.URI;
-import java.net.URISyntaxException;
-
 /**
  * Plugin to derive a tracking URL from a Yarn Application ID
+ *
  */
 @InterfaceAudience.LimitedPrivate({"MapReduce"})
 @InterfaceStability.Unstable
@@ -35,9 +36,7 @@ public abstract class TrackingUriPlugin extends Configured {
 
   /**
    * Given an application ID, return a tracking URI.
-   *
-   * @param id
-   *     the ID for which a URI is returned
+   * @param id the ID for which a URI is returned
    * @return the tracking URI
    * @throws URISyntaxException
    */

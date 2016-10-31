@@ -18,17 +18,19 @@
 
 package org.apache.hadoop.yarn.api.records.impl.pb;
 
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.ResourceOption;
-import org.apache.hadoop.yarn.proto.YarnProtos.ResourceOptionProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.ResourceProto;
+import org.apache.hadoop.yarn.proto.YarnProtos.ResourceOptionProto;
+import org.apache.hadoop.yarn.proto.YarnProtos.ResourceOptionProtoOrBuilder;
+
+import com.google.common.base.Preconditions;
 
 public class ResourceOptionPBImpl extends ResourceOption {
 
-  ResourceOptionProto proto = null;
+  ResourceOptionProto proto = ResourceOptionProto.getDefaultInstance();
   ResourceOptionProto.Builder builder = null;
-  private Resource resource = null;
+  boolean viaProto = false;
 
   public ResourceOptionPBImpl() {
     builder = ResourceOptionProto.newBuilder();
@@ -36,51 +38,76 @@ public class ResourceOptionPBImpl extends ResourceOption {
 
   public ResourceOptionPBImpl(ResourceOptionProto proto) {
     this.proto = proto;
-    this.resource = convertFromProtoFormat(proto.getResource());
+    viaProto = true;
   }
   
   public ResourceOptionProto getProto() {
+    proto = viaProto ? proto : builder.build();
+    viaProto = true;
     return proto;
   }
   
   @Override
   public Resource getResource() {
-    return this.resource;
+    ResourceOptionProtoOrBuilder p = viaProto ? proto : builder;
+    return convertFromProtoFormat(p.getResource());
   }
 
   @Override
   protected void setResource(Resource resource) {
-    if (resource != null) {
-      Preconditions.checkNotNull(builder);
-      builder.setResource(convertToProtoFormat(resource));
-    }
-    this.resource = resource;
+    maybeInitBuilder();
+    builder.setResource(convertToProtoFormat(resource));
   }
 
   @Override
   public int getOverCommitTimeout() {
-    Preconditions.checkNotNull(proto);
-    return proto.getOverCommitTimeout();
+    ResourceOptionProtoOrBuilder p = viaProto ? proto : builder;
+    return p.getOverCommitTimeout();
   }
 
   @Override
   protected void setOverCommitTimeout(int overCommitTimeout) {
-    Preconditions.checkNotNull(builder);
+    maybeInitBuilder();
     builder.setOverCommitTimeout(overCommitTimeout);
   }
   
-  private ResourceProto convertToProtoFormat(Resource resource) {
-    return ((ResourcePBImpl) resource).getProto();
+  private void maybeInitBuilder() {
+    if (viaProto || builder == null) {
+      builder = ResourceOptionProto.newBuilder(proto);
+    }
+    viaProto = false;
   }
   
-  private ResourcePBImpl convertFromProtoFormat(ResourceProto p) {
+  private ResourceProto convertToProtoFormat(
+      Resource resource) {
+    return ((ResourcePBImpl)resource).getProto();
+  }
+  
+  private ResourcePBImpl convertFromProtoFormat(
+      ResourceProto p) {
     return new ResourcePBImpl(p);
   }
   
   @Override
   protected void build() {
     proto = builder.build();
+    viaProto = true;
     builder = null;
+  }
+
+  @Override
+  public int hashCode() {
+    return getProto().hashCode();
+  }
+
+  @Override
+  public boolean equals(Object other) {
+    if (other == null)
+      return false;
+    if (other.getClass().isAssignableFrom(this.getClass())) {
+      return this.getProto().equals(this.getClass().cast(other).getProto());
+    }
+    return false;
   }
 
 }

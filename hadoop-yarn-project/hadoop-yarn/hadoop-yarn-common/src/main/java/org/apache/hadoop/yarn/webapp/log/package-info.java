@@ -15,8 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-@InterfaceAudience.LimitedPrivate(
-    {"YARN", "MapReduce"}) package org.apache.hadoop.yarn.webapp.log;
-
+@InterfaceAudience.LimitedPrivate({"YARN", "MapReduce"})
+package org.apache.hadoop.yarn.webapp.log;
 import org.apache.hadoop.classification.InterfaceAudience;
 

@@ -20,10 +20,12 @@ package org.apache.hadoop.streaming;
 
 import java.io.*;
 import java.net.InetAddress;
+import java.nio.charset.Charset;
 import java.util.*;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.util.StringUtils;
 
 /**
  * This is a class used to get the current environment
@@ -42,7 +44,7 @@ public class Environment extends Properties {
     // http://lopica.sourceforge.net/os.html
     String command = null;
     String OS = System.getProperty("os.name");
-    String lowerOs = OS.toLowerCase();
+    String lowerOs = StringUtils.toLowerCase(OS);
     if (OS.indexOf("Windows") > -1) {
       command = "cmd /C set";
     } else if (lowerOs.indexOf("ix") > -1 || lowerOs.indexOf("linux") > -1
@@ -62,7 +64,8 @@ public class Environment extends Properties {
     // Read the environment variables
 
     Process pid = Runtime.getRuntime().exec(command);
-    BufferedReader in = new BufferedReader(new InputStreamReader(pid.getInputStream()));
+    BufferedReader in = new BufferedReader(
+        new InputStreamReader(pid.getInputStream(), Charset.forName("UTF-8")));
     try {
       while (true) {
         String line = in.readLine();

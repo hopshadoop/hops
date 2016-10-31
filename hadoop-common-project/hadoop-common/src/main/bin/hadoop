@@ -22,23 +22,28 @@ bin=`dirname ${bin}`
 bin=`cd "$bin"; pwd`
  
 DEFAULT_LIBEXEC_DIR="$bin"/../libexec
+
 HADOOP_LIBEXEC_DIR=${HADOOP_LIBEXEC_DIR:-$DEFAULT_LIBEXEC_DIR}
 . $HADOOP_LIBEXEC_DIR/hadoop-config.sh
 
 function print_usage(){
-  echo "Usage: hadoop [--config confdir] COMMAND"
-  echo "       where COMMAND is one of:"
+  echo "Usage: hadoop [--config confdir] [COMMAND | CLASSNAME]"
+  echo "  CLASSNAME            run the class named CLASSNAME"
+  echo " or"
+  echo "  where COMMAND is one of:"
   echo "  fs                   run a generic filesystem user client"
   echo "  version              print the version"
   echo "  jar <jar>            run a jar file"
+  echo "                       note: please use \"yarn jar\" to launch"
+  echo "                             YARN applications, not this command."
   echo "  checknative [-a|-h]  check native hadoop and compression libraries availability"
   echo "  distcp <srcurl> <desturl> copy file or directories recursively"
   echo "  archive -archiveName NAME -p <parent path> <src>* <dest> create a hadoop archive"
   echo "  classpath            prints the class path needed to get the"
+  echo "  credential           interact with credential providers"
   echo "                       Hadoop jar and the required libraries"
   echo "  daemonlog            get/set the log level for each daemon"
-  echo " or"
-  echo "  CLASSNAME            run the class named CLASSNAME"
+  echo "  trace                view and modify Hadoop tracing settings"
   echo ""
   echo "Most commands print help when invoked w/o parameters."
 }
@@ -90,11 +95,6 @@ case $COMMAND in
     fi
     ;;
 
-  classpath)
-    echo $CLASSPATH
-    exit
-    ;;
-
   #core commands  
   *)
     # the core commands
@@ -104,6 +104,11 @@ case $COMMAND in
       CLASS=org.apache.hadoop.util.VersionInfo
     elif [ "$COMMAND" = "jar" ] ; then
       CLASS=org.apache.hadoop.util.RunJar
+      if [[ -n "${YARN_OPTS}" ]] || [[ -n "${YARN_CLIENT_OPTS}" ]]; then
+        echo "WARNING: Use \"yarn jar\" to launch YARN applications." 1>&2
+      fi
+    elif [ "$COMMAND" = "key" ] ; then
+      CLASS=org.apache.hadoop.crypto.key.KeyShell
     elif [ "$COMMAND" = "checknative" ] ; then
       CLASS=org.apache.hadoop.util.NativeLibraryChecker
     elif [ "$COMMAND" = "distcp" ] ; then
@@ -114,6 +119,21 @@ case $COMMAND in
     elif [ "$COMMAND" = "archive" ] ; then
       CLASS=org.apache.hadoop.tools.HadoopArchives
       CLASSPATH=${CLASSPATH}:${TOOL_PATH}
+    elif [ "$COMMAND" = "credential" ] ; then
+      CLASS=org.apache.hadoop.security.alias.CredentialShell
+    elif [ "$COMMAND" = "trace" ] ; then
+      CLASS=org.apache.hadoop.tracing.TraceAdmin
+    elif [ "$COMMAND" = "classpath" ] ; then
+      if [ "$#" -gt 1 ]; then
+        CLASS=org.apache.hadoop.util.Classpath
+      else
+        # No need to bother starting up a JVM for this simple case.
+        if $cygwin; then
+          CLASSPATH=$(cygpath -p -w "$CLASSPATH" 2>/dev/null)
+        fi
+        echo $CLASSPATH
+        exit
+      fi
     elif [[ "$COMMAND" = -*  ]] ; then
         # class and package names cannot begin with a -
         echo "Error: No command named \`$COMMAND' was found. Perhaps you meant \`hadoop ${COMMAND#-}'"
@@ -121,6 +141,19 @@ case $COMMAND in
     else
       CLASS=$COMMAND
     fi
+
+    # cygwin path translation
+    if $cygwin; then
+      CLASSPATH=$(cygpath -p -w "$CLASSPATH" 2>/dev/null)
+      HADOOP_LOG_DIR=$(cygpath -w "$HADOOP_LOG_DIR" 2>/dev/null)
+      HADOOP_PREFIX=$(cygpath -w "$HADOOP_PREFIX" 2>/dev/null)
+      HADOOP_CONF_DIR=$(cygpath -w "$HADOOP_CONF_DIR" 2>/dev/null)
+      HADOOP_COMMON_HOME=$(cygpath -w "$HADOOP_COMMON_HOME" 2>/dev/null)
+      HADOOP_HDFS_HOME=$(cygpath -w "$HADOOP_HDFS_HOME" 2>/dev/null)
+      HADOOP_YARN_HOME=$(cygpath -w "$HADOOP_YARN_HOME" 2>/dev/null)
+      HADOOP_MAPRED_HOME=$(cygpath -w "$HADOOP_MAPRED_HOME" 2>/dev/null)
+    fi
+
     shift
     
     # Always respect HADOOP_OPTS and HADOOP_CLIENT_OPTS

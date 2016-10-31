@@ -50,6 +50,7 @@ import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.apache.hadoop.distributedloadsimulator.sls.scheduler.ContainerSimulator;
 import org.apache.hadoop.distributedloadsimulator.sls.SLSRunner;
 import org.apache.hadoop.distributedloadsimulator.sls.conf.SLSConfiguration;
+import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.security.SaslRpcServer;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -141,11 +142,11 @@ public class MRAMSimulator extends AMSimulator {
           List tasks, ResourceManager rm, SLSRunner se,
           long traceStartTime, long traceFinishTime, String user, String queue,
           boolean isTracked, String oldAppId,
-          String[] remoteSimIp, YarnClient rmClient, Configuration conf) throws
+          String[] remoteSimIp, int rmiPort, YarnClient rmClient, Configuration conf) throws
           IOException {
     super.init(id, heartbeatInterval, tasks, rm, se,
             traceStartTime, traceFinishTime, user, queue,
-            isTracked, oldAppId, remoteSimIp,
+            isTracked, oldAppId, remoteSimIp, rmiPort,
             rmClient, conf);
     amtype = "mapreduce";
 
@@ -245,8 +246,9 @@ public class MRAMSimulator extends AMSimulator {
                 YarnConfiguration.DEFAULT_RM_SCHEDULER_PORT);
         SecurityUtil.setTokenService(amRMToken, resourceManagerAddress);
         ApplicationMasterProtocol appMasterProtocol = ClientRMProxy.
-                createRMProxy(conf, ApplicationMasterProtocol.class);
+                createRMProxy(conf, ApplicationMasterProtocol.class, true);
         AllocateResponse response = appMasterProtocol.allocate(request);
+        RPC.stopProxy(appMasterProtocol);
         return response;
       }
     });
@@ -496,8 +498,9 @@ public class MRAMSimulator extends AMSimulator {
                 YarnConfiguration.DEFAULT_RM_SCHEDULER_PORT);
         SecurityUtil.setTokenService(amRMToken, resourceManagerAddress);
         ApplicationMasterProtocol appMasterProtocol = ClientRMProxy.
-                createRMProxy(conf, ApplicationMasterProtocol.class);
+                createRMProxy(conf, ApplicationMasterProtocol.class, true);
         AllocateResponse response = appMasterProtocol.allocate(request);
+        RPC.stopProxy(appMasterProtocol);
         return response;
       }
     });

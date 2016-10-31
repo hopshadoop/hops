@@ -18,26 +18,31 @@
 
 package org.apache.hadoop.yarn;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Unstable;
-import org.apache.log4j.FileAppender;
-import org.apache.log4j.spi.LoggingEvent;
-
 import java.io.File;
 import java.io.Flushable;
 import java.util.LinkedList;
 import java.util.Queue;
 
+import org.apache.hadoop.classification.InterfaceAudience.Public;
+import org.apache.hadoop.classification.InterfaceStability.Unstable;
+import org.apache.log4j.FileAppender;
+import org.apache.log4j.spi.LoggingEvent;
+
 /**
  * A simple log4j-appender for container's logs.
+ * 
  */
 @Public
 @Unstable
-public class ContainerLogAppender extends FileAppender implements Flushable {
+public class ContainerLogAppender extends FileAppender
+  implements Flushable
+{
   private String containerLogDir;
+  private String containerLogFile;
   //so that log4j can configure it from the configuration(log4j.properties). 
   private int maxEvents;
   private Queue<LoggingEvent> tail = null;
+  private boolean closing = false;
 
   @Override
   public void activateOptions() {
@@ -45,7 +50,7 @@ public class ContainerLogAppender extends FileAppender implements Flushable {
       if (maxEvents > 0) {
         tail = new LinkedList<LoggingEvent>();
       }
-      setFile(new File(this.containerLogDir, "syslog").toString());
+      setFile(new File(this.containerLogDir, containerLogFile).toString());
       setAppend(true);
       super.activateOptions();
     }
@@ -54,6 +59,9 @@ public class ContainerLogAppender extends FileAppender implements Flushable {
   @Override
   public void append(LoggingEvent event) {
     synchronized (this) {
+      if (closing) { // When closing drop any new/transitive CLA appending
+        return;
+      }
       if (tail == null) {
         super.append(event);
       } else {
@@ -74,6 +82,7 @@ public class ContainerLogAppender extends FileAppender implements Flushable {
 
   @Override
   public synchronized void close() {
+    closing = true;
     if (tail != null) {
       for (LoggingEvent event : tail) {
         super.append(event);
@@ -92,6 +101,14 @@ public class ContainerLogAppender extends FileAppender implements Flushable {
 
   public void setContainerLogDir(String containerLogDir) {
     this.containerLogDir = containerLogDir;
+  }
+
+  public String getContainerLogFile() {
+    return containerLogFile;
+  }
+
+  public void setContainerLogFile(String containerLogFile) {
+    this.containerLogFile = containerLogFile;
   }
 
   private static final int EVENT_SIZE = 100;

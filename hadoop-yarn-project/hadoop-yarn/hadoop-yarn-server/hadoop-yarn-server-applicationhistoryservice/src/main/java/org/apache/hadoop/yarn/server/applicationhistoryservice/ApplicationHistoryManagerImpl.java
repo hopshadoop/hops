@@ -18,7 +18,11 @@
 
 package org.apache.hadoop.yarn.server.applicationhistoryservice;
 
-import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Map.Entry;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -37,15 +41,12 @@ import org.apache.hadoop.yarn.server.applicationhistoryservice.records.Applicati
 import org.apache.hadoop.yarn.server.applicationhistoryservice.records.ContainerHistoryData;
 import org.apache.hadoop.yarn.webapp.util.WebAppUtils;
 
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Map.Entry;
+import com.google.common.annotations.VisibleForTesting;
 
-public class ApplicationHistoryManagerImpl extends AbstractService
-    implements ApplicationHistoryManager {
-  private static final Log LOG =
-      LogFactory.getLog(ApplicationHistoryManagerImpl.class);
+public class ApplicationHistoryManagerImpl extends AbstractService implements
+    ApplicationHistoryManager {
+  private static final Log LOG = LogFactory
+    .getLog(ApplicationHistoryManagerImpl.class);
   private static final String UNAVAILABLE = "N/A";
 
   private ApplicationHistoryStore historyStore;
@@ -81,31 +82,32 @@ public class ApplicationHistoryManagerImpl extends AbstractService
 
   protected ApplicationHistoryStore createApplicationHistoryStore(
       Configuration conf) {
-    return ReflectionUtils.newInstance(
-        conf.getClass(YarnConfiguration.APPLICATION_HISTORY_STORE,
-            FileSystemApplicationHistoryStore.class,
-            ApplicationHistoryStore.class), conf);
+    return ReflectionUtils.newInstance(conf.getClass(
+      YarnConfiguration.APPLICATION_HISTORY_STORE,
+      FileSystemApplicationHistoryStore.class,
+      ApplicationHistoryStore.class), conf);
   }
 
   @Override
   public ContainerReport getAMContainer(ApplicationAttemptId appAttemptId)
       throws IOException {
-    ApplicationReport app = getApplication(appAttemptId.getApplicationId());
+    ApplicationReport app =
+        getApplication(appAttemptId.getApplicationId());
     return convertToContainerReport(historyStore.getAMContainer(appAttemptId),
         app == null ? null : app.getUser());
   }
 
   @Override
-  public Map<ApplicationId, ApplicationReport> getAllApplications()
+  public Map<ApplicationId, ApplicationReport> getApplications(long appsNum)
       throws IOException {
     Map<ApplicationId, ApplicationHistoryData> histData =
         historyStore.getAllApplications();
     HashMap<ApplicationId, ApplicationReport> applicationsReport =
         new HashMap<ApplicationId, ApplicationReport>();
     for (Entry<ApplicationId, ApplicationHistoryData> entry : histData
-        .entrySet()) {
-      applicationsReport
-          .put(entry.getKey(), convertToApplicationReport(entry.getValue()));
+      .entrySet()) {
+      applicationsReport.put(entry.getKey(),
+        convertToApplicationReport(entry.getValue()));
     }
     return applicationsReport;
   }
@@ -131,15 +133,13 @@ public class ApplicationHistoryManagerImpl extends AbstractService
       host = lastAttempt.getHost();
       rpcPort = lastAttempt.getRPCPort();
     }
-    return ApplicationReport
-        .newInstance(appHistory.getApplicationId(), currentApplicationAttemptId,
-            appHistory.getUser(), appHistory.getQueue(),
-            appHistory.getApplicationName(), host, rpcPort, null,
-            appHistory.getYarnApplicationState(),
-            appHistory.getDiagnosticsInfo(), trackingUrl,
-            appHistory.getStartTime(), appHistory.getFinishTime(),
-            appHistory.getFinalApplicationStatus(), null, "", 100,
-            appHistory.getApplicationType(), null);
+    return ApplicationReport.newInstance(appHistory.getApplicationId(),
+      currentApplicationAttemptId, appHistory.getUser(), appHistory.getQueue(),
+      appHistory.getApplicationName(), host, rpcPort, null,
+      appHistory.getYarnApplicationState(), appHistory.getDiagnosticsInfo(),
+      trackingUrl, appHistory.getStartTime(), appHistory.getFinishTime(),
+      appHistory.getFinalApplicationStatus(), null, "", 100,
+      appHistory.getApplicationType(), null);
   }
 
   private ApplicationAttemptHistoryData getLastAttempt(ApplicationId appId)
@@ -161,34 +161,32 @@ public class ApplicationHistoryManagerImpl extends AbstractService
 
   private ApplicationAttemptReport convertToApplicationAttemptReport(
       ApplicationAttemptHistoryData appAttemptHistory) {
-    return ApplicationAttemptReport
-        .newInstance(appAttemptHistory.getApplicationAttemptId(),
-            appAttemptHistory.getHost(), appAttemptHistory.getRPCPort(),
-            appAttemptHistory.getTrackingURL(),
-            appAttemptHistory.getDiagnosticsInfo(),
-            appAttemptHistory.getYarnApplicationAttemptState(),
-            appAttemptHistory.getMasterContainerId());
+    return ApplicationAttemptReport.newInstance(
+      appAttemptHistory.getApplicationAttemptId(), appAttemptHistory.getHost(),
+      appAttemptHistory.getRPCPort(), appAttemptHistory.getTrackingURL(), null,
+      appAttemptHistory.getDiagnosticsInfo(),
+      appAttemptHistory.getYarnApplicationAttemptState(),
+      appAttemptHistory.getMasterContainerId());
   }
 
   @Override
   public ApplicationAttemptReport getApplicationAttempt(
       ApplicationAttemptId appAttemptId) throws IOException {
-    return convertToApplicationAttemptReport(
-        historyStore.getApplicationAttempt(appAttemptId));
+    return convertToApplicationAttemptReport(historyStore
+      .getApplicationAttempt(appAttemptId));
   }
 
   @Override
-  public Map<ApplicationAttemptId, ApplicationAttemptReport> getApplicationAttempts(
-      ApplicationId appId) throws IOException {
+  public Map<ApplicationAttemptId, ApplicationAttemptReport>
+      getApplicationAttempts(ApplicationId appId) throws IOException {
     Map<ApplicationAttemptId, ApplicationAttemptHistoryData> histData =
         historyStore.getApplicationAttempts(appId);
-    HashMap<ApplicationAttemptId, ApplicationAttemptReport>
-        applicationAttemptsReport =
+    HashMap<ApplicationAttemptId, ApplicationAttemptReport> applicationAttemptsReport =
         new HashMap<ApplicationAttemptId, ApplicationAttemptReport>();
     for (Entry<ApplicationAttemptId, ApplicationAttemptHistoryData> entry : histData
-        .entrySet()) {
+      .entrySet()) {
       applicationAttemptsReport.put(entry.getKey(),
-          convertToApplicationAttemptReport(entry.getValue()));
+        convertToApplicationAttemptReport(entry.getValue()));
     }
     return applicationAttemptsReport;
   }
@@ -196,40 +194,43 @@ public class ApplicationHistoryManagerImpl extends AbstractService
   @Override
   public ContainerReport getContainer(ContainerId containerId)
       throws IOException {
-    ApplicationReport app = getApplication(
-        containerId.getApplicationAttemptId().getApplicationId());
+    ApplicationReport app =
+        getApplication(containerId.getApplicationAttemptId().getApplicationId());
     return convertToContainerReport(historyStore.getContainer(containerId),
-        app == null ? null : app.getUser());
+        app == null ? null: app.getUser());
   }
 
   private ContainerReport convertToContainerReport(
       ContainerHistoryData containerHistory, String user) {
     // If the container has the aggregated log, add the server root url
-    String logUrl = WebAppUtils.getAggregatedLogURL(serverHttpAddress,
+    String logUrl = WebAppUtils.getAggregatedLogURL(
+        serverHttpAddress,
         containerHistory.getAssignedNode().toString(),
         containerHistory.getContainerId().toString(),
-        containerHistory.getContainerId().toString(), user);
+        containerHistory.getContainerId().toString(),
+        user);
     return ContainerReport.newInstance(containerHistory.getContainerId(),
-        containerHistory.getAllocatedResource(),
-        containerHistory.getAssignedNode(), containerHistory.getPriority(),
-        containerHistory.getStartTime(), containerHistory.getFinishTime(),
-        containerHistory.getDiagnosticsInfo(), logUrl,
-        containerHistory.getContainerExitStatus(),
-        containerHistory.getContainerState());
+      containerHistory.getAllocatedResource(),
+      containerHistory.getAssignedNode(), containerHistory.getPriority(),
+      containerHistory.getStartTime(), containerHistory.getFinishTime(),
+      containerHistory.getDiagnosticsInfo(), logUrl,
+      containerHistory.getContainerExitStatus(),
+      containerHistory.getContainerState(), null);
   }
 
   @Override
   public Map<ContainerId, ContainerReport> getContainers(
       ApplicationAttemptId appAttemptId) throws IOException {
-    ApplicationReport app = getApplication(appAttemptId.getApplicationId());
+    ApplicationReport app =
+        getApplication(appAttemptId.getApplicationId());
     Map<ContainerId, ContainerHistoryData> histData =
         historyStore.getContainers(appAttemptId);
     HashMap<ContainerId, ContainerReport> containersReport =
         new HashMap<ContainerId, ContainerReport>();
     for (Entry<ContainerId, ContainerHistoryData> entry : histData.entrySet()) {
       containersReport.put(entry.getKey(),
-          convertToContainerReport(entry.getValue(),
-              app == null ? null : app.getUser()));
+        convertToContainerReport(entry.getValue(),
+            app == null ? null : app.getUser()));
     }
     return containersReport;
   }

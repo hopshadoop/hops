@@ -27,6 +27,7 @@ import java.lang.reflect.Proxy;
 import java.net.InetSocketAddress;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.net.SocketFactory;
 
@@ -48,6 +49,8 @@ import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.util.ProtoUtil;
 import org.apache.hadoop.util.Time;
+import org.apache.htrace.Trace;
+import org.apache.htrace.TraceScope;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.BlockingService;
@@ -81,14 +84,23 @@ public class ProtobufRpcEngine implements RpcEngine {
   }
 
   @Override
-  @SuppressWarnings("unchecked")
   public <T> ProtocolProxy<T> getProxy(Class<T> protocol, long clientVersion,
       InetSocketAddress addr, UserGroupInformation ticket, Configuration conf,
       SocketFactory factory, int rpcTimeout, RetryPolicy connectionRetryPolicy
       ) throws IOException {
+    return getProxy(protocol, clientVersion, addr, ticket, conf, factory,
+      rpcTimeout, connectionRetryPolicy, null);
+  }
+
+  @Override
+  @SuppressWarnings("unchecked")
+  public <T> ProtocolProxy<T> getProxy(Class<T> protocol, long clientVersion,
+      InetSocketAddress addr, UserGroupInformation ticket, Configuration conf,
+      SocketFactory factory, int rpcTimeout, RetryPolicy connectionRetryPolicy,
+      AtomicBoolean fallbackToSimpleAuth) throws IOException {
 
     final Invoker invoker = new Invoker(protocol, addr, ticket, conf, factory,
-        rpcTimeout, connectionRetryPolicy);
+        rpcTimeout, connectionRetryPolicy, fallbackToSimpleAuth);
     return new ProtocolProxy<T>(protocol, (T) Proxy.newProxyInstance(
         protocol.getClassLoader(), new Class[]{protocol}, invoker), false);
   }
@@ -112,13 +124,16 @@ public class ProtobufRpcEngine implements RpcEngine {
     private final Client client;
     private final long clientProtocolVersion;
     private final String protocolName;
+    private AtomicBoolean fallbackToSimpleAuth;
 
     private Invoker(Class<?> protocol, InetSocketAddress addr,
         UserGroupInformation ticket, Configuration conf, SocketFactory factory,
-        int rpcTimeout, RetryPolicy connectionRetryPolicy) throws IOException {
+        int rpcTimeout, RetryPolicy connectionRetryPolicy,
+        AtomicBoolean fallbackToSimpleAuth) throws IOException {
       this(protocol, Client.ConnectionId.getConnectionId(
           addr, protocol, ticket, rpcTimeout, connectionRetryPolicy, conf),
           conf, factory);
+      this.fallbackToSimpleAuth = fallbackToSimpleAuth;
     }
     
     /**
@@ -191,6 +206,14 @@ public class ProtobufRpcEngine implements RpcEngine {
             + method.getName() + "]");
       }
 
+      TraceScope traceScope = null;
+      // if Tracing is on then start a new span for this rpc.
+      // guard it in the if statement to make sure there isn't
+      // any extra string manipulation.
+      if (Trace.isTracing()) {
+        traceScope = Trace.startSpan(RpcClientUtil.methodToTraceString(method));
+      }
+
       RequestHeaderProto rpcRequestHeader = constructRpcRequestHeader(method);
       
       if (LOG.isTraceEnabled()) {
@@ -204,7 +227,8 @@ public class ProtobufRpcEngine implements RpcEngine {
       final RpcResponseWrapper val;
       try {
         val = (RpcResponseWrapper) client.call(RPC.RpcKind.RPC_PROTOCOL_BUFFER,
-            new RpcRequestWrapper(rpcRequestHeader, theRequest), remoteId);
+            new RpcRequestWrapper(rpcRequestHeader, theRequest), remoteId,
+            fallbackToSimpleAuth);
 
       } catch (Throwable e) {
         if (LOG.isTraceEnabled()) {
@@ -212,8 +236,13 @@ public class ProtobufRpcEngine implements RpcEngine {
               remoteId + ": " + method.getName() +
                 " {" + e + "}");
         }
-
+        if (Trace.isTracing()) {
+          traceScope.getSpan().addTimelineAnnotation(
+              "Call got exception: " + e.getMessage());
+        }
         throw new ServiceException(e);
+      } finally {
+        if (traceScope != null) traceScope.close();
       }
 
       if (LOG.isDebugEnabled()) {
@@ -579,24 +608,35 @@ public class ProtobufRpcEngine implements RpcEngine {
             .mergeFrom(request.theRequestRead).build();
         
         Message result;
+        long startTime = Time.now();
+        int qTime = (int) (startTime - receiveTime);
+        Exception exception = null;
         try {
-          long startTime = Time.now();
           server.rpcDetailedMetrics.init(protocolImpl.protocolClass);
           result = service.callBlockingMethod(methodDescriptor, null, param);
-          int processingTime = (int) (Time.now() - startTime);
-          int qTime = (int) (startTime - receiveTime);
-          if (LOG.isDebugEnabled()) {
-            LOG.info("Served: " + methodName + " queueTime= " + qTime +
-                      " procesingTime= " + processingTime);
-          }
-          server.rpcMetrics.addRpcQueueTime(qTime);
-          server.rpcMetrics.addRpcProcessingTime(processingTime);
-          server.rpcDetailedMetrics.addProcessingTime(methodName,
-              processingTime);
         } catch (ServiceException e) {
+          exception = (Exception) e.getCause();
           throw (Exception) e.getCause();
         } catch (Exception e) {
+          exception = e;
           throw e;
+        } finally {
+          int processingTime = (int) (Time.now() - startTime);
+          if (LOG.isDebugEnabled()) {
+            String msg = "Served: " + methodName + " queueTime= " + qTime +
+                " procesingTime= " + processingTime;
+            if (exception != null) {
+              msg += " exception= " + exception.getClass().getSimpleName();
+            }
+            LOG.debug(msg);
+          }
+          String detailedMetricsName = (exception == null) ?
+              methodName :
+              exception.getClass().getSimpleName();
+          server.rpcMetrics.addRpcQueueTime(qTime);
+          server.rpcMetrics.addRpcProcessingTime(processingTime);
+          server.rpcDetailedMetrics.addProcessingTime(detailedMetricsName,
+              processingTime);
         }
         return new RpcResponseWrapper(result);
       }

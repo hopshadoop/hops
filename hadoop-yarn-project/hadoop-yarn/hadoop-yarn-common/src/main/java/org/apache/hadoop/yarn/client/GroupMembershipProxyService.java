@@ -16,14 +16,14 @@
 package org.apache.hadoop.yarn.client;
 
 import io.hops.leader_election.node.ActiveNode;
-import io.hops.yarn.groupMembership.SortedActiveRMList;
+import io.hops.util.GroupMembership;
+import io.hops.util.impl.pb.client.GroupMembershipPBClientImpl;
+import io.hops.util.LiveRMsResponse;
+import io.hops.util.SortedActiveRMList;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.yarn.api.GroupMembership;
-import org.apache.hadoop.yarn.api.impl.pb.client.GroupMembershipPBClientImpl;
-import org.apache.hadoop.yarn.api.protocolrecords.LiveRMsResponse;
 import org.apache.hadoop.yarn.conf.HAUtil;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 
@@ -36,8 +36,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 

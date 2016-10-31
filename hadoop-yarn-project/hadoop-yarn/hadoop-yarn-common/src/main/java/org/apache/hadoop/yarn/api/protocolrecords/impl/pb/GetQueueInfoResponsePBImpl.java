@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.yarn.api.protocolrecords.impl.pb;
 
-import com.google.protobuf.TextFormat;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.protocolrecords.GetQueueInfoResponse;
@@ -28,14 +27,16 @@ import org.apache.hadoop.yarn.proto.YarnProtos.QueueInfoProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetQueueInfoResponseProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetQueueInfoResponseProtoOrBuilder;
 
+import com.google.protobuf.TextFormat;
+
 @Private
 @Unstable
 public class GetQueueInfoResponsePBImpl extends GetQueueInfoResponse {
 
   QueueInfo queueInfo;
   
-  GetQueueInfoResponseProto proto =
-      GetQueueInfoResponseProto.getDefaultInstance();
+  GetQueueInfoResponseProto proto = 
+    GetQueueInfoResponseProto.getDefaultInstance();
   GetQueueInfoResponseProto.Builder builder = null;
   boolean viaProto = false;
 
@@ -49,7 +50,7 @@ public class GetQueueInfoResponsePBImpl extends GetQueueInfoResponse {
   }
 
   public GetQueueInfoResponseProto getProto() {
-    mergeLocalToProto();
+      mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
     viaProto = true;
     return proto;
@@ -62,9 +63,8 @@ public class GetQueueInfoResponsePBImpl extends GetQueueInfoResponse {
 
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -93,7 +93,7 @@ public class GetQueueInfoResponsePBImpl extends GetQueueInfoResponse {
   @Override
   public void setQueueInfo(QueueInfo queueInfo) {
     maybeInitBuilder();
-    if (queueInfo == null) {
+    if(queueInfo == null) {
       builder.clearQueueInfo();
     }
     this.queueInfo = queueInfo;
@@ -106,9 +106,8 @@ public class GetQueueInfoResponsePBImpl extends GetQueueInfoResponse {
   }
 
   private void mergeLocalToProto() {
-    if (viaProto) {
+    if (viaProto) 
       maybeInitBuilder();
-    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
@@ -126,7 +125,7 @@ public class GetQueueInfoResponsePBImpl extends GetQueueInfoResponse {
   }
 
   private QueueInfoProto convertToProtoFormat(QueueInfo queueInfo) {
-    return ((QueueInfoPBImpl) queueInfo).getProto();
+    return ((QueueInfoPBImpl)queueInfo).getProto();
   }
 
 }

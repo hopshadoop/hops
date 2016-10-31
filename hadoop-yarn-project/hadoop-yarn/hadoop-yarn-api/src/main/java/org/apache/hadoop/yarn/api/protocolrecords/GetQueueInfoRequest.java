@@ -35,9 +35,9 @@ public abstract class GetQueueInfoRequest {
 
   @Public
   @Stable
-  public static GetQueueInfoRequest newInstance(String queueName,
-      boolean includeApplications, boolean includeChildQueues,
-      boolean recursive) {
+  public static GetQueueInfoRequest
+      newInstance(String queueName, boolean includeApplications,
+          boolean includeChildQueues, boolean recursive) {
     GetQueueInfoRequest request = Records.newRecord(GetQueueInfoRequest.class);
     request.setQueueName(queueName);
     request.setIncludeApplications(includeApplications);
@@ -48,7 +48,6 @@ public abstract class GetQueueInfoRequest {
 
   /**
    * Get the <em>queue name</em> for which to get queue information.
-   *
    * @return <em>queue name</em> for which to get queue information
    */
   @Public
@@ -57,19 +56,16 @@ public abstract class GetQueueInfoRequest {
   
   /**
    * Set the <em>queue name</em> for which to get queue information
-   *
-   * @param queueName
-   *     <em>queue name</em> for which to get queue information
+   * @param queueName <em>queue name</em> for which to get queue information
    */
   @Public
   @Stable
   public abstract void setQueueName(String queueName);
 
   /**
-   * Is information about <em>active applications<e/m> required?
-   *
+   * Is information about <em>active applications</em> required?
    * @return <code>true</code> if applications' information is to be included,
-   * else <code>false</code>
+   *         else <code>false</code>
    */
   @Public
   @Stable
@@ -77,10 +73,8 @@ public abstract class GetQueueInfoRequest {
 
   /**
    * Should we get fetch information about <em>active applications</em>?
-   *
-   * @param includeApplications
-   *     fetch information about <em>active
-   *     applications</em>?
+   * @param includeApplications fetch information about <em>active 
+   *                            applications</em>?
    */
   @Public
   @Stable
@@ -88,9 +82,8 @@ public abstract class GetQueueInfoRequest {
 
   /**
    * Is information about <em>child queues</em> required?
-   *
    * @return <code>true</code> if information about child queues is required,
-   * else <code>false</code>
+   *         else <code>false</code>
    */
   @Public
   @Stable
@@ -98,9 +91,7 @@ public abstract class GetQueueInfoRequest {
   
   /**
    * Should we fetch information about <em>child queues</em>?
-   *
-   * @param includeChildQueues
-   *     fetch information about <em>child queues</em>?
+   * @param includeChildQueues fetch information about <em>child queues</em>?
    */
   @Public
   @Stable
@@ -108,9 +99,8 @@ public abstract class GetQueueInfoRequest {
 
   /**
    * Is information on the entire <em>child queue hierarchy</em> required?
-   *
-   * @return <code>true</code> if information about entire hierarchy is
-   * required, <code>false</code> otherwise
+   * @return <code>true</code> if information about entire hierarchy is 
+   *         required, <code>false</code> otherwise
    */
   @Public
   @Stable
@@ -118,10 +108,8 @@ public abstract class GetQueueInfoRequest {
   
   /**
    * Should we fetch information on the entire <em>child queue hierarchy</em>?
-   *
-   * @param recursive
-   *     fetch information on the entire <em>child queue
-   *     hierarchy</em>?
+   * @param recursive fetch information on the entire <em>child queue 
+   *                  hierarchy</em>?
    */
   @Public
   @Stable

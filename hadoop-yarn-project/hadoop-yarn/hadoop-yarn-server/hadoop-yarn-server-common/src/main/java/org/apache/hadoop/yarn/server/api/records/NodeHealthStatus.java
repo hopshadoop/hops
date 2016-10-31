@@ -26,20 +26,18 @@ import org.apache.hadoop.yarn.api.records.NodeReport;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * <p><code>NodeHealthStatus</code> is a summary of the health status of the
- * node.</p>
- * <p/>
- * <p>It includes information such as:
+ * {@code NodeHealthStatus} is a summary of the health status of the node.
+ * <p>
+ * It includes information such as:
  * <ul>
- * <li>
- * An indicator of whether the node is healthy, as determined by the
- * health-check script.
- * </li>
- * <li>The previous time at which the health status was reported.</li>
- * <li>A diagnostic report on the health status.</li>
+ *   <li>
+ *     An indicator of whether the node is healthy, as determined by the
+ *     health-check script.
+ *   </li>
+ *   <li>The previous time at which the health status was reported.</li>
+ *   <li>A diagnostic report on the health status.</li>
  * </ul>
- * </p>
- *
+ * 
  * @see NodeReport
  * @see ApplicationClientProtocol#getClusterNodes(org.apache.hadoop.yarn.api.protocolrecords.GetClusterNodesRequest)
  */
@@ -59,7 +57,6 @@ public abstract class NodeHealthStatus {
 
   /**
    * Is the node healthy?
-   *
    * @return <code>true</code> if the node is healthy, else <code>false</code>
    */
   @Public
@@ -72,7 +69,6 @@ public abstract class NodeHealthStatus {
 
   /**
    * Get the <em>diagnostic health report</em> of the node.
-   *
    * @return <em>diagnostic health report</em> of the node
    */
   @Public
@@ -85,7 +81,6 @@ public abstract class NodeHealthStatus {
 
   /**
    * Get the <em>last timestamp</em> at which the health report was received.
-   *
    * @return <em>last timestamp</em> at which the health report was received
    */
   @Public

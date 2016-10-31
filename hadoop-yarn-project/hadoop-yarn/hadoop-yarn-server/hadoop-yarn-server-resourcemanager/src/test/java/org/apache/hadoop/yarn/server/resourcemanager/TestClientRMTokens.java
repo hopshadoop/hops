@@ -5,9 +5,9 @@
  * licenses this file to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
+ * 
  * http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -17,19 +17,37 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager;
 
-import io.hops.exception.StorageInitializtionException;
-import io.hops.metadata.util.RMStorageFactory;
-import io.hops.metadata.util.YarnAPIStorageFactory;
-import junit.framework.Assert;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyString;
+import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.security.PrivilegedAction;
+import java.security.PrivilegedExceptionAction;
+
+import org.apache.hadoop.net.NetUtils;
+import org.junit.Assert;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.security.SecurityUtil;
-import org.apache.hadoop.security.SecurityUtilTestHelper;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.apache.hadoop.security.token.SecretManager;
@@ -54,27 +72,7 @@ import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.hadoop.yarn.util.Records;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
-
-import java.io.IOException;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.security.PrivilegedAction;
-import java.security.PrivilegedExceptionAction;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyString;
-import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.reset;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 
 public class TestClientRMTokens {
@@ -82,12 +80,8 @@ public class TestClientRMTokens {
   private static final Log LOG = LogFactory.getLog(TestClientRMTokens.class);
   
   @Before
-  public void resetSecretManager()
-      throws StorageInitializtionException, IOException {
+  public void resetSecretManager() {
     RMDelegationTokenIdentifier.Renewer.setSecretManager(null, null);
-    YarnConfiguration conf = new YarnConfiguration();
-    YarnAPIStorageFactory.setConfiguration(conf);
-    RMStorageFactory.setConfiguration(conf);
   }
   
   @Test
@@ -96,26 +90,24 @@ public class TestClientRMTokens {
     final YarnConfiguration conf = new YarnConfiguration();
     conf.set(YarnConfiguration.RM_PRINCIPAL, "testuser/localhost@apache.org");
 
-    conf.set(CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION,
-        "kerberos");
+    conf.set(CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION, "kerberos");
     UserGroupInformation.setConfiguration(conf);
     
     ResourceScheduler scheduler = createMockScheduler(conf);
     
     long initialInterval = 10000l;
-    long maxLifetime = 20000l;
+    long maxLifetime= 20000l;
     long renewInterval = 10000l;
 
-    RMDelegationTokenSecretManager rmDtSecretManager =
-        createRMDelegationTokenSecretManager(initialInterval, maxLifetime,
-            renewInterval);
+    RMDelegationTokenSecretManager rmDtSecretManager = createRMDelegationTokenSecretManager(
+        initialInterval, maxLifetime, renewInterval);
     rmDtSecretManager.startThreads();
-    LOG.info("Creating DelegationTokenSecretManager with initialInterval: " +
-        initialInterval + ", maxLifetime: " + maxLifetime +
-        ", renewInterval: " + renewInterval);
+    LOG.info("Creating DelegationTokenSecretManager with initialInterval: "
+        + initialInterval + ", maxLifetime: " + maxLifetime
+        + ", renewInterval: " + renewInterval);
 
-    final ClientRMService clientRMService =
-        new ClientRMServiceForTest(conf, scheduler, rmDtSecretManager);
+    final ClientRMService clientRMService = new ClientRMServiceForTest(conf,
+        scheduler, rmDtSecretManager);
     clientRMService.init(conf);
     clientRMService.start();
 
@@ -123,49 +115,44 @@ public class TestClientRMTokens {
     try {
 
       // Create a user for the renewr and fake the authentication-method
-      UserGroupInformation loggedInUser =
-          UserGroupInformation.createRemoteUser("testrenewer@APACHE.ORG");
+      UserGroupInformation loggedInUser = UserGroupInformation
+          .createRemoteUser("testrenewer@APACHE.ORG");
       Assert.assertEquals("testrenewer", loggedInUser.getShortUserName());
       // Default realm is APACHE.ORG
       loggedInUser.setAuthenticationMethod(AuthenticationMethod.KERBEROS);
 
       
-      org.apache.hadoop.yarn.api.records.Token token =
-          getDelegationToken(loggedInUser, clientRMService,
-              loggedInUser.getShortUserName());
+      org.apache.hadoop.yarn.api.records.Token token = getDelegationToken(loggedInUser, clientRMService,
+          loggedInUser.getShortUserName());
       long tokenFetchTime = System.currentTimeMillis();
       LOG.info("Got delegation token at: " + tokenFetchTime);
-
+ 
       // Now try talking to RMService using the delegation token
-      clientRMWithDT =
-          getClientRMProtocolWithDT(token, clientRMService.getBindAddress(),
-              "loginuser1", conf);
+      clientRMWithDT = getClientRMProtocolWithDT(token,
+          clientRMService.getBindAddress(), "loginuser1", conf);
 
-      GetNewApplicationRequest request =
-          Records.newRecord(GetNewApplicationRequest.class);
+      GetNewApplicationRequest request = Records.newRecord(GetNewApplicationRequest.class);
       
       try {
         clientRMWithDT.getNewApplication(request);
       } catch (IOException e) {
         fail("Unexpected exception" + e);
-      } catch (YarnException e) {
+      }  catch (YarnException e) {
         fail("Unexpected exception" + e);
       }
       
       // Renew after 50% of token age.
-      while (System.currentTimeMillis() <
-          tokenFetchTime + initialInterval / 2) {
+      while(System.currentTimeMillis() < tokenFetchTime + initialInterval / 2) {
         Thread.sleep(500l);
       }
-      long nextExpTime =
-          renewDelegationToken(loggedInUser, clientRMService, token);
+      long nextExpTime = renewDelegationToken(loggedInUser, clientRMService, token);
       long renewalTime = System.currentTimeMillis();
-      LOG.info("Renewed token at: " + renewalTime + ", NextExpiryTime: " +
-          nextExpTime);
+      LOG.info("Renewed token at: " + renewalTime + ", NextExpiryTime: "
+          + nextExpTime);
 
       // Wait for first expiry, but before renewed expiry.
-      while (System.currentTimeMillis() > tokenFetchTime + initialInterval &&
-          System.currentTimeMillis() < nextExpTime) {
+      while (System.currentTimeMillis() > tokenFetchTime + initialInterval
+          && System.currentTimeMillis() < nextExpTime) {
         Thread.sleep(500l);
       }
       Thread.sleep(50l);
@@ -180,12 +167,11 @@ public class TestClientRMTokens {
       }
       
       // Wait for expiry.
-      while (System.currentTimeMillis() < renewalTime + renewInterval) {
+      while(System.currentTimeMillis() < renewalTime + renewInterval) {
         Thread.sleep(500l);
       }
       Thread.sleep(50l);
-      LOG.info("At time: " + System.currentTimeMillis() +
-          ", token should be invalid");
+      LOG.info("At time: " + System.currentTimeMillis() + ", token should be invalid");
       // Token should have expired.      
       try {
         clientRMWithDT.getNewApplication(request);
@@ -193,7 +179,7 @@ public class TestClientRMTokens {
       } catch (Exception e) {
         assertEquals(InvalidToken.class.getName(), e.getClass().getName());
         assertTrue(e.getMessage().contains("is expired"));
-      }
+      } 
 
       // Test cancellation
       // Stop the existing proxy, start another.
@@ -205,11 +191,10 @@ public class TestClientRMTokens {
           loggedInUser.getShortUserName());
       tokenFetchTime = System.currentTimeMillis();
       LOG.info("Got delegation token at: " + tokenFetchTime);
-
+ 
       // Now try talking to RMService using the delegation token
-      clientRMWithDT =
-          getClientRMProtocolWithDT(token, clientRMService.getBindAddress(),
-              "loginuser2", conf);
+      clientRMWithDT = getClientRMProtocolWithDT(token,
+          clientRMService.getBindAddress(), "loginuser2", conf);
 
       request = Records.newRecord(GetNewApplicationRequest.class);
       
@@ -224,12 +209,11 @@ public class TestClientRMTokens {
       if (clientRMWithDT != null) {
         RPC.stopProxy(clientRMWithDT);
         clientRMWithDT = null;
-      }
+      } 
       
       // Creating a new connection.
-      clientRMWithDT =
-          getClientRMProtocolWithDT(token, clientRMService.getBindAddress(),
-              "loginuser2", conf);
+      clientRMWithDT = getClientRMProtocolWithDT(token,
+          clientRMService.getBindAddress(), "loginuser2", conf);
       LOG.info("Cancelled delegation token at: " + System.currentTimeMillis());
       // Verify cancellation worked.
       try {
@@ -238,7 +222,51 @@ public class TestClientRMTokens {
       } catch (IOException e) {
       } catch (YarnException e) {
       }
+      
+      // Test new version token
+      // Stop the existing proxy, start another.
+      if (clientRMWithDT != null) {
+        RPC.stopProxy(clientRMWithDT);
+        clientRMWithDT = null;
+      }
+      token = getDelegationToken(loggedInUser, clientRMService,
+          loggedInUser.getShortUserName());
+      
+      byte[] tokenIdentifierContent = token.getIdentifier().array();
+      RMDelegationTokenIdentifier tokenIdentifier = new RMDelegationTokenIdentifier();
+      
+      DataInputBuffer dib = new DataInputBuffer();
+      dib.reset(tokenIdentifierContent, tokenIdentifierContent.length);
+      tokenIdentifier.readFields(dib);
+      
+      // Construct new version RMDelegationTokenIdentifier with additional field
+      RMDelegationTokenIdentifierForTest newVersionTokenIdentifier = 
+          new RMDelegationTokenIdentifierForTest(tokenIdentifier, "message");
+      
+      Token<RMDelegationTokenIdentifier> newRMDTtoken =
+          new Token<RMDelegationTokenIdentifier>(newVersionTokenIdentifier,
+              rmDtSecretManager);
+      org.apache.hadoop.yarn.api.records.Token newToken = 
+          BuilderUtils.newDelegationToken(
+              newRMDTtoken.getIdentifier(),
+              newRMDTtoken.getKind().toString(),
+              newRMDTtoken.getPassword(),
+              newRMDTtoken.getService().toString()
+          );
+ 
+      // Now try talking to RMService using the new version delegation token
+      clientRMWithDT = getClientRMProtocolWithDT(newToken,
+          clientRMService.getBindAddress(), "loginuser3", conf);
 
+      request = Records.newRecord(GetNewApplicationRequest.class);
+      
+      try {
+        clientRMWithDT.getNewApplication(request);
+      } catch (IOException e) {
+        fail("Unexpected exception" + e);
+      } catch (YarnException e) {
+        fail("Unexpected exception" + e);
+      }
 
     } finally {
       rmDtSecretManager.stopThreads();
@@ -248,13 +276,12 @@ public class TestClientRMTokens {
       }
     }
   }
-
-  @Ignore("HOPS fails on vanilla")
+  
   @Test
   public void testShortCircuitRenewCancel()
       throws IOException, InterruptedException {
-    InetSocketAddress addr =
-        new InetSocketAddress(InetAddress.getLocalHost(), 123);
+    InetSocketAddress addr = NetUtils.createSocketAddr(
+        InetAddress.getLocalHost().getHostName(), 123, null);
     checkShortCircuitRenewCancel(addr, addr, true);
   }
 
@@ -262,58 +289,65 @@ public class TestClientRMTokens {
   public void testShortCircuitRenewCancelWildcardAddress()
       throws IOException, InterruptedException {
     InetSocketAddress rmAddr = new InetSocketAddress(123);
-    checkShortCircuitRenewCancel(rmAddr,
-        new InetSocketAddress(InetAddress.getLocalHost(), rmAddr.getPort()),
+    InetSocketAddress serviceAddr = NetUtils.createSocketAddr(
+        InetAddress.getLocalHost().getHostName(), rmAddr.getPort(), null);
+    checkShortCircuitRenewCancel(
+        rmAddr,
+        serviceAddr,
         true);
   }
 
   @Test
   public void testShortCircuitRenewCancelSameHostDifferentPort()
       throws IOException, InterruptedException {
-    InetSocketAddress rmAddr =
-        new InetSocketAddress(InetAddress.getLocalHost(), 123);
-    checkShortCircuitRenewCancel(rmAddr,
-        new InetSocketAddress(rmAddr.getAddress(), rmAddr.getPort() + 1),
+    InetSocketAddress rmAddr = NetUtils.createSocketAddr(
+        InetAddress.getLocalHost().getHostName(), 123, null);
+    checkShortCircuitRenewCancel(
+        rmAddr,
+        new InetSocketAddress(rmAddr.getAddress(), rmAddr.getPort()+1),
         false);
   }
 
   @Test
   public void testShortCircuitRenewCancelDifferentHostSamePort()
       throws IOException, InterruptedException {
-    InetSocketAddress rmAddr =
-        new InetSocketAddress(InetAddress.getLocalHost(), 123);
-    checkShortCircuitRenewCancel(rmAddr,
-        new InetSocketAddress("1.1.1.1", rmAddr.getPort()), false);
+    InetSocketAddress rmAddr = NetUtils.createSocketAddr(
+        InetAddress.getLocalHost().getHostName(), 123, null);
+    checkShortCircuitRenewCancel(
+        rmAddr,
+        new InetSocketAddress("1.1.1.1", rmAddr.getPort()),
+        false);
   }
 
   @Test
   public void testShortCircuitRenewCancelDifferentHostDifferentPort()
       throws IOException, InterruptedException {
-    InetSocketAddress rmAddr =
-        new InetSocketAddress(InetAddress.getLocalHost(), 123);
-    checkShortCircuitRenewCancel(rmAddr,
-        new InetSocketAddress("1.1.1.1", rmAddr.getPort() + 1), false);
+    InetSocketAddress rmAddr = NetUtils.createSocketAddr(
+        InetAddress.getLocalHost().getHostName(), 123, null);
+    checkShortCircuitRenewCancel(
+        rmAddr,
+        new InetSocketAddress("1.1.1.1", rmAddr.getPort()+1),
+        false);
   }
 
   @SuppressWarnings("unchecked")
   private void checkShortCircuitRenewCancel(InetSocketAddress rmAddr,
-      InetSocketAddress serviceAddr, boolean shouldShortCircuit)
-      throws IOException, InterruptedException {
+                                            InetSocketAddress serviceAddr,
+                                            boolean shouldShortCircuit
+      ) throws IOException, InterruptedException {
     Configuration conf = new Configuration();
-    conf.setClass(YarnConfiguration.IPC_RPC_IMPL, YarnBadRPC.class,
-        YarnRPC.class);
+    conf.setClass(YarnConfiguration.IPC_RPC_IMPL,
+        YarnBadRPC.class, YarnRPC.class);
     
     RMDelegationTokenSecretManager secretManager =
         mock(RMDelegationTokenSecretManager.class);
     RMDelegationTokenIdentifier.Renewer.setSecretManager(secretManager, rmAddr);
 
-    RMDelegationTokenIdentifier ident =
-        new RMDelegationTokenIdentifier(new Text("owner"), new Text("renewer"),
-            null);
+    RMDelegationTokenIdentifier ident = new RMDelegationTokenIdentifier(
+        new Text("owner"), new Text("renewer"), null);
     Token<RMDelegationTokenIdentifier> token =
         new Token<RMDelegationTokenIdentifier>(ident, secretManager);
 
-    SecurityUtilTestHelper.setTokenServiceUseIp(true);
     SecurityUtil.setTokenService(token, serviceAddr);
     if (shouldShortCircuit) {
       token.renew(conf);
@@ -321,15 +355,15 @@ public class TestClientRMTokens {
       reset(secretManager);
       token.cancel(conf);
       verify(secretManager).cancelToken(eq(token), eq("renewer"));
-    } else {
-      try {
+    } else {      
+      try { 
         token.renew(conf);
         fail();
       } catch (RuntimeException e) {
         assertEquals("getProxy", e.getMessage());
       }
       verify(secretManager, never()).renewToken(any(Token.class), anyString());
-      try {
+      try { 
         token.cancel(conf);
         fail();
       } catch (RuntimeException e) {
@@ -355,8 +389,8 @@ public class TestClientRMTokens {
     @Override
     public Server getServer(Class protocol, Object instance,
         InetSocketAddress addr, Configuration conf,
-        SecretManager<? extends TokenIdentifier> secretManager, int numHandlers,
-        String portRangeConfig) {
+        SecretManager<? extends TokenIdentifier> secretManager,
+        int numHandlers, String portRangeConfig) {
       throw new RuntimeException("getServer");
     }
   }
@@ -365,15 +399,15 @@ public class TestClientRMTokens {
   // the kerberos based rpc.
   private org.apache.hadoop.yarn.api.records.Token getDelegationToken(
       final UserGroupInformation loggedInUser,
-      final ApplicationClientProtocol clientRMService,
-      final String renewerString) throws IOException, InterruptedException {
-    org.apache.hadoop.yarn.api.records.Token token = loggedInUser.doAs(
-        new PrivilegedExceptionAction<org.apache.hadoop.yarn.api.records.Token>() {
+      final ApplicationClientProtocol clientRMService, final String renewerString)
+      throws IOException, InterruptedException {
+    org.apache.hadoop.yarn.api.records.Token token = loggedInUser
+        .doAs(new PrivilegedExceptionAction<org.apache.hadoop.yarn.api.records.Token>() {
           @Override
-          public org.apache.hadoop.yarn.api.records.Token run()
-              throws YarnException, IOException {
-            GetDelegationTokenRequest request =
-                Records.newRecord(GetDelegationTokenRequest.class);
+            public org.apache.hadoop.yarn.api.records.Token run()
+                throws YarnException, IOException {
+            GetDelegationTokenRequest request = Records
+                .newRecord(GetDelegationTokenRequest.class);
             request.setRenewer(renewerString);
             return clientRMService.getDelegationToken(request)
                 .getRMDelegationToken();
@@ -389,8 +423,8 @@ public class TestClientRMTokens {
     long nextExpTime = loggedInUser.doAs(new PrivilegedExceptionAction<Long>() {
       @Override
       public Long run() throws YarnException, IOException {
-        RenewDelegationTokenRequest request =
-            Records.newRecord(RenewDelegationTokenRequest.class);
+        RenewDelegationTokenRequest request = Records
+            .newRecord(RenewDelegationTokenRequest.class);
         request.setDelegationToken(dToken);
         return clientRMService.renewDelegationToken(request)
             .getNextExpirationTime();
@@ -406,8 +440,8 @@ public class TestClientRMTokens {
     loggedInUser.doAs(new PrivilegedExceptionAction<Void>() {
       @Override
       public Void run() throws YarnException, IOException {
-        CancelDelegationTokenRequest request =
-            Records.newRecord(CancelDelegationTokenRequest.class);
+        CancelDelegationTokenRequest request = Records
+            .newRecord(CancelDelegationTokenRequest.class);
         request.setDelegationToken(dToken);
         clientRMService.cancelDelegationToken(request);
         return null;
@@ -417,21 +451,21 @@ public class TestClientRMTokens {
   
   private ApplicationClientProtocol getClientRMProtocolWithDT(
       org.apache.hadoop.yarn.api.records.Token token,
-      final InetSocketAddress rmAddress, String user,
-      final Configuration conf) {
+      final InetSocketAddress rmAddress, String user, final Configuration conf) {
     // Maybe consider converting to Hadoop token, serialize de-serialize etc
     // before trying to renew the token.
 
-    UserGroupInformation ugi = UserGroupInformation.createRemoteUser(user);
+    UserGroupInformation ugi = UserGroupInformation
+        .createRemoteUser(user);
     ugi.addToken(ConverterUtils.convertFromYarn(token, rmAddress));
 
     final YarnRPC rpc = YarnRPC.create(conf);
-    ApplicationClientProtocol clientRMWithDT =
-        ugi.doAs(new PrivilegedAction<ApplicationClientProtocol>() {
+    ApplicationClientProtocol clientRMWithDT = ugi
+        .doAs(new PrivilegedAction<ApplicationClientProtocol>() {
           @Override
           public ApplicationClientProtocol run() {
-            return (ApplicationClientProtocol) rpc
-                .getProxy(ApplicationClientProtocol.class, rmAddress, conf);
+            return (ApplicationClientProtocol) rpc.getProxy(ApplicationClientProtocol.class,
+                rmAddress, conf);
           }
         });
     return clientRMWithDT;
@@ -443,8 +477,8 @@ public class TestClientRMTokens {
         ResourceScheduler scheduler,
         RMDelegationTokenSecretManager rmDTSecretManager) {
       super(mock(RMContext.class), scheduler, mock(RMAppManager.class),
-          new ApplicationACLsManager(conf),
-          new QueueACLsManager(scheduler, conf), rmDTSecretManager);
+          new ApplicationACLsManager(conf), new QueueACLsManager(scheduler,
+              conf), rmDTSecretManager);
     }
 
     // Use a random port unless explicitly specified.
@@ -474,14 +508,15 @@ public class TestClientRMTokens {
     return mockSched;
   }
 
-  private static RMDelegationTokenSecretManager createRMDelegationTokenSecretManager(
-      long secretKeyInterval, long tokenMaxLifetime, long tokenRenewInterval) {
+  private static RMDelegationTokenSecretManager
+      createRMDelegationTokenSecretManager(long secretKeyInterval,
+          long tokenMaxLifetime, long tokenRenewInterval) {
     RMContext rmContext = mock(RMContext.class);
     when(rmContext.getStateStore()).thenReturn(new NullRMStateStore());
 
     RMDelegationTokenSecretManager rmDtSecretManager =
         new RMDelegationTokenSecretManager(secretKeyInterval, tokenMaxLifetime,
-            tokenRenewInterval, 3600000, rmContext);
+          tokenRenewInterval, 3600000, rmContext);
     return rmDtSecretManager;
   }
 }

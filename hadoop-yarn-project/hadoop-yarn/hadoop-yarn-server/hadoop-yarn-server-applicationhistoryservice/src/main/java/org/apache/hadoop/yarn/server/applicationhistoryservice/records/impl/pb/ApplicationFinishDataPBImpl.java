@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.yarn.server.applicationhistoryservice.records.impl.pb;
 
-import com.google.protobuf.TextFormat;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
 import org.apache.hadoop.yarn.api.records.YarnApplicationState;
@@ -31,10 +30,12 @@ import org.apache.hadoop.yarn.proto.YarnProtos.FinalApplicationStatusProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.YarnApplicationStateProto;
 import org.apache.hadoop.yarn.server.applicationhistoryservice.records.ApplicationFinishData;
 
+import com.google.protobuf.TextFormat;
+
 public class ApplicationFinishDataPBImpl extends ApplicationFinishData {
 
-  ApplicationFinishDataProto proto =
-      ApplicationFinishDataProto.getDefaultInstance();
+  ApplicationFinishDataProto proto = ApplicationFinishDataProto
+    .getDefaultInstance();
   ApplicationFinishDataProto.Builder builder = null;
   boolean viaProto = false;
 
@@ -119,8 +120,8 @@ public class ApplicationFinishDataPBImpl extends ApplicationFinishData {
       builder.clearFinalApplicationStatus();
       return;
     }
-    builder.setFinalApplicationStatus(
-        convertToProtoFormat(finalApplicationStatus));
+    builder
+      .setFinalApplicationStatus(convertToProtoFormat(finalApplicationStatus));
   }
 
   @Override
@@ -156,9 +157,8 @@ public class ApplicationFinishDataPBImpl extends ApplicationFinishData {
 
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -171,9 +171,9 @@ public class ApplicationFinishDataPBImpl extends ApplicationFinishData {
   }
 
   private void mergeLocalToBuilder() {
-    if (this.applicationId != null &&
-        !((ApplicationIdPBImpl) this.applicationId).getProto()
-            .equals(builder.getApplicationId())) {
+    if (this.applicationId != null
+        && !((ApplicationIdPBImpl) this.applicationId).getProto().equals(
+          builder.getApplicationId())) {
       builder.setApplicationId(convertToProtoFormat(this.applicationId));
     }
   }

@@ -57,9 +57,9 @@ public class ApplicationHistoryData {
   @Public
   @Unstable
   public static ApplicationHistoryData newInstance(ApplicationId applicationId,
-      String applicationName, String applicationType, String queue, String user,
-      long submitTime, long startTime, long finishTime, String diagnosticsInfo,
-      FinalApplicationStatus finalApplicationStatus,
+      String applicationName, String applicationType, String queue,
+      String user, long submitTime, long startTime, long finishTime,
+      String diagnosticsInfo, FinalApplicationStatus finalApplicationStatus,
       YarnApplicationState yarnApplicationState) {
     ApplicationHistoryData appHD = new ApplicationHistoryData();
     appHD.setApplicationId(applicationId);
@@ -205,8 +205,8 @@ public class ApplicationHistoryData {
 
   @Public
   @Unstable
-  public void setYarnApplicationState(
-      YarnApplicationState yarnApplicationState) {
+  public void
+      setYarnApplicationState(YarnApplicationState yarnApplicationState) {
     this.yarnApplicationState = yarnApplicationState;
   }
 

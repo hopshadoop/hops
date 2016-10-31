@@ -18,13 +18,10 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.event;
 
-import io.hops.ha.common.TransactionState;
-import org.apache.hadoop.yarn.event.AbstractEventTransaction;
+import org.apache.hadoop.yarn.event.AbstractEvent;
 
-public class SchedulerEvent
-    extends AbstractEventTransaction<SchedulerEventType> {
-  public SchedulerEvent(SchedulerEventType type,
-      TransactionState transactionState) {
-    super(type, transactionState);
+public class SchedulerEvent extends AbstractEvent<SchedulerEventType> {
+  public SchedulerEvent(SchedulerEventType type) {
+    super(type);
   }
 }

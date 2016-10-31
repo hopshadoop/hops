@@ -74,7 +74,7 @@ public class SecondarySort {
     }
     /**
      * Read the two integers. 
-     * Encoded as: MIN_VALUE -> 0, 0 -> -MIN_VALUE, MAX_VALUE-> -1
+     * Encoded as: MIN_VALUE -&gt; 0, 0 -&gt; -MIN_VALUE, MAX_VALUE-&gt; -1
      */
     @Override
     public void readFields(DataInput in) throws IOException {
@@ -214,7 +214,7 @@ public class SecondarySort {
       System.err.println("Usage: secondarysort <in> <out>");
       System.exit(2);
     }
-    Job job = new Job(conf, "secondary sort");
+    Job job = Job.getInstance(conf, "secondary sort");
     job.setJarByClass(SecondarySort.class);
     job.setMapperClass(MapClass.class);
     job.setReducerClass(Reduce.class);

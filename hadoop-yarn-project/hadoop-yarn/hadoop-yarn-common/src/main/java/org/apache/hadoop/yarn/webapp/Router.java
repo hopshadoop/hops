@@ -1,30 +1,28 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Licensed to the Apache Software Foundation (ASF) under one
+* or more contributor license agreements.  See the NOTICE file
+* distributed with this work for additional information
+* regarding copyright ownership.  The ASF licenses this file
+* to you under the Apache License, Version 2.0 (the
+* "License"); you may not use this file except in compliance
+* with the License.  You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
 
 package org.apache.hadoop.yarn.webapp;
 
-import com.google.common.base.CharMatcher;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Maps;
-import org.apache.commons.lang.StringUtils;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Preconditions.checkState;
+import static org.apache.hadoop.yarn.util.StringHelper.djoin;
+import static org.apache.hadoop.yarn.util.StringHelper.join;
+import static org.apache.hadoop.yarn.util.StringHelper.pjoin;
 
 import java.lang.reflect.Method;
 import java.util.EnumSet;
@@ -33,11 +31,14 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.regex.Pattern;
 
-import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.base.Preconditions.checkState;
-import static org.apache.hadoop.yarn.util.StringHelper.djoin;
-import static org.apache.hadoop.yarn.util.StringHelper.join;
-import static org.apache.hadoop.yarn.util.StringHelper.pjoin;
+import org.apache.commons.lang.StringUtils;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.common.base.CharMatcher;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Maps;
 
 /**
  * Manages path info to controller#action routing.
@@ -59,12 +60,12 @@ class Router {
     final EnumSet<WebApp.HTTP> methods;
 
     Dest(String path, Method method, Class<? extends Controller> cls,
-        List<String> pathParams, WebApp.HTTP httpMethod) {
+         List<String> pathParams, WebApp.HTTP httpMethod) {
       prefix = checkNotNull(path);
       action = checkNotNull(method);
       controllerClass = checkNotNull(cls);
-      this.pathParams =
-          pathParams != null ? ImmutableList.copyOf(pathParams) : EMPTY_LIST;
+      this.pathParams = pathParams != null ? ImmutableList.copyOf(pathParams)
+                                           : EMPTY_LIST;
       methods = EnumSet.of(httpMethod);
     }
   }
@@ -79,7 +80,8 @@ class Router {
    * The name list is from /foo/show/:name/...
    */
   synchronized Dest add(WebApp.HTTP httpMethod, String path,
-      Class<? extends Controller> cls, String action, List<String> names) {
+                        Class<? extends Controller> cls,
+                        String action, List<String> names) {
     LOG.debug("adding {}({})->{}#{}", new Object[]{path, names, cls, action});
     Dest dest = addController(httpMethod, path, cls, action, names);
     addDefaultView(dest);
@@ -87,7 +89,8 @@ class Router {
   }
 
   private Dest addController(WebApp.HTTP httpMethod, String path,
-      Class<? extends Controller> cls, String action, List<String> names) {
+                             Class<? extends Controller> cls,
+                             String action, List<String> names) {
     try {
       // Look for the method in all public methods declared in the class
       // or inherited by the class.
@@ -108,19 +111,19 @@ class Router {
       throw new WebAppException(action + "() not found in " + cls);
     } catch (SecurityException se) {
       throw new WebAppException("Security exception thrown for " + action +
-          "() in " + cls);
+        "() in " + cls);
     }
   }
 
   private void addDefaultView(Dest dest) {
     String controllerName = dest.controllerClass.getSimpleName();
     if (controllerName.endsWith("Controller")) {
-      controllerName =
-          controllerName.substring(0, controllerName.length() - 10);
+      controllerName = controllerName.substring(0,
+          controllerName.length() - 10);
     }
-    dest.defaultViewClass =
-        find(View.class, dest.controllerClass.getPackage().getName(),
-            join(controllerName + "View"));
+    dest.defaultViewClass = find(View.class,
+                                 dest.controllerClass.getPackage().getName(),
+                                 join(controllerName + "View"));
   }
 
   void setHostClass(Class<?> cls) {
@@ -144,7 +147,7 @@ class Router {
     do {
       Dest dest = routes.get(key);
       if (dest != null && methodAllowed(method, dest)) {
-        if ((Object) key == path) { // shut up warnings
+        if ((Object)key == path) { // shut up warnings
           LOG.debug("exact match for {}: {}", key, dest.action);
           return dest;
         } else if (isGoodMatch(dest, path)) {
@@ -177,13 +180,13 @@ class Router {
 
   static boolean methodAllowed(WebApp.HTTP method, Dest dest) {
     // Accept all methods by default, unless explicity configured otherwise.
-    return dest.methods.contains(method) ||
-        (dest.methods.size() == 1 && dest.methods.contains(WebApp.HTTP.GET));
+    return dest.methods.contains(method) || (dest.methods.size() == 1 &&
+           dest.methods.contains(WebApp.HTTP.GET));
   }
 
   static boolean prefixMatches(Dest dest, String path) {
-    LOG.debug("checking prefix {}{} for path: {}",
-        new Object[]{dest.prefix, dest.pathParams, path});
+    LOG.debug("checking prefix {}{} for path: {}", new Object[]{dest.prefix,
+              dest.pathParams, path});
     if (!path.startsWith(dest.prefix)) {
       return false;
     }
@@ -220,14 +223,14 @@ class Router {
     String controller = parts.get(WebApp.R_CONTROLLER);
     String action = parts.get(WebApp.R_ACTION);
     // NameController is encouraged default
-    Class<? extends Controller> cls =
-        find(Controller.class, join(controller, "Controller"));
+    Class<? extends Controller> cls = find(Controller.class,
+                                           join(controller, "Controller"));
     if (cls == null) {
       cls = find(Controller.class, controller);
     }
     if (cls == null) {
-      throw new WebAppException(
-          join(path, ": controller for ", controller, " not found"));
+      throw new WebAppException(join(path, ": controller for ", controller,
+                                " not found"));
     }
     return add(method, defaultPrefix(controller, action), cls, action, null);
   }
@@ -286,6 +289,6 @@ class Router {
     String controller = parts.get(WebApp.R_CONTROLLER);
     String action = parts.get(WebApp.R_ACTION);
     return add(method, pjoin("", controller, action), dest.controllerClass,
-        action, null);
+               action, null);
   }
 }

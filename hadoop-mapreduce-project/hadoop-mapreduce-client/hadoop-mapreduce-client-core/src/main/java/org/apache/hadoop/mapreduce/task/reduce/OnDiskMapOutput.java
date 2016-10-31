@@ -24,6 +24,7 @@ import java.io.OutputStream;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -32,11 +33,13 @@ import org.apache.hadoop.fs.Path;
 
 import org.apache.hadoop.io.IOUtils;
 
+import org.apache.hadoop.mapred.IFileInputStream;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.Reporter;
 import org.apache.hadoop.mapred.MapOutputFile;
 
 import org.apache.hadoop.mapreduce.TaskAttemptID;
+import org.apache.hadoop.mapreduce.CryptoUtils;
 import org.apache.hadoop.mapreduce.task.reduce.MergeManagerImpl.CompressAwarePath;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -51,6 +54,7 @@ class OnDiskMapOutput<K, V> extends MapOutput<K, V> {
   private final MergeManagerImpl<K, V> merger;
   private final OutputStream disk; 
   private long compressedSize;
+  private final Configuration conf;
 
   public OnDiskMapOutput(TaskAttemptID mapId, TaskAttemptID reduceId,
                          MergeManagerImpl<K,V> merger, long size,
@@ -59,7 +63,7 @@ class OnDiskMapOutput<K, V> extends MapOutput<K, V> {
                          int fetcher, boolean primaryMapOutput)
       throws IOException {
     this(mapId, reduceId, merger, size, conf, mapOutputFile, fetcher,
-        primaryMapOutput, FileSystem.getLocal(conf),
+        primaryMapOutput, FileSystem.getLocal(conf).getRaw(),
         mapOutputFile.getInputFileForWrite(mapId.getTaskID(), size));
   }
 
@@ -75,7 +79,8 @@ class OnDiskMapOutput<K, V> extends MapOutput<K, V> {
     this.merger = merger;
     this.outputPath = outputPath;
     tmpOutputPath = getTempPath(outputPath, fetcher);
-    disk = fs.create(tmpOutputPath);
+    disk = CryptoUtils.wrapIfNecessary(conf, fs.create(tmpOutputPath));
+    this.conf = conf;
   }
 
   @VisibleForTesting
@@ -88,13 +93,14 @@ class OnDiskMapOutput<K, V> extends MapOutput<K, V> {
                       long compressedLength, long decompressedLength,
                       ShuffleClientMetrics metrics,
                       Reporter reporter) throws IOException {
+    input = new IFileInputStream(input, compressedLength, conf);
     // Copy data to local-disk
     long bytesLeft = compressedLength;
     try {
       final int BYTES_TO_READ = 64 * 1024;
       byte[] buf = new byte[BYTES_TO_READ];
       while (bytesLeft > 0) {
-        int n = input.read(buf, 0, (int) Math.min(bytesLeft, BYTES_TO_READ));
+        int n = ((IFileInputStream)input).readWithChecksum(buf, 0, (int) Math.min(bytesLeft, BYTES_TO_READ));
         if (n < 0) {
           throw new IOException("read past end of stream reading " + 
                                 getMapId());

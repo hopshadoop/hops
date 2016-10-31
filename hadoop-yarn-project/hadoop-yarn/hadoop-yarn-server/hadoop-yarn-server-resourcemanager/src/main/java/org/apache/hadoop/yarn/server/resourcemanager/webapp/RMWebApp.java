@@ -1,38 +1,38 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Licensed to the Apache Software Foundation (ASF) under one
+* or more contributor license agreements.  See the NOTICE file
+* distributed with this work for additional information
+* regarding copyright ownership.  The ASF licenses this file
+* to you under the Apache License, Version 2.0 (the
+* "License"); you may not use this file except in compliance
+* with the License.  You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
 
 package org.apache.hadoop.yarn.server.resourcemanager.webapp;
 
-import com.sun.jersey.guice.spi.container.servlet.GuiceContainer;
+import static org.apache.hadoop.yarn.util.StringHelper.pajoin;
+
+import java.net.InetSocketAddress;
+
 import org.apache.hadoop.ha.HAServiceProtocol.HAServiceState;
+import org.apache.hadoop.yarn.api.ApplicationBaseProtocol;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import org.apache.hadoop.yarn.util.RMHAUtils;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
-import org.apache.hadoop.yarn.server.resourcemanager.security.QueueACLsManager;
-import org.apache.hadoop.yarn.server.security.ApplicationACLsManager;
-import org.apache.hadoop.yarn.util.RMHAUtils;
 import org.apache.hadoop.yarn.webapp.GenericExceptionHandler;
 import org.apache.hadoop.yarn.webapp.WebApp;
 import org.apache.hadoop.yarn.webapp.YarnWebParams;
 
-import java.net.InetSocketAddress;
-
-import static org.apache.hadoop.yarn.util.StringHelper.pajoin;
+import com.sun.jersey.guice.spi.container.servlet.GuiceContainer;
 
 /**
  * The RM webapp
@@ -55,10 +55,7 @@ public class RMWebApp extends WebApp implements YarnWebParams {
 
     if (rm != null) {
       bind(ResourceManager.class).toInstance(rm);
-      bind(RMContext.class).toInstance(rm.getRMContext());
-      bind(ApplicationACLsManager.class)
-          .toInstance(rm.getApplicationACLsManager());
-      bind(QueueACLsManager.class).toInstance(rm.getQueueACLsManager());
+      bind(ApplicationBaseProtocol.class).toInstance(rm.getClientRMService());
     }
     route("/", RmController.class);
     route(pajoin("/nodes", NODE_STATE), RmController.class, "nodes");
@@ -67,6 +64,10 @@ public class RMWebApp extends WebApp implements YarnWebParams {
     route(pajoin("/app", APPLICATION_ID), RmController.class, "app");
     route("/scheduler", RmController.class, "scheduler");
     route(pajoin("/queue", QUEUE_NAME), RmController.class, "queue");
+    route("/nodelabels", RmController.class, "nodelabels");
+    route(pajoin("/appattempt", APPLICATION_ATTEMPT_ID), RmController.class,
+      "appattempt");
+    route(pajoin("/container", CONTAINER_ID), RmController.class, "container");
   }
 
   @Override
@@ -86,9 +87,8 @@ public class RMWebApp extends WebApp implements YarnWebParams {
   public String getRedirectPath() {
     if (standby) {
       return buildRedirectPath();
-    } else {
+    } else
       return super.getRedirectPath();
-    }
   }
 
   private String buildRedirectPath() {
@@ -100,18 +100,28 @@ public class RMWebApp extends WebApp implements YarnWebParams {
     if (activeRMHAId != null) {
       yarnConf.set(YarnConfiguration.RM_HA_ID, activeRMHAId);
 
-      InetSocketAddress sock = YarnConfiguration.useHttps(yarnConf) ? yarnConf
-          .getSocketAddr(YarnConfiguration.RM_WEBAPP_HTTPS_ADDRESS,
+      InetSocketAddress sock = YarnConfiguration.useHttps(yarnConf)
+          ? yarnConf.getSocketAddr(YarnConfiguration.RM_WEBAPP_HTTPS_ADDRESS,
               YarnConfiguration.DEFAULT_RM_WEBAPP_HTTPS_ADDRESS,
-              YarnConfiguration.DEFAULT_RM_WEBAPP_HTTPS_PORT) : yarnConf
-          .getSocketAddr(YarnConfiguration.RM_WEBAPP_ADDRESS,
+              YarnConfiguration.DEFAULT_RM_WEBAPP_HTTPS_PORT)
+          : yarnConf.getSocketAddr(YarnConfiguration.RM_WEBAPP_ADDRESS,
               YarnConfiguration.DEFAULT_RM_WEBAPP_ADDRESS,
               YarnConfiguration.DEFAULT_RM_WEBAPP_PORT);
 
       path = sock.getHostName() + ":" + Integer.toString(sock.getPort());
-      path = YarnConfiguration.useHttps(yarnConf) ? "https://" + path :
-          "http://" + path;
+      path = YarnConfiguration.useHttps(yarnConf)
+          ? "https://" + path
+          : "http://" + path;
     }
     return path;
+  }
+
+  public String getHAZookeeperConnectionState() {
+    return rm.getRMContext().getRMAdminService()
+      .getHAZookeeperConnectionState();
+  }
+
+  public RMContext getRMContext() {
+    return rm.getRMContext();
   }
 }

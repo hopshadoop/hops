@@ -18,16 +18,14 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.rmapp;
 
-import io.hops.ha.common.TransactionState;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 
 public class RMAppRejectedEvent extends RMAppEvent {
 
   private final String message;
 
-  public RMAppRejectedEvent(ApplicationId appId, String message,
-      TransactionState transactionState) {
-    super(appId, RMAppEventType.APP_REJECTED, transactionState);
+  public RMAppRejectedEvent(ApplicationId appId, String message) {
+    super(appId, RMAppEventType.APP_REJECTED);
     this.message = message;
   }
 

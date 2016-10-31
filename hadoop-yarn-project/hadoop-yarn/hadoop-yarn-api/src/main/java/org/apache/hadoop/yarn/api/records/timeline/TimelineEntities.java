@@ -18,15 +18,16 @@
 
 package org.apache.hadoop.yarn.api.records.timeline;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Unstable;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
-import java.util.ArrayList;
-import java.util.List;
+
+import org.apache.hadoop.classification.InterfaceAudience.Public;
+import org.apache.hadoop.classification.InterfaceStability.Evolving;
 
 /**
  * The class that hosts a list of timeline entities.
@@ -34,10 +35,11 @@ import java.util.List;
 @XmlRootElement(name = "entities")
 @XmlAccessorType(XmlAccessType.NONE)
 @Public
-@Unstable
+@Evolving
 public class TimelineEntities {
 
-  private List<TimelineEntity> entities = new ArrayList<TimelineEntity>();
+  private List<TimelineEntity> entities =
+      new ArrayList<TimelineEntity>();
 
   public TimelineEntities() {
 
@@ -45,7 +47,7 @@ public class TimelineEntities {
 
   /**
    * Get a list of entities
-   *
+   * 
    * @return a list of entities
    */
   @XmlElement(name = "entities")
@@ -55,9 +57,9 @@ public class TimelineEntities {
 
   /**
    * Add a single entity into the existing entity list
-   *
+   * 
    * @param entity
-   *     a single entity
+   *          a single entity
    */
   public void addEntity(TimelineEntity entity) {
     entities.add(entity);
@@ -65,9 +67,9 @@ public class TimelineEntities {
 
   /**
    * All a list of entities into the existing entity list
-   *
+   * 
    * @param entities
-   *     a list of entities
+   *          a list of entities
    */
   public void addEntities(List<TimelineEntity> entities) {
     this.entities.addAll(entities);
@@ -75,9 +77,9 @@ public class TimelineEntities {
 
   /**
    * Set the entity list to the given list of entities
-   *
+   * 
    * @param entities
-   *     a list of entities
+   *          a list of entities
    */
   public void setEntities(List<TimelineEntity> entities) {
     this.entities = entities;

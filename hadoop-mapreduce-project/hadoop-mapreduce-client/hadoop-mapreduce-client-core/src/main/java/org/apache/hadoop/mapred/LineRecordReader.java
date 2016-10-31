@@ -38,6 +38,7 @@ import org.apache.hadoop.io.compress.SplitCompressionInputStream;
 import org.apache.hadoop.io.compress.SplittableCompressionCodec;
 import org.apache.hadoop.mapreduce.lib.input.CompressedSplitLineReader;
 import org.apache.hadoop.mapreduce.lib.input.SplitLineReader;
+import org.apache.hadoop.mapreduce.lib.input.UncompressedSplitLineReader;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.logging.Log;
 
@@ -124,7 +125,8 @@ public class LineRecordReader implements RecordReader<LongWritable, Text> {
       }
     } else {
       fileIn.seek(start);
-      in = new SplitLineReader(fileIn, job, recordDelimiter);
+      in = new UncompressedSplitLineReader(
+          fileIn, job, recordDelimiter, split.getLength());
       filePosition = fileIn;
     }
     // If this is not the first split, we always throw away first record
@@ -184,7 +186,7 @@ public class LineRecordReader implements RecordReader<LongWritable, Text> {
   private int maxBytesToConsume(long pos) {
     return isCompressedInput()
       ? Integer.MAX_VALUE
-      : (int) Math.min(Integer.MAX_VALUE, end - pos);
+      : (int) Math.max(Math.min(Integer.MAX_VALUE, end - pos), maxLineLength);
   }
 
   private long getFilePosition() throws IOException {
@@ -197,6 +199,39 @@ public class LineRecordReader implements RecordReader<LongWritable, Text> {
     return retVal;
   }
 
+  private int skipUtfByteOrderMark(Text value) throws IOException {
+    // Strip BOM(Byte Order Mark)
+    // Text only support UTF-8, we only need to check UTF-8 BOM
+    // (0xEF,0xBB,0xBF) at the start of the text stream.
+    int newMaxLineLength = (int) Math.min(3L + (long) maxLineLength,
+        Integer.MAX_VALUE);
+    int newSize = in.readLine(value, newMaxLineLength, maxBytesToConsume(pos));
+    // Even we read 3 extra bytes for the first line,
+    // we won't alter existing behavior (no backwards incompat issue).
+    // Because the newSize is less than maxLineLength and
+    // the number of bytes copied to Text is always no more than newSize.
+    // If the return size from readLine is not less than maxLineLength,
+    // we will discard the current line and read the next line.
+    pos += newSize;
+    int textLength = value.getLength();
+    byte[] textBytes = value.getBytes();
+    if ((textLength >= 3) && (textBytes[0] == (byte)0xEF) &&
+        (textBytes[1] == (byte)0xBB) && (textBytes[2] == (byte)0xBF)) {
+      // find UTF-8 BOM, strip it.
+      LOG.info("Found UTF-8 BOM and skipped it");
+      textLength -= 3;
+      newSize -= 3;
+      if (textLength > 0) {
+        // It may work to use the same buffer and not do the copyBytes
+        textBytes = value.copyBytes();
+        value.set(textBytes, 3, textLength);
+      } else {
+        value.clear();
+      }
+    }
+    return newSize;
+  }
+
   /** Read a line. */
   public synchronized boolean next(LongWritable key, Text value)
     throws IOException {
@@ -206,12 +241,17 @@ public class LineRecordReader implements RecordReader<LongWritable, Text> {
     while (getFilePosition() <= end || in.needAdditionalRecordAfterSplit()) {
       key.set(pos);
 
-      int newSize = in.readLine(value, maxLineLength,
-          Math.max(maxBytesToConsume(pos), maxLineLength));
+      int newSize = 0;
+      if (pos == 0) {
+        newSize = skipUtfByteOrderMark(value);
+      } else {
+        newSize = in.readLine(value, maxLineLength, maxBytesToConsume(pos));
+        pos += newSize;
+      }
+
       if (newSize == 0) {
         return false;
       }
-      pos += newSize;
       if (newSize < maxLineLength) {
         return true;
       }
@@ -246,6 +286,7 @@ public class LineRecordReader implements RecordReader<LongWritable, Text> {
     } finally {
       if (decompressor != null) {
         CodecPool.returnDecompressor(decompressor);
+        decompressor = null;
       }
     }
   }

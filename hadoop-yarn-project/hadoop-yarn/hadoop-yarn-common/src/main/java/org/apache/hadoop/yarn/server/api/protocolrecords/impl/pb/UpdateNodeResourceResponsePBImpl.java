@@ -20,11 +20,9 @@ package org.apache.hadoop.yarn.server.api.protocolrecords.impl.pb;
 import org.apache.hadoop.yarn.proto.YarnServerResourceManagerServiceProtos.UpdateNodeResourceResponseProto;
 import org.apache.hadoop.yarn.server.api.protocolrecords.UpdateNodeResourceResponse;
 
-public class UpdateNodeResourceResponsePBImpl
-    implements UpdateNodeResourceResponse {
+public class UpdateNodeResourceResponsePBImpl extends UpdateNodeResourceResponse {
 
-  UpdateNodeResourceResponseProto proto =
-      UpdateNodeResourceResponseProto.getDefaultInstance();
+  UpdateNodeResourceResponseProto proto = UpdateNodeResourceResponseProto.getDefaultInstance();
   UpdateNodeResourceResponseProto.Builder builder = null;
   boolean viaProto = false;
   
@@ -51,9 +49,8 @@ public class UpdateNodeResourceResponsePBImpl
 
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -63,7 +60,7 @@ public class UpdateNodeResourceResponsePBImpl
   @Override
   public String toString() {
     return getProto().toString().replaceAll("\\n", ", ")
-        .replaceAll("\\s+", " ");
+      .replaceAll("\\s+", " ");
   }
 
 }

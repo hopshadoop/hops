@@ -30,6 +30,7 @@ import javax.management.ObjectName;
 import javax.management.ReflectionException;
 
 import static com.google.common.base.Preconditions.*;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -59,8 +60,9 @@ class MetricsSourceAdapter implements DynamicMBean {
   private final Iterable<MetricsTag> injectedTags;
 
   private Iterable<MetricsRecordImpl> lastRecs;
+  private boolean lastRecsCleared;
   private long jmxCacheTS = 0;
-  private int jmxCacheTTL;
+  private long jmxCacheTTL;
   private MBeanInfo infoCache;
   private ObjectName mbeanName;
   private final boolean startMBeans;
@@ -68,7 +70,7 @@ class MetricsSourceAdapter implements DynamicMBean {
   MetricsSourceAdapter(String prefix, String name, String description,
                        MetricsSource source, Iterable<MetricsTag> injectedTags,
                        MetricsFilter recordFilter, MetricsFilter metricFilter,
-                       int jmxCacheTTL, boolean startMBeans) {
+                       long jmxCacheTTL, boolean startMBeans) {
     this.prefix = checkNotNull(prefix, "prefix");
     this.name = checkNotNull(name, "name");
     this.source = checkNotNull(source, "source");
@@ -79,11 +81,14 @@ class MetricsSourceAdapter implements DynamicMBean {
     this.metricFilter = metricFilter;
     this.jmxCacheTTL = checkArg(jmxCacheTTL, jmxCacheTTL > 0, "jmxCacheTTL");
     this.startMBeans = startMBeans;
+    // Initialize to true so we always trigger update MBeanInfo cache the first
+    // time calling updateJmxCache
+    this.lastRecsCleared = true;
   }
 
   MetricsSourceAdapter(String prefix, String name, String description,
                        MetricsSource source, Iterable<MetricsTag> injectedTags,
-                       int period, MetricsConfig conf) {
+                       long period, MetricsConfig conf) {
     this(prefix, name, description, source, injectedTags,
          conf.getFilter(RECORD_FILTER_KEY),
          conf.getFilter(METRIC_FILTER_KEY),
@@ -157,8 +162,12 @@ class MetricsSourceAdapter implements DynamicMBean {
       if (Time.now() - jmxCacheTS >= jmxCacheTTL) {
         // temporarilly advance the expiry while updating the cache
         jmxCacheTS = Time.now() + jmxCacheTTL;
-        if (lastRecs == null) {
+        // lastRecs might have been set to an object already by another thread.
+        // Track the fact that lastRecs has been reset once to make sure refresh
+        // is correctly triggered.
+        if (lastRecsCleared) {
           getAllMetrics = true;
+          lastRecsCleared = false;
         }
       }
       else {
@@ -172,13 +181,13 @@ class MetricsSourceAdapter implements DynamicMBean {
     }
 
     synchronized(this) {
-      int oldCacheSize = attrCache.size();
-      int newCacheSize = updateAttrCache();
-      if (oldCacheSize < newCacheSize) {
+      updateAttrCache();
+      if (getAllMetrics) {
         updateInfoCache();
       }
       jmxCacheTS = Time.now();
       lastRecs = null;  // in case regular interval update is not running
+      lastRecsCleared = true;
     }
   }
 
@@ -226,6 +235,16 @@ class MetricsSourceAdapter implements DynamicMBean {
       MBeans.unregister(mbeanName);
       mbeanName = null;
     }
+  }
+  
+  @VisibleForTesting
+  ObjectName getMBeanName() {
+    return mbeanName;
+  }
+
+  @VisibleForTesting
+  long getJmxCacheTTL() {
+    return jmxCacheTTL;
   }
 
   private void updateInfoCache() {

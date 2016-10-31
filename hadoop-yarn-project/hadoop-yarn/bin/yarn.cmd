@@ -64,6 +64,10 @@ if "%1" == "--config" (
   shift
   shift
 )
+if "%1" == "--loglevel" (
+  shift
+  shift
+)
 
 :main
   if exist %YARN_CONF_DIR%\yarn-env.cmd (
@@ -120,11 +124,12 @@ if "%1" == "--config" (
 
   if exist %HADOOP_YARN_HOME%\yarn-server\yarn-server-resourcemanager\target\classes (
     set CLASSPATH=%CLASSPATH%;%HADOOP_YARN_HOME%\yarn-server\yarn-server-resourcemanager\target\classes
-    set CLASSPATH=%CLASSPATH%;%HADOOP_YARN_HOME%\yarn-server\yarn-server-applicationhistoryservice\target\classes
   )
+
   if exist %HADOOP_YARN_HOME%\yarn-server\yarn-server-applicationhistoryservice\target\classes (
     set CLASSPATH=%CLASSPATH%;%HADOOP_YARN_HOME%\yarn-server\yarn-server-applicationhistoryservice\target\classes
   )
+
   if exist %HADOOP_YARN_HOME%\build\test\classes (
     set CLASSPATH=%CLASSPATH%;%HADOOP_YARN_HOME%\build\test\classes
   )
@@ -137,12 +142,16 @@ if "%1" == "--config" (
   set CLASSPATH=%CLASSPATH%;%HADOOP_YARN_HOME%\%YARN_LIB_JARS_DIR%\*
 
   if %yarn-command% == classpath (
-    @echo %CLASSPATH%
-    goto :eof
+    if not defined yarn-command-arguments (
+      @rem No need to bother starting up a JVM for this simple case. 
+      @echo %CLASSPATH%
+      exit /b
+    )
   )
 
   set yarncommands=resourcemanager nodemanager proxyserver rmadmin version jar ^
-     application applicationattempt container node logs daemonlog historyserver
+     application applicationattempt cluster container node queue logs daemonlog historyserver ^
+     timelineserver classpath
   for %%i in ( %yarncommands% ) do (
     if %yarn-command% == %%i set yarncommand=true
   )
@@ -163,7 +172,7 @@ if "%1" == "--config" (
 goto :eof
 
 :classpath
-  @echo %CLASSPATH%
+  set CLASS=org.apache.hadoop.util.Classpath 
   goto :eof
 
 :rmadmin
@@ -183,6 +192,11 @@ goto :eof
   set yarn-command-arguments=%yarn-command% %yarn-command-arguments%
   goto :eof
 
+:cluster
+  set CLASS=org.apache.hadoop.yarn.client.cli.ClusterCLI
+  set YARN_OPTS=%YARN_OPTS% %YARN_CLIENT_OPTS%
+  goto :eof
+
 :container
   set CLASS=org.apache.hadoop.yarn.client.cli.ApplicationCLI
   set YARN_OPTS=%YARN_OPTS% %YARN_CLIENT_OPTS%
@@ -191,6 +205,11 @@ goto :eof
 
 :node
   set CLASS=org.apache.hadoop.yarn.client.cli.NodeCLI
+  set YARN_OPTS=%YARN_OPTS% %YARN_CLIENT_OPTS%
+  goto :eof
+
+:queue
+  set CLASS=org.apache.hadoop.yarn.client.cli.QueueCLI
   set YARN_OPTS=%YARN_OPTS% %YARN_CLIENT_OPTS%
   goto :eof
 
@@ -204,11 +223,22 @@ goto :eof
   goto :eof
 
 :historyserver
+  @echo DEPRECATED: Use of this command to start the timeline server is deprecated. 1>&2
+  @echo Instead use the timelineserver command for it. 1>&2
   set CLASSPATH=%CLASSPATH%;%YARN_CONF_DIR%\ahs-config\log4j.properties
   set CLASS=org.apache.hadoop.yarn.server.applicationhistoryservice.ApplicationHistoryServer
   set YARN_OPTS=%YARN_OPTS% %HADOOP_HISTORYSERVER_OPTS%
   if defined YARN_HISTORYSERVER_HEAPSIZE (
     set JAVA_HEAP_MAX=-Xmx%YARN_HISTORYSERVER_HEAPSIZE%m
+  )
+  goto :eof
+
+:timelineserver
+  set CLASSPATH=%CLASSPATH%;%YARN_CONF_DIR%\timelineserver-config\log4j.properties
+  set CLASS=org.apache.hadoop.yarn.server.applicationhistoryservice.ApplicationHistoryServer
+  set YARN_OPTS=%YARN_OPTS% %HADOOP_TIMELINESERVER_OPTS%
+  if defined YARN_TIMELINESERVER_HEAPSIZE (
+    set JAVA_HEAP_MAX=-Xmx%YARN_TIMELINESERVER_HEAPSIZE%m
   )
   goto :eof
 
@@ -255,6 +285,10 @@ goto :eof
     shift
     shift
   )
+  if "%1" == "--loglevel" (
+    shift
+    shift
+  )
   if [%2] == [] goto :eof
   shift
   set _yarnarguments=
@@ -273,18 +307,20 @@ goto :eof
   goto :eof
 
 :print_usage
-  @echo Usage: yarn [--config confdir] COMMAND
+  @echo Usage: yarn [--config confdir] [--loglevel loglevel] COMMAND
   @echo        where COMMAND is one of:
   @echo   resourcemanager      run the ResourceManager
   @echo   nodemanager          run a nodemanager on each slave
-  @echo   historyserver        run the application history server  
+  @echo   timelineserver       run the timeline server
   @echo   rmadmin              admin tools
   @echo   version              print the version
   @echo   jar ^<jar^>          run a jar file
   @echo   application          prints application(s) report/kill application
   @echo   applicationattempt   prints applicationattempt(s) report
+  @echo   cluster              prints cluster information
   @echo   container            prints container(s) report
   @echo   node                 prints node report(s)
+  @echo   queue                prints queue information
   @echo   logs                 dump container logs
   @echo   classpath            prints the class path needed to get the
   @echo                        Hadoop jar and the required libraries

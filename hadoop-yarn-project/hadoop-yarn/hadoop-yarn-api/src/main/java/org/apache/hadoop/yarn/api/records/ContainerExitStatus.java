@@ -1,20 +1,20 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Licensed to the Apache Software Foundation (ASF) under one
+* or more contributor license agreements.  See the NOTICE file
+* distributed with this work for additional information
+* regarding copyright ownership.  The ASF licenses this file
+* to you under the Apache License, Version 2.0 (the
+* "License"); you may not use this file except in compliance
+* with the License.  You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
 
 package org.apache.hadoop.yarn.api.records;
 
@@ -46,7 +46,33 @@ public class ContainerExitStatus {
    * Containers preempted by the framework.
    */
   public static final int PREEMPTED = -102;
+
+  /**
+   * Container terminated because of exceeding allocated virtual memory.
+   */
+  public static final int KILLED_EXCEEDED_VMEM = -103;
+
+  /**
+   * Container terminated because of exceeding allocated physical memory.
+   */
+  public static final int KILLED_EXCEEDED_PMEM = -104;
+
+  /**
+   * Container was terminated by stop request by the app master.
+   */
+  public static final int KILLED_BY_APPMASTER = -105;
+
+  /**
+   * Container was terminated by the resource manager.
+   */
+  public static final int KILLED_BY_RESOURCEMANAGER = -106;
+
+  /**
+   * Container was terminated after the application finished.
+   */
+  public static final int KILLED_AFTER_APP_COMPLETION = -107;
   
-  public static final int UNKNOWN_CONTAINER_EXIT = -200;
   public static final int CONTAINER_RUNNING_STATE = -201;
+
+  public static final int UNKNOWN_CONTAINER_EXIT  = -404;
 }

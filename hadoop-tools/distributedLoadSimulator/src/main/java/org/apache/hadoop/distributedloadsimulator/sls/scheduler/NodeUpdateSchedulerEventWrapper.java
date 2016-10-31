@@ -24,7 +24,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event
 public class NodeUpdateSchedulerEventWrapper extends NodeUpdateSchedulerEvent {
   
   public NodeUpdateSchedulerEventWrapper(NodeUpdateSchedulerEvent event) {
-    super(new RMNodeWrapper(event.getRMNode(), event.getTransactionState()),event.getTransactionState());
+    super(new RMNodeWrapper(event.getRMNode()));
   }
   
 }

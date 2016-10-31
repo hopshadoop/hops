@@ -41,7 +41,10 @@
 <property>
   <name>io.native.lib.available</name>
   <value>true</value>
-  <description>Should native hadoop libraries, if present, be used.</description>
+  <description>Controls whether to use native libraries for bz2 and zlib
+    compression codecs or not. The property does not control any other native
+    libraries.
+  </description>
 </property>
 
 <property>
@@ -94,6 +97,98 @@
   </description>
 </property>
 
+<!-- 
+=== Multiple group mapping providers configuration sample === 
+  This sample illustrates a typical use case for CompositeGroupsMapping where
+Hadoop authentication uses MIT Kerberos which trusts an AD realm. In this case, service
+principals such as hdfs, mapred, hbase, hive, oozie and etc can be placed in In MIT Kerberos,
+but end users are just from the trusted AD. For the service principals, ShellBasedUnixGroupsMapping
+provider can be used to query their groups for efficiency, and for end users, LdapGroupsMapping 
+provider can be used. This avoids to add group entries in AD for service principals when only using 
+LdapGroupsMapping provider.
+  In case multiple ADs are involved and trusted by the MIT Kerberos in this use case, LdapGroupsMapping
+provider can be used more times with different AD specific configurations. This sample also shows how
+to do that. Here are the necessary configurations.
+
+<property>
+  <name>hadoop.security.group.mapping</name>
+  <value>org.apache.hadoop.security.CompositeGroupsMapping</value>
+  <description>
+    Class for user to group mapping (get groups for a given user) for ACL, which 
+    makes use of other multiple providers to provide the service.
+  </description>
+</property>
+
+<property>
+  <name>hadoop.security.group.mapping.providers</name>
+  <value>shell4services,ad4usersX,ad4usersY</value>
+  <description>
+    Comma separated of names of other providers to provide user to group mapping. 
+  </description>
+</property>
+
+<property>
+  <name>hadoop.security.group.mapping.providers.combined</name>
+  <value>true</value>
+  <description>
+    true or false to indicate whether groups from the providers are combined or not. The default value is true
+    If true, then all the providers will be tried to get groups and all the groups are combined to return as
+    the final results. Otherwise, providers are tried one by one in the configured list order, and if any
+    groups are retrieved from any provider, then the groups will be returned without trying the left ones.
+  </description>
+</property>
+
+<property>
+  <name>hadoop.security.group.mapping.provider.shell4services</name>
+  <value>org.apache.hadoop.security.ShellBasedUnixGroupsMapping</value>
+  <description>
+    Class for group mapping provider named by 'shell4services'. The name can then be referenced 
+    by hadoop.security.group.mapping.providers property.
+  </description>
+</property>
+
+<property>
+  <name>hadoop.security.group.mapping.provider.ad4usersX</name>
+  <value>org.apache.hadoop.security.LdapGroupsMapping</value>
+  <description>
+    Class for group mapping provider named by 'ad4usersX'. The name can then be referenced 
+    by hadoop.security.group.mapping.providers property.
+  </description>
+</property>
+
+<property>
+  <name>hadoop.security.group.mapping.provider.ad4usersY</name>
+  <value>org.apache.hadoop.security.LdapGroupsMapping</value>
+  <description>
+    Class for group mapping provider named by 'ad4usersY'. The name can then be referenced 
+    by hadoop.security.group.mapping.providers property.
+  </description>
+</property>
+
+<property>
+<name>hadoop.security.group.mapping.provider.ad4usersX.ldap.url</name>
+<value>ldap://ad-host-for-users-X:389</value>
+  <description>
+    ldap url for the provider named by 'ad4usersX'. Note this property comes from 
+    'hadoop.security.group.mapping.ldap.url'.
+  </description>
+</property>
+
+<property>
+<name>hadoop.security.group.mapping.provider.ad4usersY.ldap.url</name>
+<value>ldap://ad-host-for-users-Y:389</value>
+  <description>
+    ldap url for the provider named by 'ad4usersY'. Note this property comes from 
+    'hadoop.security.group.mapping.ldap.url'.
+  </description>
+</property>
+
+You also need to configure other properties like
+  hadoop.security.group.mapping.ldap.bind.password.file and etc.
+for ldap providers in the same way as above does.
+
+-->
+ 
 <property>
   <name>hadoop.security.groups.cache.secs</name>
   <value>300</value>
@@ -102,6 +197,20 @@
     containing the user->group mapping. When this duration has expired,
     then the implementation of the group mapping provider is invoked to get
     the groups of the user and then cached back.
+  </description>
+</property>
+
+<property>
+  <name>hadoop.security.groups.negative-cache.secs</name>
+  <value>30</value>
+  <description>
+    Expiration time for entries in the the negative user-to-group mapping
+    caching, in seconds. This is useful when invalid users are retrying
+    frequently. It is suggested to set a small value for this expiration, since
+    a transient error in group lookup could temporarily lock out a legitimate
+    user.
+
+    Set this to zero or negative value to disable negative user-to-group caching.
   </description>
 </property>
 
@@ -444,6 +553,11 @@
   <description>The AbstractFileSystem for file: uris.</description>
 </property>
 
+<property>
+  <name>fs.AbstractFileSystem.har.impl</name>
+  <value>org.apache.hadoop.fs.HarFs</value>
+  <description>The AbstractFileSystem for har: uris.</description>
+</property> 
 
 <property>
   <name>fs.AbstractFileSystem.hdfs.impl</name>
@@ -456,6 +570,12 @@
   <value>org.apache.hadoop.fs.viewfs.ViewFs</value>
   <description>The AbstractFileSystem for view file system for viewfs: uris
   (ie client side mount table:).</description>
+</property>
+
+<property>
+  <name>fs.AbstractFileSystem.ftp.impl</name>
+  <value>org.apache.hadoop.fs.ftp.FtpFs</value>
+  <description>The FileSystem for Ftp: uris.</description>
 </property>
 
 <property>
@@ -560,6 +680,189 @@
   <description>The block size for multipart copy in native S3 filesystem.
   Default size is 5GB.
   </description>
+</property>
+
+<property>
+  <name>fs.s3n.server-side-encryption-algorithm</name>
+  <value></value>
+  <description>Specify a server-side encryption algorithm for S3.
+  The default is NULL, and the only other currently allowable value is AES256.
+  </description>
+</property>
+
+<property>
+  <name>fs.s3a.awsAccessKeyId</name>
+  <description>AWS access key ID. Omit for Role-based authentication.</description>
+</property>
+
+<property>
+  <name>fs.s3a.awsSecretAccessKey</name>
+  <description>AWS secret key. Omit for Role-based authentication.</description>
+</property>
+
+<property>
+  <name>fs.s3a.connection.maximum</name>
+  <value>15</value>
+  <description>Controls the maximum number of simultaneous connections to S3.</description>
+</property>
+
+<property>
+  <name>fs.s3a.connection.ssl.enabled</name>
+  <value>true</value>
+  <description>Enables or disables SSL connections to S3.</description>
+</property>
+
+<property>
+  <name>fs.s3a.endpoint</name>
+  <description>AWS S3 endpoint to connect to. An up-to-date list is
+    provided in the AWS Documentation: regions and endpoints. Without this
+    property, the standard region (s3.amazonaws.com) is assumed.
+  </description>
+</property>
+
+<property>
+  <name>fs.s3a.proxy.host</name>
+  <description>Hostname of the (optional) proxy server for S3 connections.</description>
+</property>
+
+<property>
+  <name>fs.s3a.proxy.port</name>
+  <description>Proxy server port. If this property is not set
+    but fs.s3a.proxy.host is, port 80 or 443 is assumed (consistent with
+    the value of fs.s3a.connection.ssl.enabled).</description>
+</property>
+
+<property>
+  <name>fs.s3a.proxy.username</name>
+  <description>Username for authenticating with proxy server.</description>
+</property>
+
+<property>
+  <name>fs.s3a.proxy.password</name>
+  <description>Password for authenticating with proxy server.</description>
+</property>
+
+<property>
+  <name>fs.s3a.proxy.domain</name>
+  <description>Domain for authenticating with proxy server.</description>
+</property>
+
+<property>
+  <name>fs.s3a.proxy.workstation</name>
+  <description>Workstation for authenticating with proxy server.</description>
+</property>
+
+<property>
+  <name>fs.s3a.attempts.maximum</name>
+  <value>10</value>
+  <description>How many times we should retry commands on transient errors.</description>
+</property>
+
+<property>
+  <name>fs.s3a.connection.establish.timeout</name>
+  <value>5000</value>
+  <description>Socket connection setup timeout in milliseconds.</description>
+</property>
+
+<property>
+  <name>fs.s3a.connection.timeout</name>
+  <value>50000</value>
+  <description>Socket connection timeout in milliseconds.</description>
+</property>
+
+<property>
+  <name>fs.s3a.paging.maximum</name>
+  <value>5000</value>
+  <description>How many keys to request from S3 when doing 
+     directory listings at a time.</description>
+</property>
+
+<property>
+  <name>fs.s3a.threads.max</name>
+  <value>256</value>
+  <description> Maximum number of concurrent active (part)uploads,
+    which each use a thread from the threadpool.</description>
+</property>
+
+<property>
+  <name>fs.s3a.threads.core</name>
+  <value>15</value>
+  <description>Number of core threads in the threadpool.</description>
+</property>
+
+<property>
+  <name>fs.s3a.threads.keepalivetime</name>
+  <value>60</value>
+  <description>Number of seconds a thread can be idle before being
+    terminated.</description>
+</property>
+
+<property>
+  <name>fs.s3a.max.total.tasks</name>
+  <value>1000</value>
+  <description>Number of (part)uploads allowed to the queue before
+    blocking additional uploads.</description>
+</property>
+
+<property>
+  <name>fs.s3a.multipart.size</name>
+  <value>104857600</value>
+  <description>How big (in bytes) to split upload or copy operations up into.</description>
+</property>
+
+<property>
+  <name>fs.s3a.multipart.threshold</name>
+  <value>2147483647</value>
+  <description>Threshold before uploads or copies use parallel multipart operations.</description>
+</property>
+
+<property>
+  <name>fs.s3a.acl.default</name>
+  <description>Set a canned ACL for newly created and copied objects. Value may be private, 
+     public-read, public-read-write, authenticated-read, log-delivery-write, 
+     bucket-owner-read, or bucket-owner-full-control.</description>
+</property>
+
+<property>
+  <name>fs.s3a.multipart.purge</name>
+  <value>false</value>
+  <description>True if you want to purge existing multipart uploads that may not have been
+     completed/aborted correctly</description>
+</property>
+
+<property>
+  <name>fs.s3a.multipart.purge.age</name>
+  <value>86400</value>
+  <description>Minimum age in seconds of multipart uploads to purge</description>
+</property>
+
+<property>
+  <name>fs.s3a.buffer.dir</name>
+  <value>${hadoop.tmp.dir}/s3a</value>
+  <description>Comma separated list of directories that will be used to buffer file 
+    uploads to.</description>
+</property>
+
+<property>
+  <name>fs.s3a.fast.upload</name>
+  <value>false</value>
+  <description>Upload directly from memory instead of buffering to
+    disk first. Memory usage and parallelism can be controlled as up to
+    fs.s3a.multipart.size memory is consumed for each (part)upload actively
+    uploading (fs.s3a.threads.max) or queueing (fs.s3a.max.total.tasks)</description>
+</property>
+
+  <property>
+  <name>fs.s3a.fast.buffer.size</name>
+  <value>1048576</value>
+  <description>Size of initial memory buffer in bytes allocated for an
+    upload. No effect if fs.s3a.fast.upload is false.</description>
+</property>
+
+<property>
+  <name>fs.s3a.impl</name>
+  <value>org.apache.hadoop.fs.s3a.S3AFileSystem</value>
+  <description>The implementation class of the S3A Filesystem</description>
 </property>
 
 <property>
@@ -673,6 +976,35 @@
 </property>
 
 <property>
+  <name>ipc.client.ping</name>
+  <value>true</value>
+  <description>Send a ping to the server when timeout on reading the response,
+  if set to true. If no failure is detected, the client retries until at least
+  a byte is read.
+  </description>
+</property>
+
+<property>
+  <name>ipc.ping.interval</name>
+  <value>60000</value>
+  <description>Timeout on waiting response from server, in milliseconds.
+  The client will send ping when the interval is passed without receiving bytes,
+  if ipc.client.ping is set to true.
+  </description>
+</property>
+
+<property>
+  <name>ipc.client.rpc-timeout.ms</name>
+  <value>0</value>
+  <description>Timeout on waiting response from server, in milliseconds.
+  Currently this timeout works only when ipc.client.ping is set to true
+  because it uses the same facilities with IPC ping.
+  The timeout overrides the ipc.ping.interval and client will throw exception
+  instead of sending ping when the interval is passed.
+  </description>
+</property>
+
+<property>
   <name>ipc.server.listen.queue.size</name>
   <value>128</value>
   <description>Indicates the length of the listen queue for servers accepting
@@ -681,25 +1013,27 @@
 </property>
 
 <property>
-  <name>ipc.server.tcpnodelay</name>
-  <value>false</value>
-  <description>Turn on/off Nagle's algorithm for the TCP socket connection on 
-  the server. Setting to true disables the algorithm and may decrease latency
-  with a cost of more/smaller packets. 
+  <name>ipc.maximum.data.length</name>
+  <value>67108864</value>
+  <description>This indicates the maximum IPC message length (bytes) that can be
+    accepted by the server. Messages larger than this value are rejected by
+    server immediately. This setting should rarely need to be changed. It merits
+    investigating whether the cause of long RPC messages can be fixed instead,
+    e.g. by splitting into smaller messages.
   </description>
 </property>
+<!-- Proxy Configuration -->
 
 <property>
-  <name>ipc.client.tcpnodelay</name>
-  <value>false</value>
-  <description>Turn on/off Nagle's algorithm for the TCP socket connection on 
-  the client. Setting to true disables the algorithm and may decrease latency
-  with a cost of more/smaller packets. 
+  <name>hadoop.security.impersonation.provider.class</name>
+  <value></value>
+  <description>A class which implements ImpersonationProvider interface, used to 
+       authorize whether one user can impersonate a specific user. 
+       If not specified, the DefaultImpersonationProvider will be used. 
+       If a class is specified, then that class will be used to determine 
+       the impersonation capability.
   </description>
 </property>
-
-
-<!-- Proxy Configuration -->
 
 <property>
   <name>hadoop.rpc.socket.factory.class.default</name>
@@ -1016,6 +1350,42 @@
   </description>
 </property>
 
+<!-- HTTP CORS support -->
+<property>
+  <description>Enable/disable the cross-origin (CORS) filter.</description>
+  <name>hadoop.http.cross-origin.enabled</name>
+  <value>false</value>
+</property>
+
+<property>
+  <description>Comma separated list of origins that are allowed for web
+    services needing cross-origin (CORS) support. Wildcards (*) and patterns
+    allowed</description>
+  <name>hadoop.http.cross-origin.allowed-origins</name>
+  <value>*</value>
+</property>
+
+<property>
+  <description>Comma separated list of methods that are allowed for web
+    services needing cross-origin (CORS) support.</description>
+  <name>hadoop.http.cross-origin.allowed-methods</name>
+  <value>GET,POST,HEAD</value>
+</property>
+
+<property>
+  <description>Comma separated list of headers that are allowed for web
+    services needing cross-origin (CORS) support.</description>
+  <name>hadoop.http.cross-origin.allowed-headers</name>
+  <value>X-Requested-With,Content-Type,Accept,Origin</value>
+</property>
+
+<property>
+  <description>The number of seconds a pre-flighted request can be cached
+    for web services needing cross-origin (CORS) support.</description>
+  <name>hadoop.http.cross-origin.max-age</name>
+  <value>1800</value>
+</property>
+
 <property>
   <name>dfs.ha.fencing.methods</name>
   <value></value>
@@ -1169,6 +1539,14 @@
 </property>
 
 <property>
+  <name>hadoop.ssl.enabled.protocols</name>
+  <value>TLSv1</value>
+  <description>
+    Protocols supported by the ssl.
+  </description>
+</property>
+
+<property>
   <name>hadoop.jetty.logs.serve.aliases</name>
   <value>true</value>
   <description>
@@ -1278,18 +1656,17 @@
 </property>
 
 <property>
-  <name>nfs3.server.port</name>
-  <value>2049</value>
+  <name>nfs.exports.allowed.hosts</name>
+  <value>* rw</value>
   <description>
-      Specify the port number used by Hadoop NFS.
-  </description>
-</property>
-
-<property>
-  <name>nfs3.mountd.port</name>
-  <value>4242</value>
-  <description>
-      Specify the port number used by Hadoop mount daemon.
+    By default, the export can be mounted by any client. The value string 
+    contains machine name and access privilege, separated by whitespace 
+    characters. The machine name format can be a single host, a Java regular 
+    expression, or an IPv4 address. The access privilege uses rw or ro to 
+    specify read/write or read-only access of the machines to exports. If the 
+    access privilege is not provided, the default is read-only. Entries are separated by ";".
+    For example: "192.168.0.0/22 rw ; host.*\.example\.com ; host1.test.org ro;".
+    Only the NFS gateway needs to restart after this property is updated. 
   </description>
 </property>
 
@@ -1328,4 +1705,273 @@
     true.
   </description>
 </property>
+
+<property>
+  <name>hadoop.security.crypto.codec.classes.EXAMPLECIPHERSUITE</name>
+  <value></value>
+  <description>
+    The prefix for a given crypto codec, contains a comma-separated
+    list of implementation classes for a given crypto codec (eg EXAMPLECIPHERSUITE).
+    The first implementation will be used if available, others are fallbacks.
+  </description>
+</property>
+
+<property>
+  <name>hadoop.security.crypto.codec.classes.aes.ctr.nopadding</name>
+  <value>org.apache.hadoop.crypto.OpensslAesCtrCryptoCodec,org.apache.hadoop.crypto.JceAesCtrCryptoCodec</value>
+  <description>
+    Comma-separated list of crypto codec implementations for AES/CTR/NoPadding. 
+    The first implementation will be used if available, others are fallbacks.
+  </description>
+</property>
+
+<property>
+  <name>hadoop.security.crypto.cipher.suite</name>
+  <value>AES/CTR/NoPadding</value>
+  <description>
+    Cipher suite for crypto codec.
+  </description>
+</property>
+
+<property>
+  <name>hadoop.security.crypto.jce.provider</name>
+  <value></value>
+  <description>
+    The JCE provider name used in CryptoCodec. 
+  </description>
+</property>
+
+<property>
+  <name>hadoop.security.crypto.buffer.size</name>
+  <value>8192</value>
+  <description>
+    The buffer size used by CryptoInputStream and CryptoOutputStream. 
+  </description>
+</property>
+
+<property>
+  <name>hadoop.security.java.secure.random.algorithm</name>
+  <value>SHA1PRNG</value>
+  <description>
+    The java secure random algorithm. 
+  </description>
+</property>
+
+<property>
+  <name>hadoop.security.secure.random.impl</name>
+  <value></value>
+  <description>
+    Implementation of secure random. 
+  </description>
+</property>
+
+<property>
+  <name>hadoop.security.random.device.file.path</name>
+  <value>/dev/urandom</value>
+  <description>
+    OS security random device file path.
+  </description>
+</property>
+
+<property>
+  <name>fs.har.impl.disable.cache</name>
+  <value>true</value>
+  <description>Don't cache 'har' filesystem instances.</description>
+</property>
+
+<!--- KMSClientProvider configurations -->
+<property>
+  <name>hadoop.security.kms.client.authentication.retry-count</name>
+  <value>1</value>
+  <description>
+    Number of time to retry connecting to KMS on authentication failure
+  </description>
+</property>
+<property>
+  <name>hadoop.security.kms.client.encrypted.key.cache.size</name>
+  <value>500</value>
+  <description>
+    Size of the EncryptedKeyVersion cache Queue for each key
+  </description>
+</property>
+<property>
+  <name>hadoop.security.kms.client.encrypted.key.cache.low-watermark</name>
+  <value>0.3f</value>
+  <description>
+    If size of the EncryptedKeyVersion cache Queue falls below the
+    low watermark, this cache queue will be scheduled for a refill
+  </description>
+</property>
+<property>
+  <name>hadoop.security.kms.client.encrypted.key.cache.num.refill.threads</name>
+  <value>2</value>
+  <description>
+    Number of threads to use for refilling depleted EncryptedKeyVersion
+    cache Queues
+  </description>
+</property>
+<property>
+  <name>hadoop.security.kms.client.encrypted.key.cache.expiry</name>
+  <value>43200000</value>
+  <description>
+    Cache expiry time for a Key, after which the cache Queue for this
+    key will be dropped. Default = 12hrs
+  </description>
+</property>
+
+<property>
+  <name>hadoop.htrace.spanreceiver.classes</name>
+  <value></value>
+  <description>
+    A comma separated list of the fully-qualified class name of classes 
+    implementing SpanReceiver. The tracing system works by collecting 
+    information in structs called 'Spans'. It is up to you to choose 
+    how you want to receive this information by implementing the 
+    SpanReceiver interface.
+  </description>
+</property>
+
+ <property>
+  <name>ipc.server.max.connections</name>
+  <value>0</value>
+  <description>The maximum number of concurrent connections a server is allowed
+    to accept. If this limit is exceeded, incoming connections will first fill
+    the listen queue and then may go to an OS-specific listen overflow queue. 
+    The client may fail or timeout, but the server can avoid running out of file
+    descriptors using this feature. 0 means no limit.
+  </description>
+</property>
+
+
+  <!-- YARN registry -->
+
+  <property>
+    <description>
+      Is the registry enabled in the YARN Resource Manager?
+
+      If true, the YARN RM will, as needed.
+      create the user and system paths, and purge
+      service records when containers, application attempts
+      and applications complete.
+
+      If false, the paths must be created by other means,
+      and no automatic cleanup of service records will take place.
+    </description>
+    <name>hadoop.registry.rm.enabled</name>
+    <value>false</value>
+  </property>
+
+  <property>
+    <description>
+      The root zookeeper node for the registry
+    </description>
+    <name>hadoop.registry.zk.root</name>
+    <value>/registry</value>
+  </property>
+
+  <property>
+    <description>
+      Zookeeper session timeout in milliseconds
+    </description>
+    <name>hadoop.registry.zk.session.timeout.ms</name>
+    <value>60000</value>
+  </property>
+
+  <property>
+    <description>
+      Zookeeper connection timeout in milliseconds
+    </description>
+    <name>hadoop.registry.zk.connection.timeout.ms</name>
+    <value>15000</value>
+  </property>
+
+  <property>
+    <description>
+      Zookeeper connection retry count before failing
+    </description>
+    <name>hadoop.registry.zk.retry.times</name>
+    <value>5</value>
+  </property>
+
+  <property>
+    <description>
+    </description>
+    <name>hadoop.registry.zk.retry.interval.ms</name>
+    <value>1000</value>
+  </property>
+
+  <property>
+    <description>
+      Zookeeper retry limit in milliseconds, during
+      exponential backoff.
+
+      This places a limit even
+      if the retry times and interval limit, combined
+      with the backoff policy, result in a long retry
+      period
+    </description>
+    <name>hadoop.registry.zk.retry.ceiling.ms</name>
+    <value>60000</value>
+  </property>
+
+  <property>
+    <description>
+      List of hostname:port pairs defining the
+      zookeeper quorum binding for the registry
+    </description>
+    <name>hadoop.registry.zk.quorum</name>
+    <value>localhost:2181</value>
+  </property>
+
+  <property>
+    <description>
+      Key to set if the registry is secure. Turning it on
+      changes the permissions policy from "open access"
+      to restrictions on kerberos with the option of
+      a user adding one or more auth key pairs down their
+      own tree.
+    </description>
+    <name>hadoop.registry.secure</name>
+    <value>false</value>
+  </property>
+
+  <property>
+    <description>
+      A comma separated list of Zookeeper ACL identifiers with
+      system access to the registry in a secure cluster.
+
+      These are given full access to all entries.
+
+      If there is an "@" at the end of a SASL entry it
+      instructs the registry client to append the default kerberos domain.
+    </description>
+    <name>hadoop.registry.system.acls</name>
+    <value>sasl:yarn@, sasl:mapred@, sasl:hdfs@</value>
+  </property>
+
+  <property>
+    <description>
+      The kerberos realm: used to set the realm of
+      system principals which do not declare their realm,
+      and any other accounts that need the value.
+
+      If empty, the default realm of the running process
+      is used.
+
+      If neither are known and the realm is needed, then the registry
+      service/client will fail.
+    </description>
+    <name>hadoop.registry.kerberos.realm</name>
+    <value></value>
+  </property>
+
+  <property>
+    <description>
+      Key to define the JAAS context. Used in secure
+      mode
+    </description>
+    <name>hadoop.registry.jaas.context</name>
+    <value>Client</value>
+  </property>
+
 </configuration>

@@ -219,13 +219,21 @@ public class HistoryFileManager extends AbstractService {
         // keeping the cache size exactly at the maximum.
         Iterator<JobId> keys = cache.navigableKeySet().iterator();
         long cutoff = System.currentTimeMillis() - maxAge;
+
+        // MAPREDUCE-6436: In order to reduce the number of logs written
+        // in case of a lot of move pending histories.
+        JobId firstInIntermediateKey = null;
+        int inIntermediateCount = 0;
+        JobId firstMoveFailedKey = null;
+        int moveFailedCount = 0;
+
         while(cache.size() > maxSize && keys.hasNext()) {
           JobId key = keys.next();
           HistoryFileInfo firstValue = cache.get(key);
           if(firstValue != null) {
             synchronized(firstValue) {
               if (firstValue.isMovePending()) {
-                if(firstValue.didMoveFail() && 
+                if(firstValue.didMoveFail() &&
                     firstValue.jobIndexInfo.getFinishTime() <= cutoff) {
                   cache.remove(key);
                   //Now lets try to delete it
@@ -236,14 +244,37 @@ public class HistoryFileManager extends AbstractService {
                     		" that could not be moved to done.", e);
                   }
                 } else {
-                  LOG.warn("Waiting to remove " + key
-                      + " from JobListCache because it is not in done yet.");
+                  if (firstValue.didMoveFail()) {
+                    if (moveFailedCount == 0) {
+                      firstMoveFailedKey = key;
+                    }
+                    moveFailedCount += 1;
+                  } else {
+                    if (inIntermediateCount == 0) {
+                      firstInIntermediateKey = key;
+                    }
+                    inIntermediateCount += 1;
+                  }
                 }
               } else {
                 cache.remove(key);
               }
             }
           }
+        }
+        // Log output only for first jobhisotry in pendings to restrict
+        // the total number of logs.
+        if (inIntermediateCount > 0) {
+          LOG.warn("Waiting to remove IN_INTERMEDIATE state histories " +
+                  "(e.g. " + firstInIntermediateKey + ") from JobListCache " +
+                  "because it is not in done yet. Total count is " +
+                  inIntermediateCount + ".");
+        }
+        if (moveFailedCount > 0) {
+          LOG.warn("Waiting to remove MOVE_FAILED state histories " +
+                  "(e.g. " + firstMoveFailedKey + ") from JobListCache " +
+                  "because it is not in done yet. Total count is " +
+                  moveFailedCount + ".");
         }
       }
       return old;
@@ -263,6 +294,10 @@ public class HistoryFileManager extends AbstractService {
     public HistoryFileInfo get(JobId jobId) {
       return cache.get(jobId);
     }
+
+    public boolean isFull() {
+      return cache.size() >= maxSize;
+    }
   }
 
   /**
@@ -271,10 +306,21 @@ public class HistoryFileManager extends AbstractService {
    */
   private class UserLogDir {
     long modTime = 0;
-    
+    private long scanTime = 0;
+
     public synchronized void scanIfNeeded(FileStatus fs) {
       long newModTime = fs.getModificationTime();
-      if (modTime != newModTime) {
+      // MAPREDUCE-6680: In some Cloud FileSystem, like Azure FS or S3, file's
+      // modification time is truncated into seconds. In that case,
+      // modTime == newModTime doesn't means no file update in the directory,
+      // so we need to have additional check.
+      // Note: modTime (X second Y millisecond) could be casted to X second or
+      // X+1 second.
+      if (modTime != newModTime
+          || (scanTime/1000) == (modTime/1000)
+          || (scanTime/1000 + 1) == (modTime/1000)) {
+        // reset scanTime before scanning happens
+        scanTime = System.currentTimeMillis();
         Path p = fs.getPath();
         try {
           scanIntermediateDirectory(p);
@@ -288,10 +334,12 @@ public class HistoryFileManager extends AbstractService {
         if (LOG.isDebugEnabled()) {
           LOG.debug("Scan not needed of " + fs.getPath());
         }
+        // reset scanTime
+        scanTime = System.currentTimeMillis();
       }
     }
   }
-  
+
   public class HistoryFileInfo {
     private Path historyFile;
     private Path confFile;
@@ -299,8 +347,9 @@ public class HistoryFileManager extends AbstractService {
     private JobIndexInfo jobIndexInfo;
     private HistoryInfoState state;
 
-    private HistoryFileInfo(Path historyFile, Path confFile, Path summaryFile,
-        JobIndexInfo jobIndexInfo, boolean isInDone) {
+    @VisibleForTesting
+    protected HistoryFileInfo(Path historyFile, Path confFile,
+        Path summaryFile, JobIndexInfo jobIndexInfo, boolean isInDone) {
       this.historyFile = historyFile;
       this.confFile = confFile;
       this.summaryFile = summaryFile;
@@ -333,7 +382,8 @@ public class HistoryFileManager extends AbstractService {
              + " historyFile = " + historyFile;
     }
 
-    private synchronized void moveToDone() throws IOException {
+    @VisibleForTesting
+    synchronized void moveToDone() throws IOException {
       if (LOG.isDebugEnabled()) {
         LOG.debug("moveToDone: " + historyFile);
       }
@@ -364,7 +414,8 @@ public class HistoryFileManager extends AbstractService {
           paths.add(confFile);
         }
 
-        if (summaryFile == null) {
+        if (summaryFile == null || !intermediateDoneDirFc.util().exists(
+            summaryFile)) {
           LOG.info("No summary file for job: " + jobId);
         } else {
           String jobSummaryString = getJobSummary(intermediateDoneDirFc,
@@ -668,6 +719,10 @@ public class HistoryFileManager extends AbstractService {
     for (FileStatus fs : timestampedDirList) {
       // TODO Could verify the correct format for these directories.
       addDirectoryToSerialNumberIndex(fs.getPath());
+    }
+    for (int i= timestampedDirList.size() - 1;
+        i >= 0 && !jobListCache.isFull(); i--) {
+      FileStatus fs = timestampedDirList.get(i); 
       addDirectoryToJobListCache(fs.getPath());
     }
   }
@@ -732,17 +787,22 @@ public class HistoryFileManager extends AbstractService {
     }
   }
 
-  private static List<FileStatus> scanDirectory(Path path, FileContext fc,
+  @VisibleForTesting
+  protected static List<FileStatus> scanDirectory(Path path, FileContext fc,
       PathFilter pathFilter) throws IOException {
     path = fc.makeQualified(path);
     List<FileStatus> jhStatusList = new ArrayList<FileStatus>();
-    RemoteIterator<FileStatus> fileStatusIter = fc.listStatus(path);
-    while (fileStatusIter.hasNext()) {
-      FileStatus fileStatus = fileStatusIter.next();
-      Path filePath = fileStatus.getPath();
-      if (fileStatus.isFile() && pathFilter.accept(filePath)) {
-        jhStatusList.add(fileStatus);
+    try {
+      RemoteIterator<FileStatus> fileStatusIter = fc.listStatus(path);
+      while (fileStatusIter.hasNext()) {
+        FileStatus fileStatus = fileStatusIter.next();
+        Path filePath = fileStatus.getPath();
+        if (fileStatus.isFile() && pathFilter.accept(filePath)) {
+          jhStatusList.add(fileStatus);
+        }
       }
+    } catch (FileNotFoundException fe) {
+      LOG.error("Error while scanning directory " + path, fe);
     }
     return jhStatusList;
   }
@@ -848,7 +908,7 @@ public class HistoryFileManager extends AbstractService {
             }
           });
         }
-      } else if (old != null && !old.isMovePending()) {
+      } else if (!old.isMovePending()) {
         //This is a duplicate so just delete it
         if (LOG.isDebugEnabled()) {
           LOG.debug("Duplicate: deleting");
@@ -950,9 +1010,16 @@ public class HistoryFileManager extends AbstractService {
 
   private String getJobSummary(FileContext fc, Path path) throws IOException {
     Path qPath = fc.makeQualified(path);
-    FSDataInputStream in = fc.open(qPath);
-    String jobSummaryString = in.readUTF();
-    in.close();
+    FSDataInputStream in = null;
+    String jobSummaryString = null;
+    try {
+      in = fc.open(qPath);
+      jobSummaryString = in.readUTF();
+    } finally {
+      if (in != null) {
+        in.close();
+      }
+    }
     return jobSummaryString;
   }
 

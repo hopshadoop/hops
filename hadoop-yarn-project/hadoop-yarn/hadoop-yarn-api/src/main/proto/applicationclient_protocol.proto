@@ -23,17 +23,12 @@
  */
 
 option java_package = "org.apache.hadoop.yarn.proto";
-
 option java_outer_classname = "ApplicationClientProtocol";
-
 option java_generic_services = true;
-
 option java_generate_equals_and_hash = true;
-
 package hadoop.yarn;
 
 import "Security.proto";
-
 import "yarn_service_protos.proto";
 
 service ApplicationClientProtocolService {
@@ -46,13 +41,18 @@ service ApplicationClientProtocolService {
   rpc getClusterNodes (GetClusterNodesRequestProto) returns (GetClusterNodesResponseProto);
   rpc getQueueInfo (GetQueueInfoRequestProto) returns (GetQueueInfoResponseProto);
   rpc getQueueUserAcls (GetQueueUserAclsInfoRequestProto) returns (GetQueueUserAclsInfoResponseProto);
-  rpc getDelegationToken (hadoop.common.GetDelegationTokenRequestProto) returns (hadoop.common.GetDelegationTokenResponseProto);
-  rpc renewDelegationToken (hadoop.common.RenewDelegationTokenRequestProto) returns (hadoop.common.RenewDelegationTokenResponseProto);
-  rpc cancelDelegationToken (hadoop.common.CancelDelegationTokenRequestProto) returns (hadoop.common.CancelDelegationTokenResponseProto);
-  rpc moveApplicationAcrossQueues (MoveApplicationAcrossQueuesRequestProto) returns (MoveApplicationAcrossQueuesResponseProto);
+  rpc getDelegationToken(hadoop.common.GetDelegationTokenRequestProto) returns (hadoop.common.GetDelegationTokenResponseProto);
+  rpc renewDelegationToken(hadoop.common.RenewDelegationTokenRequestProto) returns (hadoop.common.RenewDelegationTokenResponseProto);
+  rpc cancelDelegationToken(hadoop.common.CancelDelegationTokenRequestProto) returns (hadoop.common.CancelDelegationTokenResponseProto);
+  rpc moveApplicationAcrossQueues(MoveApplicationAcrossQueuesRequestProto) returns (MoveApplicationAcrossQueuesResponseProto);
   rpc getApplicationAttemptReport (GetApplicationAttemptReportRequestProto) returns (GetApplicationAttemptReportResponseProto);
   rpc getApplicationAttempts (GetApplicationAttemptsRequestProto) returns (GetApplicationAttemptsResponseProto);
   rpc getContainerReport (GetContainerReportRequestProto) returns (GetContainerReportResponseProto);
   rpc getContainers (GetContainersRequestProto) returns (GetContainersResponseProto);
+  rpc submitReservation (ReservationSubmissionRequestProto) returns (ReservationSubmissionResponseProto);
+  rpc updateReservation (ReservationUpdateRequestProto) returns (ReservationUpdateResponseProto);
+  rpc deleteReservation (ReservationDeleteRequestProto) returns (ReservationDeleteResponseProto);
+  rpc getNodeToLabels (GetNodesToLabelsRequestProto) returns (GetNodesToLabelsResponseProto);
+  rpc getLabelsToNodes (GetLabelsToNodesRequestProto) returns (GetLabelsToNodesResponseProto);
+  rpc getClusterNodeLabels (GetClusterNodeLabelsRequestProto) returns (GetClusterNodeLabelsResponseProto);
 }
-

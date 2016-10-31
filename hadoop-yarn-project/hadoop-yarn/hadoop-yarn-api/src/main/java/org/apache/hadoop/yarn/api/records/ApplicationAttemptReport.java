@@ -24,23 +24,19 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * <p>
- * <code>ApplicationAttemptReport</code> is a report of an application attempt.
- * </p>
- * <p/>
+ * {@code ApplicationAttemptReport} is a report of an application attempt.
  * <p>
  * It includes details such as:
  * <ul>
- * <li>{@link ApplicationAttemptId} of the application.</li>
- * <li>Host on which the <code>ApplicationMaster</code> of this attempt is
- * running.</li>
- * <li>RPC port of the <code>ApplicationMaster</code> of this attempt.</li>
- * <li>Tracking URL.</li>
- * <li>Diagnostic information in case of errors.</li>
- * <li>{@link YarnApplicationAttemptState} of the application attempt.</li>
- * <li>{@link ContainerId} of the master Container.</li>
+ *   <li>{@link ApplicationAttemptId} of the application.</li>
+ *   <li>Host on which the <code>ApplicationMaster</code> of this attempt is
+ *   running.</li>
+ *   <li>RPC port of the <code>ApplicationMaster</code> of this attempt.</li>
+ *   <li>Tracking URL.</li>
+ *   <li>Diagnostic information in case of errors.</li>
+ *   <li>{@link YarnApplicationAttemptState} of the application attempt.</li>
+ *   <li>{@link ContainerId} of the master Container.</li>
  * </ul>
- * </p>
  */
 @Public
 @Unstable
@@ -50,14 +46,15 @@ public abstract class ApplicationAttemptReport {
   @Unstable
   public static ApplicationAttemptReport newInstance(
       ApplicationAttemptId applicationAttemptId, String host, int rpcPort,
-      String url, String diagnostics, YarnApplicationAttemptState state,
-      ContainerId amContainerId) {
+      String url, String oUrl, String diagnostics,
+      YarnApplicationAttemptState state, ContainerId amContainerId) {
     ApplicationAttemptReport report =
         Records.newRecord(ApplicationAttemptReport.class);
     report.setApplicationAttemptId(applicationAttemptId);
     report.setHost(host);
     report.setRpcPort(rpcPort);
     report.setTrackingUrl(url);
+    report.setOriginalTrackingUrl(oUrl);
     report.setDiagnostics(diagnostics);
     report.setYarnApplicationAttemptState(state);
     report.setAMContainerId(amContainerId);
@@ -66,7 +63,7 @@ public abstract class ApplicationAttemptReport {
 
   /**
    * Get the <em>YarnApplicationAttemptState</em> of the application attempt.
-   *
+   * 
    * @return <em>YarnApplicationAttemptState</em> of the application attempt
    */
   @Public
@@ -80,7 +77,7 @@ public abstract class ApplicationAttemptReport {
 
   /**
    * Get the <em>RPC port</em> of this attempt <code>ApplicationMaster</code>.
-   *
+   * 
    * @return <em>RPC port</em> of this attempt <code>ApplicationMaster</code>
    */
   @Public
@@ -94,9 +91,9 @@ public abstract class ApplicationAttemptReport {
   /**
    * Get the <em>host</em> on which this attempt of
    * <code>ApplicationMaster</code> is running.
-   *
+   * 
    * @return <em>host</em> on which this attempt of
-   * <code>ApplicationMaster</code> is running
+   *         <code>ApplicationMaster</code> is running
    */
   @Public
   @Unstable
@@ -107,12 +104,11 @@ public abstract class ApplicationAttemptReport {
   public abstract void setHost(String host);
 
   /**
-   * Get the <em>diagnositic information</em> of the application attempt in
-   * case
+   * Get the <em>diagnositic information</em> of the application attempt in case
    * of errors.
-   *
+   * 
    * @return <em>diagnositic information</em> of the application attempt in case
-   * of errors
+   *         of errors
    */
   @Public
   @Unstable
@@ -124,7 +120,7 @@ public abstract class ApplicationAttemptReport {
 
   /**
    * Get the <em>tracking url</em> for the application attempt.
-   *
+   * 
    * @return <em>tracking url</em> for the application attempt
    */
   @Public
@@ -136,9 +132,22 @@ public abstract class ApplicationAttemptReport {
   public abstract void setTrackingUrl(String url);
 
   /**
+   * Get the <em>original tracking url</em> for the application attempt.
+   * 
+   * @return <em>original tracking url</em> for the application attempt
+   */
+  @Public
+  @Unstable
+  public abstract String getOriginalTrackingUrl();
+
+  @Private
+  @Unstable
+  public abstract void setOriginalTrackingUrl(String oUrl);
+
+  /**
    * Get the <code>ApplicationAttemptId</code> of this attempt of the
    * application
-   *
+   * 
    * @return <code>ApplicationAttemptId</code> of the attempt
    */
   @Public
@@ -152,7 +161,7 @@ public abstract class ApplicationAttemptReport {
 
   /**
    * Get the <code>ContainerId</code> of AMContainer for this attempt
-   *
+   * 
    * @return <code>ContainerId</code> of the attempt
    */
   @Public

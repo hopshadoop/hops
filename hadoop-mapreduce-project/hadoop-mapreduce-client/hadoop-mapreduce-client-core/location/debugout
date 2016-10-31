@@ -1,0 +1,4 @@
+LOG_DIR:location
+stdout:0 0
+stderr:0 0
+syslog:0 0

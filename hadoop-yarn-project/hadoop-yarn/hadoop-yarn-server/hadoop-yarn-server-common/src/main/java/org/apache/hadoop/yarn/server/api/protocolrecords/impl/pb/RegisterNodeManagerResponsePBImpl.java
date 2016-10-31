@@ -30,11 +30,9 @@ import org.apache.hadoop.yarn.server.api.records.NodeAction;
 import org.apache.hadoop.yarn.server.api.records.impl.pb.MasterKeyPBImpl;
 
 
-public class RegisterNodeManagerResponsePBImpl
-    extends ProtoBase<RegisterNodeManagerResponseProto>
-    implements RegisterNodeManagerResponse {
-  RegisterNodeManagerResponseProto proto =
-      RegisterNodeManagerResponseProto.getDefaultInstance();
+    
+public class RegisterNodeManagerResponsePBImpl extends ProtoBase<RegisterNodeManagerResponseProto> implements RegisterNodeManagerResponse {
+  RegisterNodeManagerResponseProto proto = RegisterNodeManagerResponseProto.getDefaultInstance();
   RegisterNodeManagerResponseProto.Builder builder = null;
   boolean viaProto = false;
   
@@ -47,16 +45,14 @@ public class RegisterNodeManagerResponsePBImpl
     builder = RegisterNodeManagerResponseProto.newBuilder();
   }
 
-  public RegisterNodeManagerResponsePBImpl(
-      RegisterNodeManagerResponseProto proto) {
+  public RegisterNodeManagerResponsePBImpl(RegisterNodeManagerResponseProto proto) {
     this.proto = proto;
     viaProto = true;
   }
   
   public RegisterNodeManagerResponseProto getProto() {
-    if (rebuild) {
+    if (rebuild)
       mergeLocalToProto();
-    }
     proto = viaProto ? proto : builder.build();
     viaProto = true;
     return proto;
@@ -68,14 +64,14 @@ public class RegisterNodeManagerResponsePBImpl
           convertToProtoFormat(this.containerTokenMasterKey));
     }
     if (this.nmTokenMasterKey != null) {
-      builder.setNmTokenMasterKey(convertToProtoFormat(this.nmTokenMasterKey));
+      builder.setNmTokenMasterKey(
+          convertToProtoFormat(this.nmTokenMasterKey));
     }
   }
 
   private void mergeLocalToProto() {
-    if (viaProto) {
+    if (viaProto) 
       maybeInitBuilder();
-    }
     mergeLocalToBuilder();
     proto = builder.build();
     rebuild = false;
@@ -106,9 +102,8 @@ public class RegisterNodeManagerResponsePBImpl
   @Override
   public void setContainerTokenMasterKey(MasterKey masterKey) {
     maybeInitBuilder();
-    if (masterKey == null) {
+    if (masterKey == null)
       builder.clearContainerTokenMasterKey();
-    }
     this.containerTokenMasterKey = masterKey;
     rebuild = true;
   }
@@ -122,16 +117,16 @@ public class RegisterNodeManagerResponsePBImpl
     if (!p.hasNmTokenMasterKey()) {
       return null;
     }
-    this.nmTokenMasterKey = convertFromProtoFormat(p.getNmTokenMasterKey());
+    this.nmTokenMasterKey =
+        convertFromProtoFormat(p.getNmTokenMasterKey());
     return this.nmTokenMasterKey;
   }
 
   @Override
   public void setNMTokenMasterKey(MasterKey masterKey) {
     maybeInitBuilder();
-    if (masterKey == null) {
+    if (masterKey == null)
       builder.clearNmTokenMasterKey();
-    }
     this.nmTokenMasterKey = masterKey;
     rebuild = true;
   }
@@ -177,7 +172,7 @@ public class RegisterNodeManagerResponsePBImpl
   @Override
   public NodeAction getNodeAction() {
     RegisterNodeManagerResponseProtoOrBuilder p = viaProto ? proto : builder;
-    if (!p.hasNodeAction()) {
+    if(!p.hasNodeAction()) {
       return null;
     }
     return convertFromProtoFormat(p.getNodeAction());
@@ -207,7 +202,7 @@ public class RegisterNodeManagerResponsePBImpl
   }
 
   private NodeAction convertFromProtoFormat(NodeActionProto p) {
-    return NodeAction.valueOf(p.name());
+    return  NodeAction.valueOf(p.name());
   }
 
   private NodeActionProto convertToProtoFormat(NodeAction t) {
@@ -219,6 +214,6 @@ public class RegisterNodeManagerResponsePBImpl
   }
 
   private MasterKeyProto convertToProtoFormat(MasterKey t) {
-    return ((MasterKeyPBImpl) t).getProto();
+    return ((MasterKeyPBImpl)t).getProto();
   }
 }  

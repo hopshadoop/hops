@@ -21,6 +21,7 @@ package org.apache.hadoop.tools;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.nio.charset.Charset;
 import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -59,7 +60,9 @@ import org.apache.hadoop.mapreduce.lib.map.RegexMapper;
  *  b) Directory on dfs to archive the logs. 
  *  c) The sort/grep patterns for analyzing the files and separator for boundaries.
  * Usage: 
- * Logalyzer -archive -archiveDir <directory to archive logs> -analysis <directory> -logs <log-list uri> -grep <pattern> -sort <col1, col2> -separator <separator>   
+ * Logalyzer -archive -archiveDir &lt;directory to archive logs&gt; -analysis
+ * &lt;directory&gt; -logs &lt;log-list uri&gt; -grep &lt;pattern&gt; -sort
+ * &lt;col1, col2&gt; -separator &lt;separator&gt;
  * <p>
  */
 
@@ -155,15 +158,15 @@ public class Logalyzer {
         
         //Compare column-wise according to *sortSpec*
         for(int i=0; i < sortSpec.length; ++i) {
-          int column = (Integer.valueOf(sortSpec[i]).intValue());
+          int column = Integer.parseInt(sortSpec[i]);
           String c1 = logColumns1[column]; 
           String c2 = logColumns2[column];
           
           //Compare columns
           int comparision = super.compareBytes(
-                                               c1.getBytes(), 0, c1.length(),
-                                               c2.getBytes(), 0, c2.length()
-                                               );
+                                  c1.getBytes(Charset.forName("UTF-8")), 0, c1.length(),
+                                  c2.getBytes(Charset.forName("UTF-8")), 0, c2.length()
+                                  );
           
           //They differ!
           if (comparision != 0) {

@@ -27,13 +27,12 @@ import org.apache.hadoop.yarn.api.records.QueueInfo;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * <p>The response sent by the <code>ResourceManager</code> to a client
- * requesting information about queues in the system.</p>
- * <p/>
- * <p>The response includes a {@link QueueInfo} which has details such as
- * queue name, used/total capacities, running applications, child queues etc
- * .</p>
- *
+ * The response sent by the {@code ResourceManager} to a client
+ * requesting information about queues in the system.
+ * <p>
+ * The response includes a {@link QueueInfo} which has details such as
+ * queue name, used/total capacities, running applications, child queues etc.
+ * 
  * @see QueueInfo
  * @see ApplicationClientProtocol#getQueueInfo(GetQueueInfoRequest)
  */
@@ -44,15 +43,13 @@ public abstract class GetQueueInfoResponse {
   @Private
   @Unstable
   public static GetQueueInfoResponse newInstance(QueueInfo queueInfo) {
-    GetQueueInfoResponse response =
-        Records.newRecord(GetQueueInfoResponse.class);
+    GetQueueInfoResponse response = Records.newRecord(GetQueueInfoResponse.class);
     response.setQueueInfo(queueInfo);
     return response;
   }
 
   /**
    * Get the <code>QueueInfo</code> for the specified queue.
-   *
    * @return <code>QueueInfo</code> for the specified queue
    */
   @Public

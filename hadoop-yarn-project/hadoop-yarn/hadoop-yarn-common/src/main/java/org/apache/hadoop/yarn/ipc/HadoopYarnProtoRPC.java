@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.yarn.ipc;
 
+import java.net.InetSocketAddress;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -27,16 +29,14 @@ import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.yarn.factory.providers.RpcFactoryProvider;
 
-import java.net.InetSocketAddress;
-
 /**
- * This uses Hadoop RPC. Uses a tunnel ProtoSpecificRpcEngine over
+ * This uses Hadoop RPC. Uses a tunnel ProtoSpecificRpcEngine over 
  * Hadoop connection.
- * This does not give cross-language wire compatibility, since the Hadoop
+ * This does not give cross-language wire compatibility, since the Hadoop 
  * RPC wire format is non-standard, but it does permit use of Protocol Buffers
- * protocol versioning features for inter-Java RPCs.
+ *  protocol versioning features for inter-Java RPCs.
  */
-@InterfaceAudience.LimitedPrivate({"MapReduce", "YARN"})
+@InterfaceAudience.LimitedPrivate({ "MapReduce", "YARN" })
 public class HadoopYarnProtoRPC extends YarnRPC {
 
   private static final Log LOG = LogFactory.getLog(HadoopYarnProtoRPC.class);
@@ -45,8 +45,8 @@ public class HadoopYarnProtoRPC extends YarnRPC {
   public Object getProxy(Class protocol, InetSocketAddress addr,
       Configuration conf) {
     LOG.debug("Creating a HadoopYarnProtoRpc proxy for protocol " + protocol);
-    return RpcFactoryProvider.getClientFactory(conf)
-        .getClient(protocol, 1, addr, conf);
+    return RpcFactoryProvider.getClientFactory(conf).getClient(protocol, 1,
+        addr, conf);
   }
 
   @Override
@@ -57,14 +57,13 @@ public class HadoopYarnProtoRPC extends YarnRPC {
   @Override
   public Server getServer(Class protocol, Object instance,
       InetSocketAddress addr, Configuration conf,
-      SecretManager<? extends TokenIdentifier> secretManager, int numHandlers,
-      String portRangeConfig) {
-    LOG.debug("Creating a HadoopYarnProtoRpc server for protocol " + protocol +
+      SecretManager<? extends TokenIdentifier> secretManager,
+      int numHandlers, String portRangeConfig) {
+    LOG.debug("Creating a HadoopYarnProtoRpc server for protocol " + protocol + 
         " with " + numHandlers + " handlers");
     
-    return RpcFactoryProvider.getServerFactory(conf)
-        .getServer(protocol, instance, addr, conf, secretManager, numHandlers,
-            portRangeConfig);
+    return RpcFactoryProvider.getServerFactory(conf).getServer(protocol, 
+        instance, addr, conf, secretManager, numHandlers, portRangeConfig);
 
   }
 

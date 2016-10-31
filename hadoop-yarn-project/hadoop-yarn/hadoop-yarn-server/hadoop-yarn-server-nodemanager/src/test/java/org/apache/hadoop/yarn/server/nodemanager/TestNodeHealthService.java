@@ -18,6 +18,12 @@
 
 package org.apache.hadoop.yarn.server.nodemanager;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.util.TimerTask;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -34,26 +40,19 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.util.TimerTask;
-
 public class TestNodeHealthService {
 
-  private static volatile Log LOG =
-      LogFactory.getLog(TestNodeHealthService.class);
+  private static volatile Log LOG = LogFactory
+      .getLog(TestNodeHealthService.class);
 
-  protected static File testRootDir =
-      new File("target", TestNodeHealthService.class.getName() + "-localDir")
-          .getAbsoluteFile();
+  protected static File testRootDir = new File("target",
+      TestNodeHealthService.class.getName() + "-localDir").getAbsoluteFile();
 
-  final static File nodeHealthConfigFile =
-      new File(testRootDir, "modified-mapred-site.xml");
+  final static File nodeHealthConfigFile = new File(testRootDir,
+      "modified-mapred-site.xml");
 
-  private File nodeHealthscriptFile =
-      new File(testRootDir, Shell.appendScriptExtension("failingscript"));
+  private File nodeHealthscriptFile = new File(testRootDir,
+      Shell.appendScriptExtension("failingscript"));
 
   @Before
   public void setup() {
@@ -63,8 +62,8 @@ public class TestNodeHealthService {
   @After
   public void tearDown() throws Exception {
     if (testRootDir.exists()) {
-      FileContext.getLocalFSFileContext()
-          .delete(new Path(testRootDir.getAbsolutePath()), true);
+      FileContext.getLocalFSFileContext().delete(
+          new Path(testRootDir.getAbsolutePath()), true);
     }
   }
 
@@ -73,17 +72,23 @@ public class TestNodeHealthService {
     conf.set(YarnConfiguration.NM_HEALTH_CHECK_SCRIPT_PATH,
         nodeHealthscriptFile.getAbsolutePath());
     conf.setLong(YarnConfiguration.NM_HEALTH_CHECK_INTERVAL_MS, 500);
-    conf.setLong(YarnConfiguration.NM_HEALTH_CHECK_SCRIPT_TIMEOUT_MS, 1000);
+    conf.setLong(
+        YarnConfiguration.NM_HEALTH_CHECK_SCRIPT_TIMEOUT_MS, 1000);
     return conf;
   }
 
-  private void writeNodeHealthScriptFile(String scriptStr,
-      boolean setExecutable) throws IOException {
-    PrintWriter pw =
-        new PrintWriter(new FileOutputStream(nodeHealthscriptFile));
-    pw.println(scriptStr);
-    pw.flush();
-    pw.close();
+  private void writeNodeHealthScriptFile(String scriptStr, boolean setExecutable)
+          throws IOException {
+    PrintWriter pw = null;
+    try {
+      FileUtil.setWritable(nodeHealthscriptFile, true);
+      FileUtil.setReadable(nodeHealthscriptFile, true);
+      pw = new PrintWriter(new FileOutputStream(nodeHealthscriptFile));
+      pw.println(scriptStr);
+      pw.flush();
+    } finally {
+      pw.close();
+    }
     FileUtil.setExecutable(nodeHealthscriptFile, setExecutable);
   }
 
@@ -125,9 +130,8 @@ public class TestNodeHealthService {
         factory.newRecordInstance(NodeHealthStatus.class);
     String errorScript = "echo ERROR\n echo \"Tracker not healthy\"";
     String normalScript = "echo \"I am all fine\"";
-    String timeOutScript = Shell.WINDOWS ?
-        "@echo off\nping -n 4 127.0.0.1 >nul\necho \"I am fine\"" :
-        "sleep 4\necho \"I am fine\"";
+    String timeOutScript = Shell.WINDOWS ? "@echo off\nping -n 4 127.0.0.1 >nul\necho \"I am fine\""
+        : "sleep 4\necho \"I am fine\"";
     Configuration conf = getConfForNodeHealthScript();
     conf.writeXml(new FileOutputStream(nodeHealthConfigFile));
     conf.addResource(nodeHealthConfigFile.getName());
@@ -146,11 +150,10 @@ public class TestNodeHealthService {
         nodeHealthChecker.getLastHealthReportTime());
     LOG.info("Checking initial healthy condition");
     // Check proper report conditions.
-    Assert.assertTrue("Node health status reported unhealthy",
-        healthStatus.getIsNodeHealthy());
-    Assert.assertTrue("Node health status reported unhealthy",
-        healthStatus.getHealthReport()
-            .equals(nodeHealthChecker.getHealthReport()));
+    Assert.assertTrue("Node health status reported unhealthy", healthStatus
+        .getIsNodeHealthy());
+    Assert.assertTrue("Node health status reported unhealthy", healthStatus
+        .getHealthReport().equals(nodeHealthChecker.getHealthReport()));
 
     // write out error file.
     // Healthy to unhealthy transition
@@ -162,11 +165,10 @@ public class TestNodeHealthService {
         nodeHealthChecker.getHealthReport(),
         nodeHealthChecker.getLastHealthReportTime());
     LOG.info("Checking Healthy--->Unhealthy");
-    Assert.assertFalse("Node health status reported healthy",
-        healthStatus.getIsNodeHealthy());
-    Assert.assertTrue("Node health status reported healthy",
-        healthStatus.getHealthReport()
-            .equals(nodeHealthChecker.getHealthReport()));
+    Assert.assertFalse("Node health status reported healthy", healthStatus
+        .getIsNodeHealthy());
+    Assert.assertTrue("Node health status reported healthy", healthStatus
+        .getHealthReport().equals(nodeHealthChecker.getHealthReport()));
     
     // Check unhealthy to healthy transitions.
     writeNodeHealthScriptFile(normalScript, true);
@@ -176,11 +178,10 @@ public class TestNodeHealthService {
         nodeHealthChecker.getLastHealthReportTime());
     LOG.info("Checking UnHealthy--->healthy");
     // Check proper report conditions.
-    Assert.assertTrue("Node health status reported unhealthy",
-        healthStatus.getIsNodeHealthy());
-    Assert.assertTrue("Node health status reported unhealthy",
-        healthStatus.getHealthReport()
-            .equals(nodeHealthChecker.getHealthReport()));
+    Assert.assertTrue("Node health status reported unhealthy", healthStatus
+        .getIsNodeHealthy());
+    Assert.assertTrue("Node health status reported unhealthy", healthStatus
+        .getHealthReport().equals(nodeHealthChecker.getHealthReport()));
 
     // Healthy to timeout transition.
     writeNodeHealthScriptFile(timeOutScript, true);
@@ -193,9 +194,9 @@ public class TestNodeHealthService {
         healthStatus.getIsNodeHealthy());
     Assert.assertTrue("Node script time out message not propogated",
         healthStatus.getHealthReport().equals(
-            NodeHealthScriptRunner.NODE_HEALTH_SCRIPT_TIMED_OUT_MSG +
-                NodeHealthCheckerService.SEPARATOR +
-                nodeHealthChecker.getDiskHandler().getDisksHealthReport()));
+            NodeHealthScriptRunner.NODE_HEALTH_SCRIPT_TIMED_OUT_MSG
+            + NodeHealthCheckerService.SEPARATOR
+            + nodeHealthChecker.getDiskHandler().getDisksHealthReport(false)));
   }
 
 }

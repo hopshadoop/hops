@@ -22,8 +22,6 @@ import java.util.Map;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.Maps;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 
@@ -32,7 +30,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
  */
 @InterfaceAudience.Private
 public class UniqueNames {
-  private static final Log LOG = LogFactory.getLog(UniqueNames.class);
+
   static class Count {
     final String baseName;
     int value;
@@ -50,7 +48,6 @@ public class UniqueNames {
     Count c = map.get(name);
     if (c == null) {
       c = new Count(name, 0);
-      LOG.info("adding name to map " + name);
       map.put(name, c);
       return name;
     }
@@ -59,7 +56,6 @@ public class UniqueNames {
       String newName = joiner.join(name, ++c.value);
       Count c2 = map.get(newName);
       if (c2 == null) {
-        LOG.info("adding name to map " + newName);
         map.put(newName, c);
         return newName;
       }

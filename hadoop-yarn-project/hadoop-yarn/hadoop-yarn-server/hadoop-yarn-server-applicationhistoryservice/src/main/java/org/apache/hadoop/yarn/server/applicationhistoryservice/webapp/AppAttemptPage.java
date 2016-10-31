@@ -17,15 +17,14 @@
  */
 package org.apache.hadoop.yarn.server.applicationhistoryservice.webapp;
 
-import org.apache.hadoop.yarn.server.webapp.AppAttemptBlock;
-import org.apache.hadoop.yarn.webapp.SubView;
-import org.apache.hadoop.yarn.webapp.YarnWebParams;
-
 import static org.apache.hadoop.yarn.util.StringHelper.join;
 import static org.apache.hadoop.yarn.webapp.view.JQueryUI.DATATABLES;
 import static org.apache.hadoop.yarn.webapp.view.JQueryUI.DATATABLES_ID;
 import static org.apache.hadoop.yarn.webapp.view.JQueryUI.initID;
-import static org.apache.hadoop.yarn.webapp.view.JQueryUI.tableInit;
+import org.apache.hadoop.yarn.server.webapp.AppAttemptBlock;
+import org.apache.hadoop.yarn.server.webapp.WebPageUtils;
+import org.apache.hadoop.yarn.webapp.SubView;
+import org.apache.hadoop.yarn.webapp.YarnWebParams;
 
 public class AppAttemptPage extends AHSView {
 
@@ -34,14 +33,17 @@ public class AppAttemptPage extends AHSView {
     commonPreHead(html);
 
     String appAttemptId = $(YarnWebParams.APPLICATION_ATTEMPT_ID);
-    set(TITLE,
-        appAttemptId.isEmpty() ? "Bad request: missing application attempt ID" :
-            join("Application Attempt ",
-                $(YarnWebParams.APPLICATION_ATTEMPT_ID)));
+    set(
+      TITLE,
+      appAttemptId.isEmpty() ? "Bad request: missing application attempt ID"
+          : join("Application Attempt ",
+            $(YarnWebParams.APPLICATION_ATTEMPT_ID)));
 
     set(DATATABLES_ID, "containers");
-    set(initID(DATATABLES, "containers"), containersTableInit());
+    set(initID(DATATABLES, "containers"), WebPageUtils.containersTableInit());
     setTableStyles(html, "containers", ".queue {width:6em}", ".ui {width:8em}");
+
+    set(YarnWebParams.WEB_UI_TYPE, YarnWebParams.APP_HISTORY_WEB_UI);
   }
 
   @Override
@@ -49,20 +51,10 @@ public class AppAttemptPage extends AHSView {
     return AppAttemptBlock.class;
   }
 
-  private String containersTableInit() {
-    return tableInit().append(", 'aaData': containersTableData")
-        .append(", bDeferRender: true").append(", bProcessing: true")
-
-        .append("\n, aoColumnDefs: ").append(getContainersTableColumnDefs())
-
-            // Sort by id upon page load
-        .append(", aaSorting: [[0, 'desc']]}").toString();
-  }
-
   protected String getContainersTableColumnDefs() {
     StringBuilder sb = new StringBuilder();
-    return sb.append("[\n").append("{'sType':'numeric', 'aTargets': [0]")
-        .append(", 'mRender': parseHadoopID }]").toString();
+    return sb.append("[\n").append("{'sType':'natural', 'aTargets': [0]")
+      .append(", 'mRender': parseHadoopID }]").toString();
   }
 
 }

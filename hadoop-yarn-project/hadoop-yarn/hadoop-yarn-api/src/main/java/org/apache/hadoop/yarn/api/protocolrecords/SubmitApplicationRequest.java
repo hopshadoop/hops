@@ -27,15 +27,15 @@ import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * <p>The request sent by a client to <em>submit an application</em> to the
+ * <p>The request sent by a client to <em>submit an application</em> to the 
  * <code>ResourceManager</code>.</p>
- * <p/>
+ * 
  * <p>The request, via {@link ApplicationSubmissionContext}, contains
- * details such as queue, {@link Resource} required to run the
- * <code>ApplicationMaster</code>, the equivalent of
- * {@link ContainerLaunchContext} for launching the
+ * details such as queue, {@link Resource} required to run the 
+ * <code>ApplicationMaster</code>, the equivalent of 
+ * {@link ContainerLaunchContext} for launching the 
  * <code>ApplicationMaster</code> etc.
- *
+ * 
  * @see ApplicationClientProtocol#submitApplication(SubmitApplicationRequest)
  */
 @Public
@@ -54,7 +54,6 @@ public abstract class SubmitApplicationRequest {
 
   /**
    * Get the <code>ApplicationSubmissionContext</code> for the application.
-   *
    * @return <code>ApplicationSubmissionContext</code> for the application
    */
   @Public
@@ -63,10 +62,8 @@ public abstract class SubmitApplicationRequest {
 
   /**
    * Set the <code>ApplicationSubmissionContext</code> for the application.
-   *
-   * @param context
-   *     <code>ApplicationSubmissionContext</code> for the
-   *     application
+   * @param context <code>ApplicationSubmissionContext</code> for the 
+   *                application
    */
   @Public
   @Stable

@@ -76,6 +76,7 @@ import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
 import org.apache.hadoop.yarn.api.records.LocalResource;
 import org.apache.hadoop.yarn.api.records.LocalResourceType;
 import org.apache.hadoop.yarn.api.records.LocalResourceVisibility;
+import org.apache.hadoop.yarn.api.records.ReservationId;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.URL;
 import org.apache.hadoop.yarn.api.records.YarnApplicationState;
@@ -356,8 +357,9 @@ public class YARNRunner implements ClientProtocol {
             jobConfPath, LocalResourceType.FILE));
     if (jobConf.get(MRJobConfig.JAR) != null) {
       Path jobJarPath = new Path(jobConf.get(MRJobConfig.JAR));
-      LocalResource rc = createApplicationResource(defaultFileContext,
-          jobJarPath, 
+      LocalResource rc = createApplicationResource(
+          FileContext.getFileContext(jobJarPath.toUri(), jobConf),
+          jobJarPath,
           LocalResourceType.PATTERN);
       String pattern = conf.getPattern(JobContext.JAR_UNPACK_PATTERN, 
           JobConf.UNPACK_JAR_PATTERN_DEFAULT).pattern();
@@ -390,14 +392,11 @@ public class YARNRunner implements ClientProtocol {
     vargs.add(MRApps.crossPlatformifyMREnv(jobConf, Environment.JAVA_HOME)
         + "/bin/java");
 
-    // TODO: why do we use 'conf' some places and 'jobConf' others?
-    long logSize = jobConf.getLong(MRJobConfig.MR_AM_LOG_KB,
-        MRJobConfig.DEFAULT_MR_AM_LOG_KB) << 10;
-    String logLevel = jobConf.get(
-        MRJobConfig.MR_AM_LOG_LEVEL, MRJobConfig.DEFAULT_MR_AM_LOG_LEVEL);
-    int numBackups = jobConf.getInt(MRJobConfig.MR_AM_LOG_BACKUPS,
-        MRJobConfig.DEFAULT_MR_AM_LOG_BACKUPS);
-    MRApps.addLog4jSystemProperties(logLevel, logSize, numBackups, vargs);
+    Path amTmpDir =
+        new Path(MRApps.crossPlatformifyMREnv(conf, Environment.PWD),
+            YarnConfiguration.DEFAULT_CONTAINER_TEMP_DIR);
+    vargs.add("-Djava.io.tmpdir=" + amTmpDir);
+    MRApps.addLog4jSystemProperties(null, vargs, conf);
 
     // Check for Java Lib Path usage in MAP and REDUCE configs
     warnForJavaLibPath(conf.get(MRJobConfig.MAP_JAVA_OPTS,""), "map", 
@@ -407,7 +406,7 @@ public class YARNRunner implements ClientProtocol {
     warnForJavaLibPath(conf.get(MRJobConfig.REDUCE_JAVA_OPTS,""), "reduce", 
         MRJobConfig.REDUCE_JAVA_OPTS, MRJobConfig.REDUCE_ENV);
     warnForJavaLibPath(conf.get(MRJobConfig.MAPRED_REDUCE_ADMIN_JAVA_OPTS,""), "reduce", 
-        MRJobConfig.MAPRED_REDUCE_ADMIN_JAVA_OPTS, MRJobConfig.MAPRED_ADMIN_USER_ENV);   
+        MRJobConfig.MAPRED_REDUCE_ADMIN_JAVA_OPTS, MRJobConfig.MAPRED_ADMIN_USER_ENV);
 
     // Add AM admin command opts before user command opts
     // so that it can be overridden by user
@@ -423,7 +422,18 @@ public class YARNRunner implements ClientProtocol {
     warnForJavaLibPath(mrAppMasterUserOptions, "app master", 
         MRJobConfig.MR_AM_COMMAND_OPTS, MRJobConfig.MR_AM_ENV);
     vargs.add(mrAppMasterUserOptions);
-    
+
+    if (jobConf.getBoolean(MRJobConfig.MR_AM_PROFILE,
+        MRJobConfig.DEFAULT_MR_AM_PROFILE)) {
+      final String profileParams = jobConf.get(MRJobConfig.MR_AM_PROFILE_PARAMS,
+          MRJobConfig.DEFAULT_TASK_PROFILE_PARAMS);
+      if (profileParams != null) {
+        vargs.add(String.format(profileParams,
+            ApplicationConstants.LOG_DIR_EXPANSION_VAR + Path.SEPARATOR
+                + TaskLog.LogName.PROFILE));
+      }
+    }
+
     vargs.add(MRJobConfig.APPLICATION_MASTER_CLASS);
     vargs.add("1>" + ApplicationConstants.LOG_DIR_EXPANSION_VAR +
         Path.SEPARATOR + ApplicationConstants.STDOUT);
@@ -447,9 +457,19 @@ public class YARNRunner implements ClientProtocol {
     Map<String, String> environment = new HashMap<String, String>();
     MRApps.setClasspath(environment, conf);
 
+    // Shell
+    environment.put(Environment.SHELL.name(),
+        conf.get(MRJobConfig.MAPRED_ADMIN_USER_SHELL,
+            MRJobConfig.DEFAULT_SHELL));
+
+    // Add the container working directory in front of LD_LIBRARY_PATH
+    MRApps.addToEnvironment(environment, Environment.LD_LIBRARY_PATH.name(),
+        MRApps.crossPlatformifyMREnv(conf, Environment.PWD), conf);
+
     // Setup the environment variables for Admin first
     MRApps.setEnvFromInputString(environment, 
-        conf.get(MRJobConfig.MR_AM_ADMIN_USER_ENV), conf);
+        conf.get(MRJobConfig.MR_AM_ADMIN_USER_ENV,
+            MRJobConfig.DEFAULT_MR_AM_ADMIN_USER_ENV), conf);
     // Setup the environment variables (LD_LIBRARY_PATH, etc)
     MRApps.setEnvFromInputString(environment, 
         conf.get(MRJobConfig.MR_AM_ENV), conf);
@@ -480,6 +500,26 @@ public class YARNRunner implements ClientProtocol {
     appContext.setQueue(                                       // Queue name
         jobConf.get(JobContext.QUEUE_NAME,
         YarnConfiguration.DEFAULT_QUEUE_NAME));
+    // add reservationID if present
+    ReservationId reservationID = null;
+    try {
+      reservationID =
+          ReservationId.parseReservationId(jobConf
+              .get(JobContext.RESERVATION_ID));
+    } catch (NumberFormatException e) {
+      // throw exception as reservationid as is invalid
+      String errMsg =
+          "Invalid reservationId: " + jobConf.get(JobContext.RESERVATION_ID)
+              + " specified for the app: " + applicationId;
+      LOG.warn(errMsg);
+      throw new IOException(errMsg);
+    }
+    if (reservationID != null) {
+      appContext.setReservationID(reservationID);
+      LOG.info("SUBMITTING ApplicationSubmissionContext app:" + applicationId
+          + " to queue:" + appContext.getQueue() + " with reservationId:"
+          + appContext.getReservationID());
+    }
     appContext.setApplicationName(                             // Job name
         jobConf.get(JobContext.JOB_NAME,
         YarnConfiguration.DEFAULT_APPLICATION_NAME));
@@ -494,6 +534,7 @@ public class YARNRunner implements ClientProtocol {
     if (tagsFromConf != null && !tagsFromConf.isEmpty()) {
       appContext.setApplicationTags(new HashSet<String>(tagsFromConf));
     }
+
     return appContext;
   }
 
@@ -552,16 +593,50 @@ public class YARNRunner implements ClientProtocol {
         .getTaskReports(jobID, taskType);
   }
 
+  private void killUnFinishedApplication(ApplicationId appId)
+      throws IOException {
+    ApplicationReport application = null;
+    try {
+      application = resMgrDelegate.getApplicationReport(appId);
+    } catch (YarnException e) {
+      throw new IOException(e);
+    }
+    if (application.getYarnApplicationState() == YarnApplicationState.FINISHED
+        || application.getYarnApplicationState() == YarnApplicationState.FAILED
+        || application.getYarnApplicationState() == YarnApplicationState.KILLED) {
+      return;
+    }
+    killApplication(appId);
+  }
+
+  private void killApplication(ApplicationId appId) throws IOException {
+    try {
+      resMgrDelegate.killApplication(appId);
+    } catch (YarnException e) {
+      throw new IOException(e);
+    }
+  }
+
+  private boolean isJobInTerminalState(JobStatus status) {
+    return status.getState() == JobStatus.State.KILLED
+        || status.getState() == JobStatus.State.FAILED
+        || status.getState() == JobStatus.State.SUCCEEDED;
+  }
+
   @Override
   public void killJob(JobID arg0) throws IOException, InterruptedException {
     /* check if the status is not running, if not send kill to RM */
     JobStatus status = clientCache.getClient(arg0).getJobStatus(arg0);
+    ApplicationId appId = TypeConverter.toYarn(arg0).getAppId();
+
+    // get status from RM and return
+    if (status == null) {
+      killUnFinishedApplication(appId);
+      return;
+    }
+
     if (status.getState() != JobStatus.State.RUNNING) {
-      try {
-        resMgrDelegate.killApplication(TypeConverter.toYarn(arg0).getAppId());
-      } catch (YarnException e) {
-        throw new IOException(e);
-      }
+      killApplication(appId);
       return;
     }
 
@@ -570,26 +645,29 @@ public class YARNRunner implements ClientProtocol {
       clientCache.getClient(arg0).killJob(arg0);
       long currentTimeMillis = System.currentTimeMillis();
       long timeKillIssued = currentTimeMillis;
-      while ((currentTimeMillis < timeKillIssued + 10000L) && (status.getState()
-          != JobStatus.State.KILLED)) {
-          try {
-            Thread.sleep(1000L);
-          } catch(InterruptedException ie) {
-            /** interrupted, just break */
-            break;
-          }
-          currentTimeMillis = System.currentTimeMillis();
-          status = clientCache.getClient(arg0).getJobStatus(arg0);
+      long killTimeOut =
+          conf.getLong(MRJobConfig.MR_AM_HARD_KILL_TIMEOUT_MS,
+                       MRJobConfig.DEFAULT_MR_AM_HARD_KILL_TIMEOUT_MS);
+      while ((currentTimeMillis < timeKillIssued + killTimeOut)
+          && !isJobInTerminalState(status)) {
+        try {
+          Thread.sleep(1000L);
+        } catch (InterruptedException ie) {
+          /** interrupted, just break */
+          break;
+        }
+        currentTimeMillis = System.currentTimeMillis();
+        status = clientCache.getClient(arg0).getJobStatus(arg0);
+        if (status == null) {
+          killUnFinishedApplication(appId);
+          return;
+        }
       }
     } catch(IOException io) {
       LOG.debug("Error when checking for application status", io);
     }
-    if (status.getState() != JobStatus.State.KILLED) {
-      try {
-        resMgrDelegate.killApplication(TypeConverter.toYarn(arg0).getAppId());
-      } catch (YarnException e) {
-        throw new IOException(e);
-      }
+    if (status != null && !isJobInTerminalState(status)) {
+      killApplication(appId);
     }
   }
 
@@ -631,6 +709,17 @@ public class YARNRunner implements ClientProtocol {
                "are used. These values should be set as part of the " +
                "LD_LIBRARY_PATH in the " + component + " JVM env using " +
                envConf + " config settings.");
+    }
+  }
+
+  public void close() throws IOException {
+    if (resMgrDelegate != null) {
+      resMgrDelegate.close();
+      resMgrDelegate = null;
+    }
+    if (clientCache != null) {
+      clientCache.close();
+      clientCache = null;
     }
   }
 }

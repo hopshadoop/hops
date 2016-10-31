@@ -43,8 +43,7 @@ class Test extends FsCommand {
     "  -e  return 0 if <path> exists.\n" +
     "  -f  return 0 if <path> is a file.\n" +
     "  -s  return 0 if file <path> is greater than zero bytes in size.\n" +
-    "  -z  return 0 if file <path> is zero bytes in size.\n" +
-    "else, return 1.";
+    "  -z  return 0 if file <path> is zero bytes in size, else return 1.";
 
   private char flag;
   
@@ -83,6 +82,8 @@ class Test extends FsCommand {
         break;
       case 'z':
         test = (item.stat.getLen() == 0);
+        break;
+      default:
         break;
     }
     if (!test) exitCode = 1;

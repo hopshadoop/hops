@@ -18,17 +18,17 @@
 
 package org.apache.hadoop.yarn.applications.distributedshell;
 
+import java.nio.ByteBuffer;
+import java.util.Map;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 
-import java.nio.ByteBuffer;
-import java.util.Map;
-
 public class ContainerLaunchFailAppMaster extends ApplicationMaster {
 
   private static final Log LOG =
-      LogFactory.getLog(ContainerLaunchFailAppMaster.class);
+    LogFactory.getLog(ContainerLaunchFailAppMaster.class);
 
   public ContainerLaunchFailAppMaster() {
     super();
@@ -40,18 +40,18 @@ public class ContainerLaunchFailAppMaster extends ApplicationMaster {
   }
 
   class FailContainerLaunchNMCallbackHandler
-      extends ApplicationMaster.NMCallbackHandler {
+    extends ApplicationMaster.NMCallbackHandler {
 
     public FailContainerLaunchNMCallbackHandler(
-        ApplicationMaster applicationMaster) {
+      ApplicationMaster applicationMaster) {
       super(applicationMaster);
     }
 
     @Override
     public void onContainerStarted(ContainerId containerId,
-        Map<String, ByteBuffer> allServiceResponse) {
+                                   Map<String, ByteBuffer> allServiceResponse) {
       super.onStartContainerError(containerId,
-          new RuntimeException("Inject Container Launch failure"));
+        new RuntimeException("Inject Container Launch failure"));
     }
 
   }
@@ -60,7 +60,7 @@ public class ContainerLaunchFailAppMaster extends ApplicationMaster {
     boolean result = false;
     try {
       ContainerLaunchFailAppMaster appMaster =
-          new ContainerLaunchFailAppMaster();
+        new ContainerLaunchFailAppMaster();
       LOG.info("Initializing ApplicationMaster");
       boolean doRun = appMaster.init(args);
       if (!doRun) {

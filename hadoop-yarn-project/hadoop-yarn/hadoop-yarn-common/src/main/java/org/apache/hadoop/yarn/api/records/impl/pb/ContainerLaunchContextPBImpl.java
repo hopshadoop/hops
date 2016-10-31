@@ -1,25 +1,30 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Licensed to the Apache Software Foundation (ASF) under one
+* or more contributor license agreements.  See the NOTICE file
+* distributed with this work for additional information
+* regarding copyright ownership.  The ASF licenses this file
+* to you under the Apache License, Version 2.0 (the
+* "License"); you may not use this file except in compliance
+* with the License.  You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
 package org.apache.hadoop.yarn.api.records.impl.pb;
 
 
-import com.google.protobuf.ByteString;
-import com.google.protobuf.TextFormat;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.records.ApplicationAccessType;
@@ -33,17 +38,14 @@ import org.apache.hadoop.yarn.proto.YarnProtos.StringBytesMapProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.StringLocalResourceMapProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.StringStringMapProto;
 
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import com.google.protobuf.ByteString;
+import com.google.protobuf.TextFormat;
 
 @Private
 @Unstable
-public class ContainerLaunchContextPBImpl extends ContainerLaunchContext {
-  ContainerLaunchContextProto proto =
+public class ContainerLaunchContextPBImpl 
+extends ContainerLaunchContext {
+  ContainerLaunchContextProto proto = 
       ContainerLaunchContextProto.getDefaultInstance();
   ContainerLaunchContextProto.Builder builder = null;
   boolean viaProto = false;
@@ -65,7 +67,7 @@ public class ContainerLaunchContextPBImpl extends ContainerLaunchContext {
   }
   
   public ContainerLaunchContextProto getProto() {
-    mergeLocalToProto();
+      mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
     viaProto = true;
     return proto;
@@ -78,9 +80,8 @@ public class ContainerLaunchContextPBImpl extends ContainerLaunchContext {
 
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -122,9 +123,8 @@ public class ContainerLaunchContextPBImpl extends ContainerLaunchContext {
   }
   
   private void mergeLocalToProto() {
-    if (viaProto) {
+    if (viaProto) 
       maybeInitBuilder();
-    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
@@ -158,9 +158,8 @@ public class ContainerLaunchContextPBImpl extends ContainerLaunchContext {
   
   @Override
   public void setCommands(final List<String> commands) {
-    if (commands == null) {
+    if (commands == null)
       return;
-    }
     initCommands();
     this.commands.clear();
     this.commands.addAll(commands);
@@ -169,9 +168,8 @@ public class ContainerLaunchContextPBImpl extends ContainerLaunchContext {
   private void addCommandsToProto() {
     maybeInitBuilder();
     builder.clearCommand();
-    if (this.commands == null) {
+    if (this.commands == null) 
       return;
-    }
     builder.addAllCommand(this.commands);
   }
   
@@ -197,9 +195,8 @@ public class ContainerLaunchContextPBImpl extends ContainerLaunchContext {
   @Override
   public void setLocalResources(
       final Map<String, LocalResource> localResources) {
-    if (localResources == null) {
+    if (localResources == null)
       return;
-    }
     initLocalResources();
     this.localResources.clear();
     this.localResources.putAll(localResources);
@@ -208,38 +205,36 @@ public class ContainerLaunchContextPBImpl extends ContainerLaunchContext {
   private void addLocalResourcesToProto() {
     maybeInitBuilder();
     builder.clearLocalResources();
-    if (localResources == null) {
+    if (localResources == null)
       return;
-    }
-    Iterable<StringLocalResourceMapProto> iterable =
+    Iterable<StringLocalResourceMapProto> iterable = 
         new Iterable<StringLocalResourceMapProto>() {
-
+      
+      @Override
+      public Iterator<StringLocalResourceMapProto> iterator() {
+        return new Iterator<StringLocalResourceMapProto>() {
+          
+          Iterator<String> keyIter = localResources.keySet().iterator();
+          
           @Override
-          public Iterator<StringLocalResourceMapProto> iterator() {
-            return new Iterator<StringLocalResourceMapProto>() {
-
-              Iterator<String> keyIter = localResources.keySet().iterator();
-
-              @Override
-              public void remove() {
-                throw new UnsupportedOperationException();
-              }
-
-              @Override
-              public StringLocalResourceMapProto next() {
-                String key = keyIter.next();
-                return StringLocalResourceMapProto.newBuilder().setKey(key).
-                    setValue(convertToProtoFormat(localResources.get(key)))
-                    .build();
-              }
-
-              @Override
-              public boolean hasNext() {
-                return keyIter.hasNext();
-              }
-            };
+          public void remove() {
+            throw new UnsupportedOperationException();
+          }
+          
+          @Override
+          public StringLocalResourceMapProto next() {
+            String key = keyIter.next();
+            return StringLocalResourceMapProto.newBuilder().setKey(key).
+                setValue(convertToProtoFormat(localResources.get(key))).build();
+          }
+          
+          @Override
+          public boolean hasNext() {
+            return keyIter.hasNext();
           }
         };
+      }
+    };
     builder.addAllLocalResources(iterable);
   }
   
@@ -252,7 +247,7 @@ public class ContainerLaunchContextPBImpl extends ContainerLaunchContext {
     if (!p.hasTokens()) {
       return null;
     }
-    this.tokens = convertFromProtoFormat(p.getTokens());
+    this.tokens =  convertFromProtoFormat(p.getTokens());
     return this.tokens;
   }
 
@@ -286,9 +281,8 @@ public class ContainerLaunchContextPBImpl extends ContainerLaunchContext {
   
   @Override
   public void setServiceData(final Map<String, ByteBuffer> serviceData) {
-    if (serviceData == null) {
+    if (serviceData == null)
       return;
-    }
     initServiceData();
     this.serviceData.putAll(serviceData);
   }
@@ -296,38 +290,36 @@ public class ContainerLaunchContextPBImpl extends ContainerLaunchContext {
   private void addServiceDataToProto() {
     maybeInitBuilder();
     builder.clearServiceData();
-    if (serviceData == null) {
+    if (serviceData == null)
       return;
-    }
-    Iterable<StringBytesMapProto> iterable =
+    Iterable<StringBytesMapProto> iterable = 
         new Iterable<StringBytesMapProto>() {
-
+      
+      @Override
+      public Iterator<StringBytesMapProto> iterator() {
+        return new Iterator<StringBytesMapProto>() {
+          
+          Iterator<String> keyIter = serviceData.keySet().iterator();
+          
           @Override
-          public Iterator<StringBytesMapProto> iterator() {
-            return new Iterator<StringBytesMapProto>() {
-
-              Iterator<String> keyIter = serviceData.keySet().iterator();
-
-              @Override
-              public void remove() {
-                throw new UnsupportedOperationException();
-              }
-
-              @Override
-              public StringBytesMapProto next() {
-                String key = keyIter.next();
-                return StringBytesMapProto.newBuilder().setKey(key)
-                    .setValue(convertToProtoFormat(serviceData.get(key)))
-                    .build();
-              }
-
-              @Override
-              public boolean hasNext() {
-                return keyIter.hasNext();
-              }
-            };
+          public void remove() {
+            throw new UnsupportedOperationException();
+          }
+          
+          @Override
+          public StringBytesMapProto next() {
+            String key = keyIter.next();
+            return StringBytesMapProto.newBuilder().setKey(key).setValue(
+                convertToProtoFormat(serviceData.get(key))).build();
+          }
+          
+          @Override
+          public boolean hasNext() {
+            return keyIter.hasNext();
           }
         };
+      }
+    };
     builder.addAllServiceData(iterable);
   }
   
@@ -352,9 +344,8 @@ public class ContainerLaunchContextPBImpl extends ContainerLaunchContext {
   
   @Override
   public void setEnvironment(final Map<String, String> env) {
-    if (env == null) {
+    if (env == null)
       return;
-    }
     initEnv();
     this.environment.clear();
     this.environment.putAll(env);
@@ -363,37 +354,36 @@ public class ContainerLaunchContextPBImpl extends ContainerLaunchContext {
   private void addEnvToProto() {
     maybeInitBuilder();
     builder.clearEnvironment();
-    if (environment == null) {
+    if (environment == null)
       return;
-    }
-    Iterable<StringStringMapProto> iterable =
+    Iterable<StringStringMapProto> iterable = 
         new Iterable<StringStringMapProto>() {
-
+      
+      @Override
+      public Iterator<StringStringMapProto> iterator() {
+        return new Iterator<StringStringMapProto>() {
+          
+          Iterator<String> keyIter = environment.keySet().iterator();
+          
           @Override
-          public Iterator<StringStringMapProto> iterator() {
-            return new Iterator<StringStringMapProto>() {
-
-              Iterator<String> keyIter = environment.keySet().iterator();
-
-              @Override
-              public void remove() {
-                throw new UnsupportedOperationException();
-              }
-
-              @Override
-              public StringStringMapProto next() {
-                String key = keyIter.next();
-                return StringStringMapProto.newBuilder().setKey(key)
-                    .setValue((environment.get(key))).build();
-              }
-
-              @Override
-              public boolean hasNext() {
-                return keyIter.hasNext();
-              }
-            };
+          public void remove() {
+            throw new UnsupportedOperationException();
+          }
+          
+          @Override
+          public StringStringMapProto next() {
+            String key = keyIter.next();
+            return StringStringMapProto.newBuilder().setKey(key).setValue(
+                (environment.get(key))).build();
+          }
+          
+          @Override
+          public boolean hasNext() {
+            return keyIter.hasNext();
           }
         };
+      }
+    };
     builder.addAllEnvironment(iterable);
   }
 
@@ -409,13 +399,12 @@ public class ContainerLaunchContextPBImpl extends ContainerLaunchContext {
     }
     ContainerLaunchContextProtoOrBuilder p = viaProto ? proto : builder;
     List<ApplicationACLMapProto> list = p.getApplicationACLsList();
-    this.applicationACLS =
-        new HashMap<ApplicationAccessType, String>(list.size());
+    this.applicationACLS = new HashMap<ApplicationAccessType, String>(list
+        .size());
 
     for (ApplicationACLMapProto aclProto : list) {
-      this.applicationACLS
-          .put(ProtoUtils.convertFromProtoFormat(aclProto.getAccessType()),
-              aclProto.getAcl());
+      this.applicationACLS.put(ProtoUtils.convertFromProtoFormat(aclProto
+          .getAccessType()), aclProto.getAcl());
     }
   }
 
@@ -425,45 +414,43 @@ public class ContainerLaunchContextPBImpl extends ContainerLaunchContext {
     if (applicationACLS == null) {
       return;
     }
-    Iterable<? extends ApplicationACLMapProto> values =
-        new Iterable<ApplicationACLMapProto>() {
+    Iterable<? extends ApplicationACLMapProto> values
+        = new Iterable<ApplicationACLMapProto>() {
+
+      @Override
+      public Iterator<ApplicationACLMapProto> iterator() {
+        return new Iterator<ApplicationACLMapProto>() {
+          Iterator<ApplicationAccessType> aclsIterator = applicationACLS
+              .keySet().iterator();
 
           @Override
-          public Iterator<ApplicationACLMapProto> iterator() {
-            return new Iterator<ApplicationACLMapProto>() {
-              Iterator<ApplicationAccessType> aclsIterator =
-                  applicationACLS.keySet().iterator();
+          public boolean hasNext() {
+            return aclsIterator.hasNext();
+          }
 
-              @Override
-              public boolean hasNext() {
-                return aclsIterator.hasNext();
-              }
+          @Override
+          public ApplicationACLMapProto next() {
+            ApplicationAccessType key = aclsIterator.next();
+            return ApplicationACLMapProto.newBuilder().setAcl(
+                applicationACLS.get(key)).setAccessType(
+                ProtoUtils.convertToProtoFormat(key)).build();
+          }
 
-              @Override
-              public ApplicationACLMapProto next() {
-                ApplicationAccessType key = aclsIterator.next();
-                return ApplicationACLMapProto.newBuilder()
-                    .setAcl(applicationACLS.get(key))
-                    .setAccessType(ProtoUtils.convertToProtoFormat(key))
-                    .build();
-              }
-
-              @Override
-              public void remove() {
-                throw new UnsupportedOperationException();
-              }
-            };
+          @Override
+          public void remove() {
+            throw new UnsupportedOperationException();
           }
         };
+      }
+    };
     this.builder.addAllApplicationACLs(values);
   }
 
   @Override
   public void setApplicationACLs(
       final Map<ApplicationAccessType, String> appACLs) {
-    if (appACLs == null) {
+    if (appACLs == null)
       return;
-    }
     initApplicationACLs();
     this.applicationACLS.clear();
     this.applicationACLS.putAll(appACLs);
@@ -474,6 +461,6 @@ public class ContainerLaunchContextPBImpl extends ContainerLaunchContext {
   }
 
   private LocalResourceProto convertToProtoFormat(LocalResource t) {
-    return ((LocalResourcePBImpl) t).getProto();
+    return ((LocalResourcePBImpl)t).getProto();
   }
 }  

@@ -18,13 +18,13 @@
 
 package org.apache.hadoop.yarn.conf;
 
+import java.io.IOException;
+import java.io.InputStream;
+
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.exceptions.YarnException;
-
-import java.io.IOException;
-import java.io.InputStream;
 
 @Private
 @Unstable
@@ -32,7 +32,8 @@ import java.io.InputStream;
  * Base class to implement ConfigurationProvider.
  * Real ConfigurationProvider implementations need to derive from it and
  * implement load methods to actually load the configuration.
- */ public abstract class ConfigurationProvider {
+ */
+public abstract class ConfigurationProvider {
 
   public void init(Configuration bootstrapConf) throws Exception {
     initInternal(bootstrapConf);
@@ -44,18 +45,15 @@ import java.io.InputStream;
 
   /**
    * Opens an InputStream at the indicated file
-   *
-   * @param bootstrapConf
-   *     Configuration
-   * @param name
-   *     The configuration file name
+   * @param bootstrapConf Configuration
+   * @param name The configuration file name
    * @return configuration
    * @throws YarnException
    * @throws IOException
    */
   public abstract InputStream getConfigurationInputStream(
-      Configuration bootstrapConf, String name)
-      throws YarnException, IOException;
+      Configuration bootstrapConf, String name) throws YarnException,
+      IOException;
 
   /**
    * Derived classes initialize themselves using this method.

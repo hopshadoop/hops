@@ -25,9 +25,7 @@ public enum RMAppAttemptEventType {
 
   // Source: AMLauncher
   LAUNCHED,
-  //gautier done
   LAUNCH_FAILED,
-  //gautier done
 
   // Source: AMLivelinessMonitor
   EXPIRE,
@@ -38,21 +36,17 @@ public enum RMAppAttemptEventType {
   UNREGISTERED,
 
   // Source: Containers
-  CONTAINER_ACQUIRED,
   CONTAINER_ALLOCATED,
   CONTAINER_FINISHED,
-  //gautier done
   
   // Source: RMStateStore
   ATTEMPT_NEW_SAVED,
-  //gautier done
   ATTEMPT_UPDATE_SAVED,
-  //gautier done
 
   // Source: Scheduler
-  ATTEMPT_ADDED,//gautier done
+  ATTEMPT_ADDED,
   
   // Source: RMAttemptImpl.recover
-  //  RECOVER
+  RECOVER
 
 }

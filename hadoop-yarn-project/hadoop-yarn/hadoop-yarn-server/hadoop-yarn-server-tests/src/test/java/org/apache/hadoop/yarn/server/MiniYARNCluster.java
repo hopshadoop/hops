@@ -1,30 +1,40 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements. See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership. The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
- */
+* Licensed to the Apache Software Foundation (ASF) under one
+* or more contributor license agreements.  See the NOTICE file
+* distributed with this work for additional information
+* regarding copyright ownership.  The ASF licenses this file
+* to you under the Apache License, Version 2.0 (the
+* "License"); you may not use this file except in compliance
+* with the License.  You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
+
 package org.apache.hadoop.yarn.server;
 
-import com.google.common.annotations.VisibleForTesting;
-import io.hops.metadata.util.RMStorageFactory;
-import io.hops.metadata.util.YarnAPIStorageFactory;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.util.Collection;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.ha.HAServiceProtocol;
@@ -35,6 +45,7 @@ import org.apache.hadoop.util.Shell;
 import org.apache.hadoop.util.Shell.ShellCommandExecutor;
 import org.apache.hadoop.yarn.api.protocolrecords.GetClusterMetricsRequest;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
+import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.conf.HAUtil;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.event.Dispatcher;
@@ -51,8 +62,6 @@ import org.apache.hadoop.yarn.server.api.protocolrecords.RegisterNodeManagerResp
 import org.apache.hadoop.yarn.server.applicationhistoryservice.ApplicationHistoryServer;
 import org.apache.hadoop.yarn.server.applicationhistoryservice.ApplicationHistoryStore;
 import org.apache.hadoop.yarn.server.applicationhistoryservice.MemoryApplicationHistoryStore;
-import org.apache.hadoop.yarn.server.applicationhistoryservice.timeline.MemoryTimelineStore;
-import org.apache.hadoop.yarn.server.applicationhistoryservice.timeline.TimelineStore;
 import org.apache.hadoop.yarn.server.nodemanager.Context;
 import org.apache.hadoop.yarn.server.nodemanager.NodeHealthCheckerService;
 import org.apache.hadoop.yarn.server.nodemanager.NodeManager;
@@ -60,29 +69,34 @@ import org.apache.hadoop.yarn.server.nodemanager.NodeStatusUpdater;
 import org.apache.hadoop.yarn.server.nodemanager.NodeStatusUpdaterImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
 import org.apache.hadoop.yarn.server.resourcemanager.ResourceTrackerService;
+import org.apache.hadoop.yarn.server.resourcemanager.reservation.ReservationSystemTestUtil;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.event.RMAppAttemptRegistrationEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.event.RMAppAttemptUnregistrationEvent;
+import org.apache.hadoop.yarn.server.timeline.MemoryTimelineStore;
+import org.apache.hadoop.yarn.server.timeline.TimelineStore;
+import org.apache.hadoop.yarn.server.timeline.recovery.MemoryTimelineStateStore;
+import org.apache.hadoop.yarn.server.timeline.recovery.TimelineStateStore;
+import org.apache.hadoop.yarn.util.resource.Resources;
 import org.apache.hadoop.yarn.webapp.util.WebAppUtils;
 
-import java.io.File;
-import java.io.IOException;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
-import java.util.Collection;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
+import com.google.common.annotations.VisibleForTesting;
 
 /**
- * Embedded Yarn minicluster for testcases that need to interact with a
- * cluster.
+ * Embedded Yarn minicluster for testcases that need to interact with a cluster.
  * <p/>
  * In a real cluster, resource request matching is done using the hostname, and
  * by default Yarn minicluster works in the exact same way as a real cluster.
  * <p/>
- * If a testcase needs to use multiple nodes and exercise resource request
- * matching to a specific node, then the property {
+ * If a testcase needs to use multiple nodes and exercise resource request 
+ * matching to a specific node, then the property 
+ * {@YarnConfiguration.RM_SCHEDULER_INCLUDE_PORT_IN_NODE_NAME} should be set
+ * <code>true</code> in the configuration used to initialize the minicluster.
+ * <p/>
+ * With this property set to <code>true</code>, the matching will be done using
+ * the <code>hostname:port</code> of the namenodes. In such case, the AM must
+ * do resource request using <code>hostname:port</code> as the location.
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
@@ -107,7 +121,7 @@ public class MiniYARNCluster extends CompositeService {
 
   private ConcurrentMap<ApplicationAttemptId, Long> appMasters =
       new ConcurrentHashMap<ApplicationAttemptId, Long>(16, 0.75f, 2);
-
+  
   private File testWorkDir;
 
   // Number of nm-local-dirs per nodemanager
@@ -115,37 +129,32 @@ public class MiniYARNCluster extends CompositeService {
   // Number of nm-log-dirs per nodemanager
   private int numLogDirs;
   private boolean enableAHS;
-
+  private boolean formatDB;
   /**
-   * @param testName
-   *     name of the test
-   * @param numResourceManagers
-   *     the number of resource managers in the cluster
-   * @param numNodeManagers
-   *     the number of node managers in the cluster
-   * @param numLocalDirs
-   *     the number of nm-local-dirs per nodemanager
-   * @param numLogDirs
-   *     the number of nm-log-dirs per nodemanager
-   * @param enableAHS
-   *     enable ApplicationHistoryServer or not
+   * @param testName name of the test
+   * @param numResourceManagers the number of resource managers in the cluster
+   * @param numNodeManagers the number of node managers in the cluster
+   * @param numLocalDirs the number of nm-local-dirs per nodemanager
+   * @param numLogDirs the number of nm-log-dirs per nodemanager
+   * @param enableAHS enable ApplicationHistoryServer or not
    */
-  public MiniYARNCluster(String testName, int numResourceManagers,
-      int numNodeManagers, int numLocalDirs, int numLogDirs,
-      boolean enableAHS) {
+  public MiniYARNCluster(
+      String testName, int numResourceManagers, int numNodeManagers,
+      int numLocalDirs, int numLogDirs, boolean enableAHS, boolean formatDB) {
     super(testName.replace("$", ""));
     this.numLocalDirs = numLocalDirs;
     this.numLogDirs = numLogDirs;
     this.enableAHS = enableAHS;
+    this.formatDB = formatDB;
     String testSubDir = testName.replace("$", "");
     File targetWorkDir = new File("target", testSubDir);
     try {
-      FileContext.getLocalFSFileContext()
-          .delete(new Path(targetWorkDir.getAbsolutePath()), true);
+      FileContext.getLocalFSFileContext().delete(
+          new Path(targetWorkDir.getAbsolutePath()), true);
     } catch (Exception e) {
       LOG.warn("COULD NOT CLEANUP", e);
-      throw new YarnRuntimeException("could not cleanup test dir: " + e, e);
-    }
+      throw new YarnRuntimeException("could not cleanup test dir: "+ e, e);
+    } 
 
     if (Shell.WINDOWS) {
       // The test working directory can exceed the maximum path length supported
@@ -155,27 +164,26 @@ public class MiniYARNCluster extends CompositeService {
       // symlink as the test working directory.
       String targetPath = targetWorkDir.getAbsolutePath();
       File link = new File(System.getProperty("java.io.tmpdir"),
-          String.valueOf(System.currentTimeMillis()));
+        String.valueOf(System.currentTimeMillis()));
       String linkPath = link.getAbsolutePath();
 
       try {
         FileContext.getLocalFSFileContext().delete(new Path(linkPath), true);
       } catch (IOException e) {
-        throw new YarnRuntimeException("could not cleanup symlink: " + linkPath,
-            e);
+        throw new YarnRuntimeException("could not cleanup symlink: " + linkPath, e);
       }
 
       // Guarantee target exists before creating symlink.
       targetWorkDir.mkdirs();
 
       ShellCommandExecutor shexec = new ShellCommandExecutor(
-          Shell.getSymlinkCommand(targetPath, linkPath));
+        Shell.getSymlinkCommand(targetPath, linkPath));
       try {
         shexec.execute();
       } catch (IOException e) {
-        throw new YarnRuntimeException(String
-            .format("failed to create symlink from %s to %s, shell output: %s",
-                linkPath, targetPath, shexec.getOutput()), e);
+        throw new YarnRuntimeException(String.format(
+          "failed to create symlink from %s to %s, shell output: %s", linkPath,
+          targetPath, shexec.getOutput()), e);
       }
 
       this.testWorkDir = link;
@@ -187,56 +195,53 @@ public class MiniYARNCluster extends CompositeService {
     nodeManagers = new NodeManager[numNodeManagers];
   }
 
+  public MiniYARNCluster(
+      String testName, int numResourceManagers, int numNodeManagers,
+      int numLocalDirs, int numLogDirs, boolean enableAHS) {
+    this(testName, numResourceManagers, numNodeManagers, numLocalDirs,
+            numLogDirs, enableAHS, true);
+  }
+  
   /**
-   * @param testName
-   *     name of the test
-   * @param numResourceManagers
-   *     the number of resource managers in the cluster
-   * @param numNodeManagers
-   *     the number of node managers in the cluster
-   * @param numLocalDirs
-   *     the number of nm-local-dirs per nodemanager
-   * @param numLogDirs
-   *     the number of nm-log-dirs per nodemanager
+   * @param testName name of the test
+   * @param numResourceManagers the number of resource managers in the cluster
+   * @param numNodeManagers the number of node managers in the cluster
+   * @param numLocalDirs the number of nm-local-dirs per nodemanager
+   * @param numLogDirs the number of nm-log-dirs per nodemanager
    */
-  public MiniYARNCluster(String testName, int numResourceManagers,
-      int numNodeManagers, int numLocalDirs, int numLogDirs) {
+  public MiniYARNCluster(
+      String testName, int numResourceManagers, int numNodeManagers,
+      int numLocalDirs, int numLogDirs) {
     this(testName, numResourceManagers, numNodeManagers, numLocalDirs,
         numLogDirs, false);
   }
 
   /**
-   * @param testName
-   *     name of the test
-   * @param numNodeManagers
-   *     the number of node managers in the cluster
-   * @param numLocalDirs
-   *     the number of nm-local-dirs per nodemanager
-   * @param numLogDirs
-   *     the number of nm-log-dirs per nodemanager
+   * @param testName name of the test
+   * @param numNodeManagers the number of node managers in the cluster
+   * @param numLocalDirs the number of nm-local-dirs per nodemanager
+   * @param numLogDirs the number of nm-log-dirs per nodemanager
    */
-  public MiniYARNCluster(String testName, int numNodeManagers, int numLocalDirs,
-      int numLogDirs) {
+  public MiniYARNCluster(String testName, int numNodeManagers,
+                         int numLocalDirs, int numLogDirs) {
     this(testName, 1, numNodeManagers, numLocalDirs, numLogDirs);
   }
 
   @Override
   public void serviceInit(Configuration conf) throws Exception {
-    useFixedPorts =
-        conf.getBoolean(YarnConfiguration.YARN_MINICLUSTER_FIXED_PORTS,
-            YarnConfiguration.DEFAULT_YARN_MINICLUSTER_FIXED_PORTS);
+    useFixedPorts = conf.getBoolean(
+        YarnConfiguration.YARN_MINICLUSTER_FIXED_PORTS,
+        YarnConfiguration.DEFAULT_YARN_MINICLUSTER_FIXED_PORTS);
     useRpc = conf.getBoolean(YarnConfiguration.YARN_MINICLUSTER_USE_RPC,
         YarnConfiguration.DEFAULT_YARN_MINICLUSTER_USE_RPC);
-    //TODO reduce this value when the failover work at a proper speed
-    failoverTimeout = ((conf
-        .getInt(CommonConfigurationKeys.DFS_LEADER_MISSED_HB_THRESHOLD_KEY,
-            CommonConfigurationKeys.DFS_LEADER_MISSED_HB_THRESHOLD_DEFAULT) +
-        2) *
-        conf.getInt(CommonConfigurationKeys.DFS_LEADER_CHECK_INTERVAL_IN_MS_KEY,
-            CommonConfigurationKeys.DFS_LEADER_CHECK_INTERVAL_IN_MS_DEFAULT)) +
-        2 * 1000;
-    YarnAPIStorageFactory.setConfiguration(conf);
+    failoverTimeout = conf.getInt(YarnConfiguration.RM_ZK_TIMEOUT_MS,
+        YarnConfiguration.DEFAULT_RM_ZK_TIMEOUT_MS);
+
     RMStorageFactory.setConfiguration(conf);
+    YarnAPIStorageFactory.setConfiguration(conf);
+    if(formatDB){
+      DBUtility.InitializeDB();
+    }
 
     if (useRpc && !useFixedPorts) {
       throw new YarnRuntimeException("Invalid configuration!" +
@@ -264,86 +269,78 @@ public class MiniYARNCluster extends CompositeService {
       resourceManagers[i] = createResourceManager();
       if (!useFixedPorts) {
         if (HAUtil.isHAEnabled(conf)) {
-          setHARMConfiguration(i, conf);
+          setHARMConfigurationWithEphemeralPorts(i, conf);
         } else {
-          setNonHARMConfiguration(conf);
+          setNonHARMConfigurationWithEphemeralPorts(conf);
         }
       }
       addService(new ResourceManagerWrapper(i));
     }
-    for (int index = 0; index < nodeManagers.length; index++) {
+    for(int index = 0; index < nodeManagers.length; index++) {
       nodeManagers[index] =
           useRpc ? new CustomNodeManager() : new ShortCircuitedNodeManager();
       addService(new NodeManagerWrapper(index));
     }
 
-    if (enableAHS) {
-      addService(new ApplicationHistoryServerWrapper());
+    if(conf.getBoolean(YarnConfiguration.TIMELINE_SERVICE_ENABLED,
+        YarnConfiguration.DEFAULT_TIMELINE_SERVICE_ENABLED) || enableAHS) {
+        addService(new ApplicationHistoryServerWrapper());
     }
-
+    
     super.serviceInit(
         conf instanceof YarnConfiguration ? conf : new YarnConfiguration(conf));
   }
 
-  private void setNonHARMConfiguration(Configuration conf) {
+  @Override
+  protected synchronized void serviceStart() throws Exception {
+    super.serviceStart();
+    this.waitForNodeManagersToConnect(5000);
+  }
+
+  private void setNonHARMConfigurationWithEphemeralPorts(Configuration conf) {
     String hostname = MiniYARNCluster.getHostname();
     conf.set(YarnConfiguration.RM_ADDRESS, hostname + ":0");
     conf.set(YarnConfiguration.RM_ADMIN_ADDRESS, hostname + ":0");
     conf.set(YarnConfiguration.RM_SCHEDULER_ADDRESS, hostname + ":0");
     conf.set(YarnConfiguration.RM_RESOURCE_TRACKER_ADDRESS, hostname + ":0");
+    conf.set(YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS, hostname + ":0");
     WebAppUtils.setRMWebAppHostnameAndPort(conf, hostname, 0);
   }
 
-  private void setHARMConfiguration(final int index, Configuration conf) {
+  private void setHARMConfigurationWithEphemeralPorts(final int index, Configuration conf) {
     String hostname = MiniYARNCluster.getHostname();
-    for (String confKey : YarnConfiguration.getServiceAddressConfKeys(conf)) {
-      conf.set(HAUtil.addSuffix(confKey, rmIds[index]), hostname + ":0");
-    }
+      for (String confKey : YarnConfiguration.getServiceAddressConfKeys(conf)) {
+        conf.set(HAUtil.addSuffix(confKey, rmIds[index]), hostname + ":0");
+      }
   }
 
   private synchronized void initResourceManager(int index, Configuration conf) {
-    Configuration config = conf;
-    if (HAUtil.isHAEnabled(config)) {
-      if (HAUtil.isAutomaticFailoverEnabled(conf)) {
-        config = new YarnConfiguration(conf);
-      }
-      config.set(YarnConfiguration.RM_HA_ID, rmIds[index]);
+    if (HAUtil.isHAEnabled(conf)) {
+      conf.set(YarnConfiguration.RM_HA_ID, rmIds[index]);
     }
-    resourceManagers[index].init(config);
-    resourceManagers[index].getRMContext().getDispatcher()
-        .register(RMAppAttemptEventType.class,
-            new EventHandler<RMAppAttemptEvent>() {
-              public void handle(RMAppAttemptEvent event) {
-                if (event instanceof RMAppAttemptRegistrationEvent) {
-                  appMasters.put(event.getApplicationAttemptId(),
-                      event.getTimestamp());
-                } else if (event instanceof RMAppAttemptUnregistrationEvent) {
-                  appMasters.remove(event.getApplicationAttemptId());
-                }
-              }
-            });
+    resourceManagers[index].init(conf);
+    resourceManagers[index].getRMContext().getDispatcher().register(
+        RMAppAttemptEventType.class,
+        new EventHandler<RMAppAttemptEvent>() {
+          public void handle(RMAppAttemptEvent event) {
+            if (event instanceof RMAppAttemptRegistrationEvent) {
+              appMasters.put(event.getApplicationAttemptId(),
+                  event.getTimestamp());
+            } else if (event instanceof RMAppAttemptUnregistrationEvent) {
+              appMasters.remove(event.getApplicationAttemptId());
+            }
+          }
+        });
   }
 
   private synchronized void startResourceManager(final int index) {
     try {
-      Thread rmThread = new Thread() {
-        public void run() {
-          resourceManagers[index].start();
-        }
-      };
-      rmThread.setName("RM-" + index);
-      rmThread.start();
-      int waitCount = 0;
-      while (resourceManagers[index].getServiceState() == STATE.INITED &&
-          waitCount++ < 60) {
-        LOG.info("Waiting for RM to start...");
-        Thread.sleep(1500);
-      }
+      resourceManagers[index].start();
       if (resourceManagers[index].getServiceState() != STATE.STARTED) {
         // RM could have failed.
         throw new IOException(
-            "ResourceManager failed to start. Final state is " +
-                resourceManagers[index].getServiceState());
+            "ResourceManager failed to start. Final state is "
+                + resourceManagers[index].getServiceState());
       }
     } catch (Throwable t) {
       throw new YarnRuntimeException(t);
@@ -373,7 +370,7 @@ public class MiniYARNCluster extends CompositeService {
     }
     Configuration conf = getConfig();
     resourceManagers[index] = new ResourceManager();
-    initResourceManager(index, getConfig());
+    initResourceManager(index, conf);
     startResourceManager(index);
   }
 
@@ -422,12 +419,14 @@ public class MiniYARNCluster extends CompositeService {
   }
 
   /**
-   * @return the active {@link ResourceManager} of the cluster, null if none
-   * of them are active.
+   * @return the active {@link ResourceManager} of the cluster,
+   * null if none of them are active.
    */
   public ResourceManager getResourceManager() {
     int activeRMIndex = getActiveRMIndex();
-    return activeRMIndex == -1 ? null : this.resourceManagers[activeRMIndex];
+    return activeRMIndex == -1
+        ? null
+        : this.resourceManagers[activeRMIndex];
   }
 
   public ResourceManager getResourceManager(int i) {
@@ -441,13 +440,13 @@ public class MiniYARNCluster extends CompositeService {
   public static String getHostname() {
     try {
       return InetAddress.getLocalHost().getHostName();
-    } catch (UnknownHostException ex) {
+    }
+    catch (UnknownHostException ex) {
       throw new RuntimeException(ex);
     }
   }
 
   private class ResourceManagerWrapper extends AbstractService {
-
     private int index;
 
     public ResourceManagerWrapper(int i) {
@@ -465,19 +464,22 @@ public class MiniYARNCluster extends CompositeService {
     @Override
     protected synchronized void serviceStart() throws Exception {
       startResourceManager(index);
+      if(index == 0 && resourceManagers[index].getRMContext().isHAEnabled()) {
+          resourceManagers[index].getRMContext().getRMAdminService()
+            .transitionToActive(new HAServiceProtocol.StateChangeRequestInfo(
+              HAServiceProtocol.RequestSource.REQUEST_BY_USER_FORCED));
+      }
       LOG.info("MiniYARN ResourceManager address: " +
-          getConfig().get(YarnConfiguration.RM_ADDRESS));
+               getConfig().get(YarnConfiguration.RM_ADDRESS));
       LOG.info("MiniYARN ResourceManager web address: " +
-          WebAppUtils.getRMWebAppURLWithoutScheme(getConfig()));
+               WebAppUtils.getRMWebAppURLWithoutScheme(getConfig()));
       super.serviceStart();
     }
 
-    private void waitForAppMastersToFinish(long timeoutMillis)
-        throws InterruptedException {
+    private void waitForAppMastersToFinish(long timeoutMillis) throws InterruptedException {
       long started = System.currentTimeMillis();
       synchronized (appMasters) {
-        while (!appMasters.isEmpty() &&
-            System.currentTimeMillis() - started < timeoutMillis) {
+        while (!appMasters.isEmpty() && System.currentTimeMillis() - started < timeoutMillis) {
           appMasters.wait(1000);
         }
       }
@@ -485,7 +487,7 @@ public class MiniYARNCluster extends CompositeService {
         LOG.warn("Stopping RM while some app masters are still alive");
       }
     }
-
+    
     @Override
     protected synchronized void serviceStop() throws Exception {
       if (resourceManagers[index] != null) {
@@ -498,11 +500,11 @@ public class MiniYARNCluster extends CompositeService {
         // work around path length limitation.
         String testWorkDirPath = testWorkDir.getAbsolutePath();
         try {
-          FileContext.getLocalFSFileContext()
-              .delete(new Path(testWorkDirPath), true);
+          FileContext.getLocalFSFileContext().delete(new Path(testWorkDirPath),
+            true);
         } catch (IOException e) {
-          LOG.warn(
-              "could not cleanup symlink: " + testWorkDir.getAbsolutePath());
+          LOG.warn("could not cleanup symlink: " +
+            testWorkDir.getAbsolutePath());
         }
       }
       super.serviceStop();
@@ -510,7 +512,6 @@ public class MiniYARNCluster extends CompositeService {
   }
 
   private class NodeManagerWrapper extends AbstractService {
-
     int index = 0;
 
     public NodeManagerWrapper(int i) {
@@ -521,10 +522,6 @@ public class MiniYARNCluster extends CompositeService {
     protected synchronized void serviceInit(Configuration conf)
         throws Exception {
       Configuration config = new YarnConfiguration(conf);
-      if (HAUtil.isHAEnabled(config) &&
-          HAUtil.isAutomaticFailoverEnabled(conf)) {
-        config.set(YarnConfiguration.RM_HA_ID, rmIds[0]);
-      }
       // create nm-local-dirs and configure them for the nodemanager
       String localDirsString = prepareDirs("local", numLocalDirs);
       config.set(YarnConfiguration.NM_LOCAL_DIRS, localDirsString);
@@ -532,24 +529,23 @@ public class MiniYARNCluster extends CompositeService {
       String logDirsString = prepareDirs("log", numLogDirs);
       config.set(YarnConfiguration.NM_LOG_DIRS, logDirsString);
 
-      File remoteLogDir = new File(testWorkDir,
-          MiniYARNCluster.this.getName() + "-remoteLogDir-nm-" + index);
-      remoteLogDir.mkdir();
-      config.set(YarnConfiguration.NM_REMOTE_APP_LOG_DIR,
-          remoteLogDir.getAbsolutePath());
-      // By default AM + 2 containers
-      config.setInt(YarnConfiguration.NM_PMEM_MB, 4 * 1024);
+      config.setInt(YarnConfiguration.NM_PMEM_MB, config.getInt(
+          YarnConfiguration.YARN_MINICLUSTER_NM_PMEM_MB,
+          YarnConfiguration.DEFAULT_YARN_MINICLUSTER_NM_PMEM_MB));
+
       config.set(YarnConfiguration.NM_ADDRESS,
           MiniYARNCluster.getHostname() + ":0");
       config.set(YarnConfiguration.NM_LOCALIZER_ADDRESS,
           MiniYARNCluster.getHostname() + ":0");
       WebAppUtils
-          .setNMWebAppHostNameAndPort(config, MiniYARNCluster.getHostname(), 0);
+          .setNMWebAppHostNameAndPort(config,
+              MiniYARNCluster.getHostname(), 0);
 
       // Disable resource checks by default
       if (!config.getBoolean(
           YarnConfiguration.YARN_MINICLUSTER_CONTROL_RESOURCE_MONITORING,
-          YarnConfiguration.DEFAULT_YARN_MINICLUSTER_CONTROL_RESOURCE_MONITORING)) {
+          YarnConfiguration.
+              DEFAULT_YARN_MINICLUSTER_CONTROL_RESOURCE_MONITORING)) {
         config.setBoolean(YarnConfiguration.NM_PMEM_CHECK_ENABLED, false);
         config.setBoolean(YarnConfiguration.NM_VMEM_CHECK_ENABLED, false);
       }
@@ -561,20 +557,16 @@ public class MiniYARNCluster extends CompositeService {
 
     /**
      * Create local/log directories
-     *
-     * @param dirType
-     *     type of directories i.e. local dirs or log dirs
-     * @param numDirs
-     *     number of directories
+     * @param dirType type of directories i.e. local dirs or log dirs 
+     * @param numDirs number of directories
      * @return the created directories as a comma delimited String
      */
     private String prepareDirs(String dirType, int numDirs) {
-      File[] dirs = new File[numDirs];
+      File []dirs = new File[numDirs];
       String dirsString = "";
       for (int i = 0; i < numDirs; i++) {
-        dirs[i] = new File(testWorkDir,
-            MiniYARNCluster.this.getName() + "-" + dirType + "Dir-nm-" + index +
-                "_" + i);
+        dirs[i]= new File(testWorkDir, MiniYARNCluster.this.getName()
+            + "-" + dirType + "Dir-nm-" + index + "_" + i);
         dirs[i].mkdirs();
         LOG.info("Created " + dirType + "Dir in " + dirs[i].getAbsolutePath());
         String delimiter = (i > 0) ? "," : "";
@@ -584,26 +576,12 @@ public class MiniYARNCluster extends CompositeService {
     }
 
     protected synchronized void serviceStart() throws Exception {
-      try {
-        new Thread() {
-          public void run() {
-            nodeManagers[index].start();
-          }
-        }.start();
-        int waitCount = 0;
-        while (nodeManagers[index].getServiceState() == STATE.INITED &&
-            waitCount++ < 60) {
-          LOG.info("Waiting for NM " + index + " to start...");
-          Thread.sleep(1000);
-        }
-        if (nodeManagers[index].getServiceState() != STATE.STARTED) {
-          // RM could have failed.
-          throw new IOException("NodeManager " + index + " failed to start");
-        }
-        super.serviceStart();
-      } catch (Throwable t) {
-        throw new YarnRuntimeException(t);
+      nodeManagers[index].start();
+      if (nodeManagers[index].getServiceState() != STATE.STARTED) {
+        // NM could have failed.
+        throw new IOException("NodeManager " + index + " failed to start");
       }
+      super.serviceStart();
     }
 
     @Override
@@ -616,7 +594,6 @@ public class MiniYARNCluster extends CompositeService {
   }
 
   private class CustomNodeManager extends NodeManager {
-
     @Override
     protected void doSecureLogin() throws IOException {
       // Don't try to login using keytab in the testcase.
@@ -624,31 +601,30 @@ public class MiniYARNCluster extends CompositeService {
   }
 
   private class ShortCircuitedNodeManager extends CustomNodeManager {
-
     @Override
     protected NodeStatusUpdater createNodeStatusUpdater(Context context,
         Dispatcher dispatcher, NodeHealthCheckerService healthChecker) {
-      return new NodeStatusUpdaterImpl(context, dispatcher, healthChecker,
-          metrics) {
+      return new NodeStatusUpdaterImpl(context, dispatcher,
+          healthChecker, metrics) {
         @Override
         protected ResourceTracker getRMClient() {
           final ResourceTrackerService rt =
               getResourceManager().getResourceTrackerService();
           final RecordFactory recordFactory =
-              RecordFactoryProvider.getRecordFactory(null);
+            RecordFactoryProvider.getRecordFactory(null);
 
           // For in-process communication without RPC
           return new ResourceTracker() {
 
             @Override
             public NodeHeartbeatResponse nodeHeartbeat(
-                NodeHeartbeatRequest request)
-                throws YarnException, IOException {
+                NodeHeartbeatRequest request) throws YarnException,
+                IOException {
               NodeHeartbeatResponse response;
               try {
                 response = rt.nodeHeartbeat(request);
               } catch (YarnException e) {
-                LOG.info("Exception in heartbeat from node " +
+                LOG.info("Exception in heartbeat from node " + 
                     request.getNodeStatus().getNodeId(), e);
                 throw e;
               }
@@ -663,19 +639,17 @@ public class MiniYARNCluster extends CompositeService {
               try {
                 response = rt.registerNodeManager(request);
               } catch (YarnException e) {
-                LOG.info("Exception in node registration from " +
-                    request.getNodeId().toString(), e);
+                LOG.info("Exception in node registration from "
+                    + request.getNodeId().toString(), e);
                 throw e;
               }
               return response;
             }
-
           };
         }
 
         @Override
-        protected void stopRMProxy() {
-        }
+        protected void stopRMProxy() { }
       };
     }
   }
@@ -683,31 +657,31 @@ public class MiniYARNCluster extends CompositeService {
   /**
    * Wait for all the NodeManagers to connect to the ResourceManager.
    *
-   * @param timeout
-   *     Time to wait (sleeps in 100 ms intervals) in milliseconds.
-   * @return true if all NodeManagers connect to the (Active) ResourceManager,
-   * false otherwise.
+   * @param timeout Time to wait (sleeps in 10 ms intervals) in milliseconds.
+   * @return true if all NodeManagers connect to the (Active)
+   * ResourceManager, false otherwise.
    * @throws YarnException
    * @throws InterruptedException
    */
   public boolean waitForNodeManagersToConnect(long timeout)
       throws YarnException, InterruptedException {
-    ResourceManager rm = getResourceManager();
     GetClusterMetricsRequest req = GetClusterMetricsRequest.newInstance();
-
-    for (int i = 0; i < timeout / 100; i++) {
-      if (nodeManagers.length ==
-          rm.getClientRMService().getClusterMetrics(req).getClusterMetrics()
-              .getNumNodeManagers()) {
+    for (int i = 0; i < timeout / 10; i++) {
+      ResourceManager rm = getResourceManager();
+      if (rm == null) {
+        throw new YarnException("Can not find the active RM.");
+      }
+      else if (nodeManagers.length == rm.getClientRMService()
+          .getClusterMetrics(req).getClusterMetrics().getNumNodeManagers()) {
+        LOG.info("All Node Managers connected in MiniYARNCluster");
         return true;
       }
-      Thread.sleep(100);
+      Thread.sleep(10);
     }
     return false;
   }
 
   private class ApplicationHistoryServerWrapper extends AbstractService {
-
     public ApplicationHistoryServerWrapper() {
       super(ApplicationHistoryServerWrapper.class.getName());
     }
@@ -720,6 +694,14 @@ public class MiniYARNCluster extends CompositeService {
           MemoryApplicationHistoryStore.class, ApplicationHistoryStore.class);
       conf.setClass(YarnConfiguration.TIMELINE_SERVICE_STORE,
           MemoryTimelineStore.class, TimelineStore.class);
+      conf.setClass(YarnConfiguration.TIMELINE_SERVICE_STATE_STORE_CLASS,
+          MemoryTimelineStateStore.class, TimelineStateStore.class);
+      if (!useFixedPorts) {
+        String hostname = MiniYARNCluster.getHostname();
+        conf.set(YarnConfiguration.TIMELINE_SERVICE_ADDRESS, hostname + ":0");
+        conf.set(YarnConfiguration.TIMELINE_SERVICE_WEBAPP_ADDRESS, hostname
+            + ":0");
+      }
       appHistoryServer.init(conf);
       super.serviceInit(conf);
     }
@@ -727,33 +709,21 @@ public class MiniYARNCluster extends CompositeService {
     @Override
     protected synchronized void serviceStart() throws Exception {
       try {
-        new Thread() {
-          public void run() {
-            appHistoryServer.start();
-          }
-
-          ;
-        }.start();
-        int waitCount = 0;
-        while (appHistoryServer.getServiceState() == STATE.INITED &&
-            waitCount++ < 60) {
-          LOG.info("Waiting for Timeline Server to start...");
-          Thread.sleep(1500);
-        }
+        appHistoryServer.start();
         if (appHistoryServer.getServiceState() != STATE.STARTED) {
           // AHS could have failed.
           throw new IOException(
-              "ApplicationHistoryServer failed to start. Final state is " +
-                  appHistoryServer.getServiceState());
+              "ApplicationHistoryServer failed to start. Final state is "
+                  + appHistoryServer.getServiceState());
         }
         super.serviceStart();
       } catch (Throwable t) {
         throw new YarnRuntimeException(t);
       }
-      LOG.info("MiniYARN ApplicationHistoryServer address: " +
-          getConfig().get(YarnConfiguration.TIMELINE_SERVICE_ADDRESS));
-      LOG.info("MiniYARN ApplicationHistoryServer web address: " +
-          getConfig().get(YarnConfiguration.TIMELINE_SERVICE_WEBAPP_ADDRESS));
+      LOG.info("MiniYARN ApplicationHistoryServer address: "
+          + getConfig().get(YarnConfiguration.TIMELINE_SERVICE_ADDRESS));
+      LOG.info("MiniYARN ApplicationHistoryServer web address: "
+          + getConfig().get(YarnConfiguration.TIMELINE_SERVICE_WEBAPP_ADDRESS));
     }
 
     @Override
@@ -761,7 +731,6 @@ public class MiniYARNCluster extends CompositeService {
       if (appHistoryServer != null) {
         appHistoryServer.stop();
       }
-      super.serviceStop();
     }
   }
 
@@ -770,7 +739,7 @@ public class MiniYARNCluster extends CompositeService {
   }
 
   protected ResourceManager createResourceManager() {
-    return new ResourceManager() {
+    return new ResourceManager(){
       @Override
       protected void doSecureLogin() throws IOException {
         // Don't try to login using keytab in the testcases.

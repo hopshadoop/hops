@@ -176,12 +176,64 @@ public abstract class OutputCommitter
 
   /**
    * This method implements the new interface by calling the old method. Note
-   * that the input types are different between the new and old apis and this
-   * is a bridge between the two.
+   * that the input types are different between the new and old apis and this is
+   * a bridge between the two.
+   * 
+   * @deprecated Use {@link #isRecoverySupported(JobContext)} instead.
    */
+  @Deprecated
   @Override
   public boolean isRecoverySupported() {
     return false;
+  }
+
+  /**
+   * Is task output recovery supported for restarting jobs?
+   * 
+   * If task output recovery is supported, job restart can be done more
+   * efficiently.
+   *
+   * @param jobContext
+   *          Context of the job whose output is being written.
+   * @return <code>true</code> if task output recovery is supported,
+   *         <code>false</code> otherwise
+   * @throws IOException
+   * @see #recoverTask(TaskAttemptContext)
+   */
+  public boolean isRecoverySupported(JobContext jobContext) throws IOException {
+    return isRecoverySupported();
+  }
+
+  /**
+   * Returns true if an in-progress job commit can be retried. If the MR AM is
+   * re-run then it will check this value to determine if it can retry an
+   * in-progress commit that was started by a previous version.
+   * Note that in rare scenarios, the previous AM version might still be running
+   * at that time, due to system anomalies. Hence if this method returns true
+   * then the retry commit operation should be able to run concurrently with
+   * the previous operation.
+   *
+   * If repeatable job commit is supported, job restart can tolerate previous
+   * AM failures during job commit.
+   *
+   * By default, it is not supported. Extended classes (like:
+   * FileOutputCommitter) should explicitly override it if provide support.
+   *
+   * @param jobContext
+   *          Context of the job whose output is being written.
+   * @return <code>true</code> repeatable job commit is supported,
+   *         <code>false</code> otherwise
+   * @throws IOException
+   */
+  public boolean isCommitJobRepeatable(JobContext jobContext) throws
+      IOException {
+    return false;
+  }
+
+  @Override
+  public boolean isCommitJobRepeatable(org.apache.hadoop.mapreduce.JobContext
+      jobContext) throws IOException {
+    return isCommitJobRepeatable((JobContext) jobContext);
   }
 
   /**
@@ -313,6 +365,17 @@ public abstract class OutputCommitter
   void recoverTask(org.apache.hadoop.mapreduce.TaskAttemptContext taskContext
       ) throws IOException {
     recoverTask((TaskAttemptContext) taskContext);
+  }
+
+  /**
+   * This method implements the new interface by calling the old method. Note
+   * that the input types are different between the new and old apis and this is
+   * a bridge between the two.
+   */
+  @Override
+  public final boolean isRecoverySupported(
+      org.apache.hadoop.mapreduce.JobContext context) throws IOException {
+    return isRecoverySupported((JobContext) context);
   }
 
 }

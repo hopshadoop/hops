@@ -39,6 +39,7 @@ public class DistCpOptions {
   private boolean deleteMissing = false;
   private boolean ignoreFailures = false;
   private boolean overwrite = false;
+  private boolean append = false;
   private boolean skipCRC = false;
   private boolean blocking = true;
 
@@ -51,6 +52,8 @@ public class DistCpOptions {
 
   private EnumSet<FileAttribute> preserveStatus = EnumSet.noneOf(FileAttribute.class);
 
+  private boolean preserveRawXattrs;
+
   private Path atomicWorkPath;
 
   private Path logPath;
@@ -58,10 +61,17 @@ public class DistCpOptions {
   private Path sourceFileListing;
   private List<Path> sourcePaths;
 
+  private String fromSnapshot;
+  private String toSnapshot;
+
   private Path targetPath;
 
+  // targetPathExist is a derived field, it's initialized in the 
+  // beginning of distcp.
+  private boolean targetPathExists = true;
+  
   public static enum FileAttribute{
-    REPLICATION, BLOCKSIZE, USER, GROUP, PERMISSION, CHECKSUMTYPE;
+    REPLICATION, BLOCKSIZE, USER, GROUP, PERMISSION, CHECKSUMTYPE, ACL, XATTR, TIMES;
 
     public static FileAttribute getAttribute(char symbol) {
       for (FileAttribute attribute : values()) {
@@ -118,11 +128,13 @@ public class DistCpOptions {
       this.sslConfigurationFile = that.getSslConfigurationFile();
       this.copyStrategy = that.copyStrategy;
       this.preserveStatus = that.preserveStatus;
+      this.preserveRawXattrs = that.preserveRawXattrs;
       this.atomicWorkPath = that.getAtomicWorkPath();
       this.logPath = that.getLogPath();
       this.sourceFileListing = that.getSourceFileListing();
       this.sourcePaths = that.getSourcePaths();
       this.targetPath = that.getTargetPath();
+      this.targetPathExists = that.getTargetPathExists();
     }
   }
 
@@ -240,6 +252,30 @@ public class DistCpOptions {
   }
 
   /**
+   * @return whether we can append new data to target files
+   */
+  public boolean shouldAppend() {
+    return append;
+  }
+
+  /**
+   * Set if we want to append new data to target files. This is valid only with
+   * update option and CRC is not skipped.
+   */
+  public void setAppend(boolean append) {
+    validate(DistCpOptionSwitch.APPEND, append);
+    this.append = append;
+  }
+
+  public String getFromSnapshot() {
+    return this.fromSnapshot;
+  }
+
+  public String getToSnapshot() {
+    return this.toSnapshot;
+  }
+
+  /**
    * Should CRC/checksum check be skipped while checking files are identical
    *
    * @return true if checksum check should be skipped while checking files are
@@ -323,7 +359,7 @@ public class DistCpOptions {
   }
 
   /**
-   * Checks if the input attibute should be preserved or not
+   * Checks if the input attribute should be preserved or not
    *
    * @param attribute - Attribute to check
    * @return True if attribute should be preserved, false otherwise
@@ -345,6 +381,21 @@ public class DistCpOptions {
       }
     }
     preserveStatus.add(fileAttribute);
+  }
+
+  /**
+   * Return true if raw.* xattrs should be preserved.
+   * @return true if raw.* xattrs should be preserved.
+   */
+  public boolean shouldPreserveRawXattrs() {
+    return preserveRawXattrs;
+  }
+
+  /**
+   * Indicate that raw.* xattrs should be preserved
+   */
+  public void preserveRawXattrs() {
+    preserveRawXattrs = true;
   }
 
   /** Get work path for atomic commit. If null, the work
@@ -439,6 +490,22 @@ public class DistCpOptions {
     return targetPath;
   }
 
+  /**
+   * Getter for the targetPathExists.
+   * @return The target-path.
+   */
+  public boolean getTargetPathExists() {
+    return targetPathExists;
+  }
+  
+  /**
+   * Set targetPathExists.
+   * @param targetPathExists Whether the target path of distcp exists.
+   */
+  public boolean setTargetPathExists(boolean targetPathExists) {
+    return this.targetPathExists = targetPathExists;
+  }
+
   public void validate(DistCpOptionSwitch option, boolean value) {
 
     boolean syncFolder = (option == DistCpOptionSwitch.SYNC_FOLDERS ?
@@ -451,6 +518,7 @@ public class DistCpOptions {
         value : this.atomicCommit);
     boolean skipCRC = (option == DistCpOptionSwitch.SKIP_CRC ?
         value : this.skipCRC);
+    boolean append = (option == DistCpOptionSwitch.APPEND ? value : this.append);
 
     if (syncFolder && atomicCommit) {
       throw new IllegalArgumentException("Atomic commit can't be used with " +
@@ -471,6 +539,14 @@ public class DistCpOptions {
       throw new IllegalArgumentException("Skip CRC is valid only with update options");
     }
 
+    if (!syncFolder && append) {
+      throw new IllegalArgumentException(
+          "Append is valid only with update options");
+    }
+    if (skipCRC && append) {
+      throw new IllegalArgumentException(
+          "Append is disallowed when skipping CRC");
+    }
   }
 
   /**
@@ -489,6 +565,8 @@ public class DistCpOptions {
         String.valueOf(deleteMissing));
     DistCpOptionSwitch.addToConf(conf, DistCpOptionSwitch.OVERWRITE,
         String.valueOf(overwrite));
+    DistCpOptionSwitch.addToConf(conf, DistCpOptionSwitch.APPEND,
+        String.valueOf(append));
     DistCpOptionSwitch.addToConf(conf, DistCpOptionSwitch.SKIP_CRC,
         String.valueOf(skipCRC));
     DistCpOptionSwitch.addToConf(conf, DistCpOptionSwitch.BANDWIDTH,
@@ -515,6 +593,8 @@ public class DistCpOptions {
         ", sourceFileListing=" + sourceFileListing +
         ", sourcePaths=" + sourcePaths +
         ", targetPath=" + targetPath +
+        ", targetPathExists=" + targetPathExists +
+        ", preserveRawXattrs=" + preserveRawXattrs +
         '}';
   }
 

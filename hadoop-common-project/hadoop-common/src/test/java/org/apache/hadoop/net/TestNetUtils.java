@@ -19,6 +19,7 @@ package org.apache.hadoop.net;
 
 import static org.junit.Assert.*;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.net.BindException;
 import java.net.ConnectException;
@@ -254,6 +255,17 @@ public class TestNetUtils {
     assertInException(wrapped, "localhost");
     assertRemoteDetailsIncluded(wrapped);
     assertInException(wrapped, "/UnknownHost");
+  }
+  
+  @Test
+  public void testWrapEOFException() throws Throwable {
+    IOException e = new EOFException("eof");
+    IOException wrapped = verifyExceptionClass(e, EOFException.class);
+    assertInException(wrapped, "eof");
+    assertWikified(wrapped);
+    assertInException(wrapped, "localhost");
+    assertRemoteDetailsIncluded(wrapped);
+    assertInException(wrapped, "/EOFException");
   }
   
   @Test
@@ -605,7 +617,7 @@ public class TestNetUtils {
   @Test
   public void testNormalizeHostName() {	
     List<String> hosts = Arrays.asList(new String[] {"127.0.0.1",
-        "localhost", "3w.org", "UnknownHost"});
+        "localhost", "1.kanyezone.appspot.com", "UnknownHost123"});
     List<String> normalizedHosts = NetUtils.normalizeHostNames(hosts);
     // when ipaddress is normalized, same address is expected in return
     assertEquals(normalizedHosts.get(0), hosts.get(0));
@@ -629,6 +641,17 @@ public class TestNetUtils {
     assertNull(NetUtils.getHostNameOfIP("127.0.0.1:A"));  // bogus port
     assertNotNull(NetUtils.getHostNameOfIP("127.0.0.1"));
     assertNotNull(NetUtils.getHostNameOfIP("127.0.0.1:1"));
+  }
+
+  @Test
+  public void testTrimCreateSocketAddress() {
+    Configuration conf = new Configuration();
+    NetUtils.addStaticResolution("host", "127.0.0.1");
+    final String defaultAddr = "host:1  ";
+
+    InetSocketAddress addr = NetUtils.createSocketAddr(defaultAddr);
+    conf.setSocketAddr("myAddress", addr);
+    assertEquals(defaultAddr.trim(), NetUtils.getHostPortString(addr));
   }
 
   private <T> void assertBetterArrayEquals(T[] expect, T[]got) {

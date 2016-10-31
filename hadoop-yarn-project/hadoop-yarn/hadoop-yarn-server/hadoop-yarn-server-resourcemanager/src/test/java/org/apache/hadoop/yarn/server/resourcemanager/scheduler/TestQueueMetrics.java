@@ -18,15 +18,23 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler;
 
-import io.hops.exception.StorageInitializtionException;
-import io.hops.metadata.util.RMStorageFactory;
-import io.hops.metadata.util.YarnAPIStorageFactory;
+import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
+import static org.apache.hadoop.test.MetricsAsserts.assertGauge;
+import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
+import static org.apache.hadoop.test.MockitoMaker.make;
+import static org.apache.hadoop.test.MockitoMaker.stub;
+import static org.junit.Assert.assertNull;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.impl.MetricsSystemImpl;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.test.MetricsAsserts;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -42,15 +50,6 @@ import org.junit.Test;
 
 import java.io.IOException;
 
-import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
-import static org.apache.hadoop.test.MetricsAsserts.assertGauge;
-import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
-import static org.apache.hadoop.test.MockitoMaker.make;
-import static org.apache.hadoop.test.MockitoMaker.stub;
-import static org.junit.Assert.assertNull;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
 public class TestQueueMetrics {
   static final int GB = 1024; // MB
   private static final Configuration conf = new Configuration();
@@ -58,22 +57,18 @@ public class TestQueueMetrics {
   private MetricsSystem ms;
 
   @Before
-  public void setUp() throws StorageInitializtionException, IOException {
-    YarnAPIStorageFactory.setConfiguration(conf);
-    RMStorageFactory.setConfiguration(conf);
-    UserGroupInformation.setConfiguration(conf);
+  public void setUp() {
     ms = new MetricsSystemImpl();
     QueueMetrics.clearQueueMetrics();
   }
   
-  @Test
-  public void testDefaultSingleQueueMetrics() {
+  @Test public void testDefaultSingleQueueMetrics() {
     String queueName = "single";
     String user = "alice";
 
-    QueueMetrics metrics =
-        QueueMetrics.forQueue(ms, queueName, null, false, conf);
-    MetricsSource queueSource = queueSource(ms, queueName);
+    QueueMetrics metrics = QueueMetrics.forQueue(ms, queueName, null, false,
+						 conf);
+    MetricsSource queueSource= queueSource(ms, queueName);
     AppSchedulingInfo app = mockApp(user);
 
     metrics.submitApp(user);
@@ -82,28 +77,23 @@ public class TestQueueMetrics {
     metrics.submitAppAttempt(user);
     checkApps(queueSource, 1, 1, 0, 0, 0, 0, true);
 
-    metrics
-        .setAvailableResourcesToQueue(Resources.createResource(100 * GB, 100));
-    metrics.incrPendingResources(user, 5, Resources.createResource(3 * GB, 3));
+    metrics.setAvailableResourcesToQueue(Resources.createResource(100*GB, 100));
+    metrics.incrPendingResources(user, 5, Resources.createResource(3*GB, 3));
     // Available resources is set externally, as it depends on dynamic
     // configurable cluster/queue resources
-    checkResources(queueSource, 0, 0, 0, 0, 0, 100 * GB, 100, 15 * GB, 15, 5, 0,
-        0, 0);
+    checkResources(queueSource, 0, 0, 0, 0, 0, 100*GB, 100, 15*GB, 15, 5, 0, 0, 0);
 
     metrics.runAppAttempt(app.getApplicationId(), user);
     checkApps(queueSource, 1, 0, 1, 0, 0, 0, true);
 
-    metrics
-        .allocateResources(user, 3, Resources.createResource(2 * GB, 2), true);
-    checkResources(queueSource, 6 * GB, 6, 3, 3, 0, 100 * GB, 100, 9 * GB, 9, 2,
-        0, 0, 0);
+    metrics.allocateResources(user, 3, Resources.createResource(2*GB, 2), true);
+    checkResources(queueSource, 6*GB, 6, 3, 3, 0, 100*GB, 100, 9*GB, 9, 2, 0, 0, 0);
 
-    metrics.releaseResources(user, 1, Resources.createResource(2 * GB, 2));
-    checkResources(queueSource, 4 * GB, 4, 2, 3, 1, 100 * GB, 100, 9 * GB, 9, 2,
-        0, 0, 0);
+    metrics.releaseResources(user, 1, Resources.createResource(2*GB, 2));
+    checkResources(queueSource, 4*GB, 4, 2, 3, 1, 100*GB, 100, 9*GB, 9, 2, 0, 0, 0);
 
-    metrics.finishAppAttempt(app.getApplicationId(), app.isPending(),
-        app.getUser());
+    metrics.finishAppAttempt(
+        app.getApplicationId(), app.isPending(), app.getUser());
     checkApps(queueSource, 1, 0, 0, 0, 0, 0, true);
     metrics.finishApp(user, RMAppState.FINISHED);
     checkApps(queueSource, 1, 0, 0, 1, 0, 0, true);
@@ -115,8 +105,8 @@ public class TestQueueMetrics {
     String queueName = "single";
     String user = "alice";
 
-    QueueMetrics metrics =
-        QueueMetrics.forQueue(ms, queueName, null, false, new Configuration());
+    QueueMetrics metrics = QueueMetrics.forQueue(ms, queueName, null, false,
+        new Configuration());
     MetricsSource queueSource = queueSource(ms, queueName);
     AppSchedulingInfo app = mockApp(user);
 
@@ -129,8 +119,8 @@ public class TestQueueMetrics {
     metrics.runAppAttempt(app.getApplicationId(), user);
     checkApps(queueSource, 1, 0, 1, 0, 0, 0, true);
 
-    metrics.finishAppAttempt(app.getApplicationId(), app.isPending(),
-        app.getUser());
+    metrics.finishAppAttempt(
+        app.getApplicationId(), app.isPending(), app.getUser());
     checkApps(queueSource, 1, 0, 0, 0, 0, 0, true);
 
     // As the application has failed, framework retries the same application
@@ -142,8 +132,8 @@ public class TestQueueMetrics {
     checkApps(queueSource, 1, 0, 1, 0, 0, 0, true);
 
     // Suppose say application has failed this time as well.
-    metrics.finishAppAttempt(app.getApplicationId(), app.isPending(),
-        app.getUser());
+    metrics.finishAppAttempt(
+        app.getApplicationId(), app.isPending(), app.getUser());
     checkApps(queueSource, 1, 0, 0, 0, 0, 0, true);
 
     // As the application has failed, framework retries the same application
@@ -155,8 +145,8 @@ public class TestQueueMetrics {
     checkApps(queueSource, 1, 0, 1, 0, 0, 0, true);
 
     // Suppose say application has failed, and there's no more retries.
-    metrics.finishAppAttempt(app.getApplicationId(), app.isPending(),
-        app.getUser());
+    metrics.finishAppAttempt(
+        app.getApplicationId(), app.isPending(), app.getUser());
     checkApps(queueSource, 1, 0, 0, 0, 0, 0, true);
 
     metrics.finishApp(user, RMAppState.FAILED);
@@ -165,13 +155,12 @@ public class TestQueueMetrics {
     assertNull(userSource);
   }
 
-  @Test
-  public void testSingleQueueWithUserMetrics() {
+  @Test public void testSingleQueueWithUserMetrics() {
     String queueName = "single2";
     String user = "dodo";
 
-    QueueMetrics metrics =
-        QueueMetrics.forQueue(ms, queueName, null, true, conf);
+    QueueMetrics metrics = QueueMetrics.forQueue(ms, queueName, null, true,
+						 conf);
     MetricsSource queueSource = queueSource(ms, queueName);
     AppSchedulingInfo app = mockApp(user);
 
@@ -185,37 +174,28 @@ public class TestQueueMetrics {
     checkApps(queueSource, 1, 1, 0, 0, 0, 0, true);
     checkApps(userSource, 1, 1, 0, 0, 0, 0, true);
 
-    metrics
-        .setAvailableResourcesToQueue(Resources.createResource(100 * GB, 100));
-    metrics.setAvailableResourcesToUser(user,
-        Resources.createResource(10 * GB, 10));
-    metrics.incrPendingResources(user, 5, Resources.createResource(3 * GB, 3));
+    metrics.setAvailableResourcesToQueue(Resources.createResource(100*GB, 100));
+    metrics.setAvailableResourcesToUser(user, Resources.createResource(10*GB, 10));
+    metrics.incrPendingResources(user, 5, Resources.createResource(3*GB, 3));
     // Available resources is set externally, as it depends on dynamic
     // configurable cluster/queue resources
-    checkResources(queueSource, 0, 0, 0, 0, 0, 100 * GB, 100, 15 * GB, 15, 5, 0,
-        0, 0);
-    checkResources(userSource, 0, 0, 0, 0, 0, 10 * GB, 10, 15 * GB, 15, 5, 0, 0,
-        0);
+    checkResources(queueSource, 0, 0, 0, 0, 0,  100*GB, 100, 15*GB, 15, 5, 0, 0, 0);
+    checkResources(userSource, 0, 0, 0, 0, 0, 10*GB, 10, 15*GB, 15, 5, 0, 0, 0);
 
     metrics.runAppAttempt(app.getApplicationId(), user);
     checkApps(queueSource, 1, 0, 1, 0, 0, 0, true);
     checkApps(userSource, 1, 0, 1, 0, 0, 0, true);
 
-    metrics
-        .allocateResources(user, 3, Resources.createResource(2 * GB, 2), true);
-    checkResources(queueSource, 6 * GB, 6, 3, 3, 0, 100 * GB, 100, 9 * GB, 9, 2,
-        0, 0, 0);
-    checkResources(userSource, 6 * GB, 6, 3, 3, 0, 10 * GB, 10, 9 * GB, 9, 2, 0,
-        0, 0);
+    metrics.allocateResources(user, 3, Resources.createResource(2*GB, 2), true);
+    checkResources(queueSource, 6*GB, 6, 3, 3, 0, 100*GB, 100, 9*GB, 9, 2, 0, 0, 0);
+    checkResources(userSource, 6*GB, 6, 3, 3, 0, 10*GB, 10, 9*GB, 9, 2, 0, 0, 0);
 
-    metrics.releaseResources(user, 1, Resources.createResource(2 * GB, 2));
-    checkResources(queueSource, 4 * GB, 4, 2, 3, 1, 100 * GB, 100, 9 * GB, 9, 2,
-        0, 0, 0);
-    checkResources(userSource, 4 * GB, 4, 2, 3, 1, 10 * GB, 10, 9 * GB, 9, 2, 0,
-        0, 0);
+    metrics.releaseResources(user, 1, Resources.createResource(2*GB, 2));
+    checkResources(queueSource, 4*GB, 4, 2, 3, 1, 100*GB, 100, 9*GB, 9, 2, 0, 0, 0);
+    checkResources(userSource, 4*GB, 4, 2, 3, 1, 10*GB, 10, 9*GB, 9, 2, 0, 0, 0);
 
-    metrics.finishAppAttempt(app.getApplicationId(), app.isPending(),
-        app.getUser());
+    metrics.finishAppAttempt(
+        app.getApplicationId(), app.isPending(), app.getUser());
     checkApps(queueSource, 1, 0, 0, 0, 0, 0, true);
     checkApps(userSource, 1, 0, 0, 0, 0, 0, true);
     metrics.finishApp(user, RMAppState.FINISHED);
@@ -223,18 +203,17 @@ public class TestQueueMetrics {
     checkApps(userSource, 1, 0, 0, 1, 0, 0, true);
   }
 
-  @Test
-  public void testTwoLevelWithUserMetrics() {
+  @Test public void testTwoLevelWithUserMetrics() {
     String parentQueueName = "root";
     String leafQueueName = "root.leaf";
     String user = "alice";
 
     QueueMetrics parentMetrics =
-        QueueMetrics.forQueue(ms, parentQueueName, null, true, conf);
+      QueueMetrics.forQueue(ms, parentQueueName, null, true, conf);
     Queue parentQueue = make(stub(Queue.class).returning(parentMetrics).
         from.getMetrics());
     QueueMetrics metrics =
-        QueueMetrics.forQueue(ms, leafQueueName, parentQueue, true, conf);
+      QueueMetrics.forQueue(ms, leafQueueName, parentQueue, true, conf);
     MetricsSource parentQueueSource = queueSource(ms, parentQueueName);
     MetricsSource queueSource = queueSource(ms, leafQueueName);
     AppSchedulingInfo app = mockApp(user);
@@ -254,55 +233,38 @@ public class TestQueueMetrics {
     checkApps(userSource, 1, 1, 0, 0, 0, 0, true);
     checkApps(parentUserSource, 1, 1, 0, 0, 0, 0, true);
 
-    parentMetrics
-        .setAvailableResourcesToQueue(Resources.createResource(100 * GB, 100));
-    metrics
-        .setAvailableResourcesToQueue(Resources.createResource(100 * GB, 100));
-    parentMetrics.setAvailableResourcesToUser(user,
-        Resources.createResource(10 * GB, 10));
-    metrics.setAvailableResourcesToUser(user,
-        Resources.createResource(10 * GB, 10));
-    metrics.incrPendingResources(user, 5, Resources.createResource(3 * GB, 3));
-    checkResources(queueSource, 0, 0, 0, 0, 0, 100 * GB, 100, 15 * GB, 15, 5, 0,
-        0, 0);
-    checkResources(parentQueueSource, 0, 0, 0, 0, 0, 100 * GB, 100, 15 * GB, 15,
-        5, 0, 0, 0);
-    checkResources(userSource, 0, 0, 0, 0, 0, 10 * GB, 10, 15 * GB, 15, 5, 0, 0,
-        0);
-    checkResources(parentUserSource, 0, 0, 0, 0, 0, 10 * GB, 10, 15 * GB, 15, 5,
-        0, 0, 0);
+    parentMetrics.setAvailableResourcesToQueue(Resources.createResource(100*GB, 100));
+    metrics.setAvailableResourcesToQueue(Resources.createResource(100*GB, 100));
+    parentMetrics.setAvailableResourcesToUser(user, Resources.createResource(10*GB, 10));
+    metrics.setAvailableResourcesToUser(user, Resources.createResource(10*GB, 10));
+    metrics.incrPendingResources(user, 5, Resources.createResource(3*GB, 3));
+    checkResources(queueSource, 0, 0, 0, 0, 0, 100*GB, 100, 15*GB, 15, 5, 0, 0, 0);
+    checkResources(parentQueueSource, 0, 0, 0, 0, 0, 100*GB, 100, 15*GB, 15, 5, 0, 0, 0);
+    checkResources(userSource, 0, 0, 0, 0, 0, 10*GB, 10, 15*GB, 15, 5, 0, 0, 0);
+    checkResources(parentUserSource, 0, 0, 0, 0, 0, 10*GB, 10, 15*GB, 15, 5, 0, 0, 0);
 
     metrics.runAppAttempt(app.getApplicationId(), user);
     checkApps(queueSource, 1, 0, 1, 0, 0, 0, true);
     checkApps(userSource, 1, 0, 1, 0, 0, 0, true);
 
-    metrics
-        .allocateResources(user, 3, Resources.createResource(2 * GB, 2), true);
-    metrics.reserveResource(user, Resources.createResource(3 * GB, 3));
+    metrics.allocateResources(user, 3, Resources.createResource(2*GB, 2), true);
+    metrics.reserveResource(user, Resources.createResource(3*GB, 3));
     // Available resources is set externally, as it depends on dynamic
     // configurable cluster/queue resources
-    checkResources(queueSource, 6 * GB, 6, 3, 3, 0, 100 * GB, 100, 9 * GB, 9, 2,
-        3 * GB, 3, 1);
-    checkResources(parentQueueSource, 6 * GB, 6, 3, 3, 0, 100 * GB, 100, 9 * GB,
-        9, 2, 3 * GB, 3, 1);
-    checkResources(userSource, 6 * GB, 6, 3, 3, 0, 10 * GB, 10, 9 * GB, 9, 2,
-        3 * GB, 3, 1);
-    checkResources(parentUserSource, 6 * GB, 6, 3, 3, 0, 10 * GB, 10, 9 * GB, 9,
-        2, 3 * GB, 3, 1);
+    checkResources(queueSource, 6*GB, 6, 3, 3, 0, 100*GB, 100, 9*GB, 9, 2, 3*GB, 3, 1);
+    checkResources(parentQueueSource, 6*GB, 6, 3, 3, 0,  100*GB, 100, 9*GB, 9, 2, 3*GB, 3, 1);
+    checkResources(userSource, 6*GB, 6, 3, 3, 0, 10*GB, 10, 9*GB, 9, 2, 3*GB, 3, 1);
+    checkResources(parentUserSource, 6*GB, 6, 3, 3, 0, 10*GB, 10, 9*GB, 9, 2, 3*GB, 3, 1);
 
-    metrics.releaseResources(user, 1, Resources.createResource(2 * GB, 2));
-    metrics.unreserveResource(user, Resources.createResource(3 * GB, 3));
-    checkResources(queueSource, 4 * GB, 4, 2, 3, 1, 100 * GB, 100, 9 * GB, 9, 2,
-        0, 0, 0);
-    checkResources(parentQueueSource, 4 * GB, 4, 2, 3, 1, 100 * GB, 100, 9 * GB,
-        9, 2, 0, 0, 0);
-    checkResources(userSource, 4 * GB, 4, 2, 3, 1, 10 * GB, 10, 9 * GB, 9, 2, 0,
-        0, 0);
-    checkResources(parentUserSource, 4 * GB, 4, 2, 3, 1, 10 * GB, 10, 9 * GB, 9,
-        2, 0, 0, 0);
+    metrics.releaseResources(user, 1, Resources.createResource(2*GB, 2));
+    metrics.unreserveResource(user, Resources.createResource(3*GB, 3));
+    checkResources(queueSource, 4*GB, 4, 2, 3, 1, 100*GB, 100, 9*GB, 9, 2, 0, 0, 0);
+    checkResources(parentQueueSource, 4*GB, 4, 2, 3, 1, 100*GB, 100, 9*GB, 9, 2, 0, 0, 0);
+    checkResources(userSource, 4*GB, 4, 2, 3, 1, 10*GB, 10, 9*GB, 9, 2, 0, 0, 0);
+    checkResources(parentUserSource, 4*GB, 4, 2, 3, 1, 10*GB, 10, 9*GB, 9, 2, 0, 0, 0);
 
-    metrics.finishAppAttempt(app.getApplicationId(), app.isPending(),
-        app.getUser());
+    metrics.finishAppAttempt(
+        app.getApplicationId(), app.isPending(), app.getUser());
     checkApps(queueSource, 1, 0, 0, 0, 0, 0, true);
     checkApps(parentQueueSource, 1, 0, 0, 0, 0, 0, true);
     checkApps(userSource, 1, 0, 0, 0, 0, 0, true);
@@ -315,7 +277,7 @@ public class TestQueueMetrics {
     checkApps(parentUserSource, 1, 0, 0, 1, 0, 0, true);
   }
   
-  @Test
+  @Test 
   public void testMetricsCache() {
     MetricsSystem ms = new MetricsSystemImpl("cache");
     ms.start();
@@ -324,7 +286,8 @@ public class TestQueueMetrics {
       String p1 = "root1";
       String leafQueueName = "root1.leaf";
 
-      QueueMetrics p1Metrics = QueueMetrics.forQueue(ms, p1, null, true, conf);
+      QueueMetrics p1Metrics =
+          QueueMetrics.forQueue(ms, p1, null, true, conf);
       Queue parentQueue1 = make(stub(Queue.class).returning(p1Metrics).
           from.getMetrics());
       QueueMetrics metrics =
@@ -337,7 +300,7 @@ public class TestQueueMetrics {
       QueueMetrics alterMetrics =
           QueueMetrics.forQueue(ms, leafQueueName, parentQueue1, true, conf);
 
-      Assert.assertNotNull("QueueMetrics for alterMetrics shoudn't be null",
+      Assert.assertNotNull("QueueMetrics for alterMetrics shoudn't be null", 
           alterMetrics);
     } finally {
       ms.shutdown();
@@ -345,10 +308,14 @@ public class TestQueueMetrics {
   }
 
   @Test
-  public void testMetricsInitializedOnRMInit() {
+  public void testMetricsInitializedOnRMInit() throws IOException {
     YarnConfiguration conf = new YarnConfiguration();
-    conf.setClass(YarnConfiguration.RM_SCHEDULER, FifoScheduler.class,
-        ResourceScheduler.class);
+    RMStorageFactory.setConfiguration(conf);
+    YarnAPIStorageFactory.setConfiguration(conf);
+    DBUtility.InitializeDB();
+
+    conf.setClass(YarnConfiguration.RM_SCHEDULER,
+      FifoScheduler.class, ResourceScheduler.class);
     MockRM rm = new MockRM(conf);
     QueueMetrics metrics = rm.getResourceScheduler().getRootQueueMetrics();
     checkApps(metrics, 0, 0, 0, 0, 0, 0, true);
@@ -370,8 +337,8 @@ public class TestQueueMetrics {
       checkApps(queueSource, 0, 0, 0, 0, 0, 0, false);
       Assert.fail();
     } catch (AssertionError e) {
-      Assert.assertTrue(
-          e.getMessage().contains("Expected exactly one metric for name "));
+      Assert.assertTrue(e.getMessage().contains(
+        "Expected exactly one metric for name "));
     }
     // collect all metrics
     checkApps(queueSource, 0, 0, 0, 0, 0, 0, true);
@@ -390,9 +357,9 @@ public class TestQueueMetrics {
 
   public static void checkResources(MetricsSource source, int allocatedMB,
       int allocatedCores, int allocCtnrs, long aggreAllocCtnrs,
-      long aggreReleasedCtnrs, int availableMB, int availableCores,
-      int pendingMB, int pendingCores, int pendingCtnrs, int reservedMB,
-      int reservedCores, int reservedCtnrs) {
+      long aggreReleasedCtnrs, int availableMB, int availableCores, int pendingMB,
+      int pendingCores, int pendingCtnrs, int reservedMB, int reservedCores,
+      int reservedCtnrs) {
     MetricsRecordBuilder rb = getMetrics(source);
     assertGauge("AllocatedMB", allocatedMB, rb);
     assertGauge("AllocatedVCores", allocatedCores, rb);
@@ -424,7 +391,7 @@ public class TestQueueMetrics {
   }
 
   public static MetricsSource userSource(MetricsSystem ms, String queue,
-      String user) {
+                                         String user) {
     MetricsSource s = ms.getSource(QueueMetrics.sourceName(queue).
         append(",user=").append(user).toString());
     return s;

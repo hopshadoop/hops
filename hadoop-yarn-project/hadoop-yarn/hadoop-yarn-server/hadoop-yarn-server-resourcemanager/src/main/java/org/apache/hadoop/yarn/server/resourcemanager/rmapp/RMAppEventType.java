@@ -21,32 +21,28 @@ package org.apache.hadoop.yarn.server.resourcemanager.rmapp;
 public enum RMAppEventType {
   // Source: ClientRMService
   START,
-  //gautier done
-  //  RECOVER,
+  RECOVER,
   KILL,
-  MOVE,
-  // Move app to a new queue
+  MOVE, // Move app to a new queue
 
   // Source: Scheduler and RMAppManager
   APP_REJECTED,
-  //gautier done
 
   // Source: Scheduler
   APP_ACCEPTED,
-  //gautier done
 
   // Source: RMAppAttempt
   ATTEMPT_REGISTERED,
   ATTEMPT_UNREGISTERED,
-  ATTEMPT_FINISHED,
-  // Will send the final state //gautier done
+  ATTEMPT_FINISHED, // Will send the final state
   ATTEMPT_FAILED,
   ATTEMPT_KILLED,
-  //gautier done
   NODE_UPDATE,
+  
+  // Source: Container and ResourceTracker
+  APP_RUNNING_ON_NODE,
 
   // Source: RMStateStore
   APP_NEW_SAVED,
-  //gautier done
-  APP_UPDATE_SAVED, //gautier done
+  APP_UPDATE_SAVED,
 }

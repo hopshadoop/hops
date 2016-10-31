@@ -31,8 +31,6 @@ import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.Collection;
 
-import junit.framework.Assert;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.JobID;
 import org.apache.hadoop.mapreduce.JobStatus;
@@ -50,14 +48,17 @@ import org.apache.hadoop.mapreduce.v2.api.records.Counters;
 import org.apache.hadoop.mapreduce.v2.api.records.JobReport;
 import org.apache.hadoop.mapreduce.v2.api.records.JobState;
 import org.apache.hadoop.mapreduce.v2.util.MRBuilderUtils;
+import org.apache.hadoop.security.authorize.AuthorizationException;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ApplicationReport;
 import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
 import org.apache.hadoop.yarn.api.records.YarnApplicationState;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import org.apache.hadoop.yarn.exceptions.ApplicationNotFoundException;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.util.Records;
+import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -183,6 +184,49 @@ public class TestClientServiceDelegate {
   }
 
   @Test
+  public void testNoRetryOnAMAuthorizationException() throws Exception {
+    if (!isAMReachableFromClient) {
+      return;
+    }
+
+    ResourceMgrDelegate rm = mock(ResourceMgrDelegate.class);
+    when(rm.getApplicationReport(TypeConverter.toYarn(oldJobId).getAppId()))
+      .thenReturn(getRunningApplicationReport("am1", 78));
+
+    // throw authorization exception on first invocation
+    final MRClientProtocol amProxy = mock(MRClientProtocol.class);
+    when(amProxy.getJobReport(any(GetJobReportRequest.class)))
+      .thenThrow(new AuthorizationException("Denied"));
+    Configuration conf = new YarnConfiguration();
+    conf.set(MRConfig.FRAMEWORK_NAME, MRConfig.YARN_FRAMEWORK_NAME);
+    conf.setBoolean(MRJobConfig.JOB_AM_ACCESS_DISABLED,
+      !isAMReachableFromClient);
+    ClientServiceDelegate clientServiceDelegate =
+        new ClientServiceDelegate(conf, rm, oldJobId, null) {
+          @Override
+          MRClientProtocol instantiateAMProxy(
+              final InetSocketAddress serviceAddr) throws IOException {
+            super.instantiateAMProxy(serviceAddr);
+            return amProxy;
+          }
+        };
+
+    try {
+      clientServiceDelegate.getJobStatus(oldJobId);
+      Assert.fail("Exception should be thrown upon AuthorizationException");
+    } catch (IOException e) {
+      Assert.assertEquals(AuthorizationException.class.getName() + ": Denied",
+          e.getMessage());
+    }
+
+    // assert maxClientRetry is not decremented.
+    Assert.assertEquals(conf.getInt(MRJobConfig.MR_CLIENT_MAX_RETRIES,
+      MRJobConfig.DEFAULT_MR_CLIENT_MAX_RETRIES), clientServiceDelegate
+      .getMaxClientRetry());
+    verify(amProxy, times(1)).getJobReport(any(GetJobReportRequest.class));
+  }
+
+  @Test
   public void testHistoryServerNotConfigured() throws Exception {
     //RM doesn't have app report and job History Server is not configured
     ClientServiceDelegate clientServiceDelegate = getClientServiceDelegate(
@@ -218,8 +262,8 @@ public class TestClientServiceDelegate {
     Assert.assertNotNull(jobStatus);
     Assert.assertEquals("TestJobFilePath", jobStatus.getJobFile());                               
     Assert.assertEquals("http://TestTrackingUrl", jobStatus.getTrackingUrl());                    
-    Assert.assertEquals(1.0f, jobStatus.getMapProgress());                                        
-    Assert.assertEquals(1.0f, jobStatus.getReduceProgress());                                     
+    Assert.assertEquals(1.0f, jobStatus.getMapProgress(), 0.0f);
+    Assert.assertEquals(1.0f, jobStatus.getReduceProgress(), 0.0f);
   }
   
   @Test
@@ -358,8 +402,8 @@ public class TestClientServiceDelegate {
     Assert.assertNotNull(jobStatus1);
     Assert.assertEquals("TestJobFilePath", jobStatus1.getJobFile());                               
     Assert.assertEquals("http://TestTrackingUrl", jobStatus1.getTrackingUrl());                    
-    Assert.assertEquals(1.0f, jobStatus1.getMapProgress());                                        
-    Assert.assertEquals(1.0f, jobStatus1.getReduceProgress());
+    Assert.assertEquals(1.0f, jobStatus1.getMapProgress(), 0.0f);
+    Assert.assertEquals(1.0f, jobStatus1.getReduceProgress(), 0.0f);
     
     verify(clientServiceDelegate, times(0)).instantiateAMProxy(
         any(InetSocketAddress.class));
@@ -488,7 +532,9 @@ public class TestClientServiceDelegate {
   private ResourceMgrDelegate getRMDelegate() throws IOException {
     ResourceMgrDelegate rm = mock(ResourceMgrDelegate.class);
     try {
-      when(rm.getApplicationReport(jobId.getAppId())).thenReturn(null);
+      ApplicationId appId = jobId.getAppId();
+      when(rm.getApplicationReport(appId)).
+          thenThrow(new ApplicationNotFoundException(appId + " not found"));
     } catch (YarnException e) {
       throw new IOException(e);
     }

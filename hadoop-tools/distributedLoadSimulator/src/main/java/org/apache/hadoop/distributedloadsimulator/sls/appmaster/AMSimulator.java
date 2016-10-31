@@ -60,10 +60,10 @@ import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
 import org.apache.log4j.Logger;
 
 import org.apache.hadoop.distributedloadsimulator.sls.scheduler.ContainerSimulator;
-import org.apache.hadoop.distributedloadsimulator.sls.scheduler.ResourceSchedulerWrapper;
 import org.apache.hadoop.distributedloadsimulator.sls.SLSRunner;
 import org.apache.hadoop.distributedloadsimulator.sls.scheduler.TaskRunner;
 import org.apache.hadoop.distributedloadsimulator.sls.utils.SLSUtils;
+import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.SaslRpcServer;
 import org.apache.hadoop.security.SecurityUtil;
@@ -150,12 +150,12 @@ public abstract class AMSimulator extends TaskRunner.Task {
   public void init(int id, int heartbeatInterval,
           List task, ResourceManager rm, SLSRunner se,
           long traceStartTime, long traceFinishTime, String user, String queue,
-          boolean isTracked, String oldAppId, String[] listOfRemoteSimIp,
+          boolean isTracked, String oldAppId, String[] listOfRemoteSimIp, int rmiPort,
           YarnClient rmClient, Configuration conf) throws IOException {
     super.init(traceStartTime, traceStartTime + 1000000L * heartbeatInterval,
             heartbeatInterval);
     this.conf = conf;
-    conf.setClass(YarnConfiguration.CLIENT_FAILOVER_PROXY_PROVIDER,
+    conf.setClass(YarnConfiguration.LEADER_CLIENT_FAILOVER_PROXY_PROVIDER,
             ConfiguredLeaderFailoverHAProxyProvider.class,
             RMFailoverProxyProvider.class);
 
@@ -170,13 +170,13 @@ public abstract class AMSimulator extends TaskRunner.Task {
     this.traceStartTimeMS = traceStartTime;
     this.traceFinishTimeMS = traceFinishTime;
     this.applicationClient = ClientRMProxy
-            .createRMProxy(this.conf, ApplicationClientProtocol.class);
+            .createRMProxy(this.conf, ApplicationClientProtocol.class, true);
     this.rmClient = rmClient;
 
     Registry primaryRegistry;
     Registry secondryRegistry;
     try {
-      primaryRegistry = LocateRegistry.getRegistry("127.0.0.1");
+      primaryRegistry = LocateRegistry.getRegistry("127.0.0.1", rmiPort);
       primaryRemoteConnection = (AMNMCommonObject) primaryRegistry.lookup(
               "AMNMCommonObject");
       RemoteConnections.add(primaryRemoteConnection);
@@ -193,7 +193,7 @@ public abstract class AMSimulator extends TaskRunner.Task {
     for (String remoteIp : listOfRemoteSimIp) {
       if (!(remoteIp.equals("127.0.0.1"))) {
         try {
-          secondryRegistry = LocateRegistry.getRegistry(remoteIp);
+          secondryRegistry = LocateRegistry.getRegistry(remoteIp, rmiPort);
           AMNMCommonObject secondryConnections
                   = (AMNMCommonObject) secondryRegistry.lookup(
                           "AMNMCommonObject");
@@ -292,8 +292,9 @@ public abstract class AMSimulator extends TaskRunner.Task {
                   SecurityUtil.setTokenService(amRMToken,
                           resourceManagerAddress);
                   ApplicationMasterProtocol appMasterProtocol = ClientRMProxy.
-                  createRMProxy(conf, ApplicationMasterProtocol.class);
+                  createRMProxy(conf, ApplicationMasterProtocol.class, true);
                   appMasterProtocol.finishApplicationMaster(finishAMRequest);
+                  RPC.stopProxy(appMasterProtocol);
                   return null;
                 }
               });
@@ -306,11 +307,6 @@ public abstract class AMSimulator extends TaskRunner.Task {
     if (rm != null) {
       simulateFinishTimeMS = System.currentTimeMillis()
               - SLSRunner.getApplicationRunner().getStartTimeMS();
-      // record job running information
-      ((ResourceSchedulerWrapper) rm.getResourceScheduler())
-              .addAMRuntime(appId,
-                      traceStartTimeMS, traceFinishTimeMS,
-                      simulateStartTimeMS, simulateFinishTimeMS);
     }
     try {
       primaryRemoteConnection.decreseApplicationCount(appId.toString(), false);
@@ -384,10 +380,11 @@ public abstract class AMSimulator extends TaskRunner.Task {
                 SecurityUtil.
                 setTokenService(amRMToken, resourceManagerAddress);
                 ApplicationMasterProtocol appMasterProtocol = ClientRMProxy.
-                createRMProxy(conf, ApplicationMasterProtocol.class);
+                createRMProxy(conf, ApplicationMasterProtocol.class, true);
                 RegisterApplicationMasterResponse response
                 = appMasterProtocol.registerApplicationMaster(
                         amRegisterRequest);
+                RPC.stopProxy(appMasterProtocol);
                 return response;
               }
             });
@@ -488,8 +485,6 @@ public abstract class AMSimulator extends TaskRunner.Task {
     if (isTracked) {
       // if we are running load simulator alone, rm is null
       if (rm != null) {
-        ((ResourceSchedulerWrapper) rm.getResourceScheduler())
-                .addTrackedApp(appAttemptId, oldAppId);
       }
     }
   }
@@ -498,8 +493,6 @@ public abstract class AMSimulator extends TaskRunner.Task {
     if (isTracked) {
       // if we are running load simulator alone, rm is null
       if (rm != null) {
-        ((ResourceSchedulerWrapper) rm.getResourceScheduler())
-                .removeTrackedApp(appAttemptId, oldAppId);
       }
     }
   }

@@ -18,14 +18,18 @@
 
 package org.apache.hadoop.tools;
 
+import static org.junit.Assert.fail;
+
 import org.junit.Assert;
 import org.junit.Test;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.tools.DistCpOptions.*;
 import org.apache.hadoop.conf.Configuration;
 
 import java.util.Iterator;
 import java.util.NoSuchElementException;
+import org.junit.Ignore;
 
 public class TestOptionsParser {
 
@@ -354,7 +358,8 @@ public class TestOptionsParser {
     DistCpOptions option = new DistCpOptions(new Path("abc"), new Path("xyz"));
     String val = "DistCpOptions{atomicCommit=false, syncFolder=false, deleteMissing=false, " +
         "ignoreFailures=false, maxMaps=20, sslConfigurationFile='null', copyStrategy='uniformsize', " +
-        "sourceFileListing=abc, sourcePaths=null, targetPath=xyz}";
+        "sourceFileListing=abc, sourcePaths=null, targetPath=xyz, targetPathExists=true, " +
+        "preserveRawXattrs=false}";
     Assert.assertEquals(val, option.toString());
     Assert.assertNotSame(DistCpOptionSwitch.ATOMIC_COMMIT.toString(),
         DistCpOptionSwitch.ATOMIC_COMMIT.name());
@@ -410,6 +415,8 @@ public class TestOptionsParser {
     Assert.assertTrue(options.shouldPreserve(FileAttribute.USER));
     Assert.assertTrue(options.shouldPreserve(FileAttribute.GROUP));
     Assert.assertTrue(options.shouldPreserve(FileAttribute.CHECKSUMTYPE));
+    Assert.assertFalse(options.shouldPreserve(FileAttribute.ACL));
+    Assert.assertFalse(options.shouldPreserve(FileAttribute.XATTR));
 
     options = OptionsParser.parse(new String[] {
         "-p",
@@ -421,6 +428,8 @@ public class TestOptionsParser {
     Assert.assertTrue(options.shouldPreserve(FileAttribute.USER));
     Assert.assertTrue(options.shouldPreserve(FileAttribute.GROUP));
     Assert.assertTrue(options.shouldPreserve(FileAttribute.CHECKSUMTYPE));
+    Assert.assertFalse(options.shouldPreserve(FileAttribute.ACL));
+    Assert.assertFalse(options.shouldPreserve(FileAttribute.XATTR));
 
     options = OptionsParser.parse(new String[] {
         "-pbr",
@@ -433,6 +442,8 @@ public class TestOptionsParser {
     Assert.assertFalse(options.shouldPreserve(FileAttribute.USER));
     Assert.assertFalse(options.shouldPreserve(FileAttribute.GROUP));
     Assert.assertFalse(options.shouldPreserve(FileAttribute.CHECKSUMTYPE));
+    Assert.assertFalse(options.shouldPreserve(FileAttribute.ACL));
+    Assert.assertFalse(options.shouldPreserve(FileAttribute.XATTR));
 
     options = OptionsParser.parse(new String[] {
         "-pbrgup",
@@ -445,9 +456,11 @@ public class TestOptionsParser {
     Assert.assertTrue(options.shouldPreserve(FileAttribute.USER));
     Assert.assertTrue(options.shouldPreserve(FileAttribute.GROUP));
     Assert.assertFalse(options.shouldPreserve(FileAttribute.CHECKSUMTYPE));
+    Assert.assertFalse(options.shouldPreserve(FileAttribute.ACL));
+    Assert.assertFalse(options.shouldPreserve(FileAttribute.XATTR));
 
     options = OptionsParser.parse(new String[] {
-        "-pbrgupc",
+        "-pbrgupcax",
         "-f",
         "hdfs://localhost:8020/source/first",
         "hdfs://localhost:8020/target/"});
@@ -457,6 +470,8 @@ public class TestOptionsParser {
     Assert.assertTrue(options.shouldPreserve(FileAttribute.USER));
     Assert.assertTrue(options.shouldPreserve(FileAttribute.GROUP));
     Assert.assertTrue(options.shouldPreserve(FileAttribute.CHECKSUMTYPE));
+    Assert.assertTrue(options.shouldPreserve(FileAttribute.ACL));
+    Assert.assertTrue(options.shouldPreserve(FileAttribute.XATTR));
 
     options = OptionsParser.parse(new String[] {
         "-pc",
@@ -469,6 +484,8 @@ public class TestOptionsParser {
     Assert.assertFalse(options.shouldPreserve(FileAttribute.USER));
     Assert.assertFalse(options.shouldPreserve(FileAttribute.GROUP));
     Assert.assertTrue(options.shouldPreserve(FileAttribute.CHECKSUMTYPE));
+    Assert.assertFalse(options.shouldPreserve(FileAttribute.ACL));
+    Assert.assertFalse(options.shouldPreserve(FileAttribute.XATTR));
 
     options = OptionsParser.parse(new String[] {
         "-p",
@@ -481,11 +498,11 @@ public class TestOptionsParser {
       attribIterator.next();
       i++;
     }
-    Assert.assertEquals(i, 6);
+    Assert.assertEquals(i, DistCpOptionSwitch.PRESERVE_STATUS_DEFAULT.length() - 2);
 
     try {
       OptionsParser.parse(new String[] {
-          "-pabc",
+          "-pabcd",
           "-f",
           "hdfs://localhost:8020/source/first",
           "hdfs://localhost:8020/target"});
@@ -547,5 +564,116 @@ public class TestOptionsParser {
     Assert.assertTrue(conf.getBoolean(DistCpOptionSwitch.DELETE_MISSING.getConfigLabel(), false));
     Assert.assertEquals(conf.get(DistCpOptionSwitch.PRESERVE_STATUS.getConfigLabel()), "U");
     Assert.assertEquals(conf.getInt(DistCpOptionSwitch.BANDWIDTH.getConfigLabel(), -1), 11);
+  }
+
+  @Test
+  public void testAppendOption() {
+    Configuration conf = new Configuration();
+    Assert.assertFalse(conf.getBoolean(
+        DistCpOptionSwitch.APPEND.getConfigLabel(), false));
+    Assert.assertFalse(conf.getBoolean(
+        DistCpOptionSwitch.SYNC_FOLDERS.getConfigLabel(), false));
+
+    DistCpOptions options = OptionsParser.parse(new String[] { "-update",
+        "-append", "hdfs://localhost:8020/source/first",
+        "hdfs://localhost:8020/target/" });
+    options.appendToConf(conf);
+    Assert.assertTrue(conf.getBoolean(
+        DistCpOptionSwitch.APPEND.getConfigLabel(), false));
+    Assert.assertTrue(conf.getBoolean(
+        DistCpOptionSwitch.SYNC_FOLDERS.getConfigLabel(), false));
+
+    // make sure -append is only valid when -update is specified
+    try {
+      OptionsParser.parse(new String[] { "-append",
+              "hdfs://localhost:8020/source/first",
+              "hdfs://localhost:8020/target/" });
+      fail("Append should fail if update option is not specified");
+    } catch (IllegalArgumentException e) {
+      GenericTestUtils.assertExceptionContains(
+          "Append is valid only with update options", e);
+    }
+
+    // make sure -append is invalid when skipCrc is specified
+    try {
+      OptionsParser.parse(new String[] {
+          "-append", "-update", "-skipcrccheck",
+          "hdfs://localhost:8020/source/first",
+          "hdfs://localhost:8020/target/" });
+      fail("Append should fail if skipCrc option is specified");
+    } catch (IllegalArgumentException e) {
+      GenericTestUtils.assertExceptionContains(
+          "Append is disallowed when skipping CRC", e);
+    }
+  }
+
+  @Ignore //not suported by our version of HTML
+  @Test
+  public void testDiffOption() {
+    Configuration conf = new Configuration();
+    Assert.assertFalse(conf.getBoolean(DistCpOptionSwitch.DIFF.getConfigLabel(),
+        false));
+
+    DistCpOptions options = OptionsParser.parse(new String[] { "-update",
+        "-delete", "-diff", "s1", "s2",
+        "hdfs://localhost:8020/source/first",
+        "hdfs://localhost:8020/target/" });
+    options.appendToConf(conf);
+    Assert.assertTrue(conf.getBoolean(DistCpOptionSwitch.DIFF.getConfigLabel(), false));
+    Assert.assertEquals("s1", options.getFromSnapshot());
+    Assert.assertEquals("s2", options.getToSnapshot());
+
+    options = OptionsParser.parse(new String[] {
+        "-delete", "-diff", "s1", ".", "-update",
+        "hdfs://localhost:8020/source/first",
+        "hdfs://localhost:8020/target/" });
+    options.appendToConf(conf);
+    Assert.assertTrue(conf.getBoolean(DistCpOptionSwitch.DIFF.getConfigLabel(),
+        false));
+    Assert.assertEquals("s1", options.getFromSnapshot());
+    Assert.assertEquals(".", options.getToSnapshot());
+
+    // -diff requires two option values
+    try {
+      OptionsParser.parse(new String[] {"-diff", "s1", "-delete", "-update",
+          "hdfs://localhost:8020/source/first",
+          "hdfs://localhost:8020/target/" });
+      fail("-diff should fail with only one snapshot name");
+    } catch (IllegalArgumentException e) {
+      GenericTestUtils.assertExceptionContains(
+          "Must provide both the starting and ending snapshot names", e);
+    }
+
+    // make sure -diff is only valid when -update and -delete is specified
+    try {
+      OptionsParser.parse(new String[] { "-diff", "s1", "s2",
+          "hdfs://localhost:8020/source/first",
+          "hdfs://localhost:8020/target/" });
+      fail("-diff should fail if -update or -delete option is not specified");
+    } catch (IllegalArgumentException e) {
+      GenericTestUtils.assertExceptionContains(
+          "Diff is valid only with update and delete options", e);
+    }
+
+    try {
+      OptionsParser.parse(new String[] { "-diff", "s1", "s2", "-update",
+          "hdfs://localhost:8020/source/first",
+          "hdfs://localhost:8020/target/" });
+      fail("-diff should fail if -update or -delete option is not specified");
+    } catch (IllegalArgumentException e) {
+      GenericTestUtils.assertExceptionContains(
+          "Diff is valid only with update and delete options", e);
+    }
+
+    try {
+      OptionsParser.parse(new String[] { "-diff", "s1", "s2",
+          "-delete", "-overwrite",
+          "hdfs://localhost:8020/source/first",
+          "hdfs://localhost:8020/target/" });
+      fail("-diff should fail if -update or -delete option is not specified");
+    } catch (IllegalArgumentException e) {
+      GenericTestUtils.assertExceptionContains(
+          "Diff is valid only with update and delete options", e);
+    }
   }
 }

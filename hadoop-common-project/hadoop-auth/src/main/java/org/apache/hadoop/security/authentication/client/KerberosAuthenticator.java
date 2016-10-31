@@ -14,6 +14,7 @@
 package org.apache.hadoop.security.authentication.client;
 
 import org.apache.commons.codec.binary.Base64;
+import org.apache.hadoop.security.authentication.util.AuthToken;
 import org.apache.hadoop.security.authentication.util.KerberosUtil;
 import org.ietf.jgss.GSSContext;
 import org.ietf.jgss.GSSManager;
@@ -23,10 +24,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.security.auth.Subject;
+import javax.security.auth.kerberos.KerberosKey;
+import javax.security.auth.kerberos.KerberosTicket;
 import javax.security.auth.login.AppConfigurationEntry;
 import javax.security.auth.login.Configuration;
 import javax.security.auth.login.LoginContext;
 import javax.security.auth.login.LoginException;
+
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -41,9 +45,9 @@ import static org.apache.hadoop.util.PlatformName.IBM_JAVA;
 
 /**
  * The {@link KerberosAuthenticator} implements the Kerberos SPNEGO authentication sequence.
- * <p/>
+ * <p>
  * It uses the default principal for the Kerberos cache (normally set via kinit).
- * <p/>
+ * <p>
  * It falls back to the {@link PseudoAuthenticator} if the HTTP endpoint does not trigger an SPNEGO authentication
  * sequence.
  */
@@ -160,9 +164,9 @@ public class KerberosAuthenticator implements Authenticator {
 
   /**
    * Performs SPNEGO authentication against the specified URL.
-   * <p/>
+   * <p>
    * If a token is given it does a NOP and returns the given token.
-   * <p/>
+   * <p>
    * If no token is given, it will perform the SPNEGO authentication sequence using an
    * HTTP <code>OPTIONS</code> request.
    *
@@ -185,13 +189,18 @@ public class KerberosAuthenticator implements Authenticator {
       conn.setRequestMethod(AUTH_HTTP_METHOD);
       conn.connect();
       
+      boolean needFallback = false;
       if (conn.getResponseCode() == HttpURLConnection.HTTP_OK) {
         LOG.debug("JDK performed authentication on our behalf.");
         // If the JDK already did the SPNEGO back-and-forth for
         // us, just pull out the token.
         AuthenticatedURL.extractToken(conn, token);
-        return;
-      } else if (isNegotiate()) {
+        if (isTokenKerberos(token)) {
+          return;
+        }
+        needFallback = true;
+      }
+      if (!needFallback && isNegotiate()) {
         LOG.debug("Performing our own SPNEGO sequence.");
         doSpnegoSequence(token);
       } else {
@@ -209,7 +218,7 @@ public class KerberosAuthenticator implements Authenticator {
 
   /**
    * If the specified URL does not support SPNEGO authentication, a fallback {@link Authenticator} will be used.
-   * <p/>
+   * <p>
    * This implementation returns a {@link PseudoAuthenticator}.
    *
    * @return the fallback {@link Authenticator}.
@@ -220,6 +229,21 @@ public class KerberosAuthenticator implements Authenticator {
       auth.setConnectionConfigurator(connConfigurator);
     }
     return auth;
+  }
+
+  /*
+   * Check if the passed token is of type "kerberos" or "kerberos-dt"
+   */
+  private boolean isTokenKerberos(AuthenticatedURL.Token token)
+      throws AuthenticationException {
+    if (token.isSet()) {
+      AuthToken aToken = AuthToken.parse(token.toString());          
+      if (aToken.getType().equals("kerberos") ||
+          aToken.getType().equals("kerberos-dt")) {              
+        return true;
+      }
+    }
+    return false;
   }
 
   /*
@@ -247,7 +271,9 @@ public class KerberosAuthenticator implements Authenticator {
     try {
       AccessControlContext context = AccessController.getContext();
       Subject subject = Subject.getSubject(context);
-      if (subject == null) {
+      if (subject == null
+          || (subject.getPrivateCredentials(KerberosKey.class).isEmpty()
+              && subject.getPrivateCredentials(KerberosTicket.class).isEmpty())) {
         LOG.debug("No subject in context, logging in");
         subject = new Subject();
         LoginContext login = new LoginContext("", subject,

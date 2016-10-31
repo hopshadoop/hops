@@ -18,12 +18,12 @@
 
 package org.apache.hadoop.yarn.factories;
 
+import java.net.InetSocketAddress;
+
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 
-import java.net.InetSocketAddress;
-
-@InterfaceAudience.LimitedPrivate({"MapReduce", "YARN"})
+@InterfaceAudience.LimitedPrivate({ "MapReduce", "YARN" })
 public interface RpcClientFactory {
   
   public Object getClient(Class<?> protocol, long clientVersion,

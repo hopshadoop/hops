@@ -12,7 +12,7 @@
   See the License for the specific language governing permissions and
   limitations under the License. See accompanying LICENSE file.
 -->
-<project>
+<project xmlns:pom="http://maven.apache.org/POM/4.0.0">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <artifactId>hadoop-yarn</artifactId>
@@ -27,6 +27,8 @@
   <properties>
     <!-- Needed for generating FindBugs warnings using parent pom -->
     <yarn.basedir>${project.parent.basedir}</yarn.basedir>
+    <should.run.jdiff>true</should.run.jdiff>
+    <dev-support.relative.dir>../dev-support</dev-support.relative.dir>
   </properties>
 
   <dependencies>
@@ -35,24 +37,6 @@
       <groupId>io.hops</groupId>
       <artifactId>hadoop-common</artifactId>
       <scope>provided</scope>
-      <exclusions>
-        <exclusion>
-          <groupId>commons-el</groupId>
-          <artifactId>commons-el</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>tomcat</groupId>
-          <artifactId>jasper-runtime</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>tomcat</groupId>
-          <artifactId>jasper-compiler</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.mortbay.jetty</groupId>
-          <artifactId>jsp-2.1-jetty</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
 
     <dependency>
@@ -74,14 +58,6 @@
     <dependency>
       <groupId>log4j</groupId>
       <artifactId>log4j</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.mortbay.jetty</groupId>
-      <artifactId>jetty-util</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.sun.jersey</groupId>
-      <artifactId>jersey-client</artifactId>
     </dependency>
 
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
@@ -115,13 +91,19 @@
     </dependency>
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
-      <groupId>io.hops</groupId>
-      <artifactId>hadoop-yarn-api</artifactId>
-    </dependency>
+  		<groupId>io.hops</groupId>
+  		<artifactId>hadoop-yarn-api</artifactId>
+  	</dependency>
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
-      <groupId>io.hops</groupId>
-      <artifactId>hadoop-yarn-common</artifactId>
+  		<groupId>io.hops</groupId>
+  		<artifactId>hadoop-yarn-common</artifactId>
+  	</dependency>
+    <dependency>
+        <groupId>io.hops</groupId>
+        <artifactId>hadoop-yarn-common</artifactId>
+        <type>test-jar</type>
+        <scope>test</scope>
     </dependency>
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
@@ -131,24 +113,59 @@
     </dependency>
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
-      <groupId>io.hops</groupId>
-      <artifactId>hadoop-yarn-server-resourcemanager</artifactId>
+  		<groupId>io.hops</groupId>
+  		<artifactId>hadoop-yarn-server-resourcemanager</artifactId>
       <scope>test</scope>
-    </dependency>
+  	</dependency>
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
-      <groupId>io.hops</groupId>
-      <artifactId>hadoop-yarn-server-tests</artifactId>
+  		<groupId>io.hops</groupId>
+  		<artifactId>hadoop-yarn-server-tests</artifactId>
       <scope>test</scope>
       <type>test-jar</type>
-    </dependency>
+  	</dependency>
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->
     <dependency>
-      <groupId>io.hops</groupId>
-      <artifactId>hadoop-yarn-server-resourcemanager</artifactId>
+    <groupId>io.hops</groupId>
+    <artifactId>hadoop-yarn-server-resourcemanager</artifactId>
       <scope>test</scope>
       <type>test-jar</type>
     </dependency>
 
   </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>io.hops</groupId>
+        <artifactId>hadoop-maven-plugins</artifactId>
+        <executions>
+          <execution>
+            <id>compile-protoc</id>
+            <phase>generate-sources</phase>
+            <goals>
+              <goal>protoc</goal>
+            </goals>
+            <configuration>
+              <protocVersion>${protobuf.version}</protocVersion>
+              <protocCommand>${protoc.path}</protocCommand>
+              <imports>
+                <param>${basedir}/src/test/proto</param>
+                <param>${basedir}/../../../hadoop-common-project/hadoop-common/src/main/proto</param>
+                <param>${basedir}/../hadoop-yarn-api/src/main/proto</param>
+              </imports>
+              <source>
+                <directory>${basedir}/src/test/proto</directory>
+                <includes>
+                  <include>test_amrm_token.proto</include>
+                </includes>
+              </source>
+              <output>${project.build.directory}/generated-sources/java</output>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+
 </project>

@@ -29,7 +29,7 @@ import org.apache.hadoop.yarn.util.Records;
  * The request from clients to get a list of application attempt reports of an
  * application from the <code>ResourceManager</code>.
  * </p>
- *
+ * 
  * @see ApplicationHistoryProtocol#getApplicationAttempts(GetApplicationAttemptsRequest)
  */
 @Public
@@ -48,7 +48,7 @@ public abstract class GetApplicationAttemptsRequest {
 
   /**
    * Get the <code>ApplicationId</code> of an application
-   *
+   * 
    * @return <code>ApplicationId</code> of an application
    */
   @Public
@@ -57,9 +57,9 @@ public abstract class GetApplicationAttemptsRequest {
 
   /**
    * Set the <code>ApplicationId</code> of an application
-   *
+   * 
    * @param applicationId
-   *     <code>ApplicationId</code> of an application
+   *          <code>ApplicationId</code> of an application
    */
   @Public
   @Unstable

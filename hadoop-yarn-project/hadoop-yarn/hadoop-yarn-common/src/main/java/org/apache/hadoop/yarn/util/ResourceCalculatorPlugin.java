@@ -27,22 +27,11 @@ import org.apache.hadoop.util.Shell;
 
 /**
  * Plugin to calculate resource information on the system.
+ *
  */
 @InterfaceAudience.LimitedPrivate({"YARN", "MAPREDUCE"})
 @InterfaceStability.Unstable
 public abstract class ResourceCalculatorPlugin extends Configured {
-  
-  protected String processPid = null;
-
-  /**
-   * set the pid of the process for which <code>getProcResourceValues</code>
-   * will be invoked
-   *
-   * @param pid
-   */
-  public void setProcessPid(String pid) {
-    processPid = pid;
-  }
 
   /**
    * Obtain the total size of the virtual memory present in the system.
@@ -103,17 +92,14 @@ public abstract class ResourceCalculatorPlugin extends Configured {
   public abstract float getCpuUsage();
 
   /**
-   * Create the ResourceCalculatorPlugin from the class name and configure it.
-   * If
+   * Create the ResourceCalculatorPlugin from the class name and configure it. If
    * class name is null, this method will try and return a memory calculator
    * plugin available for this system.
    *
-   * @param clazz
-   *     ResourceCalculator plugin class-name
-   * @param conf
-   *     configure the plugin with this.
+   * @param clazz ResourceCalculator plugin class-name
+   * @param conf configure the plugin with this.
    * @return ResourceCalculatorPlugin or null if ResourceCalculatorPlugin is not
-   * available for current system
+   * 		 available for current system
    */
   public static ResourceCalculatorPlugin getResourceCalculatorPlugin(
       Class<? extends ResourceCalculatorPlugin> clazz, Configuration conf) {

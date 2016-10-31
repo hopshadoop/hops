@@ -82,6 +82,11 @@ public final class NativeCodeLoader {
    * Returns true only if this build was compiled with support for snappy.
    */
   public static native boolean buildSupportsSnappy();
+  
+  /**
+   * Returns true only if this build was compiled with support for openssl.
+   */
+  public static native boolean buildSupportsOpenssl();
 
   /**
    * Returns true only if this build was compiled with support for ISA-L.
@@ -91,7 +96,6 @@ public final class NativeCodeLoader {
   /**
    * Returns true only if this build was compiled with support for openssl.
    */
-  public static native boolean buildSupportsOpenssl();
 
   public static native String getLibraryName();
 

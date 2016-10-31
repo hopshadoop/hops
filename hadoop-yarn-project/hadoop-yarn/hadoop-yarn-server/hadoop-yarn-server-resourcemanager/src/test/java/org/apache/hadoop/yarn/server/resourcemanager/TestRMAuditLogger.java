@@ -17,6 +17,13 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager;
 
+import static org.junit.Assert.assertEquals;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.Server;
@@ -30,13 +37,6 @@ import org.apache.hadoop.yarn.server.resourcemanager.RMAuditLogger.Keys;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-
-import static junit.framework.Assert.assertEquals;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
 
 /**
  * Tests {@link RMAuditLogger}.
@@ -48,8 +48,7 @@ public class TestRMAuditLogger {
   private static final String PERM = "admin group";
   private static final String DESC = "description of an audit log";
   private static final ApplicationId APPID = mock(ApplicationId.class);
-  private static final ApplicationAttemptId ATTEMPTID =
-      mock(ApplicationAttemptId.class);
+  private static final ApplicationAttemptId ATTEMPTID = mock(ApplicationAttemptId.class);
   private static final ContainerId CONTAINERID = mock(ContainerId.class);
 
   @Before
@@ -63,7 +62,7 @@ public class TestRMAuditLogger {
   /**
    * Test the AuditLog format with key-val pair.
    */
-  @Test
+  @Test  
   public void testKeyValLogFormat() throws Exception {
     StringBuilder actLog = new StringBuilder();
     StringBuilder expLog = new StringBuilder();
@@ -78,7 +77,7 @@ public class TestRMAuditLogger {
     assertEquals(expLog.toString(), actLog.toString());
 
     // append another k1=null pair and test
-    RMAuditLogger.add(Keys.APPID, (String) null, actLog);
+    RMAuditLogger.add(Keys.APPID, (String)null, actLog);
     expLog.append("\tAPPID=null");
     assertEquals(expLog.toString(), actLog.toString());
 
@@ -94,9 +93,8 @@ public class TestRMAuditLogger {
    */
   private void testSuccessLogFormatHelper(boolean checkIP, ApplicationId appId,
       ApplicationAttemptId attemptId, ContainerId containerId) {
-    String sLog = RMAuditLogger
-        .createSuccessLog(USER, OPERATION, TARGET, appId, attemptId,
-            containerId);
+    String sLog = RMAuditLogger.createSuccessLog(USER, OPERATION, TARGET,
+        appId, attemptId, containerId);
     StringBuilder expLog = new StringBuilder();
     expLog.append("USER=test\t");
     if (checkIP) {
@@ -121,8 +119,8 @@ public class TestRMAuditLogger {
    * Test the AuditLog format for successful events passing nulls.
    */
   private void testSuccessLogNulls(boolean checkIP) {
-    String sLog =
-        RMAuditLogger.createSuccessLog(null, null, null, null, null, null);
+    String sLog = RMAuditLogger.createSuccessLog(null, null, null, null, 
+        null, null);
     StringBuilder expLog = new StringBuilder();
     expLog.append("USER=null\t");
     if (checkIP) {
@@ -155,9 +153,9 @@ public class TestRMAuditLogger {
    */
   private void testFailureLogFormatHelper(boolean checkIP, ApplicationId appId,
       ApplicationAttemptId attemptId, ContainerId containerId) {
-    String fLog = RMAuditLogger
-        .createFailureLog(USER, OPERATION, PERM, TARGET, DESC, appId, attemptId,
-            containerId);
+    String fLog =
+      RMAuditLogger.createFailureLog(USER, OPERATION, PERM, TARGET, DESC,
+      appId, attemptId, containerId);
     StringBuilder expLog = new StringBuilder();
     expLog.append("USER=test\t");
     if (checkIP) {
@@ -197,7 +195,7 @@ public class TestRMAuditLogger {
   /**
    * Test {@link RMAuditLogger} without IP set.
    */
-  @Test
+  @Test  
   public void testRMAuditLoggerWithoutIP() throws Exception {
     // test without ip
     testSuccessLogFormat(false);
@@ -205,7 +203,7 @@ public class TestRMAuditLogger {
   }
 
   /**
-   * A special extension of {@link TestImpl} RPC server with
+   * A special extension of {@link TestImpl} RPC server with 
    * {@link TestImpl#ping()} testing the audit logs.
    */
   private class MyTestRPCServer extends TestImpl {
@@ -220,20 +218,20 @@ public class TestRMAuditLogger {
   /**
    * Test {@link RMAuditLogger} with IP set.
    */
-  @Test
+  @Test  
   public void testRMAuditLoggerWithIP() throws Exception {
     Configuration conf = new Configuration();
     // start the IPC server
     Server server = new RPC.Builder(conf).setProtocol(TestProtocol.class)
-        .setInstance(new MyTestRPCServer()).setBindAddress("0.0.0.0").setPort(0)
-        .setNumHandlers(5).setVerbose(true).build();
+        .setInstance(new MyTestRPCServer()).setBindAddress("0.0.0.0")
+        .setPort(0).setNumHandlers(5).setVerbose(true).build();
     server.start();
 
     InetSocketAddress addr = NetUtils.getConnectAddress(server);
 
     // Make a client connection and test the audit log
-    TestProtocol proxy = (TestProtocol) RPC
-        .getProxy(TestProtocol.class, TestProtocol.versionID, addr, conf);
+    TestProtocol proxy = (TestProtocol)RPC.getProxy(TestProtocol.class,
+                           TestProtocol.versionID, addr, conf);
     // Start the testcase
     proxy.ping();
 

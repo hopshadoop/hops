@@ -14,6 +14,7 @@
 package org.apache.hadoop.security.authentication.server;
 
 import java.io.IOException;
+import java.util.Locale;
 import java.util.Properties;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -28,7 +29,6 @@ import org.apache.hadoop.security.authentication.client.AuthenticationException;
  * to allow a developer to implement their own custom authentication for browser
  * access.  The alternateAuthenticate method will be called whenever a request
  * comes from a browser.
- * <p/>
  */
 public abstract class AltKerberosAuthenticationHandler
                         extends KerberosAuthenticationHandler {
@@ -52,7 +52,6 @@ public abstract class AltKerberosAuthenticationHandler
   /**
    * Returns the authentication type of the authentication handler,
    * 'alt-kerberos'.
-   * <p/>
    *
    * @return the authentication type of the authentication handler,
    * 'alt-kerberos'.
@@ -70,7 +69,8 @@ public abstract class AltKerberosAuthenticationHandler
             NON_BROWSER_USER_AGENTS, NON_BROWSER_USER_AGENTS_DEFAULT)
             .split("\\W*,\\W*");
     for (int i = 0; i < nonBrowserUserAgents.length; i++) {
-        nonBrowserUserAgents[i] = nonBrowserUserAgents[i].toLowerCase();
+        nonBrowserUserAgents[i] =
+            nonBrowserUserAgents[i].toLowerCase(Locale.ENGLISH);
     }
   }
 
@@ -80,7 +80,6 @@ public abstract class AltKerberosAuthenticationHandler
    * completed successfully (in the case of Java access) and only after the
    * custom authentication implemented by the subclass in alternateAuthenticate
    * has completed successfully (in the case of browser access).
-   * <p/>
    *
    * @param request the HTTP client request.
    * @param response the HTTP client response.
@@ -109,7 +108,7 @@ public abstract class AltKerberosAuthenticationHandler
    * refers to a browser.  If its not a browser, then Kerberos authentication
    * will be used; if it is a browser, alternateAuthenticate from the subclass
    * will be used.
-   * <p/>
+   * <p>
    * A User-Agent String is considered to be a browser if it does not contain
    * any of the values from alt-kerberos.non-browser.user-agents; the default
    * behavior is to consider everything a browser unless it contains one of:
@@ -123,7 +122,7 @@ public abstract class AltKerberosAuthenticationHandler
     if (userAgent == null) {
       return false;
     }
-    userAgent = userAgent.toLowerCase();
+    userAgent = userAgent.toLowerCase(Locale.ENGLISH);
     boolean isBrowser = true;
     for (String nonBrowserUserAgent : nonBrowserUserAgents) {
         if (userAgent.contains(nonBrowserUserAgent)) {

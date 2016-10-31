@@ -29,11 +29,11 @@ import org.apache.hadoop.yarn.util.Records;
 /**
  * <p>The request sent by the <code>ApplicationMaster</code> to the
  * <code>NodeManager</code> to <em>start</em> a container.</p>
- * <p/>
+ * 
  * <p>The <code>ApplicationMaster</code> has to provide details such as
  * allocated resource capability, security tokens (if enabled), command
- * to be executed to start the container, environment for the process,
- * necessary binaries/jar/shared-objects etc. via the
+ * to be executed to start the container, environment for the process, 
+ * necessary binaries/jar/shared-objects etc. via the 
  * {@link ContainerLaunchContext}.</p>
  *
  * @see ContainerManagementProtocol#startContainers(StartContainersRequest)
@@ -53,38 +53,32 @@ public abstract class StartContainerRequest {
   }
 
   /**
-   * Get the <code>ContainerLaunchContext</code> for the container to be
-   * started
+   * Get the <code>ContainerLaunchContext</code> for the container to be started
    * by the <code>NodeManager</code>.
-   *
+   * 
    * @return <code>ContainerLaunchContext</code> for the container to be started
-   * by the <code>NodeManager</code>
+   *         by the <code>NodeManager</code>
    */
   @Public
   @Stable
   public abstract ContainerLaunchContext getContainerLaunchContext();
   
   /**
-   * Set the <code>ContainerLaunchContext</code> for the container to be
-   * started
+   * Set the <code>ContainerLaunchContext</code> for the container to be started
    * by the <code>NodeManager</code>
-   *
-   * @param context
-   *     <code>ContainerLaunchContext</code> for the container to be
-   *     started by the <code>NodeManager</code>
+   * @param context <code>ContainerLaunchContext</code> for the container to be 
+   *                started by the <code>NodeManager</code>
    */
   @Public
   @Stable
-  public abstract void setContainerLaunchContext(
-      ContainerLaunchContext context);
+  public abstract void setContainerLaunchContext(ContainerLaunchContext context);
 
   /**
-   * <p>Get the container token to be used for authorization during starting
-   * container.</p>
-   * <p>Note: {@link NMToken} will be used for authenticating communication with
-   * </code>
-   * NodeManager</code>.</p>
-   *
+   * Get the container token to be used for authorization during starting
+   * container.
+   * <p>
+   * Note: {@link NMToken} will be used for authenticating communication with
+   * {@code NodeManager}.
    * @return the container token to be used for authorization during starting
    * container.
    * @see NMToken

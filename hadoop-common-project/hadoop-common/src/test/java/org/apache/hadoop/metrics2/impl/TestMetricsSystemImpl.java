@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.metrics2.impl;
 
+import java.io.Closeable;
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.*;
@@ -29,7 +31,9 @@ import org.junit.runner.RunWith;
 
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
+import org.mockito.invocation.InvocationOnMock;
 import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.stubbing.Answer;
 
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
@@ -167,14 +171,16 @@ public class TestMetricsSystemImpl {
   }
   
   @Test public void testMultiThreadedPublish() throws Exception {
+    final int numThreads = 10;
     new ConfigBuilder().add("*.period", 80)
-      .add("test.sink.Collector.queue.capacity", "20")
+      .add("test.sink.collector." + MetricsConfig.QUEUE_CAPACITY_KEY,
+              numThreads)
       .save(TestMetricsConfig.getTestFilename("hadoop-metrics2-test"));
     final MetricsSystemImpl ms = new MetricsSystemImpl("Test");
     ms.start();
-    final int numThreads = 10;
+
     final CollectingSink sink = new CollectingSink(numThreads);
-    ms.registerSink("Collector",
+    ms.registerSink("collector",
         "Collector of values from all threads.", sink);
     final TestSource[] sources = new TestSource[numThreads];
     final Thread[] threads = new Thread[numThreads];
@@ -359,6 +365,59 @@ public class TestMetricsSystemImpl {
     ms.register(ts);
   }
 
+  @Test public void testStartStopStart() {
+    DefaultMetricsSystem.shutdown(); // Clear pre-existing source names.
+    MetricsSystemImpl ms = new MetricsSystemImpl("test");
+    TestSource ts = new TestSource("ts");
+    ms.start();
+    ms.register("ts", "", ts);
+    MetricsSourceAdapter sa = ms.getSourceAdapter("ts");
+    assertNotNull(sa);
+    assertNotNull(sa.getMBeanName());
+    ms.stop();
+    ms.shutdown();
+    ms.start();
+    sa = ms.getSourceAdapter("ts");
+    assertNotNull(sa);
+    assertNotNull(sa.getMBeanName());
+    ms.stop();
+    ms.shutdown();
+  }
+
+  @Test public void testUnregisterSource() {
+    MetricsSystem ms = new MetricsSystemImpl();
+    TestSource ts1 = new TestSource("ts1");
+    TestSource ts2 = new TestSource("ts2");
+    ms.register("ts1", "", ts1);
+    ms.register("ts2", "", ts2);
+    MetricsSource s1 = ms.getSource("ts1");
+    assertNotNull(s1);
+    // should work when metrics system is not started
+    ms.unregisterSource("ts1");
+    s1 = ms.getSource("ts1");
+    assertNull(s1);
+    MetricsSource s2 = ms.getSource("ts2");
+    assertNotNull(s2);
+    ms.shutdown();
+  }
+
+  @Test public void testRegisterSourceWithoutName() {
+    MetricsSystem ms = new MetricsSystemImpl();
+    TestSource ts = new TestSource("ts");
+    TestSource2 ts2 = new TestSource2("ts2");
+    ms.register(ts);
+    ms.register(ts2);
+    ms.init("TestMetricsSystem");
+    // if metrics source is registered without name,
+    // the class name will be used as the name
+    MetricsSourceAdapter sa = ((MetricsSystemImpl) ms)
+        .getSourceAdapter("TestSource");
+    assertNotNull(sa);
+    MetricsSourceAdapter sa2 = ((MetricsSystemImpl) ms)
+        .getSourceAdapter("TestSource2");
+    assertNotNull(sa2);
+    ms.shutdown();
+  }
 
   private void checkMetricsRecords(List<MetricsRecord> recs) {
     LOG.debug(recs);
@@ -379,6 +438,126 @@ public class TestMetricsSystemImpl {
                new MetricGaugeInt(MsInfo.NumActiveSinks, 3)));
   }
 
+  @Test
+  public void testQSize() throws Exception {
+    new ConfigBuilder().add("*.period", 8)
+        .add("*.queue.capacity", 2)
+        .add("test.sink.test.class", TestSink.class.getName())
+        .save(TestMetricsConfig.getTestFilename("hadoop-metrics2-test"));
+    MetricsSystemImpl ms = new MetricsSystemImpl("Test");
+    final CountDownLatch proceedSignal = new CountDownLatch(1);
+    final CountDownLatch reachedPutMetricSignal = new CountDownLatch(1);
+    ms.start();
+    try {
+      MetricsSink slowSink = mock(MetricsSink.class);
+      MetricsSink dataSink = mock(MetricsSink.class);
+      ms.registerSink("slowSink",
+          "The sink that will wait on putMetric", slowSink);
+      ms.registerSink("dataSink",
+          "The sink I'll use to get info about slowSink", dataSink);
+      doAnswer(new Answer() {
+        @Override
+        public Object answer(InvocationOnMock invocation) throws Throwable {
+          reachedPutMetricSignal.countDown();
+          proceedSignal.await();
+          return null;
+        }
+      }).when(slowSink).putMetrics(any(MetricsRecord.class));
+
+      // trigger metric collection first time
+      ms.onTimerEvent();
+      assertTrue(reachedPutMetricSignal.await(1, TimeUnit.SECONDS));
+      // Now that the slow sink is still processing the first metric,
+      // its queue length should be 1 for the second collection.
+      ms.onTimerEvent();
+      verify(dataSink, timeout(500).times(2)).putMetrics(r1.capture());
+      List<MetricsRecord> mr = r1.getAllValues();
+      Number qSize = Iterables.find(mr.get(1).metrics(),
+          new Predicate<AbstractMetric>() {
+            @Override
+            public boolean apply(@Nullable AbstractMetric input) {
+              assert input != null;
+              return input.name().equals("Sink_slowSinkQsize");
+            }
+      }).value();
+      assertEquals(1, qSize);
+    } finally {
+      proceedSignal.countDown();
+      ms.stop();
+    }
+  }
+
+  /**
+   * Class to verify HADOOP-11932. Instead of reading from HTTP, going in loop
+   * until closed.
+   */
+  private static class TestClosableSink implements MetricsSink, Closeable {
+
+    boolean closed = false;
+    CountDownLatch collectingLatch;
+
+    public TestClosableSink(CountDownLatch collectingLatch) {
+      this.collectingLatch = collectingLatch;
+    }
+
+    @Override
+    public void init(SubsetConfiguration conf) {
+    }
+
+    @Override
+    public void close() throws IOException {
+      closed = true;
+    }
+
+    @Override
+    public void putMetrics(MetricsRecord record) {
+      while (!closed) {
+        collectingLatch.countDown();
+      }
+    }
+
+    @Override
+    public void flush() {
+    }
+  }
+
+  /**
+   * HADOOP-11932
+   */
+  @Test(timeout = 5000)
+  public void testHangOnSinkRead() throws Exception {
+    new ConfigBuilder().add("*.period", 8)
+        .add("test.sink.test.class", TestSink.class.getName())
+        .save(TestMetricsConfig.getTestFilename("hadoop-metrics2-test"));
+    MetricsSystemImpl ms = new MetricsSystemImpl("Test");
+    ms.start();
+    try {
+      CountDownLatch collectingLatch = new CountDownLatch(1);
+      MetricsSink sink = new TestClosableSink(collectingLatch);
+      ms.registerSink("closeableSink",
+          "The sink will be used to test closeability", sink);
+      // trigger metric collection first time
+      ms.onTimerEvent();
+      // Make sure that sink is collecting metrics
+      assertTrue(collectingLatch.await(1, TimeUnit.SECONDS));
+    } finally {
+      ms.stop();
+    }
+  }
+
+  @Test
+  public void testRegisterSourceJmxCacheTTL() {
+    MetricsSystem ms = new MetricsSystemImpl();
+    ms.init("TestMetricsSystem");
+    TestSource ts = new TestSource("ts");
+    ms.register(ts);
+    MetricsSourceAdapter sa = ((MetricsSystemImpl) ms)
+        .getSourceAdapter("TestSource");
+    assertEquals(MetricsConfig.PERIOD_DEFAULT * 1000 + 1,
+        sa.getJmxCacheTTL());
+    ms.shutdown();
+  }
+
   @Metrics(context="test")
   private static class TestSource {
     @Metric("C1 desc") MutableCounterLong c1;
@@ -389,6 +568,20 @@ public class TestMetricsSystemImpl {
     final MetricsRegistry registry;
 
     TestSource(String recName) {
+      registry = new MetricsRegistry(recName);
+    }
+  }
+
+  @Metrics(context="test")
+  private static class TestSource2 {
+    @Metric("C1 desc") MutableCounterLong c1;
+    @Metric("XXX desc") MutableCounterLong xxx;
+    @Metric("G1 desc") MutableGaugeLong g1;
+    @Metric("YYY desc") MutableGaugeLong yyy;
+    @Metric MutableRate s1;
+    final MetricsRegistry registry;
+
+    TestSource2(String recName) {
       registry = new MetricsRegistry(recName);
     }
   }

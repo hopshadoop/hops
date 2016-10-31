@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.conf;
 
+import com.google.common.annotations.VisibleForTesting;
+
 import java.io.BufferedInputStream;
 import java.io.DataInput;
 import java.io.DataOutput;
@@ -50,6 +52,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.WeakHashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -67,6 +70,7 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
+import com.google.common.base.Charsets;
 import org.apache.commons.collections.map.UnmodifiableMap;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -78,6 +82,9 @@ import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.security.alias.CredentialProvider;
+import org.apache.hadoop.security.alias.CredentialProvider.CredentialEntry;
+import org.apache.hadoop.security.alias.CredentialProviderFactory;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.StringInterner;
 import org.apache.hadoop.util.StringUtils;
@@ -107,8 +114,9 @@ import com.google.common.base.Preconditions;
  *
  * <p>Unless explicitly turned off, Hadoop by default specifies two 
  * resources, loaded in-order from the classpath: <ol>
- * <li><tt><a href="{@docRoot}/../core-default.html">core-default.xml</a>
- * </tt>: Read-only defaults for hadoop.</li>
+ * <li><tt>
+ * <a href="{@docRoot}/../hadoop-project-dist/hadoop-common/core-default.xml">
+ * core-default.xml</a></tt>: Read-only defaults for hadoop.</li>
  * <li><tt>core-site.xml</tt>: Site-specific configuration for a given hadoop
  * installation.</li>
  * </ol>
@@ -173,6 +181,11 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
     LogFactory.getLog("org.apache.hadoop.conf.Configuration.deprecation");
 
   private boolean quietmode = true;
+
+  private static final String DEFAULT_STRING_CHECK =
+    "testingforemptydefaultvalue";
+
+  private boolean allowNullValueProperties = false;
   
   private static class Resource {
     private final Object resource;
@@ -216,7 +229,8 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
   /**
    * List of configuration parameters marked <b>final</b>. 
    */
-  private Set<String> finalParameters = new HashSet<String>();
+  private Set<String> finalParameters = Collections.newSetFromMap(
+      new ConcurrentHashMap<String, Boolean>());
   
   private boolean loadDefaults = true;
   
@@ -246,7 +260,7 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
    * Stores the mapping of key to the resource which modifies or loads 
    * the key most recently
    */
-  private HashMap<String, String[]> updatingResource;
+  private Map<String, String[]> updatingResource;
  
   /**
    * Class to keep the information about the keys which replace the deprecated
@@ -423,7 +437,9 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
       new DeprecationDelta("fs.default.name", 
         CommonConfigurationKeys.FS_DEFAULT_NAME_KEY),
       new DeprecationDelta("dfs.umaskmode",
-        CommonConfigurationKeys.FS_PERMISSIONS_UMASK_KEY)
+        CommonConfigurationKeys.FS_PERMISSIONS_UMASK_KEY),
+      new DeprecationDelta("dfs.nfs.exports.allowed.hosts",
+          CommonConfigurationKeys.NFS_EXPORTS_ALLOWED_HOSTS_KEY)
     };
 
   /**
@@ -553,6 +569,32 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
   }
 
   /**
+   * Sets all deprecated properties that are not currently set but have a
+   * corresponding new property that is set. Useful for iterating the
+   * properties when all deprecated properties for currently set properties
+   * need to be present.
+   */
+  public void setDeprecatedProperties() {
+    DeprecationContext deprecations = deprecationContext.get();
+    Properties props = getProps();
+    Properties overlay = getOverlay();
+    for (Map.Entry<String, DeprecatedKeyInfo> entry :
+        deprecations.getDeprecatedKeyMap().entrySet()) {
+      String depKey = entry.getKey();
+      if (!overlay.contains(depKey)) {
+        for (String newKey : entry.getValue().newKeys) {
+          String val = overlay.getProperty(newKey);
+          if (val != null) {
+            props.setProperty(depKey, val);
+            overlay.setProperty(depKey, val);
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  /**
    * Checks for the presence of the property <code>name</code> in the
    * deprecation map. Returns the first of the list of new keys if present
    * in the deprecation map or the <code>name</code> itself. If the property
@@ -566,6 +608,9 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
    */
   private String[] handleDeprecation(DeprecationContext deprecations,
       String name) {
+    if (null != name) {
+      name = name.trim();
+    }
     ArrayList<String > names = new ArrayList<String>();
 	if (isDeprecated(name)) {
       DeprecatedKeyInfo keyInfo = deprecations.getDeprecatedKeyMap().get(name);
@@ -642,7 +687,7 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
    */
   public Configuration(boolean loadDefaults) {
     this.loadDefaults = loadDefaults;
-    updatingResource = new HashMap<String, String[]>();
+    updatingResource = new ConcurrentHashMap<String, String[]>();
     synchronized(Configuration.class) {
       REGISTRY.put(this, null);
     }
@@ -665,10 +710,13 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
        this.overlay = (Properties)other.overlay.clone();
      }
 
-     this.updatingResource = new HashMap<String, String[]>(other.updatingResource);
+     this.updatingResource = new ConcurrentHashMap<String, String[]>(
+         other.updatingResource);
+     this.finalParameters = Collections.newSetFromMap(
+         new ConcurrentHashMap<String, Boolean>());
+     this.finalParameters.addAll(other.finalParameters);
    }
    
-    this.finalParameters = new HashSet<String>(other.finalParameters);
     synchronized(Configuration.class) {
       REGISTRY.put(this, null);
     }
@@ -796,23 +844,101 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
     resources.add(resource);                      // add to resources
     reloadConfiguration();
   }
-  
-  private static Pattern varPat = Pattern.compile("\\$\\{[^\\}\\$\u0020]+\\}");
-  private static int MAX_SUBST = 20;
 
+  private static final int MAX_SUBST = 20;
+
+  private static final int SUB_START_IDX = 0;
+  private static final int SUB_END_IDX = SUB_START_IDX + 1;
+
+  /**
+   * This is a manual implementation of the following regex
+   * "\\$\\{[^\\}\\$\u0020]+\\}". It can be 15x more efficient than
+   * a regex matcher as demonstrated by HADOOP-11506. This is noticeable with
+   * Hadoop apps building on the assumption Configuration#get is an O(1)
+   * hash table lookup, especially when the eval is a long string.
+   *
+   * @param eval a string that may contain variables requiring expansion.
+   * @return a 2-element int array res such that
+   * eval.substring(res[0], res[1]) is "var" for the left-most occurrence of
+   * ${var} in eval. If no variable is found -1, -1 is returned.
+   */
+  private static int[] findSubVariable(String eval) {
+    int[] result = {-1, -1};
+
+    int matchStart;
+    int leftBrace;
+
+    // scanning for a brace first because it's less frequent than $
+    // that can occur in nested class names
+    //
+    match_loop:
+    for (matchStart = 1, leftBrace = eval.indexOf('{', matchStart);
+         // minimum left brace position (follows '$')
+         leftBrace > 0
+         // right brace of a smallest valid expression "${c}"
+         && leftBrace + "{c".length() < eval.length();
+         leftBrace = eval.indexOf('{', matchStart)) {
+      int matchedLen = 0;
+      if (eval.charAt(leftBrace - 1) == '$') {
+        int subStart = leftBrace + 1; // after '{'
+        for (int i = subStart; i < eval.length(); i++) {
+          switch (eval.charAt(i)) {
+            case '}':
+              if (matchedLen > 0) { // match
+                result[SUB_START_IDX] = subStart;
+                result[SUB_END_IDX] = subStart + matchedLen;
+                break match_loop;
+              }
+              // fall through to skip 1 char
+            case ' ':
+            case '$':
+              matchStart = i + 1;
+              continue match_loop;
+            default:
+              matchedLen++;
+          }
+        }
+        // scanned from "${"  to the end of eval, and no reset via ' ', '$':
+        //    no match!
+        break match_loop;
+      } else {
+        // not a start of a variable
+        //
+        matchStart = leftBrace + 1;
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Attempts to repeatedly expand the value {@code expr} by replacing the
+   * left-most substring of the form "${var}" in the following precedence order
+   * <ol>
+   *   <li>by the value of the Java system property "var" if defined</li>
+   *   <li>by the value of the configuration key "var" if defined</li>
+   * </ol>
+   *
+   * If var is unbounded the current state of expansion "prefix${var}suffix" is
+   * returned.
+   *
+   * @param expr the literal value of a config key
+   * @return null if expr is null, otherwise the value resulting from expanding
+   * expr using the algorithm above.
+   * @throws IllegalArgumentException when more than
+   * {@link Configuration#MAX_SUBST} replacements are required
+   */
   private String substituteVars(String expr) {
     if (expr == null) {
       return null;
     }
-    Matcher match = varPat.matcher("");
     String eval = expr;
-    for(int s=0; s<MAX_SUBST; s++) {
-      match.reset(eval);
-      if (!match.find()) {
+    for (int s = 0; s < MAX_SUBST; s++) {
+      final int[] varBounds = findSubVariable(eval);
+      if (varBounds[SUB_START_IDX] == -1) {
         return eval;
       }
-      String var = match.group();
-      var = var.substring(2, var.length()-1); // remove ${ .. }
+      final String var = eval.substring(varBounds[SUB_START_IDX],
+          varBounds[SUB_END_IDX]);
       String val = null;
       try {
         val = System.getProperty(var);
@@ -825,8 +951,12 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
       if (val == null) {
         return eval; // return literal ${var}: var is unbound
       }
+      final int dollar = varBounds[SUB_START_IDX] - "${".length();
+      final int afterRightBrace = varBounds[SUB_END_IDX] + "}".length();
       // substitute
-      eval = eval.substring(0, match.start())+val+eval.substring(match.end());
+      eval = eval.substring(0, dollar)
+             + val
+             + eval.substring(afterRightBrace);
     }
     throw new IllegalStateException("Variable substitution depth too large: " 
                                     + MAX_SUBST + " " + expr);
@@ -835,12 +965,12 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
   /**
    * Get the value of the <code>name</code> property, <code>null</code> if
    * no such property exists. If the key is deprecated, it returns the value of
-   * the first key which replaces the deprecated key and is not null
+   * the first key which replaces the deprecated key and is not null.
    * 
    * Values are processed for <a href="#VariableExpansion">variable expansion</a> 
    * before being returned. 
    * 
-   * @param name the property name.
+   * @param name the property name, will be trimmed before get value.
    * @return the value of the <code>name</code> or its replacing property, 
    *         or null if no such property exists.
    */
@@ -852,7 +982,38 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
     }
     return result;
   }
-  
+
+  /**
+   * Set Configuration to allow keys without values during setup.  Intended
+   * for use during testing.
+   *
+   * @param val If true, will allow Configuration to store keys without values
+   */
+  @VisibleForTesting
+  public void setAllowNullValueProperties( boolean val ) {
+    this.allowNullValueProperties = val;
+  }
+
+  /**
+   * Return existence of the <code>name</code> property, but only for
+   * names which have no valid value, usually non-existent or commented
+   * out in XML.
+   *
+   * @param name the property name
+   * @return true if the property <code>name</code> exists without value
+   */
+  @VisibleForTesting
+  public boolean onlyKeyExists(String name) {
+    String[] names = handleDeprecation(deprecationContext.get(), name);
+    for(String n : names) {
+      if ( getProps().getProperty(n,DEFAULT_STRING_CHECK)
+               .equals(DEFAULT_STRING_CHECK) ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   /**
    * Get the value of the <code>name</code> property as a trimmed <code>String</code>, 
    * <code>null</code> if no such property exists. 
@@ -944,20 +1105,21 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
   /** 
    * Set the <code>value</code> of the <code>name</code> property. If 
    * <code>name</code> is deprecated or there is a deprecated name associated to it,
-   * it sets the value to both names.
+   * it sets the value to both names. Name will be trimmed before put into
+   * configuration.
    * 
    * @param name property name.
    * @param value property value.
    */
   public void set(String name, String value) {
-    LOG.debug("conf set " + name + " value " + value);
     set(name, value, null);
   }
   
   /** 
    * Set the <code>value</code> of the <code>name</code> property. If 
    * <code>name</code> is deprecated, it also sets the <code>value</code> to
-   * the keys that replace the deprecated key.
+   * the keys that replace the deprecated key. Name will be trimmed before put
+   * into configuration.
    *
    * @param name property name.
    * @param value property value.
@@ -972,6 +1134,7 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
     Preconditions.checkArgument(
         value != null,
         "The value of property " + name + " must not be null");
+    name = name.trim();
     DeprecationContext deprecations = deprecationContext.get();
     if (deprecations.getDeprecatedKeyMap().isEmpty()) {
       getProps();
@@ -1057,7 +1220,7 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
    * If no such property exists,
    * then <code>defaultValue</code> is returned.
    * 
-   * @param name property name.
+   * @param name property name, will be trimmed before get value.
    * @param defaultValue default value.
    * @return property value, or <code>defaultValue</code> if the property 
    *         doesn't exist.                    
@@ -1271,11 +1434,9 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
       return defaultValue;
     }
 
-    valueString = valueString.toLowerCase();
-
-    if ("true".equals(valueString))
+    if (StringUtils.equalsIgnoreCase("true", valueString))
       return true;
-    else if ("false".equals(valueString))
+    else if (StringUtils.equalsIgnoreCase("false", valueString))
       return false;
     else return defaultValue;
   }
@@ -1311,13 +1472,14 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
 
   /**
    * Return value matching this enumerated type.
+   * Note that the returned value is trimmed by this method.
    * @param name Property name
    * @param defaultValue Value returned if no mapping exists
    * @throws IllegalArgumentException If mapping is illegal for the type
    * provided
    */
   public <T extends Enum<T>> T getEnum(String name, T defaultValue) {
-    final String val = get(name);
+    final String val = getTrimmed(name);
     return null == val
       ? defaultValue
       : Enum.valueOf(defaultValue.getDeclaringClass(), val);
@@ -1414,6 +1576,7 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
    * Get the value of the <code>name</code> property as a <code>Pattern</code>.
    * If no such property is specified, or if the specified value is not a valid
    * <code>Pattern</code>, then <code>DefaultValue</code> is returned.
+   * Note that the returned value is NOT trimmed by this method.
    *
    * @param name property name
    * @param defaultValue default value
@@ -1442,11 +1605,8 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
    * @param pattern new value
    */
   public void setPattern(String name, Pattern pattern) {
-    if (null == pattern) {
-      set(name, null);
-    } else {
-      set(name, pattern.pattern());
-    }
+    assert pattern != null : "Pattern cannot be null";
+    set(name, pattern.pattern());
   }
 
   /**
@@ -1753,6 +1913,111 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
   }
 
   /**
+   * Get the value for a known password configuration element.
+   * In order to enable the elimination of clear text passwords in config,
+   * this method attempts to resolve the property name as an alias through
+   * the CredentialProvider API and conditionally fallsback to config.
+   * @param name property name
+   * @return password
+   */
+  public char[] getPassword(String name) throws IOException {
+    char[] pass = null;
+
+    pass = getPasswordFromCredentialProviders(name);
+
+    if (pass == null) {
+      pass = getPasswordFromConfig(name);
+    }
+
+    return pass;
+  }
+
+  /**
+   * Try and resolve the provided element name as a credential provider
+   * alias.
+   * @param name alias of the provisioned credential
+   * @return password or null if not found
+   * @throws IOException
+   */
+  protected char[] getPasswordFromCredentialProviders(String name)
+      throws IOException {
+    char[] pass = null;
+    try {
+      List<CredentialProvider> providers =
+          CredentialProviderFactory.getProviders(this);
+
+      if (providers != null) {
+        for (CredentialProvider provider : providers) {
+          try {
+            CredentialEntry entry = provider.getCredentialEntry(name);
+            if (entry != null) {
+              pass = entry.getCredential();
+              break;
+            }
+          }
+          catch (IOException ioe) {
+            throw new IOException("Can't get key " + name + " from key provider" +
+            		"of type: " + provider.getClass().getName() + ".", ioe);
+          }
+        }
+      }
+    }
+    catch (IOException ioe) {
+      throw new IOException("Configuration problem with provider path.", ioe);
+    }
+
+    return pass;
+  }
+
+  /**
+   * Fallback to clear text passwords in configuration.
+   * @param name
+   * @return clear text password or null
+   */
+  protected char[] getPasswordFromConfig(String name) {
+    char[] pass = null;
+    if (getBoolean(CredentialProvider.CLEAR_TEXT_FALLBACK, true)) {
+      String passStr = get(name);
+      if (passStr != null) {
+        pass = passStr.toCharArray();
+      }
+    }
+    return pass;
+  }
+
+  /**
+   * Get the socket address for <code>hostProperty</code> as a
+   * <code>InetSocketAddress</code>. If <code>hostProperty</code> is
+   * <code>null</code>, <code>addressProperty</code> will be used. This
+   * is useful for cases where we want to differentiate between host
+   * bind address and address clients should use to establish connection.
+   *
+   * @param hostProperty bind host property name.
+   * @param addressProperty address property name.
+   * @param defaultAddressValue the default value
+   * @param defaultPort the default port
+   * @return InetSocketAddress
+   */
+  public InetSocketAddress getSocketAddr(
+      String hostProperty,
+      String addressProperty,
+      String defaultAddressValue,
+      int defaultPort) {
+
+    InetSocketAddress bindAddr = getSocketAddr(
+      addressProperty, defaultAddressValue, defaultPort);
+
+    final String host = get(hostProperty);
+
+    if (host == null || host.isEmpty()) {
+      return bindAddr;
+    }
+
+    return NetUtils.createSocketAddr(
+        host, bindAddr.getPort(), hostProperty);
+  }
+
+  /**
    * Get the socket address for <code>name</code> property as a
    * <code>InetSocketAddress</code>.
    * @param name property name.
@@ -1762,20 +2027,50 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
    */
   public InetSocketAddress getSocketAddr(
       String name, String defaultAddress, int defaultPort) {
-    final String address = get(name, defaultAddress);
+    final String address = getTrimmed(name, defaultAddress);
     return NetUtils.createSocketAddr(address, defaultPort, name);
   }
 
-  public int getPort(
-      String name, int defaultPort) {
-    return getInt(name, defaultPort);
-  }
   /**
    * Set the socket address for the <code>name</code> property as
    * a <code>host:port</code>.
    */
   public void setSocketAddr(String name, InetSocketAddress addr) {
     set(name, NetUtils.getHostPortString(addr));
+  }
+
+  /**
+   * Set the socket address a client can use to connect for the
+   * <code>name</code> property as a <code>host:port</code>.  The wildcard
+   * address is replaced with the local host's address. If the host and address
+   * properties are configured the host component of the address will be combined
+   * with the port component of the addr to generate the address.  This is to allow
+   * optional control over which host name is used in multi-home bind-host
+   * cases where a host can have multiple names
+   * @param hostProperty the bind-host configuration name
+   * @param addressProperty the service address configuration name
+   * @param defaultAddressValue the service default address configuration value
+   * @param addr InetSocketAddress of the service listener
+   * @return InetSocketAddress for clients to connect
+   */
+  public InetSocketAddress updateConnectAddr(
+      String hostProperty,
+      String addressProperty,
+      String defaultAddressValue,
+      InetSocketAddress addr) {
+
+    final String host = get(hostProperty);
+    final String connectHostPort = getTrimmed(addressProperty, defaultAddressValue);
+
+    if (host == null || host.isEmpty() || connectHostPort == null || connectHostPort.isEmpty()) {
+      //not our case, fall back to original logic
+      return updateConnectAddr(addressProperty, addr);
+    }
+
+    final String connectHost = connectHostPort.split(":")[0];
+    // Create connect address using client address hostname and server port.
+    return updateConnectAddr(addressProperty, NetUtils.createSocketAddrForHost(
+        connectHost, addr.getPort()));
   }
   
   /**
@@ -2084,7 +2379,7 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
         LOG.info("found resource " + name + " at " + url);
       }
 
-      return new InputStreamReader(url.openStream());
+      return new InputStreamReader(url.openStream(), Charsets.UTF_8);
     } catch (Exception e) {
       return null;
     }
@@ -2096,20 +2391,27 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
    * @return final parameter set.
    */
   public Set<String> getFinalParameters() {
-    return new HashSet<String>(finalParameters);
+    Set<String> setFinalParams = Collections.newSetFromMap(
+        new ConcurrentHashMap<String, Boolean>());
+    setFinalParams.addAll(finalParameters);
+    return setFinalParams;
   }
 
   protected synchronized Properties getProps() {
     if (properties == null) {
       properties = new Properties();
-      HashMap<String, String[]> backup = 
-        new HashMap<String, String[]>(updatingResource);
+      Map<String, String[]> backup =
+          new ConcurrentHashMap<String, String[]>(updatingResource);
       loadResources(properties, resources, quietmode);
-      if (overlay!= null) {
+
+      if (overlay != null) {
         properties.putAll(overlay);
         for (Map.Entry<Object,Object> item: overlay.entrySet()) {
           String key = (String)item.getKey();
-          updatingResource.put(key, backup.get(key));
+          String[] source = backup.get(key);
+          if(source != null) {
+            updatingResource.put(key, source);
+          }
         }
       }
     }
@@ -2147,9 +2449,9 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
     // code.
     Map<String,String> result = new HashMap<String,String>();
     for(Map.Entry<Object,Object> item: getProps().entrySet()) {
-      if (item.getKey() instanceof String && 
+      if (item.getKey() instanceof String &&
           item.getValue() instanceof String) {
-        result.put((String) item.getKey(), (String) item.getValue());
+          result.put((String) item.getKey(), (String) item.getValue());
       }
     }
     return result.entrySet().iterator();
@@ -2355,16 +2657,21 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
   
   private void loadProperty(Properties properties, String name, String attr,
       String value, boolean finalParameter, String[] source) {
-    if (value != null) {
+    if (value != null || allowNullValueProperties) {
       if (!finalParameters.contains(attr)) {
+        if (value==null && allowNullValueProperties) {
+          value = DEFAULT_STRING_CHECK;
+        }
         properties.setProperty(attr, value);
-        updatingResource.put(attr, source);
-      } else {
+        if(source != null) {
+          updatingResource.put(attr, source);
+        }
+      } else if (!value.equals(properties.getProperty(attr))) {
         LOG.warn(name+":an attempt to override final parameter: "+attr
             +";  Ignoring.");
       }
     }
-    if (finalParameter) {
+    if (finalParameter && attr != null) {
       finalParameters.add(attr);
     }
   }
@@ -2567,7 +2874,9 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
       String value = org.apache.hadoop.io.Text.readString(in);
       set(key, value); 
       String sources[] = WritableUtils.readCompressedStringArray(in);
-      updatingResource.put(key, sources);
+      if(sources != null) {
+        updatingResource.put(key, sources);
+      }
     }
   }
 
@@ -2600,7 +2909,8 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
           item.getValue() instanceof String) {
         m = p.matcher((String)item.getKey());
         if(m.find()) { // match
-          result.put((String) item.getKey(), (String) item.getValue());
+          result.put((String) item.getKey(),
+              substituteVars(getProps().getProperty((String) item.getKey())));
         }
       }
     }

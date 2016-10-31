@@ -26,17 +26,16 @@ import org.apache.hadoop.yarn.util.Records;
 /**
  * <p>The request sent by the client to the <code>ResourceManager</code>
  * to move a submitted application to a different queue.</p>
- * <p/>
+ * 
  * <p>The request includes the {@link ApplicationId} of the application to be
  * moved and the queue to place it in.</p>
- *
+ * 
  * @see ApplicationClientProtocol#moveApplicationAcrossQueues(MoveApplicationAcrossQueuesRequest)
  */
 @Public
 @Unstable
 public abstract class MoveApplicationAcrossQueuesRequest {
-  public static MoveApplicationAcrossQueuesRequest newInstance(
-      ApplicationId appId, String queue) {
+  public static MoveApplicationAcrossQueuesRequest newInstance(ApplicationId appId, String queue) {
     MoveApplicationAcrossQueuesRequest request =
         Records.newRecord(MoveApplicationAcrossQueuesRequest.class);
     request.setApplicationId(appId);
@@ -46,31 +45,25 @@ public abstract class MoveApplicationAcrossQueuesRequest {
   
   /**
    * Get the <code>ApplicationId</code> of the application to be moved.
-   *
    * @return <code>ApplicationId</code> of the application to be moved
    */
   public abstract ApplicationId getApplicationId();
   
   /**
    * Set the <code>ApplicationId</code> of the application to be moved.
-   *
-   * @param appId
-   *     <code>ApplicationId</code> of the application to be moved
+   * @param appId <code>ApplicationId</code> of the application to be moved
    */
   public abstract void setApplicationId(ApplicationId appId);
   
   /**
    * Get the queue to place the application in.
-   *
    * @return the name of the queue to place the application in
    */
   public abstract String getTargetQueue();
 
   /**
    * Get the queue to place the application in.
-   *
-   * @param queue
-   *     the name of the queue to place the application in
+   * @param queue the name of the queue to place the application in
    */
   public abstract void setTargetQueue(String queue);
 }

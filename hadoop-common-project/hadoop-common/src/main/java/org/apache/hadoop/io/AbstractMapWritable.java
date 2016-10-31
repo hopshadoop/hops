@@ -48,11 +48,11 @@ public abstract class AbstractMapWritable implements Writable, Configurable {
   
   /* Class to id mappings */
   @VisibleForTesting
-  Map<Class, Byte> classToIdMap = new ConcurrentHashMap<Class, Byte>();
+  Map<Class<?>, Byte> classToIdMap = new ConcurrentHashMap<Class<?>, Byte>();
   
   /* Id to Class mappings */
   @VisibleForTesting
-  Map<Byte, Class> idToClassMap = new ConcurrentHashMap<Byte, Class>();
+  Map<Byte, Class<?>> idToClassMap = new ConcurrentHashMap<Byte, Class<?>>();
   
   /* The number of new classes (those not established by the constructor) */
   private volatile byte newClasses = 0;
@@ -65,7 +65,7 @@ public abstract class AbstractMapWritable implements Writable, Configurable {
   /**
    * Used to add "predefined" classes and by Writable to copy "new" classes.
    */
-  private synchronized void addToMap(Class clazz, byte id) {
+  private synchronized void addToMap(Class<?> clazz, byte id) {
     if (classToIdMap.containsKey(clazz)) {
       byte b = classToIdMap.get(clazz);
       if (b != id) {
@@ -74,7 +74,7 @@ public abstract class AbstractMapWritable implements Writable, Configurable {
       }
     }
     if (idToClassMap.containsKey(id)) {
-      Class c = idToClassMap.get(id);
+      Class<?> c = idToClassMap.get(id);
       if (!c.equals(clazz)) {
         throw new IllegalArgumentException("Id " + id + " exists but maps to " +
             c.getName() + " and not " + clazz.getName());
@@ -85,7 +85,7 @@ public abstract class AbstractMapWritable implements Writable, Configurable {
   }
   
   /** Add a Class to the maps if it is not already present. */ 
-  protected synchronized void addToMap(Class clazz) {
+  protected synchronized void addToMap(Class<?> clazz) {
     if (classToIdMap.containsKey(clazz)) {
       return;
     }
@@ -98,12 +98,12 @@ public abstract class AbstractMapWritable implements Writable, Configurable {
   }
 
   /** @return the Class class for the specified id */
-  protected Class getClass(byte id) {
+  protected Class<?> getClass(byte id) {
     return idToClassMap.get(id);
   }
 
   /** @return the id for the specified Class */
-  protected byte getId(Class clazz) {
+  protected byte getId(Class<?> clazz) {
     return classToIdMap.containsKey(clazz) ? classToIdMap.get(clazz) : -1;
   }
 
@@ -197,20 +197,22 @@ public abstract class AbstractMapWritable implements Writable, Configurable {
   public void readFields(DataInput in) throws IOException {
     
     // Get the number of "unknown" classes
-    
     newClasses = in.readByte();
-    
+
+    // Use the classloader of the current thread to load classes instead of the
+    // system-classloader so as to support both client-only and inside-a-MR-job
+    // use-cases. The context-loader by default eventually falls back to the
+    // system one, so there should be no cases where changing this is an issue.
+    ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+
     // Then read in the class names and add them to our tables
-    
     for (int i = 0; i < newClasses; i++) {
       byte id = in.readByte();
       String className = in.readUTF();
       try {
-        addToMap(Class.forName(className), id);
-        
+        addToMap(classLoader.loadClass(className), id);
       } catch (ClassNotFoundException e) {
-        throw new IOException("can't find class: " + className + " because "+
-            e.getMessage());
+        throw new IOException(e);
       }
     }
   }    

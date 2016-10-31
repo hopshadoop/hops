@@ -30,7 +30,6 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 
 import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.CallbackHandler;
@@ -45,6 +44,7 @@ import javax.security.sasl.SaslServer;
 import javax.security.sasl.SaslServerFactory;
 
 import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.io.Charsets;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -66,8 +66,6 @@ import org.apache.hadoop.security.token.TokenIdentifier;
 public class SaslRpcServer {
   public static final Log LOG = LogFactory.getLog(SaslRpcServer.class);
   public static final String SASL_DEFAULT_REALM = "default";
-  public static final Map<String, String> SASL_PROPS = 
-      new TreeMap<String, String>();
   private static SaslServerFactory saslFactory;
 
   public static enum QualityOfProtection {
@@ -187,11 +185,11 @@ public class SaslRpcServer {
   }
   
   static String encodeIdentifier(byte[] identifier) {
-    return new String(Base64.encodeBase64(identifier));
+    return new String(Base64.encodeBase64(identifier), Charsets.UTF_8);
   }
 
   static byte[] decodeIdentifier(String identifier) {
-    return Base64.decodeBase64(identifier.getBytes());
+    return Base64.decodeBase64(identifier.getBytes(Charsets.UTF_8));
   }
 
   public static <T extends TokenIdentifier> T getIdentifier(String id,
@@ -209,7 +207,8 @@ public class SaslRpcServer {
   }
 
   static char[] encodePassword(byte[] password) {
-    return new String(Base64.encodeBase64(password)).toCharArray();
+    return new String(Base64.encodeBase64(password),
+                      Charsets.UTF_8).toCharArray();
   }
 
   /** Splitting fully qualified Kerberos name into parts */

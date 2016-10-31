@@ -111,6 +111,11 @@
        <Method name="driver" />
        <Bug pattern="DM_EXIT" />
      </Match>
+     <Match>
+       <Class name="org.apache.hadoop.util.RunJar" />
+       <Method name="run" />
+       <Bug pattern="DM_EXIT" />
+     </Match>
      <!--
        We need to cast objects between old and new api objects
      -->
@@ -254,6 +259,16 @@
        <Method name="writeVLong" />
        <Bug pattern="SF_SWITCH_FALLTHROUGH" />
      </Match>
+     <Match>
+       <Class name="org.apache.hadoop.io.Text" />
+       <Method name="bytesToCodePoint" />
+       <Bug pattern="SF_SWITCH_NO_DEFAULT" />
+     </Match>
+     <Match>
+       <Class name="org.apache.hadoop.util.PureJavaCrc32C" />
+       <Method name="update" />
+       <Bug pattern="SF_SWITCH_NO_DEFAULT" />
+     </Match>
     <!--
 	  The switch condition fall through is intentional and for performance
 	  purposes.
@@ -304,6 +319,14 @@
     <Match>
       <!-- protobuf generated code -->
       <Class name="~org\.apache\.hadoop\.ipc\.proto\.RefreshCallQueueProtocolProtos.*"/>
+    </Match>
+    <Match>
+      <!-- protobuf generated code -->
+      <Class name="~org\.apache\.hadoop\.ipc\.proto\.GenericRefreshProtocolProtos.*"/>
+    </Match>
+    <Match>
+      <!-- protobuf generated code -->
+      <Class name="~org\.apache\.hadoop\.tracing\.TraceAdminPB.*"/>
     </Match>
 
     <!--
@@ -374,5 +397,17 @@
        <Method name="compareTo" />
        <Bug code="NP" />
      </Match>
+
+  <Match>
+    <Class name="org.apache.hadoop.util.HttpExceptionUtils"/>
+    <Method name="validateResponse"/>
+    <Bug pattern="REC_CATCH_EXCEPTION"/>
+  </Match>
+
+  <Match>
+    <Class name="org.apache.hadoop.conf.Configuration"/>
+    <Method name="loadProperty"/>
+    <Bug pattern="NP_NULL_PARAM_DEREF"/>
+  </Match>
 
 </FindBugsFilter>

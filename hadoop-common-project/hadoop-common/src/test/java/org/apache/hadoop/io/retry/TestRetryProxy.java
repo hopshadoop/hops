@@ -22,31 +22,43 @@ import static org.apache.hadoop.io.retry.RetryPolicies.RETRY_FOREVER;
 import static org.apache.hadoop.io.retry.RetryPolicies.TRY_ONCE_THEN_FAIL;
 import static org.apache.hadoop.io.retry.RetryPolicies.retryByException;
 import static org.apache.hadoop.io.retry.RetryPolicies.retryByRemoteException;
+import static org.apache.hadoop.io.retry.RetryPolicies.retryOtherThanRemoteException;
 import static org.apache.hadoop.io.retry.RetryPolicies.retryUpToMaximumCountWithFixedSleep;
 import static org.apache.hadoop.io.retry.RetryPolicies.retryUpToMaximumCountWithProportionalSleep;
 import static org.apache.hadoop.io.retry.RetryPolicies.retryUpToMaximumTimeWithFixedSleep;
 import static org.apache.hadoop.io.retry.RetryPolicies.exponentialBackoffRetry;
+import static org.junit.Assert.*;
 
+import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-
-import junit.framework.TestCase;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.hadoop.io.retry.UnreliableInterface.FatalException;
 import org.apache.hadoop.io.retry.UnreliableInterface.UnreliableException;
 import org.apache.hadoop.ipc.ProtocolTranslator;
 import org.apache.hadoop.ipc.RemoteException;
+import org.junit.Before;
+import org.junit.Test;
 
-public class TestRetryProxy extends TestCase {
+import java.lang.reflect.UndeclaredThrowableException;
+
+public class TestRetryProxy {
   
   private UnreliableImplementation unreliableImpl;
   
-  @Override
-  protected void setUp() throws Exception {
+  @Before
+  public void setUp() throws Exception {
     unreliableImpl = new UnreliableImplementation();
   }
 
+  @Test
   public void testTryOnceThenFail() throws UnreliableException {
     UnreliableInterface unreliable = (UnreliableInterface)
       RetryProxy.create(UnreliableInterface.class, unreliableImpl, TRY_ONCE_THEN_FAIL);
@@ -62,6 +74,7 @@ public class TestRetryProxy extends TestCase {
   /**
    * Test for {@link RetryInvocationHandler#isRpcInvocation(Object)}
    */
+  @Test
   public void testRpcInvocation() throws Exception {
     // For a proxy method should return true
     final UnreliableInterface unreliable = (UnreliableInterface)
@@ -91,6 +104,7 @@ public class TestRetryProxy extends TestCase {
     assertFalse(RetryInvocationHandler.isRpcInvocation(new Object()));
   }
   
+  @Test
   public void testRetryForever() throws UnreliableException {
     UnreliableInterface unreliable = (UnreliableInterface)
       RetryProxy.create(UnreliableInterface.class, unreliableImpl, RETRY_FOREVER);
@@ -99,6 +113,7 @@ public class TestRetryProxy extends TestCase {
     unreliable.failsTenTimesThenSucceeds();
   }
   
+  @Test
   public void testRetryUpToMaximumCountWithFixedSleep() throws UnreliableException {
     UnreliableInterface unreliable = (UnreliableInterface)
       RetryProxy.create(UnreliableInterface.class, unreliableImpl,
@@ -113,6 +128,7 @@ public class TestRetryProxy extends TestCase {
     }
   }
   
+  @Test
   public void testRetryUpToMaximumTimeWithFixedSleep() throws UnreliableException {
     UnreliableInterface unreliable = (UnreliableInterface)
       RetryProxy.create(UnreliableInterface.class, unreliableImpl,
@@ -127,6 +143,7 @@ public class TestRetryProxy extends TestCase {
     }
   }
   
+  @Test
   public void testRetryUpToMaximumCountWithProportionalSleep() throws UnreliableException {
     UnreliableInterface unreliable = (UnreliableInterface)
       RetryProxy.create(UnreliableInterface.class, unreliableImpl,
@@ -141,6 +158,7 @@ public class TestRetryProxy extends TestCase {
     }
   }
   
+  @Test
   public void testExponentialRetry() throws UnreliableException {
     UnreliableInterface unreliable = (UnreliableInterface)
       RetryProxy.create(UnreliableInterface.class, unreliableImpl,
@@ -155,6 +173,7 @@ public class TestRetryProxy extends TestCase {
     }
   }
   
+  @Test
   public void testRetryByException() throws UnreliableException {
     Map<Class<? extends Exception>, RetryPolicy> exceptionToPolicyMap =
       Collections.<Class<? extends Exception>, RetryPolicy>singletonMap(FatalException.class, TRY_ONCE_THEN_FAIL);
@@ -171,6 +190,7 @@ public class TestRetryProxy extends TestCase {
     }
   }
   
+  @Test
   public void testRetryByRemoteException() {
     Map<Class<? extends Exception>, RetryPolicy> exceptionToPolicyMap =
       Collections.<Class<? extends Exception>, RetryPolicy>singletonMap(FatalException.class, TRY_ONCE_THEN_FAIL);
@@ -184,6 +204,58 @@ public class TestRetryProxy extends TestCase {
     } catch (RemoteException e) {
       // expected
     }
-  }  
-  
+  }
+
+  @Test
+  public void testRetryOtherThanRemoteException() throws Throwable {
+    Map<Class<? extends Exception>, RetryPolicy> exceptionToPolicyMap =
+        Collections.<Class<? extends Exception>, RetryPolicy>singletonMap(
+            IOException.class, RETRY_FOREVER);
+
+    UnreliableInterface unreliable = (UnreliableInterface)
+        RetryProxy.create(UnreliableInterface.class, unreliableImpl,
+            retryOtherThanRemoteException(TRY_ONCE_THEN_FAIL,
+                exceptionToPolicyMap));
+    // should retry with local IOException.
+    unreliable.failsOnceWithIOException();
+    try {
+      // won't get retry on remote exception
+      unreliable.failsOnceWithRemoteException();
+      fail("Should fail");
+    } catch (RemoteException e) {
+      // expected
+    }
+  }
+
+  @Test
+  public void testRetryInterruptible() throws Throwable {
+    final UnreliableInterface unreliable = (UnreliableInterface)
+        RetryProxy.create(UnreliableInterface.class, unreliableImpl,
+            retryUpToMaximumTimeWithFixedSleep(10, 10, TimeUnit.SECONDS));
+    
+    final CountDownLatch latch = new CountDownLatch(1);
+    final AtomicReference<Thread> futureThread = new AtomicReference<Thread>();
+    ExecutorService exec = Executors.newSingleThreadExecutor();
+    Future<Throwable> future = exec.submit(new Callable<Throwable>(){
+      @Override
+      public Throwable call() throws Exception {
+        futureThread.set(Thread.currentThread());
+        latch.countDown();
+        try {
+          unreliable.alwaysFailsWithFatalException();
+        } catch (UndeclaredThrowableException ute) {
+          return ute.getCause();
+        }
+        return null;
+      }
+    });
+    latch.await();
+    Thread.sleep(1000); // time to fail and sleep
+    assertTrue(futureThread.get().isAlive());
+    futureThread.get().interrupt();
+    Throwable e = future.get(1, TimeUnit.SECONDS); // should return immediately 
+    assertNotNull(e);
+    assertEquals(InterruptedException.class, e.getClass());
+    assertEquals("sleep interrupted", e.getMessage());
+  }
 }

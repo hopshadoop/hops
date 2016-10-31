@@ -38,9 +38,16 @@ import java.lang.reflect.Proxy;
 import java.net.ConnectException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -75,6 +82,7 @@ import org.junit.Test;
 
 import com.google.protobuf.DescriptorProtos;
 import com.google.protobuf.DescriptorProtos.EnumDescriptorProto;
+import java.net.SocketTimeoutException;
 
 /** Unit tests for RPC. */
 @SuppressWarnings("deprecation")
@@ -228,7 +236,7 @@ public class TestRPC {
         assertTrue("Exception from RPC exchange() "  + e, false);
       }
       assertEquals(indata.length, outdata.length);
-      assertEquals(val, 3);
+      assertEquals(3, val);
       for (int i = 0; i < outdata.length; i++) {
         assertEquals(outdata[i], i);
       }
@@ -276,11 +284,21 @@ public class TestRPC {
    */
   private static class StoppedRpcEngine implements RpcEngine {
 
-    @SuppressWarnings("unchecked")
     @Override
     public <T> ProtocolProxy<T> getProxy(Class<T> protocol, long clientVersion,
         InetSocketAddress addr, UserGroupInformation ticket, Configuration conf,
         SocketFactory factory, int rpcTimeout, RetryPolicy connectionRetryPolicy
+        ) throws IOException {
+      return getProxy(protocol, clientVersion, addr, ticket, conf, factory,
+        rpcTimeout, connectionRetryPolicy, null);
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public <T> ProtocolProxy<T> getProxy(Class<T> protocol, long clientVersion,
+        InetSocketAddress addr, UserGroupInformation ticket, Configuration conf,
+        SocketFactory factory, int rpcTimeout,
+        RetryPolicy connectionRetryPolicy, AtomicBoolean fallbackToSimpleAuth
         ) throws IOException {
       T proxy = (T) Proxy.newProxyInstance(protocol.getClassLoader(),
               new Class[] { protocol }, new StoppedInvocationHandler());
@@ -468,17 +486,17 @@ public class TestRPC {
     assertTrue(Arrays.equals(stringResults, null));
 
     UTF8 utf8Result = (UTF8)proxy.echo(new UTF8("hello world"));
-    assertEquals(utf8Result, new UTF8("hello world"));
+    assertEquals(new UTF8("hello world"), utf8Result );
 
     utf8Result = (UTF8)proxy.echo((UTF8)null);
-    assertEquals(utf8Result, null);
+    assertEquals(null, utf8Result);
 
     int intResult = proxy.add(1, 2);
     assertEquals(intResult, 3);
 
     intResult = proxy.add(new int[] {1, 2});
     assertEquals(intResult, 3);
-    
+
     // Test protobufs
     EnumDescriptorProto sendProto =
       EnumDescriptorProto.newBuilder().setName("test").build();
@@ -496,6 +514,8 @@ public class TestRPC {
       caught = true;
     }
     assertTrue(caught);
+    rb = getMetrics(server.rpcDetailedMetrics.name());
+    assertCounter("IOExceptionNumOps", 1L, rb);
 
     proxy.testServerGet();
 
@@ -581,14 +601,14 @@ public class TestRPC {
       }
       MetricsRecordBuilder rb = getMetrics(server.rpcMetrics.name());
       if (expectFailure) {
-        assertCounter("RpcAuthorizationFailures", 1, rb);
+        assertCounter("RpcAuthorizationFailures", 1L, rb);
       } else {
-        assertCounter("RpcAuthorizationSuccesses", 1, rb);
+        assertCounter("RpcAuthorizationSuccesses", 1L, rb);
       }
       //since we don't have authentication turned ON, we should see 
       // 0 for the authentication successes and 0 for failure
-      assertCounter("RpcAuthenticationFailures", 0, rb);
-      assertCounter("RpcAuthenticationSuccesses", 0, rb);
+      assertCounter("RpcAuthenticationFailures", 0L, rb);
+      assertCounter("RpcAuthenticationSuccesses", 0L, rb);
     }
   }
   
@@ -603,28 +623,28 @@ public class TestRPC {
     } finally {
       server.stop();
     }
-    assertEquals(bindAddr.getAddress(), InetAddress.getLocalHost());
+    assertEquals(InetAddress.getLocalHost(), bindAddr.getAddress());
   }
-  
+
   @Test
   public void testAuthorization() throws IOException {
     Configuration conf = new Configuration();
     conf.setBoolean(CommonConfigurationKeys.HADOOP_SECURITY_AUTHORIZATION,
         true);
-    
+
     // Expect to succeed
     conf.set(ACL_CONFIG, "*");
     doRPCs(conf, false);
-    
+
     // Reset authorization to expect failure
     conf.set(ACL_CONFIG, "invalid invalid");
     doRPCs(conf, true);
-    
+
     conf.setInt(CommonConfigurationKeys.IPC_SERVER_RPC_READ_THREADS_KEY, 2);
     // Expect to succeed
     conf.set(ACL_CONFIG, "*");
     doRPCs(conf, false);
-    
+
     // Reset authorization to expect failure
     conf.set(ACL_CONFIG, "invalid invalid");
     doRPCs(conf, true);
@@ -659,42 +679,42 @@ public class TestRPC {
    */
   @Test
   public void testStopMockObject() throws IOException {
-    RPC.stopProxy(MockitoUtil.mockProtocol(TestProtocol.class)); 
+    RPC.stopProxy(MockitoUtil.mockProtocol(TestProtocol.class));
   }
-  
+
   @Test
   public void testStopProxy() throws IOException {
     StoppedProtocol proxy = RPC.getProxy(StoppedProtocol.class,
         StoppedProtocol.versionID, null, conf);
     StoppedInvocationHandler invocationHandler = (StoppedInvocationHandler)
         Proxy.getInvocationHandler(proxy);
-    assertEquals(invocationHandler.getCloseCalled(), 0);
+    assertEquals(0, invocationHandler.getCloseCalled());
     RPC.stopProxy(proxy);
-    assertEquals(invocationHandler.getCloseCalled(), 1);
+    assertEquals(1, invocationHandler.getCloseCalled());
   }
-  
+
   @Test
   public void testWrappedStopProxy() throws IOException {
     StoppedProtocol wrappedProxy = RPC.getProxy(StoppedProtocol.class,
         StoppedProtocol.versionID, null, conf);
     StoppedInvocationHandler invocationHandler = (StoppedInvocationHandler)
         Proxy.getInvocationHandler(wrappedProxy);
-    
+
     StoppedProtocol proxy = (StoppedProtocol) RetryProxy.create(StoppedProtocol.class,
         wrappedProxy, RetryPolicies.RETRY_FOREVER);
-    
-    assertEquals(invocationHandler.getCloseCalled(), 0);
+
+    assertEquals(0, invocationHandler.getCloseCalled());
     RPC.stopProxy(proxy);
-    assertEquals(invocationHandler.getCloseCalled(), 1);
+    assertEquals(1, invocationHandler.getCloseCalled());
   }
-  
+
   @Test
   public void testErrorMsgForInsecureClient() throws IOException {
     Configuration serverConf = new Configuration(conf);
     SecurityUtil.setAuthenticationMethod(AuthenticationMethod.KERBEROS,
                                          serverConf);
     UserGroupInformation.setConfiguration(serverConf);
-    
+
     final Server server = new RPC.Builder(serverConf).setProtocol(TestProtocol.class)
         .setInstance(new TestImpl()).setBindAddress(ADDRESS).setPort(0)
         .setNumHandlers(5).setVerbose(true).build();
@@ -994,6 +1014,96 @@ public class TestRPC {
         RPC.stopProxy(proxy);
       }
       server.stop();
+    }
+  }
+
+  /**
+   *  Verify the RPC server can shutdown properly when callQueue is full.
+   */
+  @Test (timeout=30000)
+  public void testRPCServerShutdown() throws Exception {
+    final int numClients = 3;
+    final List<Future<Void>> res = new ArrayList<Future<Void>>();
+    final ExecutorService executorService =
+        Executors.newFixedThreadPool(numClients);
+    final Configuration conf = new Configuration();
+    conf.setInt(CommonConfigurationKeys.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY, 0);
+    final Server server = new RPC.Builder(conf)
+        .setProtocol(TestProtocol.class).setInstance(new TestImpl())
+        .setBindAddress(ADDRESS).setPort(0)
+        .setQueueSizePerHandler(1).setNumHandlers(1).setVerbose(true)
+        .build();
+    server.start();
+
+    final TestProtocol proxy =
+        RPC.getProxy(TestProtocol.class, TestProtocol.versionID,
+            NetUtils.getConnectAddress(server), conf);
+    try {
+      // start a sleep RPC call to consume the only handler thread.
+      // Start another sleep RPC call to make callQueue full.
+      // Start another sleep RPC call to make reader thread block on CallQueue.
+      for (int i = 0; i < numClients; i++) {
+        res.add(executorService.submit(
+            new Callable<Void>() {
+              @Override
+              public Void call() throws IOException, InterruptedException {
+                proxy.sleep(100000);
+                return null;
+              }
+            }));
+      }
+      while (server.getCallQueueLen() != 1
+          && countThreads(CallQueueManager.class.getName()) != 1
+          && countThreads(TestProtocol.class.getName()) != 1) {
+        Thread.sleep(100);
+      }
+    } finally {
+      try {
+        server.stop();
+        assertEquals("Not enough clients", numClients, res.size());
+        for (Future<Void> f : res) {
+          try {
+            f.get();
+            fail("Future get should not return");
+          } catch (ExecutionException e) {
+            assertTrue("Unexpected exception: " + e,
+                e.getCause() instanceof IOException);
+            LOG.info("Expected exception", e.getCause());
+          }
+        }
+      } finally {
+        RPC.stopProxy(proxy);
+        executorService.shutdown();
+      }
+    }
+  }
+
+  /**
+   *  Test RPC timeout.
+   */
+  @Test(timeout=30000)
+  public void testClientRpcTimeout() throws Exception {
+    final Server server = new RPC.Builder(conf)
+        .setProtocol(TestProtocol.class).setInstance(new TestImpl())
+        .setBindAddress(ADDRESS).setPort(0)
+        .setQueueSizePerHandler(1).setNumHandlers(1).setVerbose(true)
+        .build();
+    server.start();
+
+    final Configuration conf = new Configuration();
+    conf.setInt(CommonConfigurationKeys.IPC_CLIENT_RPC_TIMEOUT_KEY, 1000);
+    final TestProtocol proxy =
+        RPC.getProxy(TestProtocol.class, TestProtocol.versionID,
+            NetUtils.getConnectAddress(server), conf);
+
+    try {
+      proxy.sleep(3000);
+      fail("RPC should time out.");
+    } catch (SocketTimeoutException e) {
+      LOG.info("got expected timeout.", e);
+    } finally {
+      server.stop();
+      RPC.stopProxy(proxy);
     }
   }
 

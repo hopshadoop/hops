@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.yarn.api.records.impl.pb;
 
-import com.google.protobuf.TextFormat;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.security.proto.SecurityProtos.TokenProto;
@@ -36,6 +35,8 @@ import org.apache.hadoop.yarn.proto.YarnProtos.ApplicationReportProtoOrBuilder;
 import org.apache.hadoop.yarn.proto.YarnProtos.ApplicationResourceUsageReportProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.FinalApplicationStatusProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.YarnApplicationStateProto;
+
+import com.google.protobuf.TextFormat;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -76,8 +77,7 @@ public class ApplicationReportPBImpl extends ApplicationReport {
     return this.applicationId;
   }
 
-  public void setApplicationResourceUsageReport(
-      ApplicationResourceUsageReport appInfo) {
+  public void setApplicationResourceUsageReport(ApplicationResourceUsageReport appInfo) {
     maybeInitBuilder();
     if (appInfo == null) {
       builder.clearAppResourceUsage();
@@ -96,8 +96,7 @@ public class ApplicationReportPBImpl extends ApplicationReport {
     if (!p.hasCurrentApplicationAttemptId()) {
       return null;
     }
-    this.currentApplicationAttemptId =
-        convertFromProtoFormat(p.getCurrentApplicationAttemptId());
+    this.currentApplicationAttemptId = convertFromProtoFormat(p.getCurrentApplicationAttemptId());
     return this.currentApplicationAttemptId;
   }
 
@@ -218,7 +217,7 @@ public class ApplicationReportPBImpl extends ApplicationReport {
     ApplicationReportProtoOrBuilder p = viaProto ? proto : builder;
     if (!p.hasFinalApplicationStatus()) {
       return null;
-    }
+    }	
     return convertFromProtoFormat(p.getFinalApplicationStatus());
   }
 
@@ -268,19 +267,16 @@ public class ApplicationReportPBImpl extends ApplicationReport {
   @Override
   public void setApplicationId(ApplicationId applicationId) {
     maybeInitBuilder();
-    if (applicationId == null) {
+    if (applicationId == null)
       builder.clearApplicationId();
-    }
     this.applicationId = applicationId;
   }
 
   @Override
-  public void setCurrentApplicationAttemptId(
-      ApplicationAttemptId applicationAttemptId) {
+  public void setCurrentApplicationAttemptId(ApplicationAttemptId applicationAttemptId) {
     maybeInitBuilder();
-    if (applicationAttemptId == null) {
+    if (applicationAttemptId == null)
       builder.clearCurrentApplicationAttemptId();
-    }
     this.currentApplicationAttemptId = applicationAttemptId;
   }
 
@@ -353,9 +349,8 @@ public class ApplicationReportPBImpl extends ApplicationReport {
   @Override
   public void setClientToAMToken(Token clientToAMToken) {
     maybeInitBuilder();
-    if (clientToAMToken == null) {
+    if (clientToAMToken == null) 
       builder.clearClientToAmToken();
-    }
     this.clientToAMToken = clientToAMToken;
   }
 
@@ -449,9 +444,8 @@ public class ApplicationReportPBImpl extends ApplicationReport {
 
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }
@@ -464,35 +458,35 @@ public class ApplicationReportPBImpl extends ApplicationReport {
   }
 
   private void mergeLocalToBuilder() {
-    if (this.applicationId != null &&
-        !((ApplicationIdPBImpl) this.applicationId).getProto()
-            .equals(builder.getApplicationId())) {
+    if (this.applicationId != null
+        && !((ApplicationIdPBImpl) this.applicationId).getProto().equals(
+            builder.getApplicationId())) {
       builder.setApplicationId(convertToProtoFormat(this.applicationId));
     }
-    if (this.currentApplicationAttemptId != null &&
-        !((ApplicationAttemptIdPBImpl) this.currentApplicationAttemptId)
-            .getProto().equals(builder.getCurrentApplicationAttemptId())) {
-      builder.setCurrentApplicationAttemptId(
-          convertToProtoFormat(this.currentApplicationAttemptId));
+    if (this.currentApplicationAttemptId != null
+        && !((ApplicationAttemptIdPBImpl) this.currentApplicationAttemptId).getProto().equals(
+            builder.getCurrentApplicationAttemptId())) {
+      builder.setCurrentApplicationAttemptId(convertToProtoFormat(this.currentApplicationAttemptId));
     }
-    if (this.clientToAMToken != null &&
-        !((TokenPBImpl) this.clientToAMToken).getProto()
-            .equals(builder.getClientToAmToken())) {
+    if (this.clientToAMToken != null
+        && !((TokenPBImpl) this.clientToAMToken).getProto().equals(
+            builder.getClientToAmToken())) {
       builder.setClientToAmToken(convertToProtoFormat(this.clientToAMToken));
     }
-    if (this.amRmToken != null && !((TokenPBImpl) this.amRmToken).getProto()
-        .equals(builder.getAmRmToken())) {
+    if (this.amRmToken != null
+      && !((TokenPBImpl) this.amRmToken).getProto().equals(
+      builder.getAmRmToken())) {
       builder.setAmRmToken(convertToProtoFormat(this.amRmToken));
     }
     if (this.applicationTags != null && !this.applicationTags.isEmpty()) {
+      builder.clearApplicationTags();
       builder.addAllApplicationTags(this.applicationTags);
     }
   }
 
   private void mergeLocalToProto() {
-    if (viaProto) {
+    if (viaProto)
       maybeInitBuilder();
-    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
@@ -509,18 +503,15 @@ public class ApplicationReportPBImpl extends ApplicationReport {
     return ((ApplicationIdPBImpl) t).getProto();
   }
   
-  private ApplicationAttemptIdProto convertToProtoFormat(
-      ApplicationAttemptId t) {
+  private ApplicationAttemptIdProto convertToProtoFormat(ApplicationAttemptId t) {
     return ((ApplicationAttemptIdPBImpl) t).getProto();
   }
 
-  private ApplicationResourceUsageReport convertFromProtoFormat(
-      ApplicationResourceUsageReportProto s) {
+  private ApplicationResourceUsageReport convertFromProtoFormat(ApplicationResourceUsageReportProto s) {
     return ProtoUtils.convertFromProtoFormat(s);
   }
 
-  private ApplicationResourceUsageReportProto convertToProtoFormat(
-      ApplicationResourceUsageReport s) {
+  private ApplicationResourceUsageReportProto convertToProtoFormat(ApplicationResourceUsageReport s) {
     return ProtoUtils.convertToProtoFormat(s);
   }
 
@@ -534,23 +525,19 @@ public class ApplicationReportPBImpl extends ApplicationReport {
     return new ApplicationAttemptIdPBImpl(applicationAttemptId);
   }
 
-  private YarnApplicationState convertFromProtoFormat(
-      YarnApplicationStateProto s) {
+  private YarnApplicationState convertFromProtoFormat(YarnApplicationStateProto s) {
     return ProtoUtils.convertFromProtoFormat(s);
   }
 
-  private YarnApplicationStateProto convertToProtoFormat(
-      YarnApplicationState s) {
+  private YarnApplicationStateProto convertToProtoFormat(YarnApplicationState s) {
     return ProtoUtils.convertToProtoFormat(s);
   }
 
-  private FinalApplicationStatus convertFromProtoFormat(
-      FinalApplicationStatusProto s) {
+  private FinalApplicationStatus convertFromProtoFormat(FinalApplicationStatusProto s) {
     return ProtoUtils.convertFromProtoFormat(s);
   }
 
-  private FinalApplicationStatusProto convertToProtoFormat(
-      FinalApplicationStatus s) {
+  private FinalApplicationStatusProto convertToProtoFormat(FinalApplicationStatus s) {
     return ProtoUtils.convertToProtoFormat(s);
   }
 
@@ -559,6 +546,6 @@ public class ApplicationReportPBImpl extends ApplicationReport {
   }
 
   private TokenProto convertToProtoFormat(Token t) {
-    return ((TokenPBImpl) t).getProto();
+    return ((TokenPBImpl)t).getProto();
   }
 }

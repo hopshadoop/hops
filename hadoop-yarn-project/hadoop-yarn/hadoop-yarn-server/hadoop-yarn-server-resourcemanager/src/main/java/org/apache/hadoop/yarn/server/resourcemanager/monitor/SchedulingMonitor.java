@@ -17,12 +17,14 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.monitor;
 
-import com.google.common.annotations.VisibleForTesting;
-import io.hops.ha.common.TransactionState;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.service.AbstractService;
+import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.PreemptableResourceScheduler;
+
+import com.google.common.annotations.VisibleForTesting;
 
 public class SchedulingMonitor extends AbstractService {
 
@@ -34,18 +36,28 @@ public class SchedulingMonitor extends AbstractService {
   private Thread checkerThread;
   private volatile boolean stopped;
   private long monitorInterval;
+  private RMContext rmContext;
 
-  public SchedulingMonitor(SchedulingEditPolicy scheduleEditPolicy) {
+  public SchedulingMonitor(RMContext rmContext,
+      SchedulingEditPolicy scheduleEditPolicy) {
     super("SchedulingMonitor (" + scheduleEditPolicy.getPolicyName() + ")");
     this.scheduleEditPolicy = scheduleEditPolicy;
-    this.monitorInterval = scheduleEditPolicy.getMonitoringInterval();
+    this.rmContext = rmContext;
   }
 
   public long getMonitorInterval() {
     return monitorInterval;
   }
+  
+  @VisibleForTesting
+  public synchronized SchedulingEditPolicy getSchedulingEditPolicy() {
+    return scheduleEditPolicy;
+  }
 
   public void serviceInit(Configuration conf) throws Exception {
+    scheduleEditPolicy.init(conf, rmContext,
+        (PreemptableResourceScheduler) rmContext.getScheduler());
+    this.monitorInterval = scheduleEditPolicy.getMonitoringInterval();
     super.serviceInit(conf);
   }
 
@@ -68,8 +80,8 @@ public class SchedulingMonitor extends AbstractService {
   }
 
   @VisibleForTesting
-  public void invokePolicy(TransactionState transactionState) {
-    scheduleEditPolicy.editSchedule(transactionState);
+  public void invokePolicy(){
+    scheduleEditPolicy.editSchedule();
   }
 
   private class PreemptionChecker implements Runnable {
@@ -79,7 +91,7 @@ public class SchedulingMonitor extends AbstractService {
         //invoke the preemption policy at a regular pace
         //the policy will generate preemption or kill events
         //managed by the dispatcher
-        invokePolicy(null);
+        invokePolicy();
         try {
           Thread.sleep(monitorInterval);
         } catch (InterruptedException e) {

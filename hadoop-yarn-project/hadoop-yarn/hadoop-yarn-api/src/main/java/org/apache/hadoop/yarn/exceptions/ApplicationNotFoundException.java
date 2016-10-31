@@ -21,6 +21,7 @@ package org.apache.hadoop.yarn.exceptions;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.ApplicationClientProtocol;
+import org.apache.hadoop.yarn.api.protocolrecords.GetApplicationReportRequest;
 
 /**
  * This exception is thrown on
@@ -30,7 +31,7 @@ import org.apache.hadoop.yarn.api.ApplicationClientProtocol;
  */
 @Public
 @Unstable
-public class ApplicationNotFoundException extends YarnException {
+public class ApplicationNotFoundException extends YarnException{
 
   private static final long serialVersionUID = 8694408L;
 
@@ -42,7 +43,8 @@ public class ApplicationNotFoundException extends YarnException {
     super(message);
   }
 
-  public ApplicationNotFoundException(String message, Throwable cause) {
+  public ApplicationNotFoundException(String message,
+      Throwable cause) {
     super(message, cause);
   }
 }

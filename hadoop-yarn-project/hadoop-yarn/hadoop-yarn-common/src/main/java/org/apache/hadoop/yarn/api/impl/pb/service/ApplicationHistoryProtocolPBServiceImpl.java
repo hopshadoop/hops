@@ -18,8 +18,8 @@
 
 package org.apache.hadoop.yarn.api.impl.pb.service;
 
-import com.google.protobuf.RpcController;
-import com.google.protobuf.ServiceException;
+import java.io.IOException;
+
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.security.proto.SecurityProtos.CancelDelegationTokenRequestProto;
 import org.apache.hadoop.security.proto.SecurityProtos.CancelDelegationTokenResponseProto;
@@ -70,15 +70,15 @@ import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetContainerReportResponse
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetContainersRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetContainersResponseProto;
 
-import java.io.IOException;
+import com.google.protobuf.RpcController;
+import com.google.protobuf.ServiceException;
 
 @Private
-public class ApplicationHistoryProtocolPBServiceImpl
-    implements ApplicationHistoryProtocolPB {
+public class ApplicationHistoryProtocolPBServiceImpl implements
+    ApplicationHistoryProtocolPB {
   private ApplicationHistoryProtocol real;
 
-  public ApplicationHistoryProtocolPBServiceImpl(
-      ApplicationHistoryProtocol impl) {
+  public ApplicationHistoryProtocolPBServiceImpl(ApplicationHistoryProtocol impl) {
     this.real = impl;
   }
 

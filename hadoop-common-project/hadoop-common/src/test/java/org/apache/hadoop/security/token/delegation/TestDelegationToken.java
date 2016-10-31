@@ -30,7 +30,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-import junit.framework.Assert;
+import org.junit.Assert;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -121,7 +121,7 @@ public class TestDelegationToken {
 
     @Override
     protected void storeNewToken(TestDelegationTokenIdentifier ident,
-        long renewDate) {
+        long renewDate) throws IOException {
       super.storeNewToken(ident, renewDate);
       isStoreNewTokenCalled = true;
     }
@@ -135,7 +135,7 @@ public class TestDelegationToken {
 
     @Override
     protected void updateStoredToken(TestDelegationTokenIdentifier ident,
-        long renewDate) {
+        long renewDate) throws IOException {
       super.updateStoredToken(ident, renewDate);
       isUpdateStoredTokenCalled = true;
     }

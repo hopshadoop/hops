@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.yarn.security.client;
 
+import java.util.Collection;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.io.Text;
@@ -25,13 +27,11 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.security.token.TokenSelector;
 
-import java.util.Collection;
+public class ClientToAMTokenSelector implements
+    TokenSelector<ClientToAMTokenIdentifier> {
 
-public class ClientToAMTokenSelector
-    implements TokenSelector<ClientToAMTokenIdentifier> {
-
-  private static final Log LOG =
-      LogFactory.getLog(ClientToAMTokenSelector.class);
+  private static final Log LOG = LogFactory
+      .getLog(ClientToAMTokenSelector.class);
 
   @SuppressWarnings("unchecked")
   public Token<ClientToAMTokenIdentifier> selectToken(Text service,
@@ -41,10 +41,10 @@ public class ClientToAMTokenSelector
     }
     LOG.debug("Looking for a token with service " + service.toString());
     for (Token<? extends TokenIdentifier> token : tokens) {
-      LOG.debug("Token kind is " + token.getKind().toString() +
-          " and the token's service name is " + token.getService());
-      if (ClientToAMTokenIdentifier.KIND_NAME.equals(token.getKind()) &&
-          service.equals(token.getService())) {
+      LOG.debug("Token kind is " + token.getKind().toString()
+          + " and the token's service name is " + token.getService());
+      if (ClientToAMTokenIdentifier.KIND_NAME.equals(token.getKind())
+          && service.equals(token.getService())) {
         return (Token<ClientToAMTokenIdentifier>) token;
       }
     }

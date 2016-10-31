@@ -18,14 +18,14 @@
 
 package org.apache.hadoop.yarn.applications.distributedshell;
 
-import org.apache.commons.io.IOUtils;
-import org.apache.log4j.LogManager;
-import org.apache.log4j.PropertyConfigurator;
-
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.util.Map.Entry;
 import java.util.Properties;
+
+import org.apache.commons.io.IOUtils;
+import org.apache.log4j.LogManager;
+import org.apache.log4j.PropertyConfigurator;
 
 
 public class Log4jPropertyHelper {
@@ -42,12 +42,12 @@ public class Log4jPropertyHelper {
       Properties originalProperties = new Properties();
       originalProperties.load(is);
       for (Entry<Object, Object> entry : customProperties.entrySet()) {
-        originalProperties.setProperty(entry.getKey().toString(),
-            entry.getValue().toString());
+        originalProperties.setProperty(entry.getKey().toString(), entry
+            .getValue().toString());
       }
       LogManager.resetConfiguration();
       PropertyConfigurator.configure(originalProperties);
-    } finally {
+    }finally {
       IOUtils.closeQuietly(is);
       IOUtils.closeQuietly(fs);
     }

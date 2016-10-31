@@ -18,16 +18,21 @@
 
 package org.apache.hadoop.fs.shell;
 
-import java.io.*;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.Arrays;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
-import org.apache.hadoop.fs.*;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.PathIsDirectoryException;
 import org.apache.hadoop.io.IOUtils;
 
 /** Various commands for copy files */
@@ -50,10 +55,10 @@ class CopyCommands {
     public static final String NAME = "getmerge";    
     public static final String USAGE = "[-nl] <src> <localdst>";
     public static final String DESCRIPTION =
-      "Get all the files in the directories that\n" +
-      "match the source file pattern and merge and sort them to only\n" +
+      "Get all the files in the directories that " +
+      "match the source file pattern and merge and sort them to only " +
       "one file on local fs. <src> is kept.\n" +
-      "  -nl   Add a newline character at the end of each file.";
+      "-nl: Add a newline character at the end of each file.";
 
     protected PathData dst = null;
     protected String delimiter = null;
@@ -128,23 +133,52 @@ class CopyCommands {
 
   static class Cp extends CommandWithDestination {
     public static final String NAME = "cp";
-    public static final String USAGE = "[-f] [-p] <src> ... <dst>";
+    public static final String USAGE = "[-f] [-p | -p[topax]] <src> ... <dst>";
     public static final String DESCRIPTION =
-      "Copy files that match the file pattern <src> to a\n" +
-      "destination.  When copying multiple files, the destination\n" +
-      "must be a directory. Passing -p preserves access and\n" +
-      "modification times, ownership and the mode. Passing -f\n" +
-      "overwrites the destination if it already exists.\n";
-    
+      "Copy files that match the file pattern <src> to a " +
+      "destination.  When copying multiple files, the destination " +
+      "must be a directory. Passing -p preserves status " +
+      "[topax] (timestamps, ownership, permission, ACLs, XAttr). " +
+      "If -p is specified with no <arg>, then preserves " +
+      "timestamps, ownership, permission. If -pa is specified, " +
+      "then preserves permission also because ACL is a super-set of " +
+      "permission. Passing -f overwrites the destination if it " +
+      "already exists. raw namespace extended attributes are preserved " +
+      "if (1) they are supported (HDFS only) and, (2) all of the source and " +
+      "target pathnames are in the /.reserved/raw hierarchy. raw namespace " +
+      "xattr preservation is determined solely by the presence (or absence) " +
+      "of the /.reserved/raw prefix and not by the -p option.\n";
+
     @Override
     protected void processOptions(LinkedList<String> args) throws IOException {
-      CommandFormat cf = new CommandFormat(2, Integer.MAX_VALUE, "f", "p");
+      popPreserveOption(args);
+      CommandFormat cf = new CommandFormat(2, Integer.MAX_VALUE, "f");
       cf.parse(args);
       setOverwrite(cf.getOpt("f"));
-      setPreserve(cf.getOpt("p"));
       // should have a -r option
       setRecursive(true);
       getRemoteDestination(args);
+    }
+    
+    private void popPreserveOption(List<String> args) {
+      for (Iterator<String> iter = args.iterator(); iter.hasNext(); ) {
+        String cur = iter.next();
+        if (cur.equals("--")) {
+          // stop parsing arguments when you see --
+          break;
+        } else if (cur.startsWith("-p")) {
+          iter.remove();
+          if (cur.length() == 2) {
+            setPreserve(true);
+          } else {
+            String attributes = cur.substring(2);
+            for (int index = 0; index < attributes.length(); index++) {
+              preserve(FileAttribute.getAttribute(attributes.charAt(index)));
+            }
+          }
+          return;
+        }
+      }
     }
   }
   
@@ -156,10 +190,10 @@ class CopyCommands {
     public static final String USAGE =
       "[-p] [-ignoreCrc] [-crc] <src> ... <localdst>";
     public static final String DESCRIPTION =
-      "Copy files that match the file pattern <src>\n" +
-      "to the local name.  <src> is kept.  When copying multiple,\n" +
-      "files, the destination must be a directory. Passing\n" +
-      "-p preserves access and modification times,\n" +
+      "Copy files that match the file pattern <src> " +
+      "to the local name.  <src> is kept.  When copying multiple " +
+      "files, the destination must be a directory. Passing " +
+      "-p preserves access and modification times, " +
       "ownership and the mode.\n";
 
     @Override
@@ -181,21 +215,25 @@ class CopyCommands {
    */
   public static class Put extends CommandWithDestination {
     public static final String NAME = "put";
-    public static final String USAGE = "[-f] [-p] <localsrc> ... <dst>";
+    public static final String USAGE = "[-f] [-p] [-l] <localsrc> ... <dst>";
     public static final String DESCRIPTION =
-      "Copy files from the local file system\n" +
-      "into fs. Copying fails if the file already\n" +
-      "exists, unless the -f flag is given. Passing\n" +
-      "-p preserves access and modification times,\n" +
-      "ownership and the mode. Passing -f overwrites\n" +
-      "the destination if it already exists.\n";
+      "Copy files from the local file system " +
+      "into fs. Copying fails if the file already " +
+      "exists, unless the -f flag is given.\n" +
+      "Flags:\n" +
+      "  -p : Preserves access and modification times, ownership and the mode.\n" +
+      "  -f : Overwrites the destination if it already exists.\n" +
+      "  -l : Allow DataNode to lazily persist the file to disk. Forces\n" +
+      "       replication factor of 1. This flag will result in reduced\n" +
+      "       durability. Use with care.\n";
 
     @Override
     protected void processOptions(LinkedList<String> args) throws IOException {
-      CommandFormat cf = new CommandFormat(1, Integer.MAX_VALUE, "f", "p");
+      CommandFormat cf = new CommandFormat(1, Integer.MAX_VALUE, "f", "p", "l");
       cf.parse(args);
       setOverwrite(cf.getOpt("f"));
       setPreserve(cf.getOpt("p"));
+      setLazyPersist(cf.getOpt("l"));
       getRemoteDestination(args);
       // should have a -r option
       setRecursive(true);
@@ -250,9 +288,9 @@ class CopyCommands {
     public static final String NAME = "appendToFile";
     public static final String USAGE = "<localsrc> ... <dst>";
     public static final String DESCRIPTION =
-        "Appends the contents of all the given local files to the\n" +
-            "given dst file. The dst file will be created if it does\n" +
-            "not exist. If <localSrc> is -, then the input is read\n" +
+        "Appends the contents of all the given local files to the " +
+            "given dst file. The dst file will be created if it does " +
+            "not exist. If <localSrc> is -, then the input is read " +
             "from stdin.";
 
     private static final int DEFAULT_IO_LENGTH = 1024 * 1024;

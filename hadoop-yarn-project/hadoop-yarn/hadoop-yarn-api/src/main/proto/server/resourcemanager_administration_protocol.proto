@@ -23,24 +23,23 @@
  */
 
 option java_package = "org.apache.hadoop.yarn.proto";
-
 option java_outer_classname = "ResourceManagerAdministrationProtocol";
-
 option java_generic_services = true;
-
 option java_generate_equals_and_hash = true;
-
 package hadoop.yarn;
 
 import "server/yarn_server_resourcemanager_service_protos.proto";
 
 service ResourceManagerAdministrationProtocolService {
-  rpc refreshQueues (RefreshQueuesRequestProto) returns (RefreshQueuesResponseProto);
-  rpc refreshNodes (RefreshNodesRequestProto) returns (RefreshNodesResponseProto);
-  rpc refreshSuperUserGroupsConfiguration (RefreshSuperUserGroupsConfigurationRequestProto) returns (RefreshSuperUserGroupsConfigurationResponseProto);
-  rpc refreshUserToGroupsMappings (RefreshUserToGroupsMappingsRequestProto) returns (RefreshUserToGroupsMappingsResponseProto);
-  rpc refreshAdminAcls (RefreshAdminAclsRequestProto) returns (RefreshAdminAclsResponseProto);
-  rpc refreshServiceAcls (RefreshServiceAclsRequestProto) returns (RefreshServiceAclsResponseProto);
-  rpc getGroupsForUser (GetGroupsForUserRequestProto) returns (GetGroupsForUserResponseProto);
+  rpc refreshQueues(RefreshQueuesRequestProto) returns (RefreshQueuesResponseProto);
+  rpc refreshNodes(RefreshNodesRequestProto) returns (RefreshNodesResponseProto);
+  rpc refreshSuperUserGroupsConfiguration(RefreshSuperUserGroupsConfigurationRequestProto) returns (RefreshSuperUserGroupsConfigurationResponseProto);
+  rpc refreshUserToGroupsMappings(RefreshUserToGroupsMappingsRequestProto) returns (RefreshUserToGroupsMappingsResponseProto);
+  rpc refreshAdminAcls(RefreshAdminAclsRequestProto) returns (RefreshAdminAclsResponseProto);
+  rpc refreshServiceAcls(RefreshServiceAclsRequestProto) returns (RefreshServiceAclsResponseProto);
+  rpc getGroupsForUser(GetGroupsForUserRequestProto) returns (GetGroupsForUserResponseProto);
   rpc updateNodeResource (UpdateNodeResourceRequestProto) returns (UpdateNodeResourceResponseProto);
+  rpc addToClusterNodeLabels(AddToClusterNodeLabelsRequestProto) returns (AddToClusterNodeLabelsResponseProto);
+  rpc removeFromClusterNodeLabels(RemoveFromClusterNodeLabelsRequestProto) returns (RemoveFromClusterNodeLabelsResponseProto);
+  rpc replaceLabelsOnNodes(ReplaceLabelsOnNodeRequestProto) returns (ReplaceLabelsOnNodeResponseProto);
 }

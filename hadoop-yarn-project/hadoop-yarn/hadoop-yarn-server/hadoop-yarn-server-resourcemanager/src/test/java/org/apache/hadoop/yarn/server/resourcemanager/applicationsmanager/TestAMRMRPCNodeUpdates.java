@@ -1,28 +1,34 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Licensed to the Apache Software Foundation (ASF) under one
+* or more contributor license agreements.  See the NOTICE file
+* distributed with this work for additional information
+* regarding copyright ownership.  The ASF licenses this file
+* to you under the Apache License, Version 2.0 (the
+* "License"); you may not use this file except in compliance
+* with the License.  You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
 
 package org.apache.hadoop.yarn.server.resourcemanager.applicationsmanager;
 
-import io.hops.exception.StorageInitializtionException;
-import io.hops.metadata.util.RMStorageFactory;
-import io.hops.metadata.util.RMUtilities;
-import io.hops.metadata.util.YarnAPIStorageFactory;
-import junit.framework.Assert;
+import java.io.IOException;
+import java.security.PrivilegedExceptionAction;
+import java.util.List;
+
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import org.junit.Assert;
+
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.yarn.api.protocolrecords.AllocateRequest;
@@ -30,7 +36,6 @@ import org.apache.hadoop.yarn.api.protocolrecords.AllocateResponse;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.NodeReport;
 import org.apache.hadoop.yarn.api.records.NodeState;
-import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.event.Dispatcher;
 import org.apache.hadoop.yarn.event.DrainDispatcher;
 import org.apache.hadoop.yarn.event.EventHandler;
@@ -42,27 +47,30 @@ import org.apache.hadoop.yarn.server.resourcemanager.MockRM;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.SchedulerEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacitySchedulerConfiguration;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.io.IOException;
-import java.security.PrivilegedExceptionAction;
-import java.util.List;
-
 public class TestAMRMRPCNodeUpdates {
   private MockRM rm;
   ApplicationMasterService amService = null;
-  DrainDispatcher dispatcher = null;
 
   @Before
-  public void setUp() throws StorageInitializtionException, IOException {
-    YarnConfiguration conf = new YarnConfiguration();
-    YarnAPIStorageFactory.setConfiguration(conf);
+  public void setUp() throws IOException {
+    Configuration conf = new YarnConfiguration();
     RMStorageFactory.setConfiguration(conf);
-    RMUtilities.InitializeDB();
-    dispatcher = new DrainDispatcher();
+    YarnAPIStorageFactory.setConfiguration(conf);
+    DBUtility.InitializeDB();
+
     this.rm = new MockRM() {
+      @Override
+      public void init(Configuration conf) {
+        conf.set(
+          CapacitySchedulerConfiguration.MAXIMUM_APPLICATION_MASTERS_RESOURCE_PERCENT,
+          "1.0");
+        super.init(conf);
+      }
       @Override
       protected EventHandler<SchedulerEvent> createSchedulerEventDispatcher() {
         return new SchedulerEventDispatcher(this.scheduler) {
@@ -75,8 +83,7 @@ public class TestAMRMRPCNodeUpdates {
 
       @Override
       protected Dispatcher createDispatcher() {
-        dispatcher = new DrainDispatcher();
-        return dispatcher;
+        return new DrainDispatcher();
       }
     };
     rm.start();
@@ -92,14 +99,14 @@ public class TestAMRMRPCNodeUpdates {
   
   private void syncNodeHeartbeat(MockNM nm, boolean health) throws Exception {
     nm.nodeHeartbeat(health);
-    dispatcher.await();
+    ((DrainDispatcher) rm.getRMContext().getDispatcher()).await();
   }
   
   private void syncNodeLost(MockNM nm) throws Exception {
     rm.sendNodeStarted(nm);
     rm.NMwaitForState(nm.getNodeId(), NodeState.RUNNING);
     rm.sendNodeLost(nm);
-    dispatcher.await();
+    ((DrainDispatcher) rm.getRMContext().getDispatcher()).await();
   }
 
   private AllocateResponse allocate(final ApplicationAttemptId attemptId,
@@ -108,7 +115,7 @@ public class TestAMRMRPCNodeUpdates {
         UserGroupInformation.createRemoteUser(attemptId.toString());
     Token<AMRMTokenIdentifier> token =
         rm.getRMContext().getRMApps().get(attemptId.getApplicationId())
-            .getRMAppAttempt(attemptId).getAMRMToken();
+          .getRMAppAttempt(attemptId).getAMRMToken();
     ugi.addTokenIdentifier(token.decodeIdentifier());
     return ugi.doAs(new PrivilegedExceptionAction<AllocateResponse>() {
       @Override
@@ -125,6 +132,7 @@ public class TestAMRMRPCNodeUpdates {
     MockNM nm2 = rm.registerNode("127.0.0.2:1234", 10000);
     MockNM nm3 = rm.registerNode("127.0.0.3:1234", 10000);
     MockNM nm4 = rm.registerNode("127.0.0.4:1234", 10000);
+    ((DrainDispatcher) rm.getRMContext().getDispatcher()).await();
 
     RMApp app1 = rm.submitApp(2000);
 
@@ -148,8 +156,9 @@ public class TestAMRMRPCNodeUpdates {
     syncNodeHeartbeat(nm4, false);
     
     // allocate request returns updated node
-    allocateRequest1 = AllocateRequest
-        .newInstance(response1.getResponseId(), 0F, null, null, null);
+    allocateRequest1 =
+        AllocateRequest.newInstance(response1.getResponseId(), 0F, null, null,
+          null);
     response1 = allocate(attempt1.getAppAttemptId(), allocateRequest1);
     updatedNodes = response1.getUpdatedNodes();
     Assert.assertEquals(1, updatedNodes.size());
@@ -168,15 +177,16 @@ public class TestAMRMRPCNodeUpdates {
     syncNodeLost(nm3);
     
     // subsequent allocate request returns delta
-    allocateRequest1 = AllocateRequest
-        .newInstance(response1.getResponseId(), 0F, null, null, null);
+    allocateRequest1 =
+        AllocateRequest.newInstance(response1.getResponseId(), 0F, null, null,
+          null);
     response1 = allocate(attempt1.getAppAttemptId(), allocateRequest1);
     updatedNodes = response1.getUpdatedNodes();
     Assert.assertEquals(1, updatedNodes.size());
     nr = updatedNodes.iterator().next();
     Assert.assertEquals(nm3.getNodeId(), nr.getNodeId());
     Assert.assertEquals(NodeState.LOST, nr.getNodeState());
-
+        
     // registering another AM gives it the complete failed list
     RMApp app2 = rm.submitApp(2000);
     // Trigger nm2 heartbeat so that AM gets launched on it
@@ -198,8 +208,9 @@ public class TestAMRMRPCNodeUpdates {
     syncNodeHeartbeat(nm4, true);
     
     // both AM's should get delta updated nodes
-    allocateRequest1 = AllocateRequest
-        .newInstance(response1.getResponseId(), 0F, null, null, null);
+    allocateRequest1 =
+        AllocateRequest.newInstance(response1.getResponseId(), 0F, null, null,
+          null);
     response1 = allocate(attempt1.getAppAttemptId(), allocateRequest1);
     updatedNodes = response1.getUpdatedNodes();
     Assert.assertEquals(1, updatedNodes.size());
@@ -207,8 +218,9 @@ public class TestAMRMRPCNodeUpdates {
     Assert.assertEquals(nm4.getNodeId(), nr.getNodeId());
     Assert.assertEquals(NodeState.RUNNING, nr.getNodeState());
     
-    allocateRequest2 = AllocateRequest
-        .newInstance(response2.getResponseId(), 0F, null, null, null);
+    allocateRequest2 =
+        AllocateRequest.newInstance(response2.getResponseId(), 0F, null, null,
+          null);
     response2 = allocate(attempt2.getAppAttemptId(), allocateRequest2);
     updatedNodes = response2.getUpdatedNodes();
     Assert.assertEquals(1, updatedNodes.size());
@@ -217,13 +229,14 @@ public class TestAMRMRPCNodeUpdates {
     Assert.assertEquals(NodeState.RUNNING, nr.getNodeState());
 
     // subsequent allocate calls should return no updated nodes
-    allocateRequest2 = AllocateRequest
-        .newInstance(response2.getResponseId(), 0F, null, null, null);
+    allocateRequest2 =
+        AllocateRequest.newInstance(response2.getResponseId(), 0F, null, null,
+          null);
     response2 = allocate(attempt2.getAppAttemptId(), allocateRequest2);
     updatedNodes = response2.getUpdatedNodes();
     Assert.assertEquals(0, updatedNodes.size());
     
     // how to do the above for LOST node
-
+  
   }
 }

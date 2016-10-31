@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.yarn.api.protocolrecords;
 
+import java.util.List;
+
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Stable;
 import org.apache.hadoop.yarn.api.ContainerManagementProtocol;
@@ -25,15 +27,11 @@ import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.util.Records;
 
-import java.util.List;
-
 /**
- * <p>
  * The request sent by the <code>ApplicationMaster</code> to the
  * <code>NodeManager</code> to get {@link ContainerStatus} of requested
  * containers.
- * </p>
- *
+ * 
  * @see ContainerManagementProtocol#getContainerStatuses(GetContainerStatusesRequest)
  */
 @Public
@@ -51,12 +49,11 @@ public abstract class GetContainerStatusesRequest {
   }
 
   /**
-   * Get the list of <code>ContainerId</code>s of containers for which to
-   * obtain
+   * Get the list of <code>ContainerId</code>s of containers for which to obtain
    * the <code>ContainerStatus</code>.
-   *
+   * 
    * @return the list of <code>ContainerId</code>s of containers for which to
-   * obtain the <code>ContainerStatus</code>.
+   *         obtain the <code>ContainerStatus</code>.
    */
   @Public
   @Stable
@@ -65,10 +62,10 @@ public abstract class GetContainerStatusesRequest {
   /**
    * Set a list of <code>ContainerId</code>s of containers for which to obtain
    * the <code>ContainerStatus</code>
-   *
+   * 
    * @param containerIds
-   *     a list of <code>ContainerId</code>s of containers for which to
-   *     obtain the <code>ContainerStatus</code>
+   *          a list of <code>ContainerId</code>s of containers for which to
+   *          obtain the <code>ContainerStatus</code>
    */
   @Public
   @Stable

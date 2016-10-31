@@ -29,7 +29,7 @@ import org.apache.hadoop.yarn.util.Records;
  * The request from clients to get a list of container reports, which belong to
  * an application attempt from the <code>ResourceManager</code>.
  * </p>
- *
+ * 
  * @see ApplicationHistoryProtocol#getContainers(GetContainersRequest)
  */
 @Public
@@ -47,7 +47,7 @@ public abstract class GetContainersRequest {
 
   /**
    * Get the <code>ApplicationAttemptId</code> of an application attempt.
-   *
+   * 
    * @return <code>ApplicationAttemptId</code> of an application attempt
    */
   @Public
@@ -56,9 +56,9 @@ public abstract class GetContainersRequest {
 
   /**
    * Set the <code>ApplicationAttemptId</code> of an application attempt
-   *
+   * 
    * @param applicationAttemptId
-   *     <code>ApplicationAttemptId</code> of an application attempt
+   *          <code>ApplicationAttemptId</code> of an application attempt
    */
   @Public
   @Unstable

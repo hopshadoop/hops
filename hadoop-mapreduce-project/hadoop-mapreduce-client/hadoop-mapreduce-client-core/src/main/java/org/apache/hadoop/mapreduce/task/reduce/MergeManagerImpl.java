@@ -30,6 +30,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.ChecksumFileSystem;
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.LocalFileSystem;
@@ -54,6 +55,7 @@ import org.apache.hadoop.mapred.Task.CombineValuesIterator;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.TaskID;
+import org.apache.hadoop.mapreduce.CryptoUtils;
 import org.apache.hadoop.mapreduce.task.reduce.MapOutput.MapOutputComparator;
 import org.apache.hadoop.util.Progress;
 import org.apache.hadoop.util.ReflectionUtils;
@@ -91,8 +93,10 @@ public class MergeManagerImpl<K, V> implements MergeManager<K, V> {
   
   Set<CompressAwarePath> onDiskMapOutputs = new TreeSet<CompressAwarePath>();
   private final OnDiskMerger onDiskMerger;
-  
-  private final long memoryLimit;
+
+  @VisibleForTesting
+  final long memoryLimit;
+
   private long usedMemory;
   private long commitMemory;
   private final long maxSingleShuffleLimit;
@@ -156,7 +160,8 @@ public class MergeManagerImpl<K, V> implements MergeManager<K, V> {
     this.rfs = ((LocalFileSystem)localFS).getRaw();
     
     final float maxInMemCopyUse =
-      jobConf.getFloat(MRJobConfig.SHUFFLE_INPUT_BUFFER_PERCENT, 0.90f);
+      jobConf.getFloat(MRJobConfig.SHUFFLE_INPUT_BUFFER_PERCENT,
+          MRJobConfig.DEFAULT_SHUFFLE_INPUT_BUFFER_PERCENT);
     if (maxInMemCopyUse > 1.0 || maxInMemCopyUse < 0.0) {
       throw new IllegalArgumentException("Invalid value for " +
           MRJobConfig.SHUFFLE_INPUT_BUFFER_PERCENT + ": " +
@@ -164,11 +169,10 @@ public class MergeManagerImpl<K, V> implements MergeManager<K, V> {
     }
 
     // Allow unit tests to fix Runtime memory
-    this.memoryLimit = 
-      (long)(jobConf.getLong(MRJobConfig.REDUCE_MEMORY_TOTAL_BYTES,
-          Math.min(Runtime.getRuntime().maxMemory(), Integer.MAX_VALUE))
-        * maxInMemCopyUse);
- 
+    this.memoryLimit = (long)(jobConf.getLong(
+        MRJobConfig.REDUCE_MEMORY_TOTAL_BYTES,
+        Runtime.getRuntime().maxMemory()) * maxInMemCopyUse);
+
     this.ioSortFactor = jobConf.getInt(MRJobConfig.IO_SORT_FACTOR, 100);
 
     final float singleShuffleMemoryLimitPercent =
@@ -197,8 +201,8 @@ public class MergeManagerImpl<K, V> implements MergeManager<K, V> {
              "memToMemMergeOutputsThreshold=" + memToMemMergeOutputsThreshold);
 
     if (this.maxSingleShuffleLimit >= this.mergeThreshold) {
-      throw new RuntimeException("Invlaid configuration: "
-          + "maxSingleShuffleLimit should be less than mergeThreshold"
+      throw new RuntimeException("Invalid configuration: "
+          + "maxSingleShuffleLimit should be less than mergeThreshold "
           + "maxSingleShuffleLimit: " + this.maxSingleShuffleLimit
           + "mergeThreshold: " + this.mergeThreshold);
     }
@@ -225,6 +229,10 @@ public class MergeManagerImpl<K, V> implements MergeManager<K, V> {
   
   protected MergeThread<InMemoryMapOutput<K,V>, K,V> createInMemoryMerger() {
     return new InMemoryMerger(this);
+  }
+
+  protected MergeThread<CompressAwarePath,K,V> createOnDiskMerger() {
+    return new OnDiskMerger(this);
   }
 
   TaskAttemptID getReduceId() {
@@ -452,11 +460,10 @@ public class MergeManagerImpl<K, V> implements MergeManager<K, V> {
                                            mergeOutputSize).suffix(
                                                Task.MERGED_OUTPUT_PREFIX);
 
-      Writer<K,V> writer = 
-        new Writer<K,V>(jobConf, rfs, outputPath,
-                        (Class<K>) jobConf.getMapOutputKeyClass(),
-                        (Class<V>) jobConf.getMapOutputValueClass(),
-                        codec, null);
+      FSDataOutputStream out = CryptoUtils.wrapIfNecessary(jobConf, rfs.create(outputPath));
+      Writer<K, V> writer = new Writer<K, V>(jobConf, out,
+          (Class<K>) jobConf.getMapOutputKeyClass(),
+          (Class<V>) jobConf.getMapOutputValueClass(), codec, null, true);
 
       RawKeyValueIterator rIter = null;
       CompressAwarePath compressAwarePath;
@@ -536,11 +543,12 @@ public class MergeManagerImpl<K, V> implements MergeManager<K, V> {
       Path outputPath = 
         localDirAllocator.getLocalPathForWrite(inputs.get(0).toString(), 
             approxOutputSize, jobConf).suffix(Task.MERGED_OUTPUT_PREFIX);
-      Writer<K,V> writer = 
-        new Writer<K,V>(jobConf, rfs, outputPath, 
-                        (Class<K>) jobConf.getMapOutputKeyClass(), 
-                        (Class<V>) jobConf.getMapOutputValueClass(),
-                        codec, null);
+
+      FSDataOutputStream out = CryptoUtils.wrapIfNecessary(jobConf, rfs.create(outputPath));
+      Writer<K, V> writer = new Writer<K, V>(jobConf, out,
+          (Class<K>) jobConf.getMapOutputKeyClass(),
+          (Class<V>) jobConf.getMapOutputValueClass(), codec, null, true);
+
       RawKeyValueIterator iter  = null;
       CompressAwarePath compressAwarePath;
       Path tmpDir = new Path(reduceId.toString());
@@ -660,24 +668,26 @@ public class MergeManagerImpl<K, V> implements MergeManager<K, V> {
     }
   }
 
+  @VisibleForTesting
+  final long getMaxInMemReduceLimit() {
+    final float maxRedPer =
+        jobConf.getFloat(MRJobConfig.REDUCE_INPUT_BUFFER_PERCENT, 0f);
+    if (maxRedPer > 1.0 || maxRedPer < 0.0) {
+      throw new RuntimeException(maxRedPer + ": "
+          + MRJobConfig.REDUCE_INPUT_BUFFER_PERCENT
+          + " must be a float between 0 and 1.0");
+    }
+    return (long)(memoryLimit * maxRedPer);
+  }
+
   private RawKeyValueIterator finalMerge(JobConf job, FileSystem fs,
                                        List<InMemoryMapOutput<K,V>> inMemoryMapOutputs,
                                        List<CompressAwarePath> onDiskMapOutputs
                                        ) throws IOException {
-    LOG.info("finalMerge called with " + 
-             inMemoryMapOutputs.size() + " in-memory map-outputs and " + 
-             onDiskMapOutputs.size() + " on-disk map-outputs");
-    
-    final float maxRedPer =
-      job.getFloat(MRJobConfig.REDUCE_INPUT_BUFFER_PERCENT, 0f);
-    if (maxRedPer > 1.0 || maxRedPer < 0.0) {
-      throw new IOException(MRJobConfig.REDUCE_INPUT_BUFFER_PERCENT +
-                            maxRedPer);
-    }
-    int maxInMemReduce = (int)Math.min(
-        Runtime.getRuntime().maxMemory() * maxRedPer, Integer.MAX_VALUE);
-    
-
+    LOG.info("finalMerge called with " +
+        inMemoryMapOutputs.size() + " in-memory map-outputs and " +
+        onDiskMapOutputs.size() + " on-disk map-outputs");
+    final long maxInMemReduce = getMaxInMemReduceLimit();
     // merge config params
     Class<K> keyClass = (Class<K>)job.getMapOutputKeyClass();
     Class<V> valueClass = (Class<V>)job.getMapOutputValueClass();
@@ -716,8 +726,10 @@ public class MergeManagerImpl<K, V> implements MergeManager<K, V> {
             keyClass, valueClass, memDiskSegments, numMemDiskSegments,
             tmpDir, comparator, reporter, spilledRecordsCounter, null, 
             mergePhase);
-        Writer<K,V> writer = new Writer<K,V>(job, fs, outputPath,
-            keyClass, valueClass, codec, null);
+
+        FSDataOutputStream out = CryptoUtils.wrapIfNecessary(job, fs.create(outputPath));
+        Writer<K, V> writer = new Writer<K, V>(job, out, keyClass, valueClass,
+            codec, null, true);
         try {
           Merger.writeFile(rIter, writer, reporter, job);
           writer.close();

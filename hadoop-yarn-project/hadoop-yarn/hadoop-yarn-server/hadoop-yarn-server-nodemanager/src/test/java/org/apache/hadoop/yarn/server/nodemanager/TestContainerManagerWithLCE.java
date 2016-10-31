@@ -1,22 +1,25 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Licensed to the Apache Software Foundation (ASF) under one
+* or more contributor license agreements.  See the NOTICE file
+* distributed with this work for additional information
+* regarding copyright ownership.  The ASF licenses this file
+* to you under the Apache License, Version 2.0 (the
+* "License"); you may not use this file except in compliance
+* with the License.  You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
 
 package org.apache.hadoop.yarn.server.nodemanager;
+
+import java.io.File;
+import java.io.IOException;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -28,22 +31,20 @@ import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.TestContainerManager;
 import org.junit.After;
 
-import java.io.File;
-import java.io.IOException;
-
 public class TestContainerManagerWithLCE extends TestContainerManager {
 
-  private static final Log LOG =
-      LogFactory.getLog(TestContainerManagerWithLCE.class);
+  private static final Log LOG = LogFactory
+      .getLog(TestContainerManagerWithLCE.class);
 
   public TestContainerManagerWithLCE() throws UnsupportedFileSystemException {
     super();
   }
 
   static {
-    localDir = new File("target",
-        TestContainerManagerWithLCE.class.getName() + "-localDir")
-        .getAbsoluteFile();
+    localDir =
+        new File("target",
+            TestContainerManagerWithLCE.class.getName() + "-localDir")
+            .getAbsoluteFile();
     tmpDir = new File("target",
         TestContainerManagerWithLCE.class.getName() + "-tmpDir");
   }
@@ -57,9 +58,11 @@ public class TestContainerManagerWithLCE extends TestContainerManager {
     }
     super.setup();
     localFS.setPermission(new Path(localDir.getCanonicalPath()),
-        new FsPermission((short) 0777));
+        new FsPermission(
+            (short) 0777));
     localFS.setPermission(new Path(tmpDir.getCanonicalPath()),
-        new FsPermission((short) 0777));
+        new FsPermission(
+            (short) 0777));
   }
 
   @After
@@ -71,8 +74,8 @@ public class TestContainerManagerWithLCE extends TestContainerManager {
   }
 
   @Override
-  public void testContainerSetup()
-      throws Exception, InterruptedException, YarnException {
+  public void testContainerSetup() throws Exception, InterruptedException,
+      YarnException {
     // Don't run the test if the binary is not available.
     if (!shouldRunTest()) {
       LOG.info("LCE binary path is not passed. Not running the test");
@@ -94,8 +97,8 @@ public class TestContainerManagerWithLCE extends TestContainerManager {
   }
 
   @Override
-  public void testContainerLaunchAndStop()
-      throws IOException, InterruptedException, YarnException {
+  public void testContainerLaunchAndStop() throws IOException,
+      InterruptedException, YarnException {
     // Don't run the test if the binary is not available.
     if (!shouldRunTest()) {
       LOG.info("LCE binary path is not passed. Not running the test");
@@ -106,8 +109,8 @@ public class TestContainerManagerWithLCE extends TestContainerManager {
   }
   
   @Override
-  public void testContainerLaunchAndExitSuccess()
-      throws IOException, InterruptedException, YarnException {
+  public void testContainerLaunchAndExitSuccess() throws IOException,
+      InterruptedException, YarnException {
     // Don't run the test if the binary is not available.
     if (!shouldRunTest()) {
       LOG.info("LCE binary path is not passed. Not running the test");
@@ -118,8 +121,8 @@ public class TestContainerManagerWithLCE extends TestContainerManager {
   }
 
   @Override
-  public void testContainerLaunchAndExitFailure()
-      throws IOException, InterruptedException, YarnException {
+  public void testContainerLaunchAndExitFailure() throws IOException,
+      InterruptedException, YarnException {
     // Don't run the test if the binary is not available.
     if (!shouldRunTest()) {
       LOG.info("LCE binary path is not passed. Not running the test");
@@ -130,8 +133,8 @@ public class TestContainerManagerWithLCE extends TestContainerManager {
   }
   
   @Override
-  public void testLocalFilesCleanup()
-      throws InterruptedException, IOException, YarnException {
+  public void testLocalFilesCleanup() throws InterruptedException,
+      IOException, YarnException {
     // Don't run the test if the binary is not available.
     if (!shouldRunTest()) {
       LOG.info("LCE binary path is not passed. Not running the test");
@@ -142,8 +145,8 @@ public class TestContainerManagerWithLCE extends TestContainerManager {
   }
 
   @Override
-  public void testContainerLaunchFromPreviousRM()
-      throws InterruptedException, IOException, YarnException {
+  public void testContainerLaunchFromPreviousRM() throws InterruptedException,
+      IOException, YarnException {
     // Don't run the test if the binary is not available.
     if (!shouldRunTest()) {
       LOG.info("LCE binary path is not passed. Not running the test");
@@ -176,8 +179,7 @@ public class TestContainerManagerWithLCE extends TestContainerManager {
   }
 
   @Override
-  public void testStartContainerFailureWithUnknownAuxService()
-      throws Exception {
+  public void testStartContainerFailureWithUnknownAuxService() throws Exception {
     // Don't run the test if the binary is not available.
     if (!shouldRunTest()) {
       LOG.info("LCE binary path is not passed. Not running the test");
@@ -189,14 +191,13 @@ public class TestContainerManagerWithLCE extends TestContainerManager {
 
   private boolean shouldRunTest() {
     return System
-        .getProperty(YarnConfiguration.NM_LINUX_CONTAINER_EXECUTOR_PATH) !=
-        null;
+        .getProperty(YarnConfiguration.NM_LINUX_CONTAINER_EXECUTOR_PATH) != null;
   }
 
   @Override
   protected ContainerExecutor createContainerExecutor() {
-    super.conf.set(YarnConfiguration.NM_LINUX_CONTAINER_EXECUTOR_PATH,
-        System.getProperty(YarnConfiguration.NM_LINUX_CONTAINER_EXECUTOR_PATH));
+    super.conf.set(YarnConfiguration.NM_LINUX_CONTAINER_EXECUTOR_PATH, System
+        .getProperty(YarnConfiguration.NM_LINUX_CONTAINER_EXECUTOR_PATH));
     LinuxContainerExecutor linuxContainerExecutor =
         new LinuxContainerExecutor();
     linuxContainerExecutor.setConf(super.conf);

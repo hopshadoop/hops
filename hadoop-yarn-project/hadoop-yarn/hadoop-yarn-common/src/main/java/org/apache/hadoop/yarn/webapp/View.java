@@ -1,41 +1,41 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Licensed to the Apache Software Foundation (ASF) under one
+* or more contributor license agreements.  See the NOTICE file
+* distributed with this work for additional information
+* regarding copyright ownership.  The ASF licenses this file
+* to you under the Apache License, Version 2.0 (the
+* "License"); you may not use this file except in compliance
+* with the License.  You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
 
 package org.apache.hadoop.yarn.webapp;
 
 import com.google.inject.Inject;
 import com.google.inject.Injector;
 import com.google.inject.servlet.RequestScoped;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.yarn.api.ApplicationConstants;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.util.Map;
 import javax.servlet.ServletOutputStream;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.util.Map;
 
-import static org.apache.hadoop.yarn.util.StringHelper.join;
-import static org.apache.hadoop.yarn.util.StringHelper.ujoin;
+import static org.apache.hadoop.yarn.util.StringHelper.*;
+
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.yarn.api.ApplicationConstants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Base class for all views
@@ -50,32 +50,23 @@ public abstract class View implements Params {
     int nestLevel = 0;
     boolean wasInline;
 
-    @Inject
-    ViewContext(Controller.RequestContext ctx) {
+    @Inject ViewContext(Controller.RequestContext ctx) {
       rc = ctx;
     }
 
-    public int nestLevel() {
-      return nestLevel;
-    }
-
-    public boolean wasInline() {
-      return wasInline;
-    }
+    public int nestLevel() { return nestLevel; }
+    public boolean wasInline() { return wasInline; }
 
     public void set(int nestLevel, boolean wasInline) {
       this.nestLevel = nestLevel;
       this.wasInline = wasInline;
     }
 
-    public Controller.RequestContext requestContext() {
-      return rc;
-    }
+    public Controller.RequestContext requestContext() { return rc; }
   }
 
   private ViewContext vc;
-  @Inject
-  Injector injector;
+  @Inject Injector injector;
 
   public View() {
     // Makes injection in subclasses optional.
@@ -105,21 +96,13 @@ public abstract class View implements Params {
     return vc;
   }
 
-  public Throwable error() {
-    return context().rc.error;
-  }
+  public Throwable error() { return context().rc.error; }
 
-  public int status() {
-    return context().rc.status;
-  }
+  public int status() { return context().rc.status; }
 
-  public boolean inDevMode() {
-    return context().rc.devMode;
-  }
+  public boolean inDevMode() { return context().rc.devMode; }
 
-  public Injector injector() {
-    return context().rc.injector;
-  }
+  public Injector injector() { return context().rc.injector; }
 
   public <T> T getInstance(Class<T> cls) {
     return injector().getInstance(cls);
@@ -139,7 +122,6 @@ public abstract class View implements Params {
 
   /**
    * Get the cookies
-   *
    * @return the cookies map
    */
   public Map<String, Cookie> cookies() {
@@ -164,11 +146,8 @@ public abstract class View implements Params {
 
   /**
    * Lookup a value from the current context.
-   *
-   * @param key
-   *     to lookup
-   * @param defaultValue
-   *     if key is missing
+   * @param key to lookup
+   * @param defaultValue if key is missing
    * @return the value of the key or the default value
    */
   public String $(String key, String defaultValue) {
@@ -182,9 +161,7 @@ public abstract class View implements Params {
 
   /**
    * Lookup a value from the current context
-   *
-   * @param key
-   *     to lookup
+   * @param key to lookup
    * @return the value of the key or empty string
    */
   public String $(String key) {
@@ -194,27 +171,23 @@ public abstract class View implements Params {
   /**
    * Set a context value. (e.g. UI properties for sub views.)
    * Try to avoid any application (vs view/ui) logic.
-   *
-   * @param key
-   *     to set
-   * @param value
-   *     to set
+   * @param key to set
+   * @param value to set
    */
   public void set(String key, String value) {
     moreParams().put(key, value);
   }
 
   public String root() {
-    String root =
-        System.getenv(ApplicationConstants.APPLICATION_WEB_PROXY_BASE_ENV);
-    if (root == null || root.isEmpty()) {
+    String root = System.getenv(ApplicationConstants.APPLICATION_WEB_PROXY_BASE_ENV);
+    if(root == null || root.isEmpty()) {
       root = "/";
     }
     return root;
   }
   
   public String prefix() {
-    if (context().rc.prefix == null) {
+    if(context().rc.prefix == null) {
       return root();
     } else {
       return ujoin(root(), context().rc.prefix);
@@ -232,9 +205,7 @@ public abstract class View implements Params {
 
   /**
    * Create an url from url components
-   *
-   * @param parts
-   *     components to join
+   * @param parts components to join
    * @return an url string
    */
   public String root_url(String... parts) {
@@ -244,9 +215,7 @@ public abstract class View implements Params {
   
   /**
    * Create an url from url components
-   *
-   * @param parts
-   *     components to join
+   * @param parts components to join
    * @return an url string
    */
   public String url(String... parts) {
@@ -259,16 +228,13 @@ public abstract class View implements Params {
 
   /**
    * Render a sub-view
-   *
-   * @param cls
-   *     the class of the sub-view
+   * @param cls the class of the sub-view
    */
   public void render(Class<? extends SubView> cls) {
     int saved = context().nestLevel;
     getInstance(cls).renderPartial();
     if (context().nestLevel != saved) {
-      throw new WebAppException(
-          "View " + cls.getSimpleName() + " not complete");
+      throw new WebAppException("View "+ cls.getSimpleName() +" not complete");
     }
   }
 }

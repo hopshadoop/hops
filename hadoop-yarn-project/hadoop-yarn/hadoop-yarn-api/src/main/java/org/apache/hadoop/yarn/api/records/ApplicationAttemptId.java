@@ -18,27 +18,26 @@
 
 package org.apache.hadoop.yarn.api.records;
 
+import java.text.NumberFormat;
+
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Stable;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.util.Records;
 
-import java.text.NumberFormat;
-
 /**
  * <p><code>ApplicationAttemptId</code> denotes the particular <em>attempt</em>
  * of an <code>ApplicationMaster</code> for a given {@link ApplicationId}.</p>
- * <p/>
+ * 
  * <p>Multiple attempts might be needed to run an application to completion due
  * to temporal failures of the <code>ApplicationMaster</code> such as hardware
- * failures, connectivity issues etc. on the node on which it was
- * scheduled.</p>
+ * failures, connectivity issues etc. on the node on which it was scheduled.</p>
  */
 @Public
 @Stable
-public abstract class ApplicationAttemptId
-    implements Comparable<ApplicationAttemptId> {
+public abstract class ApplicationAttemptId implements
+    Comparable<ApplicationAttemptId> {
 
   @Private
   @Unstable
@@ -57,8 +56,7 @@ public abstract class ApplicationAttemptId
   }
 
   /**
-   * Get the <code>ApplicationId</code> of the <code>ApplicationAttempId</code>.
-   *
+   * Get the <code>ApplicationId</code> of the <code>ApplicationAttempId</code>. 
    * @return <code>ApplicationId</code> of the <code>ApplicationAttempId</code>
    */
   @Public
@@ -71,7 +69,6 @@ public abstract class ApplicationAttemptId
   
   /**
    * Get the <code>attempt id</code> of the <code>Application</code>.
-   *
    * @return <code>attempt id</code> of the <code>Application</code>
    */
   @Public
@@ -99,36 +96,31 @@ public abstract class ApplicationAttemptId
     final int prime = 347671;
     int result = 5501;
     ApplicationId appId = getApplicationId();
-    result = prime * result + appId.hashCode();
+    result = prime * result +  appId.hashCode();
     result = prime * result + getAttemptId();
     return result;
   }
 
   @Override
   public boolean equals(Object obj) {
-    if (this == obj) {
+    if (this == obj)
       return true;
-    }
-    if (obj == null) {
+    if (obj == null)
       return false;
-    }
-    if (getClass() != obj.getClass()) {
+    if (getClass() != obj.getClass())
       return false;
-    }
     ApplicationAttemptId other = (ApplicationAttemptId) obj;
-    if (!this.getApplicationId().equals(other.getApplicationId())) {
+    if (!this.getApplicationId().equals(other.getApplicationId()))
       return false;
-    }
-    if (this.getAttemptId() != other.getAttemptId()) {
+    if (this.getAttemptId() != other.getAttemptId())
       return false;
-    }
     return true;
   }
 
   @Override
   public int compareTo(ApplicationAttemptId other) {
-    int compareAppIds =
-        this.getApplicationId().compareTo(other.getApplicationId());
+    int compareAppIds = this.getApplicationId().compareTo(
+        other.getApplicationId());
     if (compareAppIds == 0) {
       return this.getAttemptId() - other.getAttemptId();
     } else {
@@ -140,8 +132,8 @@ public abstract class ApplicationAttemptId
   public String toString() {
     StringBuilder sb = new StringBuilder(appAttemptIdStrPrefix);
     sb.append(this.getApplicationId().getClusterTimestamp()).append("_");
-    sb.append(ApplicationId.appIdFormat.get()
-        .format(this.getApplicationId().getId()));
+    sb.append(ApplicationId.appIdFormat.get().format(
+        this.getApplicationId().getId()));
     sb.append("_").append(attemptIdFormat.get().format(getAttemptId()));
     return sb.toString();
   }

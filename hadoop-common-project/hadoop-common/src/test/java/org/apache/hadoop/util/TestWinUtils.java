@@ -20,10 +20,12 @@ package org.apache.hadoop.util;
 
 import static org.junit.Assert.*;
 import static org.junit.Assume.assumeTrue;
+import static org.junit.matchers.JUnitMatchers.containsString;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 
 import org.apache.commons.io.FileUtils;
@@ -33,7 +35,7 @@ import org.apache.hadoop.fs.FileUtil;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import static org.junit.Assume.*;
+
 import static org.hamcrest.CoreMatchers.*;
 
 /**
@@ -369,7 +371,7 @@ public class TestWinUtils {
     testChmodInternalR("a+rX", "rw-r--r--", "rwxr-xr-x");
 
     // Test a new file created in a chmod'ed directory has expected permission
-    testNewFileChmodInternal("-rwx------");
+    testNewFileChmodInternal("-rwxr-xr-x");
   }
 
   private void chown(String userGroup, File file) throws IOException {
@@ -380,8 +382,10 @@ public class TestWinUtils {
   private void assertOwners(File file, String expectedUser,
       String expectedGroup) throws IOException {
     String [] args = lsF(file).trim().split("[\\|]");
-    assertEquals(expectedUser.toLowerCase(), args[2].toLowerCase());
-    assertEquals(expectedGroup.toLowerCase(), args[3].toLowerCase());
+    assertEquals(StringUtils.toLowerCase(expectedUser),
+        StringUtils.toLowerCase(args[2]));
+    assertEquals(StringUtils.toLowerCase(expectedGroup),
+        StringUtils.toLowerCase(args[3]));
   }
 
   @Test (timeout = 30000)
@@ -519,6 +523,90 @@ public class TestWinUtils {
       fail("Failed to get Shell.ExitCodeException with bad parameters");
     } catch (Shell.ExitCodeException ece) {
       assertThat(ece.getExitCode(), is(1));
+    }
+  }
+  
+  @SuppressWarnings("deprecation")
+  @Test(timeout=10000)
+  public void testTaskCreate() throws IOException {
+    File batch = new File(TEST_DIR, "testTaskCreate.cmd");
+    File proof = new File(TEST_DIR, "testTaskCreate.out");
+    FileWriter fw = new FileWriter(batch);
+    String testNumber = String.format("%f", Math.random());
+    fw.write(String.format("echo %s > \"%s\"", testNumber, proof.getAbsolutePath()));
+    fw.close();
+    
+    assertFalse(proof.exists());
+    
+    Shell.execCommand(Shell.WINUTILS, "task", "create", "testTaskCreate" + testNumber, 
+        batch.getAbsolutePath());
+    
+    assertTrue(proof.exists());
+    
+    String outNumber = FileUtils.readFileToString(proof);
+    
+    assertThat(outNumber, containsString(testNumber));
+  }
+
+  @Test (timeout = 30000)
+  public void testTaskCreateWithLimits() throws IOException {
+    // Generate a unique job id
+    String jobId = String.format("%f", Math.random());
+
+    // Run a task without any options
+    String out = Shell.execCommand(Shell.WINUTILS, "task", "create",
+        "job" + jobId, "cmd /c echo job" + jobId);
+    assertTrue(out.trim().equals("job" + jobId));
+
+    // Run a task without any limits
+    jobId = String.format("%f", Math.random());
+    out = Shell.execCommand(Shell.WINUTILS, "task", "create", "-c", "-1", "-m",
+        "-1", "job" + jobId, "cmd /c echo job" + jobId);
+    assertTrue(out.trim().equals("job" + jobId));
+
+    // Run a task with limits (128MB should be enough for a cmd)
+    jobId = String.format("%f", Math.random());
+    out = Shell.execCommand(Shell.WINUTILS, "task", "create", "-c", "10000", "-m",
+        "128", "job" + jobId, "cmd /c echo job" + jobId);
+    assertTrue(out.trim().equals("job" + jobId));
+
+    // Run a task without enough memory
+    try {
+      jobId = String.format("%f", Math.random());
+      out = Shell.execCommand(Shell.WINUTILS, "task", "create", "-m", "128", "job"
+          + jobId, "java -Xmx256m -version");
+      fail("Failed to get Shell.ExitCodeException with insufficient memory");
+    } catch (Shell.ExitCodeException ece) {
+      assertThat(ece.getExitCode(), is(1));
+    }
+
+    // Run tasks with wrong parameters
+    //
+    try {
+      jobId = String.format("%f", Math.random());
+      Shell.execCommand(Shell.WINUTILS, "task", "create", "-c", "-1", "-m",
+          "-1", "foo", "job" + jobId, "cmd /c echo job" + jobId);
+      fail("Failed to get Shell.ExitCodeException with bad parameters");
+    } catch (Shell.ExitCodeException ece) {
+      assertThat(ece.getExitCode(), is(1639));
+    }
+
+    try {
+      jobId = String.format("%f", Math.random());
+      Shell.execCommand(Shell.WINUTILS, "task", "create", "-c", "-m", "-1",
+          "job" + jobId, "cmd /c echo job" + jobId);
+      fail("Failed to get Shell.ExitCodeException with bad parameters");
+    } catch (Shell.ExitCodeException ece) {
+      assertThat(ece.getExitCode(), is(1639));
+    }
+
+    try {
+      jobId = String.format("%f", Math.random());
+      Shell.execCommand(Shell.WINUTILS, "task", "create", "-c", "foo",
+          "job" + jobId, "cmd /c echo job" + jobId);
+      fail("Failed to get Shell.ExitCodeException with bad parameters");
+    } catch (Shell.ExitCodeException ece) {
+      assertThat(ece.getExitCode(), is(1639));
     }
   }
 }

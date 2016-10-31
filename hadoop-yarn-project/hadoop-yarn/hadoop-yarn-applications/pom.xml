@@ -13,8 +13,8 @@
   limitations under the License. See accompanying LICENSE file.
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
                       http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <artifactId>hadoop-yarn</artifactId>
@@ -29,9 +29,7 @@
   <packaging>pom</packaging>
 
   <properties>
-    <hadoop.common.build.dir>
-      ${basedir}/../../../../hadoop-common-project/hadoop-common/target
-    </hadoop.common.build.dir>
+    <hadoop.common.build.dir>${basedir}/../../../../hadoop-common-project/hadoop-common/target</hadoop.common.build.dir>
   </properties>
 
   <!-- Do not add dependencies here, add them to the POM of the leaf module -->
@@ -41,21 +39,21 @@
     <module>hadoop-yarn-applications-unmanaged-am-launcher</module>
   </modules>
 
-  <profiles>
-    <profile>
-      <id>clover</id>
-      <activation>
-        <activeByDefault>false</activeByDefault>
-        <property>
-          <name>clover</name>
-        </property>
-      </activation>
-      <dependencies>
-        <dependency>
-          <groupId>com.cenqua.clover</groupId>
-          <artifactId>clover</artifactId>
-        </dependency>
-      </dependencies>
-    </profile>
-  </profiles>
+ <profiles>
+  <profile>
+    <id>clover</id>
+    <activation>
+      <activeByDefault>false</activeByDefault>
+      <property>
+        <name>clover</name>
+      </property>
+    </activation>
+    <dependencies>
+      <dependency>
+        <groupId>com.cenqua.clover</groupId>
+        <artifactId>clover</artifactId>
+      </dependency>
+    </dependencies>
+  </profile>
+</profiles>
 </project>

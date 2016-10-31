@@ -18,14 +18,14 @@
 
 package org.apache.hadoop.yarn.api.records.impl.pb;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.records.ResourceBlacklistRequest;
 import org.apache.hadoop.yarn.proto.YarnProtos.ResourceBlacklistRequestProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.ResourceBlacklistRequestProtoOrBuilder;
-
-import java.util.ArrayList;
-import java.util.List;
 
 @Private
 @Unstable
@@ -82,7 +82,7 @@ public class ResourceBlacklistRequestPBImpl extends ResourceBlacklistRequest {
   private void addBlacklistAdditionsToProto() {
     maybeInitBuilder();
     builder.clearBlacklistAdditions();
-    if (this.blacklistAdditions == null) {
+    if (this.blacklistAdditions == null) { 
       return;
     }
     builder.addAllBlacklistAdditions(this.blacklistAdditions);
@@ -90,8 +90,8 @@ public class ResourceBlacklistRequestPBImpl extends ResourceBlacklistRequest {
 
   private void addBlacklistRemovalsToProto() {
     maybeInitBuilder();
-    builder.clearBlacklistAdditions();
-    if (this.blacklistRemovals == null) {
+    builder.clearBlacklistRemovals();
+    if (this.blacklistRemovals == null) { 
       return;
     }
     builder.addAllBlacklistRemovals(this.blacklistRemovals);
@@ -159,5 +159,14 @@ public class ResourceBlacklistRequestPBImpl extends ResourceBlacklistRequest {
   public int hashCode() {
     return getProto().hashCode();
   }
-  
+
+  @Override
+  public boolean equals(Object other) {
+    if (other == null)
+      return false;
+    if (other.getClass().isAssignableFrom(this.getClass())) {
+      return this.getProto().equals(this.getClass().cast(other).getProto());
+    }
+    return false;
+  }
 }

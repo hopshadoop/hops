@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.util;
 
+import com.google.common.base.Preconditions;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.URI;
@@ -27,10 +28,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -351,12 +355,15 @@ public class StringUtils {
 
   /**
    * Splits a comma separated value <code>String</code>, trimming leading and trailing whitespace on each value.
+   * Duplicate and empty values are removed.
    * @param str a comma separated <String> with values
    * @return a <code>Collection</code> of <code>String</code> values
    */
   public static Collection<String> getTrimmedStringCollection(String str){
-    return new ArrayList<String>(
+    Set<String> set = new LinkedHashSet<String>(
       Arrays.asList(getTrimmedStrings(str)));
+    set.remove("");
+    return set;
   }
   
   /**
@@ -370,6 +377,19 @@ public class StringUtils {
     }
 
     return str.trim().split("\\s*,\\s*");
+  }
+
+  /**
+   * Trims all the strings in a Collection<String> and returns a Set<String>.
+   * @param strings
+   * @return
+   */
+  public static Set<String> getTrimmedStrings(Collection<String> strings) {
+    Set<String> trimmedStrings = new HashSet<String>();
+    for (String string: strings) {
+      trimmedStrings.add(string.trim());
+    }
+    return trimmedStrings;
   }
 
   final public static String[] emptyStringArray = {};
@@ -609,6 +629,22 @@ public class StringUtils {
    */
   public static void startupShutdownMessage(Class<?> clazz, String[] args,
                                      final org.apache.commons.logging.Log LOG) {
+    startupShutdownMessage(clazz, args, LogAdapter.create(LOG));
+  }
+
+  /**
+   * Print a log message for starting up and shutting down
+   * @param clazz the class of the server
+   * @param args arguments
+   * @param LOG the target log object
+   */
+  public static void startupShutdownMessage(Class<?> clazz, String[] args,
+                                     final org.slf4j.Logger LOG) {
+    startupShutdownMessage(clazz, args, LogAdapter.create(LOG));
+  }
+
+  static void startupShutdownMessage(Class<?> clazz, String[] args,
+                                     final LogAdapter LOG) { 
     final String hostname = NetUtils.getHostname();
     final String classname = clazz.getSimpleName();
     LOG.info(
@@ -866,7 +902,7 @@ public class StringUtils {
    */
   public static String camelize(String s) {
     StringBuilder sb = new StringBuilder();
-    String[] words = split(s.toLowerCase(Locale.US), ESCAPE_CHAR, '_');
+    String[] words = split(StringUtils.toLowerCase(s), ESCAPE_CHAR,  '_');
 
     for (String word : words)
       sb.append(org.apache.commons.lang.StringUtils.capitalize(word));
@@ -997,4 +1033,41 @@ public class StringUtils {
     }
     return null;
   }
+
+  /**
+   * Converts all of the characters in this String to lower case with
+   * Locale.ENGLISH.
+   *
+   * @param str  string to be converted
+   * @return     the str, converted to lowercase.
+   */
+  public static String toLowerCase(String str) {
+    return str.toLowerCase(Locale.ENGLISH);
+  }
+
+  /**
+   * Converts all of the characters in this String to upper case with
+   * Locale.ENGLISH.
+   *
+   * @param str  string to be converted
+   * @return     the str, converted to uppercase.
+   */
+  public static String toUpperCase(String str) {
+    return str.toUpperCase(Locale.ENGLISH);
+  }
+
+  /**
+   * Compare strings locale-freely by using String#equalsIgnoreCase.
+   *
+   * @param s1  Non-null string to be converted
+   * @param s2  string to be converted
+   * @return     the str, converted to uppercase.
+   */
+  public static boolean equalsIgnoreCase(String s1, String s2) {
+    Preconditions.checkNotNull(s1);
+    // don't check non-null against s2 to make the semantics same as
+    // s1.equals(s2)
+    return s1.equalsIgnoreCase(s2);
+  }
+
 }

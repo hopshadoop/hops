@@ -52,7 +52,7 @@ public class PriorityPBImpl extends Priority {
     }
     viaProto = false;
   }
-
+    
   
   @Override
   public int getPriority() {
@@ -68,7 +68,7 @@ public class PriorityPBImpl extends Priority {
   
   @Override
   public String toString() {
-    return Integer.valueOf(getPriority()).toString();
+    return Integer.toString(getPriority());
   }
 
 }  

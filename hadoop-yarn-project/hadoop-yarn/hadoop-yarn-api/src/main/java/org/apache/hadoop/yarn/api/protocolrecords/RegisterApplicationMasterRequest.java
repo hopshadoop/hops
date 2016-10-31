@@ -24,17 +24,16 @@ import org.apache.hadoop.yarn.api.ApplicationMasterProtocol;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * <p>The request sent by the <code>ApplicationMaster</code> to
- * <code>ResourceManager</code> on registration.</p>
- * <p/>
- * <p>The registration includes details such as:
+ * The request sent by the {@code ApplicationMaster} to {@code ResourceManager}
+ * on registration.
+ * <p>
+ * The registration includes details such as:
  * <ul>
- * <li>Hostname on which the AM is running.</li>
- * <li>RPC Port</li>
- * <li>Tracking URL</li>
+ *   <li>Hostname on which the AM is running.</li>
+ *   <li>RPC Port</li>
+ *   <li>Tracking URL</li>
  * </ul>
- * </p>
- *
+ * 
  * @see ApplicationMasterProtocol#registerApplicationMaster(RegisterApplicationMasterRequest)
  */
 @Public
@@ -43,14 +42,12 @@ public abstract class RegisterApplicationMasterRequest {
 
   /**
    * Create a new instance of <code>RegisterApplicationMasterRequest</code>.
-   * If <em>port, trackingUrl</em> is not used, use the following default
-   * value:
+   * If <em>port, trackingUrl</em> is not used, use the following default value:
    * <ul>
-   * <li>port: -1</li>
-   * <li>trackingUrl: null</li>
+   *  <li>port: -1</li>
+   *  <li>trackingUrl: null</li>
    * </ul>
    * The port is allowed to be any integer larger than or equal to -1.
-   *
    * @return the new instance of <code>RegisterApplicationMasterRequest</code>
    */
   @Public
@@ -66,46 +63,39 @@ public abstract class RegisterApplicationMasterRequest {
   }
 
   /**
-   * Get the <em>host</em> on which the <code>ApplicationMaster</code> is
+   * Get the <em>host</em> on which the <code>ApplicationMaster</code> is 
    * running.
-   *
-   * @return <em>host</em> on which the <code>ApplicationMaster</code> is
-   * running
+   * @return <em>host</em> on which the <code>ApplicationMaster</code> is running
    */
   @Public
   @Stable
   public abstract String getHost();
   
   /**
-   * Set the <em>host</em> on which the <code>ApplicationMaster</code> is
+   * Set the <em>host</em> on which the <code>ApplicationMaster</code> is 
    * running.
-   *
-   * @param host
-   *     <em>host</em> on which the <code>ApplicationMaster</code>
-   *     is running
+   * @param host <em>host</em> on which the <code>ApplicationMaster</code> 
+   *             is running
    */
   @Public
   @Stable
   public abstract void setHost(String host);
 
   /**
-   * Get the <em>RPC port</em> on which the <code>ApplicationMaster</code>
-   * is responding.
-   *
-   * @return the <em>RPC port<em> on which the <code>ApplicationMaster</code> is
-   * responding
+   * Get the <em>RPC port</em> on which the {@code ApplicationMaster} is
+   * responding.
+   * @return the <em>RPC port</em> on which the {@code ApplicationMaster}
+   *         is responding
    */
   @Public
   @Stable
   public abstract int getRpcPort();
   
   /**
-   * Set the <em>RPC port<em> on which the <code>ApplicationMaster</code> is
+   * Set the <em>RPC port</em> on which the {@code ApplicationMaster} is
    * responding.
-   *
-   * @param port
-   *     <em>RPC port<em> on which the <code>ApplicationMaster</code> is
-   *     responding
+   * @param port <em>RPC port</em> on which the {@code ApplicationMaster}
+   *             is responding
    */
   @Public
   @Stable
@@ -115,7 +105,6 @@ public abstract class RegisterApplicationMasterRequest {
    * Get the <em>tracking URL</em> for the <code>ApplicationMaster</code>.
    * This url if contains scheme then that will be used by resource manager
    * web application proxy otherwise it will default to http.
-   *
    * @return <em>tracking URL</em> for the <code>ApplicationMaster</code>
    */
   @Public
@@ -132,14 +121,13 @@ public abstract class RegisterApplicationMasterRequest {
    * ResourceManager and web-application proxy, otherwise the scheme will
    * default to http.
    * </p>
-   * <p/>
-   * Empty, null, "N/A" strings are all valid besides a real URL. In case an
-   * url
+   * <p>
+   * Empty, null, "N/A" strings are all valid besides a real URL. In case an url
    * isn't explicitly passed, it defaults to "N/A" on the ResourceManager.
-   * <p/>
+   * <p>
    *
    * @param trackingUrl
-   *     <em>tracking URL</em>for the <code>ApplicationMaster</code>
+   *          <em>tracking URL</em>for the <code>ApplicationMaster</code>
    */
   @Public
   @Stable

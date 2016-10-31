@@ -17,20 +17,24 @@
  */
 package org.apache.hadoop.yarn.webapp;
 
-import com.google.inject.Singleton;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+
+import javax.servlet.http.HttpServletResponse;
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.Response;
+import javax.ws.rs.ext.ExceptionMapper;
+import javax.ws.rs.ext.Provider;
+import javax.xml.bind.UnmarshalException;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.security.authorize.AuthorizationException;
 
-import javax.servlet.http.HttpServletResponse;
-import javax.ws.rs.core.Context;
-import javax.ws.rs.core.Response;
-import javax.ws.rs.ext.ExceptionMapper;
-import javax.ws.rs.ext.Provider;
-import java.io.FileNotFoundException;
-import java.io.IOException;
+import com.google.inject.Singleton;
 
 /**
  * Handle webservices jersey exceptions and create json or xml response
@@ -40,11 +44,10 @@ import java.io.IOException;
 @Singleton
 @Provider
 public class GenericExceptionHandler implements ExceptionMapper<Exception> {
-  public static final Log LOG =
-      LogFactory.getLog(GenericExceptionHandler.class);
+  public static final Log LOG = LogFactory
+      .getLog(GenericExceptionHandler.class);
 
-  private
-  @Context
+  private @Context
   HttpServletResponse response;
 
   @Override
@@ -78,6 +81,8 @@ public class GenericExceptionHandler implements ExceptionMapper<Exception> {
       s = Response.Status.NOT_FOUND;
     } else if (e instanceof IOException) {
       s = Response.Status.NOT_FOUND;
+    } else if (e instanceof ForbiddenException) {
+      s = Response.Status.FORBIDDEN;
     } else if (e instanceof UnsupportedOperationException) {
       s = Response.Status.BAD_REQUEST;
     } else if (e instanceof IllegalArgumentException) {
@@ -86,16 +91,19 @@ public class GenericExceptionHandler implements ExceptionMapper<Exception> {
       s = Response.Status.BAD_REQUEST;
     } else if (e instanceof BadRequestException) {
       s = Response.Status.BAD_REQUEST;
+    } else if (e instanceof WebApplicationException
+        && e.getCause() instanceof UnmarshalException) {
+      s = Response.Status.BAD_REQUEST;
     } else {
       LOG.warn("INTERNAL_SERVER_ERROR", e);
       s = Response.Status.INTERNAL_SERVER_ERROR;
     }
 
     // let jaxb handle marshalling data out in the same format requested
-    RemoteExceptionData exception =
-        new RemoteExceptionData(e.getClass().getSimpleName(), e.getMessage(),
-            e.getClass().getName());
+    RemoteExceptionData exception = new RemoteExceptionData(e.getClass().getSimpleName(),
+       e.getMessage(), e.getClass().getName());
 
-    return Response.status(s).entity(exception).build();
+    return Response.status(s).entity(exception)
+        .build();
   }
 }

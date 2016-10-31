@@ -28,6 +28,6 @@ import org.apache.hadoop.yarn.proto.ApplicationHistoryProtocol.ApplicationHistor
 @ProtocolInfo(
     protocolName = "org.apache.hadoop.yarn.api.ApplicationHistoryProtocolPB",
     protocolVersion = 1)
-public interface ApplicationHistoryProtocolPB
-    extends ApplicationHistoryProtocolService.BlockingInterface {
+public interface ApplicationHistoryProtocolPB extends
+    ApplicationHistoryProtocolService.BlockingInterface {
 }

@@ -31,6 +31,26 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <!-- Use the version needed by maven-clover-plugin -->
         <version>3.0.2</version>
       </dependency>
+       <dependency>
+       <groupId>org.apache.curator</groupId>
+       <artifactId>curator-recipes</artifactId>
+       <version>${curator.version}</version>
+     </dependency>
+     <dependency>
+       <groupId>org.apache.curator</groupId>
+       <artifactId>curator-client</artifactId>
+       <version>${curator.version}</version>
+     </dependency>
+     <dependency>
+       <groupId>org.apache.curator</groupId>
+       <artifactId>curator-framework</artifactId>
+       <version>${curator.version}</version>
+     </dependency>
+     <dependency>
+       <groupId>org.apache.curator</groupId>
+       <artifactId>curator-test</artifactId>
+       <version>${curator.version}</version>
+     </dependency>
     </dependencies>
   </dependencyManagement>
 
@@ -86,6 +106,8 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <!-- platform encoding override -->
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    
+    <curator.version>2.7.1</curator.version>
   </properties>
 
   <modules>
@@ -103,6 +125,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <module>hadoop-dist</module>
     <module>hadoop-client</module>
     <module>hadoop-minicluster</module>
+    <module>hadoop-build-tools</module>
   </modules>
 
   <build>
@@ -217,12 +240,14 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       <plugin>
         <groupId>org.apache.rat</groupId>
         <artifactId>apache-rat-plugin</artifactId>
-       <configuration>
+	<configuration>
           <excludes>
             <exclude>.gitattributes</exclude>
             <exclude>.gitignore</exclude>
             <exclude>.git/**</exclude>
             <exclude>.idea/**</exclude>
+	    <exclude>**/build/**</exclude>
+            <exclude>**/patchprocess/**</exclude>
          </excludes>
        </configuration>
       </plugin>

@@ -27,7 +27,7 @@ import org.apache.hadoop.yarn.api.records.ResourceRequest;
  * This exception is thrown when an application provides an invalid
  * {@link ResourceBlacklistRequest} specification for blacklisting of resources
  * in {@link ApplicationMasterProtocol#allocate(AllocateRequest)} API.
- * <p/>
+ * 
  * Currently this exceptions is thrown when an application tries to
  * blacklist {@link ResourceRequest#ANY}.
  */
@@ -43,8 +43,7 @@ public class InvalidResourceBlacklistRequestException extends YarnException {
     super(message);
   }
 
-  public InvalidResourceBlacklistRequestException(String message,
-      Throwable cause) {
+  public InvalidResourceBlacklistRequestException(String message, Throwable cause) {
     super(message, cause);
   }
 

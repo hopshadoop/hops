@@ -51,6 +51,7 @@ import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.concurrent.ConcurrentNavigableMap;
+import org.apache.hadoop.security.authorize.DefaultImpersonationProvider;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -288,8 +289,8 @@ public class TestWrites {
     Mockito.when(securityHandler.getUser())
         .thenReturn(System.getProperty("user.name"));
     String currentUser = System.getProperty("user.name");
-    config.set(ProxyUsers.getProxySuperuserGroupConfKey(currentUser), "*");
-    config.set(ProxyUsers.getProxySuperuserIpConfKey(currentUser), "*");
+    config.set(DefaultImpersonationProvider.getTestProvider().getProxySuperuserGroupConfKey(currentUser), "*");
+    config.set(DefaultImpersonationProvider.getTestProvider().getProxySuperuserIpConfKey(currentUser), "*");
     ProxyUsers.refreshSuperUserGroupsConfiguration(config);
 
     try {

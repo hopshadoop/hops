@@ -18,30 +18,32 @@
 
 package org.apache.hadoop.yarn.applications.distributedshell;
 
+import java.io.IOException;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.yarn.exceptions.YarnException;
-
-import java.io.IOException;
 
 public class TestDSFailedAppMaster extends ApplicationMaster {
 
   private static final Log LOG = LogFactory.getLog(TestDSFailedAppMaster.class);
 
   @Override
-  public void run() throws YarnException, IOException {
+  public void run() throws YarnException, IOException, InterruptedException {
     super.run();
 
     // for the 2nd attempt.
     if (appAttemptID.getAttemptId() == 2) {
       // should reuse the earlier running container, so numAllocatedContainers
       // should be set to 1. And should ask no more containers, so
-      // numRequestedContainers should be set to 0.
-      if (numAllocatedContainers.get() != 1 ||
-          numRequestedContainers.get() != 0) {
-        LOG.info("NumAllocatedContainers is " + numAllocatedContainers.get() +
-            " and NumRequestedContainers is " + numRequestedContainers.get() +
-            ".Application Master failed. exiting");
+      // numRequestedContainers should be the same as numTotalContainers.
+      // The only container is the container requested by the AM in the first
+      // attempt.
+      if (numAllocatedContainers.get() != 1
+          || numRequestedContainers.get() != numTotalContainers) {
+        LOG.info("NumAllocatedContainers is " + numAllocatedContainers.get()
+            + " and NumRequestedContainers is " + numAllocatedContainers.get()
+            + ".Application Master failed. exiting");
         System.exit(200);
       }
     }
@@ -60,8 +62,7 @@ public class TestDSFailedAppMaster extends ApplicationMaster {
         try {
           // sleep some time, wait for the AM to launch a container.
           Thread.sleep(3000);
-        } catch (InterruptedException e) {
-        }
+        } catch (InterruptedException e) {}
         // fail the first am.
         System.exit(100);
       }

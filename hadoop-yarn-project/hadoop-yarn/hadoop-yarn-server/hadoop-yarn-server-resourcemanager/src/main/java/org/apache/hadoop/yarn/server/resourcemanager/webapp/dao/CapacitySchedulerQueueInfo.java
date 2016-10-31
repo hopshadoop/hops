@@ -17,14 +17,21 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.webapp.dao;
 
-import org.apache.hadoop.yarn.api.records.QueueState;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CSQueue;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Set;
 
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.XmlSeeAlso;
 import javax.xml.bind.annotation.XmlTransient;
+
+import org.apache.hadoop.yarn.api.records.QueueState;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceUsage;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CSQueue;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.PlanQueue;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.QueueCapacities;
 
 @XmlRootElement
 @XmlAccessorType(XmlAccessType.FIELD)
@@ -48,30 +55,48 @@ public class CapacitySchedulerQueueInfo {
   protected QueueState state;
   protected CapacitySchedulerQueueInfoList queues;
   protected ResourceInfo resourcesUsed;
+  private boolean hideReservationQueues = false;
+  protected ArrayList<String> nodeLabels = new ArrayList<String>();
 
   CapacitySchedulerQueueInfo() {
-  }
+  };
 
-  ;
+  /*
+   * @param q capacity scheduler queue
+   * @param nodeLabel node partition
+   */
+  CapacitySchedulerQueueInfo(final CSQueue q, final String nodeLabel) {
+    QueueCapacities qCapacities = q.getQueueCapacities();
+    ResourceUsage queueResourceUsage = q.getQueueResourceUsage();
 
-  CapacitySchedulerQueueInfo(CSQueue q) {
     queuePath = q.getQueuePath();
-    capacity = q.getCapacity() * 100;
-    usedCapacity = q.getUsedCapacity() * 100;
+    capacity = qCapacities.getCapacity(nodeLabel) * 100;
+    usedCapacity = q.getUsedCapacity(nodeLabel) * 100;
 
-    maxCapacity = q.getMaximumCapacity();
-    if (maxCapacity < EPSILON || maxCapacity > 1f) {
+    maxCapacity = qCapacities.getMaximumCapacity(nodeLabel);
+    if (maxCapacity < EPSILON || maxCapacity > 1f)
       maxCapacity = 1f;
-    }
     maxCapacity *= 100;
 
-    absoluteCapacity = cap(q.getAbsoluteCapacity(), 0f, 1f) * 100;
-    absoluteMaxCapacity = cap(q.getAbsoluteMaximumCapacity(), 0f, 1f) * 100;
-    absoluteUsedCapacity = cap(q.getAbsoluteUsedCapacity(), 0f, 1f) * 100;
+    absoluteCapacity =
+        cap(qCapacities.getAbsoluteCapacity(nodeLabel), 0f, 1f) * 100;
+    absoluteMaxCapacity =
+        cap(qCapacities.getAbsoluteMaximumCapacity(nodeLabel), 0f, 1f) * 100;
+    absoluteUsedCapacity = q.getAbsoluteUsedCapacity(nodeLabel) * 100;
     numApplications = q.getNumApplications();
     queueName = q.getQueueName();
     state = q.getState();
-    resourcesUsed = new ResourceInfo(q.getUsedResources());
+    resourcesUsed = new ResourceInfo(queueResourceUsage.getUsed(nodeLabel));
+    if (q instanceof PlanQueue && !((PlanQueue) q).showReservationsAsQueues()) {
+      hideReservationQueues = true;
+    }
+
+    // add labels
+    Set<String> labelSet = q.getAccessibleNodeLabels();
+    if (labelSet != null) {
+      nodeLabels.addAll(labelSet);
+      Collections.sort(nodeLabels);
+    }
   }
 
   public float getCapacity() {
@@ -115,6 +140,9 @@ public class CapacitySchedulerQueueInfo {
   }
 
   public CapacitySchedulerQueueInfoList getQueues() {
+    if(hideReservationQueues) {
+      return new CapacitySchedulerQueueInfoList();
+    }
     return this.queues;
   }
 
@@ -124,16 +152,16 @@ public class CapacitySchedulerQueueInfo {
 
   /**
    * Limit a value to a specified range.
-   *
-   * @param val
-   *     the value to be capped
-   * @param low
-   *     the lower bound of the range (inclusive)
-   * @param hi
-   *     the upper bound of the range (inclusive)
+   * @param val the value to be capped
+   * @param low the lower bound of the range (inclusive)
+   * @param hi the upper bound of the range (inclusive)
    * @return the capped value
    */
   static float cap(float val, float low, float hi) {
     return Math.min(Math.max(val, low), hi);
+  }
+  
+  public ArrayList<String> getNodeLabels() {
+    return this.nodeLabels;
   }
 }

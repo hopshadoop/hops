@@ -18,19 +18,18 @@
 
 package org.apache.hadoop.yarn;
 
-import org.apache.hadoop.util.ExitUtil;
-import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
-import org.junit.Test;
-
 import static org.junit.Assert.assertSame;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 
+import org.apache.hadoop.util.ExitUtil;
+import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
+import org.junit.Test;
+
 public class TestYarnUncaughtExceptionHandler {
 
   private static final YarnUncaughtExceptionHandler exHandler =
-      new YarnUncaughtExceptionHandler();
-
+        new YarnUncaughtExceptionHandler();
   /**
    * Throw {@code YarnRuntimeException} inside thread and
    * check {@code YarnUncaughtExceptionHandler} instance
@@ -41,8 +40,8 @@ public class TestYarnUncaughtExceptionHandler {
   public void testUncaughtExceptionHandlerWithRuntimeException()
       throws InterruptedException {
     final YarnUncaughtExceptionHandler spyYarnHandler = spy(exHandler);
-    final YarnRuntimeException yarnException =
-        new YarnRuntimeException("test-yarn-runtime-exception");
+    final YarnRuntimeException yarnException = new YarnRuntimeException(
+        "test-yarn-runtime-exception");
     final Thread yarnThread = new Thread(new Runnable() {
       @Override
       public void run() {
@@ -58,10 +57,10 @@ public class TestYarnUncaughtExceptionHandler {
   }
 
   /**
-   * <p/>
+   * <p>
    * Throw {@code Error} inside thread and
    * check {@code YarnUncaughtExceptionHandler} instance
-   * <p/>
+   * <p>
    * Used {@code ExitUtil} class to avoid jvm exit through
    * {@code System.exit(-1) }
    *
@@ -87,10 +86,10 @@ public class TestYarnUncaughtExceptionHandler {
   }
 
   /**
-   * <p/>
+   * <p>
    * Throw {@code OutOfMemoryError} inside thread and
    * check {@code YarnUncaughtExceptionHandler} instance
-   * <p/>
+   * <p>
    * Used {@code ExitUtil} class to avoid jvm exit through
    * {@code Runtime.getRuntime().halt(-1)}
    *
@@ -101,8 +100,7 @@ public class TestYarnUncaughtExceptionHandler {
       throws InterruptedException {
     ExitUtil.disableSystemHalt();
     final YarnUncaughtExceptionHandler spyOomHandler = spy(exHandler);
-    final OutOfMemoryError oomError =
-        new OutOfMemoryError("out-of-memory-error");
+    final OutOfMemoryError oomError = new OutOfMemoryError("out-of-memory-error");
     final Thread oomThread = new Thread(new Runnable() {
       @Override
       public void run() {

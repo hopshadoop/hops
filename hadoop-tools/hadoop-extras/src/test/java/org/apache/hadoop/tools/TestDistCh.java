@@ -158,7 +158,7 @@ public class TestDistCh extends junit.framework.TestCase {
 
       args[3]="/test/testDistCh/sub3:sub1:sub2:447";
       newstatus[3] = new ChPermissionStatus(rootstatus, "sub1", "sub2", "447");
-
+ 
       args[4]="/test/testDistCh/sub4::sub5:437";
       newstatus[4] = new ChPermissionStatus(rootstatus, "", "sub5", "437");
 
@@ -172,7 +172,7 @@ public class TestDistCh extends junit.framework.TestCase {
       System.out.println("newstatus=" + Arrays.asList(newstatus).toString().replace(",", ",\n  "));
 
       //run DistCh
-      new DistCh(MiniMRClientClusterFactory.create(this.getClass(), 2, conf).getConfig()).run(args);
+      new DistCh(MiniMRClientClusterFactory.create(this.getClass(), 2, conf, false).getConfig()).run(args);
       runLsr(shell, tree.root, 0);
 
       //check results

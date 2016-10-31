@@ -27,6 +27,7 @@ import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.Map.Entry;
 
@@ -44,10 +45,16 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FsConstants;
 import org.apache.hadoop.fs.FsServerDefaults;
+import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.PathFilter;
+import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.UnsupportedFileSystemException;
+import org.apache.hadoop.fs.XAttrSetFlag;
 import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.AclStatus;
+import org.apache.hadoop.fs.permission.AclUtil;
+import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.viewfs.InodeTree.INode;
 import org.apache.hadoop.fs.viewfs.InodeTree.INodeLink;
@@ -111,8 +118,7 @@ public class ViewFileSystem extends FileSystem {
    */
   private String getUriPath(final Path p) {
     checkPath(p);
-    String s = makeAbsolute(p).toUri().getPath();
-    return s;
+    return makeAbsolute(p).toUri().getPath();
   }
   
   private Path makeAbsolute(final Path f) {
@@ -278,7 +284,7 @@ public class ViewFileSystem extends FileSystem {
     }
     assert(res.remainingPath != null);
     return res.targetFileSystem.createNonRecursive(res.remainingPath, permission,
-         flags, bufferSize, replication, blockSize, progress);
+        flags, bufferSize, replication, blockSize, progress);
   }
   
   @Override
@@ -293,7 +299,7 @@ public class ViewFileSystem extends FileSystem {
     }
     assert(res.remainingPath != null);
     return res.targetFileSystem.create(res.remainingPath, permission,
-         overwrite, bufferSize, replication, blockSize, progress);
+        overwrite, bufferSize, replication, blockSize, progress);
   }
 
   
@@ -324,7 +330,7 @@ public class ViewFileSystem extends FileSystem {
     final InodeTree.ResolveResult<FileSystem> res = 
       fsState.resolve(getUriPath(fs.getPath()), true);
     return res.targetFileSystem.getFileBlockLocations(
-          new ViewFsFileStatus(fs, res.remainingPath), start, len);
+        new ViewFsFileStatus(fs, res.remainingPath), start, len);
   }
 
   @Override
@@ -336,27 +342,52 @@ public class ViewFileSystem extends FileSystem {
     return res.targetFileSystem.getFileChecksum(res.remainingPath);
   }
 
+
+  private static FileStatus fixFileStatus(FileStatus orig,
+      Path qualified) throws IOException {
+    // FileStatus#getPath is a fully qualified path relative to the root of
+    // target file system.
+    // We need to change it to viewfs URI - relative to root of mount table.
+
+    // The implementors of RawLocalFileSystem were trying to be very smart.
+    // They implement FileStatus#getOwner lazily -- the object
+    // returned is really a RawLocalFileSystem that expect the
+    // FileStatus#getPath to be unchanged so that it can get owner when needed.
+    // Hence we need to interpose a new ViewFileSystemFileStatus that
+    // works around.
+    if ("file".equals(orig.getPath().toUri().getScheme())) {
+      orig = wrapLocalFileStatus(orig, qualified);
+    }
+
+    orig.setPath(qualified);
+    return orig;
+  }
+
+  private static FileStatus wrapLocalFileStatus(FileStatus orig,
+      Path qualified) {
+    return orig instanceof LocatedFileStatus
+        ? new ViewFsLocatedFileStatus((LocatedFileStatus)orig, qualified)
+        : new ViewFsFileStatus(orig, qualified);
+  }
+
+
   @Override
   public FileStatus getFileStatus(final Path f) throws AccessControlException,
       FileNotFoundException, IOException {
-    InodeTree.ResolveResult<FileSystem> res = 
+    InodeTree.ResolveResult<FileSystem> res =
       fsState.resolve(getUriPath(f), true);
-    
-    // FileStatus#getPath is a fully qualified path relative to the root of 
-    // target file system.
-    // We need to change it to viewfs URI - relative to root of mount table.
-    
-    // The implementors of RawLocalFileSystem were trying to be very smart.
-    // They implement FileStatus#getOwener lazily -- the object
-    // returned is really a RawLocalFileSystem that expect the
-    // FileStatus#getPath to be unchanged so that it can get owner when needed.
-    // Hence we need to interpose a new ViewFileSystemFileStatus that 
-    // works around.
     FileStatus status =  res.targetFileSystem.getFileStatus(res.remainingPath);
-    return new ViewFsFileStatus(status, this.makeQualified(f));
+    return fixFileStatus(status, this.makeQualified(f));
   }
   
-  
+  @Override
+  public void access(Path path, FsAction mode) throws AccessControlException,
+      FileNotFoundException, IOException {
+    InodeTree.ResolveResult<FileSystem> res =
+      fsState.resolve(getUriPath(path), true);
+    res.targetFileSystem.access(res.remainingPath, mode);
+  }
+
   @Override
   public FileStatus[] listStatus(final Path f) throws AccessControlException,
       FileNotFoundException, IOException {
@@ -367,16 +398,48 @@ public class ViewFileSystem extends FileSystem {
     if (!res.isInternalDir()) {
       // We need to change the name in the FileStatus as described in
       // {@link #getFileStatus }
-      ChRootedFileSystem targetFs;
-      targetFs = (ChRootedFileSystem) res.targetFileSystem;
       int i = 0;
       for (FileStatus status : statusLst) {
-          String suffix = targetFs.stripOutRoot(status.getPath());
-          statusLst[i++] = new ViewFsFileStatus(status, this.makeQualified(
-              suffix.length() == 0 ? f : new Path(res.resolvedPath, suffix)));
+          statusLst[i++] = fixFileStatus(status,
+              getChrootedPath(res, status, f));
       }
     }
     return statusLst;
+  }
+
+  @Override
+  public RemoteIterator<LocatedFileStatus>listLocatedStatus(final Path f,
+      final PathFilter filter) throws FileNotFoundException, IOException {
+    final InodeTree.ResolveResult<FileSystem> res = fsState
+        .resolve(getUriPath(f), true);
+    final RemoteIterator<LocatedFileStatus> statusIter = res.targetFileSystem
+        .listLocatedStatus(res.remainingPath);
+
+    if (res.isInternalDir()) {
+      return statusIter;
+    }
+
+    return new RemoteIterator<LocatedFileStatus>() {
+      @Override
+      public boolean hasNext() throws IOException {
+        return statusIter.hasNext();
+      }
+
+      @Override
+      public LocatedFileStatus next() throws IOException {
+        final LocatedFileStatus status = statusIter.next();
+        return (LocatedFileStatus)fixFileStatus(status,
+            getChrootedPath(res, status, f));
+      }
+    };
+  }
+
+  private Path getChrootedPath(InodeTree.ResolveResult<FileSystem> res,
+      FileStatus status, Path f) throws IOException {
+    final String suffix = ((ChRootedFileSystem)res.targetFileSystem)
+        .stripOutRoot(status.getPath());
+    return this.makeQualified(
+        suffix.length() == 0 ? f : new Path(res.resolvedPath, suffix));
   }
 
   @Override
@@ -434,6 +497,14 @@ public class ViewFileSystem extends FileSystem {
     }
     return resSrc.targetFileSystem.rename(resSrc.remainingPath,
         resDst.remainingPath);
+  }
+
+  @Override
+  public boolean truncate(final Path f, final long newLength)
+      throws IOException {
+    InodeTree.ResolveResult<FileSystem> res =
+        fsState.resolve(getUriPath(f), true);
+    return res.targetFileSystem.truncate(f, newLength);
   }
   
   @Override
@@ -517,6 +588,50 @@ public class ViewFileSystem extends FileSystem {
     InodeTree.ResolveResult<FileSystem> res =
       fsState.resolve(getUriPath(path), true);
     return res.targetFileSystem.getAclStatus(res.remainingPath);
+  }
+
+  @Override
+  public void setXAttr(Path path, String name, byte[] value,
+      EnumSet<XAttrSetFlag> flag) throws IOException {
+    InodeTree.ResolveResult<FileSystem> res =
+        fsState.resolve(getUriPath(path), true);
+    res.targetFileSystem.setXAttr(res.remainingPath, name, value, flag);
+  }
+
+  @Override
+  public byte[] getXAttr(Path path, String name) throws IOException {
+    InodeTree.ResolveResult<FileSystem> res =
+        fsState.resolve(getUriPath(path), true);
+    return res.targetFileSystem.getXAttr(res.remainingPath, name);
+  }
+
+  @Override
+  public Map<String, byte[]> getXAttrs(Path path) throws IOException {
+    InodeTree.ResolveResult<FileSystem> res =
+        fsState.resolve(getUriPath(path), true);
+    return res.targetFileSystem.getXAttrs(res.remainingPath);
+  }
+
+  @Override
+  public Map<String, byte[]> getXAttrs(Path path, List<String> names)
+      throws IOException {
+    InodeTree.ResolveResult<FileSystem> res =
+        fsState.resolve(getUriPath(path), true);
+    return res.targetFileSystem.getXAttrs(res.remainingPath, names);
+  }
+
+  @Override
+  public List<String> listXAttrs(Path path) throws IOException {
+    InodeTree.ResolveResult<FileSystem> res =
+      fsState.resolve(getUriPath(path), true);
+    return res.targetFileSystem.listXAttrs(res.remainingPath);
+  }
+
+  @Override
+  public void removeXAttr(Path path, String name) throws IOException {
+    InodeTree.ResolveResult<FileSystem> res = fsState.resolve(getUriPath(path),
+        true);
+    res.targetFileSystem.removeXAttr(res.remainingPath, name);
   }
 
   @Override
@@ -779,6 +894,11 @@ public class ViewFileSystem extends FileSystem {
     }
 
     @Override
+    public boolean truncate(Path f, long newLength) throws IOException {
+      throw readOnlyMountTable("truncate", f);
+    }
+
+    @Override
     public void setOwner(Path f, String username, String groupname)
         throws AccessControlException, IOException {
       checkPathIsSlash(f);
@@ -824,6 +944,81 @@ public class ViewFileSystem extends FileSystem {
     @Override
     public short getDefaultReplication(Path f) {
       throw new NotInMountpointException(f, "getDefaultReplication");
+    }
+
+    @Override
+    public void modifyAclEntries(Path path, List<AclEntry> aclSpec)
+        throws IOException {
+      checkPathIsSlash(path);
+      throw readOnlyMountTable("modifyAclEntries", path);
+    }
+
+    @Override
+    public void removeAclEntries(Path path, List<AclEntry> aclSpec)
+        throws IOException {
+      checkPathIsSlash(path);
+      throw readOnlyMountTable("removeAclEntries", path);
+    }
+
+    @Override
+    public void removeDefaultAcl(Path path) throws IOException {
+      checkPathIsSlash(path);
+      throw readOnlyMountTable("removeDefaultAcl", path);
+    }
+
+    @Override
+    public void removeAcl(Path path) throws IOException {
+      checkPathIsSlash(path);
+      throw readOnlyMountTable("removeAcl", path);
+    }
+
+    @Override
+    public void setAcl(Path path, List<AclEntry> aclSpec) throws IOException {
+      checkPathIsSlash(path);
+      throw readOnlyMountTable("setAcl", path);
+    }
+
+    @Override
+    public AclStatus getAclStatus(Path path) throws IOException {
+      checkPathIsSlash(path);
+      return new AclStatus.Builder().owner(ugi.getUserName())
+          .group(ugi.getGroupNames()[0])
+          .addEntries(AclUtil.getMinimalAcl(PERMISSION_555))
+          .stickyBit(false).build();
+    }
+
+    @Override
+    public void setXAttr(Path path, String name, byte[] value,
+                         EnumSet<XAttrSetFlag> flag) throws IOException {
+      checkPathIsSlash(path);
+      throw readOnlyMountTable("setXAttr", path);
+    }
+
+    @Override
+    public byte[] getXAttr(Path path, String name) throws IOException {
+      throw new NotInMountpointException(path, "getXAttr");
+    }
+
+    @Override
+    public Map<String, byte[]> getXAttrs(Path path) throws IOException {
+      throw new NotInMountpointException(path, "getXAttrs");
+    }
+
+    @Override
+    public Map<String, byte[]> getXAttrs(Path path, List<String> names)
+        throws IOException {
+      throw new NotInMountpointException(path, "getXAttrs");
+    }
+
+    @Override
+    public List<String> listXAttrs(Path path) throws IOException {
+      throw new NotInMountpointException(path, "listXAttrs");
+    }
+
+    @Override
+    public void removeXAttr(Path path, String name) throws IOException {
+      checkPathIsSlash(path);
+      throw readOnlyMountTable("removeXAttr", path);
     }
   }
 }

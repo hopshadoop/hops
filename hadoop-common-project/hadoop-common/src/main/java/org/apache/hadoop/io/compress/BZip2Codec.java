@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+import org.apache.commons.io.Charsets;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 
@@ -100,7 +101,8 @@ public class BZip2Codec implements Configurable, SplittableCompressionCodec {
   @Override
   public CompressionOutputStream createOutputStream(OutputStream out)
       throws IOException {
-    return createOutputStream(out, createCompressor());
+    return CompressionCodec.Util.
+        createOutputStreamWithCodecPool(this, conf, out);
   }
 
   /**
@@ -153,7 +155,8 @@ public class BZip2Codec implements Configurable, SplittableCompressionCodec {
   @Override
   public CompressionInputStream createInputStream(InputStream in)
       throws IOException {
-    return createInputStream(in, createDecompressor());
+    return CompressionCodec.Util.
+        createInputStreamWithCodecPool(this, conf, in);
   }
 
   /**
@@ -204,7 +207,12 @@ public class BZip2Codec implements Configurable, SplittableCompressionCodec {
     // time stream might start without a leading BZ.
     final long FIRST_BZIP2_BLOCK_MARKER_POSITION =
       CBZip2InputStream.numberOfBytesTillNextMarker(seekableIn);
-    long adjStart = Math.max(0L, start - FIRST_BZIP2_BLOCK_MARKER_POSITION);
+    long adjStart = 0L;
+    if (start != 0) {
+      // Other than the first of file, the marker size is 6 bytes.
+      adjStart = Math.max(0L, start - (FIRST_BZIP2_BLOCK_MARKER_POSITION
+          - (HEADER_LEN + SUB_HEADER_LEN)));
+    }
 
     ((Seekable)seekableIn).seek(adjStart);
     SplitCompressionInputStream in =
@@ -222,7 +230,7 @@ public class BZip2Codec implements Configurable, SplittableCompressionCodec {
     // ........................................^^[We align at wrong position!]
     // ...........................................................^^[While this pos is correct]
 
-    if (in.getPos() <= start) {
+    if (in.getPos() < start) {
       ((Seekable)seekableIn).seek(start);
       in = new BZip2CompressionInputStream(seekableIn, start, end, readMode);
     }
@@ -279,7 +287,7 @@ public class BZip2Codec implements Configurable, SplittableCompressionCodec {
         // The compressed bzip2 stream should start with the
         // identifying characters BZ. Caller of CBZip2OutputStream
         // i.e. this class must write these characters.
-        out.write(HEADER.getBytes());
+        out.write(HEADER.getBytes(Charsets.UTF_8));
       }
     }
 
@@ -413,7 +421,7 @@ public class BZip2Codec implements Configurable, SplittableCompressionCodec {
         byte[] headerBytes = new byte[HEADER_LEN];
         int actualRead = bufferedIn.read(headerBytes, 0, HEADER_LEN);
         if (actualRead != -1) {
-          String header = new String(headerBytes);
+          String header = new String(headerBytes, Charsets.UTF_8);
           if (header.compareTo(HEADER) != 0) {
             bufferedIn.reset();
           } else {

@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.mapred;
 
-
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -28,6 +27,7 @@ import java.util.Iterator;
 import java.util.StringTokenizer;
 
 import junit.framework.TestCase;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
@@ -36,7 +36,7 @@ import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.serializer.JavaSerializationComparator;
 import org.apache.hadoop.mapreduce.MRConfig;
-//jira MAPREDUCE-6048
+
 public class TestJavaSerialization extends TestCase {
 
   private static String TEST_ROOT_DIR =
@@ -81,7 +81,7 @@ public class TestJavaSerialization extends TestCase {
   }
 
   private void cleanAndCreateInput(FileSystem fs) throws IOException {
-    fs.delete(INPUT_FILE, true);
+    fs.delete(INPUT_DIR, true);
     fs.delete(OUTPUT_DIR, true);
 
     OutputStream os = fs.create(INPUT_FILE);
@@ -119,20 +119,19 @@ public class TestJavaSerialization extends TestCase {
     FileOutputFormat.setOutputPath(conf, OUTPUT_DIR);
 
     String inputFileContents =
-    FileUtils.readFileToString(new File(INPUT_FILE.toUri().getPath()));
+        FileUtils.readFileToString(new File(INPUT_FILE.toUri().getPath()));
     assertTrue("Input file contents not as expected; contents are '"
-    + inputFileContents + "', expected \"b a\n\" ",
-    inputFileContents.equals("b a\n"));
+        + inputFileContents + "', expected \"b a\n\" ",
+      inputFileContents.equals("b a\n"));
 
     JobClient.runJob(conf);
 
     Path[] outputFiles =
         FileUtil.stat2Paths(fs.listStatus(OUTPUT_DIR,
           new Utils.OutputFileUtils.OutputFilesFilter()));
-            
     assertEquals(1, outputFiles.length);
     InputStream is = fs.open(outputFiles[0]);
-        String reduceOutput = org.apache.commons.io.IOUtils.toString(is);
+    String reduceOutput = org.apache.commons.io.IOUtils.toString(is);
     String[] lines = reduceOutput.split(System.getProperty("line.separator"));
     assertEquals("Unexpected output; received output '" + reduceOutput + "'",
       "a\t1", lines[0]);

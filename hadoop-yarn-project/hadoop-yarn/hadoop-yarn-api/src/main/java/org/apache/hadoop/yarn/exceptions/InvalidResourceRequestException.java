@@ -25,9 +25,9 @@ import org.apache.hadoop.yarn.api.records.ResourceRequest;
 /**
  * This exception is thrown when a resource requested via
  * {@link ResourceRequest} in the
- * {@link ApplicationMasterProtocol#allocate(AllocateRequest)} API is out of
- * the
+ * {@link ApplicationMasterProtocol#allocate(AllocateRequest)} API is out of the
  * range of the configured lower and upper limits on resources.
+ * 
  */
 public class InvalidResourceRequestException extends YarnException {
 

@@ -66,6 +66,7 @@ import org.apache.hadoop.mapreduce.lib.map.WrappedMapper;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormatCounter;
 import org.apache.hadoop.mapreduce.split.JobSplit.TaskSplitIndex;
 import org.apache.hadoop.mapreduce.task.MapContextImpl;
+import org.apache.hadoop.mapreduce.CryptoUtils;
 import org.apache.hadoop.util.IndexedSortable;
 import org.apache.hadoop.util.IndexedSorter;
 import org.apache.hadoop.util.Progress;
@@ -380,16 +381,38 @@ public class MapTask extends Task {
   private <KEY, VALUE> MapOutputCollector<KEY, VALUE>
           createSortingCollector(JobConf job, TaskReporter reporter)
     throws IOException, ClassNotFoundException {
-    MapOutputCollector<KEY, VALUE> collector
-      = (MapOutputCollector<KEY, VALUE>)
-       ReflectionUtils.newInstance(
-                        job.getClass(JobContext.MAP_OUTPUT_COLLECTOR_CLASS_ATTR,
-                        MapOutputBuffer.class, MapOutputCollector.class), job);
-    LOG.info("Map output collector class = " + collector.getClass().getName());
     MapOutputCollector.Context context =
-                           new MapOutputCollector.Context(this, job, reporter);
-    collector.init(context);
-    return collector;
+      new MapOutputCollector.Context(this, job, reporter);
+
+    Class<?>[] collectorClasses = job.getClasses(
+      JobContext.MAP_OUTPUT_COLLECTOR_CLASS_ATTR, MapOutputBuffer.class);
+    int remainingCollectors = collectorClasses.length;
+    Exception lastException = null;
+    for (Class clazz : collectorClasses) {
+      try {
+        if (!MapOutputCollector.class.isAssignableFrom(clazz)) {
+          throw new IOException("Invalid output collector class: " + clazz.getName() +
+            " (does not implement MapOutputCollector)");
+        }
+        Class<? extends MapOutputCollector> subclazz =
+          clazz.asSubclass(MapOutputCollector.class);
+        LOG.debug("Trying map output collector class: " + subclazz.getName());
+        MapOutputCollector<KEY, VALUE> collector =
+          ReflectionUtils.newInstance(subclazz, job);
+        collector.init(context);
+        LOG.info("Map output collector class = " + collector.getClass().getName());
+        return collector;
+      } catch (Exception e) {
+        String msg = "Unable to initialize MapOutputCollector " + clazz.getName();
+        if (--remainingCollectors > 0) {
+          msg += " (" + remainingCollectors + " more collector(s) to try)";
+        }
+        lastException = e;
+        LOG.warn(msg, e);
+      }
+    }
+    throw new IOException("Initialization of all the collectors failed. " +
+      "Error in last collector was :" + lastException.getMessage(), lastException);
   }
 
   @SuppressWarnings("unchecked")
@@ -1435,6 +1458,10 @@ public class MapTask extends Task {
     public void flush() throws IOException, ClassNotFoundException,
            InterruptedException {
       LOG.info("Starting flush of map output");
+      if (kvbuffer == null) {
+        LOG.info("kvbuffer is null. Skipping flush.");
+        return;
+      }
       spillLock.lock();
       try {
         while (spillInProgress) {
@@ -1555,9 +1582,7 @@ public class MapTask extends Task {
                                        InterruptedException {
       //approximate the length of the output file to be the length of the
       //buffer + header lengths for the partitions
-      final long size = (bufend >= bufstart
-          ? bufend - bufstart
-          : (bufvoid - bufend) + bufstart) +
+      final long size = distanceTo(bufstart, bufend, bufvoid) +
                   partitions * APPROX_HEADER_LENGTH;
       FSDataOutputStream out = null;
       try {
@@ -1580,7 +1605,8 @@ public class MapTask extends Task {
           IFile.Writer<K, V> writer = null;
           try {
             long segmentStart = out.getPos();
-            writer = new Writer<K, V>(job, out, keyClass, valClass, codec,
+            FSDataOutputStream partitionOut = CryptoUtils.wrapIfNecessary(job, out);
+            writer = new Writer<K, V>(job, partitionOut, keyClass, valClass, codec,
                                       spilledRecordsCounter);
             if (combinerRunner == null) {
               // spill directly
@@ -1617,8 +1643,8 @@ public class MapTask extends Task {
 
             // record offsets
             rec.startOffset = segmentStart;
-            rec.rawLength = writer.getRawLength();
-            rec.partLength = writer.getCompressedLength();
+            rec.rawLength = writer.getRawLength() + CryptoUtils.cryptoPadding(job);
+            rec.partLength = writer.getCompressedLength() + CryptoUtils.cryptoPadding(job);
             spillRec.putIndex(rec, i);
 
             writer = null;
@@ -1668,7 +1694,8 @@ public class MapTask extends Task {
           try {
             long segmentStart = out.getPos();
             // Create a new codec, don't care!
-            writer = new IFile.Writer<K,V>(job, out, keyClass, valClass, codec,
+            FSDataOutputStream partitionOut = CryptoUtils.wrapIfNecessary(job, out);
+            writer = new IFile.Writer<K,V>(job, partitionOut, keyClass, valClass, codec,
                                             spilledRecordsCounter);
 
             if (i == partition) {
@@ -1682,8 +1709,8 @@ public class MapTask extends Task {
 
             // record offsets
             rec.startOffset = segmentStart;
-            rec.rawLength = writer.getRawLength();
-            rec.partLength = writer.getCompressedLength();
+            rec.rawLength = writer.getRawLength() + CryptoUtils.cryptoPadding(job);
+            rec.partLength = writer.getCompressedLength() + CryptoUtils.cryptoPadding(job);
             spillRec.putIndex(rec, i);
 
             writer = null;
@@ -1825,12 +1852,13 @@ public class MapTask extends Task {
         try {
           for (int i = 0; i < partitions; i++) {
             long segmentStart = finalOut.getPos();
+            FSDataOutputStream finalPartitionOut = CryptoUtils.wrapIfNecessary(job, finalOut);
             Writer<K, V> writer =
-              new Writer<K, V>(job, finalOut, keyClass, valClass, codec, null);
+              new Writer<K, V>(job, finalPartitionOut, keyClass, valClass, codec, null);
             writer.close();
             rec.startOffset = segmentStart;
-            rec.rawLength = writer.getRawLength();
-            rec.partLength = writer.getCompressedLength();
+            rec.rawLength = writer.getRawLength() + CryptoUtils.cryptoPadding(job);
+            rec.partLength = writer.getCompressedLength() + CryptoUtils.cryptoPadding(job);
             sr.putIndex(rec, i);
           }
           sr.writeToFile(finalIndexFile, job);
@@ -1879,8 +1907,9 @@ public class MapTask extends Task {
 
           //write merged output to disk
           long segmentStart = finalOut.getPos();
+          FSDataOutputStream finalPartitionOut = CryptoUtils.wrapIfNecessary(job, finalOut);
           Writer<K, V> writer =
-              new Writer<K, V>(job, finalOut, keyClass, valClass, codec,
+              new Writer<K, V>(job, finalPartitionOut, keyClass, valClass, codec,
                                spilledRecordsCounter);
           if (combinerRunner == null || numSpills < minSpillsForCombine) {
             Merger.writeFile(kvIter, writer, reporter, job);
@@ -1896,8 +1925,8 @@ public class MapTask extends Task {
           
           // record offsets
           rec.startOffset = segmentStart;
-          rec.rawLength = writer.getRawLength();
-          rec.partLength = writer.getCompressedLength();
+          rec.rawLength = writer.getRawLength() + CryptoUtils.cryptoPadding(job);
+          rec.partLength = writer.getCompressedLength() + CryptoUtils.cryptoPadding(job);
           spillRec.putIndex(rec, parts);
         }
         spillRec.writeToFile(finalIndexFile, job);

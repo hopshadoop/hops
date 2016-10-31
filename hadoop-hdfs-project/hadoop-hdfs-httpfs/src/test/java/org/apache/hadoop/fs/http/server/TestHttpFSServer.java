@@ -57,6 +57,10 @@ import java.net.URL;
 import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Properties;
+import org.apache.hadoop.security.authentication.server.AuthenticationFilter;
+import org.apache.hadoop.security.authentication.util.SignerSecretProvider;
+import org.apache.hadoop.security.authentication.util.StringSignerSecretProviderCreator;
 
 public class TestHttpFSServer extends HFSTestCase {
 
@@ -304,7 +308,12 @@ public class TestHttpFSServer extends HFSTestCase {
     AuthenticationToken token = new AuthenticationToken("u", "p",
         HttpFSKerberosAuthenticationHandlerForTesting.TYPE);
     token.setExpires(System.currentTimeMillis() + 100000000);
-    Signer signer = new Signer("secret".getBytes());
+    SignerSecretProvider secretProvider =
+        StringSignerSecretProviderCreator.newStringSignerSecretProvider();
+    Properties secretProviderProps = new Properties();
+    secretProviderProps.setProperty(AuthenticationFilter.SIGNATURE_SECRET, "secret");
+    secretProvider.init(secretProviderProps, null, -1);
+    Signer signer = new Signer(secretProvider);
     String tokenSigned = signer.sign(token.toString());
 
     url = new URL(TestJettyHelper.getJettyURL(),

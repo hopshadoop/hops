@@ -18,23 +18,22 @@
 
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer;
 
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.yarn.api.records.LocalResourceType;
 import org.apache.hadoop.yarn.api.records.LocalResourceVisibility;
 import org.apache.hadoop.yarn.server.nodemanager.DeletionService;
+import org.apache.hadoop.yarn.server.nodemanager.recovery.NMNullStateStoreService;
 import org.junit.Test;
+
+import static org.junit.Assert.*;
+
 import org.mockito.ArgumentCaptor;
 
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-
-import static org.junit.Assert.assertTrue;
-import static org.mockito.Mockito.atMost;
-import static org.mockito.Mockito.isA;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.*;
 
 public class TestResourceRetention {
 
@@ -45,16 +44,16 @@ public class TestResourceRetention {
     ResourceRetentionSet rss = new ResourceRetentionSet(delService, TARGET_MB);
     // 3MB files @{10, 15}
     LocalResourcesTracker pubTracker =
-        createMockTracker(null, 3 * 1024 * 1024, 2, 10, 5);
+      createMockTracker(null, 3 * 1024 * 1024, 2, 10, 5);
     // 1MB files @{3, 6, 9, 12}
     LocalResourcesTracker trackerA =
-        createMockTracker("A", 1 * 1024 * 1024, 4, 3, 3);
+      createMockTracker("A", 1 * 1024 * 1024, 4, 3, 3);
     // 4MB file @{1}
     LocalResourcesTracker trackerB =
-        createMockTracker("B", 4 * 1024 * 1024, 1, 10, 5);
+      createMockTracker("B", 4 * 1024 * 1024, 1, 10, 5);
     // 2MB files @{7, 9, 11}
     LocalResourcesTracker trackerC =
-        createMockTracker("C", 2 * 1024 * 1024, 3, 7, 2);
+      createMockTracker("C", 2 * 1024 * 1024, 3, 7, 2);
     // Total cache: 20MB; verify removed at least 10MB
     rss.addResources(pubTracker);
     rss.addResources(trackerA);
@@ -62,15 +61,15 @@ public class TestResourceRetention {
     rss.addResources(trackerC);
     long deleted = 0L;
     ArgumentCaptor<LocalizedResource> captor =
-        ArgumentCaptor.forClass(LocalizedResource.class);
+      ArgumentCaptor.forClass(LocalizedResource.class);
     verify(pubTracker, atMost(2))
-        .remove(captor.capture(), isA(DeletionService.class));
+      .remove(captor.capture(), isA(DeletionService.class));
     verify(trackerA, atMost(4))
-        .remove(captor.capture(), isA(DeletionService.class));
+      .remove(captor.capture(), isA(DeletionService.class));
     verify(trackerB, atMost(1))
-        .remove(captor.capture(), isA(DeletionService.class));
+      .remove(captor.capture(), isA(DeletionService.class));
     verify(trackerC, atMost(3))
-        .remove(captor.capture(), isA(DeletionService.class));
+      .remove(captor.capture(), isA(DeletionService.class));
     for (LocalizedResource rem : captor.getAllValues()) {
       deleted += rem.getSize();
     }
@@ -81,43 +80,23 @@ public class TestResourceRetention {
   LocalResourcesTracker createMockTracker(String user, final long rsrcSize,
       long nRsrcs, long timestamp, long tsstep) {
     Configuration conf = new Configuration();
-    ConcurrentMap<LocalResourceRequest, LocalizedResource> trackerResources =
-        new ConcurrentHashMap<LocalResourceRequest, LocalizedResource>();
-    LocalResourcesTracker ret =
-        spy(new LocalResourcesTrackerImpl(user, null, trackerResources, false,
-            conf));
+    ConcurrentMap<LocalResourceRequest,LocalizedResource> trackerResources =
+      new ConcurrentHashMap<LocalResourceRequest,LocalizedResource>();
+    LocalResourcesTracker ret = spy(new LocalResourcesTrackerImpl(user, null,
+      null, trackerResources, false, conf, new NMNullStateStoreService()));
     for (int i = 0; i < nRsrcs; ++i) {
-      final LocalResourceRequest req =
-          new LocalResourceRequest(new Path("file:///" + user + "/rsrc" + i),
-              timestamp + i * tsstep, LocalResourceType.FILE,
-              LocalResourceVisibility.PUBLIC, null);
+      final LocalResourceRequest req = new LocalResourceRequest(
+          new Path("file:///" + user + "/rsrc" + i), timestamp + i * tsstep,
+          LocalResourceType.FILE, LocalResourceVisibility.PUBLIC, null);
       final long ts = timestamp + i * tsstep;
       final Path p = new Path("file:///local/" + user + "/rsrc" + i);
       LocalizedResource rsrc = new LocalizedResource(req, null) {
+        @Override public int getRefCount() { return 0; }
+        @Override public long getSize() { return rsrcSize; }
+        @Override public Path getLocalPath() { return p; }
+        @Override public long getTimestamp() { return ts; }
         @Override
-        public int getRefCount() {
-          return 0;
-        }
-
-        @Override
-        public long getSize() {
-          return rsrcSize;
-        }
-
-        @Override
-        public Path getLocalPath() {
-          return p;
-        }
-
-        @Override
-        public long getTimestamp() {
-          return ts;
-        }
-
-        @Override
-        public ResourceState getState() {
-          return ResourceState.LOCALIZED;
-        }
+        public ResourceState getState() { return ResourceState.LOCALIZED; }
       };
       trackerResources.put(req, rsrc);
     }

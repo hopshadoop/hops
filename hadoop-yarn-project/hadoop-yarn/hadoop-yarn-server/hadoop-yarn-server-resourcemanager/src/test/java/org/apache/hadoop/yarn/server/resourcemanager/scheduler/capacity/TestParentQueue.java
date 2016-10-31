@@ -18,39 +18,12 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity;
 
-import io.hops.ha.common.TransactionState;
-import io.hops.ha.common.TransactionStateImpl;
-import junit.framework.Assert;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.yarn.api.records.QueueACL;
-import org.apache.hadoop.yarn.api.records.QueueUserACLInfo;
-import org.apache.hadoop.yarn.api.records.Resource;
-import org.apache.hadoop.yarn.conf.YarnConfiguration;
-import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.NodeType;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerApp;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode;
-import org.apache.hadoop.yarn.util.resource.DefaultResourceCalculator;
-import org.apache.hadoop.yarn.util.resource.ResourceCalculator;
-import org.apache.hadoop.yarn.util.resource.Resources;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-import org.mockito.InOrder;
-import org.mockito.invocation.InvocationOnMock;
-import org.mockito.stubbing.Answer;
-
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyBoolean;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
@@ -58,6 +31,34 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.yarn.api.records.QueueACL;
+import org.apache.hadoop.yarn.api.records.QueueUserACLInfo;
+import org.apache.hadoop.yarn.api.records.Resource;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import org.apache.hadoop.yarn.security.YarnAuthorizationProvider;
+import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.NodeType;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceLimits;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerApp;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode;
+import org.apache.hadoop.yarn.util.resource.DefaultResourceCalculator;
+import org.apache.hadoop.yarn.util.resource.ResourceCalculator;
+import org.apache.hadoop.yarn.util.resource.Resources;
+import org.junit.After;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Test;
+import org.mockito.InOrder;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 
 public class TestParentQueue {
 
@@ -83,27 +84,27 @@ public class TestParentQueue {
     csContext = mock(CapacitySchedulerContext.class);
     when(csContext.getConf()).thenReturn(conf);
     when(csContext.getConfiguration()).thenReturn(csConf);
-    when(csContext.getMinimumResourceCapability())
-        .thenReturn(Resources.createResource(GB, 1));
-    when(csContext.getMaximumResourceCapability())
-        .thenReturn(Resources.createResource(16 * GB, 32));
-    when(csContext.getClusterResources()).
+    when(csContext.getMinimumResourceCapability()).thenReturn(
+        Resources.createResource(GB, 1));
+    when(csContext.getMaximumResourceCapability()).thenReturn(
+        Resources.createResource(16*GB, 32));
+    when(csContext.getClusterResource()).
         thenReturn(Resources.createResource(100 * 16 * GB, 100 * 32));
     when(csContext.getApplicationComparator()).
-        thenReturn(CapacityScheduler.applicationComparator);
+    thenReturn(CapacityScheduler.applicationComparator);
     when(csContext.getQueueComparator()).
-        thenReturn(CapacityScheduler.queueComparator);
+    thenReturn(CapacityScheduler.queueComparator);
     when(csContext.getResourceCalculator()).
-        thenReturn(resourceComparator);
+    thenReturn(resourceComparator);
+    when(csContext.getRMContext()).thenReturn(rmContext);
   }
   
   private static final String A = "a";
   private static final String B = "b";
-
   private void setupSingleLevelQueues(CapacitySchedulerConfiguration conf) {
     
     // Define top-level queues
-    conf.setQueues(CapacitySchedulerConfiguration.ROOT, new String[]{A, B});
+    conf.setQueues(CapacitySchedulerConfiguration.ROOT, new String[] {A, B});
     
     final String Q_A = CapacitySchedulerConfiguration.ROOT + "." + A;
     conf.setCapacity(Q_A, 30);
@@ -121,15 +122,15 @@ public class TestParentQueue {
     return application;
   }
 
-  private void stubQueueAllocation(final CSQueue queue,
-      final Resource clusterResource, final FiCaSchedulerNode node,
+  private void stubQueueAllocation(final CSQueue queue, 
+      final Resource clusterResource, final FiCaSchedulerNode node, 
       final int allocation) {
-    stubQueueAllocation(queue, clusterResource, node, allocation,
+    stubQueueAllocation(queue, clusterResource, node, allocation, 
         NodeType.NODE_LOCAL);
   }
   
-  private void stubQueueAllocation(final CSQueue queue,
-      final Resource clusterResource, final FiCaSchedulerNode node,
+  private void stubQueueAllocation(final CSQueue queue, 
+      final Resource clusterResource, final FiCaSchedulerNode node, 
       final int allocation, final NodeType type) {
     
     // Simulate the queue allocation
@@ -139,58 +140,61 @@ public class TestParentQueue {
         try {
           throw new Exception();
         } catch (Exception e) {
-          LOG.info("FOOBAR q.assignContainers q=" + queue.getQueueName() +
+          LOG.info("FOOBAR q.assignContainers q=" + queue.getQueueName() + 
               " alloc=" + allocation + " node=" + node.getNodeName());
         }
         final Resource allocatedResource = Resources.createResource(allocation);
         if (queue instanceof ParentQueue) {
-          ((ParentQueue) queue)
-                  .allocateResource(clusterResource, allocatedResource);
+          ((ParentQueue)queue).allocateResource(clusterResource, 
+              allocatedResource, null);
         } else {
           FiCaSchedulerApp app1 = getMockApplication(0, "");
-          ((LeafQueue) queue)
-                  .allocateResource(clusterResource, app1, allocatedResource);
+          ((LeafQueue)queue).allocateResource(clusterResource, app1, 
+              allocatedResource, null);
         }
         
         // Next call - nothing
         if (allocation > 0) {
-          doReturn(new CSAssignment(Resources.none(), type)).
-              when(queue).assignContainers(eq(clusterResource), eq(node),
-              any(TransactionState.class));
+          doReturn(new CSAssignment(Resources.none(), type)).when(queue)
+              .assignContainers(eq(clusterResource), eq(node),
+                  any(ResourceLimits.class));
 
           // Mock the node's resource availability
           Resource available = node.getAvailableResource();
           doReturn(Resources.subtractFrom(available, allocatedResource)).
-              when(node).getAvailableResource();
+          when(node).getAvailableResource();
         }
 
         return new CSAssignment(allocatedResource, type);
       }
-    }).
-        when(queue).assignContainers(eq(clusterResource), eq(node),
-        any(TransactionState.class));
+    }).when(queue).assignContainers(eq(clusterResource), eq(node),
+        any(ResourceLimits.class));
   }
   
-  private float computeQueueAbsoluteUsedCapacity(CSQueue queue,
+  private float computeQueueAbsoluteUsedCapacity(CSQueue queue, 
       int expectedMemory, Resource clusterResource) {
-    return (((float) expectedMemory / (float) clusterResource.getMemory()));
+    return (
+        ((float)expectedMemory / (float)clusterResource.getMemory())
+      );
   }
   
-  private float computeQueueUsedCapacity(CSQueue queue, int expectedMemory,
-      Resource clusterResource) {
-    return (expectedMemory /
+  private float computeQueueUsedCapacity(CSQueue queue,
+      int expectedMemory, Resource clusterResource) {
+    return (expectedMemory / 
         (clusterResource.getMemory() * queue.getAbsoluteCapacity()));
   }
   
   final static float DELTA = 0.0001f;
-
-  private void verifyQueueMetrics(CSQueue queue, int expectedMemory,
-      Resource clusterResource) {
-    assertEquals(computeQueueAbsoluteUsedCapacity(queue, expectedMemory,
-        clusterResource), queue.getAbsoluteUsedCapacity(), DELTA);
+  private void verifyQueueMetrics(CSQueue queue, 
+      int expectedMemory, Resource clusterResource) {
     assertEquals(
-        computeQueueUsedCapacity(queue, expectedMemory, clusterResource),
-        queue.getUsedCapacity(), DELTA);
+        computeQueueAbsoluteUsedCapacity(queue, expectedMemory, clusterResource), 
+        queue.getAbsoluteUsedCapacity(), 
+        DELTA);
+    assertEquals(
+        computeQueueUsedCapacity(queue, expectedMemory, clusterResource), 
+        queue.getUsedCapacity(), 
+        DELTA);
 
   }
   
@@ -200,99 +204,92 @@ public class TestParentQueue {
     setupSingleLevelQueues(csConf);
     
     Map<String, CSQueue> queues = new HashMap<String, CSQueue>();
-    CSQueue root = CapacityScheduler.parseQueue(csContext, csConf, null,
-        CapacitySchedulerConfiguration.ROOT, queues, queues, TestUtils.spyHook,
-        null);
+    CSQueue root = 
+        CapacityScheduler.parseQueue(csContext, csConf, null, 
+            CapacitySchedulerConfiguration.ROOT, queues, queues, 
+            TestUtils.spyHook);
 
     // Setup some nodes
     final int memoryPerNode = 10;
     final int coresPerNode = 16;
     final int numNodes = 2;
     
-    FiCaSchedulerNode node_0 =
-        TestUtils.getMockNode("host_0", DEFAULT_RACK, 0, memoryPerNode * GB);
-    FiCaSchedulerNode node_1 =
-        TestUtils.getMockNode("host_1", DEFAULT_RACK, 0, memoryPerNode * GB);
+    FiCaSchedulerNode node_0 = 
+        TestUtils.getMockNode("host_0", DEFAULT_RACK, 0, memoryPerNode*GB);
+    FiCaSchedulerNode node_1 = 
+        TestUtils.getMockNode("host_1", DEFAULT_RACK, 0, memoryPerNode*GB);
     
-    final Resource clusterResource = Resources
-        .createResource(numNodes * (memoryPerNode * GB),
+    final Resource clusterResource = 
+        Resources.createResource(numNodes * (memoryPerNode*GB),
             numNodes * coresPerNode);
     when(csContext.getNumClusterNodes()).thenReturn(numNodes);
 
     // Start testing
-    LeafQueue a = (LeafQueue) queues.get(A);
-    LeafQueue b = (LeafQueue) queues.get(B);
+    LeafQueue a = (LeafQueue)queues.get(A);
+    LeafQueue b = (LeafQueue)queues.get(B);
     
     // Simulate B returning a container on node_0
-    stubQueueAllocation(a, clusterResource, node_0, 0 * GB);
-    stubQueueAllocation(b, clusterResource, node_0, 1 * GB);
-    root.assignContainers(clusterResource, node_0, new TransactionStateImpl(
-            TransactionState.TransactionType.RM));
-    verifyQueueMetrics(a, 0 * GB, clusterResource);
-    verifyQueueMetrics(b, 1 * GB, clusterResource);
+    stubQueueAllocation(a, clusterResource, node_0, 0*GB);
+    stubQueueAllocation(b, clusterResource, node_0, 1*GB);
+    root.assignContainers(clusterResource, node_0, 
+        new ResourceLimits(clusterResource));
+    verifyQueueMetrics(a, 0*GB, clusterResource);
+    verifyQueueMetrics(b, 1*GB, clusterResource);
     
     // Now, A should get the scheduling opportunity since A=0G/6G, B=1G/14G
-    stubQueueAllocation(a, clusterResource, node_1, 2 * GB);
-    stubQueueAllocation(b, clusterResource, node_1, 1 * GB);
-    root.assignContainers(clusterResource, node_1, new TransactionStateImpl(
-            TransactionState.TransactionType.RM));
+    stubQueueAllocation(a, clusterResource, node_1, 2*GB);
+    stubQueueAllocation(b, clusterResource, node_1, 1*GB);
+    root.assignContainers(clusterResource, node_1, 
+        new ResourceLimits(clusterResource));
     InOrder allocationOrder = inOrder(a, b);
-    allocationOrder.verify(a)
-        .assignContainers(eq(clusterResource), any(FiCaSchedulerNode.class),
-            any(TransactionState.class));
-    allocationOrder.verify(b)
-        .assignContainers(eq(clusterResource), any(FiCaSchedulerNode.class),
-            any(TransactionState.class));
-    verifyQueueMetrics(a, 2 * GB, clusterResource);
-    verifyQueueMetrics(b, 2 * GB, clusterResource);
+    allocationOrder.verify(a).assignContainers(eq(clusterResource), 
+        any(FiCaSchedulerNode.class), anyResourceLimits());
+    allocationOrder.verify(b).assignContainers(eq(clusterResource), 
+        any(FiCaSchedulerNode.class), anyResourceLimits());
+    verifyQueueMetrics(a, 2*GB, clusterResource);
+    verifyQueueMetrics(b, 2*GB, clusterResource);
 
     // Now, B should get the scheduling opportunity 
     // since A has 2/6G while B has 2/14G
-    stubQueueAllocation(a, clusterResource, node_0, 1 * GB);
-    stubQueueAllocation(b, clusterResource, node_0, 2 * GB);
-    root.assignContainers(clusterResource, node_0, new TransactionStateImpl(
-            TransactionState.TransactionType.RM));
+    stubQueueAllocation(a, clusterResource, node_0, 1*GB);
+    stubQueueAllocation(b, clusterResource, node_0, 2*GB);
+    root.assignContainers(clusterResource, node_0, 
+        new ResourceLimits(clusterResource));
     allocationOrder = inOrder(b, a);
-    allocationOrder.verify(b)
-        .assignContainers(eq(clusterResource), any(FiCaSchedulerNode.class),
-            any(TransactionState.class));
-    allocationOrder.verify(a)
-        .assignContainers(eq(clusterResource), any(FiCaSchedulerNode.class),
-            any(TransactionState.class));
-    verifyQueueMetrics(a, 3 * GB, clusterResource);
-    verifyQueueMetrics(b, 4 * GB, clusterResource);
+    allocationOrder.verify(b).assignContainers(eq(clusterResource), 
+        any(FiCaSchedulerNode.class), anyResourceLimits());
+    allocationOrder.verify(a).assignContainers(eq(clusterResource), 
+        any(FiCaSchedulerNode.class), anyResourceLimits());
+    verifyQueueMetrics(a, 3*GB, clusterResource);
+    verifyQueueMetrics(b, 4*GB, clusterResource);
 
     // Now, B should still get the scheduling opportunity 
     // since A has 3/6G while B has 4/14G
-    stubQueueAllocation(a, clusterResource, node_0, 0 * GB);
-    stubQueueAllocation(b, clusterResource, node_0, 4 * GB);
-    root.assignContainers(clusterResource, node_0, new TransactionStateImpl(
-            TransactionState.TransactionType.RM));
+    stubQueueAllocation(a, clusterResource, node_0, 0*GB);
+    stubQueueAllocation(b, clusterResource, node_0, 4*GB);
+    root.assignContainers(clusterResource, node_0, 
+        new ResourceLimits(clusterResource));
     allocationOrder = inOrder(b, a);
-    allocationOrder.verify(b)
-        .assignContainers(eq(clusterResource), any(FiCaSchedulerNode.class),
-            any(TransactionState.class));
-    allocationOrder.verify(a)
-        .assignContainers(eq(clusterResource), any(FiCaSchedulerNode.class),
-            any(TransactionState.class));
-    verifyQueueMetrics(a, 3 * GB, clusterResource);
-    verifyQueueMetrics(b, 8 * GB, clusterResource);
+    allocationOrder.verify(b).assignContainers(eq(clusterResource), 
+        any(FiCaSchedulerNode.class), anyResourceLimits());
+    allocationOrder.verify(a).assignContainers(eq(clusterResource), 
+        any(FiCaSchedulerNode.class), anyResourceLimits());
+    verifyQueueMetrics(a, 3*GB, clusterResource);
+    verifyQueueMetrics(b, 8*GB, clusterResource);
 
     // Now, A should get the scheduling opportunity 
     // since A has 3/6G while B has 8/14G
-    stubQueueAllocation(a, clusterResource, node_1, 1 * GB);
-    stubQueueAllocation(b, clusterResource, node_1, 1 * GB);
-    root.assignContainers(clusterResource, node_1, new TransactionStateImpl(
-            TransactionState.TransactionType.RM));
+    stubQueueAllocation(a, clusterResource, node_1, 1*GB);
+    stubQueueAllocation(b, clusterResource, node_1, 1*GB);
+    root.assignContainers(clusterResource, node_1, 
+        new ResourceLimits(clusterResource));
     allocationOrder = inOrder(a, b);
-    allocationOrder.verify(b)
-        .assignContainers(eq(clusterResource), any(FiCaSchedulerNode.class),
-            any(TransactionState.class));
-    allocationOrder.verify(a)
-        .assignContainers(eq(clusterResource), any(FiCaSchedulerNode.class),
-            any(TransactionState.class));
-    verifyQueueMetrics(a, 4 * GB, clusterResource);
-    verifyQueueMetrics(b, 9 * GB, clusterResource);
+    allocationOrder.verify(b).assignContainers(eq(clusterResource), 
+        any(FiCaSchedulerNode.class), anyResourceLimits());
+    allocationOrder.verify(a).assignContainers(eq(clusterResource), 
+        any(FiCaSchedulerNode.class), anyResourceLimits());
+    verifyQueueMetrics(a, 4*GB, clusterResource);
+    verifyQueueMetrics(b, 9*GB, clusterResource);
   }
 
   @Test
@@ -309,7 +306,7 @@ public class TestParentQueue {
     try {
       CapacityScheduler.parseQueue(csContext, csConf, null,
           CapacitySchedulerConfiguration.ROOT, queues, queues,
-          TestUtils.spyHook, null);
+          TestUtils.spyHook);
     } catch (IllegalArgumentException ie) {
       exceptionOccured = true;
     }
@@ -323,7 +320,7 @@ public class TestParentQueue {
     try {
       CapacityScheduler.parseQueue(csContext, csConf, null,
           CapacitySchedulerConfiguration.ROOT, queues, queues,
-          TestUtils.spyHook, null);
+          TestUtils.spyHook);
     } catch (IllegalArgumentException ie) {
       exceptionOccured = true;
     }
@@ -337,13 +334,13 @@ public class TestParentQueue {
     try {
       CapacityScheduler.parseQueue(csContext, csConf, null,
           CapacitySchedulerConfiguration.ROOT, queues, queues,
-          TestUtils.spyHook, null);
+          TestUtils.spyHook);
     } catch (IllegalArgumentException ie) {
       exceptionOccured = true;
     }
     if (exceptionOccured) {
-      Assert.fail(
-          "Capacity is under PRECISION which is .05% so should not be failed.");
+      Assert
+          .fail("Capacity is under PRECISION which is .05% so should not be failed.");
     }
   }
   
@@ -363,8 +360,7 @@ public class TestParentQueue {
   private void setupMultiLevelQueues(CapacitySchedulerConfiguration conf) {
     
     // Define top-level queues
-    csConf.setQueues(CapacitySchedulerConfiguration.ROOT,
-        new String[]{A, B, C, D});
+    csConf.setQueues(CapacitySchedulerConfiguration.ROOT, new String[] {A, B, C, D});
     
     final String Q_A = CapacitySchedulerConfiguration.ROOT + "." + A;
     conf.setCapacity(Q_A, 10);
@@ -379,57 +375,74 @@ public class TestParentQueue {
     conf.setCapacity(Q_D, 20.5f);
     
     // Define 2-nd level queues
-    conf.setQueues(Q_A, new String[]{A1, A2});
+    conf.setQueues(Q_A, new String[] {A1, A2});
     conf.setCapacity(Q_A + "." + A1, 50);
     conf.setCapacity(Q_A + "." + A2, 50);
     
-    conf.setQueues(Q_B, new String[]{B1, B2, B3});
+    conf.setQueues(Q_B, new String[] {B1, B2, B3});
     conf.setCapacity(Q_B + "." + B1, 10);
     conf.setCapacity(Q_B + "." + B2, 20);
     conf.setCapacity(Q_B + "." + B3, 70);
 
-    conf.setQueues(Q_C, new String[]{C1});
+    conf.setQueues(Q_C, new String[] {C1});
 
-    final String Q_C1 = Q_C + "." + C1;
+    final String Q_C1= Q_C + "." + C1;
     conf.setCapacity(Q_C1, 100);
-    conf.setQueues(Q_C1, new String[]{C11});
+    conf.setQueues(Q_C1, new String[] {C11});
 
-    final String Q_C11 = Q_C1 + "." + C11;
+    final String Q_C11= Q_C1 + "." + C11;
     conf.setCapacity(Q_C11, 100);
-    conf.setQueues(Q_C11, new String[]{C111});
+    conf.setQueues(Q_C11, new String[] {C111});
 
-    final String Q_C111 = Q_C11 + "." + C111;
+    final String Q_C111= Q_C11 + "." + C111;
     conf.setCapacity(Q_C111, 100);
     //Leaf Queue
-    conf.setQueues(Q_C111, new String[]{C1111});
-    final String Q_C1111 = Q_C111 + "." + C1111;
+    conf.setQueues(Q_C111, new String[] {C1111});
+    final String Q_C1111= Q_C111 + "." + C1111;
     conf.setCapacity(Q_C1111, 100);
   }
 
   @Test
   public void testMultiLevelQueues() throws Exception {
+    /*
+     * Structure of queue:
+     *            Root
+     *           ____________
+     *          /    |   \   \
+     *         A     B    C   D
+     *       / |   / | \   \
+     *      A1 A2 B1 B2 B3  C1
+     *                        \
+     *                         C11
+     *                           \
+     *                           C111
+     *                             \
+     *                              C1111
+     */
+    
     // Setup queue configs
     setupMultiLevelQueues(csConf);
     
     Map<String, CSQueue> queues = new HashMap<String, CSQueue>();
-    CSQueue root = CapacityScheduler.parseQueue(csContext, csConf, null,
-        CapacitySchedulerConfiguration.ROOT, queues, queues, TestUtils.spyHook, 
-        null);
+    CSQueue root = 
+        CapacityScheduler.parseQueue(csContext, csConf, null, 
+            CapacitySchedulerConfiguration.ROOT, queues, queues, 
+            TestUtils.spyHook);
     
     // Setup some nodes
     final int memoryPerNode = 10;
     final int coresPerNode = 16;
     final int numNodes = 3;
     
-    FiCaSchedulerNode node_0 =
-        TestUtils.getMockNode("host_0", DEFAULT_RACK, 0, memoryPerNode * GB);
-    FiCaSchedulerNode node_1 =
-        TestUtils.getMockNode("host_1", DEFAULT_RACK, 0, memoryPerNode * GB);
-    FiCaSchedulerNode node_2 =
-        TestUtils.getMockNode("host_2", DEFAULT_RACK, 0, memoryPerNode * GB);
+    FiCaSchedulerNode node_0 = 
+        TestUtils.getMockNode("host_0", DEFAULT_RACK, 0, memoryPerNode*GB);
+    FiCaSchedulerNode node_1 = 
+        TestUtils.getMockNode("host_1", DEFAULT_RACK, 0, memoryPerNode*GB);
+    FiCaSchedulerNode node_2 = 
+        TestUtils.getMockNode("host_2", DEFAULT_RACK, 0, memoryPerNode*GB);
     
-    final Resource clusterResource = Resources
-        .createResource(numNodes * (memoryPerNode * GB),
+    final Resource clusterResource = 
+        Resources.createResource(numNodes * (memoryPerNode*GB), 
             numNodes * coresPerNode);
     when(csContext.getNumClusterNodes()).thenReturn(numNodes);
 
@@ -447,95 +460,80 @@ public class TestParentQueue {
     CSQueue b3 = queues.get(B3);
 
     // Simulate C returning a container on node_0
-    stubQueueAllocation(a, clusterResource, node_0, 0 * GB);
-    stubQueueAllocation(b, clusterResource, node_0, 0 * GB);
-    stubQueueAllocation(c, clusterResource, node_0, 1 * GB);
-    stubQueueAllocation(d, clusterResource, node_0, 0 * GB);
-    root.assignContainers(clusterResource, node_0, new TransactionStateImpl(
-            TransactionState.TransactionType.RM));
-    verifyQueueMetrics(a, 0 * GB, clusterResource);
-    verifyQueueMetrics(b, 0 * GB, clusterResource);
-    verifyQueueMetrics(c, 1 * GB, clusterResource);
-    verifyQueueMetrics(d, 0 * GB, clusterResource);
-    reset(a);
-    reset(b);
-    reset(c);
+    stubQueueAllocation(a, clusterResource, node_0, 0*GB);
+    stubQueueAllocation(b, clusterResource, node_0, 0*GB);
+    stubQueueAllocation(c, clusterResource, node_0, 1*GB);
+    stubQueueAllocation(d, clusterResource, node_0, 0*GB);
+    root.assignContainers(clusterResource, node_0, 
+        new ResourceLimits(clusterResource));
+    verifyQueueMetrics(a, 0*GB, clusterResource);
+    verifyQueueMetrics(b, 0*GB, clusterResource);
+    verifyQueueMetrics(c, 1*GB, clusterResource);
+    verifyQueueMetrics(d, 0*GB, clusterResource);
+    reset(a); reset(b); reset(c);
 
     // Now get B2 to allocate
     // A = 0/3, B = 0/15, C = 1/6, D=0/6
-    stubQueueAllocation(a, clusterResource, node_1, 0 * GB);
-    stubQueueAllocation(b2, clusterResource, node_1, 4 * GB);
-    stubQueueAllocation(c, clusterResource, node_1, 0 * GB);
-    root.assignContainers(clusterResource, node_1, new TransactionStateImpl(
-            TransactionState.TransactionType.RM));
-    verifyQueueMetrics(a, 0 * GB, clusterResource);
-    verifyQueueMetrics(b, 4 * GB, clusterResource);
-    verifyQueueMetrics(c, 1 * GB, clusterResource);
-    reset(a);
-    reset(b);
-    reset(c);
+    stubQueueAllocation(a, clusterResource, node_1, 0*GB);
+    stubQueueAllocation(b2, clusterResource, node_1, 4*GB);
+    stubQueueAllocation(c, clusterResource, node_1, 0*GB);
+    root.assignContainers(clusterResource, node_1, 
+        new ResourceLimits(clusterResource));
+    verifyQueueMetrics(a, 0*GB, clusterResource);
+    verifyQueueMetrics(b, 4*GB, clusterResource);
+    verifyQueueMetrics(c, 1*GB, clusterResource);
+    reset(a); reset(b); reset(c);
     
     // Now get both A1, C & B3 to allocate in right order
     // A = 0/3, B = 4/15, C = 1/6, D=0/6
-    stubQueueAllocation(a1, clusterResource, node_0, 1 * GB);
-    stubQueueAllocation(b3, clusterResource, node_0, 2 * GB);
-    stubQueueAllocation(c, clusterResource, node_0, 2 * GB);
-    root.assignContainers(clusterResource, node_0, new TransactionStateImpl(
-            TransactionState.TransactionType.RM));
+    stubQueueAllocation(a1, clusterResource, node_0, 1*GB);
+    stubQueueAllocation(b3, clusterResource, node_0, 2*GB);
+    stubQueueAllocation(c, clusterResource, node_0, 2*GB);
+    root.assignContainers(clusterResource, node_0, 
+        new ResourceLimits(clusterResource));
     InOrder allocationOrder = inOrder(a, c, b);
-    allocationOrder.verify(a)
-        .assignContainers(eq(clusterResource), any(FiCaSchedulerNode.class),
-            any(TransactionState.class));
-    allocationOrder.verify(c)
-        .assignContainers(eq(clusterResource), any(FiCaSchedulerNode.class),
-            any(TransactionState.class));
-    allocationOrder.verify(b)
-        .assignContainers(eq(clusterResource), any(FiCaSchedulerNode.class),
-            any(TransactionState.class));
-    verifyQueueMetrics(a, 1 * GB, clusterResource);
-    verifyQueueMetrics(b, 6 * GB, clusterResource);
-    verifyQueueMetrics(c, 3 * GB, clusterResource);
-    reset(a);
-    reset(b);
-    reset(c);
+    allocationOrder.verify(a).assignContainers(eq(clusterResource), 
+        any(FiCaSchedulerNode.class), anyResourceLimits());
+    allocationOrder.verify(c).assignContainers(eq(clusterResource), 
+        any(FiCaSchedulerNode.class), anyResourceLimits());
+    allocationOrder.verify(b).assignContainers(eq(clusterResource), 
+        any(FiCaSchedulerNode.class), anyResourceLimits());
+    verifyQueueMetrics(a, 1*GB, clusterResource);
+    verifyQueueMetrics(b, 6*GB, clusterResource);
+    verifyQueueMetrics(c, 3*GB, clusterResource);
+    reset(a); reset(b); reset(c);
     
     // Now verify max-capacity
     // A = 1/3, B = 6/15, C = 3/6, D=0/6
     // Ensure a1 won't alloc above max-cap although it should get 
     // scheduling opportunity now, right after a2
     LOG.info("here");
-    ((ParentQueue) a).setMaxCapacity(.1f);  // a should be capped at 3/30
-    stubQueueAllocation(a1, clusterResource, node_2, 1 * GB); // shouldn't be
-    // allocated due
-    // to max-cap
-    stubQueueAllocation(a2, clusterResource, node_2, 2 * GB);
-    stubQueueAllocation(b3, clusterResource, node_2, 1 * GB);
-    stubQueueAllocation(b1, clusterResource, node_2, 1 * GB);
-    stubQueueAllocation(c, clusterResource, node_2, 1 * GB);
-    root.assignContainers(clusterResource, node_2, new TransactionStateImpl(
-            TransactionState.TransactionType.RM));
+    ((ParentQueue)a).setMaxCapacity(.1f);  // a should be capped at 3/30
+    stubQueueAllocation(a1, clusterResource, node_2, 1*GB); // shouldn't be 
+                                                            // allocated due 
+                                                            // to max-cap
+    stubQueueAllocation(a2, clusterResource, node_2, 2*GB);
+    stubQueueAllocation(b3, clusterResource, node_2, 1*GB);
+    stubQueueAllocation(b1, clusterResource, node_2, 1*GB);
+    stubQueueAllocation(c, clusterResource, node_2, 1*GB);
+    root.assignContainers(clusterResource, node_2, 
+        new ResourceLimits(clusterResource));
     allocationOrder = inOrder(a, a2, a1, b, c);
-    allocationOrder.verify(a)
-        .assignContainers(eq(clusterResource), any(FiCaSchedulerNode.class),
-            any(TransactionState.class));
-    allocationOrder.verify(a2)
-        .assignContainers(eq(clusterResource), any(FiCaSchedulerNode.class),
-            any(TransactionState.class));
-    allocationOrder.verify(b)
-        .assignContainers(eq(clusterResource), any(FiCaSchedulerNode.class),
-            any(TransactionState.class));
-    allocationOrder.verify(c)
-        .assignContainers(eq(clusterResource), any(FiCaSchedulerNode.class),
-            any(TransactionState.class));
-    verifyQueueMetrics(a, 3 * GB, clusterResource);
-    verifyQueueMetrics(b, 8 * GB, clusterResource);
-    verifyQueueMetrics(c, 4 * GB, clusterResource);
-    reset(a);
-    reset(b);
-    reset(c);
+    allocationOrder.verify(a).assignContainers(eq(clusterResource), 
+        any(FiCaSchedulerNode.class), anyResourceLimits());
+    allocationOrder.verify(a2).assignContainers(eq(clusterResource), 
+        any(FiCaSchedulerNode.class), anyResourceLimits());
+    allocationOrder.verify(b).assignContainers(eq(clusterResource), 
+        any(FiCaSchedulerNode.class), anyResourceLimits());
+    allocationOrder.verify(c).assignContainers(eq(clusterResource), 
+        any(FiCaSchedulerNode.class), anyResourceLimits());
+    verifyQueueMetrics(a, 3*GB, clusterResource);
+    verifyQueueMetrics(b, 8*GB, clusterResource);
+    verifyQueueMetrics(c, 4*GB, clusterResource);
+    reset(a); reset(b); reset(c);
   }
   
-  @Test(expected = IllegalArgumentException.class)
+  @Test (expected=IllegalArgumentException.class)
   public void testQueueCapacitySettingChildZero() throws Exception {
     // Setup queue configs
     setupMultiLevelQueues(csConf);
@@ -546,13 +544,13 @@ public class TestParentQueue {
     csConf.setCapacity(Q_B + "." + B2, 0);
     csConf.setCapacity(Q_B + "." + B3, 0);
     
-    Map<String, CSQueue> queues = new HashMap<String, CSQueue>();
-    CapacityScheduler.parseQueue(csContext, csConf, null,
-        CapacitySchedulerConfiguration.ROOT, queues, queues, TestUtils.spyHook, 
-        null);
+    Map<String, CSQueue> queues = new HashMap<String, CSQueue>(); 
+    CapacityScheduler.parseQueue(csContext, csConf, null, 
+        CapacitySchedulerConfiguration.ROOT, queues, queues, 
+        TestUtils.spyHook);
   }
   
-  @Test(expected = IllegalArgumentException.class)
+  @Test (expected=IllegalArgumentException.class)
   public void testQueueCapacitySettingParentZero() throws Exception {
     // Setup queue configs
     setupMultiLevelQueues(csConf);
@@ -563,10 +561,10 @@ public class TestParentQueue {
     final String Q_A = CapacitySchedulerConfiguration.ROOT + "." + A;
     csConf.setCapacity(Q_A, 60);
 
-    Map<String, CSQueue> queues = new HashMap<String, CSQueue>();
-    CapacityScheduler.parseQueue(csContext, csConf, null,
-        CapacitySchedulerConfiguration.ROOT, queues, queues, TestUtils.spyHook, 
-        null);
+    Map<String, CSQueue> queues = new HashMap<String, CSQueue>(); 
+    CapacityScheduler.parseQueue(csContext, csConf, null, 
+        CapacitySchedulerConfiguration.ROOT, queues, queues, 
+        TestUtils.spyHook);
   }
   
   @Test
@@ -584,11 +582,11 @@ public class TestParentQueue {
     final String Q_A = CapacitySchedulerConfiguration.ROOT + "." + A;
     csConf.setCapacity(Q_A, 60);
 
-    Map<String, CSQueue> queues = new HashMap<String, CSQueue>();
+    Map<String, CSQueue> queues = new HashMap<String, CSQueue>(); 
     try {
-      CapacityScheduler.parseQueue(csContext, csConf, null,
-          CapacitySchedulerConfiguration.ROOT, queues, queues,
-          TestUtils.spyHook, null);
+      CapacityScheduler.parseQueue(csContext, csConf, null, 
+          CapacitySchedulerConfiguration.ROOT, queues, queues, 
+          TestUtils.spyHook);
     } catch (IllegalArgumentException e) {
       fail("Failed to create queues with 0 capacity: " + e);
     }
@@ -601,75 +599,66 @@ public class TestParentQueue {
     setupSingleLevelQueues(csConf);
     
     Map<String, CSQueue> queues = new HashMap<String, CSQueue>();
-    CSQueue root = CapacityScheduler.parseQueue(csContext, csConf, null,
-        CapacitySchedulerConfiguration.ROOT, queues, queues, TestUtils.spyHook, 
-        null);
+    CSQueue root = 
+        CapacityScheduler.parseQueue(csContext, csConf, null, 
+            CapacitySchedulerConfiguration.ROOT, queues, queues, 
+            TestUtils.spyHook);
 
     // Setup some nodes
     final int memoryPerNode = 10;
     final int coresPerNode = 16;
     final int numNodes = 2;
     
-    FiCaSchedulerNode node_0 =
-        TestUtils.getMockNode("host_0", DEFAULT_RACK, 0, memoryPerNode * GB);
-    FiCaSchedulerNode node_1 =
-        TestUtils.getMockNode("host_1", DEFAULT_RACK, 0, memoryPerNode * GB);
+    FiCaSchedulerNode node_0 = 
+        TestUtils.getMockNode("host_0", DEFAULT_RACK, 0, memoryPerNode*GB);
+    FiCaSchedulerNode node_1 = 
+        TestUtils.getMockNode("host_1", DEFAULT_RACK, 0, memoryPerNode*GB);
     
-    final Resource clusterResource = Resources
-        .createResource(numNodes * (memoryPerNode * GB),
+    final Resource clusterResource = 
+        Resources.createResource(numNodes * (memoryPerNode*GB), 
             numNodes * coresPerNode);
     when(csContext.getNumClusterNodes()).thenReturn(numNodes);
 
     // Start testing
-    LeafQueue a = (LeafQueue) queues.get(A);
-    LeafQueue b = (LeafQueue) queues.get(B);
+    LeafQueue a = (LeafQueue)queues.get(A);
+    LeafQueue b = (LeafQueue)queues.get(B);
     
     // Simulate B returning a container on node_0
-    stubQueueAllocation(a, clusterResource, node_0, 0 * GB,
-        NodeType.OFF_SWITCH);
-    stubQueueAllocation(b, clusterResource, node_0, 1 * GB,
-            NodeType.OFF_SWITCH);
-    root.assignContainers(clusterResource, node_0, new TransactionStateImpl(
-            TransactionState.TransactionType.RM));
-    verifyQueueMetrics(a, 0 * GB, clusterResource);
-    verifyQueueMetrics(b, 1 * GB, clusterResource);
+    stubQueueAllocation(a, clusterResource, node_0, 0*GB, NodeType.OFF_SWITCH);
+    stubQueueAllocation(b, clusterResource, node_0, 1*GB, NodeType.OFF_SWITCH);
+    root.assignContainers(clusterResource, node_0, 
+        new ResourceLimits(clusterResource));
+    verifyQueueMetrics(a, 0*GB, clusterResource);
+    verifyQueueMetrics(b, 1*GB, clusterResource);
     
     // Now, A should get the scheduling opportunity since A=0G/6G, B=1G/14G
     // also, B gets a scheduling opportunity since A allocates RACK_LOCAL
-    stubQueueAllocation(a, clusterResource, node_1, 2 * GB,
-        NodeType.RACK_LOCAL);
-    stubQueueAllocation(b, clusterResource, node_1, 1 * GB,
-            NodeType.OFF_SWITCH);
-    root.assignContainers(clusterResource, node_1, new TransactionStateImpl(
-            TransactionState.TransactionType.RM));
+    stubQueueAllocation(a, clusterResource, node_1, 2*GB, NodeType.RACK_LOCAL);
+    stubQueueAllocation(b, clusterResource, node_1, 1*GB, NodeType.OFF_SWITCH);
+    root.assignContainers(clusterResource, node_1, 
+        new ResourceLimits(clusterResource));
     InOrder allocationOrder = inOrder(a, b);
-    allocationOrder.verify(a)
-        .assignContainers(eq(clusterResource), any(FiCaSchedulerNode.class),
-            any(TransactionState.class));
-    allocationOrder.verify(b)
-        .assignContainers(eq(clusterResource), any(FiCaSchedulerNode.class),
-            any(TransactionState.class));
-    verifyQueueMetrics(a, 2 * GB, clusterResource);
-    verifyQueueMetrics(b, 2 * GB, clusterResource);
+    allocationOrder.verify(a).assignContainers(eq(clusterResource), 
+        any(FiCaSchedulerNode.class), anyResourceLimits());
+    allocationOrder.verify(b).assignContainers(eq(clusterResource), 
+        any(FiCaSchedulerNode.class), anyResourceLimits());
+    verifyQueueMetrics(a, 2*GB, clusterResource);
+    verifyQueueMetrics(b, 2*GB, clusterResource);
     
     // Now, B should get the scheduling opportunity 
     // since A has 2/6G while B has 2/14G, 
     // However, since B returns off-switch, A won't get an opportunity
-    stubQueueAllocation(a, clusterResource, node_0, 1 * GB,
-        NodeType.NODE_LOCAL);
-    stubQueueAllocation(b, clusterResource, node_0, 2 * GB,
-            NodeType.OFF_SWITCH);
-    root.assignContainers(clusterResource, node_0, new TransactionStateImpl(
-            TransactionState.TransactionType.RM));
+    stubQueueAllocation(a, clusterResource, node_0, 1*GB, NodeType.NODE_LOCAL);
+    stubQueueAllocation(b, clusterResource, node_0, 2*GB, NodeType.OFF_SWITCH);
+    root.assignContainers(clusterResource, node_0, 
+        new ResourceLimits(clusterResource));
     allocationOrder = inOrder(b, a);
-    allocationOrder.verify(b)
-        .assignContainers(eq(clusterResource), any(FiCaSchedulerNode.class),
-            any(TransactionState.class));
-    allocationOrder.verify(a)
-        .assignContainers(eq(clusterResource), any(FiCaSchedulerNode.class),
-            any(TransactionState.class));
-    verifyQueueMetrics(a, 2 * GB, clusterResource);
-    verifyQueueMetrics(b, 4 * GB, clusterResource);
+    allocationOrder.verify(b).assignContainers(eq(clusterResource), 
+        any(FiCaSchedulerNode.class), anyResourceLimits());
+    allocationOrder.verify(a).assignContainers(eq(clusterResource), 
+        any(FiCaSchedulerNode.class), anyResourceLimits());
+    verifyQueueMetrics(a, 2*GB, clusterResource);
+    verifyQueueMetrics(b, 4*GB, clusterResource);
 
   }
   
@@ -679,116 +668,107 @@ public class TestParentQueue {
     setupMultiLevelQueues(csConf);
     //B3
     Map<String, CSQueue> queues = new HashMap<String, CSQueue>();
-    CSQueue root = CapacityScheduler.parseQueue(csContext, csConf, null,
-        CapacitySchedulerConfiguration.ROOT, queues, queues, TestUtils.spyHook, 
-        null);
+    CSQueue root = 
+        CapacityScheduler.parseQueue(csContext, csConf, null, 
+            CapacitySchedulerConfiguration.ROOT, queues, queues, 
+            TestUtils.spyHook);
 
     // Setup some nodes
     final int memoryPerNode = 10;
     final int coresPerNode = 10;
     final int numNodes = 2;
     
-    FiCaSchedulerNode node_0 =
-        TestUtils.getMockNode("host_0", DEFAULT_RACK, 0, memoryPerNode * GB);
-    FiCaSchedulerNode node_1 =
-        TestUtils.getMockNode("host_1", DEFAULT_RACK, 0, memoryPerNode * GB);
+    FiCaSchedulerNode node_0 = 
+        TestUtils.getMockNode("host_0", DEFAULT_RACK, 0, memoryPerNode*GB);
+    FiCaSchedulerNode node_1 = 
+        TestUtils.getMockNode("host_1", DEFAULT_RACK, 0, memoryPerNode*GB);
     
-    final Resource clusterResource = Resources
-        .createResource(numNodes * (memoryPerNode * GB),
+    final Resource clusterResource = 
+        Resources.createResource(numNodes * (memoryPerNode*GB),
             numNodes * coresPerNode);
     when(csContext.getNumClusterNodes()).thenReturn(numNodes);
 
     // Start testing
-    LeafQueue b3 = (LeafQueue) queues.get(B3);
-    LeafQueue b2 = (LeafQueue) queues.get(B2);
+    LeafQueue b3 = (LeafQueue)queues.get(B3);
+    LeafQueue b2 = (LeafQueue)queues.get(B2);
     
     // Simulate B3 returning a container on node_0
-    stubQueueAllocation(b2, clusterResource, node_0, 0 * GB,
-        NodeType.OFF_SWITCH);
-    stubQueueAllocation(b3, clusterResource, node_0, 1 * GB,
-            NodeType.OFF_SWITCH);
-    root.assignContainers(clusterResource, node_0, new TransactionStateImpl(
-            TransactionState.TransactionType.RM));
-    verifyQueueMetrics(b2, 0 * GB, clusterResource);
-    verifyQueueMetrics(b3, 1 * GB, clusterResource);
+    stubQueueAllocation(b2, clusterResource, node_0, 0*GB, NodeType.OFF_SWITCH);
+    stubQueueAllocation(b3, clusterResource, node_0, 1*GB, NodeType.OFF_SWITCH);
+    root.assignContainers(clusterResource, node_0, 
+        new ResourceLimits(clusterResource));
+    verifyQueueMetrics(b2, 0*GB, clusterResource);
+    verifyQueueMetrics(b3, 1*GB, clusterResource);
     
     // Now, B2 should get the scheduling opportunity since B2=0G/2G, B3=1G/7G
     // also, B3 gets a scheduling opportunity since B2 allocates RACK_LOCAL
-    stubQueueAllocation(b2, clusterResource, node_1, 1 * GB,
-        NodeType.RACK_LOCAL);
-    stubQueueAllocation(b3, clusterResource, node_1, 1 * GB,
-            NodeType.OFF_SWITCH);
-    root.assignContainers(clusterResource, node_1, new TransactionStateImpl(
-            TransactionState.TransactionType.RM));
+    stubQueueAllocation(b2, clusterResource, node_1, 1*GB, NodeType.RACK_LOCAL);
+    stubQueueAllocation(b3, clusterResource, node_1, 1*GB, NodeType.OFF_SWITCH);
+    root.assignContainers(clusterResource, node_1, 
+        new ResourceLimits(clusterResource));
     InOrder allocationOrder = inOrder(b2, b3);
-    allocationOrder.verify(b2)
-        .assignContainers(eq(clusterResource), any(FiCaSchedulerNode.class),
-            any(TransactionState.class));
-    allocationOrder.verify(b3)
-        .assignContainers(eq(clusterResource), any(FiCaSchedulerNode.class),
-            any(TransactionState.class));
-    verifyQueueMetrics(b2, 1 * GB, clusterResource);
-    verifyQueueMetrics(b3, 2 * GB, clusterResource);
+    allocationOrder.verify(b2).assignContainers(eq(clusterResource), 
+        any(FiCaSchedulerNode.class), anyResourceLimits());
+    allocationOrder.verify(b3).assignContainers(eq(clusterResource), 
+        any(FiCaSchedulerNode.class), anyResourceLimits());
+    verifyQueueMetrics(b2, 1*GB, clusterResource);
+    verifyQueueMetrics(b3, 2*GB, clusterResource);
     
     // Now, B3 should get the scheduling opportunity 
     // since B2 has 1/2G while B3 has 2/7G, 
     // However, since B3 returns off-switch, B2 won't get an opportunity
-    stubQueueAllocation(b2, clusterResource, node_0, 1 * GB,
-        NodeType.NODE_LOCAL);
-    stubQueueAllocation(b3, clusterResource, node_0, 1 * GB,
-            NodeType.OFF_SWITCH);
-    root.assignContainers(clusterResource, node_0, new TransactionStateImpl(
-            TransactionState.TransactionType.RM));
+    stubQueueAllocation(b2, clusterResource, node_0, 1*GB, NodeType.NODE_LOCAL);
+    stubQueueAllocation(b3, clusterResource, node_0, 1*GB, NodeType.OFF_SWITCH);
+    root.assignContainers(clusterResource, node_0, 
+        new ResourceLimits(clusterResource));
     allocationOrder = inOrder(b3, b2);
-    allocationOrder.verify(b3)
-        .assignContainers(eq(clusterResource), any(FiCaSchedulerNode.class),
-            any(TransactionState.class));
-    allocationOrder.verify(b2)
-        .assignContainers(eq(clusterResource), any(FiCaSchedulerNode.class),
-            any(TransactionState.class));
-    verifyQueueMetrics(b2, 1 * GB, clusterResource);
-    verifyQueueMetrics(b3, 3 * GB, clusterResource);
+    allocationOrder.verify(b3).assignContainers(eq(clusterResource), 
+        any(FiCaSchedulerNode.class), anyResourceLimits());
+    allocationOrder.verify(b2).assignContainers(eq(clusterResource), 
+        any(FiCaSchedulerNode.class), anyResourceLimits());
+    verifyQueueMetrics(b2, 1*GB, clusterResource);
+    verifyQueueMetrics(b3, 3*GB, clusterResource);
 
   }
 
-  public boolean hasQueueACL(List<QueueUserACLInfo> aclInfos, QueueACL acl,
-      String qName) {
+  public boolean hasQueueACL(List<QueueUserACLInfo> aclInfos, QueueACL acl, String qName) {
     for (QueueUserACLInfo aclInfo : aclInfos) {
       if (aclInfo.getQueueName().equals(qName)) {
         if (aclInfo.getUserAcls().contains(acl)) {
           return true;
         }
       }
-    }
+    }    
     return false;
   }
 
   @Test
   public void testQueueAcl() throws Exception {
-
+ 
     setupMultiLevelQueues(csConf);
-    csConf.setAcl(CapacitySchedulerConfiguration.ROOT,
-        QueueACL.SUBMIT_APPLICATIONS, " ");
-    csConf
-        .setAcl(CapacitySchedulerConfiguration.ROOT, QueueACL.ADMINISTER_QUEUE,
-            " ");
+    csConf.setAcl(CapacitySchedulerConfiguration.ROOT, QueueACL.SUBMIT_APPLICATIONS, " ");
+    csConf.setAcl(CapacitySchedulerConfiguration.ROOT, QueueACL.ADMINISTER_QUEUE, " ");
 
     final String Q_C = CapacitySchedulerConfiguration.ROOT + "." + C;
     csConf.setAcl(Q_C, QueueACL.ADMINISTER_QUEUE, "*");
-    final String Q_C11 = Q_C + "." + C1 + "." + C11;
+    final String Q_C11= Q_C + "." + C1 +  "." + C11;
     csConf.setAcl(Q_C11, QueueACL.SUBMIT_APPLICATIONS, "*");
 
     Map<String, CSQueue> queues = new HashMap<String, CSQueue>();
-    CSQueue root = CapacityScheduler.parseQueue(csContext, csConf, null,
-        CapacitySchedulerConfiguration.ROOT, queues, queues, TestUtils.spyHook, 
-        null);
+    CSQueue root = 
+        CapacityScheduler.parseQueue(csContext, csConf, null, 
+            CapacitySchedulerConfiguration.ROOT, queues, queues, 
+            TestUtils.spyHook);
+    YarnAuthorizationProvider authorizer =
+        YarnAuthorizationProvider.getInstance(conf);
+    CapacityScheduler.setQueueAcls(authorizer, queues);
 
     UserGroupInformation user = UserGroupInformation.getCurrentUser();
     // Setup queue configs
-    ParentQueue c = (ParentQueue) queues.get(C);
-    ParentQueue c1 = (ParentQueue) queues.get(C1);
-    ParentQueue c11 = (ParentQueue) queues.get(C11);
-    ParentQueue c111 = (ParentQueue) queues.get(C111);
+    ParentQueue c = (ParentQueue)queues.get(C);
+    ParentQueue c1 = (ParentQueue)queues.get(C1);
+    ParentQueue c11 = (ParentQueue)queues.get(C11);
+    ParentQueue c111 = (ParentQueue)queues.get(C111);
 
     assertFalse(root.hasAccess(QueueACL.ADMINISTER_QUEUE, user));
     List<QueueUserACLInfo> aclInfos = root.getQueueUserAclInfo(user);
@@ -799,25 +779,25 @@ public class TestParentQueue {
 
     // c has no SA, but QA
     assertTrue(c.hasAccess(QueueACL.ADMINISTER_QUEUE, user));
-    assertTrue(hasQueueACL(aclInfos, QueueACL.ADMINISTER_QUEUE, "c"));
+    assertTrue(hasQueueACL(aclInfos,  QueueACL.ADMINISTER_QUEUE, "c"));
     assertFalse(c.hasAccess(QueueACL.SUBMIT_APPLICATIONS, user));
     assertFalse(hasQueueACL(aclInfos, QueueACL.SUBMIT_APPLICATIONS, "c"));
 
     //Queue c1 has QA, no SA (gotten perm from parent)
-    assertTrue(c1.hasAccess(QueueACL.ADMINISTER_QUEUE, user));
-    assertTrue(hasQueueACL(aclInfos, QueueACL.ADMINISTER_QUEUE, "c1"));
-    assertFalse(c1.hasAccess(QueueACL.SUBMIT_APPLICATIONS, user));
+    assertTrue(c1.hasAccess(QueueACL.ADMINISTER_QUEUE, user)); 
+    assertTrue(hasQueueACL(aclInfos,  QueueACL.ADMINISTER_QUEUE, "c1"));
+    assertFalse(c1.hasAccess(QueueACL.SUBMIT_APPLICATIONS, user)); 
     assertFalse(hasQueueACL(aclInfos, QueueACL.SUBMIT_APPLICATIONS, "c1"));
 
     //Queue c11 has permissions from parent queue and SA
     assertTrue(c11.hasAccess(QueueACL.ADMINISTER_QUEUE, user));
-    assertTrue(hasQueueACL(aclInfos, QueueACL.ADMINISTER_QUEUE, "c11"));
+    assertTrue(hasQueueACL(aclInfos,  QueueACL.ADMINISTER_QUEUE, "c11"));
     assertTrue(c11.hasAccess(QueueACL.SUBMIT_APPLICATIONS, user));
     assertTrue(hasQueueACL(aclInfos, QueueACL.SUBMIT_APPLICATIONS, "c11"));
 
     //Queue c111 has SA and AQ, both from parent
     assertTrue(c111.hasAccess(QueueACL.ADMINISTER_QUEUE, user));
-    assertTrue(hasQueueACL(aclInfos, QueueACL.ADMINISTER_QUEUE, "c111"));
+    assertTrue(hasQueueACL(aclInfos,  QueueACL.ADMINISTER_QUEUE, "c111"));
     assertTrue(c111.hasAccess(QueueACL.SUBMIT_APPLICATIONS, user));
     assertTrue(hasQueueACL(aclInfos, QueueACL.SUBMIT_APPLICATIONS, "c111"));
 
@@ -826,5 +806,9 @@ public class TestParentQueue {
 
   @After
   public void tearDown() throws Exception {
+  }
+  
+  private ResourceLimits anyResourceLimits() {
+    return any(ResourceLimits.class);
   }
 }

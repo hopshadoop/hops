@@ -1,21 +1,26 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Licensed to the Apache Software Foundation (ASF) under one
+* or more contributor license agreements.  See the NOTICE file
+* distributed with this work for additional information
+* regarding copyright ownership.  The ASF licenses this file
+* to you under the Apache License, Version 2.0 (the
+* "License"); you may not use this file except in compliance
+* with the License.  You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
 package org.apache.hadoop.yarn.server.nodemanager.api.protocolrecords.impl.pb;
+
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+
 
 import org.apache.hadoop.yarn.api.records.impl.pb.ProtoBase;
 import org.apache.hadoop.yarn.proto.YarnServerNodemanagerServiceProtos.LocalizerActionProto;
@@ -27,16 +32,12 @@ import org.apache.hadoop.yarn.server.nodemanager.api.impl.pb.ResourceLocalizatio
 import org.apache.hadoop.yarn.server.nodemanager.api.protocolrecords.LocalizerAction;
 import org.apache.hadoop.yarn.server.nodemanager.api.protocolrecords.LocalizerHeartbeatResponse;
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-
 public class LocalizerHeartbeatResponsePBImpl
-    extends ProtoBase<LocalizerHeartbeatResponseProto>
-    implements LocalizerHeartbeatResponse {
+        extends ProtoBase<LocalizerHeartbeatResponseProto>
+        implements LocalizerHeartbeatResponse {
 
   LocalizerHeartbeatResponseProto proto =
-      LocalizerHeartbeatResponseProto.getDefaultInstance();
+    LocalizerHeartbeatResponseProto.getDefaultInstance();
   LocalizerHeartbeatResponseProto.Builder builder = null;
   boolean viaProto = false;
 
@@ -66,9 +67,8 @@ public class LocalizerHeartbeatResponsePBImpl
   }
 
   private void mergeLocalToProto() {
-    if (viaProto) {
+    if (viaProto)
       maybeInitBuilder();
-    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
@@ -129,39 +129,37 @@ public class LocalizerHeartbeatResponsePBImpl
   private void addResourcesToProto() {
     maybeInitBuilder();
     builder.clearResources();
-    if (this.resourceSpecs == null) {
+    if (this.resourceSpecs == null) 
       return;
-    }
     Iterable<ResourceLocalizationSpecProto> iterable =
         new Iterable<ResourceLocalizationSpecProto>() {
+      @Override
+      public Iterator<ResourceLocalizationSpecProto> iterator() {
+        return new Iterator<ResourceLocalizationSpecProto>() {
+
+          Iterator<ResourceLocalizationSpec> iter = resourceSpecs.iterator();
+
           @Override
-          public Iterator<ResourceLocalizationSpecProto> iterator() {
-            return new Iterator<ResourceLocalizationSpecProto>() {
+          public boolean hasNext() {
+            return iter.hasNext();
+          }
 
-              Iterator<ResourceLocalizationSpec> iter =
-                  resourceSpecs.iterator();
+          @Override
+          public ResourceLocalizationSpecProto next() {
+            ResourceLocalizationSpec resource = iter.next();
+            
+            return ((ResourceLocalizationSpecPBImpl)resource).getProto();
+          }
 
-              @Override
-              public boolean hasNext() {
-                return iter.hasNext();
-              }
-
-              @Override
-              public ResourceLocalizationSpecProto next() {
-                ResourceLocalizationSpec resource = iter.next();
-
-                return ((ResourceLocalizationSpecPBImpl) resource).getProto();
-              }
-
-              @Override
-              public void remove() {
-                throw new UnsupportedOperationException();
-
-              }
-            };
+          @Override
+          public void remove() {
+            throw new UnsupportedOperationException();
 
           }
         };
+
+      }
+    };
     builder.addAllResources(iterable);
   }
 

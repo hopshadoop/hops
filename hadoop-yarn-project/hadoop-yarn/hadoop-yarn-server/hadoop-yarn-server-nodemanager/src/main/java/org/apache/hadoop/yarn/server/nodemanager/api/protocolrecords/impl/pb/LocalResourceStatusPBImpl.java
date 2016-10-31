@@ -1,20 +1,20 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Licensed to the Apache Software Foundation (ASF) under one
+* or more contributor license agreements.  See the NOTICE file
+* distributed with this work for additional information
+* regarding copyright ownership.  The ASF licenses this file
+* to you under the Apache License, Version 2.0 (the
+* "License"); you may not use this file except in compliance
+* with the License.  You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
 package org.apache.hadoop.yarn.server.nodemanager.api.protocolrecords.impl.pb;
 
 import org.apache.hadoop.yarn.api.records.LocalResource;
@@ -34,10 +34,10 @@ import org.apache.hadoop.yarn.server.nodemanager.api.protocolrecords.LocalResour
 import org.apache.hadoop.yarn.server.nodemanager.api.protocolrecords.ResourceStatusType;
 
 public class LocalResourceStatusPBImpl
-    extends ProtoBase<LocalResourceStatusProto> implements LocalResourceStatus {
+  extends ProtoBase<LocalResourceStatusProto> implements LocalResourceStatus {
 
   LocalResourceStatusProto proto =
-      LocalResourceStatusProto.getDefaultInstance();
+    LocalResourceStatusProto.getDefaultInstance();
   LocalResourceStatusProto.Builder builder = null;
   boolean viaProto = false;
 
@@ -63,25 +63,25 @@ public class LocalResourceStatusPBImpl
 
   private void mergeLocalToBuilder() {
     if (this.resource != null &&
-        !((LocalResourcePBImpl) this.resource).getProto()
-            .equals(builder.getResource())) {
+        !((LocalResourcePBImpl)this.resource).getProto()
+          .equals(builder.getResource())) {
       builder.setResource(convertToProtoFormat(this.resource));
     }
-    if (this.localPath != null && !((URLPBImpl) this.localPath).getProto()
-        .equals(builder.getLocalPath())) {
+    if (this.localPath != null &&
+        !((URLPBImpl)this.localPath).getProto()
+          .equals(builder.getLocalPath())) {
       builder.setLocalPath(convertToProtoFormat(this.localPath));
     }
     if (this.exception != null &&
-        !((SerializedExceptionPBImpl) this.exception).getProto()
-            .equals(builder.getException())) {
+        !((SerializedExceptionPBImpl)this.exception).getProto()
+          .equals(builder.getException())) {
       builder.setException(convertToProtoFormat(this.exception));
     }
   }
 
   private void mergeLocalToProto() {
-    if (viaProto) {
+    if (viaProto)
       maybeInitBuilder();
-    }
     mergeLocalToBuilder();
     proto = builder.build();
     viaProto = true;
@@ -152,9 +152,8 @@ public class LocalResourceStatusPBImpl
   @Override
   public void setResource(LocalResource resource) {
     maybeInitBuilder();
-    if (resource == null) {
+    if (resource == null)
       builder.clearResource();
-    }
     this.resource = resource;
   }
 
@@ -171,9 +170,8 @@ public class LocalResourceStatusPBImpl
   @Override
   public void setLocalPath(URL localPath) {
     maybeInitBuilder();
-    if (localPath == null) {
+    if (localPath == null)
       builder.clearLocalPath();
-    }
     this.localPath = localPath;
   }
 
@@ -186,14 +184,13 @@ public class LocalResourceStatusPBImpl
   @Override
   public void setException(SerializedException exception) {
     maybeInitBuilder();
-    if (exception == null) {
+    if (exception == null)
       builder.clearException();
-    }
     this.exception = exception;
   }
 
   private LocalResourceProto convertToProtoFormat(LocalResource rsrc) {
-    return ((LocalResourcePBImpl) rsrc).getProto();
+    return ((LocalResourcePBImpl)rsrc).getProto();
   }
 
   private LocalResourcePBImpl convertFromProtoFormat(LocalResourceProto rsrc) {
@@ -205,7 +202,7 @@ public class LocalResourceStatusPBImpl
   }
 
   private URLProto convertToProtoFormat(URL t) {
-    return ((URLPBImpl) t).getProto();
+    return ((URLPBImpl)t).getProto();
   }
 
   private ResourceStatusTypeProto convertToProtoFormat(ResourceStatusType e) {
@@ -216,13 +213,12 @@ public class LocalResourceStatusPBImpl
     return ResourceStatusType.valueOf(e.name());
   }
 
-  private SerializedExceptionPBImpl convertFromProtoFormat(
-      SerializedExceptionProto p) {
+  private SerializedExceptionPBImpl convertFromProtoFormat(SerializedExceptionProto p) {
     return new SerializedExceptionPBImpl(p);
   }
 
   private SerializedExceptionProto convertToProtoFormat(SerializedException t) {
-    return ((SerializedExceptionPBImpl) t).getProto();
+    return ((SerializedExceptionPBImpl)t).getProto();
   }
 
 }

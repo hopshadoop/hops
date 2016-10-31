@@ -18,18 +18,17 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair;
 
-import org.apache.hadoop.security.GroupMappingServiceProvider;
-
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+
+import org.apache.hadoop.security.GroupMappingServiceProvider;
 
 public class SimpleGroupsMapping implements GroupMappingServiceProvider {
   
   @Override
   public List<String> getGroups(String user) {
-    return Arrays
-        .asList(user + "group", user + "subgroup1", user + "subgroup2");
+    return Arrays.asList(user + "group", user + "subgroup1", user + "subgroup2");
   }
 
   @Override

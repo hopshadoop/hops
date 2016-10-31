@@ -1,33 +1,34 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Licensed to the Apache Software Foundation (ASF) under one
+* or more contributor license agreements.  See the NOTICE file
+* distributed with this work for additional information
+* regarding copyright ownership.  The ASF licenses this file
+* to you under the Apache License, Version 2.0 (the
+* "License"); you may not use this file except in compliance
+* with the License.  You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
 
 package org.apache.hadoop.yarn.ipc;
-
-import com.google.protobuf.ServiceException;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.ipc.RemoteException;
-import org.apache.hadoop.yarn.exceptions.YarnException;
 
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 
-@InterfaceAudience.LimitedPrivate({"MapReduce", "YARN"})
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.ipc.RemoteException;
+import org.apache.hadoop.yarn.exceptions.YarnException;
+
+import com.google.protobuf.ServiceException;
+
+@InterfaceAudience.LimitedPrivate({ "MapReduce", "YARN" })
 public class RPCUtil {
 
   /**
@@ -71,11 +72,11 @@ public class RPCUtil {
 
   /**
    * Utility method that unwraps and returns appropriate exceptions.
-   *
+   * 
    * @param se
-   *     ServiceException
+   *          ServiceException
    * @return An instance of the actual exception, which will be a subclass of
-   * {@link YarnException} or {@link IOException}
+   *         {@link YarnException} or {@link IOException}
    */
   public static Void unwrapAndThrowException(ServiceException se)
       throws IOException, YarnException {
@@ -97,8 +98,8 @@ public class RPCUtil {
         }
 
         if (YarnException.class.isAssignableFrom(realClass)) {
-          throw instantiateException(realClass.asSubclass(YarnException.class),
-              re);
+          throw instantiateException(
+              realClass.asSubclass(YarnException.class), re);
         } else if (IOException.class.isAssignableFrom(realClass)) {
           throw instantiateException(realClass.asSubclass(IOException.class),
               re);

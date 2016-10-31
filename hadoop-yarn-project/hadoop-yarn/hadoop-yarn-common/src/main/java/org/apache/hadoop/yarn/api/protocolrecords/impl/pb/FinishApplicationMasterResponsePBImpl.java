@@ -19,19 +19,19 @@
 package org.apache.hadoop.yarn.api.protocolrecords.impl.pb;
 
 
-import com.google.protobuf.TextFormat;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.protocolrecords.FinishApplicationMasterResponse;
+import org.apache.hadoop.yarn.proto.YarnProtos.ResourceRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.FinishApplicationMasterResponseProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.FinishApplicationMasterResponseProtoOrBuilder;
 
+import com.google.protobuf.TextFormat;
+
 @Private
 @Unstable
-public class FinishApplicationMasterResponsePBImpl
-    extends FinishApplicationMasterResponse {
-  FinishApplicationMasterResponseProto proto =
-      FinishApplicationMasterResponseProto.getDefaultInstance();
+public class FinishApplicationMasterResponsePBImpl extends FinishApplicationMasterResponse {
+  FinishApplicationMasterResponseProto proto = FinishApplicationMasterResponseProto.getDefaultInstance();
   FinishApplicationMasterResponseProto.Builder builder = null;
   boolean viaProto = false;
   
@@ -39,8 +39,7 @@ public class FinishApplicationMasterResponsePBImpl
     builder = FinishApplicationMasterResponseProto.newBuilder();
   }
 
-  public FinishApplicationMasterResponsePBImpl(
-      FinishApplicationMasterResponseProto proto) {
+  public FinishApplicationMasterResponsePBImpl(FinishApplicationMasterResponseProto proto) {
     this.proto = proto;
     viaProto = true;
   }
@@ -58,9 +57,8 @@ public class FinishApplicationMasterResponsePBImpl
 
   @Override
   public boolean equals(Object other) {
-    if (other == null) {
+    if (other == null)
       return false;
-    }
     if (other.getClass().isAssignableFrom(this.getClass())) {
       return this.getProto().equals(this.getClass().cast(other).getProto());
     }

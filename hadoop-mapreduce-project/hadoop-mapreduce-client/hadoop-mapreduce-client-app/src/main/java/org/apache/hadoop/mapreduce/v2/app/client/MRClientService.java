@@ -131,7 +131,8 @@ public class MRClientService extends AbstractService implements ClientService {
     }
 
     server.start();
-    this.bindAddress = NetUtils.getConnectAddress(server);
+    this.bindAddress = NetUtils.createSocketAddrForHost(appContext.getNMHostname(),
+        server.getListenerAddress().getPort());
     LOG.info("Instantiated MRClientService at " + this.bindAddress);
     try {
       // Explicitly disabling SSL for map reduce task as we can't allow MR users
@@ -183,11 +184,14 @@ public class MRClientService extends AbstractService implements ClientService {
       return getBindAddress();
     }
     
-    private Job verifyAndGetJob(JobId jobID,
-        JobACL accessType) throws IOException {
+    private Job verifyAndGetJob(JobId jobID, JobACL accessType,
+        boolean exceptionThrow) throws IOException {
       Job job = appContext.getJob(jobID);
+      if (job == null && exceptionThrow) {
+        throw new IOException("Unknown Job " + jobID);
+      }
       UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
-      if (!job.checkAccess(ugi, accessType)) {
+      if (job != null && !job.checkAccess(ugi, accessType)) {
         throw new AccessControlException("User " + ugi.getShortUserName()
             + " cannot perform operation " + accessType.name() + " on "
             + jobID);
@@ -197,8 +201,8 @@ public class MRClientService extends AbstractService implements ClientService {
  
     private Task verifyAndGetTask(TaskId taskID, 
         JobACL accessType) throws IOException {
-      Task task = verifyAndGetJob(taskID.getJobId(), 
-          accessType).getTask(taskID);
+      Task task =
+          verifyAndGetJob(taskID.getJobId(), accessType, true).getTask(taskID);
       if (task == null) {
         throw new IOException("Unknown Task " + taskID);
       }
@@ -219,7 +223,7 @@ public class MRClientService extends AbstractService implements ClientService {
     public GetCountersResponse getCounters(GetCountersRequest request) 
       throws IOException {
       JobId jobId = request.getJobId();
-      Job job = verifyAndGetJob(jobId, JobACL.VIEW_JOB);
+      Job job = verifyAndGetJob(jobId, JobACL.VIEW_JOB, true);
       GetCountersResponse response =
         recordFactory.newRecordInstance(GetCountersResponse.class);
       response.setCounters(TypeConverter.toYarn(job.getAllCounters()));
@@ -230,7 +234,8 @@ public class MRClientService extends AbstractService implements ClientService {
     public GetJobReportResponse getJobReport(GetJobReportRequest request) 
       throws IOException {
       JobId jobId = request.getJobId();
-      Job job = verifyAndGetJob(jobId, JobACL.VIEW_JOB);
+      // false is for retain compatibility
+      Job job = verifyAndGetJob(jobId, JobACL.VIEW_JOB, false);
       GetJobReportResponse response = 
         recordFactory.newRecordInstance(GetJobReportResponse.class);
       if (job != null) {
@@ -271,7 +276,7 @@ public class MRClientService extends AbstractService implements ClientService {
       JobId jobId = request.getJobId();
       int fromEventId = request.getFromEventId();
       int maxEvents = request.getMaxEvents();
-      Job job = verifyAndGetJob(jobId, JobACL.VIEW_JOB);
+      Job job = verifyAndGetJob(jobId, JobACL.VIEW_JOB, true);
       
       GetTaskAttemptCompletionEventsResponse response = 
         recordFactory.newRecordInstance(GetTaskAttemptCompletionEventsResponse.class);
@@ -289,7 +294,7 @@ public class MRClientService extends AbstractService implements ClientService {
       String message = "Kill job " + jobId + " received from " + callerUGI
           + " at " + Server.getRemoteAddress();
       LOG.info(message);
-      verifyAndGetJob(jobId, JobACL.MODIFY_JOB);
+      verifyAndGetJob(jobId, JobACL.MODIFY_JOB, false);
       appContext.getEventHandler().handle(
           new JobDiagnosticsUpdateEvent(jobId, message));
       appContext.getEventHandler().handle(
@@ -381,7 +386,7 @@ public class MRClientService extends AbstractService implements ClientService {
       GetTaskReportsResponse response = 
         recordFactory.newRecordInstance(GetTaskReportsResponse.class);
       
-      Job job = verifyAndGetJob(jobId, JobACL.VIEW_JOB);
+      Job job = verifyAndGetJob(jobId, JobACL.VIEW_JOB, true);
       Collection<Task> tasks = job.getTasks(taskType).values();
       LOG.info("Getting task report for " + taskType + "   " + jobId
           + ". Report-size will be " + tasks.size());

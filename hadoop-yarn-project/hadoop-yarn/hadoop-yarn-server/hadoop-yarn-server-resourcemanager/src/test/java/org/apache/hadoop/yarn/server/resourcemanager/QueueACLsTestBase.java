@@ -1,26 +1,34 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Licensed to the Apache Software Foundation (ASF) under one
+* or more contributor license agreements.  See the NOTICE file
+* distributed with this work for additional information
+* regarding copyright ownership.  The ASF licenses this file
+* to you under the Apache License, Version 2.0 (the
+* "License"); you may not use this file except in compliance
+* with the License.  You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
 
 package org.apache.hadoop.yarn.server.resourcemanager;
 
-import io.hops.metadata.util.RMStorageFactory;
-import io.hops.metadata.util.YarnAPIStorageFactory;
-import junit.framework.Assert;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.security.PrivilegedExceptionAction;
+import java.util.HashMap;
+import java.util.Map;
+
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
+import org.junit.Assert;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -47,12 +55,6 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.security.PrivilegedExceptionAction;
-import java.util.HashMap;
-import java.util.Map;
-
 public abstract class QueueACLsTestBase {
 
   protected static final String COMMON_USER = "common_user";
@@ -76,23 +78,23 @@ public abstract class QueueACLsTestBase {
   public void setup() throws InterruptedException, IOException {
     conf = createConfiguration();
     rpc = YarnRPC.create(conf);
-    rmAddress = conf.getSocketAddr(YarnConfiguration.RM_ADDRESS,
-        YarnConfiguration.DEFAULT_RM_ADDRESS,
-        YarnConfiguration.DEFAULT_RM_PORT);
+    rmAddress = conf.getSocketAddr(
+      YarnConfiguration.RM_ADDRESS, YarnConfiguration.DEFAULT_RM_ADDRESS,
+      YarnConfiguration.DEFAULT_RM_PORT);
     
     AccessControlList adminACL = new AccessControlList("");
     conf.set(YarnConfiguration.YARN_ADMIN_ACL, adminACL.getAclString());
-    YarnAPIStorageFactory.setConfiguration(conf);
+
     RMStorageFactory.setConfiguration(conf);
+    YarnAPIStorageFactory.setConfiguration(conf);
+    DBUtility.InitializeDB();
+
     resourceManager = new MockRM(conf) {
       protected ClientRMService createClientRMService() {
         return new ClientRMService(getRMContext(), this.scheduler,
-            this.rmAppManager, this.applicationACLsManager,
-            this.queueACLsManager,
-            getRMContext().getRMDelegationTokenSecretManager());
-      }
-
-      ;
+          this.rmAppManager, this.applicationACLsManager,
+          this.queueACLsManager, getRMContext().getRMDelegationTokenSecretManager());
+      };
 
       @Override
       protected void doSecureLogin() throws IOException {
@@ -101,20 +103,18 @@ public abstract class QueueACLsTestBase {
     new Thread() {
       public void run() {
         resourceManager.start();
-      }
-
-      ;
+      };
     }.start();
     int waitCount = 0;
-    while (resourceManager.getServiceState() == STATE.INITED &&
-        waitCount++ < 60) {
+    while (resourceManager.getServiceState() == STATE.INITED
+        && waitCount++ < 60) {
       LOG.info("Waiting for RM to start...");
       Thread.sleep(1500);
     }
     if (resourceManager.getServiceState() != STATE.STARTED) {
       // RM could have failed.
-      throw new IOException("ResourceManager failed to start. Final state is " +
-          resourceManager.getServiceState());
+      throw new IOException("ResourceManager failed to start. Final state is "
+          + resourceManager.getServiceState());
     }
   }
 
@@ -165,9 +165,9 @@ public abstract class QueueACLsTestBase {
     GetApplicationReportResponse adMinUserGetReport =
         adMinUserClient.getApplicationReport(appReportRequest);
 
-    Assert.assertEquals(
-        submitterGetReport.getApplicationReport().getClientToAMToken(),
-        adMinUserGetReport.getApplicationReport().getClientToAMToken());
+    Assert.assertEquals(submitterGetReport.getApplicationReport()
+      .getClientToAMToken(), adMinUserGetReport.getApplicationReport()
+      .getClientToAMToken());
   }
 
   private void verifyKillAppFailure(String submitter, String killer,
@@ -188,8 +188,8 @@ public abstract class QueueACLsTestBase {
     } catch (YarnException e) {
       LOG.info("Got exception while killing app as the enemy", e);
       Assert.assertTrue(e.getMessage().contains(
-          "User " + killer + " cannot perform operation MODIFY_APP on " +
-              applicationId));
+        "User " + killer + " cannot perform operation MODIFY_APP on "
+            + applicationId));
     }
 
     getRMClientForUser(submitter).forceKillApplication(finishAppRequest);
@@ -210,8 +210,8 @@ public abstract class QueueACLsTestBase {
     resourceManager.waitForState(applicationId, RMAppState.KILLED);
   }
 
-  private ApplicationId submitAppAndGetAppId(String submitter, String queueName,
-      boolean setupACLs) throws Exception {
+  private ApplicationId submitAppAndGetAppId(String submitter,
+      String queueName, boolean setupACLs) throws Exception {
 
     GetNewApplicationRequest newAppRequest =
         GetNewApplicationRequest.newInstance();
@@ -226,9 +226,9 @@ public abstract class QueueACLsTestBase {
         ContainerLaunchContext.newInstance(null, null, null, null, null, acls);
 
     ApplicationSubmissionContext appSubmissionContext =
-        ApplicationSubmissionContext
-            .newInstance(applicationId, "applicationName", queueName, null,
-                amContainerSpec, false, true, 1, resource, "applicationType");
+        ApplicationSubmissionContext.newInstance(applicationId,
+          "applicationName", queueName, null, amContainerSpec, false, true, 1,
+          resource, "applicationType");
     appSubmissionContext.setApplicationId(applicationId);
     appSubmissionContext.setQueue(queueName);
 
@@ -259,14 +259,15 @@ public abstract class QueueACLsTestBase {
   private ApplicationClientProtocol getRMClientForUser(String user)
       throws IOException, InterruptedException {
     UserGroupInformation userUGI = UserGroupInformation.createRemoteUser(user);
-    ApplicationClientProtocol userClient = userUGI
-        .doAs(new PrivilegedExceptionAction<ApplicationClientProtocol>() {
-          @Override
-          public ApplicationClientProtocol run() throws Exception {
-            return (ApplicationClientProtocol) rpc
-                .getProxy(ApplicationClientProtocol.class, rmAddress, conf);
-          }
-        });
+    ApplicationClientProtocol userClient =
+        userUGI
+          .doAs(new PrivilegedExceptionAction<ApplicationClientProtocol>() {
+            @Override
+            public ApplicationClientProtocol run() throws Exception {
+              return (ApplicationClientProtocol) rpc.getProxy(
+                ApplicationClientProtocol.class, rmAddress, conf);
+            }
+          });
     return userClient;
   }
 
