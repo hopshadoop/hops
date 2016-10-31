@@ -4,7 +4,7 @@
     <parent>
         <groupId>io.hops</groupId>
         <artifactId>hadoop-tools</artifactId>
-        <version>2.4.0</version>
+        <version>2.7.3</version>
     </parent>
     <artifactId>distributedLoadSimulator</artifactId>
     <packaging>jar</packaging>

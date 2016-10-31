@@ -19,12 +19,12 @@
   <parent>
     <artifactId>hadoop-yarn-server</artifactId>
     <groupId>io.hops</groupId>
-    <version>2.4.0</version>
+    <version>2.7.3</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
   <groupId>io.hops</groupId>
   <artifactId>hadoop-yarn-server-resourcemanager</artifactId>
-  <version>2.4.0</version>
+  <version>2.7.3</version>
   <name>hadoop-yarn-server-resourcemanager</name>
 
   <properties>
@@ -36,7 +36,7 @@
     <dependency>
       <groupId>io.hops</groupId>
       <artifactId>hops-leader-election</artifactId>
-      <version>2.4.0</version>
+      <version>2.7.3</version>
     </dependency>
     <dependency>
       <groupId>io.hops.metadata</groupId>
