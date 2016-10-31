@@ -183,6 +183,8 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
         (base + YarnConfiguration.DEFAULT_RM_WEBAPP_PORT));
     setConfForRM(rmId, YarnConfiguration.RM_WEBAPP_HTTPS_ADDRESS, "0.0.0.0:" +
         (base + YarnConfiguration.DEFAULT_RM_WEBAPP_HTTPS_PORT));
+    setConfForRM(rmId, YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS, "0.0.0.0:" +
+        (base + YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_PORT));
   }
 
   @Before
