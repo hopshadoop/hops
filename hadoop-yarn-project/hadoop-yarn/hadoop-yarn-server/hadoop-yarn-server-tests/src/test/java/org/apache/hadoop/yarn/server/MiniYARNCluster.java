@@ -335,6 +335,10 @@ public class MiniYARNCluster extends CompositeService {
 
   private synchronized void startResourceManager(final int index) {
     try {
+      Configuration conf = getConfig();
+      if (HAUtil.isHAEnabled(conf)) {
+        conf.set(YarnConfiguration.RM_HA_ID, rmIds[index]);
+      }
       resourceManagers[index].start();
       if (resourceManagers[index].getServiceState() != STATE.STARTED) {
         // RM could have failed.

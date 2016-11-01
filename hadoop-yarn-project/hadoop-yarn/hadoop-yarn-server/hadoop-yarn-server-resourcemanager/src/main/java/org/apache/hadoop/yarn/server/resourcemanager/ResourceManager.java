@@ -245,9 +245,12 @@ public class ResourceManager extends CompositeService implements Recoverable {
     this.rmContext.setHAEnabled(HAUtil.isHAEnabled(this.conf));
     if (this.rmContext.isHAEnabled()) {
       HAUtil.verifyAndSetConfiguration(this.conf);
-      groupMembershipService = createGroupMembershipService();
-      addService(groupMembershipService);
-      rmContext.setRMGroupMembershipService(groupMembershipService);
+      if (this.rmContext.isDistributed() || HAUtil.isAutomaticFailoverEnabled(
+              conf)) {
+        groupMembershipService = createGroupMembershipService();
+        addService(groupMembershipService);
+        rmContext.setRMGroupMembershipService(groupMembershipService);
+      }
     }else if(this.rmContext.isDistributed()){
       groupMembershipService = createGroupMembershipService();
       addService(groupMembershipService);
@@ -1179,7 +1182,9 @@ LOG.info("+");
     if (state == HAServiceProtocol.HAServiceState.ACTIVE) {
       stopSchedulerServices();
       resourceTrackingService.stop();
-      if ((this.rmContext.isHAEnabled()|| this.rmContext.isDistributed()) && rmContext.isLeader()) {
+      if (((this.rmContext.isHAEnabled()
+              && HAUtil.isAutomaticFailoverEnabled(conf)) || this.rmContext.
+              isDistributed()) && rmContext.isLeader()) {
         groupMembershipService.relinquishId();
       }
       reinitialize(initialize);
@@ -1198,8 +1203,10 @@ LOG.info("+");
     try{
     if (this.rmContext.isHAEnabled() || this.rmContext.isDistributed()) {
       transitionToStandby(true);
-      LOG.info("start gms");
-      groupMembershipService.start();
+      if (HAUtil.isAutomaticFailoverEnabled(conf)|| this.rmContext.isDistributed()) {
+        LOG.info("start gms");
+        groupMembershipService.start();
+      }
     } else {
       transitionToActive();
     }

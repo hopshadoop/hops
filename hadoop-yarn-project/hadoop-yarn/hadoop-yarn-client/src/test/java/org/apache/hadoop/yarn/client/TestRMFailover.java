@@ -103,6 +103,8 @@ public class TestRMFailover extends ClientBaseWithFixes {
 
     conf.setBoolean(YarnConfiguration.YARN_MINICLUSTER_FIXED_PORTS, true);
     conf.setBoolean(YarnConfiguration.YARN_MINICLUSTER_USE_RPC, true);
+    conf.set(YarnConfiguration.LEADER_CLIENT_FAILOVER_PROXY_PROVIDER,
+            "org.apache.hadoop.yarn.client.ConfiguredRMFailoverProxyProvider");
 
     cluster = new MiniYARNCluster(TestRMFailover.class.getName(), 2, 1, 1, 1);
   }
