@@ -43,8 +43,10 @@ import org.apache.hadoop.service.CompositeService;
 import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
 import org.apache.hadoop.yarn.api.records.ContainerState;
 import org.apache.hadoop.yarn.api.records.Resource;
+import org.apache.hadoop.yarn.api.records.impl.pb.ResourcePBImpl;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
+import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 
 public class ContainersLogsService extends CompositeService {
@@ -240,9 +242,15 @@ public class ContainersLogsService extends CompositeService {
       }
       cl = activeContainers.get(cs.getContainerid());
       if (cl == null) {
-        Resource containerResources = rMContext.getScheduler().getRMContainer(
-                ConverterUtils.toContainerId(cs.getContainerid())).
-                getContainer().getResource();
+        RMContainer container = rMContext.getScheduler().getRMContainer(
+                ConverterUtils.toContainerId(cs.getContainerid()));
+        Resource containerResources = null;
+        if(container==null){
+          containerResources = Resource.newInstance(0,
+                  0);
+        }else{
+          containerResources = container.getContainer().getResource();
+        }
         cl = new ContainerLog(cs.getContainerid(), tickCounter.getValue(),
                 ContainerExitStatus.CONTAINER_RUNNING_STATE,
                 currentMultiplicator, containerResources.getVirtualCores(),
