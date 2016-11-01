@@ -1860,22 +1860,35 @@ RM_PREFIX + "resource-tracker.port";
   public InetSocketAddress getSocketAddr(String name, String defaultAddress,
           int defaultPort, String host) {
     String address = null;
+    boolean found = false;
     if (HAUtil.isHAEnabled(this) && getServiceAddressConfKeys(this).contains(
             name)) {
-      String[] rmHAIds = this.get(YarnConfiguration.RM_HA_IDS).split(",");
+      System.out.println("<Leader> HA");
 
-      for (int i = 0; i < rmHAIds.length; ++i) {
-        address = this.get(HAUtil.addSuffix(name, rmHAIds[i]));
+      for (String rmHAId : HAUtil.getRMHAIds(this)) {
+        String tmpLeaderHost = get(HAUtil.addSuffix(YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS, rmHAId));
+        String tmpProxy = get(HAUtil.addSuffix(name, rmHAId));
+        System.out.println("<Leader> " + HAUtil.addSuffix(YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS, rmHAId) + ": " + tmpLeaderHost);
+        System.out.println("<Leader> " + HAUtil.addSuffix(name, rmHAId) + ": " + tmpProxy);
 
-        if (address != null && address.equals(host)) {
+        if (tmpLeaderHost.equals(host)) {
+          found = true;
+          address = tmpProxy;
           break;
         }
       }
 
+      if (!found) {
+        System.out.println("<Leader> HA falling back to default address");
+        address = defaultAddress;
+      }
+
     } else {
+      System.out.println("<Leader> Non HA");
       address = get(name, defaultAddress);
     }
     if (address != null) {
+      System.out.println("<Leader> Leader is " + host + " and I return " + address);
       return NetUtils.createSocketAddr(address, defaultPort, name);
     }
 
@@ -1908,6 +1921,8 @@ RM_PREFIX + "resource-tracker.port";
       return YarnConfiguration.DEFAULT_RM_RESOURCE_TRACKER_PORT;
     } else if (addressPrefix.equals(YarnConfiguration.RM_ADMIN_ADDRESS)) {
       return YarnConfiguration.DEFAULT_RM_ADMIN_PORT;
+    } else if (addressPrefix.equals(YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS)) {
+      return YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_PORT;
     } else {
       throw new HadoopIllegalArgumentException(
           "Invalid RM RPC address Prefix: " + addressPrefix

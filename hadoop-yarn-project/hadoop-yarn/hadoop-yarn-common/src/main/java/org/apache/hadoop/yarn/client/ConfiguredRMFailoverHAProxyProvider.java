@@ -84,11 +84,11 @@ public abstract class ConfiguredRMFailoverHAProxyProvider<T>
 
   private T createProxy(ActiveNode leader) {
     try {
-
+      final String leaderHost = leader.getHostname();
       final InetSocketAddress rmAddress = rmProxy
           //.getRMAddress(conf, protocol, leader.getIpAddress(),
           //    leader.getPort());
-          .getRMAddress(conf, protocol, leader.getIpAddress());
+          .getRMAddress(conf, protocol, leaderHost);
       LOG.info("creating proxy from active nodes " + currentRMId + " " +
           rmAddress.getPort());
       return RMProxy.getProxy(conf, protocol, rmAddress);
