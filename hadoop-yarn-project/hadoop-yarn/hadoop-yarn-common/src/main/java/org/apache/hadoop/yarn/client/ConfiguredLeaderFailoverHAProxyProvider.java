@@ -26,7 +26,11 @@ public class ConfiguredLeaderFailoverHAProxyProvider<T>
 
   protected ActiveNode getActiveNode() {
     ActiveNode node = groupMembership.getLeader();
-    LOG.info("geting leader : " + node.getHostname());
+    if (node != null) {
+      LOG.info("geting leader : " + node.getHostname());
+    } else {
+      LOG.info("geting leader : " + null);
+    }
     return node;
   }
 }

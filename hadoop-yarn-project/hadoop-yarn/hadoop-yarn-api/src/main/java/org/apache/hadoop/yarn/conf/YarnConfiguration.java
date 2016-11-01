@@ -1857,21 +1857,11 @@ RM_PREFIX + "resource-tracker.port";
     return NetUtils.createSocketAddr(address, defaultPort, name);
   }
 
-  public InetSocketAddress getSocketAddr(String name, String defaultAddress,
-          int defaultPort, String host) {
-    String address = null;
-    if (HAUtil.isHAEnabled(this) && getServiceAddressConfKeys(this).contains(
-            name)) {
-      String[] rmHAIds = this.get(YarnConfiguration.RM_HA_IDS).split(",");
-
-      for (int i = 0; i < rmHAIds.length; ++i) {
-        address = this.get(HAUtil.addSuffix(name, rmHAIds[i]));
-
-        if (address != null && address.equals(host)) {
-          break;
-        }
-      }
-
+  public InetSocketAddress getSocketAddr(
+      String name, String defaultAddress, int defaultPort, String host) {
+    String address;
+    if (HAUtil.isHAEnabled(this) && getServiceAddressConfKeys(this).contains(name)) {
+      address = HAUtil.getConfValueForRMInstance(name, defaultAddress, this, host);
     } else {
       address = get(name, defaultAddress);
     }
