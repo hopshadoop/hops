@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.yarn.client.api.impl;
 
+import io.hops.util.DBUtility;
+import io.hops.util.RMStorageFactory;
+import io.hops.util.YarnAPIStorageFactory;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -268,6 +271,10 @@ public class TestYarnClient {
   public void testApplicationType() throws Exception {
     Logger rootLogger = LogManager.getRootLogger();
     rootLogger.setLevel(Level.DEBUG);
+    Configuration conf = new YarnConfiguration();
+    RMStorageFactory.setConfiguration(conf);
+    YarnAPIStorageFactory.setConfiguration(conf);
+    DBUtility.InitializeDB();
     MockRM rm = new MockRM();
     rm.start();
     RMApp app = rm.submitApp(2000);
@@ -284,6 +291,10 @@ public class TestYarnClient {
   public void testApplicationTypeLimit() throws Exception {
     Logger rootLogger = LogManager.getRootLogger();
     rootLogger.setLevel(Level.DEBUG);
+    Configuration conf = new YarnConfiguration();
+    RMStorageFactory.setConfiguration(conf);
+    YarnAPIStorageFactory.setConfiguration(conf);
+    DBUtility.InitializeDB();
     MockRM rm = new MockRM();
     rm.start();
     RMApp app1 =
@@ -1238,7 +1249,10 @@ public class TestYarnClient {
   public void testShouldNotRetryForeverForNonNetworkExceptions() throws Exception {
     YarnConfiguration conf = new YarnConfiguration();
     conf.setInt(YarnConfiguration.RESOURCEMANAGER_CONNECT_MAX_WAIT_MS, -1);
-
+    RMStorageFactory.setConfiguration(conf);
+    YarnAPIStorageFactory.setConfiguration(conf);
+    DBUtility.InitializeDB();
+    
     ResourceManager rm = null;
     YarnClient yarnClient = null;
     try {

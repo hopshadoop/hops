@@ -279,7 +279,7 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
             }
           }
           try {
-            Thread.sleep(50);
+            Thread.sleep(500);
           } catch (InterruptedException e) {
             // DO NOTHING
           }

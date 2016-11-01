@@ -245,9 +245,12 @@ public class ResourceManager extends CompositeService implements Recoverable {
     this.rmContext.setHAEnabled(HAUtil.isHAEnabled(this.conf));
     if (this.rmContext.isHAEnabled()) {
       HAUtil.verifyAndSetConfiguration(this.conf);
-      groupMembershipService = createGroupMembershipService();
-      addService(groupMembershipService);
-      rmContext.setRMGroupMembershipService(groupMembershipService);
+      if (this.rmContext.isDistributed() || HAUtil.isAutomaticFailoverEnabled(
+              conf)) {
+        groupMembershipService = createGroupMembershipService();
+        addService(groupMembershipService);
+        rmContext.setRMGroupMembershipService(groupMembershipService);
+      }
     }else if(this.rmContext.isDistributed()){
       groupMembershipService = createGroupMembershipService();
       addService(groupMembershipService);
@@ -1127,7 +1130,7 @@ LOG.info("+");
       return;
     }
 
-    LOG.info("Transitioning to active state " + groupMembershipService.getRMId());
+    LOG.info("Transitioning to active state " + HAUtil.getRMHAId(conf));
 
     stopSchedulerServices();
     if(resourceTrackingService.isInState(STATE.STARTED)){
@@ -1155,7 +1158,7 @@ LOG.info("+");
 //    }
 
     rmContext.setHAServiceState(HAServiceProtocol.HAServiceState.ACTIVE);
-    LOG.info("Transitioned to active state " + groupMembershipService.getRMId());
+    LOG.info("Transitioned to active state " + HAUtil.getRMHAId(conf));
     }finally{
       LOG.info("unlocked resourceTrackingServiceStart");
       resourceTrackingServiceStartStopLock.unlock();
@@ -1173,18 +1176,20 @@ LOG.info("+");
       return;
     }
 
-    LOG.info("Transitioning to standby state " + groupMembershipService.getRMId());
+    LOG.info("Transitioning to standby state " + HAUtil.getRMHAId(conf));
     HAServiceState state = rmContext.getHAServiceState();
     rmContext.setHAServiceState(HAServiceProtocol.HAServiceState.STANDBY);
     if (state == HAServiceProtocol.HAServiceState.ACTIVE) {
       stopSchedulerServices();
       resourceTrackingService.stop();
-      if ((this.rmContext.isHAEnabled()|| this.rmContext.isDistributed()) && rmContext.isLeader()) {
+      if (((this.rmContext.isHAEnabled()
+              && HAUtil.isAutomaticFailoverEnabled(conf)) || this.rmContext.
+              isDistributed()) && rmContext.isLeader()) {
         groupMembershipService.relinquishId();
       }
       reinitialize(initialize);
     }
-    LOG.info("Transitioned to standby state " + groupMembershipService.getRMId());
+    LOG.info("Transitioned to standby state " + HAUtil.getRMHAId(conf));
     }finally{
       LOG.info("unlocked resourceTrackingServiceStart");
       resourceTrackingServiceStartStopLock.unlock();
@@ -1198,8 +1203,10 @@ LOG.info("+");
     try{
     if (this.rmContext.isHAEnabled() || this.rmContext.isDistributed()) {
       transitionToStandby(true);
-      LOG.info("start gms");
-      groupMembershipService.start();
+      if (HAUtil.isAutomaticFailoverEnabled(conf)|| this.rmContext.isDistributed()) {
+        LOG.info("start gms");
+        groupMembershipService.start();
+      }
     } else {
       transitionToActive();
     }

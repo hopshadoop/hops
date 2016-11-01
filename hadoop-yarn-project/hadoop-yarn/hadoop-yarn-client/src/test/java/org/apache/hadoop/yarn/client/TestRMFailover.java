@@ -87,7 +87,7 @@ public class TestRMFailover extends ClientBaseWithFixes {
     setConfForRM(rmId, YarnConfiguration.RM_WEBAPP_HTTPS_ADDRESS, "0.0.0.0:" +
         (base + YarnConfiguration.DEFAULT_RM_WEBAPP_HTTPS_PORT));
     setConfForRM(rmId, YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS, "0.0.0.0:" +
-            (base + YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_PORT));
+        (base + YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_PORT));
   }
 
   @Before
@@ -103,6 +103,8 @@ public class TestRMFailover extends ClientBaseWithFixes {
 
     conf.setBoolean(YarnConfiguration.YARN_MINICLUSTER_FIXED_PORTS, true);
     conf.setBoolean(YarnConfiguration.YARN_MINICLUSTER_USE_RPC, true);
+    conf.set(YarnConfiguration.LEADER_CLIENT_FAILOVER_PROXY_PROVIDER,
+            "org.apache.hadoop.yarn.client.ConfiguredRMFailoverProxyProvider");
 
     cluster = new MiniYARNCluster(TestRMFailover.class.getName(), 2, 1, 1, 1);
   }
@@ -164,19 +166,14 @@ public class TestRMFailover extends ClientBaseWithFixes {
     conf.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, false);
     cluster.init(conf);
     cluster.start();
-    LOG.info("Checkpoint 1");
     assertFalse("RM never turned active", -1 == cluster.getActiveRMIndex());
     verifyConnections();
 
-    LOG.info("Checkpoint 2");
     explicitFailover();
-    LOG.info("Checkpoint 3");
     verifyConnections();
-    LOG.info("Checkpoint 4");
+
     explicitFailover();
-    LOG.info("Checkpoint 5");
     verifyConnections();
-    LOG.info("Checkpoint 6");
   }
 
   @Test
