@@ -342,7 +342,7 @@ public class RMStateStoreTestBase extends ClientBaseWithFixes{
             oldAttemptState.getMasterContainer(),
             oldAttemptState.getAppAttemptTokens(),
             oldAttemptState.getStartTime(), RMAppAttemptState.FINISHED,
-            "myFinalTrackingUrl", "attemptDiagnostics",
+            "myTrackingUrl", "attemptDiagnostics",
             FinalApplicationStatus.SUCCEEDED, 100,
             oldAttemptState.getFinishTime(), 0, 0,
             "myTrackingUrl");
@@ -367,7 +367,7 @@ public class RMStateStoreTestBase extends ClientBaseWithFixes{
             oldAttemptState.getMasterContainer(),
             oldAttemptState.getAppAttemptTokens(),
             oldAttemptState.getStartTime(), RMAppAttemptState.FINISHED,
-            "myFinalTrackingUrl", "attemptDiagnostics",
+            "myTrackingUrl", "attemptDiagnostics",
             FinalApplicationStatus.SUCCEEDED, 111,
             oldAttemptState.getFinishTime(), 0, 0, "myTrackingUrl");
     store.updateApplicationAttemptState(dummyAttempt);

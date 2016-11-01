@@ -31,7 +31,8 @@ import static org.junit.Assert.assertEquals;
  * This class tests various cases during file creation.
  */
 public class TestFormatAll {
-   @Test
+
+  //@Test
   public void testFormatAll() throws IOException {
     MiniDFSCluster cluster = null;
     Configuration conf = new HdfsConfiguration();
@@ -44,7 +45,7 @@ public class TestFormatAll {
   }
 
   @Test
-  public void test2() throws IOException {
+  public void testCreateAfterFormat() throws IOException {
     MiniDFSCluster cluster = null;
     Configuration conf = new HdfsConfiguration();
     try {

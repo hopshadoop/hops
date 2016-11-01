@@ -72,10 +72,11 @@ public class GroupMembershipService extends CompositeService
   private boolean autoFailoverEnabled;
   private InetSocketAddress groupMembershipServiceAddress;
   boolean running = true;
-  private String hostname = "";
+  private String rmId = "";
   private Thread lEnGmMonitor;
   private YarnAuthorizationProvider authorizer;
   private UserGroupInformation daemonUser;
+  private Configuration conf;
   
   public GroupMembershipService(ResourceManager rm, RMContext rmContext) {
     super(GroupMembershipService.class.getName());
@@ -86,19 +87,21 @@ public class GroupMembershipService extends CompositeService
   @Override
   public synchronized void serviceInit(Configuration conf) throws Exception {
 
-    groupMembershipServiceAddress =
-        conf.getSocketAddr(YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS,
-            YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_ADDRESS,
-            YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_PORT);
+    this.conf = conf;
+    groupMembershipServiceAddress = conf.getSocketAddr(
+        YarnConfiguration.RM_BIND_HOST,
+        YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS,
+        YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_ADDRESS,
+        YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_PORT);
     adminAcl = new AccessControlList(conf.get(YarnConfiguration.YARN_ADMIN_ACL,
         YarnConfiguration.DEFAULT_YARN_ADMIN_ACL));
-    this.hostname = groupMembershipServiceAddress.toString();
+    this.rmId = HAUtil.getRMHAId(conf);
     daemonUser = UserGroupInformation.getCurrentUser();
     authorizer = YarnAuthorizationProvider.getInstance(conf);
     authorizer.setAdmins(getAdminAclList(conf), UserGroupInformation
         .getCurrentUser());
     
-    LOG.info("init groupMembershipService " + this.hostname);
+    LOG.info("init groupMembershipService " + this.rmId);
 
     if (rmContext.isHAEnabled() || rmContext.isDistributed()) {
       initLEandGM(conf);
@@ -117,20 +120,7 @@ public class GroupMembershipService extends CompositeService
   protected synchronized void serviceStart() throws Exception {
     startGroupMembership();
     startServer();
-    /*getConfig().updateConnectAddr(YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS,
-            server.getListenerAddress());*/
-
-    /*getConfig().updateConnectAddr(YarnConfiguration.RM_BIND_HOST,
-            YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS,
-            YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_ADDRESS,
-            server.getListenerAddress());*/
-
-    // TODO: For the moment this is needed, otherwise tests fail, I should check it later
-    LOG.info("Started GMS on " + this.server.getListenerAddress().getHostName()
-            + ":" + this.server.getPort());
-    /*getConfig().set(YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS,
-            this.server.getListenerAddress().getHostName() + ":" + this.server.getPort());
-    getConfig().setInt(YarnConfiguration.RM_GROUP_MEMBERSHIP_PORT, this.server.getPort());*/
+    LOG.info("Started GMS on " + rmId);
 
     getConfig().updateConnectAddr(YarnConfiguration.RM_BIND_HOST,
             YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS,
@@ -157,9 +147,13 @@ public class GroupMembershipService extends CompositeService
 
   @Override
   protected synchronized void serviceStop() throws Exception {
+    LOG.info("stopping group membership service server");
     stopServer();
+    LOG.info("stopping group membership service service");
     stopGroupMembership();
+    LOG.info("stopped group membership service");
     super.serviceStop();
+    LOG.info("stopped GMS on " + rmId);
   }
 
   protected synchronized void stopGroupMembership() throws Exception {
@@ -194,8 +188,8 @@ public class GroupMembershipService extends CompositeService
     return conf;
   }
 
-  public String getHostname() {
-    return hostname;
+  public String getRMId() {
+    return rmId;
   }
 
   public boolean isLeader() {
@@ -249,7 +243,7 @@ public class GroupMembershipService extends CompositeService
 
   private void throwStandbyException() throws StandbyException {
     throw new StandbyException(
-        "ResourceManager " + hostname + " is not Active!");
+        "ResourceManager " + rmId + " is not Active!");
   }
 
   @Override
@@ -361,9 +355,9 @@ public class GroupMembershipService extends CompositeService
 
     groupMembership =
         new LeaderElection(new YarnLeDescriptorFactory(), leadercheckInterval,
-            missedHeartBeatThreshold, leIncrement, "",
+            missedHeartBeatThreshold, leIncrement, rmId,
             groupMembershipServiceAddress.getAddress().getHostAddress() + ":"
-                + groupMembershipServiceAddress.getPort());
+			   + groupMembershipServiceAddress.getPort());
   }
 
   private class LEnGmMonitor implements Runnable {
@@ -374,7 +368,7 @@ public class GroupMembershipService extends CompositeService
     @Override
     public void run() {
       try {
-        while (true && groupMembership.isRunning()) {
+        while (groupMembership.isRunning()) {
           boolean currentLeaderRole = isLeader();
           if (previousLeaderRole == null ||
               currentLeaderRole != previousLeaderRole) {
@@ -382,11 +376,6 @@ public class GroupMembershipService extends CompositeService
             switchLeaderRole(previousLeaderRole);
           }
           boolean currentLeadingRTRole = isLeadingRT();
-//          if(previousLeadingRTRole ==null || 
-//                  currentLeadingRTRole != previousLeadingRTRole){
-//            previousLeadingRTRole = currentLeadingRTRole;
-//            switchLeadintRTRole(currentLeadingRTRole);
-//          }
           Thread.sleep(100L);
         }
       } catch (Exception ex) {
@@ -395,6 +384,7 @@ public class GroupMembershipService extends CompositeService
     }
 
     private void switchLeaderRole(boolean role) throws Exception {
+      conf.set(YarnConfiguration.RM_HA_ID, rmId);
       if (role) {
         LOG.info(hostname + " id: " + groupMembership.getCurrentId() + " switching to active ");
         rm.transitionToActive();
@@ -404,15 +394,6 @@ public class GroupMembershipService extends CompositeService
       }
     }
     
-//    private void switchLeadintRTRole(boolean isLeadingRT) throws Exception {
-//      if (isLeadingRT) {
-//        LOG.info(groupMembership.getCurrentId() + " switching to leading RT");
-//        rm.transitionToLeadingRT();
-//      } else {
-//        LOG.info(groupMembership.getCurrentId() + " switching to nonleading RT ");
-//        rm.transitionToNonLeadingRT();
-//      }
-//    }
   }
 
   public void relinquishId() throws InterruptedException {

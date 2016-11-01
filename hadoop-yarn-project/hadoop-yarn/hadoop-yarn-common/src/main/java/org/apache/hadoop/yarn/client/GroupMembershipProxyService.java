@@ -178,6 +178,8 @@ public class GroupMembershipProxyService implements Closeable {
           tries++;
           continue;
         }
+        LOG.debug("create proxy to the ResourceManager "
+                + rmServiceIds[currentProxyIndex]);
         anList = response.getLiveRMsList();
         return;
       } catch (IOException e) {

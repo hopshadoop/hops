@@ -255,7 +255,7 @@ public class HAUtil {
       return addSuffix(prefix, RMId);
     }
   }
-  
+
   public static String getConfValueForRMInstance(String prefix,
                                                  Configuration conf, String host) {
     String confKey = getConfKeyForRMInstance(prefix, conf, host);
@@ -285,6 +285,7 @@ public class HAUtil {
     String value = getConfValueForRMInstance(prefix, conf, host);
     return (value == null) ? defaultValue : value;
   }
+  
   public static String getConfValueForRMInstance(
       String prefix, String defaultValue, Configuration conf) {
     String value = getConfValueForRMInstance(prefix, conf);

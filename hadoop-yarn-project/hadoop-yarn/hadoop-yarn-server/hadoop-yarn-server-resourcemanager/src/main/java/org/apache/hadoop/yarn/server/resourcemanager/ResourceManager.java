@@ -1123,11 +1123,11 @@ LOG.info("+");
     LOG.info("locked resourceTrackingServiceStart");
     try{
     if (rmContext.getHAServiceState() == HAServiceProtocol.HAServiceState.ACTIVE) {
-      LOG.info("Already in active state <" + getBindAddress(this.conf).getPort() + ">");
+      LOG.info("Already in active state");
       return;
     }
 
-    LOG.info("Transitioning to active state <" + getBindAddress(this.conf).getPort() + ">");
+    LOG.info("Transitioning to active state " + groupMembershipService.getRMId());
 
     stopSchedulerServices();
     if(resourceTrackingService.isInState(STATE.STARTED)){
@@ -1155,7 +1155,7 @@ LOG.info("+");
 //    }
 
     rmContext.setHAServiceState(HAServiceProtocol.HAServiceState.ACTIVE);
-    LOG.info("Transitioned to active state <" + getBindAddress(this.conf).getPort() + ">");
+    LOG.info("Transitioned to active state " + groupMembershipService.getRMId());
     }finally{
       LOG.info("unlocked resourceTrackingServiceStart");
       resourceTrackingServiceStartStopLock.unlock();
@@ -1173,8 +1173,8 @@ LOG.info("+");
       return;
     }
 
+    LOG.info("Transitioning to standby state " + groupMembershipService.getRMId());
     HAServiceState state = rmContext.getHAServiceState();
-      LOG.info("Transitioning to standby state <" + + getBindAddress(this.conf).getPort() + "> " + state.toString());
     rmContext.setHAServiceState(HAServiceProtocol.HAServiceState.STANDBY);
     if (state == HAServiceProtocol.HAServiceState.ACTIVE) {
       stopSchedulerServices();
@@ -1184,7 +1184,7 @@ LOG.info("+");
       }
       reinitialize(initialize);
     }
-      LOG.info("Transitioned to StandBy state <" + + getBindAddress(this.conf).getPort() + ">");
+    LOG.info("Transitioned to standby state " + groupMembershipService.getRMId());
     }finally{
       LOG.info("unlocked resourceTrackingServiceStart");
       resourceTrackingServiceStartStopLock.unlock();
@@ -1236,23 +1236,23 @@ LOG.info("+");
   protected void serviceStop() throws Exception {
     resourceTrackingServiceStartStopLock.lock();
     LOG.info("locked resourceTrackingServiceStart");
-    try{
-    if (webApp != null) {
-      webApp.stop();
-    }
-    if (fetcher != null) {
-      fetcher.stop();
-    }
-    if (configurationProvider != null) {
-      configurationProvider.close();
-    }
-    if (resourceTrackingService != null) {
-      resourceTrackingService.stop();
-    }
-    super.serviceStop();
-    transitionToStandby(false);
-    rmContext.setHAServiceState(HAServiceState.STOPPING);
-    }finally{
+    try {
+      if (webApp != null) {
+        webApp.stop();
+      }
+      if (fetcher != null) {
+        fetcher.stop();
+      }
+      if (configurationProvider != null) {
+        configurationProvider.close();
+      }
+      if (resourceTrackingService != null) {
+        resourceTrackingService.stop();
+      }
+      super.serviceStop();
+      transitionToStandby(false);
+      rmContext.setHAServiceState(HAServiceState.STOPPING);
+    } finally {
       LOG.info("unlocked resourceTrackingServiceStart");
       resourceTrackingServiceStartStopLock.unlock();
     }

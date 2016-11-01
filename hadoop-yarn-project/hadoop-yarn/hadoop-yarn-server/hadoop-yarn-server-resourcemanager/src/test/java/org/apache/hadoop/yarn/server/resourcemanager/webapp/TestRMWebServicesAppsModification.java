@@ -542,6 +542,7 @@ public class TestRMWebServicesAppsModification extends JerseyTestBase {
         rm.getResourceScheduler() instanceof FairScheduler;
     assumeTrue("This test is only supported on Capacity and Fair Scheduler",
         isCapacityScheduler || isFairScheduler);
+    rm.start();
     // FairScheduler use ALLOCATION_FILE to configure ACL
     if (isCapacityScheduler) {
       // default root queue allows anyone to have admin acl
@@ -551,8 +552,7 @@ public class TestRMWebServicesAppsModification extends JerseyTestBase {
       csconf.setAcl("root.default", QueueACL.ADMINISTER_QUEUE, "someuser");
       rm.getResourceScheduler().reinitialize(csconf, rm.getRMContext());
     }
-
-    rm.start();
+    
     MockNM amNodeManager = rm.registerNode("127.0.0.1:1234", 2048);
 
     String[] mediaTypes =
@@ -1003,9 +1003,9 @@ public class TestRMWebServicesAppsModification extends JerseyTestBase {
     csconf.setAcl("root", QueueACL.ADMINISTER_QUEUE, "someuser");
     csconf.setAcl("root.default", QueueACL.ADMINISTER_QUEUE, "someuser");
     csconf.setAcl("root.test", QueueACL.ADMINISTER_QUEUE, "someuser");
-    rm.getResourceScheduler().reinitialize(csconf, rm.getRMContext());
-
     rm.start();
+    rm.getResourceScheduler().reinitialize(csconf, rm.getRMContext());
+    
     MockNM amNodeManager = rm.registerNode("127.0.0.1:1234", 2048);
     String[] mediaTypes =
         { MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML };

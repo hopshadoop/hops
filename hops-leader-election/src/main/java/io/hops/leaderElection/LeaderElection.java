@@ -178,8 +178,8 @@ public class LeaderElection extends Thread {
   }
   
   public void stopElectionThread() {
-    this.interrupt();
     running = false;
+    this.interrupt();
   }
   
   public boolean isStopped() {

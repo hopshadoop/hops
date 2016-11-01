@@ -193,6 +193,7 @@ public class TestFsLimits {
             INode child = new INodeDirectory(name, perms);
             child.setIdNoPersistance(id++);
             child.setLocalName(name);
+            child.setPartitionIdNoPersistance(INodeDirectory.ROOT_ID);
 
             Class<?> generated = null;
             try {
