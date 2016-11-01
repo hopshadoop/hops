@@ -386,10 +386,10 @@ public class GroupMembershipService extends CompositeService
     private void switchLeaderRole(boolean role) throws Exception {
       conf.set(YarnConfiguration.RM_HA_ID, rmId);
       if (role) {
-        LOG.info(hostname + " id: " + groupMembership.getCurrentId() + " switching to active ");
+        LOG.info(groupMembership.getCurrentId() + " switching to active ");
         rm.transitionToActive();
       } else {
-        LOG.info(hostname + " id: " + groupMembership.getCurrentId() + " switching to standby ");
+        LOG.info(groupMembership.getCurrentId() + " switching to standby ");
         rm.transitionToStandby(true);
       }
     }
