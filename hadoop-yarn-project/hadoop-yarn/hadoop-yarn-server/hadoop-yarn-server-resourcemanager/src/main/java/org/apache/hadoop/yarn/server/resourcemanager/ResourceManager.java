@@ -245,8 +245,8 @@ public class ResourceManager extends CompositeService implements Recoverable {
     this.rmContext.setHAEnabled(HAUtil.isHAEnabled(this.conf));
     if (this.rmContext.isHAEnabled()) {
       HAUtil.verifyAndSetConfiguration(this.conf);
-      if (this.rmContext.isDistributed() || HAUtil.isAutomaticFailoverEnabled(
-              conf)) {
+      if (this.rmContext.isDistributed() || (HAUtil.isAutomaticFailoverEnabled(conf)
+              && HAUtil.isHopsRMFailoverProxy(conf))) {
         groupMembershipService = createGroupMembershipService();
         addService(groupMembershipService);
         rmContext.setRMGroupMembershipService(groupMembershipService);
@@ -1172,7 +1172,7 @@ LOG.info("+");
     try{
     if (rmContext.getHAServiceState() ==
         HAServiceProtocol.HAServiceState.STANDBY) {
-      LOG.info("Already in standby state <" + + getBindAddress(this.conf).getPort() + ">");
+      LOG.info("Already in standby state <" + getBindAddress(this.conf).getPort() + ">");
       return;
     }
 
@@ -1183,9 +1183,11 @@ LOG.info("+");
       stopSchedulerServices();
       resourceTrackingService.stop();
       if (((this.rmContext.isHAEnabled()
-              && HAUtil.isAutomaticFailoverEnabled(conf)) || this.rmContext.
-              isDistributed()) && rmContext.isLeader()) {
-        groupMembershipService.relinquishId();
+              && HAUtil.isAutomaticFailoverEnabled(conf) && HAUtil.isHopsRMFailoverProxy(conf))
+              || this.rmContext.isDistributed()) && rmContext.isLeader()) {
+        if (groupMembershipService != null) {
+          groupMembershipService.relinquishId();
+        }
       }
       reinitialize(initialize);
     }
@@ -1203,7 +1205,8 @@ LOG.info("+");
     try{
     if (this.rmContext.isHAEnabled() || this.rmContext.isDistributed()) {
       transitionToStandby(true);
-      if (HAUtil.isAutomaticFailoverEnabled(conf)|| this.rmContext.isDistributed()) {
+      if ((HAUtil.isAutomaticFailoverEnabled(conf) && HAUtil.isHopsRMFailoverProxy(conf))
+              || this.rmContext.isDistributed()) {
         LOG.info("start gms");
         groupMembershipService.start();
       }

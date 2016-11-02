@@ -248,8 +248,7 @@ public class ClientRMService extends AbstractService implements
   @Override
   protected void serviceStop() throws Exception {
     if (this.server != null) {
-        this.server.stop();
-      LOG.info("Stopped ClientRMService: " + server.getListenerAddress().getHostName() + ":" + server.getPort());
+      this.server.stop();
     }
     super.serviceStop();
   }

@@ -302,6 +302,8 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
       throws Exception {
     conf.setBoolean(YarnConfiguration.RECOVERY_ENABLED, true);
     conf.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, false);
+    conf.set(YarnConfiguration.LEADER_CLIENT_FAILOVER_PROXY_PROVIDER,
+            "org.apache.hadoop.yarn.client.ConfiguredRMFailoverProxyProvider");
     cluster =
         new MiniYARNClusterForHATesting(TestRMFailover.class.getName(), 2,
             numOfNMs, 1, 1, false, overrideClientRMService, overrideRTS,
