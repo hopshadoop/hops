@@ -55,6 +55,7 @@ import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -235,7 +236,7 @@ public class TestDFSIO implements Tool {
     bench.analyzeResult(fs, TestType.TEST_TYPE_WRITE, execTime);
   }
 
-  @Test (timeout = 3000)
+  @Test (timeout = 10000)
   public void testRead() throws Exception {
     FileSystem fs = cluster.getFileSystem();
     long tStart = System.currentTimeMillis();
@@ -244,7 +245,7 @@ public class TestDFSIO implements Tool {
     bench.analyzeResult(fs, TestType.TEST_TYPE_READ, execTime);
   }
 
-  @Test (timeout = 3000)
+  @Test (timeout = 10000)
   public void testReadRandom() throws Exception {
     FileSystem fs = cluster.getFileSystem();
     long tStart = System.currentTimeMillis();
@@ -254,7 +255,7 @@ public class TestDFSIO implements Tool {
     bench.analyzeResult(fs, TestType.TEST_TYPE_READ_RANDOM, execTime);
   }
 
-  @Test (timeout = 3000)
+  @Test (timeout = 10000)
   public void testReadBackward() throws Exception {
     FileSystem fs = cluster.getFileSystem();
     long tStart = System.currentTimeMillis();
@@ -264,7 +265,7 @@ public class TestDFSIO implements Tool {
     bench.analyzeResult(fs, TestType.TEST_TYPE_READ_BACKWARD, execTime);
   }
 
-  @Test (timeout = 3000)
+  @Test (timeout = 10000)
   public void testReadSkip() throws Exception {
     FileSystem fs = cluster.getFileSystem();
     long tStart = System.currentTimeMillis();
@@ -284,6 +285,7 @@ public class TestDFSIO implements Tool {
   }
 
   @Test (timeout = 60000)
+  @Ignore
   public void testTruncate() throws Exception {
     FileSystem fs = cluster.getFileSystem();
     bench.createControlFile(fs, DEFAULT_NR_BYTES / 2, DEFAULT_NR_FILES);
