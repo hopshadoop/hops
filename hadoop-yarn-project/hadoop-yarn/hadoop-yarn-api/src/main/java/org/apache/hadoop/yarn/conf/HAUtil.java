@@ -59,6 +59,13 @@ public class HAUtil {
         YarnConfiguration.DEFAULT_AUTO_FAILOVER_ENABLED);
   }
 
+  // TODO: Parameterize the class of the configured HA proxy
+  public static boolean isHopsRMFailoverProxy(Configuration conf) {
+    return conf.get(YarnConfiguration.LEADER_CLIENT_FAILOVER_PROXY_PROVIDER,
+            YarnConfiguration.DEFAULT_LEADER_CLIENT_FAILOVER_PROXY_PROVIDER)
+            .equals("org.apache.hadoop.yarn.client.ConfiguredLeaderFailoverHAProxyProvider");
+  }
+
   public static boolean isAutomaticFailoverEnabledAndEmbedded(
       Configuration conf) {
     return isAutomaticFailoverEnabled(conf) &&

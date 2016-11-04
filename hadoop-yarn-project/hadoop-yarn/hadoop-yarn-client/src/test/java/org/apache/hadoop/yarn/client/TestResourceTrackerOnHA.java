@@ -41,7 +41,7 @@ public class TestResourceTrackerOnHA extends ProtocolHATestBase{
 
   @Before
   public void initiate() throws Exception {
-    startHACluster(0, false, true, false);
+    startHACluster(0, false, true, false, true);
     this.resourceTracker = getRMClient();
   }
 

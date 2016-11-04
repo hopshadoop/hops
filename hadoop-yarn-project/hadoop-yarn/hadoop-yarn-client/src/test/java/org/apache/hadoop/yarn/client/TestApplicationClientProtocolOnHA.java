@@ -51,7 +51,7 @@ public class TestApplicationClientProtocolOnHA extends ProtocolHATestBase {
 
   @Before
   public void initiate() throws Exception {
-    startHACluster(1, true, false, false);
+    startHACluster(1, true, false, false, true);
     Configuration conf = new YarnConfiguration(this.conf);
     client = createAndStartYarnClient(conf);
   }

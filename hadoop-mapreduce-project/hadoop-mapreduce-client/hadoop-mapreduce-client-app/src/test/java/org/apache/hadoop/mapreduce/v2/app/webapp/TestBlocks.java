@@ -189,6 +189,7 @@ public class TestBlocks {
     app.setTask(task);
     Job job = mock(Job.class);
     when(job.getTasks(TaskType.REDUCE)).thenReturn(tasks);
+    when(job.getID()).thenReturn(jobId);
     app.setJob(job);
 
     AttemptsBlockForTest block = new AttemptsBlockForTest(app,

@@ -179,9 +179,14 @@ public class TestRMFailover extends ClientBaseWithFixes {
   @Test
   public void testAutomaticFailover()
       throws YarnException, InterruptedException, IOException {
-    conf.set(YarnConfiguration.RM_CLUSTER_ID, "yarn-test-cluster");
+    /*conf.set(YarnConfiguration.RM_CLUSTER_ID, "yarn-test-cluster");
     conf.set(YarnConfiguration.RM_ZK_ADDRESS, hostPort);
-    conf.setInt(YarnConfiguration.RM_ZK_TIMEOUT_MS, 2000);
+    conf.setInt(YarnConfiguration.RM_ZK_TIMEOUT_MS, 2000);*/
+
+    // Configuration parameters to use for Hops leader election
+    conf.setBoolean(YarnConfiguration.AUTO_FAILOVER_EMBEDDED, false);
+    conf.set(YarnConfiguration.LEADER_CLIENT_FAILOVER_PROXY_PROVIDER,
+            YarnConfiguration.DEFAULT_LEADER_CLIENT_FAILOVER_PROXY_PROVIDER);
 
     cluster.init(conf);
     cluster.start();
