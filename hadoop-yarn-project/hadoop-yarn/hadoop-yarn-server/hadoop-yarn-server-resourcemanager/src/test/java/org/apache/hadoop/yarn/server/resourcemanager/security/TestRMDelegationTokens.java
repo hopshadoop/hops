@@ -142,12 +142,14 @@ public class TestRMDelegationTokens {
     // For all keys that still remain in memory, we should have them stored
     // in state-store also.
     while (((TestRMDelegationTokenSecretManager) dtSecretManager).numUpdatedKeys
-      .get() < 3) {
-          rmState = rm1.getRMContext().getStateStore().loadState();
-    rmDTMasterKeyState =
-        rmState.getRMDTSecretManagerState().getMasterKeyState();
+            .get() < 3) {
+      do {
+        rmState = rm1.getRMContext().getStateStore().loadState();
+        rmDTMasterKeyState = rmState.getRMDTSecretManagerState().
+                getMasterKeyState();
+      } while (rmDTMasterKeyState == null);
       ((TestRMDelegationTokenSecretManager) dtSecretManager)
-        .checkCurrentKeyInStateStore(rmDTMasterKeyState);
+              .checkCurrentKeyInStateStore(rmDTMasterKeyState);
       Thread.sleep(100);
     }
 
