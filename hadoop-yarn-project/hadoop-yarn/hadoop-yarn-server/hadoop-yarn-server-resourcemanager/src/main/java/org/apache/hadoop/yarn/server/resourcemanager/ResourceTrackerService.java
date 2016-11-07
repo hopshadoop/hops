@@ -329,7 +329,7 @@ public class ResourceTrackerService extends AbstractService implements
       if (this.rmContext.isDistributed()) {
         load.decrementAndGet();
         DBUtility.updateLoad(new Load(rmContext.getGroupMembershipService().
-                getHostname(), load.get()));
+                getRMId(), load.get()));
       }
       // Reset heartbeat ID since node just restarted.
       oldNode.resetLastNodeHeartBeatResponse();
@@ -347,7 +347,7 @@ public class ResourceTrackerService extends AbstractService implements
     if (this.rmContext.isDistributed()) {
       load.incrementAndGet();
       DBUtility.updateLoad(new Load(rmContext.getGroupMembershipService().
-              getHostname(), load.get()));
+              getRMId(), load.get()));
     }
     // Handle received container status, this should be processed after new
     // RMNode inserted

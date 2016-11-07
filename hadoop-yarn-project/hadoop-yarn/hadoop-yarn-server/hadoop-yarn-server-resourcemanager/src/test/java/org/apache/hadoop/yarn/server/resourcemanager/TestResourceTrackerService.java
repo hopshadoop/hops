@@ -360,7 +360,7 @@ public class TestResourceTrackerService {
     Assert.assertTrue(rm.getRMContext().getRMNodes().get(nodeId) instanceof RMNodeImplDist);
     //check that datas are commited to the database 
     //load
-    Assert.assertEquals(1, DBUtility.getAllLoads().get(rm.getRMContext().getGroupMembershipService().getHostname()).getLoad());
+    Assert.assertEquals(1, DBUtility.getAllLoads().get(rm.getRMContext().getGroupMembershipService().getRMId()).getLoad());
     //rmnode
     Map<String, io.hops.metadata.yarn.entity.RMNode> rmNodesInDb= DBUtilityTests.getAllRMNodess();
     Assert.assertEquals(1, rmNodesInDb.size());

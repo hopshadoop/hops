@@ -203,6 +203,8 @@ public class TestRMHA {
   @Test (timeout = 30000)
   public void testFailoverAndTransitions() throws Exception {
     configuration.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, false);
+    configuration.set(YarnConfiguration.LEADER_CLIENT_FAILOVER_PROXY_PROVIDER,
+            "org.apache.hadoop.yarn.client.ConfiguredRMFailoverProxyProvider");
     Configuration conf = new YarnConfiguration(configuration);
 
     rm = new MockRM(conf);
@@ -328,6 +330,9 @@ public class TestRMHA {
         "Expect to get the same number of handlers";
     String errorMessageForService = "Expect to get the same number of services";
     configuration.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, false);
+    configuration.set(YarnConfiguration.LEADER_CLIENT_FAILOVER_PROXY_PROVIDER,
+            "org.apache.hadoop.yarn.client.ConfiguredRMFailoverProxyProvider");
+
     Configuration conf = new YarnConfiguration(configuration);
     rm = new MockRM(conf) {
       @Override
@@ -431,6 +436,9 @@ public class TestRMHA {
   public void testFailoverWhenTransitionToActiveThrowException()
       throws Exception {
     configuration.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, false);
+    configuration.set(YarnConfiguration.LEADER_CLIENT_FAILOVER_PROXY_PROVIDER,
+            "org.apache.hadoop.yarn.client.ConfiguredRMFailoverProxyProvider");
+
     Configuration conf = new YarnConfiguration(configuration);
 
     MemoryRMStateStore memStore = new MemoryRMStateStore() {
@@ -483,6 +491,9 @@ public class TestRMHA {
   @Test(timeout = 130000)
   public void testTransitionedToStandbyShouldNotHang() throws Exception {
     configuration.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, false);
+    configuration.set(YarnConfiguration.LEADER_CLIENT_FAILOVER_PROXY_PROVIDER,
+            "org.apache.hadoop.yarn.client.ConfiguredRMFailoverProxyProvider");
+
     Configuration conf = new YarnConfiguration(configuration);
 
     MemoryRMStateStore memStore = new MemoryRMStateStore() {
@@ -547,6 +558,8 @@ public class TestRMHA {
   @Ignore
   public void testFailoverClearsRMContext() throws Exception {
     configuration.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, false);
+    configuration.set(YarnConfiguration.LEADER_CLIENT_FAILOVER_PROXY_PROVIDER,
+            "org.apache.hadoop.yarn.client.ConfiguredRMFailoverProxyProvider");
     configuration.setBoolean(YarnConfiguration.RECOVERY_ENABLED, true);
     Configuration conf = new YarnConfiguration(configuration);
 
@@ -612,8 +625,13 @@ public class TestRMHA {
   }
 
   @Test(timeout = 90000)
+  @Ignore
+  // In Hops we re-initialize the Scheduler services during transition to active
   public void testTransitionedToActiveRefreshFail() throws Exception {
     configuration.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, false);
+    configuration.set(YarnConfiguration.LEADER_CLIENT_FAILOVER_PROXY_PROVIDER,
+            "org.apache.hadoop.yarn.client.ConfiguredRMFailoverProxyProvider");
+
     YarnConfiguration conf = new YarnConfiguration(configuration);
     configuration = new CapacitySchedulerConfiguration(conf);
     rm = new MockRM(configuration) {

@@ -86,6 +86,8 @@ public class TestRMFailover extends ClientBaseWithFixes {
         (base + YarnConfiguration.DEFAULT_RM_WEBAPP_PORT));
     setConfForRM(rmId, YarnConfiguration.RM_WEBAPP_HTTPS_ADDRESS, "0.0.0.0:" +
         (base + YarnConfiguration.DEFAULT_RM_WEBAPP_HTTPS_PORT));
+    setConfForRM(rmId, YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS, "0.0.0.0:" +
+        (base + YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_PORT));
   }
 
   @Before
@@ -101,6 +103,8 @@ public class TestRMFailover extends ClientBaseWithFixes {
 
     conf.setBoolean(YarnConfiguration.YARN_MINICLUSTER_FIXED_PORTS, true);
     conf.setBoolean(YarnConfiguration.YARN_MINICLUSTER_USE_RPC, true);
+    conf.set(YarnConfiguration.LEADER_CLIENT_FAILOVER_PROXY_PROVIDER,
+            "org.apache.hadoop.yarn.client.ConfiguredRMFailoverProxyProvider");
 
     cluster = new MiniYARNCluster(TestRMFailover.class.getName(), 2, 1, 1, 1);
   }
@@ -175,9 +179,14 @@ public class TestRMFailover extends ClientBaseWithFixes {
   @Test
   public void testAutomaticFailover()
       throws YarnException, InterruptedException, IOException {
-    conf.set(YarnConfiguration.RM_CLUSTER_ID, "yarn-test-cluster");
+    /*conf.set(YarnConfiguration.RM_CLUSTER_ID, "yarn-test-cluster");
     conf.set(YarnConfiguration.RM_ZK_ADDRESS, hostPort);
-    conf.setInt(YarnConfiguration.RM_ZK_TIMEOUT_MS, 2000);
+    conf.setInt(YarnConfiguration.RM_ZK_TIMEOUT_MS, 2000);*/
+
+    // Configuration parameters to use for Hops leader election
+    conf.setBoolean(YarnConfiguration.AUTO_FAILOVER_EMBEDDED, false);
+    conf.set(YarnConfiguration.LEADER_CLIENT_FAILOVER_PROXY_PROVIDER,
+            YarnConfiguration.DEFAULT_LEADER_CLIENT_FAILOVER_PROXY_PROVIDER);
 
     cluster.init(conf);
     cluster.start();

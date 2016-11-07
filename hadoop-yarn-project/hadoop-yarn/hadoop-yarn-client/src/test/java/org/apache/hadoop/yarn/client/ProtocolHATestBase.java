@@ -22,9 +22,6 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 
-import io.hops.util.DBUtility;
-import io.hops.util.RMStorageFactory;
-import io.hops.util.YarnAPIStorageFactory;
 import org.apache.hadoop.yarn.api.protocolrecords.FinishApplicationMasterRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.FinishApplicationMasterResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterRequest;
@@ -177,7 +174,7 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
     setConfForRM(rmId, YarnConfiguration.RM_ADMIN_ADDRESS, "0.0.0.0:" +
         (base + YarnConfiguration.DEFAULT_RM_ADMIN_PORT));
     setConfForRM(rmId, YarnConfiguration.RM_RESOURCE_TRACKER_ADDRESS,
-        "0.0.0.0:" + (base + YarnConfiguration
+            "0.0.0.0:" + (base + YarnConfiguration
             .DEFAULT_RM_RESOURCE_TRACKER_PORT));
     setConfForRM(rmId, YarnConfiguration.RM_WEBAPP_ADDRESS, "0.0.0.0:" +
         (base + YarnConfiguration.DEFAULT_RM_WEBAPP_PORT));
@@ -202,9 +199,6 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
 
     conf.setBoolean(YarnConfiguration.YARN_MINICLUSTER_FIXED_PORTS, true);
     conf.setBoolean(YarnConfiguration.YARN_MINICLUSTER_USE_RPC, true);
-    RMStorageFactory.setConfiguration(conf);
-    YarnAPIStorageFactory.setConfiguration(conf);
-    DBUtility.InitializeDB();
   }
 
   @After
@@ -285,7 +279,7 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
             }
           }
           try {
-            Thread.sleep(50);
+            Thread.sleep(500);
           } catch (InterruptedException e) {
             // DO NOTHING
           }
@@ -297,14 +291,23 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
   }
 
   protected void startHACluster(int numOfNMs, boolean overrideClientRMService,
-      boolean overrideRTS, boolean overrideApplicationMasterService)
+          boolean overrideRTS, boolean overrideApplicationMasterService)
+          throws Exception {
+    startHACluster(numOfNMs, overrideClientRMService, overrideRTS,
+            overrideApplicationMasterService, true);
+  }
+
+  protected void startHACluster(int numOfNMs, boolean overrideClientRMService,
+      boolean overrideRTS, boolean overrideApplicationMasterService, boolean formatDB)
       throws Exception {
     conf.setBoolean(YarnConfiguration.RECOVERY_ENABLED, true);
     conf.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, false);
+    conf.set(YarnConfiguration.LEADER_CLIENT_FAILOVER_PROXY_PROVIDER,
+            "org.apache.hadoop.yarn.client.ConfiguredRMFailoverProxyProvider");
     cluster =
         new MiniYARNClusterForHATesting(TestRMFailover.class.getName(), 2,
             numOfNMs, 1, 1, false, overrideClientRMService, overrideRTS,
-            overrideApplicationMasterService);
+            overrideApplicationMasterService, formatDB);
     cluster.resetStartFailoverFlag(false);
     cluster.init(conf);
     cluster.start();
@@ -332,11 +335,20 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
     private final AtomicBoolean failoverTriggered = new AtomicBoolean(false);
 
     public MiniYARNClusterForHATesting(String testName,
+            int numResourceManagers, int numNodeManagers, int numLocalDirs,
+            int numLogDirs, boolean enableAHS, boolean overrideClientRMService,
+            boolean overrideRTS, boolean overrideApplicationMasterService) {
+      this(testName, numResourceManagers, numNodeManagers, numLocalDirs,
+              numLogDirs, enableAHS, overrideClientRMService, overrideRTS,
+              overrideApplicationMasterService, true);
+    }
+
+    public MiniYARNClusterForHATesting(String testName,
         int numResourceManagers, int numNodeManagers, int numLocalDirs,
         int numLogDirs, boolean enableAHS, boolean overrideClientRMService,
-        boolean overrideRTS, boolean overrideApplicationMasterService) {
+        boolean overrideRTS, boolean overrideApplicationMasterService, boolean formatDB) {
       super(testName, numResourceManagers, numNodeManagers, numLocalDirs,
-          numLogDirs, enableAHS);
+          numLogDirs, enableAHS, formatDB);
       this.overrideClientRMService = overrideClientRMService;
       this.overrideRTS = overrideRTS;
       this.overrideApplicationMasterService = overrideApplicationMasterService;

@@ -107,7 +107,7 @@ public class TestMRCJCSocketFactory {
 
   private MiniMRYarnCluster initAndStartMiniMRYarnCluster(JobConf jobConf) {
     MiniMRYarnCluster miniMRYarnCluster;
-    miniMRYarnCluster = new MiniMRYarnCluster(this.getClass().getName(), 1);
+    miniMRYarnCluster = new MiniMRYarnCluster(this.getClass().getName(), 1, false);
     miniMRYarnCluster.init(jobConf);
     miniMRYarnCluster.start();
     return miniMRYarnCluster;

@@ -188,6 +188,8 @@ public class TestDistributedScheduler {
     Assert.assertEquals(1, hbrsp.getApplicationsToCleanup().size());
     Assert.assertEquals(finishedAppId, hbrsp.getApplicationsToCleanup().get(0));
     //Check DB
+    // DB operations are done asynchronously. Sleep for a while just to be sure
+    Thread.sleep(100);
     Assert.assertEquals(0, DBUtilityTests.getAllContainersToCleanUp().size());
     Assert.assertEquals(0, DBUtilityTests.getAllAppsToCleanup().size());
   }

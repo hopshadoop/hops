@@ -59,6 +59,13 @@ public class HAUtil {
         YarnConfiguration.DEFAULT_AUTO_FAILOVER_ENABLED);
   }
 
+  // TODO: Parameterize the class of the configured HA proxy
+  public static boolean isHopsRMFailoverProxy(Configuration conf) {
+    return conf.get(YarnConfiguration.LEADER_CLIENT_FAILOVER_PROXY_PROVIDER,
+            YarnConfiguration.DEFAULT_LEADER_CLIENT_FAILOVER_PROXY_PROVIDER)
+            .equals("org.apache.hadoop.yarn.client.ConfiguredLeaderFailoverHAProxyProvider");
+  }
+
   public static boolean isAutomaticFailoverEnabledAndEmbedded(
       Configuration conf) {
     return isAutomaticFailoverEnabled(conf) &&
@@ -255,7 +262,7 @@ public class HAUtil {
       return addSuffix(prefix, RMId);
     }
   }
-  
+
   public static String getConfValueForRMInstance(String prefix,
                                                  Configuration conf, String host) {
     String confKey = getConfKeyForRMInstance(prefix, conf, host);
@@ -285,6 +292,7 @@ public class HAUtil {
     String value = getConfValueForRMInstance(prefix, conf, host);
     return (value == null) ? defaultValue : value;
   }
+  
   public static String getConfValueForRMInstance(
       String prefix, String defaultValue, Configuration conf) {
     String value = getConfValueForRMInstance(prefix, conf);

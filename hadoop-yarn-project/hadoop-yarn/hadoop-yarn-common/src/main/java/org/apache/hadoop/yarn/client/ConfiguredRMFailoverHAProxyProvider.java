@@ -88,7 +88,7 @@ public abstract class ConfiguredRMFailoverHAProxyProvider<T>
       final InetSocketAddress rmAddress = rmProxy
           //.getRMAddress(conf, protocol, leader.getIpAddress(),
           //    leader.getPort());
-          .getRMAddress(conf, protocol, leader.getIpAddress());
+          .getRMAddress(conf, protocol, leader.getHttpAddress());
       LOG.info("creating proxy from active nodes " + currentRMId + " " +
           rmAddress.getPort());
       return RMProxy.getProxy(conf, protocol, rmAddress);
@@ -119,8 +119,8 @@ public abstract class ConfiguredRMFailoverHAProxyProvider<T>
     do {
       ActiveNode leader = getActiveNode();
       if (leader != null) {
-        if (currentRMId == null || !currentRMId.equals(leader.getHostname())) {
-          currentRMId = leader.getHostname();
+        if (currentRMId == null || !currentRMId.equals(leader.getHttpAddress())) {
+          currentRMId = leader.getHttpAddress();
           this.currentProxy = getProxyFromActiveNode(leader);
         } else {
           this.currentProxy = createProxy(leader);

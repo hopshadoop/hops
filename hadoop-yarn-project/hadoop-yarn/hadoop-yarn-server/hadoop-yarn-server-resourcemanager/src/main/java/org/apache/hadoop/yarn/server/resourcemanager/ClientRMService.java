@@ -241,13 +241,14 @@ public class ClientRMService extends AbstractService implements
                                                YarnConfiguration.RM_ADDRESS,
                                                YarnConfiguration.DEFAULT_RM_ADDRESS,
                                                server.getListenerAddress());
+    LOG.info("Started ClientRMService " + clientBindAddress.getHostName() + ":" + clientBindAddress.getPort());
     super.serviceStart();
   }
 
   @Override
   protected void serviceStop() throws Exception {
     if (this.server != null) {
-        this.server.stop();
+      this.server.stop();
     }
     super.serviceStop();
   }

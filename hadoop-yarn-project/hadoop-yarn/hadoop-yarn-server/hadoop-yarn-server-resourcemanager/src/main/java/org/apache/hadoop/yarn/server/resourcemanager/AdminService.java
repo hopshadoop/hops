@@ -110,7 +110,8 @@ public class AdminService extends CompositeService implements
     RecordFactoryProvider.getRecordFactory(null);
 
   private UserGroupInformation daemonUser;
-
+  private Configuration conf;
+  
   public AdminService(ResourceManager rm, RMContext rmContext) {
     super(AdminService.class.getName());
     this.rm = rm;
@@ -119,6 +120,7 @@ public class AdminService extends CompositeService implements
 
   @Override
   public void serviceInit(Configuration conf) throws Exception {
+    this.conf =conf;
     if (rmContext.isHAEnabled()) {
       autoFailoverEnabled = HAUtil.isAutomaticFailoverEnabled(conf);
       if (autoFailoverEnabled) {
@@ -300,6 +302,7 @@ public class AdminService extends CompositeService implements
     UserGroupInformation user = checkAccess("transitionToActive");
     checkHaStateChange(reqInfo);
     try {
+      conf.set(YarnConfiguration.RM_HA_ID, rmId);
       rm.transitionToActive();
     } catch (Exception e) {
       RMAuditLogger.logFailure(user.getShortUserName(), "transitionToActive",
