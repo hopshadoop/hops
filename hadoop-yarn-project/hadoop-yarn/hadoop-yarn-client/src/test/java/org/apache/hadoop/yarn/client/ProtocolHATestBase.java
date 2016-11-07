@@ -22,15 +22,12 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.yarn.api.protocolrecords.FinishApplicationMasterRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.FinishApplicationMasterResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterResponse;
 import org.apache.hadoop.yarn.api.records.ApplicationAccessType;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -129,6 +126,8 @@ import org.apache.hadoop.yarn.util.Records;
 import org.junit.After;
 import org.junit.Before;
 
+import static org.junit.Assert.*;
+
 
 /**
  * Test Base for ResourceManager's Protocol on HA.
@@ -167,20 +166,20 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
   }
 
   private void setRpcAddressForRM(String rmId, int base) {
-    setConfForRM(rmId, YarnConfiguration.RM_ADDRESS, "0.0.0.0:" +
+    setConfForRM(rmId, YarnConfiguration.RM_ADDRESS, "localhost:" +
         (base + YarnConfiguration.DEFAULT_RM_PORT));
-    setConfForRM(rmId, YarnConfiguration.RM_SCHEDULER_ADDRESS, "0.0.0.0:" +
+    setConfForRM(rmId, YarnConfiguration.RM_SCHEDULER_ADDRESS, "localhost:" +
         (base + YarnConfiguration.DEFAULT_RM_SCHEDULER_PORT));
-    setConfForRM(rmId, YarnConfiguration.RM_ADMIN_ADDRESS, "0.0.0.0:" +
+    setConfForRM(rmId, YarnConfiguration.RM_ADMIN_ADDRESS, "localhost:" +
         (base + YarnConfiguration.DEFAULT_RM_ADMIN_PORT));
     setConfForRM(rmId, YarnConfiguration.RM_RESOURCE_TRACKER_ADDRESS,
-            "0.0.0.0:" + (base + YarnConfiguration
+            "localhost:" + (base + YarnConfiguration
             .DEFAULT_RM_RESOURCE_TRACKER_PORT));
-    setConfForRM(rmId, YarnConfiguration.RM_WEBAPP_ADDRESS, "0.0.0.0:" +
+    setConfForRM(rmId, YarnConfiguration.RM_WEBAPP_ADDRESS, "localhost:" +
         (base + YarnConfiguration.DEFAULT_RM_WEBAPP_PORT));
-    setConfForRM(rmId, YarnConfiguration.RM_WEBAPP_HTTPS_ADDRESS, "0.0.0.0:" +
+    setConfForRM(rmId, YarnConfiguration.RM_WEBAPP_HTTPS_ADDRESS, "localhost:" +
         (base + YarnConfiguration.DEFAULT_RM_WEBAPP_HTTPS_PORT));
-    setConfForRM(rmId, YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS, "0.0.0.0:" +
+    setConfForRM(rmId, YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS, "localhost:" +
         (base + YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_PORT));
   }
 
@@ -212,6 +211,7 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
         LOG.error("Error joining with failover thread", ex);
       }
     }
+    LOG.info("Shutting down the cluster");
     cluster.stop();
   }
 
@@ -227,6 +227,25 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
     getAdminService(newActiveRMIndex).transitionToActive(req);
     assertEquals("Failover failed", newActiveRMIndex,
         cluster.getActiveRMIndex());
+  }
+
+  protected void explicitRestart() throws Exception {
+    int activeRMIndex = cluster.getActiveRMIndex();
+
+    // Start the previously stopped RM, if stopped
+    cluster.initAndStartResourceManager((activeRMIndex + 1) % 2);
+
+    // Stop the active RM
+    cluster.stopResourceManager(activeRMIndex);
+
+    // Wait for the failover to happen
+    verifyConnections();
+
+    int currentlyActive = cluster.getActiveRMIndex();
+
+    assertNotEquals(-1, currentlyActive);
+    assertNotEquals("Automatic failover failed", currentlyActive,
+            activeRMIndex);
   }
 
   protected YarnClient createAndStartYarnClient(Configuration conf) {
@@ -262,14 +281,18 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
     fail("Client couldn't connect to the Active RM");
   }
 
-  protected Thread createAndStartFailoverThread() {
+  protected Thread createAndStartFailoverThread(final TestApplicationClientProtocolOnHA.Params haMode) {
     Thread failoverThread = new Thread() {
       public void run() {
         keepRunning = true;
         while (keepRunning) {
           if (cluster.getStartFailoverFlag()) {
             try {
-              explicitFailover();
+              if (haMode.equals(TestApplicationClientProtocolOnHA.Params.MANUAL_HA)) {
+                explicitFailover();
+              } else {
+                explicitRestart();
+              }
               keepRunning = false;
               cluster.resetFailoverTriggeredFlag(true);
             } catch (Exception e) {
@@ -291,19 +314,28 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
   }
 
   protected void startHACluster(int numOfNMs, boolean overrideClientRMService,
-          boolean overrideRTS, boolean overrideApplicationMasterService)
+          boolean overrideRTS, boolean overrideApplicationMasterService, TestApplicationClientProtocolOnHA.Params haMode)
           throws Exception {
     startHACluster(numOfNMs, overrideClientRMService, overrideRTS,
-            overrideApplicationMasterService, true);
+            overrideApplicationMasterService, true, haMode);
   }
 
   protected void startHACluster(int numOfNMs, boolean overrideClientRMService,
-      boolean overrideRTS, boolean overrideApplicationMasterService, boolean formatDB)
+      boolean overrideRTS, boolean overrideApplicationMasterService, boolean formatDB, TestApplicationClientProtocolOnHA.Params haMode)
       throws Exception {
     conf.setBoolean(YarnConfiguration.RECOVERY_ENABLED, true);
-    conf.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, false);
-    conf.set(YarnConfiguration.LEADER_CLIENT_FAILOVER_PROXY_PROVIDER,
-            "org.apache.hadoop.yarn.client.ConfiguredRMFailoverProxyProvider");
+
+    if (haMode.equals(TestApplicationClientProtocolOnHA.Params.MANUAL_HA)) {
+      conf.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, false);
+      conf.set(YarnConfiguration.LEADER_CLIENT_FAILOVER_PROXY_PROVIDER,
+              "org.apache.hadoop.yarn.client.ConfiguredRMFailoverProxyProvider");
+    } else {
+      conf.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, true);
+      conf.setBoolean(YarnConfiguration.AUTO_FAILOVER_EMBEDDED, false);
+      conf.setInt(CommonConfigurationKeys.DFS_LEADER_CHECK_INTERVAL_IN_MS_KEY, 500);
+      conf.set(YarnConfiguration.LEADER_CLIENT_FAILOVER_PROXY_PROVIDER,
+              "org.apache.hadoop.yarn.client.ConfiguredLeaderFailoverHAProxyProvider");
+    }
     cluster =
         new MiniYARNClusterForHATesting(TestRMFailover.class.getName(), 2,
             numOfNMs, 1, 1, false, overrideClientRMService, overrideRTS,
@@ -315,11 +347,15 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
     verifyConnections();
 
     // Do the failover
-    explicitFailover();
+    if (haMode.equals(TestApplicationClientProtocolOnHA.Params.MANUAL_HA)) {
+      explicitFailover();
+    } else {
+      // Restart RM and let the GMS do the failover
+      explicitRestart();
+    }
     verifyConnections();
 
-    failoverThread = createAndStartFailoverThread();
-
+    failoverThread = createAndStartFailoverThread(haMode);
   }
 
   protected ResourceManager getActiveRM() {

@@ -378,6 +378,16 @@ public class MiniYARNCluster extends CompositeService {
     startResourceManager(index);
   }
 
+  public synchronized void initAndStartResourceManager(int index) throws InterruptedException {
+    if (resourceManagers[index] != null) {
+      return;
+    }
+    Configuration conf = getConfig();
+    resourceManagers[index] = new ResourceManager();
+    initResourceManager(index, conf);
+    startResourceManager(index);
+  }
+
   public File getTestWorkDir() {
     return testWorkDir;
   }

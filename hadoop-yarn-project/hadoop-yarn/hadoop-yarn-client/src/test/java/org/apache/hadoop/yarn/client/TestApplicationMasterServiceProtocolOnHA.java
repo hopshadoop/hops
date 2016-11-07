@@ -52,7 +52,7 @@ public class TestApplicationMasterServiceProtocolOnHA
 
   @Before
   public void initialize() throws Exception {
-    startHACluster(0, false, false, true, true);
+    startHACluster(0, false, false, true, true, TestApplicationClientProtocolOnHA.Params.MANUAL_HA);
     attemptId = this.cluster.createFakeApplicationAttemptId();
     amClient = ClientRMProxy
         .createRMProxy(this.conf, ApplicationMasterProtocol.class, true);

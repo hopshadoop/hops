@@ -41,7 +41,7 @@ public class TestResourceTrackerOnHA extends ProtocolHATestBase{
 
   @Before
   public void initiate() throws Exception {
-    startHACluster(0, false, true, false, true);
+    startHACluster(0, false, true, false, true, TestApplicationClientProtocolOnHA.Params.MANUAL_HA);
     this.resourceTracker = getRMClient();
   }
 
@@ -65,7 +65,7 @@ public class TestResourceTrackerOnHA extends ProtocolHATestBase{
     Assert.assertTrue(waitForNodeManagerToConnect(10000, nodeId));
 
     // restart the failover thread, and make sure nodeHeartbeat works
-    failoverThread = createAndStartFailoverThread();
+    failoverThread = createAndStartFailoverThread(TestApplicationClientProtocolOnHA.Params.MANUAL_HA);
     NodeStatus status =
         NodeStatus.newInstance(NodeId.newInstance("localhost", 0), 0, null,
             null, null);
