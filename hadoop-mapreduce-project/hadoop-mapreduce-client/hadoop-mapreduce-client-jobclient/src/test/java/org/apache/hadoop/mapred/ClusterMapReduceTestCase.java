@@ -22,6 +22,7 @@ import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Properties;
@@ -54,6 +55,15 @@ public abstract class ClusterMapReduceTestCase extends TestCase {
     super.setUp();
 
     startCluster(true, null);
+  }
+
+  protected void purgeOutputDir() throws IOException {
+    try {
+      dfsCluster.getFileSystem().getFileStatus(getOutputDir());
+      dfsCluster.getFileSystem().delete(getOutputDir(), true);
+    } catch (FileNotFoundException ex) {
+      // Ignore, output dir does not exist
+    }
   }
 
   /**
