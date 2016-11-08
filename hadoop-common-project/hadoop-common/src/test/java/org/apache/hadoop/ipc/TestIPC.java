@@ -760,6 +760,7 @@ public class TestIPC {
     // check a few times to make sure we didn't go over
     for (int i=0; i<4; i++) {
       assertEquals(maxAccept, server.getNumOpenConnections());
+      Thread.sleep(100);
     }
 
     assertEquals(maxAccept, server.getNumOpenConnections());
