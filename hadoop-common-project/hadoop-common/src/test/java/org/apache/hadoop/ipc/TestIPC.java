@@ -752,10 +752,14 @@ public class TestIPC {
       LOG.info("(max clients) need:"+maxAccept+" connections have:"+server.getNumOpenConnections());
       Thread.sleep(100);
     }
-    // check a few times to make sure we didn't go over
+
     int maxTries = 6;
     while (maxTries-- >= 0 && server.getNumOpenConnections() != maxAccept) {
       Thread.sleep(100);
+    }
+    // check a few times to make sure we didn't go over
+    for (int i=0; i<4; i++) {
+      assertEquals(maxAccept, server.getNumOpenConnections());
     }
 
     assertEquals(maxAccept, server.getNumOpenConnections());
