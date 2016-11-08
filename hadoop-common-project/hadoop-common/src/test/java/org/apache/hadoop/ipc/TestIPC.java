@@ -763,8 +763,6 @@ public class TestIPC {
       Thread.sleep(100);
     }
 
-    assertEquals(maxAccept, server.getNumOpenConnections());
-
     // sanity check that no calls have finished
     assertEquals(clients, callFinishedLatch.getCount());
     LOG.info("releasing the calls");
