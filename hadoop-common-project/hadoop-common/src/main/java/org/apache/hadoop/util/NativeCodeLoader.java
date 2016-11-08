@@ -48,9 +48,6 @@ public final class NativeCodeLoader {
       LOG.warn("Loaded the native-hadoop library");
       nativeCodeLoaded = true;
     } catch (Throwable t) {
-        System.out.println(t);
-              String javaLibPath = System.getProperty("java.library.path");
-        System.out.println(javaLibPath);
       // Ignore failure to load
       if(LOG.isDebugEnabled()) {
         System.out.println(t);

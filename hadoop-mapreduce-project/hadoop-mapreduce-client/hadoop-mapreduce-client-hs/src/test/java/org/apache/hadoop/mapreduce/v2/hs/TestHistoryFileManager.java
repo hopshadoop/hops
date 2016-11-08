@@ -25,7 +25,7 @@ import java.io.FileNotFoundException;
 import java.util.UUID;
 import java.util.List;
 
-import org.junit.Assert;
+import org.junit.*;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
@@ -47,11 +47,6 @@ import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.util.Clock;
 import org.apache.hadoop.yarn.util.ControlledClock;
 import org.apache.hadoop.yarn.util.SystemClock;
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
 import org.junit.rules.TestName;
 
 import static org.mockito.Mockito.*;
@@ -120,6 +115,8 @@ public class TestHistoryFileManager {
   }
 
   @Test
+  // In Hops-HDFS two clusters use the same DB so this test is not applicable
+  @Ignore
   public void testCreateDirsWithAdditionalFileSystem() throws Exception {
     dfsCluster.getFileSystem().setSafeMode(
         HdfsConstants.SafeModeAction.SAFEMODE_LEAVE);
