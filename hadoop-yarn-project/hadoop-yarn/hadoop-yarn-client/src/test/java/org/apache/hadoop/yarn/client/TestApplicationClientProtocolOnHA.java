@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.yarn.client;
 
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
@@ -53,42 +51,18 @@ public class TestApplicationClientProtocolOnHA extends ProtocolHATestBase {
   @Rule
   public TestName testName = new TestName();
   private YarnClient client = null;
-  private Params haMode = Params.AUTO_HA;
+  private HA_MODE haMode = HA_MODE.MANUAL_HA;
 
-  protected enum Params {
-    AUTO_HA,
-    MANUAL_HA
-  }
-
-  @Parameterized.Parameters
-  public static Collection parameters() {
-    return Arrays.asList(new Object[][] {
-            //{Params.AUTO_HA},
-            {Params.MANUAL_HA}
-    });
-  }
-
-
-  public TestApplicationClientProtocolOnHA(Params haMode) {
+  public TestApplicationClientProtocolOnHA(HA_MODE haMode) {
     this.haMode = haMode;
   }
 
   @Before
   public void initiate() throws Exception {
     LOG.info(">>> Running test " + testName.getMethodName());
-    startCluster();
+    startHACluster(1, true, false, false, true, haMode);
     Configuration conf = new YarnConfiguration(this.conf);
     client = createAndStartYarnClient(conf);
-  }
-
-  private void startCluster() throws Exception {
-    if (haMode.equals(Params.MANUAL_HA)) {
-      LOG.info("Starting cluster with AUTO_FAILOVER disabled");
-      startHACluster(1, true, false, false, true, haMode);
-    } else {
-      LOG.info("Starting cluster with AUTO_FAILOVER enabled");
-      startHACluster(1, true, false, false, true, haMode);
-    }
   }
 
   @After

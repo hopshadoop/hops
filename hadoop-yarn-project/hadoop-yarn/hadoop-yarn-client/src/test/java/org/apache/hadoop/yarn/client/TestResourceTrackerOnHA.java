@@ -34,14 +34,22 @@ import org.apache.hadoop.yarn.util.YarnVersionInfo;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
+@RunWith(Parameterized.class)
 public class TestResourceTrackerOnHA extends ProtocolHATestBase{
 
   private ResourceTracker resourceTracker = null;
+  private HA_MODE haMode = HA_MODE.MANUAL_HA;
+
+  public TestResourceTrackerOnHA(HA_MODE haMode) {
+    this.haMode = haMode;
+  }
 
   @Before
   public void initiate() throws Exception {
-    startHACluster(0, false, true, false, true, TestApplicationClientProtocolOnHA.Params.MANUAL_HA);
+    startHACluster(0, false, true, false, true, haMode);
     this.resourceTracker = getRMClient();
   }
 
@@ -65,7 +73,8 @@ public class TestResourceTrackerOnHA extends ProtocolHATestBase{
     Assert.assertTrue(waitForNodeManagerToConnect(10000, nodeId));
 
     // restart the failover thread, and make sure nodeHeartbeat works
-    failoverThread = createAndStartFailoverThread(TestApplicationClientProtocolOnHA.Params.MANUAL_HA);
+    // The failover thread is started by the startHACluster. Why here as well???
+    failoverThread = createAndStartFailoverThread(haMode);
     NodeStatus status =
         NodeStatus.newInstance(NodeId.newInstance("localhost", 0), 0, null,
             null, null);

@@ -19,8 +19,7 @@
 package org.apache.hadoop.yarn.client;
 
 import java.nio.ByteBuffer;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.yarn.api.protocolrecords.FinishApplicationMasterRequest;
@@ -30,10 +29,9 @@ import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterRespo
 import org.apache.hadoop.yarn.api.records.ApplicationAccessType;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.apache.hadoop.yarn.security.AMRMTokenIdentifier;
 import org.junit.Assert;
 
 import org.apache.hadoop.conf.Configuration;
@@ -125,6 +123,7 @@ import org.apache.hadoop.yarn.server.security.ApplicationACLsManager;
 import org.apache.hadoop.yarn.util.Records;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.runners.Parameterized;
 
 import static org.junit.Assert.*;
 
@@ -149,6 +148,21 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
   protected static final HAServiceProtocol.StateChangeRequestInfo req =
       new HAServiceProtocol.StateChangeRequestInfo(
           HAServiceProtocol.RequestSource.REQUEST_BY_USER);
+
+  protected enum HA_MODE {
+    AUTO_HA,
+    MANUAL_HA
+  }
+
+  @Parameterized.Parameters
+  public static Collection parameters() {
+    return Arrays.asList(new Object[][] {
+            {HA_MODE.AUTO_HA},
+            {HA_MODE.MANUAL_HA}
+    });
+  }
+
+  protected org.apache.hadoop.security.token.Token<AMRMTokenIdentifier> appToken = null;
 
   protected static final String RM1_NODE_ID = "rm1";
   protected static final int RM1_PORT_BASE = 10000;
@@ -281,14 +295,14 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
     fail("Client couldn't connect to the Active RM");
   }
 
-  protected Thread createAndStartFailoverThread(final TestApplicationClientProtocolOnHA.Params haMode) {
+  protected Thread createAndStartFailoverThread(final HA_MODE haMode) {
     Thread failoverThread = new Thread() {
       public void run() {
         keepRunning = true;
         while (keepRunning) {
           if (cluster.getStartFailoverFlag()) {
             try {
-              if (haMode.equals(TestApplicationClientProtocolOnHA.Params.MANUAL_HA)) {
+              if (haMode.equals(HA_MODE.MANUAL_HA)) {
                 explicitFailover();
               } else {
                 explicitRestart();
@@ -314,22 +328,24 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
   }
 
   protected void startHACluster(int numOfNMs, boolean overrideClientRMService,
-          boolean overrideRTS, boolean overrideApplicationMasterService, TestApplicationClientProtocolOnHA.Params haMode)
+          boolean overrideRTS, boolean overrideApplicationMasterService, HA_MODE haMode)
           throws Exception {
     startHACluster(numOfNMs, overrideClientRMService, overrideRTS,
             overrideApplicationMasterService, true, haMode);
   }
 
   protected void startHACluster(int numOfNMs, boolean overrideClientRMService,
-      boolean overrideRTS, boolean overrideApplicationMasterService, boolean formatDB, TestApplicationClientProtocolOnHA.Params haMode)
+      boolean overrideRTS, boolean overrideApplicationMasterService, boolean formatDB, HA_MODE haMode)
       throws Exception {
     conf.setBoolean(YarnConfiguration.RECOVERY_ENABLED, true);
 
-    if (haMode.equals(TestApplicationClientProtocolOnHA.Params.MANUAL_HA)) {
+    if (haMode.equals(HA_MODE.MANUAL_HA)) {
+      LOG.info("Starting MiniYARN cluster with AUTOMATIC_FAILOVER DISABLED");
       conf.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, false);
       conf.set(YarnConfiguration.LEADER_CLIENT_FAILOVER_PROXY_PROVIDER,
               "org.apache.hadoop.yarn.client.ConfiguredRMFailoverProxyProvider");
     } else {
+      LOG.info("Starting MiniYARN cluster with AUTOMATIC_FAILOVER ENABLED");
       conf.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, true);
       conf.setBoolean(YarnConfiguration.AUTO_FAILOVER_EMBEDDED, false);
       conf.setInt(CommonConfigurationKeys.DFS_LEADER_CHECK_INTERVAL_IN_MS_KEY, 500);
@@ -347,9 +363,14 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
     verifyConnections();
 
     // Do the failover
-    if (haMode.equals(TestApplicationClientProtocolOnHA.Params.MANUAL_HA)) {
+    if (haMode.equals(HA_MODE.MANUAL_HA)) {
       explicitFailover();
     } else {
+      // Sync token for the TestApplicationMasterServiceProtocolOnHA test
+      // In case of MANUAL_HA mode, it is done in the test itself
+      if (appToken != null) {
+        syncToken(appToken);
+      }
       // Restart RM and let the GMS do the failover
       explicitRestart();
     }
@@ -360,6 +381,14 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
 
   protected ResourceManager getActiveRM() {
     return cluster.getResourceManager(cluster.getActiveRMIndex());
+  }
+
+  protected void syncToken(org.apache.hadoop.security.token.Token<AMRMTokenIdentifier> token)
+          throws IOException {
+    for (int i = 0; i < this.cluster.getNumOfResourceManager(); i++) {
+      cluster.getResourceManager(i).getRMContext()
+              .getAMRMTokenSecretManager().addPersistedPassword(token);
+    }
   }
 
   public class MiniYARNClusterForHATesting extends MiniYARNCluster {
