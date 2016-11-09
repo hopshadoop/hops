@@ -25,7 +25,8 @@ public abstract class MrClusterTest extends ClusterTest {
   public void setUp() throws Exception {
     super.setUp();
     Configuration conf = new Configuration(getConfig());
-    mrCluster = new MiniMRYarnCluster(this.getClass().getName(), numDatanode);
+    mrCluster = new MiniMRYarnCluster(this.getClass().getName(), numDatanode,
+            false);
     conf.set("fs.defaultFS", fs.getUri().toString());
     mrCluster.init(conf);
     mrCluster.start();

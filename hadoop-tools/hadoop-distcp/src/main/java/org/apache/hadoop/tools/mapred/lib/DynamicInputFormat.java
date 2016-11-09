@@ -34,6 +34,7 @@ import org.apache.hadoop.tools.CopyListingFileStatus;
 import java.util.List;
 import java.util.ArrayList;
 import java.io.IOException;
+import org.apache.hadoop.fs.FileStatus;
 
 /**
  * DynamicInputFormat implements the "Worker pattern" for DistCp.
@@ -133,7 +134,7 @@ public class DynamicInputFormat<K, V> extends InputFormat<K, V> {
     
     List<DynamicInputChunk> chunksFinal = new ArrayList<DynamicInputChunk>();
 
-    CopyListingFileStatus fileStatus = new CopyListingFileStatus();
+    FileStatus fileStatus = new FileStatus();
     Text relPath = new Text();
     int recordCounter = 0;
     int chunkCount = 0;
