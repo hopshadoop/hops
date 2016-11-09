@@ -18,9 +18,11 @@
 package org.apache.hadoop.ipc;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
+import java.net.URI;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -34,6 +36,7 @@ import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.v2.MiniMRYarnCluster;
 import org.apache.hadoop.net.StandardSocketFactory;
 import org.junit.Assert;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -45,6 +48,7 @@ public class TestMRCJCSocketFactory {
    * Check that we can reach a NameNode or Resource Manager using a specific
    * socket factory
    */
+  @Ignore //this test is not compatible with our nn selection system
   @Test
   public void testSocketFactory() throws IOException {
     // Create a standard mini-cluster
@@ -73,7 +77,7 @@ public class TestMRCJCSocketFactory {
 
       Assert.assertFalse(directDfs.exists(filePath));
       Assert.assertFalse(dfs.exists(filePath));
-
+      
       directDfs.mkdirs(filePath);
       Assert.assertTrue(directDfs.exists(filePath));
       Assert.assertTrue(dfs.exists(filePath));

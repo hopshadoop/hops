@@ -91,7 +91,7 @@ class DynamicInputChunk<K, V> {
   private void openForWrite() throws IOException {
     writer = SequenceFile.createWriter(
             chunkFilePath.getFileSystem(configuration), configuration,
-            chunkFilePath, Text.class, CopyListingFileStatus.class,
+            chunkFilePath, Text.class, FileStatus.class,
             SequenceFile.CompressionType.NONE);
 
   }
@@ -118,7 +118,7 @@ class DynamicInputChunk<K, V> {
    * @param value Corresponding value from the listing file.
    * @throws IOException Exception onf failure to write to the file.
    */
-  public void write(Text key, CopyListingFileStatus value) throws IOException {
+  public void write(Text key, FileStatus value) throws IOException {
     writer.append(key, value);
   }
 

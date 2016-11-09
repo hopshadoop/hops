@@ -120,7 +120,7 @@ public class GroupMembershipService extends CompositeService
   protected synchronized void serviceStart() throws Exception {
     startGroupMembership();
     startServer();
-    LOG.info("Started GMS on " + rmId);
+    LOG.info("Started GMS on " + rmId + " port: " + server.getPort());
 
     getConfig().updateConnectAddr(YarnConfiguration.RM_BIND_HOST,
             YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS,

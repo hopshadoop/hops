@@ -43,21 +43,28 @@ import org.apache.hadoop.yarn.security.AMRMTokenIdentifier;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
-
+@RunWith(Parameterized.class)
 public class TestApplicationMasterServiceProtocolOnHA
     extends ProtocolHATestBase {
   private ApplicationMasterProtocol amClient;
   private ApplicationAttemptId attemptId ;
+  private HA_MODE haMode = HA_MODE.MANUAL_HA;
+
+  public TestApplicationMasterServiceProtocolOnHA(HA_MODE haMode) {
+    this.haMode = haMode;
+  }
 
   @Before
   public void initialize() throws Exception {
-    startHACluster(0, false, false, true, true);
+    startHACluster(0, false, false, true, true, haMode);
     attemptId = this.cluster.createFakeApplicationAttemptId();
     amClient = ClientRMProxy
         .createRMProxy(this.conf, ApplicationMasterProtocol.class, true);
 
-    Token<AMRMTokenIdentifier> appToken =
+    appToken =
         this.cluster.getResourceManager().getRMContext()
           .getAMRMTokenSecretManager().createAndGetAMRMToken(attemptId);
     appToken.setService(ClientRMProxy.getAMRMTokenService(conf));
@@ -65,7 +72,11 @@ public class TestApplicationMasterServiceProtocolOnHA
         .createRemoteUser(UserGroupInformation.getCurrentUser()
             .getUserName()));
     UserGroupInformation.getCurrentUser().addToken(appToken);
-    syncToken(appToken);
+    // In AUTO_HA mode we sync the token in startCluster, before performing
+    // the first failover
+    if (haMode.equals(HA_MODE.MANUAL_HA)) {
+      syncToken(appToken);
+    }
   }
 
   @After
@@ -107,12 +118,5 @@ public class TestApplicationMasterServiceProtocolOnHA
             new ArrayList<String>()));
     AllocateResponse response = amClient.allocate(request);
     Assert.assertEquals(response, this.cluster.createFakeAllocateResponse());
-  }
-
-  private void syncToken(Token<AMRMTokenIdentifier> token) throws IOException {
-    for (int i = 0; i < this.cluster.getNumOfResourceManager(); i++) {
-      this.cluster.getResourceManager(i).getRMContext()
-          .getAMRMTokenSecretManager().addPersistedPassword(token);
-    }
   }
 }
