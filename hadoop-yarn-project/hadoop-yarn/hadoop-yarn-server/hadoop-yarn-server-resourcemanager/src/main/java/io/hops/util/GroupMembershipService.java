@@ -102,10 +102,6 @@ public class GroupMembershipService extends CompositeService
         .getCurrentUser());
     
     LOG.info("init groupMembershipService " + this.rmId);
-
-    if (rmContext.isHAEnabled() || rmContext.isDistributed()) {
-      initLEandGM(conf);
-    }
   }
 
   private AccessControlList getAdminAclList(Configuration conf) {
@@ -118,18 +114,25 @@ public class GroupMembershipService extends CompositeService
   
   @Override
   protected synchronized void serviceStart() throws Exception {
-    startGroupMembership();
     startServer();
-    LOG.info("Started GMS on " + rmId);
 
-    getConfig().updateConnectAddr(YarnConfiguration.RM_BIND_HOST,
+    groupMembershipServiceAddress = getConfig().updateConnectAddr(YarnConfiguration.RM_BIND_HOST,
             YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS,
             YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_ADDRESS,
             server.getListenerAddress());
+
+    startGroupMembership();
+    LOG.info("Started GMS: " + rmId + " on "
+            + groupMembershipServiceAddress.getAddress().getHostAddress()
+            + ":" + groupMembershipServiceAddress.getPort());
     super.serviceStart();
   }
 
-  protected synchronized void startGroupMembership() {
+  protected synchronized void startGroupMembership() throws IOException {
+    if (rmContext.isHAEnabled() || rmContext.isDistributed()) {
+      initLEandGM(conf);
+    }
+
     if (groupMembership != null) {
       groupMembership.start();
 
