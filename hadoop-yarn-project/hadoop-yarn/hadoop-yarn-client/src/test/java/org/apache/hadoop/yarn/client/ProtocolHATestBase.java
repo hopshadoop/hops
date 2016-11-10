@@ -180,20 +180,20 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
   }
 
   private void setRpcAddressForRM(String rmId, int base) {
-    setConfForRM(rmId, YarnConfiguration.RM_ADDRESS, "localhost:" +
+    setConfForRM(rmId, YarnConfiguration.RM_ADDRESS, "0.0.0.0:" +
         (base + YarnConfiguration.DEFAULT_RM_PORT));
-    setConfForRM(rmId, YarnConfiguration.RM_SCHEDULER_ADDRESS, "localhost:" +
+    setConfForRM(rmId, YarnConfiguration.RM_SCHEDULER_ADDRESS, "0.0.0.0:" +
         (base + YarnConfiguration.DEFAULT_RM_SCHEDULER_PORT));
-    setConfForRM(rmId, YarnConfiguration.RM_ADMIN_ADDRESS, "localhost:" +
+    setConfForRM(rmId, YarnConfiguration.RM_ADMIN_ADDRESS, "0.0.0.0:" +
         (base + YarnConfiguration.DEFAULT_RM_ADMIN_PORT));
     setConfForRM(rmId, YarnConfiguration.RM_RESOURCE_TRACKER_ADDRESS,
-            "localhost:" + (base + YarnConfiguration
+            "0.0.0.0:" + (base + YarnConfiguration
             .DEFAULT_RM_RESOURCE_TRACKER_PORT));
-    setConfForRM(rmId, YarnConfiguration.RM_WEBAPP_ADDRESS, "localhost:" +
+    setConfForRM(rmId, YarnConfiguration.RM_WEBAPP_ADDRESS, "0.0.0.0:" +
         (base + YarnConfiguration.DEFAULT_RM_WEBAPP_PORT));
-    setConfForRM(rmId, YarnConfiguration.RM_WEBAPP_HTTPS_ADDRESS, "localhost:" +
+    setConfForRM(rmId, YarnConfiguration.RM_WEBAPP_HTTPS_ADDRESS, "0.0.0.0:" +
         (base + YarnConfiguration.DEFAULT_RM_WEBAPP_HTTPS_PORT));
-    setConfForRM(rmId, YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS, "localhost:" +
+    setConfForRM(rmId, YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS, "0.0.0.0:" +
         (base + YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_PORT));
   }
 
@@ -338,6 +338,7 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
       boolean overrideRTS, boolean overrideApplicationMasterService, boolean formatDB, HA_MODE haMode)
       throws Exception {
     conf.setBoolean(YarnConfiguration.RECOVERY_ENABLED, true);
+    conf.setInt(YarnConfiguration.CLIENT_FAILOVER_RETRIES, 3);
 
     if (haMode.equals(HA_MODE.MANUAL_HA)) {
       LOG.info("Starting MiniYARN cluster with AUTOMATIC_FAILOVER DISABLED");
