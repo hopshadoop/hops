@@ -15,6 +15,7 @@
  */
 package io.hops.metadata;
 
+import com.google.common.annotations.VisibleForTesting;
 import io.hops.DalDriver;
 import io.hops.DalStorageFactory;
 import io.hops.StorageConnector;
@@ -134,6 +135,11 @@ public class HdfsStorageFactory {
   
   public static StorageConnector getConnector() {
     return dStorageFactory.getConnector();
+  }
+
+  @VisibleForTesting
+  public static void resetDALInitialized() {
+    isDALInitialized = false;
   }
 
   public static void setConfiguration(Configuration conf) throws IOException {

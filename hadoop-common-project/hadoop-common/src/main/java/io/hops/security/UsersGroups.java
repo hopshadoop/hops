@@ -54,7 +54,7 @@ public class UsersGroups {
   private static class GroupsUpdater implements Runnable {
     @Override
     public void run() {
-      while (true) {
+      while (!Thread.currentThread().isInterrupted()) {
         Set<String> knownUsers = cache.knownUsers();
         try {
           for (String user : knownUsers) {
@@ -68,6 +68,7 @@ public class UsersGroups {
           Thread.sleep(groupUpdateTime * 1000);
         } catch (InterruptedException e) {
           LOG.error(e);
+          Thread.currentThread().interrupt();
         }
       }
     }
@@ -98,6 +99,14 @@ public class UsersGroups {
       th.start();
       isConfigured = true;
     }
+  }
+
+  public static void stop() {
+    if (th != null) {
+      th.interrupt();
+      th = null;
+    }
+    isConfigured = false;
   }
 
   public static List<String> getGroups(final String user)

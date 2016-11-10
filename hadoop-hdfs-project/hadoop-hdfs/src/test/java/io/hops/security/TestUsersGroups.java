@@ -111,7 +111,7 @@ public class TestUsersGroups {
     cachedGroups = cache.getGroups(currentUser.getName());
     assertNotNull(cachedGroups);
     assertTrue(cachedGroups.equals(Arrays.asList(groups.get(2).getName())));
-
+    UsersGroups.stop();
   }
 
   @Test
@@ -223,7 +223,6 @@ public class TestUsersGroups {
     userId = cache.getUserId(users.get(2).getName());
     assertNull("Cache eviction should remove all users associated with " +
         "a removed group ", userId);
-
   }
 
 
@@ -232,12 +231,14 @@ public class TestUsersGroups {
     UsersGroups.addUserToGroups("user", new String[]{"group1", "group2"});
     assertEquals(UsersGroups.getGroupID("group1"), 0);
     assertEquals(UsersGroups.getUserID("user"), 0);
+    UsersGroups.stop();
   }
 
   @Test
   public void testAddUsers() throws IOException {
     Configuration conf = new Configuration();
     conf.setInt(CommonConfigurationKeys.HOPS_GROUPS_UPDATER_ROUND, 10);
+    HdfsStorageFactory.resetDALInitialized();
     HdfsStorageFactory.setConfiguration(conf);
     HdfsStorageFactory.formatStorage();
 
@@ -293,11 +294,14 @@ public class TestUsersGroups {
 
     assertEquals(Arrays.asList("group3",
         "group1", "group2"), UsersGroups.getGroups("user"));
+
+    UsersGroups.stop();
   }
 
   @Test
   public void testGroupMappingsRefresh() throws IOException {
     Configuration conf = new HdfsConfiguration();
+    HdfsStorageFactory.resetDALInitialized();
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1)
         .build();
     cluster.waitActive();
@@ -351,12 +355,15 @@ public class TestUsersGroups {
 
     assertEquals(Arrays.asList("group3",
         "group1", "group2"), UsersGroups.getGroups("user"));
+
+    cluster.shutdown();
   }
 
 
   @Test
   public void setOwnerMultipleTimes() throws IOException {
     Configuration conf = new HdfsConfiguration();
+    HdfsStorageFactory.resetDALInitialized();
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1)
         .build();
     cluster.waitActive();
@@ -374,6 +381,8 @@ public class TestUsersGroups {
     dfs.flushCacheGroup("testGroup");
 
     dfs.setOwner(base, "testUser", "testGroup");
+
+    cluster.shutdown();
   }
 
   private void removeUser(final int userId) throws IOException {

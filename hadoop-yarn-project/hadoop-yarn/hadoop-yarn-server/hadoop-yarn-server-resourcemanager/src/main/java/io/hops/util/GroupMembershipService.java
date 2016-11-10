@@ -95,7 +95,9 @@ public class GroupMembershipService extends CompositeService
         YarnConfiguration.DEFAULT_RM_GROUP_MEMBERSHIP_PORT);
     adminAcl = new AccessControlList(conf.get(YarnConfiguration.YARN_ADMIN_ACL,
         YarnConfiguration.DEFAULT_YARN_ADMIN_ACL));
-    this.rmId = HAUtil.getRMHAId(conf);
+    if (HAUtil.isHAEnabled(conf)) {
+      this.rmId = HAUtil.getRMHAId(conf);
+    }
     daemonUser = UserGroupInformation.getCurrentUser();
     authorizer = YarnAuthorizationProvider.getInstance(conf);
     authorizer.setAdmins(getAdminAclList(conf), UserGroupInformation
