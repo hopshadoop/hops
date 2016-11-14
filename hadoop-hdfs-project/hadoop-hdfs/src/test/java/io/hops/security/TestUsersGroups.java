@@ -301,7 +301,6 @@ public class TestUsersGroups {
   @Test
   public void testGroupMappingsRefresh() throws IOException {
     Configuration conf = new HdfsConfiguration();
-    HdfsStorageFactory.resetDALInitialized();
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1)
         .build();
     cluster.waitActive();
@@ -363,7 +362,6 @@ public class TestUsersGroups {
   @Test
   public void setOwnerMultipleTimes() throws IOException {
     Configuration conf = new HdfsConfiguration();
-    HdfsStorageFactory.resetDALInitialized();
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1)
         .build();
     cluster.waitActive();

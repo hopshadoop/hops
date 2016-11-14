@@ -643,6 +643,7 @@ public class MiniDFSCluster {
 
 
     // Setting the configuration for Storage
+    HdfsStorageFactory.resetDALInitialized();
     HdfsStorageFactory.setConfiguration(conf);
     if (format) {
       try {
