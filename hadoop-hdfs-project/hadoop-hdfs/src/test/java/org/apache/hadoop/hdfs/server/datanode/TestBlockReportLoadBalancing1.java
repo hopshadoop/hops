@@ -52,13 +52,19 @@ import static org.junit.Assert.*;
 public class TestBlockReportLoadBalancing1 {
 
   public static final Log LOG = LogFactory.getLog(TestBlockReportLoadBalancing1.class);
+  private MiniDFSCluster cluster;
 
   @Before
   public void startUpCluster() throws IOException {
   }
 
   @After
-  public void shutDownCluster() throws IOException {
+  public void shutDownCluster() throws Exception {
+    if (cluster != null) {
+      cluster.shutdown();
+      cluster = null;
+      Thread.sleep(1000);
+    }
   }
 
 
@@ -261,7 +267,7 @@ public class TestBlockReportLoadBalancing1 {
 
 
 
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
+    cluster = new MiniDFSCluster.Builder(conf)
             .nnTopology(MiniDFSNNTopology.simpleHOPSTopology(NN_COUNT))
             .format(true).numDataNodes(0).build();
     cluster.waitActive();
