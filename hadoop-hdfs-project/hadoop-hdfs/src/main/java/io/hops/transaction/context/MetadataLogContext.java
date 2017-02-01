@@ -29,7 +29,6 @@ import java.util.Collections;
 public class MetadataLogContext
     extends BaseEntityContext<MetadataLogContext.Key, MetadataLogEntry> {
   private final MetadataLogDataAccess<MetadataLogEntry> dataAccess;
-  private Collection<MetadataLogEntry> existing = Collections.emptyList();
 
   class Key {
     private int datasetId;
@@ -99,31 +98,7 @@ public class MetadataLogContext
   @Override
   public void prepare(TransactionLocks tlm)
       throws TransactionContextException, StorageException {
-    for (MetadataLogEntry existingEntry : existing) {
-      MetadataLogEntry cached = get(getKey(existingEntry));
-      cached.updateTimestamp();
-    }
     dataAccess.addAll(getAdded());
   }
 
-  @Override
-  public Collection<MetadataLogEntry> findList(
-      FinderType<MetadataLogEntry> finder, Object... params)
-      throws TransactionContextException, StorageException {
-    MetadataLogEntry.Finder mFinder = (MetadataLogEntry.Finder) finder;
-    switch (mFinder) {
-      case ALL_CACHED:
-        return new ArrayList<MetadataLogEntry>(getAll());
-      case FETCH_EXISTING:
-        return fetchExisting((Collection<MetadataLogEntry>) params[0]);
-      default:
-        throw new RuntimeException(UNSUPPORTED_FINDER);
-    }
-  }
-
-  private Collection<MetadataLogEntry> fetchExisting(
-      Collection<MetadataLogEntry> toRead) throws StorageException {
-    existing = dataAccess.readExisting(toRead);
-    return existing;
-  }
 }
