@@ -102,6 +102,8 @@ import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.TakeRo
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.TakeRootSnapshotResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.RollBackResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.RollBackRequestProto;
+import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.RemoveSnapshotResponseProto;
+import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.RemoveSnapshotRequestProto;
 import org.apache.hadoop.hdfs.security.token.block.DataEncryptionKey;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.hdfs.server.namenode.NotReplicatedYetException;
@@ -1015,6 +1017,21 @@ public class ClientNamenodeProtocolTranslatorPB
             throw ProtobufHelper.getRemoteException(e);
         }
     }
+
+
+  @Override
+  public void removeSnapshot(String userName) throws IOException{
+    RemoveSnapshotRequestProto req = RemoveSnapshotRequestProto.newBuilder()
+            .setUser(userName)
+            .build();
+    try {
+      RemoveSnapshotResponseProto resp = rpcProxy.removeSnapshot(null,
+              req);
+    } catch (ServiceException e) {
+      throw ProtobufHelper.getRemoteException(e);
+    }
+  }
+
 
   //END_HOP_CODE
 }

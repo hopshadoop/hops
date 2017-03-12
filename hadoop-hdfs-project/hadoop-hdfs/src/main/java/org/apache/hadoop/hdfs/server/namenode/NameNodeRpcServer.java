@@ -1018,6 +1018,11 @@ class NameNodeRpcServer implements NamenodeProtocols {
         
     }
 
+  @Override
+  public void removeSnapshot(String userName)throws IOException{
+      namesystem.removeSnapshot(userName);
+  }
+
   @Override // ClientProtocol
   public HdfsFileStatus create(String src, FsPermission masked,
       String clientName, EnumSetWritable<CreateFlag> flag, boolean createParent,

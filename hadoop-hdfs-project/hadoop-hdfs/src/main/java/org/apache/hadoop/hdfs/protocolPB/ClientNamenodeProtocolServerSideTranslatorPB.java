@@ -1049,4 +1049,17 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
         ClientNamenodeProtocolProtos.RollBackResponseProto.Builder resp = ClientNamenodeProtocolProtos.RollBackResponseProto.newBuilder();
         return resp.build();
     }
+
+  @Override
+  public ClientNamenodeProtocolProtos.RemoveSnapshotResponseProto removeSnapshot(RpcController controller, ClientNamenodeProtocolProtos.RemoveSnapshotRequestProto request) throws ServiceException {
+
+    try {
+      server.removeSnapshot(request.getUser());
+    } catch (IOException e) {
+      throw new ServiceException(e);
+    }
+
+    ClientNamenodeProtocolProtos.RemoveSnapshotResponseProto.Builder resp = ClientNamenodeProtocolProtos.RemoveSnapshotResponseProto.newBuilder();
+    return resp.build();
+  }
 }

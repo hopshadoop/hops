@@ -46,6 +46,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -163,6 +164,25 @@ public abstract class INode implements Comparable<byte[]> {
      */
     long getDsCount() {
       return dsCount;
+    }
+  }
+
+  static class AtomicDirCounts {
+    AtomicLong nsCount = new AtomicLong(0);
+    AtomicLong dsCount = new AtomicLong(0);
+
+    /**
+     * returns namespace count
+     */
+    long getNsCount() {
+      return nsCount.get();
+    }
+
+    /**
+     * returns diskspace count
+     */
+    long getDsCount() {
+      return dsCount.get();
     }
   }
   

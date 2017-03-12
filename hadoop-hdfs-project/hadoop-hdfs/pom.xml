@@ -38,6 +38,12 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
   </properties>
 
   <dependencies>
+    <dependency>
+      <groupId>com.mysql.ndb</groupId>
+      <artifactId>clusterj-part-key-fix</artifactId>
+      <!--artifactId>clusterj</artifactId-->
+      <version>7.4.7</version>
+    </dependency>
       <dependency>
           <groupId>com.mysql.ndb</groupId>
           <artifactId>clusterj</artifactId>
@@ -48,6 +54,7 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
           <artifactId>mysql-connector-java</artifactId>
           <version>5.1.18</version>
       </dependency>
+
     <dependency>
       <groupId>io.hops</groupId>
       <artifactId>hops-leader-election</artifactId>

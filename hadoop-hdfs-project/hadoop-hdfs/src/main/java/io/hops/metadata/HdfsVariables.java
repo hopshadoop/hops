@@ -21,12 +21,16 @@ import io.hops.exception.TransactionContextException;
 import io.hops.leaderElection.VarsRegister;
 import io.hops.metadata.common.entity.*;
 import io.hops.metadata.hdfs.dal.VariableDataAccess;
+import io.hops.metadata.hdfs.snapshots.SnapShotConstants;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.commons.digester.substitution.VariableAttributes;
 import org.apache.commons.io.output.ByteArrayOutputStream;
 import org.apache.hadoop.hdfs.security.token.block.BlockKey;
 import org.apache.hadoop.hdfs.server.common.StorageInfo;
+import org.apache.hadoop.hdfs.server.namenode.RemoveSnapshotManager;
+import org.apache.hadoop.hdfs.server.namenode.RollBackManager;
+import org.apache.hadoop.hdfs.server.namenode.SnapShotManager;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -277,13 +281,13 @@ public class HdfsVariables {
 
     }
 
-    public static boolean setRollBackStatus2(final String status)  throws IOException {
+    public static boolean setRollBackStatus2(final RollBackManager.RollBackStatus rollBackStatus)  throws IOException {
         return (Boolean) new LightWeightRequestHandler(HDFSOperationType.SET_ROLLBACK_STATUS) {
             @Override
             public Object performTask() throws  IOException {
                 VariableDataAccess vd = (VariableDataAccess) HdfsStorageFactory.getDataAccess(VariableDataAccess.class);
                 HdfsStorageFactory.getConnector().writeLock();
-                vd.setVariable(new StringVariable(Variable.Finder.RollBackStatus, status));
+                vd.setVariable(new StringVariable(Variable.Finder.RollBackStatus, rollBackStatus.toString()));
                 return true;
             }
         }.handle();
@@ -364,7 +368,109 @@ public class HdfsVariables {
     VarsRegister.registerHdfsDefaultValues();
     // This is a workaround that is needed until HA-YARN has its own format command
     VarsRegister.registerYarnDefaultValues();
-      Variable.registerVariableDefaultValue(Variable.Finder.RollBackStatus,new StringVariable(Variable.Finder.RollBackStatus,"NOT_STARTED").getBytes());
+    Variable.registerVariableDefaultValue(Variable.Finder.RollBackStatus,new StringVariable(Variable.Finder.RollBackStatus,RollBackManager.RollBackStatus.NOT_STARTED.toString()).getBytes());
+    Variable.registerVariableDefaultValue(Variable.Finder.RollBackRequestStatus,new IntVariable(Variable.Finder.RollBackRequestStatus, SnapShotConstants.snapShotNotTaken).getBytes());
+    Variable.registerVariableDefaultValue(Variable.Finder.SnapShotStatus,new StringVariable(Variable.Finder.SnapShotStatus, SnapShotManager.SnapshotStatus.NO_SNAPSHOT.toString()).getBytes());
+    Variable.registerVariableDefaultValue(Variable.Finder.SnapshotRequestStatus,new StringVariable(Variable.Finder.SnapshotRequestStatus, SnapShotManager.SnapshotRequestStatus.NOT_REQUESTED.toString()).getBytes());
+  }
+
+  public static String getSnapShotStatus() throws IOException{
+    return (String) new LightWeightRequestHandler(HDFSOperationType.GET_SNAPSHOT_STATUS) {
+      @Override
+      public Object performTask() throws  IOException {
+        VariableDataAccess vd = (VariableDataAccess) HdfsStorageFactory.getDataAccess(VariableDataAccess.class);
+        HdfsStorageFactory.getConnector().readCommitted();
+        return   vd.getVariable(Variable.Finder.SnapShotStatus);
+      }
+    }.handle();
+
+  }
+
+  public static boolean setSnapShotStatus(final SnapShotManager.SnapshotStatus snapShotTakenStatus )  throws IOException {
+    return (Boolean) new LightWeightRequestHandler(HDFSOperationType.SET_SNAPSHOT_STATUS) {
+      @Override
+      public Object performTask() throws  IOException {
+        VariableDataAccess vd = (VariableDataAccess) HdfsStorageFactory.getDataAccess(VariableDataAccess.class);
+        HdfsStorageFactory.getConnector().writeLock();
+        vd.setVariable(new StringVariable(Variable.Finder.SnapShotStatus, snapShotTakenStatus.toString()));
+        return true;
+      }
+    }.handle();
+
+  }
+
+  public static String getSnapShotRequestStatus() throws IOException{
+    return (String) new LightWeightRequestHandler(HDFSOperationType.GET_SNAPSHOT_REQUEST_STATUS) {
+      @Override
+      public Object performTask() throws  IOException {
+        VariableDataAccess vd = (VariableDataAccess) HdfsStorageFactory.getDataAccess(VariableDataAccess.class);
+        HdfsStorageFactory.getConnector().readCommitted();
+        return   vd.getVariable(Variable.Finder.SnapshotRequestStatus);
+      }
+    }.handle();
+
+  }
+
+  public static boolean setSnapShotRequestStatus(final SnapShotManager.SnapshotRequestStatus snapShotRequestStatus )  throws IOException {
+    return (Boolean) new LightWeightRequestHandler(HDFSOperationType.SET_SNAPSHOT_REQUEST_STATUS) {
+      @Override
+      public Object performTask() throws  IOException {
+        VariableDataAccess vd = (VariableDataAccess) HdfsStorageFactory.getDataAccess(VariableDataAccess.class);
+        HdfsStorageFactory.getConnector().writeLock();
+        vd.setVariable(new StringVariable(Variable.Finder.SnapshotRequestStatus, snapShotRequestStatus.toString()));
+        return true;
+      }
+    }.handle();
+
+  }
+  public static String getRollBackRequestStatus() throws IOException{
+    return (String) new LightWeightRequestHandler(HDFSOperationType.GET_ROLLBACK_REQUEST_STATUS) {
+      @Override
+      public Object performTask() throws  IOException {
+        VariableDataAccess vd = (VariableDataAccess) HdfsStorageFactory.getDataAccess(VariableDataAccess.class);
+        HdfsStorageFactory.getConnector().readCommitted();
+        return   vd.getVariable(Variable.Finder.RollBackRequestStatus);
+      }
+    }.handle();
+
+  }
+
+  public static boolean setRollBackRequestStatus(final RollBackManager.RollBackRequestStatus rollBackRequestStatus )  throws IOException {
+    return (Boolean) new LightWeightRequestHandler(HDFSOperationType.SET_ROLLBACK_REQUEST_STATUS) {
+      @Override
+      public Object performTask() throws  IOException {
+        VariableDataAccess vd = (VariableDataAccess) HdfsStorageFactory.getDataAccess(VariableDataAccess.class);
+        HdfsStorageFactory.getConnector().writeLock();
+        vd.setVariable(new StringVariable(Variable.Finder.RollBackRequestStatus, rollBackRequestStatus.toString()));
+        return true;
+      }
+    }.handle();
+
+  }
+
+  public static String getRemoveSnapshotStatus() throws IOException{
+    return (String) new LightWeightRequestHandler(HDFSOperationType.GET_REMOVE_SNAPSHOT_STATUS) {
+      @Override
+      public Object performTask() throws  IOException {
+        VariableDataAccess vd = (VariableDataAccess) HdfsStorageFactory.getDataAccess(VariableDataAccess.class);
+        HdfsStorageFactory.getConnector().readCommitted();
+        return   vd.getVariable(Variable.Finder.RemoveSnapshotStatus);
+      }
+    }.handle();
+
+  }
+
+  public static boolean setRemoveSnapshotStatus(final RemoveSnapshotManager.ExecutionStatus removeSnapshotStatus )  throws IOException {
+    return (Boolean) new LightWeightRequestHandler(HDFSOperationType.SET_REMOVE_SNAPSHOT_STATUS) {
+      @Override
+      public Object performTask() throws  IOException {
+        VariableDataAccess vd = (VariableDataAccess) HdfsStorageFactory.getDataAccess(VariableDataAccess.class);
+        HdfsStorageFactory.getConnector().writeLock();
+        vd.setVariable(new StringVariable(Variable.Finder.RemoveSnapshotStatus, removeSnapshotStatus.toString()));
+        return true;
+      }
+    }.handle();
+
   }
 
 }

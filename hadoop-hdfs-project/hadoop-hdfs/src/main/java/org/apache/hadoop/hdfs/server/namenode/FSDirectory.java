@@ -19,14 +19,13 @@ package org.apache.hadoop.hdfs.server.namenode;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.sun.org.apache.xerces.internal.dom.EntityReferenceImpl;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.resolvingcache.Cache;
 import io.hops.metadata.HdfsStorageFactory;
-import io.hops.metadata.hdfs.dal.AccessTimeLogDataAccess;
 import io.hops.metadata.hdfs.dal.INodeAttributesDataAccess;
 import io.hops.metadata.hdfs.dal.INodeDataAccess;
-import io.hops.metadata.hdfs.entity.AccessTimeLogEntry;
 import io.hops.metadata.hdfs.entity.INodeCandidatePrimaryKey;
 import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.metadata.hdfs.entity.QuotaUpdate;
@@ -68,15 +67,12 @@ import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.BlockUCState;
 import org.apache.hadoop.hdfs.util.ByteArray;
 import org.apache.hadoop.security.AccessControlException;
 
-import io.hops.metadata.hdfs.snapshots.SnapShotConstants;
-
 import java.io.Closeable;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 
 import static org.apache.hadoop.hdfs.server.namenode.FSNamesystem.LOG;
 import static org.apache.hadoop.util.Time.now;
@@ -558,8 +554,7 @@ public class FSDirectory implements Closeable {
     // Ensure dst has quota to accommodate rename
     verifyQuotaForRename(srcInodes, dstInodes, srcNsCount, srcDsCount,
         dstNsCount, dstDsCount);
-    INode removedSrc =
-        removeChildForRename(srcInodes, srcInodes.length - 1, srcNsCount,
+    INode removedSrc = removeChildForRename(srcInodes, srcInodes.length - 1, srcNsCount,
             srcDsCount);
     if (removedSrc == null) {
       error = "Failed to rename " + src + " to " + dst +
@@ -573,44 +568,39 @@ public class FSDirectory implements Closeable {
     if(isSnapshotAtRootTaken){
       srcClone= cloneINode(removedSrc,false);
       removedSrc_backup = cloneINode(removedSrc,false);
-      if(removedSrc_backup.getStatus()==SnapShotConstants.Original){
-        removedSrc.setStatusNoPersistance(SnapShotConstants.Modified);
-        removedSrc_backup.setIdNoPersistance(-removedSrc.getId());
-        removedSrc_backup.setParentIdNoPersistance(-removedSrc.getParentId());
-        EntityManager.add(removedSrc_backup);
-      }
     }else{
       srcClone= cloneINode(removedSrc);
     }
-
-
     final String srcChildName = removedSrc.getLocalName();
     String dstChildName = null;
     INode removedDst = null;
-    INode removedDst_backup = null;
+    INode removedDst_OrigStatus_backup=null;
     try {
-      if (dstInode != null) { // dst exists remove it
-       //START ROOT_LEVEL_SNAPSHOT
-          /*
-           * If snapshot at Root is taken then we do not delete this destination permanently if this child is created after taking snapshot
-           * This dstInode will be included in future NsQuota and DSQuota calculations.
-           */
+      if (dstInode != null) { // dst exist remove it
           if(isSnapshotAtRootTaken){
               removedDst = ((INodeDirectory)dstInodes[dstInodes.length -2]).getChild(dstInodes[dstInodes.length -1].getLocalName());
-
-            removedDst_backup = cloneINode(removedDst,false);
-            removedDst_backup.setParentIdNoPersistance(-removedDst.getParentId());
-            removedDst_backup.setIsDeletedNoPersistance(SnapShotConstants.isDeleted);
-            removedDst_backup.setIdNoPersistance(-removedDst.getId());
-            removedDst_backup.setLocalName(removedDst.getLocalName()+"$DEL:"+removedDst.getId()+"$");
-            EntityManager.add(removedDst_backup);
-            EntityManager.remove(removedDst);
+            if(removedDst.getStatus() == SnapShotConstants.Original){
+                propagatePendingQuotaUpdates(dstInodes,dstInodes.length-1);
+              propagatePendingQuotaUpdates(dstInodes,dstInodes.length-1);
+              INode targetNode_backup = cloneINode(removedDst, false);
+              targetNode_backup.setParentIdNoPersistance(-removedDst.getParentId());
+              targetNode_backup.setIsDeletedNoPersistance(SnapShotConstants.isDeleted);
+              targetNode_backup.setIdNoPersistance(-removedDst.getId());
+              targetNode_backup.setLocalName(removedDst.getLocalName() + "$DEL:" + removedDst.getId() + "$");
+              removedDst_OrigStatus_backup =targetNode_backup;
+              EntityManager.add(targetNode_backup);
+              EntityManager.remove(removedDst);
+            }else if(removedDst.getStatus() == SnapShotConstants.Modified){
+              propagatePendingQuotaUpdates(dstInodes,dstInodes.length-1);
+              EntityManager.remove(removedDst);
+            }else{
+              removedDst = removeChild(dstInodes, dstInodes.length-1);
+            }
           }else{
               //destination exists, remove it.
               removedDst = removeChild(dstInodes, dstInodes.length - 1,dstNsCount,
                       dstDsCount);
           }
-        //END ROOT_LEVEL_SNAPSHOT
         dstChildName = removedDst.getLocalName();
       }
 
@@ -629,80 +619,87 @@ public class FSDirectory implements Closeable {
               "DIR* FSDirectory.unprotectedRenameTo: " + src +
                   " is renamed to " + dst);
         }
- //START ROOT_LEVEL_SNAPSHOT
         if(isSnapshotAtRootTaken){
-            /*
-             * Since we are updating the modification time, if the inode is before exisiting before snapshot, we need to take back-up of it.
-             * 
-             */
-            if( srcInodes[srcInodes.length - 2].getStatus()==SnapShotConstants.Original){
-                INodeDirectory node = (INodeDirectory) srcInodes[srcInodes.length - 2];
-                INode backUpRecord;
-                backUpRecord = cloneINode(node,false);
-                backUpRecord.setIdNoPersistance(-node.getId());
-                backUpRecord.setParentIdNoPersistance(-node.getParentId());
-                node.setStatusNoPersistance(SnapShotConstants.Modified);
-                EntityManager.add(backUpRecord);
-            }
-            
-            if(dstInodes[dstInodes.length - 2].getStatus()==SnapShotConstants.Original){
-                INodeDirectory node = (INodeDirectory) dstInodes[dstInodes.length - 2];
-                INode backUpRecord;
-                backUpRecord = cloneINode(node,false);
-                backUpRecord.setIdNoPersistance(-node.getId());
-                backUpRecord.setParentIdNoPersistance(-node.getParentId());
-                node.setStatusNoPersistance(SnapShotConstants.Modified);
-                EntityManager.add(backUpRecord);
-            }
+             updateParentINodeModificationTime(srcInodes,srcInodes.length-1,timestamp);
+             updateParentINodeModificationTime(dstInodes,dstInodes.length-1,timestamp);
+        }else{
+          srcInodes[srcInodes.length - 2].setModificationTime(timestamp);
+          dstInodes[dstInodes.length - 2].setModificationTime(timestamp);
         }
-        //END ROOT_LEVEL_SNAPSHOT
-        srcInodes[srcInodes.length - 2].setModificationTime(timestamp);
-        dstInodes[dstInodes.length - 2].setModificationTime(timestamp);
         // update moved lease with new filename
         getFSNamesystem().unprotectedChangeLease(src, dst);
 
-        //START ROOT_LEVEL_SNAPSHOT
-        if (isSnapshotAtRootTaken) {
-          //removedSrc or dstChild's parent_id has been changed hence new row.But the row with parent_id before move needs to be removed.
-          EntityManager.snapshotMaintenance(
-                  HdfsTransactionContextMaintenanceCmds.INodePKChanged, srcClone,
-                  dstChild);
-            return true;
-        } else {
-          //END ROOT_LEVEL_SNAPSHOT
-
           // Collect the blocks and remove the lease for previous dst
-          if (removedDst != null) {
-            INode rmdst = removedDst;
+          if ((!isSnapshotAtRootTaken && removedDst != null) ||
+                  (isSnapshotAtRootTaken && removedDst!=null && removedDst.getStatus()==SnapShotConstants.New)) {
             removedDst = null;
             List<Block> collectedBlocks = new ArrayList<Block>();
-            filesDeleted = rmdst.collectSubtreeBlocksAndClear(collectedBlocks);
+            filesDeleted = 1;// rmdst.collectSubtreeBlocksAndClear(collectedBlocks);
+            // [S] as the dst dir was empty it will always return 1
             getFSNamesystem().removePathAndBlocks(src, collectedBlocks);
           }
-          EntityManager.snapshotMaintenance(
-                  HdfsTransactionContextMaintenanceCmds.INodePKChanged, srcClone,
-                  dstChild);
-
-          return filesDeleted > 0;
-          //START ROOT_LEVEL_SNAPSHOT
-        }
-          //END ROOT_LEVEL_SNAPSHOT
+          if(isSnapshotAtRootTaken ){
+            if(removedDst!=null){
+              removedDst = null;
+            }
+            EntityManager.snapshotMaintenance(
+                    HdfsTransactionContextMaintenanceCmds.INodePKChanged, srcClone,
+                    dstChild);
+            return true;
+           }else{
+            EntityManager.snapshotMaintenance(
+                    HdfsTransactionContextMaintenanceCmds.INodePKChanged, srcClone,
+                    dstChild);
+            return filesDeleted > 0;
+          }
       }
     } finally {
-      if(!isSnapshotAtRootTaken){
-        if (removedSrc != null) {
-          // Rename failed - restore src
-          removedSrc.setLocalNameNoPersistance(srcChildName);
-          addChildNoQuotaCheck(srcInodes, srcInodes.length - 1, removedSrc,
-                  srcNsCount, srcDsCount);
+        if(!isSnapshotAtRootTaken){
+          if (removedDst != null) {
+            // Rename failed - restore dst
+            removedDst.setLocalNameNoPersistance(dstChildName);
+            addChildNoQuotaCheck(dstInodes, dstInodes.length - 1, removedDst,
+                    dstNsCount, dstDsCount);
+          }
+          if (removedSrc != null) {
+            // Rename failed - restore src
+            removedSrc.setLocalNameNoPersistance(srcChildName);
+            addChildNoQuotaCheck(srcInodes, srcInodes.length - 1, removedSrc,
+                    srcNsCount, srcDsCount);
+          }
+        }else {
+          if (removedSrc == null && removedDst == null) {
+            //Rename is success. Add back-up record for removedSrc if it is original
+            if (removedSrc_backup.getStatus() == SnapShotConstants.Original) {
+              removedSrc.setStatusNoPersistance(SnapShotConstants.Modified);
+              removedSrc_backup.setIdNoPersistance(-removedSrc.getId());
+              removedSrc_backup.setParentIdNoPersistance(-removedSrc.getParentId());
+              EntityManager.add(removedSrc_backup);
+            }
+          } else {
+            if (removedDst != null) {
+              // Rename failed - restore dst
+              removedDst.setLocalNameNoPersistance(dstChildName);
+              if (removedDst.status == SnapShotConstants.New) {
+                // Rename failed - restore dst
+                removedDst.setLocalNameNoPersistance(dstChildName);
+                addChildNoQuotaCheck(dstInodes, dstInodes.length - 1, removedDst,
+                        dstNsCount, dstDsCount);
+              } else if (removedDst.status == SnapShotConstants.Modified) {
+                EntityManager.add(removedDst);
+              } else if (removedDst.status == SnapShotConstants.Original) {
+                EntityManager.add(removedDst);
+                EntityManager.remove(removedDst_OrigStatus_backup);
+              }
+            }
+            if (removedSrc != null) {
+              // Rename failed - restore src
+              removedSrc.setLocalNameNoPersistance(srcChildName);
+              addChildNoQuotaCheck(srcInodes, srcInodes.length - 1, removedSrc,
+                      srcNsCount, srcDsCount);
+            }
+          }
         }
-        if (removedDst != null) {
-          // Rename failed - restore dst
-          removedDst.setLocalNameNoPersistance(dstChildName);
-          addChildNoQuotaCheck(dstInodes, dstInodes.length - 1, removedDst,
-                  dstNsCount, dstDsCount);
-        }
-      }
     }
     NameNode.stateChangeLog.warn(
         "DIR* FSDirectory.unprotectedRenameTo: " + "failed to rename " + src +
@@ -1425,88 +1422,130 @@ if (removedDst != null) {
    * @return true on successful deletion; else false
    */
   boolean delete(String src, List<Block> collectedBlocks)
-      throws UnresolvedLinkException, StorageException, IOException {
+          throws UnresolvedLinkException, StorageException, IOException {
     if (NameNode.stateChangeLog.isDebugEnabled()) {
       NameNode.stateChangeLog.debug("DIR* FSDirectory.delete: " + src);
     }
-     long now = now();
-        int filesRemoved;
-       
-        if (namesystem.isSnapshotAtRootTaken()) {
-            src = normalizePath(src);
+    long now = now();
+    int filesRemoved;
 
-            INode[] inodes = getRootDir().getExistingPathINodes(src, false);
-            INode targetNode = inodes[inodes.length - 1];
+    if (namesystem.isSnapshotAtRootTaken()) {
+      src = normalizePath(src);
 
-            if (targetNode == null) { // non-existent src
-                if (NameNode.stateChangeLog.isDebugEnabled()) {
-                    NameNode.stateChangeLog.debug("DIR* FSDirectory.unprotectedDelete: "
-                            + "failed to remove " + src + " because it does not exist");
-                }
-                return false;
-            }
-            if (inodes.length == 1) { // src is the root
-                NameNode.stateChangeLog.warn("DIR* FSDirectory.unprotectedDelete: "
-                        + "failed to remove " + src
-                        + " because the root is not allowed to be deleted");
-                 return false;
-            }
-            int pos = inodes.length - 1;
-            
-             targetNode = ((INodeDirectory)inodes[pos-1]).getChild(inodes[pos].getLocalName());    
-            
-            if (targetNode == null) {
-                 return false;
-            }
-            
-            //clone targetInode with-out cloning INodeAtributes..since we are not changing anything over-there..like quota
-            INode targetNode_backup = cloneINode(targetNode,false);
-            targetNode_backup.setParentIdNoPersistance(-targetNode.getParentId());
-            targetNode_backup.setIsDeletedNoPersistance(SnapShotConstants.isDeleted);
-            targetNode_backup.setIdNoPersistance(-targetNode.getId());
-            targetNode_backup.setLocalName(targetNode.getLocalName()+"$DEL:"+targetNode.getId()+"$");
-            EntityManager.add(targetNode_backup);
-            EntityManager.remove(targetNode);
-            
-            // set the parent's modification time
-            if (inodes[pos - 1].getStatus() == SnapShotConstants.Original) {
-                 INode backUpRecord ;
-                
-                if(inodes[pos-1] instanceof INodeDirectoryWithQuota){
-                    INodeDirectoryWithQuota nodeQuota = (INodeDirectoryWithQuota) inodes[pos - 1];
-                    backUpRecord =new INodeDirectoryWithQuota(nodeQuota.getNsQuota(),nodeQuota.getDsQuota(),nodeQuota);
-                }else{
-                    backUpRecord = cloneINode(inodes[pos-1]);
-                }
-               
-                backUpRecord.setIdNoPersistance(-inodes[pos - 1].getId());
-                backUpRecord.setParentIdNoPersistance(-inodes[pos - 1].getParentId());
-                inodes[pos - 1].setStatusNoPersistance(SnapShotConstants.Modified);
-                inodes[pos - 1].setModificationTimeNoPersistance(now);
-                EntityManager.update(inodes[pos - 1]);
-                EntityManager.add(backUpRecord);
-                
-            } else {
-                inodes[pos - 1].setModificationTime(now);
-                EntityManager.update(inodes[pos - 1]);
-            }
-            
-        } else {
+      INode[] inodes = getRootDir().getExistingPathINodes(src, false);
+      INode targetNode = inodes[inodes.length - 1];
 
-                filesRemoved = unprotectedDelete(src, collectedBlocks, now);
-
-            if (filesRemoved <= 0) {
-                return false;
-            }
-            incrDeletedFileCount(filesRemoved);
-            // Blocks will be deleted later by the caller of this method
-            getFSNamesystem().removePathAndBlocks(src, null);
+      if (targetNode == null) { // non-existent src
+        if (NameNode.stateChangeLog.isDebugEnabled()) {
+          NameNode.stateChangeLog.debug("DIR* FSDirectory.unprotectedDelete: "
+                  + "failed to remove " + src + " because it does not exist");
         }
+        return false;
+      }
+      if (inodes.length == 1) { // src is the root
+        NameNode.stateChangeLog.warn("DIR* FSDirectory.unprotectedDelete: "
+                + "failed to remove " + src
+                + " because the root is not allowed to be deleted");
+        return false;
+      }
+      int pos = inodes.length - 1;
 
+      targetNode = ((INodeDirectory) inodes[pos - 1]).getChild(inodes[pos].getLocalName());
 
+      if (targetNode == null) {
+        return false;
+      }
+
+      if (targetNode.getStatus() == SnapShotConstants.Original) {
+        propagatePendingQuotaUpdates(inodes,pos);
+        INode targetNode_backup = cloneINode(targetNode, false);
+        targetNode_backup.setParentIdNoPersistance(-targetNode.getParentId());
+        targetNode_backup.setIsDeletedNoPersistance(SnapShotConstants.isDeleted);
+        targetNode_backup.setIdNoPersistance(-targetNode.getId());
+        targetNode_backup.setLocalName(targetNode.getLocalName() + "$DEL:" + targetNode.getId() + "$");
+        EntityManager.add(targetNode_backup);
+        EntityManager.remove(targetNode);
+        updateParentINodeModificationTime(inodes, pos, now);
+
+      } else if (targetNode.getStatus() == SnapShotConstants.Modified) {
+        propagatePendingQuotaUpdates(inodes,pos);
+        EntityManager.remove(targetNode);
+        updateParentINodeModificationTime(inodes, pos, now);
+
+      } else {//targetNode.getStatus() == SnapShotConstants.New --> Normal deletion of the file
+
+        // Remove the node from the namespace
+        targetNode = removeChild(inodes, pos);
+        if (targetNode == null) {
+          return false;
+        }
+        updateParentINodeModificationTime(inodes, pos, now);
+        filesRemoved = targetNode.collectSubtreeBlocksAndClear(collectedBlocks);
+        if (filesRemoved < 0) {
+          return false;
+        }
+        if (NameNode.stateChangeLog.isDebugEnabled()) {
+          NameNode.stateChangeLog
+                  .debug("DIR* FSDirectory.unprotectedDelete: " + src + " is removed");
+        }
+        incrDeletedFileCount(filesRemoved);
+        // Blocks will be deleted later by the caller of this method
+        getFSNamesystem().removePathAndBlocks(src, null);
         return true;
+      }
+    } else {
+      filesRemoved = unprotectedDelete(src, collectedBlocks, now);
+
+      if (filesRemoved <= 0) {
+        return false;
+      }
+      incrDeletedFileCount(filesRemoved);
+      // Blocks will be deleted later by the caller of this method
+      getFSNamesystem().removePathAndBlocks(src, null);
     }
-   
+    return true;
+  }
+  protected void propagatePendingQuotaUpdates(INode[] inodes, int pos) throws TransactionContextException, StorageException {
+    INode targetNode = inodes[pos];
+    if (isQuotaEnabled()) {
+      List<QuotaUpdate> outstandingUpdates = (List<QuotaUpdate>) EntityManager
+              .findList(QuotaUpdate.Finder.ByINodeId, targetNode.getId());
+      long nsDelta = 0;
+      long dsDelta = 0;
+      for (QuotaUpdate update : outstandingUpdates) {
+        nsDelta += update.getNamespaceDelta();
+        dsDelta += update.getDiskspaceDelta();
+      }
+      INode.DirCounts counts = new INode.DirCounts();
+      updateCountNoQuotaCheck(inodes, pos,
+              -counts.getNsCount() + nsDelta, -counts.getDsCount() + dsDelta);
+    }
+  }
+  private void updateParentINodeModificationTime(INode[] inodes, int pos, long time) throws TransactionContextException, StorageException {
+    // set the parent's modification time
+    if (inodes[pos - 1].getStatus() == SnapShotConstants.Original) {
+      INode backUpRecord;
+
+      if (inodes[pos - 1] instanceof INodeDirectoryWithQuota) {
+        INodeDirectoryWithQuota nodeQuota = (INodeDirectoryWithQuota) inodes[pos - 1];
+        backUpRecord = cloneINode(nodeQuota, false);
+      } else {
+        backUpRecord = cloneINode(inodes[pos - 1]);
+      }
+
+      backUpRecord.setIdNoPersistance(-inodes[pos - 1].getId());
+      backUpRecord.setParentIdNoPersistance(-inodes[pos - 1].getParentId());
+      inodes[pos - 1].setStatusNoPersistance(SnapShotConstants.Modified);
+      inodes[pos - 1].setModificationTimeNoPersistance(time);
+      EntityManager.update(inodes[pos - 1]);
+      EntityManager.add(backUpRecord);
+
+    } else {
+      inodes[pos - 1].setModificationTime(time);
+      EntityManager.update(inodes[pos - 1]);
+    }
+  }
+
   /**
    * @return true if the path is a non-empty directory; otherwise, return false.
    */
@@ -2152,8 +2191,7 @@ if (removedDst != null) {
     /*
      * The semantics of space calculations after taking snapshot are
      * Consider /A/B/C and /A/D/C
-     * 1. If we B is deleted, then the subtree under B is included in NSQuota and DSQuota for /(Root) and A.
-     * 2. If C is moved to D,i.e, by overwriting the file C. Then C is included in NSQuota, DSQuota of {/,A,D}. 
+     * 2. If C is moved to D,i.e, by overwriting the file C. Then C is included in NSQuota, DSQuota of {/D}.
      *  2.1 The NSQuota of B is decreased by 1 and DSQuota is decreased by the size of C.
      *  2.2 The NSQUota of D is increased by 1 and DAQuota is increased by the size of C.
      *  2.3 Similary if C is directory(over-writing an non-empty directory is not allowed), then
@@ -2443,8 +2481,8 @@ if (removedDst != null) {
     return removedNode;
   }
   
-  INode removeChild(INode[] pathComponents, int pos, boolean forRename, 
-          final long nsCount, final long dsCount)
+  INode removeChild(INode[] pathComponents, int pos, boolean forRename,
+                    final long nsCount, final long dsCount)
       throws StorageException, TransactionContextException {
     INode removedNode = null;
     if (forRename) {
@@ -2514,7 +2552,7 @@ if (removedDst != null) {
   }
 
   private INode removeChildForRename(INode[] pathComponents, int pos,
-      long nsCount, long dsCount)
+                                     long nsCount, long dsCount)
       throws StorageException, TransactionContextException {
     return removeChild(pathComponents, pos, true, nsCount, dsCount);
   }

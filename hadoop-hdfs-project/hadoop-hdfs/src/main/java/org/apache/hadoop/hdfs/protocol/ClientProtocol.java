@@ -1247,7 +1247,8 @@ public interface ClientProtocol {
   public boolean takeRootLevelSnapshot(String userName) throws IOException;
   
   public void rollBack(String userName) throws IOException;
-  
+
+  public void removeSnapshot(String userName) throws IOException;
   /**
    * @return encryption key so a client can encrypt data sent via the
    * DataTransferProtocol to/from DataNodes.

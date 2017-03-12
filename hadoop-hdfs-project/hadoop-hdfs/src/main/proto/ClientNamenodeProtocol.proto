@@ -530,6 +530,13 @@ required string user=1;
 message RollBackResponseProto{
 }
 
+message RemoveSnapshotRequestProto{
+required string user=1;
+}
+
+message RemoveSnapshotResponseProto{
+}
+
 service ClientNamenodeProtocol {
   rpc getBlockLocations (GetBlockLocationsRequestProto) returns (GetBlockLocationsResponseProto);
   rpc getMissingBlockLocations (GetMissingBlockLocationsRequestProto) returns (GetMissingBlockLocationsResponseProto);
@@ -586,5 +593,6 @@ service ClientNamenodeProtocol {
   rpc changeConf (ChangeConfProto) returns (ChangeConfResponseProto);
   rpc takeRootSnapshot(TakeRootSnapshotRequestProto) returns (TakeRootSnapshotResponseProto);
   rpc rollBack(RollBackRequestProto) returns (RollBackResponseProto);
+  rpc removeSnapshot(RemoveSnapshotRequestProto) returns (RemoveSnapshotResponseProto);
   
 }

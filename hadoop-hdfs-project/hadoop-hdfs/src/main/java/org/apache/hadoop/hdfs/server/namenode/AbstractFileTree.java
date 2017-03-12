@@ -367,6 +367,33 @@ abstract class AbstractFileTree {
     }
   }
 
+  static class DeleteQuotaCountingFileTree extends AbstractFileTree{
+    private final AtomicLong namespaceCount = new AtomicLong(0);
+    private final AtomicLong diskspaceCount = new AtomicLong(0);
+
+    public DeleteQuotaCountingFileTree(FSNamesystem namesystem, int subtreeRootId) {
+      super(namesystem, subtreeRootId);
+    }
+
+    public DeleteQuotaCountingFileTree(FSNamesystem namesystem, int subtreeRootId,
+                                 FsAction subAccess) {
+      super(namesystem, subtreeRootId, subAccess);
+    }
+
+    @Override
+    protected void addSubtreeRoot(ProjectedINode node) {
+      addNode(node);
+    }
+
+    private void addNode(ProjectedINode node) {
+
+    }
+
+    @Override
+    protected void addChildNode(int level, ProjectedINode node, boolean quotaEnabledBranch) {
+
+    }
+  }
   @VisibleForTesting
   static class QuotaCountingFileTree extends AbstractFileTree {
     private final AtomicLong namespaceCount = new AtomicLong(0);
