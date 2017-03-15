@@ -92,8 +92,8 @@ public class AMRMTokenIdentifier extends TokenIdentifier {
     if (proto.hasAppAttemptId()) {
       appAttemptId = 
           new ApplicationAttemptIdPBImpl(proto.getAppAttemptId()).toString();
-    }
-    return UserGroupInformation.createRemoteUser(appAttemptId);
+  }
+    return UserGroupInformation.createRemoteUser(appAttemptId, false);
   }
 
   public int getKeyId() {
