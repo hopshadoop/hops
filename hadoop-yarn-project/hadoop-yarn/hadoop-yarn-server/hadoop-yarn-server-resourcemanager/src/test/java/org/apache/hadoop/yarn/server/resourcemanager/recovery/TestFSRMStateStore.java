@@ -109,7 +109,7 @@ public class TestFSRMStateStore extends RMStateStoreTestBase {
           workingDirPathURI.toString());
       conf.set(YarnConfiguration.FS_RM_STATE_STORE_RETRY_POLICY_SPEC,
               "100,6000");
-      conf.setInt(YarnConfiguration.FS_RM_STATE_STORE_NUM_RETRIES, 8);
+      conf.setInt(YarnConfiguration.FS_RM_STATE_STORE_NUM_RETRIES, 20);
       conf.setLong(YarnConfiguration.FS_RM_STATE_STORE_RETRY_INTERVAL_MS,
               900L);
       if (adminCheckEnable) {
@@ -117,7 +117,7 @@ public class TestFSRMStateStore extends RMStateStoreTestBase {
           YarnConfiguration.YARN_INTERMEDIATE_DATA_ENCRYPTION, true);
       }
       this.store = new TestFileSystemRMStore(conf);
-      Assert.assertEquals(store.getNumRetries(), 8);
+      Assert.assertEquals(store.getNumRetries(), 20);
       Assert.assertEquals(store.getRetryInterval(), 900L);
       return store;
     }
