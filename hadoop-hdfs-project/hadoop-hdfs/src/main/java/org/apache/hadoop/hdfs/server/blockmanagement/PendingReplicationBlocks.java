@@ -19,6 +19,7 @@ package org.apache.hadoop.hdfs.server.blockmanagement;
 
 import com.google.common.base.Predicate;
 import com.google.common.collect.Collections2;
+import io.hops.StorageConnector;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.HdfsStorageFactory;
@@ -29,8 +30,6 @@ import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.commons.logging.Log;
 
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.sql.Time;
 import java.util.Collection;
 import java.util.List;
 
@@ -123,9 +122,9 @@ class PendingReplicationBlocks {
   public void clear() throws IOException {
     new LightWeightRequestHandler(HDFSOperationType.DEL_ALL_PENDING_REPL_BLKS) {
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         PendingBlockDataAccess da = (PendingBlockDataAccess) HdfsStorageFactory
-            .getDataAccess(PendingBlockDataAccess.class);
+            .getDataAccess(connector, PendingBlockDataAccess.class);
         da.removeAll();
         return null;
       }
@@ -139,9 +138,9 @@ class PendingReplicationBlocks {
     return (Integer) new LightWeightRequestHandler(
         HDFSOperationType.COUNT_ALL_VALID_PENDING_REPL_BLKS) {
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         PendingBlockDataAccess da = (PendingBlockDataAccess) HdfsStorageFactory
-            .getDataAccess(PendingBlockDataAccess.class);
+            .getDataAccess(connector, PendingBlockDataAccess.class);
         return da.countValidPendingBlocks(getTimeLimit());
       }
     }.handle();
@@ -169,11 +168,11 @@ class PendingReplicationBlocks {
         (List<PendingBlockInfo>) new LightWeightRequestHandler(
             HDFSOperationType.GET_TIMED_OUT_PENDING_BLKS) {
           @Override
-          public Object performTask() throws StorageException, IOException {
+          public Object performTask(StorageConnector connector) throws StorageException, IOException {
             long timeLimit = getTimeLimit();
             PendingBlockDataAccess da =
                 (PendingBlockDataAccess) HdfsStorageFactory
-                    .getDataAccess(PendingBlockDataAccess.class);
+                    .getDataAccess(connector, PendingBlockDataAccess.class);
             List<PendingBlockInfo> timedoutPendings =
                 (List<PendingBlockInfo>) da.findByTimeLimitLessThan(timeLimit);
             if (timedoutPendings == null || timedoutPendings.size() <= 0) {

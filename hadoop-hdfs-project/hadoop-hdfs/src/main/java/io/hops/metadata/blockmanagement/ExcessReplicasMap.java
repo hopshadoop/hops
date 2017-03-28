@@ -15,6 +15,7 @@
  */
 package io.hops.metadata.blockmanagement;
 
+import io.hops.StorageConnector;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.HdfsStorageFactory;
@@ -108,10 +109,10 @@ public class ExcessReplicasMap {
   public void clear() throws IOException {
     new LightWeightRequestHandler(HDFSOperationType.DEL_ALL_EXCESS_BLKS) {
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         ExcessReplicaDataAccess da =
             (ExcessReplicaDataAccess) HdfsStorageFactory
-                .getDataAccess(ExcessReplicaDataAccess.class);
+                .getDataAccess(connector, ExcessReplicaDataAccess.class);
         da.removeAll();
         return null;
       }
@@ -123,10 +124,10 @@ public class ExcessReplicasMap {
     return (Collection<ExcessReplica>) new LightWeightRequestHandler(
         HDFSOperationType.GET_EXCESS_RELPLICAS_BY_STORAGEID) {
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         ExcessReplicaDataAccess da =
             (ExcessReplicaDataAccess) HdfsStorageFactory
-                .getDataAccess(ExcessReplicaDataAccess.class);
+                .getDataAccess(connector, ExcessReplicaDataAccess.class);
         return da.findExcessReplicaByStorageId(dn);
       }
     }.handle();

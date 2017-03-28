@@ -1,5 +1,6 @@
 package io.hops.transaction.context;
 
+import io.hops.StorageConnector;
 import io.hops.exception.StorageException;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.INodeDataAccess;
@@ -80,9 +81,9 @@ public class RootINodeCache {
       LightWeightRequestHandler getRootINode =
               new LightWeightRequestHandler(HDFSOperationType.GET_ROOT) {
                 @Override
-                public Object performTask() throws IOException {
+                public Object performTask(StorageConnector connector) throws IOException {
                   INodeDataAccess da = (INodeDataAccess) HdfsStorageFactory
-                          .getDataAccess(INodeDataAccess.class);
+                          .getDataAccess(connector, INodeDataAccess.class);
                   INode rootINode = (INode) da.findInodeByNameParentIdAndPartitionIdPK(INodeDirectory.ROOT_NAME, INodeDirectory.ROOT_PARENT_ID, rootPartitionId);
                   return rootINode;
                 }

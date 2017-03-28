@@ -15,6 +15,7 @@
  */
 package io.hops.leaderElection;
 
+import io.hops.StorageConnector;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.leaderElection.exception.LEWeakLocks;
@@ -58,10 +59,10 @@ public class LETransaction {
         new LeaderTransactionalRequestHandler(
             LeaderOperationType.LEADER_ELECTION) {
           @Override
-          public void preTransactionSetup() throws IOException {
+          public void preTransactionSetup(StorageConnector connector) throws IOException {
             sortedList = null;
             leFactory = lef;
-            super.preTransactionSetup();
+            super.preTransactionSetup(connector);
             context = new LEContext(currentContext, lef);
             if (relinquishCurrentId) {
               context.id = LeaderElection.LEADER_INITIALIZATION_ID;
@@ -92,7 +93,7 @@ public class LETransaction {
           }
 
           @Override
-          public Object performTask() throws IOException {
+          public Object performTask(StorageConnector connector) throws IOException {
 
             try {
               if (context.nextTimeTakeStrongerLocks) {
@@ -118,13 +119,13 @@ public class LETransaction {
                     "Aborting the transaction because the parent thread has stopped");
               }
 
-              return new Boolean(true);
+              return true;
             } finally {
             }
           }
         };
 
-    Boolean retVal = (Boolean) leaderElectionHandler.handle(null);
+    Boolean retVal = (Boolean) leaderElectionHandler.handle();
     if (retVal != null && retVal.equals(true)) {
       return context;
     } else {

@@ -50,7 +50,7 @@ public class TestUtil {
       }
 
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         INode targetNode = nameNode.getNamesystem().getINode(filePath);
         return targetNode.getId();
       }

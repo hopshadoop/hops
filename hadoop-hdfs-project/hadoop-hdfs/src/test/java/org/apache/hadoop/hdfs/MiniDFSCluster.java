@@ -19,6 +19,7 @@ package org.apache.hadoop.hdfs;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import io.hops.StorageConnector;
 import io.hops.erasure_coding.MockEncodingManager;
 import io.hops.erasure_coding.MockRepairManager;
 import io.hops.exception.StorageException;
@@ -31,6 +32,7 @@ import io.hops.metadata.hdfs.dal.InvalidateBlockDataAccess;
 import io.hops.metadata.hdfs.dal.PendingBlockDataAccess;
 import io.hops.metadata.hdfs.dal.UnderReplicatedBlockDataAccess;
 import io.hops.security.UsersGroups;
+import io.hops.transaction.TransactionCluster;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -645,11 +647,12 @@ public class MiniDFSCluster {
     // Setting the configuration for Storage
     HdfsStorageFactory.resetDALInitialized();
     HdfsStorageFactory.setConfiguration(conf);
+    StorageConnector connector = HdfsStorageFactory.getConnector().connectorFor(TransactionCluster.PRIMARY);
     if (format) {
       try {
         // this should be done before creating namenodes
         LOG.debug("MiniDFSClustring Formatting the Cluster");
-        assert (HdfsStorageFactory.formatStorage());
+        assert (HdfsStorageFactory.formatStorage(connector));
       } catch (StorageException ex) {
         throw new IOException(ex);
       }
@@ -2316,9 +2319,14 @@ public class MiniDFSCluster {
       try {
         HdfsVariables.resetMisReplicatedIndex();
         HdfsVariables.enterClusterSafeMode();
-        HdfsStorageFactory.formatStorage(UnderReplicatedBlockDataAccess.class,
-            ExcessReplicaDataAccess.class, CorruptReplicaDataAccess.class,
-            InvalidateBlockDataAccess.class, PendingBlockDataAccess.class,
+        StorageConnector connector = HdfsStorageFactory.getConnector().connectorFor(TransactionCluster.PRIMARY);
+        HdfsStorageFactory.formatStorage(
+            connector,
+            UnderReplicatedBlockDataAccess.class,
+            ExcessReplicaDataAccess.class,
+            CorruptReplicaDataAccess.class,
+            InvalidateBlockDataAccess.class,
+            PendingBlockDataAccess.class,
             HdfsLeDescriptorDataAccess.class);
       } catch (Exception e) {
         LOG.error(e);

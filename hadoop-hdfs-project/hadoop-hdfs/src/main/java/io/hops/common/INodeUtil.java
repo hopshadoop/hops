@@ -15,6 +15,7 @@
  */
 package io.hops.common;
 
+import io.hops.StorageConnector;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.HdfsStorageFactory;
@@ -42,11 +43,7 @@ import org.apache.hadoop.hdfs.server.namenode.INodeDirectory;
 import org.apache.hadoop.hdfs.server.namenode.Lease;
 
 import java.io.IOException;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 public class INodeUtil {
   private final static Log LOG = LogFactory.getLog(INodeUtil.class);
@@ -62,37 +59,36 @@ public class INodeUtil {
     return buf.toString();
   }
 
-  public static INode getNode(byte[] name, int parentId, int partitionId, boolean transactional)
+  public static INode getNode(StorageConnector connector, byte[] name, int parentId, int partitionId, boolean transactional)
       throws StorageException, TransactionContextException {
     String nameString = DFSUtil.bytes2String(name);
     if (transactional) {
       return EntityManager
           .find(INode.Finder.ByNameParentIdAndPartitionId, nameString, parentId, partitionId);
     } else {
-      return findINodeWithNoTransaction(nameString, parentId, partitionId);
+      return findINodeWithNoTransaction(connector, nameString, parentId, partitionId);
     }
   }
 
-  private static INode findINodeWithNoTransaction(String name, int parentId, int partitionId)
-      throws StorageException {
+  private static INode findINodeWithNoTransaction(
+      StorageConnector connector, String name, int parentId, int partitionId) throws StorageException {
     LOG.debug(String
         .format("Read inode with no transaction by parent_id=%d, name=%s, partitionId=%s",
             parentId, name, parentId));
-    INodeDataAccess<INode> da = (INodeDataAccess) HdfsStorageFactory
-        .getDataAccess(INodeDataAccess.class);
+    INodeDataAccess<INode> da = (INodeDataAccess)
+        HdfsStorageFactory.getDataAccess(connector, INodeDataAccess.class);
     return da.findInodeByNameParentIdAndPartitionIdPK(name, parentId, partitionId);
   }
 
-  public static void resolvePathWithNoTransaction(String path,
+  public static void resolvePathWithNoTransaction(
+      StorageConnector connector, String path,
       boolean resolveLink, LinkedList<INode> preTxResolvedINodes,
-      boolean[] isPathFullyResolved)
-      throws UnresolvedPathException, StorageException,
-      TransactionContextException {
+      boolean[] isPathFullyResolved) throws UnresolvedPathException, StorageException, TransactionContextException {
     preTxResolvedINodes.clear();
     isPathFullyResolved[0] = false;
 
     byte[][] components = INode.getPathComponents(path);
-    INode curNode = getRoot();
+    INode curNode = getRoot(connector);
     preTxResolvedINodes.add(curNode);
 
     if (components.length == 1) {
@@ -100,7 +96,7 @@ public class INodeUtil {
     }
 
     INodeResolver resolver =
-        new INodeResolver(components, curNode, resolveLink, false);
+        new INodeResolver(connector, components, curNode, resolveLink, false);
     while (resolver.hasNext()) {
       curNode = resolver.next();
       if (curNode != null) {
@@ -110,17 +106,17 @@ public class INodeUtil {
     isPathFullyResolved[0] = preTxResolvedINodes.size() == components.length;
   }
 
-  public static void findPathINodesById(int inodeId,
-      LinkedList<INode> preTxResolvedINodes, boolean[] isPreTxPathFullyResolved)
-      throws StorageException {
+  public static void findPathINodesById(
+      StorageConnector connector, int inodeId, LinkedList<INode> preTxResolvedINodes,
+      boolean[] isPreTxPathFullyResolved) throws StorageException {
     if (inodeId != INode.NON_EXISTING_ID) {
-      INode inode = indexINodeScanById(inodeId);
+      INode inode = indexINodeScanById(connector, inodeId);
       if (inode == null) {
         isPreTxPathFullyResolved[0] = false;
         return;
       }
       preTxResolvedINodes.add(inode);
-      readFromLeafToRoot(inode, preTxResolvedINodes);
+      readFromLeafToRoot(connector, inode, preTxResolvedINodes);
     }
     isPreTxPathFullyResolved[0] = true;
     //reverse the list
@@ -140,17 +136,17 @@ public class INodeUtil {
     }
   }
 
-  public static Set<String> findPathsByLeaseHolder(String holder)
+  public static Set<String> findPathsByLeaseHolder(StorageConnector connector, String holder)
       throws StorageException {
     HashSet<String> paths = new HashSet<String>();
-    LeaseDataAccess<Lease> lda = (LeaseDataAccess) HdfsStorageFactory
-        .getDataAccess(LeaseDataAccess.class);
-    Lease rcLease = lda.findByPKey(holder,Lease.getHolderId(holder));
+    LeaseDataAccess<Lease> lda = (LeaseDataAccess)
+        HdfsStorageFactory.getDataAccess(connector, LeaseDataAccess.class);
+    Lease rcLease = lda.findByPKey(holder, Lease.getHolderId(holder));
     if (rcLease == null) {
       return paths;
     }
-    LeasePathDataAccess pda = (LeasePathDataAccess) HdfsStorageFactory
-        .getDataAccess(LeasePathDataAccess.class);
+    LeasePathDataAccess pda = (LeasePathDataAccess)
+        HdfsStorageFactory.getDataAccess(connector, LeasePathDataAccess.class);
     Collection<LeasePath> rclPaths = pda.findByHolderId(rcLease.getHolderID());
     for (LeasePath lp : rclPaths) {
       paths.add(lp.getPath());
@@ -158,27 +154,28 @@ public class INodeUtil {
     return paths;
   }
 
-  private static INode getRoot()
+  private static INode getRoot(StorageConnector connector)
       throws StorageException, TransactionContextException {
-    return getNode(INodeDirectory.ROOT_NAME.getBytes(),
-        INodeDirectory.ROOT_PARENT_ID, INodeDirectory.getRootDirPartitionKey(), false);
+    return getNode(
+        connector,
+        INodeDirectory.ROOT_NAME.getBytes(), INodeDirectory.ROOT_PARENT_ID,
+        INodeDirectory.getRootDirPartitionKey(), false);
   }
 
-  public static INode indexINodeScanById(int id) throws StorageException {
+  public static INode indexINodeScanById(StorageConnector connector, int id) throws StorageException {
     LOG.debug(String.format("Read inode with no transaction by id=%d", id));
-    INodeDataAccess<INode> da = (INodeDataAccess) HdfsStorageFactory
-        .getDataAccess(INodeDataAccess.class);
+    INodeDataAccess<INode> da = (INodeDataAccess)
+        HdfsStorageFactory.getDataAccess(connector, INodeDataAccess.class);
     return da.findInodeByIdFTIS(id);
   }
 
   //puts the indoes in the list in reverse order
-  private static void readFromLeafToRoot(INode inode, LinkedList<INode> list)
+  private static void readFromLeafToRoot(StorageConnector connector, INode inode, LinkedList<INode> list)
       throws StorageException {
     INode temp = inode;
     while (temp != null &&
         temp.getParentId() != INodeDirectory.ROOT_PARENT_ID) {
-      temp = indexINodeScanById(
-          temp.getParentId()); // all upper components are dirs
+      temp = indexINodeScanById(connector, temp.getParentId()); // all upper components are dirs
       if (temp != null) {
         list.add(temp);
       }
@@ -191,18 +188,17 @@ public class INodeUtil {
     LightWeightRequestHandler handler = new LightWeightRequestHandler(
         HDFSOperationType.RESOLVE_INODE_FROM_BLOCKID) {
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
 
-        BlockLookUpDataAccess<BlockLookUp> da =
-            (BlockLookUpDataAccess) HdfsStorageFactory
-                .getDataAccess(BlockLookUpDataAccess.class);
+        BlockLookUpDataAccess<BlockLookUp> da = (BlockLookUpDataAccess)
+            HdfsStorageFactory.getDataAccess(connector, BlockLookUpDataAccess.class);
         BlockLookUp blu = da.findByBlockId(bid);
         if (blu == null) {
           return null;
         }
         INodeIdentifier inodeIdent = new INodeIdentifier(blu.getInodeId());
-        INodeDALAdaptor ida = (INodeDALAdaptor) HdfsStorageFactory
-            .getDataAccess(INodeDataAccess.class);
+        INodeDALAdaptor ida = (INodeDALAdaptor)
+            HdfsStorageFactory.getDataAccess(connector, INodeDataAccess.class);
         INode inode = ida.findInodeByIdFTIS(blu.getInodeId());
         if (inode != null) {
           inodeIdent.setName(inode.getLocalName());
@@ -219,15 +215,15 @@ public class INodeUtil {
     }
     return inodeIdentifier;
   }
-  
-  
-  public static INodeIdentifier resolveINodeFromBlock(final Block b)
+
+
+  public static INodeIdentifier resolveINodeFromBlock(StorageConnector connector, final Block b)
       throws StorageException {
     if (b instanceof BlockInfo || b instanceof BlockInfoUnderConstruction) {
       INodeIdentifier inodeIden =
           new INodeIdentifier(((BlockInfo) b).getInodeId());
-      INodeDALAdaptor ida = (INodeDALAdaptor) HdfsStorageFactory
-          .getDataAccess(INodeDataAccess.class);
+      INodeDALAdaptor ida = (INodeDALAdaptor)
+          HdfsStorageFactory.getDataAccess(connector, INodeDataAccess.class);
       INode inode = ida.findInodeByIdFTIS(((BlockInfo) b).getInodeId());
       if (inode != null) {
         inodeIden.setName(inode.getLocalName());
@@ -239,16 +235,15 @@ public class INodeUtil {
       return resolveINodeFromBlockID(b.getBlockId());
     }
   }
-  
+
   public static int[] resolveINodesFromBlockIds(final long[] blockIds)
       throws StorageException {
     LightWeightRequestHandler handler =
         new LightWeightRequestHandler(HDFSOperationType.GET_INODEIDS_FOR_BLKS) {
           @Override
-          public Object performTask() throws IOException {
-            BlockLookUpDataAccess<BlockLookUp> da =
-                (BlockLookUpDataAccess) HdfsStorageFactory
-                    .getDataAccess(BlockLookUpDataAccess.class);
+          public Object performTask(StorageConnector connector) throws IOException {
+            BlockLookUpDataAccess<BlockLookUp> da = (BlockLookUpDataAccess)
+                HdfsStorageFactory.getDataAccess(connector, BlockLookUpDataAccess.class);
             return da.findINodeIdsByBlockIds(blockIds);
           }
         };
@@ -267,9 +262,10 @@ public class INodeUtil {
         new LightWeightRequestHandler(HDFSOperationType.RESOLVE_INODE_FROM_ID) {
 
           @Override
-          public Object performTask() throws StorageException, IOException {
-            INodeDALAdaptor ida = (INodeDALAdaptor) HdfsStorageFactory
-                .getDataAccess(INodeDataAccess.class);
+          public Object performTask(StorageConnector connector) throws StorageException, IOException {
+            INodeDALAdaptor ida = (INodeDALAdaptor)
+                HdfsStorageFactory
+                    .getDataAccess(connector, INodeDataAccess.class);
             INode inode = ida.findInodeByIdFTIS(id);
             INodeIdentifier inodeIdent = new INodeIdentifier(id);
             if (inode != null) {

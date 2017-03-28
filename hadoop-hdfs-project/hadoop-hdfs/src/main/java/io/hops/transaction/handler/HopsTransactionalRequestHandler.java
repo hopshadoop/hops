@@ -15,6 +15,8 @@
  */
 package io.hops.transaction.handler;
 
+import io.hops.StorageConnector;
+import io.hops.transaction.TransactionCluster;
 import io.hops.transaction.TransactionInfo;
 import io.hops.transaction.lock.HdfsTransactionalLockAcquirer;
 import io.hops.transaction.lock.TransactionLockAcquirer;
@@ -27,13 +29,12 @@ public abstract class HopsTransactionalRequestHandler
     extends TransactionalRequestHandler {
 
   private final String path;
-  
+
   public HopsTransactionalRequestHandler(HDFSOperationType opType) {
     this(opType, null);
   }
-  
-  public HopsTransactionalRequestHandler(HDFSOperationType opType,
-      String path) {
+
+  public HopsTransactionalRequestHandler(HDFSOperationType opType, String path) {
     super(opType);
     this.path = path;
   }
@@ -43,11 +44,9 @@ public abstract class HopsTransactionalRequestHandler
     return new HdfsTransactionalLockAcquirer();
   }
 
-  
   @Override
-  protected Object execute(final Object namesystem) throws IOException {
-
-    return super.execute(new TransactionInfo() {
+  protected Object execute(TransactionCluster cluster, final Object namesystem) throws IOException {
+    return super.execute(cluster, new TransactionInfo() {
       @Override
       public String getContextName(OperationType opType) {
         if (namesystem != null && namesystem instanceof FSNamesystem) {
@@ -68,19 +67,15 @@ public abstract class HopsTransactionalRequestHandler
   }
 
   @Override
-  protected final void preTransactionSetup() throws IOException {
-    setUp();
+  protected final void preTransactionSetup(StorageConnector connector) throws IOException {
+    setUp(connector);
   }
 
-  public void setUp() throws IOException {
-
+  public void setUp(StorageConnector connector) throws IOException {
   }
 
   @Override
   protected final boolean shouldAbort(Exception e) {
-    if (e instanceof RecoveryInProgressException.NonAbortingRecoveryInProgressException) {
-      return false;
-    }
-    return true;
+    return !(e instanceof RecoveryInProgressException.NonAbortingRecoveryInProgressException);
   }
 }

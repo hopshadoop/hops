@@ -17,7 +17,6 @@
  */
 package io.hops.transaction.context;
 
-import com.google.common.collect.Lists;
 import io.hops.exception.StorageCallPreventedException;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;

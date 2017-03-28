@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
+import io.hops.StorageConnector;
 import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
@@ -32,7 +33,6 @@ import io.hops.metadata.common.entity.Variable;
 import io.hops.metadata.hdfs.dal.MisReplicatedRangeQueueDataAccess;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
-import io.hops.metadata.hdfs.entity.Replica;
 import io.hops.metadata.security.token.block.NameNodeBlockTokenSecretManager;
 import io.hops.transaction.EntityManager;
 import io.hops.transaction.handler.HDFSOperationType;
@@ -99,12 +99,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static io.hops.transaction.lock.LockFactory.BLK;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import org.apache.commons.lang.ArrayUtils;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_SUBTREE_EXECUTOR_LIMIT_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_SUBTREE_EXECUTOR_LIMIT_KEY;
+
 import static org.apache.hadoop.util.ExitUtil.terminate;
 
 /**
@@ -1099,9 +1094,9 @@ public class BlockManager {
       INodeIdentifier inodeIdentifier;
 
       @Override
-      public void setUp() throws StorageException {
+      public void setUp(StorageConnector connector) throws StorageException {
         Block b = blk.getLocalBlock();
-        inodeIdentifier = INodeUtil.resolveINodeFromBlock(b);
+        inodeIdentifier = INodeUtil.resolveINodeFromBlock(connector, b);
       }
 
       @Override
@@ -1120,7 +1115,7 @@ public class BlockManager {
       }
 
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         final BlockInfo storedBlock = getStoredBlock(blk.getLocalBlock());
         if (storedBlock == null) {
           // Check if the replica is in the blockMap, if not
@@ -1763,9 +1758,9 @@ public class BlockManager {
           INodeIdentifier inodeIdentifier;
 
           @Override
-          public void setUp() throws StorageException {
+          public void setUp(StorageConnector connector) throws StorageException {
             Block b = (Block) getParams()[0];
-            inodeIdentifier = INodeUtil.resolveINodeFromBlock(b);
+            inodeIdentifier = INodeUtil.resolveINodeFromBlock(connector, b);
           }
 
           @Override
@@ -1780,7 +1775,7 @@ public class BlockManager {
           }
 
           @Override
-          public Object performTask() throws IOException {
+          public Object performTask(StorageConnector connector) throws IOException {
             Block b = (Block) getParams()[0];
             Set<Block> toRemoveSet = (Set<Block>) getParams()[1];
 
@@ -1893,9 +1888,9 @@ public class BlockManager {
           INodeIdentifier inodeIdentifier;
 
           @Override
-          public void setUp() throws StorageException {
+          public void setUp(StorageConnector connector) throws StorageException {
             Block b = (Block) getParams()[0];
-            inodeIdentifier = INodeUtil.resolveINodeFromBlock(b);
+            inodeIdentifier = INodeUtil.resolveINodeFromBlock(connector, b);
           }
 
           @Override
@@ -1915,7 +1910,7 @@ public class BlockManager {
           }
 
           @Override
-          public Object performTask() throws IOException {
+          public Object performTask(StorageConnector connector) throws IOException {
             Block iblk = (Block) getParams()[0];
             ReplicaState reportedState = (ReplicaState) getParams()[1];
 
@@ -2028,7 +2023,7 @@ public class BlockManager {
                 }
 
                 @Override
-                public Object performTask() throws IOException {
+                public Object performTask(StorageConnector connector) throws IOException {
                   Block[] blks = (Block[]) getParams()[1];
                   ReplicaState[] blksStates = (ReplicaState[]) getParams()[2];
                   // scan the report and process newly reported blocks
@@ -2047,7 +2042,7 @@ public class BlockManager {
                 }
               };
               processReportHandler.setParams(blksData[0], blksData[1], blksData[2]);
-              processReportHandler.handle(null);
+              processReportHandler.handle();
               return null;
             }
           };
@@ -2626,7 +2621,7 @@ public class BlockManager {
           }
 
           @Override
-          public Object performTask() throws IOException {
+          public Object performTask(StorageConnector connector) throws IOException {
             List<INodeIdentifier> inodeIdentifiers =
                 (List<INodeIdentifier>) getParams()[0];
             for (INodeIdentifier inodeIdentifier : inodeIdentifiers) {
@@ -2726,10 +2721,10 @@ public class BlockManager {
     new LightWeightRequestHandler(
         HDFSOperationType.UPDATE_MIS_REPLICATED_RANGE_QUEUE) {
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         MisReplicatedRangeQueueDataAccess da =
             (MisReplicatedRangeQueueDataAccess) HdfsStorageFactory
-                .getDataAccess(MisReplicatedRangeQueueDataAccess.class);
+                .getDataAccess(connector, MisReplicatedRangeQueueDataAccess.class);
         da.insert(start, end);
         return null;
       }
@@ -2741,10 +2736,10 @@ public class BlockManager {
     new LightWeightRequestHandler(
         HDFSOperationType.UPDATE_MIS_REPLICATED_RANGE_QUEUE) {
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         MisReplicatedRangeQueueDataAccess da =
             (MisReplicatedRangeQueueDataAccess) HdfsStorageFactory
-                .getDataAccess(MisReplicatedRangeQueueDataAccess.class);
+                .getDataAccess(connector, MisReplicatedRangeQueueDataAccess.class);
         da.remove(start, end);
         return null;
       }
@@ -2755,10 +2750,10 @@ public class BlockManager {
     return (Integer) new LightWeightRequestHandler(
         HDFSOperationType.COUNT_ALL_MIS_REPLICATED_RANGE_QUEUE) {
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         MisReplicatedRangeQueueDataAccess da =
             (MisReplicatedRangeQueueDataAccess) HdfsStorageFactory
-                .getDataAccess(MisReplicatedRangeQueueDataAccess.class);
+                .getDataAccess(connector, MisReplicatedRangeQueueDataAccess.class);
         return da.countAll();
       }
     }.handle();
@@ -3103,8 +3098,8 @@ public class BlockManager {
       INodeIdentifier inodeIdentifier;
 
       @Override
-      public void setUp() throws StorageException {
-        inodeIdentifier = INodeUtil.resolveINodeFromBlock(block);
+      public void setUp(StorageConnector connector) throws StorageException {
+        inodeIdentifier = INodeUtil.resolveINodeFromBlock(connector, block);
       }
 
       @Override
@@ -3117,7 +3112,7 @@ public class BlockManager {
       }
 
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         BlockInfo temp = getBlockInfo(block);
         final List<String> ms = getValidLocations(temp);
         machineSet.addAll(ms);
@@ -3213,10 +3208,10 @@ public class BlockManager {
           INodeIdentifier inodeIdentifier;
 
           @Override
-          public void setUp() throws StorageException {
+          public void setUp(StorageConnector connector) throws StorageException {
             ReceivedDeletedBlockInfo rdbi =
                 (ReceivedDeletedBlockInfo) getParams()[0];
-            inodeIdentifier = INodeUtil.resolveINodeFromBlock(rdbi.getBlock());
+            inodeIdentifier = INodeUtil.resolveINodeFromBlock(connector, rdbi.getBlock());
             LOG.debug("reported block id=" + rdbi.getBlock().getBlockId());
             if (inodeIdentifier == null) {
               LOG.error("Invalid State. deleted blk is not recognized. bid=" +
@@ -3245,7 +3240,7 @@ public class BlockManager {
           }
 
           @Override
-          public Object performTask() throws IOException {
+          public Object performTask(StorageConnector connector) throws IOException {
             ReceivedDeletedBlockInfo rdbi =
                 (ReceivedDeletedBlockInfo) getParams()[0];
             LOG.debug("BLOCK_RECEIVED_AND_DELETED_INC_BLK_REPORT " +
@@ -3403,9 +3398,9 @@ public class BlockManager {
           INodeIdentifier inodeIdentifier;
 
           @Override
-          public void setUp() throws StorageException {
+          public void setUp(StorageConnector connector) throws StorageException {
             Block b = (Block) getParams()[0];
-            inodeIdentifier = INodeUtil.resolveINodeFromBlock(b);
+            inodeIdentifier = INodeUtil.resolveINodeFromBlock(connector, b);
           }
 
           @Override
@@ -3421,7 +3416,7 @@ public class BlockManager {
           }
 
           @Override
-          public Object performTask() throws IOException {
+          public Object performTask(StorageConnector connector) throws IOException {
             final Block block = (Block) getParams()[0];
             BlockCollection bc = blocksMap.getBlockCollection(block);
             short expectedReplication = bc.getBlockReplication();
@@ -3465,9 +3460,9 @@ public class BlockManager {
           INodeIdentifier inodeIdentifier;
 
           @Override
-          public void setUp() throws StorageException {
+          public void setUp(StorageConnector connector) throws StorageException {
             Block b = (Block) getParams()[0];
-            inodeIdentifier = INodeUtil.resolveINodeFromBlock(b);
+            inodeIdentifier = INodeUtil.resolveINodeFromBlock(connector, b);
 
           }
 
@@ -3483,7 +3478,7 @@ public class BlockManager {
           }
 
           @Override
-          public Object performTask() throws IOException {
+          public Object performTask(StorageConnector connector) throws IOException {
             final Block block = (Block) getParams()[0];
             BlockCollection bc = blocksMap.getBlockCollection(block);
 
@@ -3908,7 +3903,7 @@ public class BlockManager {
       INodeIdentifier inodeIdentifier;
 
       @Override
-      public void setUp() throws StorageException {
+      public void setUp(StorageConnector connector) throws StorageException {
         inodeIdentifier = INodeUtil.resolveINodeFromBlockID(b);
       }
 
@@ -3927,7 +3922,7 @@ public class BlockManager {
       }
 
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         BlockInfo block =
             EntityManager.find(BlockInfo.Finder.ByBlockIdAndINodeId, b);
         removeStoredBlock(block, node);
@@ -3944,8 +3939,8 @@ public class BlockManager {
       INodeIdentifier inodeIdentifier;
 
       @Override
-      public void setUp() throws StorageException {
-        inodeIdentifier = INodeUtil.resolveINodeFromBlock(b);
+      public void setUp(StorageConnector connector) throws StorageException {
+        inodeIdentifier = INodeUtil.resolveINodeFromBlock(connector, b);
       }
 
       @Override
@@ -3960,7 +3955,7 @@ public class BlockManager {
       }
 
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         return computeReplicationWorkForBlockInternal(b, priority);
       }
     }.handle(namesystem);
@@ -4021,7 +4016,7 @@ public class BlockManager {
       INodeIdentifier inodeIdentifier;
 
       @Override
-      public void setUp() throws StorageException {
+      public void setUp(StorageConnector connector) throws StorageException {
         inodeIdentifier = INodeUtil.resolveINodeFromBlockID(timedOutItemId);
       }
 
@@ -4040,7 +4035,7 @@ public class BlockManager {
       }
 
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         BlockInfo timedOutItem = EntityManager
             .find(BlockInfo.Finder.ByBlockIdAndINodeId, timedOutItemId);
         NumberReplicas num = countNodes(timedOutItem);
@@ -4074,8 +4069,8 @@ public class BlockManager {
       INodeIdentifier inodeIdentifier;
 
       @Override
-      public void setUp() throws StorageException {
-        inodeIdentifier = INodeUtil.resolveINodeFromBlock(block);
+      public void setUp(StorageConnector connector) throws StorageException {
+        inodeIdentifier = INodeUtil.resolveINodeFromBlock(connector, block);
       }
 
       @Override
@@ -4093,7 +4088,7 @@ public class BlockManager {
       }
 
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         return addStoredBlock(block, node, delNodeHint, logEveryBlock);
       }
     }.handle();
@@ -4108,8 +4103,8 @@ public class BlockManager {
       INodeIdentifier inodeIdentifier;
 
       @Override
-      public void setUp() throws StorageException {
-        inodeIdentifier = INodeUtil.resolveINodeFromBlock(block);
+      public void setUp(StorageConnector connector) throws StorageException {
+        inodeIdentifier = INodeUtil.resolveINodeFromBlock(connector, block);
       }
 
       @Override
@@ -4128,7 +4123,7 @@ public class BlockManager {
       }
 
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         addStoredBlockUnderConstruction(block, node, reportedState);
         return null;
       }
@@ -4147,8 +4142,8 @@ public class BlockManager {
       INodeIdentifier inodeIdentifier;
 
       @Override
-      public void setUp() throws StorageException {
-        inodeIdentifier = INodeUtil.resolveINodeFromBlock(b.corrupted);
+      public void setUp(StorageConnector connector) throws StorageException {
+        inodeIdentifier = INodeUtil.resolveINodeFromBlock(connector, b.corrupted);
       }
 
       @Override
@@ -4167,7 +4162,7 @@ public class BlockManager {
       }
 
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         markBlockAsCorrupt(b, dn);
         return null;
       }
@@ -4196,8 +4191,8 @@ public class BlockManager {
       INodeIdentifier inodeIdentifier;
 
       @Override
-      public void setUp() throws StorageException {
-        inodeIdentifier = INodeUtil.resolveINodeFromBlock(block);
+      public void setUp(StorageConnector connector) throws StorageException {
+        inodeIdentifier = INodeUtil.resolveINodeFromBlock(connector, block);
       }
 
       @Override
@@ -4216,7 +4211,7 @@ public class BlockManager {
       }
 
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         block.addReplicaIfNotPresent(node, block, reportedState);
         //and fall through to next clause
         //add replica if appropriate
@@ -4235,8 +4230,8 @@ public class BlockManager {
       INodeIdentifier inodeIdentifier;
 
       @Override
-      public void setUp() throws StorageException {
-        inodeIdentifier = INodeUtil.resolveINodeFromBlock(block);
+      public void setUp(StorageConnector connector) throws StorageException {
+        inodeIdentifier = INodeUtil.resolveINodeFromBlock(connector, block);
       }
 
       @Override
@@ -4255,7 +4250,7 @@ public class BlockManager {
       }
 
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         addStoredBlockImmediate(block, node);
         return null;
       }

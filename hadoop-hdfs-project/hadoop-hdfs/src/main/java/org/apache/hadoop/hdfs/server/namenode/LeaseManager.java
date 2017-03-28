@@ -19,6 +19,7 @@ package org.apache.hadoop.hdfs.server.namenode;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import io.hops.StorageConnector;
 import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
@@ -39,7 +40,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.util.Daemon;
@@ -112,9 +112,9 @@ public class LeaseManager {
           }
 
           @Override
-          public Object performTask() throws StorageException, IOException {
+          public Object performTask(StorageConnector connector) throws StorageException, IOException {
             LeaseDataAccess<Lease> da = (LeaseDataAccess) HdfsStorageFactory
-                .getDataAccess(LeaseDataAccess.class);
+                .getDataAccess(connector, LeaseDataAccess.class);
             return da.findAll();
           }
         };
@@ -145,9 +145,9 @@ public class LeaseManager {
     return (Integer) new LightWeightRequestHandler(
         HDFSOperationType.COUNT_LEASE) {
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         LeaseDataAccess da = (LeaseDataAccess) HdfsStorageFactory
-            .getDataAccess(LeaseDataAccess.class);
+            .getDataAccess(connector, LeaseDataAccess.class);
         return da.countAll();
       }
     }.handle(fsnamesystem);
@@ -217,11 +217,11 @@ public class LeaseManager {
   void removeAllLeases() throws IOException {
     new LightWeightRequestHandler(HDFSOperationType.REMOVE_ALL_LEASES) {
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         LeaseDataAccess lda = (LeaseDataAccess) HdfsStorageFactory
-            .getDataAccess(LeaseDataAccess.class);
+            .getDataAccess(connector, LeaseDataAccess.class);
         LeasePathDataAccess lpda = (LeasePathDataAccess) HdfsStorageFactory
-            .getDataAccess(LeasePathDataAccess.class);
+            .getDataAccess(connector, LeasePathDataAccess.class);
         lda.removeAll();
         lpda.removeAll();
         return null;
@@ -476,10 +476,10 @@ public class LeaseManager {
         new LightWeightRequestHandler(
             HDFSOperationType.PREPARE_LEASE_MANAGER_MONITOR) {
           @Override
-          public Object performTask() throws StorageException, IOException {
+          public Object performTask(StorageConnector connector) throws StorageException, IOException {
             long expiredTime = now() - hardLimit;
             LeaseDataAccess da = (LeaseDataAccess) HdfsStorageFactory
-                .getDataAccess(LeaseDataAccess.class);
+                .getDataAccess(connector, LeaseDataAccess.class);
             return new TreeSet<Lease>(da.findByTimeLimit(expiredTime));
           }
         };
@@ -490,9 +490,9 @@ public class LeaseManager {
           private Set<String> leasePaths = null;
 
           @Override
-          public void setUp() throws StorageException {
+          public void setUp(StorageConnector connector) throws StorageException {
             String holder = (String) getParams()[0];
-            leasePaths = INodeUtil.findPathsByLeaseHolder(holder);
+            leasePaths = INodeUtil.findPathsByLeaseHolder(connector, holder);
             if(leasePaths!=null){
               LOG.debug("Total Paths "+leasePaths.size()+" Paths: "+Arrays.toString(leasePaths.toArray()));
             }
@@ -516,10 +516,10 @@ public class LeaseManager {
           }
 
           @Override
-          public Object performTask() throws StorageException, IOException {
+          public Object performTask(StorageConnector connector) throws StorageException, IOException {
             String holder = (String) getParams()[0];
             if (holder != null) {
-              checkLeases(holder);
+              checkLeases(connector, holder);
             }
             return null;
           }
@@ -531,7 +531,7 @@ public class LeaseManager {
    *
    * @return true is sync is needed.
    */
-  private boolean checkLeases(String holder)
+  private boolean checkLeases(StorageConnector connector, String holder)
       throws StorageException, TransactionContextException {
     boolean needSync = false;
 
@@ -559,9 +559,8 @@ public class LeaseManager {
     for (LeasePath lPath : leasePaths) {
       try {
         boolean leaseReleased = false;
-        leaseReleased = fsnamesystem
-            .internalReleaseLease(oldest, lPath.getPath(),
-                HdfsServerConstants.NAMENODE_LEASE_HOLDER);
+        leaseReleased = fsnamesystem.internalReleaseLease(
+            connector, oldest, lPath.getPath(), HdfsServerConstants.NAMENODE_LEASE_HOLDER);
         if (leaseReleased) {
           LOG.info("Lease recovery for file " + lPath +
               " is complete. File closed.");

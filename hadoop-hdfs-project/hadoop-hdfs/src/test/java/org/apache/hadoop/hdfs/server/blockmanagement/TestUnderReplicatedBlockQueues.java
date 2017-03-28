@@ -18,16 +18,19 @@
 
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
+import io.hops.StorageConnector;
 import io.hops.exception.StorageException;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.transaction.EntityManager;
+import io.hops.transaction.TransactionCluster;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLocks;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.server.common.Storage;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -45,7 +48,8 @@ public class TestUnderReplicatedBlockQueues extends Assert {
   @Test
   public void testBlockPriorities() throws Throwable {
     HdfsStorageFactory.setConfiguration(new HdfsConfiguration());
-    HdfsStorageFactory.formatStorage();
+    StorageConnector connector = HdfsStorageFactory.getConnector().connectorFor(TransactionCluster.PRIMARY);
+    HdfsStorageFactory.formatStorage(connector);
     
     UnderReplicatedBlocks queues = new UnderReplicatedBlocks();
     BlockInfo block1 = add(new BlockInfo(new Block(1), 1));
@@ -124,7 +128,7 @@ public class TestUnderReplicatedBlockQueues extends Assert {
       }
 
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         EntityManager.add(new BlockInfo(block));
         return null;
       }
@@ -146,7 +150,7 @@ public class TestUnderReplicatedBlockQueues extends Assert {
       }
 
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         return queues
             .add(block, curReplicas, decomissionedReplicas, expectedReplicas);
       }

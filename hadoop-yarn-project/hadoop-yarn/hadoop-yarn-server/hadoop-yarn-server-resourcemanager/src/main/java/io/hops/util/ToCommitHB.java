@@ -15,6 +15,7 @@
  */
 package io.hops.util;
 
+import io.hops.StorageConnector;
 import io.hops.exception.StorageException;
 import io.hops.metadata.yarn.dal.ContainerStatusDataAccess;
 import io.hops.metadata.yarn.dal.NextHeartbeatDataAccess;
@@ -149,10 +150,10 @@ public class ToCommitHB {
       handler = new LightWeightRequestHandler(
               YARNOperationType.TEST) {
         @Override
-        public Object performTask() throws StorageException {
+        public Object performTask(StorageConnector connector) throws StorageException {
           connector.beginTransaction();
           connector.writeLock();
-          persistHeartbeat(pendingEvent);
+          persistHeartbeat(connector, pendingEvent);
           connector.commit();
           return null;
         }
@@ -161,10 +162,10 @@ public class ToCommitHB {
       handler = new AsyncLightWeightRequestHandler(
               YARNOperationType.TEST) {
         @Override
-        public Object performTask() throws StorageException {
+        public Object performTask(StorageConnector connector) throws StorageException {
           connector.beginTransaction();
           connector.writeLock();
-          persistHeartbeat(pendingEvent);
+          persistHeartbeat(connector, pendingEvent);
           connector.commit();
           return null;
         }
@@ -175,19 +176,19 @@ public class ToCommitHB {
     handler.handle();
   }
 
-  private void persistHeartbeat(PendingEvent pendingEvent) throws StorageException {
-    PendingEventDataAccess peDA = (PendingEventDataAccess) RMStorageFactory
-            .getDataAccess(PendingEventDataAccess.class);
-    NextHeartbeatDataAccess nextHBDA = (NextHeartbeatDataAccess) RMStorageFactory
-            .getDataAccess(NextHeartbeatDataAccess.class);
+  private void persistHeartbeat(StorageConnector connector, PendingEvent pendingEvent) throws StorageException {
+    PendingEventDataAccess peDA = (PendingEventDataAccess)
+        RMStorageFactory.getDataAccess(connector, PendingEventDataAccess.class);
+    NextHeartbeatDataAccess nextHBDA = (NextHeartbeatDataAccess)
+        RMStorageFactory.getDataAccess(connector, NextHeartbeatDataAccess.class);
     UpdatedContainerInfoDataAccess uciDA = (UpdatedContainerInfoDataAccess)
-            RMStorageFactory.getDataAccess(UpdatedContainerInfoDataAccess.class);
+        RMStorageFactory.getDataAccess(connector, UpdatedContainerInfoDataAccess.class);
     ContainerStatusDataAccess contStatDA = (ContainerStatusDataAccess)
-            RMStorageFactory.getDataAccess(ContainerStatusDataAccess.class);
-    RMNodeDataAccess rmNodeDA = (RMNodeDataAccess) RMStorageFactory
-            .getDataAccess(RMNodeDataAccess.class);
-    ResourceDataAccess resourceDA = (ResourceDataAccess) RMStorageFactory
-            .getDataAccess(ResourceDataAccess.class);
+            RMStorageFactory.getDataAccess(connector, ContainerStatusDataAccess.class);
+    RMNodeDataAccess rmNodeDA = (RMNodeDataAccess)
+        RMStorageFactory.getDataAccess(connector, RMNodeDataAccess.class);
+    ResourceDataAccess resourceDA = (ResourceDataAccess)
+        RMStorageFactory.getDataAccess(connector, ResourceDataAccess.class);
 
     peDA.add(pendingEvent);
 

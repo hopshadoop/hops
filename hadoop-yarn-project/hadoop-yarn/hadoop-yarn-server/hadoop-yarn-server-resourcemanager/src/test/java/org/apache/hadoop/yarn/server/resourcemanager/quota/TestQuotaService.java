@@ -30,6 +30,7 @@ import io.hops.metadata.yarn.entity.quota.ProjectDailyCost;
 import io.hops.metadata.yarn.entity.quota.ProjectQuota;
 import io.hops.metadata.yarn.entity.rmstatestore.ApplicationState;
 import io.hops.transaction.handler.LightWeightRequestHandler;
+import io.hops.transaction.handler.RequestHandler;
 import io.hops.util.DBUtility;
 import io.hops.util.RMStorageFactory;
 import io.hops.util.YarnAPIStorageFactory;
@@ -93,27 +94,24 @@ public class TestQuotaService {
       LightWeightRequestHandler bomb;
       bomb = new LightWeightRequestHandler(YARNOperationType.TEST) {
         @Override
-        public Object performTask() throws IOException {
+        public Object performTask(StorageConnector connector) throws IOException {
           connector.beginTransaction();
           connector.writeLock();
 
-          RMNodeDataAccess _rmDA = (RMNodeDataAccess) RMStorageFactory.
-                  getDataAccess(RMNodeDataAccess.class);
+          RMNodeDataAccess _rmDA = (RMNodeDataAccess)
+              RMStorageFactory.getDataAccess(connector, RMNodeDataAccess.class);
           _rmDA.addAll(hopRMNode);
 
-          ApplicationStateDataAccess<ApplicationState> _appState
-                  = (ApplicationStateDataAccess) RMStorageFactory.getDataAccess(
-                          ApplicationStateDataAccess.class);
+          ApplicationStateDataAccess<ApplicationState> _appState = (ApplicationStateDataAccess)
+              RMStorageFactory.getDataAccess(connector, ApplicationStateDataAccess.class);
           _appState.add(hopApplicationState);
 
-          ContainersLogsDataAccess<ContainerLog> _clDA
-                  = (ContainersLogsDataAccess) RMStorageFactory.
-                  getDataAccess(ContainersLogsDataAccess.class);
+          ContainersLogsDataAccess<ContainerLog> _clDA = (ContainersLogsDataAccess)
+              RMStorageFactory.getDataAccess(connector, ContainersLogsDataAccess.class);
           _clDA.addAll(hopContainerLog);
 
-          ProjectQuotaDataAccess<ProjectQuota> _pqDA
-                  = (ProjectQuotaDataAccess) RMStorageFactory.
-                  getDataAccess(ProjectQuotaDataAccess.class);
+          ProjectQuotaDataAccess<ProjectQuota> _pqDA = (ProjectQuotaDataAccess)
+              RMStorageFactory.getDataAccess(connector, ProjectQuotaDataAccess.class);
           _pqDA.addAll(hopProjectQuota);
 
           connector.commit();
@@ -135,13 +133,13 @@ public class TestQuotaService {
     LightWeightRequestHandler bomb;
     bomb = new LightWeightRequestHandler(YARNOperationType.TEST) {
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         connector.beginTransaction();
         connector.writeLock();
 
         ProjectQuotaDataAccess<ProjectQuota> _pqDA
                 = (ProjectQuotaDataAccess) RMStorageFactory.
-                getDataAccess(ProjectQuotaDataAccess.class);
+                getDataAccess(connector, ProjectQuotaDataAccess.class);
         Map<String, ProjectQuota> _hopProjectQuotaList = _pqDA.
                 getAll();
 
@@ -169,13 +167,12 @@ public class TestQuotaService {
     LightWeightRequestHandler bomb;
     bomb = new LightWeightRequestHandler(YARNOperationType.TEST) {
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         connector.beginTransaction();
         connector.writeLock();
 
-        ProjectsDailyCostDataAccess _pdcDA
-                = (ProjectsDailyCostDataAccess) RMStorageFactory.
-                getDataAccess(ProjectsDailyCostDataAccess.class);
+        ProjectsDailyCostDataAccess _pdcDA = (ProjectsDailyCostDataAccess)
+            RMStorageFactory.getDataAccess(connector, ProjectsDailyCostDataAccess.class);
         Map<String, ProjectDailyCost> hopYarnProjectsDailyCostList
                 = _pdcDA.getAll();
 
@@ -237,18 +234,16 @@ public class TestQuotaService {
     LightWeightRequestHandler prepareHandler = new LightWeightRequestHandler(
             YARNOperationType.TEST) {
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         connector.beginTransaction();
         connector.writeLock();
 
-        ApplicationStateDataAccess<ApplicationState> _appState
-                = (ApplicationStateDataAccess) RMStorageFactory.getDataAccess(
-                        ApplicationStateDataAccess.class);
+        ApplicationStateDataAccess<ApplicationState> _appState = (ApplicationStateDataAccess)
+            RMStorageFactory.getDataAccess(connector, ApplicationStateDataAccess.class);
         _appState.add(hopApplicationState);
 
-        ProjectQuotaDataAccess<ProjectQuota> _pqDA
-                = (ProjectQuotaDataAccess) RMStorageFactory.
-                getDataAccess(ProjectQuotaDataAccess.class);
+        ProjectQuotaDataAccess<ProjectQuota> _pqDA = (ProjectQuotaDataAccess)
+            RMStorageFactory.getDataAccess(connector, ProjectQuotaDataAccess.class);
         _pqDA.addAll(hopProjectQuota);
 
         connector.commit();

@@ -15,6 +15,7 @@
  */
 package io.hops.transaction.handler;
 
+import io.hops.transaction.TransactionCluster;
 import io.hops.transaction.handler.RequestHandler.OperationType;
 
 public enum HDFSOperationType implements OperationType {
@@ -305,5 +306,9 @@ public enum HDFSOperationType implements OperationType {
   GET_USERS_AND_GROUPS_BATCH,
   // Block Report Load Balancing
   GET_BR_LB_MAX_BLKS_PER_TW,
-  SET_BR_LB_MAX_BLKS_PER_TW
+  SET_BR_LB_MAX_BLKS_PER_TW;
+
+  public TransactionCluster getCluster() {
+    return TransactionCluster.PRIMARY;
+  }
 }

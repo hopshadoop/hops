@@ -16,11 +16,13 @@
 package io.hops.security;
 
 import com.google.common.collect.Lists;
+import io.hops.StorageConnector;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.GroupDataAccess;
 import io.hops.metadata.hdfs.dal.UserDataAccess;
 import io.hops.metadata.hdfs.entity.Group;
 import io.hops.metadata.hdfs.entity.User;
+import io.hops.transaction.TransactionCluster;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.hadoop.conf.Configuration;
@@ -29,7 +31,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
-import org.apache.hadoop.ipc.RemoteException;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -240,7 +241,8 @@ public class TestUsersGroups {
     conf.setInt(CommonConfigurationKeys.HOPS_GROUPS_UPDATER_ROUND, 10);
     HdfsStorageFactory.resetDALInitialized();
     HdfsStorageFactory.setConfiguration(conf);
-    HdfsStorageFactory.formatStorage();
+    StorageConnector connector = HdfsStorageFactory.getConnector().connectorFor(TransactionCluster.PRIMARY);
+    HdfsStorageFactory.formatStorage(connector);
 
     UsersGroups.addUserToGroupsTx("user", new String[]{"group1", "group2"});
 
@@ -387,9 +389,9 @@ public class TestUsersGroups {
     new LightWeightRequestHandler(
         HDFSOperationType.TEST) {
       @Override
-      public Object performTask() throws IOException {
-        UserDataAccess da = (UserDataAccess) HdfsStorageFactory.getDataAccess(UserDataAccess
-            .class);
+      public Object performTask(StorageConnector connector) throws IOException {
+        UserDataAccess da = (UserDataAccess)
+            HdfsStorageFactory.getDataAccess(connector, UserDataAccess.class);
         da.removeUser(userId);
         return null;
       }
@@ -400,9 +402,9 @@ public class TestUsersGroups {
     new LightWeightRequestHandler(
         HDFSOperationType.TEST) {
       @Override
-      public Object performTask() throws IOException {
-        GroupDataAccess da = (GroupDataAccess) HdfsStorageFactory.getDataAccess
-            (GroupDataAccess.class);
+      public Object performTask(StorageConnector connector) throws IOException {
+        GroupDataAccess da = (GroupDataAccess)
+            HdfsStorageFactory.getDataAccess(connector, GroupDataAccess.class);
         da.removeGroup(groupId);
         return null;
       }

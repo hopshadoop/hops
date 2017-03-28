@@ -17,10 +17,12 @@
  */
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
+import io.hops.StorageConnector;
 import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
+import io.hops.transaction.TransactionCluster;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.lock.LockFactory;
@@ -79,7 +81,8 @@ public class TestCorruptReplicaInfo {
       throws IOException, InterruptedException, StorageException {
     
     HdfsStorageFactory.setConfiguration(new HdfsConfiguration());
-    HdfsStorageFactory.formatStorage();
+    StorageConnector connector = HdfsStorageFactory.getConnector().connectorFor(TransactionCluster.PRIMARY);
+    HdfsStorageFactory.formatStorage(connector);
 
     CorruptReplicasMap crm = new CorruptReplicasMap(null);
 
@@ -152,8 +155,8 @@ public class TestCorruptReplicaInfo {
       INodeIdentifier inodeIdentifier;
 
       @Override
-      public void setUp() throws StorageException, IOException {
-        inodeIdentifier = INodeUtil.resolveINodeFromBlock(blk);
+      public void setUp(StorageConnector connector) throws StorageException, IOException {
+        inodeIdentifier = INodeUtil.resolveINodeFromBlock(connector, blk);
       }
 
       @Override
@@ -164,7 +167,7 @@ public class TestCorruptReplicaInfo {
       }
 
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         blocksMap.addBlockCollection(blk, new INodeFile(new PermissionStatus
             ("n", "n", FsPermission.getDefault()), null, (short)1, 0, 0, 1));
         crm.addToCorruptReplicasMap(blk, dn, reason);
@@ -180,8 +183,8 @@ public class TestCorruptReplicaInfo {
       INodeIdentifier inodeIdentifier;
 
       @Override
-      public void setUp() throws StorageException, IOException {
-        inodeIdentifier = INodeUtil.resolveINodeFromBlock(blk);
+      public void setUp(StorageConnector connector) throws StorageException, IOException {
+        inodeIdentifier = INodeUtil.resolveINodeFromBlock(connector, blk);
       }
 
       @Override
@@ -192,7 +195,7 @@ public class TestCorruptReplicaInfo {
       }
 
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         crm.removeFromCorruptReplicasMap(blk);
         return null;
       }

@@ -15,6 +15,7 @@
  */
 package io.hops.metadata;
 
+import io.hops.StorageConnector;
 import io.hops.exception.StorageException;
 import io.hops.metadata.common.entity.Variable;
 import io.hops.metadata.hdfs.dal.StorageIdMapDataAccess;
@@ -62,10 +63,10 @@ public class StorageIdMap {
   private void initialize() throws IOException {
     new LightWeightRequestHandler(HDFSOperationType.INITIALIZE_SID_MAP) {
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         StorageIdMapDataAccess<StorageId> da =
             (StorageIdMapDataAccess) HdfsStorageFactory
-                .getDataAccess(StorageIdMapDataAccess.class);
+                .getDataAccess(connector, StorageIdMapDataAccess.class);
         Collection<StorageId> sids = da.findAll();
         for (StorageId h : sids) {
           storageIdtoSId.put(h.getStorageId(), h.getsId());
@@ -86,11 +87,11 @@ public class StorageIdMap {
       }
 
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         int currSIdCount = HdfsVariables.getSIdCounter();
         StorageIdMapDataAccess<StorageId> da =
             (StorageIdMapDataAccess) HdfsStorageFactory
-                .getDataAccess(StorageIdMapDataAccess.class);
+                .getDataAccess(connector, StorageIdMapDataAccess.class);
         StorageId h = da.findByPk(storageId);
         if (h == null) {
           h = new StorageId(storageId, currSIdCount);

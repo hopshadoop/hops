@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
+import io.hops.StorageConnector;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.HdfsStorageFactory;
@@ -193,10 +194,10 @@ public class CorruptReplicasMap {
     return (Integer) new LightWeightRequestHandler(
         HDFSOperationType.COUNT_CORRUPT_REPLICAS) {
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         CorruptReplicaDataAccess da =
             (CorruptReplicaDataAccess) HdfsStorageFactory
-                .getDataAccess(CorruptReplicaDataAccess.class);
+                .getDataAccess(connector, CorruptReplicaDataAccess.class);
         return da.countAllUniqueBlk();
       }
     }.handle();
@@ -279,10 +280,10 @@ public class CorruptReplicasMap {
     return (Collection<CorruptReplica>) new LightWeightRequestHandler(
         HDFSOperationType.GET_ALL_CORRUPT_REPLICAS) {
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         CorruptReplicaDataAccess crDa =
             (CorruptReplicaDataAccess) HdfsStorageFactory
-                .getDataAccess(CorruptReplicaDataAccess.class);
+                .getDataAccess(connector, CorruptReplicaDataAccess.class);
         return crDa.findAll();
       }
     }.handle();

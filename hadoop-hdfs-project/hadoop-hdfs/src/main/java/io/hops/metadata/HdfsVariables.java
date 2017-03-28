@@ -17,15 +17,12 @@ package io.hops.metadata;
 
 import com.google.common.math.IntMath;
 import com.google.common.math.LongMath;
+import io.hops.StorageConnector;
 import io.hops.common.CountersQueue;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.leaderElection.VarsRegister;
-import io.hops.metadata.common.entity.ArrayVariable;
-import io.hops.metadata.common.entity.ByteArrayVariable;
-import io.hops.metadata.common.entity.IntVariable;
-import io.hops.metadata.common.entity.LongVariable;
-import io.hops.metadata.common.entity.Variable;
+import io.hops.metadata.common.entity.*;
 import io.hops.metadata.hdfs.dal.VariableDataAccess;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
@@ -34,62 +31,55 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.security.token.block.BlockKey;
 import org.apache.hadoop.hdfs.server.common.StorageInfo;
-import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class HdfsVariables {
 
-  private interface Handler{
-    Object handle(VariableDataAccess<Variable, Variable.Finder> vd) throws StorageException;
+  private interface Handler {
+    Object handle(StorageConnector connector, VariableDataAccess<Variable, Variable.Finder> vd) throws StorageException;
   }
 
-  private static Object handleVariable(Handler handler, boolean
-      writeLock)
-      throws StorageException {
+  private static Object handleVariable(
+      StorageConnector connector, Handler handler, boolean writeLock) throws StorageException {
     VariableDataAccess<Variable, Variable.Finder> vd = (VariableDataAccess)
-        HdfsStorageFactory.getDataAccess(VariableDataAccess.class);
+        HdfsStorageFactory.getDataAccess(connector, VariableDataAccess.class);
 
-    boolean insideActiveTransaction = HdfsStorageFactory.getConnector()
-        .isTransactionActive();
-    if(!insideActiveTransaction){
-      HdfsStorageFactory.getConnector().beginTransaction();
+    boolean insideActiveTransaction = connector.isTransactionActive();
+    if (!insideActiveTransaction) {
+      connector.beginTransaction();
     }
 
-    if(writeLock) {
-      HdfsStorageFactory.getConnector().writeLock();
-    }else{
-      HdfsStorageFactory.getConnector().readLock();
+    if (writeLock) {
+      connector.writeLock();
+    } else {
+      connector.readLock();
     }
 
     try {
-      Object response = handler.handle(vd);
+      Object response = handler.handle(connector, vd);
       return response;
-    }finally {
-      if(!insideActiveTransaction){
-        HdfsStorageFactory.getConnector().commit();
-      }else{
-        HdfsStorageFactory.getConnector().readCommitted();
+    } finally {
+      if (!insideActiveTransaction) {
+        connector.commit();
+      } else {
+        connector.readCommitted();
       }
     }
   }
 
-  private static Object handleVariableWithReadLock(Handler handler)
+  private static Object handleVariableWithReadLock(StorageConnector connector, Handler handler)
       throws StorageException {
-    return handleVariable(handler, false);
+    return handleVariable(connector, handler, false);
   }
 
-  private static Object handleVariableWithWriteLock(Handler handler)
+  private static Object handleVariableWithWriteLock(StorageConnector connector, Handler handler)
       throws StorageException {
-    return handleVariable(handler, true);
+    return handleVariable(connector, handler, true);
   }
 
   public static CountersQueue.Counter incrementBlockIdCounter(
@@ -97,8 +87,8 @@ public class HdfsVariables {
     return (CountersQueue.Counter) new LightWeightRequestHandler(
         HDFSOperationType.UPDATE_BLOCK_ID_COUNTER) {
       @Override
-      public Object performTask() throws IOException {
-        return incrementCounter(Variable.Finder.BlockID, increment);
+      public Object performTask(StorageConnector connector) throws IOException {
+        return incrementCounter(connector, Variable.Finder.BlockID, increment);
       }
     }.handle();
   }
@@ -108,8 +98,8 @@ public class HdfsVariables {
     return (CountersQueue.Counter) new LightWeightRequestHandler(
         HDFSOperationType.UPDATE_INODE_ID_COUNTER) {
       @Override
-      public Object performTask() throws IOException {
-        return incrementCounter(Variable.Finder.INodeID, increment);
+      public Object performTask(StorageConnector connector) throws IOException {
+        return incrementCounter(connector, Variable.Finder.INodeID, increment);
       }
     }.handle();
   }
@@ -119,28 +109,28 @@ public class HdfsVariables {
     return (CountersQueue.Counter) new LightWeightRequestHandler(
         HDFSOperationType.UPDATE_INODE_ID_COUNTER) {
       @Override
-      public Object performTask() throws IOException {
-        return incrementCounter(Variable.Finder.QuotaUpdateID, increment);
+      public Object performTask(StorageConnector connector) throws IOException {
+        return incrementCounter(connector, Variable.Finder.QuotaUpdateID, increment);
       }
     }.handle();
   }
 
-  private static CountersQueue.Counter incrementCounter(final Variable.Finder
-      finder, final int increment)
-      throws StorageException {
+  private static CountersQueue.Counter incrementCounter(
+      StorageConnector connector, final Variable.Finder finder, final int increment
+  ) throws StorageException {
 
-    return (CountersQueue.Counter) handleVariableWithWriteLock(new Handler() {
+    return (CountersQueue.Counter) handleVariableWithWriteLock(connector, new Handler() {
       @Override
-      public Object handle(VariableDataAccess<Variable, Variable.Finder> vd)
+      public Object handle(StorageConnector connector, VariableDataAccess<Variable, Variable.Finder> vd)
           throws StorageException {
-        Variable variable =  vd.getVariable(finder);
-        if(variable instanceof IntVariable){
+        Variable variable = vd.getVariable(finder);
+        if (variable instanceof IntVariable) {
           int oldValue = ((IntVariable) vd.getVariable(finder)).getValue();
           int newValue = IntMath.checkedAdd(oldValue, increment);
           vd.setVariable(new IntVariable(finder, newValue));
           return new CountersQueue.Counter(oldValue, newValue);
 
-        }else if(variable instanceof LongVariable){
+        } else if (variable instanceof LongVariable) {
           long oldValue = ((LongVariable) variable).getValue();
           long newValue = LongMath.checkedAdd(oldValue, increment);
           vd.setVariable(new LongVariable(finder, newValue));
@@ -163,11 +153,11 @@ public class HdfsVariables {
     return (Long) new LightWeightRequestHandler(
         HDFSOperationType.INCREMENT_MIS_REPLICATED_FILES_INDEX) {
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
 
-        return handleVariableWithWriteLock(new Handler() {
+        return handleVariableWithWriteLock(connector, new Handler() {
           @Override
-          public Object handle(VariableDataAccess<Variable, Variable.Finder> vd)
+          public Object handle(StorageConnector connector, VariableDataAccess<Variable, Variable.Finder> vd)
               throws StorageException {
             LongVariable var = (LongVariable) vd
                 .getVariable(Variable.Finder.MisReplicatedFilesIndex);
@@ -182,14 +172,14 @@ public class HdfsVariables {
       }
     }.handle();
   }
-  
+
   public static void enterClusterSafeMode() throws IOException {
     new LightWeightRequestHandler(HDFSOperationType.ENTER_CLUSTER_SAFE_MODE) {
       @Override
-      public Object performTask() throws IOException {
-        return handleVariableWithWriteLock(new Handler() {
+      public Object performTask(StorageConnector connector) throws IOException {
+        return handleVariableWithWriteLock(connector, new Handler() {
           @Override
-          public Object handle(VariableDataAccess<Variable, Variable.Finder> vd)
+          public Object handle(StorageConnector connector, VariableDataAccess<Variable, Variable.Finder> vd)
               throws StorageException {
             vd.setVariable(new IntVariable(Variable.Finder.ClusterInSafeMode, 1));
             return null;
@@ -198,14 +188,14 @@ public class HdfsVariables {
       }
     }.handle();
   }
-  
+
   public static void exitClusterSafeMode() throws IOException {
     new LightWeightRequestHandler(HDFSOperationType.EXIT_CLUSTER_SAFE_MODE) {
       @Override
-      public Object performTask() throws IOException {
-        return handleVariableWithWriteLock(new Handler() {
+      public Object performTask(StorageConnector connector) throws IOException {
+        return handleVariableWithWriteLock(connector, new Handler() {
           @Override
-          public Object handle(VariableDataAccess<Variable, Variable.Finder> vd)
+          public Object handle(StorageConnector connector, VariableDataAccess<Variable, Variable.Finder> vd)
               throws StorageException {
             vd.setVariable(new IntVariable(Variable.Finder.ClusterInSafeMode, 0));
             return null;
@@ -219,10 +209,10 @@ public class HdfsVariables {
     return (Boolean) new LightWeightRequestHandler(
         HDFSOperationType.GET_CLUSTER_SAFE_MODE) {
       @Override
-      public Object performTask() throws IOException {
-        return handleVariableWithReadLock(new Handler() {
+      public Object performTask(StorageConnector connector) throws IOException {
+        return handleVariableWithReadLock(connector, new Handler() {
           @Override
-          public Object handle(VariableDataAccess<Variable, Variable.Finder> vd)
+          public Object handle(StorageConnector connector, VariableDataAccess<Variable, Variable.Finder> vd)
               throws StorageException {
             IntVariable var =
                 (IntVariable) vd.getVariable(Variable.Finder.ClusterInSafeMode);
@@ -236,13 +226,13 @@ public class HdfsVariables {
   public static void setBrLbMasBlkPerMin(final long value) throws IOException {
     new LightWeightRequestHandler(HDFSOperationType.SET_BR_LB_MAX_BLKS_PER_TW) {
       @Override
-      public Object performTask() throws IOException {
-        return handleVariableWithWriteLock(new Handler() {
+      public Object performTask(StorageConnector connector) throws IOException {
+        return handleVariableWithWriteLock(connector, new Handler() {
           @Override
-          public Object handle(VariableDataAccess<Variable, Variable.Finder> vd)
+          public Object handle(StorageConnector connector, VariableDataAccess<Variable, Variable.Finder> vd)
               throws StorageException {
             vd.setVariable(new LongVariable(Variable.Finder.BrLbMaxBlkPerTW, value));
-            LOG.debug("Set block report max blocks per time window is : "+ value);
+            LOG.debug("Set block report max blocks per time window is : " + value);
             return null;
           }
         });
@@ -252,12 +242,12 @@ public class HdfsVariables {
 
   public static long getBrLbMaxBlkPerTW() throws IOException {
     return (Long) new LightWeightRequestHandler(
-            HDFSOperationType.GET_BR_LB_MAX_BLKS_PER_TW) {
+        HDFSOperationType.GET_BR_LB_MAX_BLKS_PER_TW) {
       @Override
-      public Object performTask() throws IOException {
-        return handleVariableWithReadLock(new Handler() {
+      public Object performTask(StorageConnector connector) throws IOException {
+        return handleVariableWithReadLock(connector, new Handler() {
           @Override
-          public Object handle(VariableDataAccess<Variable, Variable.Finder> vd)
+          public Object handle(StorageConnector connector, VariableDataAccess<Variable, Variable.Finder> vd)
               throws StorageException {
             LongVariable var =
                 (LongVariable) vd.getVariable(Variable.Finder.BrLbMaxBlkPerTW);
@@ -301,14 +291,14 @@ public class HdfsVariables {
         (String) vals.get(2), (Long) vals.get(3), (String) vals.get(4));
   }
 
-  
+
   public static void updateBlockTokenKeys(BlockKey curr, BlockKey next)
       throws IOException {
     updateBlockTokenKeys(curr, next, null);
   }
-  
+
   public static void updateBlockTokenKeys(BlockKey curr, BlockKey next,
-      BlockKey simple) throws IOException {
+                                          BlockKey simple) throws IOException {
     ArrayVariable arr = new ArrayVariable(Variable.Finder.BlockTokenKeys);
     arr.addVariable(serializeBlockKey(curr, Variable.Finder.BTCurrKey));
     arr.addVariable(serializeBlockKey(next, Variable.Finder.BTNextKey));
@@ -317,7 +307,7 @@ public class HdfsVariables {
     }
     Variables.updateVariable(arr);
   }
-  
+
   public static Map<Integer, BlockKey> getAllBlockTokenKeysByID()
       throws IOException {
     return getAllBlockTokenKeys(true, false);
@@ -348,9 +338,9 @@ public class HdfsVariables {
       throws StorageException, TransactionContextException {
     Variables.updateVariable(new IntVariable(Variable.Finder.SIdCounter, sid));
   }
-  
+
   private static Map<Integer, BlockKey> getAllBlockTokenKeys(boolean useKeyId,
-      boolean leightWeight) throws IOException {
+                                                             boolean leightWeight) throws IOException {
     List<Variable> vars = (List<Variable>) (leightWeight ?
         getVariableLightWeight(Variable.Finder.BlockTokenKeys).getValue() :
         Variables.getVariable(Variable.Finder.BlockTokenKeys).getValue());
@@ -362,9 +352,9 @@ public class HdfsVariables {
     }
     return keys;
   }
-  
+
   private static ByteArrayVariable serializeBlockKey(BlockKey key,
-      Variable.Finder keyType) throws IOException {
+                                                     Variable.Finder keyType) throws IOException {
     ByteArrayOutputStream os = new ByteArrayOutputStream();
     DataOutputStream dos = new DataOutputStream(os);
     key.write(dos);
@@ -390,20 +380,20 @@ public class HdfsVariables {
     }
     return key;
   }
-  
+
   private static Variable getVariableLightWeight(final Variable.Finder varType)
       throws IOException {
     return (Variable) new LightWeightRequestHandler(
         HDFSOperationType.GET_VARIABLE) {
       @Override
-      public Object performTask() throws IOException {
-        VariableDataAccess vd = (VariableDataAccess) HdfsStorageFactory
-            .getDataAccess(VariableDataAccess.class);
+      public Object performTask(StorageConnector connector) throws IOException {
+        VariableDataAccess vd = (VariableDataAccess)
+            HdfsStorageFactory.getDataAccess(connector, VariableDataAccess.class);
         return vd.getVariable(varType);
       }
     }.handle();
   }
-  
+
   public static void registerDefaultValues(Configuration conf) {
     Variable.registerVariableDefaultValue(Variable.Finder.BlockID,
         new LongVariable(0).getBytes());
@@ -422,8 +412,8 @@ public class HdfsVariables {
     Variable.registerVariableDefaultValue(Variable.Finder.QuotaUpdateID,
         new IntVariable(0).getBytes());
     Variable.registerVariableDefaultValue(Variable.Finder.BrLbMaxBlkPerTW,
-            new LongVariable(conf.getLong(DFSConfigKeys.DFS_BR_LB_MAX_BLK_PER_TW,
-                    DFSConfigKeys.DFS_BR_LB_MAX_BLK_PER_TW_DEFAULT)).getBytes());
+        new LongVariable(conf.getLong(DFSConfigKeys.DFS_BR_LB_MAX_BLK_PER_TW,
+            DFSConfigKeys.DFS_BR_LB_MAX_BLK_PER_TW_DEFAULT)).getBytes());
     VarsRegister.registerHdfsDefaultValues();
     // This is a workaround that is needed until HA-YARN has its own format command
     VarsRegister.registerYarnDefaultValues();

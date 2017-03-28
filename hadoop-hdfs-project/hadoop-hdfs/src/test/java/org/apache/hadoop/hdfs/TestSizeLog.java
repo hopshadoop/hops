@@ -15,6 +15,7 @@
  */
 package org.apache.hadoop.hdfs;
 
+import io.hops.StorageConnector;
 import io.hops.TestUtil;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.SizeLogDataAccess;
@@ -36,9 +37,9 @@ public class TestSizeLog extends TestCase {
   private int getLogEntryCount(final int inodeId) throws IOException {
     return (Integer) new LightWeightRequestHandler(HDFSOperationType.TEST) {
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         SizeLogDataAccess<SizeLogEntry> da = (SizeLogDataAccess)
-            HdfsStorageFactory.getDataAccess(SizeLogDataAccess.class);
+            HdfsStorageFactory.getDataAccess(connector, SizeLogDataAccess.class);
         Collection<SizeLogEntry> logEntries = da.find(inodeId);
         return logEntries.size();
       }

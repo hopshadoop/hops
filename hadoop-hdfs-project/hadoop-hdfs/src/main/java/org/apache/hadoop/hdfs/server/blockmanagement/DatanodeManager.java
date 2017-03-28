@@ -20,6 +20,7 @@ package org.apache.hadoop.hdfs.server.blockmanagement;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.net.InetAddresses;
+import io.hops.StorageConnector;
 import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
 import io.hops.metadata.StorageIdMap;
@@ -69,7 +70,6 @@ import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.Time;
 
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
@@ -1298,8 +1298,8 @@ public class DatanodeManager {
       INodeIdentifier inodeIdentifier;
 
       @Override
-      public void setUp() throws StorageException {
-        inodeIdentifier = INodeUtil.resolveINodeFromBlock(b);
+      public void setUp(StorageConnector connector) throws StorageException {
+        inodeIdentifier = INodeUtil.resolveINodeFromBlock(connector, b);
       }
 
       @Override
@@ -1313,7 +1313,7 @@ public class DatanodeManager {
       }
 
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         return b.getExpectedLocations(datanodeManager);
       }
     }.handle();

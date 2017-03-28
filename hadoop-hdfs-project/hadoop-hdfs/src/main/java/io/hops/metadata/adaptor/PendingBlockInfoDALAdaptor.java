@@ -43,8 +43,7 @@ public class PendingBlockInfoDALAdaptor extends
   }
 
   @Override
-  public List<org.apache.hadoop.hdfs.server.blockmanagement.PendingBlockInfo> findAll()
-      throws StorageException {
+  public List<org.apache.hadoop.hdfs.server.blockmanagement.PendingBlockInfo> findAll() throws StorageException {
     return (List<org.apache.hadoop.hdfs.server.blockmanagement.PendingBlockInfo>) convertDALtoHDFS(
         dataAccces.findAll());
   }
@@ -66,8 +65,8 @@ public class PendingBlockInfoDALAdaptor extends
       Collection<org.apache.hadoop.hdfs.server.blockmanagement.PendingBlockInfo> newed,
       Collection<org.apache.hadoop.hdfs.server.blockmanagement.PendingBlockInfo> modified)
       throws StorageException {
-    dataAccces.prepare(convertHDFStoDAL(removed), convertHDFStoDAL(newed),
-        convertHDFStoDAL(modified));
+    dataAccces.prepare(convertHDFStoDAL(removed),
+        convertHDFStoDAL(newed), convertHDFStoDAL(modified));
   }
 
   @Override
@@ -108,8 +107,7 @@ public class PendingBlockInfoDALAdaptor extends
   }
 
   @Override
-  public List<org.apache.hadoop.hdfs.server.blockmanagement.PendingBlockInfo> findByINodeIds(
-      int[] inodeIds) throws StorageException {
+  public List<org.apache.hadoop.hdfs.server.blockmanagement.PendingBlockInfo> findByINodeIds(int[] inodeIds) throws StorageException {
     return (List<org.apache.hadoop.hdfs.server.blockmanagement.PendingBlockInfo>) convertDALtoHDFS(
         dataAccces.findByINodeIds(inodeIds));
   }

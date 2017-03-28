@@ -14,6 +14,7 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
+import io.hops.StorageConnector;
 import io.hops.leader_election.node.ActiveNode;
 import io.hops.leader_election.node.ActiveNodePBImpl;
 import io.hops.leader_election.node.SortedActiveNodeList;
@@ -24,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import io.hops.transaction.TransactionCluster;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -79,7 +81,8 @@ public class TestBlockReportLoadBalancing1 {
     Configuration conf = new Configuration();
     conf.setLong(DFSConfigKeys.DFS_BR_LB_MAX_BLK_PER_TW, NN_COUNT*DFS_BR_LB_MAX_BLK_PER_NN_PER_TW);
     HdfsStorageFactory.setConfiguration(conf);
-    assert (HdfsStorageFactory.formatStorage());
+    StorageConnector connector = HdfsStorageFactory.getConnector().connectorFor(TransactionCluster.PRIMARY);
+    assert (HdfsStorageFactory.formatStorage(connector));
 
     List<ActiveNode> list = new ArrayList<ActiveNode>();
     for (int i = 0; i < NN_COUNT; i++) {
@@ -136,7 +139,8 @@ public class TestBlockReportLoadBalancing1 {
     Configuration conf = new Configuration();
     conf.setLong(DFSConfigKeys.DFS_BR_LB_MAX_BLK_PER_TW, NN_COUNT*DFS_BR_LB_MAX_BLK_PER_NN_PER_TW);
     HdfsStorageFactory.setConfiguration(conf);
-    assert (HdfsStorageFactory.formatStorage());
+    StorageConnector connector = HdfsStorageFactory.getConnector().connectorFor(TransactionCluster.PRIMARY);
+    assert (HdfsStorageFactory.formatStorage(connector));
 
     List<ActiveNode> list = new ArrayList<ActiveNode>();
     for (int i = 0; i < NN_COUNT; i++) {
@@ -213,7 +217,8 @@ public class TestBlockReportLoadBalancing1 {
     Configuration conf = new Configuration();
     conf.setLong(DFSConfigKeys.DFS_BR_LB_MAX_BLK_PER_TW, NN_COUNT*DFS_BR_LB_MAX_BLK_PER_NN_PER_TW);
     HdfsStorageFactory.setConfiguration(conf);
-    assert (HdfsStorageFactory.formatStorage());
+    StorageConnector connector = HdfsStorageFactory.getConnector().connectorFor(TransactionCluster.PRIMARY);
+    assert (HdfsStorageFactory.formatStorage(connector));
 
     List<ActiveNode> list = new ArrayList<ActiveNode>();
     for (int i = 0; i < NN_COUNT; i++) {

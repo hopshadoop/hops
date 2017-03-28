@@ -15,6 +15,7 @@
  */
 package org.apache.hadoop.hdfs;
 
+import io.hops.StorageConnector;
 import io.hops.TestUtil;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.MetadataLogDataAccess;
@@ -60,9 +61,9 @@ public class TestMetadataLog extends TestCase {
     return (Collection<MetadataLogEntry>) new LightWeightRequestHandler(
         HDFSOperationType.GET_METADATA_LOG_ENTRIES) {
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         MetadataLogDataAccess da = (MetadataLogDataAccess)
-            HdfsStorageFactory.getDataAccess(MetadataLogDataAccess.class);
+            HdfsStorageFactory.getDataAccess(connector, MetadataLogDataAccess.class);
         return da.find(inodeId);
       }
     }.handle();

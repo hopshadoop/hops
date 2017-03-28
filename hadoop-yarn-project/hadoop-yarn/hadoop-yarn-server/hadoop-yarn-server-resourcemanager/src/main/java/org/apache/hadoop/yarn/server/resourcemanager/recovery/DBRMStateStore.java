@@ -18,6 +18,7 @@
 package org.apache.hadoop.yarn.server.resourcemanager.recovery;
 
 import com.google.common.annotations.VisibleForTesting;
+import io.hops.StorageConnector;
 import io.hops.exception.StorageException;
 import io.hops.metadata.common.entity.ByteArrayVariable;
 import io.hops.metadata.common.entity.IntVariable;
@@ -53,7 +54,6 @@ import org.apache.hadoop.yarn.server.records.impl.pb.VersionPBImpl;
 import org.apache.hadoop.yarn.proto.YarnServerCommonProtos.VersionProto;
 import org.apache.hadoop.yarn.proto.YarnServerResourceManagerRecoveryProtos;
 import org.apache.hadoop.yarn.security.client.RMDelegationTokenIdentifier;
-import static org.apache.hadoop.yarn.server.resourcemanager.recovery.LeveldbRMStateStore.LOG;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.AMRMTokenSecretManagerState;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.ApplicationAttemptStateData;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.ApplicationStateData;
@@ -98,14 +98,13 @@ public class DBRMStateStore extends RMStateStore {
   }
 
   private void setVariable(final Variable var) throws IOException {
-    LightWeightRequestHandler setVersionHandler = new LightWeightRequestHandler(
-            YARNOperationType.TEST) {
+    LightWeightRequestHandler setVersionHandler = new LightWeightRequestHandler(YARNOperationType.TEST) {
       @Override
-      public Object performTask() throws StorageException {
+      public Object performTask(StorageConnector connector) throws StorageException {
         connector.beginTransaction();
         connector.writeLock();
-        VariableDataAccess vDA = (VariableDataAccess) RMStorageFactory
-                .getDataAccess(VariableDataAccess.class);
+        VariableDataAccess vDA = (VariableDataAccess)
+            RMStorageFactory.getDataAccess(connector, VariableDataAccess.class);
         vDA.setVariable(var);
         connector.commit();
         return null;
@@ -130,11 +129,10 @@ public class DBRMStateStore extends RMStateStore {
     return (byte[]) var.getValue();
   }
 
-  private Variable getVariableInt(Variable.Finder finder) throws
+  private Variable getVariableInt(StorageConnector connector, Variable.Finder finder) throws
           StorageException {
-    VariableDataAccess DA
-            = (VariableDataAccess) RMStorageFactory
-            .getDataAccess(VariableDataAccess.class);
+    VariableDataAccess DA = (VariableDataAccess)
+        RMStorageFactory.getDataAccess(connector, VariableDataAccess.class);
     return (Variable) DA.getVariable(finder);
 
   }
@@ -143,10 +141,10 @@ public class DBRMStateStore extends RMStateStore {
     LightWeightRequestHandler getVersionHandler = new LightWeightRequestHandler(
             YARNOperationType.TEST) {
       @Override
-      public Object performTask() throws StorageException {
+      public Object performTask(StorageConnector connector) throws StorageException {
         connector.beginTransaction();
         connector.readCommitted();
-        Variable var = getVariableInt(finder);
+        Variable var = getVariableInt(connector, finder);
 
         connector.commit();
         return var;
@@ -159,16 +157,13 @@ public class DBRMStateStore extends RMStateStore {
   public synchronized long getAndIncrementEpoch() throws Exception {
     final Variable.Finder dbKey = Variable.Finder.RMStateStoreEpoch;
 
-    LightWeightRequestHandler getAndIncrementEpochHandler
-            = new LightWeightRequestHandler(
-                    YARNOperationType.TEST) {
+    LightWeightRequestHandler getAndIncrementEpochHandler = new LightWeightRequestHandler(YARNOperationType.TEST) {
       @Override
-      public Object performTask() throws StorageException {
+      public Object performTask(StorageConnector connector) throws StorageException {
         connector.beginTransaction();
         connector.writeLock();
         VariableDataAccess DA
-                = (VariableDataAccess) RMStorageFactory
-                .getDataAccess(VariableDataAccess.class);
+                = (VariableDataAccess) RMStorageFactory.getDataAccess(connector, VariableDataAccess.class);
         LongVariable var = (LongVariable) DA.getVariable(dbKey);
 
         long currentEpoch = 0;
@@ -193,12 +188,12 @@ public class DBRMStateStore extends RMStateStore {
     LightWeightRequestHandler loadStateHandler = new LightWeightRequestHandler(
             YARNOperationType.TEST) {
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         connector.beginTransaction();
         connector.readLock();
-        loadRMDTSecretManagerState(rmState);
-        loadRMApps(rmState);
-        loadAMRMTokenSecretManagerState(rmState);
+        loadRMDTSecretManagerState(connector, rmState);
+        loadRMApps(connector, rmState);
+        loadAMRMTokenSecretManagerState(connector, rmState);
         connector.commit();
         return null;
       }
@@ -207,10 +202,9 @@ public class DBRMStateStore extends RMStateStore {
     return rmState;
   }
 
-  private void loadAMRMTokenSecretManagerState(RMState rmState)
+  private void loadAMRMTokenSecretManagerState(StorageConnector connector, RMState rmState)
           throws IOException {
-    ByteArrayVariable var = (ByteArrayVariable) getVariableInt(
-            Variable.Finder.AMRMToken);
+    ByteArrayVariable var = (ByteArrayVariable) getVariableInt(connector, Variable.Finder.AMRMToken);
     if(var==null || var.getValue()==null){
       return;
     }
@@ -224,18 +218,13 @@ public class DBRMStateStore extends RMStateStore {
                     stateData.getNextMasterKey());
   }
 
-  private void loadRMApps(RMState state) throws IOException {
-    ApplicationStateDataAccess DA
-            = (ApplicationStateDataAccess) RMStorageFactory
-            .getDataAccess(ApplicationStateDataAccess.class);
-    ApplicationAttemptStateDataAccess attemptDA
-            = (ApplicationAttemptStateDataAccess) RMStorageFactory
-            .getDataAccess(ApplicationAttemptStateDataAccess.class);
-
+  private void loadRMApps(StorageConnector connector, RMState state) throws IOException {
+    ApplicationStateDataAccess DA = (ApplicationStateDataAccess)
+        RMStorageFactory.getDataAccess(connector, ApplicationStateDataAccess.class);
+    ApplicationAttemptStateDataAccess attemptDA = (ApplicationAttemptStateDataAccess)
+        RMStorageFactory.getDataAccess(connector, ApplicationAttemptStateDataAccess.class);
     List<ApplicationState> appStates = DA.getAll();
-
-    Map<String, List<ApplicationAttemptState>> applicationAttemptStates
-            = attemptDA.getAll();
+    Map<String, List<ApplicationAttemptState>> applicationAttemptStates = attemptDA.getAll();
 
     if (appStates != null) {
       for (ApplicationState hopAppState : appStates) {
@@ -291,30 +280,25 @@ public class DBRMStateStore extends RMStateStore {
     return attemptState;
   }
 
-  private void loadRMDTSecretManagerState(RMState state) throws IOException {
-    int numKeys = loadRMDTSecretManagerKeys(state);
+  private void loadRMDTSecretManagerState(StorageConnector connector, RMState state) throws IOException {
+    int numKeys = loadRMDTSecretManagerKeys(connector, state);
     LOG.info("Recovered " + numKeys + " RM delegation token master keys ");
-    int numTokens = loadRMDTSecretManagerTokens(state);
+    int numTokens = loadRMDTSecretManagerTokens(connector, state);
     LOG.info("Recovered " + numTokens + " RM delegation tokens");
-    loadRMDTSecretManagerTokenSequenceNumber(state);
+    loadRMDTSecretManagerTokenSequenceNumber(connector, state);
   }
 
-  private int loadRMDTSecretManagerKeys(RMState state) throws
+  private int loadRMDTSecretManagerKeys(StorageConnector connector, RMState state) throws
           IOException {
     int numKeys = 0;
-    DelegationKeyDataAccess DA = (DelegationKeyDataAccess) RMStorageFactory
-            .getDataAccess(DelegationKeyDataAccess.class);
-    List<io.hops.metadata.yarn.entity.rmstatestore.DelegationKey> delKeys = DA.
-            getAll();
+    DelegationKeyDataAccess DA = (DelegationKeyDataAccess)
+        RMStorageFactory.getDataAccess(connector, DelegationKeyDataAccess.class);
+    List<io.hops.metadata.yarn.entity.rmstatestore.DelegationKey> delKeys = DA.getAll();
     if (delKeys != null) {
-      for (io.hops.metadata.yarn.entity.rmstatestore.DelegationKey delKey
-              : delKeys) {
-
+      for (io.hops.metadata.yarn.entity.rmstatestore.DelegationKey delKey : delKeys) {
         DelegationKey masterKey = loadDelegationKey(delKey.getDelegationkey());
         state.rmSecretManagerState.masterKeyState.add(masterKey);
-
         numKeys++;
-
       }
     }
     return numKeys;
@@ -331,10 +315,10 @@ public class DBRMStateStore extends RMStateStore {
     return key;
   }
 
-  private int loadRMDTSecretManagerTokens(RMState state) throws IOException {
+  private int loadRMDTSecretManagerTokens(StorageConnector connector, RMState state) throws IOException {
     int numTokens = 0;
-    DelegationTokenDataAccess DA = (DelegationTokenDataAccess) RMStorageFactory.
-            getDataAccess(DelegationTokenDataAccess.class);
+    DelegationTokenDataAccess DA = (DelegationTokenDataAccess)
+        RMStorageFactory.getDataAccess(connector, DelegationTokenDataAccess.class);
     List<DelegationToken> delTokens = DA.getAll();
 
     if (delTokens != null) {
@@ -364,10 +348,9 @@ public class DBRMStateStore extends RMStateStore {
     return tokenData;
   }
 
-  private void loadRMDTSecretManagerTokenSequenceNumber(RMState state)
+  private void loadRMDTSecretManagerTokenSequenceNumber(StorageConnector connector, RMState state)
           throws IOException {
-    IntVariable var = (IntVariable) getVariableInt(
-            Variable.Finder.RMDTSequenceNumber);
+    IntVariable var = (IntVariable) getVariableInt(connector, Variable.Finder.RMDTSequenceNumber);
     if(var!=null && var.getValue()!=null){
       state.rmSecretManagerState.dtSequenceNumber = var.getValue();
     }
@@ -386,17 +369,14 @@ public class DBRMStateStore extends RMStateStore {
       stateName = appStateDataPB.getState().toString();
     }
     final String stateN=stateName;
-    LightWeightRequestHandler setApplicationStateHandler
-            = new LightWeightRequestHandler(YARNOperationType.TEST) {
+    LightWeightRequestHandler setApplicationStateHandler = new LightWeightRequestHandler(YARNOperationType.TEST) {
       @Override
-      public Object performTask() throws StorageException {
+      public Object performTask(StorageConnector connector) throws StorageException {
         connector.beginTransaction();
         connector.writeLock();
-        ApplicationStateDataAccess DA
-                = (ApplicationStateDataAccess) RMStorageFactory
-                .getDataAccess(ApplicationStateDataAccess.class);
-        ApplicationState state = new ApplicationState(appIdString, appState,
-                user, name, stateN);
+        ApplicationStateDataAccess DA = (ApplicationStateDataAccess)
+            RMStorageFactory.getDataAccess(connector, ApplicationStateDataAccess.class);
+        ApplicationState state = new ApplicationState(appIdString, appState, user, name, stateN);
         DA.add(state);
         connector.commit();
         return null;
@@ -420,18 +400,14 @@ public class DBRMStateStore extends RMStateStore {
     final String attemptId = appAttemptId.toString();
     final byte[] attemptData = attemptStateDataPB.getProto().toByteArray();
     final String trakingURL = attemptStateDataPB.getTrackingUrl();
-    LightWeightRequestHandler setApplicationAttemptIdHandler
-            = new LightWeightRequestHandler(YARNOperationType.TEST) {
+    LightWeightRequestHandler setApplicationAttemptIdHandler = new LightWeightRequestHandler(YARNOperationType.TEST) {
       @Override
-      public Object performTask() throws StorageException {
+      public Object performTask(StorageConnector connector) throws StorageException {
         connector.beginTransaction();
         connector.writeLock();
-        ApplicationAttemptStateDataAccess DA
-                = (ApplicationAttemptStateDataAccess) RMStorageFactory.
-                getDataAccess(ApplicationAttemptStateDataAccess.class);
-        DA.add(
-                new ApplicationAttemptState(appId, attemptId, attemptData,
-                trakingURL));
+        ApplicationAttemptStateDataAccess DA = (ApplicationAttemptStateDataAccess)
+            RMStorageFactory.getDataAccess(connector, ApplicationAttemptStateDataAccess.class);
+        DA.add(new ApplicationAttemptState(appId, attemptId, attemptData, trakingURL));
         connector.commit();
         return null;
       }
@@ -457,7 +433,7 @@ public class DBRMStateStore extends RMStateStore {
 
     //Get ApplicationAttemptIds for this 
     final List<ApplicationAttemptState> attemptsToRemove
-            = new ArrayList<ApplicationAttemptState>();
+            = new ArrayList<>();
     for (ApplicationAttemptId attemptId : appState.attempts.keySet()) {
       attemptsToRemove.add(new ApplicationAttemptState(appId, attemptId.
               toString()));
@@ -466,21 +442,19 @@ public class DBRMStateStore extends RMStateStore {
     LightWeightRequestHandler setApplicationStateHandler
             = new LightWeightRequestHandler(YARNOperationType.TEST) {
       @Override
-      public Object performTask() throws StorageException {
+      public Object performTask(StorageConnector connector) throws StorageException {
         if (appId != null) {
           connector.beginTransaction();
           connector.writeLock();
-          ApplicationStateDataAccess DA
-                  = (ApplicationStateDataAccess) RMStorageFactory
-                  .getDataAccess(ApplicationStateDataAccess.class);
+          ApplicationStateDataAccess DA = (ApplicationStateDataAccess)
+              RMStorageFactory.getDataAccess(connector, ApplicationStateDataAccess.class);
           //Remove this particular appState from NDB
           ApplicationState hop = new ApplicationState(appId);
           DA.remove(hop);
 
           //Remove attempts of this app
-          ApplicationAttemptStateDataAccess attemptDA
-                  = (ApplicationAttemptStateDataAccess) RMStorageFactory
-                  .getDataAccess(ApplicationAttemptStateDataAccess.class);
+          ApplicationAttemptStateDataAccess attemptDA = (ApplicationAttemptStateDataAccess)
+              RMStorageFactory.getDataAccess(connector, ApplicationAttemptStateDataAccess.class);
           attemptDA.removeAll(attemptsToRemove);
           connector.commit();
         }
@@ -504,13 +478,12 @@ public class DBRMStateStore extends RMStateStore {
     LightWeightRequestHandler setDelegationTokenHandler
             = new LightWeightRequestHandler(YARNOperationType.TEST) {
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         if (seqNumber != Integer.MIN_VALUE) {
           connector.beginTransaction();
           connector.writeLock();
-          DelegationTokenDataAccess DA
-                  = (DelegationTokenDataAccess) RMStorageFactory
-                  .getDataAccess(DelegationTokenDataAccess.class);
+          DelegationTokenDataAccess DA = (DelegationTokenDataAccess)
+              RMStorageFactory.getDataAccess(connector, DelegationTokenDataAccess.class);
           DelegationToken dtToRemove = new DelegationToken(seqNumber);
           DA.remove(dtToRemove);
           connector.commit();
@@ -537,19 +510,17 @@ public class DBRMStateStore extends RMStateStore {
     LightWeightRequestHandler setTokenAndSequenceNumberHandler
             = new LightWeightRequestHandler(YARNOperationType.TEST) {
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         connector.beginTransaction();
         connector.writeLock();
-        DelegationTokenDataAccess DA
-                = (DelegationTokenDataAccess) RMStorageFactory
-                .getDataAccess(DelegationTokenDataAccess.class);
+        DelegationTokenDataAccess DA = (DelegationTokenDataAccess)
+            RMStorageFactory.getDataAccess(connector, DelegationTokenDataAccess.class);
 
         DA.add(new DelegationToken(tokenNumber, tokenData.toByteArray()));
         if (!isUpdate) {
-          VariableDataAccess vDA = (VariableDataAccess) RMStorageFactory
-                  .getDataAccess(VariableDataAccess.class);
-          vDA.setVariable(new IntVariable(Variable.Finder.RMDTSequenceNumber,
-                  tokenNumber));
+          VariableDataAccess vDA = (VariableDataAccess)
+              RMStorageFactory.getDataAccess(connector, VariableDataAccess.class);
+          vDA.setVariable(new IntVariable(Variable.Finder.RMDTSequenceNumber, tokenNumber));
         }
         connector.commit();
         return null;
@@ -574,16 +545,12 @@ public class DBRMStateStore extends RMStateStore {
     LightWeightRequestHandler setRMDTMasterKeyHandler
             = new LightWeightRequestHandler(YARNOperationType.TEST) {
       @Override
-      public Object performTask() throws StorageException {
+      public Object performTask(StorageConnector connector) throws StorageException {
         connector.beginTransaction();
         connector.writeLock();
-        DelegationKeyDataAccess DA = (DelegationKeyDataAccess) RMStorageFactory
-                .getDataAccess(DelegationKeyDataAccess.class);
-
-        DA.add(
-                new io.hops.metadata.yarn.entity.rmstatestore.DelegationKey(
-                        keyId, os.toByteArray()));
-
+        DelegationKeyDataAccess DA = (DelegationKeyDataAccess)
+            RMStorageFactory.getDataAccess(connector, DelegationKeyDataAccess.class);
+        DA.add(new io.hops.metadata.yarn.entity.rmstatestore.DelegationKey(keyId, os.toByteArray()));
         connector.commit();
         return null;
       }
@@ -598,18 +565,16 @@ public class DBRMStateStore extends RMStateStore {
     LightWeightRequestHandler setRMDTMasterKeyHandler
             = new LightWeightRequestHandler(YARNOperationType.TEST) {
       @Override
-      public Object performTask() throws StorageException {
+      public Object performTask(StorageConnector connector) throws StorageException {
         LOG.debug("HOP :: key=" + key);
         if (key != Integer.MIN_VALUE) {
           connector.beginTransaction();
           connector.writeLock();
-          DelegationKeyDataAccess DA
-                  = (DelegationKeyDataAccess) RMStorageFactory
-                  .getDataAccess(DelegationKeyDataAccess.class);
+          DelegationKeyDataAccess DA = (DelegationKeyDataAccess)
+              RMStorageFactory.getDataAccess(connector, DelegationKeyDataAccess.class);
           //Remove this particular DK from NDB
           io.hops.metadata.yarn.entity.rmstatestore.DelegationKey dkeyToremove
-                  = new io.hops.metadata.yarn.entity.rmstatestore.DelegationKey(
-                          key, null);
+                  = new io.hops.metadata.yarn.entity.rmstatestore.DelegationKey(key, null);
           DA.remove(dkeyToremove);
           connector.commit();
           LOG.debug("HOP :: committed");
@@ -625,35 +590,28 @@ public class DBRMStateStore extends RMStateStore {
     LightWeightRequestHandler deleteStoreHandler
             = new LightWeightRequestHandler(YARNOperationType.TEST) {
       @Override
-      public Object performTask() throws StorageException {
+      public Object performTask(StorageConnector connector) throws StorageException {
         connector.beginTransaction();
         connector.writeLock();
-        ApplicationAttemptStateDataAccess appAttemptDA
-                = (ApplicationAttemptStateDataAccess) RMStorageFactory.
-                getDataAccess(ApplicationAttemptStateDataAccess.class);
-        ApplicationStateDataAccess appDA
-                = (ApplicationStateDataAccess) RMStorageFactory.getDataAccess(
-                        ApplicationStateDataAccess.class);
-        DelegationKeyDataAccess dkDA
-                = (DelegationKeyDataAccess) RMStorageFactory.getDataAccess(
-                        DelegationKeyDataAccess.class);
-        DelegationTokenDataAccess dtDA
-                = (DelegationTokenDataAccess) RMStorageFactory.getDataAccess(
-                        DelegationTokenDataAccess.class);
+        ApplicationAttemptStateDataAccess appAttemptDA = (ApplicationAttemptStateDataAccess)
+            RMStorageFactory.getDataAccess(connector, ApplicationAttemptStateDataAccess.class);
+        ApplicationStateDataAccess appDA = (ApplicationStateDataAccess)
+            RMStorageFactory.getDataAccess(connector, ApplicationStateDataAccess.class);
+        DelegationKeyDataAccess dkDA = (DelegationKeyDataAccess)
+            RMStorageFactory.getDataAccess(connector, DelegationKeyDataAccess.class);
+        DelegationTokenDataAccess dtDA = (DelegationTokenDataAccess)
+            RMStorageFactory.getDataAccess(connector, DelegationTokenDataAccess.class);
         appAttemptDA.removeAll();
         appDA.removeAll();
         dkDA.removeAll();
         dtDA.removeAll();
 
-        VariableDataAccess vDA = (VariableDataAccess) RMStorageFactory.
-                getDataAccess(VariableDataAccess.class);
+        VariableDataAccess vDA = (VariableDataAccess)
+            RMStorageFactory.getDataAccess(connector, VariableDataAccess.class);
         vDA.setVariable(new ByteArrayVariable(Variable.Finder.AMRMToken, null));
-        vDA.setVariable(new ByteArrayVariable(
-                Variable.Finder.RMStateStoreVersion,
-                null));
+        vDA.setVariable(new ByteArrayVariable(Variable.Finder.RMStateStoreVersion, null));
         vDA.setVariable(new LongVariable(Variable.Finder.RMStateStoreEpoch, 0));
-        vDA.setVariable(new IntVariable(Variable.Finder.RMDTSequenceNumber,
-                0));
+        vDA.setVariable(new IntVariable(Variable.Finder.RMDTSequenceNumber, 0));
         connector.commit();
         return null;
       }
@@ -679,14 +637,12 @@ public class DBRMStateStore extends RMStateStore {
     LightWeightRequestHandler getRMAppStateHandler
             = new LightWeightRequestHandler(YARNOperationType.TEST) {
       @Override
-      public Object performTask() throws StorageException {
+      public Object performTask(StorageConnector connector) throws StorageException {
         connector.beginTransaction();
         connector.readLock();
-        ApplicationStateDataAccess appDA
-                = (ApplicationStateDataAccess) RMStorageFactory.getDataAccess(
-                        ApplicationStateDataAccess.class);
-        ApplicationState appState = (ApplicationState) appDA.
-                findByApplicationId(appIdString);
+        ApplicationStateDataAccess appDA =
+            (ApplicationStateDataAccess) RMStorageFactory.getDataAccess(connector, ApplicationStateDataAccess.class);
+        ApplicationState appState = (ApplicationState) appDA.findByApplicationId(appIdString);
         connector.commit();
         return appState;
       }
@@ -702,24 +658,19 @@ public class DBRMStateStore extends RMStateStore {
 
   @VisibleForTesting
   public synchronized int getNumEntriesInDatabase() throws Exception {
-    LightWeightRequestHandler countEntriesHandler
-            = new LightWeightRequestHandler(YARNOperationType.TEST) {
+    LightWeightRequestHandler countEntriesHandler = new LightWeightRequestHandler(YARNOperationType.TEST) {
       @Override
-      public Object performTask() throws StorageException {
+      public Object performTask(StorageConnector connector) throws StorageException {
         connector.beginTransaction();
         connector.writeLock();
-        ApplicationAttemptStateDataAccess appAttemptDA
-                = (ApplicationAttemptStateDataAccess) RMStorageFactory.
-                getDataAccess(ApplicationAttemptStateDataAccess.class);
-        ApplicationStateDataAccess appDA
-                = (ApplicationStateDataAccess) RMStorageFactory.getDataAccess(
-                        ApplicationStateDataAccess.class);
-        DelegationKeyDataAccess dkDA
-                = (DelegationKeyDataAccess) RMStorageFactory.getDataAccess(
-                        DelegationKeyDataAccess.class);
-        DelegationTokenDataAccess dtDA
-                = (DelegationTokenDataAccess) RMStorageFactory.getDataAccess(
-                        DelegationTokenDataAccess.class);
+        ApplicationAttemptStateDataAccess appAttemptDA =
+            (ApplicationAttemptStateDataAccess) RMStorageFactory.getDataAccess(connector, ApplicationAttemptStateDataAccess.class);
+        ApplicationStateDataAccess appDA =
+            (ApplicationStateDataAccess) RMStorageFactory.getDataAccess(connector, ApplicationStateDataAccess.class);
+        DelegationKeyDataAccess dkDA =
+            (DelegationKeyDataAccess) RMStorageFactory.getDataAccess(connector, DelegationKeyDataAccess.class);
+        DelegationTokenDataAccess dtDA =
+            (DelegationTokenDataAccess) RMStorageFactory.getDataAccess(connector, DelegationTokenDataAccess.class);
         int numEntries = 0;
         for(Object o : appAttemptDA.getAll().values()){
           List<ApplicationAttemptState> l = (List<ApplicationAttemptState>)o;

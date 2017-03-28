@@ -17,9 +17,9 @@
  */
 package org.apache.hadoop.hdfs;
 
+import io.hops.StorageConnector;
 import io.hops.exception.StorageException;
 import io.hops.metadata.HdfsStorageFactory;
-import io.hops.metadata.hdfs.TablesDef;
 import io.hops.metadata.hdfs.dal.QuotaUpdateDataAccess;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
@@ -1184,7 +1184,7 @@ public class TestQuota {
     LightWeightRequestHandler quotaApplicationChecker=
             new LightWeightRequestHandler(HDFSOperationType.TEST) {
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         while(true){
           if((System.currentTimeMillis() - START_TIME ) > MAX_TIME){
             throw new StorageException("All quota updates were not applied in givin time. Time "+MAX_TIME+"ms");
@@ -1193,7 +1193,8 @@ public class TestQuota {
             Thread.sleep(500);
           }catch(InterruptedException e){}
 
-          QuotaUpdateDataAccess da = (QuotaUpdateDataAccess)HdfsStorageFactory.getDataAccess(QuotaUpdateDataAccess.class);
+          QuotaUpdateDataAccess da = (QuotaUpdateDataAccess)
+              HdfsStorageFactory.getDataAccess(connector, QuotaUpdateDataAccess.class);
           int count = da.getCount();
 
           if(count==0){

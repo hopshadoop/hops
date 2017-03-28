@@ -18,6 +18,7 @@ package io.hops.security;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Collections2;
 import com.google.common.collect.Lists;
+import io.hops.StorageConnector;
 import io.hops.exception.ForeignKeyConstraintViolationException;
 import io.hops.exception.StorageException;
 import io.hops.exception.UniqueKeyConstraintViolationException;
@@ -26,6 +27,7 @@ import io.hops.metadata.hdfs.dal.UserDataAccess;
 import io.hops.metadata.hdfs.dal.UserGroupDataAccess;
 import io.hops.metadata.hdfs.entity.Group;
 import io.hops.metadata.hdfs.entity.User;
+import io.hops.transaction.TransactionCluster;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import io.hops.transaction.handler.RequestHandler;
 import org.apache.commons.logging.Log;
@@ -48,7 +50,12 @@ public class UsersGroups {
     ADD_USER,
     GET_USER_GROUPS,
     GET_USER,
-    GET_GROUP
+    GET_GROUP;
+
+    @Override
+    public TransactionCluster getCluster() {
+      return TransactionCluster.PRIMARY;
+    }
   }
 
   private static class GroupsUpdater implements Runnable {
@@ -258,7 +265,7 @@ public class UsersGroups {
     final LightWeightRequestHandler getGroups = new LightWeightRequestHandler
         (UsersOperationsType.GET_USER_GROUPS) {
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         boolean transactionActive = connector.isTransactionActive();
 
         if (!transactionActive) {
@@ -291,7 +298,7 @@ public class UsersGroups {
 
     return (User) new LightWeightRequestHandler(UsersOperationsType.GET_USER) {
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         return userName == null ? userDataAccess.getUser(userId) :
             userDataAccess.getUser(userName);
       }
@@ -305,7 +312,7 @@ public class UsersGroups {
     return (Group) new LightWeightRequestHandler(
         UsersOperationsType.GET_GROUP) {
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         return groupName == null ? groupDataAccess.getGroup(groupId) :
             groupDataAccess.getGroup(groupName);
       }
@@ -344,7 +351,7 @@ public class UsersGroups {
   String[] grps) throws IOException {
       new LightWeightRequestHandler(UsersOperationsType.ADD_USER) {
         @Override
-        public Object performTask() throws StorageException, IOException {
+        public Object performTask(StorageConnector connector) throws StorageException, IOException {
           addUserToGroupsInternal(user, grps);
           return null;
         }

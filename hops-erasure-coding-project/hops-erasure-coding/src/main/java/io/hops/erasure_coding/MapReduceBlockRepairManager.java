@@ -18,6 +18,7 @@
 
 package io.hops.erasure_coding;
 
+import io.hops.StorageConnector;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.RepairJobsDataAccess;
 import io.hops.metadata.hdfs.entity.RepairJob;
@@ -580,9 +581,9 @@ public class MapReduceBlockRepairManager extends BlockRepairManager {
       final String inDir, final String outDir) throws IOException {
     new LightWeightRequestHandler(HDFSOperationType.PERSIST_ENCODING_JOB) {
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         RepairJobsDataAccess da = (RepairJobsDataAccess)
-            HdfsStorageFactory.getDataAccess(RepairJobsDataAccess.class);
+            HdfsStorageFactory.getDataAccess(connector, RepairJobsDataAccess.class);
         da.add(new RepairJob(jobId.getJtIdentifier(),
             jobId.getId(), path, inDir, outDir));
         return null;
@@ -593,9 +594,9 @@ public class MapReduceBlockRepairManager extends BlockRepairManager {
   private void cleanRecovery() throws IOException {
     new LightWeightRequestHandler(HDFSOperationType.DELETE_ENCODING_JOBS) {
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         RepairJobsDataAccess da = (RepairJobsDataAccess)
-            HdfsStorageFactory.getDataAccess(RepairJobsDataAccess.class);
+            HdfsStorageFactory.getDataAccess(connector, RepairJobsDataAccess.class);
         Iterator<ActiveRepair> it = completedJobs.iterator();
         while (it.hasNext()) {
           ActiveRepair job = it.next();
@@ -639,9 +640,9 @@ public class MapReduceBlockRepairManager extends BlockRepairManager {
     LightWeightRequestHandler handler = new LightWeightRequestHandler(
         HDFSOperationType.RECOVER_ENCODING_JOBS) {
       @Override
-      public Object performTask() throws IOException {
+      public Object performTask(StorageConnector connector) throws IOException {
         RepairJobsDataAccess da = (RepairJobsDataAccess)
-            HdfsStorageFactory.getDataAccess(RepairJobsDataAccess.class);
+            HdfsStorageFactory.getDataAccess(connector, RepairJobsDataAccess.class);
         return da.findAll();
       }
     };

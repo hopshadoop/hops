@@ -17,6 +17,7 @@
 package org.apache.hadoop.hdfs.server.namenode;
 
 import com.google.common.annotations.VisibleForTesting;
+import io.hops.StorageConnector;
 import io.hops.security.Users;
 import io.hops.exception.StorageException;
 import io.hops.leaderElection.HdfsLeDescriptorFactory;
@@ -25,6 +26,7 @@ import io.hops.leader_election.node.ActiveNode;
 import io.hops.leader_election.node.SortedActiveNodeList;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.HdfsVariables;
+import io.hops.transaction.TransactionCluster;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.HadoopIllegalArgumentException;
@@ -41,6 +43,7 @@ import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.server.blockmanagement.BRTrackingService;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.NamenodeRole;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.StartupOption;
+import org.apache.hadoop.hdfs.server.common.Storage;
 import org.apache.hadoop.hdfs.server.common.StorageInfo;
 import org.apache.hadoop.hdfs.server.datanode.BRLoadBalancingException;
 import org.apache.hadoop.hdfs.server.namenode.metrics.NameNodeMetrics;
@@ -728,13 +731,13 @@ public class NameNode {
 
     try {
       HdfsStorageFactory.setConfiguration(conf);
+      StorageConnector connector = HdfsStorageFactory.getConnector().connectorFor(TransactionCluster.PRIMARY);
       if (force) {
-        HdfsStorageFactory.formatHdfsStorageNonTransactional();
+        HdfsStorageFactory.formatHdfsStorageNonTransactional(connector);
       } else {
-        HdfsStorageFactory.formatHdfsStorage();
+        HdfsStorageFactory.formatHdfsStorage(connector);
       }
-      StorageInfo
-          .storeStorageInfoToDB(clusterId);  //this adds new row to the db
+      StorageInfo.storeStorageInfoToDB(clusterId);  //this adds new row to the db
     } catch (StorageException e) {
       throw new RuntimeException(e.getMessage());
     }
@@ -763,8 +766,9 @@ public class NameNode {
 
     try {
       HdfsStorageFactory.setConfiguration(conf);
+      StorageConnector connector = HdfsStorageFactory.getConnector().connectorFor(TransactionCluster.PRIMARY);
 //      HdfsStorageFactory.formatAllStorageNonTransactional();
-      HdfsStorageFactory.formatStorage();
+      HdfsStorageFactory.formatStorage(connector);
       StorageInfo.storeStorageInfoToDB(clusterId);  //this adds new row to the db
     } catch (StorageException e) {
       throw new RuntimeException(e.getMessage());
@@ -1122,7 +1126,7 @@ public class NameNode {
 
   private static void dropAndCreateDB(Configuration conf) throws IOException {
     HdfsStorageFactory.setConfiguration(conf);
-    HdfsStorageFactory.getConnector().dropAndRecreateDB();
+    HdfsStorageFactory.getConnector().connectorFor(TransactionCluster.PRIMARY).dropAndRecreateDB();
   }
 
   public boolean isNameNodeAlive(long namenodeId) {

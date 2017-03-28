@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdfs.server.common;
 
 import com.google.common.base.Joiner;
+import io.hops.StorageConnector;
 import io.hops.exception.StorageException;
 import io.hops.metadata.HdfsVariables;
 import io.hops.metadata.common.entity.Variable;
@@ -147,7 +148,7 @@ public class StorageInfo {
         }
 
         @Override
-        public Object performTask() throws StorageException, IOException {
+        public Object performTask(StorageConnector connector) throws StorageException, IOException {
           return HdfsVariables.getStorageInfo();
         }
       }.handle();
@@ -168,7 +169,7 @@ public class StorageInfo {
       }
 
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         Configuration conf = new Configuration();
         String bpid = newBlockPoolID();
         storageInfo = new StorageInfo(HdfsConstants.LAYOUT_VERSION,

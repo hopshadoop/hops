@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
+import io.hops.StorageConnector;
 import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
@@ -115,9 +116,9 @@ public class TestNodeCount {
             INodeIdentifier inodeIdentifier;
 
             @Override
-            public void setUp() throws StorageException, IOException {
+            public void setUp(StorageConnector connector) throws StorageException, IOException {
               inodeIdentifier =
-                  INodeUtil.resolveINodeFromBlock(block.getLocalBlock());
+                  INodeUtil.resolveINodeFromBlock(connector, block.getLocalBlock());
             }
 
             @Override
@@ -128,7 +129,7 @@ public class TestNodeCount {
             }
 
             @Override
-            public Object performTask() throws StorageException, IOException {
+            public Object performTask(StorageConnector connector) throws StorageException, IOException {
               final Iterator<DatanodeDescriptor> iter =
                   bm.blocksMap.nodeIterator(block.getLocalBlock());
               BlockInfo blkInfo = new BlockInfo(block.getLocalBlock(),
@@ -217,8 +218,8 @@ public class TestNodeCount {
       INodeIdentifier inodeIdentifier;
 
       @Override
-      public void setUp() throws StorageException, IOException {
-        inodeIdentifier = INodeUtil.resolveINodeFromBlock(block);
+      public void setUp(StorageConnector connector) throws StorageException, IOException {
+        inodeIdentifier = INodeUtil.resolveINodeFromBlock(connector, block);
       }
 
       @Override
@@ -230,7 +231,7 @@ public class TestNodeCount {
       }
 
       @Override
-      public Object performTask() throws StorageException, IOException {
+      public Object performTask(StorageConnector connector) throws StorageException, IOException {
         lastBlock = block;
         lastNum = namesystem.getBlockManager().countNodes(block);
         return lastNum;
