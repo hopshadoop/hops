@@ -25,6 +25,7 @@ import io.hops.common.IDsMonitor;
 import io.hops.common.INodeUtil;
 import io.hops.erasure_coding.Codec;
 import io.hops.erasure_coding.ErasureCodingManager;
+import io.hops.exception.LockUpgradeException;
 import io.hops.exception.StorageCallPreventedException;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
@@ -485,7 +486,7 @@ public class FSNamesystem
           DFS_NAMENODE_MAX_OBJECTS_DEFAULT);
 
       this.accessTimePrecision =
-          conf.getLong(DFS_NAMENODE_ACCESSTIME_PRECISION_KEY, 0);
+          conf.getLong(DFS_NAMENODE_ACCESSTIME_PRECISION_KEY, DFS_NAMENODE_ACCESSTIME_PRECISION_DEFAULT);
       this.supportAppends =
           conf.getBoolean(DFS_SUPPORT_APPEND_KEY, DFS_SUPPORT_APPEND_DEFAULT);
       LOG.info("Append Enabled: " + supportAppends);
@@ -980,41 +981,60 @@ public class FSNamesystem
    *
    * @see ClientProtocol#getBlockLocations(String, long, long)
    */
-  LocatedBlocks getBlockLocations(final String clientMachine, final String src,
+  public LocatedBlocks getBlockLocations(final String clientMachine, final String src,
       final long offset, final long length) throws IOException {
+
+    // First try the operation using shared lock.
+    // Upgrade the lock to exclusive lock if LockUpgradeException is encountered.
+    // This operation tries to update the inode access time once every hr.
+    // The lock upgrade exception is thrown when the inode access time stamp is
+    // updated while holding shared lock on the inode. In this case retry the operation
+    // using an exclusive lock.
+    try{
+      return getBlockLocationsWithLock(clientMachine, src, offset, length, INodeLockType.READ);
+    }catch(LockUpgradeException e){
+      LOG.debug("Encountered LockUpgradeException while reading "+src+". Retrying the operation using exclusive locks");
+      return getBlockLocationsWithLock(clientMachine, src, offset, length, INodeLockType.WRITE);
+    }
+  }
+
+  LocatedBlocks getBlockLocationsWithLock(final String clientMachine, final String src,
+                                          final long offset, final long length, final INodeLockType lockType) throws IOException {
     HopsTransactionalRequestHandler getBlockLocationsHandler =
-        new HopsTransactionalRequestHandler(
-            HDFSOperationType.GET_BLOCK_LOCATIONS, src) {
-          @Override
-          public void acquireLock(TransactionLocks locks) throws IOException {
-            LockFactory lf = getInstance();
-            locks.add(lf.getINodeLock(!dir.isQuotaEnabled()?true:false,nameNode, INodeLockType.WRITE,
-                INodeResolveType.PATH, src)).add(lf.getBlockLock())
-                .add(lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UC));
-          }
-
-          @Override
-          public Object performTask() throws StorageException, IOException {
-            LocatedBlocks blocks =
-                getBlockLocationsInternal(src, offset, length, true, true,
-                    true);
-            if (blocks != null) {
-              blockManager.getDatanodeManager()
-                  .sortLocatedBlocks(clientMachine, blocks.getLocatedBlocks());
-
-              LocatedBlock lastBlock = blocks.getLastLocatedBlock();
-              if (lastBlock != null) {
-                ArrayList<LocatedBlock> lastBlockList =
-                    new ArrayList<LocatedBlock>();
-                lastBlockList.add(lastBlock);
-                blockManager.getDatanodeManager()
-                    .sortLocatedBlocks(clientMachine, lastBlockList);
+            new HopsTransactionalRequestHandler(
+                    HDFSOperationType.GET_BLOCK_LOCATIONS, src) {
+              @Override
+              public void acquireLock(TransactionLocks locks) throws IOException {
+                LockFactory lf = getInstance();
+                locks.add(lf.getINodeLock(!dir.isQuotaEnabled()?true:false,nameNode, lockType,
+                        INodeResolveType.PATH, src)).add(lf.getBlockLock())
+                        .add(lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UC));
               }
-            }
-            return blocks;
-          }
-        };
-    return (LocatedBlocks) getBlockLocationsHandler.handle(this);
+
+              @Override
+              public Object performTask() throws StorageException, IOException {
+                LocatedBlocks blocks =
+                        getBlockLocationsInternal(src, offset, length, true, true,
+                                true);
+                if (blocks != null) {
+                  blockManager.getDatanodeManager()
+                          .sortLocatedBlocks(clientMachine, blocks.getLocatedBlocks());
+
+                  LocatedBlock lastBlock = blocks.getLastLocatedBlock();
+                  if (lastBlock != null) {
+                    ArrayList<LocatedBlock> lastBlockList =
+                            new ArrayList<LocatedBlock>();
+                    lastBlockList.add(lastBlock);
+                    blockManager.getDatanodeManager()
+                            .sortLocatedBlocks(clientMachine, lastBlockList);
+                  }
+                }
+                return blocks;
+              }
+            };
+    LocatedBlocks locatedBlocks = (LocatedBlocks) getBlockLocationsHandler.handle(this);
+    logAuditEvent(true, "open", src);
+    return locatedBlocks;
   }
 
   /**
@@ -1102,7 +1122,7 @@ public class FSNamesystem
     final LocatedBlocks ret =
         getBlockLocationsUpdateTimes(src, offset, length, doAccessTime,
             needBlockToken);
-    logAuditEvent(true, "open", src);
+
     if (checkSafeMode && isInSafeMode()) {
       for (LocatedBlock b : ret.getLocatedBlocks()) {
         // if safemode & no block locations yet then throw safemodeException
@@ -1133,13 +1153,6 @@ public class FSNamesystem
       long now = now();
       final INodeFile inode = INodeFile.valueOf(dir.getINode(src), src);
       if (doAccessTime && isAccessTimeSupported()) {
-        if (now <= inode.getAccessTime() + getAccessTimePrecision()) {
-          // if we have to set access time but we only have the readlock, then
-          // restart this entire operation with the writeLock.
-          if (attempt == 0) {
-            continue;
-          }
-        }
         dir.setTimes(src, inode, -1, now, false);
       }
       return blockManager

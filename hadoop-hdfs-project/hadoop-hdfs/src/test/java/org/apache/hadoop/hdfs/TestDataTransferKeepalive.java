@@ -30,6 +30,7 @@ import java.io.PrintWriter;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 
+import com.google.common.io.ByteStreams;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -45,7 +46,6 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.google.common.io.NullOutputStream;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 
@@ -170,7 +170,7 @@ public class TestDataTransferKeepalive {
         stms[i] = fs.open(TEST_FILE);
       }
       for (InputStream stm : stms) {
-        IOUtils.copyBytes(stm, new NullOutputStream(), 1024);
+        IOUtils.copyBytes(stm, ByteStreams.nullOutputStream(), 1024);
       }
     } finally {
       IOUtils.cleanup(null, stms);

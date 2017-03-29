@@ -223,7 +223,7 @@ public class BlockInfoUnderConstruction extends BlockInfo {
 
   @Override
   public String toString() {
-    return "BlkInfoUnderConstruction FIXME " + super.toString();
+    return "BlkInfoUnderConstruction " + super.toString();
   }
 
   @Override
