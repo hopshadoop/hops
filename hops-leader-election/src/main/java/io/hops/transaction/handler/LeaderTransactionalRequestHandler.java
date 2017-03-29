@@ -16,7 +16,6 @@
 package io.hops.transaction.handler;
 
 import io.hops.StorageConnector;
-import io.hops.transaction.TransactionCluster;
 import io.hops.transaction.TransactionInfo;
 import io.hops.transaction.lock.LeaderElectionTransactionalLockAcquirer;
 import io.hops.transaction.lock.TransactionLockAcquirer;
@@ -36,8 +35,8 @@ public abstract class LeaderTransactionalRequestHandler
   }
 
   @Override
-  protected Object execute(TransactionCluster cluster, Object namesystem) throws IOException {
-    return super.execute(cluster, new TransactionInfo() {
+  protected Object execute(StorageConnector connector, Object namesystem) throws IOException {
+    return super.execute(connector, new TransactionInfo() {
       @Override
       public String getContextName(OperationType opType) {
         return opType.toString();

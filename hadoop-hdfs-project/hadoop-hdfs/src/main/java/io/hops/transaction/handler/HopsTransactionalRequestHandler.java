@@ -16,7 +16,6 @@
 package io.hops.transaction.handler;
 
 import io.hops.StorageConnector;
-import io.hops.transaction.TransactionCluster;
 import io.hops.transaction.TransactionInfo;
 import io.hops.transaction.lock.HdfsTransactionalLockAcquirer;
 import io.hops.transaction.lock.TransactionLockAcquirer;
@@ -45,8 +44,8 @@ public abstract class HopsTransactionalRequestHandler
   }
 
   @Override
-  protected Object execute(TransactionCluster cluster, final Object namesystem) throws IOException {
-    return super.execute(cluster, new TransactionInfo() {
+  protected Object execute(StorageConnector connector, final Object namesystem) throws IOException {
+    return super.execute(connector, new TransactionInfo() {
       @Override
       public String getContextName(OperationType opType) {
         if (namesystem != null && namesystem instanceof FSNamesystem) {
