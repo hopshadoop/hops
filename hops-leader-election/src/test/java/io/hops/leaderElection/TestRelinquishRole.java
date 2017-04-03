@@ -87,8 +87,8 @@ public class TestRelinquishRole {
             TIME_PERIOD_INCREMENT, HTTP_ADDRESS, RPC_ADDRESS);
     nnList.add(hdfs2);
 
-    hdfs1.getLeaderElectionInstance().waitActive();
-    hdfs2.getLeaderElectionInstance().waitActive();
+    hdfs1.getLeaderElectionInstance().waitStarted();
+    hdfs2.getLeaderElectionInstance().waitStarted();
     long hdfs1Id = hdfs1.getLeCurrentId();
     long hdfs2Id = hdfs2.getLeCurrentId();
     assertTrue("Leader Check Failed ", hdfs1.isLeader() == true);
