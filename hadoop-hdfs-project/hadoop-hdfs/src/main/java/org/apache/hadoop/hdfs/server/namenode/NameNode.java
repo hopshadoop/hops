@@ -5,9 +5,9 @@
  * licenses this file to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
+ * <p>
  * http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -18,14 +18,16 @@ package org.apache.hadoop.hdfs.server.namenode;
 
 import com.google.common.annotations.VisibleForTesting;
 import io.hops.StorageConnector;
-import io.hops.security.Users;
 import io.hops.exception.StorageException;
 import io.hops.leaderElection.HdfsLeDescriptorFactory;
-import io.hops.leaderElection.LeaderElection;
+import io.hops.leaderElection.MockLeaderElection;
+import io.hops.leaderElection.NDBLeaderElection;
 import io.hops.leader_election.node.ActiveNode;
 import io.hops.leader_election.node.SortedActiveNodeList;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.HdfsVariables;
+import io.hops.security.Users;
+import io.hops.services.LeaderElectionService;
 import io.hops.transaction.TransactionCluster;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -43,7 +45,6 @@ import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.server.blockmanagement.BRTrackingService;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.NamenodeRole;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.StartupOption;
-import org.apache.hadoop.hdfs.server.common.Storage;
 import org.apache.hadoop.hdfs.server.common.StorageInfo;
 import org.apache.hadoop.hdfs.server.datanode.BRLoadBalancingException;
 import org.apache.hadoop.hdfs.server.namenode.metrics.NameNodeMetrics;
@@ -70,21 +71,7 @@ import java.security.PrivilegedExceptionAction;
 import java.util.Collection;
 import java.util.List;
 
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_KEYTAB_FILE_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_PLUGINS_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_RPC_ADDRESS_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_STARTUP_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SUPPORT_ALLOW_FORMAT_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SUPPORT_ALLOW_FORMAT_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_USER_NAME_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.FS_DEFAULT_NAME_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.FS_TRASH_INTERVAL_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.FS_TRASH_INTERVAL_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.*;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 
 /**
@@ -161,7 +148,7 @@ public class NameNode {
           DFS_NAMENODE_USER_NAME_KEY};
 
   private static final String USAGE =
-      "Usage: java NameNode [" + 
+      "Usage: java NameNode [" +
           //StartupOption.BACKUP.getName() + "] | [" +
           //StartupOption.CHECKPOINT.getName() + "] | [" +
           StartupOption.FORMAT.getName() + " [" +
@@ -178,7 +165,7 @@ public class NameNode {
           //StartupOption.FORCE.getName() + " ] ] | [ "+
           StartupOption.SET_BLOCK_REPORT_PROCESS_SIZE.getName() + " noOfBlks ] | [" +
           StartupOption.FORMAT_ALL.getName() + " ] | [" +
-          StartupOption.DROP_AND_CREATE_DB.getName() + "]" ;
+          StartupOption.DROP_AND_CREATE_DB.getName() + "]";
 
   public long getProtocolVersion(String protocol, long clientVersion)
       throws IOException {
@@ -231,7 +218,7 @@ public class NameNode {
   private NameNodeRpcServer rpcServer;
 
 
-  protected LeaderElection leaderElection;
+  private LeaderElectionService leaderElectionService;
 
   /**
    * for block report load balancing
@@ -290,7 +277,7 @@ public class NameNode {
    * client connection
    */
   public static InetSocketAddress getServiceAddress(Configuration conf,
-      boolean fallback) {
+                                                    boolean fallback) {
     String addr = conf.get(DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY);
     if (addr == null || addr.isEmpty()) {
       return fallback ? getAddress(conf) : null;
@@ -338,7 +325,7 @@ public class NameNode {
   // Common NameNode methods implementation for the active name-node role.
   //
   public NamenodeRole getRole() {
-    if (leaderElection != null && leaderElection.isLeader()) {
+    if (leaderElectionService != null && leaderElectionService.isLeader()) {
       return NamenodeRole.LEADER_NAMENODE;
     }
     return NamenodeRole.NAMENODE;
@@ -366,12 +353,12 @@ public class NameNode {
    * setting
    */
   protected void setRpcServiceServerAddress(Configuration conf,
-      InetSocketAddress serviceRPCAddress) {
+                                            InetSocketAddress serviceRPCAddress) {
     setServiceAddress(conf, NetUtils.getHostPortString(serviceRPCAddress));
   }
 
   protected void setRpcServerAddress(Configuration conf,
-      InetSocketAddress rpcAddress) {
+                                     InetSocketAddress rpcAddress) {
     FileSystem.setDefaultUri(conf, getUri(rpcAddress));
   }
 
@@ -384,7 +371,7 @@ public class NameNode {
    */
   public static InetSocketAddress getHttpAddress(Configuration conf) {
     return NetUtils.createSocketAddr(conf.get(DFS_NAMENODE_HTTP_ADDRESS_KEY,
-            DFS_NAMENODE_HTTP_ADDRESS_DEFAULT));
+        DFS_NAMENODE_HTTP_ADDRESS_DEFAULT));
   }
 
   protected void setHttpServerAddress(Configuration conf) {
@@ -429,13 +416,13 @@ public class NameNode {
   protected void initialize(Configuration conf) throws IOException {
     UserGroupInformation.setConfiguration(conf);
     loginAsNameNodeUser(conf);
-    
+
     HdfsStorageFactory.setConfiguration(conf);
 
     this.brTrackingService = new BRTrackingService(conf.getLong(DFSConfigKeys.DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD,
-            DFSConfigKeys.DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD_DEFAULT),
-            conf.getLong(DFSConfigKeys.DFS_BR_LB_TIME_WINDOW_SIZE,
-                    DFSConfigKeys.DFS_BR_LB_TIME_WINDOW_SIZE_DEFAULT));
+        DFSConfigKeys.DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD_DEFAULT),
+        conf.getLong(DFSConfigKeys.DFS_BR_LB_TIME_WINDOW_SIZE,
+            DFSConfigKeys.DFS_BR_LB_TIME_WINDOW_SIZE_DEFAULT));
 
 
     String fsOwnerShortUserName = UserGroupInformation.getCurrentUser()
@@ -498,7 +485,7 @@ public class NameNode {
   private void startCommonServices(Configuration conf) throws IOException {
     startHttpServer(conf);
 
-    startLeaderElectionService();
+    startHopsServices(conf);
 
     namesystem.startCommonServices(conf);
 
@@ -525,8 +512,8 @@ public class NameNode {
     if (rpcServer != null) {
       rpcServer.stop();
     }
-    if (leaderElection != null && leaderElection.isRunning()) {
-      leaderElection.stopElectionThread();
+    if (leaderElectionService != null && leaderElectionService.isRunning()) {
+      leaderElectionService.stop();
     }
     if (plugins != null) {
       for (ServicePlugin p : plugins) {
@@ -556,11 +543,11 @@ public class NameNode {
     // emptier needs to run as the NN. See HDFS-3972.
     FileSystem fs =
         SecurityUtil.doAsLoginUser(new PrivilegedExceptionAction<FileSystem>() {
-              @Override
-              public FileSystem run() throws IOException {
-                return FileSystem.get(conf);
-              }
-            });
+          @Override
+          public FileSystem run() throws IOException {
+            return FileSystem.get(conf);
+          }
+        });
     this.emptier =
         new Thread(new Trash(fs, conf).getEmptier(), "Trash Emptier");
     this.emptier.setDaemon(true);
@@ -635,28 +622,28 @@ public class NameNode {
   /**
    * Stop all NameNode threads and wait for all to finish.
    */
-    public void stop() {
-        synchronized (this) {
-            if (stopRequested) {
-                return;
-            }
-            stopRequested = true;
-        }
-        try {
-            exitActiveServices();
-        } catch (ServiceFailedException e) {
-            LOG.warn("Encountered exception while exiting state ", e);
-        } finally {
-            stopCommonServices();
-            if (metrics != null) {
-                metrics.shutdown();
-            }
-            if (namesystem != null) {
-                namesystem.shutdown();
-            }
-        }
+  public void stop() {
+    synchronized (this) {
+      if (stopRequested) {
+        return;
+      }
+      stopRequested = true;
     }
-  
+    try {
+      exitActiveServices();
+    } catch (ServiceFailedException e) {
+      LOG.warn("Encountered exception while exiting state ", e);
+    } finally {
+      stopCommonServices();
+      if (metrics != null) {
+        metrics.shutdown();
+      }
+      if (namesystem != null) {
+        namesystem.shutdown();
+      }
+    }
+  }
+
 
   synchronized boolean isStopRequested() {
     return stopRequested;
@@ -710,7 +697,7 @@ public class NameNode {
    * @throws IOException
    */
   private static boolean formatHdfs(Configuration conf, boolean force,
-      boolean isInteractive) throws IOException {
+                                    boolean isInteractive) throws IOException {
     initializeGenericKeys(conf);
     checkAllowFormat(conf);
 
@@ -753,8 +740,8 @@ public class NameNode {
     if (UserGroupInformation.isSecurityEnabled()) {
       InetSocketAddress socAddr = getAddress(conf);
       SecurityUtil
-              .login(conf, DFS_NAMENODE_KEYTAB_FILE_KEY, DFS_NAMENODE_USER_NAME_KEY,
-                      socAddr.getHostName());
+          .login(conf, DFS_NAMENODE_KEYTAB_FILE_KEY, DFS_NAMENODE_USER_NAME_KEY,
+              socAddr.getHostName());
     }
 
     // if clusterID is not provided - see if you can find the current one
@@ -801,27 +788,27 @@ public class NameNode {
       if (StartupOption.SET_BLOCK_REPORT_PROCESS_SIZE.getName().equalsIgnoreCase(cmd)) {
         startOpt = StartupOption.SET_BLOCK_REPORT_PROCESS_SIZE;
         String msg = "Specify a maximum number of blocks that the NameNodes can process for block reporting.";
-            if ((i + 1) >= argsLen) {
-              // if no of blks not specified then return null
-              
-              LOG.fatal(msg);
-              return null;
-            }
-            // Make sure an id is specified and not another flag
-            long noOfBlks = 0;
-            try{
-              noOfBlks = Long.parseLong(args[i+1]);
-              if(noOfBlks < 100000){
-                LOG.fatal("The number should be >= 100K. ");
-              return null;
-              }
-            }catch(NumberFormatException e){
-              return null;
-            }
-            startOpt.setMaxBlkRptProcessSize(noOfBlks);
-            return startOpt;
+        if ((i + 1) >= argsLen) {
+          // if no of blks not specified then return null
+
+          LOG.fatal(msg);
+          return null;
+        }
+        // Make sure an id is specified and not another flag
+        long noOfBlks = 0;
+        try {
+          noOfBlks = Long.parseLong(args[i + 1]);
+          if (noOfBlks < 100000) {
+            LOG.fatal("The number should be >= 100K. ");
+            return null;
+          }
+        } catch (NumberFormatException e) {
+          return null;
+        }
+        startOpt.setMaxBlkRptProcessSize(noOfBlks);
+        return startOpt;
       }
-      
+
       if (StartupOption.FORMAT.getName().equalsIgnoreCase(cmd)) {
         startOpt = StartupOption.FORMAT;
         for (i = i + 1; i < argsLen; i++) {
@@ -845,7 +832,7 @@ public class NameNode {
             }
             startOpt.setClusterId(clusterId);
           }
-          
+
           if (args[i].equalsIgnoreCase(StartupOption.FORCE.getName())) {
             startOpt.setForceFormat(true);
           }
@@ -950,7 +937,7 @@ public class NameNode {
       }
       case SET_BLOCK_REPORT_PROCESS_SIZE:
         HdfsVariables.setBrLbMasBlkPerMin(startOpt.getMaxBlkRptProcessSize());
-        LOG.fatal("Set block processing size to "+startOpt.getMaxBlkRptProcessSize());
+        LOG.fatal("Set block processing size to " + startOpt.getMaxBlkRptProcessSize());
         return null;
       case FORMAT: {
         boolean aborted = formatHdfs(conf, startOpt.getForceFormat(),
@@ -1092,33 +1079,33 @@ public class NameNode {
    * Returns the id of this namenode
    */
   public long getId() {
-    return leaderElection.getCurrentId();
+    return leaderElectionService.getCurrentID();
   }
 
   /**
-   * Return the {@link LeaderElection} object.
+   * Return the {@link NDBLeaderElection} object.
    *
-   * @return {@link LeaderElection} object.
+   * @return {@link NDBLeaderElection} object.
    */
-  public LeaderElection getLeaderElectionInstance() {
-    return leaderElection;
+  public LeaderElectionService getLeaderElectionInstance() {
+    return leaderElectionService;
   }
 
   public boolean isLeader() {
-    if (leaderElection != null) {
-      return leaderElection.isLeader();
+    if (leaderElectionService != null) {
+      return leaderElectionService.isLeader();
     } else {
       return false;
     }
   }
 
   public ActiveNode getNextNamenodeToSendBlockReport(final long noOfBlks) throws IOException {
-    if(leaderElection.isLeader()) {
-      LOG.debug("NN Id: "+leaderElection.getCurrentId()+") Received request to assign work ("+noOfBlks+" blks) ");
-      ActiveNode an = brTrackingService.assignWork(leaderElection.getActiveNamenodes(), noOfBlks);
+    if (leaderElectionService.isLeader()) {
+      LOG.debug("NN Id: " + leaderElectionService.getCurrentID() + ") Received request to assign work (" + noOfBlks + " blks) ");
+      ActiveNode an = brTrackingService.assignWork(leaderElectionService.getActiveNamenodes(), noOfBlks);
       return an;
-    }else{
-      String msg = "NN Id: "+leaderElection.getCurrentId()+") Received request to assign work ("+noOfBlks+" blks). Returning null as I am not the leader NN";
+    } else {
+      String msg = "NN Id: " + leaderElectionService.getCurrentID() + ") Received request to assign work (" + noOfBlks + " blks). Returning null as I am not the leader NN";
       LOG.debug(msg);
       throw new BRLoadBalancingException(msg);
     }
@@ -1135,7 +1122,7 @@ public class NameNode {
   }
 
   public static boolean isNameNodeAlive(Collection<ActiveNode> activeNamenodes,
-      long namenodeId) {
+                                        long namenodeId) {
     if (activeNamenodes == null) {
       // We do not know yet, be conservative
       return true;
@@ -1150,36 +1137,47 @@ public class NameNode {
   }
 
   public long getLeCurrentId() {
-    return leaderElection.getCurrentId();
+    return leaderElectionService.getCurrentID();
   }
 
   public SortedActiveNodeList getActiveNameNodes() {
-    return leaderElection.getActiveNamenodes();
+    return leaderElectionService.getActiveNamenodes();
   }
-  
-  private void startLeaderElectionService() throws IOException {
-    // Initialize the leader election algorithm (only once rpc server is
-    // created and httpserver is started)
-    long leadercheckInterval =
-        conf.getInt(DFSConfigKeys.DFS_LEADER_CHECK_INTERVAL_IN_MS_KEY,
-            DFSConfigKeys.DFS_LEADER_CHECK_INTERVAL_IN_MS_DEFAULT);
-    int missedHeartBeatThreshold =
-        conf.getInt(DFSConfigKeys.DFS_LEADER_MISSED_HB_THRESHOLD_KEY,
-            DFSConfigKeys.DFS_LEADER_MISSED_HB_THRESHOLD_DEFAULT);
-    int leIncrement = conf.getInt(DFSConfigKeys.DFS_LEADER_TP_INCREMENT_KEY,
-        DFSConfigKeys.DFS_LEADER_TP_INCREMENT_DEFAULT);
 
-    leaderElection =
-        new LeaderElection(new HdfsLeDescriptorFactory(), leadercheckInterval,
-            missedHeartBeatThreshold, leIncrement,
-            httpServer.getHttpAddress().getAddress().getHostAddress() + ":" +
-                httpServer.getHttpAddress().getPort(),
-            rpcServer.getRpcAddress().getAddress().getHostAddress() + ":" +
-                rpcServer.getRpcAddress().getPort());
-    leaderElection.start();
+  private void startHopsServices(Configuration conf) throws IOException {
+    boolean testMode = conf.getBoolean(DFSConfigKeys.DFS_HOPS_SERVICES_TEST_MODE, false);
+    if(!testMode) {
+      // Initialize the leader election algorithm (only once rpc server is
+      // created and httpserver is started)
+      long leadercheckInterval =
+          conf.getInt(DFSConfigKeys.DFS_LEADER_CHECK_INTERVAL_IN_MS_KEY,
+              DFSConfigKeys.DFS_LEADER_CHECK_INTERVAL_IN_MS_DEFAULT);
+      int missedHeartBeatThreshold =
+          conf.getInt(DFSConfigKeys.DFS_LEADER_MISSED_HB_THRESHOLD_KEY,
+              DFSConfigKeys.DFS_LEADER_MISSED_HB_THRESHOLD_DEFAULT);
+      int leIncrement = conf.getInt(DFSConfigKeys.DFS_LEADER_TP_INCREMENT_KEY,
+          DFSConfigKeys.DFS_LEADER_TP_INCREMENT_DEFAULT);
+
+      leaderElectionService = new NDBLeaderElection(
+          new HdfsLeDescriptorFactory(),
+          leadercheckInterval,
+          missedHeartBeatThreshold,
+          leIncrement,
+          httpServer.getHttpAddress().getAddress().getHostAddress() + ":" + httpServer.getHttpAddress().getPort(),
+          rpcServer.getRpcAddress().getAddress().getHostAddress() + ":" + rpcServer.getRpcAddress().getPort()
+      );
+    } else {
+      leaderElectionService = new MockLeaderElection(
+          rpcServer.getRpcAddress().getAddress().getHostAddress(),
+          rpcServer.getRpcAddress().getPort()
+      );
+    }
+
+
+    leaderElectionService.start();
 
     try {
-      leaderElection.waitActive();
+      leaderElectionService.waitStarted();
     } catch (InterruptedException e) {
       LOG.warn("NN was interrupted");
     }

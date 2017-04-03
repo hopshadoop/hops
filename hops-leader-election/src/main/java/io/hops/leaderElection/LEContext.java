@@ -80,7 +80,7 @@ public class LEContext {
     context.leader = -1;
     context.time_period = 0;
     context.history = new ArrayList<HashMap<Long, LeDescriptor>>();
-    context.id = LeaderElection.LEADER_INITIALIZATION_ID;
+    context.id = NDBLeaderElection.LEADER_INITIALIZATION_ID;
     context.init_phase = false;
     context.max_missed_hb_threshold = 2;
     context.memberShip = null;
