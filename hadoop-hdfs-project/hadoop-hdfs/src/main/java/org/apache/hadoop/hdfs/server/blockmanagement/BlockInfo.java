@@ -228,7 +228,9 @@ public class BlockInfo extends Block {
       throws StorageException, TransactionContextException {
     List<Replica> replicas = getReplicasNoCheck();
     getDatanodes(datanodeMgr, replicas);
-    Collections.sort(replicas, Replica.Order.ByStorageId);
+    //getReplicasNoCheck return a sorted list of replicas.
+    //There is no need to sort the list again after removing the dead replicas.
+    //Collections.sort(replicas, Replica.Order.ByStorageId);
     return replicas;
   }
 

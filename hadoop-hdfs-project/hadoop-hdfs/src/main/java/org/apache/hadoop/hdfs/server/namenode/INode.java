@@ -696,7 +696,7 @@ public abstract class INode implements Comparable<byte[]> {
   public void setAccessTime(long atime)
       throws TransactionContextException, StorageException {
     setAccessTimeNoPersistance(atime);
-    if (isPathMetaEnabled()) {
+    if (isPathMetaEnabled()) { // log the operation for epipe
       AccessTimeLogDataAccess da = (AccessTimeLogDataAccess)
           HdfsStorageFactory.getDataAccess(AccessTimeLogDataAccess.class);
       int userId = -1; // TODO get userId
