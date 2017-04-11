@@ -352,7 +352,8 @@ public class LeaseManager {
     for (final LeasePath oldPath : paths) {
       final int holderId = oldPath.getHolderId();
       final LeasePath newpath =
-          new LeasePath(dst + oldPath.getPath().substring(len), holderId);
+          new LeasePath(dst + oldPath.getPath().substring(len), holderId,
+              oldPath.getLastBlockId(), oldPath.getPenultimateBlockId());
       if (LOG.isDebugEnabled()) {
         LOG.debug("changeLease: replacing " + oldPath + " with " + newpath);
       }

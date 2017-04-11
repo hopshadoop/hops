@@ -19,7 +19,6 @@ package io.hops.transaction.context;
 
 import com.google.common.base.Predicate;
 import com.google.common.collect.Collections2;
-import com.google.common.primitives.Ints;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.common.FinderType;
@@ -33,7 +32,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,13 +39,6 @@ import java.util.Map;
 public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
 
   private final static int DEFAULT_NUM_BLOCKS_PER_INODE = 10;
-  private final static Comparator<BlockInfo> BLOCK_INDEX_COMPARTOR =
-      new Comparator<BlockInfo>() {
-        @Override
-        public int compare(BlockInfo o1, BlockInfo o2) {
-          return Ints.compare(o1.getBlockIndex(), o2.getBlockIndex());
-        }
-      };
 
   private final Map<Integer, List<BlockInfo>> inodeBlocks =
       new HashMap<Integer, List<BlockInfo>>();
@@ -224,6 +215,7 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
       aboutToAccessStorage(bFinder, params);
       result = dataAccess.findById(blockId, inodeId);
       gotFromDB(blockId, result);
+      updateInodeBlocks(result);
       miss(bFinder, result, "bid", blockId, "inodeId", inodeId);
     }
     return result;
@@ -240,7 +232,7 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
                 return input.getInodeId() == inodeId;
               }
             });
-    BlockInfo result = Collections.max(notRemovedBlks, BLOCK_INDEX_COMPARTOR);
+    BlockInfo result = Collections.max(notRemovedBlks, BlockInfo.Order.ByBlockIndex);
     hit(bFinder, result, "inodeId", inodeId);
     return result;
   }
@@ -287,6 +279,9 @@ public class BlockInfoContext extends BaseEntityContext<Long, BlockInfo> {
   }
 
   private void updateInodeBlocks(BlockInfo newBlock) {
+    if(newBlock == null)
+      return;
+
     List<BlockInfo> blockList = inodeBlocks.get(newBlock.getInodeId());
 
     if (blockList != null) {

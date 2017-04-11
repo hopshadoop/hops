@@ -42,16 +42,7 @@ class IndividualBlockLock extends BaseIndividualBlockLock {
 
   @Override
   protected void acquire(TransactionLocks locks) throws IOException {
-    if (blockId != NON_EXISTING_BLOCK) {
-      BlockInfo result =
-          acquireLock(DEFAULT_LOCK_TYPE, BlockInfo.Finder.ByBlockIdAndINodeId,
-              blockId, inodeId);
-      if (result != null) {
-        blocks.add(result);
-      } else {
-        announceBlockDoesNotExist();
-      }
-    }
+    readBlock(blockId, inodeId);
   }
 
   private void announceBlockDoesNotExist() throws TransactionContextException {
@@ -64,4 +55,17 @@ class IndividualBlockLock extends BaseIndividualBlockLock {
         (HdfsTransactionContextMaintenanceCmds.EmptyFile, inodeFileId);
   }
 
+  protected void readBlock(long blkId, int indeId)
+      throws IOException {
+    if (blkId != NON_EXISTING_BLOCK || blkId > 0) {
+      BlockInfo result =
+          acquireLock(DEFAULT_LOCK_TYPE, BlockInfo.Finder.ByBlockIdAndINodeId,
+              blkId, indeId);
+      if (result != null) {
+        blocks.add(result);
+      } else {
+        announceBlockDoesNotExist();
+      }
+    }
+  }
 }

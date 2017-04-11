@@ -39,4 +39,12 @@ public interface MutableBlockCollection extends BlockCollection {
    */
   public BlockInfoUnderConstruction setLastBlock(BlockInfo lastBlock,
       DatanodeDescriptor[] locations) throws IOException, StorageException;
+
+  /**
+   * Get block at the specified index
+   * @param index
+   * @return blockinfo
+   */
+  public BlockInfo getBlock(int index)
+      throws TransactionContextException, StorageException;
 }

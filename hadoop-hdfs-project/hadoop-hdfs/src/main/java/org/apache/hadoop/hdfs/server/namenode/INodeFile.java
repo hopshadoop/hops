@@ -107,18 +107,12 @@ public class INodeFile extends INode implements BlockCollection {
   @Override
   public BlockInfo[] getBlocks()
       throws StorageException, TransactionContextException {
-    if (getId() == INode.NON_EXISTING_ID) {
+    List<BlockInfo> blocks = getBlocksOrderedByIndex();
+    if(blocks == null){
       return BlockInfo.EMPTY_ARRAY;
     }
-    List<BlockInfo> blocks = (List<BlockInfo>) EntityManager
-        .findList(BlockInfo.Finder.ByINodeId, id);
-    if (blocks != null) {
-      Collections.sort(blocks, BlockInfo.Order.ByBlockIndex);
-      BlockInfo[] blks = new BlockInfo[blocks.size()];
-      return blocks.toArray(blks);
-    } else {
-      return BlockInfo.EMPTY_ARRAY;
-    }
+    BlockInfo[] blks = new BlockInfo[blocks.size()];
+    return blocks.toArray(blks);
   }
 
   /**
@@ -295,6 +289,14 @@ public class INodeFile extends INode implements BlockCollection {
     INodeFileUnderConstruction ucfile =
         new INodeFileUnderConstruction(this, clientName, clientMachine,
             clientNode);
+    BlockInfo lastBlock = getLastBlock();
+    BlockInfo penultimateBlock = getPenultimateBlock();
+    if(lastBlock != null){
+      ucfile.setLastBlockId(lastBlock.getBlockId());
+    }
+    if(penultimateBlock != null){
+      ucfile.setPenultimateBlockId(penultimateBlock.getBlockId());
+    }
     save(ucfile);
     return ucfile;
   }
@@ -333,4 +335,20 @@ public class INodeFile extends INode implements BlockCollection {
     setSizeNoPersistence(this.computeFileSize(true));
     save();
   }
+
+  protected List<BlockInfo> getBlocksOrderedByIndex()
+      throws TransactionContextException, StorageException {
+    if (getId() == INode.NON_EXISTING_ID) {
+      return null;
+    }
+    List<BlockInfo> blocks = (List<BlockInfo>) EntityManager
+        .findList(BlockInfo.Finder.ByINodeId, id);
+    if (blocks != null) {
+      Collections.sort(blocks, BlockInfo.Order.ByBlockIndex);
+      return blocks;
+    } else {
+      return null;
+    }
+  }
+
 }

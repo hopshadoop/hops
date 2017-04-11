@@ -611,7 +611,7 @@ public class BlockManager {
     LOG.debug(
         "commitOrCompleteLastBlock. Commited Block " + lastBlock.getBlockId());
     if (countNodes(lastBlock).liveReplicas() >= minReplication) {
-      completeBlock(bc, bc.numBlocks() - 1, false);
+      completeBlock(bc, lastBlock.getBlockIndex(), false);
       LOG.debug("commitOrCompleteLastBlock. Completed Block " +
           lastBlock.getBlockId());
     } else {
@@ -637,7 +637,7 @@ public class BlockManager {
     if (blkIndex < 0) {
       return null;
     }
-    BlockInfo curBlock = bc.getBlocks()[blkIndex];
+    BlockInfo curBlock = bc.getBlock(blkIndex);
     if (curBlock.isComplete()) {
       return curBlock;
     }
@@ -671,11 +671,9 @@ public class BlockManager {
   private BlockInfo completeBlock(final MutableBlockCollection bc,
       final BlockInfo block, boolean force)
       throws IOException, StorageException {
-    BlockInfo[] fileBlocks = bc.getBlocks();
-    for (int idx = 0; idx < fileBlocks.length; idx++) {
-      if (fileBlocks[idx] == block) {
-        return completeBlock(bc, idx, force);
-      }
+    BlockInfo blk = bc.getBlock(block.getBlockIndex());
+    if(blk == block){
+      return completeBlock(bc, blk.getBlockIndex(), force);
     }
     return block;
   }
@@ -3232,7 +3230,7 @@ public class BlockManager {
                 (ReceivedDeletedBlockInfo) getParams()[0];
             locks.add(
                 lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier))
-                .add(lf.getBlockLock(rdbi.getBlock().getBlockId(),
+                .add(lf.getIndividualBlockLock(rdbi.getBlock().getBlockId(),
                     inodeIdentifier))
                 .add(lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UR));
             if (!rdbi.isDeletedBlock()) {
@@ -3989,7 +3987,7 @@ public class BlockManager {
     if (blkIndex < 0) {
       return null;
     }
-    BlockInfo curBlock = bc.getBlocks()[blkIndex];
+    BlockInfo curBlock = bc.getBlock(blkIndex);
     LOG.debug("tryToCompleteBlock. blkId = " + curBlock.getBlockId());
     if (curBlock.isComplete()) {
       return curBlock;
